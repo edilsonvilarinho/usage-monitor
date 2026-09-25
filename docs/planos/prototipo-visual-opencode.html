@@ -2223,6 +2223,8 @@ O app fechou inesperadamente.
       <div class="win" style="margin:0"><div class="titlebar"><span class="t">Configurações</span><span class="wbtn close">×</span></div></div>
     </div>
     <p class="note">Janelas continuam <em>undecorated</em>, com área arrastável, geometria persistida, sempre-visível e opacidade preservados. Altura da barra cai de 42 para 34dp; o raio da janela acompanha a escala nova.</p>
+    <p class="note"><b>Abrir e fechar as nove janelas modais</b> (<code>AppDialogWindow</code>): a janela nasce na primeira abertura e depois só se esconde — recriá-la custava 200–460&nbsp;ms até o primeiro quadro, reexibi-la custa 30–46&nbsp;ms. Ela aparece <b>transparente</b>, espera o primeiro quadro pintado e só então esmaece de 0 a 1 em 180ms com o conteúdo crescendo de 0,96 a 1 pela mola GENTLE. ×, Alt+F4, Esc e o "Fechar" do conteúdo saem pelo mesmo caminho: 140ms de fade de volta a 0,96. Com "Reduzir animações" ou sem translucidez de janela, troca seca.</p>
+    <p class="note"><b>Diálogo dentro da janela</b> (<code>AppDialog</code>, no lugar do <code>AlertDialog</code> do Material): fundo escurecendo por fade e cartão <code>surface</code> de raio 10 entrando com fade e escala 0,96 → 1, a mesma partida do menu. Saída seca — quem fecha é a ação que o usuário acabou de disparar.</p>
   </div>
 </div>
 

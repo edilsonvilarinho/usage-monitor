@@ -3,18 +3,11 @@ package com.usagemonitor.presentation.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import com.usagemonitor.DEFAULT_MODAL_MIN_HEIGHT
-import com.usagemonitor.ApplyWindowMinimumSize
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
-import com.usagemonitor.presentation.ui.theme.AppTheme
-import com.usagemonitor.presentation.ui.theme.AppThemePreset
-import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.fitWindowSize
 import com.usagemonitor.uiScaleFactor
 import com.usagemonitor.update.ReleaseNotesController
@@ -26,62 +19,47 @@ import com.usagemonitor.update.ReleaseNotesController
  * está no limite do backend JVM. O `main()` ganha uma chamada.
  *
  * Sem notas não há janela — e não uma janela vazia: lista vazia numa tela de
- * novidades afirma que a versão não trouxe nada.
+ * novidades afirma que a versão não trouxe nada. Depois de dispensadas, as
+ * notas lidas continuam na janela escondida pelo tempo da saída: o controlador
+ * zera as notas no clique, e sem elas a janela esmaeceria em branco.
  */
 @Composable
 internal fun ReleaseNotesWindow(
     controller: ReleaseNotesController,
     language: AppLanguage,
-    themePreset: AppThemePreset,
-    uiScalePercent: Int,
-    motion: AppMotionPolicy,
-    iconImage: Painter?,
-    screenWorkArea: ScreenWorkArea,
+    environment: ModalWindowEnvironment,
     onOpenReleasePage: (String) -> Unit
 ) {
-    val notes = controller.notes ?: return
+    val notes = rememberLastNonNull(controller.notes) ?: return
     val title = releaseNotesTitle(notes.version, language == AppLanguage.PT)
+    // Mesmo tratamento das outras janelas: o literal acompanha a escala, porque
+    // a 150% o conteúdo cresce e a moldura fixa o espremeria, e é preso à área
+    // útil porque o diálogo é `undecorated`.
     val windowState = rememberDialogState(
         size = fitWindowSize(
             DpSize(
-                width = 560.dp * uiScaleFactor(uiScalePercent),
-                height = 520.dp * uiScaleFactor(uiScalePercent)
+                width = 560.dp * uiScaleFactor(environment.uiScalePercent),
+                height = 520.dp * uiScaleFactor(environment.uiScalePercent)
             ),
-            screenWorkArea
+            environment.screenWorkArea
         )
     )
-    DialogWindow(
-        onCloseRequest = { controller.onDismiss() },
+    AppDialogWindow(
+        visible = controller.notes != null,
         title = title,
-        icon = iconImage,
-        // Mesmo tratamento das outras janelas: o literal acompanha a escala,
-        // porque a 150% o conteúdo cresce e a moldura fixa o espremeria, e é
-        // preso à área útil porque o diálogo é `undecorated`.
         state = windowState,
-        resizable = true,
-        undecorated = true
+        environment = environment,
+        diagnosticName = "novidades da versão",
+        minWidthDp = 320,
+        minHeightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+        onCloseRequest = { controller.onDismiss() }
     ) {
-        ApplyWindowMinimumSize(
-            window = window,
-            widthDp = 320,
-            heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
-            uiScalePercent = uiScalePercent,
-            workArea = screenWorkArea
+        ReleaseNotesContent(
+            notes = notes,
+            language = language,
+            onOpenReleasePage = { onOpenReleasePage(notes.releasePageUrl) },
+            onClose = { controller.onDismiss() },
+            modifier = Modifier.fillMaxSize()
         )
-        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
-            DesktopDialogFrame(
-                title = title,
-                iconPainter = iconImage,
-                onCloseRequest = { controller.onDismiss() }
-            ) {
-                ReleaseNotesContent(
-                    notes = notes,
-                    language = language,
-                    onOpenReleasePage = { onOpenReleasePage(notes.releasePageUrl) },
-                    onClose = { controller.onDismiss() },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
     }
 }

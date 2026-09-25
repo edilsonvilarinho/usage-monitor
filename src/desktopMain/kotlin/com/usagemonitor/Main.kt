@@ -21,7 +21,6 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.Tray
@@ -143,7 +142,10 @@ import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
-import com.usagemonitor.presentation.ui.DesktopDialogFrame
+import com.usagemonitor.presentation.ui.AppDialogWindow
+import com.usagemonitor.presentation.ui.MODAL_CLOSE_SETTLE_MILLIS
+import com.usagemonitor.presentation.ui.ModalWindowEnvironment
+import com.usagemonitor.presentation.ui.rememberLastNonNull
 import com.usagemonitor.presentation.ui.BugReportHost
 import com.usagemonitor.presentation.ui.crashPrefillDescription
 import com.usagemonitor.presentation.ui.DesktopWindowFrame
@@ -1017,6 +1019,9 @@ private fun runUsageMonitor(
             screenWorkArea
         )
     )
+    // 820 de largura: as Configurações passaram a ter navegação lateral de
+    // 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito demais para
+    // as linhas de rótulo + controle das seções de Time.
     val settingsWindowState = rememberDialogState(
         size = fitWindowSize(
             DpSize(
@@ -1289,6 +1294,8 @@ private fun runUsageMonitor(
     val alertSettingsState by alertSettingsFlow.collectAsState()
     var monthlyBudgetMicros by remember { mutableStateOf(readPersistedBudgetMicros(settings)) }
     var isSettingsDialogOpen by remember { mutableStateOf(false) }
+    // Passagem de uma janela modal para outra coisa que precisa dela fora da tela.
+    val modalHandOffScope = rememberCoroutineScope()
     var isHelpDialogOpen by remember { mutableStateOf(false) }
     var settingsOpenGeneration by remember { mutableStateOf(0) }
 
@@ -2103,214 +2110,142 @@ private fun runUsageMonitor(
         }
     }
 
-    historyDialogSource?.let { source ->
-        Window(
-            onCloseRequest = { historyDialogSource = null },
-            title = historyWindowTitle(source, language),
-            icon = iconImage,
+    // O que as nove janelas modais recebem igual, montado uma vez: esquecer a
+    // escala ou o movimento numa delas renderizaria errado sem erro nenhum.
+    val modalEnvironment = ModalWindowEnvironment(
+        iconImage = iconImage,
+        themePreset = themePreset,
+        uiScalePercent = uiScalePercent,
+        motion = appMotion,
+        screenWorkArea = screenWorkArea,
+        breadcrumbs = breadcrumbs
+    )
+
+    // A janela do histórico continua existindo, escondida, depois de fechada; o
+    // título e a fonte são os da última abertura, senão ela esmaeceria vazia.
+    val historySource = rememberLastNonNull(historyDialogSource)
+    if (historySource != null) {
+        AppDialogWindow(
+            visible = historyDialogSource != null,
+            title = historyWindowTitle(historySource, language),
             state = historyWindowState,
-            resizable = true,
-            undecorated = true
+            environment = modalEnvironment,
+            diagnosticName = "histórico",
+            minWidthDp = 320,
+            minHeightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+            onCloseRequest = { historyDialogSource = null },
+            openGeneration = historyOpenGeneration
         ) {
-            LaunchedEffect(historyOpenGeneration) {
-                activateWindow(window)
-            }
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = historyWindowTitle(source, language),
-                    iconPainter = iconImage,
-                    windowState = historyWindowState,
-                    onCloseRequest = { historyDialogSource = null }
-                ) {
-                    HistoryScreen(
-                        viewModel = historyViewModel,
-                        language = language,
-                        onBack = { historyDialogSource = null },
-                        focusedSource = source,
-                        showSourceSelector = false
-                    )
-                }
-            }
-        }
-    }
-
-    if (isCliSessionsOpen) {
-        val cliSessionsTitle = cliSessionsWindowTitle(language, cliSessionsProfileLabel)
-        // Sem avisar o ViewModel, o laço ao vivo continuaria indexando de cinco em
-        // cinco segundos com a janela fechada.
-        val closeCliSessions = {
-            isCliSessionsOpen = false
-            cliSessionsViewModel.closeWindow()
-        }
-        Window(
-            onCloseRequest = closeCliSessions,
-            title = cliSessionsTitle,
-            icon = iconImage,
-            state = cliSessionsWindowState,
-            resizable = true,
-            undecorated = true
-        ) {
-            LaunchedEffect(cliSessionsOpenGeneration) {
-                activateWindow(window)
-            }
-            ApplyWindowMinimumSize(
-                window = window,
-                widthDp = CLI_SESSIONS_MIN_WINDOW_WIDTH_DP,
-                heightDp = CLI_SESSIONS_MIN_WINDOW_HEIGHT_DP,
-                uiScalePercent = uiScalePercent,
-                workArea = screenWorkArea
+            HistoryScreen(
+                viewModel = historyViewModel,
+                language = language,
+                onBack = { historyDialogSource = null },
+                focusedSource = historySource,
+                showSourceSelector = false
             )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = cliSessionsTitle,
-                    iconPainter = iconImage,
-                    windowState = cliSessionsWindowState,
-                    onCloseRequest = closeCliSessions
-                ) {
-                    CliSessionsScreen(
-                        viewModel = cliSessionsViewModel,
-                        language = language
-                    )
-                }
-            }
         }
     }
 
-    if (isCodexCliSessionsOpen) {
-        val codexCliSessionsTitle = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI sessions"
-        val closeCodexCliSessions = {
-            isCodexCliSessionsOpen = false
-            codexCliSessionsViewModel.closeWindow()
-        }
-        Window(
-            onCloseRequest = closeCodexCliSessions,
-            title = codexCliSessionsTitle,
-            icon = iconImage,
-            state = codexCliSessionsWindowState,
-            resizable = true,
-            undecorated = true
-        ) {
-            LaunchedEffect(codexCliSessionsOpenGeneration) {
-                activateWindow(window)
-            }
-            ApplyWindowMinimumSize(
-                window = window,
-                widthDp = 820,
-                heightDp = 520,
-                uiScalePercent = uiScalePercent,
-                workArea = screenWorkArea
-            )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = codexCliSessionsTitle,
-                    iconPainter = iconImage,
-                    windowState = codexCliSessionsWindowState,
-                    onCloseRequest = closeCodexCliSessions
-                ) {
-                    CodexCliSessionsScreen(
-                        viewModel = codexCliSessionsViewModel,
-                        language = language
-                    )
-                }
-            }
-        }
+    // Sem avisar o ViewModel, o laço ao vivo continuaria indexando de cinco em
+    // cinco segundos com a janela fechada.
+    val closeCliSessions = {
+        isCliSessionsOpen = false
+        cliSessionsViewModel.closeWindow()
+    }
+    AppDialogWindow(
+        visible = isCliSessionsOpen,
+        title = cliSessionsWindowTitle(language, cliSessionsProfileLabel),
+        state = cliSessionsWindowState,
+        environment = modalEnvironment,
+        diagnosticName = "sessões CLI",
+        minWidthDp = CLI_SESSIONS_MIN_WINDOW_WIDTH_DP,
+        minHeightDp = CLI_SESSIONS_MIN_WINDOW_HEIGHT_DP,
+        onCloseRequest = closeCliSessions,
+        openGeneration = cliSessionsOpenGeneration
+    ) {
+        CliSessionsScreen(
+            viewModel = cliSessionsViewModel,
+            language = language
+        )
     }
 
-    if (isTeamUsageOpen) {
-        val teamTitle = teamUsageWindowTitle(
+    val closeCodexCliSessions = {
+        isCodexCliSessionsOpen = false
+        codexCliSessionsViewModel.closeWindow()
+    }
+    AppDialogWindow(
+        visible = isCodexCliSessionsOpen,
+        title = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI sessions",
+        state = codexCliSessionsWindowState,
+        environment = modalEnvironment,
+        diagnosticName = "sessões Codex CLI",
+        minWidthDp = 820,
+        minHeightDp = 520,
+        onCloseRequest = closeCodexCliSessions,
+        openGeneration = codexCliSessionsOpenGeneration
+    ) {
+        CodexCliSessionsScreen(
+            viewModel = codexCliSessionsViewModel,
+            language = language
+        )
+    }
+
+    // Sem avisar o ViewModel, o laço ao vivo continuaria consultando o
+    // servidor de cinco em cinco segundos com a janela fechada.
+    val closeTeamUsage = {
+        isTeamUsageOpen = false
+        teamUsageViewModel.closeWindow()
+    }
+    AppDialogWindow(
+        visible = isTeamUsageOpen,
+        title = teamUsageWindowTitle(
             language = language,
             accountLabel = teamUsageAccountLabel,
             isAdminOverview = teamUsageIsAdminOverview
+        ),
+        state = teamUsageWindowState,
+        environment = modalEnvironment,
+        diagnosticName = "uso do time",
+        minWidthDp = TEAM_USAGE_MIN_WINDOW_WIDTH_DP,
+        minHeightDp = TEAM_USAGE_MIN_WINDOW_HEIGHT_DP,
+        onCloseRequest = closeTeamUsage,
+        openGeneration = teamUsageOpenGeneration
+    ) {
+        TeamUsageScreen(
+            viewModel = teamUsageViewModel,
+            language = language,
+            // Mesma origem que a tela de presença usa logo abaixo: é ela que
+            // separa a sessão desta máquina da de um colega.
+            localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
         )
-        // Sem avisar o ViewModel, o laço ao vivo continuaria consultando o
-        // servidor de cinco em cinco segundos com a janela fechada.
-        val closeTeamUsage = {
-            isTeamUsageOpen = false
-            teamUsageViewModel.closeWindow()
-        }
-        Window(
-            onCloseRequest = closeTeamUsage,
-            title = teamTitle,
-            icon = iconImage,
-            state = teamUsageWindowState,
-            resizable = true,
-            undecorated = true
-        ) {
-            LaunchedEffect(teamUsageOpenGeneration) {
-                activateWindow(window)
-            }
-            ApplyWindowMinimumSize(
-                window = window,
-                widthDp = TEAM_USAGE_MIN_WINDOW_WIDTH_DP,
-                heightDp = TEAM_USAGE_MIN_WINDOW_HEIGHT_DP,
-                uiScalePercent = uiScalePercent,
-                workArea = screenWorkArea
-            )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = teamTitle,
-                    iconPainter = iconImage,
-                    windowState = teamUsageWindowState,
-                    onCloseRequest = closeTeamUsage
-                ) {
-                    TeamUsageScreen(
-                        viewModel = teamUsageViewModel,
-                        language = language,
-                        // Mesma origem que a tela de presença usa logo abaixo: é
-                        // ela que separa a sessão desta máquina da de um colega.
-                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() }
-                    )
-                }
-            }
-        }
     }
 
-    if (isTeamPresenceOpen) {
-        val presenceTitle = teamPresenceWindowTitle(
+    // Mesma razão de `closeTeamUsage`.
+    val closeTeamPresence = {
+        isTeamPresenceOpen = false
+        teamPresenceViewModel.closeWindow()
+    }
+    AppDialogWindow(
+        visible = isTeamPresenceOpen,
+        title = teamPresenceWindowTitle(
             language = language,
             accountLabel = teamPresenceAccountLabel,
             isAdminOverview = teamPresenceIsAdminOverview
+        ),
+        state = teamPresenceWindowState,
+        environment = modalEnvironment,
+        diagnosticName = "presença do time",
+        minWidthDp = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP,
+        minHeightDp = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP,
+        onCloseRequest = closeTeamPresence,
+        openGeneration = teamPresenceOpenGeneration
+    ) {
+        TeamPresenceScreen(
+            viewModel = teamPresenceViewModel,
+            language = language,
+            localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
+            canManage = teamSettings.isAdminMode
         )
-        // Sem avisar o ViewModel, o laço ao vivo continuaria consultando o
-        // servidor de cinco em cinco segundos com a janela fechada.
-        val closeTeamPresence = {
-            isTeamPresenceOpen = false
-            teamPresenceViewModel.closeWindow()
-        }
-        Window(
-            onCloseRequest = closeTeamPresence,
-            title = presenceTitle,
-            icon = iconImage,
-            state = teamPresenceWindowState,
-            resizable = true,
-            undecorated = true
-        ) {
-            LaunchedEffect(teamPresenceOpenGeneration) {
-                activateWindow(window)
-            }
-            ApplyWindowMinimumSize(
-                window = window,
-                widthDp = TEAM_PRESENCE_MIN_WINDOW_WIDTH_DP,
-                heightDp = TEAM_PRESENCE_MIN_WINDOW_HEIGHT_DP,
-                uiScalePercent = uiScalePercent,
-                workArea = screenWorkArea
-            )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = presenceTitle,
-                    iconPainter = iconImage,
-                    windowState = teamPresenceWindowState,
-                    onCloseRequest = closeTeamPresence
-                ) {
-                    TeamPresenceScreen(
-                        viewModel = teamPresenceViewModel,
-                        language = language,
-                        localDeviceId = teamSettings.deviceId.takeIf { it.isNotBlank() },
-                        canManage = teamSettings.isAdminMode
-                    )
-                }
-            }
-        }
     }
 
     // Sem notas ela não compõe nada; a decisão inteira mora no controlador.
@@ -2341,488 +2276,442 @@ private fun runUsageMonitor(
         )
     }
 
-    if (isHelpDialogOpen) {
-        HelpWindow(
-            language = language,
-            themePreset = themePreset,
-            uiScalePercent = uiScalePercent,
-            motion = appMotion,
-            iconImage = iconImage,
-            screenWorkArea = screenWorkArea,
-            onCloseRequest = { isHelpDialogOpen = false }
-        )
-    }
+    HelpWindow(
+        visible = isHelpDialogOpen,
+        language = language,
+        environment = modalEnvironment,
+        onCloseRequest = { isHelpDialogOpen = false }
+    )
 
     ReleaseNotesWindow(
         controller = releaseNotes,
         language = language,
-        themePreset = themePreset,
-        uiScalePercent = uiScalePercent,
-        motion = appMotion,
-        iconImage = iconImage,
-        screenWorkArea = screenWorkArea,
+        environment = modalEnvironment,
         onOpenReleasePage = { url -> appUpdateReleaseOpener.open(url) }
     )
 
-    if (isTeamKeysOpen) {
-        val keysTitle = if (language == AppLanguage.PT) {
-            "Chaves das contas"
-        } else {
-            "Account keys"
-        }
-        DialogWindow(
-            onCloseRequest = { isTeamKeysOpen = false },
-            title = keysTitle,
-            icon = iconImage,
-            // O tamanho literal acompanha a escala: a 150% o conteúdo cresce e a
-            // moldura fixa o espremeria. E é preso à área útil pelo mesmo motivo das
-            // janelas: o diálogo também é `undecorated`.
-            state = teamKeysWindowState,
-            resizable = true,
-            undecorated = true
-        ) {
-            ApplyWindowMinimumSize(
-                window = window,
-                widthDp = 320,
-                heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
-                uiScalePercent = uiScalePercent,
-                workArea = screenWorkArea
-            )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = keysTitle,
-                    iconPainter = iconImage,
-                    onCloseRequest = { isTeamKeysOpen = false }
-                ) {
-                    TeamKeysAdminScreen(
-                        viewModel = teamKeysViewModel,
-                        language = language
-                    )
-                }
-            }
-        }
+    AppDialogWindow(
+        visible = isTeamKeysOpen,
+        title = if (language == AppLanguage.PT) "Chaves das contas" else "Account keys",
+        state = teamKeysWindowState,
+        environment = modalEnvironment,
+        diagnosticName = "chaves das contas",
+        minWidthDp = 320,
+        minHeightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+        onCloseRequest = { isTeamKeysOpen = false }
+    ) {
+        TeamKeysAdminScreen(
+            viewModel = teamKeysViewModel,
+            language = language
+        )
     }
 
-    if (isSettingsDialogOpen) {
-        DialogWindow(
-            onCloseRequest = { isSettingsDialogOpen = false },
-            title = if (language == AppLanguage.PT) "Configurações" else "Settings",
-            icon = iconImage,
-            // 820 de largura: as Configurações passaram a ter navegação lateral
-            // de 150dp, e em 620 o conteúdo ficava com menos de 470 — estreito
-            // demais para as linhas de rótulo + controle das seções de Time.
-            state = settingsWindowState,
-            resizable = true,
-            undecorated = true
-        ) {
-            LaunchedEffect(settingsOpenGeneration) {
-                activateWindow(window)
-            }
-            ApplyWindowMinimumSize(
-                window = window,
-                widthDp = 320,
-                heightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
-                uiScalePercent = uiScalePercent,
-                workArea = screenWorkArea
-            )
-            AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = appMotion) {
-                DesktopDialogFrame(
-                    title = if (language == AppLanguage.PT) "Configurações" else "Settings",
-                    iconPainter = iconImage,
-                    onCloseRequest = { isSettingsDialogOpen = false }
-                ) {
-                    SettingsDialogContent(
-                        currentTheme = themePreset,
-                        currentLanguage = language,
-                        enabledApis = enabledApisState,
-                        configuredApiKeys = currentApiKeySettings.configuredSources(),
-                        autoStartEnabled = autoStartEnabled,
-                        alwaysOnTopEnabled = alwaysOnTopEnabled,
-                        cardsOnlyMode = cardsOnlyMode,
-                        hudMode = hudMode,
-                        windowOpacityPercent = windowOpacityPercent,
-                        windowOpacityEnabled = windowOpacitySupported,
-                        uiScalePercent = uiScalePercent,
-                        onUiScaleChange = { percent ->
-                            // Aviso e gravação não saem daqui pelo mesmo motivo da
-                            // opacidade: quem persiste é o coletor com debounce.
-                            uiScalePercent = clampUiScalePercent(percent)
-                        },
-                        reducedMotion = reducedMotion,
-                        onReducedMotionChange = { enabled ->
-                            reducedMotion = enabled
-                            persistReducedMotion(settings, enabled)
-                        },
-                        onReportBug = {
-                            // As Configurações fecham: o formulário mora na janela
-                            // principal, e a janela de Configurações ficaria por
-                            // cima dele -- e dentro da captura.
-                            isSettingsDialogOpen = false
-                            isBugReportOpen = true
-                            breadcrumbs.recordScreenOpened("relatório de bug")
-                        },
-                        onThemeChange = { selectedPreset ->
-                            themePreset = selectedPreset
-                            persistThemePreset(settings, selectedPreset)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.THEME))
-                        },
-                        onLanguageChange = { selectedLanguage ->
-                            language = selectedLanguage
-                            settings.putString(LANGUAGE_KEY, selectedLanguage.name)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.LANGUAGE))
-                        },
-                        onAutoStartChange = { enabled ->
-                            // O registro do Windows pode recusar a escrita; nesse
-                            // caso o estado volta ao que o sistema realmente tem e
-                            // o aviso precisa dizer que falhou.
-                            val result = AutoStartManager.setAutoStart(enabled)
-                            val applied = result.isSuccess
-                            val updatedState = if (applied) {
-                                enabled
-                            } else {
-                                AutoStartManager.isAutoStartEnabled()
-                            }
-                            autoStartEnabled = updatedState
-                            settings.putBoolean(AUTO_START_KEY, updatedState)
-                            reportSettingsSave(
-                                SettingsField.AUTO_START,
-                                applied,
-                                failureDetail = (result as? AutoStartResult.Failure)?.reason
-                            )
-                        },
-                        onAlwaysOnTopChange = { enabled ->
-                            alwaysOnTopEnabled = enabled
-                            settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
-                        },
-                        onCardsOnlyModeChange = { enabled ->
-                            setCardsOnlyMode(enabled)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
-                        },
-                        onHudModeChange = { enabled ->
-                            setHudMode(enabled)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.HUD_MODE))
-                        },
-                        autoUpdateEnabled = autoUpdate.isEnabled(),
-                        autoUpdateSupport = autoUpdate.support,
-                        autoUpdatePlatform = autoUpdate.platform,
-                        lastUpdateReceipt = autoUpdate.lastReceipt,
-                        autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
-                        onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },
-                        onWindowOpacityChange = { percent ->
-                            // Aviso não sai daqui: quem persiste é o coletor com
-                            // debounce lá em cima, e arrastar o slider dispararia
-                            // um toast por pixel.
-                            windowOpacityPercent = clampWindowOpacityPercent(percent)
-                        },
-                        alertSettings = alertSettingsState,
-                        onAlertSettingsChange = { updated ->
-                            alertSettingsFlow.value = updated
-                            persistAlertSettings(settings, updated)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
-                        },
-                        monthlyBudgetText = formatBudgetUsd(monthlyBudgetMicros),
-                        onMonthlyBudgetCommit = { text ->
-                            // Texto inválido não grava: o campo já recusa pelo
-                            // `validate`, e gravar zero aqui desligaria o teto em
-                            // silêncio no meio de uma digitação.
-                            val parsed = parseBudgetUsd(text)
-                            if (parsed != null) {
-                                monthlyBudgetMicros = parsed
-                                persistBudgetMicros(settings, parsed)
-                                showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
-                            }
-                        },
-                        onApiToggle = { api, checked ->
-                            val updatedApis = if (checked) {
-                                enabledApis.value + api
-                            } else {
-                                enabledApis.value - api
-                            }
-                            enabledApis.value = updatedApis
-                            writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
-                            viewModel.refresh(api)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.MONITORED_APIS))
-                        },
-                        onApiKeySave = { api, apiKey ->
-                            runCatching {
-                                apiKeyDataSource.save(api, apiKey)
-                                apiKeySettings.value = apiKeySettings.value.withKey(api, apiKey.trim())
-                            }.fold(
-                                onSuccess = {
-                                    showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
-                                    true
-                                },
-                                onFailure = { error ->
-                                    breadcrumbs.recordFailure("salvar chave de API", error)
-                                    showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
-                                    false
-                                }
-                            )
-                        },
-                        onApiKeyRemove = { api ->
-                            runCatching {
-                                apiKeyDataSource.clear(api)
-                                apiKeySettings.value = apiKeySettings.value.withoutKey(api)
-                                // Apagar a chave desliga a fonte, e as duas
-                                // gravações andam juntas: deixá-la ligada faria a
-                                // coleta falhar com 401 a cada tique até o
-                                // próximo reinício, que é quando o filtro de
-                                // arranque `API_KEY_DEPENDENT_SOURCES` a
-                                // removeria de qualquer forma.
-                                val updatedApis = enabledApis.value - api
-                                enabledApis.value = updatedApis
-                                writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
-                                viewModel.refresh(api)
-                            }.fold(
-                                onSuccess = {
-                                    // Reusa `API_KEY`: é a mesma coisa sendo
-                                    // gravada, e um valor novo em `SettingsField`
-                                    // obrigaria ramo em cada `when` de mensagem
-                                    // sem dizer nada que a tela já não mostre.
-                                    showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
-                                    true
-                                },
-                                onFailure = { error ->
-                                    breadcrumbs.recordFailure("remover chave de API", error)
-                                    showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
-                                    false
-                                }
-                            )
-                        },
-                        apiKeyCheck = apiKeyCheckState,
-                        onApiKeyTest = checkApiKey,
-                        onApiKeyCheckReset = { apiKeyCheckState = ApiKeyCheckUiState() },
-                        anthropicProfiles = profileUiModels,
-                        onAnthropicProfileToggle = { profileId, checked ->
-                            profileRegistry.setEnabled(profileId, checked)
-                            enabledAnthropicProfiles.value = resolveAnthropicProfiles(
-                                profileRegistry,
-                                profileRegistry.profiles.value
-                            ).enabledProfiles
-                            viewModel.refresh(ApiSource.ANTHROPIC)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
-                        },
-                        onAnthropicProfileRename = { profileId, label ->
-                            profileRegistry.updateLabel(profileId, label)
-                            showSettingsToast(
-                                SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILE_LABEL)
-                            )
-                        },
-                        onAddAnthropicProfile = {
-                            val selectedDirectory = chooseAnthropicConfigDirectory()
-                            if (selectedDirectory != null) {
-                                profileRegistry.addManual(selectedDirectory)
-                                enabledAnthropicProfiles.value = resolveAnthropicProfiles(
-                                    profileRegistry,
-                                    profileRegistry.profiles.value
-                                ).enabledProfiles
-                            }
-                        },
-                        onRemoveAnthropicProfile = { profileId ->
-                            profileRegistry.removeFromMonitor(profileId)
-                            enabledAnthropicProfiles.value = resolveAnthropicProfiles(
-                                profileRegistry,
-                                profileRegistry.profiles.value
-                            ).enabledProfiles
-                            viewModel.refresh(ApiSource.ANTHROPIC)
-                            showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
-                        },
-                        onRescanAnthropicProfiles = {
-                            profileRegistry.rescan(restoreRemoved = true)
-                            enabledAnthropicProfiles.value = resolveAnthropicProfiles(
-                                profileRegistry,
-                                profileRegistry.profiles.value
-                            ).enabledProfiles
-                            viewModel.refresh(ApiSource.ANTHROPIC)
-                        },
-                        expandedProfileId = expandedAnthropicProfileId,
-                        onToggleProfileExpanded = { profileId ->
-                            expandedAnthropicProfileId = if (expandedAnthropicProfileId == profileId) {
-                                null
-                            } else {
-                                profileId
-                            }
-                        },
-                        teamSettings = teamSettings,
-                        teamConnection = teamConnectionState,
-                        onTeamEnabledChange = { enabled ->
-                            val saved = updateTeamSettings(
-                                teamSettingsFlow,
-                                teamSettingsDataSource
-                            ) { current -> current.copy(enabled = enabled) }
-                            // Mudar de servidor ou religar a integração não pode
-                            // deixar um resultado antigo na tela como se fosse atual.
-                            teamConnectionState = TeamConnectionUiState()
-                            reportSettingsSave(SettingsField.TEAM_INTEGRATION, saved)
-                        },
-                        onTeamServerUrlChange = { url ->
-                            val saved = updateTeamSettings(
-                                teamSettingsFlow,
-                                teamSettingsDataSource
-                            ) { current -> current.copy(serverUrl = url) }
-                            teamConnectionState = TeamConnectionUiState()
-                            reportSettingsSave(SettingsField.TEAM_SERVER, saved)
-                        },
-                        onTeamApiKeyChange = { key ->
-                            val saved = updateTeamSettings(
-                                teamSettingsFlow,
-                                teamSettingsDataSource
-                            ) { current -> current.copy(apiKey = key) }
-                            reportSettingsSave(SettingsField.TEAM_KEY, saved)
-                            // Vincula na hora: uma chave que não cobre a conta
-                            // marcada faria o envio falhar em silêncio a cada 30s,
-                            // e o usuário só descobriria pela ausência dos dados.
-                            if (saved) {
-                                checkTeamConnection()
-                                // A identidade tem de sair com a chave nova, senão
-                                // o servidor continua sem saber a quem ela pertence
-                                // até surgir turno novo no Claude Code.
-                                teamSyncService.requestImmediateSync()
-                            } else {
-                                teamConnectionState = TeamConnectionUiState()
-                            }
-                        },
-                        onTeamAliasChange = { alias ->
-                            // O campo já barra apagar um apelido gravado; esta é a
-                            // rede de baixo, para nenhum outro caminho zerá-lo.
-                            if (alias.isBlank() && teamSettings.alias.isNotBlank()) {
-                                showSettingsToast(SettingsToast.TeamAliasRequired)
-                            } else {
-                                val saved = updateTeamSettings(
-                                    teamSettingsFlow,
-                                    teamSettingsDataSource
-                                ) { current -> current.copy(alias = alias) }
-                                reportSettingsSave(SettingsField.TEAM_ALIAS, saved)
-                                // O apelido só chega ao servidor dentro de um
-                                // ingest: sem antecipar a passada, o nome novo
-                                // esperaria o tique de 30s para aparecer ao time.
-                                if (saved) {
-                                    teamSyncService.requestImmediateSync()
-                                }
-                            }
-                        },
-                        onTeamProfileParticipationChange = { profileId, participates ->
-                            val saved = updateTeamSettings(
-                                teamSettingsFlow,
-                                teamSettingsDataSource
-                            ) { current ->
-                                val updated = if (participates) {
-                                    current.participatingProfileIds + profileId
-                                } else {
-                                    current.participatingProfileIds - profileId
-                                }
-                                current.copy(participatingProfileIds = updated)
-                            }
-                            reportSettingsSave(SettingsField.TEAM_ACCOUNTS, saved)
-                            // Marcar uma conta é justamente o momento em que o
-                            // vínculo da chave passa a importar.
-                            if (saved && participates) {
-                                checkTeamConnection()
-                            }
-                        },
-                        onTeamTestConnection = checkTeamConnection,
-                        teamSyncFailureMessage = teamSyncStatus
-                            .takeIf { status -> status.isFailing }
-                            ?.lastFailureMessage,
-                        teamRejectedProfiles = teamSyncStatus.rejectedProfiles,
-                        teamAdminConnection = teamAdminConnectionState,
-                        onTeamAdminTokenChange = { token ->
-                            val saved = updateTeamSettings(
-                                teamSettingsFlow,
-                                teamSettingsDataSource
-                            ) { current -> current.copy(adminToken = token) }
-                            teamAdminConnectionState = TeamConnectionUiState()
-                            reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
-                        },
-                        onTeamValidateAdminToken = {
-                            teamAdminConnectionState =
-                                TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
-                            teamScope.launch {
-                                val error = validateAdminToken().exceptionOrNull()
-                                teamAdminConnectionState = if (error == null) {
-                                    TeamConnectionUiState(
-                                        status = TeamConnectionUiStatus.OK,
-                                        message = if (language == AppLanguage.PT) {
-                                            "Token válido."
-                                        } else {
-                                            "Token is valid."
-                                        }
-                                    )
-                                } else {
-                                    breadcrumbs.recordFailure("validar token administrativo do time", error)
-                                    TeamConnectionUiState(
-                                        status = TeamConnectionUiStatus.FAILED,
-                                        message = error.message
-                                            ?: if (language == AppLanguage.PT) {
-                                                "Falha desconhecida."
-                                            } else {
-                                                "Unknown failure."
-                                            }
-                                    )
-                                }
-                            }
-                        },
-                        onTeamOpenKeysManager = {
-                            breadcrumbs.recordScreenOpened("chaves das contas (admin)")
-                            isTeamKeysOpen = true
-                            teamKeysViewModel.open()
-                        },
-                        onTeamExitAdminMode = {
-                            val saved = updateTeamSettings(
-                                teamSettingsFlow,
-                                teamSettingsDataSource
-                            ) { current -> current.copy(adminToken = "") }
-                            teamAdminConnectionState = TeamConnectionUiState()
-                            isTeamKeysOpen = false
-                            reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
-                        },
-                        proxySettings = proxySettings,
-                        proxyConnection = proxyConnectionState,
-                        onProxyUseEnvironmentChange = { useEnvironment ->
-                            val saved = updateProxySettings(
-                                proxySettingsFlow,
-                                proxySettingsDataSource
-                            ) { current -> current.copy(useEnvironmentProxy = useEnvironment) }
-                            proxyConnectionState = ProxyConnectionUiState()
-                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
-                        },
-                        onProxyHostChange = { host ->
-                            val saved = updateProxySettings(
-                                proxySettingsFlow,
-                                proxySettingsDataSource
-                            ) { current -> current.copy(host = host) }
-                            proxyConnectionState = ProxyConnectionUiState()
-                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
-                        },
-                        onProxyPortChange = { portText ->
-                            val saved = updateProxySettings(
-                                proxySettingsFlow,
-                                proxySettingsDataSource
-                            ) { current -> current.copy(port = portText.toIntOrNull() ?: 0) }
-                            proxyConnectionState = ProxyConnectionUiState()
-                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
-                        },
-                        onProxyUsernameChange = { username ->
-                            val saved = updateProxySettings(
-                                proxySettingsFlow,
-                                proxySettingsDataSource
-                            ) { current -> current.copy(username = username) }
-                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
-                        },
-                        onProxyPasswordChange = { password ->
-                            val saved = updateProxySettings(
-                                proxySettingsFlow,
-                                proxySettingsDataSource
-                            ) { current -> current.copy(password = password) }
-                            reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
-                        },
-                        onProxyTestConnection = checkProxyConnection,
-                        toastEvent = settingsToastEvent
-                    )
+    AppDialogWindow(
+        visible = isSettingsDialogOpen,
+        title = if (language == AppLanguage.PT) "Configurações" else "Settings",
+        state = settingsWindowState,
+        environment = modalEnvironment,
+        diagnosticName = "Configurações",
+        minWidthDp = 320,
+        minHeightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
+        onCloseRequest = { isSettingsDialogOpen = false },
+        openGeneration = settingsOpenGeneration
+    ) {
+        SettingsDialogContent(
+            currentTheme = themePreset,
+            currentLanguage = language,
+            enabledApis = enabledApisState,
+            configuredApiKeys = currentApiKeySettings.configuredSources(),
+            autoStartEnabled = autoStartEnabled,
+            alwaysOnTopEnabled = alwaysOnTopEnabled,
+            cardsOnlyMode = cardsOnlyMode,
+            hudMode = hudMode,
+            windowOpacityPercent = windowOpacityPercent,
+            windowOpacityEnabled = windowOpacitySupported,
+            uiScalePercent = uiScalePercent,
+            onUiScaleChange = { percent ->
+                // Aviso e gravação não saem daqui pelo mesmo motivo da
+                // opacidade: quem persiste é o coletor com debounce.
+                uiScalePercent = clampUiScalePercent(percent)
+            },
+            reducedMotion = reducedMotion,
+            onReducedMotionChange = { enabled ->
+                reducedMotion = enabled
+                persistReducedMotion(settings, enabled)
+            },
+            onReportBug = {
+                // As Configurações fecham: o formulário mora na janela
+                // principal, e a janela de Configurações ficaria por
+                // cima dele -- e dentro da captura. A captura acontece na
+                // abertura do formulário, então ela espera a janela terminar
+                // de esmaecer: aberto no mesmo clique, ele fotografaria as
+                // Configurações no meio da saída.
+                isSettingsDialogOpen = false
+                modalHandOffScope.launch {
+                    delay(MODAL_CLOSE_SETTLE_MILLIS)
+                    isBugReportOpen = true
+                    breadcrumbs.recordScreenOpened("relatório de bug")
                 }
-            }
-        }
+            },
+            onThemeChange = { selectedPreset ->
+                themePreset = selectedPreset
+                persistThemePreset(settings, selectedPreset)
+                showSettingsToast(SettingsToast.Saved(SettingsField.THEME))
+            },
+            onLanguageChange = { selectedLanguage ->
+                language = selectedLanguage
+                settings.putString(LANGUAGE_KEY, selectedLanguage.name)
+                showSettingsToast(SettingsToast.Saved(SettingsField.LANGUAGE))
+            },
+            onAutoStartChange = { enabled ->
+                // O registro do Windows pode recusar a escrita; nesse
+                // caso o estado volta ao que o sistema realmente tem e
+                // o aviso precisa dizer que falhou.
+                val result = AutoStartManager.setAutoStart(enabled)
+                val applied = result.isSuccess
+                val updatedState = if (applied) {
+                    enabled
+                } else {
+                    AutoStartManager.isAutoStartEnabled()
+                }
+                autoStartEnabled = updatedState
+                settings.putBoolean(AUTO_START_KEY, updatedState)
+                reportSettingsSave(
+                    SettingsField.AUTO_START,
+                    applied,
+                    failureDetail = (result as? AutoStartResult.Failure)?.reason
+                )
+            },
+            onAlwaysOnTopChange = { enabled ->
+                alwaysOnTopEnabled = enabled
+                settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
+            },
+            onCardsOnlyModeChange = { enabled ->
+                setCardsOnlyMode(enabled)
+                showSettingsToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
+            },
+            onHudModeChange = { enabled ->
+                setHudMode(enabled)
+                showSettingsToast(SettingsToast.Saved(SettingsField.HUD_MODE))
+            },
+            autoUpdateEnabled = autoUpdate.isEnabled(),
+            autoUpdateSupport = autoUpdate.support,
+            autoUpdatePlatform = autoUpdate.platform,
+            lastUpdateReceipt = autoUpdate.lastReceipt,
+            autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
+            onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },
+            onWindowOpacityChange = { percent ->
+                // Aviso não sai daqui: quem persiste é o coletor com
+                // debounce lá em cima, e arrastar o slider dispararia
+                // um toast por pixel.
+                windowOpacityPercent = clampWindowOpacityPercent(percent)
+            },
+            alertSettings = alertSettingsState,
+            onAlertSettingsChange = { updated ->
+                alertSettingsFlow.value = updated
+                persistAlertSettings(settings, updated)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
+            },
+            monthlyBudgetText = formatBudgetUsd(monthlyBudgetMicros),
+            onMonthlyBudgetCommit = { text ->
+                // Texto inválido não grava: o campo já recusa pelo
+                // `validate`, e gravar zero aqui desligaria o teto em
+                // silêncio no meio de uma digitação.
+                val parsed = parseBudgetUsd(text)
+                if (parsed != null) {
+                    monthlyBudgetMicros = parsed
+                    persistBudgetMicros(settings, parsed)
+                    showSettingsToast(SettingsToast.Saved(SettingsField.ALERTS))
+                }
+            },
+            onApiToggle = { api, checked ->
+                val updatedApis = if (checked) {
+                    enabledApis.value + api
+                } else {
+                    enabledApis.value - api
+                }
+                enabledApis.value = updatedApis
+                writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
+                viewModel.refresh(api)
+                showSettingsToast(SettingsToast.Saved(SettingsField.MONITORED_APIS))
+            },
+            onApiKeySave = { api, apiKey ->
+                runCatching {
+                    apiKeyDataSource.save(api, apiKey)
+                    apiKeySettings.value = apiKeySettings.value.withKey(api, apiKey.trim())
+                }.fold(
+                    onSuccess = {
+                        showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
+                        true
+                    },
+                    onFailure = { error ->
+                        breadcrumbs.recordFailure("salvar chave de API", error)
+                        showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
+                        false
+                    }
+                )
+            },
+            onApiKeyRemove = { api ->
+                runCatching {
+                    apiKeyDataSource.clear(api)
+                    apiKeySettings.value = apiKeySettings.value.withoutKey(api)
+                    // Apagar a chave desliga a fonte, e as duas
+                    // gravações andam juntas: deixá-la ligada faria a
+                    // coleta falhar com 401 a cada tique até o
+                    // próximo reinício, que é quando o filtro de
+                    // arranque `API_KEY_DEPENDENT_SOURCES` a
+                    // removeria de qualquer forma.
+                    val updatedApis = enabledApis.value - api
+                    enabledApis.value = updatedApis
+                    writeApiSourceCollection(settings, ENABLED_APIS_KEY, updatedApis)
+                    viewModel.refresh(api)
+                }.fold(
+                    onSuccess = {
+                        // Reusa `API_KEY`: é a mesma coisa sendo
+                        // gravada, e um valor novo em `SettingsField`
+                        // obrigaria ramo em cada `when` de mensagem
+                        // sem dizer nada que a tela já não mostre.
+                        showSettingsToast(SettingsToast.Saved(SettingsField.API_KEY))
+                        true
+                    },
+                    onFailure = { error ->
+                        breadcrumbs.recordFailure("remover chave de API", error)
+                        showSettingsToast(SettingsToast.SaveFailed(SettingsField.API_KEY))
+                        false
+                    }
+                )
+            },
+            apiKeyCheck = apiKeyCheckState,
+            onApiKeyTest = checkApiKey,
+            onApiKeyCheckReset = { apiKeyCheckState = ApiKeyCheckUiState() },
+            anthropicProfiles = profileUiModels,
+            onAnthropicProfileToggle = { profileId, checked ->
+                profileRegistry.setEnabled(profileId, checked)
+                enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                    profileRegistry,
+                    profileRegistry.profiles.value
+                ).enabledProfiles
+                viewModel.refresh(ApiSource.ANTHROPIC)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
+            },
+            onAnthropicProfileRename = { profileId, label ->
+                profileRegistry.updateLabel(profileId, label)
+                showSettingsToast(
+                    SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILE_LABEL)
+                )
+            },
+            onAddAnthropicProfile = {
+                val selectedDirectory = chooseAnthropicConfigDirectory()
+                if (selectedDirectory != null) {
+                    profileRegistry.addManual(selectedDirectory)
+                    enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                        profileRegistry,
+                        profileRegistry.profiles.value
+                    ).enabledProfiles
+                }
+            },
+            onRemoveAnthropicProfile = { profileId ->
+                profileRegistry.removeFromMonitor(profileId)
+                enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                    profileRegistry,
+                    profileRegistry.profiles.value
+                ).enabledProfiles
+                viewModel.refresh(ApiSource.ANTHROPIC)
+                showSettingsToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
+            },
+            onRescanAnthropicProfiles = {
+                profileRegistry.rescan(restoreRemoved = true)
+                enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+                    profileRegistry,
+                    profileRegistry.profiles.value
+                ).enabledProfiles
+                viewModel.refresh(ApiSource.ANTHROPIC)
+            },
+            expandedProfileId = expandedAnthropicProfileId,
+            onToggleProfileExpanded = { profileId ->
+                expandedAnthropicProfileId = if (expandedAnthropicProfileId == profileId) {
+                    null
+                } else {
+                    profileId
+                }
+            },
+            teamSettings = teamSettings,
+            teamConnection = teamConnectionState,
+            onTeamEnabledChange = { enabled ->
+                val saved = updateTeamSettings(
+                    teamSettingsFlow,
+                    teamSettingsDataSource
+                ) { current -> current.copy(enabled = enabled) }
+                // Mudar de servidor ou religar a integração não pode
+                // deixar um resultado antigo na tela como se fosse atual.
+                teamConnectionState = TeamConnectionUiState()
+                reportSettingsSave(SettingsField.TEAM_INTEGRATION, saved)
+            },
+            onTeamServerUrlChange = { url ->
+                val saved = updateTeamSettings(
+                    teamSettingsFlow,
+                    teamSettingsDataSource
+                ) { current -> current.copy(serverUrl = url) }
+                teamConnectionState = TeamConnectionUiState()
+                reportSettingsSave(SettingsField.TEAM_SERVER, saved)
+            },
+            onTeamApiKeyChange = { key ->
+                val saved = updateTeamSettings(
+                    teamSettingsFlow,
+                    teamSettingsDataSource
+                ) { current -> current.copy(apiKey = key) }
+                reportSettingsSave(SettingsField.TEAM_KEY, saved)
+                // Vincula na hora: uma chave que não cobre a conta
+                // marcada faria o envio falhar em silêncio a cada 30s,
+                // e o usuário só descobriria pela ausência dos dados.
+                if (saved) {
+                    checkTeamConnection()
+                    // A identidade tem de sair com a chave nova, senão
+                    // o servidor continua sem saber a quem ela pertence
+                    // até surgir turno novo no Claude Code.
+                    teamSyncService.requestImmediateSync()
+                } else {
+                    teamConnectionState = TeamConnectionUiState()
+                }
+            },
+            onTeamAliasChange = { alias ->
+                // O campo já barra apagar um apelido gravado; esta é a
+                // rede de baixo, para nenhum outro caminho zerá-lo.
+                if (alias.isBlank() && teamSettings.alias.isNotBlank()) {
+                    showSettingsToast(SettingsToast.TeamAliasRequired)
+                } else {
+                    val saved = updateTeamSettings(
+                        teamSettingsFlow,
+                        teamSettingsDataSource
+                    ) { current -> current.copy(alias = alias) }
+                    reportSettingsSave(SettingsField.TEAM_ALIAS, saved)
+                    // O apelido só chega ao servidor dentro de um
+                    // ingest: sem antecipar a passada, o nome novo
+                    // esperaria o tique de 30s para aparecer ao time.
+                    if (saved) {
+                        teamSyncService.requestImmediateSync()
+                    }
+                }
+            },
+            onTeamProfileParticipationChange = { profileId, participates ->
+                val saved = updateTeamSettings(
+                    teamSettingsFlow,
+                    teamSettingsDataSource
+                ) { current ->
+                    val updated = if (participates) {
+                        current.participatingProfileIds + profileId
+                    } else {
+                        current.participatingProfileIds - profileId
+                    }
+                    current.copy(participatingProfileIds = updated)
+                }
+                reportSettingsSave(SettingsField.TEAM_ACCOUNTS, saved)
+                // Marcar uma conta é justamente o momento em que o
+                // vínculo da chave passa a importar.
+                if (saved && participates) {
+                    checkTeamConnection()
+                }
+            },
+            onTeamTestConnection = checkTeamConnection,
+            teamSyncFailureMessage = teamSyncStatus
+                .takeIf { status -> status.isFailing }
+                ?.lastFailureMessage,
+            teamRejectedProfiles = teamSyncStatus.rejectedProfiles,
+            teamAdminConnection = teamAdminConnectionState,
+            onTeamAdminTokenChange = { token ->
+                val saved = updateTeamSettings(
+                    teamSettingsFlow,
+                    teamSettingsDataSource
+                ) { current -> current.copy(adminToken = token) }
+                teamAdminConnectionState = TeamConnectionUiState()
+                reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
+            },
+            onTeamValidateAdminToken = {
+                teamAdminConnectionState =
+                    TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
+                teamScope.launch {
+                    val error = validateAdminToken().exceptionOrNull()
+                    teamAdminConnectionState = if (error == null) {
+                        TeamConnectionUiState(
+                            status = TeamConnectionUiStatus.OK,
+                            message = if (language == AppLanguage.PT) {
+                                "Token válido."
+                            } else {
+                                "Token is valid."
+                            }
+                        )
+                    } else {
+                        breadcrumbs.recordFailure("validar token administrativo do time", error)
+                        TeamConnectionUiState(
+                            status = TeamConnectionUiStatus.FAILED,
+                            message = error.message
+                                ?: if (language == AppLanguage.PT) {
+                                    "Falha desconhecida."
+                                } else {
+                                    "Unknown failure."
+                                }
+                        )
+                    }
+                }
+            },
+            onTeamOpenKeysManager = {
+                breadcrumbs.recordScreenOpened("chaves das contas (admin)")
+                isTeamKeysOpen = true
+                teamKeysViewModel.open()
+            },
+            onTeamExitAdminMode = {
+                val saved = updateTeamSettings(
+                    teamSettingsFlow,
+                    teamSettingsDataSource
+                ) { current -> current.copy(adminToken = "") }
+                teamAdminConnectionState = TeamConnectionUiState()
+                isTeamKeysOpen = false
+                reportSettingsSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
+            },
+            proxySettings = proxySettings,
+            proxyConnection = proxyConnectionState,
+            onProxyUseEnvironmentChange = { useEnvironment ->
+                val saved = updateProxySettings(
+                    proxySettingsFlow,
+                    proxySettingsDataSource
+                ) { current -> current.copy(useEnvironmentProxy = useEnvironment) }
+                proxyConnectionState = ProxyConnectionUiState()
+                reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+            },
+            onProxyHostChange = { host ->
+                val saved = updateProxySettings(
+                    proxySettingsFlow,
+                    proxySettingsDataSource
+                ) { current -> current.copy(host = host) }
+                proxyConnectionState = ProxyConnectionUiState()
+                reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+            },
+            onProxyPortChange = { portText ->
+                val saved = updateProxySettings(
+                    proxySettingsFlow,
+                    proxySettingsDataSource
+                ) { current -> current.copy(port = portText.toIntOrNull() ?: 0) }
+                proxyConnectionState = ProxyConnectionUiState()
+                reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+            },
+            onProxyUsernameChange = { username ->
+                val saved = updateProxySettings(
+                    proxySettingsFlow,
+                    proxySettingsDataSource
+                ) { current -> current.copy(username = username) }
+                reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+            },
+            onProxyPasswordChange = { password ->
+                val saved = updateProxySettings(
+                    proxySettingsFlow,
+                    proxySettingsDataSource
+                ) { current -> current.copy(password = password) }
+                reportSettingsSave(SettingsField.NETWORK_PROXY, saved)
+            },
+            onProxyTestConnection = checkProxyConnection,
+            toastEvent = settingsToastEvent
+        )
     }
 }
 

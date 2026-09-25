@@ -545,6 +545,42 @@ quadros, um percentual que não é verdade.
   `snap()` em `appSpringSpec`/`appTweenSpec`: o valor chega ao alvo no mesmo quadro, e quem lê o
   estado final não precisa saber que a preferência existe. As duas funções são puras para a regra ser
   testável sem composição.
+- **Modais** (`AppDialogWindow` + `AppDialog`; plano
+  [`modais-abertura-execucao.md`](docs/planos/modais-abertura-execucao.md)): as nove janelas modais
+  (Histórico, Sessões CLI e Codex, Uso e Presença do time, Chaves, Configurações, Ajuda, Novidades)
+  passam por **um** host. Eram nove cópias do mesmo bloco, com divergências — duas não ativavam a
+  janela.
+  - **A janela nasce na primeira abertura e depois só se esconde** (`visible`), em vez de sair da
+    composição. Medido no Windows 11 com a JVM aquecida: recriar custava 200–460 ms até o primeiro
+    quadro, reexibir custa 30–46 ms — era essa espera o "modal lento". Os laços ao vivo continuam
+    parando pelo `closeWindow()` de cada ViewModel; conteúdo com laço próprio (a demo da Ajuda) lê
+    `LocalModalWindowOnScreen` para não rodar escondido. Quem guarda o assunto num anulável (a
+    fonte do histórico, as notas) usa `rememberLastNonNull`, senão a janela esmaeceria vazia.
+  - **A entrada espera o primeiro quadro pintado.** A escala da moldura começava ao compor, dentro de
+    uma janela que o sistema mostrava de uma vez e opaca, e os quadros iniciais se perdiam no custo
+    da criação. Agora a janela aparece com opacidade 0, o host espera dois quadros (com teto de
+    500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e esmaece a
+    janela AWT com o conteúdo indo de 0,96 a 1 pela mola `GENTLE`.
+  - **O pedido chega por `StateFlow`, nunca por recomposição dentro da janela** (`ModalWindowHost`).
+    Janela escondida não recompõe — o relógio de quadros para junto com a pintura —, e a primeira
+    versão, com `LaunchedEffect(visible)` dentro da janela, abria e fechava uma vez e **nunca mais
+    reabria**. Os testes de componente não têm janela e não pegariam; quem pegou foi uma sonda com o
+    host real num `awaitApplication`, amostrando a opacidade da janela AWT. A corrotina que coleta
+    nasce na primeira composição, que é síncrona, e o despacho continua vivo com a janela escondida.
+    Pelo mesmo motivo `LocalModalWindowOnScreen` vira `false` **antes** de esconder: depois, a
+    recomposição que desligaria o laço da demo não viria.
+  - **Todo fechamento é a queda de `visible`**: ×, Alt+F4, Esc e os botões do conteúdo só chamam
+    `onCloseRequest`. A opacidade fica onde a saída parou — restaurá-la antes de o esconder chegar à
+    janela AWT pintaria um quadro cheio — e a abertura seguinte a define. Quem precisa da tela limpa
+    depois de fechar (a captura do relatório de bug) espera `MODAL_CLOSE_SETTLE_MILLIS`.
+  - **O nome na trilha é fixo** (`diagnosticName`): o título pode carregar o apelido do perfil, que
+    costuma ser o e-mail, e a trilha vira issue pública. Cada abertura grava o tempo até o primeiro
+    quadro, que é o número que prova ou desmente a lentidão.
+  - **Diálogo dentro da janela é `AppDialog`, nunca o `AlertDialog` do Material**, que no desktop
+    surge num quadro. Escurecimento por fade, cartão com fade e escala; saída seca, porque quem o
+    tira da composição é a própria ação. O fundo ouve toque cru e não `clickable`: aquele funde a
+    semântica dos descendentes, e o cartão inteiro virava um nó só — quebrou dois testes do relatório
+    de bug na primeira passada.
 
 **Tipografia**: IBM Plex Mono e Sans, carregadas do classpath por `appFontFamilies`
 (`expect`/`actual`, TTFs em `desktopMain/resources/fonts/`). `label*`, `title*`, `headline*` e

@@ -7,23 +7,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
-import com.usagemonitor.ApplyWindowMinimumSize
-import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.fitWindowSize
 import com.usagemonitor.help.rememberHelpMedia
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.help.HelpContent
-import com.usagemonitor.presentation.ui.help.HelpTopic
+import com.usagemonitor.presentation.ui.help.HelpMediaState
 import com.usagemonitor.presentation.ui.help.helpWindowTitle
-import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
-import com.usagemonitor.presentation.ui.theme.AppTheme
-import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.uiScaleFactor
 
 /**
@@ -37,15 +30,16 @@ import com.usagemonitor.uiScaleFactor
  * de `rememberHelpMedia`, em `desktopMain` —, o que mantém `HelpContent`
  * exercitável nos testes de componente, onde animação infinita trava o
  * `waitForIdle`.
+ *
+ * **O laço só roda com a janela na tela** ([LocalModalWindowOnScreen]). A janela
+ * fechada continua composta, escondida, e o tocador seguiria decodificando
+ * quadros de uma demo que ninguém vê.
  */
 @Composable
 internal fun HelpWindow(
+    visible: Boolean,
     language: AppLanguage,
-    themePreset: AppThemePreset,
-    uiScalePercent: Int,
-    motion: AppMotionPolicy,
-    iconImage: Painter?,
-    screenWorkArea: ScreenWorkArea,
+    environment: ModalWindowEnvironment,
     onCloseRequest: () -> Unit
 ) {
     val title = helpWindowTitle(language)
@@ -54,44 +48,36 @@ internal fun HelpWindow(
     val windowState = rememberDialogState(
         size = fitWindowSize(
             DpSize(
-                width = DEFAULT_HELP_WINDOW_WIDTH * uiScaleFactor(uiScalePercent),
-                height = DEFAULT_HELP_WINDOW_HEIGHT * uiScaleFactor(uiScalePercent)
+                width = DEFAULT_HELP_WINDOW_WIDTH * uiScaleFactor(environment.uiScalePercent),
+                height = DEFAULT_HELP_WINDOW_HEIGHT * uiScaleFactor(environment.uiScalePercent)
             ),
-            screenWorkArea
+            environment.screenWorkArea
         )
     )
 
-    DialogWindow(
-        onCloseRequest = onCloseRequest,
+    AppDialogWindow(
+        visible = visible,
         title = title,
-        icon = iconImage,
         state = windowState,
-        resizable = true,
-        undecorated = true
+        environment = environment,
+        diagnosticName = "ajuda",
+        minWidthDp = HELP_MIN_WINDOW_WIDTH_DP,
+        minHeightDp = HELP_MIN_WINDOW_HEIGHT_DP,
+        onCloseRequest = onCloseRequest
     ) {
-        ApplyWindowMinimumSize(
-            window = window,
-            widthDp = HELP_MIN_WINDOW_WIDTH_DP,
-            heightDp = HELP_MIN_WINDOW_HEIGHT_DP,
-            uiScalePercent = uiScalePercent,
-            workArea = screenWorkArea
-        )
-        AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
-            DesktopDialogFrame(
-                title = title,
-                iconPainter = iconImage,
-                onCloseRequest = onCloseRequest
-            ) {
-                HelpContent(
-                    selectedTopic = selectedTopic,
-                    onSelectTopic = { topic -> selectedTopic = topic },
-                    language = language,
-                    onClose = onCloseRequest,
-                    media = rememberHelpMedia(HelpCatalog.mediaId(selectedTopic)),
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+        val media = if (LocalModalWindowOnScreen.current) {
+            rememberHelpMedia(HelpCatalog.mediaId(selectedTopic))
+        } else {
+            HelpMediaState.Unavailable
         }
+        HelpContent(
+            selectedTopic = selectedTopic,
+            onSelectTopic = { topic -> selectedTopic = topic },
+            language = language,
+            onClose = onCloseRequest,
+            media = media,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

@@ -1,11 +1,5 @@
 package com.usagemonitor.presentation.ui
 
-import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
-import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -275,6 +269,13 @@ fun WindowScope.DesktopDialogFrame(
     iconPainter: Painter?,
     windowState: WindowState? = null,
     onCloseRequest: () -> Unit,
+    /**
+     * Escala do conteúdo, lida no desenho. Quem a anima é o host da janela
+     * (`AppDialogWindow`), que é quem sabe quando a janela está de fato na tela:
+     * a moldura animando sozinha começava antes do primeiro quadro pintado, e a
+     * entrada se perdia no custo de criar a janela.
+     */
+    contentScale: () -> Float = { 1f },
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
@@ -296,51 +297,13 @@ fun WindowScope.DesktopDialogFrame(
         onDispose {}
     }
 
-    var entered by remember(title) { mutableStateOf(false) }
-
-    LaunchedEffect(title) {
-        entered = false
-        entered = true
-    }
-
-    // Saída: a janela esmaece antes de fechar. Antes o diálogo entrava com
-    // escala e sumia num quadro, e a assimetria lia como corte. É a opacidade da
-    // janela AWT, e não do conteúdo: o conteúdo esmaecendo dentro de uma janela
-    // opaca mostraria o fundo dela, não o que está atrás. Plataforma sem
-    // translucidez de janela (alguns Linux) ou "Reduzir animações" fecham na hora.
-    val motion = LocalAppMotionPolicy.current
-    val closeScope = rememberCoroutineScope()
-    var closing by remember { mutableStateOf(false) }
-    val animatedClose: () -> Unit = {
-        if (!closing) {
-            closing = true
-            closeScope.launch {
-                fadeOutThenClose(window, motion, onCloseRequest)
-                // Quem mantém a moldura composta depois do pedido (janela
-                // escondida em vez de removida) precisa poder fechá-la de novo.
-                closing = false
-            }
-        }
-    }
-
-    val frameScale by animateFloatAsState(
-        targetValue = if (entered) 1f else 0.94f,
-        animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
-        label = "dialogFrameScale"
-    )
-    val frameOffsetY by animateDpAsState(
-        targetValue = if (entered) 0.dp else 14.dp,
-        animationSpec = tween(durationMillis = AppMotion.normal, easing = AppMotion.enterEasing),
-        label = "dialogFrameOffsetY"
-    )
-
     Surface(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer {
-                scaleX = frameScale
-                scaleY = frameScale
-                translationY = frameOffsetY.toPx()
+                val scale = contentScale()
+                scaleX = scale
+                scaleY = scale
                 transformOrigin = TransformOrigin(0.5f, 0.3f)
             },
         color = MaterialTheme.colorScheme.background
@@ -350,7 +313,7 @@ fun WindowScope.DesktopDialogFrame(
                 title = title,
                 iconPainter = iconPainter,
                 windowState = windowState,
-                onCloseRequest = animatedClose
+                onCloseRequest = onCloseRequest
             )
 
             Box(
@@ -580,37 +543,3 @@ internal fun TitleBarButton(
         )
     }
 }
-
-/**
- * Esmaece a janela e só então pede o fechamento. A opacidade é restaurada no
- * fim: o `Window` do Compose pode ser reaproveitado pelo chamador (o diálogo de
- * Configurações abre e fecha na mesma janela), e reabri-lo transparente seria
- * uma janela invisível.
- */
-private suspend fun fadeOutThenClose(
-    window: java.awt.Window,
-    motion: AppMotionPolicy,
-    onCloseRequest: () -> Unit
-) {
-    val start = runCatching { window.opacity }.getOrNull()
-    if (motion.reduced || start == null) {
-        onCloseRequest()
-        return
-    }
-    val faded = runCatching {
-        animate(
-            initialValue = start,
-            targetValue = 0f,
-            animationSpec = tween(durationMillis = DIALOG_EXIT_MILLIS, easing = AppMotion.exitEasing)
-        ) { value, _ ->
-            window.opacity = value.coerceIn(0f, 1f)
-        }
-    }
-    onCloseRequest()
-    if (faded.isSuccess) {
-        runCatching { window.opacity = start }
-    }
-}
-
-/** Um pouco mais longa que a saída de menu: a janela é uma superfície maior. */
-private const val DIALOG_EXIT_MILLIS = 140
