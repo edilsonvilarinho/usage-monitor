@@ -8,7 +8,7 @@ const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info
 // ponteiro em cima aparecem as alças (mão e engrenagem) e, ao lado, o balão de
 // UMA conta — a do anel sob o ponteiro — ou o da engrenagem.
 export function AppHudBar({
-  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, update,
+  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, update, updateAction,
   actions = ['⟲', '▣'], style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
@@ -110,6 +110,14 @@ export function AppHudBar({
             </span>
           ))}
           <div style={{ display: 'flex', gap: 6, color: 'var(--muted)' }}>⤓ ↻ ⚙ ?</div>
+          {update ? (
+            <>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--ok)', lineHeight: '14px', maxHeight: 28, overflow: 'hidden' }}>{update}</span>
+              {updateAction ? (
+                <span role="button" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--ok)', height: 24, display: 'inline-flex', alignItems: 'center', padding: '0 4px', borderRadius: 'var(--r2)', cursor: 'pointer' }}>{updateAction} →</span>
+              ) : null}
+            </>
+          ) : null}
         </>
       )}
     </div>

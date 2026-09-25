@@ -328,7 +328,8 @@ object HelpCatalog {
                 "Abra Configurações → \"Geral\" e ligue \"Atualização automática\".",
                 "Se a instalação não suportar a troca, o interruptor aparece desabilitado com o " +
                     "motivo escrito ao lado.",
-                "Com a versão baixada, a faixa no topo do dashboard oferece \"Reiniciar e atualizar " +
+                "Com a versão baixada, a faixa no topo do dashboard — ou, na barra HUD, o balão da " +
+                    "engrenagem — oferece \"Reiniciar e atualizar " +
                     "agora\"; sem clicar nela, a troca acontece no próximo fechamento."
             ),
             mediaId = "updates"
@@ -573,7 +574,8 @@ object HelpCatalog {
                 "Open Settings → \"General\" and turn on \"Automatic updates\".",
                 "If your install cannot be swapped, the switch shows up disabled with the reason " +
                     "written next to it.",
-                "Once the version is downloaded, the strip at the top of the dashboard offers " +
+                "Once the version is downloaded, the strip at the top of the dashboard — or, in the HUD " +
+                    "bar, the gear balloon — offers " +
                     "\"Restart and update now\"; without clicking it, the swap happens on the next exit."
             ),
             mediaId = "updates"

@@ -18,6 +18,7 @@ import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
+import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.presentation.ui.components.WindowMode
@@ -102,6 +103,13 @@ class HudNotchTest {
         const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · 5h 28% · 7d 9%"
         const val DEEPSEEK_RING = "DeepSeek · Sem projeção · Saldo \$2.27"
         const val GEAR = "Configurações"
+
+        /** O texto e o rótulo que `updateBannerContent` dá ao estado pronto. */
+        val READY_INDICATOR = HudUpdateIndicator(
+            tone = AppTone.OK,
+            description = "Versão 38.1.0 pronta — será aplicada ao fechar",
+            actionLabel = "Reiniciar e atualizar agora"
+        )
     }
     private val countdown = "Próxima atualização automática"
 
@@ -639,10 +647,18 @@ class HudNotchTest {
         onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertDoesNotExist()
     }
 
-    /** A coluna do balão da engrenagem mede o que `hudAppBalloonHeight` soma, com e sem atualização. */
+    /**
+     * A coluna do balão da engrenagem mede o que `hudAppBalloonHeight` soma: sem
+     * atualização, só com a frase (baixando) e com a frase mais a ação.
+     */
     @Test
     fun `o balao da engrenagem tem a altura que a geometria calcula`() {
-        for (update in listOf(null, HudUpdateIndicator(AppTone.OK, "Atualização pronta"))) {
+        val cases = listOf(
+            null to null,
+            HudUpdateIndicator(AppTone.INFO, "Baixando a versão 38.1.0 — 42%") to null,
+            READY_INDICATOR to {}
+        )
+        for ((update, action) in cases) {
             runDesktopComposeUiTest {
                 setContent {
                     AppTheme(isDark = true) {
@@ -652,15 +668,63 @@ class HudNotchTest {
                                 countdown = null,
                                 updateIndicator = update,
                                 onWindowModeChange = {},
-                                actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) }
+                                actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
+                                onUpdateAction = action
                             )
                         }
                     }
                 }
                 val column = onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
-                assertEquals(hudAppBalloonHeight(update != null) - HUD_BALLOON_PADDING * 2, column.height, "atualização=$update")
+                assertEquals(
+                    hudAppBalloonHeight(update != null, action != null) - HUD_BALLOON_PADDING * 2,
+                    column.height,
+                    "atualização=$update, ação=${action != null}"
+                )
             }
         }
+    }
+
+    @Composable
+    private fun appBalloonWithUpdate(update: HudUpdateIndicator, onUpdateAction: (() -> Unit)?) {
+        AppTheme(isDark = true) {
+            Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                HudAppBalloonContent(
+                    language = AppLanguage.PT,
+                    countdown = null,
+                    updateIndicator = update,
+                    onWindowModeChange = {},
+                    actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
+                    onUpdateAction = onUpdateAction
+                )
+            }
+        }
+    }
+
+    /** A mesma ação da faixa do modo padrão, no balão da engrenagem (#225). */
+    @Test
+    fun `o balao da engrenagem oferece reiniciar e atualizar agora`() = runDesktopComposeUiTest {
+        var restarts = 0
+        setContent { appBalloonWithUpdate(READY_INDICATOR, onUpdateAction = { restarts += 1 }) }
+
+        // A frase inteira cabe nas duas linhas: numa só ela saía cortada.
+        onNodeWithText(READY_INDICATOR.description).assertIsDisplayed()
+        onNodeWithText("Reiniciar e atualizar agora →").assertIsDisplayed()
+        onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).performClick()
+        assertEquals(1, restarts)
+    }
+
+    /** Baixando não tem ação, como na faixa: alvo clicável sem rótulo seria invisível. */
+    @Test
+    fun `baixando o balao da engrenagem nao tem acao`() = runDesktopComposeUiTest {
+        setContent {
+            appBalloonWithUpdate(
+                HudUpdateIndicator(AppTone.INFO, "Baixando a versão 38.1.0 — 42%"),
+                onUpdateAction = null
+            )
+        }
+
+        onNodeWithText("Baixando a versão 38.1.0 — 42%").assertIsDisplayed()
+        onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).assertDoesNotExist()
     }
 
     // ------------------------------------------------------------ contagem (#185)

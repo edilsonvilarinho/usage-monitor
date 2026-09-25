@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_APP_BALLOON_ACTIONS
 import com.usagemonitor.HUD_APP_BALLOON_CAPTION
 import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE_LINES
 import com.usagemonitor.HUD_BALLOON_ACTIONS
 import com.usagemonitor.HUD_BALLOON_BAR_ROW
 import com.usagemonitor.HUD_BALLOON_FOOTER
@@ -64,6 +66,7 @@ import com.usagemonitor.hudQuotaRuns
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.accentColorFor
@@ -79,6 +82,9 @@ internal const val HUD_BALLOON_TEST_TAG = "hudBalloon"
 
 /** A coluna de linhas do balão de conta, cuja altura a geometria soma. */
 internal const val HUD_BALLOON_CONTENT_TEST_TAG = "hudBalloonContent"
+
+/** A linha de ação da atualização no balão da engrenagem ("Reiniciar e atualizar agora →"). */
+internal const val HUD_APP_BALLOON_UPDATE_ACTION_TAG = "hudAppBalloonUpdateAction"
 
 /**
  * A caixa inteira do balão na orientação de [edge]: o corpo e, do lado do notch,
@@ -333,7 +339,10 @@ internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
  * `Popup`, e popup no Compose Desktop é recortado pela própria janela, que aqui
  * é do tamanho do balão —; a fileira de ações do rodapé, a **mesma**
  * ([actions] recebe o `FooterActionGroup`), com os mesmos ícones e descrições; e a
- * atualização pendente, quando há.
+ * atualização pendente, quando há — a frase e, com [onUpdateAction], a **mesma**
+ * ação da faixa do modo padrão ("Reiniciar e atualizar agora"). Ela mora aqui e
+ * não no ícone do notch: o balão é aberto de propósito e o rótulo diz o que o
+ * clique faz, e no notch seria clique de rotina reiniciando o app (#225).
  *
  * Alturas fixas, somadas por `hudAppBalloonHeight`, como no balão de conta.
  */
@@ -343,7 +352,8 @@ internal fun HudAppBalloonContent(
     countdown: (@Composable () -> Unit)?,
     updateIndicator: HudUpdateIndicator?,
     onWindowModeChange: (WindowMode) -> Unit,
-    actions: @Composable () -> Unit
+    actions: @Composable () -> Unit,
+    onUpdateAction: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag(HUD_APP_BALLOON_CONTENT_TEST_TAG)) {
         Row(
@@ -388,11 +398,56 @@ internal fun HudAppBalloonContent(
                 text = indicator.description,
                 style = MaterialTheme.typography.labelSmall,
                 color = indicator.tone.color(),
-                maxLines = 1,
+                maxLines = HUD_APP_BALLOON_UPDATE_TITLE_LINES,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.height(HUD_BALLOON_FOOTER)
+                modifier = Modifier.height(HUD_APP_BALLOON_UPDATE_TITLE)
             )
+            val actionLabel = indicator.actionLabel
+            if (actionLabel != null && onUpdateAction != null) {
+                HudUpdateActionRow(
+                    label = actionLabel,
+                    tone = indicator.tone,
+                    onClick = onUpdateAction
+                )
+            }
         }
+    }
+}
+
+/**
+ * A ação da atualização: rótulo com seta no tom do estado, como a faixa do modo
+ * padrão, com a altura, o hover e a pressão de uma linha de modo.
+ */
+@Composable
+private fun HudUpdateActionRow(label: String, tone: AppTone, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val pressed by interaction.collectIsPressedAsState()
+    val ladder = AppSurfaceLadders.current
+    val layer = when {
+        pressed -> ladder.pressedLayer
+        hovered -> ladder.hoverLayer
+        else -> Color.Transparent
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HUD_APP_BALLOON_MODE_ROW)
+            .clip(AppShapes.small)
+            .background(layer)
+            .hoverable(interaction)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .testTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "$label →",
+            style = MaterialTheme.typography.labelMedium,
+            color = tone.color(),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
