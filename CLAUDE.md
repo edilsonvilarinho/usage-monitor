@@ -798,6 +798,17 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
   (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
   mola `GENTLE` com crossfade do conteúdo.
+- **HUD padrão na instalação nova** (`markHudDefaultPendingOnFreshInstall` + `hudDefaultShouldSwitch`;
+  issue #277). **Não é o default da leitura**: `readPersistedHudMode` continua `false`, e quem já usa o
+  app nunca é arrastado para a HUD. Instalação nova é `hudMode` e `windowPlacement` ausentes e nenhum
+  recibo de atualização (a regra de `ReleaseNotesDecision`), lida **antes** de o coletor da janela
+  gravar qualquer coisa. Nesse caso o app grava o modo padrão e marca `hudDefaultPending`. A troca sai
+  na primeira coleta com alguma conta e **sem janela modal aberta**: na primeira execução quem está
+  aberta é Configurações, e a instalação nova sobe sem API habilitada — abrir direto no notch mostraria
+  "Carregando" para sempre. Ela manda uma notificação, uma vez só, com os três caminhos de volta.
+  **Mora no bloco da bandeja**, porque a bandeja é um desses caminhos: sem ela o app não troca
+  sozinho. Qualquer escolha de modo antes da troca apaga a pendência, porque a escolha do usuário
+  vence. E sem API habilitada o notch diz "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`).
 - **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): a seção
   "Sessões CLI", entre as cotas e o rodapé, só quando há o que dizer. Uma linha por sinal: contexto
   saturado, contexto crescendo (as duas contagens saem do mesmo `SessionPulse` que faz o botão de

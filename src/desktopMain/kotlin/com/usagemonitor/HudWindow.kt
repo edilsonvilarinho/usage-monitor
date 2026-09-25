@@ -47,6 +47,7 @@ import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.launch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.toneFor
@@ -124,7 +125,7 @@ internal fun HudWindowHost(
     val stalled = stalledSessions?.collectAsState()?.value.orEmpty()
 
     val fallbackTone = snapshot?.let { worst -> toneFor(worst.risk.level) } ?: AppTone.NEUTRAL
-    val fallbackLabel = if (language == AppLanguage.PT) "Carregando" else "Loading"
+    val fallbackLabel = hudFallbackLabel(dashboardState is UiState.NoApisEnabled, language)
     // A faixa de atualização do modo padrão não existe aqui; o indicador ocupa o
     // notch com o mesmo texto e tom de `updateBannerContent` (#225).
     val updateIndicator = appUpdateState?.let { state ->

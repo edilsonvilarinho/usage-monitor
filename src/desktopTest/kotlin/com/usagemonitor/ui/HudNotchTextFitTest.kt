@@ -55,7 +55,7 @@ class HudNotchTextFitTest {
 
     private val scales = (100..200 step 5).toList() + listOf(144, 172)
 
-    private val words = listOf("Sem projeção", "No forecast", "Crítico", "Atenção", "Carregando", "Loading")
+    private val words = listOf("Sem projeção", "No forecast", "Crítico", "Atenção", "Carregando", "Loading", "Nenhuma API", "No APIs")
     private val percents = listOf("100%", "88%", "\$2.27")
     private val countdowns = listOf(formatRefreshCountdown(59 * 60 + 59), formatRefreshCountdown(10 * 60))
 
