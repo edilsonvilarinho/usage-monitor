@@ -225,6 +225,11 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
                 HUD_BALLOON_QUOTA_BLOCK * run.quotas.size + HUD_BALLOON_SECTION_GAP * (run.quotas.size - 1)
         }
     }
+    // Os sinais de sessão (issue #265): título da seção e uma linha por sinal.
+    if (account.sessionSignals.isNotEmpty()) {
+        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_GROUP_HEADER +
+            HUD_BALLOON_FOOTER * account.sessionSignals.size
+    }
     if (account.detailLine != null) {
         height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
     }

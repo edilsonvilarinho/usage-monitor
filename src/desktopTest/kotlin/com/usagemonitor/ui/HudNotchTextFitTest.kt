@@ -17,7 +17,15 @@ import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE_LINES
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.HUD_BALLOON_WIDTH
+import com.usagemonitor.domain.entity.ActiveSessionAlert
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionHealth
+import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.StalledCliSession
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.hudSessionSignals
+import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
@@ -85,6 +93,52 @@ class HudNotchTextFitTest {
             scale = next
             waitForIdle()
         }
+        assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
+    }
+
+    /**
+     * Os sinais de sessão (issue #265) cabem numa linha do balão em qualquer
+     * escala, no pior caso de contagem e de tempo: a linha é `maxLines = 1` com
+     * reticências, e cortada ela perderia justamente o número.
+     */
+    @Test
+    fun `os sinais de sessao cabem numa linha do balao em qualquer escala`() = runDesktopComposeUiTest {
+        val failures = mutableSetOf<String>()
+        var scale by mutableStateOf(scales.first())
+        val work = UsageTargetKey(ApiSource.ANTHROPIC, "work")
+        val now = Instant.parse("2026-09-25T12:00:00Z")
+        val pulse = SessionPulse(
+            List(99) { index -> ActiveSessionAlert("s$index", CliSessionHealth.SATURATED, now) } +
+                List(99) { index -> ActiveSessionAlert("a$index", CliSessionHealth.ATTENTION, now) }
+        )
+        val stalled = List(99) { index ->
+            StalledCliSession("t$index", null, "work", now, pendingMillis = (23 * 60 + 59) * 60_000L)
+        }
+        val texts = AppLanguage.entries.flatMap { language ->
+            hudSessionSignals(work, pulse, stalled, language) +
+                hudSessionSignals(work, null, stalled.take(1), language)
+        }.map { signal -> signal.text }
+        setContent {
+            AppTheme(isDark = true, uiScalePercent = scale) {
+                val measurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val column = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2
+                texts.forEach { text ->
+                    val result = measurer.measure(
+                        text = text,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        constraints = Constraints(maxWidth = with(density) { column.roundToPx() })
+                    )
+                    if (result.hasVisualOverflow) failures += "$scale%: \"$text\" não cabe em $column"
+                }
+            }
+        }
+        for (next in scales) {
+            scale = next
+            waitForIdle()
+        }
+        assertTrue(texts.size >= 8, "sinais do pior caso: $texts")
         assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
     }
 

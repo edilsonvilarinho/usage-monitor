@@ -2267,7 +2267,8 @@ private fun runUsageMonitor(
             teamSessionPulses = teamSessionPulses,
             accountColors = accountColors,
             onCloseRequest = { shutdownApplication() },
-            activeTargets = sessionPulseViewModel.activeTargets
+            activeTargets = sessionPulseViewModel.activeTargets,
+            stalledSessions = sessionPulseViewModel.stalledSessions
         )
     }
 

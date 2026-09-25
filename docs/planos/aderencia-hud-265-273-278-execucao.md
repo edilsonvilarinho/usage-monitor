@@ -38,7 +38,7 @@ funcione em mais de um monitor e mostre cada conta com cor própria. O levantame
 | P2 | #278 | Semanal por fora, 5h por dentro, legenda dos anéis | `feat/278-hud-ring-order` | feito (automática); olhar no app pendente |
 | P3 | #273 | HUD e janelas em monitores secundários | `fix/273-multi-monitor` | feito (automática); dois monitores reais não executada |
 | P4 | #275 | Cor por conta Claude | `feat/275-account-color` | feito (automática); olhar no app pendente |
-| P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | pendente |
+| P5 | #265 | Sinais de sessão na HUD | `feat/265-hud-session-signals` | feito (automática); olhar no app pendente |
 | P6 | #277 | HUD padrão na instalação nova | `feat/277-hud-default` | pendente |
 | P7 | #276, #265 | README com a HUD em destaque, captura e GIF | `docs/276-readme-hud` | pendente |
 
@@ -57,6 +57,7 @@ Regra comum a todos os PRs:
 | 2026-09-25 | P2 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudModelTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest" --tests "…ComponentTest"` | 5 classes, **178 testes, 0 falhas**. Entre eles, o arco de fora medido no bitmap com o tom da semanal crítica, o glifo de legenda por cota e a descrição "anel externo 7d 9% · anel interno 5h 28%". Depois `gradlew.bat allTests`: 214 classes, **2150 testes, 0 falhas** (9m28s). Pendente: olhar o notch e o balão no `gradlew.bat run`. |
 | 2026-09-25 | P3 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…ScreenLocatorTest" --tests "…MainWindowPreferencesTest" --tests "…HudWindowPreferencesTest" --tests "…WindowScreenFitTest" --tests "…HudNotchGeometryTest"` | Primeira passada: erro de compilação (`GraphicsDevice.idString` não existe em Kotlin, o getter Java é `getIDstring()`). Corrigido: 5 classes, **61 testes, 0 falhas**, com monitor à direita, à esquerda (x negativo), acima e renumerado. **Validação em dois monitores reais não executada**: esta máquina tem um só (`\\.\DISPLAY1`, 1366×768). Depois `gradlew.bat allTests`: 215 classes, **2164 testes, 0 falhas**. |
 | 2026-09-25 | P4 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…AppAccentsContrastTest" --tests "…HudModelTest" --tests "…AnthropicProfileRegistryTest" --tests "…ComponentTest" --tests "…HudNotch*"` | Primeira passada: erro de compilação no teste (inferência de `listOf` contra `Pair<String, AccountAccent?>`). Corrigido: 6 classes, **180 testes, 0 falhas**, cobrindo as 16 variantes AA, a matiz e a distância entre cores, a ida e volta no registro, a escolha na aba Contas e a dona única `accountAccentColor`. Depois `gradlew.bat allTests`: 215 classes, **2172 testes, 0 falhas**. |
+| 2026-09-25 | P5 | Claude Opus 5.5 | `gradlew.bat desktopTest --tests "…HudSessionSignalsTest" --tests "…HudModelTest" --tests "…HelpCatalogTest" --tests "…HudNotch*" --tests "…HudNotchGeometryTest"` | Verde na primeira passada de compilação. A primeira versão do teste esperava "2h 10min", mas o app formata "2h10" (`formatActiveTime`), e o teste foi corrigido para o formato real antes de rodar. Focado: 6 classes, **97 testes, 0 falhas**. `allTests` **vermelho na primeira passada**: `HelpContentTest > shows the selected topic with its description and activation steps` — a descrição do tópico Modos de janela, com as frases novas sobre os anéis e as sessões, empurrou "Como ativar" para baixo da dobra, que é o que o teste guarda. As frases viraram passos no fim da lista, e a descrição voltou ao tamanho de antes. Segunda passada: 216 classes, **2181 testes, 0 falhas**. |
 
 ## P1 · #274 — Reiniciar o Usage Monitor, não o computador
 
@@ -200,6 +201,13 @@ Regra comum a todos os PRs:
 - O notch em repouso não muda: o pulso âmbar continua sendo só do risco de cota, e a notificação de
   sessão já sai pela bandeja. A descrição do anel leva os mesmos sinais.
 - A altura da seção entra em `hudBalloonHeight`.
+- **Como ficou:** uma linha por sinal, com palavras próprias — "Contexto saturado · 1 sessão",
+  "Contexto crescendo · 2 sessões", "Sem resposta há 2h10" (a frase de `CliSessionsLabels`), e com
+  várias "3 sem resposta · até 3h20". Frases como "Contexto: 1 saturada · 2 em atenção" passavam de
+  uma linha nos 240dp do balão, e "atenção" é a palavra do risco de cota. Sessão sem resposta com
+  **perfil nulo não acende conta nenhuma**, em vez de cair no perfil padrão como o plano previa: conta
+  nula não é "todas as contas". A ajuda (tópico Modos de janela) passa a descrever a ordem dos anéis,
+  a seção nova e o arrasto entre monitores.
 - Testes: agregação e perfil nulo no `HudModelTest`; textos PT/EN, altura e a ausência de
   "aguardando" no `HudNotchTest`; e um passo novo no tópico HUD da ajuda.
 
