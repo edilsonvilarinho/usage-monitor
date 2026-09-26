@@ -1100,8 +1100,10 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
     ~342 s para ~224 s. Teste de **primitiva que anima** (`AppStatesTest`, `AppDialogTest`,
     `AppControlsTest`, `AppDepthTest`, `HudNotchTest`...) continua no `AppTheme` — com `Reduced` ele
     passaria sem exercitar a transição que existe para cobrir.
-  - O Gradle distribui forks **por classe**: `ComponentTest` (103 testes) roda inteiro num fork só e é
-    o caminho crítico da suíte paralela. Classe de teste de UI nova vai em arquivo próprio, não nele.
+  - O Gradle distribui forks **por classe**, e uma classe pesada vira o caminho crítico da suíte
+    paralela: `ComponentTest`, com 103 testes e 120 s no CI, terminava sozinho num fork enquanto os
+    outros esperavam. Foi dividido em `ComponentTest`, `SettingsDialogContentTest` e `HistoryScreenTest`
+    (~30–40 s cada). Teste de tela novo vai no arquivo da tela dele, não num arquivo genérico.
 - **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
   Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
   não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois
