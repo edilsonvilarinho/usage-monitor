@@ -947,12 +947,22 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
 - **Contagem até a próxima coleta uma vez só, no fim da faixa** (#185): o polling é do app inteiro. O
   tique mora no composable e tem o interruptor `countdownUpdatesEnabled`, porque sob o relógio dos
-  testes o laço giraria para sempre; o balão da engrenagem a repete no título. **Atualização pendente
-  é só ícone, sem clique próprio** (#225): no notch seria clique de rotina reiniciando o app. O
-  balão da engrenagem traz a frase em duas linhas (numa só ela saía cortada nos 240dp) e a **mesma
-  ação da faixa** do modo padrão — "Reiniciar o app e atualizar", "Baixar atualização" —, despachada
-  por `updateBannerAction`, dona única do `when` por estado para faixa e HUD não divergirem.
-  Baixando não tem ação, como na faixa.
+  testes o laço giraria para sempre; o balão da engrenagem a repete no título.
+- **Atualização pendente é o ponto da engrenagem, sem clique no notch** (#225, #291). Ela não ocupa
+  a faixa de anéis: o ícone `SystemUpdate` que ficava ali era um celular com seta, e em 12dp ninguém
+  o lia como "versão nova". Parado, o arco de dica da engrenagem toma o tom do estado e ganha um
+  ponto; aberto, a engrenagem leva um ponto no canto, e a frase inteira vai na descrição dela — cor
+  nunca informa sozinha. O notch recolhido tem o mesmo tamanho com e sem atualização, e há teste
+  afirmando. Clique nenhum no notch reinicia o app: seria clique de rotina.
+  - **O balão da engrenagem mostra um `AppBanner` e um `AppButton`**, não frase colorida e rótulo
+    com seta — aquele só parecia clicável no hover. O texto vem partido de `updateBannerContent`
+    (`headline` numa linha, `detail` em até duas), porque o título de uma linha da faixa não cabe
+    nos ~202dp de texto do banner. A cor fica só na barra de 2dp. A ação é a **mesma da faixa** do
+    modo padrão, despachada por `updateBannerAction`, dona única do `when` por estado. Baixando não
+    tem botão, como na faixa.
+  - **A faixa do modo padrão também ganhou botão**, e deixou de ser clicável inteira: com o botão
+    dentro dela, clicar fora dele faria a mesma ação sem nada indicar. O preço é a faixa passar de
+    ~34dp para ~46dp de altura, pela altura de controle do botão.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco

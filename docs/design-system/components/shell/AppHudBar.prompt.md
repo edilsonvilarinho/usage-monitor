@@ -26,7 +26,7 @@ the same spot read 45% on one poll and 72% on the next without anything changing
 informs alone. Horizontal on top/bottom, a column on the sides, where a long word ("Sem projeção")
 wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
 seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and the focus quota with its
-window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip ends with the update icon (no click of its own — #225) and the
+window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip ends with the
 countdown to the next collection, **once**: polling is app-wide. Each text estimate carries 1dp of
 slack for Skia's whole-pixel rounding, or the countdown breaks into "04:5" at fractional densities.
 
@@ -52,10 +52,17 @@ stays composed while carried, bordered in info. Both handles slide out **from in
 fade and a 0.6 scale on `GENTLE`, and slide back in on exit; the **gear** at the far end opens a balloon with
 **everything the standard footer offers**: title with the countdown, the three window modes as rows
 (the footer's menu is a popup the HUD window would clip), the footer's own action row and, with an
-update pending, its sentence on two lines plus the **same action as the standard update strip**
-("Reiniciar o app e atualizar →", "Baixar atualização →"; none while downloading) — offered here,
-where the label says what the click does, and never on the notch icon. At rest each
-handle is a quarter arc in `outline` inside the shadow margin the resting window already has.
+update pending, an `AppBanner` (one-line title, detail on up to two lines) plus the **same action as
+the standard update strip** as an `AppButton` ("Reiniciar o app e atualizar", "Baixar atualização";
+none while downloading) — offered here, where the label says what the click does, and never on the
+notch. At rest each handle is a quarter arc in `outline` inside the shadow margin the resting window
+already has.
+
+**Update pending is the gear's dot** (#225, #291). It takes no room in the strip — the old icon was a
+phone with an arrow and nobody read it as "new version" at 12dp. At rest the gear's quarter arc takes
+the state's tone with a dot on it; open, the gear disc carries an 8dp dot in its corner. The whole
+sentence goes into the gear's label: color never informs alone. The collapsed notch has the same size
+with and without an update.
 
 **Size belongs to the geometry** (`hudNotchSizes`): the window is sized before any composition
 exists, and measuring there to feed the window would close the resize loop. Estimated from mono

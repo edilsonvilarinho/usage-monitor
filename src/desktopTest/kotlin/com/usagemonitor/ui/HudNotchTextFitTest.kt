@@ -12,9 +12,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
-import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE
-import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE_LINES
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_DETAIL_LINES
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TEXT_WIDTH
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.HUD_BALLOON_WIDTH
 import com.usagemonitor.domain.entity.ActiveSessionAlert
@@ -28,6 +27,7 @@ import com.usagemonitor.presentation.ui.hudSessionSignals
 import kotlinx.datetime.Instant
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.updateBannerContent
+import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.countdownWidth
 import com.usagemonitor.HUD_COUNTDOWN_GAP
@@ -36,6 +36,8 @@ import com.usagemonitor.percentWidth
 import com.usagemonitor.presentation.ui.HudStripLine
 import com.usagemonitor.stripLineWidth
 import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
+import com.usagemonitor.presentation.ui.theme.AppChrome
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.wordWidth
 import kotlin.test.Test
@@ -155,29 +157,35 @@ class HudNotchTextFitTest {
     }
 
     /**
-     * A frase e a ação da atualização no balão da engrenagem cabem, inteiras, nas
-     * linhas que a geometria reserva (issue #274): a frase em duas, a ação numa. As
-     * duas passaram a dizer o que reinicia, e cortadas perderiam justamente essa
-     * parte. Foi este teste que reprovou "…it will be applied when Usage Monitor
-     * closes", três linhas no balão. Versão com três dígitos por campo é o pior
-     * caso de largura.
+     * O banner e o botão da atualização no balão da engrenagem cabem, inteiros, no
+     * que a geometria reserva (issues #274 e #291): título numa linha, detalhe em
+     * até duas, rótulo do botão numa. A primeira versão desta frase, "…it will be
+     * applied when Usage Monitor closes", saía em três linhas no balão. Versão com
+     * três dígitos por campo é o pior caso de largura, e os quatro estados entram.
      */
     @Test
-    fun `a frase e a acao da atualizacao cabem no balao em qualquer escala`() = runDesktopComposeUiTest {
+    fun `o banner e o botao da atualizacao cabem no balao em qualquer escala`() = runDesktopComposeUiTest {
         val failures = mutableSetOf<String>()
         var scale by mutableStateOf(scales.first())
         val update = AppUpdateInfo(version = "138.100.100", releasePageUrl = "https://example.com")
-        val contents = AppLanguage.entries.map { language ->
-            updateBannerContent(AppUpdateUiState.Ready(update), language)
+        val states = listOf(
+            AppUpdateUiState.Available(update),
+            AppUpdateUiState.Downloading(update, percent = 100),
+            AppUpdateUiState.Downloading(update, percent = null),
+            AppUpdateUiState.Ready(update),
+            AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD),
+            AppUpdateUiState.Failed(update, AppUpdateFailureReason.SCHEDULE)
+        )
+        val contents = AppLanguage.entries.flatMap { language ->
+            states.map { state -> updateBannerContent(state, language) }
         }
         setContent {
             AppTheme(isDark = true, uiScalePercent = scale) {
                 val measurer = rememberTextMeasurer()
                 val density = LocalDensity.current
-                val small = MaterialTheme.typography.labelSmall
-                val medium = MaterialTheme.typography.labelMedium
-                // A coluna do balão; a linha de ação ainda desconta 4dp de padding de cada lado.
-                val column = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2
+                val typography = MaterialTheme.typography
+                // O botão desconta o padding horizontal de 12dp de cada lado.
+                val buttonText = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2
                 fun overflow(text: String, style: TextStyle, width: Dp, lines: Int, height: Dp): String? {
                     val result = measurer.measure(
                         text = text,
@@ -193,11 +201,19 @@ class HudNotchTextFitTest {
                     }
                 }
                 contents.forEach { content ->
-                    overflow(content.title, small, column, HUD_APP_BALLOON_UPDATE_TITLE_LINES, HUD_APP_BALLOON_UPDATE_TITLE)
+                    overflow(content.headline, typography.titleSmall, HUD_APP_BALLOON_UPDATE_TEXT_WIDTH, 1, 16.dp)
                         ?.let { failure -> failures += "$scale%: $failure" }
-                    val action = "${content.actionLabel} →"
-                    overflow(action, medium, column - 8.dp, 1, HUD_APP_BALLOON_MODE_ROW)
-                        ?.let { failure -> failures += "$scale%: $failure" }
+                    overflow(
+                        content.detail,
+                        typography.bodySmall,
+                        HUD_APP_BALLOON_UPDATE_TEXT_WIDTH,
+                        HUD_APP_BALLOON_UPDATE_DETAIL_LINES,
+                        17.dp * HUD_APP_BALLOON_UPDATE_DETAIL_LINES
+                    )?.let { failure -> failures += "$scale%: $failure" }
+                    content.actionLabel?.let { label ->
+                        overflow(label, typography.labelLarge, buttonText, 1, AppChrome.control)
+                            ?.let { failure -> failures += "$scale%: $failure" }
+                    }
                 }
             }
         }

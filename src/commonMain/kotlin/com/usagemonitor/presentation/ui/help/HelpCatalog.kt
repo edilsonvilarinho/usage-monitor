@@ -343,8 +343,9 @@ object HelpCatalog {
                 "Se a instalação não suportar a troca, o interruptor aparece desabilitado com o " +
                     "motivo escrito ao lado.",
                 "Com a versão baixada, a faixa no topo do dashboard — ou, na barra HUD, o balão da " +
-                    "engrenagem — oferece \"$UPDATE_RESTART_ACTION_PT\"; sem clicar nela, a troca " +
-                    "acontece no próximo fechamento do app."
+                    "engrenagem, que ganha um ponto colorido — oferece o botão " +
+                    "\"$UPDATE_RESTART_ACTION_PT\"; sem clicar nele, a troca acontece no próximo " +
+                    "fechamento do app."
             ),
             mediaId = "updates"
         )
@@ -600,9 +601,9 @@ object HelpCatalog {
                 "If your install cannot be swapped, the switch shows up disabled with the reason " +
                     "written next to it.",
                 "Once the version is downloaded, the strip at the top of the dashboard — or, in the HUD " +
-                    "bar, the gear balloon — offers " +
-                    "\"$UPDATE_RESTART_ACTION_EN\"; without clicking it, the swap happens the next time " +
-                    "the app closes."
+                    "bar, the gear balloon, marked with a colored dot — offers the " +
+                    "\"$UPDATE_RESTART_ACTION_EN\" button; without clicking it, the swap happens the next " +
+                    "time the app closes."
             ),
             mediaId = "updates"
         )

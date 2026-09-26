@@ -6,6 +6,8 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
+import com.usagemonitor.presentation.ui.theme.AppChrome
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -150,16 +152,16 @@ internal fun hudNotchSizes(
     hasUpdateAction: Boolean = false
 ): HudNotchSizes {
     val full = if (edge.isHorizontal) {
-        horizontalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = false)
+        horizontalCollapsed(accounts, fallbackLabel, showsCountdown, compact = false)
     } else {
-        verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = false)
+        verticalCollapsed(accounts, fallbackLabel, showsCountdown, compact = false)
     }
     val fullAlong = if (edge.isHorizontal) full.width else full.height
     val compact = accounts.isNotEmpty() && fullAlong > maxAlong
     val collapsed = when {
         !compact -> full
-        edge.isHorizontal -> horizontalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = true)
-        else -> verticalCollapsed(accounts, fallbackLabel, showsCountdown, hasUpdateIndicator, compact = true)
+        edge.isHorizontal -> horizontalCollapsed(accounts, fallbackLabel, showsCountdown, compact = true)
+        else -> verticalCollapsed(accounts, fallbackLabel, showsCountdown, compact = true)
     }
     val handlesReach = (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2
     val withHandles = if (edge.isHorizontal) {
@@ -261,26 +263,36 @@ internal val HUD_APP_BALLOON_ACTIONS = HUD_BALLOON_ACTIONS
 internal const val HUD_APP_BALLOON_MODES = 3
 
 /**
- * A frase da atualização no balão da engrenagem: duas linhas. Numa só, "Versão
- * 38.1.0 pronta — será aplicada ao fechar o Usage Monitor" saía cortada nos 240dp
- * úteis. `HudNotchTextFitTest` mede a frase e a ação contra estas linhas.
+ * O aviso de atualização no balão da engrenagem é um `AppBanner` (issue #291): a
+ * frase solta em duas linhas coloridas não tinha forma de aviso. Título numa
+ * linha (`titleSmall`, 16) e detalhe em até duas (`bodySmall`, 17 cada), dentro
+ * do padding vertical de 8dp do banner. Altura fixa para a geometria somar sem
+ * medir; o conteúdo centra, e um detalhe de uma linha só deixa folga igual em
+ * cima e embaixo. `HudNotchTextFitTest` mede título e detalhe contra ela.
  */
-internal const val HUD_APP_BALLOON_UPDATE_TITLE_LINES = 2
-internal val HUD_APP_BALLOON_UPDATE_TITLE = HUD_BALLOON_FOOTER * HUD_APP_BALLOON_UPDATE_TITLE_LINES
+internal const val HUD_APP_BALLOON_UPDATE_DETAIL_LINES = 2
+internal val HUD_APP_BALLOON_UPDATE_BANNER = 8.dp * 2 + 16.dp + 17.dp * HUD_APP_BALLOON_UPDATE_DETAIL_LINES
+
+/**
+ * A largura do texto dentro do banner: a coluna do balão menos o padding de 12dp
+ * do `AppBanner` de cada lado, a barra de tom de 2dp e o vão de 12dp até o texto.
+ */
+internal val HUD_APP_BALLOON_UPDATE_TEXT_WIDTH =
+    HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2 - 2.dp - AppSpacing.md
 
 /**
  * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
- * fileira de ações do rodapé e, quando há atualização pendente, a frase dela e —
- * com ação — a linha "Reiniciar o app e atualizar →", da altura de uma linha de modo.
+ * fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
+ * com ação — o botão, na altura de controle do sistema.
  */
 internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
     var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_CAPTION + HUD_APP_BALLOON_MODE_ROW * HUD_APP_BALLOON_MODES +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
     if (hasUpdateIndicator) {
-        height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_TITLE
+        height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_BANNER
         if (hasUpdateAction) {
-            height += HUD_APP_BALLOON_MODE_ROW
+            height += HUD_BALLOON_SECTION_GAP + AppChrome.control
         }
     }
     return height
@@ -306,7 +318,6 @@ private fun horizontalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
     showsCountdown: Boolean,
-    hasUpdateIndicator: Boolean,
     compact: Boolean
 ): DpSize {
     val items = if (accounts.isEmpty()) {
@@ -322,8 +333,9 @@ private fun horizontalCollapsed(
             }
         }
     }
+    // A atualização pendente não ocupa a faixa (issue #291): ela é o ponto da
+    // engrenagem, que mora na margem das pontas.
     val extras = buildList {
-        if (hasUpdateIndicator) add(HUD_COUNTDOWN_ICON)
         if (showsCountdown) add(countdownWidth())
     }
     val all = items + extras
@@ -344,7 +356,6 @@ private fun verticalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
     showsCountdown: Boolean,
-    hasUpdateIndicator: Boolean,
     compact: Boolean
 ): DpSize {
     val words = when {
@@ -364,7 +375,6 @@ private fun verticalCollapsed(
         }
     }
     val extras = buildList {
-        if (hasUpdateIndicator) add(HUD_COUNTDOWN_ICON)
         if (showsCountdown) add(HUD_COUNTDOWN_ICON + HUD_WORD_LINE)
     }
     val all = itemHeights + extras

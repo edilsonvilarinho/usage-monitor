@@ -47,9 +47,13 @@ export interface AppHudBarProps {
   fallbackLabel?: string;
   /** `02:05` — next automatic collection, once, at the end of the strip. */
   countdown?: string;
-  /** Pending update sentence; the icon has no click of its own. */
+  /** Pending update sentence. On the notch it is only the gear's dot and its label (#291) — no click. */
   update?: string;
-  /** The update strip's action label, offered in the gear balloon only (none while downloading). */
+  /** The same notice split for the gear balloon's banner: one-line title… */
+  updateHeadline?: string;
+  /** …and a detail of up to two lines. */
+  updateDetail?: string;
+  /** The update strip's action label, a button in the gear balloon only (none while downloading). */
   updateAction?: string;
   /** Glyphs of the card's buttons shown in an account balloon (refresh is always last). */
   actions?: string[];

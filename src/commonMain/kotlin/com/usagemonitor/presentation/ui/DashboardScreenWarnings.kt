@@ -1,14 +1,11 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,13 +17,17 @@ import com.usagemonitor.domain.repository.CursorUsageFailureKind
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppBanner
+import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.UiApiError
 
 const val APP_UPDATE_BANNER_TAG = "appUpdateBanner"
+
+/** O botão da ação da faixa de atualização (issue #291). */
+const val APP_UPDATE_BANNER_ACTION_TAG = "appUpdateBannerAction"
 
 /**
  * A ação recarrega só o alvo que falhou. Recarregar toda a fonte também refazia a
@@ -347,9 +348,10 @@ internal fun warningFor(
  * no topo do dashboard empurrando os cards enquanto a atualização não fosse
  * instalada (issue #67).
  *
- * A faixa inteira é clicável e não há botão: a descrição só repetia em prosa o que
- * o rótulo da ação já diz, e uma linha clicável entrega a mesma ação com um terço
- * da altura.
+ * A ação é um [AppButton] de verdade, não um rótulo com seta (issue #291): a faixa
+ * inteira clicável com "Reiniciar… →" no tom do estado não parecia botão, e só o
+ * hover revelava o alvo. A faixa deixou de ser clicável junto — com o botão dentro
+ * dela, clicar fora dele faria a mesma ação sem nada indicar isso.
  *
  * Com a atualização automática ligada a faixa ganhou mais três estados. O
  * progresso é **texto**, nunca indicador animado: animação sem fim trava o
@@ -370,27 +372,26 @@ internal fun AppUpdateBanner(
         onOpenRelease = onOpenRelease,
         onRestartAndUpdate = onRestartAndUpdate
     )
+    val actionLabel = content.actionLabel
 
     // É o [AppBanner] do sistema, não um `Surface` próprio: mesma superfície,
-    // mesma borda de 1dp, mesmo marcador de 2dp à esquerda — o marcador que ele
-    // desenhava à mão era uma cópia do que a primitiva já traz. A faixa continua
-    // sem descrição, porque ela repetiria em prosa o que o rótulo da ação diz, e
-    // é isso que a mantém com um terço da altura de um aviso de duas linhas.
+    // mesma borda de 1dp, mesmo marcador de 2dp à esquerda. A faixa continua sem
+    // descrição, porque ela repetiria em prosa o que o rótulo da ação diz.
     AppBanner(
         title = content.title,
         tone = content.tone,
-        modifier = modifier
-            .then(if (action != null) Modifier.clickable(onClick = action) else Modifier)
-            .testTag(APP_UPDATE_BANNER_TAG),
-        action = if (content.actionLabel == null) {
+        modifier = modifier.testTag(APP_UPDATE_BANNER_TAG),
+        action = if (actionLabel == null || action == null) {
             null
         } else {
             {
-                Text(
-                    text = "${content.actionLabel} →",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = content.tone.color(),
-                    maxLines = 1
+                AppButton(
+                    label = actionLabel,
+                    onClick = action,
+                    // DEFAULT e não PRIMARY: primária é uma por tela, e a faixa
+                    // convive com o dashboard inteiro.
+                    tone = AppButtonTone.DEFAULT,
+                    modifier = Modifier.testTag(APP_UPDATE_BANNER_ACTION_TAG)
                 )
             }
         }
@@ -439,7 +440,9 @@ internal fun updateBannerContent(
         is AppUpdateUiState.Available -> UpdateBannerContent(
             title = if (isPt) "Nova versão $version disponível" else "Version $version is available",
             actionLabel = if (isPt) "Baixar atualização" else "Download update",
-            tone = AppTone.INFO
+            tone = AppTone.INFO,
+            headline = if (isPt) "Nova versão $version" else "New version $version",
+            detail = if (isPt) "Baixe pela página da versão" else "Download it from the release page"
         )
 
         is AppUpdateUiState.Downloading -> UpdateBannerContent(
@@ -452,7 +455,16 @@ internal fun updateBannerContent(
                 else -> "Downloading version $version — ${state.percent}%"
             },
             actionLabel = null,
-            tone = AppTone.INFO
+            tone = AppTone.INFO,
+            // O percentual desce para o detalhe: "Downloading 138.100.100 — 100%"
+            // passa da largura do banner do balão.
+            headline = if (isPt) "Baixando $version" else "Downloading $version",
+            detail = when {
+                state.percent == null && isPt -> "Em segundo plano"
+                state.percent == null -> "In the background"
+                isPt -> "${state.percent}% concluído"
+                else -> "${state.percent}% done"
+            }
         )
 
         is AppUpdateUiState.Ready -> UpdateBannerContent(
@@ -462,7 +474,9 @@ internal fun updateBannerContent(
                 "Version $version is ready — applies when Usage Monitor closes"
             },
             actionLabel = if (isPt) UPDATE_RESTART_ACTION_PT else UPDATE_RESTART_ACTION_EN,
-            tone = AppTone.OK
+            tone = AppTone.OK,
+            headline = if (isPt) "Versão $version pronta" else "Version $version ready",
+            detail = if (isPt) "Aplicada ao fechar o Usage Monitor" else "Applies when Usage Monitor closes"
         )
 
         is AppUpdateUiState.Failed -> UpdateBannerContent(
@@ -470,8 +484,18 @@ internal fun updateBannerContent(
             // O caminho manual é o comportamento que o app sempre teve; a falha
             // do automático devolve o usuário a ele em vez de deixá-lo sem saída.
             actionLabel = if (isPt) "Baixar manualmente" else "Download manually",
-            tone = AppTone.WARNING
+            tone = AppTone.WARNING,
+            headline = if (isPt) "Falha na versão $version" else "Version $version failed",
+            detail = updateFailureDetail(reason = state.reason, isPt = isPt)
         )
+    }
+}
+
+/** A falha em poucas palavras, para o banner estreito do balão da HUD. */
+private fun updateFailureDetail(reason: AppUpdateFailureReason, isPt: Boolean): String {
+    return when (reason) {
+        AppUpdateFailureReason.DOWNLOAD -> if (isPt) "O download não terminou" else "The download did not finish"
+        AppUpdateFailureReason.SCHEDULE -> if (isPt) "A instalação não iniciou" else "The install did not start"
     }
 }
 
@@ -513,10 +537,18 @@ internal data class DashboardWarning(
 }
 
 internal data class UpdateBannerContent(
+    /** A frase de uma linha da faixa do modo padrão, e a descrição semântica. */
     val title: String,
-    /** Nulo quando o estado não oferece ação — a faixa deixa de ser clicável. */
+    /** Nulo quando o estado não oferece ação — a faixa fica sem botão. */
     val actionLabel: String?,
-    val tone: AppTone
+    val tone: AppTone,
+    /**
+     * O mesmo aviso partido em dois (issue #291), para o banner do balão da
+     * engrenagem da HUD, que tem 240dp: o título inteiro numa linha só sairia
+     * cortado, e em duas linhas coloridas era o texto solto que a issue apontou.
+     */
+    val headline: String,
+    val detail: String
 )
 
 /**

@@ -6,7 +6,8 @@ import type { ReactNode, CSSProperties } from 'react';
  * @startingPoint section="Feedback" subtitle="Banner — info, warn, crit, with action" viewport="700x210"
  */
 export interface AppBannerProps {
-  level?: 'info' | 'warn' | 'crit' | 'neutral';
+  /** `ok` is the update ready to apply — `AppTone.OK` in Compose. */
+  level?: 'info' | 'ok' | 'warn' | 'crit' | 'neutral';
   /** Mono 12 semibold. Names the source and the fact. */
   title: ReactNode;
   /** Sans 12. One or two sentences of consequence — what the user now sees or does not see. */
