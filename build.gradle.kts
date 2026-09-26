@@ -185,10 +185,16 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 //
 // Foi exatamente o que aconteceu: passou local, passou no primeiro run do CI e
 // derrubou o segundo com `ExceptionInInitializerError` em `AppThemeScaleTest` e
-// em 40 testes de `ComponentTest`. Ligar isto no CI depende de pre-extrair a
-// biblioteca nativa antes da suite; ate la, o default seguro e serial.
+// em 40 testes de `ComponentTest`.
+//
+// Por isso, com mais de um fork, `extractSkikoNative` roda ANTES da suite num
+// processo so (issue #295): a DLL chega a `~/.skiko` sem concorrencia e cada
+// fork encontra o cache quente. O CI passa `-PtestForks=3`; localmente o
+// default continua serial.
+val testForks = providers.gradleProperty("testForks").orNull?.toIntOrNull() ?: 1
+
 tasks.withType<Test>().configureEach {
-    maxParallelForks = providers.gradleProperty("testForks").orNull?.toIntOrNull() ?: 1
+    maxParallelForks = testForks
     maxHeapSize = "1g"
 }
 
@@ -255,6 +261,22 @@ tasks.register<JavaExec>("generateHelpMedia") {
     mainClass.set("com.usagemonitor.screenshots.HelpMediaGeneratorKt")
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(layout.projectDirectory.dir("src/desktopMain/resources/help").asFile.absolutePath)
+}
+
+// Pre-extracao da nativa do Skiko antes dos forks paralelos -- ver o comentario
+// de `testForks` acima. Sem forks nao ha corrida, e a tarefa nao entra no grafo.
+val extractSkikoNative = tasks.register<JavaExec>("extractSkikoNative") {
+    group = "verification"
+    description = "Extrai a biblioteca nativa do Skiko antes dos forks paralelos da suite."
+
+    mainClass.set("com.usagemonitor.SkikoWarmupKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+}
+
+if (testForks > 1) {
+    tasks.named<Test>("desktopTest") {
+        dependsOn(extractSkikoNative)
+    }
 }
 
 // Adicionar manifest ao desktopJar para tornÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡-lo executÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡vel
