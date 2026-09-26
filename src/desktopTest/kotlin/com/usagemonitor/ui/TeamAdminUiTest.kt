@@ -42,7 +42,6 @@ import com.usagemonitor.presentation.ui.components.TEAM_PROFILE_REJECTION_TAG_PR
 import com.usagemonitor.presentation.ui.components.TEAM_SYNC_STATUS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.TeamKeysUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -201,7 +200,7 @@ class TeamAdminSectionTest {
         rejectedProfiles: Map<String, String> = emptyMap()
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(620.dp).height(900.dp)) {
                     TeamIntegrationSection(
                         settings = settings,
@@ -402,7 +401,7 @@ class TeamKeysAdminScreenTest {
         onUnblockAccount: (String) -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamKeysAdminContent(
                         state = state,

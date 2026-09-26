@@ -119,7 +119,6 @@ import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.components.quotaBlockTag
 import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
 import com.usagemonitor.presentation.ui.historyAccountChipTag
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_PLAN_TAG
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -171,7 +170,7 @@ class ComponentTest {
     @Test
     fun `AppUsageRing carries account word and quotas in its description`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AppUsageRing(
                     arcs = listOf(
                         AppRingArc(fraction = 0.88f, tone = AppTone.CRITICAL),
@@ -192,7 +191,7 @@ class ComponentTest {
     @Test
     fun `AppUsageRing active and attention do not animate forever without the policy`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AppUsageRing(
                     arcs = listOf(AppRingArc(fraction = 1.4f, tone = AppTone.CRITICAL, hasForecast = false)),
                     description = "Codex · Crítico",
@@ -210,7 +209,7 @@ class ComponentTest {
     fun `ApiUsageCard shows the account plan beside the title`() = runDesktopComposeUiTest {
         var plan by mutableStateOf<String?>("Max 20x")
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic — Padrão",
@@ -237,7 +236,7 @@ class ComponentTest {
     fun `ApiUsageCard shows the account emoji beside the provider mark`() = runDesktopComposeUiTest {
         var emoji by mutableStateOf<AccountEmoji?>(AccountEmoji.FOX)
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic — Trabalho",
@@ -263,7 +262,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows interval and weekly quotas in the same card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -324,7 +323,7 @@ class ComponentTest {
             workspaceName = "Equipe Principal"
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -364,7 +363,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps the session buttons plain without a pulse`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AnthropicCardWithSessionButtons(
                     cliPulse = SessionPulse.EMPTY,
                     teamPulse = SessionPulse.EMPTY
@@ -385,7 +384,7 @@ class ComponentTest {
         mainClock.autoAdvance = false
         val activity = Instant.parse("2026-04-28T10:00:00Z")
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AnthropicCardWithSessionButtons(
                     cliPulse = SessionPulse(
                         listOf(
@@ -425,7 +424,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps a single quota centered when weekly data is absent`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.MINIMAX,
                     apiName = "MiniMax",
@@ -457,7 +456,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps both Codex quotas while showing an inline notice`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -515,7 +514,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps both Codex quotas when usage is zero`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -554,7 +553,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders stable Codex quotas with progress tracks when expanded`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -600,7 +599,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps Codex compact badges without progress tracks when minimized`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -648,7 +647,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard notice hint opens the notice texts on hover`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -700,7 +699,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows the missing credits notice on a minimized card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -748,7 +747,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows balance title for currency quotas`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.DEEPSEEK,
                     apiName = "DeepSeek",
@@ -788,7 +787,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard prints the balance in the account currency`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.DEEPSEEK,
                     apiName = "DeepSeek",
@@ -822,7 +821,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders OpenRouter balance`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.OPENROUTER,
                     apiName = "OpenRouter",
@@ -863,7 +862,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders OpenCode Go as percentage quotas`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.OPENCODE_GO,
                     apiName = "OpenCode Go",
@@ -914,7 +913,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows anthropic extra credits in the account currency`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(420.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -980,7 +979,7 @@ class ComponentTest {
         var opened = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -1013,7 +1012,7 @@ class ComponentTest {
         var opened = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic — Padrão",
@@ -1046,7 +1045,7 @@ class ComponentTest {
         var opened = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -1077,7 +1076,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows compact quota labels when minimized`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1123,7 +1122,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows quota tooltip on hover while minimized`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1173,7 +1172,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard drops the quota tooltip on a narrow card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(240.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -1233,7 +1232,7 @@ class ComponentTest {
         val risk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = null)
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(240.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -1269,7 +1268,7 @@ class ComponentTest {
         val risk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = null)
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(240.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -1308,7 +1307,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1351,7 +1350,7 @@ class ComponentTest {
         val resetsAt = Instant.parse("2026-04-28T17:40:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1398,7 +1397,7 @@ class ComponentTest {
         setContent {
             var now by remember { mutableStateOf(resetsAt - 1.minutes) }
 
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Column {
                     // Só para o teste mover o relógio; na app quem move é a
                     // DashboardScreen, que dorme até o próximo periodEndAt.
@@ -1440,7 +1439,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1473,7 +1472,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard stacks compact quota badges on very narrow cards`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1522,7 +1521,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps compact quota badges side by side on wide cards`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1585,7 +1584,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1627,7 +1626,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1664,7 +1663,7 @@ class ComponentTest {
             unit = UsageUnit.PERCENTAGE
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1704,7 +1703,7 @@ class ComponentTest {
     @Test
     fun `card header has no status badge when no quota has a projection`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1745,7 +1744,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1782,7 +1781,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1817,7 +1816,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1844,7 +1843,7 @@ class ComponentTest {
     @Test
     fun `RiskSemaphoreDot is absent when no risk summary is provided for the quota`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1877,7 +1876,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps a single compact quota narrower than the card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(
                     modifier = Modifier
                         .width(640.dp)
@@ -1926,7 +1925,7 @@ class ComponentTest {
         var actionClicked = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 PersistentApiWarningBanner(
                     title = "Anthropic precisa de autenticação",
                     description = "Faça login no Claude Code e tente novamente.",
@@ -1947,7 +1946,7 @@ class ComponentTest {
     @Test
     fun `ApiCheckboxRow is checked when isChecked is true`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.ANTHROPIC,
                     isChecked = true,
@@ -1963,7 +1962,7 @@ class ComponentTest {
     @Test
     fun `ApiCheckboxRow keeps Codex row plain by default`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.CODEX,
                     isChecked = true,
@@ -1989,7 +1988,7 @@ class ComponentTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.MINIMAX,
                     isChecked = false,
@@ -2009,7 +2008,7 @@ class ComponentTest {
     @Test
     fun `ApiCheckboxRow omits the edit icon when there is no key to manage`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.ANTHROPIC,
                     isChecked = true,
@@ -2032,7 +2031,7 @@ class ComponentTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.MINIMAX,
                     isChecked = true,
@@ -2059,7 +2058,7 @@ class ComponentTest {
     @Test
     fun `ApiSelector gives each edit icon a distinct accessible label`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2086,7 +2085,7 @@ class ComponentTest {
     @Test
     fun `ThemeToggle shows dark label when isDark is true`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ThemeToggle(isDark = true, onToggle = {})
             }
         }
@@ -2097,7 +2096,7 @@ class ComponentTest {
     @Test
     fun `ThemeToggle shows light label when isDark is false`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = false) {
+            ScreenTestTheme(isDark = false) {
                 ThemeToggle(isDark = false, onToggle = {})
             }
         }
@@ -2110,7 +2109,7 @@ class ComponentTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ThemeToggle(isDark = true, onToggle = { toggled = true })
             }
         }
@@ -2135,7 +2134,7 @@ class ComponentTest {
         val chosen = mutableListOf<WindowMode>()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2169,7 +2168,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2212,7 +2211,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2247,7 +2246,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2287,7 +2286,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2326,7 +2325,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2356,7 +2355,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2384,7 +2383,7 @@ class ComponentTest {
         var savedKey: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2426,7 +2425,7 @@ class ComponentTest {
         var savedKey: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2466,7 +2465,7 @@ class ComponentTest {
         var toggledApi: ApiSource? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2496,7 +2495,7 @@ class ComponentTest {
         val enabledSources = mutableSetOf<ApiSource>()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2535,7 +2534,7 @@ class ComponentTest {
         var savedKey: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2569,7 +2568,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent omits the pencil for sources without a local key`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2600,7 +2599,7 @@ class ComponentTest {
         var removed: ApiSource? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2635,7 +2634,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent hides the remove button when there is no stored key`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2661,7 +2660,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent keeps the dialog open when removal fails`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2695,7 +2694,7 @@ class ComponentTest {
         var toggleCalls = 0
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2733,7 +2732,7 @@ class ComponentTest {
         var enabled: Boolean? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2763,7 +2762,7 @@ class ComponentTest {
         var enabled: Boolean? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2790,7 +2789,7 @@ class ComponentTest {
         var enabled: Boolean? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2815,7 +2814,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent displays localized controls in EN`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.EN,
@@ -2872,7 +2871,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent shows one tab at a time`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.EN,
@@ -2901,7 +2900,7 @@ class ComponentTest {
         var lastReportedPercent = -1
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var percent by remember { mutableStateOf(75) }
                 WindowOpacitySlider(
                     percent = percent,
@@ -2927,7 +2926,7 @@ class ComponentTest {
     @Test
     fun `WindowOpacitySlider explains why the control is unavailable when disabled`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 WindowOpacitySlider(
                     percent = 100,
                     language = AppLanguage.EN,
@@ -2943,7 +2942,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent expands Anthropic profile editor only after Edit click`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var expandedProfileId by remember { mutableStateOf<String?>(null) }
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
@@ -2994,7 +2993,7 @@ class ComponentTest {
     fun `accounts tab picks an account color and marks the current one`() = runDesktopComposeUiTest {
         val picked = mutableListOf<Pair<String, AccountAccent?>>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var color by remember { mutableStateOf<AccountAccent?>(null) }
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
@@ -3046,7 +3045,7 @@ class ComponentTest {
     fun `accounts tab picks an account emoji and marks the current one`() = runDesktopComposeUiTest {
         val picked = mutableListOf<Pair<String, AccountEmoji?>>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var emoji by remember { mutableStateOf<AccountEmoji?>(null) }
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
@@ -3101,7 +3100,7 @@ class ComponentTest {
         var resolved = emptyList<Color>()
         var expected = emptyList<Color>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 resolved = listOf(
                     accountAccentColor(work, colors),
                     accountAccentColor(personal, colors),
@@ -3119,7 +3118,7 @@ class ComponentTest {
         var current = UsageAlertSettings.DEFAULT
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
                 AlertSettingsSection(
                     settings = settings,
@@ -3146,7 +3145,7 @@ class ComponentTest {
     @Test
     fun `AlertSettingsSection shows a stored threshold outside the offered list`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AlertSettingsSection(
                     settings = UsageAlertSettings.DEFAULT.copy(quotaPercents = listOf(63, 90)),
                     language = AppLanguage.PT,
@@ -3164,7 +3163,7 @@ class ComponentTest {
         var current = UsageAlertSettings.DEFAULT
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
                 AlertSettingsSection(
                     settings = settings,
@@ -3194,7 +3193,7 @@ class ComponentTest {
     @Test
     fun `AlertSettingsSection reveals the quiet range only when it is enabled`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
                 AlertSettingsSection(
                     settings = settings,
@@ -3216,7 +3215,7 @@ class ComponentTest {
     @Test
     fun `SettingsDialogContent hosts its own toast area`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -3244,7 +3243,7 @@ class ComponentTest {
         var committed: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 TeamIntegrationSection(
                     settings = ACTIVE_TEAM_SETTINGS,
                     language = AppLanguage.PT,
@@ -3275,7 +3274,7 @@ class ComponentTest {
         var committed: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 TeamIntegrationSection(
                     settings = ACTIVE_TEAM_SETTINGS,
                     language = AppLanguage.PT,
@@ -3306,7 +3305,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders OpenCode free model activity without percentage gauges`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.OPENCODE,
                     apiName = "OpenCode Zen Free",
@@ -3350,7 +3349,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders Kilo free model activity without percentage gauges`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.KILO,
                     apiName = "Kilo Free",
@@ -3399,7 +3398,7 @@ class ComponentTest {
     @Test
     fun `Cursor card names each allowance and explains a stale reading`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CURSOR,
                     apiName = "Cursor",
@@ -3445,7 +3444,7 @@ class ComponentTest {
     @Test
     fun `Antigravity card renders one percentage quota per model group`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTIGRAVITY,
                     apiName = "Antigravity CLI",
@@ -3488,7 +3487,7 @@ class ComponentTest {
     fun `OpenCode and Kilo observed activity values stay horizontal in narrow expanded cards`() = runDesktopComposeUiTest(width = 260, height = 1_200) {
         mainClock.autoAdvance = false
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(260.dp).height(1_200.dp)) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         ApiUsageCard(
@@ -3633,7 +3632,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -3768,7 +3767,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -3896,7 +3895,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -3929,7 +3928,7 @@ class ComponentTest {
     @Test
     fun `LanguageSelector displays PT and EN options`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 LanguageSelector(
                     currentLanguage = AppLanguage.PT,
                     onLanguageChange = {}
@@ -3946,7 +3945,7 @@ class ComponentTest {
         var selected: AppLanguage? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 LanguageSelector(
                     currentLanguage = AppLanguage.PT,
                     onLanguageChange = { selected = it }
@@ -3995,7 +3994,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -4095,7 +4094,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -4210,7 +4209,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -4303,7 +4302,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,
@@ -4394,7 +4393,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 HistoryScreen(
                     viewModel = viewModel,
                     language = AppLanguage.PT,

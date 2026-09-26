@@ -16,7 +16,6 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.components.THEME_PRESET_TEST_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.ThemePresetPicker
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +26,7 @@ class ThemePresetPickerTest {
     @Test
     fun `picker renders all presets`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(preset = AppThemePreset.OBSIDIANA_DARK) {
+            ScreenTestTheme(preset = AppThemePreset.OBSIDIANA_DARK) {
                 Box(modifier = Modifier.width(700.dp).height(560.dp)) {
                     ThemePresetPicker(
                         selected = AppThemePreset.OBSIDIANA_DARK,
@@ -45,7 +44,7 @@ class ThemePresetPickerTest {
     @Test
     fun `picker wraps on a narrow settings surface`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(preset = AppThemePreset.PORCELANA_LIGHT) {
+            ScreenTestTheme(preset = AppThemePreset.PORCELANA_LIGHT) {
                 Box(modifier = Modifier.width(300.dp).height(1_200.dp)) {
                     ThemePresetPicker(
                         selected = AppThemePreset.PORCELANA_LIGHT,
@@ -66,7 +65,7 @@ class ThemePresetPickerTest {
         var callbackValue: AppThemePreset? = null
 
         setContent {
-            AppTheme(preset = selected) {
+            ScreenTestTheme(preset = selected) {
                 ThemePresetPicker(
                     selected = selected,
                     onSelect = {

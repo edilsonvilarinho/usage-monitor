@@ -19,7 +19,6 @@ import com.usagemonitor.domain.usecase.GenerateBugReportUseCase
 import com.usagemonitor.presentation.ui.BugReportHost
 import com.usagemonitor.presentation.ui.components.BUG_REPORT_DESCRIPTION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.BUG_REPORT_STATUS_TEST_TAG
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.BugReportSaveRequest
 import com.usagemonitor.presentation.viewmodel.BugReportSaveResult
 import com.usagemonitor.presentation.viewmodel.BugReportWriter
@@ -173,7 +172,7 @@ class BugReportHostTest {
         useCase: GenerateBugReportUseCase = generator(recorder)
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 val hostVisible = androidx.compose.runtime.remember {
                     androidx.compose.runtime.mutableStateOf(true)
                 }

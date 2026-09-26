@@ -25,7 +25,6 @@ import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_RECEIPT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AUTO_UPDATE_TEXT_BLOCK_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AutoUpdateToggle
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -279,7 +278,7 @@ class AutoUpdateToggleTest {
     @Test
     fun `english translates the hint and the receipt`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(560.dp)) {
                     AutoUpdateToggle(
                         enabled = true,
@@ -313,7 +312,7 @@ class AutoUpdateToggleTest {
         onToggle: (Boolean) -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(560.dp)) {
                     AutoUpdateToggle(
                         enabled = enabled,

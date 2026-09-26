@@ -13,7 +13,6 @@ import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUOTA_COVERAGE
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_SPIKE_FACTOR_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -147,7 +146,7 @@ class AlertSettingsSectionTest {
         onSettingsChange: (UsageAlertSettings) -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AlertSettingsSection(
                     settings = settings,
                     language = language,

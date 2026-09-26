@@ -16,7 +16,6 @@ import com.usagemonitor.presentation.ui.components.BUG_REPORT_PREVIEW_TEST_TAG
 import com.usagemonitor.presentation.ui.components.BUG_REPORT_SCREENSHOT_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.BUG_REPORT_STATUS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.BugReportDialog
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlin.test.Test
@@ -89,7 +88,7 @@ class BugReportDialogTest {
             var expanded by androidx.compose.runtime.remember {
                 androidx.compose.runtime.mutableStateOf(false)
             }
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 BugReportDialog(
                     description = "caiu",
                     onDescriptionChange = {},
@@ -182,7 +181,7 @@ class BugReportDialogTest {
         onOpenIssue: () -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 BugReportDialog(
                     description = description,
                     onDescriptionChange = onDescriptionChange,
