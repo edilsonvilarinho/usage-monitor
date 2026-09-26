@@ -11,6 +11,10 @@ import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.datetime.Instant
 
 class HudNotchGeometryTest {
 
@@ -247,6 +251,32 @@ class HudNotchGeometryTest {
         val full = hudNotchSizes(accounts, HudEdge.TOP, "", showsCountdown = true, hasUpdateIndicator = true)
         assertTrue(full.collapsed.width > bare.collapsed.width)
         assertEquals(bare.collapsed.height, full.collapsed.height)
+    }
+
+    /**
+     * Na coluna vertical a contagem é uma linha só, ícone e tempo lado a lado
+     * (#293): empilhados eles custavam uma linha a mais para o mesmo `05:42`.
+     */
+    @Test
+    fun `na lateral a contagem ocupa uma linha so`() {
+        val accounts = listOf(account("Padrão", "Sem projeção", listOf("5h" to "9%", "7d" to "18%")))
+        val bare = hudNotchSizes(accounts, HudEdge.RIGHT, "", showsCountdown = false, hasUpdateIndicator = false)
+        val timed = hudNotchSizes(accounts, HudEdge.RIGHT, "", showsCountdown = true, hasUpdateIndicator = false)
+        assertEquals(HUD_WORD_LINE + HUD_ITEM_GAP, timed.collapsed.height - bare.collapsed.height)
+        assertTrue(timed.collapsed.width >= countdownWidth() + HUD_NOTCH_PADDING_ACROSS * 2)
+    }
+
+    @Test
+    fun `o relogio vai de cheio a vazio ao longo do intervalo`() {
+        val next = Instant.parse("2026-09-26T12:10:00Z")
+        val interval = 10.minutes
+        assertEquals(1f, hudRefreshFraction(next, next - 10.minutes, interval))
+        assertEquals(0.5f, hudRefreshFraction(next, next - 5.minutes, interval))
+        assertEquals(0f, hudRefreshFraction(next, next, interval))
+        // Coleta atrasada não vira fração negativa; agendamento além do intervalo não passa de cheio.
+        assertEquals(0f, hudRefreshFraction(next, next + 30.seconds, interval))
+        assertEquals(1f, hudRefreshFraction(next, next - 15.minutes, interval))
+        assertEquals(0f, hudRefreshFraction(next, next - 1.minutes, Duration.ZERO))
     }
 
     @Test

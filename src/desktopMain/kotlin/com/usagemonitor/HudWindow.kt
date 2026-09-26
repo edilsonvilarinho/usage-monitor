@@ -350,6 +350,7 @@ internal fun HudWindowHost(
                     updateIndicator = updateIndicator,
                     nextRefreshAt = nextRefreshAt,
                     countdownDescription = nextRefreshLabel(language),
+                    refreshInterval = viewModel.pollInterval,
                     notchCenter = centerInWindow,
                     language = language,
                     onHoverChange = { isHovered -> hovered = isHovered },
@@ -382,7 +383,7 @@ internal fun HudWindowHost(
                                     HudCountdown(
                                         nextRefreshAt = refreshAt,
                                         description = nextRefreshLabel(language),
-                                        vertical = false,
+                                        interval = viewModel.pollInterval,
                                         nowProvider = { Clock.System.now() },
                                         waitNextTick = { delay(1_000L) },
                                         updatesEnabled = true

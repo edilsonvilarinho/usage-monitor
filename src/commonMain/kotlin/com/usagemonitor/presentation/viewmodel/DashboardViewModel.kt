@@ -71,6 +71,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
+import kotlin.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
@@ -228,6 +229,10 @@ class DashboardViewModel(
 
     private val _nextRefreshAt = MutableStateFlow(initialScheduledRefreshAt)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
+
+    /** O intervalo do polling: é a volta inteira do relógio da contagem na HUD (#293). */
+    val pollInterval: Duration
+        get() = config.pollInterval
 
     private val _refreshingTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
     val refreshingTargets: StateFlow<Set<UsageTargetKey>> = _refreshingTargets.asStateFlow()

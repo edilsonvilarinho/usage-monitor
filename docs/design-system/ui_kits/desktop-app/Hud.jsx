@@ -55,27 +55,27 @@ export function Hud() {
 
       <Caption>1 · parado no topo — anel, uma linha por janela e a palavra de cada conta</Caption>
       <Screen>
-        <AppHudBar accounts={ACCOUNTS} countdown="02:05" />
+        <AppHudBar accounts={ACCOUNTS} countdown="02:05" refreshFraction={0.21} />
       </Screen>
 
       <Caption>2 · ponteiro no primeiro anel — balão só daquela conta, alças nas pontas</Caption>
       <Screen tall>
-        <AppHudBar accounts={ACCOUNTS} balloon={0} countdown="02:05" actions={['⟲', '▣', '⚇', '◉']} />
+        <AppHudBar accounts={ACCOUNTS} balloon={0} countdown="02:05" refreshFraction={0.21} actions={['⟲', '▣', '⚇', '◉']} />
       </Screen>
 
       <Caption>3 · colado na lateral direita — o balão abre para dentro, a cauda no anel</Caption>
       <Screen edge="right" tall>
-        <AppHudBar accounts={ACCOUNTS} edge="right" balloon={0} countdown="02:05" />
+        <AppHudBar accounts={ACCOUNTS} edge="right" balloon={0} countdown="02:05" refreshFraction={0.21} />
       </Screen>
 
       <Caption>3b · engrenagem — o que o rodapé oferece: contagem, modos, ações</Caption>
       <Screen tall>
-        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" />
+        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" refreshFraction={0.21} />
       </Screen>
 
       <Caption>3c · engrenagem com atualização pronta — ponto na engrenagem, banner e o botão da faixa do modo padrão</Caption>
       <Screen tall>
-        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05"
+        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" refreshFraction={0.21}
           update="Versão 38.1.0 pronta — será aplicada ao fechar o Usage Monitor"
           updateHeadline="Versão 38.1.0 pronta" updateDetail="Aplicada ao fechar o Usage Monitor"
           updateAction="Reiniciar o app e atualizar" />
@@ -83,7 +83,7 @@ export function Hud() {
 
       <Caption>4 · antes da primeira coleta, com atualização pendente — parado, o sinal é o arco da engrenagem</Caption>
       <Screen>
-        <AppHudBar accounts={[]} fallbackLabel="Carregando" countdown="02:05" update="Atualização pronta" />
+        <AppHudBar accounts={[]} fallbackLabel="Carregando" countdown="02:05" refreshFraction={0.21} update="Atualização pronta" />
       </Screen>
 
       <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '58ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -44,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
@@ -75,6 +77,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
@@ -101,6 +104,7 @@ import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.HUD_RING_TEXT_GAP
 import com.usagemonitor.HUD_SHADOW_MARGIN
 import com.usagemonitor.HudEdge
+import com.usagemonitor.hudRefreshFraction
 import com.usagemonitor.HudNotchSizes
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
@@ -126,6 +130,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** Descrição do corpo do notch — é por ela que leitor de tela e testes o acham. */
 internal const val HUD_NOTCH_DESCRIPTION = "Barra HUD do Usage Monitor"
@@ -187,6 +193,8 @@ internal fun HudNotch(
     updateIndicator: HudUpdateIndicator? = null,
     nextRefreshAt: Instant? = null,
     countdownDescription: String? = null,
+    /** O intervalo de coleta do app: a volta inteira do relógio da contagem (#293). */
+    refreshInterval: Duration? = null,
     /** Centro do notch ao longo da borda, no contêiner; `null` centra. */
     notchCenter: Dp? = null,
     language: AppLanguage = AppLanguage.PT,
@@ -267,7 +275,7 @@ internal fun HudNotch(
             HudCountdown(
                 nextRefreshAt = nextRefreshAt,
                 description = countdownDescription,
-                vertical = !edge.isHorizontal,
+                interval = refreshInterval,
                 nowProvider = nowProvider,
                 waitNextTick = waitNextTick,
                 updatesEnabled = countdownUpdatesEnabled
@@ -819,6 +827,9 @@ private fun HudRingItem(
             text = account.statusLabel,
             style = MaterialTheme.typography.labelSmall,
             color = account.tone.color(),
+            // Na coluna vertical "Sem projeção" quebra em duas linhas; alinhadas
+            // à esquerda elas destoavam do anel e dos percentuais, centrados.
+            textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -944,7 +955,8 @@ internal class HudNotchShape(private val edge: HudEdge) : Shape {
 internal fun HudCountdown(
     nextRefreshAt: Instant,
     description: String,
-    vertical: Boolean,
+    /** Com o intervalo, o ícone é o relógio que esvazia; sem ele, o ↻ de sempre. */
+    interval: Duration? = null,
     nowProvider: () -> Instant,
     waitNextTick: suspend () -> Unit,
     updatesEnabled: Boolean
@@ -968,12 +980,20 @@ internal fun HudCountdown(
     }
 
     val icon: @Composable () -> Unit = {
-        Icon(
-            imageVector = Icons.Rounded.Refresh,
-            contentDescription = description,
-            modifier = Modifier.size(HUD_COUNTDOWN_ICON),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (interval == null) {
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = description,
+                modifier = Modifier.size(HUD_COUNTDOWN_ICON),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            // A fração sai dos mesmos segundos que o texto mostra, não de um segundo relógio.
+            HudCountdownClock(
+                fraction = hudRefreshFraction(nextRefreshAt, nextRefreshAt - secondsUntilRefresh.seconds, interval),
+                description = description
+            )
+        }
     }
     val text: @Composable () -> Unit = {
         Text(
@@ -983,18 +1003,61 @@ internal fun HudCountdown(
             maxLines = 1
         )
     }
-    if (vertical) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            icon()
-            text()
-        }
-    } else {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HUD_COUNTDOWN_GAP)) {
-            icon()
-            text()
-        }
+    // Ícone e tempo numa linha só também na coluna vertical (#293): empilhados
+    // eram duas linhas, e o tempo cabe na largura que a palavra já pede.
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HUD_COUNTDOWN_GAP)) {
+        icon()
+        text()
     }
 }
+
+internal const val HUD_COUNTDOWN_CLOCK_TAG = "hudCountdownClock"
+
+/**
+ * O relógio da contagem (#293): um timer de cozinha de 12dp. O setor cheio é o
+ * que falta até a próxima coleta; ele esvazia no sentido horário a partir das
+ * 12h e, na coleta, volta cheio de uma vez. Ao lado do `05:42` o número diz
+ * quanto falta e o relógio diz que aquilo é contagem regressiva — o filete solto
+ * na borda que o precedeu não dizia nem uma coisa nem outra.
+ *
+ * O passo de cada segundo desliza em [HUD_CLOCK_STEP_MILLIS], então o setor anda
+ * contínuo. São transições finitas, uma por tique, e não animação infinita: o
+ * `waitForIdle` dos testes não trava, e "Reduzir animações" vira salto.
+ */
+@Composable
+private fun HudCountdownClock(fraction: Float, description: String) {
+    val shown by animateFloatAsState(
+        targetValue = fraction,
+        animationSpec = appTween(HUD_CLOCK_STEP_MILLIS, LinearEasing),
+        label = "hudCountdownClock"
+    )
+    val ringColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val fillColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(
+        modifier = Modifier
+            .size(HUD_COUNTDOWN_ICON)
+            .testTag(HUD_COUNTDOWN_CLOCK_TAG)
+            .semantics { contentDescription = description }
+    ) {
+        val stroke = HUD_CLOCK_RING.toPx()
+        drawCircle(color = ringColor, radius = size.minDimension / 2f - stroke / 2f, style = Stroke(stroke))
+        // O setor fica recuado do aro: colado nele, o relógio cheio viraria um disco.
+        val inset = stroke + HUD_CLOCK_GAP.toPx()
+        drawArc(
+            color = fillColor,
+            startAngle = -90f,
+            sweepAngle = 360f * shown,
+            useCenter = true,
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - inset * 2, size.height - inset * 2)
+        )
+    }
+}
+
+/** Um pouco menos que o tique de 1s: o setor chega antes do passo seguinte. */
+private const val HUD_CLOCK_STEP_MILLIS = 900
+private val HUD_CLOCK_RING = 1.25.dp
+private val HUD_CLOCK_GAP = 1.dp
 
 /**
  * Um gesto só para as ações do notch: mover (só pela mão), clicar num anel e —
