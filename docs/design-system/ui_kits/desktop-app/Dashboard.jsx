@@ -296,7 +296,7 @@ export function Dashboard({ onOpen, warnings = [] }) {
       <AppUpdateStrip
         state="ready"
         message="38.3.0 pronta para instalar"
-        action={<AppButton variant="ghost">Reiniciar o app e atualizar</AppButton>}
+        action={<AppButton>Reiniciar o app e atualizar</AppButton>}
       />
       {warnings.map((warning) => (
         <AppBanner key={warning.title} level={warning.level || 'warn'} title={warning.title}>

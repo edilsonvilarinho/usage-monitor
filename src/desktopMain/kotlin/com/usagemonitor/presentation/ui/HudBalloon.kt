@@ -46,8 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_APP_BALLOON_ACTIONS
 import com.usagemonitor.HUD_APP_BALLOON_CAPTION
 import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
-import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE
-import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TITLE_LINES
+import com.usagemonitor.HUD_APP_BALLOON_UPDATE_BANNER
 import com.usagemonitor.HUD_BALLOON_ACTIONS
 import com.usagemonitor.HUD_BALLOON_BAR_ROW
 import com.usagemonitor.HUD_BALLOON_FOOTER
@@ -65,6 +64,8 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudQuotaRuns
+import com.usagemonitor.presentation.ui.components.AppBanner
+import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
@@ -76,6 +77,7 @@ import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
 import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
@@ -95,8 +97,11 @@ internal const val HUD_BALLOON_RING_LEGEND_TAG_PREFIX = "hudBalloonRingLegend_"
 /** A seção de sinais de sessão CLI do balão de uma conta (issue #265). */
 internal const val HUD_BALLOON_SESSION_SIGNALS_TAG = "hudBalloonSessionSignals"
 
-/** A linha de ação da atualização no balão da engrenagem ("Reiniciar o app e atualizar →"). */
+/** O botão da ação da atualização no balão da engrenagem ("Reiniciar o app e atualizar"). */
 internal const val HUD_APP_BALLOON_UPDATE_ACTION_TAG = "hudAppBalloonUpdateAction"
+
+/** O banner da atualização pendente no balão da engrenagem (issue #291). */
+internal const val HUD_APP_BALLOON_UPDATE_BANNER_TAG = "hudAppBalloonUpdateBanner"
 
 /**
  * A caixa inteira do balão na orientação de [edge]: o corpo e, do lado do notch,
@@ -390,10 +395,12 @@ internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
  * `Popup`, e popup no Compose Desktop é recortado pela própria janela, que aqui
  * é do tamanho do balão —; a fileira de ações do rodapé, a **mesma**
  * ([actions] recebe o `FooterActionGroup`), com os mesmos ícones e descrições; e a
- * atualização pendente, quando há — a frase e, com [onUpdateAction], a **mesma**
- * ação da faixa do modo padrão ("Reiniciar o app e atualizar"). Ela mora aqui e
- * não no ícone do notch: o balão é aberto de propósito e o rótulo diz o que o
- * clique faz, e no notch seria clique de rotina reiniciando o app (#225).
+ * atualização pendente, quando há — um `AppBanner` e, com [onUpdateAction], a
+ * **mesma** ação da faixa do modo padrão ("Reiniciar o app e atualizar") como
+ * `AppButton`. Era frase colorida solta e um rótulo com seta que só o hover
+ * revelava clicável (issue #291). Ela mora aqui e não no notch: o balão é aberto
+ * de propósito e o rótulo diz o que o clique faz, e no notch seria clique de
+ * rotina reiniciando o app (#225).
  *
  * Alturas fixas, somadas por `hudAppBalloonHeight`, como no balão de conta.
  */
@@ -445,60 +452,23 @@ internal fun HudAppBalloonContent(
         }
         updateIndicator?.let { indicator ->
             Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
-            Text(
-                text = indicator.description,
-                style = MaterialTheme.typography.labelSmall,
-                color = indicator.tone.color(),
-                maxLines = HUD_APP_BALLOON_UPDATE_TITLE_LINES,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.height(HUD_APP_BALLOON_UPDATE_TITLE)
+            // A cor fica só na barra de 2dp do banner; o texto é o do sistema.
+            AppBanner(
+                title = indicator.headline,
+                description = indicator.detail,
+                tone = indicator.tone,
+                modifier = Modifier.height(HUD_APP_BALLOON_UPDATE_BANNER).testTag(HUD_APP_BALLOON_UPDATE_BANNER_TAG)
             )
             val actionLabel = indicator.actionLabel
             if (actionLabel != null && onUpdateAction != null) {
-                HudUpdateActionRow(
+                Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+                AppButton(
                     label = actionLabel,
-                    tone = indicator.tone,
-                    onClick = onUpdateAction
+                    onClick = onUpdateAction,
+                    modifier = Modifier.height(AppChrome.control).testTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG)
                 )
             }
         }
-    }
-}
-
-/**
- * A ação da atualização: rótulo com seta no tom do estado, como a faixa do modo
- * padrão, com a altura, o hover e a pressão de uma linha de modo.
- */
-@Composable
-private fun HudUpdateActionRow(label: String, tone: AppTone, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val pressed by interaction.collectIsPressedAsState()
-    val ladder = AppSurfaceLadders.current
-    val layer = when {
-        pressed -> ladder.pressedLayer
-        hovered -> ladder.hoverLayer
-        else -> Color.Transparent
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(HUD_APP_BALLOON_MODE_ROW)
-            .clip(AppShapes.small)
-            .background(layer)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .testTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG)
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "$label →",
-            style = MaterialTheme.typography.labelMedium,
-            color = tone.color(),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 

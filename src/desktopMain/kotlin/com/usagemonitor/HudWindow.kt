@@ -129,11 +129,18 @@ internal fun HudWindowHost(
 
     val fallbackTone = snapshot?.let { worst -> toneFor(worst.risk.level) } ?: AppTone.NEUTRAL
     val fallbackLabel = hudFallbackLabel(dashboardState is UiState.NoApisEnabled, language)
-    // A faixa de atualização do modo padrão não existe aqui; o indicador ocupa o
-    // notch com o mesmo texto e tom de `updateBannerContent` (#225).
+    // A faixa de atualização do modo padrão não existe aqui. O aviso vira o ponto
+    // da engrenagem e o banner do balão dela, com o mesmo texto e tom de
+    // `updateBannerContent` (#225, #291).
     val updateIndicator = appUpdateState?.let { state ->
         val content = updateBannerContent(state = state, language = language)
-        HudUpdateIndicator(tone = content.tone, description = content.title, actionLabel = content.actionLabel)
+        HudUpdateIndicator(
+            tone = content.tone,
+            description = content.title,
+            actionLabel = content.actionLabel,
+            headline = content.headline,
+            detail = content.detail
+        )
     }
     // A mesma ação da faixa, oferecida no balão da engrenagem — nunca no ícone do
     // notch, onde seria clique de rotina reiniciando o app.

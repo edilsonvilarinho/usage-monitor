@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LEVELS = { info: 'var(--info)', warn: 'var(--warn)', crit: 'var(--crit)', neutral: 'var(--muted)' };
+const LEVELS = { info: 'var(--info)', ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', neutral: 'var(--muted)' };
 
 export function AppBanner({ level = 'info', title, children, action, style }) {
   return (

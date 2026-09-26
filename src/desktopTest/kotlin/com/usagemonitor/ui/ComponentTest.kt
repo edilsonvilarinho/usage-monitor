@@ -85,6 +85,7 @@ import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
 import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_REMOVE_TEST_TAG
+import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_ACTION_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
 import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
@@ -2270,13 +2271,13 @@ class ComponentTest {
         }
 
         onNodeWithText("Nova versão 7.1.0 disponível").assertIsDisplayed()
-        onNodeWithText("Baixar atualização →").assertIsDisplayed()
+        onNodeWithText("Baixar atualização").assertIsDisplayed()
         viewModel.onDestroy()
     }
 
     @Test
-    // Clique em qualquer ponto da faixa abre a release: não há mais botão, e é a
-    // linha inteira que carrega a ação (issue #67).
+    // O botão da faixa abre a release (issue #291): a faixa em si deixou de ser
+    // clicável quando a ação voltou a ser um botão.
     fun `DashboardScreen opens release page from update banner action`() = runDesktopComposeUiTest {
         val enabledApis = MutableStateFlow(emptySet<ApiSource>())
         var opened = false
@@ -2309,7 +2310,7 @@ class ComponentTest {
             }.getOrDefault(false)
         }
 
-        onNodeWithTag(APP_UPDATE_BANNER_TAG).performClick()
+        onNodeWithTag(APP_UPDATE_BANNER_ACTION_TAG).performClick()
         assertEquals(true, opened)
         viewModel.onDestroy()
     }

@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -141,17 +140,19 @@ internal const val HUD_CONTENT_TEST_TAG = "hudContent"
 /** O selo do emoji da conta no anel (issue #287). */
 internal const val HUD_ACCOUNT_EMOJI_TEST_TAG = "hudAccountEmoji"
 
-internal const val HUD_UPDATE_INDICATOR_TAG = "hudUpdateIndicator"
-
 /**
- * Atualização pendente: no notch só ícone, a frase inteira na semântica (issue
- * #225). [actionLabel] é o rótulo da ação da faixa do modo padrão, oferecida no
- * balão da engrenagem — nunca no ícone, onde seria clique de rotina.
+ * Atualização pendente (issues #225 e #291). No notch ela é **só o ponto da
+ * engrenagem**, com a frase inteira ([description]) na descrição dela; o aviso
+ * mesmo — [headline] e [detail] num banner, mais a ação [actionLabel] como botão
+ * — mora no balão da engrenagem, que é aberto de propósito. Nunca um clique no
+ * notch: seria clique de rotina reiniciando o app.
  */
 internal data class HudUpdateIndicator(
     val tone: AppTone,
     val description: String,
-    val actionLabel: String? = null
+    val actionLabel: String? = null,
+    val headline: String = description,
+    val detail: String? = null
 )
 
 /**
@@ -325,7 +326,6 @@ internal fun HudNotch(
                     edge = edge,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
-                    updateIndicator = updateIndicator,
                     countdown = countdown,
                     size = sizes.collapsed,
                     compact = sizes.compact,
@@ -357,7 +357,13 @@ internal fun HudNotch(
                     enter = fadeIn(appTween(AppMotion.normal, delayMillis = HINT_RETURN_DELAY_MS)),
                     exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
                 ) {
-                    HudHandleHint(edge = edge, atStart = atStart)
+                    // O ponto da atualização mora na ponta da engrenagem, também
+                    // parado: sem ele o aviso só existiria para quem abrisse o notch.
+                    HudHandleHint(
+                        edge = edge,
+                        atStart = atStart,
+                        accent = if (atStart) null else updateIndicator?.tone?.color()
+                    )
                 }
             }
             AnimatedVisibility(
@@ -382,7 +388,11 @@ internal fun HudNotch(
                 exit = handleExit(edge, atStart = false)
             ) {
                 HudGearHandle(
-                    description = gearDescription,
+                    // Cor nunca informa sozinha: a frase da atualização vai junto
+                    // da descrição da engrenagem que carrega o ponto.
+                    description = updateIndicator?.let { indicator -> "$gearDescription · ${indicator.description}" }
+                        ?: gearDescription,
+                    badgeTone = updateIndicator?.tone,
                     onClick = {
                         if (appBalloon == null) {
                             onGearClick()
@@ -644,7 +654,6 @@ private fun HudRingStrip(
     edge: HudEdge,
     fallbackLabel: String,
     fallbackTone: AppTone,
-    updateIndicator: HudUpdateIndicator?,
     countdown: (@Composable () -> Unit)?,
     size: DpSize,
     compact: Boolean,
@@ -671,8 +680,8 @@ private fun HudRingStrip(
                 )
             }
         }
-        // Atualização e contagem são do app, não de uma conta: uma vez, no fim.
-        updateIndicator?.let { indicator -> HudUpdateBadge(indicator) }
+        // A contagem é do app, não de uma conta: uma vez, no fim. A atualização
+        // pendente não entra na faixa (issue #291) — é o ponto da engrenagem.
         countdown?.invoke()
     }
     if (edge.isHorizontal) {
@@ -925,21 +934,6 @@ internal class HudNotchShape(private val edge: HudEdge) : Shape {
     override fun equals(other: Any?): Boolean = other is HudNotchShape && other.edge == edge
 
     override fun hashCode(): Int = edge.hashCode()
-}
-
-@Composable
-private fun HudUpdateBadge(indicator: HudUpdateIndicator) {
-    // Sem clique próprio (#225): o balão da engrenagem repete a frase, e o
-    // reinício é oferecido na janela padrão. Reiniciar direto daqui faria um
-    // clique de rotina reiniciar o app sem aviso.
-    Icon(
-        imageVector = Icons.Rounded.SystemUpdate,
-        contentDescription = indicator.description,
-        modifier = Modifier
-            .size(HUD_COUNTDOWN_ICON)
-            .testTag(HUD_UPDATE_INDICATOR_TAG),
-        tint = indicator.tone.color()
-    )
 }
 
 /**

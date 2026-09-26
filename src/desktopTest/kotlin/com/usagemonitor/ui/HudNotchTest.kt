@@ -23,6 +23,7 @@ import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
+import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.HudAccountBalloonContent
 import com.usagemonitor.presentation.ui.HUD_BALLOON_RING_LEGEND_TAG_PREFIX
@@ -64,6 +65,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -82,7 +84,8 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HUD_NOTCH_DESCRIPTION
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
-import com.usagemonitor.presentation.ui.HUD_UPDATE_INDICATOR_TAG
+import com.usagemonitor.presentation.ui.HUD_GEAR_HINT_UPDATE_TAG
+import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.HudQuota
@@ -119,7 +122,16 @@ class HudNotchTest {
         val READY_INDICATOR = HudUpdateIndicator(
             tone = AppTone.OK,
             description = "Versão 38.1.0 pronta — será aplicada ao fechar o Usage Monitor",
-            actionLabel = "Reiniciar o app e atualizar"
+            actionLabel = "Reiniciar o app e atualizar",
+            headline = "Versão 38.1.0 pronta",
+            detail = "Aplicada ao fechar o Usage Monitor"
+        )
+
+        val DOWNLOADING_INDICATOR = HudUpdateIndicator(
+            tone = AppTone.INFO,
+            description = "Baixando a versão 38.1.0 — 42%",
+            headline = "Baixando 38.1.0",
+            detail = "42% concluído"
         )
     }
     private val countdown = "Próxima atualização automática"
@@ -714,13 +726,13 @@ class HudNotchTest {
 
     /**
      * A coluna do balão da engrenagem mede o que `hudAppBalloonHeight` soma: sem
-     * atualização, só com a frase (baixando) e com a frase mais a ação.
+     * atualização, só com o banner (baixando) e com o banner mais o botão.
      */
     @Test
     fun `o balao da engrenagem tem a altura que a geometria calcula`() {
         val cases = listOf(
             null to null,
-            HudUpdateIndicator(AppTone.INFO, "Baixando a versão 38.1.0 — 42%") to null,
+            DOWNLOADING_INDICATOR to null,
             READY_INDICATOR to {}
         )
         for ((update, action) in cases) {
@@ -765,16 +777,23 @@ class HudNotchTest {
         }
     }
 
-    /** A mesma ação da faixa do modo padrão, no balão da engrenagem (#225). */
+    /**
+     * A mesma ação da faixa do modo padrão, no balão da engrenagem (#225), como
+     * banner e botão (#291): o rótulo com seta sobre fundo transparente não
+     * parecia botão.
+     */
     @Test
     fun `o balao da engrenagem oferece reiniciar o app e atualizar`() = runDesktopComposeUiTest {
         var restarts = 0
         setContent { appBalloonWithUpdate(READY_INDICATOR, onUpdateAction = { restarts += 1 }) }
 
-        // A frase inteira cabe nas duas linhas: numa só ela saía cortada.
-        onNodeWithText(READY_INDICATOR.description).assertIsDisplayed()
-        onNodeWithText("Reiniciar o app e atualizar →").assertIsDisplayed()
-        onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).performClick()
+        onNodeWithTag(HUD_APP_BALLOON_UPDATE_BANNER_TAG).assertIsDisplayed()
+        onNodeWithText("Versão 38.1.0 pronta").assertIsDisplayed()
+        onNodeWithText("Aplicada ao fechar o Usage Monitor").assertIsDisplayed()
+        onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG)
+            .assertIsDisplayed()
+            .assertTextEquals("Reiniciar o app e atualizar")
+            .performClick()
         assertEquals(1, restarts)
     }
 
@@ -782,13 +801,11 @@ class HudNotchTest {
     @Test
     fun `baixando o balao da engrenagem nao tem acao`() = runDesktopComposeUiTest {
         setContent {
-            appBalloonWithUpdate(
-                HudUpdateIndicator(AppTone.INFO, "Baixando a versão 38.1.0 — 42%"),
-                onUpdateAction = null
-            )
+            appBalloonWithUpdate(DOWNLOADING_INDICATOR, onUpdateAction = null)
         }
 
-        onNodeWithText("Baixando a versão 38.1.0 — 42%").assertIsDisplayed()
+        onNodeWithText("Baixando 38.1.0").assertIsDisplayed()
+        onNodeWithText("42% concluído").assertIsDisplayed()
         onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).assertDoesNotExist()
     }
 
@@ -846,46 +863,60 @@ class HudNotchTest {
         onNodeWithText("00:00").assertIsDisplayed()
     }
 
-    // ------------------------------------------------------------ atualização (#225)
+    // ------------------------------------------------------------ atualização (#225, #291)
 
     @Test
-    fun `sem indicador nenhum icone de atualizacao aparece`() = runDesktopComposeUiTest {
-        setContent { notch() }
+    fun `sem atualizacao a engrenagem nao tem ponto`() = runDesktopComposeUiTest {
+        var open by mutableStateOf(false)
+        setContent { notch(expanded = open) }
 
-        onNodeWithTag(HUD_UPDATE_INDICATOR_TAG).assertDoesNotExist()
+        onNodeWithTag(HUD_GEAR_HINT_UPDATE_TAG).assertDoesNotExist()
+        open = true
+        waitForIdle()
+        onNodeWithTag(HUD_GEAR_UPDATE_DOT_TAG).assertDoesNotExist()
+        onNodeWithContentDescription(GEAR).assertIsDisplayed()
     }
 
+    /**
+     * A atualização não ocupa a faixa de anéis (#291): o ícone de celular com seta
+     * não dizia "versão nova". Parado, o arco da engrenagem toma o tom; aberto, a
+     * engrenagem ganha o ponto e a frase vai na descrição dela, porque cor nunca
+     * informa sozinha. E nenhum clique no notch reinicia o app (#225).
+     */
     @Test
-    fun `o indicador aparece uma vez e nao tem clique proprio`() = runDesktopComposeUiTest {
+    fun `a atualizacao e o ponto da engrenagem, parado e aberto`() = runDesktopComposeUiTest {
         var refreshes = 0
+        var gearClicks = 0
         var open by mutableStateOf(false)
         setContent {
             notch(
                 expanded = open,
-                updateIndicator = HudUpdateIndicator(tone = AppTone.OK, description = "Atualização pronta"),
-                onRefreshAccount = { refreshes += 1 }
+                updateIndicator = READY_INDICATOR,
+                onRefreshAccount = { refreshes += 1 },
+                onGearClick = { gearClicks += 1 }
             )
         }
 
-        onNodeWithTag(HUD_UPDATE_INDICATOR_TAG).assertIsDisplayed()
+        onNodeWithTag(HUD_GEAR_HINT_UPDATE_TAG).assertExists()
+        onAllNodesWithContentDescription(READY_INDICATOR.description, substring = true).assertCountEquals(0)
         open = true
         waitForIdle()
-        onAllNodesWithContentDescription("Atualização pronta").assertCountEquals(1)
-        // Reiniciar num clique de rotina reiniciaria o app sem aviso (#225).
-        onNodeWithTag(HUD_UPDATE_INDICATOR_TAG).performClick()
+        onNodeWithTag(HUD_GEAR_UPDATE_DOT_TAG).assertIsDisplayed()
+        onNodeWithContentDescription("$GEAR · ${READY_INDICATOR.description}").assertIsDisplayed()
         assertEquals(0, refreshes)
+        assertEquals(0, gearClicks)
     }
 
+    /** O notch recolhido tem o mesmo tamanho com e sem atualização: ela não entra na faixa. */
     @Test
-    fun `a linha de carregamento tambem mostra o indicador`() = runDesktopComposeUiTest {
-        setContent {
-            notch(
-                list = emptyList(),
-                updateIndicator = HudUpdateIndicator(tone = AppTone.INFO, description = "Atualização disponível")
-            )
+    fun `a atualizacao nao muda o tamanho do notch recolhido`() {
+        HudEdge.entries.forEach { edge ->
+            listOf(accounts, emptyList()).forEach { list ->
+                val without = hudNotchSizes(list, edge, "Carregando", true, hasUpdateIndicator = false)
+                val withUpdate = hudNotchSizes(list, edge, "Carregando", true, hasUpdateIndicator = true, hasUpdateAction = true)
+                assertEquals(without.collapsed, withUpdate.collapsed, "$edge, ${list.size} contas")
+            }
         }
-
-        onNodeWithTag(HUD_UPDATE_INDICATOR_TAG).assertIsDisplayed()
     }
 
     // ------------------------------------------------------------ movimento contínuo

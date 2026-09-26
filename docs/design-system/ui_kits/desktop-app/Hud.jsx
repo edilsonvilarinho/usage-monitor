@@ -73,13 +73,15 @@ export function Hud() {
         <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" />
       </Screen>
 
-      <Caption>3c · engrenagem com atualização pronta — a mesma ação da faixa do modo padrão</Caption>
+      <Caption>3c · engrenagem com atualização pronta — ponto na engrenagem, banner e o botão da faixa do modo padrão</Caption>
       <Screen tall>
         <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05"
-          update="Versão 38.1.0 pronta — será aplicada ao fechar o Usage Monitor" updateAction="Reiniciar o app e atualizar" />
+          update="Versão 38.1.0 pronta — será aplicada ao fechar o Usage Monitor"
+          updateHeadline="Versão 38.1.0 pronta" updateDetail="Aplicada ao fechar o Usage Monitor"
+          updateAction="Reiniciar o app e atualizar" />
       </Screen>
 
-      <Caption>4 · antes da primeira coleta, com atualização pendente</Caption>
+      <Caption>4 · antes da primeira coleta, com atualização pendente — parado, o sinal é o arco da engrenagem</Caption>
       <Screen>
         <AppHudBar accounts={[]} fallbackLabel="Carregando" countdown="02:05" update="Atualização pronta" />
       </Screen>

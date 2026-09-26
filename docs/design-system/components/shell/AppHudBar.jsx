@@ -9,7 +9,7 @@ const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info
 // ponteiro em cima aparecem as alças (mão e engrenagem) e, ao lado, o balão de
 // UMA conta — a do anel sob o ponteiro — ou o da engrenagem.
 export function AppHudBar({
-  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, update, updateAction,
+  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, update, updateHeadline, updateDetail, updateAction,
   actions = ['⟲', '▣'], style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
@@ -61,7 +61,6 @@ export function AppHudBar({
           </div>
         );
       })}
-      {update ? <span title={update} style={{ color: 'var(--ok)', fontSize: 12 }}>⤓</span> : null}
       {countdown ? (
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>↻ {countdown}</span>
       ) : null}
@@ -69,12 +68,17 @@ export function AppHudBar({
   );
 
   // Alças: mão na ponta de perto (move), engrenagem na de longe (ações do app).
-  const handle = (glyph, title) => (
+  // A atualização pendente (#291) é um ponto no canto da engrenagem, não um ícone
+  // na faixa; a frase vai no rótulo, porque cor nunca informa sozinha.
+  const handle = (glyph, title, dot) => (
     <span title={title} style={{
+      position: 'relative',
       width: 32, height: 32, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       background: 'var(--surface)', border: '1px solid var(--border-top)', boxShadow: 'var(--shadow-raised)',
       color: 'var(--muted)', fontSize: 14
-    }}>{glyph}</span>
+    }}>{glyph}{dot ? (
+      <span aria-hidden="true" style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', boxShadow: '0 0 0 1.5px var(--surface)' }} />
+    ) : null}</span>
   );
 
   const account = typeof balloon === 'number' ? accounts[balloon] : null;
@@ -123,9 +127,9 @@ export function AppHudBar({
           <div style={{ display: 'flex', gap: 6, color: 'var(--muted)' }}>⤓ ↻ ⚙ ?</div>
           {update ? (
             <>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--ok)', lineHeight: '14px', maxHeight: 28, overflow: 'hidden' }}>{update}</span>
+              <AppBanner level="ok" title={updateHeadline || update}>{updateDetail}</AppBanner>
               {updateAction ? (
-                <span role="button" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--ok)', height: 24, display: 'inline-flex', alignItems: 'center', padding: '0 4px', borderRadius: 'var(--r2)', cursor: 'pointer' }}>{updateAction} →</span>
+                <div><AppButton>{updateAction}</AppButton></div>
               ) : null}
             </>
           ) : null}
@@ -139,7 +143,7 @@ export function AppHudBar({
     <div style={{ display: 'flex', flexDirection: row, alignItems: 'center', gap: 6 }}>
       {open ? handle('✋', 'Mover a barra HUD') : null}
       {notch}
-      {open ? handle('⚙', 'Ações do Usage Monitor') : null}
+      {open ? handle('⚙', update ? `Ações do Usage Monitor · ${update}` : 'Ações do Usage Monitor', Boolean(update)) : null}
     </div>
   );
   const outer = edge === 'bottom' || edge === 'right' ? [body, strip] : [strip, body];

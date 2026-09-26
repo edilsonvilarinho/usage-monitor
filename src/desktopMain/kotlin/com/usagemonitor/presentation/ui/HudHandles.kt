@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,6 +55,12 @@ import kotlin.math.atan2
 
 internal const val HUD_MOVE_HANDLE_TAG = "hudMoveHandle"
 internal const val HUD_GEAR_HANDLE_TAG = "hudGearHandle"
+
+/** O ponto da atualização pendente na engrenagem aberta (issue #291). */
+internal const val HUD_GEAR_UPDATE_DOT_TAG = "hudGearUpdateDot"
+
+/** O arco de dica da engrenagem tingido pela atualização pendente, com o notch parado. */
+internal const val HUD_GEAR_HINT_UPDATE_TAG = "hudGearHintUpdate"
 
 internal fun hudMoveHandleDescription(language: AppLanguage): String =
     if (language == AppLanguage.PT) "Mover a barra HUD" else "Move the HUD bar"
@@ -97,30 +105,57 @@ internal fun HudMoveHandle(
     }
 }
 
-/** A engrenagem na outra ponta: um clique abre o que ela oferece. */
+/**
+ * A engrenagem na outra ponta: um clique abre o que ela oferece.
+ *
+ * Com [badgeTone], um ponto no canto de cima — a atualização pendente (issue
+ * #291). Ele substitui o ícone de celular com seta que ficava na faixa de anéis,
+ * que em 12dp não dizia "versão nova" a ninguém: o ponto não tenta dizer o quê,
+ * só que a engrenagem tem algo a mostrar, e o balão dela mostra. O ponto fica
+ * fora do recorte circular do disco, no canto da caixa quadrada da alça, e a
+ * frase vai em [description] — cor nunca informa sozinha.
+ */
 @Composable
 internal fun HudGearHandle(
     description: String,
     onClick: () -> Unit,
     interaction: MutableInteractionSource,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badgeTone: AppTone? = null
 ) {
-    HudHandleDisc(
-        carrying = false,
-        interaction = interaction,
-        modifier = modifier
-            .testTag(HUD_GEAR_HANDLE_TAG)
-            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClickLabel = description,
-                onClick = onClick
+    Box(modifier = modifier.requiredSize(HUD_HANDLE_SIZE)) {
+        HudHandleDisc(
+            carrying = false,
+            interaction = interaction,
+            modifier = Modifier
+                .testTag(HUD_GEAR_HANDLE_TAG)
+                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClickLabel = description,
+                    onClick = onClick
+                )
+                .semantics { contentDescription = description }
+        ) { tint ->
+            Icon(Icons.Rounded.Settings, contentDescription = null, tint = tint, modifier = Modifier.size(HANDLE_ICON_SIZE))
+        }
+        if (badgeTone != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(BADGE_DOT_SIZE)
+                    .testTag(HUD_GEAR_UPDATE_DOT_TAG)
+                    .clip(CircleShape)
+                    // O anel da superfície separa o ponto do disco e do que estiver
+                    // atrás da janela transparente.
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(BADGE_DOT_RING)
+                    .clip(CircleShape)
+                    .background(badgeTone.color())
             )
-            .semantics { contentDescription = description }
-    ) { tint ->
-        Icon(Icons.Rounded.Settings, contentDescription = null, tint = tint, modifier = Modifier.size(HANDLE_ICON_SIZE))
+        }
     }
 }
 
@@ -173,11 +208,22 @@ private fun HudHandleDisc(
  * o lado de fora do notch.
  */
 @Composable
-internal fun HudHandleHint(edge: HudEdge, atStart: Boolean, modifier: Modifier = Modifier) {
+internal fun HudHandleHint(
+    edge: HudEdge,
+    atStart: Boolean,
+    modifier: Modifier = Modifier,
+    /**
+     * A atualização pendente (issue #291), só na ponta da engrenagem: o arco toma
+     * o tom do estado e ganha um ponto no meio. Parado, este arco é tudo o que se
+     * vê da engrenagem, e sem ele o aviso só existiria com o notch aberto.
+     */
+    accent: Color? = null
+) {
     // `outline` e não a borda de luz do notch: o arco fica sobre o que estiver
     // atrás da janela, e a luz de 1dp some contra papel de parede escuro.
-    val color = MaterialTheme.colorScheme.outline
-    Canvas(modifier = modifier.requiredSize(HUD_HANDLE_HINT_SIZE)) {
+    val color = accent ?: MaterialTheme.colorScheme.outline
+    val tagged = if (accent != null) modifier.testTag(HUD_GEAR_HINT_UPDATE_TAG) else modifier
+    Canvas(modifier = tagged.requiredSize(HUD_HANDLE_HINT_SIZE)) {
         val side = size.width
         // O canto do arco: onde o notch encontra a borda da tela, do lado da alça.
         val alongCorner = if (atStart) side else 0f
@@ -199,6 +245,17 @@ internal fun HudHandleHint(edge: HudEdge, atStart: Boolean, modifier: Modifier =
             size = Size(radius * 2, radius * 2),
             style = Stroke(width = stroke, cap = StrokeCap.Round)
         )
+        if (accent != null) {
+            val middle = Math.toRadians((start + sweep / 2f).toDouble())
+            drawCircle(
+                color = accent,
+                radius = HINT_DOT_RADIUS.toPx(),
+                center = Offset(
+                    x = corner.x + radius * kotlin.math.cos(middle).toFloat(),
+                    y = corner.y + radius * kotlin.math.sin(middle).toFloat()
+                )
+            )
+        }
     }
 }
 
@@ -217,4 +274,11 @@ internal val HUD_HANDLE_HINT_SIZE = 14.dp
 private val HINT_STROKE = 3.dp
 private const val HINT_RADIUS_FRACTION = 0.7f
 private val HANDLE_ICON_SIZE = 16.dp
+
+/** O ponto sobre o arco parado: cabe na caixa de 14dp em qualquer ângulo. */
+private val HINT_DOT_RADIUS = 2.5.dp
+
+/** O ponto da engrenagem aberta e o anel de superfície em volta dele. */
+private val BADGE_DOT_SIZE = 8.dp
+private val BADGE_DOT_RING = 1.5.dp
 private const val PRESSED_SCALE = 0.9f
