@@ -66,6 +66,27 @@ class HelpMediaPlayerTest {
         }
     }
 
+    /**
+     * O quadro publicado não pode ser o bitmap de trabalho: a tela ainda o está
+     * desenhando quando o próximo é decodificado por cima. Uma cópia que só
+     * compartilhasse os pixels faria o quadro já na tela mudar sozinho.
+     */
+    @Test
+    fun `a published frame keeps its pixels after the next one is decoded`() {
+        val clip = assertNotNull(decodeHelpMedia(encodedClip()))
+
+        try {
+            val published = clip.frameAt(0)
+            val before = published.toPixelMap()[0, 0]
+            clip.frameAt(1)
+            clip.frameAt(2)
+
+            assertEquals(before, published.toPixelMap()[0, 0])
+        } finally {
+            clip.close()
+        }
+    }
+
     /** Voltar ao início do laço não pode depender do quadro que está no bitmap. */
     @Test
     fun `replays the first frame after wrapping around`() {

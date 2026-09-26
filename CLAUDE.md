@@ -337,9 +337,12 @@ eram descobertas por acidente.
 - **Compose não anima GIF; o `Codec` do Skia anima.** `frameCount`, `getFrameInfo(i).duration` e
   `readPixels(bitmap, frame, priorFrame)` já estão no classpath (skiko 0.8.18). `priorFrame` é
   **otimização, não correção**: sem ele o codec refaz a cadeia de quadros requeridos a cada tique, o
-  que num GIF delta é trabalho quadrático. O quadro publicado é **cópia imutável**
-  (`Image.makeFromBitmap`), porque `Bitmap.asComposeImageBitmap()` embrulha o mesmo bitmap e escrever
-  o quadro seguinte por cima mutaria a imagem que já está na tela, sem invalidar nada.
+  que num GIF delta é trabalho quadrático. O quadro publicado é **cópia imutável dos bytes**
+  (`readPixels` → `installPixels`), porque `Bitmap.asComposeImageBitmap()` embrulha o mesmo bitmap e
+  escrever o quadro seguinte por cima mutaria a imagem que já está na tela, sem invalidar nada.
+  **`Bitmap.makeClone()` compartilha os pixels** e reprova o teste de imutabilidade; e
+  `Image.makeFromBitmap(...).toComposeImageBitmap()`, o caminho anterior, redesenha o quadro por um
+  `Canvas` a ~59 ms por quadro — 35 s de suíte num teste só (issue #295).
 - **O laço de quadros mora em `desktopMain`, nunca no composable de conteúdo.** É essa separação que
   deixa `HelpContent` exercitável: animação infinita trava o `waitForIdle` dos testes de componente.
   Pela mesma razão o tópico selecionado é hasteado — quem carrega a demo é o tocador, que precisa
