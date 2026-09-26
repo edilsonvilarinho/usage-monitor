@@ -10,6 +10,8 @@ import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 
 /**
  * Geometria do notch da HUD: em que borda ele mora, o tamanho recolhido e o
@@ -93,6 +95,17 @@ internal val HUD_COUNTDOWN_ICON = 12.dp
 
 /** Vão entre o ícone e o texto da contagem, o mesmo `spacedBy` do `HudCountdown`. */
 internal val HUD_COUNTDOWN_GAP = 4.dp
+
+/**
+ * Quanto falta do intervalo de coleta, de 1 (acabou de coletar) a 0 (coleta
+ * agora): é o setor que o relógio da contagem mostra (#293). O despertar por
+ * reset antecipa [nextRefreshAt], e o relógio salta para menos, o que é
+ * verdade; o que passa do intervalo fica cheio.
+ */
+internal fun hudRefreshFraction(nextRefreshAt: Instant, now: Instant, interval: Duration): Float {
+    if (interval <= Duration.ZERO) return 0f
+    return ((nextRefreshAt - now) / interval).toFloat().coerceIn(0f, 1f)
+}
 
 /**
  * Tamanho do notch e da área aberta.
@@ -374,8 +387,10 @@ private fun verticalCollapsed(
             }
         }
     }
+    // A contagem é uma linha só, ícone e tempo lado a lado (#293): empilhados
+    // eles custavam duas linhas da coluna para uma informação do app inteiro.
     val extras = buildList {
-        if (showsCountdown) add(HUD_COUNTDOWN_ICON + HUD_WORD_LINE)
+        if (showsCountdown) add(HUD_WORD_LINE)
     }
     val all = itemHeights + extras
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
@@ -383,7 +398,8 @@ private fun verticalCollapsed(
     val widestPercent = accounts.maxOfOrNull { account ->
         if (compact) stripLineWidth(account.focusLine) else account.stripLines.maxOf { line -> stripLineWidth(line) }
     } ?: 0.dp
-    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent, charWidth(COUNTDOWN_CHARS, WORD_ADVANCE_DP))
+    val countdownAcross = if (showsCountdown) countdownWidth() else 0.dp
+    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent, countdownAcross)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
         height = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2

@@ -41,6 +41,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
@@ -571,6 +572,7 @@ private fun HudShot(expanded: Boolean, balloonIndex: Int) {
                 },
                 nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
                 countdownDescription = "Próxima atualização automática",
+                refreshInterval = DashboardViewModelConfig().pollInterval,
                 nowProvider = { ScreenshotFixtures.NOW },
                 countdownUpdatesEnabled = false
             )

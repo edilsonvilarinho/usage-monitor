@@ -8,8 +8,18 @@ const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info
 // ("7d 72%", "5h 45%", #286) + palavra. Com o
 // ponteiro em cima aparecem as alças (mão e engrenagem) e, ao lado, o balão de
 // UMA conta — a do anel sob o ponteiro — ou o da engrenagem.
+// Relógio da contagem (#293): setor que esvazia no sentido horário a partir das 12h.
+const clockIcon = (fraction) => (
+  <svg width="12" height="12" viewBox="0 0 12 12" style={{ flex: 'none' }} aria-hidden="true">
+    <circle cx="6" cy="6" r="5.4" fill="none" stroke="var(--muted)" strokeWidth="1.2" />
+    {fraction > 0 ? (
+      <path d={fraction >= 1 ? 'M6 2.4 A3.6 3.6 0 1 1 5.99 2.4 Z' : `M6 6 L6 2.4 A3.6 3.6 0 ${fraction > 0.5 ? 1 : 0} 1 ${6 + 3.6 * Math.sin(2 * Math.PI * fraction)} ${6 - 3.6 * Math.cos(2 * Math.PI * fraction)} Z`} fill="var(--muted)" />
+    ) : null}
+  </svg>
+);
+
 export function AppHudBar({
-  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, update, updateHeadline, updateDetail, updateAction,
+  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, refreshFraction, update, updateHeadline, updateDetail, updateAction,
   actions = ['⟲', '▣'], style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
@@ -62,7 +72,7 @@ export function AppHudBar({
         );
       })}
       {countdown ? (
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>↻ {countdown}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{refreshFraction !== undefined ? clockIcon(refreshFraction) : '↻'} {countdown}</span>
       ) : null}
     </div>
   );
@@ -116,7 +126,7 @@ export function AppHudBar({
         <>
           <div style={{ display: 'flex', alignItems: 'center', height: 24 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t14)', fontWeight: 600, flex: 1 }}>Usage Monitor</span>
-            {countdown ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>↻ {countdown}</span> : null}
+            {countdown ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{refreshFraction !== undefined ? clockIcon(refreshFraction) : '↻'} {countdown}</span> : null}
           </div>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Modo de janela</span>
           {['Padrão', 'Somente os cards', 'Barra HUD'].map((mode) => (

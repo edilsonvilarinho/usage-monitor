@@ -45,8 +45,13 @@ export interface AppHudBarProps {
   /** Which balloon is open: an account index, `'gear'`, or none (resting). */
   balloon?: number | 'gear';
   fallbackLabel?: string;
-  /** `02:05` — next automatic collection, once, at the end of the strip. */
+  /** `02:05` — next automatic collection, once, at the end of the strip, on one line with its icon. */
   countdown?: string;
+  /**
+   * 0–1 — what is left of the poll interval (#293). Turns the countdown icon into a draining
+   * clock; without it the icon is `↻`.
+   */
+  refreshFraction?: number;
   /** Pending update sentence. On the notch it is only the gear's dot and its label (#291) — no click. */
   update?: string;
   /** The same notice split for the gear balloon's banner: one-line title… */

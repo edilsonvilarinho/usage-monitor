@@ -27,7 +27,11 @@ informs alone. Horizontal on top/bottom, a column on the sides, where a long wor
 wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
 seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and the focus quota with its
 window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip ends with the
-countdown to the next collection, **once**: polling is app-wide. Each text estimate carries 1dp of
+countdown to the next collection, **once**: polling is app-wide. Its icon is a 12dp **draining
+clock** (a sector that starts full after a poll and empties clockwise from 12 o'clock) on the **same
+line** as `mm:ss`, also on the side edges, where icon and time used to stack into two lines (#293).
+A bare progress line on the notch border was tried and rejected: without the number beside it, nobody
+could tell what it measured. Each text estimate carries 1dp of
 slack for Skia's whole-pixel rounding, or the countdown breaks into "04:5" at fractional densities.
 
 **Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon

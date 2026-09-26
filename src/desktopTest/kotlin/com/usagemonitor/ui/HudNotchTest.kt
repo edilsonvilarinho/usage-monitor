@@ -83,6 +83,7 @@ import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HUD_NOTCH_DESCRIPTION
+import com.usagemonitor.presentation.ui.HUD_COUNTDOWN_CLOCK_TAG
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_HINT_UPDATE_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
@@ -97,6 +98,7 @@ import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -167,6 +169,7 @@ class HudNotchTest {
         fallbackLabel: String = "Carregando",
         updateIndicator: HudUpdateIndicator? = null,
         nextRefreshAt: Instant? = null,
+        refreshInterval: Duration? = 10.minutes,
         nowProvider: () -> Instant = { now },
         waitNextTick: suspend () -> Unit = {},
         countdownUpdatesEnabled: Boolean = false,
@@ -191,6 +194,7 @@ class HudNotchTest {
                     updateIndicator = updateIndicator,
                     nextRefreshAt = nextRefreshAt,
                     countdownDescription = countdown,
+                    refreshInterval = refreshInterval,
                     nowProvider = nowProvider,
                     waitNextTick = waitNextTick,
                     countdownUpdatesEnabled = countdownUpdatesEnabled,
@@ -861,6 +865,44 @@ class HudNotchTest {
         tickChannel.trySend(Unit)
         waitForIdle()
         onNodeWithText("00:00").assertIsDisplayed()
+    }
+
+    /**
+     * Com o intervalo, o ícone da contagem é o relógio que esvazia (#293); sem
+     * ele continua o ↻. Nos dois casos a descrição é a mesma.
+     */
+    @Test
+    fun `com o intervalo a contagem usa o relogio`() = runDesktopComposeUiTest {
+        var interval by mutableStateOf<Duration?>(10.minutes)
+        setContent { notch(nextRefreshAt = now + 2.minutes + 5.seconds, refreshInterval = interval) }
+
+        onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).assertIsDisplayed()
+        onNodeWithContentDescription(countdown).assertIsDisplayed()
+        interval = null
+        waitForIdle()
+        onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).assertDoesNotExist()
+        onNodeWithContentDescription(countdown).assertIsDisplayed()
+    }
+
+    /**
+     * O relógio é desenho, e só bitmap o pega: com o intervalo quase inteiro pela
+     * frente o setor ocupa o quadrante de baixo à esquerda; faltando pouco ele
+     * sumiu dali. Compara o mesmo pixel nos dois instantes.
+     */
+    @Test
+    fun `o relogio esvazia com o tempo`() {
+        fun lowerLeft(next: Instant): Color {
+            var pixel = Color.Unspecified
+            runDesktopComposeUiTest {
+                setContent { notch(nextRefreshAt = next) }
+                val pixels = onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).captureToImage().toPixelMap()
+                pixel = pixels[pixels.width / 2 - 2, pixels.height / 2 + 2]
+            }
+            return pixel
+        }
+        val full = lowerLeft(now + 9.minutes + 50.seconds)
+        val almostDue = lowerLeft(now + 10.seconds)
+        assertTrue(full != almostDue, "o setor devia ter saído do quadrante de baixo à esquerda")
     }
 
     // ------------------------------------------------------------ atualização (#225, #291)

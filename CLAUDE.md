@@ -948,6 +948,17 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
 - **Contagem até a próxima coleta uma vez só, no fim da faixa** (#185): o polling é do app inteiro. O
   tique mora no composable e tem o interruptor `countdownUpdatesEnabled`, porque sob o relógio dos
   testes o laço giraria para sempre; o balão da engrenagem a repete no título.
+  - **O ícone é um relógio que esvazia, e fica numa linha só com o tempo** (`HudCountdownClock` +
+    `hudRefreshFraction`; #293). Na lateral, ícone e `05:42` ocupavam duas linhas. O relógio é um
+    setor de 12dp: começa cheio logo depois da coleta, esvazia no sentido horário a partir das 12h
+    e volta cheio na coleta. A volta inteira é `DashboardViewModel.pollInterval`. Sem o intervalo,
+    o ícone volta a ser o ↻.
+  - **Um filete na borda interna foi tentado e recusado**: sem número ao lado, ninguém entendia o
+    que ele media, e rente à borda ele se lia como o próprio contorno do notch. O que deu sentido
+    foi o relógio **ao lado do número**: o número diz quanto falta, e o relógio diz que é contagem.
+  - O passo de cada segundo desliza em 900 ms: são transições finitas, uma por tique, e não
+    animação infinita, e por isso não travam o `waitForIdle`. Com "Reduzir animações", o passo vira
+    salto.
 - **Atualização pendente é o ponto da engrenagem, sem clique no notch** (#225, #291). Ela não ocupa
   a faixa de anéis: o ícone `SystemUpdate` que ficava ali era um celular com seta, e em 12dp ninguém
   o lia como "versão nova". Parado, o arco de dica da engrenagem toma o tom do estado e ganha um

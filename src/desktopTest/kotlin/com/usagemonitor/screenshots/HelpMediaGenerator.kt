@@ -55,6 +55,7 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.help.HelpTopic
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
+import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
@@ -520,6 +521,7 @@ private fun recordWindowModes(outputDir: File) {
                                 // relógio andando mudaria cada passada.
                                 nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
                                 countdownDescription = "Próxima atualização automática",
+                                refreshInterval = DashboardViewModelConfig().pollInterval,
                                 nowProvider = { ScreenshotFixtures.NOW },
                                 countdownUpdatesEnabled = false
                             )
