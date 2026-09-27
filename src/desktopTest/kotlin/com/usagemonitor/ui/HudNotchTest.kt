@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.DpSize
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.hudBalloonHeight
-import com.usagemonitor.hudOpenWindowBounds
+import com.usagemonitor.hudDockedWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
@@ -316,7 +316,7 @@ class HudNotchTest {
             val sizes = hudNotchSizes(accounts, edge, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
             for ((index, ring) in listOf(INFORMATA_RING, DEEPSEEK_RING).withIndex()) {
                 runDesktopComposeUiTest {
-                    val window = hudOpenWindowBounds(edge, 0.5f, sizes, screen)
+                    val window = hudDockedWindowBounds(edge, 0.5f, sizes, screen)
                     setContent {
                         AppTheme(isDark = true) {
                             Box(modifier = Modifier.size(window.size)) {

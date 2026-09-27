@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
@@ -515,48 +516,62 @@ internal fun hudWindowBounds(
 }
 
 /**
- * A janela parada: a espessura do notch e, ao longo da borda, **o comprimento da
- * aberta**, com o centro preso como o dela.
+ * A janela encaixada, **a mesma parada e aberta**: o espaço do notch aberto com o
+ * balão, e o notch no mesmo ponto da tela nos dois estados.
  *
- * É o que deixa a origem da janela no mesmo ponto ao abrir e ao fechar. Janela
- * transparente que muda de origem mostra um ou dois quadros do conteúdo antigo
- * no lugar novo — medido no Windows 11: o notch pulava 60px e voltava, com o
- * redimensionamento do Compose, com `setBounds` numa chamada só e com ele antes
- * do estado. Crescendo só para dentro da tela, nenhum quadro fora do lugar. O
- * preço são as duas faixas transparentes onde as alças aparecem, que engolem
- * clique também parado (C11).
+ * Janela transparente que muda de origem mostra um ou dois quadros do conteúdo
+ * antigo no lugar novo — medido no Windows 11 (E11): o notch pulava e voltava
+ * com o redimensionamento do Compose, com `setBounds` numa chamada só e com ele
+ * antes do estado. Com a origem fixa, nenhum quadro fora do lugar. A E11 fixou a
+ * origem só ao longo da borda, e embaixo e à direita a espessura ainda andava: na
+ * direita o notch aparecia 274px para dentro da tela a cada abrir e sumia a cada
+ * fechar (issue #294, 39–49 de ~668 quadros no spike). Agora a janela não muda
+ * nem de tamanho entre os dois estados; quem muda é a área de clique
+ * ([hudRestHitRegion]).
  *
- * Em cima e à esquerda a origem não muda; embaixo e à direita a janela aberta
- * sobe o balão para dentro da tela e a origem anda na espessura — ali ainda sobra
- * um quadro em branco ao abrir.
+ * As duas prendem o centro do notch pela reserva do notch com as alças, então
+ * abrir perto de um canto não o faz andar; quem se ajusta ao canto é o balão,
+ * que o composable prende dentro da janela.
  */
-internal fun hudRestWindowBounds(
-    edge: HudEdge,
-    offsetFraction: Float,
-    sizes: HudNotchSizes,
-    area: ScreenWorkArea
-): HudWindowBounds {
-    val content = if (edge.isHorizontal) {
-        DpSize(sizes.expanded.width, sizes.collapsed.height)
-    } else {
-        DpSize(sizes.collapsed.width, sizes.expanded.height)
-    }
-    return hudWindowBounds(edge, offsetFraction, content, area, reserveAlong = sizes.handlesAlong(edge))
-}
-
-/**
- * A janela aberta, com o notch **no mesmo ponto da tela** em que estava parado.
- *
- * As duas prendem o centro do notch pela mesma reserva — o notch com as alças —,
- * então abrir perto de um canto não o faz andar; quem se ajusta ao canto é o
- * balão, que o composable prende dentro da janela.
- */
-internal fun hudOpenWindowBounds(
+internal fun hudDockedWindowBounds(
     edge: HudEdge,
     offsetFraction: Float,
     sizes: HudNotchSizes,
     area: ScreenWorkArea
 ): HudWindowBounds = hudWindowBounds(edge, offsetFraction, sizes.expanded, area, reserveAlong = sizes.handlesAlong(edge))
+
+/**
+ * A área de clique da janela encaixada **parada**, em coordenadas da janela: o
+ * notch recolhido com a margem de sombra nas três bordas de dentro — onde moram
+ * a sombra e os arcos de dica das alças.
+ *
+ * Pixel transparente engole clique (C11), e a janela parada tem o tamanho da
+ * aberta ([hudDockedWindowBounds]): sem recorte, o espaço do balão seria uma
+ * faixa invisível que rouba o clique da janela de baixo. O host a aplica como
+ * `Window.shape`, que no spike da #294 deixou o clique passar fora dela e não
+ * tirou quadro nenhum do lugar. O recorte também corta a pintura, e é por isso
+ * que a sombra cabe nele: ela nunca passa de [HUD_SHADOW_MARGIN].
+ *
+ * O notch é posicionado pela mesma conta do layout de `HudNotch`: centrado em
+ * [HudWindowBounds.notchCenterInWindow] e preso dentro da janela.
+ */
+internal fun hudRestHitRegion(edge: HudEdge, window: HudWindowBounds, sizes: HudNotchSizes): DpRect {
+    val alongLength = if (edge.isHorizontal) window.size.width else window.size.height
+    val acrossLength = if (edge.isHorizontal) window.size.height else window.size.width
+    val notchAlong = if (edge.isHorizontal) sizes.collapsed.width else sizes.collapsed.height
+    val notchAcross = if (edge.isHorizontal) sizes.collapsed.height else sizes.collapsed.width
+    val notchStart = (window.notchCenterInWindow - notchAlong / 2)
+        .coerceIn(0.dp, (alongLength - notchAlong).coerceAtLeast(0.dp))
+    val alongStart = (notchStart - HUD_SHADOW_MARGIN).coerceAtLeast(0.dp)
+    val alongEnd = (notchStart + notchAlong + HUD_SHADOW_MARGIN).coerceAtMost(alongLength)
+    val acrossReach = (notchAcross + HUD_SHADOW_MARGIN).coerceAtMost(acrossLength)
+    return when (edge) {
+        HudEdge.TOP -> DpRect(alongStart, 0.dp, alongEnd, acrossReach)
+        HudEdge.BOTTOM -> DpRect(alongStart, acrossLength - acrossReach, alongEnd, acrossLength)
+        HudEdge.LEFT -> DpRect(0.dp, alongStart, acrossReach, alongEnd)
+        HudEdge.RIGHT -> DpRect(acrossLength - acrossReach, alongStart, acrossLength, alongEnd)
+    }
+}
 
 /**
  * A janela durante o arrasto: o notch com as alças, simétrica ao longo da borda,
