@@ -128,3 +128,225 @@ Progress is reported as **text** ("Downloading 42%"), never an infinite animatio
 `tools/brand/render_icons.py` generates the PNG, ICO and ICNS from a monogram described in code.
 The `monogram.svg` beside it is reference material and is not read by the script. The `.icns` is only
 validated in the `build-macos` release job.
+
+## Decisões de empacotamento e atualização
+
+> Movido do `CLAUDE.md` em 2026-09-27 pela skill `usage-monitor-token-cleanup` (#319). O `CLAUDE.md` guarda as regras curtas e aponta para cá; o texto abaixo é o original, com os links relativos ajustados a este diretório.
+
+### Empacotamento
+
+`TargetFormat.Exe` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). **O `Msi` saiu**: os dois instaladores de Windows gravavam no mesmo `%LOCALAPPDATA%\Usage Monitor`, e o do MSI nunca poderia se atualizar sozinho — `selectArtifact` só aceita `WINDOWS_NSIS`. O `upgradeUuid` continua no `build.gradle.kts` porque é o UpgradeCode das instalações MSI que já existem, e é por ele que o `UsageMonitor.nsi` as encontra e remove antes de instalar. O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
+
+Auto-start (`AutoStartManager`): registro `Run` no Windows, `.desktop` no Linux, LaunchAgent (`~/Library/LaunchAgents/com.usagemonitor.app.plist` + `launchctl`) no macOS. O enum `Platform` é exaustivo em três `when` do arquivo — valor novo quebra a compilação nos três.
+- **A entrada carrega `--autostart`** (`StartupOrigin`), porque o processo lançado pela chave `Run` e o lançado pelo atalho têm o mesmo pai — o Explorer — e sem o argumento são indistinguíveis. O **nome** do valor não muda: é por ele que `isWindowsAutoStartEnabled` decide se a inicialização está ligada. `ensureAutoStartCommandCurrent()` migra por baixo quem já tinha a entrada sem o argumento; entrada **ausente não migra**, senão ligaria a inicialização de quem a desligou.
+- **O Agendador de Tarefas foi medido e recusado** (`docs/planos/arranque-no-logon-execucao.md`, A05): `schtasks /Create /SC ONLOGON` devolve `Acesso negado` a processo não elevado, com e sem `/RU`. O instalador roda com `RequestExecutionLevel user` e o app roda não elevado — nenhum dos dois criaria a tarefa. Os ~40 s entre o logon e a janela são a fila que o Explorer serializa, não custo do app.
+
+Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `StartupDiagnostics`): com o app já de pé, a segunda instância **não pode sair calada** — clicar no atalho sem nada acontecer é indistinguível de "o app não abre", e foi o que fez o autostart ser dado como quebrado numa máquina em que ele nunca deixou de disparar. Ela deixa um pedido em `~/.usage-monitor/focus.request` e a instância viva o atende por `restoreMainWindow`, o **mesmo** caminho do item "Abrir" da bandeja.
+- **Arquivo e não socket:** socket em loopback dispara o prompt do Firewall no primeiro arranque, e pedir permissão de rede para focar a própria janela é pior que o defeito. O carimbo vai no **conteúdo**, não em `lastModified`, que depende da granularidade do sistema de arquivos. Pedido sobrado de sessão anterior não é atendido — a janela saltaria sozinha no arranque.
+- **`activateWindow` alterna `alwaysOnTop` (`false → true → valor anterior`), e não "liga se estiver desligado".** Medido: com o sinalizador já ligado, atribuir `true` de novo não reordena nada e a janela continua atrás da que a cobre — exatamente o caso de quem usa "manter sempre visível". `toFront()` sozinho não vence o bloqueio de primeiro plano do Windows: ele só pisca o botão na barra.
+- **O registro de arranque é sempre ligado** (`~/.usage-monitor/diagnostics/startup.jsonl`), ao contrário dos recorders de créditos e do Codex, que são opt-in por variável de ambiente. Aqueles gravam corpo de resposta a cada coleta; este grava uma linha por arranque, com corte por contagem. Diagnóstico que exige variável configurada **antes** do fato não serve para investigar o boot que já passou. `FOCUS_REQUEST_SERVED` existe para separar "o pedido nunca foi lido" de "foi lido e a janela não subiu", que são defeitos em lugares diferentes.
+
+**Atualização automática** (`desktopMain/update/`; planos
+[`atualizacao-automatica-windows-execucao.md`](planos/atualizacao-automatica-windows-execucao.md)
+e [`atualizacao-automatica-linux-execucao.md`](planos/atualizacao-automatica-linux-execucao.md)):
+interruptor "Atualização automática" nas Configurações → Geral, desmarcado por padrão
+(`autoUpdateEnabled` em `PreferencesSettings`). Ligado, baixa a release em segundo plano, valida o
+SHA-256 contra o `digest` da API do GitHub (não o hash publicado no workflow, que serve só ao
+instalador inicial) e troca ao fechar o app — ou pelo botão "Reiniciar o app e atualizar".
+**Todo texto que manda reiniciar diz o que reinicia** (issue #274): "Reiniciar e atualizar agora"
+era lido como reiniciar o computador. Os avisos em prosa nomeiam o Usage Monitor; o **rótulo** da
+ação diz "o app" (`UPDATE_RESTART_ACTION_PT`/`_EN`), porque a faixa é de uma linha e quem cede
+espaço é o título — com o nome inteiro o rótulo ia de ~209dp a ~281dp e o título sumia numa janela
+de 400dp. A ajuda cita a constante em vez de copiar o texto, e `HudNotchTextFitTest` mede frase e
+ação contra as linhas que o balão da engrenagem reserva.
+`rememberAutoUpdateController` (`AutoUpdateController.kt`) escolhe **um** instalador por plataforma —
+`WindowsAppUpdateInstaller` ou `LinuxAppUpdateInstaller` — cada um atrás da própria flag de build
+(`AUTO_UPDATE_SHIPPED`, `LINUX_AUTO_UPDATE_SHIPPED`, **as duas em `true` desde a v38.0.1**) e de um
+piso de versão-alvo (`MIN_UPDATABLE_TARGET_VERSION` / `MIN_LINUX_UPDATABLE_TARGET_VERSION`): abaixo do
+piso a versão instalada não reconhece o mecanismo de confirmação, e o instalador desfaria uma
+atualização que funcionou. macOS fica em `UNSUPPORTED_PLATFORM` (sem Developer ID, sem caminho
+confiável de remontar o bundle sob quarentena) e Linux ARM64 em `UNSUPPORTED_ARCHITECTURE` — exceção
+declarada à regra de não criar valor novo em enum existente, porque há **um** `when` exaustivo sobre
+`AppUpdateSupport` e o erro de compilação garante que o texto novo existe.
+- **Windows**: só a instalação pelo NSIS per-user, sem UAC (`RequestExecutionLevel user`) — é o que
+  torna a troca silenciosa viável; MSI e cópia manual ficam com o interruptor desabilitado. O
+  instalador extrai para `$INSTDIR.new` e só troca por dois `Rename` no mesmo volume quando a árvore
+  nova está completa: falha antes do primeiro deixa `$INSTDIR` intacto, e o `Rename` bem-sucedido **é**
+  a prova de que o processo anterior saiu — não `taskkill /F`, que mataria no meio de uma escrita do
+  SQLite.
+- **Linux**: só a instalação `.sh` user-space em árvore XDG gerenciada (marcador
+  `.usage-monitor-managed` **e** executável em execução dentro de `versions/`); `.deb`/`.rpm` e cópia
+  manual ficam com o motivo na tela. `current` é arquivo de texto com a versão, não symlink — `mv -T`
+  não é POSIX —, o script promove por `rename(2)` puro e relança o launcher estável
+  (`~/.local/bin/usage-monitor`), que espera um ACK em arquivo (token gerado pelo script, não carimbo
+  de tempo) antes de gravar `status=success`; sem ACK em 60s, desfaz. Log sempre em
+  `~/.usage-monitor/diagnostics/linux-update.log`. A ativação real (A14) só veio depois de dois
+  defeitos achados numa Bazzite/rpm-ostree real e não previstos no plano: origem `UNMANAGED` por
+  comparar caminho não canonicalizado contra symlink do ostree, e o processo relançado herdando o
+  `LD_LIBRARY_PATH` da versão anterior e morrendo antes de `main()` — os dois só apareceram medindo ao
+  vivo, não lendo o código.
+- Nenhuma animação infinita para o progresso — é **texto** ("Baixando 42%"), pelo motivo de sempre
+  (`waitForIdle`). `AppUpdateUiState` é `sealed interface`, não enum: valor novo ali é erro de
+  compilação nos `when`, e portanto visível.
+
+**Novidades da versão** (`ReleaseNotes.kt` + `ReleaseNotesController.kt`; issues #74 e #127): a janela
+que diz o que mudou depois de uma troca de versão. **O gatilho é `CURRENT_APP_VERSION` diferente da
+marca `releaseNotesSeenVersion`, nunca o recibo do instalador.**
+- **O recibo perde a corrida no Linux, sempre.** No Windows o NSIS o grava **antes** de relançar o
+  app; no Linux o `linux-updater.sh` só o grava **depois do ACK**, que é escrito pelo app novo já em
+  execução — quando ele lê o arquivo, ele ainda descreve a atualização anterior. A ordem do script é a
+  correta: antes do ACK ainda pode haver rollback. Com o recibo como condição, a janela nunca aparecia
+  no Linux, em instalação manual (`.exe` sem `/UPDATE`, `.sh`, `.deb`, `.rpm`) nem no macOS, que não
+  tem instalador automático e portanto nunca teve recibo.
+- **Marca ausente não é uma situação só.** Sem recibo no disco é instalação nova e fica em silêncio —
+  "novidades" para quem não tem versão anterior não descreve mudança nenhuma. **Com** recibo é máquina
+  que já atualizou alguma vez, e abre: sem esse ramo, quem foi atingido pela #127 (e que por definição
+  nunca chegou a marcar nada) só veria a janela uma versão depois de a correção sair.
+- **Retrocesso marca em silêncio**, e não é caso hipotético: no `health-timeout` do updater do Linux o
+  app novo chega a abrir a janela e a gravar a marca antes de o script desistir e restaurar a versão
+  anterior. É esse ramo que reescreve a marca para baixo; sem ele as novidades daquela versão ficariam
+  perdidas para sempre. Ele cobre também "mesma versão escrita de outro jeito" (`38.0.2` × `38.0.02`),
+  que a igualdade textual não pega.
+- **`MARK_SEEN_ONLY` não vai à rede.** Pedir ao GitHub a release de uma versão que não vamos anunciar é
+  requisição gasta por nada — e é o contador de chamadas, não a janela ausente, que o teste afirma.
+- A ordenação de versões tem **um dono**, `domain/entity/AppVersionComparison.kt`, e expõe o **sinal**:
+  é ele que separa atualização de retrocesso, e retrocesso não é "não atualizou".
+- O recibo continua vivo para outras duas coisas: a linha "Última atualização" das Configurações e a
+  poda do artefato aplicado (`shouldDiscardUpdateArtifacts`).
+
+**Ajuda dentro do app** (`presentation/ui/help/` + `desktopMain/help/HelpMediaPlayer.kt` +
+`desktopMain/presentation/ui/HelpWindow.kt` + `src/desktopMain/resources/help/*.gif`; issue #184,
+plano [`modal-de-ajuda-184-execucao.md`](planos/modal-de-ajuda-184-execucao.md)): doze tópicos
+com o que cada funcionalidade faz, **como ativá-la** e uma demo animada dela. Fora do app o produto
+já estava documentado no README; dentro dele não havia porta nenhuma, e as funcionalidades que
+precisam ser **ligadas** (HUD, somente cards, alertas, atualização automática, time, orçamento) só
+eram descobertas por acidente.
+- **O catálogo é `CliSessionsGlossary` com outro assunto**: enum de tópicos, `readingOrder` e
+  entradas PT/EN em `presentation/ui/`. Os passos de ativação citam o **rótulo real** do controle,
+  lido do código; trocar o rótulo na tela sem trocar aqui manda o usuário procurar um botão que não
+  existe. Os `when` exaustivos não pegam isso — pegam a entrada faltando, não a entrada errada —, e
+  por isso os testes afirmam que todo tópico tem os dois idiomas e pelo menos um passo.
+- **Compose não anima GIF; o `Codec` do Skia anima.** `frameCount`, `getFrameInfo(i).duration` e
+  `readPixels(bitmap, frame, priorFrame)` já estão no classpath (skiko 0.8.18). `priorFrame` é
+  **otimização, não correção**: sem ele o codec refaz a cadeia de quadros requeridos a cada tique, o
+  que num GIF delta é trabalho quadrático. O quadro publicado é **cópia imutável dos bytes**
+  (`readPixels` → `installPixels`), porque `Bitmap.asComposeImageBitmap()` embrulha o mesmo bitmap e
+  escrever o quadro seguinte por cima mutaria a imagem que já está na tela, sem invalidar nada.
+  **`Bitmap.makeClone()` compartilha os pixels** e reprova o teste de imutabilidade; e
+  `Image.makeFromBitmap(...).toComposeImageBitmap()`, o caminho anterior, redesenha o quadro por um
+  `Canvas` a ~59 ms por quadro — 35 s de suíte num teste só (issue #295).
+- **O laço de quadros mora em `desktopMain`, nunca no composable de conteúdo.** É essa separação que
+  deixa `HelpContent` exercitável: animação infinita trava o `waitForIdle` dos testes de componente.
+  Pela mesma razão o tópico selecionado é hasteado — quem carrega a demo é o tocador, que precisa
+  saber qual está na tela.
+- **As demos são gravadas em 1000×420, a largura de uma janela real**, e não no tamanho da faixa do
+  modal: as telas deste app têm orçamento de coluna de ~1000dp, e gravá-las estreitas mostraria um
+  layout que o app não tem. Reduzir a gravação pela metade tornaria ilegível justamente o rótulo que
+  ela aponta. Por isso a janela nasce em 1180×780dp. `gradlew.bat generateHelpMedia` regenera todas,
+  pelo mesmo motor de `img/tour.gif` (`SceneRecorder`, extraído do gerador do tour).
+- **A faixa da demo é teto, não altura fixa.** Medido no app, numa área útil de 1280×752 com a escala
+  em 115%: os 420dp fixos deixavam a seção "Como ativar" abaixo da dobra — que é a pergunta que a
+  tela existe para responder. Ela cede até 55% da área rolável, e quem encolhe é a demo, que o `Fit`
+  mantém inteira; a seção que sai da vista não tem como se encolher.
+- **Mídia ausente não esconde o texto.** Recurso que não veio na instalação vira estado vazio com a
+  frase dizendo isso, e descrição e passos continuam: a demo ilustra o tópico, não é o tópico.
+- **Três portas — rodapé, bandeja e `F1`** —, o mesmo desenho do modo somente cards e da barra HUD: o
+  rodapé é a porta óbvia e é a primeira coisa que esses dois modos escondem.
+- **O que os testes não pegam, o olho pegou.** Quatro defeitos vieram de olhar o quadro gerado e de
+  abrir o app: o ponteiro sintético não estava sendo composto e as demos mostravam a tela reagindo
+  sozinha; o deslocamento passava do fim do conteúdo; a demo de modos de janela desenhava o HUD por
+  cima dos cards e as duas exibições se misturaram; e a grade de cards, fora de um contêiner rolável,
+  é ancorada pelo centro e o quadro começava no meio de um card. `HelpMediaResourcesTest` cobre o que
+  dá para afirmar por teste: todo `mediaId` resolve no classpath, decodifica, e **muda de um quadro
+  para o outro** — foi ele que reprovou a demo de presença, que tinha saído parada.
+
+## CI e testes — decisões
+
+> Movido do `CLAUDE.md` em 2026-09-27 pela skill `usage-monitor-token-cleanup` (#319). O `CLAUDE.md` guarda as regras curtas e aponta para cá; o texto abaixo é o original, com os links relativos ajustados a este diretório.
+
+## CI e testes
+
+Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e `ci-server.yml`
+(suíte do servidor no Ubuntu). O plano com as medições está em
+[`docs/planos/ci-testes-detalhe-e-velocidade-execucao.md`](planos/ci-testes-detalhe-e-velocidade-execucao.md).
+
+- **O cache do Gradle é da `gradle/actions/setup-gradle`, não do `cache: 'gradle'` do `setup-java`.**
+  O post-step daquele arquiva o `~/.gradle` com o daemon vivo e no Windows o `tar` morre nos `.lock`
+  (`Device or resource busy` → `exit code 2`). O efeito era total e silencioso: todo run começava com
+  `gradle cache is not found` e o repositório não tinha **uma** entrada Windows em `gh cache list`. Os
+  ~57 s gastos antes da primeira tarefa eram **download** — a mesma fase custa 0,44 s numa máquina com
+  o `~/.gradle` quente. **Só a `main` escreve o cache** (`cache-read-only` fora dela): cache gravado
+  num run de PR fica com o escopo daquele PR e nenhum outro run consegue lê-lo.
+- **O CI roda a suíte em três forks (`-PtestForks=3`); localmente o default continua um.** O
+  **Skiko** impedia forks num runner limpo: `Library.unpackIfNeeded` extrai `skiko-windows-x64.dll`
+  para `~/.skiko/<hash>/` com um `Files.move`, e no Windows esse move falha com
+  `AccessDeniedException` quando outro processo já abriu o destino — todo fork tentava extrair ao
+  mesmo tempo, e o segundo run do CI caiu com 41 testes de UI em `ExceptionInInitializerError`. Com
+  `testForks > 1`, `extractSkikoNative` (`SkikoWarmup.kt`, `Library.load()` num processo só) roda
+  **antes** do `desktopTest` e cada fork encontra o cache quente (issue #295; medido com `~/.skiko`
+  apagado e 4 forks: verde). **Divergência entre verde local e vermelho no CI em teste de UI: olhe o
+  `~/.skiko` antes de olhar o teste.**
+  - **Teste de tela usa `ScreenTestTheme`, que é o `AppTheme` com `AppMotionPolicy.Reduced`.** Sob o
+    relógio de teste toda transição finita é desenhada quadro a quadro, com as sombras de `appDepth`
+    no raster de CPU: um `AppDialog` custa 2,1 s em `Static` e 0,4 s em `Reduced`, e a suíte caiu de
+    ~342 s para ~224 s. Teste de **primitiva que anima** (`AppStatesTest`, `AppDialogTest`,
+    `AppControlsTest`, `AppDepthTest`, `HudNotchTest`...) continua no `AppTheme` — com `Reduced` ele
+    passaria sem exercitar a transição que existe para cobrir.
+  - O Gradle distribui forks **por classe**, e uma classe pesada vira o caminho crítico da suíte
+    paralela: `ComponentTest`, com 103 testes e 120 s no CI, terminava sozinho num fork enquanto os
+    outros esperavam. Foi dividido em `ComponentTest`, `SettingsDialogContentTest` e `HistoryScreenTest`
+    (~30–40 s cada). Teste de tela novo vai no arquivo da tela dele, não num arquivo genérico.
+- **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
+  Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
+  não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois
+  jobs publicam no `$GITHUB_STEP_SUMMARY` — contagem e classes mais lentas quando rodam, **NAO
+  EXECUTADA** com motivo e contagem de arquivos quando não. O `--require` do
+  `tools/ci/test-summary.mjs` derruba o job quando a suíte devia rodar e não produziu XML: é o que faz
+  "passou sem executar" ficar vermelho.
+- **Um parser de JUnit XML para os dois jobs** (`tools/ci/test-summary.mjs`), e por isso o `vitest`
+  escreve no mesmo formato (`npm run test:ci`). Duas implementações divergiriam justamente na
+  contagem, que é o número que o resumo existe para dar. Sem dependência externa: no job do desktop
+  não há `npm ci`.
+- **`delay` dentro de `runTest` avança tempo VIRTUAL e não espera trabalho de fundo.** Os view models rodam em `Dispatchers.Default`; uma espera escrita com `delay` volta na hora, e um laço de 200 tentativas gira em tempo zero e devolve o primeiro estado que encontrar. Era assim que
+  `HistoryViewModelTest > emits Empty state when enabledApis is empty` observava `Loading` num runner
+  carregado depois de anos passando (run `32855876748`), e era assim que um `delay(100)` escrito para
+  provar que *nada* aconteceu passava sem esperar nada. Espera de estado de view model usa
+  `yield()` + `Thread.sleep`, como `pauseForBackgroundWork` em `DashboardViewModelTestSupport`.
+- **Cobertura é relatório, não trava.** O Kover estava aplicado desde sempre instrumentando toda
+  passada — 6 a 7 s medidos — sem que nenhuma tarefa de relatório rodasse em lugar nenhum. Agora a
+  instrumentação é **opt-in** por `-Pcoverage`, que o CI liga em todo run que executa a suíte — PR
+  inclusive, desde a issue #299 —, e a mesma passada serve suíte e relatório. Sem `koverVerify` e sem piso: limiar calibrado antes de a linha de base existir é
+  limiar calibrado no escuro. Linha de base de 2026-08-25: **82,7% de linhas**, 52,3% de ramos.
+  `MainKt` fica fora do relatório por filtro — é o grafo de DI mais a janela, e contá-lo afunda o
+  número sem apontar lacuna que se possa fechar.
+- **O push na `main` reaproveita a árvore verificada no PR** (jobs `gate` e `verified-tree` do
+  `ci.yml`; issue #299, plano [`ci-arvore-verificada-299-execucao.md`](planos/ci-arvore-verificada-299-execucao.md)).
+  Depois do merge a `main` repetia ~11 min de Windows sobre o mesmo código. A identidade do código
+  testado é o **tree SHA**: no `pull_request` o checkout é `refs/pull/N/merge`, e o squash de um PR
+  cuja base não andou tem a mesma árvore — medido em 3 de 3 merges (#292, #296, #297). O PR verde
+  publica o artifact `ci-verified-tree-<tree>`; o `gate` o procura no push e, achando run de PR
+  verde do **próprio** repositório (fork edita o próprio `ci.yml` e forjaria o marcador), os jobs
+  publicam **NAO EXECUTADA** com o link do run. O gatilho `push` **não** foi removido: a `main` não
+  tem proteção de branch, e merge com a base adiantada gera árvore nunca testada — ali, e em push
+  direto (bump de release), marcador expirado (30 dias) ou falha de API, tudo roda. O preço é o
+  cache do Gradle: a `main` só grava quando roda de verdade.
+- **Cobertura alta não é a mesma coisa que costura certa.** `RemoteTeamDataSource` está em 1,9%
+  porque os testes **herdam da classe real** e sobrescrevem os 20 métodos: o nome aparece em três
+  arquivos de teste e nenhuma linha de HTTP executa (issue #94). Ao ver uma classe `open` com todo
+  método `open`, pergunte o que sobra dela quando o teste a substitui.
+- **`choco install` detecta antes de instalar e tem retry.** Um 504 da `community.chocolatey.org`
+  derrubou a `main` em 25/08 sem nenhum defeito de código. O WiX não lança ao fim: sem ele o roteiro
+  pula o cenário S7 com aviso, e derrubar o job custaria os outros seis.
+- **O `codeql.yml` resolvia o classpath do buildscript frio a cada run, e um 429 do Maven Central
+  derrubou a `main` por isso.** Ele era o único workflow que invocava Gradle sem
+  `gradle/actions/setup-gradle`: o log do run `33680756437` traz `Downloading gradle-8.6-bin.zip` e
+  daemon novo, e a falha é de **configuração** — `Received status code 429` em
+  `repo.maven.apache.org` para `kotlin-gradle-plugins-bom`, `kover-features-jvm` e companhia, antes
+  de compilar uma linha. Não era defeito de código: o job `CI` passou no mesmo commit, com o cache do
+  Gradle Home quente. A mitigação é dupla — a mesma action de cache dos outros dois workflows, mais
+  retry com backoff no passo de build, pelo precedente do `choco install` acima. **O retry não cria
+  "verde que não fez nada"**: há uma tarefa só, falha de configuração não compila nada e a tentativa
+  seguinte compila do zero, falha de compilação é determinística, e um build up-to-date faria
+  `Perform CodeQL Analysis` reprovar alto com *No source code was seen*. O preço aceito é o cache
+  Linux disputar os 10 GB do repositório com o cache Windows do `ci.yml`; se aquele voltar a dizer
+  `gradle cache is not found`, a saída é `cache-read-only: true` no CodeQL.

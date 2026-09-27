@@ -237,6 +237,7 @@ invented here.
 | `ui_kits/desktop-app/` | Click-through recreation: Dashboard, cards-only mode, History, CLI Sessions, Session detail, Team usage, Presence, Settings |
 | `_ds_local.js` | Mount helper so cards and kits render before/without the compiled bundle |
 | `SKILL.md` | Agent Skills entry point |
+| `compose-implementation.md` | How the tokens, depth, motion, modals, type and primitives are built in Compose, with the decisions and measurements behind them (PT; moved from `CLAUDE.md`) |
 
 ### Intentional additions
 
