@@ -152,8 +152,7 @@ class ArchitectureRulesTest {
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/AppStructure.kt" to 1018,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamPresenceScreen.kt" to 1013,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/TeamUsageViewModel.kt" to 863,
-            "src/desktopMain/kotlin/com/usagemonitor/AutoStartManager.kt" to 805
+            "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/TeamUsageViewModel.kt" to 863
         )
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */

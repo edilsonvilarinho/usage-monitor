@@ -45,6 +45,7 @@ arquivo-deus nem composable-deus novo, sem mudar comportamento, `gradlew.bat all
 | # | Atividade | Commit | Evidência |
 |---|---|---|---|
 | A0 | Plano | `docs: plan split of oversized files (#302-#309)` | — |
+| A1 | `AutoStartResult`, `AutoStartCommandResult` e os dois conversores saem para `AutoStartResult.kt`; os conversores passam de `private` a `internal`. `AutoStartManager.kt` 805 → 761 linhas, fora da lista | `refactor: split AutoStartManager below 800 lines (#309)` | `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "*AutoStart*"`: 38 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
