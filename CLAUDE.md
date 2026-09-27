@@ -337,9 +337,12 @@ eram descobertas por acidente.
 - **Compose não anima GIF; o `Codec` do Skia anima.** `frameCount`, `getFrameInfo(i).duration` e
   `readPixels(bitmap, frame, priorFrame)` já estão no classpath (skiko 0.8.18). `priorFrame` é
   **otimização, não correção**: sem ele o codec refaz a cadeia de quadros requeridos a cada tique, o
-  que num GIF delta é trabalho quadrático. O quadro publicado é **cópia imutável**
-  (`Image.makeFromBitmap`), porque `Bitmap.asComposeImageBitmap()` embrulha o mesmo bitmap e escrever
-  o quadro seguinte por cima mutaria a imagem que já está na tela, sem invalidar nada.
+  que num GIF delta é trabalho quadrático. O quadro publicado é **cópia imutável dos bytes**
+  (`readPixels` → `installPixels`), porque `Bitmap.asComposeImageBitmap()` embrulha o mesmo bitmap e
+  escrever o quadro seguinte por cima mutaria a imagem que já está na tela, sem invalidar nada.
+  **`Bitmap.makeClone()` compartilha os pixels** e reprova o teste de imutabilidade; e
+  `Image.makeFromBitmap(...).toComposeImageBitmap()`, o caminho anterior, redesenha o quadro por um
+  `Canvas` a ~59 ms por quadro — 35 s de suíte num teste só (issue #295).
 - **O laço de quadros mora em `desktopMain`, nunca no composable de conteúdo.** É essa separação que
   deixa `HelpContent` exercitável: animação infinita trava o `waitForIdle` dos testes de componente.
   Pela mesma razão o tópico selecionado é hasteado — quem carrega a demo é o tocador, que precisa
@@ -1082,14 +1085,25 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   ~57 s gastos antes da primeira tarefa eram **download** — a mesma fase custa 0,44 s numa máquina com
   o `~/.gradle` quente. **Só a `main` escreve o cache** (`cache-read-only` fora dela): cache gravado
   num run de PR fica com o escopo daquele PR e nenhum outro run consegue lê-lo.
-- **A suíte roda em um fork só, e forks paralelos são opt-in por `-PtestForks=N`.** O ganho é real —
-  1m24s serial, 52 s com 4 forks, resultado idêntico —, mas o **Skiko** impede ligá-lo por default:
-  `Library.unpackIfNeeded` extrai `skiko-windows-x64.dll` para `~/.skiko/<hash>/` com um `Files.move`,
-  e no Windows esse move falha com `AccessDeniedException` quando outro processo já abriu o destino.
-  Numa máquina de desenvolvimento o cache está quente desde sempre e não há extração nem corrida; num
-  runner limpo, todo fork tenta extrair ao mesmo tempo. Passou local, passou no primeiro run do CI e
-  derrubou o segundo com 41 testes de UI em `ExceptionInInitializerError`. **Divergência entre verde
-  local e vermelho no CI em teste de UI: olhe o `~/.skiko` antes de olhar o teste.**
+- **O CI roda a suíte em três forks (`-PtestForks=3`); localmente o default continua um.** O
+  **Skiko** impedia forks num runner limpo: `Library.unpackIfNeeded` extrai `skiko-windows-x64.dll`
+  para `~/.skiko/<hash>/` com um `Files.move`, e no Windows esse move falha com
+  `AccessDeniedException` quando outro processo já abriu o destino — todo fork tentava extrair ao
+  mesmo tempo, e o segundo run do CI caiu com 41 testes de UI em `ExceptionInInitializerError`. Com
+  `testForks > 1`, `extractSkikoNative` (`SkikoWarmup.kt`, `Library.load()` num processo só) roda
+  **antes** do `desktopTest` e cada fork encontra o cache quente (issue #295; medido com `~/.skiko`
+  apagado e 4 forks: verde). **Divergência entre verde local e vermelho no CI em teste de UI: olhe o
+  `~/.skiko` antes de olhar o teste.**
+  - **Teste de tela usa `ScreenTestTheme`, que é o `AppTheme` com `AppMotionPolicy.Reduced`.** Sob o
+    relógio de teste toda transição finita é desenhada quadro a quadro, com as sombras de `appDepth`
+    no raster de CPU: um `AppDialog` custa 2,1 s em `Static` e 0,4 s em `Reduced`, e a suíte caiu de
+    ~342 s para ~224 s. Teste de **primitiva que anima** (`AppStatesTest`, `AppDialogTest`,
+    `AppControlsTest`, `AppDepthTest`, `HudNotchTest`...) continua no `AppTheme` — com `Reduced` ele
+    passaria sem exercitar a transição que existe para cobrir.
+  - O Gradle distribui forks **por classe**, e uma classe pesada vira o caminho crítico da suíte
+    paralela: `ComponentTest`, com 103 testes e 120 s no CI, terminava sozinho num fork enquanto os
+    outros esperavam. Foi dividido em `ComponentTest`, `SettingsDialogContentTest` e `HistoryScreenTest`
+    (~30–40 s cada). Teste de tela novo vai no arquivo da tela dele, não num arquivo genérico.
 - **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
   Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
   não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois

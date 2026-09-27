@@ -29,7 +29,6 @@ import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_OPTION_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.WindowMode
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.coroutines.channels.Channel
 import kotlinx.datetime.Instant
 import androidx.compose.ui.unit.dp
@@ -46,7 +45,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -83,7 +82,7 @@ class FooterBarTest {
         var opened = 0
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -110,7 +109,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -135,7 +134,7 @@ class FooterBarTest {
         var opened = 0
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -161,7 +160,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -186,7 +185,7 @@ class FooterBarTest {
         var opened = 0
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -215,7 +214,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -240,7 +239,7 @@ class FooterBarTest {
         var exported = 0
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -268,7 +267,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -297,7 +296,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -333,7 +332,7 @@ class FooterBarTest {
         val chosen = mutableListOf<WindowMode>()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -371,7 +370,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Column(modifier = Modifier.width(240.dp).height(320.dp)) {
                     Box(modifier = Modifier.weight(1f))
                     FooterBar(
@@ -409,7 +408,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "1.1.0",
@@ -434,7 +433,7 @@ class FooterBarTest {
         val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(320.dp)) {
                     FooterBar(
                         appVersion = "6.0.0",
@@ -462,7 +461,7 @@ class FooterBarTest {
         var currentNow = start
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     FooterBar(
                         appVersion = "9.0.0",

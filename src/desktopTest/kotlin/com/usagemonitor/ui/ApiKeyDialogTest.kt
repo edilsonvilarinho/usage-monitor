@@ -25,7 +25,6 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
 import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
 import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +45,7 @@ class ApiKeyDialogTest {
         var tested: Pair<ApiSource, String>? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -82,7 +81,7 @@ class ApiKeyDialogTest {
         var tested: Pair<ApiSource, String>? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -111,7 +110,7 @@ class ApiKeyDialogTest {
         var tested: Pair<ApiSource, String>? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -139,7 +138,7 @@ class ApiKeyDialogTest {
     @Test
     fun `botao fica desabilitado durante a checagem`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -163,7 +162,7 @@ class ApiKeyDialogTest {
     @Test
     fun `o veredito aparece junto do campo`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -204,7 +203,7 @@ class ApiKeyDialogTest {
         val check = mutableStateOf(ApiKeyCheckUiState())
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,

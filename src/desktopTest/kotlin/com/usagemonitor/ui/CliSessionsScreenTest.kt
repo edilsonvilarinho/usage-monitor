@@ -50,7 +50,6 @@ import com.usagemonitor.presentation.ui.BREAKDOWN_SORT_TAG_PREFIX
 import com.usagemonitor.presentation.ui.REFRESHING_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TAB_BREAKDOWN_TAG
 import com.usagemonitor.presentation.ui.TAB_SESSIONS_TAG
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
@@ -81,7 +80,7 @@ class CliSessionsScreenTest {
     @Test
     fun `only the unanswered session row carries the stalled mark`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -112,7 +111,7 @@ class CliSessionsScreenTest {
     @Test
     fun `list shows session count total tokens and total cost`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -142,7 +141,7 @@ class CliSessionsScreenTest {
     @Test
     fun `header names the end of the quota window when the cutoff is anchored`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -171,7 +170,7 @@ class CliSessionsScreenTest {
     @Test
     fun `header names the window opened by the reset when its end is unknown`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -195,7 +194,7 @@ class CliSessionsScreenTest {
     @Test
     fun `header names the 7d window as a sliding one`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -217,7 +216,7 @@ class CliSessionsScreenTest {
     @Test
     fun `empty list in the 7d window points at the filter`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -240,7 +239,7 @@ class CliSessionsScreenTest {
     @Test
     fun `empty list inside a quota window says so`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -264,7 +263,7 @@ class CliSessionsScreenTest {
     @Test
     fun `header totals the tokens of the listed sessions`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -286,7 +285,7 @@ class CliSessionsScreenTest {
     @Test
     fun `header names the account the sessions belong to`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -308,7 +307,7 @@ class CliSessionsScreenTest {
     @Test
     fun `header offers every window with the active one selected`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -335,7 +334,7 @@ class CliSessionsScreenTest {
         val selected = mutableListOf<CliSessionRange>()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
@@ -356,7 +355,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the list header has no back button and no refresh button`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -383,7 +382,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the list header says so when nothing has changed yet`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
@@ -402,7 +401,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the list row carries the session status with the number behind it`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -431,7 +430,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the list row reports an unknown window instead of guessing one`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -458,7 +457,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the header counts the saturated and attention sessions`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -495,7 +494,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the header omits the tally when every session is healthy`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -522,7 +521,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the header tally skips sessions whose model window is unknown`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -552,7 +551,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the header breaks the token total into its components`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -576,7 +575,7 @@ class CliSessionsScreenTest {
     @Test
     fun `empty list with an active window points at the filter`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = emptyList()),
@@ -596,7 +595,7 @@ class CliSessionsScreenTest {
     @Test
     fun `empty list without a window explains where transcripts are read from`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -627,7 +626,7 @@ class CliSessionsScreenTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -669,7 +668,7 @@ class CliSessionsScreenTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -711,7 +710,7 @@ class CliSessionsScreenTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -748,7 +747,7 @@ class CliSessionsScreenTest {
         val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -784,7 +783,7 @@ class CliSessionsScreenTest {
         val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -821,7 +820,7 @@ class CliSessionsScreenTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -860,7 +859,7 @@ class CliSessionsScreenTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -891,7 +890,7 @@ class CliSessionsScreenTest {
         val summary = summary("session-abcdef01")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -918,7 +917,7 @@ class CliSessionsScreenTest {
         val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -950,7 +949,7 @@ class CliSessionsScreenTest {
         val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -987,7 +986,7 @@ class CliSessionsScreenTest {
         val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -1025,7 +1024,7 @@ class CliSessionsScreenTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -1056,7 +1055,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the list carries a scroll indicator`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -1082,7 +1081,7 @@ class CliSessionsScreenTest {
         val detail = CliSessionDetail(summary = summary, turns = listOf(turn(seq = 1)))
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -1110,7 +1109,7 @@ class CliSessionsScreenTest {
     @Test
     fun `error state shows the message`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Error("índice indisponível"),
@@ -1134,7 +1133,7 @@ class CliSessionsScreenTest {
         ).toUsageBreakdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 // Mesma razão de `renderBreakdown`: a coluna do resumo é alta.
                 Box(modifier = Modifier.width(900.dp).height(1_500.dp)) {
                     CliSessionsContent(
@@ -1218,7 +1217,7 @@ class CliSessionsScreenTest {
     @Test
     fun `trocar a janela avisa que os numeros ainda sao os antigos`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -1242,7 +1241,7 @@ class CliSessionsScreenTest {
         pageSizeTag: String? = null
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 // Acompanha [BREAKDOWN_SCENE_HEIGHT]: o `Box` não pode ser o
                 // limite mais apertado, ou a cena maior não serviria de nada.
                 Box(modifier = Modifier.width(900.dp).height(1_500.dp)) {
@@ -1270,7 +1269,7 @@ class CliSessionsScreenTest {
         val breakdown = listOf(groupRow("s1", "/workspace/alpha", inputTokens = 1_000_000L)).toUsageBreakdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
@@ -1299,7 +1298,7 @@ class CliSessionsScreenTest {
         var selected: CliSessionsView? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
@@ -1324,7 +1323,7 @@ class CliSessionsScreenTest {
         var chosen: UsageExportFormat? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
@@ -1355,7 +1354,7 @@ class CliSessionsScreenTest {
         var reportRequests = 0
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
@@ -1383,7 +1382,7 @@ class CliSessionsScreenTest {
     @Test
     fun `the budget card keeps the account currency apart`() = runDesktopComposeUiTest(height = BREAKDOWN_SCENE_HEIGHT) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(1_500.dp)) {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(

@@ -41,7 +41,6 @@ import com.usagemonitor.presentation.ui.PRESENCE_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_STATE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_WORKING_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TeamPresenceContent
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -228,7 +227,7 @@ class TeamPresenceScreenTest {
     @Test
     fun `o erro nomeia a falha do servidor`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(820.dp).height(640.dp)) {
                     TeamPresenceContent(
                         state = TeamPresenceUiState.Error("chave invalida"),
@@ -656,7 +655,7 @@ class TeamPresenceScreenTest {
         onDeleteAccount: (String) -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(widthDp.dp).height(700.dp)) {
                     TeamPresenceContent(
                         state = state,

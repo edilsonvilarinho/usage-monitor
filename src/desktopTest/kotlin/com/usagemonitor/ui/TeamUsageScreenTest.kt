@@ -61,7 +61,6 @@ import com.usagemonitor.presentation.ui.REFRESHING_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.TeamUsageLabels
 import com.usagemonitor.presentation.ui.components.TEAM_TREND_CHART_TAG
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageView
@@ -173,7 +172,7 @@ class TeamUsageScreenTest {
         var selected: CliSessionRange? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
@@ -197,7 +196,7 @@ class TeamUsageScreenTest {
         var toggled: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
@@ -333,7 +332,7 @@ class TeamUsageScreenTest {
     @Test
     fun `estado de erro nomeia o servidor de time`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Error(message = "HTTP 401"),
@@ -412,7 +411,7 @@ class TeamUsageScreenTest {
         var removed: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
@@ -462,7 +461,7 @@ class TeamUsageScreenTest {
             )
 
             setContent {
-                AppTheme(isDark = true) {
+                ScreenTestTheme(isDark = true) {
                     Box(modifier = Modifier.width(1100.dp).height(700.dp)) {
                         TeamUsageContent(
                             state = TeamUsageUiState.Success(
@@ -501,7 +500,7 @@ class TeamUsageScreenTest {
     @Test
     fun `falha ao excluir sessao aparece com mensagem especifica`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(members = emptyList()),
@@ -520,7 +519,7 @@ class TeamUsageScreenTest {
     @Test
     fun `falha ao remover aparece na tela`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
@@ -543,7 +542,7 @@ class TeamUsageScreenTest {
         var opened: Pair<String, String>? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
@@ -646,7 +645,7 @@ class TeamUsageScreenTest {
         var closed = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamUsageContent(
                         state = TeamUsageUiState.Success(
@@ -1065,7 +1064,7 @@ class TeamUsageScreenTest {
         localDeviceId: String? = null
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(width).height(height)) {
                     TeamUsageContent(
                         state = state,

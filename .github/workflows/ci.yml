@@ -135,7 +135,10 @@ jobs:
           WITH_COVERAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $arguments = @('allTests', '--build-cache')
+          # Tres forks nos 4 vCPU do runner (issue #295). A corrida de extracao
+          # do Skiko que proibia forks no CI e resolvida por `extractSkikoNative`,
+          # que o `build.gradle.kts` pendura antes do `desktopTest` com N > 1.
+          $arguments = @('allTests', '--build-cache', '-PtestForks=3')
           if ($env:WITH_COVERAGE -eq 'true') { $arguments += '-Pcoverage' }
           .\gradlew.bat @arguments
 

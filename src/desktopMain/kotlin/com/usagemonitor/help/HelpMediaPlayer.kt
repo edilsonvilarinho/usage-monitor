@@ -7,7 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.asComposeImageBitmap
 import com.usagemonitor.presentation.ui.help.HelpMediaState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -16,7 +16,6 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
-import org.jetbrains.skia.Image
 
 /**
  * Reprodução das demos da ajuda.
@@ -53,6 +52,13 @@ private const val MIN_FRAME_DELAY_MILLIS = 20L
  * O quadro publicado é **cópia imutável**: `Bitmap.asComposeImageBitmap()`
  * embrulha o mesmo bitmap, e escrever o quadro seguinte por cima dele mutaria a
  * imagem que já está na tela sem invalidar nada.
+ *
+ * A cópia é dos **bytes** (`readPixels` → `installPixels`), e não
+ * `Image.makeFromBitmap(...).toComposeImageBitmap()`, que aloca um bitmap novo
+ * e **redesenha** a imagem nele por um `Canvas`: medido nas doze demos (311
+ * quadros de 1000×420), ~59 ms por quadro contra menos de 1 ms (issue #295).
+ * `Bitmap.makeClone()` não serve — ele compartilha os pixels com o original, e
+ * o teste de imutabilidade do tocador reprova.
  */
 internal class HelpMediaClip(
     private val codec: Codec,
@@ -75,7 +81,15 @@ internal class HelpMediaClip(
         val priorFrame = if (decodedIndex == index - 1) decodedIndex else -1
         codec.readPixels(working, index, priorFrame)
         decodedIndex = index
-        return Image.makeFromBitmap(working).toComposeImageBitmap()
+        val info = working.imageInfo
+        val pixels = checkNotNull(working.readPixels(info, working.rowBytes, 0, 0)) {
+            "quadro $index sem pixels para copiar"
+        }
+        val published = Bitmap()
+        check(published.installPixels(info, pixels, working.rowBytes)) {
+            "quadro $index não coube na cópia"
+        }
+        return published.setImmutable().asComposeImageBitmap()
     }
 
     override fun close() {

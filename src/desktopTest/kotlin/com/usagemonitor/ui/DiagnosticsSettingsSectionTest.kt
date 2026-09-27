@@ -10,7 +10,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.REPORT_BUG_BUTTON_TEST_TAG
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,7 +59,7 @@ class DiagnosticsSettingsSectionTest {
         onReportBug: () -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = language,

@@ -20,7 +20,6 @@ import com.usagemonitor.presentation.ui.help.HelpContent
 import com.usagemonitor.presentation.ui.help.HelpMediaState
 import com.usagemonitor.presentation.ui.help.HelpTopic
 import com.usagemonitor.presentation.ui.help.helpTopicTestTag
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -108,7 +107,7 @@ class HelpContentTest {
         onClose: () -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.size(width = 1_180.dp, height = 780.dp)) {
                     HelpContent(
                         selectedTopic = topic,

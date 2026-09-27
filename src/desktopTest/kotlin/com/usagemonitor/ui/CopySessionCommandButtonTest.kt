@@ -16,7 +16,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.presentation.ui.CliSessionRow
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +29,7 @@ class CopySessionCommandButtonTest {
     fun `copies the resume command with the whole session id`() = runDesktopComposeUiTest {
         val copied = mutableListOf<String>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 CopySessionCommandButton(
                     sessionId = SESSION_ID,
                     language = AppLanguage.PT,
@@ -48,7 +47,7 @@ class CopySessionCommandButtonTest {
     fun `the label confirms the copy and goes back on its own`() = runDesktopComposeUiTest {
         mainClock.autoAdvance = false
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 CopySessionCommandButton(
                     sessionId = SESSION_ID,
                     language = AppLanguage.PT,
@@ -69,7 +68,7 @@ class CopySessionCommandButtonTest {
     @Test
     fun `the session row offers the copy button`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(200.dp)) {
                     CliSessionRow(
                         session = summary(),
@@ -93,7 +92,7 @@ class CopySessionCommandButtonTest {
     @Test
     fun `the team session row offers no copy button`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(200.dp)) {
                     CliSessionRow(
                         session = summary(),

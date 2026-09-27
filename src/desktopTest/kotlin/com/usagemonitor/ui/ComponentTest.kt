@@ -13,21 +13,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -38,109 +41,77 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ActiveSessionAlert
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
-import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.CliSessionHealth
-import com.usagemonitor.domain.entity.SessionPulse
-import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.OpenCodeGoQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
-import com.usagemonitor.domain.entity.UsageForecast
-import com.usagemonitor.domain.entity.UsageRiskLevel
-import com.usagemonitor.domain.entity.ApiUsageStats
-import com.usagemonitor.domain.entity.UsageHistoryPoint
-import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.SessionPulse
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
-import com.usagemonitor.domain.entity.TeamIntegrationSettings
-import com.usagemonitor.presentation.ui.theme.AppThemePreset
-import com.usagemonitor.presentation.ui.theme.AccountAccent
-import androidx.compose.ui.test.assertContentDescriptionEquals
-import com.usagemonitor.presentation.ui.components.ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX
-import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_EMOJI_TAG
-import com.usagemonitor.presentation.ui.theme.AccountEmoji
-import com.usagemonitor.presentation.ui.theme.AppAccents
-import com.usagemonitor.presentation.ui.components.ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX
-import com.usagemonitor.presentation.ui.components.accountAccentColor
-import androidx.compose.ui.test.assertIsNotSelected
+import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageTargetKey
-import androidx.compose.ui.graphics.Color
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
-import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TAG
-import com.usagemonitor.presentation.ui.components.ApiUsageCard
-import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
-import com.usagemonitor.presentation.ui.components.observedActivityTrackTag
-import com.usagemonitor.presentation.ui.components.observedActivityValueTag
-import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
-import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
-import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
-import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
-import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_REMOVE_TEST_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_ACTION_TAG
 import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.DashboardScreen
-import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
-import com.usagemonitor.presentation.ui.components.WindowMode
-import com.usagemonitor.presentation.ui.HistoryScreen
-import com.usagemonitor.presentation.ui.components.LanguageSelector
-import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
-import com.usagemonitor.presentation.ui.components.HUD_MODE_SWITCH_TEST_TAG
-import com.usagemonitor.presentation.ui.components.REDUCED_MOTION_SWITCH_TEST_TAG
-import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
-import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
-import com.usagemonitor.presentation.ui.components.SettingsDialogContent
-import com.usagemonitor.presentation.ui.components.SettingsTab
-import com.usagemonitor.presentation.ui.components.settingsTabTestTag
-import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
-import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.ACCOUNT_COLOR_OPTION_TEST_TAG_PREFIX
+import com.usagemonitor.presentation.ui.components.ACCOUNT_EMOJI_OPTION_TEST_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUIET_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_EMOJI_TAG
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_PLAN_TAG
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_HINT_TAG
+import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_STATUS_TAG
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
-import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
-import com.usagemonitor.presentation.ui.components.UI_SCALE_VALUE_TEST_TAG
-import com.usagemonitor.presentation.ui.components.WINDOW_OPACITY_VALUE_TEST_TAG
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
+import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.ApiCheckboxRow
+import com.usagemonitor.presentation.ui.components.ApiUsageCard
+import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.AppUsageRing
+import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
+import com.usagemonitor.presentation.ui.components.LanguageSelector
+import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
+import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.SettingsTab
 import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
-import com.usagemonitor.presentation.ui.components.AppRingArc
-import com.usagemonitor.presentation.ui.components.AppUsageRing
+import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
+import com.usagemonitor.presentation.ui.components.accountAccentColor
+import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
+import com.usagemonitor.presentation.ui.components.apiSelectorSwitchTestTag
+import com.usagemonitor.presentation.ui.components.observedActivityTrackTag
+import com.usagemonitor.presentation.ui.components.observedActivityValueTag
 import com.usagemonitor.presentation.ui.components.quotaBlockTag
+import com.usagemonitor.presentation.ui.components.quotaProgressTrackTag
 import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
-import com.usagemonitor.presentation.ui.historyAccountChipTag
-import com.usagemonitor.presentation.ui.theme.AppTheme
-import com.usagemonitor.presentation.ui.components.API_USAGE_CARD_PLAN_TAG
-import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.viewmodel.DashboardViewModel
-import com.usagemonitor.presentation.viewmodel.HistoryViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Instant
-import androidx.compose.ui.unit.dp
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
+import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
+import com.usagemonitor.presentation.ui.theme.AppAccents
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-
-/** Integração ligada e completa: é o estado em que a seção mostra os campos. */
-private val ACTIVE_TEAM_SETTINGS = TeamIntegrationSettings(
-    enabled = true,
-    serverUrl = "http://localhost:3000",
-    apiKey = "chave-de-time-com-tamanho-suficiente",
-    alias = "EDILSON",
-    deviceId = "device-1"
-)
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.datetime.Instant
 
 /**
  * Testes de componente Compose para Desktop.
@@ -155,23 +126,13 @@ private val ACTIVE_TEAM_SETTINGS = TeamIntegrationSettings(
 @OptIn(ExperimentalTestApi::class)
 class ComponentTest {
 
-    /**
-     * A tela de Histórico virou tabela: cada métrica ocupa uma linha de rótulo e
-     * valor em vez de um bloco de duas linhas espremido num `FlowRow`, e a coluna
-     * ficou mais alta que os 768px da cena padrão. Os asserts falhavam por
-     * viewport — o nó existe, só está abaixo do corte.
-     */
-    private companion object {
-        const val HISTORY_SCENE_HEIGHT = 1_600
-    }
-
     // ── AppUsageRing ─────────────────────────────────────────────────────
 
     /** O anel nunca informa sozinho: a frase inteira vai na semântica. */
     @Test
     fun `AppUsageRing carries account word and quotas in its description`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AppUsageRing(
                     arcs = listOf(
                         AppRingArc(fraction = 0.88f, tone = AppTone.CRITICAL),
@@ -192,7 +153,7 @@ class ComponentTest {
     @Test
     fun `AppUsageRing active and attention do not animate forever without the policy`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AppUsageRing(
                     arcs = listOf(AppRingArc(fraction = 1.4f, tone = AppTone.CRITICAL, hasForecast = false)),
                     description = "Codex · Crítico",
@@ -210,7 +171,7 @@ class ComponentTest {
     fun `ApiUsageCard shows the account plan beside the title`() = runDesktopComposeUiTest {
         var plan by mutableStateOf<String?>("Max 20x")
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic — Padrão",
@@ -237,7 +198,7 @@ class ComponentTest {
     fun `ApiUsageCard shows the account emoji beside the provider mark`() = runDesktopComposeUiTest {
         var emoji by mutableStateOf<AccountEmoji?>(AccountEmoji.FOX)
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic — Trabalho",
@@ -263,7 +224,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows interval and weekly quotas in the same card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -324,7 +285,7 @@ class ComponentTest {
             workspaceName = "Equipe Principal"
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -364,7 +325,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps the session buttons plain without a pulse`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AnthropicCardWithSessionButtons(
                     cliPulse = SessionPulse.EMPTY,
                     teamPulse = SessionPulse.EMPTY
@@ -385,7 +346,7 @@ class ComponentTest {
         mainClock.autoAdvance = false
         val activity = Instant.parse("2026-04-28T10:00:00Z")
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AnthropicCardWithSessionButtons(
                     cliPulse = SessionPulse(
                         listOf(
@@ -425,7 +386,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps a single quota centered when weekly data is absent`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.MINIMAX,
                     apiName = "MiniMax",
@@ -457,7 +418,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps both Codex quotas while showing an inline notice`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -515,7 +476,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps both Codex quotas when usage is zero`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -554,7 +515,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders stable Codex quotas with progress tracks when expanded`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -600,7 +561,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps Codex compact badges without progress tracks when minimized`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -648,7 +609,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard notice hint opens the notice texts on hover`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -700,7 +661,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows the missing credits notice on a minimized card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -748,7 +709,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows balance title for currency quotas`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.DEEPSEEK,
                     apiName = "DeepSeek",
@@ -788,7 +749,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard prints the balance in the account currency`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.DEEPSEEK,
                     apiName = "DeepSeek",
@@ -822,7 +783,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders OpenRouter balance`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.OPENROUTER,
                     apiName = "OpenRouter",
@@ -863,7 +824,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders OpenCode Go as percentage quotas`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.OPENCODE_GO,
                     apiName = "OpenCode Go",
@@ -914,7 +875,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows anthropic extra credits in the account currency`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(420.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -980,7 +941,7 @@ class ComponentTest {
         var opened = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -1013,7 +974,7 @@ class ComponentTest {
         var opened = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic — Padrão",
@@ -1046,7 +1007,7 @@ class ComponentTest {
         var opened = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CODEX,
                     apiName = "Codex",
@@ -1077,7 +1038,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows compact quota labels when minimized`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1123,7 +1084,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard shows quota tooltip on hover while minimized`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1173,7 +1134,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard drops the quota tooltip on a narrow card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(240.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -1233,7 +1194,7 @@ class ComponentTest {
         val risk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = null)
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(240.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -1269,7 +1230,7 @@ class ComponentTest {
         val risk = QuotaRiskSummary(level = UsageRiskLevel.WILL_EXCEED, estimatedExhaustionAt = null)
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(240.dp)) {
                     ApiUsageCard(
                         source = ApiSource.ANTHROPIC,
@@ -1308,7 +1269,7 @@ class ComponentTest {
         )
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1351,7 +1312,7 @@ class ComponentTest {
         val resetsAt = Instant.parse("2026-04-28T17:40:00Z")
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1398,7 +1359,7 @@ class ComponentTest {
         setContent {
             var now by remember { mutableStateOf(resetsAt - 1.minutes) }
 
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Column {
                     // Só para o teste mover o relógio; na app quem move é a
                     // DashboardScreen, que dorme até o próximo periodEndAt.
@@ -1440,7 +1401,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1473,7 +1434,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard stacks compact quota badges on very narrow cards`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1522,7 +1483,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps compact quota badges side by side on wide cards`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1585,7 +1546,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1627,7 +1588,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1664,7 +1625,7 @@ class ComponentTest {
             unit = UsageUnit.PERCENTAGE
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1704,7 +1665,7 @@ class ComponentTest {
     @Test
     fun `card header has no status badge when no quota has a projection`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1745,7 +1706,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1782,7 +1743,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1817,7 +1778,7 @@ class ComponentTest {
             unit = UsageUnit.TOKENS
         )
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1844,7 +1805,7 @@ class ComponentTest {
     @Test
     fun `RiskSemaphoreDot is absent when no risk summary is provided for the quota`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTHROPIC,
                     apiName = "Anthropic",
@@ -1877,7 +1838,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard keeps a single compact quota narrower than the card`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(
                     modifier = Modifier
                         .width(640.dp)
@@ -1926,7 +1887,7 @@ class ComponentTest {
         var actionClicked = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 PersistentApiWarningBanner(
                     title = "Anthropic precisa de autenticação",
                     description = "Faça login no Claude Code e tente novamente.",
@@ -1947,7 +1908,7 @@ class ComponentTest {
     @Test
     fun `ApiCheckboxRow is checked when isChecked is true`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.ANTHROPIC,
                     isChecked = true,
@@ -1963,7 +1924,7 @@ class ComponentTest {
     @Test
     fun `ApiCheckboxRow keeps Codex row plain by default`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.CODEX,
                     isChecked = true,
@@ -1989,7 +1950,7 @@ class ComponentTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.MINIMAX,
                     isChecked = false,
@@ -2009,7 +1970,7 @@ class ComponentTest {
     @Test
     fun `ApiCheckboxRow omits the edit icon when there is no key to manage`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.ANTHROPIC,
                     isChecked = true,
@@ -2032,7 +1993,7 @@ class ComponentTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiCheckboxRow(
                     api = ApiSource.MINIMAX,
                     isChecked = true,
@@ -2059,7 +2020,7 @@ class ComponentTest {
     @Test
     fun `ApiSelector gives each edit icon a distinct accessible label`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = AppLanguage.PT,
@@ -2086,7 +2047,7 @@ class ComponentTest {
     @Test
     fun `ThemeToggle shows dark label when isDark is true`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ThemeToggle(isDark = true, onToggle = {})
             }
         }
@@ -2097,7 +2058,7 @@ class ComponentTest {
     @Test
     fun `ThemeToggle shows light label when isDark is false`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = false) {
+            ScreenTestTheme(isDark = false) {
                 ThemeToggle(isDark = false, onToggle = {})
             }
         }
@@ -2110,7 +2071,7 @@ class ComponentTest {
         var toggled = false
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ThemeToggle(isDark = true, onToggle = { toggled = true })
             }
         }
@@ -2135,7 +2096,7 @@ class ComponentTest {
         val chosen = mutableListOf<WindowMode>()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2169,7 +2130,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2212,7 +2173,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2247,7 +2208,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2287,7 +2248,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2326,7 +2287,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2356,7 +2317,7 @@ class ComponentTest {
         viewModel.cancelCountdown()
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 DashboardScreen(
                     viewModel = viewModel,
                     appVersion = "7.0.0",
@@ -2376,532 +2337,12 @@ class ComponentTest {
         viewModel.onDestroy()
     }
 
-    // ── SettingsDialogContent ───────────────────────────────────────────
-
-    @Test
-    fun `SettingsDialogContent requests an API key before enabling MiniMax`() = runDesktopComposeUiTest {
-        var toggledApi: ApiSource? = null
-        var savedKey: String? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = emptySet(),
-                    configuredApiKeys = emptySet(),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { api, checked ->
-                        if (checked) toggledApi = api
-                    },
-                    onApiKeySave = { api, key ->
-                        savedKey = "$api:$key"
-                        true
-                    },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performClick()
-        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
-        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-secret")
-        onNodeWithText("Salvar").performClick()
-
-        assertEquals("MINIMAX:minimax-secret", savedKey)
-        assertEquals(ApiSource.MINIMAX, toggledApi)
-    }
-
-    /**
-     * Issue #124: a assinatura Go é a terceira fonte que depende de chave local, e
-     * o caminho é o mesmo do MiniMax — ligar sem chave abre o diálogo em vez de
-     * persistir um interruptor que só produziria erro na próxima coleta.
-     */
-    @Test
-    fun `SettingsDialogContent requests an API key before enabling OpenCode Go`() = runDesktopComposeUiTest {
-        var toggledApi: ApiSource? = null
-        var savedKey: String? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = emptySet(),
-                    configuredApiKeys = emptySet(),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { api, checked ->
-                        if (checked) toggledApi = api
-                    },
-                    onApiKeySave = { api, key ->
-                        savedKey = "$api:$key"
-                        true
-                    },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.OPENCODE_GO)).performScrollTo().performClick()
-        onNodeWithText("Configurar OpenCode Go").assertIsDisplayed()
-        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("opencode-secret")
-        onNodeWithText("Salvar").performClick()
-
-        assertEquals("OPENCODE_GO:opencode-secret", savedKey)
-        assertEquals(ApiSource.OPENCODE_GO, toggledApi)
-    }
-
-    /**
-     * O plano gratuito do Zen não tem chave: ligar a linha dele grava direto, sem
-     * diálogo. É o que separa as duas fontes de OpenCode na mesma lista.
-     */
-    @Test
-    fun `SettingsDialogContent toggles the free OpenCode source without asking for a key`() = runDesktopComposeUiTest {
-        var toggledApi: ApiSource? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = emptySet(),
-                    configuredApiKeys = emptySet(),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { api, checked ->
-                        if (checked) toggledApi = api
-                    },
-                    onApiKeySave = { _, _ -> true },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.OPENCODE)).performScrollTo().performClick()
-
-        assertEquals(ApiSource.OPENCODE, toggledApi)
-        onAllNodesWithText("Configurar OpenCode Zen Free").assertCountEquals(0)
-    }
-
-    @Test
-    fun `SettingsDialogContent enables local integrations without API keys`() = runDesktopComposeUiTest {
-        val enabledSources = mutableSetOf<ApiSource>()
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = emptySet(),
-                    configuredApiKeys = emptySet(),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { source, checked ->
-                        if (checked) enabledSources += source
-                    },
-                    onApiKeySave = { _, _ -> true },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        listOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY).forEach { source ->
-            onNodeWithTag(apiSelectorSwitchTestTag(source)).performScrollTo().performClick()
-        }
-
-        assertEquals(setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY), enabledSources)
-        onAllNodesWithText("Configurar Gemini CLI").assertCountEquals(0)
-        onAllNodesWithText("Configurar Cursor").assertCountEquals(0)
-        onAllNodesWithText("Configurar Antigravity CLI").assertCountEquals(0)
-    }
-
-    /**
-     * Issue #125: o caminho que não existia. Até esta passada o diálogo só abria
-     * ao **ligar** uma fonte sem chave; cadastrada uma vez, ela era definitiva
-     * pela interface. O lápis abre o mesmo diálogo com a fonte já configurada.
-     */
-    @Test
-    fun `SettingsDialogContent opens the key dialog from the pencil of a configured source`() = runDesktopComposeUiTest {
-        var savedKey: String? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.MINIMAX),
-                    configuredApiKeys = setOf(ApiSource.MINIMAX),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    onApiKeySave = { api, key ->
-                        savedKey = "$api:$key"
-                        true
-                    },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
-        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
-        // O campo nunca vem pré-preenchido com a chave guardada: para trocar,
-        // digita-se a nova.
-        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-rotated")
-        onNodeWithText("Salvar").performClick()
-
-        assertEquals("MINIMAX:minimax-rotated", savedKey)
-    }
-
-    /** Fonte sem chave local não ganha lápis: não há o que gerenciar. */
-    @Test
-    fun `SettingsDialogContent omits the pencil for sources without a local key`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    configuredApiKeys = emptySet(),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.ANTHROPIC)).assertCountEquals(0)
-        onAllNodesWithTag(apiSelectorEditKeyTestTag(ApiSource.OPENCODE)).assertCountEquals(0)
-        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().assertExists()
-    }
-
-    /**
-     * Issue #125: apagar a chave era impossível pela interface. O botão fica no
-     * mesmo diálogo, como `GHOST` — `PRIMARY` é uma por tela e continua sendo o
-     * "Salvar", que é o que o diálogo propõe.
-     */
-    @Test
-    fun `SettingsDialogContent removes a stored key from the dialog`() = runDesktopComposeUiTest {
-        var removed: ApiSource? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.DEEPSEEK),
-                    configuredApiKeys = setOf(ApiSource.DEEPSEEK),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    onApiKeyRemove = { api ->
-                        removed = api
-                        true
-                    },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().performClick()
-        onNodeWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).performClick()
-
-        assertEquals(ApiSource.DEEPSEEK, removed)
-        // Gravação confirmada fecha o diálogo.
-        onAllNodesWithText("Configurar DeepSeek").assertCountEquals(0)
-    }
-
-    /**
-     * Ligar uma fonte que nunca foi configurada abre o mesmo diálogo, e ali um
-     * botão de remover não teria o que remover.
-     */
-    @Test
-    fun `SettingsDialogContent hides the remove button when there is no stored key`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = emptySet(),
-                    configuredApiKeys = emptySet(),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    onApiKeySave = { _, _ -> true },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
-        onNodeWithText("Configurar MiniMax").assertIsDisplayed()
-        onAllNodesWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).assertCountEquals(0)
-    }
-
-    /** Remoção recusada pela camada de dados mantém o diálogo aberto. */
-    @Test
-    fun `SettingsDialogContent keeps the dialog open when removal fails`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.DEEPSEEK),
-                    configuredApiKeys = setOf(ApiSource.DEEPSEEK),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    onApiKeyRemove = { false },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.DEEPSEEK)).performScrollTo().performClick()
-        onNodeWithTag(API_KEY_DIALOG_REMOVE_TEST_TAG).performClick()
-
-        onNodeWithText("Configurar DeepSeek").assertIsDisplayed()
-    }
-
-    /**
-     * Issue #125: trocar a chave de uma fonte já ligada não mexe no interruptor.
-     * Reafirmá-lo regravaria a preferência, dispararia uma segunda coleta e
-     * trocaria o aviso de "chave de API salva" pelo de "APIs monitoradas".
-     */
-    @Test
-    fun `SettingsDialogContent rotates a key without re-enabling the source`() = runDesktopComposeUiTest {
-        var savedKey: String? = null
-        var toggleCalls = 0
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.MINIMAX),
-                    configuredApiKeys = setOf(ApiSource.MINIMAX),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> toggleCalls += 1 },
-                    onApiKeySave = { api, key ->
-                        savedKey = "$api:$key"
-                        true
-                    },
-                    initialTab = SettingsTab.APIS
-                )
-            }
-        }
-
-        onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
-        onNodeWithTag(API_KEY_DIALOG_FIELD_TEST_TAG).performTextReplacement("minimax-rotated")
-        onNodeWithText("Salvar").performClick()
-
-        assertEquals("MINIMAX:minimax-rotated", savedKey)
-        assertEquals(0, toggleCalls)
-        onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().assertIsOn()
-    }
-
-    /**
-     * Issue #70: o interruptor que esconde a moldura da janela mora ao lado de
-     * "manter sempre visível" — as duas são propriedades da moldura.
-     */
-    @Test
-    fun `SettingsDialogContent emits the cards only mode change`() = runDesktopComposeUiTest {
-        var enabled: Boolean? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    cardsOnlyMode = false,
-                    onCardsOnlyModeChange = { value -> enabled = value },
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
-                )
-            }
-        }
-
-        onNodeWithTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
-
-        assertEquals(true, enabled)
-    }
-
-    /**
-     * Issue #164: o interruptor da barra HUD mora na mesma seção do modo
-     * somente cards — as duas reduzem a moldura da janela.
-     */
-    @Test
-    fun `SettingsDialogContent emits the hud mode change`() = runDesktopComposeUiTest {
-        var enabled: Boolean? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    hudMode = false,
-                    onHudModeChange = { value -> enabled = value },
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
-                )
-            }
-        }
-
-        onNodeWithTag(HUD_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
-
-        assertEquals(true, enabled)
-    }
-
-    /** "Reduzir animações" mora em Aparência, ao lado da escala da interface. */
-    @Test
-    fun `SettingsDialogContent emits the reduced motion change`() = runDesktopComposeUiTest {
-        var enabled: Boolean? = null
-
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    reducedMotion = false,
-                    onReducedMotionChange = { value -> enabled = value },
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
-                )
-            }
-        }
-
-        onNodeWithText("Reduzir animações").assertExists()
-        onNodeWithTag(REDUCED_MOTION_SWITCH_TEST_TAG).performScrollTo().performClick()
-
-        assertEquals(true, enabled)
-    }
-
-    @Test
-    fun `SettingsDialogContent displays localized controls in EN`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.EN,
-                    enabledApis = setOf(ApiSource.ANTHROPIC, ApiSource.CODEX),
-                    autoStartEnabled = false,
-                    windowOpacityPercent = 75,
-                    uiScalePercent = 115,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    anthropicProfiles = listOf(
-                        AnthropicProfileUiModel(
-                            id = "default",
-                            label = "Personal",
-                            path = "C:\\Users\\test\\.claude",
-                            enabled = true,
-                            removable = false,
-                            identityLabel = "personal@example.com",
-                            status = AnthropicProfileUiStatus.READY
-                        )
-                    )
-                )
-            }
-        }
-
-        // A aba Geral é a que abre; o resto do diálogo só existe depois do clique
-        // na aba correspondente.
-        onNodeWithText("System Startup").assertIsDisplayed()
-        onNodeWithText("Window opacity").assertIsDisplayed()
-        // Por tag: "75%" também é rótulo de limiar no cartão de alertas.
-        onNodeWithTag(WINDOW_OPACITY_VALUE_TEST_TAG).assertTextEquals("75%")
-        onNodeWithText("Interface size").assertIsDisplayed()
-        // Mesma razão da tag de opacidade: "115%" também aparece como limiar.
-        onNodeWithTag(UI_SCALE_VALUE_TEST_TAG).assertTextEquals("115%")
-        onNodeWithText("Language").assertIsDisplayed()
-
-        onNodeWithTag(settingsTabTestTag(SettingsTab.APIS)).performClick()
-        onNodeWithText("Monitored APIs").assertIsDisplayed()
-        onNodeWithText("OpenCode Zen Free").performScrollTo().assertIsDisplayed()
-        onNodeWithText("OpenCode Go").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Kilo Free").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Gemini CLI").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Cursor").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Antigravity CLI").performScrollTo().assertIsDisplayed()
-
-        onNodeWithTag(settingsTabTestTag(SettingsTab.ACCOUNTS)).performClick()
-        onNodeWithText("Anthropic accounts").assertIsDisplayed()
-        onNodeWithText("personal@example.com").assertIsDisplayed()
-
-        onAllNodesWithText("Close").assertCountEquals(0)
-    }
-
-    @Test
-    fun `SettingsDialogContent shows one tab at a time`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.EN,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
-                )
-            }
-        }
-
-        // O conteúdo das outras abas não está apenas fora da vista: ele não está
-        // na composição. Sem isso as abas seriam decoração sobre a mesma coluna.
-        onNodeWithText("System Startup").assertIsDisplayed()
-        onAllNodesWithText("Monitored APIs").assertCountEquals(0)
-        onAllNodesWithText("Anthropic accounts").assertCountEquals(0)
-
-        onNodeWithTag(settingsTabTestTag(SettingsTab.TEAM)).performClick()
-        onAllNodesWithText("System Startup").assertCountEquals(0)
-    }
-
     @Test
     fun `WindowOpacitySlider reports the snapped percent and updates its label`() = runDesktopComposeUiTest {
         var lastReportedPercent = -1
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var percent by remember { mutableStateOf(75) }
                 WindowOpacitySlider(
                     percent = percent,
@@ -2927,7 +2368,7 @@ class ComponentTest {
     @Test
     fun `WindowOpacitySlider explains why the control is unavailable when disabled`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 WindowOpacitySlider(
                     percent = 100,
                     language = AppLanguage.EN,
@@ -2940,52 +2381,6 @@ class ComponentTest {
         onNodeWithText("Transparency is not supported on this system.").assertIsDisplayed()
     }
 
-    @Test
-    fun `SettingsDialogContent expands Anthropic profile editor only after Edit click`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                var expandedProfileId by remember { mutableStateOf<String?>(null) }
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.EN,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> },
-                    anthropicProfiles = listOf(
-                        AnthropicProfileUiModel(
-                            id = "default",
-                            label = "Personal",
-                            path = "C:\\Users\\test\\.claude",
-                            enabled = true,
-                            removable = false,
-                            identityLabel = "personal@example.com",
-                            status = AnthropicProfileUiStatus.READY
-                        )
-                    ),
-                    expandedProfileId = expandedProfileId,
-                    onToggleProfileExpanded = { profileId ->
-                        expandedProfileId = if (expandedProfileId == profileId) null else profileId
-                    },
-                    // As contas moram na aba própria; o teste é sobre o editor do
-                    // perfil, não sobre a navegação entre abas.
-                    initialTab = SettingsTab.ACCOUNTS
-                )
-            }
-        }
-
-        // Colapsado por padrão: identidade visível, campo de edição do apelido ainda não.
-        onNodeWithText("personal@example.com").performScrollTo().assertIsDisplayed()
-        onAllNodesWithText("Label").assertCountEquals(0)
-
-        onNodeWithContentDescription("Edit").performScrollTo().performClick()
-
-        // Expandido após clicar em "Editar": campo de edição do apelido aparece.
-        onNodeWithText("Label").performScrollTo().assertIsDisplayed()
-    }
-
     /**
      * A cor da conta (issue #275) é escolhida na parte expandida do perfil, entre
      * "Padrão" e as oito da paleta, e a escolha corrente fica marcada.
@@ -2994,7 +2389,7 @@ class ComponentTest {
     fun `accounts tab picks an account color and marks the current one`() = runDesktopComposeUiTest {
         val picked = mutableListOf<Pair<String, AccountAccent?>>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var color by remember { mutableStateOf<AccountAccent?>(null) }
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
@@ -3046,7 +2441,7 @@ class ComponentTest {
     fun `accounts tab picks an account emoji and marks the current one`() = runDesktopComposeUiTest {
         val picked = mutableListOf<Pair<String, AccountEmoji?>>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var emoji by remember { mutableStateOf<AccountEmoji?>(null) }
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
@@ -3101,7 +2496,7 @@ class ComponentTest {
         var resolved = emptyList<Color>()
         var expected = emptyList<Color>()
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 resolved = listOf(
                     accountAccentColor(work, colors),
                     accountAccentColor(personal, colors),
@@ -3119,7 +2514,7 @@ class ComponentTest {
         var current = UsageAlertSettings.DEFAULT
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
                 AlertSettingsSection(
                     settings = settings,
@@ -3146,7 +2541,7 @@ class ComponentTest {
     @Test
     fun `AlertSettingsSection shows a stored threshold outside the offered list`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 AlertSettingsSection(
                     settings = UsageAlertSettings.DEFAULT.copy(quotaPercents = listOf(63, 90)),
                     language = AppLanguage.PT,
@@ -3164,7 +2559,7 @@ class ComponentTest {
         var current = UsageAlertSettings.DEFAULT
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
                 AlertSettingsSection(
                     settings = settings,
@@ -3194,7 +2589,7 @@ class ComponentTest {
     @Test
     fun `AlertSettingsSection reveals the quiet range only when it is enabled`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 var settings by remember { mutableStateOf(UsageAlertSettings.DEFAULT) }
                 AlertSettingsSection(
                     settings = settings,
@@ -3213,30 +2608,6 @@ class ComponentTest {
         onNodeWithText("08h").assertIsDisplayed()
     }
 
-    @Test
-    fun `SettingsDialogContent hosts its own toast area`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
-                )
-            }
-        }
-
-        // O diálogo é uma janela separada: o SnackbarHost do dashboard não
-        // desenha por cima dela, então o aviso de "salvo" precisa deste host.
-        // A exibição em si é do Material3 e não é reencenada aqui — o teste do
-        // conteúdo da mensagem é `SettingsToastMessageTest`, em commonTest.
-        onNodeWithTag(SETTINGS_TOAST_HOST_TEST_TAG).assertExists()
-    }
-
     // ── TeamIntegrationSection ──────────────────────────────────────────
 
     @Test
@@ -3244,7 +2615,7 @@ class ComponentTest {
         var committed: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 TeamIntegrationSection(
                     settings = ACTIVE_TEAM_SETTINGS,
                     language = AppLanguage.PT,
@@ -3275,7 +2646,7 @@ class ComponentTest {
         var committed: String? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 TeamIntegrationSection(
                     settings = ACTIVE_TEAM_SETTINGS,
                     language = AppLanguage.PT,
@@ -3306,7 +2677,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders OpenCode free model activity without percentage gauges`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.OPENCODE,
                     apiName = "OpenCode Zen Free",
@@ -3350,7 +2721,7 @@ class ComponentTest {
     @Test
     fun `ApiUsageCard renders Kilo free model activity without percentage gauges`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.KILO,
                     apiName = "Kilo Free",
@@ -3399,7 +2770,7 @@ class ComponentTest {
     @Test
     fun `Cursor card names each allowance and explains a stale reading`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.CURSOR,
                     apiName = "Cursor",
@@ -3445,7 +2816,7 @@ class ComponentTest {
     @Test
     fun `Antigravity card renders one percentage quota per model group`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 ApiUsageCard(
                     source = ApiSource.ANTIGRAVITY,
                     apiName = "Antigravity CLI",
@@ -3488,7 +2859,7 @@ class ComponentTest {
     fun `OpenCode and Kilo observed activity values stay horizontal in narrow expanded cards`() = runDesktopComposeUiTest(width = 260, height = 1_200) {
         mainClock.autoAdvance = false
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(260.dp).height(1_200.dp)) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         ApiUsageCard(
@@ -3542,394 +2913,12 @@ class ComponentTest {
         ).assertExists()
     }
 
-    @Test
-    fun `HistoryScreen renders one OpenCode chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.OPENCODE,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = Instant.parse("2026-05-07T14:33:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = "MiniMax M2.5 Free 5h",
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.REQUESTS,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 4,
-                            total = 0,
-                            rawUsed = 4,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
-                            used = 11,
-                            total = 0,
-                            rawUsed = 11,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 11,
-                    currentDisplayTotal = 0,
-                    deltaDisplayUsed = 3,
-                    averageDisplayConsumptionPerHour = 17.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                ),
-                UsageHistorySeries(
-                    quotaLabel = "MiniMax M2.5 Free 7d",
-                    periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.REQUESTS,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 16,
-                            total = 0,
-                            rawUsed = 16,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
-                            used = 29,
-                            total = 0,
-                            rawUsed = 29,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 29,
-                    currentDisplayTotal = 0,
-                    deltaDisplayUsed = 13,
-                    averageDisplayConsumptionPerHour = 2.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                )
-            )
-        )
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.OPENCODE))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.OPENCODE,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("MiniMax M2.5 Free").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("MiniMax M2.5 Free").assertIsDisplayed()
-        onAllNodesWithText("MiniMax M2.5 Free 5h").assertCountEquals(0)
-        onAllNodesWithText("MiniMax M2.5 Free 7d").assertCountEquals(0)
-        onNodeWithText("Requisições nas últimas 5h").assertIsDisplayed()
-        onNodeWithText("Requisições nos últimos 7 dias").assertIsDisplayed()
-        onNodeWithText("Atividade observada do modelo free na janela curta de 5h.").assertIsDisplayed()
-        onNodeWithText("3 requisições").assertIsDisplayed()
-        onNodeWithText("17 requisições/h").assertIsDisplayed()
-
-        onNodeWithText("7 dias").performClick()
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
-        onNodeWithText("13 requisições").assertIsDisplayed()
-        onNodeWithText("2 requisições/h").assertIsDisplayed()
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `HistoryScreen renders one Kilo chart per model instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.KILO,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = Instant.parse("2026-05-07T14:33:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = "Auto Free Kilo Gateway 5h",
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.REQUESTS,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 6,
-                            total = 0,
-                            rawUsed = 6,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
-                            used = 15,
-                            total = 0,
-                            rawUsed = 15,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 15,
-                    currentDisplayTotal = 0,
-                    deltaDisplayUsed = 5,
-                    averageDisplayConsumptionPerHour = 19.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                ),
-                UsageHistorySeries(
-                    quotaLabel = "Auto Free Kilo Gateway 7d",
-                    periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.REQUESTS,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 20,
-                            total = 0,
-                            rawUsed = 20,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:33:00Z"),
-                            used = 38,
-                            total = 0,
-                            rawUsed = 38,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 38,
-                    currentDisplayTotal = 0,
-                    deltaDisplayUsed = 18,
-                    averageDisplayConsumptionPerHour = 3.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                )
-            )
-        )
-        val requestedRanges = mutableListOf<HistoryRange>()
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        requestedRanges += range
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.KILO))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.KILO,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Auto Free Kilo Gateway").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Auto Free Kilo Gateway").assertIsDisplayed()
-        onAllNodesWithText("Auto Free Kilo Gateway 5h").assertCountEquals(0)
-        onAllNodesWithText("Auto Free Kilo Gateway 7d").assertCountEquals(0)
-        onNodeWithText("Requisições nas últimas 5h").assertIsDisplayed()
-        onNodeWithText("Requisições nos últimos 7 dias").assertIsDisplayed()
-        onNodeWithText("Atividade observada do modelo free na janela curta de 5h.").assertIsDisplayed()
-        onNodeWithText("5 requisições").assertIsDisplayed()
-        onNodeWithText("19 requisições/h").assertIsDisplayed()
-
-        onNodeWithText("7 dias").performClick()
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
-        onNodeWithText("18 requisições").assertIsDisplayed()
-        onNodeWithText("3 requisições/h").assertIsDisplayed()
-
-        onNodeWithText("Total").performClick()
-
-        waitUntil(timeoutMillis = 5_000) {
-            requestedRanges.contains(HistoryRange.TOTAL)
-        }
-
-        onNodeWithText("Atividade observada do modelo free na janela semanal de 7 dias.").assertIsDisplayed()
-        assertTrue(HistoryRange.LAST_24_HOURS in requestedRanges)
-        assertTrue(HistoryRange.LAST_7_DAYS in requestedRanges)
-        assertTrue(HistoryRange.TOTAL in requestedRanges)
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `HistoryScreen renders one Claude chart instead of separate 5h and 7d cards`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.ANTHROPIC,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = Instant.parse("2026-05-07T14:33:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = "Claude 5h",
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.PERCENTAGE,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 4,
-                            total = 100,
-                            rawUsed = 180,
-                            rawTotal = 4500,
-                            periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 180,
-                    currentDisplayTotal = 4500,
-                    deltaDisplayUsed = 20,
-                    averageDisplayConsumptionPerHour = 5.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                ),
-                UsageHistorySeries(
-                    quotaLabel = "Claude 7d",
-                    periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.PERCENTAGE,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
-                            used = 46,
-                            total = 100,
-                            rawUsed = 20700,
-                            rawTotal = 45000,
-                            periodEndAt = Instant.parse("2026-05-10T14:33:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 20700,
-                    currentDisplayTotal = 45000,
-                    deltaDisplayUsed = 900,
-                    averageDisplayConsumptionPerHour = 30.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-10T14:33:00Z"),
-                    forecast = UsageForecast.ResetsBeforeExhaustion,
-                    riskSummary = null
-                )
-            )
-        )
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.ANTHROPIC,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Claude").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Claude").assertIsDisplayed()
-        onAllNodesWithText("Claude 5h").assertCountEquals(0)
-        onAllNodesWithText("Claude 7d").assertCountEquals(0)
-        onNodeWithText("Cota intervalar atual").assertIsDisplayed()
-        onNodeWithText("Cota semanal atual").assertIsDisplayed()
-        onAllNodesWithText("Início do recorte").assertCountEquals(0)
-        onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
-        viewModel.onDestroy()
-    }
-
     // ── LanguageSelector ─────────────────────────────────────────────────
 
     @Test
     fun `LanguageSelector displays PT and EN options`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 LanguageSelector(
                     currentLanguage = AppLanguage.PT,
                     onLanguageChange = {}
@@ -3946,7 +2935,7 @@ class ComponentTest {
         var selected: AppLanguage? = null
 
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 LanguageSelector(
                     currentLanguage = AppLanguage.PT,
                     onLanguageChange = { selected = it }
@@ -3957,468 +2946,16 @@ class ComponentTest {
         onNodeWithText("EN").performClick()
         assertEquals(AppLanguage.EN, selected)
     }
-
-    @Test
-    fun `HistoryScreen lists accounts and allows selecting another workspace`() = runDesktopComposeUiTest {
-        val accountA = UsageAccountContext(
-            key = UsageAccountKey(ApiSource.CODEX, "same-user", "workspace-a"),
-            email = "same@example.com",
-            workspaceName = "Workspace A"
-        )
-        val accountB = UsageAccountContext(
-            key = UsageAccountKey(ApiSource.CODEX, "same-user", "workspace-b"),
-            email = "same@example.com",
-            workspaceName = "Workspace B"
-        )
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.CODEX,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = null,
-            series = emptyList()
-        )
-        val repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-            override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
-
-            override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> {
-                return listOf(accountA, accountB)
-            }
-
-            override suspend fun getHistoryReport(
-                source: ApiSource,
-                range: HistoryRange,
-                now: Instant
-            ) = report
-        }
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(repository),
-            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.CODEX,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText(accountA.displayLabel).fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-        onNodeWithText("Conta").assertIsDisplayed()
-        // Pela tag: o rótulo da conta é `email — workspace`, texto longo e livre
-        // que também aparece no card do dashboard.
-        onNodeWithTag(historyAccountChipTag(accountA)).assertIsSelected()
-        onNodeWithTag(historyAccountChipTag(accountB)).performClick()
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithTag(historyAccountChipTag(accountB)).assertIsSelected()
-                true
-            }.getOrDefault(false)
-        }
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `HistoryScreen renders reported Codex series without inferred metrics`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.CODEX,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = Instant.parse("2026-04-28T18:00:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = "Codex atual",
-                    periodType = PeriodType.REPORTED,
-                    unit = UsageUnit.PERCENTAGE,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-04-28T16:00:00Z"),
-                            used = 10,
-                            total = 100,
-                            rawUsed = 10,
-                            rawTotal = 100,
-                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-04-28T17:00:00Z"),
-                            used = 30,
-                            total = 100,
-                            rawUsed = 30,
-                            rawTotal = 100,
-                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-04-28T18:00:00Z"),
-                            used = 50,
-                            total = 100,
-                            rawUsed = 50,
-                            rawTotal = 100,
-                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 50,
-                    currentDisplayTotal = 100,
-                    deltaDisplayUsed = 40,
-                    averageDisplayConsumptionPerHour = 0.0,
-                    currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                )
-            )
-        )
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.CODEX,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Codex atual").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Histórico do Codex").assertIsDisplayed()
-        onNodeWithText("Codex atual").assertIsDisplayed()
-        onNodeWithText("Janela reportada").assertIsDisplayed()
-        onAllNodesWithText("API").assertCountEquals(0)
-        onNodeWithText("Intervalo").assertIsDisplayed()
-        onNodeWithText("Total").assertIsDisplayed()
-        onAllNodesWithText("Início do recorte").assertCountEquals(0)
-        onAllNodesWithText("Atual").assertCountEquals(0)
-        onAllNodesWithText("Variação no recorte").assertCountEquals(0)
-        onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
-        onNodeWithText("Uso atual").assertIsDisplayed()
-        onNodeWithText("50 / 100 %").assertIsDisplayed()
-        onNodeWithText("Variação observada").assertIsDisplayed()
-        onNodeWithText("40 %").assertIsDisplayed()
-        onNodeWithText("Último reinício reportado").assertIsDisplayed()
-        onNodeWithText("28/04 17:00 BRT").assertIsDisplayed()
-        onAllNodesWithText("Média por hora").assertCountEquals(0)
-        onAllNodesWithText("Previsão").assertCountEquals(0)
-        onAllNodesWithText("Fechar").assertCountEquals(0)
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `HistoryScreen keeps reported Codex series separate from legacy series`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.CODEX,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = Instant.parse("2026-04-28T18:00:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = "Codex atual",
-                    periodType = PeriodType.REPORTED,
-                    unit = UsageUnit.PERCENTAGE,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-04-28T17:00:00Z"),
-                            used = 16,
-                            total = 100,
-                            rawUsed = 16,
-                            rawTotal = 100,
-                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 16,
-                    currentDisplayTotal = 100,
-                    deltaDisplayUsed = 0,
-                    averageDisplayConsumptionPerHour = 0.0,
-                    currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                ),
-                UsageHistorySeries(
-                    quotaLabel = "Codex 5h",
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.PERCENTAGE,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-04-28T16:00:00Z"),
-                            used = 5,
-                            total = 100,
-                            rawUsed = 5,
-                            rawTotal = 100,
-                            periodEndAt = Instant.parse("2026-04-28T20:00:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 5,
-                    currentDisplayTotal = 100,
-                    deltaDisplayUsed = 0,
-                    averageDisplayConsumptionPerHour = 0.0,
-                    currentPeriodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                )
-            )
-        )
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.CODEX))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.CODEX,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Codex atual").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Codex atual").assertIsDisplayed()
-        onNodeWithText("Codex 5h").assertIsDisplayed()
-        onNodeWithText("Quota intervalar").assertIsDisplayed()
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `HistoryScreen renders DeepSeek-specific balance summary`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.DEEPSEEK,
-            range = HistoryRange.LAST_24_HOURS,
-            lastUpdatedAt = Instant.parse("2026-05-06T21:47:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = com.usagemonitor.domain.entity.DeepSeekQuotaLabels.BALANCE,
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.CURRENCY_USD,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-06T18:00:00Z"),
-                            used = 0,
-                            total = 469,
-                            rawUsed = 469,
-                            rawTotal = 469,
-                            periodEndAt = Instant.parse("9999-12-31T23:59:59Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-06T19:30:00Z"),
-                            used = 0,
-                            total = 468,
-                            rawUsed = 468,
-                            rawTotal = 468,
-                            periodEndAt = Instant.parse("9999-12-31T23:59:59Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-06T21:47:00Z"),
-                            used = 0,
-                            total = 466,
-                            rawUsed = 466,
-                            rawTotal = 466,
-                            periodEndAt = Instant.parse("9999-12-31T23:59:59Z")
-                        )
-                    ),
-                    currentDisplayUsed = 466,
-                    currentDisplayTotal = 466,
-                    deltaDisplayUsed = 3,
-                    averageDisplayConsumptionPerHour = 0.8,
-                    currentPeriodEndAt = Instant.parse("9999-12-31T23:59:59Z"),
-                    forecast = UsageForecast.InsufficientData,
-                    riskSummary = null
-                )
-            )
-        )
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.DEEPSEEK))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.DEEPSEEK,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("Saldo restante").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onNodeWithText("Histórico do DeepSeek").assertIsDisplayed()
-        onNodeWithText("Saldo restante").assertIsDisplayed()
-        onNodeWithText("Saldo atual").assertIsDisplayed()
-        onNodeWithText("Gasto no período").assertIsDisplayed()
-        onNodeWithText("Ritmo médio").assertIsDisplayed()
-        onNodeWithText("Última coleta").assertIsDisplayed()
-        onNodeWithText("\$4.66").assertIsDisplayed()
-        onAllNodesWithText("Uso atual").assertCountEquals(0)
-        onAllNodesWithText("Quota intervalar").assertCountEquals(0)
-        viewModel.onDestroy()
-    }
-
-    @Test
-    fun `HistoryScreen renders MiniMax request metrics as counts instead of rounded percentage`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
-        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
-            source = ApiSource.MINIMAX,
-            range = HistoryRange.LAST_30_DAYS,
-            lastUpdatedAt = Instant.parse("2026-05-06T22:02:00Z"),
-            series = listOf(
-                UsageHistorySeries(
-                    quotaLabel = "MiniMax-M*",
-                    periodType = PeriodType.INTERVAL,
-                    unit = UsageUnit.REQUESTS,
-                    points = listOf(
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-04-28T19:00:00Z"),
-                            used = 16,
-                            total = 4500,
-                            rawUsed = 0,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T00:00:00Z")
-                        ),
-                        UsageHistoryPoint(
-                            capturedAt = Instant.parse("2026-05-06T22:02:00Z"),
-                            used = 16,
-                            total = 4500,
-                            rawUsed = 0,
-                            rawTotal = 0,
-                            periodEndAt = Instant.parse("2026-05-07T00:00:00Z")
-                        )
-                    ),
-                    currentDisplayUsed = 16,
-                    currentDisplayTotal = 4500,
-                    deltaDisplayUsed = 0,
-                    averageDisplayConsumptionPerHour = 0.0,
-                    currentPeriodEndAt = Instant.parse("2026-05-07T00:00:00Z"),
-                    forecast = UsageForecast.ResetsBeforeExhaustion,
-                    riskSummary = null
-                )
-            )
-        )
-
-        val viewModel = HistoryViewModel(
-            getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
-                repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
-                    override suspend fun recordSnapshot(
-                        stats: com.usagemonitor.domain.entity.ApiUsageStats,
-                        capturedAt: Instant
-                    ) = Unit
-
-                    override suspend fun getHistoryReport(
-                        source: ApiSource,
-                        range: HistoryRange,
-                        now: Instant
-                    ): com.usagemonitor.domain.entity.ApiUsageHistoryReport {
-                        return report
-                    }
-                }
-            ),
-            enabledApis = MutableStateFlow(setOf(ApiSource.MINIMAX))
-        )
-
-        setContent {
-            AppTheme(isDark = true) {
-                HistoryScreen(
-                    viewModel = viewModel,
-                    language = AppLanguage.PT,
-                    onBack = {},
-                    focusedSource = ApiSource.MINIMAX,
-                    showSourceSelector = false
-                )
-            }
-        }
-
-        waitUntil(timeoutMillis = 5_000) {
-            runCatching {
-                onNodeWithText("MiniMax-M*").fetchSemanticsNode()
-                true
-            }.getOrDefault(false)
-        }
-
-        onAllNodesWithText("16/4", substring = true).assertCountEquals(1)
-        onNodeWithText("0 req").assertIsDisplayed()
-        onNodeWithText("0 req/h").assertIsDisplayed()
-        onAllNodesWithText("0 / 100 %").assertCountEquals(0)
-        viewModel.onDestroy()
-    }
 }
+
+/** Integração ligada e completa: é o estado em que a seção mostra os campos. */
+private val ACTIVE_TEAM_SETTINGS = TeamIntegrationSettings(
+    enabled = true,
+    serverUrl = "http://localhost:3000",
+    apiKey = "chave-de-time-com-tamanho-suficiente",
+    alias = "EDILSON",
+    deviceId = "device-1"
+)
 
 /** Card Anthropic com os dois botões de sessão, o alvo do semáforo. */
 @Composable

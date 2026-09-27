@@ -14,7 +14,6 @@ import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.presentation.ui.ReleaseNotesContent
 import com.usagemonitor.presentation.ui.releaseNotesSubtitle
 import com.usagemonitor.presentation.ui.releaseNotesTitle
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -104,7 +103,7 @@ class ReleaseNotesContentTest {
         onClose: () -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.size(width = 560.dp, height = 520.dp)) {
                     ReleaseNotesContent(
                         notes = notes,

@@ -16,7 +16,6 @@ import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -133,7 +132,7 @@ class NetworkSettingsSectionTest {
         onTestConnection: () -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
                     currentLanguage = language,

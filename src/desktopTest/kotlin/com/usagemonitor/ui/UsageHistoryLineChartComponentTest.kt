@@ -14,7 +14,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 
@@ -49,7 +48,7 @@ class UsageHistoryLineChartComponentTest {
     @Test
     fun `chart shows the previous period legend when there are previous points`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(400.dp)) {
                     UsageHistoryLineChart(
                         points = currentPoints,
@@ -69,7 +68,7 @@ class UsageHistoryLineChartComponentTest {
     @Test
     fun `chart hides the previous period legend without previous points`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(400.dp)) {
                     UsageHistoryLineChart(
                         points = currentPoints,

@@ -20,7 +20,6 @@ import com.usagemonitor.presentation.ui.APP_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.AppUpdateBanner
 import com.usagemonitor.presentation.ui.updateBannerAction
 import com.usagemonitor.presentation.ui.updateBannerContent
-import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import kotlin.test.Test
@@ -205,7 +204,7 @@ class AppUpdateBannerTest {
     @Test
     fun `english keeps every state translated`() = runDesktopComposeUiTest {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     AppUpdateBanner(
                         state = AppUpdateUiState.Ready(update),
@@ -227,7 +226,7 @@ class AppUpdateBannerTest {
         onRestartAndUpdate: () -> Unit = {}
     ) {
         setContent {
-            AppTheme(isDark = true) {
+            ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     AppUpdateBanner(
                         state = state,
