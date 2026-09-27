@@ -429,6 +429,35 @@ class UsageHistoryRepositoryImplTest {
         assertEquals(200L, report.series.single().deltaDisplayUsed)
     }
 
+    @Test
+    fun `TOTAL window summary is computed before downsampling`() = kotlinx.coroutines.test.runTest {
+        // 1.000 pontos, acima do teto de 720 da amostragem; o único 100% cai
+        // num índice que a amostragem descarta. O pico da janela precisa vê-lo.
+        val start = Instant.parse("2026-04-20T00:00:00Z")
+        val records = (0 until 1_000).map { index ->
+            UsageSnapshotRecord(
+                source = ApiSource.ANTHROPIC,
+                quotaLabel = "Claude 7d",
+                periodType = PeriodType.WEEKLY,
+                unit = UsageUnit.PERCENTAGE,
+                used = if (index == 3) 100L else 10L,
+                total = 100L,
+                rawUsed = 0L,
+                rawTotal = 0L,
+                periodEndAt = Instant.parse("2026-05-01T00:00:00Z"),
+                capturedAt = start + kotlin.time.Duration.parse("${index}m")
+            )
+        }
+        val repository = UsageHistoryRepositoryImpl(FakeHistoryDataSource(records))
+
+        val series = repository.getHistoryReport(ApiSource.ANTHROPIC, HistoryRange.TOTAL, now).series.single()
+
+        assertEquals(720, series.points.size)
+        assertEquals(false, series.points.any { it.used == 100L }, "premissa: a amostragem descarta o pico")
+        assertEquals(100, series.windows.maxOf { it.peakPercent })
+        assertEquals(1, series.windowStats?.exhaustedCount)
+    }
+
     private class FakeHistoryDataSource(
         private val records: List<UsageSnapshotRecord>
     ) : UsageHistoryDataSource {

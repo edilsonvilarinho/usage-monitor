@@ -7,6 +7,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
+import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
+import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_HORIZONTAL
+import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_VERTICAL
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.abs
@@ -39,11 +42,15 @@ internal enum class HudEdge {
 }
 
 /**
- * Anel de uma conta: 36dp, três arcos concêntricos no máximo e a marca do
+ * Anel de uma conta: 44dp, três arcos concêntricos no máximo e a marca do
  * fornecedor no miolo. Era 28dp sem marca; com dois arcos o miolo de 28dp ficava
- * com 10dp, pouco para reconhecer o asterisco do Claude.
+ * com 10dp, pouco para reconhecer o asterisco do Claude. Com 36dp a marca ficava
+ * em 14dp com duas janelas e 8,4dp com três (issue #322: "os ícones dos modelos
+ * estão pequenos demais"); com 44dp ela vai a 19,6dp e 14dp pela mesma fórmula de
+ * `hudRingMarkSize`, e o notch de cima com duas janelas deixa de crescer por
+ * texto — o anel passa a ser o mais alto.
  */
-internal val HUD_RING_SIZE = 36.dp
+internal val HUD_RING_SIZE = 44.dp
 
 /**
  * O selo do emoji da conta (issue #287): uma caixa no canto de cima à direita do
@@ -340,7 +347,7 @@ private fun horizontalCollapsed(
                 maxOf(HUD_RING_SIZE, stripLineWidth(account.focusLine))
             } else {
                 val widestLine = account.stripLines.maxOf { line -> stripLineWidth(line) }
-                HUD_RING_SIZE + HUD_RING_TEXT_GAP + maxOf(widestLine, wordWidth(account.statusLabel))
+                HUD_RING_SIZE + HUD_RING_TEXT_GAP + maxOf(widestLine, statusPillWidth(account.statusLabel))
             }
         }
     }
@@ -352,7 +359,7 @@ private fun horizontalCollapsed(
     val across = when {
         accounts.isEmpty() -> maxOf(HUD_RING_SIZE, HUD_PERCENT_LINE + HUD_WORD_LINE)
         compact -> accounts.maxOf { account -> HUD_RING_SIZE + stripLineHeight(account.focusLine) }
-        else -> accounts.maxOf { account -> maxOf(HUD_RING_SIZE, stripLinesHeight(account) + HUD_WORD_LINE) }
+        else -> accounts.maxOf { account -> maxOf(HUD_RING_SIZE, stripLinesHeight(account) + statusPillHeight(1)) }
     }
     return DpSize(
         width = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2,
@@ -365,10 +372,12 @@ private fun verticalCollapsed(
     fallbackLabel: String,
     compact: Boolean
 ): DpSize {
-    val words = when {
-        accounts.isEmpty() -> listOf(fallbackLabel)
+    // A palavra solta do estado sem contas e a pílula de cada conta (#322) têm
+    // larguras diferentes: a pílula soma a folga, o ponto e o vão.
+    val wordWidths = when {
+        accounts.isEmpty() -> listOf(verticalWordLineWidth(fallbackLabel))
         compact -> emptyList()
-        else -> accounts.map { account -> account.statusLabel }
+        else -> accounts.map { account -> verticalStatusPillWidth(account.statusLabel) }
     }
     val itemHeights = if (accounts.isEmpty()) {
         listOf(HUD_RING_SIZE + HUD_WORD_LINE * verticalWordLines(fallbackLabel))
@@ -377,13 +386,13 @@ private fun verticalCollapsed(
             if (compact) {
                 HUD_RING_SIZE + stripLineHeight(account.focusLine)
             } else {
-                HUD_RING_SIZE + stripLinesHeight(account) + HUD_WORD_LINE * verticalWordLines(account.statusLabel)
+                HUD_RING_SIZE + stripLinesHeight(account) + statusPillHeight(verticalWordLines(account.statusLabel))
             }
         }
     }
     val all = itemHeights
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    val widestWord = words.maxOfOrNull { word -> verticalWordLineWidth(word) } ?: 0.dp
+    val widestWord = wordWidths.maxOrNull() ?: 0.dp
     val widestPercent = accounts.maxOfOrNull { account ->
         if (compact) stripLineWidth(account.focusLine) else account.stripLines.maxOf { line -> stripLineWidth(line) }
     } ?: 0.dp
@@ -412,6 +421,26 @@ internal fun stripLinesHeight(account: HudAccount): Dp =
     account.stripLines.fold(0.dp) { sum, line -> sum + stripLineHeight(line) }
 
 internal fun wordWidth(text: String): Dp = charWidth(text.length, WORD_ADVANCE_DP)
+
+/**
+ * O que a pílula de estado (`AppStatusPill`, issue #322) ocupa além do texto: a
+ * folga dos dois lados, o ponto e o vão até a palavra. Lido das constantes da
+ * primitiva, não repetido — o dia em que ela mudar, a janela acompanha. Cada
+ * peça arredonda para pixel à parte, e em escala fracionária a soma passava até
+ * 0,6dp da conta (`HudNotchTextFitTest`, 110% a 144%): daí a folga de 1dp, a
+ * mesma do texto.
+ */
+// Getter e não valor: `TEXT_PIXEL_ROUNDING_SLACK` é declarado mais abaixo, e um
+// `val` de topo inicializado antes dele o leria ainda nulo.
+internal val STATUS_PILL_CHROME_WIDTH: Dp
+    get() = STATUS_PILL_PADDING_HORIZONTAL * 2 + STATUS_DOT_SIZE + AppSpacing.xs + TEXT_PIXEL_ROUNDING_SLACK
+
+internal fun statusPillWidth(label: String): Dp = STATUS_PILL_CHROME_WIDTH + wordWidth(label)
+
+/** A pílula com [lines] linhas de palavra: a folga de cima e de baixo soma uma vez. */
+internal fun statusPillHeight(lines: Int): Dp = HUD_WORD_LINE * lines + STATUS_PILL_PADDING_VERTICAL * 2
+
+private fun verticalStatusPillWidth(label: String): Dp = STATUS_PILL_CHROME_WIDTH + verticalWordLineWidth(label)
 
 /**
  * Largura de [chars] caracteres mais a folga do arredondamento em pixel.

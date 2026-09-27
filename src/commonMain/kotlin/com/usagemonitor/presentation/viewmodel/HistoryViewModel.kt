@@ -33,14 +33,32 @@ class HistoryViewModel(
     private val selectedSource = MutableStateFlow<ApiSource?>(null)
     private val selectedRange = MutableStateFlow(HistoryRange.LAST_24_HOURS)
     private val selectedAccountsBySource = mutableMapOf<ApiSource, UsageAccountKey>()
+    private val selectedQuotaView = MutableStateFlow(HistoryQuotaView.BOTH)
 
     init {
         refresh()
     }
 
     fun refresh() {
+        reload(keepContent = true)
+    }
+
+    /**
+     * [keepContent] mantém o `Success` da mesma fonte na tela durante a leitura
+     * (issue #320). Cada troca de intervalo publicava `Loading`, e a janela
+     * inteira piscava "Carregando histórico..." entre dois gráficos da mesma
+     * fonte. Trocar de fonte continua passando por `Loading`: ali o conteúdo
+     * anterior é de outra API e não pode ficar como se fosse desta.
+     */
+    private fun reload(keepContent: Boolean) {
         val requestId = ++loadRequestId
         loadJob?.cancel()
+        val current = _uiState.value
+        if (keepContent && current is HistoryUiState.Success && current.selectedSource == selectedSource.value) {
+            _uiState.value = current.copy(selectedRange = selectedRange.value, isRefreshing = true)
+        } else {
+            _uiState.value = HistoryUiState.Loading
+        }
         loadJob = viewModelScope.launch {
             loadHistory(requestId)
         }
@@ -51,7 +69,7 @@ class HistoryViewModel(
         if (accountKey != null && accountKey.source == source) {
             selectedAccountsBySource[source] = accountKey
         }
-        refresh()
+        reload(keepContent = false)
     }
 
     fun selectSource(source: ApiSource) {
@@ -60,7 +78,7 @@ class HistoryViewModel(
         }
 
         selectedSource.value = source
-        refresh()
+        reload(keepContent = false)
     }
 
     fun selectRange(range: HistoryRange) {
@@ -70,6 +88,23 @@ class HistoryViewModel(
 
         selectedRange.value = range
         refresh()
+    }
+
+    /**
+     * Troca a janela mostrada sem voltar ao banco: o relatório já traz as duas
+     * séries, e reler o SQLite para filtrar o que está em memória faria a tela
+     * piscar `Loading` por uma escolha puramente visual.
+     */
+    fun selectQuotaView(view: HistoryQuotaView) {
+        if (view == selectedQuotaView.value) {
+            return
+        }
+
+        selectedQuotaView.value = view
+        val current = _uiState.value
+        if (current is HistoryUiState.Success) {
+            _uiState.value = current.copy(selectedQuotaView = view)
+        }
     }
 
     fun selectAccount(account: UsageAccountContext) {
@@ -88,8 +123,6 @@ class HistoryViewModel(
     }
 
     private suspend fun loadHistory(requestId: Long) {
-        _uiState.value = HistoryUiState.Loading
-
         val enabledSources = enabledApis.value.sortedBy { it.ordinal }
         try {
             if (enabledSources.isEmpty()) {
@@ -128,7 +161,8 @@ class HistoryViewModel(
                     selectedRange = selectedRange.value,
                     report = report,
                     availableAccounts = availableAccounts,
-                    selectedAccount = selectedAccount
+                    selectedAccount = selectedAccount,
+                    selectedQuotaView = selectedQuotaView.value
                 )
             )
         } catch (error: Throwable) {

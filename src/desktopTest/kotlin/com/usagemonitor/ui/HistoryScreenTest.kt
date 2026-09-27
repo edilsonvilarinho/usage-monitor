@@ -1,6 +1,12 @@
 package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.height
+import com.usagemonitor.presentation.ui.HistoryMetricTable
+import com.usagemonitor.presentation.ui.HistoryMetricEntry
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -24,6 +30,8 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.historyAccountChipTag
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
+import com.usagemonitor.presentation.ui.historyQuotaViewChipTag
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.Instant
 import kotlin.test.Test
@@ -423,6 +431,10 @@ class HistoryScreenTest {
         onAllNodesWithText("Claude 7d").assertCountEquals(0)
         onNodeWithText("Cota intervalar atual").assertIsDisplayed()
         onNodeWithText("Cota semanal atual").assertIsDisplayed()
+        // A semanal entra no mesmo gráfico (issue #320), e a legenda nomeia as
+        // duas — cada nome aparece no seletor de cota e na legenda.
+        onAllNodesWithText("5h").assertCountEquals(2)
+        onAllNodesWithText("7d").assertCountEquals(2)
         onAllNodesWithText("Início do recorte").assertCountEquals(0)
         onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
         viewModel.onDestroy()
@@ -886,6 +898,209 @@ class HistoryScreenTest {
         onNodeWithText("0 req").assertIsDisplayed()
         onNodeWithText("0 req/h").assertIsDisplayed()
         onAllNodesWithText("0 / 100 %").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `forecast metric wraps instead of being clipped in a narrow column`() = runDesktopComposeUiTest {
+        val forecast = "A janela deve reiniciar antes do limite"
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(520.dp)) {
+                    HistoryMetricTable(
+                        entries = listOf(
+                            HistoryMetricEntry("Uso atual", "44 / 100 %"),
+                            HistoryMetricEntry("Consumido no período", "23 %"),
+                            HistoryMetricEntry("Média por hora", "1 %/h"),
+                            HistoryMetricEntry("Previsão", forecast)
+                        )
+                    )
+                }
+            }
+        }
+
+        // Com `maxLines = 1` o nó tinha a altura de uma linha e o texto saía
+        // cortado (issue #320); a altura é o que prova a segunda linha.
+        val oneLine = onNodeWithText("1 %/h").fetchSemanticsNode().size.height
+        val wrapped = onNodeWithText(forecast).fetchSemanticsNode().size.height
+        assertTrue(wrapped > oneLine * 3 / 2, "previsão com $wrapped px contra $oneLine px de uma linha")
+    }
+
+    private fun twoWindowSeries(base: String, periodType: PeriodType, used: Long) = UsageHistorySeries(
+        quotaLabel = if (periodType == PeriodType.INTERVAL) "$base 5h" else "$base 7d",
+        periodType = periodType,
+        unit = UsageUnit.PERCENTAGE,
+        points = listOf(
+            UsageHistoryPoint(
+                capturedAt = Instant.parse("2026-05-07T11:32:00Z"),
+                used = used / 2,
+                total = 100,
+                rawUsed = 0,
+                rawTotal = 0,
+                periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+            ),
+            UsageHistoryPoint(
+                capturedAt = Instant.parse("2026-05-07T13:32:00Z"),
+                used = used,
+                total = 100,
+                rawUsed = 0,
+                rawTotal = 0,
+                periodEndAt = Instant.parse("2026-05-07T14:33:00Z")
+            )
+        ),
+        currentDisplayUsed = used,
+        currentDisplayTotal = 100,
+        deltaDisplayUsed = used / 2,
+        averageDisplayConsumptionPerHour = 1.0,
+        currentPeriodEndAt = Instant.parse("2026-05-07T14:33:00Z"),
+        forecast = UsageForecast.InsufficientData,
+        riskSummary = null
+    )
+
+    private fun historyViewModelFor(report: com.usagemonitor.domain.entity.ApiUsageHistoryReport) = HistoryViewModel(
+        getUsageHistory = com.usagemonitor.domain.usecase.GetUsageHistoryUseCase(
+            repository = object : com.usagemonitor.domain.repository.UsageHistoryRepository {
+                override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+                override suspend fun getHistoryReport(
+                    source: ApiSource,
+                    range: HistoryRange,
+                    now: Instant
+                ): com.usagemonitor.domain.entity.ApiUsageHistoryReport = report
+            }
+        ),
+        enabledApis = MutableStateFlow(setOf(report.source))
+    )
+
+    @Test
+    fun `quota selector switches the Claude card between 5h, 7d and both`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T13:32:00Z"),
+            series = listOf(
+                twoWindowSeries("Claude", PeriodType.INTERVAL, 40),
+                twoWindowSeries("Claude", PeriodType.WEEKLY, 20)
+            )
+        )
+        val viewModel = historyViewModelFor(report)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                HistoryScreen(viewModel = viewModel, language = AppLanguage.PT, onBack = {}, showSourceSelector = false)
+            }
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching { onNodeWithTag(historyQuotaViewChipTag(HistoryQuotaView.BOTH)).fetchSemanticsNode(); true }
+                .getOrDefault(false)
+        }
+
+        onNodeWithTag(historyQuotaViewChipTag(HistoryQuotaView.BOTH)).assertIsSelected()
+        onNodeWithText("Cota intervalar atual").assertIsDisplayed()
+        onNodeWithText("Cota semanal atual").assertIsDisplayed()
+
+        onNodeWithTag(historyQuotaViewChipTag(HistoryQuotaView.WEEKLY)).performClick()
+        waitForIdle()
+        onAllNodesWithText("Cota intervalar atual").assertCountEquals(0)
+        onNodeWithText("Cota semanal atual").assertIsDisplayed()
+
+        onNodeWithTag(historyQuotaViewChipTag(HistoryQuotaView.INTERVAL)).performClick()
+        waitForIdle()
+        onNodeWithText("Cota intervalar atual").assertIsDisplayed()
+        onAllNodesWithText("Cota semanal atual").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `Codex 5h and 7d share one card with the quota selector`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.CODEX,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T13:32:00Z"),
+            series = listOf(
+                twoWindowSeries("Codex", PeriodType.INTERVAL, 40),
+                twoWindowSeries("Codex", PeriodType.WEEKLY, 20)
+            )
+        )
+        val viewModel = historyViewModelFor(report)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                HistoryScreen(viewModel = viewModel, language = AppLanguage.PT, onBack = {}, showSourceSelector = false)
+            }
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching { onNodeWithText("Codex").fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        onNodeWithText("Codex").assertIsDisplayed()
+        onAllNodesWithText("Codex 5h").assertCountEquals(0)
+        onAllNodesWithText("Codex 7d").assertCountEquals(0)
+        onNodeWithTag(historyQuotaViewChipTag(HistoryQuotaView.BOTH)).assertIsSelected()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `quota selector is hidden when the source has a single window`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T13:32:00Z"),
+            series = listOf(twoWindowSeries("Claude", PeriodType.INTERVAL, 40))
+        )
+        val viewModel = historyViewModelFor(report)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                HistoryScreen(viewModel = viewModel, language = AppLanguage.PT, onBack = {}, showSourceSelector = false)
+            }
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching { onNodeWithText("Claude").fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        onAllNodesWithText("Ambas").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `history card lists quota windows and the hourly peak`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
+        val interval = twoWindowSeries("Claude", PeriodType.INTERVAL, 40).copy(
+            windows = listOf(
+                com.usagemonitor.domain.entity.QuotaWindowSummary(
+                    firstObservedAt = Instant.parse("2026-05-07T08:00:00Z"),
+                    lastObservedAt = Instant.parse("2026-05-07T12:00:00Z"),
+                    resetsAt = Instant.parse("2026-05-07T12:00:00Z"),
+                    peakPercent = 100,
+                    exhaustedAt = Instant.parse("2026-05-07T11:30:00Z"),
+                    consumedPercent = 95.0,
+                    averagePercentPerHour = 24.0,
+                    isOpen = false
+                )
+            ),
+            hourlyDistribution = com.usagemonitor.domain.entity.QuotaHourlyDistribution(
+                List(24) { hour -> if (hour == 8) 95.0 else 0.0 }
+            )
+        )
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T13:32:00Z"),
+            series = listOf(interval, twoWindowSeries("Claude", PeriodType.WEEKLY, 20))
+        )
+        val viewModel = historyViewModelFor(report)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                HistoryScreen(viewModel = viewModel, language = AppLanguage.PT, onBack = {}, showSourceSelector = false)
+            }
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching { onNodeWithText("Janelas 5h").fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        onNodeWithText("Janelas 5h").assertIsDisplayed()
+        onNodeWithText("3h 30min").assertIsDisplayed()
+        onNodeWithText("24 %/h").assertIsDisplayed()
+        onNodeWithText("Pico às 8h BRT · 100% do consumo").assertIsDisplayed()
+        // A semanal sem janelas nem distribuição não ganha painel vazio.
+        onAllNodesWithText("Janelas 7d").assertCountEquals(0)
         viewModel.onDestroy()
     }
 }

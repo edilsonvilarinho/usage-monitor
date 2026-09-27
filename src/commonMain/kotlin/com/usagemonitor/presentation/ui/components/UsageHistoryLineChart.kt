@@ -2,8 +2,6 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,12 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,33 +23,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isShiftPressed
-import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.appTween
 
 internal const val HISTORY_TOOLTIP_PADDING_PX = 8f
 internal const val HISTORY_TOOLTIP_OFFSET_PX = 10f
@@ -62,13 +42,12 @@ internal const val HISTORY_PLOT_HORIZONTAL_INSET_PX = 14f
 private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
-// 64dp cabia "Reinício" na fonte de sistema anterior; a IBM Plex Mono é mais
-// larga e a palavra passou a quebrar letra a letra dentro do emblema.
-private val HISTORY_ANNOTATION_LABEL_WIDTH = 84.dp
 private const val HISTORY_RESET_CLUSTER_GAP_PX = 24f
 internal const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
 internal const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
 internal const val HISTORY_PAN_SENSITIVITY = 0.1f
+
+private const val HISTORY_REVEAL_MILLIS = 900
 
 internal data class HistoryRangeAnnotations(
     val startIndex: Int,
@@ -108,7 +87,19 @@ internal fun UsageHistoryLineChart(
      * ampliada, e um comparativo que compara períodos diferentes é pior que
      * nenhum. "Ver tudo" devolve a comparação.
      */
-    previousPoints: List<UsageHistoryPoint> = emptyList()
+    previousPoints: List<UsageHistoryPoint> = emptyList(),
+    /**
+     * Nome da série principal na legenda e no tooltip. Só aparece quando há
+     * [overlays] — com uma série só, o título do card já diz o que é a linha.
+     */
+    seriesLabel: String? = null,
+    /**
+     * Séries sobrepostas (issue #320), traçadas sem preenchimento sobre a mesma
+     * grade. Com sobreposição a linha do período anterior some: três traçados
+     * mais o tracejado deixariam de ser legíveis, e a comparação continua na
+     * tabela de métricas.
+     */
+    overlays: List<HistoryChartOverlay> = emptyList()
 ) {
     val lineColor = accentColor
     val fillColor = accentColor.copy(alpha = 0.12f)
@@ -130,7 +121,8 @@ internal fun UsageHistoryLineChart(
 
     val revealFraction by animateFloatAsState(
         targetValue = if (revealed) 1f else 0f,
-        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        // Pela política: com "Reduzir animações" a linha aparece inteira.
+        animationSpec = appTween(durationMillis = HISTORY_REVEAL_MILLIS, easing = FastOutSlowInEasing),
         label = "lineReveal"
     )
 
@@ -167,8 +159,8 @@ internal fun UsageHistoryLineChart(
     }
     val previousRenderPoints = remember(previousPoints, unit) { filteredPoints(previousPoints, unit) }
     // Só sem zoom — ver o comentário de `previousPoints`.
-    val previousPlotPoints = remember(previousRenderPoints, valueAxis, plotSize, zoomRange) {
-        if (zoomRange != 0f..1f) {
+    val previousPlotPoints = remember(previousRenderPoints, valueAxis, plotSize, zoomRange, overlays) {
+        if (zoomRange != 0f..1f || overlays.isNotEmpty()) {
             emptyList()
         } else {
             buildPlotPoints(
@@ -193,6 +185,20 @@ internal fun UsageHistoryLineChart(
         }
     }
     val activePoint = hoveredIndex?.let { index -> plotPoints.getOrNull(index) }
+    val overlayPlots = remember(overlays, windowedPoints, plotSize, plotInset) {
+        overlays.map { overlay ->
+            overlay to buildOverlayPlotPoints(
+                overlayPoints = overlay.points,
+                reference = windowedPoints,
+                chartWidth = plotSize.width.toFloat(),
+                chartHeight = plotSize.height.toFloat(),
+                horizontalInsetPx = plotInset
+            )
+        }
+    }
+    val overlayActivePoints = overlayPlots.mapNotNull { (overlay, plot) ->
+        activePoint?.let { active -> findOverlayPointAt(plot, active) }?.let { point -> overlay to point }
+    }
     val tooltipModel = remember(
         activePoint,
         windowedPoints,
@@ -209,12 +215,22 @@ internal fun UsageHistoryLineChart(
             title = tooltipTitle,
             subtitle = tooltipSubtitle
         )
+    }?.let { model ->
+        withOverlayMetrics(model, seriesLabel, overlayActivePoints)
     }
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (overlays.isNotEmpty()) {
+            HistoryChartLegend(
+                entries = listOf((seriesLabel ?: "") to lineColor) +
+                    overlays.map { overlay -> overlay.label to overlay.color },
+                textColor = axisTextColor
+            )
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -261,6 +277,8 @@ internal fun UsageHistoryLineChart(
                         ),
                         plotPoints = plotPoints,
                         previousPlotPoints = previousPlotPoints,
+                        overlayLines = overlayPlots.map { (overlay, plot) -> plot to overlay.color },
+                        overlayActivePoints = overlayActivePoints.map { (overlay, point) -> point to overlay.color },
                         resetClusterPoints = resetClusterPoints,
                         rangeAnnotations = rangeAnnotations,
                         activePoint = activePoint,
@@ -277,39 +295,24 @@ internal fun UsageHistoryLineChart(
             }
 
             if (activePoint != null && tooltipModel != null) {
-                val tooltipLeft = clampTooltipLeft(
-                    desiredCenterX = activePoint.x,
-                    tooltipWidth = tooltipSize.width.toFloat(),
-                    containerWidth = plotSize.width.toFloat(),
-                    horizontalPadding = plotInset
-                )
-                val tooltipTop = buildHistoryTooltipTop(
-                    pointY = activePoint.y + plotTop,
-                    tooltipHeight = tooltipSize.height.toFloat(),
-                    frameHeight = frameSize.height.toFloat()
-                )
-
-                Box(
+                HistoryTooltipLayer(
+                    model = tooltipModel,
+                    left = clampTooltipLeft(
+                        desiredCenterX = activePoint.x,
+                        tooltipWidth = tooltipSize.width.toFloat(),
+                        containerWidth = plotSize.width.toFloat(),
+                        horizontalPadding = plotInset
+                    ),
+                    top = buildHistoryTooltipTop(
+                        pointY = activePoint.y + plotTop,
+                        tooltipHeight = tooltipSize.height.toFloat(),
+                        frameHeight = frameSize.height.toFloat()
+                    ),
+                    onSizeChanged = { tooltipSize = it },
                     modifier = Modifier
                         .padding(start = startPadding)
                         .align(Alignment.TopStart)
-                        .fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    x = tooltipLeft.roundToInt(),
-                                    y = tooltipTop.roundToInt()
-                                )
-                            }
-                            .onSizeChanged { tooltipSize = it }
-                    ) {
-                        HistoryTooltipBubble(
-                            model = tooltipModel
-                        )
-                    }
-                }
+                )
             }
 
             Box(
@@ -390,367 +393,6 @@ private fun HistoryTimeAxisLabels(labels: List<String>, color: Color, startPaddi
                     else -> TextAlign.End
                 }
             )
-        }
-    }
-}
-
-/**
- * Roda do mouse amplia e desloca; o ponteiro escolhe o ponto em foco.
- *
- * `zoomRange` e `plotWidth` entram como leitura, não como valor: dois eventos
- * de rolagem podem chegar entre duas recomposições, e o segundo precisa partir
- * do recorte que o primeiro acabou de gravar.
- */
-@OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.historyChartPointerInput(
-    plotStartX: Float,
-    plotWidth: () -> Float,
-    plotPoints: List<ChartPlotPoint>,
-    windowedPoints: List<UsageHistoryPoint>,
-    zoomRange: () -> ClosedFloatingPointRange<Float>,
-    onZoomRangeChange: (ClosedFloatingPointRange<Float>) -> Unit,
-    onHoveredIndexChange: (Int?) -> Unit
-): Modifier = this
-    .onPointerEvent(PointerEventType.Scroll) { event ->
-        val change = event.changes.firstOrNull() ?: return@onPointerEvent
-        val plotPointerX = coerceFramePointerToPlotPointerX(
-            framePointerX = change.position.x,
-            plotStartX = plotStartX,
-            plotWidth = plotWidth()
-        ) ?: return@onPointerEvent
-        val pointerIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
-        val pointerFraction = pointerIndex
-            ?.let { index -> buildTimelineFractions(windowedPoints).getOrNull(index) }
-            ?: 0.5f
-        onZoomRangeChange(
-            applyChartScroll(
-                current = zoomRange(),
-                scrollDeltaY = change.scrollDelta.y,
-                scrollDeltaX = change.scrollDelta.x,
-                pointerFraction = pointerFraction,
-                shiftPressed = event.keyboardModifiers.isShiftPressed
-            )
-        )
-        change.consume()
-    }
-    .onPointerEvent(PointerEventType.Enter) { event ->
-        val framePointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
-        val plotPointerX = framePointerToPlotPointerX(
-            framePointerX = framePointerX,
-            plotStartX = plotStartX,
-            plotWidth = plotWidth()
-        ) ?: return@onPointerEvent
-        onHoveredIndexChange(findClosestPlotPointIndex(plotPoints, plotPointerX))
-    }
-    .onPointerEvent(PointerEventType.Move) { event ->
-        val change = event.changes.firstOrNull() ?: return@onPointerEvent
-        val plotPointerX = coerceFramePointerToPlotPointerX(
-            framePointerX = change.position.x,
-            plotStartX = plotStartX,
-            plotWidth = plotWidth()
-        )
-        onHoveredIndexChange(plotPointerX?.let { pointerX -> findClosestPlotPointIndex(plotPoints, pointerX) })
-    }
-    .onPointerEvent(PointerEventType.Exit) {
-        onHoveredIndexChange(null)
-    }
-
-private class HistoryPlotColors(
-    val line: Color,
-    val fill: Color,
-    val grid: Color,
-    val indicator: Color,
-    val indicatorHalo: Color
-)
-
-/**
- * O desenho do gráfico: grade, marcas de reinício, linha do período anterior,
- * curva com preenchimento e os marcadores de início, fim e ponto em foco.
- *
- * Fora do composable porque é só pintura — nenhum estado nasce aqui —, e o
- * corpo inteiro dentro do `Canvas` era o que levava `UsageHistoryLineChart`
- * acima do limite de 300 linhas (#306).
- */
-private fun DrawScope.drawHistoryPlot(
-    colors: HistoryPlotColors,
-    plotPoints: List<ChartPlotPoint>,
-    previousPlotPoints: List<ChartPlotPoint>,
-    resetClusterPoints: List<Pair<ResetMarker, ChartPlotPoint>>,
-    rangeAnnotations: HistoryRangeAnnotations?,
-    activePoint: ChartPlotPoint?,
-    revealFraction: Float
-) {
-    val lineColor = colors.line
-    val fillColor = colors.fill
-    val gridColor = colors.grid
-    val chartIndicatorColor = colors.indicator
-    val chartIndicatorHaloColor = colors.indicatorHalo
-    val strokeWidth = 1.75.dp.toPx()
-    val gridStroke = 1.dp.toPx()
-    val activeMarkerRadius = 4.dp.toPx()
-    val activeMarkerHaloRadius = 7.dp.toPx()
-    val resetPathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
-    val rangeStartPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull)
-    val rangeEndPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull)
-
-    drawLine(
-        color = gridColor,
-        start = Offset(0f, 0f),
-        end = Offset(size.width, 0f),
-        strokeWidth = gridStroke
-    )
-    drawLine(
-        color = gridColor,
-        start = Offset(0f, size.height * 0.5f),
-        end = Offset(size.width, size.height * 0.5f),
-        strokeWidth = gridStroke
-    )
-    drawLine(
-        color = gridColor,
-        start = Offset(0f, size.height),
-        end = Offset(size.width, size.height),
-        strokeWidth = gridStroke
-    )
-
-    resetClusterPoints.forEach { (_, resetPoint) ->
-        drawLine(
-            color = chartIndicatorColor.copy(alpha = 0.4f),
-            start = Offset(resetPoint.x, 0f),
-            end = Offset(resetPoint.x, size.height),
-            strokeWidth = gridStroke * 1.5f,
-            pathEffect = resetPathEffect
-        )
-    }
-
-    // Linha de referência do período anterior (issue #215):
-    // tracejada e em tom neutro — nunca a cor de acento —,
-    // porque ela não é a série que a tela está medindo, é só
-    // contexto para ler a corrente contra ela. Desenhada
-    // antes da linha atual para ficar atrás dela.
-    if (previousPlotPoints.size > 1) {
-        val previousPath = Path()
-        previousPlotPoints.forEachIndexed { index, point ->
-            if (index == 0) {
-                previousPath.moveTo(point.x, point.y)
-            } else {
-                previousPath.lineTo(point.x, point.y)
-            }
-        }
-        clipRect(right = size.width * revealFraction) {
-            drawPath(
-                path = previousPath,
-                color = gridColor,
-                style = Stroke(
-                    width = strokeWidth,
-                    cap = StrokeCap.Round,
-                    pathEffect = resetPathEffect
-                )
-            )
-        }
-    }
-
-    if (plotPoints.size > 1) {
-        val path = Path()
-        val fillPath = Path()
-
-        plotPoints.forEachIndexed { index, point ->
-            if (index == 0) {
-                path.moveTo(point.x, point.y)
-                fillPath.moveTo(point.x, size.height)
-                fillPath.lineTo(point.x, point.y)
-            } else {
-                path.lineTo(point.x, point.y)
-                fillPath.lineTo(point.x, point.y)
-            }
-        }
-
-        val lastPoint = plotPoints.last()
-        fillPath.lineTo(lastPoint.x, size.height)
-        fillPath.close()
-
-        clipRect(right = size.width * revealFraction) {
-            // Massa sob a curva principal (issue #223): o
-            // preenchimento chapado nasceu só pro saldo do
-            // DeepSeek e nunca foi generalizado — a leitura
-            // percentual (a mais vista da tela) ficava só no
-            // traço de 1-2px sobre a grade. `fillColor` já é
-            // opacidade fixa sobre `accentColor`, sem
-            // gradiente; geometria de `fillPath` já era
-            // unit-agnostic, só o desenho estava condicionado.
-            drawPath(path = fillPath, color = fillColor)
-            drawPath(
-                path = path,
-                color = lineColor,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-        }
-    }
-
-    if (rangeStartPoint != null && rangeStartPoint.index != activePoint?.index) {
-        drawCircle(
-            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
-            radius = activeMarkerHaloRadius,
-            center = Offset(rangeStartPoint.x, rangeStartPoint.y)
-        )
-        drawCircle(
-            color = lineColor.copy(alpha = 0.9f),
-            radius = activeMarkerRadius,
-            center = Offset(rangeStartPoint.x, rangeStartPoint.y),
-            style = Stroke(width = 2.dp.toPx())
-        )
-    }
-
-    if (rangeEndPoint != null && rangeEndPoint.index != activePoint?.index) {
-        drawCircle(
-            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
-            radius = activeMarkerHaloRadius,
-            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
-        )
-        drawCircle(
-            color = lineColor.copy(alpha = 0.92f),
-            radius = activeMarkerRadius,
-            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
-        )
-    }
-
-    if (activePoint != null) {
-        drawLine(
-            color = chartIndicatorColor.copy(alpha = 0.18f),
-            start = Offset(activePoint.x, 0f),
-            end = Offset(activePoint.x, size.height),
-            strokeWidth = gridStroke
-        )
-        drawCircle(
-            color = chartIndicatorHaloColor,
-            radius = activeMarkerHaloRadius,
-            center = Offset(activePoint.x, activePoint.y)
-        )
-        drawCircle(
-            color = chartIndicatorColor,
-            radius = activeMarkerRadius,
-            center = Offset(activePoint.x, activePoint.y)
-        )
-    }
-}
-
-@Composable
-private fun HistoryRangeAnnotationLabels(
-    resetClusters: List<Pair<ResetMarker, ChartPlotPoint>>,
-    plotWidth: Float,
-    plotInset: Float,
-    language: AppLanguage
-) {
-    val density = LocalDensity.current
-    val labelWidthPx = with(density) { HISTORY_ANNOTATION_LABEL_WIDTH.toPx() }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        val occupiedX = mutableListOf<Float>()
-
-        resetClusters.forEach { (marker, point) ->
-            val collides = occupiedX.any { x -> abs(point.x - x) < labelWidthPx }
-            if (!collides) {
-                HistoryAnnotationLabel(
-                    text = resetLabelText(marker.count, language),
-                    left = clampTooltipLeft(
-                        desiredCenterX = point.x,
-                        tooltipWidth = labelWidthPx,
-                        containerWidth = plotWidth,
-                        horizontalPadding = plotInset
-                    )
-                )
-                occupiedX += point.x
-            }
-        }
-    }
-}
-
-private fun resetLabelText(count: Int, language: AppLanguage): String {
-    val label = if (language == AppLanguage.PT) "Reinício" else "Reset"
-    return if (count > 1) "$label ×$count" else label
-}
-
-@Composable
-private fun HistoryAnnotationLabel(
-    text: String,
-    left: Float,
-    topPadding: androidx.compose.ui.unit.Dp = 4.dp
-) {
-    Surface(
-        modifier = Modifier
-            .width(HISTORY_ANNOTATION_LABEL_WIDTH)
-            .offset {
-                IntOffset(
-                    x = left.roundToInt(),
-                    y = topPadding.roundToPx()
-                )
-            },
-        shape = AppShapes.extraSmall,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Text(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 3.dp),
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun HistoryTooltipBubble(
-    model: HistoryTooltipModel,
-    modifier: Modifier = Modifier
-) {
-    // Mesma bolha das outras três: `AppTooltipSurface`. Duas tooltips sobre o
-    // mesmo tipo de gráfico não podem flutuar em alturas diferentes, e era a
-    // anatomia repetida por extenso que deixava isso acontecer.
-    AppTooltipSurface(modifier = modifier.widthIn(max = 230.dp)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            model.title?.takeIf { it.isNotBlank() }?.let { title ->
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Text(
-                text = model.subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            model.metrics.forEach { metric ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = metric.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = metric.value,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.End
-                    )
-                }
-            }
         }
     }
 }

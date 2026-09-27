@@ -1035,7 +1035,9 @@ class HudNotchTest {
                         }
                     }
                 }
-                mainClock.advanceTimeBy(400)
+                // Depois do desenho de entrada dos arcos (issue #322), que é
+                // finito e acontece com qualquer política não reduzida.
+                mainClock.advanceTimeBy(RING_ENTRANCE_SETTLE_MILLIS)
                 first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
                 mainClock.advanceTimeBy(350)
                 second = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
@@ -1047,6 +1049,102 @@ class HudNotchTest {
         assertTrue(differs(liveA, liveB), "com a política contínua o arco devia ter girado")
         val (staticA, staticB) = frames(AppMotionPolicy.Static)
         assertTrue(!differs(staticA, staticB), "sem a política o arco devia ficar parado")
+    }
+
+    /**
+     * Em repouso — sem sessão, sem atenção, sem coleta — o reflexo corre pelos
+     * arcos com a política contínua (issue #322), e sem ela o anel fica parado.
+     */
+    @Test
+    fun `o reflexo corre pelo anel parado so com a politica continua`() {
+        assertIdleRingMoves(listOf(AppRingArc(0.8f, AppTone.OK), AppRingArc(0.6f, AppTone.WARNING)))
+    }
+
+    /**
+     * O anel do Codex no print da #322 (3% e 0%) ficava inteiramente parado.
+     * Aqui 1% e 0%: abaixo do mínimo do reflexo do valor, então só o brilho da
+     * trilha pode mexer o anel — e com a política contínua ele mexe.
+     */
+    @Test
+    fun `anel quase vazio tambem se mexe com a politica continua`() {
+        assertIdleRingMoves(listOf(AppRingArc(0.01f, AppTone.OK), AppRingArc(0f, AppTone.OK)))
+    }
+
+    private fun assertIdleRingMoves(ringArcs: List<AppRingArc>) {
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var second: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                setContent {
+                    AppTheme(isDark = true, motion = policy) {
+                        Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
+                            AppUsageRing(arcs = ringArcs, description = "anel")
+                        }
+                    }
+                }
+                mainClock.advanceTimeBy(RING_ENTRANCE_SETTLE_MILLIS)
+                first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(500)
+                second = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+            }
+            return first to second
+        }
+
+        val (liveA, liveB) = frames(AppMotionPolicy.Live)
+        assertTrue(differs(liveA, liveB), "com a política contínua o reflexo devia ter andado")
+        val (staticA, staticB) = frames(AppMotionPolicy.Static)
+        assertTrue(!differs(staticA, staticB), "sem a política o anel parado não devia mudar: ${diffReport(staticA, staticB)}")
+    }
+
+    private fun diffReport(a: PixelMap, b: PixelMap): String {
+        var count = 0
+        var maxDelta = 0f
+        val where = mutableListOf<String>()
+        for (y in 0 until minOf(a.height, b.height)) {
+            for (x in 0 until minOf(a.width, b.width)) {
+                if (a[x, y] != b[x, y]) {
+                    count++
+                    val d = maxOf(kotlin.math.abs(a[x, y].red - b[x, y].red), kotlin.math.abs(a[x, y].green - b[x, y].green), kotlin.math.abs(a[x, y].alpha - b[x, y].alpha))
+                    maxDelta = maxOf(maxDelta, d)
+                    if (where.size < 5) where += "($x,$y)"
+                }
+            }
+        }
+        return "px=$count maxDelta=$maxDelta size=${a.width}x${a.height} em $where"
+    }
+
+    /**
+     * Na primeira composição o arco se desenha a partir de zero (issue #322):
+     * no quadro inicial ele ainda não está lá, e depois está. Com "Reduzir
+     * animações" o primeiro quadro já é o final.
+     */
+    @Test
+    fun `o arco se desenha na entrada e nasce pronto com reduzir animacoes`() {
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var settled: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                setContent {
+                    AppTheme(isDark = true, motion = policy) {
+                        Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
+                            AppUsageRing(arcs = listOf(AppRingArc(0.6f, AppTone.OK)), description = "anel")
+                        }
+                    }
+                }
+                mainClock.advanceTimeByFrame()
+                first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(RING_ENTRANCE_SETTLE_MILLIS)
+                settled = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+            }
+            return first to settled
+        }
+
+        val (animatedStart, animatedEnd) = frames(AppMotionPolicy.Static)
+        assertTrue(differs(animatedStart, animatedEnd), "o arco devia se desenhar depois do primeiro quadro")
+        val (reducedStart, reducedEnd) = frames(AppMotionPolicy.Reduced)
+        assertTrue(!differs(reducedStart, reducedEnd), "com reduzir animações o arco devia nascer pronto")
     }
 
     /**
@@ -1194,6 +1292,8 @@ class HudNotchTest {
     }
 
     private val RING_FRAME = "ringFrame"
+    /** Folga para o desenho de entrada dos arcos assentar (mola `GENTLE`). */
+    private val RING_ENTRANCE_SETTLE_MILLIS = 1_500L
 
     /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */
     private fun ComposeUiTest.hoverRing(description: String) {

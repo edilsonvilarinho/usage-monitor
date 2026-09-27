@@ -82,6 +82,44 @@ class HudModelTest {
         assertEquals("60%", buildHudAccounts(tie, emptyList(), AppLanguage.PT, HUD_NOW).single().focus?.percentText)
     }
 
+    /**
+     * O número da pior janela vai no tom (issue #322) — e é a linha dela, na
+     * ordem dos anéis (semanal por fora, primeira linha), não a primeira linha.
+     */
+    @Test
+    fun `em atencao o numero da pior janela e o destacado`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 88, risk = UsageRiskLevel.WILL_EXCEED),
+            entry(PADRAO, "Sessão 7d", used = 30, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(listOf("7d", "5h"), account.stripLines.map { line -> line.label })
+        assertEquals(1, account.emphasizedStripLineIndex)
+    }
+
+    @Test
+    fun `em dia nenhum numero ganha cor`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 20, risk = UsageRiskLevel.ON_TRACK),
+            entry(PADRAO, "Sessão 7d", used = 30, risk = UsageRiskLevel.ON_TRACK, period = PeriodType.WEEKLY)
+        )
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(null, account.emphasizedStripLineIndex)
+    }
+
+    @Test
+    fun `cota unica em atencao destaca a linha unica`() {
+        val entries = listOf(entry(CODEX, "Codex 5h", used = 95, risk = UsageRiskLevel.AT_RISK))
+
+        val account = buildHudAccounts(entries, emptyList(), AppLanguage.PT, HUD_NOW).single()
+
+        assertEquals(0, account.emphasizedStripLineIndex)
+    }
+
     @Test
     fun `sem projecao a conta diz isso e a cota nao finge estado`() {
         val entries = listOf(entry(CODEX, "Codex 5h", used = 30, risk = null))

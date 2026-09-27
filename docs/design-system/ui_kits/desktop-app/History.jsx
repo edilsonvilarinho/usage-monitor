@@ -1,9 +1,10 @@
 const { AppWindowFrame, AppToolbar, AppPanel, AppPanelHeader, AppPanelBody, AppSegmentedControl, AppButton, AppDataTable, AppMetric, AppKey, AppSourceMark, AppStatusIndicator } = DS;
 
 const SERIES = [12, 18, 15, 26, 31, 28, 44, 51, 47, 58, 66, 61, 72, 68, 74, 81, 77, 69, 58, 47, 39, 31, 24, 19];
+const WEEKLY = [31, 31, 32, 33, 34, 34, 36, 37, 37, 38, 40, 40, 41, 41, 42, 43, 43, 43, 43, 43, 43, 43, 43, 43];
 const PREV = [9, 14, 13, 21, 24, 22, 33, 39, 36, 44, 49, 46, 53, 51, 55, 59, 56, 51, 43, 36, 30, 24, 19, 15];
 
-function Chart({ data, prev }) {
+function Chart({ data, prev, weekly }) {
   const W = 900, H = 150, max = 100;
   const pt = (arr) => arr.map((v, i) => (i / (arr.length - 1)) * W + ',' + (H - (v / max) * H)).join(' ');
   // Massa sob a curva principal: preenchimento chapado (color-mix com o acento
@@ -23,7 +24,10 @@ function Chart({ data, prev }) {
         <line key={i} x1={(i / 23) * W} x2={(i / 23) * W} y1="0" y2={H} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 4" />
       ))}
       <path d={area} fill="color-mix(in srgb, var(--anthropic) 14%, transparent)" stroke="none" />
-      <polyline points={pt(prev)} fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="4 4" />
+      {/* Com a semanal sobreposta (issue #320) o tracejado do período anterior some. */}
+      {weekly
+        ? <polyline points={pt(weekly)} fill="none" stroke="var(--output)" strokeWidth="2" />
+        : <polyline points={pt(prev)} fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="4 4" />}
       <polyline points={pt(data)} fill="none" stroke="var(--anthropic)" strokeWidth="2" />
     </svg>
   );
@@ -31,6 +35,7 @@ function Chart({ data, prev }) {
 
 export function History() {
   const [range, setRange] = React.useState('7 dias');
+  const [quota, setQuota] = React.useState('Ambas');
   return (
     <AppWindowFrame title="Histórico — Anthropic · Padrão" style={{ width: 1030 }}>
       <AppToolbar>
@@ -38,6 +43,8 @@ export function History() {
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>Anthropic · Padrão</span>
         <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
         <AppSegmentedControl items={['24h', '7 dias', '30 dias', 'Total']} value={range} onChange={setRange} />
+        <AppKey>Cota</AppKey>
+        <AppSegmentedControl items={['5h', '7d', 'Ambas']} value={quota} onChange={setQuota} />
         <span style={{ flex: 1 }} />
         <AppStatusIndicator level="warn">Esgota em 4h 12m</AppStatusIndicator>
         <AppButton variant="ghost">PDF</AppButton>
@@ -47,10 +54,18 @@ export function History() {
         <AppPanelHeader
           mark={<AppSourceMark source="anthropic" />}
           title="Consumo da janela"
-          subtitle="linha cheia: período atual · tracejada: 7 dias anteriores"
+          subtitle="5h e 7d no mesmo gráfico"
         />
         <AppPanelBody>
-          <Chart data={SERIES} prev={PREV} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--s3)', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
+            <span><i style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--anthropic)', marginRight: 6, verticalAlign: 'middle' }} />5h</span>
+            <span><i style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--output)', marginRight: 6, verticalAlign: 'middle' }} />7d</span>
+          </div>
+          <Chart
+            data={quota === '7d' ? WEEKLY : SERIES}
+            prev={PREV}
+            weekly={quota === 'Ambas' ? WEEKLY : null}
+          />
           <div style={{ display: 'flex', gap: 'var(--s4)', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
             <span>Sáb 09/08</span><span>Dom 10/08</span><span>Ter 12/08</span><span>Qua 13/08</span>
           </div>
@@ -69,21 +84,33 @@ export function History() {
       </div>
 
       <AppPanel>
-        <AppPanelHeader title="Reinícios de janela" subtitle="cada linha é um snapshot de reset registrado no banco local" />
+        {/* Uma linha por janela do intervalo, mais recentes primeiro (issue #320).
+            "Esgotou em" conta da primeira leitura da janela: o início nominal a
+            API não informa. */}
+        <AppPanelHeader title="Janelas 5h" subtitle="5 janelas no intervalo" />
         <AppDataTable
           columns={[
-            { key: 'quando', label: 'Reset' },
-            { key: 'pico', label: 'Pico antes do reset', numeric: true },
-            { key: 'media', label: 'Média/h', numeric: true },
-            { key: 'delta', label: 'vs. anterior', numeric: true }
+            { key: 'inicio', label: 'Início observado' },
+            { key: 'pico', label: 'Pico', numeric: true },
+            { key: 'esgotou', label: 'Esgotou em', numeric: true },
+            { key: 'ritmo', label: 'Ritmo', numeric: true }
           ]}
           rows={[
-            { id: 1, quando: 'Qua 13/08 08h00 BRT', pico: '81%', media: '3,4%', delta: '+9%' },
-            { id: 2, quando: 'Ter 12/08 03h00 BRT', pico: '72%', media: '3,0%', delta: '+2%' },
-            { id: 3, quando: 'Seg 11/08 22h00 BRT', pico: '70%', media: '2,9%', delta: '−4%' },
-            { id: 4, quando: 'Seg 11/08 17h00 BRT', pico: '74%', media: '3,1%', delta: '+6%' }
+            { id: 1, inicio: '13/08 08:05 BRT · atual', pico: '68 %', esgotou: '—', ritmo: '23 %/h' },
+            { id: 2, inicio: '13/08 03:02 BRT', pico: '100 %', esgotou: '3h 12min', ritmo: '31 %/h' },
+            { id: 3, inicio: '12/08 21:58 BRT', pico: '74 %', esgotou: '—', ritmo: '16 %/h' },
+            { id: 4, inicio: '12/08 16:55 BRT', pico: '81 %', esgotou: '—', ritmo: '17 %/h' }
           ]}
         />
+        <AppPanelBody>
+          <AppKey>Consumo por hora do dia (BRT)</AppKey>
+          <svg viewBox="0 0 700 58" style={{ display: 'block', width: '100%', height: 56 }} role="img" aria-label="Pico às 14h BRT">
+            {[2, 0, 0, 0, 0, 0, 0, 0, 6, 18, 30, 34, 22, 28, 48, 40, 30, 20, 12, 8, 6, 4, 2, 2].map((h, i) => (
+              <rect key={i} x={i * 29 + 4} y={56 - h} width="20" height={h} rx="2" fill="var(--anthropic)" />
+            ))}
+          </svg>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)' }}>Pico às 14h BRT · 15% do consumo</span>
+        </AppPanelBody>
       </AppPanel>
     </AppWindowFrame>
   );

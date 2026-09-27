@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -30,13 +32,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -58,9 +60,11 @@ import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.AppStatusPill
 import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.appSpring
 
@@ -69,6 +73,12 @@ private const val RING_REFRESH_SCALE = 0.9f
 
 /** A marca gira uma volta por segundo, o ritmo do glifo de recarga do card. */
 private const val RING_REFRESH_TURN_MILLIS = 1_000
+
+/**
+ * Quanto a marca cresce no pulso de coleta concluída (issue #322). Pouco: é
+ * aviso de "chegou leitura", não de estado — estado é a pílula e o arco.
+ */
+private const val MARK_PULSE_SCALE = 1.15f
 
 /** A faixa de anéis, do tamanho do notch. */
 @Composable
@@ -126,6 +136,10 @@ internal fun HudRingStrip(
     }
 }
 
+/** A pílula de estado de cada conta; os testes medem ela contra a geometria. */
+internal const val HUD_STATUS_PILL_TEST_TAG = "hud-status-pill"
+internal const val HUD_STRIP_LINE_TEST_TAG = "hud-strip-line"
+
 @Composable
 private fun HudRingItem(
     account: HudAccount,
@@ -157,6 +171,19 @@ private fun HudRingItem(
         angle
     } else {
         0f
+    }
+    // Pulso da marca quando a coleta da conta termina (issue #322): uma subida
+    // e uma volta em tween — sem mola, para não passar do alvo —, nunca em laço.
+    // Com "Reduzir animações" não há pulso.
+    val markPulse = remember { Animatable(1f) }
+    var wasRefreshing by remember { mutableStateOf(account.refreshing) }
+    LaunchedEffect(account.refreshing) {
+        val pulse = shouldPulseProviderMark(wasRefreshing, account.refreshing, policy)
+        wasRefreshing = account.refreshing
+        if (pulse) {
+            markPulse.animateTo(MARK_PULSE_SCALE, tween(AppMotion.normal, easing = AppMotion.enterEasing))
+            markPulse.animateTo(1f, tween(AppMotion.slow, easing = AppMotion.exitEasing))
+        }
     }
     val refreshLabel = hudRefreshAccountLabel(account, language)
     // A ação é **declarada** na semântica, não instalada: um `clickable` aqui
@@ -209,7 +236,11 @@ private fun HudRingItem(
                 source = account.source,
                 tint = account.accountAccent?.current ?: MaterialTheme.colorScheme.onSurface,
                 size = hudRingMarkSize(account.rings.size),
-                modifier = Modifier.graphicsLayer { rotationZ = markTurn }
+                modifier = Modifier.graphicsLayer {
+                    rotationZ = markTurn
+                    scaleX = markPulse.value
+                    scaleY = markPulse.value
+                }
             )
             // O emoji da conta (issue #287), selo no canto de cima à direita do
             // anel. Passa só `HUD_EMOJI_BADGE_OVERSHOOT` para fora dele, dentro do
@@ -233,20 +264,28 @@ private fun HudRingItem(
     // medem — a costura com a geometria.
     val lines: @Composable () -> Unit = {
         val stripLines = if (compact) listOf(account.focusLine) else account.stripLines
+        // Compacta, a linha única já é a cota em foco.
+        val emphasized = if (compact) account.emphasizedStripLineIndex?.let { 0 } else account.emphasizedStripLineIndex
+        val emphasisColor = account.tone.color()
         Column(horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start) {
-            stripLines.forEach { line -> HudStripLineText(line) }
+            stripLines.forEachIndexed { index, line ->
+                HudStripLineText(line, percentColor = if (index == emphasized) emphasisColor else null)
+            }
         }
     }
+    // A palavra do estado em pílula tonal (issue #322): solta, ela tinha o
+    // mesmo peso dos percentuais ao lado e o notch lia "flat". A largura e a
+    // altura saem de `statusPillWidth`/`statusPillHeight`, a costura com a
+    // geometria.
     val word: @Composable () -> Unit = {
-        Text(
-            text = account.statusLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = account.tone.color(),
+        AppStatusPill(
+            label = account.statusLabel,
+            tone = account.tone,
             // Na coluna vertical "Sem projeção" quebra em duas linhas; alinhadas
             // à esquerda elas destoavam do anel e dos percentuais, centrados.
             textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
-            overflow = TextOverflow.Ellipsis
+            modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG)
         )
     }
     if (vertical || compact) {
@@ -273,19 +312,24 @@ private fun HudRingItem(
 }
 
 /**
- * "7d 72%": a janela no tom secundário e o número no do texto. A cor do risco
- * fica no arco e na palavra — aqui ela diria o estado só pela cor. Sem rótulo é
- * o percentual de sempre, em `labelMedium`.
+ * "7d 72%": a janela no tom secundário e o número no do texto. Sem rótulo é o
+ * percentual de sempre, em `labelMedium`.
+ *
+ * [percentColor] pinta só o número da pior janela em atenção (issue #322). Isso
+ * não faz a cor informar sozinha: a pílula ao lado escreve o estado, e o tom do
+ * número só aponta **qual** janela o causou.
  */
 @Composable
-private fun HudStripLineText(line: HudStripLine) {
+private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
+    val numberColor = percentColor ?: MaterialTheme.colorScheme.onSurface
     val label = line.label
     if (label == null) {
         Text(
             text = line.percentText,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1
+            color = numberColor,
+            maxLines = 1,
+            modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG)
         )
         return
     }
@@ -293,11 +337,12 @@ private fun HudStripLineText(line: HudStripLine) {
         text = buildAnnotatedString {
             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(label) }
             append(" ")
-            append(line.percentText)
+            withStyle(SpanStyle(color = numberColor)) { append(line.percentText) }
         },
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 1
+        maxLines = 1,
+        modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG)
     )
 }
 
@@ -311,4 +356,14 @@ private fun HudStripLineText(line: HudStripLine) {
 internal fun hudRingMarkSize(arcs: Int): Dp {
     val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
     return ((HUD_RING_SIZE - used) * 0.7f).coerceAtLeast(6.dp)
+}
+
+/**
+ * A marca pulsa quando a coleta da conta **termina** — `refreshing` passa de
+ * verdadeiro a falso —, não quando começa nem na primeira composição. O fim
+ * vale também para coleta que falhou: o `finally` do view model desmarca o alvo
+ * nos dois casos, e o pulso diz "o app olhou agora", não "o número mudou".
+ */
+internal fun shouldPulseProviderMark(wasRefreshing: Boolean, refreshing: Boolean, policy: AppMotionPolicy): Boolean {
+    return wasRefreshing && !refreshing && !policy.reduced
 }

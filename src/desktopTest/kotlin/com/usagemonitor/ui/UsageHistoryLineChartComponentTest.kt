@@ -13,7 +13,9 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.components.HistoryChartOverlay
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
+import androidx.compose.ui.graphics.Color
 import kotlinx.datetime.Instant
 import kotlin.test.Test
 
@@ -80,6 +82,33 @@ class UsageHistoryLineChartComponentTest {
             }
         }
 
+        onAllNodesWithText("Tracejado: mesmo ponto do período anterior").assertCountEquals(0)
+    }
+
+    @Test
+    fun `chart with an overlay names both series and drops the previous period line`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp)) {
+                    UsageHistoryLineChart(
+                        points = currentPoints,
+                        unit = UsageUnit.PERCENTAGE,
+                        language = AppLanguage.PT,
+                        chartSelectionKey = "overlay",
+                        previousPoints = previousPoints,
+                        seriesLabel = "5h",
+                        overlays = listOf(
+                            HistoryChartOverlay(points = currentPoints, label = "7d", color = Color.Magenta)
+                        )
+                    )
+                }
+            }
+        }
+
+        // A cor sozinha não diz qual linha é qual: os dois nomes vêm escritos.
+        onNodeWithText("5h").assertIsDisplayed()
+        onNodeWithText("7d").assertIsDisplayed()
+        // Com sobreposição o tracejado do período anterior some, e a legenda dele junto.
         onAllNodesWithText("Tracejado: mesmo ponto do período anterior").assertCountEquals(0)
     }
 }

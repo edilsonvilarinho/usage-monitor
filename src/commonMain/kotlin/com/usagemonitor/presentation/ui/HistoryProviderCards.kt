@@ -1,7 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import com.usagemonitor.presentation.ui.theme.appTween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -139,12 +139,12 @@ private fun DeepSeekHistoryCard(
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(AppMotion.normal, easing = AppMotion.enterEasing),
+        animationSpec = appTween(AppMotion.normal, easing = AppMotion.enterEasing),
         label = "cardAlpha$index"
     )
     val cardOffsetY by animateFloatAsState(
         targetValue = if (visible) 0f else 28f,
-        animationSpec = tween(AppMotion.slow, easing = AppMotion.enterEasing),
+        animationSpec = appTween(AppMotion.slow, easing = AppMotion.enterEasing),
         label = "cardOffsetY$index"
     )
     LaunchedEffect(Unit) {
@@ -241,12 +241,12 @@ private fun OpenCodeHistoryCard(
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(AppMotion.normal, easing = AppMotion.enterEasing),
+        animationSpec = appTween(AppMotion.normal, easing = AppMotion.enterEasing),
         label = "openCodeHistoryCardAlpha$index"
     )
     val cardOffsetY by animateFloatAsState(
         targetValue = if (visible) 0f else 28f,
-        animationSpec = tween(AppMotion.slow, easing = AppMotion.enterEasing),
+        animationSpec = appTween(AppMotion.slow, easing = AppMotion.enterEasing),
         label = "openCodeHistoryCardOffsetY$index"
     )
     LaunchedEffect(Unit) {

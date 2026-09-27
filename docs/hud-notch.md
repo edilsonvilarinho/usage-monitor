@@ -25,12 +25,23 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **Era um número só, o da cota em foco, sem dizer a janela** (issue #286). O foco é o pior risco, e
     ele troca de janela sozinho: o mesmo lugar dizia 45% numa coleta e 72% na seguinte sem nada ter
     mudado no consumo. As linhas não mudam de lugar. A janela vai em `onSurfaceVariant` e o número em
-    `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha. Conta
+    `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha.
+    **Exceção desde a #322** (`HudAccount.emphasizedStripLineIndex`): em `Atenção`/`Crítico` o
+    **número** da pior janela vai no tom — a pílula ao lado escreve o estado, e o tom só aponta qual
+    janela o causou. Em dia nenhum número ganha cor: pintar de verde todo percentual somaria cor sem
+    informar nada. O rótulo da janela continua neutro. Conta
     de cota única continua com o número em `labelMedium`, sem rótulo. O preço é a espessura: cada
-    janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima vai de 36dp para 42dp
-    com duas e 56dp com três. **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
+    janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima fica nos 44dp do anel
+    com uma, 46dp com duas e 60dp com três (a palavra em pílula, #322). **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
     atenção, na célula compacta e na bandeja, onde não cabe uma linha por anel. A palavra continua
     sendo a do **pior** risco da conta: com as janelas à vista ela resume a conta, não um número.
+  - **A palavra é uma pílula tonal** (`AppStatusPill`, issue #322): ponto, palavra no tom e fundo do
+    tom a 8% (`STATUS_PILL_TINT_ALPHA`). Solta, tinha o peso dos percentuais e o notch lia "flat". Os
+    8% são medidos: com 14% o verde do tema claro caía para 4,17:1, e `AppStatusPillContrastTest`
+    guarda os três tons nos dois temas. A geometria lê as constantes da primitiva
+    (`statusPillWidth`/`statusPillHeight`) e soma 1dp de arredondamento — sem ele,
+    `HudNotchTextFitTest` media até 0,6dp a mais entre 110% e 144%. Com duas janelas o notch de cima
+    vai a 46dp (28 das linhas + 18 da pílula). O estado sem contas continua `AppStatusIndicator`.
   - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
     completa passa de `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda, cada conta vira a célula do
     Codenotch — anel e a cota em foco com a janela embaixo (`focusLine`, "7d 72%"), sem a palavra. Com sete APIs numa tela de notebook a faixa
@@ -87,7 +98,9 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**
   (`ApiUsageStats.displayTitle`, dono único: "Anthropic — Padrão"); a HUD mostrava só "Padrão" e
   escondia de quem era a conta. O **plano** ("Max 20x", "ChatGPT Plus") vem no rodapé do balão e na
-  descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo.
+  descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo, e de 36 para 44dp (issue #322) porque
+  a marca ainda ficava pequena: 14dp com duas janelas e 8,4dp com três. A fórmula de `hudRingMarkSize`
+  não mudou; com o anel maior ela dá 25,2 / 19,6 / 14dp.
 - **Resumo na bandeja** (`hudTraySummary`): o tooltip do ícone lista cada conta com o percentual em
   foco **e a janela dele** — "Usage Monitor — Anthropic — Padrão 7d 87% · Codex 0%" (#286) —, cortado com reticências nos 127
   caracteres do `szTip` do Windows.
@@ -203,13 +216,43 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **A faixa do modo padrão também ganhou botão**, e deixou de ser clicável inteira: com o botão
     dentro dela, clicar fora dele faria a mesma ação sem nada indicar. O preço é a faixa passar de
     ~34dp para ~46dp de altura, pela altura de controle do botão.
+- **A marca pulsa a cada coleta concluída** (issue #322, `shouldPulseProviderMark`): 1 → 1,15 em
+  `AppMotion.normal` e volta em `AppMotion.slow`, por tween — sem mola, para não passar do alvo — e uma
+  vez só, quando `refreshing` da conta cai de verdadeiro para falso. Vale também para coleta que
+  falhou (o `finally` do view model desmarca o alvo nos dois casos): o pulso diz "o app olhou agora",
+  não "o número mudou". Não é contínuo, então não depende de `continuous`; com "Reduzir animações"
+  não há pulso. Durante a coleta a marca continua girando, como antes.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
   fica parado e o pulso some; a palavra continua dizendo o estado.
+  - **Mais suave desde a #322.** A órbita virou **cometa**: 130° com a cauda num gradiente que se
+    dissolve até sumir e um ponto na cabeça, uma volta em 2,4s (era um segmento chapado de 90° em
+    1,4s, que lia como indicador de carregamento). A atenção **respira** em vez de piscar: o arco fica
+    entre 0,8 e 1 de opacidade e um halo com o dobro do traço, até 28% de opacidade, cresce e some em
+    1,6s com aceleração suave nas pontas (era o arco inteiro oscilando 0,35↔1 em 0,9s). E na primeira
+    composição os arcos **se desenham** a partir de zero pela mola `GENTLE`, juntos — antes surgiam
+    cheios. Com "Reduzir animações" nascem no valor. Houve escalonamento de fora para dentro por espera
+    em quadros; no relógio manual dos testes o arco de dentro não assentava (medido: 136 pixels mudando
+    entre 6,0s e 6,5s), e ele foi retirado.
+  - **Reflexo em repouso** (issue #322, pedido depois: "os círculos estão muito estáticos mesmo sem
+    atualização"). Com a política contínua, um reflexo branco de 48° com cauda que some corre dentro de
+    cada arco, do início até a ponta, com opacidade subindo e descendo por um seno (pico 42%). Uma
+    volta a cada 4,2s, dos quais pouco mais da metade é pausa; cada arco de dentro sai 22% da volta
+    atrasado, então o anel nunca acende inteiro. O reflexo nunca passa da ponta do arco — ali ele
+    mentiria um percentual maior.
+  - **Brilho da trilha e reflexo mais forte** (issue #322, depois de olhar no app: "os círculos de 5h
+    e 7d estão muito estáticos"). A primeira versão do reflexo não se via: 48°, pico de 42% num traço
+    de 2,5dp, mais de metade do ciclo em pausa — e o anel do Codex em 3%/0% ficava **inteiramente**
+    parado, porque arco abaixo de 12° não recebia reflexo. Agora: o reflexo tem 64°, pico de 65%, uma
+    passagem a cada 2,8s com pausa curta e mínimo de 6°; e uma faixa de luz de 80° a 22% gira pela
+    **trilha** de cada arco a cada 3,6s, defasada 120° entre arcos, com ou sem consumo. A trilha é "o
+    que falta", não o dado — iluminá-la não sugere percentual. `HudNotchTest` afirma que um anel em
+    1%/0% se mexe com a política contínua (e falha sem o brilho da trilha).
   - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
     comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
-    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3dp) além dos 36dp do anel,
+    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3,4dp, contando a cabeça do
+    cometa) além dos 44dp do anel,
     fora dos limites do `Canvas`, e cabe no respiro de 8dp do notch e na metade do vão de 12dp entre
     anéis — `HudNotchGeometryTest` afirma as duas coisas.
   - **O Codex tem sonda própria** (`LocalCodexActivityDataSource`, E10): o índice de sessões é só do

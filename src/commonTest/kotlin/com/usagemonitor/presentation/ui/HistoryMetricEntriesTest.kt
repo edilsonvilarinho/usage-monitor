@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaWindowStats
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
@@ -105,6 +106,61 @@ class HistoryMetricEntriesTest {
         )
 
         assertEquals("4.0× (3 days)", entries.valueOf("Today vs. daily median"))
+    }
+
+    /**
+     * Com janelas conhecidas, "Consumido no período" — a soma das subidas de
+     * todas as janelas sobre o total de uma, que dava 173% (issue #320) — dá
+     * lugar ao resumo das janelas.
+     */
+    @Test
+    fun `window summary replaces the cross-window consumed sum`() {
+        val series = seriesWithBaseline(todayDelta = 400L).copy(
+            windowStats = QuotaWindowStats(
+                windowCount = 4,
+                exhaustedCount = 1,
+                averagePeakPercent = 71.6,
+                averageConsumedPercent = 64.2
+            )
+        )
+
+        val entries = historyMetricEntries(ApiSource.ANTHROPIC, series, AppLanguage.PT, referenceAt = null)
+
+        assertNull(entries.valueOf("Consumido no período"))
+        assertEquals("4 · 1 esgotou", entries.valueOf("Janelas no intervalo"))
+        assertEquals("72 %", entries.valueOf("Pico médio por janela"))
+        assertEquals("64 %", entries.valueOf("Consumo médio por janela"))
+    }
+
+    @Test
+    fun `without a closed window the averages are absent, not zero`() {
+        val series = seriesWithBaseline(todayDelta = 400L).copy(
+            windowStats = QuotaWindowStats(
+                windowCount = 1,
+                exhaustedCount = 0,
+                averagePeakPercent = null,
+                averageConsumedPercent = null
+            )
+        )
+
+        val entries = historyMetricEntries(ApiSource.ANTHROPIC, series, AppLanguage.PT, referenceAt = null)
+
+        assertEquals("1", entries.valueOf("Janelas no intervalo"))
+        assertNull(entries.valueOf("Pico médio por janela"))
+        assertNull(entries.valueOf("Consumo médio por janela"))
+    }
+
+    @Test
+    fun `without windows the consumed line stays`() {
+        val entries = historyMetricEntries(
+            ApiSource.ANTHROPIC,
+            seriesWithBaseline(todayDelta = 400L),
+            AppLanguage.PT,
+            referenceAt = null
+        )
+
+        assertEquals("40 %", entries.valueOf("Consumido no período"))
+        assertNull(entries.valueOf("Janelas no intervalo"))
     }
 
     private fun List<HistoryMetricEntry>.valueOf(label: String): String? {
