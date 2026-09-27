@@ -54,12 +54,13 @@ recoleta.
 |---|---|---|---|
 | A0 | docs: plan for history 5h/7d view and HUD status pill (#320, #322) | revisão do diff | documento criado |
 | A1 | fix: wrap history forecast metric instead of clipping it (#320) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HistoryScreenTest"` | 9 testes, 0 falhas. Com `maxLines = 1` restaurado o teste novo falha: "previsão com 16 px contra 16 px de uma linha" |
+| A2 | refactor: move history chart drawing out of the chart composable (#320) | `gradlew.bat allTests` | 2254 testes, 0 falhas, 0 ignorados; `UsageHistoryLineChart.kt` 756 → 373 linhas, `UsageHistoryPlotDrawing.kt` 412; nenhum teste editado |
 
 ## Problemas em aberto e riscos
 
 | Risco | Estado |
 |---|---|
-| `UsageHistoryLineChart.kt` tem 756 linhas; sem A2 antes, A3 estoura o teto de 800 do `ArchitectureRulesTest` | aberto |
+| `UsageHistoryLineChart.kt` tem 756 linhas; sem A2 antes, A3 estoura o teto de 800 do `ArchitectureRulesTest` | fechado (A2) |
 | Codex passa de dois cards (5h, 7d) para um card com seletor — muda o que o usuário já via | aceito |
 | Pílula e anel maior engrossam o notch; `HUD_MAX_ALONG_FRACTION` (0,45) pode levar ao modo compacto mais cedo em tela pequena | aberto |
 | Contraste do texto da pílula sobre o fundo tingido nos dois temas | aberto |
