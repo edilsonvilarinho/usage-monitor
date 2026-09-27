@@ -277,8 +277,8 @@ object HelpCatalog {
                 "daquela conta: cada cota com a barra, quanto foi usado e quanto resta e a hora " +
                 "em que ela reinicia, o plano e de onde veio a leitura, e os mesmos botões do " +
                 "card. Clicar num anel atualiza aquela conta. Nas pontas do notch ficam a mão, " +
-                "que o move, e a engrenagem, que abre o que o rodapé oferece. O notch termina com " +
-                "quanto falta para a próxima coleta automática. Os dois modos são exclusivos: " +
+                "que o move, e a engrenagem, que abre o que o rodapé oferece — inclusive quanto " +
+                "falta para a próxima coleta automática. Os dois modos são exclusivos: " +
                 "ligar um desliga o outro.",
             steps = listOf(
                 "No rodapé da janela (modo Padrão), clique no ícone \"Modo de janela\" e escolha " +
@@ -538,8 +538,8 @@ object HelpCatalog {
                 "account's balloon: each quota with its bar, how much is used and left and when " +
                 "it resets, the plan and where the reading came from, and the card's own buttons. " +
                 "Clicking a ring refreshes that account. At the ends of the notch sit the hand, " +
-                "which moves it, and the gear, which opens what the footer offers. The notch ends " +
-                "with how long is left until the next automatic collection. The two modes are " +
+                "which moves it, and the gear, which opens what the footer offers — including how " +
+                "long is left until the next automatic collection. The two modes are " +
                 "mutually exclusive: turning one on turns the other off.",
             steps = listOf(
                 "In the window footer (Standard mode), click the \"Window mode\" icon and pick " +

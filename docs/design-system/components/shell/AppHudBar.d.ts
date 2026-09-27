@@ -45,7 +45,7 @@ export interface AppHudBarProps {
   /** Which balloon is open: an account index, `'gear'`, or none (resting). */
   balloon?: number | 'gear';
   fallbackLabel?: string;
-  /** `02:05` — next automatic collection, once, at the end of the strip, on one line with its icon. */
+  /** `02:05` — next automatic collection, only in the gear balloon header (#269), on one line with its icon. */
   countdown?: string;
   /** Current installed app version shown in the gear balloon header, e.g. `38.2.0`. */
   version?: string;

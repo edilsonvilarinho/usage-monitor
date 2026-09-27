@@ -208,7 +208,6 @@ internal fun HudWindowHost(
         accounts = accounts,
         edge = placement.edge,
         fallbackLabel = fallbackLabel,
-        showsCountdown = nextRefreshAt != null,
         hasUpdateIndicator = updateIndicator != null,
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
         maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
@@ -340,9 +339,6 @@ internal fun HudWindowHost(
                     expanded = expanded && !dragging,
                     dragging = dragging,
                     updateIndicator = updateIndicator,
-                    nextRefreshAt = nextRefreshAt,
-                    countdownDescription = nextRefreshLabel(language),
-                    refreshInterval = pollInterval,
                     notchCenter = centerInWindow,
                     language = language,
                     onHoverChange = { isHovered -> hovered = isHovered },

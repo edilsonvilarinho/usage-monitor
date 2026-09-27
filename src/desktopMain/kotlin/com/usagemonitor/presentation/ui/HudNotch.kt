@@ -73,11 +73,7 @@ import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.appSpring
 import com.usagemonitor.presentation.ui.theme.appTween
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlin.time.Duration
 
 /** Descrição do corpo do notch — é por ela que leitor de tela e testes o acham. */
 internal const val HUD_NOTCH_DESCRIPTION = "Barra HUD do Usage Monitor"
@@ -137,10 +133,6 @@ internal fun HudNotch(
     expanded: Boolean = false,
     dragging: Boolean = false,
     updateIndicator: HudUpdateIndicator? = null,
-    nextRefreshAt: Instant? = null,
-    countdownDescription: String? = null,
-    /** O intervalo de coleta do app: a volta inteira do relógio da contagem (#293). */
-    refreshInterval: Duration? = null,
     /** Centro do notch ao longo da borda, no contêiner; `null` centra. */
     notchCenter: Dp? = null,
     language: AppLanguage = AppLanguage.PT,
@@ -164,11 +156,7 @@ internal fun HudNotch(
     /** O clique na engrenagem quando não há [appBalloon]. */
     onGearClick: () -> Unit = {},
     gearDescription: String = "",
-    modifier: Modifier = Modifier,
-    nowProvider: () -> Instant = { Clock.System.now() },
-    waitNextTick: suspend () -> Unit = { delay(1_000L) },
-    /** O interruptor do `FooterBar`: sob o relógio dos testes o laço giraria para sempre. */
-    countdownUpdatesEnabled: Boolean = true
+    modifier: Modifier = Modifier
 ) {
     // O ponteiro "está no notch" enquanto estiver no corpo, no balão ou numa
     // alça: sair do anel para o balão atravessa a cauda, que é do balão, e
@@ -214,21 +202,6 @@ internal fun HudNotch(
     val shape = remember(edge) { HudNotchShape(edge) }
     val ladder = AppSurfaceLadders.current
 
-    val countdown: (@Composable () -> Unit)? = if (nextRefreshAt == null || countdownDescription == null) {
-        null
-    } else {
-        {
-            HudCountdown(
-                nextRefreshAt = nextRefreshAt,
-                description = countdownDescription,
-                interval = refreshInterval,
-                nowProvider = nowProvider,
-                waitNextTick = waitNextTick,
-                updatesEnabled = countdownUpdatesEnabled
-            )
-        }
-    }
-
     // Ao longo da borda o balão segue o anel pela mola `GENTLE`. A primeira
     // posição de cada abertura é salto, senão ele entraria deslizando a partir
     // do anel da abertura anterior.
@@ -264,7 +237,7 @@ internal fun HudNotch(
                         onDragMove = {},
                         onDragEnd = {},
                         // Clique num anel recoleta aquela conta; fora dos anéis
-                        // (contagem, margem) não faz nada. Abrir a janela padrão
+                        // (margem) não faz nada. Abrir a janela padrão
                         // ficou com a engrenagem, a bandeja e `Ctrl+Shift+H`.
                         onClick = { position ->
                             ringItemBounds.indexAt(position)
@@ -280,7 +253,6 @@ internal fun HudNotch(
                     edge = edge,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
-                    countdown = countdown,
                     size = sizes.collapsed,
                     compact = sizes.compact,
                     onRingHovered = { index -> balloonIndex = index },

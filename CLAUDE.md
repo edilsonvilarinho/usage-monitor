@@ -903,7 +903,7 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
 - **Alças nas pontas** (`HudHandles.kt`), o `MoveHandle` e o `SettingsOrb` do Codenotch: com o notch
   aberto, a **mão** (ponta de perto) move — **só ela**: arrastando pelo corpo o notch saía do lugar
   quando a intenção era clicar num anel — e a **engrenagem** (ponta
-  de longe) abre o balão com **tudo o que o rodapé oferece**: contagem, os três modos de janela em
+  de longe) abre o balão com **tudo o que o rodapé oferece**: contagem (o único lugar dela na HUD), os três modos de janela em
   linhas (o menu do rodapé é `Popup` e seria recortado pela janela) e o próprio `FooterActionGroup`.
   Paradas, as alças são um arco de um quarto na margem de sombra que a janela já tem — nenhuma área
   nova engolindo clique. Carregando, a mão **fica na composição**: tirá-la cancelaria o gesto.
@@ -997,9 +997,12 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
   `MouseInfo`, incremental. Saídas para a janela padrão: "Padrão" no balão da engrenagem, bandeja,
   `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
-- **Contagem até a próxima coleta uma vez só, no fim da faixa** (#185): o polling é do app inteiro. O
-  tique mora no composable e tem o interruptor `countdownUpdatesEnabled`, porque sob o relógio dos
-  testes o laço giraria para sempre; o balão da engrenagem a repete no título.
+- **Contagem até a próxima coleta só no balão da engrenagem** (#185, #269): ela ficava no fim da
+  faixa, e com a cadência adaptativa (60 s com sessão CLI ativa) virou um número que reiniciava a cada
+  minuto na borda da tela. A faixa passou a ser só das contas — `hudNotchSizes` não tem mais
+  `showsCountdown`, e o notch parado encolheu uma linha na lateral e a largura da contagem no topo. O
+  rodapé do modo padrão continua com ela. O tique mora no `HudCountdown` e tem o interruptor
+  `updatesEnabled`, porque sob o relógio dos testes o laço giraria para sempre.
   - **O ícone é um relógio que esvazia, e fica numa linha só com o tempo** (`HudCountdownClock` +
     `hudRefreshFraction`; #293). Na lateral, ícone e `05:42` ocupavam duas linhas. O relógio é um
     setor de 12dp: começa cheio logo depois da coleta, esvazia no sentido horário a partir das 12h

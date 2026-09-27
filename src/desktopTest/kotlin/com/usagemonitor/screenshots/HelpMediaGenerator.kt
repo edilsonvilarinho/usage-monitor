@@ -515,15 +515,7 @@ private fun recordWindowModes(outputDir: File) {
                                     CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
                                         RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
                                     }
-                                },
-                                // A contagem (#185) é parte do notch. O laço vai
-                                // desligado: o gravador dorme em tempo real e um
-                                // relógio andando mudaria cada passada.
-                                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
-                                countdownDescription = "Próxima atualização automática",
-                                refreshInterval = DashboardViewModelConfig().idlePollInterval,
-                                nowProvider = { ScreenshotFixtures.NOW },
-                                countdownUpdatesEnabled = false
+                                }
                             )
                         }
                     }
@@ -677,7 +669,6 @@ private val HUD_DEMO_SIZES = hudNotchSizes(
     accounts = ScreenshotFixtures.hudAccounts,
     edge = HudEdge.TOP,
     fallbackLabel = "Carregando",
-    showsCountdown = true,
     hasUpdateIndicator = false
 )
 

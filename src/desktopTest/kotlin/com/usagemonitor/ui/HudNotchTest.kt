@@ -75,6 +75,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -86,6 +87,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HUD_NOTCH_DESCRIPTION
 import com.usagemonitor.presentation.ui.HUD_COUNTDOWN_CLOCK_TAG
+import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_HINT_UPDATE_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
@@ -170,11 +172,6 @@ class HudNotchTest {
         list: List<HudAccount> = accounts,
         fallbackLabel: String = "Carregando",
         updateIndicator: HudUpdateIndicator? = null,
-        nextRefreshAt: Instant? = null,
-        refreshInterval: Duration? = 10.minutes,
-        nowProvider: () -> Instant = { now },
-        waitNextTick: suspend () -> Unit = {},
-        countdownUpdatesEnabled: Boolean = false,
         onHoverChange: (Boolean) -> Unit = {},
         onDragStart: () -> Unit = {},
         onDragMove: () -> Unit = {},
@@ -190,16 +187,10 @@ class HudNotchTest {
                 HudNotch(
                     accounts = list,
                     edge = edge,
-                    sizes = hudNotchSizes(list, edge, fallbackLabel, nextRefreshAt != null, updateIndicator != null),
+                    sizes = hudNotchSizes(list, edge, fallbackLabel, updateIndicator != null),
                     fallbackLabel = fallbackLabel,
                     expanded = expanded,
                     updateIndicator = updateIndicator,
-                    nextRefreshAt = nextRefreshAt,
-                    countdownDescription = countdown,
-                    refreshInterval = refreshInterval,
-                    nowProvider = nowProvider,
-                    waitNextTick = waitNextTick,
-                    countdownUpdatesEnabled = countdownUpdatesEnabled,
                     onHoverChange = onHoverChange,
                     onDragStart = onDragStart,
                     onDragMove = onDragMove,
@@ -315,7 +306,7 @@ class HudNotchTest {
     fun `o notch e o balao tem exatamente o tamanho que a geometria calcula`() {
         val screen = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(1920.dp, 1080.dp))
         for (edge in HudEdge.entries) {
-            val sizes = hudNotchSizes(accounts, edge, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
+            val sizes = hudNotchSizes(accounts, edge, "Carregando", hasUpdateIndicator = false)
             for ((index, ring) in listOf(INFORMATA_RING, DEEPSEEK_RING).withIndex()) {
                 runDesktopComposeUiTest {
                     val window = hudDockedWindowBounds(edge, 0.5f, sizes, screen)
@@ -328,10 +319,6 @@ class HudNotchTest {
                                     sizes = sizes,
                                     fallbackLabel = "Carregando",
                                     expanded = true,
-                                    nextRefreshAt = now + 2.minutes,
-                                    countdownDescription = countdown,
-                                    nowProvider = { now },
-                                    countdownUpdatesEnabled = false,
                                     notchCenter = window.notchCenterInWindow,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -400,14 +387,14 @@ class HudNotchTest {
     @Test
     fun `o clique num anel atualiza aquela conta`() = runDesktopComposeUiTest {
         val refreshed = mutableListOf<UsageTargetKey>()
-        setContent { notch(nextRefreshAt = now + 2.minutes, onRefreshAccount = { target -> refreshed += target }) }
+        setContent { notch(onRefreshAccount = { target -> refreshed += target }) }
 
         onNodeWithContentDescription(DEEPSEEK_RING).performClick()
         assertEquals(listOf(accounts[1].targetKey), refreshed)
         onNodeWithContentDescription(INFORMATA_RING).performClick()
         assertEquals(listOf(accounts[1].targetKey, accounts[0].targetKey), refreshed)
-        // Fora dos anéis — a contagem — o clique não atualiza nada.
-        onNodeWithText("02:00").performClick()
+        // Fora dos anéis — a margem antes do primeiro — o clique não atualiza nada.
+        onNodeWithTag(HUD_CONTENT_TEST_TAG).performMouseInput { click(Offset(14f, centerY)) }
         assertEquals(2, refreshed.size)
     }
 
@@ -533,7 +520,7 @@ class HudNotchTest {
     /** Compacta, a faixa é a célula do Codenotch: anel e percentual, a palavra vai para o balão. */
     @Test
     fun `compacta a palavra sai da faixa e continua no balao e no anel`() = runDesktopComposeUiTest {
-        val sizes = hudNotchSizes(manyAccounts, HudEdge.TOP, "Carregando", false, false, maxAlong = 400.dp)
+        val sizes = hudNotchSizes(manyAccounts, HudEdge.TOP, "Carregando", false, maxAlong = 400.dp)
         assertTrue(sizes.compact)
         setContent {
             AppTheme(isDark = true) {
@@ -555,15 +542,13 @@ class HudNotchTest {
     fun `compacta o notch tem o tamanho que a geometria calcula`() {
         for (edge in HudEdge.entries) {
             runDesktopComposeUiTest {
-                val sizes = hudNotchSizes(manyAccounts, edge, "Carregando", true, false, maxAlong = 300.dp)
+                val sizes = hudNotchSizes(manyAccounts, edge, "Carregando", false, maxAlong = 300.dp)
                 assertTrue(sizes.compact, "$edge")
                 setContent {
                     AppTheme(isDark = true) {
                         Box(modifier = Modifier.size(1400.dp, 1000.dp)) {
                             HudNotch(
-                                accounts = manyAccounts, edge = edge, sizes = sizes, fallbackLabel = "Carregando",
-                                nextRefreshAt = now + 2.minutes, countdownDescription = countdown,
-                                nowProvider = { now }, countdownUpdatesEnabled = false
+                                accounts = manyAccounts, edge = edge, sizes = sizes, fallbackLabel = "Carregando"
                             )
                         }
                     }
@@ -571,8 +556,6 @@ class HudNotchTest {
                 val bounds = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
                 assertEquals(sizes.collapsed.width, bounds.width, "$edge: largura")
                 assertEquals(sizes.collapsed.height, bounds.height, "$edge: altura")
-                // O último item, a contagem, inteiro — foi ele que a faixa espremeu antes.
-                onNodeWithText("02:00").assertIsDisplayed()
             }
         }
     }
@@ -673,7 +656,7 @@ class HudNotchTest {
                 HudNotch(
                     accounts = accounts,
                     edge = HudEdge.TOP,
-                    sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false, false),
+                    sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false),
                     fallbackLabel = "Carregando",
                     expanded = true,
                     appBalloon = { appBalloonFixture(onMode, onRefresh) },
@@ -820,34 +803,62 @@ class HudNotchTest {
         onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).assertDoesNotExist()
     }
 
-    // ------------------------------------------------------------ contagem (#185)
+    // ------------------------------------------------------------ contagem (#185, #269)
 
+    /**
+     * Com a cadência de 60 s (issue #269) a contagem reiniciava a cada minuto na
+     * borda da tela. Ela saiu da faixa: nem parado nem aberto o notch a mostra.
+     */
     @Test
-    fun `a contagem aparece uma vez so, parado e aberto`() = runDesktopComposeUiTest {
+    fun `a faixa do notch nao mostra a contagem`() = runDesktopComposeUiTest {
         var open by mutableStateOf(false)
-        setContent { notch(expanded = open, nextRefreshAt = now + 2.minutes + 5.seconds) }
+        setContent { notch(expanded = open) }
+
+        onAllNodesWithContentDescription(countdown).assertCountEquals(0)
+        onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).assertDoesNotExist()
+        open = true
+        waitForIdle()
+        onAllNodesWithContentDescription(countdown).assertCountEquals(0)
+        onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).assertDoesNotExist()
+    }
+
+    /** A contagem mora no cabeçalho do balão da engrenagem, com o relógio. */
+    @Test
+    fun `o balao da engrenagem mostra a contagem`() = runDesktopComposeUiTest {
+        setContent {
+            AppTheme(isDark = true) {
+                HudAppBalloonContent(
+                    language = AppLanguage.PT,
+                    appVersion = CURRENT_APP_VERSION,
+                    countdown = { countdownOf(now + 2.minutes + 5.seconds) },
+                    updateIndicator = null,
+                    onWindowModeChange = {},
+                    actions = {}
+                )
+            }
+        }
 
         onNodeWithText("02:05").assertIsDisplayed()
         onNodeWithContentDescription(countdown).assertIsDisplayed()
-        open = true
-        waitForIdle()
-        onAllNodesWithText("02:05").assertCountEquals(1)
+        onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).assertIsDisplayed()
     }
 
-    @Test
-    fun `sem proxima coleta a contagem nao existe`() = runDesktopComposeUiTest {
-        setContent { notch() }
-
-        onAllNodesWithText("02:05").assertCountEquals(0)
-        onAllNodesWithContentDescription(countdown).assertCountEquals(0)
-    }
-
-    @Test
-    fun `a linha de carregamento tambem mostra a contagem`() = runDesktopComposeUiTest {
-        setContent { notch(list = emptyList(), nextRefreshAt = now + 2.minutes + 5.seconds) }
-
-        onNodeWithText("Carregando").assertIsDisplayed()
-        onNodeWithText("02:05").assertIsDisplayed()
+    @Composable
+    private fun countdownOf(
+        nextRefreshAt: Instant,
+        interval: Duration? = 10.minutes,
+        nowProvider: () -> Instant = { now },
+        waitNextTick: suspend () -> Unit = {},
+        updatesEnabled: Boolean = false
+    ) {
+        HudCountdown(
+            nextRefreshAt = nextRefreshAt,
+            description = countdown,
+            interval = interval,
+            nowProvider = nowProvider,
+            waitNextTick = waitNextTick,
+            updatesEnabled = updatesEnabled
+        )
     }
 
     @Test
@@ -855,12 +866,14 @@ class HudNotchTest {
         val tickChannel = Channel<Unit>(capacity = Channel.UNLIMITED)
         var currentNow = now
         setContent {
-            notch(
-                nextRefreshAt = now + 3.seconds,
-                nowProvider = { currentNow },
-                waitNextTick = { tickChannel.receive() },
-                countdownUpdatesEnabled = true
-            )
+            AppTheme(isDark = true) {
+                countdownOf(
+                    nextRefreshAt = now + 3.seconds,
+                    nowProvider = { currentNow },
+                    waitNextTick = { tickChannel.receive() },
+                    updatesEnabled = true
+                )
+            }
         }
 
         onNodeWithText("00:03").assertIsDisplayed()
@@ -881,7 +894,7 @@ class HudNotchTest {
     @Test
     fun `com o intervalo a contagem usa o relogio`() = runDesktopComposeUiTest {
         var interval by mutableStateOf<Duration?>(10.minutes)
-        setContent { notch(nextRefreshAt = now + 2.minutes + 5.seconds, refreshInterval = interval) }
+        setContent { AppTheme(isDark = true) { countdownOf(now + 2.minutes + 5.seconds, interval = interval) } }
 
         onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).assertIsDisplayed()
         onNodeWithContentDescription(countdown).assertIsDisplayed()
@@ -901,7 +914,7 @@ class HudNotchTest {
         fun lowerLeft(next: Instant): Color {
             var pixel = Color.Unspecified
             runDesktopComposeUiTest {
-                setContent { notch(nextRefreshAt = next) }
+                setContent { AppTheme(isDark = true) { countdownOf(next) } }
                 val pixels = onNodeWithTag(HUD_COUNTDOWN_CLOCK_TAG).captureToImage().toPixelMap()
                 pixel = pixels[pixels.width / 2 - 2, pixels.height / 2 + 2]
             }
@@ -961,8 +974,8 @@ class HudNotchTest {
     fun `a atualizacao nao muda o tamanho do notch recolhido`() {
         HudEdge.entries.forEach { edge ->
             listOf(accounts, emptyList()).forEach { list ->
-                val without = hudNotchSizes(list, edge, "Carregando", true, hasUpdateIndicator = false)
-                val withUpdate = hudNotchSizes(list, edge, "Carregando", true, hasUpdateIndicator = true, hasUpdateAction = true)
+                val without = hudNotchSizes(list, edge, "Carregando", hasUpdateIndicator = false)
+                val withUpdate = hudNotchSizes(list, edge, "Carregando", hasUpdateIndicator = true, hasUpdateAction = true)
                 assertEquals(without.collapsed, withUpdate.collapsed, "$edge, ${list.size} contas")
             }
         }
