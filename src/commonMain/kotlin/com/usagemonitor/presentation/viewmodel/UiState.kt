@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
+import kotlinx.datetime.Instant
 
 /**
  * Representa todos os estados possíveis da UI do Dashboard.
@@ -55,7 +56,13 @@ data class UiApiError(
     val target: UsageTargetKey,
     val message: String,
     val rawMessage: String = message,
-    val targetLabel: String? = null
+    val targetLabel: String? = null,
+    /**
+     * Prazo do backoff armado por um 429 (issue #269). Enquanto ele vale a
+     * coleta não vai à rede, e o banner mostra a hora em vez de "Tentar
+     * novamente" — um botão que o backoff ignoraria.
+     */
+    val retryAt: Instant? = null
 ) {
     constructor(
         source: ApiSource,

@@ -90,8 +90,7 @@ private const val WORD_ADVANCE_DP = 6.7f
 /** Palavra mais longa que cabe numa linha da coluna vertical antes de quebrar. */
 private const val VERTICAL_WORD_LINE_CHARS = 8
 
-/** A contagem é medida sobre `00:00` fixo: medir o relógio mudaria a largura a cada segundo. */
-private const val COUNTDOWN_CHARS = 5
+/** O ícone da contagem, que mora no cabeçalho do balão da engrenagem (#269). */
 internal val HUD_COUNTDOWN_ICON = 12.dp
 
 /** Vão entre o ícone e o texto da contagem, o mesmo `spacedBy` do `HudCountdown`. */
@@ -158,7 +157,6 @@ internal fun hudNotchSizes(
     accounts: List<HudAccount>,
     edge: HudEdge,
     fallbackLabel: String,
-    showsCountdown: Boolean,
     hasUpdateIndicator: Boolean,
     /** O comprimento que a faixa completa pode ter antes de virar compacta. */
     maxAlong: Dp = Dp.Infinity,
@@ -166,16 +164,16 @@ internal fun hudNotchSizes(
     hasUpdateAction: Boolean = false
 ): HudNotchSizes {
     val full = if (edge.isHorizontal) {
-        horizontalCollapsed(accounts, fallbackLabel, showsCountdown, compact = false)
+        horizontalCollapsed(accounts, fallbackLabel, compact = false)
     } else {
-        verticalCollapsed(accounts, fallbackLabel, showsCountdown, compact = false)
+        verticalCollapsed(accounts, fallbackLabel, compact = false)
     }
     val fullAlong = if (edge.isHorizontal) full.width else full.height
     val compact = accounts.isNotEmpty() && fullAlong > maxAlong
     val collapsed = when {
         !compact -> full
-        edge.isHorizontal -> horizontalCollapsed(accounts, fallbackLabel, showsCountdown, compact = true)
-        else -> verticalCollapsed(accounts, fallbackLabel, showsCountdown, compact = true)
+        edge.isHorizontal -> horizontalCollapsed(accounts, fallbackLabel, compact = true)
+        else -> verticalCollapsed(accounts, fallbackLabel, compact = true)
     }
     val handlesReach = (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2
     val withHandles = if (edge.isHorizontal) {
@@ -331,7 +329,6 @@ internal fun hudQuotaRuns(quotas: List<HudQuota>): List<HudQuotaRun> {
 private fun horizontalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
-    showsCountdown: Boolean,
     compact: Boolean
 ): DpSize {
     val items = if (accounts.isEmpty()) {
@@ -347,12 +344,9 @@ private fun horizontalCollapsed(
             }
         }
     }
-    // A atualização pendente não ocupa a faixa (issue #291): ela é o ponto da
-    // engrenagem, que mora na margem das pontas.
-    val extras = buildList {
-        if (showsCountdown) add(countdownWidth())
-    }
-    val all = items + extras
+    // Só as contas: a contagem mora no balão da engrenagem (issue #269) e a
+    // atualização pendente é o ponto da engrenagem (issue #291).
+    val all = items
     val along = all.fold(0.dp) { sum, width -> sum + width } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
     // A espessura é a da conta mais alta: com duas janelas o texto passa do anel.
     val across = when {
@@ -369,7 +363,6 @@ private fun horizontalCollapsed(
 private fun verticalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
-    showsCountdown: Boolean,
     compact: Boolean
 ): DpSize {
     val words = when {
@@ -388,19 +381,13 @@ private fun verticalCollapsed(
             }
         }
     }
-    // A contagem é uma linha só, ícone e tempo lado a lado (#293): empilhados
-    // eles custavam duas linhas da coluna para uma informação do app inteiro.
-    val extras = buildList {
-        if (showsCountdown) add(HUD_WORD_LINE)
-    }
-    val all = itemHeights + extras
+    val all = itemHeights
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
     val widestWord = words.maxOfOrNull { word -> verticalWordLineWidth(word) } ?: 0.dp
     val widestPercent = accounts.maxOfOrNull { account ->
         if (compact) stripLineWidth(account.focusLine) else account.stripLines.maxOf { line -> stripLineWidth(line) }
     } ?: 0.dp
-    val countdownAcross = if (showsCountdown) countdownWidth() else 0.dp
-    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent, countdownAcross)
+    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
         height = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
@@ -425,8 +412,6 @@ internal fun stripLinesHeight(account: HudAccount): Dp =
     account.stripLines.fold(0.dp) { sum, line -> sum + stripLineHeight(line) }
 
 internal fun wordWidth(text: String): Dp = charWidth(text.length, WORD_ADVANCE_DP)
-
-internal fun countdownWidth(): Dp = HUD_COUNTDOWN_ICON + HUD_COUNTDOWN_GAP + charWidth(COUNTDOWN_CHARS, WORD_ADVANCE_DP)
 
 /**
  * Largura de [chars] caracteres mais a folga do arredondamento em pixel.

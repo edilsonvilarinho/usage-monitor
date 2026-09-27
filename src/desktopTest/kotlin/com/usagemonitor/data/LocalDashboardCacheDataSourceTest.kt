@@ -31,7 +31,7 @@ class LocalDashboardCacheDataSourceTest {
 
         dataSource.save(stats, kotlinx.datetime.Instant.parse("2026-05-07T15:00:00Z"))
 
-        assertEquals(stats, dataSource.load())
+        assertEquals(stats.map { it.copy(fetchedAt = kotlinx.datetime.Instant.parse("2026-05-07T15:00:00Z")) }, dataSource.load())
 
         Files.deleteIfExists(cacheFile.toPath())
         Files.deleteIfExists(tempDir)

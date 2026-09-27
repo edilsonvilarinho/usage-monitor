@@ -71,9 +71,7 @@ export function AppHudBar({
           </div>
         );
       })}
-      {countdown ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{refreshFraction !== undefined ? clockIcon(refreshFraction) : '↻'} {countdown}</span>
-      ) : null}
+      {/* A contagem não entra na faixa (#269): mora no cabeçalho do balão da engrenagem. */}
     </div>
   );
 

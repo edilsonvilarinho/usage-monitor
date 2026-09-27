@@ -129,6 +129,7 @@ internal fun HudWindowHost(
     val quotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
+    val pollInterval by viewModel.currentPollInterval.collectAsState()
     val dashboardState by viewModel.uiState.collectAsState()
     val refreshingTargets by viewModel.refreshingTargets.collectAsState()
     val exportScope = rememberCoroutineScope()
@@ -207,7 +208,6 @@ internal fun HudWindowHost(
         accounts = accounts,
         edge = placement.edge,
         fallbackLabel = fallbackLabel,
-        showsCountdown = nextRefreshAt != null,
         hasUpdateIndicator = updateIndicator != null,
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
         maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
@@ -339,9 +339,6 @@ internal fun HudWindowHost(
                     expanded = expanded && !dragging,
                     dragging = dragging,
                     updateIndicator = updateIndicator,
-                    nextRefreshAt = nextRefreshAt,
-                    countdownDescription = nextRefreshLabel(language),
-                    refreshInterval = viewModel.pollInterval,
                     notchCenter = centerInWindow,
                     language = language,
                     onHoverChange = { isHovered -> hovered = isHovered },
@@ -370,7 +367,7 @@ internal fun HudWindowHost(
                         HudWindowAppBalloon(
                             language = language,
                             nextRefreshAt = nextRefreshAt,
-                            refreshInterval = viewModel.pollInterval,
+                            refreshInterval = pollInterval,
                             updateIndicator = updateIndicator,
                             updateAction = updateAction,
                             actions = actions,

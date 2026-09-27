@@ -68,7 +68,7 @@ export function Hud() {
         <AppHudBar accounts={ACCOUNTS} edge="right" balloon={0} countdown="02:05" refreshFraction={0.21} />
       </Screen>
 
-      <Caption>3b · engrenagem — o que o rodapé oferece: versão instalada, contagem, modos, ações</Caption>
+      <Caption>3b · engrenagem — o que o rodapé oferece: versão instalada, contagem (só aqui, #269), modos, ações</Caption>
       <Screen tall>
         <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" version="38.2.0" refreshFraction={0.21} />
       </Screen>

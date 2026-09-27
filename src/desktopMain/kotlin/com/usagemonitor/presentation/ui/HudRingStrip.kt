@@ -77,7 +77,6 @@ internal fun HudRingStrip(
     edge: HudEdge,
     fallbackLabel: String,
     fallbackTone: AppTone,
-    countdown: (@Composable () -> Unit)?,
     size: DpSize,
     compact: Boolean,
     language: AppLanguage,
@@ -103,9 +102,10 @@ internal fun HudRingStrip(
                 )
             }
         }
-        // A contagem é do app, não de uma conta: uma vez, no fim. A atualização
-        // pendente não entra na faixa (issue #291) — é o ponto da engrenagem.
-        countdown?.invoke()
+        // A faixa é só das contas. A contagem até a próxima coleta mora no balão
+        // da engrenagem (issue #269): com a cadência de 60 s ela reiniciava a
+        // cada minuto na borda da tela. A atualização pendente também não entra
+        // (issue #291) — é o ponto da engrenagem.
     }
     if (edge.isHorizontal) {
         Row(

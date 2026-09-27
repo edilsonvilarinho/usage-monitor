@@ -541,7 +541,6 @@ private val HUD_SHOT_SIZES = hudNotchSizes(
     accounts = ScreenshotFixtures.hudAccounts,
     edge = HudEdge.TOP,
     fallbackLabel = "Carregando",
-    showsCountdown = true,
     hasUpdateIndicator = false
 )
 
@@ -569,12 +568,7 @@ private fun HudShot(expanded: Boolean, balloonIndex: Int) {
                     CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
                         RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
                     }
-                },
-                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
-                countdownDescription = "Próxima atualização automática",
-                refreshInterval = DashboardViewModelConfig().pollInterval,
-                nowProvider = { ScreenshotFixtures.NOW },
-                countdownUpdatesEnabled = false
+                }
             )
         }
     }

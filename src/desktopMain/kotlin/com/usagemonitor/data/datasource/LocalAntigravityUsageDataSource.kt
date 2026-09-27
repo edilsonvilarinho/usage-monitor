@@ -2,7 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -32,7 +32,11 @@ internal class LocalAntigravityUsageDataSource(
 
     private var verifiedVersionKey: String? = null
 
-    override suspend fun readUsageJson(): String = withContext(Dispatchers.IO) {
+    // `runInterruptible` e não `withContext`: o prazo da fonte cancela a coleta, e
+    // só a interrupção faz o `waitFor` bloqueante soltar a vaga do semáforo e
+    // matar a árvore do processo (issue #269). Com `withContext` a thread seguia
+    // presa até os 45 s do CLI.
+    override suspend fun readUsageJson(): String = runInterruptible(Dispatchers.IO) {
         val executable = executableResolver()
             ?: throw IllegalStateException(AntigravityUsageFailureKind.CLI_NOT_INSTALLED.safeMessage)
         if (!isDirectExecutable(executable)) {

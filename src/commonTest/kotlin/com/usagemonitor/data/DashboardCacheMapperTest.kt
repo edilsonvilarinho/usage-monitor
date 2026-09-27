@@ -50,7 +50,7 @@ class DashboardCacheMapperTest {
         ).toDomain()
 
         assertEquals(1, restored.size)
-        assertEquals(original, restored.first())
+        assertEquals(original.copy(fetchedAt = fixedInstant), restored.first())
     }
 
     @Test
@@ -89,7 +89,7 @@ class DashboardCacheMapperTest {
         ).toDomain()
 
         assertEquals(1, restored.size)
-        assertEquals(original, restored.first())
+        assertEquals(original.copy(fetchedAt = fixedInstant), restored.first())
     }
 
     @Test
@@ -112,7 +112,7 @@ class DashboardCacheMapperTest {
             entries = originals.map { stats -> stats.toCacheDto() }
         ).toDomain()
 
-        assertEquals(originals, restored)
+        assertEquals(originals.map { it.copy(fetchedAt = fixedInstant) }, restored)
     }
 
     @Test
@@ -176,7 +176,7 @@ class DashboardCacheMapperTest {
         assertEquals(listOf(23L, 11L), restored.first().quotas.map { it.used })
         assertEquals(listOf(PeriodType.INTERVAL, PeriodType.WEEKLY), restored.first().quotas.map { it.periodType })
         assertEquals(original.accountContext, restored.first().accountContext)
-        assertEquals(original, restored.first())
+        assertEquals(original.copy(fetchedAt = fixedInstant), restored.first())
     }
 
     @Test
@@ -201,7 +201,7 @@ class DashboardCacheMapperTest {
             entries = listOf(original.toCacheDto())
         ).toDomain()
 
-        assertEquals(original, restored.single())
+        assertEquals(original.copy(fetchedAt = fixedInstant), restored.single())
     }
 
     @Test
@@ -238,7 +238,7 @@ class DashboardCacheMapperTest {
             entries = listOf(original.toCacheDto())
         ).toDomain()
 
-        assertEquals(original, restored.first())
+        assertEquals(original.copy(fetchedAt = fixedInstant), restored.first())
     }
 
     @Test
@@ -269,7 +269,7 @@ class DashboardCacheMapperTest {
         ).toDomain()
 
         assertEquals(1, restored.size)
-        assertEquals(original, restored.first())
+        assertEquals(original.copy(fetchedAt = fixedInstant), restored.first())
         assertEquals("BRL", restored.first().quotas.first().currencyCode)
     }
 
@@ -323,5 +323,35 @@ class DashboardCacheMapperTest {
         )
 
         assertTrue(dto.toDomain().isEmpty())
+    }
+
+    @Test
+    fun `fetchedAt survives the round trip and older caches inherit savedAt`() {
+        val fetchedAt = fixedInstant - kotlin.time.Duration.parse("2h")
+        val original = ApiUsageStats(
+            source = ApiSource.MINIMAX,
+            apiName = "MiniMax",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "M2",
+                    used = 1L,
+                    total = 10L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.REQUESTS
+                )
+            ),
+            fetchedAt = fetchedAt
+        )
+        val entry = original.toCacheDto()
+
+        val restored = DashboardCacheDto(fixedInstant.toEpochMilliseconds(), listOf(entry)).toDomain().single()
+        val legacy = DashboardCacheDto(
+            fixedInstant.toEpochMilliseconds(),
+            listOf(entry.copy(fetchedAtEpochMillis = null))
+        ).toDomain().single()
+
+        assertEquals(fetchedAt, restored.fetchedAt)
+        assertEquals(fixedInstant, legacy.fetchedAt)
     }
 }

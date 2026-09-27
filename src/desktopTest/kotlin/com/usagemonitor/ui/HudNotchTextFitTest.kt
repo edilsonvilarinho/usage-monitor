@@ -29,13 +29,9 @@ import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
-import com.usagemonitor.countdownWidth
-import com.usagemonitor.HUD_COUNTDOWN_GAP
-import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.percentWidth
 import com.usagemonitor.presentation.ui.HudStripLine
 import com.usagemonitor.stripLineWidth
-import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -67,7 +63,6 @@ class HudNotchTextFitTest {
         HudStripLine("7d", "100%"), HudStripLine("5h", "100%"), HudStripLine("30d", "100%"),
         HudStripLine("Créditos", "100%"), HudStripLine("5h", "<1%")
     )
-    private val countdowns = listOf(formatRefreshCountdown(59 * 60 + 59), formatRefreshCountdown(10 * 60))
 
     @Test
     fun `a estimativa da geometria cobre o texto desenhado em qualquer escala`() = runDesktopComposeUiTest {
@@ -94,12 +89,6 @@ class HudNotchTextFitTest {
                     stripLines.forEach { line ->
                         val real = drawn(line.text, small)
                         if (real > stripLineWidth(line)) failures += "$scale%: linha \"${line.text}\" desenhada $real > estimada ${stripLineWidth(line)}"
-                    }
-                    countdowns.forEach { text ->
-                        // Ícone + vão de 4dp + texto: o mesmo `Row` do `HudCountdown`.
-                        val textBudget = countdownWidth() - HUD_COUNTDOWN_ICON - HUD_COUNTDOWN_GAP
-                        val real = drawn(text, small)
-                        if (real > textBudget) failures += "$scale%: contagem \"$text\" desenhada $real > estimada $textBudget"
                     }
                 }
         }

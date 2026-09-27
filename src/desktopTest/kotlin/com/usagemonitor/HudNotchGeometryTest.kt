@@ -59,7 +59,7 @@ class HudNotchGeometryTest {
     fun `aberto o balao fica do lado de dentro da tela e o notch nao cresce`() {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
-            val sizes = hudNotchSizes(accounts, edge, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
+            val sizes = hudNotchSizes(accounts, edge, "Carregando", hasUpdateIndicator = false)
             if (edge.isHorizontal) {
                 assertEquals(sizes.collapsed.height + HUD_BALLOON_GAP + sizes.balloon.height, sizes.expanded.height, "$edge: altura")
                 assertTrue(sizes.expanded.width >= sizes.balloon.width, "$edge: largura")
@@ -75,7 +75,7 @@ class HudNotchGeometryTest {
     fun `o balao reservado e o da conta mais alta`() {
         val short = account("A", "Normal", listOf("5h" to "9%"))
         val tall = account("B", "Normal", listOf("5h" to "9%", "7d" to "1%", "30d" to "2%"))
-        val sizes = hudNotchSizes(listOf(short, tall), HudEdge.RIGHT, "", true, false)
+        val sizes = hudNotchSizes(listOf(short, tall), HudEdge.RIGHT, "", false)
 
         assertEquals(hudBalloonHeight(tall), sizes.balloon.height)
         assertTrue(hudBalloonHeight(tall) > hudBalloonHeight(short))
@@ -90,7 +90,7 @@ class HudNotchGeometryTest {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
             for (fraction in listOf(0f, 0.02f, 0.5f, 0.98f, 1f)) {
-                val sizes = hudNotchSizes(accounts, edge, "", true, false)
+                val sizes = hudNotchSizes(accounts, edge, "", false)
                 val docked = hudDockedWindowBounds(edge, fraction, sizes, screen)
                 val along = if (edge.isHorizontal) docked.size.width else docked.size.height
                 val handlesHalf = (if (edge.isHorizontal) sizes.withHandles.width else sizes.withHandles.height) / 2
@@ -111,7 +111,7 @@ class HudNotchGeometryTest {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
             for (fraction in listOf(0f, 0.02f, 0.5f, 0.82f, 1f)) {
-                val sizes = hudNotchSizes(accounts, edge, "", true, false)
+                val sizes = hudNotchSizes(accounts, edge, "", false)
                 val window = hudDockedWindowBounds(edge, fraction, sizes, screen)
                 val region = hudRestHitRegion(edge, window, sizes)
                 val label = "$edge em $fraction"
@@ -161,7 +161,7 @@ class HudNotchGeometryTest {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
             for (fraction in listOf(0f, 0.02f, 0.5f, 0.82f, 1f)) {
-                val sizes = hudNotchSizes(accounts, edge, "", true, false)
+                val sizes = hudNotchSizes(accounts, edge, "", false)
                 val drag = hudDragWindowBounds(edge, fraction, sizes, screen)
                 val atDrag = notchOrigin(edge, drag, sizes)
                 assertEquals(notchOrigin(edge, hudDockedWindowBounds(edge, fraction, sizes, screen), sizes), atDrag, "$edge em $fraction: encaixada")
@@ -181,7 +181,7 @@ class HudNotchGeometryTest {
     fun `o notch encosta na barra de tarefas e nao passa por baixo dela`() {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         val taskbarBottom = ScreenWorkArea(0.dp, 0.dp, DpSize(1920.dp, 1032.dp))
-        val bottomSizes = hudNotchSizes(accounts, HudEdge.BOTTOM, "", true, false)
+        val bottomSizes = hudNotchSizes(accounts, HudEdge.BOTTOM, "", false)
         for (bounds in listOf(
             hudDockedWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom),
             hudDragWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom)
@@ -190,9 +190,9 @@ class HudNotchGeometryTest {
         }
 
         val taskbarTopLeft = ScreenWorkArea(48.dp, 40.dp, DpSize(1872.dp, 1040.dp))
-        val top = hudDockedWindowBounds(HudEdge.TOP, 0.5f, hudNotchSizes(accounts, HudEdge.TOP, "", true, false), taskbarTopLeft)
+        val top = hudDockedWindowBounds(HudEdge.TOP, 0.5f, hudNotchSizes(accounts, HudEdge.TOP, "", false), taskbarTopLeft)
         assertEquals(40.dp, top.y)
-        val left = hudDockedWindowBounds(HudEdge.LEFT, 0.5f, hudNotchSizes(accounts, HudEdge.LEFT, "", true, false), taskbarTopLeft)
+        val left = hudDockedWindowBounds(HudEdge.LEFT, 0.5f, hudNotchSizes(accounts, HudEdge.LEFT, "", false), taskbarTopLeft)
         assertEquals(48.dp, left.x)
     }
 
@@ -224,8 +224,8 @@ class HudNotchGeometryTest {
         val withEmoji = plain.copy(accountEmoji = com.usagemonitor.presentation.ui.theme.AccountEmoji.FOX)
         for (edge in HudEdge.entries) {
             assertEquals(
-                hudNotchSizes(listOf(plain), edge, "", true, false),
-                hudNotchSizes(listOf(withEmoji), edge, "", true, false),
+                hudNotchSizes(listOf(plain), edge, "", false),
+                hudNotchSizes(listOf(withEmoji), edge, "", false),
                 "$edge"
             )
         }
@@ -255,31 +255,24 @@ class HudNotchGeometryTest {
      */
     @Test
     fun `mudar o percentual dentro da mesma palavra nao muda o notch`() {
-        val low = hudNotchSizes(listOf(account("Padrão", "Normal", listOf("5h" to "9%"))), HudEdge.TOP, "", true, false)
-        val high = hudNotchSizes(listOf(account("Padrão", "Normal", listOf("5h" to "88%"))), HudEdge.TOP, "", true, false)
+        val low = hudNotchSizes(listOf(account("Padrão", "Normal", listOf("5h" to "9%"))), HudEdge.TOP, "", false)
+        val high = hudNotchSizes(listOf(account("Padrão", "Normal", listOf("5h" to "88%"))), HudEdge.TOP, "", false)
         assertEquals(low.collapsed, high.collapsed)
     }
 
-    @Test
-    fun `a contagem e a atualizacao ocupam espaco so quando existem`() {
-        val accounts = listOf(account("Padrão", "Normal", listOf("5h" to "9%")))
-        val bare = hudNotchSizes(accounts, HudEdge.TOP, "", showsCountdown = false, hasUpdateIndicator = false)
-        val full = hudNotchSizes(accounts, HudEdge.TOP, "", showsCountdown = true, hasUpdateIndicator = true)
-        assertTrue(full.collapsed.width > bare.collapsed.width)
-        assertEquals(bare.collapsed.height, full.collapsed.height)
-    }
-
     /**
-     * Na coluna vertical a contagem é uma linha só, ícone e tempo lado a lado
-     * (#293): empilhados eles custavam uma linha a mais para o mesmo `05:42`.
+     * A faixa é só das contas (issue #269): a contagem mora no balão da
+     * engrenagem, e a atualização pendente é o ponto da engrenagem (#291). O
+     * notch parado tem o mesmo tamanho com e sem ela, nas quatro bordas.
      */
     @Test
-    fun `na lateral a contagem ocupa uma linha so`() {
+    fun `a faixa parada mede so as contas`() {
         val accounts = listOf(account("Padrão", "Sem projeção", listOf("5h" to "9%", "7d" to "18%")))
-        val bare = hudNotchSizes(accounts, HudEdge.RIGHT, "", showsCountdown = false, hasUpdateIndicator = false)
-        val timed = hudNotchSizes(accounts, HudEdge.RIGHT, "", showsCountdown = true, hasUpdateIndicator = false)
-        assertEquals(HUD_WORD_LINE + HUD_ITEM_GAP, timed.collapsed.height - bare.collapsed.height)
-        assertTrue(timed.collapsed.width >= countdownWidth() + HUD_NOTCH_PADDING_ACROSS * 2)
+        for (edge in HudEdge.entries) {
+            val bare = hudNotchSizes(accounts, edge, "", hasUpdateIndicator = false)
+            val withUpdate = hudNotchSizes(accounts, edge, "", hasUpdateIndicator = true)
+            assertEquals(bare.collapsed, withUpdate.collapsed, "$edge")
+        }
     }
 
     @Test
@@ -297,7 +290,7 @@ class HudNotchGeometryTest {
 
     @Test
     fun `sem contas sobra a linha de carregamento`() {
-        val sizes = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = false)
+        val sizes = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", hasUpdateIndicator = false)
         assertTrue(sizes.collapsed.width > HUD_RING_SIZE)
         // Sem conta sobram as alças e o balão da engrenagem: é a saída do modo.
         assertEquals(hudAppBalloonHeight(hasUpdateIndicator = false), sizes.balloon.height)
@@ -309,9 +302,9 @@ class HudNotchGeometryTest {
     /** A ação da atualização é uma linha a mais no balão da engrenagem, e a janela aberta a reserva. */
     @Test
     fun `a acao da atualizacao cresce o balao da engrenagem`() {
-        val indicatorOnly = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = true)
+        val indicatorOnly = hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", hasUpdateIndicator = true)
         val withAction = hudNotchSizes(
-            emptyList(), HudEdge.TOP, "Carregando", showsCountdown = true, hasUpdateIndicator = true, hasUpdateAction = true
+            emptyList(), HudEdge.TOP, "Carregando", hasUpdateIndicator = true, hasUpdateAction = true
         )
         assertEquals(hudAppBalloonHeight(hasUpdateIndicator = true, hasUpdateAction = true), withAction.balloon.height)
         assertTrue(withAction.balloon.height > indicatorOnly.balloon.height)
@@ -324,8 +317,8 @@ class HudNotchGeometryTest {
     fun `a palavra longa quebra em duas linhas so na coluna vertical`() {
         assertEquals(2, verticalWordLines("Sem projeção"))
         assertEquals(1, verticalWordLines("Crítico"))
-        val single = hudNotchSizes(listOf(account("A", "Normal", listOf("5h" to "9%"))), HudEdge.LEFT, "", false, false)
-        val double = hudNotchSizes(listOf(account("A", "Sem projeção", listOf("5h" to "9%"))), HudEdge.LEFT, "", false, false)
+        val single = hudNotchSizes(listOf(account("A", "Normal", listOf("5h" to "9%"))), HudEdge.LEFT, "", false)
+        val double = hudNotchSizes(listOf(account("A", "Sem projeção", listOf("5h" to "9%"))), HudEdge.LEFT, "", false)
         assertEquals(HUD_WORD_LINE, double.collapsed.height - single.collapsed.height)
     }
 
@@ -340,8 +333,8 @@ class HudNotchGeometryTest {
         val few = many.take(2)
         for (edge in HudEdge.entries) {
             val budget = if (edge.isHorizontal) 1366.dp * HUD_MAX_ALONG_FRACTION else 768.dp * HUD_MAX_ALONG_FRACTION
-            val unbounded = hudNotchSizes(many, edge, "", showsCountdown = true, hasUpdateIndicator = false)
-            val bounded = hudNotchSizes(many, edge, "", showsCountdown = true, hasUpdateIndicator = false, maxAlong = budget)
+            val unbounded = hudNotchSizes(many, edge, "", hasUpdateIndicator = false)
+            val bounded = hudNotchSizes(many, edge, "", hasUpdateIndicator = false, maxAlong = budget)
             val along = { size: DpSize -> if (edge.isHorizontal) size.width else size.height }
 
             assertTrue(!unbounded.compact && bounded.compact, "$edge: sete contas deviam compactar")
@@ -349,13 +342,13 @@ class HudNotchGeometryTest {
             // em pé sai só a linha da palavra embaixo, e o ganho é menor.
             val ratio = if (edge.isHorizontal) 0.6f else 0.8f
             assertTrue(along(bounded.collapsed) < along(unbounded.collapsed) * ratio, "$edge: compacta devia encolher")
-            assertTrue(!hudNotchSizes(few, edge, "", true, false, maxAlong = budget).compact, "$edge: duas contas cabem completas")
+            assertTrue(!hudNotchSizes(few, edge, "", false, maxAlong = budget).compact, "$edge: duas contas cabem completas")
         }
     }
 
     @Test
     fun `sem contas a linha de carregamento nunca compacta`() {
-        assertTrue(!hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", true, false, maxAlong = 10.dp).compact)
+        assertTrue(!hudNotchSizes(emptyList(), HudEdge.TOP, "Carregando", false, maxAlong = 10.dp).compact)
     }
 
     @Test
@@ -376,7 +369,7 @@ class HudNotchGeometryTest {
     fun `cada janela a mais engrossa o notch de cima em uma linha`() {
         val quotas = listOf("5h" to "88%", "7d" to "9%", "30d" to "40%")
         val thickness = (1..3).map { count ->
-            val sizes = hudNotchSizes(listOf(account("Padrão", "Ok", quotas.take(count))), HudEdge.TOP, "Carregando", false, false)
+            val sizes = hudNotchSizes(listOf(account("Padrão", "Ok", quotas.take(count))), HudEdge.TOP, "Carregando", false)
             sizes.collapsed.height - HUD_NOTCH_PADDING_ACROSS * 2
         }
 
@@ -385,8 +378,8 @@ class HudNotchGeometryTest {
 
     @Test
     fun `na borda lateral as linhas somam na altura e a mais larga decide a coluna`() {
-        val one = hudNotchSizes(listOf(account("Padrão", "Ok", listOf("5h" to "88%"))), HudEdge.RIGHT, "Carregando", false, false)
-        val two = hudNotchSizes(listOf(account("Padrão", "Ok", listOf("5h" to "88%", "7d" to "100%"))), HudEdge.RIGHT, "Carregando", false, false)
+        val one = hudNotchSizes(listOf(account("Padrão", "Ok", listOf("5h" to "88%"))), HudEdge.RIGHT, "Carregando", false)
+        val two = hudNotchSizes(listOf(account("Padrão", "Ok", listOf("5h" to "88%", "7d" to "100%"))), HudEdge.RIGHT, "Carregando", false)
 
         assertEquals(HUD_STRIP_LINE * 2 - HUD_PERCENT_LINE, two.collapsed.height - one.collapsed.height)
         assertEquals(maxOf(HUD_RING_SIZE, wordWidth("7d 100%")), two.collapsed.width - HUD_NOTCH_PADDING_ACROSS * 2)
@@ -396,7 +389,7 @@ class HudNotchGeometryTest {
     @Test
     fun `compacta a celula mede so a linha em foco`() {
         val accounts = (1..7).map { index -> account("Conta $index", "Ok", listOf("5h" to "88%", "7d" to "9%")) }
-        val sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false, false, maxAlong = 300.dp)
+        val sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false, maxAlong = 300.dp)
 
         assertTrue(sizes.compact)
         assertEquals(HUD_RING_SIZE + HUD_STRIP_LINE, sizes.collapsed.height - HUD_NOTCH_PADDING_ACROSS * 2)

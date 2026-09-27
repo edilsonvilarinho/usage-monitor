@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -33,6 +34,9 @@ private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L  // renova se expira em men
 // com qualquer refresh token, e era por isso que a renovação nunca funcionava.
 // O client id é público — vem embutido no binário distribuído do CLI.
 private const val OAUTH_REFRESH_URL = "https://platform.claude.com/v1/oauth/token"
+
+/** Prazo da renovação do token, maior que os 15 s do GET de uso (issue #269). */
+private const val OAUTH_REFRESH_TIMEOUT_MILLIS = 25_000L
 private const val CLAUDE_CODE_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 private val DEFAULT_OAUTH_SCOPES = listOf(
     "user:profile",
@@ -174,6 +178,12 @@ internal class LocalCredentialDataSource(
         // que ela não concedeu.
         val scopes = creds.claudeAiOauth.scopes.ifEmpty { DEFAULT_OAUTH_SCOPES }
         val httpResponse = httpClient.post(OAUTH_REFRESH_URL) {
+            // A renovação tem prazo próprio, maior que o do GET de uso (issue #269):
+            // é o que o ai-usagebar usa, e o endpoint de token é o mais lento dos dois.
+            timeout {
+                requestTimeoutMillis = OAUTH_REFRESH_TIMEOUT_MILLIS
+                socketTimeoutMillis = OAUTH_REFRESH_TIMEOUT_MILLIS
+            }
             contentType(ContentType.Application.Json)
             setBody(
                 TokenRefreshRequest(
@@ -190,6 +200,10 @@ internal class LocalCredentialDataSource(
         // cliente não liga `expectSuccess` — e a falha chegava à tela como
         // "sem access_token", sem status nem motivo.
         if (!httpResponse.status.isSuccess()) {
+            // Um 429 do endpoint de token também arma o backoff (issue #269, lição
+            // do ai-usagebar): sem isso o poll seguinte renovaria de novo e
+            // prolongaria o próprio bloqueio.
+            throwIfRateLimited(httpResponse, "Token refresh")
             val body = httpResponse.bodyAsText()
             throw IllegalStateException(
                 "Token refresh falhou (HTTP ${httpResponse.status.value}): $body"

@@ -32,6 +32,32 @@ class DashboardScreenWarningsTest {
     }
 
     /**
+     * Com o backoff armado o banner diz a hora e não oferece "Tentar novamente":
+     * o clique não iria à rede (issue #269). Sem prazo o 429 continua com o botão.
+     */
+    @Test
+    fun `rate limit with an armed backoff shows the retry time instead of a button`() {
+        val target = UsageTargetKey.forSource(ApiSource.ANTHROPIC)
+        val retryAt = kotlinx.datetime.Instant.parse("2026-09-27T17:32:00Z")
+        val armed = warningFor(
+            error = UiApiError(target = target, message = "Anthropic HTTP 429: {}", retryAt = retryAt),
+            language = AppLanguage.PT
+        )
+        val unarmed = warningFor(
+            error = UiApiError(target = target, message = "Anthropic HTTP 429: {}"),
+            language = AppLanguage.PT
+        )
+
+        assertNotNull(armed)
+        assertNull(armed.actionLabel)
+        assertNull(warningActionFor(armed) { })
+        assertTrue(armed.description.contains("14:32 BRT"), armed.description)
+        assertNotNull(unarmed)
+        assertEquals("Tentar novamente", unarmed.actionLabel)
+        assertNotNull(warningActionFor(unarmed) { })
+    }
+
+    /**
      * Instalar, atualizar, autenticar ou reiniciar: nenhum dos casos se resolve
      * tentando de novo, então nenhum oferece o botão, e todos contam como
      * configuração — sem toast a cada coleta de 10 minutos.

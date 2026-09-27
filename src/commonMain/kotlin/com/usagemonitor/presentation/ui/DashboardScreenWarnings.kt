@@ -45,6 +45,11 @@ internal fun warningActionFor(
     if (warning.forcesUniversalRetry) {
         return { onRetryTarget(warning.target) }
     }
+    // Sem rótulo não há botão: é o 429 com backoff armado, em que tentar de novo
+    // seria ignorado (issue #269).
+    if (warning.actionLabel == null) {
+        return null
+    }
     return when (warning.source) {
         ApiSource.ANTHROPIC -> {
             { onRetryTarget(warning.target) }
@@ -117,6 +122,28 @@ internal fun warningFor(
                 target = error.target,
                 title = "Proxy requires authentication",
                 description = "The configured proxy rejected the sent credential (HTTP 407). Review the username and password under Settings > Network and restart Usage Monitor.",
+                actionLabel = null
+            )
+        }
+    }
+
+    val retryAt = error.retryAt
+    if (error.isRateLimitIssue && retryAt != null) {
+        // Com o backoff armado o banner diz a hora da próxima tentativa em vez de
+        // oferecer um "Tentar novamente" que não iria à rede (issue #269).
+        val clock = formatRetryClock(retryAt)
+        return if (language == AppLanguage.PT) {
+            DashboardWarning(
+                target = error.target,
+                title = "$label temporariamente limitado",
+                description = "A API respondeu HTTP 429. O app não consulta esta conta até $clock BRT, porque cada tentativa durante o limite só o prolonga. Os números da última leitura continuam no card.",
+                actionLabel = null
+            )
+        } else {
+            DashboardWarning(
+                target = error.target,
+                title = "$label is temporarily limited",
+                description = "The API returned HTTP 429. The app will not query this account until $clock BRT, because every attempt during the limit only extends it. The last reading stays on the card.",
                 actionLabel = null
             )
         }

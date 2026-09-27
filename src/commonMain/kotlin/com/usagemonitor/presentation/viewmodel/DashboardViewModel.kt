@@ -9,9 +9,10 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.isReadingFreshEnough
+import com.usagemonitor.domain.entity.looksLikeWakeFromSleep
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.BreadcrumbCategory
-import com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.repository.AppUpdateInstaller
@@ -39,6 +40,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -124,11 +126,19 @@ class DashboardViewModel(
     private val alertTimeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID),
     private val clock: Clock = Clock.System,
     private val isAppVisible: StateFlow<Boolean> = MutableStateFlow(true),
+    /**
+     * Há sessão CLI rodando (issue #269): a cadência cai de 5 min para 60 s. Global,
+     * como no Codenotch.
+     */
+    private val isBusy: StateFlow<Boolean> = MutableStateFlow(false),
     private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
         MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
     private val config: DashboardViewModelConfig = DashboardViewModelConfig(),
     private val persistedNextRefreshAt: Instant? = null,
     private val onNextRefreshAtChanged: (Instant) -> Unit = {},
+    /** Prazos de backoff gravados antes do último encerramento (issue #269). */
+    persistedRateLimitBackoffs: Map<UsageTargetKey, Instant> = emptyMap(),
+    onRateLimitBackoffChanged: (Map<UsageTargetKey, Instant>) -> Unit = {},
     /**
      * Trilha de eventos do relatório de bug.
      *
@@ -139,8 +149,8 @@ class DashboardViewModel(
      */
     private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
 ) {
-    private val initialScheduledRefreshAt: Instant =
-        persistedNextRefreshAt?.takeIf { it > clock.now() } ?: (clock.now() + config.pollInterval)
+    private val pendingPersistedRefreshAt: Instant? = persistedNextRefreshAt?.takeIf { it > clock.now() }
+    private val initialScheduledRefreshAt: Instant = pendingPersistedRefreshAt ?: (clock.now() + config.idlePollInterval)
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -148,9 +158,13 @@ class DashboardViewModel(
     private val _nextRefreshAt = MutableStateFlow(initialScheduledRefreshAt)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
-    /** O intervalo do polling: é a volta inteira do relógio da contagem na HUD (#293). */
-    val pollInterval: Duration
-        get() = config.pollInterval
+    private val _currentPollInterval = MutableStateFlow(pollIntervalFor(isBusy.value))
+
+    /**
+     * A cadência em vigor, 60 s ou 5 min (issue #269): é a volta inteira do
+     * relógio da contagem no balão da engrenagem (#293).
+     */
+    val currentPollInterval: StateFlow<Duration> = _currentPollInterval.asStateFlow()
 
     private val _refreshingTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
     val refreshingTargets: StateFlow<Set<UsageTargetKey>> = _refreshingTargets.asStateFlow()
@@ -190,8 +204,7 @@ class DashboardViewModel(
     )
     val appUpdateState: StateFlow<AppUpdateUiState?> = updates.state
     private val stateMutex = Mutex()
-    private val fetchMutex = Mutex()
-    private val pendingFetchMutex = Mutex()
+    private val historyMutex = Mutex()
     private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
     private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
     private val cachedRiskByTarget = mutableMapOf<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>()
@@ -199,13 +212,26 @@ class DashboardViewModel(
     private val sourceFetchSemaphore = Semaphore(config.maxConcurrentSourceFetches.coerceAtLeast(1))
     private val pollWakeUpSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private val initialFetchCancelled = AtomicBoolean(false)
-    @Volatile private var scheduledRefreshAt: Instant = initialScheduledRefreshAt
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
-    private var pendingFetchRequest: PendingFetchRequest? = null
+    private val scheduler = DashboardRefreshScheduler(
+        initialBackoffs = persistedRateLimitBackoffs,
+        onBackoffChanged = onRateLimitBackoffChanged,
+        // Reabrir o app dentro do prazo gravado não coleta de novo; sem prazo, o
+        // arranque conta como a tentativa — é a coleta inicial que a faz.
+        initialAttemptAnchor = pendingPersistedRefreshAt?.minus(config.idlePollInterval) ?: clock.now()
+    )
+    private val failures = DashboardFailureHandler(
+        breadcrumbs = breadcrumbs,
+        scheduler = scheduler,
+        clock = clock,
+        profiles = { anthropicProfiles.value },
+        onToast = { toast -> _toastMessage.value = toast }
+    )
+    private val fetchQueue = DashboardFetchQueue(allTargets = ::enabledTargets, perform = ::performFetch)
 
     init {
-        val isPersistedRefreshStillPending = persistedNextRefreshAt != null && persistedNextRefreshAt > clock.now()
+        val isPersistedRefreshStillPending = pendingPersistedRefreshAt != null
         // Reidrata a UI com o último snapshot salvo em vez de deixar a tela
         // presa em Loading. Vale mesmo quando o ciclo já venceu e a coleta vai
         // sair logo em seguida: ela ainda depende da rede, e o app ficou o
@@ -253,6 +279,7 @@ class DashboardViewModel(
                 val enabled = enabledTargets()
                 cachedStats.forEach { stats ->
                     if (isPersistableDashboardStats(stats) &&
+                        isReadingFreshEnough(stats.fetchedAt, clock.now()) &&
                         stats.targetKey in enabled &&
                         stats.targetKey !in cachedStatsByTarget
                     ) {
@@ -298,44 +325,68 @@ class DashboardViewModel(
     }
 
     /**
-     * Laço único de despertar, com dois gatilhos.
+     * Laço único de despertar, por alvo (issue #269).
      *
-     * O ciclo de dez minutos continua sendo o normal, mas ele sozinho deixava o
-     * card repetindo a janela anterior por até um poll inteiro depois do reset —
-     * o app só descobria o vencimento quando a API era chamada de novo. Agora o
-     * alvo da espera é o que vier primeiro: o poll agendado ou o próximo
-     * `periodEndAt` conhecido.
+     * A cada volta coleta só os alvos devidos (`DashboardRefreshScheduler.dueTargets`):
+     * 60 s com sessão CLI rodando, 5 min sem, já no reset vencido, e nunca em
+     * backoff. Dorme até o que vier primeiro — a próxima cadência, o próximo
+     * reset conhecido ou um sinal (coleta nova, sessão começando, janela voltando).
+     *
+     * A janela minimizada segura só a cadência. O reset coleta mesmo escondida:
+     * esperar a visibilidade deixaria o card congelado na janela que já venceu.
      */
     private fun startCountdown() {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
+            launch {
+                isBusy.collect { busy ->
+                    _currentPollInterval.value = pollIntervalFor(busy)
+                    nudgeCountdown()
+                }
+            }
+            launch { isAppVisible.collect { visible -> if (visible) nudgeCountdown() } }
             while (true) {
-                val pollTarget = scheduledRefreshAt
-                val resetTarget = nextQuotaResetTarget()
-                val wakeUpAt = if (resetTarget != null && resetTarget < pollTarget) resetTarget else pollTarget
-                val wokeUpForReset = wakeUpAt < pollTarget
-                // O rodapé continua contando para o poll: o despertar por reset é
-                // uma antecipação, não um novo prazo a anunciar.
-                _nextRefreshAt.value = pollTarget
-                val waitMillis = (wakeUpAt - clock.now()).inWholeMilliseconds.coerceAtLeast(0L)
-                val rescheduled = withTimeoutOrNull(waitMillis) {
-                    pollWakeUpSignal.receive()
-                } != null
-                if (rescheduled) {
-                    continue
+                val now = clock.now()
+                val visible = isAppVisible.value
+                val tick = stateMutex.withLock {
+                    scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, isBusy.value, config)
                 }
-                // A janela minimizada é justamente o caso do bug: esperar a
-                // visibilidade deixaria o card congelado no valor da janela que
-                // já venceu. Só o ciclo normal de poll respeita a visibilidade.
-                if (!wokeUpForReset && !isAppVisible.value) {
-                    isAppVisible.first { it }
+                val dispatch = if (visible) tick.due else tick.byReset
+                if (dispatch.isNotEmpty()) {
+                    scheduler.recordAttempt(dispatch, now)
+                    viewModelScope.launch { requestFetch(dispatch, preserveDataOnFailure = true) }
                 }
-                viewModelScope.launch {
-                    requestFetch(targets = enabledTargets())
+                val nextPoll = publishNextPoll(now)
+                val nextReset = nextQuotaResetTarget()
+                val wakeUpAt = listOfNotNull(nextPoll.takeIf { visible }, nextReset).minOrNull()
+                val waitMillis = wakeUpAt?.let { (it - now).inWholeMilliseconds.coerceAtLeast(0L) } ?: Long.MAX_VALUE
+                val signalled = withTimeoutOrNull(waitMillis) { pollWakeUpSignal.receive() } != null
+                if (!signalled && wakeUpAt != null &&
+                    looksLikeWakeFromSleep(wakeUpAt, clock.now(), config.sleepJumpThreshold)
+                ) {
+                    breadcrumbs.record(BreadcrumbCategory.USE_CASE, "volta do sleep: todas as fontes devidas")
+                    scheduler.forgetAttempts()
                 }
-                scheduleNextRefresh()
             }
         }
+    }
+
+    private fun pollIntervalFor(busy: Boolean): Duration =
+        if (busy) config.activePollInterval else config.idlePollInterval
+
+    /**
+     * Publica a próxima coleta por cadência — o instante que o rodapé e a HUD
+     * contam — e a grava para o arranque seguinte. O reset não entra: é uma
+     * antecipação, não um novo prazo a anunciar.
+     */
+    private fun publishNextPoll(now: Instant = clock.now()): Instant {
+        val next = scheduler.nextPollAt(enabledTargets(), now, isBusy.value, config)
+            ?: (now + pollIntervalFor(isBusy.value))
+        if (_nextRefreshAt.value != next) {
+            _nextRefreshAt.value = next
+            onNextRefreshAtChanged(next)
+        }
+        return next
     }
 
     /**
@@ -365,69 +416,20 @@ class DashboardViewModel(
     private suspend fun requestFetch(
         targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean = false
-    ) {
-        if (!fetchMutex.tryLock()) {
-            enqueuePendingFetch(targets, preserveDataOnFailure)
-            fetchMutex.withLock {
-                drainPendingFetchQueue() ?: return
-            }
-            return
-        }
-
-        try {
-            drainFetchRequests(PendingFetchRequest(targets, preserveDataOnFailure))
-        } finally {
-            fetchMutex.unlock()
-        }
-    }
-
-    private suspend fun drainFetchRequests(initialRequest: PendingFetchRequest) {
-        var currentRequest: PendingFetchRequest? = initialRequest
-
-        while (currentRequest != null) {
-            performFetch(
-                targets = currentRequest.targets,
-                preserveDataOnFailure = currentRequest.preserveDataOnFailure
-            )
-            currentRequest = dequeuePendingFetch()
-        }
-    }
-
-    private suspend fun drainPendingFetchQueue(): PendingFetchRequest? {
-        val pendingRequest = dequeuePendingFetch() ?: return null
-        drainFetchRequests(pendingRequest)
-        return pendingRequest
-    }
-
-    private suspend fun enqueuePendingFetch(
-        targets: Set<UsageTargetKey>,
-        preserveDataOnFailure: Boolean
-    ) {
-        pendingFetchMutex.withLock {
-            pendingFetchRequest = mergePendingFetch(
-                existing = pendingFetchRequest,
-                targets = targets,
-                preserveDataOnFailure = preserveDataOnFailure,
-                allTargets = ::enabledTargets
-            )
-        }
-    }
-
-    private suspend fun dequeuePendingFetch(): PendingFetchRequest? {
-        return pendingFetchMutex.withLock {
-            val request = pendingFetchRequest ?: return@withLock null
-            pendingFetchRequest = null
-            request
-        }
-    }
+    ) = fetchQueue.request(targets, preserveDataOnFailure)
 
     private suspend fun performFetch(
         targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean
     ) {
         val enabled = enabledTargets()
-        val effectiveTargets = targets.filterTo(linkedSetOf()) { target -> target in enabled }
         val snapshotCapturedAt = clock.now()
+        scheduler.retainOnly(enabled)
+        // Alvo em backoff não vai à rede (issue #269): cada chamada durante o
+        // limite só o prolonga. A leitura dele fica como está.
+        val effectiveTargets = targets.filterTo(linkedSetOf()) { target ->
+            target in enabled && !scheduler.isInBackoff(target, snapshotCapturedAt)
+        }
 
         if (effectiveTargets.isEmpty()) {
             stateMutex.withLock {
@@ -437,90 +439,84 @@ class DashboardViewModel(
             return
         }
 
+        scheduler.recordAttempt(effectiveTargets, snapshotCapturedAt)
         markRefreshing(effectiveTargets, refreshing = true)
-
-        val statsUpdates = mutableMapOf<UsageTargetKey, ApiUsageStats>()
-        val errorUpdates = mutableMapOf<UsageTargetKey, UiApiError?>()
+        val anthropicOrder = anthropicStaggerOrder(effectiveTargets)
 
         try {
-            val fetchResults = coroutineScope {
+            coroutineScope {
                 effectiveTargets.map { target ->
                     async {
-                        sourceFetchSemaphore.withPermit {
-                            target to runCatching {
-                                withTimeout(config.perSourceTimeout) {
+                        // Contas Anthropic devidas juntas saem espaçadas: rajada nos
+                        // endpoints de uso e de token é o que o ai-usagebar viu virar 429.
+                        val order = anthropicOrder[target] ?: 0
+                        if (order > 0) delay(config.anthropicStagger * order)
+                        val result = sourceFetchSemaphore.withPermit {
+                            runCatching {
+                                withTimeout(config.timeoutFor(target.source)) {
                                     fetchTarget(target).getOrThrow()
                                 }
                             }
                         }
+                        // Cada fonte entra na tela quando chega (issue #269): antes a
+                        // mais lenta segurava todas até o `awaitAll`.
+                        applyFetchResult(target, result, snapshotCapturedAt)
                     }
                 }.awaitAll()
             }
 
-            fetchResults.forEach { (target, result) ->
-                result
-                    .onSuccess { stats ->
-                        if (isPersistableDashboardStats(stats)) {
-                            statsUpdates[target] = stats
-                            errorUpdates[target] = null
-                            persistSnapshot(stats, snapshotCapturedAt)
-                            refreshHistoryDerivedState(target, stats, snapshotCapturedAt)
-                        } else {
-                            errorUpdates[target] = handleTargetFailure(
-                                target,
-                                IllegalStateException(
-                                    "A resposta do Codex não trouxe nenhuma janela utilizável."
-                                )
-                            )
-                        }
-                    }
-                    .onFailure { error ->
-                        errorUpdates[target] = handleTargetFailure(target, error)
-                    }
-            }
-
-            stateMutex.withLock {
-                val latestEnabledTargets = enabledTargets()
-                pruneDisabledTargets(latestEnabledTargets)
-
-                effectiveTargets.forEach { target ->
-                    val stats = statsUpdates[target]
-
-                    if (stats != null) {
-                        cachedStatsByTarget[target] = stats
-                        cachedErrorsByTarget.remove(target)
-                    } else {
-                        val retained = statsRetainedAfterFailure(
-                            target = target,
-                            existingStats = cachedStatsByTarget[target],
-                            preserveDataOnFailure = preserveDataOnFailure
-                        )
-                        if (retained == null) {
-                            cachedStatsByTarget.remove(target)
-                        } else {
-                            cachedStatsByTarget[target] = retained
-                        }
-
-                        val errorMessage = errorUpdates[target]
-                        if (errorMessage == null) {
-                            cachedErrorsByTarget.remove(target)
-                        } else {
-                            cachedErrorsByTarget[target] = errorMessage
-                        }
-                    }
-                }
-
-                publishUiState(latestEnabledTargets)
-            }
-
             // Os resets recém-coletados podem ser anteriores ao alvo em que o
             // laço já está dormindo; sem isto ele só os leria no poll seguinte.
+            publishNextPoll()
             nudgeCountdown()
 
             persistDashboardCache()
         } finally {
             markRefreshing(effectiveTargets, refreshing = false)
         }
+    }
+
+    /** O resultado de um alvo, aplicado e publicado sozinho. */
+    private suspend fun applyFetchResult(target: UsageTargetKey, result: Result<ApiUsageStats>, capturedAt: Instant) {
+        var stats: ApiUsageStats? = null
+        var error: UiApiError? = null
+        result
+            .onSuccess { fetched ->
+                if (isPersistableDashboardStats(fetched)) {
+                    scheduler.recordSuccess(target, capturedAt)
+                    stats = fetched
+                    // Sequencial, como era no laço único: a conexão do SQLite é
+                    // serializada e disputada pelo indexador de sessões CLI.
+                    historyMutex.withLock {
+                        persistSnapshot(fetched, capturedAt)
+                        refreshHistoryDerivedState(target, fetched, capturedAt)
+                    }
+                } else {
+                    error = failures.handle(target, IllegalStateException("A resposta do Codex não trouxe nenhuma janela utilizável."))
+                }
+            }
+            .onFailure { failure -> error = failures.handle(target, failure) }
+
+        stateMutex.withLock {
+            val latestEnabledTargets = enabledTargets()
+            pruneDisabledTargets(latestEnabledTargets)
+            if (target in latestEnabledTargets) {
+                applyTargetOutcome(target, stats, error, capturedAt)
+            }
+            publishUiState(latestEnabledTargets)
+        }
+    }
+
+    /** Sob o [stateMutex]: a leitura nova, ou a anterior mantida (`statsRetainedAfterFailure`) com o erro. */
+    private fun applyTargetOutcome(target: UsageTargetKey, stats: ApiUsageStats?, error: UiApiError?, now: Instant) {
+        if (stats != null) {
+            cachedStatsByTarget[target] = stats
+            cachedErrorsByTarget.remove(target)
+            return
+        }
+        val retained = statsRetainedAfterFailure(target, cachedStatsByTarget[target], scheduler.lastSuccessAt(target), error, now)
+        if (retained == null) cachedStatsByTarget.remove(target) else cachedStatsByTarget[target] = retained
+        if (error == null) cachedErrorsByTarget.remove(target) else cachedErrorsByTarget[target] = error
     }
 
     fun clearToast() {
@@ -535,7 +531,6 @@ class DashboardViewModel(
         // descrever ("cliquei em atualizar e...").
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de todas as fontes pedida")
         invalidateAntigravityReadingIfRequested(ApiSource.ANTIGRAVITY)
-        scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = enabledTargets())
             updates.checkForUpdate()
@@ -549,7 +544,6 @@ class DashboardViewModel(
 
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${source.name} pedida")
         invalidateAntigravityReadingIfRequested(source)
-        scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(
                 targets = enabledTargets().filterTo(linkedSetOf()) { target -> target.source == source },
@@ -565,8 +559,12 @@ class DashboardViewModel(
         // O alvo carrega `profileId`, que é interno do app e não identifica
         // ninguém; o apelido do perfil, que é o e-mail digitado, fica de fora.
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${target.source.name} pedida")
+        // Clique durante o backoff não vai à rede, e diz até quando (issue #269).
+        scheduler.backoffUntil(target, clock.now())?.let { until ->
+            _toastMessage.value = DashboardToast.RateLimit(target.source, retryAt = until)
+            return
+        }
         invalidateAntigravityReadingIfRequested(target.source)
-        scheduleNextRefresh()
         viewModelScope.launch {
             requestFetch(targets = setOf(target), preserveDataOnFailure = true)
         }
@@ -622,50 +620,6 @@ class DashboardViewModel(
         }
     }
 
-    private fun handleTargetFailure(target: UsageTargetKey, error: Throwable): UiApiError? {
-        val source = target.source
-        val uiError = uiApiErrorOf(target, error, anthropicProfiles.value)
-        val message = uiError.message
-
-        // Funil único de toda falha de coleta, e por isso o único ponto de
-        // gravação: um passo por fonte que falhou, em qualquer caminho — poll
-        // silencioso, atualização pedida ou recarga de um banner.
-        //
-        // Vai a mensagem **saneada**, a mesma que a tela mostra, e nunca a crua:
-        // `sanitizeUiErrorMessage` já é o filtro que decide o que pode aparecer
-        // para o usuário, e o relatório é ainda mais público que a tela dele.
-        breadcrumbs.record(
-            BreadcrumbCategory.API_CALL,
-            "${source.name}: falhou — ${error::class.simpleName ?: "falha"}: ${sanitizeBreadcrumbErrorMessage(message)}"
-        )
-
-        // Avaliada antes de rate limit/credencial: falha de conectividade nunca
-        // teve resposta HTTP nenhuma, então não pode ser confundida com 429/401 —
-        // e sem banner próprio (`warningFor`) o toast genérico dispararia uma vez
-        // por fonte, virando ruído quando a rede inteira está sem proxy.
-        if (uiError.isConnectivityIssue) {
-            return uiError
-        }
-
-        if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
-            _toastMessage.value = DashboardToast.RateLimit(source)
-            return uiError
-        }
-
-        if (uiError.isServiceUnavailableIssue) {
-            return uiError
-        }
-
-        if (!uiError.isConfigurationIssue) {
-            _toastMessage.value = DashboardToast.ApiError(
-                source = source,
-                message = message
-            )
-        }
-
-        return uiError
-    }
-
     private fun publishUiState(enabledTargets: Set<UsageTargetKey>) {
         _uiState.value = buildDashboardUiState(
             enabledTargets = enabledTargets,
@@ -701,7 +655,9 @@ class DashboardViewModel(
     private suspend fun persistDashboardCache() {
         val cacheUseCase = saveDashboardCache ?: return
         val snapshot = stateMutex.withLock {
-            cachedStatsByTarget.values.filter { stats -> isPersistableDashboardStats(stats) }
+            cachedStatsByTarget.values
+                .filter { stats -> isPersistableDashboardStats(stats) }
+                .map { stats -> stats.copy(fetchedAt = stats.fetchedAt ?: scheduler.lastSuccessAt(stats.targetKey)) }
         }
         if (snapshot.isEmpty()) {
             return
@@ -779,12 +735,5 @@ class DashboardViewModel(
     /** Ação da faixa no estado pronto. Sem artefato preparado não faz nada. */
     fun restartAndUpdateNow() {
         updates.restartAndUpdateNow()
-    }
-
-    private fun scheduleNextRefresh(baseTime: Instant = clock.now()) {
-        scheduledRefreshAt = baseTime + config.pollInterval
-        _nextRefreshAt.value = scheduledRefreshAt
-        onNextRefreshAtChanged(scheduledRefreshAt)
-        pollWakeUpSignal.trySend(Unit)
     }
 }

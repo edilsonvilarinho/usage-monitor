@@ -98,7 +98,7 @@ class DashboardViewModelRefreshPersistenceTest : DashboardViewModelTestSupport()
 
     @Test
     fun `refresh persists the new scheduled time via callback`() = runTest {
-        var lastPersistedInstant: kotlinx.datetime.Instant? = null
+        val lastPersistedInstant = java.util.concurrent.atomic.AtomicReference<kotlinx.datetime.Instant?>(null)
 
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
@@ -121,14 +121,17 @@ class DashboardViewModelRefreshPersistenceTest : DashboardViewModelTestSupport()
             historyUseCase(mutableListOf()),
             clock = Clock.System,
             config = noAutoStartConfig(),
-            onNextRefreshAtChanged = { instant -> lastPersistedInstant = instant }
+            onNextRefreshAtChanged = { instant -> lastPersistedInstant.set(instant) }
         )
 
         viewModel.refresh()
         awaitSettledState(viewModel)
+        // A contagem é publicada depois da tela (issue #269): é o fim da coleta,
+        // com todos os alvos já marcados, que decide o próximo prazo.
+        awaitConditionRealTime { lastPersistedInstant.get() != null }
 
-        assertEquals(viewModel.nextRefreshAt.value, lastPersistedInstant)
-        assertFalse(lastPersistedInstant == null)
+        assertEquals(viewModel.nextRefreshAt.value, lastPersistedInstant.get())
+        assertFalse(lastPersistedInstant.get() == null)
         viewModel.onDestroy()
     }
 }

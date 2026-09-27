@@ -1,5 +1,7 @@
 package com.usagemonitor.domain.entity
 
+import kotlinx.datetime.Instant
+
 /**
  * Agrega todas as cotas de uso de UMA API (Anthropic ou MiniMax).
  *
@@ -31,7 +33,12 @@ data class ApiUsageStats(
 
     // Plano da conta ("Max 20x", "ChatGPT Plus"), quando o fornecedor informa.
     // Campo novo com default: as fontes que não sabem o plano continuam iguais.
-    val planLabel: String? = null
+    val planLabel: String? = null,
+
+    // Quando esta leitura foi coletada (issue #269). Nula nas leituras que ainda
+    // não passaram pelo painel. É por ele que a leitura mantida depois de uma
+    // falha diz a idade e é descartada passados `MAX_STALE_READING_AGE`.
+    val fetchedAt: Instant? = null
 )
 
 enum class ApiUsageNotice {

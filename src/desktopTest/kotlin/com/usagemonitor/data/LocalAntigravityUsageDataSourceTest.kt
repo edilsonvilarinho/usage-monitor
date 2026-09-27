@@ -56,6 +56,37 @@ class LocalAntigravityUsageDataSourceTest {
         )
 
     /**
+     * O prazo da fonte cancela a coleta, e o cancelamento tem de **interromper** a
+     * thread presa no `waitFor` (issue #269): com `withContext` ela seguia até os
+     * 45 s do CLI segurando uma vaga do semáforo das coletas.
+     */
+    @Test
+    fun `cancelling the read interrupts the blocked process wait`() = runBlocking {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val interrupted = java.util.concurrent.CountDownLatch(1)
+        val starter = AntigravityProcessStarter { command, _, _, _ ->
+            if (command.last() == "--version") {
+                AntigravityProcessResult(0, "1.2.9\n", timedOut = false, outputTooLarge = false)
+            } else {
+                started.countDown()
+                try {
+                    Thread.sleep(60_000)
+                } catch (error: InterruptedException) {
+                    interrupted.countDown()
+                    throw error
+                }
+                AntigravityProcessResult(0, "{}", timedOut = false, outputTooLarge = false)
+            }
+        }
+
+        val result = kotlinx.coroutines.withTimeoutOrNull(500) { dataSource(starter).readUsageJson() }
+
+        assertNull(result)
+        assertTrue(started.await(1, java.util.concurrent.TimeUnit.SECONDS))
+        assertTrue(interrupted.await(5, java.util.concurrent.TimeUnit.SECONDS), "o waitFor não foi interrompido")
+    }
+
+    /**
      * `/usage` chega como argumento próprio, sem shell no meio: pelo Git Bash ele
      * virou caminho e foi ao modelo como prompt. `--output-format json` é o que
      * traz a prova de que nenhum turno abriu.

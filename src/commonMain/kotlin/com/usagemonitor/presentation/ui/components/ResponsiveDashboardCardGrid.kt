@@ -143,6 +143,7 @@ internal fun ResponsiveDashboardCardGrid(
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,
+                            lastReadingAt = stats.fetchedAt,
                             riskByQuotaKey = riskSummaries[stats.targetKey].orEmpty(),
                             showUsageDetails = stats.source != ApiSource.ANTHROPIC,
                             isRefreshing = stats.targetKey in refreshingTargets,
