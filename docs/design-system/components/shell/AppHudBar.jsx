@@ -19,7 +19,7 @@ const clockIcon = (fraction) => (
 );
 
 export function AppHudBar({
-  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, refreshFraction, update, updateHeadline, updateDetail, updateAction,
+  accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, refreshFraction, version = '38.2.0', update, updateHeadline, updateDetail, updateAction,
   actions = ['⟲', '▣'], style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
@@ -126,6 +126,7 @@ export function AppHudBar({
         <>
           <div style={{ display: 'flex', alignItems: 'center', height: 24 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t14)', fontWeight: 600, flex: 1 }}>Usage Monitor</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>v{version}</span>
             {countdown ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{refreshFraction !== undefined ? clockIcon(refreshFraction) : '↻'} {countdown}</span> : null}
           </div>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Modo de janela</span>

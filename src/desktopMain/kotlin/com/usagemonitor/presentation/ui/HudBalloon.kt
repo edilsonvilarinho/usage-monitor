@@ -383,6 +383,9 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
 /** A coluna do balão da engrenagem. */
 internal const val HUD_APP_BALLOON_CONTENT_TEST_TAG = "hudAppBalloonContent"
 
+/** A versão instalada, exibida no cabeçalho do balão da engrenagem. */
+internal const val HUD_APP_BALLOON_VERSION_TEST_TAG = "hudAppBalloonVersion"
+
 /** Prefixo das linhas de modo de janela do balão da engrenagem, seguido do nome do modo. */
 internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
 
@@ -407,6 +410,7 @@ internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
 @Composable
 internal fun HudAppBalloonContent(
     language: AppLanguage,
+    appVersion: String,
     countdown: (@Composable () -> Unit)?,
     updateIndicator: HudUpdateIndicator?,
     onWindowModeChange: (WindowMode) -> Unit,
@@ -416,7 +420,8 @@ internal fun HudAppBalloonContent(
     Column(modifier = Modifier.fillMaxWidth().testTag(HUD_APP_BALLOON_CONTENT_TEST_TAG)) {
         Row(
             modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_HEADER),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = "Usage Monitor",
@@ -424,6 +429,14 @@ internal fun HudAppBalloonContent(
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "v$appVersion",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag(HUD_APP_BALLOON_VERSION_TEST_TAG)
             )
             countdown?.invoke()
         }

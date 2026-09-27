@@ -4,7 +4,7 @@ Compose: `HudNotch` inside `HudWindowHost`, its own undecorated, transparent, al
 the main window is hidden with its geometry intact while it is shown.
 
 ```jsx
-<AppHudBar edge="right" balloon={0} countdown="02:05" accounts={[
+<AppHudBar edge="right" balloon={0} countdown="02:05" version="38.2.0" accounts={[
   { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', active: true,
     detail: 'Max 20x · via Claude Code',
     quotas: [{ short: '5h', title: 'Sessão 5h', percent: '68%', fraction: .68, level: 'warn',
@@ -54,7 +54,7 @@ notch: the **hand** at the near end (top or left) moves the notch — **only the
 moved the notch when the intent was clicking a ring, so a slip on the body just drops the click — and
 stays composed while carried, bordered in info. Both handles slide out **from inside the notch** with a
 fade and a 0.6 scale on `GENTLE`, and slide back in on exit; the **gear** at the far end opens a balloon with
-**everything the standard footer offers**: title with the countdown, the three window modes as rows
+**everything the standard footer offers**: title, the current installed version and the countdown, the three window modes as rows
 (the footer's menu is a popup the HUD window would clip), the footer's own action row and, with an
 update pending, an `AppBanner` (one-line title, detail on up to two lines) plus the **same action as
 the standard update strip** as an `AppButton` ("Reiniciar o app e atualizar", "Baixar atualização";

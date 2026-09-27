@@ -68,14 +68,14 @@ export function Hud() {
         <AppHudBar accounts={ACCOUNTS} edge="right" balloon={0} countdown="02:05" refreshFraction={0.21} />
       </Screen>
 
-      <Caption>3b · engrenagem — o que o rodapé oferece: contagem, modos, ações</Caption>
+      <Caption>3b · engrenagem — o que o rodapé oferece: versão instalada, contagem, modos, ações</Caption>
       <Screen tall>
-        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" refreshFraction={0.21} />
+        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" version="38.2.0" refreshFraction={0.21} />
       </Screen>
 
-      <Caption>3c · engrenagem com atualização pronta — ponto na engrenagem, banner e o botão da faixa do modo padrão</Caption>
+      <Caption>3c · engrenagem com atualização pronta — versão instalada, ponto na engrenagem, banner e o botão da faixa do modo padrão</Caption>
       <Screen tall>
-        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" refreshFraction={0.21}
+        <AppHudBar accounts={ACCOUNTS} balloon="gear" countdown="02:05" version="38.2.0" refreshFraction={0.21}
           update="Versão 38.1.0 pronta — será aplicada ao fechar o Usage Monitor"
           updateHeadline="Versão 38.1.0 pronta" updateDetail="Aplicada ao fechar o Usage Monitor"
           updateAction="Reiniciar o app e atualizar" />

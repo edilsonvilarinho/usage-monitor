@@ -1,6 +1,7 @@
 package com.usagemonitor.ui
 
 import androidx.compose.ui.test.onAllNodesWithTag
+import com.usagemonitor.CURRENT_APP_VERSION
 import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
@@ -24,6 +25,7 @@ import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_BANNER_TAG
+import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_VERSION_TEST_TAG
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.HudAccountBalloonContent
 import com.usagemonitor.presentation.ui.HUD_BALLOON_RING_LEGEND_TAG_PREFIX
@@ -654,6 +656,7 @@ class HudNotchTest {
     private fun appBalloonFixture(onMode: (WindowMode) -> Unit, onRefresh: () -> Unit) {
         HudAppBalloonContent(
             language = AppLanguage.PT,
+            appVersion = CURRENT_APP_VERSION,
             countdown = null,
             updateIndicator = null,
             onWindowModeChange = onMode,
@@ -690,6 +693,7 @@ class HudNotchTest {
         onNodeWithContentDescription(GEAR).performClick()
         waitForIdle()
         onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+        onNodeWithTag(HUD_APP_BALLOON_VERSION_TEST_TAG).assertTextEquals("v$CURRENT_APP_VERSION")
         onNodeWithText("Modo de janela").assertIsDisplayed()
         // A mesma fileira do rodapé, pelas mesmas descrições.
         onNodeWithContentDescription("Atualizar agora").performClick()
@@ -746,6 +750,7 @@ class HudNotchTest {
                         Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
                             HudAppBalloonContent(
                                 language = AppLanguage.PT,
+                                appVersion = CURRENT_APP_VERSION,
                                 countdown = null,
                                 updateIndicator = update,
                                 onWindowModeChange = {},
@@ -771,6 +776,7 @@ class HudNotchTest {
             Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
                 HudAppBalloonContent(
                     language = AppLanguage.PT,
+                    appVersion = CURRENT_APP_VERSION,
                     countdown = null,
                     updateIndicator = update,
                     onWindowModeChange = {},
@@ -791,6 +797,7 @@ class HudNotchTest {
         var restarts = 0
         setContent { appBalloonWithUpdate(READY_INDICATOR, onUpdateAction = { restarts += 1 }) }
 
+        onNodeWithTag(HUD_APP_BALLOON_VERSION_TEST_TAG).assertTextEquals("v$CURRENT_APP_VERSION")
         onNodeWithTag(HUD_APP_BALLOON_UPDATE_BANNER_TAG).assertIsDisplayed()
         onNodeWithText("Versão 38.1.0 pronta").assertIsDisplayed()
         onNodeWithText("Aplicada ao fechar o Usage Monitor").assertIsDisplayed()

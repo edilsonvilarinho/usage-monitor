@@ -47,6 +47,8 @@ export interface AppHudBarProps {
   fallbackLabel?: string;
   /** `02:05` — next automatic collection, once, at the end of the strip, on one line with its icon. */
   countdown?: string;
+  /** Current installed app version shown in the gear balloon header, e.g. `38.2.0`. */
+  version?: string;
   /**
    * 0–1 — what is left of the poll interval (#293). Turns the countdown icon into a draining
    * clock; without it the icon is `↻`.
