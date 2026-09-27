@@ -56,6 +56,7 @@ import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 
@@ -192,7 +193,10 @@ fun HistoryScreen(
                                     language = language,
                                     onSelectSource = viewModel::selectSource,
                                     onSelectAccount = viewModel::selectAccount,
-                                    onSelectRange = viewModel::selectRange
+                                    onSelectRange = viewModel::selectRange,
+                                    selectedQuotaView = current.selectedQuotaView,
+                                    quotaViewLabels = quotaViewLabels(current.report, language),
+                                    onSelectQuotaView = viewModel::selectQuotaView
                                 )
 
                                 if (current.report.series.isEmpty()) {
@@ -224,63 +228,12 @@ fun HistoryScreen(
                                             language = language,
                                             selectedRange = current.selectedRange
                                         )
-                                    } else if (current.report.source == ApiSource.CODEX) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                            current.report.series.forEachIndexed { index, series ->
-                                                key(
-                                                    series.quotaLabel +
-                                                        current.selectedAccount?.key.toString() +
-                                                        current.selectedRange.name
-                                                ) {
-                                                    HistorySeriesCard(
-                                                        source = current.report.source,
-                                                        series = series,
-                                                        index = index,
-                                                        accentColor = accentColor,
-                                                        language = language,
-                                                        chartSelectionKey = buildQuotaChartSelectionKey(
-                                                            source = current.report.source,
-                                                            quotaLabel = series.quotaLabel,
-                                                            periodType = series.periodType,
-                                                            selectedRange = current.selectedRange
-                                                        ),
-                                                        referenceAt = current.report.lastUpdatedAt
-                                                    )
-                                                }
-                                            }
-                                        }
                                     } else {
-                                        val cardModels = remember(current.report.series) {
-                                            buildGenericHistoryGroups(current.report.series)
-                                        }
-
-                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                            cardModels.forEachIndexed { index, model ->
-                                                key(
-                                                    model.baseLabel +
-                                                        current.selectedAccount?.key.toString() +
-                                                        current.selectedRange.name
-                                                ) {
-                                                    HistorySeriesCard(
-                                                        source = current.report.source,
-                                                        series = model.chartSeries,
-                                                        index = index,
-                                                        accentColor = accentColor,
-                                                        language = language,
-                                                        chartSelectionKey = buildQuotaChartSelectionKey(
-                                                            source = current.report.source,
-                                                            quotaLabel = model.chartSeries.quotaLabel,
-                                                            periodType = model.chartSeries.periodType,
-                                                            selectedRange = current.selectedRange
-                                                        ),
-                                                        titleOverride = model.baseLabel,
-                                                        subtitleOverride = genericHistorySubtitle(language),
-                                                        weeklySummary = model.weeklySummary,
-                                                        referenceAt = current.report.lastUpdatedAt
-                                                    )
-                                                }
-                                            }
-                                        }
+                                        GroupedHistoryContent(
+                                            state = current,
+                                            accentColor = accentColor,
+                                            language = language
+                                        )
                                     }
                                 }
                             }
@@ -373,7 +326,11 @@ private fun HistoryControls(
     language: AppLanguage,
     onSelectSource: (ApiSource) -> Unit,
     onSelectAccount: (UsageAccountContext) -> Unit,
-    onSelectRange: (HistoryRange) -> Unit
+    onSelectRange: (HistoryRange) -> Unit,
+    selectedQuotaView: HistoryQuotaView = HistoryQuotaView.BOTH,
+    /** Rótulo de cada opção, na ordem do enum; `null` esconde o controle. */
+    quotaViewLabels: List<String>? = null,
+    onSelectQuotaView: (HistoryQuotaView) -> Unit = {}
 ) {
     AppDataSurface(contentPadding = AppSpacing.sm) {
         FlowRow(
@@ -431,6 +388,18 @@ private fun HistoryControls(
                     onSelect = { index -> onSelectRange(HistoryRange.entries[index]) }
                 )
             }
+
+            if (quotaViewLabels != null) {
+                HistoryControlGroup(label = if (language == AppLanguage.PT) "Cota" else "Quota") {
+                    AppSegmentedControl(
+                        options = HistoryQuotaView.entries.mapIndexed { index, view ->
+                            AppSegment(label = quotaViewLabels[index], testTag = historyQuotaViewChipTag(view))
+                        },
+                        selectedIndex = HistoryQuotaView.entries.indexOf(selectedQuotaView),
+                        onSelect = { index -> onSelectQuotaView(HistoryQuotaView.entries[index]) }
+                    )
+                }
+            }
         }
     }
 }
@@ -463,7 +432,9 @@ internal fun HistorySeriesCard(
     subtitleOverride: String? = null,
     weeklySummary: UsageHistorySeries? = null,
     /** Carimbo do último ponto coletado; base da linha de referência diária. */
-    referenceAt: Instant? = null
+    referenceAt: Instant? = null,
+    /** Qual janela mostrar quando há [weeklySummary]; sem ela não tem efeito. */
+    quotaView: HistoryQuotaView = HistoryQuotaView.BOTH
 ) {
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
@@ -517,18 +488,23 @@ internal fun HistorySeriesCard(
                     .padding(AppSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
+                val chartSeries = if (quotaView == HistoryQuotaView.WEEKLY && weeklySummary != null) {
+                    weeklySummary
+                } else {
+                    series
+                }
                 UsageHistoryLineChart(
-                    points = series.points,
-                    unit = series.unit,
+                    points = chartSeries.points,
+                    unit = chartSeries.unit,
                     language = language,
-                    chartSelectionKey = chartSelectionKey,
+                    chartSelectionKey = chartSelectionKey + ":" + quotaView.name,
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle,
                     accentColor = accentColor,
-                    previousPoints = series.previousWindowPoints,
-                    seriesLabel = quotaWindowLabel(series, language),
+                    previousPoints = chartSeries.previousWindowPoints,
+                    seriesLabel = quotaWindowLabel(chartSeries, language),
                     overlays = historyChartOverlays(
-                        weeklySummary = weeklySummary,
+                        weeklySummary = weeklySummary.takeIf { quotaView == HistoryQuotaView.BOTH },
                         primary = series,
                         color = AppAccents.current.output,
                         language = language
@@ -536,20 +512,24 @@ internal fun HistorySeriesCard(
                 )
 
                 if (weeklySummary != null) {
-                    HistoryMetricsPanel(
-                        title = intervalSummaryLabel(language),
-                        source = source,
-                        series = series,
-                        language = language,
-                        referenceAt = referenceAt
-                    )
-                    HistoryMetricsPanel(
-                        title = weeklySummaryLabel(language),
-                        source = source,
-                        series = weeklySummary,
-                        language = language,
-                        referenceAt = referenceAt
-                    )
+                    if (quotaView != HistoryQuotaView.WEEKLY) {
+                        HistoryMetricsPanel(
+                            title = intervalSummaryLabel(language),
+                            source = source,
+                            series = series,
+                            language = language,
+                            referenceAt = referenceAt
+                        )
+                    }
+                    if (quotaView != HistoryQuotaView.INTERVAL) {
+                        HistoryMetricsPanel(
+                            title = weeklySummaryLabel(language),
+                            source = source,
+                            series = weeklySummary,
+                            language = language,
+                            referenceAt = referenceAt
+                        )
+                    }
                 } else {
                     HistoryMetrics(
                         source = source,

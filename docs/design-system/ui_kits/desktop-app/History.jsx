@@ -35,6 +35,7 @@ function Chart({ data, prev, weekly }) {
 
 export function History() {
   const [range, setRange] = React.useState('7 dias');
+  const [quota, setQuota] = React.useState('Ambas');
   return (
     <AppWindowFrame title="Histórico — Anthropic · Padrão" style={{ width: 1030 }}>
       <AppToolbar>
@@ -42,6 +43,8 @@ export function History() {
         <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>Anthropic · Padrão</span>
         <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
         <AppSegmentedControl items={['24h', '7 dias', '30 dias', 'Total']} value={range} onChange={setRange} />
+        <AppKey>Cota</AppKey>
+        <AppSegmentedControl items={['5h', '7d', 'Ambas']} value={quota} onChange={setQuota} />
         <span style={{ flex: 1 }} />
         <AppStatusIndicator level="warn">Esgota em 4h 12m</AppStatusIndicator>
         <AppButton variant="ghost">PDF</AppButton>
@@ -58,7 +61,11 @@ export function History() {
             <span><i style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--anthropic)', marginRight: 6, verticalAlign: 'middle' }} />5h</span>
             <span><i style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--output)', marginRight: 6, verticalAlign: 'middle' }} />7d</span>
           </div>
-          <Chart data={SERIES} prev={PREV} weekly={WEEKLY} />
+          <Chart
+            data={quota === '7d' ? WEEKLY : SERIES}
+            prev={PREV}
+            weekly={quota === 'Ambas' ? WEEKLY : null}
+          />
           <div style={{ display: 'flex', gap: 'var(--s4)', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
             <span>Sáb 09/08</span><span>Dom 10/08</span><span>Ter 12/08</span><span>Qua 13/08</span>
           </div>

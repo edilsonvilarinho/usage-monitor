@@ -1391,6 +1391,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="seg"><button class="on" type="button">dev@example.com</button><button type="button">qa@example.com</button></div>
       <span class="sp"></span>
       <div class="seg"><button class="on" type="button">24h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
+      <span class="k">Cota</span>
+      <div class="seg"><button type="button">5h</button><button type="button">7d</button><button class="on" type="button">Ambas</button></div>
     </div></div>
 
     <div class="chart">
@@ -1418,7 +1420,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="panel">
       <div class="phead"><span class="ptitle">Sessão 5h</span><span class="sp"></span><span class="st warn">Atenção</span></div>
       <div class="scroller"><table class="dt">
-        <tr><td>Uso atual</td><td class="num">68% de 100%</td><td>Consumido no período</td><td class="num">62 pp</td></tr>
+        <tr><td>Uso atual</td><td class="num">68% de 100%</td><td>Janelas no intervalo</td><td class="num">5 · 1 esgotou</td></tr>
         <tr><td>Média por hora</td><td class="num">5,6 pp/h</td><td>Previsão</td><td class="num">Esgota Qua 17h00 BRT</td></tr>
         <tr><td>Reinício</td><td class="num">Qua 13h00 BRT</td><td>Variação observada</td><td class="num" style="color:var(--warn)">+18% vs. período anterior</td></tr>
         <tr><td>Hoje vs. mediana diária</td><td class="num" style="color:var(--warn)">3,4× (6 dias)</td><td></td><td></td></tr>
@@ -1428,7 +1430,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="panel">
       <div class="phead"><span class="ptitle">Semanal</span><span class="sp"></span><span class="st ok">Normal</span></div>
       <div class="scroller"><table class="dt">
-        <tr><td>Uso atual</td><td class="num">41% de 100%</td><td>Consumido no período</td><td class="num">23 pp</td></tr>
+        <tr><td>Uso atual</td><td class="num">41% de 100%</td><td>Janelas no intervalo</td><td class="num">1</td></tr>
         <tr><td>Média por hora</td><td class="num">1,0 pp/h</td><td>Previsão</td><td class="num">A janela deve reiniciar antes do limite</td></tr>
         <tr><td>Reinício</td><td class="num">Sáb 15/08 21h00 BRT</td><td>Variação observada</td><td class="num" style="color:var(--ok)">−4% vs. período anterior</td></tr>
         <tr><td>Hoje vs. mediana diária</td><td class="num">1,1× (6 dias)</td><td></td><td></td></tr>
@@ -1438,6 +1440,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 <p class="note">Preservados: seleção por fonte e por conta, as quatro janelas, reinícios, média por hora, forecast, comparação com o período anterior e as regras próprias de saldo e de créditos. Os pontos da janela anterior entram no delta e, com uma série só, na linha tracejada descrita acima.</p>
+<p class="note"><b>Seletor de cota <code>5h | 7d | Ambas</code> (issue #320)</b>, só quando a fonte tem as duas janelas; os nomes saem das séries — a intervalar do MiniMax não é de 5 horas. Trocar não relê o banco. "Ambas" é o padrão; "5h" ou "7d" mostram um gráfico e uma tabela, e com série única volta a linha tracejada do período anterior. O Codex passa a ter um card só para 5h e 7d; a série reportada e a mensal continuam em cards próprios. <b>"Consumido no período" sai</b> quando a série tem janelas: somava as subidas de todas as janelas sobre o total de uma (173% numa semana de 5h). No lugar: janelas no intervalo e quantas esgotaram, pico médio e consumo médio por janela fechada.</p>
 <p class="note"><b>A semanal divide o gráfico com a intervalar (issue #320).</b> Antes ela só existia como tabela, e a progressão da 7d no intervalo não aparecia. Traço cheio na cor <code>output</code>, sem preenchimento, legenda escrita <code>5h</code>/<code>7d</code>; o valor da 7d no tooltip é casado pelo carimbo de tempo do ponto em foco. Com as duas séries o tracejado do período anterior some.</p>
 <p class="note"><b>«Hoje vs. mediana diária» fica ao lado de «vs. período anterior», e não junto da previsão</b>
 (issue #163). As duas respondem &ldquo;está mais ou menos que antes&rdquo;; a previsão responde &ldquo;quanto falta

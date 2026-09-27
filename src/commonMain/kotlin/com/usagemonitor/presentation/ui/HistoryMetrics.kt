@@ -161,10 +161,9 @@ internal fun historyMetricEntries(
                 label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
                 value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
             )
-            entries += HistoryMetricEntry(
-                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-                value = "${formatQuantity(series.deltaDisplayUsed)} req"
-            )
+            entries += windowEntriesOrConsumed(series, language) {
+                "${formatQuantity(series.deltaDisplayUsed)} req"
+            }
         } else {
             entries += HistoryMetricEntry(
                 label = if (language == AppLanguage.PT) "Requisições na janela" else "Requests in window",
@@ -184,10 +183,9 @@ internal fun historyMetricEntries(
             label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
             value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
         )
-        entries += HistoryMetricEntry(
-            label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
-            value = formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
-        )
+        entries += windowEntriesOrConsumed(series, language) {
+            formatPercentageOfTotal(series.deltaDisplayUsed.toDouble(), series.currentDisplayTotal)
+        }
         entries += HistoryMetricEntry(
             label = if (language == AppLanguage.PT) "Média por hora" else "Average per hour",
             value = formatPercentageOfTotal(series.averageDisplayConsumptionPerHour, series.currentDisplayTotal) + "/h"
@@ -229,6 +227,63 @@ internal fun historyMetricEntries(
     }
 
     return entries
+}
+
+/**
+ * O resumo das janelas no lugar de "Consumido no período" (issue #320).
+ *
+ * Aquela linha somava as subidas de todas as janelas do intervalo e dividia pelo
+ * total de uma: numa semana de janelas de 5h dava 173%, número que não responde
+ * pergunta nenhuma. Com janelas conhecidas a tabela diz quantas houve, quantas
+ * esgotaram e quanto cada uma costuma usar. Sem elas — cota sem reinício
+ * conhecido — a linha antiga fica, porque ali não há janela para contar.
+ */
+private fun windowEntriesOrConsumed(
+    series: UsageHistorySeries,
+    language: AppLanguage,
+    consumedValue: () -> String
+): List<HistoryMetricEntry> {
+    val stats = series.windowStats
+        ?: return listOf(
+            HistoryMetricEntry(
+                label = if (language == AppLanguage.PT) "Consumido no período" else "Consumed in range",
+                value = consumedValue()
+            )
+        )
+
+    val entries = mutableListOf(
+        HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Janelas no intervalo" else "Windows in range",
+            value = windowCountLabel(stats.windowCount, stats.exhaustedCount, language)
+        )
+    )
+    val averagePeak = stats.averagePeakPercent
+    if (averagePeak != null) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Pico médio por janela" else "Average peak per window",
+            value = "${averagePeak.roundToLong()} %"
+        )
+    }
+    val averageConsumed = stats.averageConsumedPercent
+    if (averageConsumed != null) {
+        entries += HistoryMetricEntry(
+            label = if (language == AppLanguage.PT) "Consumo médio por janela" else "Average use per window",
+            value = "${averageConsumed.roundToLong()} %"
+        )
+    }
+    return entries
+}
+
+internal fun windowCountLabel(windowCount: Int, exhaustedCount: Int, language: AppLanguage): String {
+    if (exhaustedCount == 0) {
+        return windowCount.toString()
+    }
+    val exhausted = if (language == AppLanguage.PT) {
+        if (exhaustedCount == 1) "1 esgotou" else "$exhaustedCount esgotaram"
+    } else {
+        "$exhaustedCount exhausted"
+    }
+    return "$windowCount · $exhausted"
 }
 
 /**

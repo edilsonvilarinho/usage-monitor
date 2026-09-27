@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -228,6 +229,36 @@ class HistoryViewModelTest {
         assertIs<HistoryUiState.Success>(state)
         assertEquals(accountB, state.selectedAccount)
         assertEquals(accountB.key, repo.lastAccountKey)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `selectQuotaView republishes without reading history again`() = runTest {
+        val repo = FakeRepo(report = emptyReport(ApiSource.ANTHROPIC))
+        val viewModel = HistoryViewModel(
+            getUsageHistory = GetUsageHistoryUseCase(repo) { now },
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
+        )
+        val initial = awaitNonLoading(viewModel)
+        assertIs<HistoryUiState.Success>(initial)
+        assertEquals(HistoryQuotaView.BOTH, initial.selectedQuotaView)
+
+        val callsBefore = repo.invocations
+        viewModel.selectQuotaView(HistoryQuotaView.WEEKLY)
+        repeat(5) { pauseForBackgroundWork() }
+
+        val state = viewModel.uiState.value
+        assertIs<HistoryUiState.Success>(state)
+        assertEquals(HistoryQuotaView.WEEKLY, state.selectedQuotaView)
+        assertEquals(callsBefore, repo.invocations)
+
+        // A escolha sobrevive à próxima leitura: trocar o intervalo não volta para "Ambas".
+        viewModel.selectRange(HistoryRange.LAST_7_DAYS)
+        awaitInvocations(repo, callsBefore + 1)
+        repeat(5) { pauseForBackgroundWork() }
+        val reloaded = awaitNonLoading(viewModel)
+        assertIs<HistoryUiState.Success>(reloaded)
+        assertEquals(HistoryQuotaView.WEEKLY, reloaded.selectedQuotaView)
         viewModel.onDestroy()
     }
 

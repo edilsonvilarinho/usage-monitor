@@ -57,6 +57,7 @@ recoleta.
 | A2 | refactor: move history chart drawing out of the chart composable (#320) | `gradlew.bat allTests` | 2254 testes, 0 falhas, 0 ignorados; `UsageHistoryLineChart.kt` 756 → 375 linhas, `UsageHistoryPlotDrawing.kt` 412; nenhum teste editado |
 | A3 | feat: overlay weekly quota on the history chart (#320) | `gradlew.bat allTests` | primeira passada: 2261 testes, 1 falha — `ArchitectureRulesTest`: `UsageHistoryLineChart` com 312 linhas (limite 300). Bolha do tooltip extraída para `HistoryTooltipLayer`; segunda passada 2261 testes, 0 falhas, 0 ignorados |
 | A4 | feat: per-window quota analysis for history series (#320) | `gradlew.bat allTests` | 2270 testes, 0 falhas, 0 ignorados; `QuotaWindowAnalysisTest` 8, `UsageHistoryRepositoryImplTest` 32 (inclui pico de 100% num índice que a amostragem do Total descarta) |
+| A5 | feat: 5h/7d/both quota selector in history (#320) | `gradlew.bat allTests` | 2277 testes, 0 falhas, 0 ignorados. No caminho, o teste antigo do card do Claude passou a achar dois nós "5h" (seletor e legenda); a asserção virou contagem de 2 |
 
 ## Problemas em aberto e riscos
 

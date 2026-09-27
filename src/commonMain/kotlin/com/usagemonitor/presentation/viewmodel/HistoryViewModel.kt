@@ -33,6 +33,7 @@ class HistoryViewModel(
     private val selectedSource = MutableStateFlow<ApiSource?>(null)
     private val selectedRange = MutableStateFlow(HistoryRange.LAST_24_HOURS)
     private val selectedAccountsBySource = mutableMapOf<ApiSource, UsageAccountKey>()
+    private val selectedQuotaView = MutableStateFlow(HistoryQuotaView.BOTH)
 
     init {
         refresh()
@@ -70,6 +71,23 @@ class HistoryViewModel(
 
         selectedRange.value = range
         refresh()
+    }
+
+    /**
+     * Troca a janela mostrada sem voltar ao banco: o relatório já traz as duas
+     * séries, e reler o SQLite para filtrar o que está em memória faria a tela
+     * piscar `Loading` por uma escolha puramente visual.
+     */
+    fun selectQuotaView(view: HistoryQuotaView) {
+        if (view == selectedQuotaView.value) {
+            return
+        }
+
+        selectedQuotaView.value = view
+        val current = _uiState.value
+        if (current is HistoryUiState.Success) {
+            _uiState.value = current.copy(selectedQuotaView = view)
+        }
     }
 
     fun selectAccount(account: UsageAccountContext) {
@@ -128,7 +146,8 @@ class HistoryViewModel(
                     selectedRange = selectedRange.value,
                     report = report,
                     availableAccounts = availableAccounts,
-                    selectedAccount = selectedAccount
+                    selectedAccount = selectedAccount,
+                    selectedQuotaView = selectedQuotaView.value
                 )
             )
         } catch (error: Throwable) {
