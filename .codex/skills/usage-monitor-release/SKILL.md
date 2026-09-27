@@ -34,7 +34,7 @@ Release this repository in a way that stays aligned with the current build, inst
    - commit the version bump with the temporary agent git identity
    - create the annotated tag `vX.Y.Z`
    - push `main` and the tag
-9. Watch the GitHub Actions workflow `Release Desktop Packages` and report the outcome. The `verify` job runs `allTests` in parallel with the build jobs and `publish-release` requires it, so a red `verify` produces workflow artifacts but no GitHub Release. The published release must carry every artifact family:
+9. Watch the GitHub Actions workflow `Release Desktop Packages` and report the outcome. The push to `main` publishes a SHA-specific `ci-release-gate-*` marker only after the remote CI suite and installer scenarios really ran. The tag workflow waits for that marker and lets `verify` reuse the successful gate; if the marker is absent, expired, invalid, or the GitHub API fails, `verify` runs its own `allTests` and installer scenarios as a safe fallback. `publish-release` still requires `verify`, so no release is published without one of those successful validations. The published release must carry every artifact family:
    - Windows: `UsageMonitor-Setup-X.Y.Z.exe`, the only Windows artifact. The `.msi` was dropped after v37 — both installers wrote to the same `%LOCALAPPDATA%\Usage Monitor` and an MSI install could never update itself.
    - Linux: `.deb`, `.rpm`, and `usage-monitor_X.Y.Z_linux_x64.tar.gz`
    - macOS: `usage-monitor_X.Y.Z_macos_arm64.dmg` and `usage-monitor_X.Y.Z_macos_x64.dmg`

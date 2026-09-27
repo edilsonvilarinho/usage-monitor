@@ -647,6 +647,51 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # O release dispara a partir da tag, mas o mesmo commit acabou de passar por
+  # este CI na main. Publicar um marcador explicito permite que o workflow de
+  # release reutilize essa verificacao em vez de rodar allTests e os cenarios do
+  # instalador Windows uma segunda vez.
+  #
+  # O `relevant` do `tests` e obrigatorio: um run verde que pulou a suite porque
+  # o gate encontrou uma arvore ja verificada nao e um gate de release novo.
+  # Sem marcador, o release cai de volta no proprio `verify`.
+  release-gate-marker:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.tests.result == 'success' &&
+      needs['installer-scenarios'].result == 'success' &&
+      needs['linux-updater-scenarios'].result == 'success' &&
+      needs.tests.outputs.relevant == 'true'
+    needs:
+      - tests
+      - installer-scenarios
+      - linux-updater-scenarios
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Prepare release gate marker
+        env:
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          printf 'commit=%s\nworkflow=CI\nrun=%s\nrepository=%s\n' \
+            "$SHA" "$RUN_ID" "$REPOSITORY" > release-gate.txt
+          cat release-gate.txt
+
+      - name: Upload release gate marker
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-release-gate-${{ github.sha }}
+          path: release-gate.txt
+          if-no-files-found: error
+          retention-days: 30
+
   # Par do job `gate`: publica o marcador de que a arvore deste run de PR passou
   # por tudo. `needs` sem `if: always()` so roda com os tres jobs verdes; e o
   # `relevant` do `tests` exige que a suite tenha rodado de fato -- check verde
