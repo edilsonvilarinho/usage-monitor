@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -61,6 +63,8 @@ import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.Clock
@@ -75,15 +79,15 @@ import kotlinx.datetime.Clock
  * geometria intacta, e esta janela é só do notch.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
- * 11, C11 do plano de execução): por isso ela só tem o tamanho da área aberta
- * enquanto o ponteiro está no notch. Ao entrar, a janela cresce **de uma vez** —
- * a área nova é transparente, o salto não se vê — e o balão entra dentro dela; ao
- * sair, o balão some e só depois a janela encolhe. O notch não anda na tela.
+ * 11, C11 do plano de execução). Por isso, parada, ela só aceita clique no notch:
+ * a janela tem sempre o tamanho da aberta (`hudDockedWindowBounds`) e a área de
+ * clique é recortada por `Window.shape` (`hudRestHitRegion`). Ao entrar, o
+ * recorte sai e o balão entra; ao sair, o balão some e só depois o recorte volta.
  *
- * Cresce **só para dentro da tela**: a janela parada já tem o comprimento da
- * aberta ao longo da borda (`hudRestWindowBounds`). Mudar a origem de uma janela
- * transparente mostra um quadro do conteúdo antigo no lugar novo — era o pisca ao
- * passar o ponteiro.
+ * A janela **não muda de origem nem de tamanho** entre parada e aberta. Mudar a
+ * origem de uma janela transparente mostra um quadro do conteúdo antigo no lugar
+ * novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e na de
+ * baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
  */
 @Composable
 internal fun HudWindowHost(
@@ -171,8 +175,8 @@ internal fun HudWindowHost(
     var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, screenArea)) }
     var hovered by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
-    // A janela no tamanho do painel aberto. Anda **antes** do conteúdo ao abrir e
-    // **depois** dele ao fechar — ver o KDoc.
+    // A área de clique da janela inteira, sem o recorte do notch parado. Sai
+    // **antes** do conteúdo ao abrir e volta **depois** dele ao fechar — ver o KDoc.
     var windowOpen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
@@ -187,9 +191,9 @@ internal fun HudWindowHost(
         if (hovered) {
             screenArea = resolveHudScreenArea(settings, hudScreenArea)
             windowOpen = true
-            // Um quadro para a janela crescer antes de o conteúdo começar a se
-            // abrir; sem ele a mola corre nos primeiros quadros dentro da janela
-            // pequena e sai recortada.
+            // Um quadro para o recorte sair antes de o conteúdo começar a se
+            // abrir; sem ele a mola corre nos primeiros quadros dentro do recorte
+            // do notch e o balão sai cortado.
             withFrameNanos { }
             expanded = true
         } else {
@@ -221,15 +225,16 @@ internal fun HudWindowHost(
         y = screenArea.y / scale,
         size = DpSize(screenArea.size.width / scale, screenArea.size.height / scale)
     )
-    // Aberta, a janela ganha o espaço do balão e o notch fica no mesmo ponto da
-    // tela (`hudOpenWindowBounds`); quem se ajusta a um canto é o balão.
+    // Parada e aberta a janela é a mesma, com o notch no mesmo ponto da tela; quem
+    // se ajusta a um canto é o balão. Parada, só o notch aceita clique.
     // Carregando, a janela é o notch com as alças — simétrico ao longo da borda,
     // então o centro dela continua sendo o do notch, que é o que o encaixe lê.
-    val bounds = when {
-        dragging -> hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
-        windowOpen -> hudOpenWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
-        else -> hudRestWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
+    val bounds = if (dragging) {
+        hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
+    } else {
+        hudDockedWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
+    val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes)
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
 
@@ -333,6 +338,12 @@ internal fun HudWindowHost(
     ) {
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
+        }
+        // Síncrono na aplicação da composição: o quadro seguinte, que o hover
+        // espera antes de abrir o balão, já sai sem o recorte.
+        val hitRegionApplier = remember { HudHitRegionApplier() }
+        SideEffect {
+            hitRegionApplier.apply(window, hitRegion, scale)
         }
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
@@ -503,4 +514,36 @@ private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: Screen
     val saved = readPersistedHudScreen(settings)
     val screens = availableScreens()
     return resolveScreen(screens, saved.id, saved.bounds)?.workArea ?: screens.firstOrNull()?.workArea ?: fallback
+}
+
+/**
+ * Aplica o recorte de clique da janela parada, ou o tira com a região nula.
+ *
+ * Guarda o último retângulo aplicado porque `Window.getShape()` devolve uma cópia
+ * em `Path2D`, que nunca é igual ao `Rectangle` pedido: comparar por ela
+ * refaria a região da janela no sistema a cada recomposição.
+ *
+ * `Window.shape` exige suporte a janela recortada (`PERPIXEL_TRANSPARENT`). Sem
+ * ele a HUD continua funcionando sem recorte: a área do balão volta a engolir
+ * clique, mas o notch não pisca — o defeito menor dos dois.
+ */
+private class HudHitRegionApplier {
+    private var applied: java.awt.Rectangle? = null
+    private var hasApplied = false
+
+    fun apply(window: java.awt.Window, region: DpRect?, scale: Float) {
+        val shape = region?.let { rect ->
+            val left = floor(rect.left.value * scale).toInt()
+            val top = floor(rect.top.value * scale).toInt()
+            val right = ceil(rect.right.value * scale).toInt()
+            val bottom = ceil(rect.bottom.value * scale).toInt()
+            java.awt.Rectangle(left, top, right - left, bottom - top)
+        }
+        if (hasApplied && shape == applied) {
+            return
+        }
+        hasApplied = true
+        applied = shape
+        runCatching { window.shape = shape }
+    }
 }
