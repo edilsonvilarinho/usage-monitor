@@ -82,53 +82,71 @@ class HudNotchGeometryTest {
     }
 
     /**
-     * Perto do canto a janela aberta é presa na tela, e centrar nela o notch o
-     * faria andar ao abrir. O notch fica onde estava; quem se ajusta é o balão.
+     * Perto do canto a janela é presa na tela, e centrar nela o notch o faria
+     * andar. O notch fica onde estava; quem se ajusta é o balão — e as alças cabem.
      */
     @Test
-    fun `abrir perto do canto nao move o notch na tela`() {
+    fun `perto do canto as alcas cabem na janela encaixada`() {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
             for (fraction in listOf(0f, 0.02f, 0.5f, 0.98f, 1f)) {
                 val sizes = hudNotchSizes(accounts, edge, "", true, false)
-                val closed = hudRestWindowBounds(edge, fraction, sizes, screen)
-                val open = hudOpenWindowBounds(edge, fraction, sizes, screen)
-                val closedCenter = (if (edge.isHorizontal) closed.x else closed.y) + closed.notchCenterInWindow
-                val openCenter = (if (edge.isHorizontal) open.x else open.y) + open.notchCenterInWindow
-                assertEquals(closedCenter, openCenter, "$edge em $fraction")
-                // As alças cabem na janela aberta, mesmo no canto.
-                val openAlong = if (edge.isHorizontal) open.size.width else open.size.height
+                val docked = hudDockedWindowBounds(edge, fraction, sizes, screen)
+                val along = if (edge.isHorizontal) docked.size.width else docked.size.height
                 val handlesHalf = (if (edge.isHorizontal) sizes.withHandles.width else sizes.withHandles.height) / 2
-                assertTrue(open.notchCenterInWindow - handlesHalf >= 0.dp, "$edge em $fraction: mão fora")
-                assertTrue(open.notchCenterInWindow + handlesHalf <= openAlong, "$edge em $fraction: engrenagem fora")
+                assertTrue(docked.notchCenterInWindow - handlesHalf >= 0.dp, "$edge em $fraction: mão fora")
+                assertTrue(docked.notchCenterInWindow + handlesHalf <= along, "$edge em $fraction: engrenagem fora")
             }
         }
     }
 
     /**
-     * Janela transparente que muda de origem mostra um quadro do conteúdo antigo
-     * no lugar novo — o notch pulava ao passar o ponteiro. Parada e aberta, ela
-     * tem o mesmo começo e o mesmo comprimento ao longo da borda; em cima e à
-     * esquerda a origem inteira fica, e a janela só cresce para dentro da tela.
+     * Issue #294: parada e aberta são a mesma janela, e só a área de clique muda.
+     * O recorte parado contém o notch inteiro com a margem de sombra, encosta na
+     * borda da tela, fica dentro da janela e deixa de fora o espaço do balão —
+     * senão aquele espaço transparente engoliria o clique da janela de baixo.
      */
     @Test
-    fun `abrir nao muda a origem da janela ao longo da borda`() {
+    fun `parada so o notch com a margem aceita clique em todas as bordas`() {
         val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
         for (edge in HudEdge.entries) {
             for (fraction in listOf(0f, 0.02f, 0.5f, 0.82f, 1f)) {
                 val sizes = hudNotchSizes(accounts, edge, "", true, false)
-                val rest = hudRestWindowBounds(edge, fraction, sizes, screen)
-                val open = hudOpenWindowBounds(edge, fraction, sizes, screen)
-                if (edge.isHorizontal) {
-                    assertEquals(rest.x, open.x, "$edge em $fraction: começo")
-                    assertEquals(rest.size.width, open.size.width, "$edge em $fraction: comprimento")
-                } else {
-                    assertEquals(rest.y, open.y, "$edge em $fraction: começo")
-                    assertEquals(rest.size.height, open.size.height, "$edge em $fraction: comprimento")
+                val window = hudDockedWindowBounds(edge, fraction, sizes, screen)
+                val region = hudRestHitRegion(edge, window, sizes)
+                val label = "$edge em $fraction"
+
+                // Dentro da janela.
+                assertTrue(region.left >= 0.dp && region.top >= 0.dp, "$label: começo")
+                assertTrue(region.right <= window.size.width && region.bottom <= window.size.height, "$label: fim")
+
+                // O notch inteiro, no ponto em que `HudNotch` o põe, com a margem ao longo.
+                val (notchX, notchY) = notchOrigin(edge, window, sizes)
+                val left = notchX.dp - window.x
+                val top = notchY.dp - window.y
+                val alongStart = if (edge.isHorizontal) left else top
+                val alongRegionStart = if (edge.isHorizontal) region.left else region.top
+                val alongRegionEnd = if (edge.isHorizontal) region.right else region.bottom
+                val notchAlong = if (edge.isHorizontal) sizes.collapsed.width else sizes.collapsed.height
+                assertEquals((alongStart - HUD_SHADOW_MARGIN).coerceAtLeast(0.dp), alongRegionStart, "$label: margem antes")
+                val windowAlong = if (edge.isHorizontal) window.size.width else window.size.height
+                assertEquals(
+                    (alongStart + notchAlong + HUD_SHADOW_MARGIN).coerceAtMost(windowAlong),
+                    alongRegionEnd,
+                    "$label: margem depois"
+                )
+
+                // Na espessura: da borda da tela até o notch mais a margem, e nada do balão.
+                val notchAcross = if (edge.isHorizontal) sizes.collapsed.height else sizes.collapsed.width
+                val reach = notchAcross + HUD_SHADOW_MARGIN
+                when (edge) {
+                    HudEdge.TOP -> assertEquals(0.dp to reach, region.top to region.bottom, label)
+                    HudEdge.BOTTOM -> assertEquals(window.size.height - reach to window.size.height, region.top to region.bottom, label)
+                    HudEdge.LEFT -> assertEquals(0.dp to reach, region.left to region.right, label)
+                    HudEdge.RIGHT -> assertEquals(window.size.width - reach to window.size.width, region.left to region.right, label)
                 }
-                if (edge == HudEdge.TOP || edge == HudEdge.LEFT) {
-                    assertEquals(rest.x to rest.y, open.x to open.y, "$edge em $fraction: origem")
-                }
+                val windowAcross = if (edge.isHorizontal) window.size.height else window.size.width
+                assertTrue(reach < windowAcross, "$label: o recorte não pode cobrir o balão")
             }
         }
     }
@@ -146,8 +164,7 @@ class HudNotchGeometryTest {
                 val sizes = hudNotchSizes(accounts, edge, "", true, false)
                 val drag = hudDragWindowBounds(edge, fraction, sizes, screen)
                 val atDrag = notchOrigin(edge, drag, sizes)
-                assertEquals(notchOrigin(edge, hudOpenWindowBounds(edge, fraction, sizes, screen), sizes), atDrag, "$edge em $fraction: aberta")
-                assertEquals(notchOrigin(edge, hudRestWindowBounds(edge, fraction, sizes, screen), sizes), atDrag, "$edge em $fraction: parada")
+                assertEquals(notchOrigin(edge, hudDockedWindowBounds(edge, fraction, sizes, screen), sizes), atDrag, "$edge em $fraction: encaixada")
                 // Simétrica: o centro da janela é o do notch, que é o que o encaixe lê.
                 val along = if (edge.isHorizontal) drag.size.width else drag.size.height
                 assertEquals(along / 2, drag.notchCenterInWindow, "$edge em $fraction: centro")
@@ -166,17 +183,16 @@ class HudNotchGeometryTest {
         val taskbarBottom = ScreenWorkArea(0.dp, 0.dp, DpSize(1920.dp, 1032.dp))
         val bottomSizes = hudNotchSizes(accounts, HudEdge.BOTTOM, "", true, false)
         for (bounds in listOf(
-            hudRestWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom),
-            hudOpenWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom),
+            hudDockedWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom),
             hudDragWindowBounds(HudEdge.BOTTOM, 0.5f, bottomSizes, taskbarBottom)
         )) {
             assertEquals(1032.dp, bounds.y + bounds.size.height)
         }
 
         val taskbarTopLeft = ScreenWorkArea(48.dp, 40.dp, DpSize(1872.dp, 1040.dp))
-        val top = hudRestWindowBounds(HudEdge.TOP, 0.5f, hudNotchSizes(accounts, HudEdge.TOP, "", true, false), taskbarTopLeft)
+        val top = hudDockedWindowBounds(HudEdge.TOP, 0.5f, hudNotchSizes(accounts, HudEdge.TOP, "", true, false), taskbarTopLeft)
         assertEquals(40.dp, top.y)
-        val left = hudRestWindowBounds(HudEdge.LEFT, 0.5f, hudNotchSizes(accounts, HudEdge.LEFT, "", true, false), taskbarTopLeft)
+        val left = hudDockedWindowBounds(HudEdge.LEFT, 0.5f, hudNotchSizes(accounts, HudEdge.LEFT, "", true, false), taskbarTopLeft)
         assertEquals(48.dp, left.x)
     }
 

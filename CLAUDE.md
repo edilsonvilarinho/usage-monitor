@@ -879,22 +879,26 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   para o topo e levada às outras bordas refletindo/girando os pontos, de controle inclusive.
   Profundidade `DIALOG`, brilho de topo, borda com luz.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
-  `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada tem a espessura do notch mais a margem
-  de sombra de 16dp, e só cresce quando o ponteiro entra: **de uma vez** (a área nova é transparente,
-  o salto não se vê), com o balão entrando **dentro** dela; ao sair, o balão
-  some (150ms de espera contra o `Exit` de um quadro na divisa) e a janela encolhe **depois** (200ms).
-  **Nenhum redimensionamento AWT por quadro** — era o tranco da barra anterior, que interpolava a
-  janela. O hover é a **união** de corpo, balão e alças: o caminho do anel ao balão passa pela cauda,
-  que é opaca e do balão.
-  - **A origem da janela não muda ao abrir** (`hudRestWindowBounds`, E11): parada ela já tem, ao longo
-    da borda, o comprimento da aberta, e cresce só para dentro da tela. Janela transparente que muda de
-    origem mostra um ou dois quadros do conteúdo antigo no lugar novo — medido no Windows 11 com
-    captura de tela: o notch pulava 60px e voltava a cada entrada e saída do ponteiro, com o
-    redimensionamento do Compose (tamanho e posição em duas chamadas AWT), com `setBounds` numa chamada
-    só e com ele aplicado antes do estado. Com a origem fixa, nenhum quadro fora do lugar. O preço são
-    as duas faixas de 38dp onde as alças aparecem, transparentes e engolindo clique também paradas.
-    Embaixo e à direita a origem ainda anda na espessura (o balão cresce para dentro), e ali sobra um
-    quadro em branco ao abrir.
+  `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada só aceita clique no notch: ela tem
+  sempre o tamanho da aberta, e a área de clique é recortada por `Window.shape` (`hudRestHitRegion`:
+  notch recolhido mais a margem de sombra de 16dp nas bordas de dentro). Quando o ponteiro entra o
+  recorte sai **antes** de o balão abrir; ao sair, o balão some (150ms de espera contra o `Exit` de um
+  quadro na divisa) e o recorte volta **depois** (200ms). **Nenhum redimensionamento AWT por quadro** —
+  era o tranco da barra anterior, que interpolava a janela. O hover é a **união** de corpo, balão e
+  alças: o caminho do anel ao balão passa pela cauda, que é opaca e do balão.
+  - **A janela não muda de origem nem de tamanho ao abrir** (`hudDockedWindowBounds`, issue #294).
+    Janela transparente que muda de origem mostra um ou dois quadros do conteúdo antigo no lugar novo
+    — medido no Windows 11 com captura de tela, com o redimensionamento do Compose (tamanho e posição
+    em duas chamadas AWT), com `setBounds` numa chamada só e com ele aplicado antes do estado. A E11
+    fixou a origem só ao longo da borda; na direita e embaixo a espessura ainda andava, e o notch da
+    direita aparecia 274px para dentro da tela a cada abrir e sumia a cada fechar (spike da #294:
+    39–49 de ~668 quadros fora do lugar). Com a janela fixa e o recorte alternando: **0 de 670**, e o
+    clique fora do recorte chega à janela de baixo (sem recorte, engolido).
+  - **O recorte também corta a pintura**, e por isso a sombra e os arcos de dica das alças cabem na
+    margem de 16dp. Sem suporte a `PERPIXEL_TRANSPARENT` o `setShape` lança e a HUD segue sem
+    recorte: a área do balão volta a engolir clique, mas o notch não pisca. **macOS e Linux não foram
+    medidos.** `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
+    em `Path2D`, que nunca é igual ao pedido.
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número
@@ -909,9 +913,8 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
     inteiro, e em densidade fracionária (115% sobre 125% do Windows) as diferenças somavam e a
     contagem, último item da faixa, quebrava em "04:5". Em densidade 1 — a dos testes de componente —
     as contas batem, e por isso só `HudNotchTextFitTest`, que varre 100%–200%, pega.
-  - **O centro do notch é preso reservando as alças, parado e aberto** (`reserveAlong`,
-    `hudRestWindowBounds`/`hudOpenWindowBounds`): com o mesmo recorte nos dois estados o notch não anda
-    na tela ao abrir perto de um canto, e as alças nunca ficam fora da tela. Durante o arrasto a janela
+  - **O centro do notch é preso reservando as alças** (`reserveAlong`, `hudDockedWindowBounds`): o
+    notch não anda na tela ao abrir perto de um canto, e as alças nunca ficam fora da tela. Durante o arrasto a janela
     é `withHandles`, simétrica, e o centro dela continua sendo o do notch.
   - **O arrasto parte de `hudDragWindowBounds` e mede pela janela de arrasto, nunca por `windowSize`**
     (issue #288). Só dá para pegar a mão com o notch aberto, e o gesto guarda os lambdas da composição
