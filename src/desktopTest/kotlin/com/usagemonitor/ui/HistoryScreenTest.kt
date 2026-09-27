@@ -1059,4 +1059,48 @@ class HistoryScreenTest {
         onAllNodesWithText("Ambas").assertCountEquals(0)
         viewModel.onDestroy()
     }
+
+    @Test
+    fun `history card lists quota windows and the hourly peak`() = runDesktopComposeUiTest(height = HISTORY_SCENE_HEIGHT) {
+        val interval = twoWindowSeries("Claude", PeriodType.INTERVAL, 40).copy(
+            windows = listOf(
+                com.usagemonitor.domain.entity.QuotaWindowSummary(
+                    firstObservedAt = Instant.parse("2026-05-07T08:00:00Z"),
+                    lastObservedAt = Instant.parse("2026-05-07T12:00:00Z"),
+                    resetsAt = Instant.parse("2026-05-07T12:00:00Z"),
+                    peakPercent = 100,
+                    exhaustedAt = Instant.parse("2026-05-07T11:30:00Z"),
+                    consumedPercent = 95.0,
+                    averagePercentPerHour = 24.0,
+                    isOpen = false
+                )
+            ),
+            hourlyDistribution = com.usagemonitor.domain.entity.QuotaHourlyDistribution(
+                List(24) { hour -> if (hour == 8) 95.0 else 0.0 }
+            )
+        )
+        val report = com.usagemonitor.domain.entity.ApiUsageHistoryReport(
+            source = ApiSource.ANTHROPIC,
+            range = HistoryRange.LAST_24_HOURS,
+            lastUpdatedAt = Instant.parse("2026-05-07T13:32:00Z"),
+            series = listOf(interval, twoWindowSeries("Claude", PeriodType.WEEKLY, 20))
+        )
+        val viewModel = historyViewModelFor(report)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                HistoryScreen(viewModel = viewModel, language = AppLanguage.PT, onBack = {}, showSourceSelector = false)
+            }
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            runCatching { onNodeWithText("Janelas 5h").fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        onNodeWithText("Janelas 5h").assertIsDisplayed()
+        onNodeWithText("3h 30min").assertIsDisplayed()
+        onNodeWithText("24 %/h").assertIsDisplayed()
+        onNodeWithText("Pico às 8h BRT · 100% do consumo").assertIsDisplayed()
+        // A semanal sem janelas nem distribuição não ganha painel vazio.
+        onAllNodesWithText("Janelas 7d").assertCountEquals(0)
+        viewModel.onDestroy()
+    }
 }

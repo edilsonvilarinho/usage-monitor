@@ -520,6 +520,7 @@ internal fun HistorySeriesCard(
                             language = language,
                             referenceAt = referenceAt
                         )
+                        HistoryWindowAnalysisPanel(series = series, accentColor = accentColor, language = language)
                     }
                     if (quotaView != HistoryQuotaView.INTERVAL) {
                         HistoryMetricsPanel(
@@ -529,6 +530,11 @@ internal fun HistorySeriesCard(
                             language = language,
                             referenceAt = referenceAt
                         )
+                        HistoryWindowAnalysisPanel(
+                            series = weeklySummary,
+                            accentColor = AppAccents.current.output,
+                            language = language
+                        )
                     }
                 } else {
                     HistoryMetrics(
@@ -537,6 +543,7 @@ internal fun HistorySeriesCard(
                         language = language,
                         referenceAt = referenceAt
                     )
+                    HistoryWindowAnalysisPanel(series = series, accentColor = accentColor, language = language)
                 }
             }
     }

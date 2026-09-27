@@ -84,21 +84,33 @@ export function History() {
       </div>
 
       <AppPanel>
-        <AppPanelHeader title="Reinícios de janela" subtitle="cada linha é um snapshot de reset registrado no banco local" />
+        {/* Uma linha por janela do intervalo, mais recentes primeiro (issue #320).
+            "Esgotou em" conta da primeira leitura da janela: o início nominal a
+            API não informa. */}
+        <AppPanelHeader title="Janelas 5h" subtitle="5 janelas no intervalo" />
         <AppDataTable
           columns={[
-            { key: 'quando', label: 'Reset' },
-            { key: 'pico', label: 'Pico antes do reset', numeric: true },
-            { key: 'media', label: 'Média/h', numeric: true },
-            { key: 'delta', label: 'vs. anterior', numeric: true }
+            { key: 'inicio', label: 'Início observado' },
+            { key: 'pico', label: 'Pico', numeric: true },
+            { key: 'esgotou', label: 'Esgotou em', numeric: true },
+            { key: 'ritmo', label: 'Ritmo', numeric: true }
           ]}
           rows={[
-            { id: 1, quando: 'Qua 13/08 08h00 BRT', pico: '81%', media: '3,4%', delta: '+9%' },
-            { id: 2, quando: 'Ter 12/08 03h00 BRT', pico: '72%', media: '3,0%', delta: '+2%' },
-            { id: 3, quando: 'Seg 11/08 22h00 BRT', pico: '70%', media: '2,9%', delta: '−4%' },
-            { id: 4, quando: 'Seg 11/08 17h00 BRT', pico: '74%', media: '3,1%', delta: '+6%' }
+            { id: 1, inicio: '13/08 08:05 BRT · atual', pico: '68 %', esgotou: '—', ritmo: '23 %/h' },
+            { id: 2, inicio: '13/08 03:02 BRT', pico: '100 %', esgotou: '3h 12min', ritmo: '31 %/h' },
+            { id: 3, inicio: '12/08 21:58 BRT', pico: '74 %', esgotou: '—', ritmo: '16 %/h' },
+            { id: 4, inicio: '12/08 16:55 BRT', pico: '81 %', esgotou: '—', ritmo: '17 %/h' }
           ]}
         />
+        <AppPanelBody>
+          <AppKey>Consumo por hora do dia (BRT)</AppKey>
+          <svg viewBox="0 0 700 58" style={{ display: 'block', width: '100%', height: 56 }} role="img" aria-label="Pico às 14h BRT">
+            {[2, 0, 0, 0, 0, 0, 0, 0, 6, 18, 30, 34, 22, 28, 48, 40, 30, 20, 12, 8, 6, 4, 2, 2].map((h, i) => (
+              <rect key={i} x={i * 29 + 4} y={56 - h} width="20" height={h} rx="2" fill="var(--anthropic)" />
+            ))}
+          </svg>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)' }}>Pico às 14h BRT · 15% do consumo</span>
+        </AppPanelBody>
       </AppPanel>
     </AppWindowFrame>
   );
