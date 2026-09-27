@@ -285,7 +285,7 @@ object HelpCatalog {
                     "\"Padrão\", \"Somente os cards\" ou \"Barra HUD\".",
                 "No modo Somente cards, o mesmo menu está na faixa revelada ao passar o mouse no " +
                     "topo — troca direto para a Barra HUD sem passar pelo Padrão.",
-                "Na Barra HUD, clique na engrenagem da ponta do notch e escolha \"Padrão\" ou " +
+                "Na Barra HUD, passe o ponteiro sobre a engrenagem da ponta do notch e escolha \"Padrão\" ou " +
                     "\"Somente os cards\"; o botão direito sobre o notch troca direto para " +
                     "Somente cards.",
                 "Pelas Configurações: abra \"Geral\" e use \"Somente os cards\" ou \"Barra HUD\".",
@@ -546,7 +546,7 @@ object HelpCatalog {
                     "\"Standard\", \"Cards only\" or \"HUD strip\".",
                 "In Cards only mode, the same menu is in the strip revealed by hovering the top — " +
                     "it jumps straight to the HUD strip without going through Standard.",
-                "On the HUD strip, click the gear at the end of the notch and pick \"Standard\" or " +
+                "On the HUD strip, hover the gear at the end of the notch and pick \"Standard\" or " +
                     "\"Cards only\"; the right mouse button over the notch switches straight to " +
                     "Cards only.",
                 "From Settings: open \"General\" and use \"Cards only\" or \"HUD strip\".",

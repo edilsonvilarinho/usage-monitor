@@ -14,6 +14,7 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlin.test.Test
@@ -51,6 +52,42 @@ class DashboardViewModelIncrementalTest : DashboardViewModelTestSupport() {
 
         anthropicGate.complete(Result.success(sampleAnthropicStats))
         awaitConditionRealTime { (viewModel.uiState.value as? UiState.Success)?.data?.size == 2 }
+        viewModel.onDestroy()
+    }
+
+    /**
+     * `awaitSettledState` espera a coleta inteira, não o primeiro `Success`. O
+     * MiniMax só falha depois de a Anthropic estar na tela, e o estado parcial,
+     * sem o erro, é exatamente o que o helper devolvia — o CI da PR #321 pegou
+     * isso em `classifies MiniMax inactive plan for persistent warning without toast`.
+     */
+    @Test
+    fun `settled state waits for the slower source instead of the first publication`() = runTest {
+        val unused = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        lateinit var viewModel: DashboardViewModel
+        viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(object : AnthropicRepository {
+                override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+            }),
+            GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage(): Result<ApiUsageStats> {
+                    while ((viewModel.uiState.value as? UiState.Success)?.data.isNullOrEmpty()) delay(10)
+                    return Result.failure(IllegalStateException("Chave da API MiniMax não configurada."))
+                }
+            }),
+            GetCodexUsageUseCase(object : CodexRepository { override suspend fun getUsage() = unused }),
+            GetDeepSeekUsageUseCase(object : DeepSeekRepository { override suspend fun getUsage() = unused }),
+            defaultEnabledApis(),
+            historyUseCase(mutableListOf()),
+            clock = Clock.System,
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+        val state = assertIs<UiState.Success>(awaitSettledState(viewModel))
+
+        assertEquals(listOf(ApiSource.ANTHROPIC), state.data.map { it.source })
+        assertEquals(listOf(ApiSource.MINIMAX), state.errors.map { it.source })
         viewModel.onDestroy()
     }
 

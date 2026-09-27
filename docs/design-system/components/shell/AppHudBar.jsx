@@ -75,7 +75,8 @@ export function AppHudBar({
     </div>
   );
 
-  // Alças: mão na ponta de perto (move), engrenagem na de longe (ações do app).
+  // Alças: mão na ponta de perto (move), engrenagem na de longe (ações do app,
+  // abertas no hover como o balão do anel — #317).
   // A atualização pendente (#291) é um ponto no canto da engrenagem, não um ícone
   // na faixa; a frase vai no rótulo, porque cor nunca informa sozinha.
   const handle = (glyph, title, dot) => (

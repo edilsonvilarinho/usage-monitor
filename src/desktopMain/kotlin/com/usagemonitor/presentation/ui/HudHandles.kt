@@ -106,7 +106,8 @@ internal fun HudMoveHandle(
 }
 
 /**
- * A engrenagem na outra ponta: um clique abre o que ela oferece.
+ * A engrenagem na outra ponta: o ponteiro em cima abre o que ela oferece
+ * (#317), e o clique também.
  *
  * Com [badgeTone], um ponto no canto de cima — a atualização pendente (issue
  * #291). Ele substitui o ícone de celular com seta que ficava na faixa de anéis,

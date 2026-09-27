@@ -93,7 +93,7 @@ export function Hud() {
         tem o tamanho da área aberta enquanto o ponteiro está no notch: cresce de uma vez ao
         entrar e encolhe depois de o balão sair, sem mover o notch. Só a mão move (solte perto de
         qualquer borda: ele gruda na mais próxima, gravado como borda + fração); a engrenagem abre
-        as ações do rodapé. Clique num anel atualiza aquela conta; botão direito vai direto a
+        as ações do rodapé no hover, como o anel (#317). Clique num anel atualiza aquela conta; botão direito vai direto a
         "Somente cards"; "Padrão" na engrenagem, Ctrl+Shift+H e a bandeja voltam à janela. O arco
         fino de sessão ativa gira em órbita por fora do anel e o anel de fora pulsa em atenção só com a animação contínua
         ligada — nunca em testes nem capturas.
