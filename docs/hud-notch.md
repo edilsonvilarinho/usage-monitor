@@ -226,9 +226,17 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
   fica parado e o pulso some; a palavra continua dizendo o estado.
+  - **Mais suave desde a #322.** A órbita virou **cometa**: 130° com a cauda num gradiente que se
+    dissolve até sumir e um ponto na cabeça, uma volta em 2,4s (era um segmento chapado de 90° em
+    1,4s, que lia como indicador de carregamento). A atenção **respira** em vez de piscar: o arco fica
+    entre 0,8 e 1 de opacidade e um halo com o dobro do traço, até 28% de opacidade, cresce e some em
+    1,6s com aceleração suave nas pontas (era o arco inteiro oscilando 0,35↔1 em 0,9s). E na primeira
+    composição os arcos **se desenham** a partir de zero pela mola `GENTLE`, escalonados de fora para
+    dentro em `AppMotion.stagger` — antes surgiam cheios. Com "Reduzir animações" nascem no valor.
   - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
     comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
-    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3dp) além dos 44dp do anel,
+    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3,4dp, contando a cabeça do
+    cometa) além dos 44dp do anel,
     fora dos limites do `Canvas`, e cabe no respiro de 8dp do notch e na metade do vão de 12dp entre
     anéis — `HudNotchGeometryTest` afirma as duas coisas.
   - **O Codex tem sonda própria** (`LocalCodexActivityDataSource`, E10): o índice de sessões é só do

@@ -1035,7 +1035,9 @@ class HudNotchTest {
                         }
                     }
                 }
-                mainClock.advanceTimeBy(400)
+                // Depois do desenho de entrada dos arcos (issue #322), que é
+                // finito e acontece com qualquer política não reduzida.
+                mainClock.advanceTimeBy(RING_ENTRANCE_SETTLE_MILLIS)
                 first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
                 mainClock.advanceTimeBy(350)
                 second = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
@@ -1047,6 +1049,39 @@ class HudNotchTest {
         assertTrue(differs(liveA, liveB), "com a política contínua o arco devia ter girado")
         val (staticA, staticB) = frames(AppMotionPolicy.Static)
         assertTrue(!differs(staticA, staticB), "sem a política o arco devia ficar parado")
+    }
+
+    /**
+     * Na primeira composição o arco se desenha a partir de zero (issue #322):
+     * no quadro inicial ele ainda não está lá, e depois está. Com "Reduzir
+     * animações" o primeiro quadro já é o final.
+     */
+    @Test
+    fun `o arco se desenha na entrada e nasce pronto com reduzir animacoes`() {
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var settled: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                setContent {
+                    AppTheme(isDark = true, motion = policy) {
+                        Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
+                            AppUsageRing(arcs = listOf(AppRingArc(0.6f, AppTone.OK)), description = "anel")
+                        }
+                    }
+                }
+                mainClock.advanceTimeByFrame()
+                first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(RING_ENTRANCE_SETTLE_MILLIS)
+                settled = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+            }
+            return first to settled
+        }
+
+        val (animatedStart, animatedEnd) = frames(AppMotionPolicy.Static)
+        assertTrue(differs(animatedStart, animatedEnd), "o arco devia se desenhar depois do primeiro quadro")
+        val (reducedStart, reducedEnd) = frames(AppMotionPolicy.Reduced)
+        assertTrue(!differs(reducedStart, reducedEnd), "com reduzir animações o arco devia nascer pronto")
     }
 
     /**
@@ -1194,6 +1229,8 @@ class HudNotchTest {
     }
 
     private val RING_FRAME = "ringFrame"
+    /** Folga para o desenho de entrada dos arcos assentar (mola `GENTLE` + escalonamento). */
+    private val RING_ENTRANCE_SETTLE_MILLIS = 1_500L
 
     /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */
     private fun ComposeUiTest.hoverRing(description: String) {
