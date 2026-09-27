@@ -147,9 +147,7 @@ class ArchitectureRulesTest {
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/UsageHistoryLineChart.kt" to 1293,
             "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt" to 1223,
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt" to 1144,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/AppControls.kt" to 1138,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/HistoryScreen.kt" to 1095,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/AppStructure.kt" to 1018,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamPresenceScreen.kt" to 1013,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899,
             "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/TeamUsageViewModel.kt" to 863

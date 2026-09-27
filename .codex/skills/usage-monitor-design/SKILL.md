@@ -32,7 +32,9 @@ system — precedência*.
 
 - **Nenhuma tela reimplementa uma primitiva.** Antes de escrever `Surface`, `Card`,
   `Modifier.border`, `.background` com cor de superfície ou `RoundedCornerShape`, procure em
-  `presentation/ui/components/AppStructure.kt`, `AppControls.kt` e `AppStates.kt`.
+  `presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e nos vizinhos
+  `AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt` e
+  `AppTooltip.kt`.
 - **Primitiva construída e não adotada não conserta nada.** O commit que cria e o que consome são o
   mesmo.
 - **Cor de acento vem de `AppAccents.current` e `AppTone`**, nunca de `darkAppAccents` /

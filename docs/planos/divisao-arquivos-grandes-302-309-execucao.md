@@ -46,6 +46,7 @@ arquivo-deus nem composable-deus novo, sem mudar comportamento, `gradlew.bat all
 |---|---|---|---|
 | A0 | Plano | `docs: plan split of oversized files (#302-#309)` | — |
 | A1 | `AutoStartResult`, `AutoStartCommandResult` e os dois conversores saem para `AutoStartResult.kt`; os conversores passam de `private` a `internal`. `AutoStartManager.kt` 805 → 761 linhas, fora da lista | `refactor: split AutoStartManager below 800 lines (#309)` | `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "*AutoStart*"`: 38 testes, 0 falhas |
+| A2 | `AppControls.kt` 1.138 → 620 linhas: menu → `AppMenu.kt`, tooltip → `AppTooltip.kt`, chips de alternância/cor/glifo → `AppChips.kt`. `AppStructure.kt` 1.018 → 677: modificadores de profundidade → `AppSurfaceDepth.kt`, abas → `AppTabs.kt`, navegação lateral das Configurações → `AppSettingsNav.kt`. `CONTROL_HEIGHT` e `DISABLED_ALPHA` passam a `internal`. `CLAUDE.md` e as duas cópias da skill de design apontam os arquivos novos | `refactor: split AppControls and AppStructure below 800 lines (#308)` | `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.ui.App*"`: 57 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

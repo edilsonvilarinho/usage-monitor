@@ -518,7 +518,9 @@ precisão.
 
 **Nenhuma tela reimplementa uma primitiva.** Antes de escrever `Surface`, `Card`, `Modifier.border`,
 `.background` com cor de superfície ou `RoundedCornerShape`, procure em
-`presentation/ui/components/AppStructure.kt`, `AppControls.kt` e `AppStates.kt`. Se a primitiva não
+`presentation/ui/components/` — `AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e os vizinhos
+`AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt` e
+`AppTooltip.kt`, que saíram dos dois primeiros pelo limite de 800 linhas (#308). Se a primitiva não
 existir, o commit que a cria e o commit que a consome são o mesmo — primitiva construída e não
 adotada não conserta nada, e é exatamente assim que `AppWindowScaffold`, `AppToolbar`, `AppTooltip` e
 `AppEmptyState` ficaram meses com adoção zero.
@@ -627,7 +629,8 @@ coluna; `body*` é **sans**, onde mora o texto corrido. **Não** usar `composeRe
 assíncrona e o `ScreenshotGenerator` renderiza offscreen com relógio manual — captura com fonte de
 fallback é falha silenciosa.
 
-**Primitivas** (`presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt`):
+**Primitivas** (`presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e os
+arquivos `App*.kt` vizinhos — abas, navegação lateral, profundidade, chips, menu e tooltip):
 todas stateless. Corpo de janela com barra de estado, barra de controles, superfície de dados,
 cabeçalho de seção com marcador de 2dp, linha de dados com divisória própria, bloco de métrica,
 faixa de legendas de coluna com valor de célula, abas sublinhadas, controle segmentado, chip de
