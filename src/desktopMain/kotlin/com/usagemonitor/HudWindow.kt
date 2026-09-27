@@ -442,6 +442,7 @@ private fun HudWindowAppBalloon(
 ) {
     HudAppBalloonContent(
         language = language,
+        appVersion = CURRENT_APP_VERSION,
         countdown = nextRefreshAt?.let { refreshAt ->
             {
                 HudCountdown(
