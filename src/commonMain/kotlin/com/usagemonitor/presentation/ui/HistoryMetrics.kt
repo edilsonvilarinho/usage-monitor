@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
@@ -261,7 +262,11 @@ private fun MetricItem(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.End,
-            maxLines = 1,
+            // Duas linhas, com reticências: com `maxLines = 1` e o `Clip` padrão,
+            // "A janela deve reiniciar antes do limite" saía cortada a meia palavra
+            // na coluna direita, sem sinal de que faltava texto (issue #320).
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
     }

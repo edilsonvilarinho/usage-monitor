@@ -53,6 +53,7 @@ recoleta.
 | # | Commit | Comando | Resultado |
 |---|---|---|---|
 | A0 | docs: plan for history 5h/7d view and HUD status pill (#320, #322) | revisão do diff | documento criado |
+| A1 | fix: wrap history forecast metric instead of clipping it (#320) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HistoryScreenTest"` | 9 testes, 0 falhas. Com `maxLines = 1` restaurado o teste novo falha: "previsão com 16 px contra 16 px de uma linha" |
 
 ## Problemas em aberto e riscos
 

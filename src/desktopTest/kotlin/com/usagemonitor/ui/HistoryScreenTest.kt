@@ -1,6 +1,12 @@
 package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.height
+import com.usagemonitor.presentation.ui.HistoryMetricTable
+import com.usagemonitor.presentation.ui.HistoryMetricEntry
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -887,5 +893,30 @@ class HistoryScreenTest {
         onNodeWithText("0 req/h").assertIsDisplayed()
         onAllNodesWithText("0 / 100 %").assertCountEquals(0)
         viewModel.onDestroy()
+    }
+
+    @Test
+    fun `forecast metric wraps instead of being clipped in a narrow column`() = runDesktopComposeUiTest {
+        val forecast = "A janela deve reiniciar antes do limite"
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(520.dp)) {
+                    HistoryMetricTable(
+                        entries = listOf(
+                            HistoryMetricEntry("Uso atual", "44 / 100 %"),
+                            HistoryMetricEntry("Consumido no período", "23 %"),
+                            HistoryMetricEntry("Média por hora", "1 %/h"),
+                            HistoryMetricEntry("Previsão", forecast)
+                        )
+                    )
+                }
+            }
+        }
+
+        // Com `maxLines = 1` o nó tinha a altura de uma linha e o texto saía
+        // cortado (issue #320); a altura é o que prova a segunda linha.
+        val oneLine = onNodeWithText("1 %/h").fetchSemanticsNode().size.height
+        val wrapped = onNodeWithText(forecast).fetchSemanticsNode().size.height
+        assertTrue(wrapped > oneLine * 3 / 2, "previsão com $wrapped px contra $oneLine px de uma linha")
     }
 }
