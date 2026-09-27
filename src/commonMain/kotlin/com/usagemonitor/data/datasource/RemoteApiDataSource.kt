@@ -11,6 +11,7 @@ import com.usagemonitor.data.dto.OpenRouterCreditsResponse
 import com.usagemonitor.data.mapper.resolveExtraCredits
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
@@ -32,6 +33,9 @@ import kotlinx.serialization.json.jsonObject
  */
 private const val CLAUDE_USER_AGENT = "claude-code/1.0.0"
 private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
+
+/** O GET de uso da Anthropic; a renovação do token tem o próprio prazo, de 25 s. */
+private const val ANTHROPIC_USAGE_TIMEOUT_MILLIS = 15_000L
 private const val GITHUB_API_VERSION = "2022-11-28"
 private const val USAGE_MONITOR_USER_AGENT = "UsageMonitorDesktop"
 
@@ -60,6 +64,8 @@ open class RemoteApiDataSource(
     open suspend fun fetchAnthropicUsage(accessToken: String): AnthropicUsageResponse {
         val response = requireSuccess(
             response = httpClient.get("https://api.anthropic.com/api/oauth/usage") {
+                // Prazo próprio, separado do da renovação do token (issue #269).
+                timeout { requestTimeoutMillis = ANTHROPIC_USAGE_TIMEOUT_MILLIS }
                 header("Authorization", "Bearer $accessToken")
                 header("User-Agent", CLAUDE_USER_AGENT)
                 header("anthropic-beta", ANTHROPIC_BETA_OAUTH)

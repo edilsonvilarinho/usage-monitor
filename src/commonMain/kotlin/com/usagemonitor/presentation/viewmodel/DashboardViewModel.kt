@@ -204,6 +204,7 @@ class DashboardViewModel(
     )
     val appUpdateState: StateFlow<AppUpdateUiState?> = updates.state
     private val stateMutex = Mutex()
+    private val historyMutex = Mutex()
     private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
     private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
     private val cachedRiskByTarget = mutableMapOf<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>()
@@ -442,85 +443,26 @@ class DashboardViewModel(
         markRefreshing(effectiveTargets, refreshing = true)
         val anthropicOrder = anthropicStaggerOrder(effectiveTargets)
 
-        val statsUpdates = mutableMapOf<UsageTargetKey, ApiUsageStats>()
-        val errorUpdates = mutableMapOf<UsageTargetKey, UiApiError?>()
-
         try {
-            val fetchResults = coroutineScope {
+            coroutineScope {
                 effectiveTargets.map { target ->
                     async {
                         // Contas Anthropic devidas juntas saem espaçadas: rajada nos
                         // endpoints de uso e de token é o que o ai-usagebar viu virar 429.
                         val order = anthropicOrder[target] ?: 0
                         if (order > 0) delay(config.anthropicStagger * order)
-                        sourceFetchSemaphore.withPermit {
-                            target to runCatching {
-                                withTimeout(config.perSourceTimeout) {
+                        val result = sourceFetchSemaphore.withPermit {
+                            runCatching {
+                                withTimeout(config.timeoutFor(target.source)) {
                                     fetchTarget(target).getOrThrow()
                                 }
                             }
                         }
+                        // Cada fonte entra na tela quando chega (issue #269): antes a
+                        // mais lenta segurava todas até o `awaitAll`.
+                        applyFetchResult(target, result, snapshotCapturedAt)
                     }
                 }.awaitAll()
-            }
-
-            fetchResults.forEach { (target, result) ->
-                result
-                    .onSuccess { stats ->
-                        if (isPersistableDashboardStats(stats)) {
-                            scheduler.recordSuccess(target, snapshotCapturedAt)
-                            statsUpdates[target] = stats
-                            errorUpdates[target] = null
-                            persistSnapshot(stats, snapshotCapturedAt)
-                            refreshHistoryDerivedState(target, stats, snapshotCapturedAt)
-                        } else {
-                            errorUpdates[target] = failures.handle(
-                                target,
-                                IllegalStateException(
-                                    "A resposta do Codex não trouxe nenhuma janela utilizável."
-                                )
-                            )
-                        }
-                    }
-                    .onFailure { error ->
-                        errorUpdates[target] = failures.handle(target, error)
-                    }
-            }
-
-            stateMutex.withLock {
-                val latestEnabledTargets = enabledTargets()
-                pruneDisabledTargets(latestEnabledTargets)
-
-                effectiveTargets.forEach { target ->
-                    val stats = statsUpdates[target]
-
-                    if (stats != null) {
-                        cachedStatsByTarget[target] = stats
-                        cachedErrorsByTarget.remove(target)
-                    } else {
-                        val retained = statsRetainedAfterFailure(
-                            target = target,
-                            existingStats = cachedStatsByTarget[target],
-                            lastSuccessAt = scheduler.lastSuccessAt(target),
-                            error = errorUpdates[target],
-                            now = snapshotCapturedAt
-                        )
-                        if (retained == null) {
-                            cachedStatsByTarget.remove(target)
-                        } else {
-                            cachedStatsByTarget[target] = retained
-                        }
-
-                        val errorMessage = errorUpdates[target]
-                        if (errorMessage == null) {
-                            cachedErrorsByTarget.remove(target)
-                        } else {
-                            cachedErrorsByTarget[target] = errorMessage
-                        }
-                    }
-                }
-
-                publishUiState(latestEnabledTargets)
             }
 
             // Os resets recém-coletados podem ser anteriores ao alvo em que o
@@ -532,6 +474,49 @@ class DashboardViewModel(
         } finally {
             markRefreshing(effectiveTargets, refreshing = false)
         }
+    }
+
+    /** O resultado de um alvo, aplicado e publicado sozinho. */
+    private suspend fun applyFetchResult(target: UsageTargetKey, result: Result<ApiUsageStats>, capturedAt: Instant) {
+        var stats: ApiUsageStats? = null
+        var error: UiApiError? = null
+        result
+            .onSuccess { fetched ->
+                if (isPersistableDashboardStats(fetched)) {
+                    scheduler.recordSuccess(target, capturedAt)
+                    stats = fetched
+                    // Sequencial, como era no laço único: a conexão do SQLite é
+                    // serializada e disputada pelo indexador de sessões CLI.
+                    historyMutex.withLock {
+                        persistSnapshot(fetched, capturedAt)
+                        refreshHistoryDerivedState(target, fetched, capturedAt)
+                    }
+                } else {
+                    error = failures.handle(target, IllegalStateException("A resposta do Codex não trouxe nenhuma janela utilizável."))
+                }
+            }
+            .onFailure { failure -> error = failures.handle(target, failure) }
+
+        stateMutex.withLock {
+            val latestEnabledTargets = enabledTargets()
+            pruneDisabledTargets(latestEnabledTargets)
+            if (target in latestEnabledTargets) {
+                applyTargetOutcome(target, stats, error, capturedAt)
+            }
+            publishUiState(latestEnabledTargets)
+        }
+    }
+
+    /** Sob o [stateMutex]: a leitura nova, ou a anterior mantida (`statsRetainedAfterFailure`) com o erro. */
+    private fun applyTargetOutcome(target: UsageTargetKey, stats: ApiUsageStats?, error: UiApiError?, now: Instant) {
+        if (stats != null) {
+            cachedStatsByTarget[target] = stats
+            cachedErrorsByTarget.remove(target)
+            return
+        }
+        val retained = statsRetainedAfterFailure(target, cachedStatsByTarget[target], scheduler.lastSuccessAt(target), error, now)
+        if (retained == null) cachedStatsByTarget.remove(target) else cachedStatsByTarget[target] = retained
+        if (error == null) cachedErrorsByTarget.remove(target) else cachedErrorsByTarget[target] = error
     }
 
     fun clearToast() {

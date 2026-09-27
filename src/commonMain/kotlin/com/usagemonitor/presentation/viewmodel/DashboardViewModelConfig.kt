@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.ApiSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlin.time.Duration
@@ -30,6 +31,17 @@ data class DashboardViewModelConfig(
     val updateCheckIntervalWhileRunning: Duration = 10.minutes,
     val perSourceTimeout: Duration = 20.seconds,
     /**
+     * Fontes que precisam de mais que [perSourceTimeout] (issue #269). A Anthropic
+     * soma a renovação do token (25 s) ao GET de uso (15 s): com os dois dentro
+     * de 20 s, uma renovação lenta matava a coleta antes de o GET sair. O
+     * Antigravity espera o CLI até 45 s, e o prazo da fonte fica acima para a
+     * mensagem de timeout do processo chegar em vez da genérica.
+     */
+    val perSourceTimeoutOverrides: Map<ApiSource, Duration> = mapOf(
+        ApiSource.ANTHROPIC to 45.seconds,
+        ApiSource.ANTIGRAVITY to 50.seconds
+    ),
+    /**
      * Folga somada ao `periodEndAt` antes de coletar por causa de um reset.
      *
      * O reset da Anthropic não é instantâneo: bater no endpoint no milissegundo
@@ -48,4 +60,6 @@ data class DashboardViewModelConfig(
      * rebaixaria ~120 MB a cada ciclo de 10 min — algo como 17 GB por dia.
      */
     val updateRetryBackoff: List<Duration> = listOf(30.minutes, 2.hours, 6.hours)
-)
+) {
+    fun timeoutFor(source: ApiSource): Duration = perSourceTimeoutOverrides[source] ?: perSourceTimeout
+}
