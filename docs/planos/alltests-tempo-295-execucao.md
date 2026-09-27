@@ -31,8 +31,12 @@
 
 ## Fora de escopo
 
-- `compileKotlinDesktop` (~95 s): a causa é `main()` gigante em `Main.kt`, já documentada; outra issue.
-- Build cache não evita recompilar em PR, porque as fontes mudam sempre.
+- `compileKotlinDesktop` (~80–95 s no CI): **causa não medida**. Uma versão anterior deste plano a atribuía ao
+  `main()` gigante sem evidência. Medido localmente (daemon quente, 16 processadores): 71.269 linhas em 19,3 s,
+  e 4 vCPU com JVM fria explicam a diferença sem essa hipótese. A função gigante existe (`runUsageMonitor`,
+  ~2.400 linhas) e já tem motivo documentado para ser quebrada (OOM no ASM): issue #298, que também mede.
+- Build cache não evita recompilar em PR: o PR só lê o cache da `main` (`cache-read-only`), e mudança em
+  `src/*Main` erra a entrada. Verificado nos logs dos runs `36278024325` e `36280893779`.
 
 ## Pontos de situação
 
@@ -46,4 +50,4 @@
 | A04 | H3 medida: decodificação 311 quadros ~0,2 s; `frameAt` 18,4 s e `toPixelMap` 9,1 s — o custo era `Image.makeFromBitmap(...).toComposeImageBitmap()` (redesenho por `Canvas`). `makeClone()` testado e **recusado**: compartilha pixels (teste novo `a published frame keeps its pixels...` reprova). Cópia de bytes (`readPixels` → `installPixels`) | `gradlew.bat desktopTest --tests "com.usagemonitor.help.*"` | verde, 9 testes; `plays every frame...` 35 s → 0,9 s. Pendente: olhar a demo na janela de Ajuda (`gradlew.bat run`, F1) |
 | A04b | Medição no CI do PR #297 (A02–A04) | run `36280083466` | verde; job `tests` 10m50s → 7m42s; `desktopTest` 7m15s → 3m32s (soma 461 → 306 s). Caminho crítico: `ComponentTest` 120 s num fork só, começando aos 61 s. Arranque até a compilação 85 s contra 24 s antes, causa não verificada |
 | A05 | `ComponentTest` dividido por tela em `ComponentTest` (78), `SettingsDialogContentTest` (17) e `HistoryScreenTest` (8); `HISTORY_SCENE_HEIGHT` foi para o `HistoryScreenTest`, único que o usa | `gradlew.bat allTests -PtestForks=3` | verde, 2211 testes; local 36 / 36 / 29 s contra 97 s numa classe só |
-| A06 | Medição no CI com A05 | run `36280893779` | verde, 2211 testes; job `tests` **5m49s** (antes 10m50s); `desktopTest` 7m15s → 2m43s; `BUILD SUCCESSFUL in 5m 13s`. O que sobra é compilação (~2m20s, `main()` gigante, fora de escopo) e `HistoryScreenTest` agendado por último num fork (começa aos 114 s) |
+| A06 | Medição no CI com A05 | run `36280893779` | verde, 2211 testes; job `tests` **5m49s** (antes 10m50s); `desktopTest` 7m15s → 2m43s; `BUILD SUCCESSFUL in 5m 13s`. O que sobra é compilação (~2m20s, causa não medida, issue #298) e `HistoryScreenTest` agendado por último num fork (começa aos 114 s) |
