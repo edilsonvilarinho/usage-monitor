@@ -148,6 +148,26 @@ data class HudAccount(
             return rings.indexOfFirst { ring -> ring === current }.takeIf { index -> index >= 0 } ?: 0
         }
 
+    /**
+     * A linha de [stripLines] cujo número vai no tom de risco (issue #322), ou
+     * `null` quando nenhuma: a conta não está em atenção ou a cota em foco não
+     * tem anel (quarta cota). Só em atenção ou pior — "Normal" já está escrito na
+     * pílula, e pintar de verde todo número em dia só somaria cor sem dizer nada.
+     * O rótulo da janela continua neutro; é o número da pior que ganha o tom, ao
+     * lado da palavra que diz o estado.
+     */
+    val emphasizedStripLineIndex: Int?
+        get() {
+            if (!needsAttention) {
+                return null
+            }
+            val current = focus ?: return null
+            if (rings.size <= 1) {
+                return 0
+            }
+            return rings.indexOfFirst { ring -> ring === current }.takeIf { index -> index >= 0 }
+        }
+
     /** Atenção ou pior: é o que acende o pulso âmbar do anel. */
     val needsAttention: Boolean
         get() = tone == AppTone.WARNING || tone == AppTone.CRITICAL

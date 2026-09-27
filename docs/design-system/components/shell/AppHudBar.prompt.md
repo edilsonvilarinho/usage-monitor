@@ -103,3 +103,7 @@ foreground color — the arcs around it already carry the risk colors. The accou
 title ("Anthropic — Padrão", never just "Padrão"). Rings are 44dp so the mark stays legible with three arcs (14dp; it was 8.4dp at 36dp, issue #322). The tray icon
 tooltip summarises every account with its focus percentage **and its window** ("7d 72%"), cut at
 Windows' 127 characters — one entry per window would overflow with three accounts.
+
+**Worst window in the tone (issue #322).** In `Atenção`/`Crítico` the percentage of the window that
+caused the state is painted in the tone; its window label stays muted, and accounts on track keep every
+number neutral. The pill next to it writes the state, so color still never informs alone.

@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
@@ -128,6 +129,7 @@ internal fun HudRingStrip(
 
 /** A pílula de estado de cada conta; os testes medem ela contra a geometria. */
 internal const val HUD_STATUS_PILL_TEST_TAG = "hud-status-pill"
+internal const val HUD_STRIP_LINE_TEST_TAG = "hud-strip-line"
 
 @Composable
 private fun HudRingItem(
@@ -236,8 +238,13 @@ private fun HudRingItem(
     // medem — a costura com a geometria.
     val lines: @Composable () -> Unit = {
         val stripLines = if (compact) listOf(account.focusLine) else account.stripLines
+        // Compacta, a linha única já é a cota em foco.
+        val emphasized = if (compact) account.emphasizedStripLineIndex?.let { 0 } else account.emphasizedStripLineIndex
+        val emphasisColor = account.tone.color()
         Column(horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start) {
-            stripLines.forEach { line -> HudStripLineText(line) }
+            stripLines.forEachIndexed { index, line ->
+                HudStripLineText(line, percentColor = if (index == emphasized) emphasisColor else null)
+            }
         }
     }
     // A palavra do estado em pílula tonal (issue #322): solta, ela tinha o
@@ -279,19 +286,24 @@ private fun HudRingItem(
 }
 
 /**
- * "7d 72%": a janela no tom secundário e o número no do texto. A cor do risco
- * fica no arco e na palavra — aqui ela diria o estado só pela cor. Sem rótulo é
- * o percentual de sempre, em `labelMedium`.
+ * "7d 72%": a janela no tom secundário e o número no do texto. Sem rótulo é o
+ * percentual de sempre, em `labelMedium`.
+ *
+ * [percentColor] pinta só o número da pior janela em atenção (issue #322). Isso
+ * não faz a cor informar sozinha: a pílula ao lado escreve o estado, e o tom do
+ * número só aponta **qual** janela o causou.
  */
 @Composable
-private fun HudStripLineText(line: HudStripLine) {
+private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
+    val numberColor = percentColor ?: MaterialTheme.colorScheme.onSurface
     val label = line.label
     if (label == null) {
         Text(
             text = line.percentText,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1
+            color = numberColor,
+            maxLines = 1,
+            modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG)
         )
         return
     }
@@ -299,11 +311,12 @@ private fun HudStripLineText(line: HudStripLine) {
         text = buildAnnotatedString {
             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(label) }
             append(" ")
-            append(line.percentText)
+            withStyle(SpanStyle(color = numberColor)) { append(line.percentText) }
         },
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 1
+        maxLines = 1,
+        modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG)
     )
 }
 

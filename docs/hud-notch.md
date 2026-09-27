@@ -25,7 +25,11 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **Era um número só, o da cota em foco, sem dizer a janela** (issue #286). O foco é o pior risco, e
     ele troca de janela sozinho: o mesmo lugar dizia 45% numa coleta e 72% na seguinte sem nada ter
     mudado no consumo. As linhas não mudam de lugar. A janela vai em `onSurfaceVariant` e o número em
-    `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha. Conta
+    `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha.
+    **Exceção desde a #322** (`HudAccount.emphasizedStripLineIndex`): em `Atenção`/`Crítico` o
+    **número** da pior janela vai no tom — a pílula ao lado escreve o estado, e o tom só aponta qual
+    janela o causou. Em dia nenhum número ganha cor: pintar de verde todo percentual somaria cor sem
+    informar nada. O rótulo da janela continua neutro. Conta
     de cota única continua com o número em `labelMedium`, sem rótulo. O preço é a espessura: cada
     janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima fica nos 44dp do anel
     com uma, 46dp com duas e 60dp com três (a palavra em pílula, #322). **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de

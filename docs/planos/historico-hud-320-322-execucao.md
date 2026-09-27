@@ -62,6 +62,7 @@ recoleta.
 | A7 | feat: keep history content on screen while reloading (#320) | `gradlew.bat allTests --rerun` | 2284 testes, 0 falhas, 0 ignorados. Antes: três passadas com `DashboardViewModelRefreshPersistenceTest` vermelho (timeout de tempo real) enquanto existia o teste novo `selectSource still goes through Loading`; `main` num worktree deu 2253/0; sem os dois testes novos 2283/0; só com `selectRange keeps the previous content` 2284/0. O teste de troca de fonte saiu — ver achados |
 | B1 | feat: enlarge HUD ring to 44dp so provider marks stay legible (#322) | `gradlew.bat allTests` | 2285 testes, 0 falhas, 0 ignorados; marca 25,2 / 19,6 / 14dp (1/2/3 arcos); `hudRest()` do gerador de capturas (64dp) comporta 44 + 2×8 |
 | B2 | feat: tonal status pill for HUD accounts (#322) | `gradlew.bat allTests` e `gradlew.bat allTests --rerun` | Primeiro os testes novos pegaram dois defeitos: pílula até 0,6dp mais larga que a estimativa entre 110% e 144% (folga de 1dp adicionada) e verde do tema claro a 4,16:1 com fundo a 14% (fundo baixado para 8%, pior caso 4,53:1). Suíte: 1ª passada 2288 testes com 1 falha em `DashboardViewModelRefreshPersistenceTest` (a mesma do A7); 2ª passada 2288, 0 falhas |
+| B3 | feat: tint the worst window percentage in the HUD (#322) | `gradlew.bat allTests` | 2291 testes, 0 falhas, 0 ignorados; `HudModelTest` 34 (3 novos: pior janela destacada na ordem dos anéis, nenhuma em dia, cota única). A cor em si não tem teste de pixel — o que é afirmado é o índice que o modelo entrega |
 
 ## Problemas em aberto e riscos
 
