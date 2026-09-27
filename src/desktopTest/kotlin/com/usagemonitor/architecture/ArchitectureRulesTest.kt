@@ -145,7 +145,6 @@ class ArchitectureRulesTest {
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt" to 1676,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt" to 1589,
             "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt" to 1223,
-            "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt" to 1144,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamPresenceScreen.kt" to 1013,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899,
             "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/TeamUsageViewModel.kt" to 863
@@ -154,8 +153,6 @@ class ArchitectureRulesTest {
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FUNCTION_CEILINGS = mapOf(
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483,
-            "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt::HudNotch" to 348,
-            "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt::HudWindowHost" to 335,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt::TeamUsageList" to 327
         )
     }
