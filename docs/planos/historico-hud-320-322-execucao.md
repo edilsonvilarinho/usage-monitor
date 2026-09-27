@@ -65,6 +65,7 @@ recoleta.
 | B3 | feat: tint the worst window percentage in the HUD (#322) | `gradlew.bat allTests` | 2291 testes, 0 falhas, 0 ignorados; `HudModelTest` 34 (3 novos: pior janela destacada na ordem dos anéis, nenhuma em dia, cota única). A cor em si não tem teste de pixel — o que é afirmado é o índice que o modelo entrega |
 | B4 | feat: pulse the HUD provider mark when a collection finishes (#322) | `gradlew.bat allTests` | 2294 testes, 0 falhas, 0 ignorados; `HudMarkPulseTest` 3, `HudNotchTest` 44 |
 | B5 | feat: smoother HUD ring motion — comet orbit, breathing halo, draw-in (#322) | `gradlew.bat allTests` e `--rerun` | pedido após o B4 ("deixar mais suave e mais elegante"). 1ª passada 2295 com a falha instável conhecida do dashboard; 2ª passada 2295, 0 falhas. Teste novo de entrada falharia no código anterior (arco nascia no valor); o teste da órbita passou a capturar depois da entrada. `appUsageRingOrbitReach` passou a contar a cabeça do cometa (3,4dp) |
+| B6 | feat: idle glint on HUD ring arcs (#322) | `gradlew.bat allTests` | pedido após o B5 ("os círculos estão muito estáticos mesmo sem atualização"). 2296 testes, 0 falhas. Teste novo mediu 136 pixels mudando entre 6,0s e 6,5s em `Static`; bissecção: com o reflexo desligado continuava, sem o escalonamento da entrada sumia — escalonamento retirado |
 | — | verificação no app e capturas | `gradlew.bat run`, `generateScreenshots`, `generateHelpMedia` | **pendente** — não executado nesta sessão |
 
 ## Problemas em aberto e riscos
@@ -105,3 +106,7 @@ recoleta.
 - **Não verificado no app.** Nada desta branch foi olhado em `gradlew.bat run`: HUD no topo e na
   lateral, escalas 100% e 115%, 1366px, tema claro e escuro, "Reduzir animações"; Histórico da
   Anthropic e do Codex com o seletor. Capturas do README e mídia de ajuda não foram regeneradas.
+- **B5/B6 — escalonamento da entrada dos arcos retirado.** O B5 fazia os arcos se desenharem de fora
+  para dentro com espera; primeiro por `delay`, depois por quadros (`withFrameMillis`). Nos dois
+  casos, com dois arcos e relógio manual, o de dentro ainda mudava 6s depois (136 pixels). Sem o
+  escalonamento o teste passa. O mecanismo exato não foi confirmado; os arcos agora entram juntos.

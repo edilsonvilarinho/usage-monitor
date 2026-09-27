@@ -231,8 +231,16 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     1,4s, que lia como indicador de carregamento). A atenção **respira** em vez de piscar: o arco fica
     entre 0,8 e 1 de opacidade e um halo com o dobro do traço, até 28% de opacidade, cresce e some em
     1,6s com aceleração suave nas pontas (era o arco inteiro oscilando 0,35↔1 em 0,9s). E na primeira
-    composição os arcos **se desenham** a partir de zero pela mola `GENTLE`, escalonados de fora para
-    dentro em `AppMotion.stagger` — antes surgiam cheios. Com "Reduzir animações" nascem no valor.
+    composição os arcos **se desenham** a partir de zero pela mola `GENTLE`, juntos — antes surgiam
+    cheios. Com "Reduzir animações" nascem no valor. Houve escalonamento de fora para dentro por espera
+    em quadros; no relógio manual dos testes o arco de dentro não assentava (medido: 136 pixels mudando
+    entre 6,0s e 6,5s), e ele foi retirado.
+  - **Reflexo em repouso** (issue #322, pedido depois: "os círculos estão muito estáticos mesmo sem
+    atualização"). Com a política contínua, um reflexo branco de 48° com cauda que some corre dentro de
+    cada arco, do início até a ponta, com opacidade subindo e descendo por um seno (pico 42%). Uma
+    volta a cada 4,2s, dos quais pouco mais da metade é pausa; cada arco de dentro sai 22% da volta
+    atrasado, então o anel nunca acende inteiro. O reflexo nunca passa da ponta do arco — ali ele
+    mentiria um percentual maior — e arco com menos de 12° não o recebe.
   - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
     comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
     atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3,4dp, contando a cabeça do

@@ -1052,6 +1052,58 @@ class HudNotchTest {
     }
 
     /**
+     * Em repouso — sem sessão, sem atenção, sem coleta — o reflexo corre pelos
+     * arcos com a política contínua (issue #322), e sem ela o anel fica parado.
+     */
+    @Test
+    fun `o reflexo corre pelo anel parado so com a politica continua`() {
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var second: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                setContent {
+                    AppTheme(isDark = true, motion = policy) {
+                        Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
+                            AppUsageRing(
+                                arcs = listOf(AppRingArc(0.8f, AppTone.OK), AppRingArc(0.6f, AppTone.WARNING)),
+                                description = "anel"
+                            )
+                        }
+                    }
+                }
+                mainClock.advanceTimeBy(RING_ENTRANCE_SETTLE_MILLIS)
+                first = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(500)
+                second = onNodeWithTag(RING_FRAME).captureToImage().toPixelMap()
+            }
+            return first to second
+        }
+
+        val (liveA, liveB) = frames(AppMotionPolicy.Live)
+        assertTrue(differs(liveA, liveB), "com a política contínua o reflexo devia ter andado")
+        val (staticA, staticB) = frames(AppMotionPolicy.Static)
+        assertTrue(!differs(staticA, staticB), "sem a política o anel parado não devia mudar: ${diffReport(staticA, staticB)}")
+    }
+
+    private fun diffReport(a: PixelMap, b: PixelMap): String {
+        var count = 0
+        var maxDelta = 0f
+        val where = mutableListOf<String>()
+        for (y in 0 until minOf(a.height, b.height)) {
+            for (x in 0 until minOf(a.width, b.width)) {
+                if (a[x, y] != b[x, y]) {
+                    count++
+                    val d = maxOf(kotlin.math.abs(a[x, y].red - b[x, y].red), kotlin.math.abs(a[x, y].green - b[x, y].green), kotlin.math.abs(a[x, y].alpha - b[x, y].alpha))
+                    maxDelta = maxOf(maxDelta, d)
+                    if (where.size < 5) where += "($x,$y)"
+                }
+            }
+        }
+        return "px=$count maxDelta=$maxDelta size=${a.width}x${a.height} em $where"
+    }
+
+    /**
      * Na primeira composição o arco se desenha a partir de zero (issue #322):
      * no quadro inicial ele ainda não está lá, e depois está. Com "Reduzir
      * animações" o primeiro quadro já é o final.
@@ -1229,7 +1281,7 @@ class HudNotchTest {
     }
 
     private val RING_FRAME = "ringFrame"
-    /** Folga para o desenho de entrada dos arcos assentar (mola `GENTLE` + escalonamento). */
+    /** Folga para o desenho de entrada dos arcos assentar (mola `GENTLE`). */
     private val RING_ENTRANCE_SETTLE_MILLIS = 1_500L
 
     /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */

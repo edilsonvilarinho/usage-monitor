@@ -24,8 +24,10 @@ status word sit beside it; `label` carries account, word and every quota for ass
 A quota without a forecast has a **dashed** track: no color can suggest a verdict nobody computed.
 
 **Motion.** Each arc follows the `GENTLE` spring — no rebound past the value — and on first composition
-draws in from zero, staggered outer to inner by `AppMotion.stagger` (issue #322; reduced motion starts
-at the value). Arc color changes over `AppMotion.slow`. Two continuous signals,
+draws in from zero (issue #322; reduced motion starts at the value). At rest, behind
+`AppMotionPolicy.continuous`, a 48° white glint with a fading tail runs inside each arc from start to tip
+(sine-eased opacity, peak 42%, one pass every 4.2s with a pause, inner arcs 22% of a cycle later); it
+never passes the tip, where it would suggest a higher percentage, and skips arcs under 12°. Arc color changes over `AppMotion.slow`. Two continuous signals,
 both only behind `AppMotionPolicy.continuous` (off in tests and capture generators): a thin `--info`
 comet orbiting **outside** the rings — 130° whose tail fades to nothing through a sweep gradient, with a
 dot at the head, one turn per 2.4s (issue #322; it was a flat 90° segment at 1.4s and read as a loading

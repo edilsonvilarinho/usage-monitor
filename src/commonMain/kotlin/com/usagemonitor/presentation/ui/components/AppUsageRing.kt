@@ -15,9 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -25,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.contentDescription
@@ -38,7 +37,6 @@ import com.usagemonitor.presentation.ui.theme.appSpringSpec
 import com.usagemonitor.presentation.ui.theme.appTween
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlinx.coroutines.delay
 
 /** Um arco do anel: quanto da cota foi usado e em que tom. */
 @Immutable
@@ -69,7 +67,7 @@ data class AppRingArc(
  * Movimento:
  * - Cada arco anda pela mola `GENTLE`, sem rebote — arco que passa do valor e
  *   volta mostra um percentual que não é verdade. Na primeira composição ele se
- *   desenha a partir de zero, de fora para dentro (issue #322).
+ *   desenha a partir de zero (issue #322).
  * - [active] (sessão CLI com turno nos últimos 5 min) desenha um cometa fino
  *   girando **em órbita por fora** do anel, e [attention] faz respirar um halo
  *   atrás do arco de [attentionIndex] — o da cota em foco; os dois **só** com
@@ -108,18 +106,15 @@ fun AppUsageRing(
     // a ordem dos estados lembrados não depender de quantas cotas a conta tem.
     //
     // O arco surgia cheio na primeira composição, e o anel parecia colado na tela
-    // em vez de medir alguma coisa (issue #322). Agora ele parte de zero, com um
-    // escalonamento curto de fora para dentro; cada leitura seguinte anda da
-    // posição atual pela mesma mola. Com "Reduzir animações" nasce no valor.
+    // em vez de medir alguma coisa (issue #322). Agora ele parte de zero; cada
+    // leitura seguinte anda da posição atual pela mesma mola. Com "Reduzir
+    // animações" nasce no valor. Os arcos entram juntos: o escalonamento de fora
+    // para dentro, feito por espera em quadros, deixava o arco de dentro sem
+    // assentar no relógio manual dos testes, e foi retirado.
     val sweeps = List(MAX_RING_ARCS) { index ->
         val target = arcs.getOrNull(index)?.fraction?.coerceIn(0f, 1f) ?: 0f
         val sweep = remember { Animatable(if (policy.reduced) target else 0f) }
-        var entered by remember { mutableStateOf(policy.reduced) }
         LaunchedEffect(target, policy) {
-            if (!entered) {
-                delay(index * AppMotion.stagger)
-                entered = true
-            }
             sweep.animateTo(target, appSpringSpec(AppMotion.Springs.GENTLE, policy, visibilityThreshold = 0.001f))
         }
         sweep.asState()
@@ -165,6 +160,23 @@ fun AppUsageRing(
         null
     }
     val pulse = if (breath == null) 1f else RING_BREATH_MIN_ALPHA + (1f - RING_BREATH_MIN_ALPHA) * breath
+    // Brilho em repouso (issue #322: "os círculos estão muito estáticos mesmo
+    // sem atualização"). Um reflexo curto percorre cada arco do início até a
+    // ponta e some, com uma pausa antes da próxima volta; os arcos saem
+    // defasados, então o anel nunca acende inteiro de uma vez. O comprimento do
+    // arco — o dado — não muda: o brilho corre **dentro** dele.
+    val glint = if (policy.continuous) {
+        val transition = rememberInfiniteTransition(label = "appUsageRingGlint")
+        val value by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = GLINT_CYCLE_SPAN,
+            animationSpec = infiniteRepeatable(tween(RING_GLINT_MILLIS, easing = LinearEasing)),
+            label = "appUsageRingGlintPhase"
+        )
+        value
+    } else {
+        null
+    }
 
     Canvas(
         modifier = modifier
@@ -221,6 +233,15 @@ fun AppUsageRing(
                     size = arcSize,
                     style = Stroke(width = strokePx, cap = StrokeCap.Round)
                 )
+                if (glint != null) {
+                    drawRingGlint(
+                        phase = glint - index * GLINT_ARC_DELAY,
+                        sweep = sweep,
+                        topLeft = topLeft,
+                        arcSize = arcSize,
+                        strokePx = strokePx
+                    )
+                }
             }
         }
         if (active) {
@@ -265,6 +286,44 @@ fun AppUsageRing(
     }
 }
 
+/**
+ * O reflexo de um arco na fase [phase]: 0..1 corre do início até a ponta, fora
+ * disso não desenha (é a pausa entre voltas). Um trecho de [GLINT_SPAN_DEGREES]
+ * com a cauda num gradiente que some, preso ao arco — nunca passa da ponta, onde
+ * mentiria um percentual maior. Entra e sai com a opacidade seguindo um seno,
+ * para não acender nem apagar de uma vez.
+ */
+private fun DrawScope.drawRingGlint(phase: Float, sweep: Float, topLeft: Offset, arcSize: Size, strokePx: Float) {
+    if (phase <= 0f || phase >= 1f || sweep < GLINT_MIN_SWEEP_DEGREES) {
+        return
+    }
+    val head = -90f + sweep * phase
+    val visible = minOf(GLINT_SPAN_DEGREES, head + 90f)
+    if (visible <= 0f) {
+        return
+    }
+    val strength = GLINT_MAX_ALPHA * sin(Math.PI * phase).toFloat()
+    val light = Color.White.copy(alpha = strength)
+    val trail = Brush.sweepGradient(
+        0f to light,
+        GLINT_HEAD_EDGE to Color.Transparent,
+        1f - GLINT_SPAN_DEGREES / 360f to Color.Transparent,
+        1f to light,
+        center = Offset(topLeft.x + arcSize.width / 2f, topLeft.y + arcSize.height / 2f)
+    )
+    rotate(degrees = head, pivot = Offset(topLeft.x + arcSize.width / 2f, topLeft.y + arcSize.height / 2f)) {
+        drawArc(
+            brush = trail,
+            startAngle = -visible,
+            sweepAngle = visible,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokePx, cap = StrokeCap.Butt)
+        )
+    }
+}
+
 /** Os anéis concêntricos que cabem em 28dp sem virar alvo de tiro. */
 const val MAX_RING_ARCS = 3
 
@@ -280,6 +339,16 @@ fun appUsageRingOrbitReach(stroke: Dp, gap: Dp): Dp {
 }
 
 private const val RING_TRACK_WEIGHT = 1.6f
+/** Uma volta do reflexo; a fase vai até [GLINT_CYCLE_SPAN], e o que passa de 1 é pausa. */
+private const val RING_GLINT_MILLIS = 4_200
+private const val GLINT_CYCLE_SPAN = 1.9f
+/** Quanto cada arco de dentro sai atrasado em relação ao de fora, em fração da volta. */
+private const val GLINT_ARC_DELAY = 0.22f
+private const val GLINT_SPAN_DEGREES = 48f
+private const val GLINT_MAX_ALPHA = 0.42f
+private const val GLINT_HEAD_EDGE = 0.004f
+/** Arco curto demais não tem onde o reflexo correr; fica parado. */
+private const val GLINT_MIN_SWEEP_DEGREES = 12f
 private const val RING_SPIN_MILLIS = 2_400
 private const val RING_BREATH_MILLIS = 1_600
 private const val RING_BREATH_MIN_ALPHA = 0.8f
