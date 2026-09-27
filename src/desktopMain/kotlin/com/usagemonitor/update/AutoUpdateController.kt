@@ -6,7 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.CURRENT_APP_VERSION
-import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
+import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.shouldDiscardUpdateArtifacts

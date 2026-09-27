@@ -162,6 +162,7 @@ import com.usagemonitor.presentation.ui.TeamPresenceScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.exportRequestForDashboard
+import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
@@ -759,6 +760,7 @@ private fun runUsageMonitor(
             syncCliSessionIndex = syncCliSessionIndex,
             getCliUsageBreakdown = GetCliUsageBreakdownUseCase(cliSessionRepository),
             exportWriter = usageExportWriter,
+            exportEncoder = DefaultUsageExportEncoder,
             getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(cliSessionRepository),
             getStalledCliSessions = getStalledCliSessions,
             stallThresholdProvider = { alertSettingsFlow.value.effectiveStallThresholdMillis },
@@ -773,6 +775,7 @@ private fun runUsageMonitor(
             getSessions = GetCodexCliSessionsUseCase(codexCliSessionRepository),
             getDetail = GetCodexCliSessionDetailUseCase(codexCliSessionRepository),
             exportWriter = usageExportWriter,
+            exportEncoder = DefaultUsageExportEncoder,
             liveIntervalMillis = CLI_SESSION_LIVE_INTERVAL_MILLIS,
             autoLoad = false,
             breadcrumbs = breadcrumbs
@@ -1802,7 +1805,7 @@ private fun runUsageMonitor(
         // Retrato do Dashboard (issue #215): mesmo `usageExportWriter` que
         // Sessões CLI e Time já usam, um diálogo de arquivo só.
         exportSnapshot = { stats ->
-            usageExportWriter.write(exportRequestForDashboard(stats, Clock.System.now()))
+            usageExportWriter.write(exportRequestForDashboard(DefaultUsageExportEncoder, stats, Clock.System.now()))
         },
         onExportFailure = { error ->
             breadcrumbs.recordFailure("exportar retrato do dashboard", error)

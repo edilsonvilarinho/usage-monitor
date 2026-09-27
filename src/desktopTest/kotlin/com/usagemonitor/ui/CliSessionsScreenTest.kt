@@ -20,7 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionDetail

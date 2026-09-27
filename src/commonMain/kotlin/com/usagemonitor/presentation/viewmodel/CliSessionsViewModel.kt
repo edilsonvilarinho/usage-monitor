@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
+import com.usagemonitor.domain.repository.UsageExportEncoder
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.AccountCreditUsage
@@ -64,6 +65,8 @@ class CliSessionsViewModel(
     private val getCliUsageBreakdown: GetCliUsageBreakdownUseCase? = null,
     /** Destino da exportação. `null` = sem exportação, como nos recursos opcionais. */
     private val exportWriter: UsageExportWriter? = null,
+    /** Serialização CSV/JSON. `null` desliga só a exportação de texto; o PDF não passa por ela. */
+    private val exportEncoder: UsageExportEncoder? = null,
     /** Orçamento mensal. `null` esconde o cartão. */
     private val getMonthlyBudgetStatus: GetMonthlyBudgetStatusUseCase? = null,
     /**
@@ -214,10 +217,12 @@ class CliSessionsViewModel(
      */
     fun exportCurrentView(format: UsageExportFormat) {
         val writer = exportWriter ?: return
+        val encoder = exportEncoder ?: return
         val current = _uiState.value as? CliSessionsUiState.Success ?: return
 
         val request = when (current.view) {
             CliSessionsView.SESSIONS -> exportRequestForSessions(
+                encoder = encoder,
                 sessions = current.sessions,
                 range = current.range,
                 format = format,
@@ -226,6 +231,7 @@ class CliSessionsViewModel(
             CliSessionsView.BREAKDOWN -> {
                 val breakdown = current.breakdown ?: return
                 exportRequestForBreakdown(
+                    encoder = encoder,
                     breakdown = breakdown,
                     range = current.range,
                     format = format,

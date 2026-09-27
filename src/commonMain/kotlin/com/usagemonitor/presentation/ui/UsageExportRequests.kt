@@ -3,9 +3,7 @@ package com.usagemonitor.presentation.ui
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import com.usagemonitor.data.export.UsageExportFormat
-import com.usagemonitor.data.export.UsageExporter
-import com.usagemonitor.data.export.CodexCliUsageExporter
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
@@ -13,6 +11,7 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.repository.UsageExportEncoder
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
 import com.usagemonitor.presentation.ui.report.UsageReportDocument
 
@@ -38,9 +37,11 @@ data class UsageExportRequest(
  * Monta o conteúdo da exportação.
  *
  * Função pura: quem grava é a camada desktop, que recebe isto pronto. É o que
- * permite testar o formato sem tocar em disco nem abrir diálogo.
+ * permite testar o formato sem tocar em disco nem abrir diálogo. O texto sai de
+ * [UsageExportEncoder], porta do domain implementada em `data`.
  */
 fun exportRequestForSessions(
+    encoder: UsageExportEncoder,
     sessions: List<CliSessionSummary>,
     range: CliSessionRange,
     format: UsageExportFormat,
@@ -49,11 +50,12 @@ fun exportRequestForSessions(
 ): UsageExportRequest {
     return UsageExportRequest(
         suggestedFileName = exportFileName("sessions", range, format, now, timeZone),
-        payload = UsageExportPayload.Text(UsageExporter.exportSessions(sessions, format))
+        payload = UsageExportPayload.Text(encoder.encodeSessions(sessions, format))
     )
 }
 
 fun exportRequestForBreakdown(
+    encoder: UsageExportEncoder,
     breakdown: CliUsageBreakdown,
     range: CliSessionRange,
     format: UsageExportFormat,
@@ -62,11 +64,12 @@ fun exportRequestForBreakdown(
 ): UsageExportRequest {
     return UsageExportRequest(
         suggestedFileName = exportFileName("breakdown", range, format, now, timeZone),
-        payload = UsageExportPayload.Text(UsageExporter.exportBreakdown(breakdown, format))
+        payload = UsageExportPayload.Text(encoder.encodeBreakdown(breakdown, format))
     )
 }
 
 fun exportRequestForCodexCliSessions(
+    encoder: UsageExportEncoder,
     sessions: List<CodexCliSessionSummary>,
     range: CodexCliSessionRange,
     format: UsageExportFormat,
@@ -83,7 +86,7 @@ fun exportRequestForCodexCliSessions(
     }
     return UsageExportRequest(
         suggestedFileName = "usage-monitor-codex-cli-$rangeSlug-${local.year}-$month-$day.${format.extension}",
-        payload = UsageExportPayload.Text(CodexCliUsageExporter.exportSessions(sessions, format))
+        payload = UsageExportPayload.Text(encoder.encodeCodexCliSessions(sessions, format))
     )
 }
 
@@ -91,7 +94,7 @@ fun exportRequestForCodexCliSessions(
  * Relatório PDF do recorte que está na tela.
  *
  * Irmão de [exportRequestForSessions], e não um valor a mais em
- * [UsageExportFormat]: os `when` exaustivos de `UsageExporter` são sobre formato
+ * [UsageExportFormat]: os `when` exaustivos do exportador de texto são sobre formato
  * de texto, e um `PDF` ali obrigaria um ramo impossível em cada um deles.
  */
 fun reportRequest(
@@ -113,6 +116,7 @@ fun reportRequest(
  * o Dashboard não tem intervalo selecionável, é sempre "agora".
  */
 fun exportRequestForDashboard(
+    encoder: UsageExportEncoder,
     stats: List<ApiUsageStats>,
     now: Instant,
     timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
@@ -122,7 +126,7 @@ fun exportRequestForDashboard(
     val day = local.dayOfMonth.toString().padStart(2, '0')
     return UsageExportRequest(
         suggestedFileName = "usage-monitor-dashboard-${local.year}-$month-$day.csv",
-        payload = UsageExportPayload.Text(UsageExporter.exportDashboardSnapshot(stats, now))
+        payload = UsageExportPayload.Text(encoder.encodeDashboardSnapshot(stats, now))
     )
 }
 

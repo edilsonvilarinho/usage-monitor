@@ -59,7 +59,7 @@ import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
-import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
+import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DEFAULT_UI_SCALE_PERCENT

@@ -1,6 +1,6 @@
 package com.usagemonitor.data
 
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.data.export.UsageExporter
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
