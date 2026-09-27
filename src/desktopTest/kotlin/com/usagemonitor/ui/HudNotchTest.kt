@@ -1057,6 +1057,20 @@ class HudNotchTest {
      */
     @Test
     fun `o reflexo corre pelo anel parado so com a politica continua`() {
+        assertIdleRingMoves(listOf(AppRingArc(0.8f, AppTone.OK), AppRingArc(0.6f, AppTone.WARNING)))
+    }
+
+    /**
+     * O anel do Codex no print da #322 (3% e 0%) ficava inteiramente parado.
+     * Aqui 1% e 0%: abaixo do mínimo do reflexo do valor, então só o brilho da
+     * trilha pode mexer o anel — e com a política contínua ele mexe.
+     */
+    @Test
+    fun `anel quase vazio tambem se mexe com a politica continua`() {
+        assertIdleRingMoves(listOf(AppRingArc(0.01f, AppTone.OK), AppRingArc(0f, AppTone.OK)))
+    }
+
+    private fun assertIdleRingMoves(ringArcs: List<AppRingArc>) {
         fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
             lateinit var first: PixelMap
             lateinit var second: PixelMap
@@ -1065,10 +1079,7 @@ class HudNotchTest {
                 setContent {
                     AppTheme(isDark = true, motion = policy) {
                         Box(modifier = Modifier.testTag(RING_FRAME).background(Color.Black).padding(6.dp)) {
-                            AppUsageRing(
-                                arcs = listOf(AppRingArc(0.8f, AppTone.OK), AppRingArc(0.6f, AppTone.WARNING)),
-                                description = "anel"
-                            )
+                            AppUsageRing(arcs = ringArcs, description = "anel")
                         }
                     }
                 }

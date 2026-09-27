@@ -165,6 +165,23 @@ fun AppUsageRing(
     // ponta e some, com uma pausa antes da próxima volta; os arcos saem
     // defasados, então o anel nunca acende inteiro de uma vez. O comprimento do
     // arco — o dado — não muda: o brilho corre **dentro** dele.
+    // Brilho da trilha: uma faixa de luz suave girando pela trilha de cada arco,
+    // com ou sem consumo. O reflexo do valor (abaixo) não existe em arco curto
+    // nem em 0%, e o anel de uma conta em dia ficava inteiramente parado — "os
+    // círculos de 5h e 7d estão muito estáticos" (issue #322). A trilha é "o que
+    // falta", não o dado: iluminá-la não sugere percentual nenhum.
+    val sheen = if (policy.continuous) {
+        val transition = rememberInfiniteTransition(label = "appUsageRingSheen")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(RING_SHEEN_MILLIS, easing = LinearEasing)),
+            label = "appUsageRingSheenAngle"
+        )
+        angle
+    } else {
+        null
+    }
     val glint = if (policy.continuous) {
         val transition = rememberInfiniteTransition(label = "appUsageRingGlint")
         val value by transition.animateFloat(
@@ -206,6 +223,15 @@ fun AppUsageRing(
                     pathEffect = if (arc.hasForecast) null else dash
                 )
             )
+            if (sheen != null) {
+                drawTrackSheen(
+                    // Cada arco de dentro gira defasado: as faixas nunca se alinham.
+                    angle = sheen + index * SHEEN_ARC_OFFSET_DEGREES,
+                    topLeft = topLeft,
+                    arcSize = arcSize,
+                    strokePx = strokePx
+                )
+            }
             val sweep = sweeps[index].value * 360f
             if (sweep > 0f) {
                 val focused = index == attentionIndex
@@ -287,6 +313,35 @@ fun AppUsageRing(
 }
 
 /**
+ * A faixa de luz da trilha em [angle]: [SHEEN_SPAN_DEGREES] com as duas pontas
+ * num gradiente que some, para não ter borda. Desenhada por baixo do arco de
+ * valor, então sobre o consumo ela só aparece nas bordas do traço.
+ */
+private fun DrawScope.drawTrackSheen(angle: Float, topLeft: Offset, arcSize: Size, strokePx: Float) {
+    val pivot = Offset(topLeft.x + arcSize.width / 2f, topLeft.y + arcSize.height / 2f)
+    val light = Color.White.copy(alpha = SHEEN_MAX_ALPHA)
+    val half = SHEEN_SPAN_DEGREES / 2f / 360f
+    val band = Brush.sweepGradient(
+        0f to Color.Transparent,
+        half to light,
+        half * 2f to Color.Transparent,
+        1f to Color.Transparent,
+        center = pivot
+    )
+    rotate(degrees = angle, pivot = pivot) {
+        drawArc(
+            brush = band,
+            startAngle = 0f,
+            sweepAngle = SHEEN_SPAN_DEGREES,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokePx, cap = StrokeCap.Butt)
+        )
+    }
+}
+
+/**
  * O reflexo de um arco na fase [phase]: 0..1 corre do início até a ponta, fora
  * disso não desenha (é a pausa entre voltas). Um trecho de [GLINT_SPAN_DEGREES]
  * com a cauda num gradiente que some, preso ao arco — nunca passa da ponta, onde
@@ -340,15 +395,22 @@ fun appUsageRingOrbitReach(stroke: Dp, gap: Dp): Dp {
 
 private const val RING_TRACK_WEIGHT = 1.6f
 /** Uma volta do reflexo; a fase vai até [GLINT_CYCLE_SPAN], e o que passa de 1 é pausa. */
-private const val RING_GLINT_MILLIS = 4_200
-private const val GLINT_CYCLE_SPAN = 1.9f
+// Mais forte e mais frequente que a primeira versão (4,2s, pico 42%, 48°, pausa
+// maior que a passagem): no app ela não se via.
+private const val RING_GLINT_MILLIS = 2_800
+private const val GLINT_CYCLE_SPAN = 1.4f
 /** Quanto cada arco de dentro sai atrasado em relação ao de fora, em fração da volta. */
 private const val GLINT_ARC_DELAY = 0.22f
-private const val GLINT_SPAN_DEGREES = 48f
-private const val GLINT_MAX_ALPHA = 0.42f
+private const val GLINT_SPAN_DEGREES = 64f
+private const val GLINT_MAX_ALPHA = 0.65f
 private const val GLINT_HEAD_EDGE = 0.004f
-/** Arco curto demais não tem onde o reflexo correr; fica parado. */
-private const val GLINT_MIN_SWEEP_DEGREES = 12f
+/** Arco curto demais não tem onde o reflexo correr; a trilha continua com o brilho dela. */
+private const val GLINT_MIN_SWEEP_DEGREES = 6f
+/** Uma volta da faixa de luz da trilha. */
+private const val RING_SHEEN_MILLIS = 3_600
+private const val SHEEN_SPAN_DEGREES = 80f
+private const val SHEEN_MAX_ALPHA = 0.22f
+private const val SHEEN_ARC_OFFSET_DEGREES = 120f
 private const val RING_SPIN_MILLIS = 2_400
 private const val RING_BREATH_MILLIS = 1_600
 private const val RING_BREATH_MIN_ALPHA = 0.8f

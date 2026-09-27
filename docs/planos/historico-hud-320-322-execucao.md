@@ -66,6 +66,7 @@ recoleta.
 | B4 | feat: pulse the HUD provider mark when a collection finishes (#322) | `gradlew.bat allTests` | 2294 testes, 0 falhas, 0 ignorados; `HudMarkPulseTest` 3, `HudNotchTest` 44 |
 | B5 | feat: smoother HUD ring motion — comet orbit, breathing halo, draw-in (#322) | `gradlew.bat allTests` e `--rerun` | pedido após o B4 ("deixar mais suave e mais elegante"). 1ª passada 2295 com a falha instável conhecida do dashboard; 2ª passada 2295, 0 falhas. Teste novo de entrada falharia no código anterior (arco nascia no valor); o teste da órbita passou a capturar depois da entrada. `appUsageRingOrbitReach` passou a contar a cabeça do cometa (3,4dp) |
 | B6 | feat: idle glint on HUD ring arcs (#322) | `gradlew.bat allTests` | pedido após o B5 ("os círculos estão muito estáticos mesmo sem atualização"). 2296 testes, 0 falhas. Teste novo mediu 136 pixels mudando entre 6,0s e 6,5s em `Static`; bissecção: com o reflexo desligado continuava, sem o escalonamento da entrada sumia — escalonamento retirado |
+| B7 | feat: track sheen and stronger glint on HUD rings (#322) | `gradlew.bat allTests` | depois de olhar no app: anel do Codex em 3%/0% parado (reflexo exigia arco ≥ 12°) e reflexo do Claude imperceptível. Teste novo com 1%/0%: falha com o brilho da trilha desligado, passa com ele. Suíte: 2297 testes, 0 falhas |
 | — | verificação no app e capturas | `gradlew.bat run`, `generateScreenshots`, `generateHelpMedia` | **pendente** — não executado nesta sessão |
 
 ## Problemas em aberto e riscos

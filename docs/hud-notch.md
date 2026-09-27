@@ -240,7 +240,15 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     cada arco, do início até a ponta, com opacidade subindo e descendo por um seno (pico 42%). Uma
     volta a cada 4,2s, dos quais pouco mais da metade é pausa; cada arco de dentro sai 22% da volta
     atrasado, então o anel nunca acende inteiro. O reflexo nunca passa da ponta do arco — ali ele
-    mentiria um percentual maior — e arco com menos de 12° não o recebe.
+    mentiria um percentual maior.
+  - **Brilho da trilha e reflexo mais forte** (issue #322, depois de olhar no app: "os círculos de 5h
+    e 7d estão muito estáticos"). A primeira versão do reflexo não se via: 48°, pico de 42% num traço
+    de 2,5dp, mais de metade do ciclo em pausa — e o anel do Codex em 3%/0% ficava **inteiramente**
+    parado, porque arco abaixo de 12° não recebia reflexo. Agora: o reflexo tem 64°, pico de 65%, uma
+    passagem a cada 2,8s com pausa curta e mínimo de 6°; e uma faixa de luz de 80° a 22% gira pela
+    **trilha** de cada arco a cada 3,6s, defasada 120° entre arcos, com ou sem consumo. A trilha é "o
+    que falta", não o dado — iluminá-la não sugere percentual. `HudNotchTest` afirma que um anel em
+    1%/0% se mexe com a política contínua (e falha sem o brilho da trilha).
   - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
     comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
     atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3,4dp, contando a cabeça do
