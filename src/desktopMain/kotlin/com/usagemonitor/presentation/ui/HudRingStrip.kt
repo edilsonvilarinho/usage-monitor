@@ -36,7 +36,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -58,6 +57,7 @@ import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.AppStatusPill
 import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -125,6 +125,9 @@ internal fun HudRingStrip(
         ) { items() }
     }
 }
+
+/** A pílula de estado de cada conta; os testes medem ela contra a geometria. */
+internal const val HUD_STATUS_PILL_TEST_TAG = "hud-status-pill"
 
 @Composable
 private fun HudRingItem(
@@ -237,16 +240,19 @@ private fun HudRingItem(
             stripLines.forEach { line -> HudStripLineText(line) }
         }
     }
+    // A palavra do estado em pílula tonal (issue #322): solta, ela tinha o
+    // mesmo peso dos percentuais ao lado e o notch lia "flat". A largura e a
+    // altura saem de `statusPillWidth`/`statusPillHeight`, a costura com a
+    // geometria.
     val word: @Composable () -> Unit = {
-        Text(
-            text = account.statusLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = account.tone.color(),
+        AppStatusPill(
+            label = account.statusLabel,
+            tone = account.tone,
             // Na coluna vertical "Sem projeção" quebra em duas linhas; alinhadas
             // à esquerda elas destoavam do anel e dos percentuais, centrados.
             textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
-            overflow = TextOverflow.Ellipsis
+            modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG)
         )
     }
     if (vertical || compact) {

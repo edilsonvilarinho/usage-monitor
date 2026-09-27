@@ -28,9 +28,16 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha. Conta
     de cota única continua com o número em `labelMedium`, sem rótulo. O preço é a espessura: cada
     janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima fica nos 44dp do anel
-    com uma e duas e vai a 56dp com três. **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
+    com uma, 46dp com duas e 60dp com três (a palavra em pílula, #322). **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
     atenção, na célula compacta e na bandeja, onde não cabe uma linha por anel. A palavra continua
     sendo a do **pior** risco da conta: com as janelas à vista ela resume a conta, não um número.
+  - **A palavra é uma pílula tonal** (`AppStatusPill`, issue #322): ponto, palavra no tom e fundo do
+    tom a 8% (`STATUS_PILL_TINT_ALPHA`). Solta, tinha o peso dos percentuais e o notch lia "flat". Os
+    8% são medidos: com 14% o verde do tema claro caía para 4,17:1, e `AppStatusPillContrastTest`
+    guarda os três tons nos dois temas. A geometria lê as constantes da primitiva
+    (`statusPillWidth`/`statusPillHeight`) e soma 1dp de arredondamento — sem ele,
+    `HudNotchTextFitTest` media até 0,6dp a mais entre 110% e 144%. Com duas janelas o notch de cima
+    vai a 46dp (28 das linhas + 18 da pílula). O estado sem contas continua `AppStatusIndicator`.
   - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
     completa passa de `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda, cada conta vira a célula do
     Codenotch — anel e a cota em foco com a janela embaixo (`focusLine`, "7d 72%"), sem a palavra. Com sete APIs numa tela de notebook a faixa

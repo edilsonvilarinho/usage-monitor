@@ -61,6 +61,7 @@ recoleta.
 | A6 | feat: quota window table and hourly usage bars in history (#320) | `gradlew.bat allTests` | 2283 testes, 0 falhas, 0 ignorados; `HistoryWindowAnalysisTest` 5, `HistoryScreenTest` 13 |
 | A7 | feat: keep history content on screen while reloading (#320) | `gradlew.bat allTests --rerun` | 2284 testes, 0 falhas, 0 ignorados. Antes: três passadas com `DashboardViewModelRefreshPersistenceTest` vermelho (timeout de tempo real) enquanto existia o teste novo `selectSource still goes through Loading`; `main` num worktree deu 2253/0; sem os dois testes novos 2283/0; só com `selectRange keeps the previous content` 2284/0. O teste de troca de fonte saiu — ver achados |
 | B1 | feat: enlarge HUD ring to 44dp so provider marks stay legible (#322) | `gradlew.bat allTests` | 2285 testes, 0 falhas, 0 ignorados; marca 25,2 / 19,6 / 14dp (1/2/3 arcos); `hudRest()` do gerador de capturas (64dp) comporta 44 + 2×8 |
+| B2 | feat: tonal status pill for HUD accounts (#322) | `gradlew.bat allTests` e `gradlew.bat allTests --rerun` | Primeiro os testes novos pegaram dois defeitos: pílula até 0,6dp mais larga que a estimativa entre 110% e 144% (folga de 1dp adicionada) e verde do tema claro a 4,16:1 com fundo a 14% (fundo baixado para 8%, pior caso 4,53:1). Suíte: 1ª passada 2288 testes com 1 falha em `DashboardViewModelRefreshPersistenceTest` (a mesma do A7); 2ª passada 2288, 0 falhas |
 
 ## Problemas em aberto e riscos
 
@@ -68,20 +69,22 @@ recoleta.
 |---|---|
 | `UsageHistoryLineChart.kt` tem 756 linhas; sem A2 antes, A3 estoura o teto de 800 do `ArchitectureRulesTest` | fechado (A2) |
 | Codex passa de dois cards (5h, 7d) para um card com seletor — muda o que o usuário já via | aceito |
-| Pílula e anel maior engrossam o notch; `HUD_MAX_ALONG_FRACTION` (0,45) pode levar ao modo compacto mais cedo em tela pequena | aberto |
-| Contraste do texto da pílula sobre o fundo tingido nos dois temas | aberto |
+| Pílula e anel maior engrossam o notch; `HUD_MAX_ALONG_FRACTION` (0,45) pode levar ao modo compacto mais cedo em tela pequena | aberto — só verificável no app em 1366px |
+| `DashboardViewModelRefreshPersistenceTest` falha intermitente na suíte completa (espera de 5 s em tempo real) | aberto — pré-existente, fora do escopo |
+| Contraste do texto da pílula sobre o fundo tingido nos dois temas | fechado (B2: 8%, `AppStatusPillContrastTest`) |
 | Caminho de atividade observada (OpenCode/Kilo/Gemini) continua escolhendo a série pelo intervalo, sem o seletor | aceito (fora do escopo) |
 
 ## Desvios do plano e achados da execução
 
-- **A7 — `DashboardViewModelRefreshPersistenceTest` sensível à suíte.** Com o teste
-  `selectSource still goes through Loading` em `HistoryViewModelTest`, `allTests` falhou três vezes
-  seguidas em `refresh persists the new scheduled time via callback` (e numa delas também em
-  `skips initial fetch…`), sempre por `Condition not met within real-time timeout`; isolado, o teste
-  do dashboard passou 3/3, e o pacote `presentation` sozinho passou 2/2. Sem aquele teste a suíte fica
-  verde. O mecanismo **não foi confirmado**: o teste do histórico passa e encerra o view model; a
-  hipótese é ordem de execução/carga afetando a espera de 5 s em tempo real do teste do dashboard. O
-  teste removido afirmava comportamento que já existia (troca de fonte passa por `Loading`).
+- **`DashboardViewModelRefreshPersistenceTest` é instável na suíte completa — conclusão do A7
+  corrigida no B2.** No A7, `allTests` falhou três vezes seguidas em `refresh persists the new scheduled
+  time via callback` (`Condition not met within real-time timeout`) e passou depois que o teste
+  `selectSource still goes through Loading` saiu de `HistoryViewModelTest`; isso foi lido como causa.
+  **Não era**: no B2, sem aquele teste, a mesma falha voltou numa passada e sumiu na seguinte. O teste
+  do dashboard espera até 5 s em tempo real e falha sob carga ou ordem desfavorável da suíte; isolado
+  passou 3/3 e na `main` (worktree, 2253 testes) passou. Não mexe em código desta branch; fica
+  registrado como instabilidade pré-existente, sem correção aqui. O teste removido do A7 não volta —
+  afirmava comportamento que já existia.
 - **A7 — falha de leitura continua publicando `Error`.** O plano previa manter os números na tela e
   publicar só a mensagem; ficou como era, porque exigiria um campo de erro no `Success` e mudaria o
   contrato testado do estado de erro. Pendente.

@@ -67,7 +67,7 @@ export function AppHudBar({
                   <span style={{ color: 'var(--muted)' }}>{q.short}</span> {q.percent}
                 </span>
               ))}
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', letterSpacing: '.07em', color: LEVELS[account.level] || LEVELS.off, textAlign: 'center', maxWidth: horizontal ? 'none' : 56 }}>{account.statusLabel}</span>
+              <AppStatusPill level={account.level || 'off'} style={{ whiteSpace: horizontal ? 'nowrap' : 'normal', textAlign: 'center', maxWidth: horizontal ? 'none' : 72 }}>{account.statusLabel}</AppStatusPill>
             </div>
           </div>
         );

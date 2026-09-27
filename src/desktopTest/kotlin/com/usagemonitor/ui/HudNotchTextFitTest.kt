@@ -36,6 +36,12 @@ import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.wordWidth
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import com.usagemonitor.presentation.ui.components.AppStatusPill
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.statusPillWidth
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -202,6 +208,42 @@ class HudNotchTextFitTest {
                     content.actionLabel?.let { label ->
                         overflow(label, typography.labelLarge, buttonText, 1, AppChrome.control)
                             ?.let { failure -> failures += "$scale%: $failure" }
+                    }
+                }
+            }
+        }
+        for (next in scales) {
+            scale = next
+            waitForIdle()
+        }
+        assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
+    }
+
+    /**
+     * A pílula de estado (issue #322) inteira — folga, ponto, vão e palavra —
+     * cabe no que a geometria reserva, em qualquer escala. O teste de texto acima
+     * só mede a palavra; é aqui que o arredondamento de cada peça da pílula soma.
+     */
+    @Test
+    fun `a pilula de estado cabe na largura estimada em qualquer escala`() = runDesktopComposeUiTest {
+        val failures = mutableSetOf<String>()
+        var scale by mutableStateOf(scales.first())
+        val statusWords = listOf("Sem projeção", "No forecast", "Crítico", "Atenção", "Normal", "Critical", "Warning")
+        setContent {
+            AppTheme(isDark = true, uiScalePercent = scale) {
+                val density = LocalDensity.current
+                Column {
+                    statusWords.forEach { word ->
+                        AppStatusPill(
+                            label = word,
+                            tone = AppTone.WARNING,
+                            modifier = Modifier.onGloballyPositioned { coordinates ->
+                                val real = with(density) { coordinates.size.width.toDp() }
+                                if (real > statusPillWidth(word)) {
+                                    failures += "$scale%: pílula \"$word\" desenhada $real > estimada ${statusPillWidth(word)}"
+                                }
+                            }
+                        )
                     }
                 }
             }

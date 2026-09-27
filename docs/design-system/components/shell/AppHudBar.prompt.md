@@ -76,7 +76,8 @@ advances — `label*` is Plex Mono — and every balloon row has a fixed height,
 a sum. The open area reserves the **tallest** balloon, so switching rings never resizes the window.
 The collapsed width is the max of the widest line and the word, so a collection that turns `9%` into
 `88%` does not resize it either. Each window adds a 14dp line to the text column: the top-edge content is
-44dp with one or two windows (the ring decides) and 56dp with three.
+44dp with one window (the ring decides), 46dp with two and 60dp with three — the state word is an
+`AppStatusPill` (issue #322), 18dp tall.
 
 **Window, measured.** A click on a transparent pixel of a transparent window is swallowed on Windows
 11 — it reaches neither the content nor the window behind. So the window is notch-thick at rest (plus

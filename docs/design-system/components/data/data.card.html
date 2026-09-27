@@ -21,7 +21,7 @@
 <script type="text/babel" data-presets="react">
 let DS = {};
 function Demo() {
-  const { AppStatusIndicator, AppProgressTrack, AppDataRow, AppKey, AppValue, AppColumnHeader, AppDataTable, AppPanel, AppPanelBody, AppSourceMark, AppIconButton } = DS;
+  const { AppStatusIndicator, AppStatusPill, AppProgressTrack, AppDataRow, AppKey, AppValue, AppColumnHeader, AppDataTable, AppPanel, AppPanelBody, AppSourceMark, AppIconButton } = DS;
   return (
     <div className="grid">
       <div className="row">
@@ -30,6 +30,12 @@ function Demo() {
         <AppStatusIndicator level="crit">Crítico</AppStatusIndicator>
         <AppStatusIndicator level="off">Desconectado</AppStatusIndicator>
         <AppStatusIndicator level="info">Trabalhando agora</AppStatusIndicator>
+      </div>
+      <div className="row">
+        <AppStatusPill level="ok">Normal</AppStatusPill>
+        <AppStatusPill level="warn">Atenção</AppStatusPill>
+        <AppStatusPill level="crit">Crítico</AppStatusPill>
+        <AppStatusPill level="off">Sem projeção</AppStatusPill>
       </div>
       <div className="grid" style={{ gap: 8 }}>
         <AppProgressTrack percent={41} level="ok" label="Semanal" />

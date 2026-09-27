@@ -377,8 +377,8 @@ class HudNotchGeometryTest {
 
         val expected = listOf(
             HUD_RING_SIZE,
-            maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 2 + HUD_WORD_LINE),
-            maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 3 + HUD_WORD_LINE)
+            maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 2 + statusPillHeight(1)),
+            maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 3 + statusPillHeight(1))
         )
         assertEquals(expected, thickness)
         assertTrue(thickness[2] > thickness[1], "a terceira janela ainda engrossa o notch")
