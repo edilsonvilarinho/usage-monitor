@@ -148,7 +148,7 @@ fun DashboardScreen(
      * Troca a moldura da janela (issue #187); `null` esconde o menu.
      *
      * Repassado ao rodapé sem interpretação: quem sabe que os dois modos são
-     * mutuamente exclusivos é `Main.kt`, dono das duas preferências.
+     * mutuamente exclusivos é `AppShellState`, dono das duas preferências.
      */
     onWindowModeChange: ((WindowMode) -> Unit)? = null,
     /**

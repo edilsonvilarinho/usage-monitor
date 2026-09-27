@@ -14,13 +14,13 @@ import com.usagemonitor.domain.entity.ApiUsageStats
  *
  * **É o mesmo caminho da coleta, não um paralelo.** Cada repositório é montado
  * com o `apiKeyReader` apontando para a chave sob teste — o mesmo ponto de
- * injeção que o `Main.kt` já usa —, e o que volta é o `Result` que o dashboard
+ * injeção que o `AppGraph` já usa —, e o que volta é o `Result` que o dashboard
  * receberia. Endpoint próprio de teste passaria enquanto a coleta real falha; e
  * um `GET` cru com o status HTTP examinado na UI aprovaria uma chave inválida da
  * MiniMax, que responde `HTTP 200` com `status_code` de erro no corpo.
  *
- * Mora fora do `Main.kt` porque ali dentro seria mais bytecode num `main()` que
- * já está no limite do backend JVM.
+ * Mora em arquivo próprio pela regra de tamanho que `ArchitectureRulesTest`
+ * impõe: a raiz de composição só compõe.
  *
  * O `when` é **exaustivo e sem `else`**: fonte nova obriga a decidir se ela tem
  * chave testável, em vez de cair calada num ramo genérico. As fontes sem chave

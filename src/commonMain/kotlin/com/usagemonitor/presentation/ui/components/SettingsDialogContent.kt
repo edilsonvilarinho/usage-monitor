@@ -747,7 +747,7 @@ private fun MonitoredApisTab(
  * **Não é um segundo dono do conjunto**, e o nome diz isso: a resposta continua
  * saindo de [requiresApiKey], e este val é só a projeção dela em `Set` para o
  * [ApiSelector]. O nome `API_KEY_DEPENDENT_SOURCES` está tomado pelo literal do
- * `Main.kt`, que é o filtro de arranque; dois símbolos com o mesmo nome fariam
+ * `AppPreferenceKeys.kt`, que é o filtro de arranque; dois símbolos com o mesmo nome fariam
  * quem lê os dois concluir que são a mesma constante duplicada, quando um é
  * literal e o outro é derivado.
  */

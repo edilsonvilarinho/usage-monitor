@@ -11,8 +11,8 @@ import com.usagemonitor.presentation.ui.components.WindowMode
  *
  * Existe porque elas têm **duas portas** — o rodapé e os cards de um lado, o
  * balão da engrenagem e o balão de cada conta da barra HUD do outro — e, escritas
- * duas vezes em `main()`, divergiriam no primeiro breadcrumb ou na primeira
- * condição de admin que mudasse só num lado. `main()` as monta uma vez; o
+ * duas vezes, divergiriam no primeiro breadcrumb ou na primeira
+ * condição de admin que mudasse só num lado. `buildShellActions` as monta uma vez; o
  * `DashboardScreen` e o `HudWindowHost` só as consomem.
  *
  * As de admin são nulas para quem não administra: `null` esconde o botão, nas

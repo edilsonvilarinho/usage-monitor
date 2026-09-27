@@ -21,7 +21,7 @@ private const val DEFAULT_TEAM_USAGE_WINDOW_WIDTH_DP = 960
 private const val DEFAULT_TEAM_USAGE_WINDOW_HEIGHT_DP = 780
 
 /**
- * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
+ * Piso da janela, aplicado em `ModalWindowsHost.kt` via `minimumSize` da janela AWT.
  *
  * Mesma razão da janela de Sessões CLI e da de presença: a lista ganhou faixa de
  * legendas de coluna, e faixa sobre linha que quebra promete um alinhamento que o

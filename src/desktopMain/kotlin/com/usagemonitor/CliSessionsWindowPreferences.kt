@@ -21,7 +21,7 @@ private const val DEFAULT_CLI_SESSIONS_WINDOW_WIDTH_DP = 960
 private const val DEFAULT_CLI_SESSIONS_WINDOW_HEIGHT_DP = 780
 
 /**
- * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
+ * Piso da janela, aplicado em `ModalWindowsHost.kt` via `minimumSize` da janela AWT.
  *
  * A lista de sessões passou a ter uma **faixa de legendas de coluna**, e uma faixa
  * dessas só cumpre a promessa se a linha não quebrar: as seis colunas fixas mais o

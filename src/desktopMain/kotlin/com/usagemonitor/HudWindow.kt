@@ -68,12 +68,11 @@ import kotlinx.datetime.Clock
 /**
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
  *
- * Ela era a janela principal encolhida, e isso obrigava `main()` a guardar a
+ * Ela era a janela principal encolhida, e isso obrigava o antigo `main()` a guardar a
  * geometria de antes, proibir o coletor de gravar a pílula como "tamanho
  * normal", ordenar textualmente o piso de tamanho e redimensionar a janela AWT a
  * cada quadro — a fonte do tranco. Agora a principal fica escondida com a
- * geometria intacta, e esta janela é só do notch. Mora fora de `main()`, que está
- * no limite do backend JVM.
+ * geometria intacta, e esta janela é só do notch.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
  * 11, C11 do plano de execução): por isso ela só tem o tamanho da área aberta

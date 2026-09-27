@@ -27,7 +27,7 @@ private const val DEFAULT_TEAM_PRESENCE_WINDOW_WIDTH_DP = 1_030
 private const val DEFAULT_TEAM_PRESENCE_WINDOW_HEIGHT_DP = 620
 
 /**
- * Piso da janela, aplicado em `Main.kt` via `minimumSize` da janela AWT.
+ * Piso da janela, aplicado em `ModalWindowsHost.kt` via `minimumSize` da janela AWT.
  *
  * O tamanho default já cabia; o que faltava era impedir o arrasto da borda para
  * baixo do orçamento. Abaixo dele a soma das colunas mais a coluna de ação passa

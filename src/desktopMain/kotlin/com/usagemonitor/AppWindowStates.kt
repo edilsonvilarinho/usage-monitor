@@ -229,8 +229,7 @@ internal fun rememberPersistedMainWindowState(
  * um monitor de 1366, e um piso maior que a tela não é piso — é janela que nem
  * arrastando a borda cabe.
  *
- * Fora de `main()` de propósito: aquele composable já está no limite do backend
- * JVM, e três cópias deste efeito seriam três lugares para o orçamento divergir.
+ * Um efeito só, e não três cópias: seriam três lugares para o orçamento divergir.
  */
 @Composable
 internal fun ApplyWindowMinimumSize(

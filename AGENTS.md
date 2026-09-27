@@ -33,7 +33,7 @@ Arquitetura em tres camadas com dependencia unidirecional: `presentation -> doma
 | Source set | Platform | Contents |
 |---|---|---|
 | `commonMain` | shared | domain + data (DTOs, mappers, repositories) + presentation/UI |
-| `desktopMain` | JVM only | data sources locais com `java.io.File`, `AutoStartManager`, `Main.kt` e bootstrap desktop |
+| `desktopMain` | JVM only | data sources locais com `java.io.File`, `AutoStartManager`, `Main.kt` (arranque), `AppGraph.kt` (DI) e hosts de janela |
 | `commonTest` | shared | testes unitarios de domain, mappers e ViewModel |
 | `desktopTest` | JVM only | testes de componentes Compose Desktop |
 | `installer` | Windows only | scripts e assets do NSIS installer |
@@ -46,7 +46,7 @@ Arquitetura em tres camadas com dependencia unidirecional: `presentation -> doma
 
 ## DI and lifecycle
 
-`Main.kt` monta o grafo manualmente:
+`AppGraph.kt` monta o grafo manualmente e `AppViewModels.kt` os view models; `Main.kt` so faz o arranque e compoe os hosts:
 
 `HttpClient(OkHttp)` -> `LocalCredentialDataSource` + `LocalCodexAuthDataSource` + `RemoteApiDataSource` -> repositories -> use cases -> `DashboardViewModel` -> `DashboardScreen`
 
@@ -55,7 +55,15 @@ Regras importantes:
 - `DashboardViewModel` faz polling a cada 10 minutos via `while(true) + delay`.
 - O scope usa `SupervisorJob`, para que falha de uma API nao cancele as outras.
 - **Tem de chamar `viewModel.onDestroy()` ao fechar a janela.**
-- `Main.kt` tambem fecha o `HttpClient` no fechamento da janela e no shutdown hook.
+- `AppViewModels.shutdown()` e o dono unico do encerramento (idempotente): para os view models e fecha `HttpClient`, bancos e registro de perfis na saida do app, no `onDispose` e no shutdown hook.
+
+## Architecture and size rules
+
+Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que roda no `allTests`:
+
+- Direcao das camadas por import: `domain` nao importa Ktor, Compose, `kotlinx.serialization`, `java.io`, `data` nem `presentation`; `data` nao importa `presentation` nem Compose; `presentation` nao importa `data`. Precisando de algo de `data`, o contrato sobe para o domain como porta (precedente: `UsageExportEncoder`).
+- Arquivo de producao <= 800 linhas; funcao <= 300. Nada de arquivo-deus nem composable-deus.
+- As excecoes (`FILE_CEILINGS`/`FUNCTION_CEILINGS`) tem teto exato e so encolhem. **Excecao nova nao entra na lista** — divida o arquivo.
 
 ## External API calls
 

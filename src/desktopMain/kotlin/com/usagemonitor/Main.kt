@@ -48,9 +48,8 @@ internal fun loadWindowIcon() = runCatching {
  *
  * Corpo de bloco, e nao expressao: a trilha de eventos precisa nascer **antes**
  * da janela, porque quem a consome primeiro e o handler de excecao nao tratada,
- * que roda fora de qualquer composicao. O corpo gigante continua em uma funcao
- * so -- [runUsageMonitor] --, entao isto nao reparte `main()` nem cria
- * composable nova.
+ * que roda fora de qualquer composicao. A composicao fica em [runUsageMonitor],
+ * que so compoe os hosts.
  */
 fun main(args: Array<String>) {
     val breadcrumbs = LocalBreadcrumbRecorder()

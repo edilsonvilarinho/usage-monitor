@@ -26,10 +26,8 @@ import kotlinx.coroutines.launch
 /**
  * Estado e ações do relatório de bug em volta do [BugReportDialog] stateless.
  *
- * Existe **fora** do `main()` de propósito: o diálogo tem seis pedaços de estado e
- * duas ações suspensas, e todos eles dentro daquele composable seriam mais mil
- * linhas no método que já estourou o backend da JVM uma vez. `main()` fica com
- * dois `remember` e uma chamada.
+ * Host próprio: o diálogo tem seis pedaços de estado e duas ações suspensas, e
+ * quem o abre fica com dois `remember` e uma chamada.
  *
  * Fica em `desktopMain` porque conhece writer, capturer e abridor de navegador —
  * três coisas que o `commonMain` não pode importar.

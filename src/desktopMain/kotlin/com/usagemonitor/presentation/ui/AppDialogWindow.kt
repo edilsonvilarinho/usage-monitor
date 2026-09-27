@@ -46,7 +46,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * O que toda janela modal recebe igual: ícone, tema, escala, movimento e a área
  * útil da tela.
  *
- * Montado **uma vez** em `main()` e passado inteiro: eram cinco argumentos
+ * Montado **uma vez** em `runUsageMonitor` e passado inteiro: eram cinco argumentos
  * repetidos em nove janelas, e a janela que esquecesse um deles — a escala, por
  * exemplo — renderizaria errado sem erro nenhum.
  */

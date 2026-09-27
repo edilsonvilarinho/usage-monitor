@@ -15,8 +15,7 @@ import com.usagemonitor.update.ReleaseNotesController
 /**
  * Janela das novidades da versão.
  *
- * Composable próprio, e não mais um bloco dentro do `main()`: aquele composable
- * está no limite do backend JVM. O `main()` ganha uma chamada.
+ * Composable próprio: quem o abre ganha uma chamada, não um bloco.
  *
  * Sem notas não há janela — e não uma janela vazia: lista vazia numa tela de
  * novidades afirma que a versão não trouxe nada. Depois de dispensadas, as
