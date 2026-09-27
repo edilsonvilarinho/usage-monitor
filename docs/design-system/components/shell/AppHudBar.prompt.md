@@ -107,3 +107,7 @@ Windows' 127 characters — one entry per window would overflow with three accou
 **Worst window in the tone (issue #322).** In `Atenção`/`Crítico` the percentage of the window that
 caused the state is painted in the tone; its window label stays muted, and accounts on track keep every
 number neutral. The pill next to it writes the state, so color still never informs alone.
+
+**Mark pulse (issue #322).** When an account's collection finishes, its provider mark scales to 1.15
+and back (tween 180ms + 240ms, once). Not continuous, so it does not wait for `continuous`; reduced
+motion turns it off.

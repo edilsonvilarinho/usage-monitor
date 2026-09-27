@@ -216,6 +216,12 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **A faixa do modo padrão também ganhou botão**, e deixou de ser clicável inteira: com o botão
     dentro dela, clicar fora dele faria a mesma ação sem nada indicar. O preço é a faixa passar de
     ~34dp para ~46dp de altura, pela altura de controle do botão.
+- **A marca pulsa a cada coleta concluída** (issue #322, `shouldPulseProviderMark`): 1 → 1,15 em
+  `AppMotion.normal` e volta em `AppMotion.slow`, por tween — sem mola, para não passar do alvo — e uma
+  vez só, quando `refreshing` da conta cai de verdadeiro para falso. Vale também para coleta que
+  falhou (o `finally` do view model desmarca o alvo nos dois casos): o pulso diz "o app olhou agora",
+  não "o número mudou". Não é contínuo, então não depende de `continuous`; com "Reduzir animações"
+  não há pulso. Durante a coleta a marca continua girando, como antes.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco

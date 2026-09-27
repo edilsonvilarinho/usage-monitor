@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -62,6 +64,7 @@ import com.usagemonitor.presentation.ui.components.AppStatusPill
 import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.appSpring
 
@@ -70,6 +73,12 @@ private const val RING_REFRESH_SCALE = 0.9f
 
 /** A marca gira uma volta por segundo, o ritmo do glifo de recarga do card. */
 private const val RING_REFRESH_TURN_MILLIS = 1_000
+
+/**
+ * Quanto a marca cresce no pulso de coleta concluída (issue #322). Pouco: é
+ * aviso de "chegou leitura", não de estado — estado é a pílula e o arco.
+ */
+private const val MARK_PULSE_SCALE = 1.15f
 
 /** A faixa de anéis, do tamanho do notch. */
 @Composable
@@ -163,6 +172,19 @@ private fun HudRingItem(
     } else {
         0f
     }
+    // Pulso da marca quando a coleta da conta termina (issue #322): uma subida
+    // e uma volta em tween — sem mola, para não passar do alvo —, nunca em laço.
+    // Com "Reduzir animações" não há pulso.
+    val markPulse = remember { Animatable(1f) }
+    var wasRefreshing by remember { mutableStateOf(account.refreshing) }
+    LaunchedEffect(account.refreshing) {
+        val pulse = shouldPulseProviderMark(wasRefreshing, account.refreshing, policy)
+        wasRefreshing = account.refreshing
+        if (pulse) {
+            markPulse.animateTo(MARK_PULSE_SCALE, tween(AppMotion.normal, easing = AppMotion.enterEasing))
+            markPulse.animateTo(1f, tween(AppMotion.slow, easing = AppMotion.exitEasing))
+        }
+    }
     val refreshLabel = hudRefreshAccountLabel(account, language)
     // A ação é **declarada** na semântica, não instalada: um `clickable` aqui
     // consumiria o `down` e o arrasto pelo corpo nunca começaria.
@@ -214,7 +236,11 @@ private fun HudRingItem(
                 source = account.source,
                 tint = account.accountAccent?.current ?: MaterialTheme.colorScheme.onSurface,
                 size = hudRingMarkSize(account.rings.size),
-                modifier = Modifier.graphicsLayer { rotationZ = markTurn }
+                modifier = Modifier.graphicsLayer {
+                    rotationZ = markTurn
+                    scaleX = markPulse.value
+                    scaleY = markPulse.value
+                }
             )
             // O emoji da conta (issue #287), selo no canto de cima à direita do
             // anel. Passa só `HUD_EMOJI_BADGE_OVERSHOOT` para fora dele, dentro do
@@ -330,4 +356,14 @@ private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
 internal fun hudRingMarkSize(arcs: Int): Dp {
     val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
     return ((HUD_RING_SIZE - used) * 0.7f).coerceAtLeast(6.dp)
+}
+
+/**
+ * A marca pulsa quando a coleta da conta **termina** — `refreshing` passa de
+ * verdadeiro a falso —, não quando começa nem na primeira composição. O fim
+ * vale também para coleta que falhou: o `finally` do view model desmarca o alvo
+ * nos dois casos, e o pulso diz "o app olhou agora", não "o número mudou".
+ */
+internal fun shouldPulseProviderMark(wasRefreshing: Boolean, refreshing: Boolean, policy: AppMotionPolicy): Boolean {
+    return wasRefreshing && !refreshing && !policy.reduced
 }

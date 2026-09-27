@@ -63,6 +63,8 @@ recoleta.
 | B1 | feat: enlarge HUD ring to 44dp so provider marks stay legible (#322) | `gradlew.bat allTests` | 2285 testes, 0 falhas, 0 ignorados; marca 25,2 / 19,6 / 14dp (1/2/3 arcos); `hudRest()` do gerador de capturas (64dp) comporta 44 + 2×8 |
 | B2 | feat: tonal status pill for HUD accounts (#322) | `gradlew.bat allTests` e `gradlew.bat allTests --rerun` | Primeiro os testes novos pegaram dois defeitos: pílula até 0,6dp mais larga que a estimativa entre 110% e 144% (folga de 1dp adicionada) e verde do tema claro a 4,16:1 com fundo a 14% (fundo baixado para 8%, pior caso 4,53:1). Suíte: 1ª passada 2288 testes com 1 falha em `DashboardViewModelRefreshPersistenceTest` (a mesma do A7); 2ª passada 2288, 0 falhas |
 | B3 | feat: tint the worst window percentage in the HUD (#322) | `gradlew.bat allTests` | 2291 testes, 0 falhas, 0 ignorados; `HudModelTest` 34 (3 novos: pior janela destacada na ordem dos anéis, nenhuma em dia, cota única). A cor em si não tem teste de pixel — o que é afirmado é o índice que o modelo entrega |
+| B4 | feat: pulse the HUD provider mark when a collection finishes (#322) | `gradlew.bat allTests` | 2294 testes, 0 falhas, 0 ignorados; `HudMarkPulseTest` 3, `HudNotchTest` 44 |
+| — | verificação no app e capturas | `gradlew.bat run`, `generateScreenshots`, `generateHelpMedia` | **pendente** — não executado nesta sessão |
 
 ## Problemas em aberto e riscos
 
@@ -89,3 +91,16 @@ recoleta.
 - **A7 — falha de leitura continua publicando `Error`.** O plano previa manter os números na tela e
   publicar só a mensagem; ficou como era, porque exigiria um campo de erro no `Success` e mudaria o
   contrato testado do estado de erro. Pendente.
+- **B4 — gatilho do pulso é o fim da coleta, e a trava é "Reduzir animações".** O plano dizia disparar
+  pela troca de `capturedAt` e testar "com `Static` a marca não muda". `HudAccount` não carrega
+  carimbo de coleta; o sinal disponível é `refreshing`, que o view model desliga no `finally` — logo o
+  pulso acontece também em coleta que falhou. E `Static` não é "sem movimento": é "sem contínuo", e o
+  pulso é finito; a trava certa é `reduced`. Coberto por função pura (`shouldPulseProviderMark`), sem
+  teste de pixel.
+- **B3 — só em atenção.** O plano dizia pintar o percentual da pior janela no tom; em `Normal` isso
+  pintaria números de verde sem informar nada, então o destaque só existe em `Atenção`/`Crítico`.
+- **A5 — rótulos do seletor saem das séries.** A intervalar do MiniMax não é de 5 horas; o seletor
+  usa `quotaWindowLabel` (`5h`/`7d` do rótulo, tipo de período quando o rótulo não diz).
+- **Não verificado no app.** Nada desta branch foi olhado em `gradlew.bat run`: HUD no topo e na
+  lateral, escalas 100% e 115%, 1366px, tema claro e escuro, "Reduzir animações"; Histórico da
+  Anthropic e do Codex com o seletor. Capturas do README e mídia de ajuda não foram regeneradas.
