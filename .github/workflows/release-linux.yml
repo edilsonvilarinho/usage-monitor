@@ -12,11 +12,110 @@ on:
         type: string
 
 jobs:
+  # O push da tag normalmente acontece logo depois do push na main. O CI da
+  # main ja executa os mesmos testes que este workflow usava como verify, entao
+  # espera o marcador daquele run e evita trabalho remoto duplicado.
+  #
+  # A ausencia do marcador nunca libera o release: ela apenas seleciona o
+  # verify local abaixo como fallback. Isso cobre tag manual, CI pulado, marker
+  # expirado, falha do CI e falha da API do GitHub.
+  resolve-ci-gate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: read
+
+    outputs:
+      target_sha: ${{ steps.resolve.outputs.target_sha }}
+      reuse_ci: ${{ steps.resolve.outputs.reuse_ci }}
+      reason: ${{ steps.resolve.outputs.reason }}
+
+    steps:
+      - name: Resolve CI gate for release commit
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+
+          fallback() {
+            local message="$1"
+            echo "reuse_ci=false" >> "$GITHUB_OUTPUT"
+            echo "reason=$message" >> "$GITHUB_OUTPUT"
+            echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+            echo "$message; o verify do release sera executado."
+            exit 0
+          }
+
+          target_sha="$EVENT_SHA"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ -z "$INPUT_TAG" ]; then
+              target_sha=''
+              fallback 'tag de release ausente'
+            fi
+
+            if ! target_sha="$(gh api "repos/$REPOSITORY/commits/$INPUT_TAG" --jq '.sha' 2>/dev/null)" || [ -z "$target_sha" ]; then
+              target_sha=''
+              fallback "nao foi possivel resolver a tag $INPUT_TAG"
+            fi
+          fi
+
+          echo "Commit alvo do release: $target_sha"
+          marker_name="ci-release-gate-$target_sha"
+          deadline=$((SECONDS + 900))
+
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if ! artifact_runs="$(gh api "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100" \
+              --jq '.artifacts[] | select(.expired == false) | select(.workflow_run.head_repository_id == .workflow_run.repository_id) | .workflow_run.id' 2>/dev/null)"; then
+              fallback 'consulta do marcador no GitHub falhou'
+            fi
+
+            for run_id in $artifact_runs; do
+              [ -z "$run_id" ] && continue
+
+              if ! run="$(gh api "repos/$REPOSITORY/actions/runs/$run_id" \
+                --jq '[.event, (.conclusion // ""), .path, .head_branch, .head_sha] | @tsv' 2>/dev/null)"; then
+                continue
+              fi
+
+              IFS=$'\t' read -r event conclusion path branch head_sha <<< "$run"
+              echo "Candidato: run $run_id event=$event conclusion=$conclusion path=$path branch=$branch sha=$head_sha"
+
+              case "$path" in
+                .github/workflows/ci.yml*) ;;
+                *) continue ;;
+              esac
+
+              if [ "$event" = "push" ] && \
+                [ "$conclusion" = "success" ] && \
+                [ "$branch" = "main" ] && \
+                [ "$head_sha" = "$target_sha" ]; then
+                reason="CI da main ja verificou $target_sha no run https://github.com/$REPOSITORY/actions/runs/$run_id"
+                echo "reuse_ci=true" >> "$GITHUB_OUTPUT"
+                echo "reason=$reason" >> "$GITHUB_OUTPUT"
+                echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+                echo "$reason"
+                exit 0
+              fi
+            done
+
+            echo "Marcador $marker_name ainda nao esta disponivel; aguardando 15s."
+            sleep 15
+          done
+
+          fallback "marcador $marker_name nao apareceu em 15 minutos"
+
   # Gate de testes do release. Roda em paralelo com os jobs de build (nenhum
   # deles depende deste), e so `publish-release` o exige: falha aqui deixa os
   # artefatos como artifacts do workflow, mas nenhum GitHub Release e criado.
   # Encadear os builds atras dele somaria ~4 min a todo release sem ganho.
   verify:
+    needs: resolve-ci-gate
     # Mesmo motivo do `ci.yml`: os testes de componente Compose nunca rodaram
     # headless em Linux.
     runs-on: windows-latest
@@ -25,12 +124,25 @@ jobs:
       contents: read
 
     steps:
+      - name: Reuse CI gate
+        if: needs['resolve-ci-gate'].outputs.reuse_ci == 'true'
+        shell: pwsh
+        env:
+          GATE_REASON: ${{ needs['resolve-ci-gate'].outputs.reason }}
+          TARGET_SHA: ${{ needs['resolve-ci-gate'].outputs.target_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Reutilizando o gate da main para $env:TARGET_SHA."
+          Write-Host $env:GATE_REASON
+
       - name: Checkout
+        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup JDK
+        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: 'temurin'
@@ -45,11 +157,13 @@ jobs:
       # nunca escreve: quem grava e o push na main do `ci.yml`, mesmo runner
       # (`windows-latest`), mesmo wrapper.
       - name: Setup Gradle
+        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
           cache-read-only: true
 
       - name: Run tests
+        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -60,17 +174,19 @@ jobs:
       # so no ci.yml, porque este e o gate que decide se um release sai -- uma
       # release com o /UPDATE quebrado atualiza a maquina de quem instalou.
       - name: Install NSIS
+        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         shell: pwsh
         run: choco install nsis -y
 
       - name: Run installer update scenarios
+        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           .\src\installer\test\Invoke-UpdateScenarios.ps1
 
       - name: Upload test reports
-        if: failure()
+        if: failure() && needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-reports

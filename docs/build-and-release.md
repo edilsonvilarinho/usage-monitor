@@ -37,14 +37,23 @@ first launch.
 | `.github/workflows/ci.yml` | `allTests` on Windows, on push to `main` and on pull request |
 | `.github/workflows/ci-server.yml` | `typecheck` and `vitest` for `server/`, when `server/**` changes |
 | `.github/workflows/release-linux.yml` | on `v*` tags: publishes Windows, Linux and macOS artifacts |
+| `.github/workflows/codeql.yml` | CodeQL on push to `main`, weekly and manually |
 
 Both test jobs publish a summary to `$GITHUB_STEP_SUMMARY` — test counts and slowest classes when
 they run, and an explicit **not executed** notice with the reason when the path filter skips them. A
 job that passes in five seconds without running a single test is otherwise indistinguishable from one
 that ran the suite.
 
-The release job `verify` runs `allTests` in parallel with the builds, and `publish-release` depends
-on it: a red suite does not publish a release.
+The release workflow waits for the SHA-specific `ci-release-gate-*` artifact from the preceding
+push to `main`. When that marker proves that the remote CI suite and installer scenarios really
+passed, `verify` reuses the result and does not repeat the expensive checks. A missing, expired,
+invalid or unreadable marker makes `verify` run its existing `allTests` and installer scenarios as
+a fallback. `publish-release` depends on `verify` in both paths, so a release is never published
+without a successful validation gate.
+
+A normal release still produces three visible workflow runs for the same commit: `CI`, `CodeQL`
+and `Release Desktop Packages`. The change removes duplicated validation work; it does not remove
+the independent CodeQL run or the local `allTests` preflight performed by the release skill.
 
 ### Gradle cache
 
