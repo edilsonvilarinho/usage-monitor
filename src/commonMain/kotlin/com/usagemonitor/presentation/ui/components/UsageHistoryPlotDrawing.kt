@@ -1,12 +1,14 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -29,10 +31,12 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -131,6 +135,8 @@ internal fun DrawScope.drawHistoryPlot(
     colors: HistoryPlotColors,
     plotPoints: List<ChartPlotPoint>,
     previousPlotPoints: List<ChartPlotPoint>,
+    overlayLines: List<Pair<List<ChartPlotPoint>, Color>>,
+    overlayActivePoints: List<Pair<ChartPlotPoint, Color>>,
     resetClusterPoints: List<Pair<ResetMarker, ChartPlotPoint>>,
     rangeAnnotations: HistoryRangeAnnotations?,
     activePoint: ChartPlotPoint?,
@@ -205,6 +211,29 @@ internal fun DrawScope.drawHistoryPlot(
         }
     }
 
+    // Séries sobrepostas (issue #320): traço cheio da cor própria, sem
+    // preenchimento — duas massas translúcidas empilhadas virariam uma mancha
+    // e esconderiam qual área é de qual série. Antes da principal, atrás dela.
+    overlayLines.forEach { (overlayPoints, overlayColor) ->
+        if (overlayPoints.size > 1) {
+            val overlayPath = Path()
+            overlayPoints.forEachIndexed { index, point ->
+                if (index == 0) {
+                    overlayPath.moveTo(point.x, point.y)
+                } else {
+                    overlayPath.lineTo(point.x, point.y)
+                }
+            }
+            clipRect(right = size.width * revealFraction) {
+                drawPath(
+                    path = overlayPath,
+                    color = overlayColor,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+            }
+        }
+    }
+
     if (plotPoints.size > 1) {
         val path = Path()
         val fillPath = Path()
@@ -266,6 +295,19 @@ internal fun DrawScope.drawHistoryPlot(
             color = lineColor.copy(alpha = 0.92f),
             radius = activeMarkerRadius,
             center = Offset(rangeEndPoint.x, rangeEndPoint.y)
+        )
+    }
+
+    overlayActivePoints.forEach { (point, overlayColor) ->
+        drawCircle(
+            color = chartIndicatorHaloColor,
+            radius = activeMarkerHaloRadius,
+            center = Offset(point.x, point.y)
+        )
+        drawCircle(
+            color = overlayColor,
+            radius = activeMarkerRadius,
+            center = Offset(point.x, point.y)
         )
     }
 
@@ -407,6 +449,66 @@ internal fun HistoryTooltipBubble(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Legenda das séries quando há mais de uma (issue #320): traço curto da cor e o
+ * nome ao lado. A cor sozinha não diz qual linha é qual — o nome escrito é o que
+ * informa, e o traço só liga o nome à linha.
+ */
+@Composable
+internal fun HistoryChartLegend(
+    entries: List<Pair<String, Color>>,
+    textColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        entries.forEach { (label, color) ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(14.dp)
+                        .height(2.dp)
+                        .background(color)
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = textColor,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A bolha do ponto em foco, posicionada pelo gráfico. Fora do composable do
+ * gráfico pelo limite de 300 linhas por função.
+ */
+@Composable
+internal fun HistoryTooltipLayer(
+    model: HistoryTooltipModel,
+    left: Float,
+    top: Float,
+    onSizeChanged: (IntSize) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(x = left.roundToInt(), y = top.roundToInt()) }
+                .onSizeChanged(onSizeChanged)
+        ) {
+            HistoryTooltipBubble(model = model)
         }
     }
 }

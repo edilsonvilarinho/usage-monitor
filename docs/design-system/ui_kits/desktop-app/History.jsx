@@ -1,9 +1,10 @@
 const { AppWindowFrame, AppToolbar, AppPanel, AppPanelHeader, AppPanelBody, AppSegmentedControl, AppButton, AppDataTable, AppMetric, AppKey, AppSourceMark, AppStatusIndicator } = DS;
 
 const SERIES = [12, 18, 15, 26, 31, 28, 44, 51, 47, 58, 66, 61, 72, 68, 74, 81, 77, 69, 58, 47, 39, 31, 24, 19];
+const WEEKLY = [31, 31, 32, 33, 34, 34, 36, 37, 37, 38, 40, 40, 41, 41, 42, 43, 43, 43, 43, 43, 43, 43, 43, 43];
 const PREV = [9, 14, 13, 21, 24, 22, 33, 39, 36, 44, 49, 46, 53, 51, 55, 59, 56, 51, 43, 36, 30, 24, 19, 15];
 
-function Chart({ data, prev }) {
+function Chart({ data, prev, weekly }) {
   const W = 900, H = 150, max = 100;
   const pt = (arr) => arr.map((v, i) => (i / (arr.length - 1)) * W + ',' + (H - (v / max) * H)).join(' ');
   // Massa sob a curva principal: preenchimento chapado (color-mix com o acento
@@ -23,7 +24,10 @@ function Chart({ data, prev }) {
         <line key={i} x1={(i / 23) * W} x2={(i / 23) * W} y1="0" y2={H} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 4" />
       ))}
       <path d={area} fill="color-mix(in srgb, var(--anthropic) 14%, transparent)" stroke="none" />
-      <polyline points={pt(prev)} fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="4 4" />
+      {/* Com a semanal sobreposta (issue #320) o tracejado do período anterior some. */}
+      {weekly
+        ? <polyline points={pt(weekly)} fill="none" stroke="var(--output)" strokeWidth="2" />
+        : <polyline points={pt(prev)} fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="4 4" />}
       <polyline points={pt(data)} fill="none" stroke="var(--anthropic)" strokeWidth="2" />
     </svg>
   );
@@ -47,10 +51,14 @@ export function History() {
         <AppPanelHeader
           mark={<AppSourceMark source="anthropic" />}
           title="Consumo da janela"
-          subtitle="linha cheia: período atual · tracejada: 7 dias anteriores"
+          subtitle="5h e 7d no mesmo gráfico"
         />
         <AppPanelBody>
-          <Chart data={SERIES} prev={PREV} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--s3)', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
+            <span><i style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--anthropic)', marginRight: 6, verticalAlign: 'middle' }} />5h</span>
+            <span><i style={{ display: 'inline-block', width: 14, height: 2, background: 'var(--output)', marginRight: 6, verticalAlign: 'middle' }} />7d</span>
+          </div>
+          <Chart data={SERIES} prev={PREV} weekly={WEEKLY} />
           <div style={{ display: 'flex', gap: 'var(--s4)', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
             <span>Sáb 09/08</span><span>Dom 10/08</span><span>Ter 12/08</span><span>Qua 13/08</span>
           </div>

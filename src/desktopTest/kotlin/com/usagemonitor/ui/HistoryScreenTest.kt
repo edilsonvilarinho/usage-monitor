@@ -429,6 +429,9 @@ class HistoryScreenTest {
         onAllNodesWithText("Claude 7d").assertCountEquals(0)
         onNodeWithText("Cota intervalar atual").assertIsDisplayed()
         onNodeWithText("Cota semanal atual").assertIsDisplayed()
+        // A semanal entra no mesmo gráfico (issue #320), e a legenda nomeia as duas.
+        onNodeWithText("5h").assertIsDisplayed()
+        onNodeWithText("7d").assertIsDisplayed()
         onAllNodesWithText("Início do recorte").assertCountEquals(0)
         onAllNodesWithText("Arraste no gráfico para comparar dois pontos.").assertCountEquals(0)
         viewModel.onDestroy()

@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.UsagePeriodComparison
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.presentation.ui.components.HistoryChartOverlay
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.theme.AppAccents
 
@@ -435,6 +436,48 @@ internal fun weeklySummaryLabel(language: AppLanguage): String {
 
 internal fun intervalSummaryLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Cota intervalar atual" else "Current interval quota"
+}
+
+/**
+ * Nome curto da janela de uma série, como o usuário a vê no card e na HUD:
+ * `5h`/`7d` quando o rótulo da cota traz o sufixo, o tipo de período quando não.
+ */
+internal fun quotaWindowLabel(series: UsageHistorySeries, language: AppLanguage): String {
+    return when {
+        series.quotaLabel.endsWith(" 5h") -> "5h"
+        series.quotaLabel.endsWith(" 7d") -> "7d"
+        series.periodType == PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Intervalo" else "Interval"
+        series.periodType == PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Semanal" else "Weekly"
+        series.periodType == PeriodType.MONTHLY -> if (language == AppLanguage.PT) "Mensal" else "Monthly"
+        else -> series.quotaLabel
+    }
+}
+
+/**
+ * A semanal sobreposta à intervalar no mesmo gráfico (issue #320). Antes a
+ * semanal só existia como tabela, e a progressão dela no intervalo não aparecia
+ * em lugar nenhum. Só quando as duas são percentuais: é o eixo 0–100% comum que
+ * permite lê-las contra a mesma grade.
+ */
+internal fun historyChartOverlays(
+    weeklySummary: UsageHistorySeries?,
+    primary: UsageHistorySeries,
+    color: Color,
+    language: AppLanguage
+): List<HistoryChartOverlay> {
+    if (weeklySummary == null) {
+        return emptyList()
+    }
+    if (primary.unit != UsageUnit.PERCENTAGE || weeklySummary.unit != UsageUnit.PERCENTAGE) {
+        return emptyList()
+    }
+    return listOf(
+        HistoryChartOverlay(
+            points = weeklySummary.points,
+            label = quotaWindowLabel(weeklySummary, language),
+            color = color
+        )
+    )
 }
 
 internal fun buildQuotaChartSelectionKey(

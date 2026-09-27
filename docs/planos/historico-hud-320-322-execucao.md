@@ -54,7 +54,8 @@ recoleta.
 |---|---|---|---|
 | A0 | docs: plan for history 5h/7d view and HUD status pill (#320, #322) | revisão do diff | documento criado |
 | A1 | fix: wrap history forecast metric instead of clipping it (#320) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HistoryScreenTest"` | 9 testes, 0 falhas. Com `maxLines = 1` restaurado o teste novo falha: "previsão com 16 px contra 16 px de uma linha" |
-| A2 | refactor: move history chart drawing out of the chart composable (#320) | `gradlew.bat allTests` | 2254 testes, 0 falhas, 0 ignorados; `UsageHistoryLineChart.kt` 756 → 373 linhas, `UsageHistoryPlotDrawing.kt` 412; nenhum teste editado |
+| A2 | refactor: move history chart drawing out of the chart composable (#320) | `gradlew.bat allTests` | 2254 testes, 0 falhas, 0 ignorados; `UsageHistoryLineChart.kt` 756 → 375 linhas, `UsageHistoryPlotDrawing.kt` 412; nenhum teste editado |
+| A3 | feat: overlay weekly quota on the history chart (#320) | `gradlew.bat allTests` | primeira passada: 2261 testes, 1 falha — `ArchitectureRulesTest`: `UsageHistoryLineChart` com 312 linhas (limite 300). Bolha do tooltip extraída para `HistoryTooltipLayer`; segunda passada 2261 testes, 0 falhas, 0 ignorados |
 
 ## Problemas em aberto e riscos
 

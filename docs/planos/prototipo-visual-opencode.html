@@ -1397,7 +1397,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       <div class="hstack" style="margin-bottom:var(--s2)">
         <span class="k">Consumo ao longo do intervalo selecionado</span>
         <span class="sp"></span>
-        <span class="legend"><span><i style="background:var(--anthropic)"></i>Sessão 5h</span><span><i style="background:var(--output)"></i>Semanal</span></span>
+        <span class="legend"><span><i style="background:var(--anthropic)"></i>5h</span><span><i style="background:var(--output)"></i>7d</span></span>
       </div>
       <svg class="spark" viewBox="0 0 700 180" role="img" aria-label="Consumo das janelas ao longo de 24 horas">
         <g stroke="var(--border)" stroke-width="1">
@@ -1437,7 +1437,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
     <div class="statusbar"><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
   </div>
 </div>
-<p class="note">Preservados: seleção por fonte e por conta, as quatro janelas, reinícios, média por hora, forecast, comparação com o período anterior e as regras próprias de saldo e de créditos. Os pontos da janela anterior continuam <b>fora do gráfico</b> — entram só no delta.</p>
+<p class="note">Preservados: seleção por fonte e por conta, as quatro janelas, reinícios, média por hora, forecast, comparação com o período anterior e as regras próprias de saldo e de créditos. Os pontos da janela anterior entram no delta e, com uma série só, na linha tracejada descrita acima.</p>
+<p class="note"><b>A semanal divide o gráfico com a intervalar (issue #320).</b> Antes ela só existia como tabela, e a progressão da 7d no intervalo não aparecia. Traço cheio na cor <code>output</code>, sem preenchimento, legenda escrita <code>5h</code>/<code>7d</code>; o valor da 7d no tooltip é casado pelo carimbo de tempo do ponto em foco. Com as duas séries o tracejado do período anterior some.</p>
 <p class="note"><b>«Hoje vs. mediana diária» fica ao lado de «vs. período anterior», e não junto da previsão</b>
 (issue #163). As duas respondem &ldquo;está mais ou menos que antes&rdquo;; a previsão responde &ldquo;quanto falta
 para o teto&rdquo;. O valor traz a <b>contagem de dias</b> entre parênteses porque ela é a régua — <code>3,4×</code>

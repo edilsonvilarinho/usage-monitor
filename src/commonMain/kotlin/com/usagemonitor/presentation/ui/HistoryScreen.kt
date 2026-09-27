@@ -525,7 +525,14 @@ internal fun HistorySeriesCard(
                     tooltipTitle = title,
                     tooltipSubtitle = subtitle,
                     accentColor = accentColor,
-                    previousPoints = series.previousWindowPoints
+                    previousPoints = series.previousWindowPoints,
+                    seriesLabel = quotaWindowLabel(series, language),
+                    overlays = historyChartOverlays(
+                        weeklySummary = weeklySummary,
+                        primary = series,
+                        color = AppAccents.current.output,
+                        language = language
+                    )
                 )
 
                 if (weeklySummary != null) {

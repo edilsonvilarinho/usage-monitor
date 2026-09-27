@@ -2,7 +2,6 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -30,14 +28,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.theme.appTween
 
 internal const val HISTORY_TOOLTIP_PADDING_PX = 8f
 internal const val HISTORY_TOOLTIP_OFFSET_PX = 10f
@@ -49,6 +46,8 @@ private const val HISTORY_RESET_CLUSTER_GAP_PX = 24f
 internal const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
 internal const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
 internal const val HISTORY_PAN_SENSITIVITY = 0.1f
+
+private const val HISTORY_REVEAL_MILLIS = 900
 
 internal data class HistoryRangeAnnotations(
     val startIndex: Int,
@@ -88,7 +87,19 @@ internal fun UsageHistoryLineChart(
      * ampliada, e um comparativo que compara períodos diferentes é pior que
      * nenhum. "Ver tudo" devolve a comparação.
      */
-    previousPoints: List<UsageHistoryPoint> = emptyList()
+    previousPoints: List<UsageHistoryPoint> = emptyList(),
+    /**
+     * Nome da série principal na legenda e no tooltip. Só aparece quando há
+     * [overlays] — com uma série só, o título do card já diz o que é a linha.
+     */
+    seriesLabel: String? = null,
+    /**
+     * Séries sobrepostas (issue #320), traçadas sem preenchimento sobre a mesma
+     * grade. Com sobreposição a linha do período anterior some: três traçados
+     * mais o tracejado deixariam de ser legíveis, e a comparação continua na
+     * tabela de métricas.
+     */
+    overlays: List<HistoryChartOverlay> = emptyList()
 ) {
     val lineColor = accentColor
     val fillColor = accentColor.copy(alpha = 0.12f)
@@ -110,7 +121,8 @@ internal fun UsageHistoryLineChart(
 
     val revealFraction by animateFloatAsState(
         targetValue = if (revealed) 1f else 0f,
-        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        // Pela política: com "Reduzir animações" a linha aparece inteira.
+        animationSpec = appTween(durationMillis = HISTORY_REVEAL_MILLIS, easing = FastOutSlowInEasing),
         label = "lineReveal"
     )
 
@@ -147,8 +159,8 @@ internal fun UsageHistoryLineChart(
     }
     val previousRenderPoints = remember(previousPoints, unit) { filteredPoints(previousPoints, unit) }
     // Só sem zoom — ver o comentário de `previousPoints`.
-    val previousPlotPoints = remember(previousRenderPoints, valueAxis, plotSize, zoomRange) {
-        if (zoomRange != 0f..1f) {
+    val previousPlotPoints = remember(previousRenderPoints, valueAxis, plotSize, zoomRange, overlays) {
+        if (zoomRange != 0f..1f || overlays.isNotEmpty()) {
             emptyList()
         } else {
             buildPlotPoints(
@@ -173,6 +185,20 @@ internal fun UsageHistoryLineChart(
         }
     }
     val activePoint = hoveredIndex?.let { index -> plotPoints.getOrNull(index) }
+    val overlayPlots = remember(overlays, windowedPoints, plotSize, plotInset) {
+        overlays.map { overlay ->
+            overlay to buildOverlayPlotPoints(
+                overlayPoints = overlay.points,
+                reference = windowedPoints,
+                chartWidth = plotSize.width.toFloat(),
+                chartHeight = plotSize.height.toFloat(),
+                horizontalInsetPx = plotInset
+            )
+        }
+    }
+    val overlayActivePoints = overlayPlots.mapNotNull { (overlay, plot) ->
+        activePoint?.let { active -> findOverlayPointAt(plot, active) }?.let { point -> overlay to point }
+    }
     val tooltipModel = remember(
         activePoint,
         windowedPoints,
@@ -189,12 +215,22 @@ internal fun UsageHistoryLineChart(
             title = tooltipTitle,
             subtitle = tooltipSubtitle
         )
+    }?.let { model ->
+        withOverlayMetrics(model, seriesLabel, overlayActivePoints)
     }
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (overlays.isNotEmpty()) {
+            HistoryChartLegend(
+                entries = listOf((seriesLabel ?: "") to lineColor) +
+                    overlays.map { overlay -> overlay.label to overlay.color },
+                textColor = axisTextColor
+            )
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -241,6 +277,8 @@ internal fun UsageHistoryLineChart(
                         ),
                         plotPoints = plotPoints,
                         previousPlotPoints = previousPlotPoints,
+                        overlayLines = overlayPlots.map { (overlay, plot) -> plot to overlay.color },
+                        overlayActivePoints = overlayActivePoints.map { (overlay, point) -> point to overlay.color },
                         resetClusterPoints = resetClusterPoints,
                         rangeAnnotations = rangeAnnotations,
                         activePoint = activePoint,
@@ -257,39 +295,24 @@ internal fun UsageHistoryLineChart(
             }
 
             if (activePoint != null && tooltipModel != null) {
-                val tooltipLeft = clampTooltipLeft(
-                    desiredCenterX = activePoint.x,
-                    tooltipWidth = tooltipSize.width.toFloat(),
-                    containerWidth = plotSize.width.toFloat(),
-                    horizontalPadding = plotInset
-                )
-                val tooltipTop = buildHistoryTooltipTop(
-                    pointY = activePoint.y + plotTop,
-                    tooltipHeight = tooltipSize.height.toFloat(),
-                    frameHeight = frameSize.height.toFloat()
-                )
-
-                Box(
+                HistoryTooltipLayer(
+                    model = tooltipModel,
+                    left = clampTooltipLeft(
+                        desiredCenterX = activePoint.x,
+                        tooltipWidth = tooltipSize.width.toFloat(),
+                        containerWidth = plotSize.width.toFloat(),
+                        horizontalPadding = plotInset
+                    ),
+                    top = buildHistoryTooltipTop(
+                        pointY = activePoint.y + plotTop,
+                        tooltipHeight = tooltipSize.height.toFloat(),
+                        frameHeight = frameSize.height.toFloat()
+                    ),
+                    onSizeChanged = { tooltipSize = it },
                     modifier = Modifier
                         .padding(start = startPadding)
                         .align(Alignment.TopStart)
-                        .fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    x = tooltipLeft.roundToInt(),
-                                    y = tooltipTop.roundToInt()
-                                )
-                            }
-                            .onSizeChanged { tooltipSize = it }
-                    ) {
-                        HistoryTooltipBubble(
-                            model = tooltipModel
-                        )
-                    }
-                }
+                )
             }
 
             Box(
