@@ -398,10 +398,12 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 - **Arquivo de produção ≤ 800 linhas; função ≤ 300**, medida por varredura de chaves que ignora
   comentário e string. Nada de arquivo-deus nem composable-deus: estado, efeitos e ações de uma
   janela moram em arquivos próprios, e um host compõe.
-- **As exceções são uma lista congelada com teto exato** (`FILE_CEILINGS`/`FUNCTION_CEILINGS`), e
-  ela só encolhe. Crescer acima do teto falha; encolher falha pedindo para baixar o teto; cair
-  abaixo do limite falha pedindo para sair da lista. **Exceção nova não entra na lista** — divida o
-  arquivo.
+- **As exceções eram uma lista congelada com teto exato** (`FILE_CEILINGS`/`FUNCTION_CEILINGS`), e
+  **as duas estão vazias desde as issues #302–#309**. O mecanismo continua no teste, mas não há
+  item para ele congelar: arquivo ou função acima do limite falha direto. **Exceção nova não entra
+  na lista** — divida o arquivo. Vários arquivos ficaram entre 750 e 800 linhas
+  (`DashboardViewModel`, `LocalCliSessionDataSource`, `ApiUsageCardFormatting`, `AutoStartManager`):
+  a próxima mudança neles começa extraindo, não crescendo.
 
 ## Integração com time (`server/`)
 
