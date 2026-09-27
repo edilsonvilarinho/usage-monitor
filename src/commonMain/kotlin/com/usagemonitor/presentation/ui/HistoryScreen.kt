@@ -2,7 +2,6 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +55,7 @@ import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.ui.theme.appTween
 import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
@@ -78,6 +78,9 @@ fun historyAccountChipTag(account: UsageAccountContext): String =
     "$HISTORY_ACCOUNT_CHIP_TAG_PREFIX${account.key.providerAccountId}/${account.key.workspaceId}"
 
 fun historyRangeChipTag(range: HistoryRange): String = "$HISTORY_RANGE_CHIP_TAG_PREFIX${range.name}"
+
+/** Opacidade do conteúdo anterior enquanto a nova leitura não chega. */
+private const val REFRESHING_CONTENT_ALPHA = 0.55f
 
 @Composable
 fun HistoryScreen(
@@ -182,7 +185,17 @@ fun HistoryScreen(
                         }
 
                         is HistoryUiState.Success -> {
-                            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            // Durante a releitura o conteúdo anterior fica, esmaecido:
+                            // diz que está mudando sem trocar a tela por "Carregando".
+                            val contentAlpha by animateFloatAsState(
+                                targetValue = if (current.isRefreshing) REFRESHING_CONTENT_ALPHA else 1f,
+                                animationSpec = appTween(AppMotion.normal),
+                                label = "historyRefreshingAlpha"
+                            )
+                            Column(
+                                modifier = Modifier.graphicsLayer { alpha = contentAlpha },
+                                verticalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
                                 HistoryControls(
                                     availableSources = current.availableSources,
                                     selectedSource = current.selectedSource,
@@ -439,12 +452,12 @@ internal fun HistorySeriesCard(
     var visible by remember { mutableStateOf(false) }
     val cardAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(AppMotion.normal, easing = AppMotion.enterEasing),
+        animationSpec = appTween(AppMotion.normal, easing = AppMotion.enterEasing),
         label = "seriesCardAlpha$index"
     )
     val cardOffsetY by animateFloatAsState(
         targetValue = if (visible) 0f else 28f,
-        animationSpec = tween(AppMotion.slow, easing = AppMotion.enterEasing),
+        animationSpec = appTween(AppMotion.slow, easing = AppMotion.enterEasing),
         label = "seriesCardOffsetY$index"
     )
     LaunchedEffect(Unit) {

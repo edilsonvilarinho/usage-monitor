@@ -32,6 +32,12 @@ sealed interface HistoryUiState {
         val report: ApiUsageHistoryReport,
         val availableAccounts: List<UsageAccountContext> = emptyList(),
         val selectedAccount: UsageAccountContext? = null,
-        val selectedQuotaView: HistoryQuotaView = HistoryQuotaView.BOTH
+        val selectedQuotaView: HistoryQuotaView = HistoryQuotaView.BOTH,
+        /**
+         * Nova leitura em curso sobre este conteúdo (issue #320): trocar o
+         * intervalo ou a conta mantém o relatório anterior na tela até o novo
+         * chegar, em vez de trocar a tela inteira por "Carregando".
+         */
+        val isRefreshing: Boolean = false
     ) : HistoryUiState
 }

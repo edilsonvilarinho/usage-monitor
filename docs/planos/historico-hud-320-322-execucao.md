@@ -59,6 +59,7 @@ recoleta.
 | A4 | feat: per-window quota analysis for history series (#320) | `gradlew.bat allTests` | 2270 testes, 0 falhas, 0 ignorados; `QuotaWindowAnalysisTest` 8, `UsageHistoryRepositoryImplTest` 32 (inclui pico de 100% num índice que a amostragem do Total descarta) |
 | A5 | feat: 5h/7d/both quota selector in history (#320) | `gradlew.bat allTests` | 2277 testes, 0 falhas, 0 ignorados. No caminho, o teste antigo do card do Claude passou a achar dois nós "5h" (seletor e legenda); a asserção virou contagem de 2 |
 | A6 | feat: quota window table and hourly usage bars in history (#320) | `gradlew.bat allTests` | 2283 testes, 0 falhas, 0 ignorados; `HistoryWindowAnalysisTest` 5, `HistoryScreenTest` 13 |
+| A7 | feat: keep history content on screen while reloading (#320) | `gradlew.bat allTests --rerun` | 2284 testes, 0 falhas, 0 ignorados. Antes: três passadas com `DashboardViewModelRefreshPersistenceTest` vermelho (timeout de tempo real) enquanto existia o teste novo `selectSource still goes through Loading`; `main` num worktree deu 2253/0; sem os dois testes novos 2283/0; só com `selectRange keeps the previous content` 2284/0. O teste de troca de fonte saiu — ver achados |
 
 ## Problemas em aberto e riscos
 
@@ -72,4 +73,14 @@ recoleta.
 
 ## Desvios do plano e achados da execução
 
-(preenchido na última atividade)
+- **A7 — `DashboardViewModelRefreshPersistenceTest` sensível à suíte.** Com o teste
+  `selectSource still goes through Loading` em `HistoryViewModelTest`, `allTests` falhou três vezes
+  seguidas em `refresh persists the new scheduled time via callback` (e numa delas também em
+  `skips initial fetch…`), sempre por `Condition not met within real-time timeout`; isolado, o teste
+  do dashboard passou 3/3, e o pacote `presentation` sozinho passou 2/2. Sem aquele teste a suíte fica
+  verde. O mecanismo **não foi confirmado**: o teste do histórico passa e encerra o view model; a
+  hipótese é ordem de execução/carga afetando a espera de 5 s em tempo real do teste do dashboard. O
+  teste removido afirmava comportamento que já existia (troca de fonte passa por `Loading`).
+- **A7 — falha de leitura continua publicando `Error`.** O plano previa manter os números na tela e
+  publicar só a mensagem; ficou como era, porque exigiria um campo de erro no `Success` e mudaria o
+  contrato testado do estado de erro. Pendente.

@@ -40,8 +40,25 @@ class HistoryViewModel(
     }
 
     fun refresh() {
+        reload(keepContent = true)
+    }
+
+    /**
+     * [keepContent] mantém o `Success` da mesma fonte na tela durante a leitura
+     * (issue #320). Cada troca de intervalo publicava `Loading`, e a janela
+     * inteira piscava "Carregando histórico..." entre dois gráficos da mesma
+     * fonte. Trocar de fonte continua passando por `Loading`: ali o conteúdo
+     * anterior é de outra API e não pode ficar como se fosse desta.
+     */
+    private fun reload(keepContent: Boolean) {
         val requestId = ++loadRequestId
         loadJob?.cancel()
+        val current = _uiState.value
+        if (keepContent && current is HistoryUiState.Success && current.selectedSource == selectedSource.value) {
+            _uiState.value = current.copy(selectedRange = selectedRange.value, isRefreshing = true)
+        } else {
+            _uiState.value = HistoryUiState.Loading
+        }
         loadJob = viewModelScope.launch {
             loadHistory(requestId)
         }
@@ -52,7 +69,7 @@ class HistoryViewModel(
         if (accountKey != null && accountKey.source == source) {
             selectedAccountsBySource[source] = accountKey
         }
-        refresh()
+        reload(keepContent = false)
     }
 
     fun selectSource(source: ApiSource) {
@@ -61,7 +78,7 @@ class HistoryViewModel(
         }
 
         selectedSource.value = source
-        refresh()
+        reload(keepContent = false)
     }
 
     fun selectRange(range: HistoryRange) {
@@ -106,8 +123,6 @@ class HistoryViewModel(
     }
 
     private suspend fun loadHistory(requestId: Long) {
-        _uiState.value = HistoryUiState.Loading
-
         val enabledSources = enabledApis.value.sortedBy { it.ordinal }
         try {
             if (enabledSources.isEmpty()) {

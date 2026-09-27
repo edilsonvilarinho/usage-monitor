@@ -262,6 +262,31 @@ class HistoryViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `selectRange keeps the previous content instead of emitting Loading`() = runTest {
+        val repo = FakeRepo(report = emptyReport(ApiSource.ANTHROPIC))
+        val viewModel = HistoryViewModel(
+            getUsageHistory = GetUsageHistoryUseCase(repo) { now },
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
+        )
+        assertIs<HistoryUiState.Success>(awaitNonLoading(viewModel))
+
+        val callsBefore = repo.invocations
+        viewModel.selectRange(HistoryRange.LAST_7_DAYS)
+
+        // Publicado antes de a leitura começar: nunca passa por `Loading`.
+        val during = viewModel.uiState.value
+        assertIs<HistoryUiState.Success>(during)
+        assertEquals(HistoryRange.LAST_7_DAYS, during.selectedRange)
+
+        awaitInvocations(repo, callsBefore + 1)
+        repeat(5) { pauseForBackgroundWork() }
+        val after = viewModel.uiState.value
+        assertIs<HistoryUiState.Success>(after)
+        assertEquals(false, after.isRefreshing)
+        viewModel.onDestroy()
+    }
+
     private fun emptyReport(source: ApiSource): ApiUsageHistoryReport {
         return ApiUsageHistoryReport(
             source = source,
