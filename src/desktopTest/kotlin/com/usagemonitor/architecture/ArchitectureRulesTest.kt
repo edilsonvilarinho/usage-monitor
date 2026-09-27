@@ -143,17 +143,13 @@ class ArchitectureRulesTest {
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliSessionsScreen.kt" to 1703,
             "src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalCliSessionDataSource.kt" to 1696,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt" to 1676,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt" to 1589,
             "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt" to 1223,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamPresenceScreen.kt" to 1013,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/TeamUsageViewModel.kt" to 863
+            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899
         )
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FUNCTION_CEILINGS = mapOf(
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt::TeamUsageList" to 327
+            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483
         )
     }
 }
