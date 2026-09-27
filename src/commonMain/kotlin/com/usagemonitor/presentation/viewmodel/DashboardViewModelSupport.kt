@@ -242,3 +242,16 @@ internal fun rateLimitBreadcrumb(source: ApiSource, decision: RateLimitDecision)
     return "${source.name}: 429 — Retry-After $retryAfter, tentativa ${decision.attempt + 1}, " +
         "espera ${decision.wait.inWholeSeconds}s, backoff até ${decision.until}"
 }
+
+/**
+ * A posição de cada alvo Anthropic entre os coletados juntos (issue #269): o
+ * primeiro sai na hora, o seguinte `anthropicStagger` depois, e assim por diante.
+ * Os demais alvos não entram no mapa e não esperam.
+ */
+internal fun anthropicStaggerOrder(targets: Collection<UsageTargetKey>): Map<UsageTargetKey, Int> {
+    return targets
+        .filter { target -> target.source == ApiSource.ANTHROPIC }
+        .sortedBy { target -> target.profileId.orEmpty() }
+        .withIndex()
+        .associate { indexed -> indexed.value to indexed.index }
+}

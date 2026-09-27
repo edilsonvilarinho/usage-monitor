@@ -572,7 +572,7 @@ private fun HudShot(expanded: Boolean, balloonIndex: Int) {
                 },
                 nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(125),
                 countdownDescription = "Próxima atualização automática",
-                refreshInterval = DashboardViewModelConfig().pollInterval,
+                refreshInterval = DashboardViewModelConfig().idlePollInterval,
                 nowProvider = { ScreenshotFixtures.NOW },
                 countdownUpdatesEnabled = false
             )

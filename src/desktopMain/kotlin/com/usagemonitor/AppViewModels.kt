@@ -55,7 +55,12 @@ import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import com.usagemonitor.update.AutoUpdateController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
 
@@ -73,6 +78,14 @@ internal class AppViewModels(
 ) {
     private val breadcrumbs = graph.breadcrumbs
     private val shutdownStarted = AtomicBoolean(false)
+
+    /**
+     * Há sessão CLI rodando — a cadência de 60 s da coleta (issue #269). O
+     * semáforo que sabe disso nasce depois do painel, então o painel recebe esta
+     * ponte e o laço de [busyBridgeScope] a alimenta.
+     */
+    private val cliBusy = MutableStateFlow(false)
+    private val busyBridgeScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val dashboard = DashboardViewModel(
         getAnthropicUsage = GetAnthropicUsageUseCase(graph.anthropicRepository),
@@ -100,6 +113,7 @@ internal class AppViewModels(
         currentAppVersion = CURRENT_APP_VERSION,
         spikeFactorProvider = { graph.alertSettingsFlow.value.effectiveSpikeFactor },
         isAppVisible = graph.isAppVisible,
+        isBusy = cliBusy,
         anthropicProfiles = graph.enabledAnthropicProfiles,
         persistedNextRefreshAt = graph.persistedNextRefreshAt,
         onNextRefreshAtChanged = { instant ->
@@ -195,6 +209,14 @@ internal class AppViewModels(
         breadcrumbs = breadcrumbs
     )
 
+    init {
+        // Claude CLI pelo índice, Codex pela sonda própria: é o mesmo sinal que
+        // acende o arco de sessão ativa da HUD.
+        busyBridgeScope.launch {
+            sessionPulse.activeTargets.collect { active -> cliBusy.value = active.isNotEmpty() }
+        }
+    }
+
     val usageAlert = UsageAlertViewModel(
         dashboardState = dashboard.uiState,
         cliPulses = sessionPulse.cliPulses,
@@ -246,6 +268,7 @@ internal class AppViewModels(
         if (!shutdownStarted.compareAndSet(false, true)) {
             return
         }
+        busyBridgeScope.cancel()
         dashboard.onDestroy()
         history.onDestroy()
         cliSessions.onDestroy()

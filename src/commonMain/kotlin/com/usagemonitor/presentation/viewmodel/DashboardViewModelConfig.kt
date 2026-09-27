@@ -4,12 +4,29 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 data class DashboardViewModelConfig(
     val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    val pollInterval: Duration = 600.seconds,
+    /**
+     * Cadência com sessão CLI ativa (issue #269). O Codenotch coleta a 60 s; o
+     * ai-usagebar diz que os endpoints da Anthropic e do Codex limitam abaixo de
+     * ~300 s. Nenhum dos dois mediu: se a trilha mostrar 429, o degrau seguinte é
+     * 300 s, e o ajuste é esta linha.
+     */
+    val activePollInterval: Duration = 60.seconds,
+    /** Cadência sem nenhuma sessão rodando: uso não anda enquanto nada o usa. */
+    val idlePollInterval: Duration = 5.minutes,
+    /**
+     * Intervalo entre contas Anthropic devidas no mesmo tique. O ai-usagebar
+     * registrou 429 com várias contas batendo juntas nos endpoints de uso e de
+     * token; espaçá-las custa menos de um segundo por conta.
+     */
+    val anthropicStagger: Duration = 800.milliseconds,
+    /** Espera que terminou esse tanto além do pedido é volta do sleep: tudo fica devido. */
+    val sleepJumpThreshold: Duration = 2.minutes,
     val updateCheckIntervalWhileRunning: Duration = 10.minutes,
     val perSourceTimeout: Duration = 20.seconds,
     /**

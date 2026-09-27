@@ -84,3 +84,71 @@ fun decodeRateLimitBackoffs(encoded: String?, now: Instant): Map<UsageTargetKey,
     }
     return result
 }
+
+/**
+ * Se um alvo deve ser coletado em [now] — o `shouldRefresh` do
+ * Codenotch, por alvo (issue #269):
+ * - em backoff, nunca;
+ * - nunca tentado, sempre;
+ * - com um reset vencido desde a última tentativa, sempre;
+ * - senão, quando a espera da cadência corrente passou: [activeInterval] com
+ *   sessão CLI rodando, [idleInterval] sem nenhuma. Uso não anda enquanto nada o
+ *   usa, e bater no endpoint numa tarde parada só gasta orçamento de rate limit.
+ */
+fun isTargetDue(
+    now: Instant,
+    lastAttemptAt: Instant?,
+    backoffUntil: Instant?,
+    busy: Boolean,
+    resetRolledOver: Boolean,
+    activeInterval: Duration,
+    idleInterval: Duration
+): Boolean {
+    if (backoffUntil != null && backoffUntil > now) {
+        return false
+    }
+    if (lastAttemptAt == null || resetRolledOver) {
+        return true
+    }
+    val interval = if (busy) activeInterval else idleInterval
+    return now - lastAttemptAt >= interval
+}
+
+/** Quando o alvo fica devido pela cadência, sem contar reset. O prazo de backoff empurra para depois. */
+fun nextDueAt(
+    now: Instant,
+    lastAttemptAt: Instant?,
+    backoffUntil: Instant?,
+    busy: Boolean,
+    activeInterval: Duration,
+    idleInterval: Duration
+): Instant {
+    val interval = if (busy) activeInterval else idleInterval
+    val byCadence = lastAttemptAt?.plus(interval) ?: now
+    return if (backoffUntil != null && backoffUntil > byCadence) backoffUntil else byCadence
+}
+
+/**
+ * Se alguma cota de [stats] reiniciou depois da última tentativa — o
+ * `hasWindowRolledOver` do Codenotch. O reset só conta com [grace] somada: o da
+ * Anthropic não é instantâneo, e bater no milissegundo do vencimento devolve a
+ * janela velha. Reset sem data conhecida é sentinela e nunca conta.
+ */
+fun hasQuotaResetSince(stats: ApiUsageStats?, lastAttemptAt: Instant?, now: Instant, grace: Duration): Boolean {
+    if (stats == null || lastAttemptAt == null) {
+        return false
+    }
+    return stats.quotas.any { quota ->
+        val due = quota.periodEndAt + grace
+        quota.hasKnownResetAt && due <= now && due > lastAttemptAt
+    }
+}
+
+/**
+ * Se a espera terminou muito depois do pedido: o processo não rodou nesse
+ * intervalo, o que na prática é o PC voltando do sleep — o substituto na JVM do
+ * `didWakeNotification` do macOS. Nesse caso tudo fica devido.
+ */
+fun looksLikeWakeFromSleep(expectedWakeAt: Instant, actualWakeAt: Instant, threshold: Duration): Boolean {
+    return actualWakeAt - expectedWakeAt > threshold
+}

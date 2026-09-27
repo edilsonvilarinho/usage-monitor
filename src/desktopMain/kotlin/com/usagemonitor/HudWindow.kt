@@ -129,6 +129,7 @@ internal fun HudWindowHost(
     val quotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
     val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
+    val pollInterval by viewModel.currentPollInterval.collectAsState()
     val dashboardState by viewModel.uiState.collectAsState()
     val refreshingTargets by viewModel.refreshingTargets.collectAsState()
     val exportScope = rememberCoroutineScope()
@@ -341,7 +342,7 @@ internal fun HudWindowHost(
                     updateIndicator = updateIndicator,
                     nextRefreshAt = nextRefreshAt,
                     countdownDescription = nextRefreshLabel(language),
-                    refreshInterval = viewModel.pollInterval,
+                    refreshInterval = pollInterval,
                     notchCenter = centerInWindow,
                     language = language,
                     onHoverChange = { isHovered -> hovered = isHovered },
@@ -370,7 +371,7 @@ internal fun HudWindowHost(
                         HudWindowAppBalloon(
                             language = language,
                             nextRefreshAt = nextRefreshAt,
-                            refreshInterval = viewModel.pollInterval,
+                            refreshInterval = pollInterval,
                             updateIndicator = updateIndicator,
                             updateAction = updateAction,
                             actions = actions,

@@ -111,7 +111,8 @@ class DashboardViewModelQuotaResetTest : DashboardViewModelTestSupport() {
             isAppVisible = isAppVisible,
             config = DashboardViewModelConfig(
                 workerDispatcher = StandardTestDispatcher(scheduler),
-                pollInterval = pollInterval,
+                activePollInterval = pollInterval,
+                idlePollInterval = pollInterval,
                 quotaResetGrace = Duration.ZERO,
                 autoStartInitialFetch = true,
                 autoStartCountdown = true,

@@ -512,7 +512,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
     }
 
     @Test
-    fun `refreshing one source updates only that card and resets countdown`() = runTest {
+    fun `refreshing one source updates only that card and leaves the other schedules alone`() = runTest {
         var anthropicCalls = 0
         var minimaxCalls = 0
         val recordedSnapshots = mutableListOf<ApiUsageStats>()
@@ -563,6 +563,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         awaitSettledState(viewModel)
         val anthropicCallsAfterGlobalRefresh = anthropicCalls
         val minimaxCallsAfterGlobalRefresh = minimaxCalls
+        val nextRefreshAfterGlobalRefresh = viewModel.nextRefreshAt.value
 
         anthropicResult = Result.success(updatedAnthropicStats)
         viewModel.refresh(ApiSource.ANTHROPIC)
@@ -576,8 +577,10 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
                 ?.firstOrNull()
                 ?.used == 75000L
         }
-        val remaining = (viewModel.nextRefreshAt.value - Clock.System.now()).inWholeSeconds
-        assertTrue(remaining in 595L..600L)
+        // A contagem é a do alvo mais próximo, e o MiniMax não foi recoletado:
+        // atualizar uma fonte não empurra o agendamento das outras (issue #269).
+        assertEquals(nextRefreshAfterGlobalRefresh, viewModel.nextRefreshAt.value)
+        assertEquals(minimaxCallsAfterGlobalRefresh, minimaxCalls)
 
         val state = awaitSettledState(viewModel) as UiState.Success
         val anthropicData = state.data.first { it.source == ApiSource.ANTHROPIC }

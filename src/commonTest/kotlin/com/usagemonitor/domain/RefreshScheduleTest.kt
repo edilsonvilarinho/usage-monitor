@@ -1,6 +1,14 @@
 package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.nextDueAt
+import com.usagemonitor.domain.entity.looksLikeWakeFromSleep
+import com.usagemonitor.domain.entity.isTargetDue
+import com.usagemonitor.domain.entity.hasQuotaResetSince
+import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.RATE_LIMIT_BACKOFF_CAP
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.decodeRateLimitBackoffs
@@ -62,5 +70,66 @@ class RefreshScheduleTest {
 
         assertEquals(mapOf(anthropic to now + 5.minutes), decoded)
         assertEquals(emptyMap(), decodeRateLimitBackoffs(null, now))
+    }
+
+    private val active = 1.minutes
+    private val idle = 5.minutes
+
+    @Test
+    fun `isTargetDue follows the four branches`() {
+        // Backoff vence tudo, até reset e alvo nunca tentado.
+        assertFalse(isTargetDue(now, null, now + 1.minutes, busy = true, resetRolledOver = true, active, idle))
+        // Nunca tentado.
+        assertTrue(isTargetDue(now, null, null, busy = false, resetRolledOver = false, active, idle))
+        // Reset vencido desde a última tentativa.
+        assertTrue(isTargetDue(now, now - 10.seconds, null, busy = false, resetRolledOver = true, active, idle))
+        // Cadência: 90 s basta com sessão, não sem.
+        assertTrue(isTargetDue(now, now - 90.seconds, null, busy = true, resetRolledOver = false, active, idle))
+        assertFalse(isTargetDue(now, now - 90.seconds, null, busy = false, resetRolledOver = false, active, idle))
+        assertTrue(isTargetDue(now, now - 5.minutes, null, busy = false, resetRolledOver = false, active, idle))
+        // Backoff vencido não segura mais.
+        assertTrue(isTargetDue(now, now - 5.minutes, now - 1.seconds, busy = false, resetRolledOver = false, active, idle))
+    }
+
+    @Test
+    fun `nextDueAt is the cadence pushed by the backoff`() {
+        assertEquals(now + 4.minutes, nextDueAt(now, now - 1.minutes, null, busy = false, active, idle))
+        assertEquals(now, nextDueAt(now, now - 1.minutes, null, busy = true, active, idle))
+        assertEquals(now + 10.minutes, nextDueAt(now, now - 1.minutes, now + 10.minutes, busy = false, active, idle))
+        assertEquals(now, nextDueAt(now, null, null, busy = false, active, idle))
+    }
+
+    @Test
+    fun `a reset counts once, after the grace, and never when unknown`() {
+        fun statsResetting(at: kotlinx.datetime.Instant, known: Boolean = true) = ApiUsageStats(
+            source = ApiSource.ANTHROPIC,
+            apiName = "Anthropic",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "5h",
+                    used = 1L,
+                    total = 100L,
+                    periodEndAt = at,
+                    hasKnownResetAt = known,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            )
+        )
+        val grace = 20.seconds
+        val lastAttempt = now - 5.minutes
+
+        assertTrue(hasQuotaResetSince(statsResetting(now - 1.minutes), lastAttempt, now, grace))
+        // Ainda dentro da folga: o reset da Anthropic não é instantâneo.
+        assertFalse(hasQuotaResetSince(statsResetting(now - 10.seconds), lastAttempt, now, grace))
+        // Já coletado depois do reset.
+        assertFalse(hasQuotaResetSince(statsResetting(now - 1.minutes), now - 30.seconds, now, grace))
+        assertFalse(hasQuotaResetSince(statsResetting(now - 1.minutes, known = false), lastAttempt, now, grace))
+    }
+
+    @Test
+    fun `a wait that ends far past its deadline is a wake from sleep`() {
+        assertTrue(looksLikeWakeFromSleep(now - 3.minutes, now, 2.minutes))
+        assertFalse(looksLikeWakeFromSleep(now - 1.minutes, now, 2.minutes))
     }
 }
