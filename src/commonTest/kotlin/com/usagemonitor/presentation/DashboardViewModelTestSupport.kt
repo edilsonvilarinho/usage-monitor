@@ -305,10 +305,18 @@ abstract class DashboardViewModelTestSupport {
         return vm
     }
 
+    /**
+     * O estado depois de a coleta inteira terminar, não o primeiro publicado.
+     *
+     * Desde a publicação incremental da #269 cada alvo entra na tela quando a
+     * coleta dele termina: o primeiro `Success` pode trazer só a Anthropic, sem o
+     * erro do MiniMax que ainda está a caminho. `refreshingTargets` só esvazia no
+     * `finally` de `performFetch`, depois do `awaitAll`, da contagem e do cache.
+     */
     protected suspend fun awaitSettledState(viewModel: DashboardViewModel): UiState {
         repeat(200) {
             val state = viewModel.uiState.value
-            if (state !is UiState.Loading) {
+            if (state !is UiState.Loading && viewModel.refreshingTargets.value.isEmpty()) {
                 return state
             }
             pauseForBackgroundWork()
