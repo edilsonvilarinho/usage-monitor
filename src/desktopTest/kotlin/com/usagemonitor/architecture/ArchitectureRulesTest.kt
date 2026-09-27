@@ -161,7 +161,7 @@ class ArchitectureRulesTest {
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/UsageHistoryLineChart.kt::UsageHistoryLineChart" to 460,
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt::HudNotch" to 348,
-            "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt::HudWindowHost" to 339,
+            "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt::HudWindowHost" to 335,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt::TeamUsageList" to 327
         )
     }
