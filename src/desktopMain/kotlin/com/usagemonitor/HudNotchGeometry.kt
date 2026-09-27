@@ -39,11 +39,15 @@ internal enum class HudEdge {
 }
 
 /**
- * Anel de uma conta: 36dp, três arcos concêntricos no máximo e a marca do
+ * Anel de uma conta: 44dp, três arcos concêntricos no máximo e a marca do
  * fornecedor no miolo. Era 28dp sem marca; com dois arcos o miolo de 28dp ficava
- * com 10dp, pouco para reconhecer o asterisco do Claude.
+ * com 10dp, pouco para reconhecer o asterisco do Claude. Com 36dp a marca ficava
+ * em 14dp com duas janelas e 8,4dp com três (issue #322: "os ícones dos modelos
+ * estão pequenos demais"); com 44dp ela vai a 19,6dp e 14dp pela mesma fórmula de
+ * `hudRingMarkSize`, e o notch de cima com duas janelas deixa de crescer por
+ * texto — o anel passa a ser o mais alto.
  */
-internal val HUD_RING_SIZE = 36.dp
+internal val HUD_RING_SIZE = 44.dp
 
 /**
  * O selo do emoji da conta (issue #287): uma caixa no canto de cima à direita do

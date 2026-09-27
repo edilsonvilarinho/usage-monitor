@@ -8,6 +8,7 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
+import com.usagemonitor.presentation.ui.hudRingMarkSize
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -362,8 +363,9 @@ class HudNotchGeometryTest {
     }
 
     /**
-     * Uma linha por janela (#286): o notch engrossa só o que as linhas pedem.
-     * Com uma cota a espessura é a do anel, como antes.
+     * Uma linha por janela (#286): o notch engrossa só o que as linhas pedem,
+     * e nunca fica mais fino que o anel. Com o anel de 44dp (#322), uma e duas
+     * janelas cabem na altura dele; a terceira engrossa.
      */
     @Test
     fun `cada janela a mais engrossa o notch de cima em uma linha`() {
@@ -373,7 +375,23 @@ class HudNotchGeometryTest {
             sizes.collapsed.height - HUD_NOTCH_PADDING_ACROSS * 2
         }
 
-        assertEquals(listOf(HUD_RING_SIZE, HUD_STRIP_LINE * 2 + HUD_WORD_LINE, HUD_STRIP_LINE * 3 + HUD_WORD_LINE), thickness)
+        val expected = listOf(
+            HUD_RING_SIZE,
+            maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 2 + HUD_WORD_LINE),
+            maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 3 + HUD_WORD_LINE)
+        )
+        assertEquals(expected, thickness)
+        assertTrue(thickness[2] > thickness[1], "a terceira janela ainda engrossa o notch")
+    }
+
+    /**
+     * A marca do fornecedor com três arcos ficava em 8,4dp no anel de 36dp —
+     * ilegível (issue #322). Com 44dp ela não desce de 14dp.
+     */
+    @Test
+    fun `a marca do fornecedor nao fica menor que 14dp com tres arcos`() {
+        assertTrue(hudRingMarkSize(3) >= 14.dp, "marca com três arcos: ${hudRingMarkSize(3)}")
+        assertTrue(hudRingMarkSize(2) > hudRingMarkSize(3))
     }
 
     @Test

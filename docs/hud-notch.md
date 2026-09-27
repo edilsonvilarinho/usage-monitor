@@ -27,8 +27,8 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     mudado no consumo. As linhas não mudam de lugar. A janela vai em `onSurfaceVariant` e o número em
     `onSurface`; a cor de risco fica no arco e na palavra, senão ela informaria o estado sozinha. Conta
     de cota única continua com o número em `labelMedium`, sem rótulo. O preço é a espessura: cada
-    janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima vai de 36dp para 42dp
-    com duas e 56dp com três. **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
+    janela é uma linha `labelSmall` de 14dp (`HUD_STRIP_LINE`), e o notch de cima fica nos 44dp do anel
+    com uma e duas e vai a 56dp com três. **O foco continua** (`HudAccount.focusIndex`/`focusLine`) no pulso de
     atenção, na célula compacta e na bandeja, onde não cabe uma linha por anel. A palavra continua
     sendo a do **pior** risco da conta: com as janelas à vista ela resume a conta, não um número.
   - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
@@ -87,7 +87,9 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**
   (`ApiUsageStats.displayTitle`, dono único: "Anthropic — Padrão"); a HUD mostrava só "Padrão" e
   escondia de quem era a conta. O **plano** ("Max 20x", "ChatGPT Plus") vem no rodapé do balão e na
-  descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo.
+  descrição do anel. O anel passou de 28 para 36dp para a marca caber no miolo, e de 36 para 44dp (issue #322) porque
+  a marca ainda ficava pequena: 14dp com duas janelas e 8,4dp com três. A fórmula de `hudRingMarkSize`
+  não mudou; com o anel maior ela dá 25,2 / 19,6 / 14dp.
 - **Resumo na bandeja** (`hudTraySummary`): o tooltip do ícone lista cada conta com o percentual em
   foco **e a janela dele** — "Usage Monitor — Anthropic — Padrão 7d 87% · Codex 0%" (#286) —, cortado com reticências nos 127
   caracteres do `szTip` do Windows.
@@ -209,7 +211,7 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   fica parado e o pulso some; a palavra continua dizendo o estado.
   - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
     comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
-    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3dp) além dos 36dp do anel,
+    atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3dp) além dos 44dp do anel,
     fora dos limites do `Canvas`, e cabe no respiro de 8dp do notch e na metade do vão de 12dp entre
     anéis — `HudNotchGeometryTest` afirma as duas coisas.
   - **O Codex tem sonda própria** (`LocalCodexActivityDataSource`, E10): o índice de sessões é só do

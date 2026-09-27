@@ -60,6 +60,7 @@ recoleta.
 | A5 | feat: 5h/7d/both quota selector in history (#320) | `gradlew.bat allTests` | 2277 testes, 0 falhas, 0 ignorados. No caminho, o teste antigo do card do Claude passou a achar dois nós "5h" (seletor e legenda); a asserção virou contagem de 2 |
 | A6 | feat: quota window table and hourly usage bars in history (#320) | `gradlew.bat allTests` | 2283 testes, 0 falhas, 0 ignorados; `HistoryWindowAnalysisTest` 5, `HistoryScreenTest` 13 |
 | A7 | feat: keep history content on screen while reloading (#320) | `gradlew.bat allTests --rerun` | 2284 testes, 0 falhas, 0 ignorados. Antes: três passadas com `DashboardViewModelRefreshPersistenceTest` vermelho (timeout de tempo real) enquanto existia o teste novo `selectSource still goes through Loading`; `main` num worktree deu 2253/0; sem os dois testes novos 2283/0; só com `selectRange keeps the previous content` 2284/0. O teste de troca de fonte saiu — ver achados |
+| B1 | feat: enlarge HUD ring to 44dp so provider marks stay legible (#322) | `gradlew.bat allTests` | 2285 testes, 0 falhas, 0 ignorados; marca 25,2 / 19,6 / 14dp (1/2/3 arcos); `hudRest()` do gerador de capturas (64dp) comporta 44 + 2×8 |
 
 ## Problemas em aberto e riscos
 

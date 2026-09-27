@@ -76,7 +76,7 @@ advances — `label*` is Plex Mono — and every balloon row has a fixed height,
 a sum. The open area reserves the **tallest** balloon, so switching rings never resizes the window.
 The collapsed width is the max of the widest line and the word, so a collection that turns `9%` into
 `88%` does not resize it either. Each window adds a 14dp line to the text column: the top-edge content is
-36dp with one window (the ring decides), 42dp with two and 56dp with three.
+44dp with one or two windows (the ring decides) and 56dp with three.
 
 **Window, measured.** A click on a transparent pixel of a transparent window is swallowed on Windows
 11 — it reaches neither the content nor the window behind. So the window is notch-thick at rest (plus
@@ -99,6 +99,6 @@ item, Ctrl+Shift+H.
 
 **Identification.** The provider mark (`AppProviderMark`) sits in the middle of each ring in the
 foreground color — the arcs around it already carry the risk colors. The account label is the card
-title ("Anthropic — Padrão", never just "Padrão"). Rings are 36dp so the mark fits. The tray icon
+title ("Anthropic — Padrão", never just "Padrão"). Rings are 44dp so the mark stays legible with three arcs (14dp; it was 8.4dp at 36dp, issue #322). The tray icon
 tooltip summarises every account with its focus percentage **and its window** ("7d 72%"), cut at
 Windows' 127 characters — one entry per window would overflow with three accounts.

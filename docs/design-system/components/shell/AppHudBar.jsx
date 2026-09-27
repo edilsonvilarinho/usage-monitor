@@ -54,6 +54,7 @@ export function AppHudBar({
         return (
           <div key={account.label} style={{ display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center', gap: horizontal ? 6 : 0 }}>
             <AppUsageRing
+              size={44}
               arcs={rings.map((q) => ({ fraction: q.fraction, level: q.level, forecast: q.forecast }))}
               active={account.active}
               label={`${account.label} · ${account.statusLabel}`}
