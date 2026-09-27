@@ -261,7 +261,15 @@ data class UsageHistorySeries(
      * usa para desenhar a linha de referência tracejada; nenhuma consulta
      * nova ao banco.
      */
-    val previousWindowPoints: List<UsageHistoryPoint> = emptyList()
+    val previousWindowPoints: List<UsageHistoryPoint> = emptyList(),
+    /**
+     * As janelas de cota do intervalo (issue #320), calculadas **antes** da
+     * amostragem do "Total": com um ponto a cada N, o pico de uma janela e o
+     * instante em que ela esgotou podem cair justamente no ponto descartado.
+     */
+    val windows: List<QuotaWindowSummary> = emptyList(),
+    val windowStats: QuotaWindowStats? = null,
+    val hourlyDistribution: QuotaHourlyDistribution? = null
 ) {
     val seriesKey: QuotaSeriesKey
         get() = QuotaSeriesKey(label = quotaLabel, periodType = periodType)

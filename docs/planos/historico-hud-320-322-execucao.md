@@ -56,6 +56,7 @@ recoleta.
 | A1 | fix: wrap history forecast metric instead of clipping it (#320) | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HistoryScreenTest"` | 9 testes, 0 falhas. Com `maxLines = 1` restaurado o teste novo falha: "previsão com 16 px contra 16 px de uma linha" |
 | A2 | refactor: move history chart drawing out of the chart composable (#320) | `gradlew.bat allTests` | 2254 testes, 0 falhas, 0 ignorados; `UsageHistoryLineChart.kt` 756 → 375 linhas, `UsageHistoryPlotDrawing.kt` 412; nenhum teste editado |
 | A3 | feat: overlay weekly quota on the history chart (#320) | `gradlew.bat allTests` | primeira passada: 2261 testes, 1 falha — `ArchitectureRulesTest`: `UsageHistoryLineChart` com 312 linhas (limite 300). Bolha do tooltip extraída para `HistoryTooltipLayer`; segunda passada 2261 testes, 0 falhas, 0 ignorados |
+| A4 | feat: per-window quota analysis for history series (#320) | `gradlew.bat allTests` | 2270 testes, 0 falhas, 0 ignorados; `QuotaWindowAnalysisTest` 8, `UsageHistoryRepositoryImplTest` 32 (inclui pico de 100% num índice que a amostragem do Total descarta) |
 
 ## Problemas em aberto e riscos
 

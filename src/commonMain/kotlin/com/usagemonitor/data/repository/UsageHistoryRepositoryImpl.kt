@@ -11,8 +11,11 @@ import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsagePeriodComparison
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.isSamePeriod
 import com.usagemonitor.domain.entity.positiveDeltaOf
+import com.usagemonitor.domain.entity.quotaHourlyDistributionOf
+import com.usagemonitor.domain.entity.quotaWindowStatsOf
+import com.usagemonitor.domain.entity.quotaWindowsOf
+import com.usagemonitor.domain.entity.splitIntoQuotaWindows
 import com.usagemonitor.domain.entity.riskSummary
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -107,6 +110,8 @@ class UsageHistoryRepositoryImpl(
         range: HistoryRange
     ): UsageHistorySeries {
         val points = records.map(::toHistoryPoint)
+        val unitForWindows = records.last().unit
+        val windows = quotaWindowsOf(points, unitForWindows, key.periodType)
         val renderPoints = if (range == HistoryRange.TOTAL) {
             downsamplePoints(points, MAX_TOTAL_POINTS_PER_SERIES)
         } else {
@@ -152,7 +157,10 @@ class UsageHistoryRepositoryImpl(
             // Mesmos registros que já alimentam a comparação, só que crus: o
             // gráfico é quem decide como desenhar, este repositório só para
             // de descartá-los depois de calcular o delta.
-            previousWindowPoints = previousRecords.map(::toHistoryPoint)
+            previousWindowPoints = previousRecords.map(::toHistoryPoint),
+            windows = windows,
+            windowStats = quotaWindowStatsOf(windows),
+            hourlyDistribution = quotaHourlyDistributionOf(points, unitForWindows, key.periodType)
         )
     }
 
@@ -233,26 +241,8 @@ class UsageHistoryRepositoryImpl(
     }
 
     private fun currentSegment(points: List<UsageHistoryPoint>, unit: UsageUnit): List<UsageHistoryPoint> {
-        if (points.size <= 1) {
-            return points
-        }
-
-        var segmentStartIndex = 0
-        for (index in 1 until points.size) {
-            val previous = points[index - 1]
-            val current = points[index]
-            val periodChanged = !isSamePeriod(current.periodEndAt, previous.periodEndAt)
-            val resetDetected = if (unit == UsageUnit.CURRENCY_USD) {
-                periodChanged
-            } else {
-                current.displayUsed < previous.displayUsed || periodChanged
-            }
-            if (resetDetected) {
-                segmentStartIndex = index
-            }
-        }
-
-        return points.subList(segmentStartIndex, points.size)
+        // A última janela é o trecho corrente: mesmo corte do resumo por janela.
+        return splitIntoQuotaWindows(points, unit).lastOrNull() ?: points
     }
 
     private fun downsamplePoints(points: List<UsageHistoryPoint>, maxPoints: Int): List<UsageHistoryPoint> {
