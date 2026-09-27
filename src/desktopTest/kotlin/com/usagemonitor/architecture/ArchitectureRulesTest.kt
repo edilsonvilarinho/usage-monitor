@@ -138,18 +138,14 @@ class ArchitectureRulesTest {
         const val MAX_FUNCTION_LINES = 300
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
-        val FILE_CEILINGS = mapOf(
+        val FILE_CEILINGS: Map<String, Int> = mapOf(
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/SettingsDialogContent.kt" to 1853,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliSessionsScreen.kt" to 1703,
             "src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalCliSessionDataSource.kt" to 1696,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt" to 1676,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt" to 1223,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899
         )
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
-        val FUNCTION_CEILINGS = mapOf(
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483
-        )
+        val FUNCTION_CEILINGS: Map<String, Int> = emptyMap()
     }
 }
