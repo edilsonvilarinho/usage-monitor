@@ -139,7 +139,6 @@ class ArchitectureRulesTest {
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FILE_CEILINGS = mapOf(
-            "src/desktopMain/kotlin/com/usagemonitor/Main.kt" to 3141,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/SettingsDialogContent.kt" to 1853,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliSessionsScreen.kt" to 1703,
             "src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalCliSessionDataSource.kt" to 1696,
@@ -159,7 +158,6 @@ class ArchitectureRulesTest {
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FUNCTION_CEILINGS = mapOf(
-            "src/desktopMain/kotlin/com/usagemonitor/Main.kt::runUsageMonitor" to 2395,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483,
             "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/UsageHistoryLineChart.kt::UsageHistoryLineChart" to 460,
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt::HudNotch" to 348,
