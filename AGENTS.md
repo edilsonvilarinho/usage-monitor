@@ -63,7 +63,7 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 
 - Direcao das camadas por import: `domain` nao importa Ktor, Compose, `kotlinx.serialization`, `java.io`, `data` nem `presentation`; `data` nao importa `presentation` nem Compose; `presentation` nao importa `data`. Precisando de algo de `data`, o contrato sobe para o domain como porta (precedente: `UsageExportEncoder`).
 - Arquivo de producao <= 800 linhas; funcao <= 300. Nada de arquivo-deus nem composable-deus.
-- As excecoes (`FILE_CEILINGS`/`FUNCTION_CEILINGS`) tem teto exato e so encolhem. **Excecao nova nao entra na lista** — divida o arquivo.
+- As excecoes (`FILE_CEILINGS`/`FUNCTION_CEILINGS`) tem teto exato e so encolhem; as duas estao vazias desde as issues #302-#309. **Excecao nova nao entra na lista** — divida o arquivo.
 
 ## External API calls
 

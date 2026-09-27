@@ -2,68 +2,32 @@ package com.usagemonitor.presentation.ui.components
 
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import androidx.compose.ui.unit.IntSize
-import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.rememberInfiniteTransition
 import com.usagemonitor.presentation.ui.theme.appTween
-import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.Sensors
-import androidx.compose.material.icons.rounded.Terminal
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -72,11 +36,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -90,21 +49,12 @@ import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageAccountContext
-import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.displayName
-import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.isObservedActivitySource
-import com.usagemonitor.domain.entity.seriesKey
-import com.usagemonitor.domain.entity.statusBadgeLabel
-import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.appSpring
 import androidx.compose.animation.core.VisibilityThreshold
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
-import com.usagemonitor.presentation.ui.theme.AppSpacing
-
-private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 
 /**
  * Âncoras estruturais do card.
@@ -125,17 +75,8 @@ const val API_USAGE_CARD_STATUS_TAG = "apiUsageCardStatus"
 const val API_USAGE_CARD_STATUS_HINT_TAG = "apiUsageCardStatusHint"
 const val QUOTA_BLOCK_TAG_PREFIX = "quotaBlock:"
 const val QUOTA_PROGRESS_TRACK_TAG_PREFIX = "quotaProgress:"
-private const val OBSERVED_ACTIVITY_TRACK_TAG_PREFIX = "observedActivityTrack:"
-private const val OBSERVED_ACTIVITY_VALUE_TAG_PREFIX = "observedActivityValue:"
-
 /** O rótulo da cota é único dentro de um card: é a chave da série. */
 fun quotaBlockTag(label: String): String = "$QUOTA_BLOCK_TAG_PREFIX$label"
-
-internal fun observedActivityTrackTag(modelName: String, label: String): String =
-    "$OBSERVED_ACTIVITY_TRACK_TAG_PREFIX$modelName:$label"
-
-internal fun observedActivityValueTag(modelName: String, label: String): String =
-    "$OBSERVED_ACTIVITY_VALUE_TAG_PREFIX$modelName:$label"
 
 /** Âncora de teste da barra da cota expandida; não altera a semântica visual. */
 fun quotaProgressTrackTag(label: String): String = "$QUOTA_PROGRESS_TRACK_TAG_PREFIX$label"
@@ -146,7 +87,7 @@ const val API_USAGE_CARD_EMOJI_TAG = "apiUsageCardEmoji"
 fun apiUsageCardTag(apiName: String): String = "$API_USAGE_CARD_TAG_PREFIX$apiName"
 
 /** Opacidade do número de uma janela já vencida — o dado é real, mas velho. */
-private const val STALE_QUOTA_ALPHA = 0.45f
+internal const val STALE_QUOTA_ALPHA = 0.45f
 
 // Entrada do card: o fade é longo o bastante para a grade ler como cascata com
 // o atraso de `AppMotion.stagger`, e a subida e a escala andam por mola.
@@ -343,1334 +284,131 @@ fun ApiUsageCard(
             )
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                // O cabeçalho carrega o próprio padding e o conteúdo abaixo dele
-                // encosta na borda: é o `.pbody.flush` do protótipo, onde a
-                // divisória de cada cota atravessa o card de ponta a ponta. Com o
-                // padding num bloco só em volta de tudo, a divisória parava a 12dp
-                // de cada lado e a lista deixava de ler como tabela.
-                //
-                // `spacedBy` e não `SpaceBetween`: a coluna do título já leva
-                // `weight(1f)` e empurra o resto para a direita sozinha, e o
-                // arranjo por espaço não deixava vão entre o badge de estado e o
-                // primeiro botão — a palavra encostava no ícone.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = density.contentHorizontalPadding,
-                            vertical = density.contentVerticalPadding
-                        )
-                        .testTag(API_USAGE_CARD_HEADER_TAG),
-                    horizontalArrangement = Arrangement.spacedBy(density.headerSpacing),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(density.headerSpacing),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        // A identidade da fonte cabe num traço de 2dp. Ela era o
-                        // fundo inteiro do card, e com quatro cards abertos o
-                        // dashboard virava quatro retângulos coloridos disputando
-                        // a atenção que os números deviam ter.
-                        AppSourceMarker(
-                            color = accent ?: accentColorFor(source = source, accents = AppAccents.current),
-                            height = if (accountContext == null) 18.dp else 28.dp
-                        )
-                        // A marca do fornecedor, no acento da fonte: reconhecer o
-                        // card antes de ler o título, como no Codenotch e no
-                        // ai-usagebar. O traço continua — ele é a identidade no
-                        // alinhamento vertical da grade; a marca é a do olho.
-                        AppProviderMark(
-                            source = source,
-                            tint = accent ?: accentColorFor(source = source, accents = AppAccents.current),
-                            size = PROVIDER_MARK_SIZE
-                        )
-                        // O emoji da conta (issue #287): o mesmo selo do anel da
-                        // HUD. A identidade não pode existir num lugar e sumir no
-                        // outro.
-                        if (emoji != null) {
-                            AccountEmojiGlyph(
-                                emoji = emoji,
-                                size = PROVIDER_MARK_SIZE,
-                                modifier = Modifier.testTag(API_USAGE_CARD_EMOJI_TAG)
-                            )
-                        }
-                        // Título e conta na mesma coluna, como o `.ptitle`/`.psub`
-                        // do protótipo. A conta era uma linha de largura cheia
-                        // abaixo do cabeçalho inteiro, alinhada à borda do card e
-                        // não ao título de que ela é o subtítulo.
-                        Column(modifier = Modifier.weight(1f, fill = false)) {
-                            // O plano da conta colado no nome — o "Claude Max 20x"
-                            // do ai-usagebar. Na linha do título e não depois da
-                            // coluna: a coluna mede o e-mail, que é mais largo, e o
-                            // selo ia parar longe do nome de que ele é atributo.
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                HoverTooltipBox(
-                                    title = apiName,
-                                    metrics = emptyList(),
-                                    modifier = Modifier.weight(1f, fill = false)
-                                ) {
-                                    Text(
-                                        text = apiName,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                planLabel?.let { plan -> CardHeaderBadge(plan, Modifier.testTag(API_USAGE_CARD_PLAN_TAG)) }
-                            }
-                            if (accountContext != null) {
-                                AccountIdentityLabel(
-                                    account = accountContext,
-                                    language = language
-                                )
-                            }
-                        }
-                        source.statusBadgeLabel(language)?.let { badgeLabel -> CardHeaderBadge(badgeLabel) }
-
-                        // O aviso da fonte sai aqui, no cabeçalho, e não como
-                        // banner abaixo das cotas: o cabeçalho é composto tanto
-                        // com o card aberto quanto fechado — a garantia que o
-                        // aviso de créditos exige — e ocupa a altura que já
-                        // existe.
-                        if (notices.isNotEmpty()) {
-                            CardNoticeHint(
-                                notices = notices,
-                                source = source,
-                                language = language,
-                                iconSize = density.actionIconSize
-                            )
-                        }
-                    }
-
-                    // Estado da fonte com **ponto e palavra**, ao lado das ações,
-                    // como no protótipo. O `RiskSemaphoreDot` de cada cota é só
-                    // ponto: sozinho, ele deixa a cor informando o estado, que é
-                    // exatamente o que este sistema visual não faz. Aqui a
-                    // palavra aparece uma vez, para o card inteiro, e continua
-                    // sendo lida com o card minimizado — o cabeçalho é composto
-                    // nos dois estados.
-                    worstQuotaRisk(
-                        quotas = orderedQuotas,
-                        riskByQuotaKey = riskByQuotaKey,
-                        now = now
-                    )?.let { (worstQuota, worstRisk) ->
-                        val statusLabel = riskLevelLabel(worstRisk.level, language)
-                        Box(modifier = Modifier.testTag(API_USAGE_CARD_STATUS_TAG)) {
-                            HoverTooltipBox(
-                                title = riskDotTooltipTitle(language),
-                                metrics = listOf(
-                                    TooltipMetric(
-                                        label = if (language == AppLanguage.PT) "Cota" else "Quota",
-                                        value = worstQuota.label
-                                    ),
-                                    TooltipMetric(
-                                        label = if (language == AppLanguage.PT) "Status" else "Status",
-                                        value = statusLabel
-                                    )
-                                ),
-                                footnote = riskDotTooltipSubtitle(worstRisk, language),
-                                modifier = Modifier.testTag(API_USAGE_CARD_STATUS_HINT_TAG)
-                            ) {
-                                AppStatusIndicator(
-                                    label = statusLabel,
-                                    tone = toneFor(worstRisk.level),
-                                    modifier = Modifier.semantics {
-                                        contentDescription = riskStatusContentDescription(
-                                            quotaLabel = worstQuota.label,
-                                            risk = worstRisk,
-                                            language = language
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.testTag(API_USAGE_CARD_ACTIONS_TAG),
-                        horizontalArrangement = Arrangement.spacedBy(density.actionSpacing),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CardIconActionButton(
-                            label = refreshActionLabel(
-                                isRefreshing = isRefreshing,
-                                language = language
-                            ),
-                            onClick = onRefresh,
-                            buttonSize = density.actionButtonSize,
-                            enabled = !isRefreshing
-                        ) { tint ->
-                            RefreshGlyph(
-                                refreshing = isRefreshing,
-                                tint = tint,
-                                size = density.actionIconSize
-                            )
-                        }
-
-                        CardIconActionButton(
-                            label = minimizeActionLabel(
-                                isMinimized = isMinimized,
-                                language = language
-                            ),
-                            onClick = onToggleMinimized,
-                            buttonSize = density.actionButtonSize
-                        ) { tint ->
-                            Icon(
-                                imageVector = if (isMinimized) {
-                                    Icons.Rounded.Add
-                                } else {
-                                    Icons.Rounded.Remove
-                                },
-                                modifier = Modifier.size(density.actionIconSize),
-                                contentDescription = null,
-                                tint = tint
-                            )
-                        }
-                    }
-                }
+                ApiUsageCardHeader(
+                    source = source,
+                    apiName = apiName,
+                    accountContext = accountContext,
+                    notices = notices,
+                    planLabel = planLabel,
+                    accent = accent,
+                    emoji = emoji,
+                    quotas = orderedQuotas,
+                    riskByQuotaKey = riskByQuotaKey,
+                    now = now,
+                    isRefreshing = isRefreshing,
+                    isMinimized = isMinimized,
+                    language = language,
+                    density = density,
+                    onRefresh = onRefresh,
+                    onToggleMinimized = onToggleMinimized
+                )
 
                 AppDivider()
 
-                // Um dono só para o tamanho: esta transição. Havia também um
-                // `animateContentSize` no card inteiro, e as duas animações de
-                // tamanho aninhadas faziam o card esticar em dois tempos ao
-                // minimizar. A mola do tamanho é a mesma do resto do card.
-                val minimizeFadeIn = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing, delayMillis = MINIMIZE_FADE_DELAY_MS)
-                val minimizeFadeOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
-                val minimizeScaleIn = appSpring<Float>(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f)
-                val minimizeScaleOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
-                val minimizeSize = appSpring<IntSize>(AppMotion.Springs.GENTLE, visibilityThreshold = IntSize.VisibilityThreshold)
-                AnimatedContent(
-                    targetState = isMinimized,
-                    transitionSpec = {
-                        (fadeIn(minimizeFadeIn) + scaleIn(minimizeScaleIn, initialScale = 0.97f))
-                            .togetherWith(fadeOut(minimizeFadeOut) + scaleOut(minimizeScaleOut, targetScale = 0.98f))
-                            .using(SizeTransform(clip = false) { _, _ -> minimizeSize })
-                    },
-                    label = "cardLayoutMode"
-                ) { minimized ->
-                    // Só a cota expandida é linha de tabela e traz a própria
-                    // divisória de ponta a ponta. Badge e resumo do OpenCode são
-                    // blocos, e bloco encostado na borda não tem onde respirar:
-                    // esses dois recebem o padding do card.
-                    val blockPadding = Modifier.padding(
-                        horizontal = density.contentHorizontalPadding,
-                        vertical = density.contentVerticalPadding
-                    )
-                    if (source.isObservedActivitySource()) {
-                        ObservedUsageSummary(
-                            source = source,
-                            quotas = orderedQuotas,
-                            language = language,
-                            compact = minimized,
-                            modifier = blockPadding
-                        )
-                    } else if (minimized) {
-                        CompactQuotaSummary(
-                            source = source,
-                            quotas = orderedQuotas,
-                            showUsageDetails = showUsageDetails,
-                            language = language,
-                            riskByQuotaKey = riskByQuotaKey,
-                            density = density,
-                            stacked = stackCompactQuotas,
-                            showTooltip = showQuotaTooltip,
-                            now = now,
-                            modifier = blockPadding
-                        )
-                    } else {
-                        ExpandedQuotaSummary(
-                            quotas = orderedQuotas,
-                            showUsageDetails = showUsageDetails,
-                            language = language,
-                            riskByQuotaKey = riskByQuotaKey,
-                            density = density,
-                            showTooltip = showQuotaTooltip,
-                            now = now
-                        )
-                    }
-                }
+                ApiUsageCardQuotaContent(
+                    source = source,
+                    quotas = orderedQuotas,
+                    isMinimized = isMinimized,
+                    showUsageDetails = showUsageDetails,
+                    language = language,
+                    riskByQuotaKey = riskByQuotaKey,
+                    density = density,
+                    stackCompactQuotas = stackCompactQuotas,
+                    showQuotaTooltip = showQuotaTooltip,
+                    now = now
+                )
 
-            // As quatro ações de navegação desceram do cabeçalho para uma barra
-            // própria. No topo elas dividiam espaço com atualizar e minimizar, que
-            // agem sobre o card, e num card estreito a fileira de seis botões
-            // comia o título. Aqui a divisão é por natureza: em cima o que mexe
-            // no card, embaixo o que abre outra janela.
-            //
-            // Continuam sendo botões de ícone com `contentDescription`, e não
-            // botões de texto como no protótipo: a descrição carrega a explicação
-            // do pisca ("1 sessão ativa agora pede atenção: …"), que é o motivo de
-            // o semáforo existir. Texto no botão não teria onde levá-la.
-            AppStatusBar {
-                // A ordem e as condições são de `cardActionsFor`, dono único da
-                // regra; aqui chegam como lambdas nulas ou não.
-                val actions = buildList {
-                    add(CardAction.HISTORY)
-                    if (onOpenCodexCliSessions != null) add(CardAction.CODEX_CLI_SESSIONS)
-                    if (onOpenCliSessions != null) add(CardAction.CLI_SESSIONS)
-                    if (onOpenTeamUsage != null) add(CardAction.TEAM_USAGE)
-                    if (onOpenTeamPresence != null) add(CardAction.TEAM_PRESENCE)
-                }
-                actions.forEach { action ->
-                    CardActionButton(
-                        action = action,
-                        language = language,
-                        buttonSize = density.actionButtonSize,
-                        iconSize = density.actionIconSize,
-                        cliSessionPulse = cliSessionPulse,
-                        teamSessionPulse = teamSessionPulse,
-                        onClick = when (action) {
-                            CardAction.HISTORY -> onOpenHistory
-                            CardAction.CODEX_CLI_SESSIONS -> onOpenCodexCliSessions ?: {}
-                            CardAction.CLI_SESSIONS -> onOpenCliSessions ?: {}
-                            CardAction.TEAM_USAGE -> onOpenTeamUsage ?: {}
-                            CardAction.TEAM_PRESENCE -> onOpenTeamPresence ?: {}
-                        }
-                    )
-                }
-            }
+            ApiUsageCardNavigationBar(
+                language = language,
+                density = density,
+                cliSessionPulse = cliSessionPulse,
+                teamSessionPulse = teamSessionPulse,
+                onOpenHistory = onOpenHistory,
+                onOpenCliSessions = onOpenCliSessions,
+                onOpenCodexCliSessions = onOpenCodexCliSessions,
+                onOpenTeamUsage = onOpenTeamUsage,
+                onOpenTeamPresence = onOpenTeamPresence
+            )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AccountIdentityLabel(
-    account: UsageAccountContext,
-    language: AppLanguage,
-    modifier: Modifier = Modifier
-) {
-    val tooltipState = rememberTooltipState(isPersistent = true)
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = {
-            PlainTooltip {
-                Text(
-                    text = if (language == AppLanguage.PT) {
-                        "Conta da última coleta: ${account.displayLabel}"
-                    } else {
-                        "Account from last snapshot: ${account.displayLabel}"
-                    }
-                )
-            }
-        },
-        state = tooltipState,
-        modifier = modifier
-    ) {
-        Text(
-            text = account.displayLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            // Alinhada à esquerda, como subtítulo do cabeçalho. Centrada ela
-            // flutuava sozinha no meio do card, sem coluna a que pertencer.
-            textAlign = TextAlign.Start,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("usageAccountLabel")
-                .semantics {
-                    contentDescription = if (language == AppLanguage.PT) {
-                        "Conta da última coleta: ${account.displayLabel}"
-                    } else {
-                        "Account from last snapshot: ${account.displayLabel}"
-                    }
-                }
-        )
     }
 }
 
 /**
- * Avisos não fatais da fonte, condensados numa exclamação.
- *
- * Eram `AppBanner` empilhados abaixo das cotas, e o texto deles não muda entre
- * coletas: na janela estreita do modo somente cards os dois avisos do Codex
- * ocupavam mais altura que o número que o card existe para mostrar (issue #76).
- *
- * O sinal continua sem hover — é o ícone âmbar, e ele mora no cabeçalho, que é
- * composto também com o card minimizado. O que passou a exigir hover é o texto.
- *
- * Sem piso de largura, ao contrário da tooltip de cota: aquele piso existe
- * porque o popup cobre o número que o ponteiro apontava, e este não aponta
- * número nenhum. Sem a tooltip o aviso ficaria inacessível justamente na janela
- * estreita, que é onde ele mais atrapalhava.
+ * As cotas do card, aberto ou minimizado. A troca entre os dois é a única
+ * animação de tamanho do card.
  */
 @Composable
-private fun CardNoticeHint(
-    notices: Set<ApiUsageNotice>,
-    source: ApiSource,
-    language: AppLanguage,
-    iconSize: Dp,
-    modifier: Modifier = Modifier
-) {
-    // Mesma ordem estável dos banners que este hint substituiu.
-    val texts = remember(notices, source, language) {
-        notices
-            .toList()
-            .sortedBy { notice -> notice.ordinal }
-            .map { notice -> noticeText(notice = notice, source = source, language = language) }
-    }
-    if (texts.isEmpty()) return
-
-    val title = noticeHintTitle(count = texts.size, language = language)
-    // Bullet só com dois ou mais: marcador solto numa frase única é ruído.
-    val body = remember(texts) {
-        if (texts.size == 1) {
-            texts.first()
-        } else {
-            texts.joinToString(separator = "\n") { text -> "• $text" }
-        }
-    }
-    // A descrição carrega as frases inteiras: sem hover a tooltip não existe na
-    // árvore, e é por ela que leitor de tela e testes chegam ao aviso.
-    val description = remember(title, texts) {
-        "$title: ${texts.joinToString(separator = " ")}"
-    }
-
-    HoverTooltipBox(
-        title = title,
-        metrics = emptyList(),
-        footnote = body,
-        modifier = modifier
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.ErrorOutline,
-            contentDescription = description,
-            modifier = Modifier.size(iconSize),
-            // O aviso é do estado da fonte, não da identidade dela: pintá-lo com
-            // a cor da API diria "Codex" onde precisa dizer "atenção".
-            tint = AppTone.WARNING.color()
-        )
-    }
-}
-
-private fun noticeHintTitle(count: Int, language: AppLanguage): String {
-    return if (language == AppLanguage.PT) {
-        if (count == 1) "Aviso" else "Avisos"
-    } else {
-        if (count == 1) "Notice" else "Notices"
-    }
-}
-
-private fun noticeText(notice: ApiUsageNotice, source: ApiSource, language: AppLanguage): String {
-    return when (notice) {
-        ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE -> {
-            if (language == AppLanguage.PT) {
-                "Quota 7d indisponível na fonte semanal do Codex"
-            } else {
-                "7d quota unavailable in Codex weekly source"
-            }
-        }
-        // Fora do Codex a marca é posta pelo painel quando guarda a última leitura
-        // depois de uma falha (issue #267): a frase do contrato do Codex não se aplica.
-        ApiUsageNotice.SOURCE_UNSTABLE -> if (source != ApiSource.CODEX) {
-            if (language == AppLanguage.PT) {
-                "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."
-            } else {
-                "The latest refresh failed. These numbers are from the last valid reading and may be out of date."
-            }
-        } else {
-            if (language == AppLanguage.PT) {
-                "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar."
-            } else {
-                "Codex usage source is unstable: the contract changed and limits may fluctuate until it stabilizes."
-            }
-        }
-        ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE -> {
-            if (language == AppLanguage.PT) {
-                "Créditos de uso não vieram nesta coleta. O saldo no claude.ai continua valendo."
-            } else {
-                "Usage credits missing from this snapshot. The balance on claude.ai still holds."
-            }
-        }
-    }
-}
-
-@Composable
-private fun ObservedUsageSummary(
+private fun ApiUsageCardQuotaContent(
     source: ApiSource,
     quotas: List<QuotaInfo>,
-    language: AppLanguage,
-    compact: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val modelSummaries = remember(quotas) { buildObservedUsageSummaries(quotas) }
-
-    if (modelSummaries.isEmpty()) {
-        // Superfície neutra com borda, como todo bloco de dado do sistema. O
-        // fundo pintado com a cor da fonte era o resto do card colorido que a
-        // refatoração tirou do resto do dashboard: aqui ele sobreviveu porque
-        // OpenCode e Kilo não entram nas capturas.
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .appSurfaceBlock()
-                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
-        ) {
-            Text(
-                text = if (source == ApiSource.GEMINI) {
-                    if (language == AppLanguage.PT) "Nenhum token registrado" else "No tokens recorded"
-                } else {
-                    if (language == AppLanguage.PT) "Nenhum uso free detectado" else "No free usage detected"
-                },
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = if (source == ApiSource.GEMINI) {
-                    if (language == AppLanguage.PT) {
-                        "O uso aparece quando o Gemini CLI registra sessões locais com contagem de tokens."
-                    } else {
-                        "Usage appears when Gemini CLI records local sessions with token counts."
-                    }
-                } else if (language == AppLanguage.PT) {
-                    "Abra o ${source.displayName(language)} e use um modelo free para começar a preencher este card."
-                } else {
-                    "Use a free ${source.displayName(language)} model to start populating this card."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-        return
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
-    ) {
-        modelSummaries.forEach { summary ->
-            ObservedUsageModelRow(
-                source = source,
-                summary = summary,
-                language = language,
-                compact = compact
-            )
-        }
-    }
-}
-
-@Composable
-private fun ObservedUsageModelRow(
-    source: ApiSource,
-    summary: ObservedUsageModelSummary,
-    language: AppLanguage,
-    compact: Boolean,
-    modifier: Modifier = Modifier
-) {
-    // No modo compacto a linha não renderiza as barras internas (que já têm
-    // tooltip própria), então é seguro dar tooltip à linha inteira.
-    if (compact) {
-        HoverTooltipBox(
-            title = summary.modelName,
-            subtitle = if (language == AppLanguage.PT) "Atividade observada" else "Observed activity",
-            metrics = buildObservedUsageTooltipMetrics(summary = summary, language = language),
-            modifier = modifier
-        ) {
-            ObservedUsageModelRowContent(
-                source = source,
-                summary = summary,
-                language = language,
-                compact = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        return
-    }
-
-    ObservedUsageModelRowContent(
-        source = source,
-        summary = summary,
-        language = language,
-        compact = false,
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun ObservedUsageModelRowContent(
-    source: ApiSource,
-    summary: ObservedUsageModelSummary,
-    language: AppLanguage,
-    compact: Boolean,
-    modifier: Modifier = Modifier
-) {
-    // A identidade da fonte fica no marcador de 2dp do cabeçalho do card, como em
-    // todos os outros. Aqui ela pintava o bloco inteiro, e num card com três
-    // modelos eram três retângulos coloridos dentro de um card já identificado.
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .appSurfaceBlock()
-            .padding(horizontal = AppSpacing.md, vertical = if (compact) AppSpacing.sm else AppSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else AppSpacing.md)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = summary.modelName,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = if (source == ApiSource.GEMINI) {
-                        if (language == AppLanguage.PT) "Métrica local; cota da conta separada" else "Local metric; account quota is separate"
-                    } else {
-                        if (language == AppLanguage.PT) "Limite oficial indisponível" else "Official limit unavailable"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = localizedObservedCount(summary.amountFiveHours, summary.unit, language),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = observedPrimaryWindowLabel(language),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = observedSecondaryWindowLabel(
-                        value = summary.amountSevenDays,
-                        source = source,
-                        unit = summary.unit,
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        if (!compact) {
-            ObservedUsageInlineComparisonChart(
-                source = source,
-                summary = summary,
-                language = language
-            )
-        }
-    }
-}
-
-
-@Composable
-private fun ObservedUsageInlineComparisonChart(
-    source: ApiSource,
-    summary: ObservedUsageModelSummary,
-    language: AppLanguage,
-    modifier: Modifier = Modifier
-) {
-    val maxValue = maxOf(summary.amountFiveHours, summary.amountSevenDays, 1L).toFloat()
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = if (language == AppLanguage.PT) {
-                "Atividade observada"
-            } else {
-                "Observed activity"
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        ObservedUsageInlineBar(
-            modelName = summary.modelName,
-            label = "5h",
-            value = summary.amountFiveHours,
-            fraction = summary.amountFiveHours / maxValue,
-            unit = summary.unit,
-            language = language
-        )
-        ObservedUsageInlineBar(
-            modelName = summary.modelName,
-            label = "7d",
-            value = summary.amountSevenDays,
-            fraction = summary.amountSevenDays / maxValue,
-            unit = summary.unit,
-            language = language
-        )
-    }
-}
-
-@Composable
-private fun ObservedUsageInlineBar(
-    modelName: String,
-    label: String,
-    value: Long,
-    fraction: Float,
-    unit: UsageUnit,
-    language: AppLanguage,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        HoverTooltipBox(
-            title = modelName,
-            subtitle = if (language == AppLanguage.PT) {
-                "Atividade observada"
-            } else {
-                "Observed activity"
-            },
-            metrics = listOf(
-                TooltipMetric(
-                    label = if (language == AppLanguage.PT) "Janela" else "Window",
-                    value = label
-                ),
-                TooltipMetric(
-                    label = when {
-                        unit == UsageUnit.TOKENS -> "Tokens"
-                        language == AppLanguage.PT -> "Requisições"
-                        else -> "Requests"
-                    },
-                    value = localizedObservedCount(value, unit, language)
-                )
-            ),
-            modifier = Modifier.weight(1f)
-        ) {
-            // A barra do sistema: 4dp, com borda e trilha neutra. Esta era a
-            // única do app com 8dp e superfície com alpha própria.
-            AppProgressTrack(
-                fraction = fraction,
-                tone = AppTone.INFO,
-                modifier = Modifier.testTag(observedActivityTrackTag(modelName, label))
-            )
-        }
-
-        Text(
-            text = compactObservedCount(value, unit),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            softWrap = false,
-            // O valor é uma coluna de dados, não texto flexível. Sem um piso
-            // ele recebe a largura residual e o Compose quebra cada caractere
-            // verticalmente quando o card fica estreito.
-            modifier = Modifier
-                .widthIn(min = 42.dp)
-                .testTag(observedActivityValueTag(modelName, label))
-        )
-    }
-}
-
-
-@Composable
-internal fun CardIconActionButton(
-    label: String,
-    onClick: () -> Unit,
-    buttonSize: Dp,
-    enabled: Boolean = true,
-    /** Semáforo das sessões em curso; vazio deixa o botão em repouso. */
-    pulse: SessionPulse = SessionPulse.EMPTY,
-    language: AppLanguage = AppLanguage.PT,
-    /** Recebe a cor do ícone: a do tema em repouso, a da severidade no pisca. */
-    content: @Composable (Color) -> Unit
-) {
-    val frame = rememberSessionPulseFrame(pulse)
-    // O motivo entra na descrição, e não só na tooltip: um botão que pisca sem
-    // explicação obriga justamente o clique que o semáforo quer poupar.
-    //
-    // Memorizado porque o pisca recompõe este botão a cada quadro: sem isso o
-    // texto seria remontado sessenta vezes por segundo sem nunca mudar.
-    val hint = remember(pulse, language) { sessionPulseHint(pulse, language) }
-    val description = remember(label, hint) { if (hint == null) label else "$label — $hint" }
-    val accents = AppAccents.current
-    val tint = frame?.color(accents) ?: MaterialTheme.colorScheme.onSurfaceVariant
-    // Em repouso o botão é a própria superfície do card: o contêiner tonal do
-    // Material acrescentava um segundo tom de fundo por botão, e são até seis.
-    val containerColor = sessionPulseContainerColor(
-        frame = frame,
-        resting = Color.Transparent,
-        accents = accents
-    )
-
-    HoverTooltipBox(
-        title = label,
-        subtitle = hint,
-        metrics = emptyList()
-    ) {
-        // Quadrado de raio 6 no lugar do botão circular preenchido: seis
-        // círculos no cabeçalho pesavam mais que o número que o card existe
-        // para mostrar. O contêiner só ganha cor quando o semáforo está aceso —
-        // aí a cor é informação, não decoração.
-        // Sem hover nem pressão, a ação do card era o único botão da tela que não
-        // respondia ao ponteiro. Ganha as duas camadas e a escala de pressão --
-        // é superfície sem texto, então encolher não borra nada.
-        val interaction = remember { MutableInteractionSource() }
-        val hovered by interaction.collectIsHoveredAsState()
-        val pressed by interaction.collectIsPressedAsState()
-        val ladder = AppSurfaceLadders.current
-        val layer by animateColorAsState(
-            targetValue = when {
-                !enabled -> Color.Transparent
-                pressed -> ladder.pressedLayer
-                hovered -> ladder.hoverLayer
-                else -> Color.Transparent
-            },
-            animationSpec = appTween(AppMotion.fast),
-            label = "cardActionLayer"
-        )
-        Box(
-            modifier = Modifier
-                .size(buttonSize)
-                .appPressScale(interaction, enabled)
-                .appSurfaceBlock(color = containerColor)
-                .background(layer)
-                .hoverable(interaction, enabled = enabled)
-                .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
-                .semantics {
-                    contentDescription = description
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            content(tint)
-        }
-    }
-}
-
-@Composable
-private fun CompactQuotaSummary(
-    source: ApiSource,
-    quotas: List<QuotaInfo>,
+    isMinimized: Boolean,
     showUsageDetails: Boolean,
     language: AppLanguage,
     riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
     density: ApiUsageCardDensity,
-    stacked: Boolean,
-    showTooltip: Boolean,
-    now: Instant,
-    modifier: Modifier = Modifier
+    stackCompactQuotas: Boolean,
+    showQuotaTooltip: Boolean,
+    now: Instant
 ) {
-    if (quotas.size == 1) {
-        BoxWithConstraints(
-            modifier = modifier.fillMaxWidth(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            val badgeWidthFraction = if (maxWidth < 360.dp) 0.76f else 0.5f
 
-            CompactQuotaBadge(
+    // Um dono só para o tamanho: esta transição. Havia também um
+    // `animateContentSize` no card inteiro, e as duas animações de
+    // tamanho aninhadas faziam o card esticar em dois tempos ao
+    // minimizar. A mola do tamanho é a mesma do resto do card.
+    val minimizeFadeIn = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing, delayMillis = MINIMIZE_FADE_DELAY_MS)
+    val minimizeFadeOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+    val minimizeScaleIn = appSpring<Float>(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f)
+    val minimizeScaleOut = appTween<Float>(AppMotion.exit, AppMotion.exitEasing)
+    val minimizeSize = appSpring<IntSize>(AppMotion.Springs.GENTLE, visibilityThreshold = IntSize.VisibilityThreshold)
+    AnimatedContent(
+        targetState = isMinimized,
+        transitionSpec = {
+            (fadeIn(minimizeFadeIn) + scaleIn(minimizeScaleIn, initialScale = 0.97f))
+                .togetherWith(fadeOut(minimizeFadeOut) + scaleOut(minimizeScaleOut, targetScale = 0.98f))
+                .using(SizeTransform(clip = false) { _, _ -> minimizeSize })
+        },
+        label = "cardLayoutMode"
+    ) { minimized ->
+        // Só a cota expandida é linha de tabela e traz a própria
+        // divisória de ponta a ponta. Badge e resumo do OpenCode são
+        // blocos, e bloco encostado na borda não tem onde respirar:
+        // esses dois recebem o padding do card.
+        val blockPadding = Modifier.padding(
+            horizontal = density.contentHorizontalPadding,
+            vertical = density.contentVerticalPadding
+        )
+        if (source.isObservedActivitySource()) {
+            ObservedUsageSummary(
                 source = source,
-                quota = quotas.first(),
+                quotas = quotas,
+                language = language,
+                compact = minimized,
+                modifier = blockPadding
+            )
+        } else if (minimized) {
+            CompactQuotaSummary(
+                source = source,
+                quotas = quotas,
                 showUsageDetails = showUsageDetails,
                 language = language,
-                risk = riskByQuotaKey[quotas.first().seriesKey],
+                riskByQuotaKey = riskByQuotaKey,
                 density = density,
-                showTooltip = showTooltip,
+                stacked = stackCompactQuotas,
+                showTooltip = showQuotaTooltip,
                 now = now,
-                modifier = Modifier.fillMaxWidth(badgeWidthFraction)
+                modifier = blockPadding
             )
-        }
-
-        return
-    }
-
-    if (stacked) {
-        Column(
-            modifier = modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(density.compactQuotaSpacing)
-        ) {
-            quotas.forEach { quota ->
-                CompactQuotaBadge(
-                    source = source,
-                    quota = quota,
-                    showUsageDetails = showUsageDetails,
-                    language = language,
-                    risk = riskByQuotaKey[quota.seriesKey],
-                    density = density,
-                    showTooltip = showTooltip,
-                    now = now,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        return
-    }
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(density.compactQuotaSpacing),
-        verticalAlignment = Alignment.Top
-    ) {
-        quotas.forEach { quota ->
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                CompactQuotaBadge(
-                    source = source,
-                    quota = quota,
-                    showUsageDetails = showUsageDetails,
-                    language = language,
-                    risk = riskByQuotaKey[quota.seriesKey],
-                    density = density,
-                    showTooltip = showTooltip,
-                    now = now,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactQuotaBadge(
-    source: ApiSource,
-    quota: QuotaInfo,
-    showUsageDetails: Boolean,
-    language: AppLanguage,
-    risk: QuotaRiskSummary?,
-    density: ApiUsageCardDensity,
-    /** Ver `shouldShowQuotaTooltip`: em card estreito o popup cobre o card. */
-    showTooltip: Boolean,
-    now: Instant,
-    modifier: Modifier = Modifier
-) {
-    // Sem tooltip a `testTag` do bloco desce para o conteúdo: presa ao
-    // `HoverTooltipBox`, o nó sumiria da árvore em card estreito.
-    if (!showTooltip) {
-        CompactQuotaBadgeContent(
-            quota = quota,
-            showUsageDetails = showUsageDetails,
-            language = language,
-            risk = risk,
-            density = density,
-            now = now,
-            // Sem popup para explicar o semáforo, a explicação vira texto: ver
-            // `CompactQuotaBadgeContent.showRiskSummaryLine`.
-            showRiskSummaryLine = true,
-            modifier = modifier.testTag(quotaBlockTag(quota.label))
-        )
-
-        return
-    }
-
-    HoverTooltipBox(
-        title = quota.label,
-        subtitle = expandedQuotaTitle(quota = quota, language = language),
-        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
-        footnote = risk?.let { riskDotTooltipSubtitle(risk = it, language = language) },
-        modifier = modifier.testTag(quotaBlockTag(quota.label))
-    ) {
-        CompactQuotaBadgeContent(
-            quota = quota,
-            showUsageDetails = showUsageDetails,
-            language = language,
-            risk = risk,
-            density = density,
-            now = now,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun CompactQuotaBadgeContent(
-    quota: QuotaInfo,
-    showUsageDetails: Boolean,
-    language: AppLanguage,
-    risk: QuotaRiskSummary?,
-    density: ApiUsageCardDensity,
-    now: Instant,
-    /**
-     * Card estreito (issue #215): sem tooltip para explicar o semáforo — o
-     * popup cobriria o card inteiro, `shouldShowQuotaTooltip` —, a mesma
-     * frase de `riskDotTooltipSubtitle` vira uma linha de texto sempre
-     * visível, truncada com reticências em vez de omitida. Mesma saída que
-     * já resolveu o problema análogo na barra HUD: texto no fluxo, não popup.
-     */
-    showRiskSummaryLine: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    val isExpired = quota.isExpiredAt(now)
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(COMPACT_QUOTA_BADGE_TAG)
-            // Fundo neutro e borda: o tom de acento em bloco fazia o card
-            // fechado — que existe para ocupar pouco — chamar mais atenção
-            // que o aberto.
-            .appSurfaceBlock()
-            .padding(
-                horizontal = density.badgeHorizontalPadding,
-                vertical = density.badgeVerticalPadding
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (risk != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // A tooltip do ponto fica desligada: o badge inteiro já tem a
-                // própria tooltip e dois TooltipBox aninhados disputam o hover.
-                RiskSemaphoreDot(
-                    risk = risk,
-                    quotaLabel = quota.label,
-                    language = language,
-                    showTooltip = false
-                )
-                Text(
-                    text = quota.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         } else {
-            Text(
-                text = quota.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        AppAnimatedNumber(
-            text = compactPercentageLabel(quota),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            // Mesmo tratamento do arco: o numero e o da janela anterior.
-            modifier = Modifier.alpha(if (isExpired) STALE_QUOTA_ALPHA else 1f)
-        )
-
-        val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
-        if (detailText != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = detailText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        if (showRiskSummaryLine && risk != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = riskDotTooltipSubtitle(risk = risk, language = language),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
+            ExpandedQuotaSummary(
+                quotas = quotas,
+                showUsageDetails = showUsageDetails,
+                language = language,
+                riskByQuotaKey = riskByQuotaKey,
+                density = density,
+                showTooltip = showQuotaTooltip,
+                now = now
             )
         }
     }
 }
-
-/**
- * As cotas do card expandido, uma por linha.
- *
- * Eram colunas com um arco de 92dp cada. O arco ocupava a maior parte da altura
- * do card para dizer um número que a linha diz em 12sp, e três deles lado a lado
- * — a Anthropic tem três cotas desde os créditos de uso — obrigavam uma regra de
- * empilhamento própria, com largura mínima por coluna. Empilhado sempre, essa
- * regra deixa de existir: a linha ocupa a largura que o card tiver.
- */
-@Composable
-private fun ExpandedQuotaSummary(
-    quotas: List<QuotaInfo>,
-    showUsageDetails: Boolean,
-    language: AppLanguage,
-    riskByQuotaKey: Map<QuotaSeriesKey, QuotaRiskSummary>,
-    density: ApiUsageCardDensity,
-    /** Ver `shouldShowQuotaTooltip`: em card estreito o popup cobre o card. */
-    showTooltip: Boolean,
-    now: Instant,
-    modifier: Modifier = Modifier
-) {
-    // Linha de dados, com divisória própria e sem vão entre elas: é a mesma
-    // decisão da lista do time. O vão fazia três cotas lerem como três blocos
-    // empilhados, e sem a divisória o rótulo de uma encostava no reinício da
-    // anterior sem nada dizendo onde uma termina.
-    Column(modifier = modifier.fillMaxWidth()) {
-        quotas.forEachIndexed { index, quota ->
-            AppDataRow(
-                showDivider = index != quotas.lastIndex,
-                horizontalPadding = density.contentHorizontalPadding,
-                verticalPadding = density.contentVerticalPadding
-            ) {
-                QuotaRow(
-                    quota = quota,
-                    showUsageDetails = showUsageDetails,
-                    language = language,
-                    risk = riskByQuotaKey[quota.seriesKey],
-                    showTooltip = showTooltip,
-                    now = now,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-/**
- * Uma cota: rótulo e valor na mesma linha, barra abaixo, reinício embaixo.
- *
- * A barra é a leitura de relance que o arco fazia, na altura de 4dp em vez de
- * 92. Cota em moeda **não** ganha barra: o saldo da DeepSeek não tem um total
- * contra o qual medir, e uma barra ali desenharia uma fração inventada. Os
- * créditos de uso ganham, porque têm limite mensal declarado.
- */
-@Composable
-private fun QuotaRow(
-    quota: QuotaInfo,
-    showUsageDetails: Boolean,
-    language: AppLanguage,
-    risk: QuotaRiskSummary?,
-    /** Ver `shouldShowQuotaTooltip`: em card estreito o popup cobre o card. */
-    showTooltip: Boolean,
-    now: Instant,
-    modifier: Modifier = Modifier
-) {
-    // Sem tooltip a `testTag` do bloco desce para o conteúdo: presa ao
-    // `HoverTooltipBox`, o nó sumiria da árvore em card estreito.
-    if (!showTooltip) {
-        QuotaRowContent(
-            quota = quota,
-            showUsageDetails = showUsageDetails,
-            language = language,
-            risk = risk,
-            now = now,
-            // Sem popup para explicar o semáforo, a explicação vira texto —
-            // ver `CompactQuotaBadgeContent.showRiskSummaryLine`, mesma saída.
-            showRiskSummaryLine = true,
-            modifier = modifier.testTag(quotaBlockTag(quota.label))
-        )
-
-        return
-    }
-
-    HoverTooltipBox(
-        title = quota.label,
-        subtitle = expandedQuotaTitle(quota = quota, language = language),
-        metrics = buildQuotaTooltipMetrics(quota = quota, language = language, now = now, risk = risk),
-        footnote = risk?.let { riskDotTooltipSubtitle(risk = it, language = language) },
-        modifier = modifier.testTag(quotaBlockTag(quota.label))
-    ) {
-        QuotaRowContent(
-            quota = quota,
-            showUsageDetails = showUsageDetails,
-            language = language,
-            risk = risk,
-            now = now,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun QuotaRowContent(
-    quota: QuotaInfo,
-    showUsageDetails: Boolean,
-    language: AppLanguage,
-    risk: QuotaRiskSummary?,
-    now: Instant,
-    showRiskSummaryLine: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    val isExpired = quota.isExpiredAt(now)
-    val staleAlpha = if (isExpired) STALE_QUOTA_ALPHA else 1f
-    val hasTrack = quota.unit != UsageUnit.CURRENCY_USD || quota.isExtraCreditsQuota
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            if (risk != null) {
-                RiskSemaphoreDot(
-                    risk = risk,
-                    quotaLabel = quota.label,
-                    language = language,
-                    showTooltip = false
-                )
-            }
-            Text(
-                text = expandedQuotaTitle(quota = quota, language = language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            AppAnimatedNumber(
-                text = compactPercentageLabel(quota),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                // Mesmo tratamento de antes: janela vencida mostra o último
-                // dado real da fonte, esmaecido para não passar por corrente.
-                modifier = Modifier.alpha(staleAlpha),
-                contentAlignment = Alignment.CenterEnd
-            )
-        }
-
-        if (hasTrack) {
-            AppProgressTrack(
-                fraction = quota.percentageUsed,
-                tone = quotaTone(quota = quota, risk = risk),
-                modifier = Modifier
-                    .testTag(quotaProgressTrackTag(quota.label))
-                    .alpha(staleAlpha)
-            )
-        }
-
-        val detailText = quotaDetailText(quota = quota, showUsageDetails = showUsageDetails)
-        if (detailText != null) {
-            Text(
-                text = detailText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Text(
-            text = resetLabel(quota = quota, language = language, now = now),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2
-        )
-
-        if (showRiskSummaryLine && risk != null) {
-            Text(
-                text = riskDotTooltipSubtitle(risk = risk, language = language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-/**
- * Severidade da barra.
- *
- * O risco projetado tem prioridade sobre o percentual porque responde à pergunta
- * certa: 40% às onze da manhã pode ser pior que 80% faltando dez minutos para o
- * reinício. Sem projeção conhecida, sobra o percentual, com os mesmos cortes de
- * 75 e 90 que os alertas da bandeja usam.
- */
-private fun quotaTone(quota: QuotaInfo, risk: QuotaRiskSummary?): AppTone {
-    if (risk != null) {
-        return toneFor(risk.level)
-    }
-    val percent = quota.percentageUsed * 100f
-    return when {
-        percent >= 90f -> AppTone.CRITICAL
-        percent >= 75f -> AppTone.WARNING
-        else -> AppTone.OK
-    }
-}
-
-/**
- * O glifo de recarga do card.
- *
- * Coletando, ele **gira** — só com [com.usagemonitor.presentation.ui.theme.AppMotionPolicy.continuous]
- * ligada, que é o app em uso; nos testes e nos geradores de captura ele fica
- * parado no tom de informação, e a semântica ("Atualizando…") continua dizendo o
- * estado. Era um `CircularProgressIndicator` do Material: outra espessura, outro
- * raio e animação infinita incondicional, a mesma classe de coisa que trava o
- * `waitForIdle`.
- */
-@Composable
-internal fun RefreshGlyph(refreshing: Boolean, tint: Color, size: Dp) {
-    val policy = LocalAppMotionPolicy.current
-    val rotation = if (refreshing && policy.continuous) {
-        val transition = rememberInfiniteTransition(label = "refreshGlyph")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(REFRESH_TURN_MILLIS, easing = LinearEasing)),
-            label = "refreshGlyphAngle"
-        )
-        angle
-    } else {
-        0f
-    }
-    Icon(
-        imageVector = Icons.Rounded.Refresh,
-        contentDescription = null,
-        modifier = Modifier
-            .size(size)
-            .graphicsLayer { rotationZ = rotation },
-        tint = if (refreshing) AppTone.INFO.color() else tint
-    )
-}
-
-/** Uma volta por segundo: rápido o bastante para ler "trabalhando", lento para não agitar. */
-private const val REFRESH_TURN_MILLIS = 1_000
-
-/** A marca do cabeçalho: do tamanho do glifo de ação, para não disputar com o título. */
-private val PROVIDER_MARK_SIZE = 16.dp
-
-/** O selo do cabeçalho do card: plano da conta, fonte local. */
-@Composable
-private fun CardHeaderBadge(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        modifier = modifier
-            .appSurfaceBlock(color = Color.Transparent)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    )
-}
-
-/** O selo do plano; os testes o acham por aqui. */
-const val API_USAGE_CARD_PLAN_TAG = "apiUsageCardPlan"

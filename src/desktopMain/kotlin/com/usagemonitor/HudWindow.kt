@@ -14,12 +14,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
@@ -60,6 +60,7 @@ import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.updateBannerAction
 import com.usagemonitor.presentation.ui.updateBannerContent
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
@@ -68,6 +69,10 @@ import kotlin.math.floor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.Clock
+import com.usagemonitor.domain.entity.ApiUsageStats
+import kotlinx.coroutines.CoroutineScope
+import kotlin.time.Duration
+import kotlinx.datetime.Instant
 
 /**
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
@@ -135,16 +140,7 @@ internal fun HudWindowHost(
     // A faixa de atualização do modo padrão não existe aqui. O aviso vira o ponto
     // da engrenagem e o banner do balão dela, com o mesmo texto e tom de
     // `updateBannerContent` (#225, #291).
-    val updateIndicator = appUpdateState?.let { state ->
-        val content = updateBannerContent(state = state, language = language)
-        HudUpdateIndicator(
-            tone = content.tone,
-            description = content.title,
-            actionLabel = content.actionLabel,
-            headline = content.headline,
-            detail = content.detail
-        )
-    }
+    val updateIndicator = appUpdateState?.let { state -> hudUpdateIndicatorOf(state, language) }
     // A mesma ação da faixa, oferecida no balão da engrenagem — nunca no ícone do
     // notch, onde seria clique de rotina reiniciando o app.
     val updateAction = appUpdateState?.let { state ->
@@ -318,16 +314,12 @@ internal fun HudWindowHost(
         resizable = false,
         alwaysOnTop = true,
         onKeyEvent = { event ->
-            val isDown = event.type == KeyEventType.KeyDown
-            val hudToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.H
-            val cardsOnlyToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.M
-            val help = isDown && event.key == Key.F1
-            when {
-                hudToggle -> onOpenFull()
-                cardsOnlyToggle -> onSwitchToCardsOnly()
-                help -> actions.openHelp()
-            }
-            hudToggle || cardsOnlyToggle || help
+            handleHudWindowKey(
+                event = event,
+                onOpenFull = onOpenFull,
+                onSwitchToCardsOnly = onSwitchToCardsOnly,
+                onOpenHelp = actions.openHelp
+            )
         }
     ) {
         LaunchedEffect(windowOpacityPercent) {
@@ -375,43 +367,15 @@ internal fun HudWindowHost(
                     // A engrenagem da ponta de longe abre o balão com o que o
                     // rodapé do modo padrão oferece — aqui não há rodapé.
                     appBalloon = {
-                        HudAppBalloonContent(
+                        HudWindowAppBalloon(
                             language = language,
-                            countdown = nextRefreshAt?.let { refreshAt ->
-                                {
-                                    HudCountdown(
-                                        nextRefreshAt = refreshAt,
-                                        description = nextRefreshLabel(language),
-                                        interval = viewModel.pollInterval,
-                                        nowProvider = { Clock.System.now() },
-                                        waitNextTick = { delay(1_000L) },
-                                        updatesEnabled = true
-                                    )
-                                }
-                            },
+                            nextRefreshAt = nextRefreshAt,
+                            refreshInterval = viewModel.pollInterval,
                             updateIndicator = updateIndicator,
-                            onUpdateAction = updateAction,
-                            onWindowModeChange = actions.changeWindowMode,
-                            actions = {
-                                FooterActionGroup(
-                                    language = language,
-                                    onRefresh = actions.refreshAll,
-                                    onOpenSettings = actions.openSettings,
-                                    onOpenAdminOverview = actions.openAdminOverview,
-                                    onOpenTeamPresence = actions.openTeamPresenceOverview,
-                                    onOpenHelp = actions.openHelp,
-                                    onExportSnapshot = {
-                                        val stats = (dashboardState as? UiState.Success)?.data
-                                        if (stats != null) {
-                                            // Sem snackbar aqui: o diálogo de arquivo é o retorno.
-                                            exportScope.launch {
-                                                runCatching { actions.exportSnapshot(stats) }
-                                                    .onFailure { error -> actions.onExportFailure(error) }
-                                            }
-                                        }
-                                    }
-                                )
-                            }
+                            updateAction = updateAction,
+                            actions = actions,
+                            exportScope = exportScope,
+                            currentStats = { (dashboardState as? UiState.Success)?.data }
                         )
                     },
                     appBalloonHeight = hudAppBalloonHeight(
@@ -424,6 +388,96 @@ internal fun HudWindowHost(
             }
         }
     }
+}
+
+
+
+private fun hudUpdateIndicatorOf(state: AppUpdateUiState, language: AppLanguage): HudUpdateIndicator {
+    val content = updateBannerContent(state = state, language = language)
+    return HudUpdateIndicator(
+        tone = content.tone,
+        description = content.title,
+        actionLabel = content.actionLabel,
+        headline = content.headline,
+        detail = content.detail
+    )
+}
+
+/** `Ctrl+Shift+H` volta à janela padrão, `Ctrl+Shift+M` vai a "Somente cards", `F1` abre a ajuda. */
+private fun handleHudWindowKey(
+    event: KeyEvent,
+    onOpenFull: () -> Unit,
+    onSwitchToCardsOnly: () -> Unit,
+    onOpenHelp: () -> Unit
+): Boolean {
+    val isDown = event.type == KeyEventType.KeyDown
+    val hudToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.H
+    val cardsOnlyToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.M
+    val help = isDown && event.key == Key.F1
+    when {
+        hudToggle -> onOpenFull()
+        cardsOnlyToggle -> onSwitchToCardsOnly()
+        help -> onOpenHelp()
+    }
+    return hudToggle || cardsOnlyToggle || help
+}
+
+/**
+ * O balão da engrenagem: o que o rodapé do modo padrão oferece — aqui não há
+ * rodapé —, mais a contagem e o aviso de atualização.
+ *
+ * [exportScope] é do host, não deste balão: o balão sai da composição quando o
+ * ponteiro deixa a HUD, e um escopo dele cancelaria a exportação no meio.
+ */
+@Composable
+private fun HudWindowAppBalloon(
+    language: AppLanguage,
+    nextRefreshAt: Instant?,
+    refreshInterval: Duration,
+    updateIndicator: HudUpdateIndicator?,
+    updateAction: (() -> Unit)?,
+    actions: AppShellActions,
+    exportScope: CoroutineScope,
+    currentStats: () -> List<ApiUsageStats>?
+) {
+    HudAppBalloonContent(
+        language = language,
+        countdown = nextRefreshAt?.let { refreshAt ->
+            {
+                HudCountdown(
+                    nextRefreshAt = refreshAt,
+                    description = nextRefreshLabel(language),
+                    interval = refreshInterval,
+                    nowProvider = { Clock.System.now() },
+                    waitNextTick = { delay(1_000L) },
+                    updatesEnabled = true
+                )
+            }
+        },
+        updateIndicator = updateIndicator,
+        onUpdateAction = updateAction,
+        onWindowModeChange = actions.changeWindowMode,
+        actions = {
+            FooterActionGroup(
+                language = language,
+                onRefresh = actions.refreshAll,
+                onOpenSettings = actions.openSettings,
+                onOpenAdminOverview = actions.openAdminOverview,
+                onOpenTeamPresence = actions.openTeamPresenceOverview,
+                onOpenHelp = actions.openHelp,
+                onExportSnapshot = {
+                    val stats = currentStats()
+                    if (stats != null) {
+                        // Sem snackbar aqui: o diálogo de arquivo é o retorno.
+                        exportScope.launch {
+                            runCatching { actions.exportSnapshot(stats) }
+                                .onFailure { error -> actions.onExportFailure(error) }
+                        }
+                    }
+                }
+            )
+        }
+    )
 }
 
 /**

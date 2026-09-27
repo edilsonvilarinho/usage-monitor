@@ -1,6 +1,10 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.scaleOut
@@ -11,26 +15,16 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,33 +34,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
-import androidx.compose.ui.input.pointer.isSecondaryPressed
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -75,50 +50,22 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.HUD_COUNTDOWN_GAP
-import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
-import com.usagemonitor.HUD_EMOJI_BADGE_SIZE
-import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.HUD_HANDLE_GAP
-import com.usagemonitor.HUD_ITEM_GAP
-import com.usagemonitor.HUD_NOTCH_PADDING_ACROSS
-import com.usagemonitor.HUD_NOTCH_PADDING_ALONG
-import com.usagemonitor.HUD_NOTCH_RADIUS
-import com.usagemonitor.HUD_NOTCH_SHOULDER
-import com.usagemonitor.HUD_RING_GAP
-import com.usagemonitor.HUD_RING_SIZE
-import com.usagemonitor.HUD_RING_STROKE
-import com.usagemonitor.HUD_RING_TEXT_GAP
 import com.usagemonitor.HUD_SHADOW_MARGIN
 import com.usagemonitor.HudEdge
-import com.usagemonitor.hudRefreshFraction
 import com.usagemonitor.HudNotchSizes
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
-import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
-import com.usagemonitor.presentation.ui.components.AppProviderMark
-import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
-import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
 import com.usagemonitor.presentation.ui.components.color
-import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.components.rememberLatestNonNull
 import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -131,7 +78,6 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /** Descrição do corpo do notch — é por ela que leitor de tela e testes o acham. */
 internal const val HUD_NOTCH_DESCRIPTION = "Barra HUD do Usage Monitor"
@@ -450,82 +396,111 @@ internal fun HudNotch(
                     )
                 }
             }
-        }
-    ) { measurables, constraints ->
-        val notch = measurables.first { measurable -> measurable.layoutId == HudNotchPart.NOTCH }
-            .measure(Constraints())
-        val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
-            ?.measure(Constraints())
-        val extras = listOf(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR)
-            .associateWith { part ->
-                measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
-            }
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else notch.width
-        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else notch.height
-        val alongLength = if (edge.isHorizontal) width else height
-        val notchAlong = if (edge.isHorizontal) notch.width else notch.height
-        val center = notchCenter?.roundToPx() ?: (alongLength / 2)
-        val notchStart = (center - notchAlong / 2).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
+        },
+        measurePolicy = hudNotchMeasurePolicy(
+            edge = edge,
+            notchCenter = notchCenter,
+            ringCenters = ringCenters,
+            shownIndex = lastShown,
+            placement = placement,
+            balloonAlong = balloonAlong,
+            alongSpec = alongSpec,
+            scope = scope
+        )
+    )
+}
 
-        // O balão centrado no anel e preso ao contêiner, com a margem da sombra.
-        var balloonStart = 0
-        if (balloon != null && balloon.width > 0) {
-            val balloonAlongSize = if (edge.isHorizontal) balloon.width else balloon.height
-            val ring = ringCenters[lastShown ?: 0] ?: (notchStart + notchAlong / 2f)
-            val margin = HUD_SHADOW_MARGIN.roundToPx()
-            val maxStart = (alongLength - margin - balloonAlongSize).coerceAtLeast(0).toFloat()
-            val target = (ring - balloonAlongSize / 2f).coerceIn(margin.toFloat().coerceAtMost(maxStart), maxStart)
-            if (!placement.placed) {
-                placement.placed = true
+/**
+ * A medida do notch: o corpo rente à borda, as dicas e as alças nas pontas e o
+ * balão centrado no anel em foco, preso ao contêiner com a margem da sombra.
+ *
+ * Criada a cada composição, como o lambda que ela substitui: o balão lê a
+ * posição animada de [balloonAlong] e os centros de [ringCenters], e é a nova
+ * política que faz a medida seguinte enxergar o anel novo.
+ */
+private fun hudNotchMeasurePolicy(
+    edge: HudEdge,
+    notchCenter: Dp?,
+    ringCenters: Map<Int, Float>,
+    shownIndex: Int?,
+    placement: HudBalloonPlacement,
+    balloonAlong: Animatable<Float, AnimationVector1D>,
+    alongSpec: AnimationSpec<Float>,
+    scope: CoroutineScope
+): MeasurePolicy = MeasurePolicy { measurables, constraints ->
+    val notch = measurables.first { measurable -> measurable.layoutId == HudNotchPart.NOTCH }
+        .measure(Constraints())
+    val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
+        ?.measure(Constraints())
+    val extras = listOf(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR)
+        .associateWith { part ->
+            measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
+        }
+    val width = if (constraints.hasBoundedWidth) constraints.maxWidth else notch.width
+    val height = if (constraints.hasBoundedHeight) constraints.maxHeight else notch.height
+    val alongLength = if (edge.isHorizontal) width else height
+    val notchAlong = if (edge.isHorizontal) notch.width else notch.height
+    val center = notchCenter?.roundToPx() ?: (alongLength / 2)
+    val notchStart = (center - notchAlong / 2).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
+
+    // O balão centrado no anel e preso ao contêiner, com a margem da sombra.
+    var balloonStart = 0
+    if (balloon != null && balloon.width > 0) {
+        val balloonAlongSize = if (edge.isHorizontal) balloon.width else balloon.height
+        val ring = ringCenters[shownIndex ?: 0] ?: (notchStart + notchAlong / 2f)
+        val margin = HUD_SHADOW_MARGIN.roundToPx()
+        val maxStart = (alongLength - margin - balloonAlongSize).coerceAtLeast(0).toFloat()
+        val target = (ring - balloonAlongSize / 2f).coerceIn(margin.toFloat().coerceAtMost(maxStart), maxStart)
+        if (!placement.placed) {
+            placement.placed = true
+            placement.target = target
+            scope.launch { balloonAlong.snapTo(target) }
+            balloonStart = target.roundToInt()
+        } else {
+            if (placement.target != target) {
                 placement.target = target
-                scope.launch { balloonAlong.snapTo(target) }
-                balloonStart = target.roundToInt()
-            } else {
-                if (placement.target != target) {
-                    placement.target = target
-                    scope.launch { balloonAlong.animateTo(target, alongSpec) }
-                }
-                balloonStart = balloonAlong.value.roundToInt()
+                scope.launch { balloonAlong.animateTo(target, alongSpec) }
+            }
+            balloonStart = balloonAlong.value.roundToInt()
+        }
+    }
+
+    val notchAcross = if (edge.isHorizontal) notch.height else notch.width
+    val handleGap = HUD_HANDLE_GAP.roundToPx()
+
+    layout(width, height) {
+        // (ao longo, a partir da borda da tela) → posição na caixa de cada borda.
+        fun Placeable.placeAt(along: Int, across: Int, zIndex: Float = 0f) {
+            val acrossSize = if (edge.isHorizontal) this.height else this.width
+            when (edge) {
+                HudEdge.TOP -> place(along, across, zIndex)
+                HudEdge.BOTTOM -> place(along, height - across - acrossSize, zIndex)
+                HudEdge.LEFT -> place(across, along, zIndex)
+                HudEdge.RIGHT -> place(width - across - acrossSize, along, zIndex)
             }
         }
-
-        val notchAcross = if (edge.isHorizontal) notch.height else notch.width
-        val handleGap = HUD_HANDLE_GAP.roundToPx()
-
-        layout(width, height) {
-            // (ao longo, a partir da borda da tela) → posição na caixa de cada borda.
-            fun Placeable.placeAt(along: Int, across: Int, zIndex: Float = 0f) {
-                val acrossSize = if (edge.isHorizontal) this.height else this.width
-                when (edge) {
-                    HudEdge.TOP -> place(along, across, zIndex)
-                    HudEdge.BOTTOM -> place(along, height - across - acrossSize, zIndex)
-                    HudEdge.LEFT -> place(across, along, zIndex)
-                    HudEdge.RIGHT -> place(width - across - acrossSize, along, zIndex)
-                }
-            }
-            notch.placeAt(notchStart, 0)
-            val notchEnd = notchStart + notchAlong
-            extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
-            extras[HudNotchPart.HINT_END]?.let { hint -> hint.placeAt(notchEnd, 0) }
-            // As alças centradas na espessura do notch, uma além de cada ponta, e
-            // por baixo dele: entrando, elas saem de trás do notch.
-            extras[HudNotchPart.MOVE]?.let { handle ->
-                handle.placeAt(
-                    notchStart - handleGap - handle.alongSize(edge),
-                    (notchAcross - handle.acrossSize(edge)) / 2,
-                    HANDLE_Z_INDEX
-                )
-            }
-            extras[HudNotchPart.GEAR]?.let { handle ->
-                handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2, HANDLE_Z_INDEX)
-            }
-            if (balloon != null) {
-                when (edge) {
-                    HudEdge.TOP -> balloon.place(balloonStart, notch.height)
-                    HudEdge.BOTTOM -> balloon.place(balloonStart, height - notch.height - balloon.height)
-                    HudEdge.LEFT -> balloon.place(notch.width, balloonStart)
-                    HudEdge.RIGHT -> balloon.place(width - notch.width - balloon.width, balloonStart)
-                }
+        notch.placeAt(notchStart, 0)
+        val notchEnd = notchStart + notchAlong
+        extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
+        extras[HudNotchPart.HINT_END]?.let { hint -> hint.placeAt(notchEnd, 0) }
+        // As alças centradas na espessura do notch, uma além de cada ponta, e
+        // por baixo dele: entrando, elas saem de trás do notch.
+        extras[HudNotchPart.MOVE]?.let { handle ->
+            handle.placeAt(
+                notchStart - handleGap - handle.alongSize(edge),
+                (notchAcross - handle.acrossSize(edge)) / 2,
+                HANDLE_Z_INDEX
+            )
+        }
+        extras[HudNotchPart.GEAR]?.let { handle ->
+            handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2, HANDLE_Z_INDEX)
+        }
+        if (balloon != null) {
+            when (edge) {
+                HudEdge.TOP -> balloon.place(balloonStart, notch.height)
+                HudEdge.BOTTOM -> balloon.place(balloonStart, height - notch.height - balloon.height)
+                HudEdge.LEFT -> balloon.place(notch.width, balloonStart)
+                HudEdge.RIGHT -> balloon.place(width - notch.width - balloon.width, balloonStart)
             }
         }
     }
@@ -646,499 +621,5 @@ private fun balloonOrigin(edge: HudEdge): TransformOrigin = when (edge) {
 
 private const val BALLOON_ENTER_SCALE = 0.94f
 
-/** O anel "pressionado" enquanto a conta recoleta. */
-private const val RING_REFRESH_SCALE = 0.9f
-
-/** A marca gira uma volta por segundo, o ritmo do glifo de recarga do card. */
-private const val RING_REFRESH_TURN_MILLIS = 1_000
-
 /** Meio pixel: abaixo disso o balão já está no anel. */
 private const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
-
-/** A faixa de anéis, do tamanho do notch. */
-@Composable
-private fun HudRingStrip(
-    accounts: List<HudAccount>,
-    edge: HudEdge,
-    fallbackLabel: String,
-    fallbackTone: AppTone,
-    countdown: (@Composable () -> Unit)?,
-    size: DpSize,
-    compact: Boolean,
-    language: AppLanguage,
-    onRingHovered: (Int) -> Unit,
-    onRingRefresh: (Int) -> Unit,
-    onItemPlaced: (Int, LayoutCoordinates) -> Unit,
-    onRingPlaced: (Int, LayoutCoordinates) -> Unit
-) {
-    val items: @Composable () -> Unit = {
-        if (accounts.isEmpty()) {
-            AppStatusIndicator(label = fallbackLabel, tone = fallbackTone)
-        } else {
-            accounts.forEachIndexed { index, account ->
-                HudRingItem(
-                    account = account,
-                    vertical = !edge.isHorizontal,
-                    compact = compact,
-                    language = language,
-                    onHovered = { onRingHovered(index) },
-                    onRefresh = { onRingRefresh(index) },
-                    onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
-                    onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
-                )
-            }
-        }
-        // A contagem é do app, não de uma conta: uma vez, no fim. A atualização
-        // pendente não entra na faixa (issue #291) — é o ponto da engrenagem.
-        countdown?.invoke()
-    }
-    if (edge.isHorizontal) {
-        Row(
-            modifier = Modifier
-                .size(size)
-                .padding(horizontal = HUD_NOTCH_SHOULDER + HUD_NOTCH_PADDING_ALONG, vertical = HUD_NOTCH_PADDING_ACROSS),
-            horizontalArrangement = Arrangement.spacedBy(HUD_ITEM_GAP, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) { items() }
-    } else {
-        Column(
-            modifier = Modifier
-                .size(size)
-                .padding(horizontal = HUD_NOTCH_PADDING_ACROSS, vertical = HUD_NOTCH_SHOULDER + HUD_NOTCH_PADDING_ALONG),
-            verticalArrangement = Arrangement.spacedBy(HUD_ITEM_GAP, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) { items() }
-    }
-}
-
-@Composable
-private fun HudRingItem(
-    account: HudAccount,
-    vertical: Boolean,
-    /** A célula do Codenotch: anel e percentual embaixo, sem a palavra. */
-    compact: Boolean,
-    language: AppLanguage,
-    onHovered: () -> Unit,
-    onRefresh: () -> Unit,
-    onItemPlaced: (LayoutCoordinates) -> Unit,
-    onPlaced: (LayoutCoordinates) -> Unit
-) {
-    // Coletando, o anel fica pressionado — o `refreshRing` do Codenotch — e a
-    // marca gira, só com a política contínua.
-    val pressScale by animateFloatAsState(
-        targetValue = if (account.refreshing) RING_REFRESH_SCALE else 1f,
-        animationSpec = appSpring(AppMotion.Springs.SNAPPY),
-        label = "hudRingRefreshScale"
-    )
-    val policy = LocalAppMotionPolicy.current
-    val markTurn = if (account.refreshing && policy.continuous) {
-        val transition = rememberInfiniteTransition(label = "hudRingRefresh")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(RING_REFRESH_TURN_MILLIS, easing = LinearEasing)),
-            label = "hudRingRefreshAngle"
-        )
-        angle
-    } else {
-        0f
-    }
-    val refreshLabel = hudRefreshAccountLabel(account, language)
-    // A ação é **declarada** na semântica, não instalada: um `clickable` aqui
-    // consumiria o `down` e o arrasto pelo corpo nunca começaria.
-    val itemModifier = Modifier
-        .onGloballyPositioned(onItemPlaced)
-        .semantics {
-            onClick(label = refreshLabel) {
-                onRefresh()
-                true
-            }
-        }
-    // O anel sob o ponteiro escolhe a conta do balão.
-    val hover = remember { MutableInteractionSource() }
-    val isHovered by hover.collectIsHoveredAsState()
-    val currentOnHovered by rememberUpdatedState(onHovered)
-    LaunchedEffect(isHovered) {
-        if (isHovered) currentOnHovered()
-    }
-    val description = hudRingDescription(account, language)
-    val ring: @Composable () -> Unit = {
-        // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
-        // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
-        // cor do texto e não no acento — em volta dela já estão os arcos, e o
-        // acento ali competiria com a cor de risco deles. **Exceção: a cor que o
-        // usuário deu à conta** (issue #275). Com duas contas Claude, o miolo é
-        // o único ponto do notch recolhido que diz qual é qual, e ali a escolha
-        // é dele — um marcador à parte mudaria a geometria e dividiria espaço
-        // com a órbita de sessão ativa.
-        Box(
-            modifier = Modifier
-                .onGloballyPositioned(onPlaced)
-                .graphicsLayer {
-                    scaleX = pressScale
-                    scaleY = pressScale
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            AppUsageRing(
-                arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
-                description = description,
-                size = HUD_RING_SIZE,
-                stroke = HUD_RING_STROKE,
-                gap = HUD_RING_GAP,
-                active = account.sessionActive,
-                attention = account.needsAttention,
-                attentionIndex = account.attentionRingIndex
-            )
-            AppProviderMark(
-                source = account.source,
-                tint = account.accountAccent?.current ?: MaterialTheme.colorScheme.onSurface,
-                size = hudRingMarkSize(account.rings.size),
-                modifier = Modifier.graphicsLayer { rotationZ = markTurn }
-            )
-            // O emoji da conta (issue #287), selo no canto de cima à direita do
-            // anel. Passa só `HUD_EMOJI_BADGE_OVERSHOOT` para fora dele, dentro do
-            // respiro do notch: é selo, não item, e não mexe em `hudNotchSizes`.
-            // Fica de pé em toda borda, como o texto do balão.
-            val emoji = account.accountEmoji
-            if (emoji != null) {
-                AccountEmojiGlyph(
-                    emoji = emoji,
-                    size = HUD_EMOJI_BADGE_SIZE,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = HUD_EMOJI_BADGE_OVERSHOOT, y = -HUD_EMOJI_BADGE_OVERSHOOT)
-                        .testTag(HUD_ACCOUNT_EMOJI_TEST_TAG)
-                )
-            }
-        }
-    }
-    // Uma linha por anel, com a janela (#286); compacta, só a cota em foco. As
-    // linhas são desenhadas no tamanho que `stripLineWidth`/`stripLineHeight`
-    // medem — a costura com a geometria.
-    val lines: @Composable () -> Unit = {
-        val stripLines = if (compact) listOf(account.focusLine) else account.stripLines
-        Column(horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start) {
-            stripLines.forEach { line -> HudStripLineText(line) }
-        }
-    }
-    val word: @Composable () -> Unit = {
-        Text(
-            text = account.statusLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = account.tone.color(),
-            // Na coluna vertical "Sem projeção" quebra em duas linhas; alinhadas
-            // à esquerda elas destoavam do anel e dos percentuais, centrados.
-            textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
-            maxLines = if (vertical) 2 else 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-    if (vertical || compact) {
-        Column(modifier = itemModifier.hoverable(hover), horizontalAlignment = Alignment.CenterHorizontally) {
-            ring()
-            lines()
-            // Compacto, a palavra fica no balão e na descrição do anel: com
-            // contas demais ela é o que fazia a faixa atravessar a tela.
-            if (!compact) word()
-        }
-    } else {
-        Row(
-            modifier = itemModifier.hoverable(hover),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(HUD_RING_TEXT_GAP)
-        ) {
-            ring()
-            Column {
-                lines()
-                word()
-            }
-        }
-    }
-}
-
-/**
- * "7d 72%": a janela no tom secundário e o número no do texto. A cor do risco
- * fica no arco e na palavra — aqui ela diria o estado só pela cor. Sem rótulo é
- * o percentual de sempre, em `labelMedium`.
- */
-@Composable
-private fun HudStripLineText(line: HudStripLine) {
-    val label = line.label
-    if (label == null) {
-        Text(
-            text = line.percentText,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1
-        )
-        return
-    }
-    Text(
-        text = buildAnnotatedString {
-            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(label) }
-            append(" ")
-            append(line.percentText)
-        },
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 1
-    )
-}
-
-/**
- * A marca cabe no miolo que os arcos deixam livre: cada arco come um traço e um
- * vão de cada lado. 70% do miolo deixa ar entre a marca e o arco de dentro.
- *
- * A sessão ativa não entra na conta: a órbita dela gira por fora do anel. Quando
- * ela morava por dentro, a marca da conta trabalhando caía de 14dp para 8dp.
- */
-internal fun hudRingMarkSize(arcs: Int): Dp {
-    val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
-    return ((HUD_RING_SIZE - used) * 0.7f).coerceAtLeast(6.dp)
-}
-
-/**
- * A silhueta do notch: reta e rente na borda da tela, cantos redondos do lado de
- * dentro e **ombros côncavos** ligando os dois — o que faz ele ler como parte da
- * borda, como o notch de hardware que o Codenotch imita, e não como pílula
- * flutuando rente a ela. Isenta do teto de 10dp de raio: é forma, não painel.
- */
-internal class HudNotchShape(private val edge: HudEdge) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val s = with(density) { HUD_NOTCH_SHOULDER.toPx() }
-        val r = with(density) { HUD_NOTCH_RADIUS.toPx() }
-        // Desenhado para a borda de cima em (along, across) e levado às outras
-        // bordas por reflexão/rotação dos pontos — de controle inclusive, que é
-        // afim e portanto preserva as curvas.
-        val along = if (edge.isHorizontal) size.width else size.height
-        val across = if (edge.isHorizontal) size.height else size.width
-        val radius = minOf(r, (along - 2 * s) / 2, across / 2).coerceAtLeast(0f)
-        val map: (Float, Float) -> Offset = when (edge) {
-            HudEdge.TOP -> { a, c -> Offset(a, c) }
-            HudEdge.BOTTOM -> { a, c -> Offset(a, size.height - c) }
-            HudEdge.LEFT -> { a, c -> Offset(c, a) }
-            HudEdge.RIGHT -> { a, c -> Offset(size.width - c, a) }
-        }
-        val path = Path()
-        fun moveTo(a: Float, c: Float) = map(a, c).let { point -> path.moveTo(point.x, point.y) }
-        fun lineTo(a: Float, c: Float) = map(a, c).let { point -> path.lineTo(point.x, point.y) }
-        fun quadTo(ca: Float, cc: Float, a: Float, c: Float) {
-            val control = map(ca, cc)
-            val end = map(a, c)
-            path.quadraticTo(control.x, control.y, end.x, end.y)
-        }
-        moveTo(0f, 0f)
-        lineTo(along, 0f)
-        // Ombro côncavo: da borda da tela até o corpo do notch.
-        quadTo(along - s, 0f, along - s, s)
-        lineTo(along - s, across - radius)
-        quadTo(along - s, across, along - s - radius, across)
-        lineTo(s + radius, across)
-        quadTo(s, across, s, across - radius)
-        lineTo(s, s)
-        quadTo(s, 0f, 0f, 0f)
-        path.close()
-        return Outline.Generic(path)
-    }
-
-    override fun equals(other: Any?): Boolean = other is HudNotchShape && other.edge == edge
-
-    override fun hashCode(): Int = edge.hashCode()
-}
-
-/**
- * A contagem até a próxima coleta (issue #185). O tique mora aqui e não em quem
- * chama, e para em zero — é suspensão, não quadro pendente.
- */
-@Composable
-internal fun HudCountdown(
-    nextRefreshAt: Instant,
-    description: String,
-    /** Com o intervalo, o ícone é o relógio que esvazia; sem ele, o ↻ de sempre. */
-    interval: Duration? = null,
-    nowProvider: () -> Instant,
-    waitNextTick: suspend () -> Unit,
-    updatesEnabled: Boolean
-) {
-    val remainingOf = { (nextRefreshAt - nowProvider()).inWholeSeconds.coerceAtLeast(0).toInt() }
-    var secondsUntilRefresh by remember(nextRefreshAt) { mutableStateOf(remainingOf()) }
-
-    LaunchedEffect(nextRefreshAt, updatesEnabled) {
-        secondsUntilRefresh = remainingOf()
-        if (!updatesEnabled) {
-            return@LaunchedEffect
-        }
-        while (true) {
-            val remaining = remainingOf()
-            secondsUntilRefresh = remaining
-            if (remaining <= 0) {
-                break
-            }
-            waitNextTick()
-        }
-    }
-
-    val icon: @Composable () -> Unit = {
-        if (interval == null) {
-            Icon(
-                imageVector = Icons.Rounded.Refresh,
-                contentDescription = description,
-                modifier = Modifier.size(HUD_COUNTDOWN_ICON),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            // A fração sai dos mesmos segundos que o texto mostra, não de um segundo relógio.
-            HudCountdownClock(
-                fraction = hudRefreshFraction(nextRefreshAt, nextRefreshAt - secondsUntilRefresh.seconds, interval),
-                description = description
-            )
-        }
-    }
-    val text: @Composable () -> Unit = {
-        Text(
-            text = formatRefreshCountdown(secondsUntilRefresh),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-    }
-    // Ícone e tempo numa linha só também na coluna vertical (#293): empilhados
-    // eram duas linhas, e o tempo cabe na largura que a palavra já pede.
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HUD_COUNTDOWN_GAP)) {
-        icon()
-        text()
-    }
-}
-
-internal const val HUD_COUNTDOWN_CLOCK_TAG = "hudCountdownClock"
-
-/**
- * O relógio da contagem (#293): um timer de cozinha de 12dp. O setor cheio é o
- * que falta até a próxima coleta; ele esvazia no sentido horário a partir das
- * 12h e, na coleta, volta cheio de uma vez. Ao lado do `05:42` o número diz
- * quanto falta e o relógio diz que aquilo é contagem regressiva — o filete solto
- * na borda que o precedeu não dizia nem uma coisa nem outra.
- *
- * O passo de cada segundo desliza em [HUD_CLOCK_STEP_MILLIS], então o setor anda
- * contínuo. São transições finitas, uma por tique, e não animação infinita: o
- * `waitForIdle` dos testes não trava, e "Reduzir animações" vira salto.
- */
-@Composable
-private fun HudCountdownClock(fraction: Float, description: String) {
-    val shown by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = appTween(HUD_CLOCK_STEP_MILLIS, LinearEasing),
-        label = "hudCountdownClock"
-    )
-    val ringColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val fillColor = MaterialTheme.colorScheme.onSurfaceVariant
-    Canvas(
-        modifier = Modifier
-            .size(HUD_COUNTDOWN_ICON)
-            .testTag(HUD_COUNTDOWN_CLOCK_TAG)
-            .semantics { contentDescription = description }
-    ) {
-        val stroke = HUD_CLOCK_RING.toPx()
-        drawCircle(color = ringColor, radius = size.minDimension / 2f - stroke / 2f, style = Stroke(stroke))
-        // O setor fica recuado do aro: colado nele, o relógio cheio viraria um disco.
-        val inset = stroke + HUD_CLOCK_GAP.toPx()
-        drawArc(
-            color = fillColor,
-            startAngle = -90f,
-            sweepAngle = 360f * shown,
-            useCenter = true,
-            topLeft = Offset(inset, inset),
-            size = Size(size.width - inset * 2, size.height - inset * 2)
-        )
-    }
-}
-
-/** Um pouco menos que o tique de 1s: o setor chega antes do passo seguinte. */
-private const val HUD_CLOCK_STEP_MILLIS = 900
-private val HUD_CLOCK_RING = 1.25.dp
-private val HUD_CLOCK_GAP = 1.dp
-
-/**
- * Um gesto só para as ações do notch: mover (só pela mão), clicar num anel e —
- * com o botão direito, #215 — trocar direto para "Somente cards". O que separa
- * clique de arrasto é o limiar de deslocamento; o botão direito é decidido no
- * próprio `down` e nunca vira arrasto. Nenhuma coordenada sai daqui.
- *
- * Sem [draggable], passar do limiar só desiste do clique: o ponteiro que
- * escorregou não recoleta a conta, e o `move` não é consumido.
- */
-@Composable
-internal fun Modifier.hudPressGesture(
-    draggable: Boolean = true,
-    onDragStart: () -> Unit,
-    onDragMove: () -> Unit,
-    onDragEnd: () -> Unit,
-    /** Recebe a posição do `down`, no nó do gesto: é por ela que o notch acha o anel. */
-    onClick: (Offset) -> Unit,
-    onSecondaryClick: () -> Unit = {}
-): Modifier {
-    val currentDragStart by rememberUpdatedState(onDragStart)
-    val currentDragMove by rememberUpdatedState(onDragMove)
-    val currentDragEnd by rememberUpdatedState(onDragEnd)
-    val currentClick by rememberUpdatedState(onClick)
-    val currentSecondaryClick by rememberUpdatedState(onSecondaryClick)
-
-    return pointerInput(Unit) {
-        awaitEachGesture {
-            // `awaitFirstDown` só reage ao botão primário do mouse; o laço abaixo
-            // é o mesmo, sem esse filtro, para o direito chegar aqui.
-            var down: PointerInputChange
-            while (true) {
-                val event = awaitPointerEvent()
-                val candidate = event.changes.firstOrNull { it.changedToDownIgnoreConsumed() }
-                if (candidate != null) {
-                    down = candidate
-                    break
-                }
-            }
-
-            if (currentEvent.buttons.isSecondaryPressed) {
-                down.consume()
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
-                        ?: break
-                    change.consume()
-                    if (!change.pressed) break
-                }
-                currentSecondaryClick()
-                return@awaitEachGesture
-            }
-
-            var travelled = 0f
-            var dragging = false
-            var slipped = false
-            while (true) {
-                val event = awaitPointerEvent()
-                val change = event.changes.firstOrNull { candidate -> candidate.id == down.id }
-                    ?: break
-                if (!change.pressed) {
-                    when {
-                        dragging -> currentDragEnd()
-                        !slipped -> currentClick(down.position)
-                    }
-                    break
-                }
-                travelled += change.positionChange().getDistance()
-                if (!dragging && !slipped && travelled > viewConfiguration.touchSlop) {
-                    if (draggable) {
-                        dragging = true
-                        currentDragStart()
-                    } else {
-                        slipped = true
-                    }
-                }
-                if (dragging) {
-                    change.consume()
-                    currentDragMove()
-                }
-            }
-        }
-    }
-}

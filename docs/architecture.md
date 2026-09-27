@@ -81,7 +81,8 @@ and the API keys do not live there.
 | File | Role |
 |---|---|
 | `src/desktopMain/kotlin/com/usagemonitor/Main.kt` | bootstrap, preferences, main composition |
-| `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt` | polling, refresh, snapshots, update flow |
+| `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt` | polling, refresh, snapshots |
+| `src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardUpdateCoordinator.kt` | update flow (check, download, backoff, install on exit) |
 | `src/commonMain/kotlin/com/usagemonitor/data/repository/UsageHistoryRepositoryImpl.kt` | history aggregation and forecast |
 | `src/commonMain/kotlin/com/usagemonitor/data/datasource/RemoteApiDataSource.kt` | remote HTTP calls |
 | `src/desktopMain/kotlin/com/usagemonitor/data/datasource/AnthropicCredentialStore.kt` | Anthropic credential origin (file, or macOS Keychain) |

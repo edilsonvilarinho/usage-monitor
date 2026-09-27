@@ -138,31 +138,9 @@ class ArchitectureRulesTest {
         const val MAX_FUNCTION_LINES = 300
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
-        val FILE_CEILINGS = mapOf(
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/SettingsDialogContent.kt" to 1853,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliSessionsScreen.kt" to 1703,
-            "src/desktopMain/kotlin/com/usagemonitor/data/datasource/LocalCliSessionDataSource.kt" to 1696,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt" to 1676,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt" to 1589,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/UsageHistoryLineChart.kt" to 1293,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/DashboardViewModel.kt" to 1223,
-            "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt" to 1144,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/AppControls.kt" to 1138,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/HistoryScreen.kt" to 1095,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/AppStructure.kt" to 1018,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamPresenceScreen.kt" to 1013,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/CliUsageBreakdownPane.kt" to 899,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/viewmodel/TeamUsageViewModel.kt" to 863,
-            "src/desktopMain/kotlin/com/usagemonitor/AutoStartManager.kt" to 805
-        )
+        val FILE_CEILINGS: Map<String, Int> = emptyMap()
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
-        val FUNCTION_CEILINGS = mapOf(
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/ApiUsageCard.kt::ApiUsageCard" to 483,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/UsageHistoryLineChart.kt::UsageHistoryLineChart" to 460,
-            "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt::HudNotch" to 348,
-            "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt::HudWindowHost" to 335,
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/TeamUsageScreen.kt::TeamUsageList" to 327
-        )
+        val FUNCTION_CEILINGS: Map<String, Int> = emptyMap()
     }
 }

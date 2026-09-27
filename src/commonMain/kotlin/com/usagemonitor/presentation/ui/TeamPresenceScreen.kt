@@ -3,31 +3,23 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -53,25 +44,17 @@ import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppConfirmationDialog
-import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
-import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppCellValue
 import com.usagemonitor.presentation.ui.components.AppSourceMarker
-import com.usagemonitor.presentation.ui.components.AppTextField
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.AppDataRow
-import com.usagemonitor.presentation.ui.components.AppDivider
-import com.usagemonitor.presentation.ui.components.AppGroupBand
-import com.usagemonitor.presentation.ui.components.AppToggleChip
-import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.TeamPresenceAccountGroup
-import com.usagemonitor.presentation.viewmodel.TeamPresenceEmailGroup
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
 
@@ -122,21 +105,21 @@ internal const val PRESENCE_LAST_TURN_TAG_PREFIX = "teamPresenceLastTurn:"
 // subiu de 940 para 1030dp: cada carimbo é "12/08 10:58 BRT" por extenso, e
 // truncá-lo em "12/08 10:58 B…" apaga justamente o fuso que a frase existe para
 // dizer. O somatório abaixo é 802dp.
-private val PRESENCE_COLUMN_STATE = 132.dp
-private val PRESENCE_COLUMN_IDENTITY = 150.dp
-private val PRESENCE_COLUMN_MACHINE = 104.dp
-private val PRESENCE_COLUMN_ACTIVE_SESSIONS = 96.dp
-private val PRESENCE_COLUMN_LAST_SEEN = 116.dp
-private val PRESENCE_COLUMN_LAST_TURN = 116.dp
-private val PRESENCE_COLUMN_STATUS = 88.dp
+internal val PRESENCE_COLUMN_STATE = 132.dp
+internal val PRESENCE_COLUMN_IDENTITY = 150.dp
+internal val PRESENCE_COLUMN_MACHINE = 104.dp
+internal val PRESENCE_COLUMN_ACTIVE_SESSIONS = 96.dp
+internal val PRESENCE_COLUMN_LAST_SEEN = 116.dp
+internal val PRESENCE_COLUMN_LAST_TURN = 116.dp
+internal val PRESENCE_COLUMN_STATUS = 88.dp
 
-private val PRESENCE_COLUMN_SPACING = 16.dp
-private val PRESENCE_ROW_CONTENT_PADDING = 14.dp
+internal val PRESENCE_COLUMN_SPACING = 16.dp
+internal val PRESENCE_ROW_CONTENT_PADDING = 14.dp
 
 // A faixa da conta é a capa, e capa mais baixa que o item é o defeito que a
 // issue #104 abriu na lista de consumo. Aqui ela nasce mais alta pelo padding e
 // pelo degrau tipográfico do e-mail.
-private val PRESENCE_ACCOUNT_VERTICAL_PADDING = AppSpacing.md
+internal val PRESENCE_ACCOUNT_VERTICAL_PADDING = AppSpacing.md
 
 // Degrau de aninhamento, aplicado **dentro da coluna de identidade**, como na
 // lista de consumo.
@@ -155,10 +138,10 @@ private val PRESENCE_NEST_INDENT = AppSpacing.md
 private val PRESENCE_BAND_ICON_GUTTER = 24.dp + 8.dp
 
 /** Largura fixa: num `FlowRow` um campo elástico empurraria os indicadores. */
-private val PRESENCE_FILTER_FIELD_WIDTH = 200.dp
+internal val PRESENCE_FILTER_FIELD_WIDTH = 200.dp
 
 /** Mesma pegada do `AppIconButton` (26dp), para o cabeçalho reservar a casa certa. */
-private val PRESENCE_ACTION_SLOT = 26.dp
+internal val PRESENCE_ACTION_SLOT = 26.dp
 
 /**
  * As três palavras que os dois booleanos produzem.
@@ -475,350 +458,6 @@ private fun TeamPresenceList(
                     .fillMaxHeight()
                     .testTag(PRESENCE_LIST_SCROLLBAR_TAG)
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TeamPresenceHeader(
-    state: TeamPresenceUiState.Success,
-    language: AppLanguage,
-    onSetOnlyOnline: (Boolean) -> Unit,
-    onQueryChange: (String) -> Unit
-) {
-    // Superfície de dados como as outras, com o patamar `AppDepth.CARD` que ela
-    // já traz: a sombra de diálogo que existia aqui punha 8dp sob um bloco que
-    // não flutua sobre nada.
-    //
-    // `Arrangement.Top` porque este bloco separa os filhos com o `Spacer` que ele
-    // já traz; o `spacedBy` default somaria 8dp a cada um deles.
-    AppDataSurface(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = AppSpacing.md,
-        verticalArrangement = Arrangement.Top
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // O e-mail é dado, e dado fica na cor do texto — a mesma decisão do
-            // cabeçalho do modal de consumo.
-            if (state.accountLabel != null) {
-                Text(
-                    text = state.accountLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            if (state.isAdminOverview) {
-                Text(
-                    text = TeamUsageLabels.allEmailGroups(
-                        emailCount = state.emailGroups.size,
-                        accountCount = state.presenceGroups.size,
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            LiveBadge(language = language)
-            Text(
-                text = TeamUsageLabels.lastChange(
-                    instantLabel = state.lastChangedAt?.let { instant -> formatInstant(instant) },
-                    language = language
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth().testTag(PRESENCE_SUMMARY_TAG),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Indicador de estado, não bloco de métrica: aqui o texto já traz o
-            // número ("2 conectados"), e o protótipo desenha esta tela com ponto
-            // e palavra. Eram três números soltos e coloridos — verde, azul e
-            // branco — sem nada dizendo o que a cor significava. Os tons são os
-            // mesmos das linhas abaixo, ou a mesma ideia teria duas cores na
-            // mesma tela.
-            AppStatusIndicator(
-                label = TeamPresenceLabels.workingSummary(state.workingCount, language),
-                tone = AppTone.OK
-            )
-            AppStatusIndicator(
-                label = TeamPresenceLabels.onlineSummary(state.onlineCount, language),
-                tone = AppTone.INFO
-            )
-            AppStatusIndicator(
-                label = TeamPresenceLabels.knownSummary(state.totalCount, language),
-                tone = AppTone.NEUTRAL
-            )
-
-            // Filtro binário: um segmentado de dois estados diria "ou isto, ou
-            // aquilo", e o que existe aqui é uma restrição ligada ou desligada.
-            // O `selectable` mantém a semântica que o teste observa.
-            AppToggleChip(
-                label = TeamPresenceLabels.onlyOnline(language),
-                selected = state.onlyOnline,
-                onClick = { onSetOnlyOnline(!state.onlyOnline) },
-                modifier = Modifier.testTag(PRESENCE_ONLY_ONLINE_TAG)
-            )
-
-            // Campo de texto ao lado do chip, como no protótipo: o chip liga uma
-            // restrição, o campo estreita por nome. Num time de vinte máquinas o
-            // chip sozinho não acha ninguém.
-            AppTextField(
-                value = state.query,
-                onValueChange = onQueryChange,
-                placeholder = TeamPresenceLabels.filterPlaceholder(language),
-                modifier = Modifier.width(PRESENCE_FILTER_FIELD_WIDTH).testTag(PRESENCE_FILTER_TAG)
-            )
-        }
-    }
-}
-
-/**
- * Faixa de legendas das colunas, uma vez para a lista inteira.
- *
- * Antes cada linha reimprimia "Máquina", "Estado", "Trabalhando agora" e "Status"
- * ao lado do próprio valor. Numa lista de time isso dobra o texto da tela e o
- * ruído cresce com o número de pessoas — a legenda pertence à coluna, não à
- * célula. As larguras são as mesmas `PRESENCE_COLUMN_*` da linha, senão o
- * cabeçalho prometeria um alinhamento que o conteúdo não cumpre.
- *
- * Não é `stickyHeader`: fica fora da `LazyColumn` de propósito, porque na visão
- * global a lista já tem as faixas de conta rolando dentro dela e dois níveis de
- * cabeçalho grudado empilhariam.
- */
-@Composable
-private fun TeamPresenceColumnHeader(
-    language: AppLanguage,
-    hasHealthColumn: Boolean,
-    hasActionColumn: Boolean
-) {
-    AppColumnHeaderRow(
-        modifier = Modifier
-            .padding(end = SCROLLBAR_GUTTER)
-            .testTag(PRESENCE_COLUMN_HEADER_TAG),
-        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING,
-        spacing = PRESENCE_COLUMN_SPACING
-    ) {
-        AppColumnHeaderLabel(
-            label = TeamPresenceLabels.columnState(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_STATE)
-        )
-        AppColumnHeaderLabel(
-            label = TeamPresenceLabels.columnMember(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY)
-        )
-        AppColumnHeaderLabel(
-            label = CliSessionsLabels.machine(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_MACHINE)
-        )
-        AppColumnHeaderLabel(
-            label = TeamPresenceLabels.columnActiveSessions(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_ACTIVE_SESSIONS)
-        )
-        AppColumnHeaderLabel(
-            label = TeamPresenceLabels.columnLastSeen(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_LAST_SEEN)
-        )
-        AppColumnHeaderLabel(
-            label = TeamPresenceLabels.columnLastTurn(language),
-            modifier = Modifier.width(PRESENCE_COLUMN_LAST_TURN)
-        )
-        if (hasHealthColumn) {
-            AppColumnHeaderLabel(
-                label = TeamUsageLabels.columnStatus(language),
-                modifier = Modifier.width(PRESENCE_COLUMN_STATUS)
-            )
-        }
-        if (hasActionColumn) {
-            // A ação é coluna fixa à direita nas linhas e na faixa da conta; o vão
-            // elástico é o que leva a legenda até o mesmo x.
-            Spacer(modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(PRESENCE_ACTION_SLOT))
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TeamPresenceEmailHeader(
-    group: TeamPresenceEmailGroup,
-    expanded: Boolean,
-    language: AppLanguage,
-    /** A lista tem coluna de ação; a faixa reserva a casa mesmo sem botão. */
-    hasActionColumn: Boolean,
-    onToggle: () -> Unit
-) {
-    val accents = AppAccents.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(
-                    horizontal = PRESENCE_ROW_CONTENT_PADDING,
-                    vertical = PRESENCE_ACCOUNT_VERTICAL_PADDING
-                )
-                .testTag(
-                    "$PRESENCE_ACCOUNT_GROUP_TAG_PREFIX${group.accounts.singleOrNull()?.accountKey ?: group.groupKey}"
-                ),
-            // Marcador e vão iguais aos do `AppDataRow` da linha do integrante: é o
-            // que mantém os agregados da conta no mesmo x das colunas dela.
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AppSourceMarker(color = accents.cacheRead)
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(PRESENCE_COLUMN_SPACING),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // A primeira coluna da linha é o estado, e a faixa não tem estado
-                // agregado: o vão mantém a identidade da conta no mesmo x do
-                // apelido do integrante.
-                Spacer(modifier = Modifier.width(PRESENCE_COLUMN_STATE))
-
-                // Ícone dentro da coluna de identidade, como na linha do integrante: é o
-                // que mantém as colunas seguintes no mesmo x nas duas.
-                Row(
-                    modifier = Modifier.width(PRESENCE_COLUMN_IDENTITY),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                        contentDescription = if (expanded) {
-                            TeamUsageLabels.collapseAccount(language)
-                        } else {
-                            TeamUsageLabels.expandAccount(language)
-                        },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        // A palavra vem antes do e-mail: sem ela a faixa entregava um
-                        // endereço e um uuid sem dizer que aquilo é a conta, e ao lado de
-                        // uma linha de integrante — que também tem nome e identificador —
-                        // as duas liam igual.
-                        Text(
-                            text = TeamUsageLabels.accountBand(language),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        // Continua em `titleSmall`, como na lista de consumo:
-                        // com 16sp o e-mail não cabe nos 118dp úteis da coluna e
-                        // a captura saiu com "ana@example…". A altura da faixa
-                        // vem do padding vertical, que não custa largura.
-                        Text(
-                            text = group.accountEmail ?: TeamUsageLabels.unlabeledAccount(language),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = group.accounts.singleOrNull()?.accountKey.orEmpty().takeIf { it.isNotEmpty() }
-                                ?.let { accountKey -> accountKey }
-                                ?: TeamUsageLabels.technicalAccounts(
-                                    count = group.accounts.size,
-                                    language = language
-                                ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // A faixa da conta agrega, e a coluna Máquina não tem agregado: o vão
-                // mantém as colunas seguintes no mesmo x da linha do integrante.
-                Spacer(modifier = Modifier.width(PRESENCE_COLUMN_MACHINE))
-
-                // Uma célula só, atravessando as três colunas que a conta não
-                // tem — sessões ativas, último sinal e último turno. O texto se
-                // descreve ("2 de 2 conectados · 1 trabalhando"), então ele não
-                // depende da legenda de coluna nenhuma; o que não pode acontecer
-                // é um número cru sob a legenda errada.
-                AppCellValue(
-                    value = TeamPresenceLabels.accountBandSummary(
-                        online = group.onlineCount,
-                        total = group.totalCount,
-                        working = group.workingCount,
-                        language = language
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(
-                        PRESENCE_COLUMN_ACTIVE_SESSIONS +
-                            PRESENCE_COLUMN_SPACING + PRESENCE_COLUMN_LAST_SEEN +
-                            PRESENCE_COLUMN_SPACING + PRESENCE_COLUMN_LAST_TURN
-                    )
-                )
-            }
-
-            // Fora do `Row` de propósito: dentro dele a ação é o último item e
-            // portanto o primeiro a quebrar, e numa janela estreita o botão de
-            // apagar aparecia sozinho numa linha abaixo do e-mail.
-            if (hasActionColumn) {
-                Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
-            }
-        }
-        AppDivider()
-    }
-}
-
-@Composable
-private fun TeamPresenceAccountSubgroupHeader(
-    group: TeamPresenceAccountGroup,
-    language: AppLanguage,
-    deletable: Boolean,
-    hasActionColumn: Boolean,
-    onDelete: () -> Unit
-) {
-    AppGroupBand(
-        label = "${TeamUsageLabels.accountBand(language)} · ${group.accountKey.orEmpty()}",
-        detail = TeamPresenceLabels.accountBandSummary(
-            online = group.onlineCount,
-            total = group.totalCount,
-            working = group.workingCount,
-            language = language
-        ),
-        indent = AppSpacing.xl,
-        horizontalPadding = PRESENCE_ROW_CONTENT_PADDING
-    ) {
-        if (deletable) {
-            AppIconButton(
-                contentDescription = TeamPresenceLabels.deleteAccount(language),
-                onClick = onDelete,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag("$PRESENCE_ACCOUNT_DELETE_TAG_PREFIX${group.groupKey}")
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.DeleteForever,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        } else if (hasActionColumn) {
-            Spacer(modifier = Modifier.size(PRESENCE_ACTION_SLOT))
         }
     }
 }
