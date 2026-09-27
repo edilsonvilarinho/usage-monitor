@@ -669,7 +669,7 @@ class HudNotchTest {
 
     /** Na barra HUD não há rodapé: a engrenagem abre o que ele oferece. */
     @Test
-    fun `a engrenagem abre e fecha o balao com as acoes do rodape`() = runDesktopComposeUiTest {
+    fun `a engrenagem abre o balao com as acoes do rodape e o segundo clique nao fecha`() = runDesktopComposeUiTest {
         var refreshes = 0
         setContent { notchWithActions(onRefresh = { refreshes += 1 }) }
 
@@ -684,8 +684,32 @@ class HudNotchTest {
         onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
         onNodeWithContentDescription("Abrir ajuda").assertIsDisplayed()
 
+        // Com o hover abrindo o balão (#317), alternar no clique fecharia o que
+        // o próprio ponteiro acabou de abrir.
         onNodeWithContentDescription(GEAR).performClick()
         waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+    }
+
+    /** O ponteiro sobre a engrenagem abre o balão dela sem clique, como o anel abre o da conta (#317). */
+    @Test
+    fun `o ponteiro sobre a engrenagem abre o balao dela`() = runDesktopComposeUiTest {
+        setContent { notchWithActions() }
+
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+    }
+
+    /** Sem balão da engrenagem, o hover não dispara a ação dela: ação é do clique. */
+    @Test
+    fun `sem balao o ponteiro sobre a engrenagem nao chama a acao dela`() = runDesktopComposeUiTest {
+        var gears = 0
+        setContent { notch(expanded = true, onGearClick = { gears += 1 }) }
+
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(0, gears)
         onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
     }
 

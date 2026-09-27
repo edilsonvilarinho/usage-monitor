@@ -92,8 +92,9 @@ internal const val HUD_ACCOUNT_EMOJI_TEST_TAG = "hudAccountEmoji"
  * Atualização pendente (issues #225 e #291). No notch ela é **só o ponto da
  * engrenagem**, com a frase inteira ([description]) na descrição dela; o aviso
  * mesmo — [headline] e [detail] num banner, mais a ação [actionLabel] como botão
- * — mora no balão da engrenagem, que é aberto de propósito. Nunca um clique no
- * notch: seria clique de rotina reiniciando o app.
+ * — mora no balão da engrenagem, e só o botão dele reinicia: o balão abre no
+ * hover (#317), mas o reinício continua sendo um clique no rótulo que diz o que
+ * ele faz. Nunca um clique no notch: seria clique de rotina reiniciando o app.
  */
 internal data class HudUpdateIndicator(
     val tone: AppTone,
@@ -148,8 +149,8 @@ internal fun HudNotch(
     /** Os botões do card de cada conta, na fileira de baixo do balão dela. */
     accountActions: (@Composable (HudAccount) -> Unit)? = null,
     /**
-     * O conteúdo do balão da engrenagem. Com ele, a engrenagem abre e fecha o
-     * balão; sem ele, o clique vai a [onGearClick].
+     * O conteúdo do balão da engrenagem. Com ele, o ponteiro sobre a engrenagem
+     * abre o balão, e o clique também; sem ele, o clique vai a [onGearClick].
      */
     appBalloon: (@Composable () -> Unit)? = null,
     appBalloonHeight: Dp = 0.dp,
@@ -184,6 +185,12 @@ internal fun HudNotch(
     var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
     LaunchedEffect(open) {
         if (!open && initialBalloonIndex == null) balloonIndex = null
+    }
+    // A engrenagem abre o balão dela no hover, como o anel abre o da conta
+    // (#317). Só com o notch aberto: durante o arrasto as alças continuam na
+    // tela, e o índice gravado ali reabriria o balão ao soltar.
+    LaunchedEffect(gearHovered, open) {
+        if (gearHovered && open && appBalloon != null) balloonIndex = APP_BALLOON
     }
     val shownIndex = balloonIndex?.takeIf { index ->
         index in accounts.indices || (index == APP_BALLOON && appBalloon != null)
@@ -319,11 +326,13 @@ internal fun HudNotch(
                     description = updateIndicator?.let { indicator -> "$gearDescription · ${indicator.description}" }
                         ?: gearDescription,
                     badgeTone = updateIndicator?.tone,
+                    // O clique só abre, nunca fecha: com o hover já abrindo o
+                    // balão, alternar fecharia o que o próprio ponteiro abriu.
                     onClick = {
                         if (appBalloon == null) {
                             onGearClick()
                         } else {
-                            balloonIndex = if (balloonIndex == APP_BALLOON) null else APP_BALLOON
+                            balloonIndex = APP_BALLOON
                         }
                     },
                     interaction = gearHover,

@@ -909,6 +909,10 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   linhas (o menu do rodapé é `Popup` e seria recortado pela janela) e o próprio `FooterActionGroup`.
   Paradas, as alças são um arco de um quarto na margem de sombra que a janela já tem — nenhuma área
   nova engolindo clique. Carregando, a mão **fica na composição**: tirá-la cancelaria o gesto.
+  - **A engrenagem abre no hover, como o anel** (#317). O clique também abre e **nunca fecha**: com o
+    hover abrindo, alternar fecharia o balão que o próprio ponteiro acabou de abrir. Fechar é sair do
+    notch ou passar num anel. O reinício do app continua sendo o clique no botão do balão — abrir no
+    hover não torna o reinício um gesto de rotina.
   As alças e o balão entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`.
 - **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
   no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
