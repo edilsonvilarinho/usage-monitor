@@ -6,15 +6,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -36,32 +33,20 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
-import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
-import com.usagemonitor.presentation.ui.components.ActivityHeatmapGrid
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
-import com.usagemonitor.presentation.ui.components.AppCellValue
-import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
-import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
-import com.usagemonitor.presentation.ui.components.AppDataRow
-import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppMetricBlock
-import com.usagemonitor.presentation.ui.components.AppProgressTrack
-import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppTextField
-import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 const val BREAKDOWN_SCROLLBAR_TAG = "breakdownScrollbar"
@@ -100,14 +85,14 @@ private val FILTER_FIELD_WIDTH = 220.dp
 // e o único texto de comprimento imprevisível — leva o resto por peso. Se a soma
 // passar da largura o `Row` corta a última coluna, e é por isso que só o rótulo é
 // elástico.
-private val AXIS_COLUMN_MIN_WIDTH = 140.dp
-private val SESSIONS_COLUMN_WIDTH = 70.dp
-private val TURNS_COLUMN_WIDTH = 70.dp
-private val TOKENS_COLUMN_WIDTH = 140.dp
-private val COST_COLUMN_WIDTH = 100.dp
-private val ACTIVE_TIME_COLUMN_WIDTH = 84.dp
-private val SHARE_COLUMN_WIDTH = 100.dp
-private val CALLS_COLUMN_WIDTH = 90.dp
+internal val AXIS_COLUMN_MIN_WIDTH = 140.dp
+internal val SESSIONS_COLUMN_WIDTH = 70.dp
+internal val TURNS_COLUMN_WIDTH = 70.dp
+internal val TOKENS_COLUMN_WIDTH = 140.dp
+internal val COST_COLUMN_WIDTH = 100.dp
+internal val ACTIVE_TIME_COLUMN_WIDTH = 84.dp
+internal val SHARE_COLUMN_WIDTH = 100.dp
+internal val CALLS_COLUMN_WIDTH = 90.dp
 
 /**
  * Resumo do consumo da janela por projeto, branch e modelo.
@@ -610,290 +595,6 @@ private fun BreakdownTotals(
         NoticeText(BreakdownLabels.axisNotice(language), MaterialTheme.colorScheme.onSurfaceVariant)
         if (hint != null) {
             NoticeText(hint, MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-/**
- * Orçamento do mês, num painel de dados com cabeçalho.
- *
- * Não existe no protótipo — é recurso posterior a ele — e por isso recebe a
- * anatomia comum: cabeçalho com título e divisória, corpo com o valor, a barra e
- * as qualificações. O título deixou de ser azul pelo mesmo motivo dos totais.
- */
-@Composable
-private fun BudgetPanel(
-    budget: MonthlyBudgetStatus?,
-    accountCredits: AccountCreditUsage?,
-    language: AppLanguage
-) {
-    AppDataSurfaceFlush(
-        header = { AppSectionHeader(title = BreakdownLabels.budgetTitle(language)) }
-    ) {
-        Column(
-            modifier = Modifier.padding(AppSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-        ) {
-            if (budget != null) {
-                Text(
-                    text = BreakdownLabels.budgetValue(
-                        spentMicros = budget.spentMicros,
-                        limitMicros = budget.limitMicros,
-                        isComplete = budget.isSpendComplete,
-                        language = language
-                    ),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (budget.isExceeded) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                )
-                AppProgressTrack(
-                    fraction = budget.share.toFloat(),
-                    tone = if (budget.isExceeded) AppTone.CRITICAL else AppTone.INFO
-                )
-                NoticeText(
-                    BreakdownLabels.budgetProjection(budget.projectedMicros, budget.willExceed, language),
-                    if (budget.willExceed) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-                NoticeText(
-                    BreakdownLabels.budgetScopeNotice(language),
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (accountCredits != null) {
-                // Linha própria e moeda explícita: somar isto ao valor acima daria
-                // um número inventado quando a conta não é em USD.
-                NoticeText(
-                    BreakdownLabels.accountCredits(
-                        usedMinorUnits = accountCredits.usedMinorUnits,
-                        limitMinorUnits = accountCredits.limitMinorUnits,
-                        currencyCode = accountCredits.currencyCode,
-                        language = language
-                    ),
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/**
- * A página do eixo como tabela: uma faixa de legendas e uma linha por balde.
- *
- * Era um card por linha, com o rótulo em cima, o custo à direita e uma barra de
- * largura total embaixo — três elementos para dizer o que uma linha de tabela diz
- * com colunas alinhadas, e numa lista de dez projetos a tela virava dez blocos.
- *
- * A coluna de tempo ativo aparece **uma vez para a lista inteira** ou não
- * aparece: os eixos de modelo e de ferramenta não têm hora, e uma coluna que
- * existe em algumas linhas e some em outras desloca tudo o que vem depois.
- */
-@Composable
-private fun BucketTable(
-    page: BreakdownPage<CliUsageBucket>,
-    axis: BreakdownAxis,
-    totals: CliUsageBucket,
-    unknownLabel: String,
-    language: AppLanguage
-) {
-    val hasActiveTime = page.items.any { bucket -> bucket.activeMillis != null }
-
-    AppDataSurfaceFlush(
-        header = {
-            AppColumnHeaderRow(startGutter = 0.dp) {
-                AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnAxis(axis, language),
-                    modifier = Modifier.weight(1f).widthIn(min = AXIS_COLUMN_MIN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = CliSessionsLabels.columnSessions(language),
-                    modifier = Modifier.width(SESSIONS_COLUMN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnTurns(language),
-                    modifier = Modifier.width(TURNS_COLUMN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = CliSessionsLabels.columnTokens(language),
-                    modifier = Modifier.width(TOKENS_COLUMN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = CliSessionsLabels.columnCost(language),
-                    modifier = Modifier.width(COST_COLUMN_WIDTH)
-                )
-                if (hasActiveTime) {
-                    AppColumnHeaderLabel(
-                        label = CliSessionsLabels.activeTime(language),
-                        modifier = Modifier.width(ACTIVE_TIME_COLUMN_WIDTH)
-                    )
-                }
-                AppColumnHeaderLabel(
-                    label = CliSessionsLabels.columnShare(language),
-                    modifier = Modifier.width(SHARE_COLUMN_WIDTH)
-                )
-            }
-        }
-    ) {
-        page.items.forEachIndexed { index, bucket ->
-            BucketRow(
-                bucket = bucket,
-                totals = totals,
-                unknownLabel = unknownLabel,
-                hasActiveTime = hasActiveTime,
-                showDivider = index < page.items.lastIndex,
-                language = language
-            )
-        }
-    }
-}
-
-@Composable
-private fun BucketRow(
-    bucket: CliUsageBucket,
-    totals: CliUsageBucket,
-    unknownLabel: String,
-    hasActiveTime: Boolean,
-    showDivider: Boolean,
-    language: AppLanguage
-) {
-    val share = bucket.costShareOf(totals)
-
-    AppDataRow(showDivider = showDivider) {
-        AppCellValue(
-            value = bucket.label ?: unknownLabel,
-            modifier = Modifier.weight(1f).widthIn(min = AXIS_COLUMN_MIN_WIDTH)
-        )
-        AppCellValue(
-            value = bucket.sessionCount.toString(),
-            modifier = Modifier.width(SESSIONS_COLUMN_WIDTH)
-        )
-        AppCellValue(
-            value = bucket.turnCount.toString(),
-            modifier = Modifier.width(TURNS_COLUMN_WIDTH)
-        )
-        AppCellValue(
-            value = formatQuantity(bucket.totalTokens),
-            modifier = Modifier.width(TOKENS_COLUMN_WIDTH)
-        )
-        AppCellValue(
-            value = BreakdownLabels.bucketCost(bucket),
-            modifier = Modifier.width(COST_COLUMN_WIDTH)
-        )
-        if (hasActiveTime) {
-            // Hora nula é eixo sem medida e hora zero é balde só de sessões de um
-            // turno: nos dois casos sai o travessão, porque "0min" seria lido como
-            // trabalho instantâneo.
-            AppCellValue(
-                value = bucket.activeMillis
-                    ?.takeIf { millis -> millis > 0L }
-                    ?.let { millis -> formatActiveTime(millis) }
-                    ?: "—",
-                modifier = Modifier.width(ACTIVE_TIME_COLUMN_WIDTH)
-            )
-        }
-        Column(modifier = Modifier.width(SHARE_COLUMN_WIDTH)) {
-            AppCellValue(value = formatPercent(share))
-            Spacer(modifier = Modifier.height(AppSpacing.xs))
-            AppProgressTrack(fraction = share.toFloat(), tone = AppTone.INFO)
-        }
-    }
-}
-
-/**
- * A página de ferramentas, na mesma anatomia.
- *
- * Sem coluna de custo: um turno que chama `Read` e `Bash` gastou tokens uma vez
- * só, e ratear entre as duas contaria o mesmo gasto duas vezes. A fatia é contra
- * a ferramenta mais chamada da janela **inteira**, não da página — a pergunta é
- * qual domina, e renormalizar por página faria a primeira linha de toda página
- * parecer o pico.
- */
-@Composable
-private fun ToolTable(page: BreakdownPage<CliToolUsage>, peak: Int, language: AppLanguage) {
-    AppDataSurfaceFlush(
-        header = {
-            AppColumnHeaderRow(startGutter = 0.dp) {
-                AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnAxis(BreakdownAxis.TOOL, language),
-                    modifier = Modifier.weight(1f).widthIn(min = AXIS_COLUMN_MIN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnCalls(language),
-                    modifier = Modifier.width(CALLS_COLUMN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnTurns(language),
-                    modifier = Modifier.width(TURNS_COLUMN_WIDTH)
-                )
-                AppColumnHeaderLabel(
-                    label = CliSessionsLabels.columnShare(language),
-                    modifier = Modifier.width(SHARE_COLUMN_WIDTH)
-                )
-            }
-        }
-    ) {
-        page.items.forEachIndexed { index, tool ->
-            val share = if (peak <= 0) 0.0 else tool.callCount.toDouble() / peak.toDouble()
-            AppDataRow(showDivider = index < page.items.lastIndex) {
-                AppCellValue(
-                    value = tool.toolName,
-                    modifier = Modifier.weight(1f).widthIn(min = AXIS_COLUMN_MIN_WIDTH)
-                )
-                AppCellValue(
-                    value = tool.callCount.toString(),
-                    modifier = Modifier.width(CALLS_COLUMN_WIDTH)
-                )
-                AppCellValue(
-                    value = tool.turnCount.toString(),
-                    modifier = Modifier.width(TURNS_COLUMN_WIDTH)
-                )
-                Column(modifier = Modifier.width(SHARE_COLUMN_WIDTH)) {
-                    AppCellValue(value = formatPercent(share))
-                    Spacer(modifier = Modifier.height(AppSpacing.xs))
-                    AppProgressTrack(fraction = share.toFloat(), tone = AppTone.INFO)
-                }
-            }
-        }
-    }
-}
-
-/**
- * A grade de atividade, num painel com cabeçalho.
- *
- * A explicação vive no `trailing` do cabeçalho, como no protótipo: ela qualifica
- * a grade inteira, e abaixo dela lia como mais uma linha de dado.
- */
-@Composable
-private fun ActivityPanel(breakdown: CliUsageBreakdown, language: AppLanguage) {
-    AppDataSurfaceFlush(
-        header = {
-            AppSectionHeader(
-                title = BreakdownLabels.activityTitle(language),
-                trailing = {
-                    Text(
-                        text = BreakdownLabels.activityNotice(language),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2
-                    )
-                }
-            )
-        }
-    ) {
-        Box(modifier = Modifier.padding(AppSpacing.md)) {
-            ActivityHeatmapGrid(
-                heatmap = breakdown.heatmap,
-                accent = AppAccents.current.cacheRead,
-                language = language,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
