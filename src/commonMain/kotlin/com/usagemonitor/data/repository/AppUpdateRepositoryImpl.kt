@@ -11,22 +11,13 @@ import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.isVersionNewer
 import com.usagemonitor.domain.entity.parseReleaseNoteItems
 import com.usagemonitor.domain.repository.AppUpdateRepository
+import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
 import kotlinx.datetime.Instant
 
 private const val RELEASE_REPOSITORY_OWNER = "edilsonvilarinho"
 private const val RELEASE_REPOSITORY_NAME = "usage-monitor"
 
 private const val SHA256_DIGEST_PREFIX = "sha256:"
-
-/**
- * Nome da variável de ambiente que substitui o feed de releases.
- *
- * Existe para o smoke test da atualização automática: sem ela, cada tentativa
- * exigiria publicar uma release de verdade no GitHub. **A UI mostra um aviso
- * quando ela está ativa** — quem esquecer de desligá-la precisa esbarrar nisso,
- * porque o SHA-256 que barra artefato trocado vem do mesmo feed.
- */
-const val UPDATE_FEED_URL_ENV_VAR = "USAGE_MONITOR_UPDATE_FEED_URL"
 
 class AppUpdateRepositoryImpl(
     private val remoteApiDataSource: RemoteApiDataSource,

@@ -72,12 +72,11 @@ import kotlinx.datetime.Clock
 /**
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
  *
- * Ela era a janela principal encolhida, e isso obrigava `main()` a guardar a
+ * Ela era a janela principal encolhida, e isso obrigava o antigo `main()` a guardar a
  * geometria de antes, proibir o coletor de gravar a pílula como "tamanho
  * normal", ordenar textualmente o piso de tamanho e redimensionar a janela AWT a
  * cada quadro — a fonte do tranco. Agora a principal fica escondida com a
- * geometria intacta, e esta janela é só do notch. Mora fora de `main()`, que está
- * no limite do backend JVM.
+ * geometria intacta, e esta janela é só do notch.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
  * 11, C11 do plano de execução). Por isso, parada, ela só aceita clique no notch:
@@ -219,13 +218,7 @@ internal fun HudWindowHost(
             uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION,
         hasUpdateAction = updateAction != null
     )
-    // A geometria trabalha em dp de composição; a janela, em dp do sistema. A área
-    // da tela desce à escala da composição e o resultado volta multiplicado.
-    val composedArea = ScreenWorkArea(
-        x = screenArea.x / scale,
-        y = screenArea.y / scale,
-        size = DpSize(screenArea.size.width / scale, screenArea.size.height / scale)
-    )
+    val composedArea = screenArea.inCompositionDp(scale)
     // Parada e aberta a janela é a mesma, com o notch no mesmo ponto da tela; quem
     // se ajusta a um canto é o balão. Parada, só o notch aceita clique.
     // Carregando, a janela é o notch com as alças — simétrico ao longo da borda,
@@ -340,12 +333,7 @@ internal fun HudWindowHost(
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
-        // Síncrono na aplicação da composição: o quadro seguinte, que o hover
-        // espera antes de abrir o balão, já sai sem o recorte.
-        val hitRegionApplier = remember { HudHitRegionApplier() }
-        SideEffect {
-            hitRegionApplier.apply(window, hitRegion, scale)
-        }
+        ApplyHudHitRegion(window, hitRegion, scale)
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
             val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
@@ -515,6 +503,29 @@ private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: Screen
     val saved = readPersistedHudScreen(settings)
     val screens = availableScreens()
     return resolveScreen(screens, saved.id, saved.bounds)?.workArea ?: screens.firstOrNull()?.workArea ?: fallback
+}
+
+/**
+ * A área da tela na escala da composição. A geometria trabalha em dp de
+ * composição; a janela, em dp do sistema. A área desce à escala da composição e o
+ * resultado da geometria volta multiplicado.
+ */
+private fun ScreenWorkArea.inCompositionDp(scale: Float): ScreenWorkArea = ScreenWorkArea(
+    x = x / scale,
+    y = y / scale,
+    size = DpSize(size.width / scale, size.height / scale)
+)
+
+/**
+ * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
+ * antes de abrir o balão, já sai sem o recorte.
+ */
+@Composable
+private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float) {
+    val applier = remember { HudHitRegionApplier() }
+    SideEffect {
+        applier.apply(window, region, scale)
+    }
 }
 
 /**

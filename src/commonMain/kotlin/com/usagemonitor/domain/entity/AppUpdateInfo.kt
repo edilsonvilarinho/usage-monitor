@@ -20,7 +20,7 @@ data class AppUpdateInfo(
 data class AppUpdateArtifact(
     val assetName: String,
     val downloadUrl: String,
-    /** Nulo é "não informado". Ver [com.usagemonitor.data.dto.GitHubReleaseAssetDto.size]. */
+    /** Nulo é "não informado". Ver `GitHubReleaseAssetDto.size`, em `data`. */
     val sizeBytes: Long?,
     /** Hex puro, sem o prefixo `sha256:` que a API manda. Nulo torna o artefato inelegível. */
     val sha256: String?,

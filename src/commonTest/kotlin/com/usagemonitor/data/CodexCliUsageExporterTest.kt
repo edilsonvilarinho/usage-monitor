@@ -1,7 +1,7 @@
 package com.usagemonitor.data
 
 import com.usagemonitor.data.export.CodexCliUsageExporter
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import kotlin.test.Test

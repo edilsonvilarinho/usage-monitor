@@ -7,17 +7,12 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.UsageExportFormat
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-
-/** Formato de saída da exportação. */
-enum class UsageExportFormat(val extension: String) {
-    CSV("csv"),
-    JSON("json")
-}
 
 /**
  * Serializa o que a tela de Sessões CLI mostra.

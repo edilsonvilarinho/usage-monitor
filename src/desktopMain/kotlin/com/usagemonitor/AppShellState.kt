@@ -1,0 +1,238 @@
+package com.usagemonitor
+
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.components.WindowMode
+import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
+import com.usagemonitor.presentation.ui.normalizeCardOrder
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.AppThemePreset
+
+/**
+ * As preferências de aparência e de moldura que o app inteiro lê: escala, tema,
+ * idioma, movimento, opacidade, modos de janela e a arrumação dos cards.
+ *
+ * Cada mudança passa por um método, que grava e aplica a regra de negócio no
+ * mesmo lugar — a exclusão entre a barra HUD e o modo somente cards, por
+ * exemplo, era um par de lambdas locais em `runUsageMonitor` que qualquer outro
+ * trecho do lambda podia contornar escrevendo direto no `var`.
+ *
+ * A escala e a opacidade são exceção: o controle deslizante muda o valor a cada
+ * pixel, e quem grava é o coletor com debounce de `AppPreferenceEffects`.
+ */
+@Stable
+internal class AppShellState(
+    private val settings: PreferencesSettings,
+    hasUpdateReceipt: Boolean,
+    initialTargets: List<UsageTargetKey>
+) {
+    /** Escala da interface; o valor persistido acompanha pelo coletor com debounce. */
+    var uiScalePercent by mutableStateOf(readPersistedUiScalePercent(settings))
+        private set
+
+    /**
+     * A escala que a janela principal já reflete. A razão do redimensionamento
+     * sai daqui e nunca de 100 — duas mudanças seguidas multiplicariam duas vezes.
+     */
+    var appliedUiScalePercent by mutableStateOf(uiScalePercent)
+
+    /** Sobe a cada gravação da escala; é o que faz o aviso de "salvo" sair uma vez. */
+    var uiScaleSaveGeneration by mutableStateOf(0)
+
+    var reducedMotion by mutableStateOf(readPersistedReducedMotion(settings))
+        private set
+
+    /**
+     * A política de movimento de **todas** as janelas: cada `Window` tem
+     * composição própria, e a que não receber isto fica na política estática sem
+     * erro nenhum — a armadilha da escala.
+     */
+    val motion: AppMotionPolicy
+        get() = AppMotionPolicy.forPreference(reducedMotion)
+
+    var themePreset by mutableStateOf(readPersistedThemePreset(settings))
+        private set
+
+    var language by mutableStateOf(storedLanguage(settings))
+        private set
+
+    /** O que estava gravado no arranque; a leitura real do sistema chega depois. */
+    val storedAutoStartPreference: Boolean = settings.getBoolean(AUTO_START_KEY, false)
+
+    var autoStartEnabled by mutableStateOf(storedAutoStartPreference)
+        private set
+
+    var alwaysOnTopEnabled by mutableStateOf(settings.getBoolean(ALWAYS_ON_TOP_KEY, false))
+        private set
+
+    val windowOpacitySupported: Boolean = isWindowOpacitySupported()
+
+    var windowOpacityPercent by mutableStateOf(readPersistedWindowOpacityPercent(settings))
+        private set
+
+    /** Sobe a cada gravação da opacidade, pela mesma razão de [uiScaleSaveGeneration]. */
+    var opacitySaveGeneration by mutableStateOf(0)
+
+    var monthlyBudgetMicros by mutableStateOf(readPersistedBudgetMicros(settings))
+        private set
+
+    // HUD padrão na instalação nova (issue #277): lido na construção, antes de
+    // qualquer gravação, porque o coletor da janela principal grava
+    // `windowPlacement` e daí em diante toda execução parece antiga. A troca em
+    // si sai na primeira coleta, na bandeja.
+    var hudDefaultPending by mutableStateOf(markHudDefaultPendingOnFreshInstall(settings, hasUpdateReceipt))
+        private set
+
+    var hudMode by mutableStateOf(readPersistedHudMode(settings))
+        private set
+
+    // Modo somente cards: sem barra de título e sem rodapé. Booleano grava direto,
+    // sem o coletor com debounce que a opacidade e a escala precisam.
+    var cardsOnlyMode by mutableStateOf(readPersistedCardsOnlyMode(settings))
+        private set
+
+    var cardOrder by mutableStateOf(
+        normalizeCardOrder(readUsageTargetCollection(settings, CARD_ORDER_KEY), initialTargets)
+    )
+        private set
+
+    var minimizedCards by mutableStateOf(
+        if (settings.getStringOrNull(MINIMIZED_CARDS_KEY) == null) {
+            initialTargets.toSet()
+        } else {
+            readUsageTargetCollection(settings, MINIMIZED_CARDS_KEY).toSet()
+        }
+    )
+        private set
+
+    /** A moldura corrente, na forma que o menu de modos oferece. */
+    val windowMode: WindowMode
+        get() = when {
+            hudMode -> WindowMode.HUD
+            cardsOnlyMode -> WindowMode.CARDS_ONLY
+            else -> WindowMode.STANDARD
+        }
+
+    /**
+     * Barra HUD (issue #164): mutuamente exclusiva com o modo somente cards — só
+     * uma moldura reduzida por vez faz sentido. Qualquer escolha de modo encerra a
+     * troca pendente da instalação nova, inclusive a própria troca.
+     */
+    fun changeHudMode(enabled: Boolean) {
+        if (enabled) {
+            cardsOnlyMode = false
+            persistCardsOnlyMode(settings, false)
+        }
+        hudMode = enabled
+        persistHudMode(settings, enabled)
+        clearPendingHudDefault()
+    }
+
+    fun changeCardsOnlyMode(enabled: Boolean) {
+        clearPendingHudDefault()
+        if (enabled) {
+            hudMode = false
+            persistHudMode(settings, false)
+        }
+        cardsOnlyMode = enabled
+        persistCardsOnlyMode(settings, enabled)
+    }
+
+    fun changeWindowMode(mode: WindowMode) {
+        when (mode) {
+            WindowMode.STANDARD -> {
+                changeCardsOnlyMode(false)
+                changeHudMode(false)
+            }
+            WindowMode.CARDS_ONLY -> changeCardsOnlyMode(true)
+            WindowMode.HUD -> changeHudMode(true)
+        }
+    }
+
+    fun changeUiScale(percent: Int) {
+        uiScalePercent = clampUiScalePercent(percent)
+    }
+
+    fun changeReducedMotion(enabled: Boolean) {
+        reducedMotion = enabled
+        persistReducedMotion(settings, enabled)
+    }
+
+    fun changeTheme(preset: AppThemePreset) {
+        themePreset = preset
+        persistThemePreset(settings, preset)
+    }
+
+    fun changeLanguage(selected: AppLanguage) {
+        language = selected
+        settings.putString(LANGUAGE_KEY, selected.name)
+    }
+
+    /**
+     * A leitura real do sistema, que chega depois do primeiro quadro. Só grava
+     * quando ela diverge do que estava gravado no arranque.
+     */
+    fun applyResolvedAutoStart(resolved: Boolean) {
+        if (resolved != storedAutoStartPreference) {
+            settings.putBoolean(AUTO_START_KEY, resolved)
+        }
+        autoStartEnabled = resolved
+    }
+
+    /** O estado que o sistema realmente tem, gravado como a preferência. */
+    fun recordAutoStart(enabled: Boolean) {
+        autoStartEnabled = enabled
+        settings.putBoolean(AUTO_START_KEY, enabled)
+    }
+
+    fun changeAlwaysOnTop(enabled: Boolean) {
+        alwaysOnTopEnabled = enabled
+        settings.putBoolean(ALWAYS_ON_TOP_KEY, enabled)
+    }
+
+    fun changeWindowOpacity(percent: Int) {
+        windowOpacityPercent = clampWindowOpacityPercent(percent)
+    }
+
+    fun changeMonthlyBudget(micros: Long) {
+        monthlyBudgetMicros = micros
+        persistBudgetMicros(settings, micros)
+    }
+
+    fun moveCard(target: UsageTargetKey, targetIndex: Int, visibleTargets: Set<UsageTargetKey>) {
+        val updated = moveVisibleCardToIndex(
+            currentOrder = cardOrder,
+            visibleTargets = visibleTargets,
+            target = target,
+            targetIndex = targetIndex
+        )
+        cardOrder = updated
+        writeUsageTargetCollection(settings, CARD_ORDER_KEY, updated)
+    }
+
+    fun toggleCardMinimized(target: UsageTargetKey) {
+        val updated = if (target in minimizedCards) minimizedCards - target else minimizedCards + target
+        minimizedCards = updated
+        writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, updated)
+    }
+
+    /** Conta que sumiu sai da ordem e dos minimizados; conta nova entra na ordem. */
+    fun keepCardsOf(availableTargets: List<UsageTargetKey>) {
+        cardOrder = normalizeCardOrder(cardOrder, availableTargets)
+        minimizedCards = minimizedCards.filterTo(linkedSetOf()) { target -> target in availableTargets }
+        writeUsageTargetCollection(settings, CARD_ORDER_KEY, cardOrder)
+        writeUsageTargetCollection(settings, MINIMIZED_CARDS_KEY, minimizedCards)
+    }
+
+    private fun clearPendingHudDefault() {
+        if (hudDefaultPending) {
+            hudDefaultPending = false
+            clearHudDefaultPending(settings)
+        }
+    }
+}

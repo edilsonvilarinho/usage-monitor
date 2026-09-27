@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
+import com.usagemonitor.domain.repository.UsageExportEncoder
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
@@ -57,6 +58,8 @@ class CodexCliSessionsViewModel(
     private val getSessions: GetCodexCliSessionsUseCase,
     private val getDetail: GetCodexCliSessionDetailUseCase,
     private val exportWriter: UsageExportWriter? = null,
+    /** Serialização CSV/JSON; sem ela a exportação fica desligada, como sem [exportWriter]. */
+    private val exportEncoder: UsageExportEncoder? = null,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: Clock = Clock.System,
     private val liveIntervalMillis: Long? = null,
@@ -177,8 +180,10 @@ class CodexCliSessionsViewModel(
 
     fun exportCurrent(format: UsageExportFormat) {
         val writer = exportWriter ?: return
+        val encoder = exportEncoder ?: return
         val current = _uiState.value as? CodexCliSessionsUiState.Success ?: return
         val request = exportRequestForCodexCliSessions(
+            encoder = encoder,
             sessions = current.sessions,
             range = current.range,
             format = format,

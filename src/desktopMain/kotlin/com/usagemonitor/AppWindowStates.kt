@@ -1,0 +1,253 @@
+package com.usagemonitor
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogState
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.rememberDialogState
+import androidx.compose.ui.window.rememberWindowState
+import com.russhwolf.settings.PreferencesSettings
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.ui.window.Window
+import io.ktor.client.request.get
+import kotlin.math.roundToInt
+
+/** O estado de cada janela do app: tamanho, posição e disposição. */
+internal class AppWindowStates(
+    val main: WindowState,
+    val history: WindowState,
+    val cliSessions: WindowState,
+    val codexCliSessions: WindowState,
+    val teamUsage: WindowState,
+    val teamPresence: WindowState,
+    val teamKeys: DialogState,
+    val settings: DialogState,
+    /** A janela principal tinha tamanho gravado no arranque, antes de o coletor gravar o atual. */
+    val mainHadPersistedSize: Boolean
+)
+
+/**
+ * Os estados das janelas, lidos do que foi gravado. A escala entra no tamanho
+ * default de cada uma quando não há nada gravado; tamanho gravado é escolha do
+ * usuário e não é reescalado. Todas são presas à área útil da tela: nenhuma tem
+ * moldura do sistema, então nascer maior que o monitor é nascer sem botão de
+ * fechar.
+ */
+@Composable
+internal fun rememberAppWindowStates(
+    settings: PreferencesSettings,
+    uiScalePercent: Int,
+    workArea: ScreenWorkArea
+): AppWindowStates {
+    val scale = uiScaleFactor(uiScalePercent)
+    val persistedMain = remember(settings) { readPersistedMainWindowState(settings) }
+    val persistedHistory = remember(settings) { readPersistedHistoryWindowState(settings) }
+    val persistedCliSessions = remember(settings) { readPersistedCliSessionsWindowState(settings) }
+    val persistedTeamUsage = remember(settings) { readPersistedTeamUsageWindowState(settings) }
+    val persistedTeamPresence = remember(settings) { readPersistedTeamPresenceWindowState(settings) }
+    return AppWindowStates(
+        main = rememberPersistedMainWindowState(persistedMain, uiScalePercent, workArea),
+        history = rememberPersistedHistoryWindowState(persistedHistory, uiScalePercent, workArea),
+        cliSessions = rememberPersistedCliSessionsWindowState(persistedCliSessions, uiScalePercent, workArea),
+        codexCliSessions = rememberWindowState(
+            size = fitWindowSize(DpSize(980.dp * scale, 640.dp * scale), workArea)
+        ),
+        teamUsage = rememberPersistedTeamUsageWindowState(persistedTeamUsage, uiScalePercent, workArea),
+        teamPresence = rememberPersistedTeamPresenceWindowState(persistedTeamPresence, uiScalePercent, workArea),
+        teamKeys = rememberDialogState(size = fitWindowSize(DpSize(760.dp * scale, 640.dp * scale), workArea)),
+        // 820 de largura: as Configurações têm navegação lateral de 150dp, e em
+        // 620 o conteúdo ficava com menos de 470 — estreito demais para as
+        // linhas de rótulo + controle das seções de Time.
+        settings = rememberDialogState(size = fitWindowSize(DpSize(820.dp * scale, 720.dp * scale), workArea)),
+        mainHadPersistedSize = persistedMain.widthDp != null
+    )
+}
+
+/** A moldura de uma janela que pode ser gravada: posição, tamanho e disposição. */
+private data class WindowFrame(val position: WindowPosition, val size: DpSize, val placement: WindowPlacement)
+
+/**
+ * Grava a geometria das janelas com debounce de 250ms — o arrasto emitiria uma
+ * gravação por pixel. A principal grava também a posição (issue #273: sem ela a
+ * janela voltava ao monitor principal a cada abertura) e publica se está
+ * minimizada, que é o que suspende a leitura do time no semáforo.
+ */
+@OptIn(FlowPreview::class)
+@Composable
+internal fun PersistAppWindowStates(
+    windows: AppWindowStates,
+    settings: PreferencesSettings,
+    isAppVisible: MutableStateFlow<Boolean>
+) {
+    LaunchedEffect(windows.main, settings) {
+        snapshotFlow { windows.main.isMinimized to mainWindowSnapshotOf(windows.main) }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { (isMinimized, snapshot) ->
+                isAppVisible.value = !isMinimized
+                persistMainWindowState(settings = settings, snapshot = snapshot)
+            }
+    }
+    PersistWindowFrame(windows.history, settings) { frame ->
+        persistHistoryWindowState(
+            settings = settings,
+            snapshot = HistoryWindowSnapshot(
+                widthDp = frame.size.width.value,
+                heightDp = frame.size.height.value,
+                xDp = frame.xDp,
+                yDp = frame.yDp,
+                placement = frame.placement
+            )
+        )
+    }
+    PersistWindowFrame(windows.cliSessions, settings) { frame ->
+        persistCliSessionsWindowState(
+            settings = settings,
+            snapshot = CliSessionsWindowSnapshot(
+                widthDp = frame.size.width.value,
+                heightDp = frame.size.height.value,
+                xDp = frame.xDp,
+                yDp = frame.yDp,
+                placement = frame.placement
+            )
+        )
+    }
+    PersistWindowFrame(windows.teamUsage, settings) { frame ->
+        persistTeamUsageWindowState(
+            settings = settings,
+            snapshot = TeamUsageWindowSnapshot(
+                widthDp = frame.size.width.value,
+                heightDp = frame.size.height.value,
+                xDp = frame.xDp,
+                yDp = frame.yDp,
+                placement = frame.placement
+            )
+        )
+    }
+    PersistWindowFrame(windows.teamPresence, settings) { frame ->
+        persistTeamPresenceWindowState(
+            settings = settings,
+            snapshot = TeamPresenceWindowSnapshot(
+                widthDp = frame.size.width.value,
+                heightDp = frame.size.height.value,
+                xDp = frame.xDp,
+                yDp = frame.yDp,
+                placement = frame.placement
+            )
+        )
+    }
+}
+
+private val WindowFrame.xDp: Float?
+    get() = if (position.isSpecified) position.x.value else null
+
+private val WindowFrame.yDp: Float?
+    get() = if (position.isSpecified) position.y.value else null
+
+@OptIn(FlowPreview::class)
+@Composable
+private fun PersistWindowFrame(state: WindowState, settings: PreferencesSettings, persist: (WindowFrame) -> Unit) {
+    LaunchedEffect(state, settings) {
+        snapshotFlow { WindowFrame(state.position, state.size, state.placement) }
+            .distinctUntilChanged()
+            .debounce(250.milliseconds)
+            .collect { frame -> persist(frame) }
+    }
+}
+
+@Composable
+internal fun rememberPersistedMainWindowState(
+    persistedState: PersistedMainWindowState,
+    uiScalePercent: Int,
+    workArea: ScreenWorkArea
+) = when {
+    persistedState.widthDp != null && persistedState.heightDp != null -> {
+        val desired = DpSize(width = persistedState.composeWidth, height = persistedState.composeHeight)
+        // O monitor em que a janela ficou, não o primário (issue #273).
+        val area = remember(persistedState, workArea) {
+            workAreaForPosition(persistedState.xDp?.dp, persistedState.yDp?.dp, desired, fallback = workArea)
+        }
+        val size = fitWindowSize(desired, area)
+        val x = persistedState.xDp
+        val y = persistedState.yDp
+        rememberWindowState(
+            placement = persistedState.composePlacement,
+            size = size,
+            position = if (x != null && y != null) {
+                fitWindowPosition(x = x.dp, y = y.dp, size = size, workArea = area)
+            } else {
+                WindowPosition.PlatformDefault
+            }
+        )
+    }
+
+    persistedState.placement == PersistedWindowPlacement.MAXIMIZED -> {
+        rememberWindowState(
+            placement = persistedState.composePlacement
+        )
+    }
+
+    // 800×600 é o default do próprio `rememberWindowState`, agora explícito para
+    // acompanhar a escala: na primeira execução não há tamanho persistido, e sem
+    // isto o app subiria com a moldura de 100% e o conteúdo de 115%.
+    else -> rememberWindowState(
+        size = fitWindowSize(
+            DpSize(
+                width = 800.dp * uiScaleFactor(uiScalePercent),
+                height = 600.dp * uiScaleFactor(uiScalePercent)
+            ),
+            workArea
+        )
+    )
+}
+
+/**
+ * Piso de arrasto da janela AWT, em `Dp` de interface.
+ *
+ * As três janelas de lista — Sessões CLI, Sessões do time e Presença — têm faixa
+ * de legendas de coluna sobre linhas de largura fixa. Abaixo do orçamento de
+ * colunas a linha quebra e as colunas param de alinhar; o tamanho persistido não
+ * protege nada, porque quem arrasta a borda é o usuário.
+ *
+ * A unidade da janela AWT é a mesma `Dp` do `WindowState` — o Compose Desktop
+ * converte 1:1 (`setSizeImpl` usa `size.width.value`), e a densidade do sistema
+ * fica só no desenho. O que entra aqui é a **escala da interface**, pelo mesmo
+ * motivo de `scaledWindowSize`: ela multiplica a densidade do conteúdo, então a
+ * 150% a mesma janela mostra menos colunas e o piso precisa subir junto.
+ *
+ * O piso também é preso à área útil: a 150% ele daria 1410dp de largura, mais que
+ * um monitor de 1366, e um piso maior que a tela não é piso — é janela que nem
+ * arrastando a borda cabe.
+ *
+ * Um efeito só, e não três cópias: seriam três lugares para o orçamento divergir.
+ */
+@Composable
+internal fun ApplyWindowMinimumSize(
+    window: java.awt.Window,
+    widthDp: Int,
+    heightDp: Int,
+    uiScalePercent: Int,
+    workArea: ScreenWorkArea
+) {
+    val scale = uiScaleFactor(uiScalePercent)
+    LaunchedEffect(window, scale, workArea, widthDp, heightDp) {
+        val minimum = fitWindowSize(
+            DpSize(width = widthDp.dp * scale, height = heightDp.dp * scale),
+            workArea
+        )
+        window.minimumSize = java.awt.Dimension(
+            minimum.width.value.roundToInt(),
+            minimum.height.value.roundToInt()
+        )
+    }
+}

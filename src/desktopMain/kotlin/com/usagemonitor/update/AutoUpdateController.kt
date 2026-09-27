@@ -6,7 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.CURRENT_APP_VERSION
-import com.usagemonitor.data.repository.UPDATE_FEED_URL_ENV_VAR
+import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.shouldDiscardUpdateArtifacts
@@ -60,10 +60,8 @@ internal const val LINUX_AUTO_UPDATE_SHIPPED = true
 /**
  * Tudo que a janela principal precisa saber sobre atualização automática.
  *
- * Existe como classe própria, e não como mais um punhado de `remember` dentro do
- * `main()`, porque aquele composable já está no limite do backend JVM: a análise
- * de fluxo de controle sobre o método inteiro estoura em `OutOfMemoryError`
- * dentro do ASM. O `main()` ganha **uma** chamada.
+ * Existe como classe própria, e não como um punhado de `remember` na raiz de
+ * composição: quem a consome ganha **uma** chamada.
  */
 internal class AutoUpdateController(
     val installer: AppUpdateInstaller?,
@@ -105,9 +103,9 @@ internal class AutoUpdateController(
     /**
      * Encerramento ordenado, ligado depois da construção.
      *
-     * A indireção existe porque o `DashboardViewModel` é criado antes de o
-     * `main()` montar a rotina de saída, e a alternativa seria mais um estado
-     * mutável dentro do composable que não pode crescer.
+     * A indireção existe porque o `DashboardViewModel` é criado antes de
+     * `runUsageMonitor` montar a rotina de saída, e a alternativa seria um estado
+     * mutável a mais na raiz de composição.
      */
     private var restartAction: () -> Unit = {}
 
@@ -123,8 +121,8 @@ internal class AutoUpdateController(
 /**
  * Valor corrente do interruptor, como estado de composição.
  *
- * Função de extensão em vez de um `collectAsState` no `main()`: ali não pode
- * entrar mais estado, e uma chamada não é estado.
+ * Função de extensão em vez de um `collectAsState` na raiz de composição: uma
+ * chamada não é estado.
  */
 @Composable
 internal fun AutoUpdateController.isEnabled(): Boolean = enabled.collectAsState().value
@@ -163,8 +161,7 @@ internal fun rememberAutoUpdateController(
         )
     }
 
-    // Poda do artefato já aplicado. Mora aqui, e não no `main()`, porque aquele
-    // composable está no limite do backend JVM e não pode receber estado novo;
+    // Poda do artefato já aplicado. Mora aqui, junto do resto da atualização;
     // e num LaunchedEffect, e não no corpo do `remember` acima, porque apagar
     // arquivo é escrita e escrita não vai na thread de composição.
     //

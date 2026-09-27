@@ -30,7 +30,7 @@ import kotlinx.datetime.Instant
  * Uma conta na barra HUD: o que o notch mostra em repouso e o que o painel
  * mostra aberto.
  *
- * Era montada inline em `main()`, que está no limite do backend JVM e onde a
+ * Era montada inline no antigo `main()` gigante (quebrado na #298), onde a
  * regra não tinha teste nenhum além do que a tela deixava ver. Aqui ela é função
  * pura de `commonMain`, e a janela da HUD só a consome.
  */

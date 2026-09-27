@@ -23,8 +23,8 @@ import com.usagemonitor.presentation.viewmodel.recordFailure
 /**
  * Decide, busca e lembra: tudo que a janela de novidades precisa.
  *
- * Classe própria pelo mesmo motivo do [AutoUpdateController]: o `main()` está no
- * limite do backend JVM e recebe **uma** chamada, não estado novo.
+ * Classe própria pelo mesmo motivo do [AutoUpdateController]: a raiz de
+ * composição recebe **uma** chamada, não estado novo.
  */
 internal class ReleaseNotesController(
     /** Notas a mostrar. `null` enquanto não há o que mostrar — que é o caso normal. */

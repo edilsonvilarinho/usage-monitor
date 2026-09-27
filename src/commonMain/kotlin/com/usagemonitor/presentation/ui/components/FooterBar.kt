@@ -64,7 +64,7 @@ const val FOOTER_EXPORT_SNAPSHOT_TEST_TAG = "footerExportSnapshot"
  *
  * **Enum novo, e as preferências continuam sendo dois booleanos.** `cardsOnlyMode`
  * e `hudMode` seguem separados em `PreferencesSettings`, e a exclusão mútua entre
- * eles continua sendo regra dos setters em `Main.kt` — este tipo descreve o que o
+ * eles continua sendo regra dos setters em `AppShellState.kt` — este tipo descreve o que o
  * **controle** oferece, não como o estado é guardado.
  *
  * Os rótulos são os **mesmos** das Configurações. Dois nomes para a mesma moldura

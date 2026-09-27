@@ -37,7 +37,7 @@ open class RemoteApiDataSource(
         NoOpAnthropicCreditsDiagnosticsRecorder
 ) {
 
-    // Mesmas flags do `Json` do ContentNegotiation em Main.kt: o caminho de
+    // Mesmas flags do `Json` do ContentNegotiation em HttpClientFactory.kt: o caminho de
     // diagnóstico não pode desserializar sob regras diferentes das do caminho
     // normal, senão registraria um comportamento que a coleta não tem.
     private val diagnosticsJson = Json {

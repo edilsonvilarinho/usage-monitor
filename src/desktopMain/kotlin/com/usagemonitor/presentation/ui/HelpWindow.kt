@@ -22,8 +22,7 @@ import com.usagemonitor.uiScaleFactor
 /**
  * Janela de ajuda: as funcionalidades, o que cada uma faz e como ligá-la.
  *
- * Composable própria, e não um bloco dentro do `main()`: aquele composable está
- * no limite do backend JVM. O `main()` ganha uma chamada.
+ * Composable própria: quem a abre ganha uma chamada, não um bloco.
  *
  * O tópico escolhido mora **aqui**, e não em `HelpContent`: é ele que decide
  * qual demo o tocador carrega. É também aqui que o laço de quadros roda — dentro

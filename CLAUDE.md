@@ -53,7 +53,7 @@ KMP Desktop (JVM único alvo). Código organizado em três camadas com dependên
 | Source set | Conteúdo |
 |---|---|
 | `commonMain` | domain + data (exceto leitura de ficheiros) + presentation/UI |
-| `desktopMain` | `LocalCredentialDataSource` (usa `java.io.File`) + `Main.kt` (DI + janela) |
+| `desktopMain` | `LocalCredentialDataSource` (usa `java.io.File`) + `Main.kt` (arranque e composição dos hosts) + `AppGraph.kt` (DI) + hosts de janela |
 | `commonTest` | Testes unitários de domain, mappers e ViewModel |
 | `desktopTest` | Testes de componente Compose (`runDesktopComposeUiTest`) |
 
@@ -87,7 +87,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
   - **`is_enabled` falso continua escondendo a linha em silêncio** — é o estado normal de quem não contratou créditos, e avisar ali viraria alerta permanente. Só `LIMIT_ABSENT` e `UNSUPPORTED_EXPONENT` (`AnthropicCreditsOutcome.signalsFailure`) viram `ApiUsageNotice.EXTRA_CREDITS_UNAVAILABLE`, que a `ApiUsageCard` mostra **também com o card minimizado**: foi o card fechado que escondeu o episódio. O aviso vive no **cabeçalho**, que é composto nos dois estados — ver `CardNoticeHint`.
   - **Expoente monetário diferente de 2 não vira cota.** `formatCents` assume duas casas; aceitar outro expoente mostraria o valor errado por um fator de dez, o que é pior que omitir a linha.
   - **Diagnóstico opt-in** (`USAGE_MONITOR_DEBUG_ANTHROPIC_CREDITS=1` → `~/.usage-monitor/diagnostics/anthropic-credits.jsonl`, mesmo desenho do recorder do Codex): guarda os nós `extra_usage` e `spend` **crus**, porque campo derivado não revela campo renomeado. Com o registro desligado o corpo continua sendo lido uma vez só, pelo `ContentNegotiation`.
-- `MiniMaxRepositoryImpl`, `DeepSeekRepositoryImpl` e `OpenCodeGoRepositoryImpl` recebem o leitor da chave por injeção; no desktop ele lê exclusivamente `LocalApiKeyDataSource`. Nunca hardcode credenciais nem leia variáveis de ambiente para essas integrações. O conjunto das fontes que dependem de chave é `API_KEY_DEPENDENT_SOURCES` (`Main.kt`), e não um literal repetido: ele já tinha dois donos — o filtro de arranque e `requiresApiKey` das Configurações —, e o terceiro seria onde a fonte seguinte ficaria esquecida.
+- `MiniMaxRepositoryImpl`, `DeepSeekRepositoryImpl` e `OpenCodeGoRepositoryImpl` recebem o leitor da chave por injeção; no desktop ele lê exclusivamente `LocalApiKeyDataSource`. Nunca hardcode credenciais nem leia variáveis de ambiente para essas integrações. O conjunto das fontes que dependem de chave é `API_KEY_DEPENDENT_SOURCES` (`AppPreferenceKeys.kt`), e não um literal repetido: ele já tinha dois donos — o filtro de arranque e `requiresApiKey` das Configurações —, e o terceiro seria onde a fonte seguinte ficaria esquecida.
 - Ambos os repos usam `Result.runCatching { }` para encapsular falhas.
 - **OpenCode Go** (`OpenCodeGoRepositoryImpl` + `OpenCodeGoMapper`; plano [`opencode-go-execucao.md`](docs/planos/opencode-go-execucao.md), issue #124): a assinatura paga, lida de `GET /zen/go/v1/usage` com a chave da API do OpenCode. É **fonte própria** (`ApiSource.OPENCODE_GO`), ao lado de `OPENCODE`, que é o plano gratuito do Zen lido do SQLite local — exceção declarada à regra de não criar valor em enum existente, pela mesma razão de `AppUpdateSupport`: os cinco `when` exaustivos sobre `ApiSource` são justamente os pontos que a fonte nova precisa preencher, e o erro de compilação garante que nenhum ficou para trás. Reaproveitar `OPENCODE` faria `isObservedActivitySource()` desviar o card para o resumo sem barras, misturaria requisições com percentual, e ignoraria que uma máquina pode ter uma das duas sem a outra.
   - **O acento é reusado, não é um sétimo token.** `accentColorFor` manda `OPENCODE` e `OPENCODE_GO` para `accents.opencode`: o acento identifica o **fornecedor**, o sistema visual fixa seis identidades e diz que elas não mudam, e um sétimo tom teria de passar AA 4,5:1 nas duas superfícies mantendo 20° dos outros seis. Quem separa os cards é o título.
@@ -120,7 +120,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
   - Instalação, versão, login e disjuntor são `AntigravityUsageFailureKind` e contam como configuração (sem toast, banner sem "Tentar novamente"). Timeout e saída ilegível continuam falha comum.
 - **Proxy HTTP corporativo** (`ProxySettings.kt` + `ProxyResolution.kt` + `LocalProxySettingsDataSource.kt` + `HttpClientFactory.kt`; issue #174): configuração de proxy para o `HttpClient` único do app, que até então não tinha nenhuma. Precedência resolvida por `resolveEffectiveProxy`: manual explicitamente ligado (`ProxySettings.useEnvironmentProxy = false`) vence sobre `HTTPS_PROXY`/`HTTP_PROXY` do ambiente (`parseProxyEnvironmentValue`, convenção de shell — curl, npm, pip —, não uma API documentada), que vence sobre nenhum proxy. `NO_PROXY` fica fora do escopo.
   - **Só Basic auth.** NTLM exigiria dependência própria que o OkHttp não traz nativamente, e a própria issue trata como caso de borda a validar só com proxy corporativo real. Documentado como limitação na própria aba, não escondido.
-  - **A configuração só vale depois de reiniciar o app.** O `httpClient` compartilhado (`Main.kt`, `buildHttpClient`) é montado uma única vez no arranque, com o proxy já resolvido, e é usado por 5+ consumidores com laços próprios (dashboard, sincronização de time, atualização automática) — recriar o engine em runtime arriscaria `ClosedException` numa requisição in-flight de qualquer um deles. Por isso `LocalProxySettingsDataSource` é lido **antes** do bloco do `httpClient`, não depois como os demais data sources de configuração.
+  - **A configuração só vale depois de reiniciar o app.** O `httpClient` compartilhado (`AppGraph.kt`, `buildHttpClient`) é montado uma única vez no arranque, com o proxy já resolvido, e é usado por 5+ consumidores com laços próprios (dashboard, sincronização de time, atualização automática) — recriar o engine em runtime arriscaria `ClosedException` numa requisição in-flight de qualquer um deles. Por isso `LocalProxySettingsDataSource` é lido **antes** do bloco do `httpClient`, não depois como os demais data sources de configuração.
   - **"Testar conexão" nunca usa o client compartilhado.** Monta um `HttpClient` efêmero com o valor corrente de `proxySettingsFlow` (já commitado pelos campos da seção, mesmo sem reiniciar) contra um endpoint leve e sem credencial (`https://api.github.com/zen`), e fecha o client depois — é a única forma de dar feedback imediato sem esperar o reinício.
   - **O `Authenticator` do proxy verifica se a requisição já carrega `Proxy-Authorization`** antes de responder ao desafio 407 de novo: sem esse guard, uma senha errada faz o OkHttp reenviar a mesma credencial recusada para sempre. HTTP 407 chega como resposta HTTP normal (`RemoteApiDataSource.requireSuccess` já vira `IllegalStateException`) e cai no mesmo mecanismo de marcador por substring dos demais status (`isProxyAuthIssue`, conta como `isConfigurationIssue` — é credencial errada, só que do proxy).
   - **Falha de conectividade (DNS, timeout de conexão, proxy inalcançável) é classificada por TIPO de exceção, não por substring da mensagem** — texto de `ConnectException`/`SocketTimeoutException` varia por JVM e SO. A checagem mora em `DashboardViewModel.handleTargetFailure`, o funil único de toda falha de coleta, e embute um marcador fixo (`NETWORK_CONNECTIVITY_MARKER`, mesmo desenho de `HTTP_RATE_LIMIT_MARKER`) que `UiApiError.isConnectivityIssue`/`warningFor` consomem por substring — sem precisar de um enum de erro novo. Categoria própria, **fora** de `isConfigurationIssue`: a causa não é credencial errada, e classificar como configuração orientaria a revisar login em vez de proxy.
@@ -187,7 +187,7 @@ Núcleo puro — **zero imports de Ktor, Compose ou bibliotecas externas**.
 
 - **Comparativo período a período** (`UsagePeriodComparison`): a leitura do histórico passou a começar em `HistoryRange.previousWindowStart`, e os pontos anteriores **não entram no gráfico** — só no delta. Compara o **delta** de cada janela, nunca o acumulado: o acumulado zera no reset e a comparação viraria função de quando o reset caiu. Sem ponto na janela anterior não há comparação (zero ali significaria "não consumiu", quando foi "não havia dado"), e `changeRatio` é `null` com anterior zerado em vez de "infinito por cento". `TOTAL` não tem janela anterior. Série que só existe na janela anterior é descartada, e `lastUpdatedAt` continua sendo o carimbo da janela **corrente**.
 
-- **Alertas na bandeja** (`evaluateUsageAlerts` em `domain/entity/UsageAlert.kt` + `UsageAlertViewModel` + `Tray` no `Main.kt`): notificação nativa quando uma cota cruza um limiar (default 75/90/100) ou uma sessão CLI satura. A decisão é **função pura** — entra `UiState.Success` (que já traz `riskSummaries`), o `SessionPulse` mesclado e o estado anterior; sai a lista a emitir e o estado novo. O view model **não tem laço próprio**: reage às emissões do polling de 10min e da passada de 30s que já existem.
+- **Alertas na bandeja** (`evaluateUsageAlerts` em `domain/entity/UsageAlert.kt` + `UsageAlertViewModel` + `Tray` no `AppTrayHost.kt`): notificação nativa quando uma cota cruza um limiar (default 75/90/100) ou uma sessão CLI satura. A decisão é **função pura** — entra `UiState.Success` (que já traz `riskSummaries`), o `SessionPulse` mesclado e o estado anterior; sai a lista a emitir e o estado novo. O view model **não tem laço próprio**: reage às emissões do polling de 10min e da passada de 30s que já existem.
   - **`UsageAlertState` é a dedup**, e sem ela o mesmo alerta sairia a cada coleta. A chave da janela é `QuotaAlertScope` (alvo + rótulo + `periodType`), **sem** o `periodEndAt`: o reset entra como valor guardado e a comparação passa por `isSamePeriod`, a mesma tolerância de 5 min que o histórico usa contra o jitter de ~1s do `resets_at`. Comparar o reset por igualdade rearmaria o alerta a cada poll.
   - **Cota vencida não alerta** (`isExpiredAt`): a janela descreve um período que já não existe.
   - **O limiar é piso**: o percentual é truncado, não arredondado — 89,9% não cruzou 90%.
@@ -370,9 +370,38 @@ eram descobertas por acidente.
 
 ### Injeção de dependências
 
-Manual, em `Main.kt` (desktopMain). Sem framework.
+Manual, sem framework. `AppGraph.kt` monta data sources, repositórios e use cases (sequência
+`HttpClient(OkHttp)` → datasources → repos → use cases); `AppViewModels.kt` monta os view models e é
+o **dono único do encerramento** (`shutdown()`, idempotente), chamado pela saída do app, pelo
+`onDispose` da composição e pelo shutdown hook — antes eram três cópias divergentes, o hook não
+fechava o índice do Codex e a saída pela janela não fechava o `profileRegistry`.
+`Main.kt` só faz o arranque e compõe os hosts (`MainWindowHost`, `ModalWindowsHost`,
+`SettingsWindowHost`, `AppTrayHost`, `HudWindowHost`); estado de shell e de modais mora em
+`AppShellState`/`AppModalState`. Os arquivos ficaram no pacote `com.usagemonitor`, e não num
+subpacote, para não abrir a visibilidade dos helpers `internal`/`private` que eles usam.
 
-**`main()` está no limite do backend JVM.** É um composable único de mais de mil linhas, e a análise de fluxo de controle sobre o método inteiro estourou em `OutOfMemoryError` dentro do ASM (`Back-end (JVM) Internal error: Couldn't transform method node`). O `gradle.properties` dá folga de heap ao daemon, mas isso é paliativo: a correção real é quebrar `main()` em composables menores. Antes de acrescentar mais estado ali, extraia. Sequência: `HttpClient(OkHttp)` → datasources → repos → use cases → `DashboardViewModel` → `DashboardScreen`.
+**O `gradle.properties` dá 3 GB ao daemon, e isso não é mais paliativo de um método gigante.** O
+`main()` de ~2.400 linhas foi quebrado (#298), e o build sem a folga continua em
+`OutOfMemoryError: GC overhead limit exceeded`, agora num composable de ~165 linhas: falta heap para
+o módulo, não para um método. Medida e números em
+[`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md).
+
+## Regras de arquitetura e tamanho
+
+Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que roda no `allTests`
+— a regra não depende de revisão lembrar dela.
+
+- **Direção das camadas por import**: `domain` não importa Ktor, Compose, `kotlinx.serialization`,
+  `java.io`, `data` nem `presentation`; `data` não importa `presentation` nem Compose;
+  `presentation` não importa `data`. Quando a apresentação precisa de algo de `data`, o contrato
+  sobe para o domain como porta e `data` o implementa (precedente: `UsageExportEncoder`).
+- **Arquivo de produção ≤ 800 linhas; função ≤ 300**, medida por varredura de chaves que ignora
+  comentário e string. Nada de arquivo-deus nem composable-deus: estado, efeitos e ações de uma
+  janela moram em arquivos próprios, e um host compõe.
+- **As exceções são uma lista congelada com teto exato** (`FILE_CEILINGS`/`FUNCTION_CEILINGS`), e
+  ela só encolhe. Crescer acima do teto falha; encolher falha pedindo para baixar o teto; cair
+  abaixo do limite falha pedindo para sair da lista. **Exceção nova não entra na lista** — divida o
+  arquivo.
 
 ## Integração com time (`server/`)
 
@@ -417,7 +446,7 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
   `LazyColumn`, e a célula carrega só o valor. Isso só se sustenta se a linha **não quebrar**: por
   isso elas são `Row` e não `FlowRow`, cada arquivo carrega o orçamento de largura no comentário das
   constantes `*_COLUMN_*`, e as três janelas de lista têm piso de arrasto (`*_MIN_WINDOW_WIDTH_DP`,
-  aplicado por `ApplyWindowMinimumSize` em `Main.kt`). Faixa de legendas sobre linha quebrada promete
+  aplicado por `ApplyWindowMinimumSize` em `AppWindowStates.kt`). Faixa de legendas sobre linha quebrada promete
   um alinhamento que o conteúdo não cumpre.
   - O que liberou a linha de sessão foi o **veredito de saturação sair do fluxo de colunas**: ele
     media 210dp e desceu para uma segunda linha da própria linha, junto da razão que o gerou. Foi ele
@@ -769,7 +798,7 @@ Configurações, por `Ctrl+Shift+M`/`Ctrl+Shift+H` ou pela bandeja, e por isso s
 acidente.
 - **`WindowMode` é enum novo, e as preferências continuam sendo dois booleanos.** `cardsOnlyMode` e
   `hudMode` seguem separados em `PreferencesSettings`, e a exclusão mútua continua sendo regra dos
-  setters em `Main.kt`: o enum descreve o que o **controle** oferece, não como o estado é guardado.
+  setters em `AppShellState.kt` (`changeHudMode`/`changeCardsOnlyMode`): o enum descreve o que o **controle** oferece, não como o estado é guardado.
   Os rótulos são os **mesmos** das Configurações — dois nomes para a mesma moldura fariam o passo da
   ajuda apontar para um controle que a tela chama de outra coisa.
 - **`AppMenu` é primitiva nova, e é `Popup` com a superfície deste sistema — não o `DropdownMenu` do
@@ -795,7 +824,7 @@ terceiro chrome, ainda mais discreto que o modo somente cards. A janela principa
 janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`). O desenho vem do
 Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
 **Não é valor novo em enum existente**: `hudMode` continua um booleano, exclusivo com o modo somente
-cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
+cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
 - **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos). **A janela mais
   longa fica por fora** (`HudAccount.rings`, issue #278): mensal, semanal, a janela curta, e saldo e
   créditos (`REPORTED`) por dentro. Na ordem da API a 5h ficava por fora da semanal, o contrário de
@@ -853,7 +882,7 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
 - **Os botões do card têm dona única** (`cardActionsFor`): histórico sempre, sessões CLI na Anthropic,
   sessões Codex CLI no Codex, uso e presença do time na conta marcada. A barra do card e o balão compõem
   o mesmo `CardActionButton`; o balão acrescenta "atualizar só esta conta". As ações moram em
-  `AppShellActions`, montadas **uma vez** em `main()` e consumidas pelo `DashboardScreen` e pelo host.
+  `AppShellActions`, montadas **uma vez** por `buildShellActions` (`AppShellActionsFactory.kt`) e consumidas pelo `DashboardScreen` e pelo host.
 - **Alças nas pontas** (`HudHandles.kt`), o `MoveHandle` e o `SettingsOrb` do Codenotch: com o notch
   aberto, a **mão** (ponta de perto) move — **só ela**: arrastando pelo corpo o notch saía do lugar
   quando a intenção era clicar num anel — e a **engrenagem** (ponta
@@ -873,7 +902,7 @@ cards por regra dos setters em `Main.kt`, e `HudEdge` é enum novo.
   caracteres do `szTip` do Windows.
 - **A ordem é a dos cards** (`orderedByCardOrder`, em `buildHudAccounts`), nunca a do risco: com o
   risco mandando, a primeira conta trocava sozinha. `buildHudAccounts` é função pura de `commonMain`
-  com teste próprio — a regra morava inline em `main()`, sem teste.
+  com teste próprio — a regra morava inline no antigo `main()`, sem teste.
 - **Forma** (`HudNotchShape`): reta e rente na borda, cantos de 14dp do lado de dentro e **ombros
   côncavos** de 8dp ligando os dois. Isenta do teto de raio de 10dp: é silhueta, não painel. Desenhada
   para o topo e levada às outras bordas refletindo/girando os pontos, de controle inclusive.
@@ -1063,7 +1092,7 @@ aviso: a tooltip lista todos, com bullet só a partir do segundo.
   em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
 
 **Regras que continuam valendo**: animação infinita só atrás de `AppMotionPolicy.continuous`
-(sem a política ela trava o `waitForIdle`); `ShimmerBox` foi apagado — não tinha chamador; nenhuma composable nova em `main()`; nenhum
+(sem a política ela trava o `waitForIdle`); `ShimmerBox` foi apagado — não tinha chamador; nenhuma composable nova em `runUsageMonitor` — ele só compõe os hosts; nenhum
 `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
 **Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em

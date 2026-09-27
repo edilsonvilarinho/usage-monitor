@@ -15,7 +15,7 @@ import kotlin.test.assertNull
  */
 class GitHubReleaseDtoTest {
 
-    // Mesma configuração do cliente montado em Main.kt.
+    // Mesma configuração do cliente montado em HttpClientFactory.kt.
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true

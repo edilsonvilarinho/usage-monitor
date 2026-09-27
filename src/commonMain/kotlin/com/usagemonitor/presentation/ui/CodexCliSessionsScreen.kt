@@ -21,7 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.presentation.ui.components.AppBanner

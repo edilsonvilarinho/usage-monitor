@@ -18,7 +18,8 @@ import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
-import com.usagemonitor.data.export.UsageExportFormat
+import com.usagemonitor.domain.entity.UsageExportFormat
+import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.startOfMonthMillis
 import com.usagemonitor.domain.usecase.GetCliUsageBreakdownUseCase
@@ -952,6 +953,7 @@ class CliSessionsViewModelTest {
             syncCliSessionIndex = SyncCliSessionIndexUseCase(repository),
             getCliUsageBreakdown = GetCliUsageBreakdownUseCase(repository, useCaseClock),
             exportWriter = exportWriter,
+            exportEncoder = DefaultUsageExportEncoder,
             getMonthlyBudgetStatus = GetMonthlyBudgetStatusUseCase(repository, useCaseClock),
             getStalledCliSessions = if (detectStalled) {
                 GetStalledCliSessionsUseCase(repository, useCaseClock)

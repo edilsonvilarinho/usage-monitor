@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.parseProxyEnvironmentValue
 /**
  * Nomes das variáveis de ambiente padrão de proxy — convenção de shell (curl,
  * npm, pip), não uma API própria do app. Mesmo padrão de nome de constante de
- * `UPDATE_FEED_URL_ENV_VAR` (`AppUpdateRepositoryImpl.kt`).
+ * `UPDATE_FEED_URL_ENV_VAR` (`AppUpdateRepository.kt`, domain).
  */
 const val HTTPS_PROXY_ENV_VAR = "HTTPS_PROXY"
 const val HTTP_PROXY_ENV_VAR = "HTTP_PROXY"

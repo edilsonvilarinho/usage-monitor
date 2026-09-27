@@ -1,6 +1,7 @@
 package com.usagemonitor.data.export
 
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.entity.UsageExportFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
