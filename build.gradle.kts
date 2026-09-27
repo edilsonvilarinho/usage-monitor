@@ -201,8 +201,8 @@ tasks.withType<Test>().configureEach {
 // O plugin do Kover estava aplicado desde sempre e NENHUMA tarefa de relatorio
 // era executada em lugar nenhum: o agente instrumentava toda passada de
 // `:desktopTest` -- 6 a 7 s medidos -- para produzir um numero que ninguem lia.
-// Agora a instrumentacao e opt-in por `-Pcoverage`, que e o que o passo da
-// `main` usa no CI. Sem a propriedade, a suite roda limpa.
+// Agora a instrumentacao e opt-in por `-Pcoverage`, que o CI liga em todo run
+// que executa a suite (issue #299). Sem a propriedade, a suite roda limpa.
 kover {
     currentProject {
         instrumentation {

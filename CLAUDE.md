@@ -28,7 +28,7 @@ gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"
 gradlew.bat allTests -PtestForks=4
 
 # Cobertura: a instrumentacao do Kover e opt-in, senao custa 6-7s por passada
-# para produzir um numero que ninguem le. So o push na `main` liga isto no CI.
+# para produzir um numero que ninguem le. No CI ela liga em todo run que executa a suite.
 gradlew.bat allTests -Pcoverage
 gradlew.bat koverHtmlReport -Pcoverage
 
@@ -1122,11 +1122,22 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   `yield()` + `Thread.sleep`, como `pauseForBackgroundWork` em `DashboardViewModelTestSupport`.
 - **Cobertura é relatório, não trava.** O Kover estava aplicado desde sempre instrumentando toda
   passada — 6 a 7 s medidos — sem que nenhuma tarefa de relatório rodasse em lugar nenhum. Agora a
-  instrumentação é **opt-in** por `-Pcoverage`, que só o push na `main` usa, e a mesma passada serve
-  suíte e relatório. Sem `koverVerify` e sem piso: limiar calibrado antes de a linha de base existir é
+  instrumentação é **opt-in** por `-Pcoverage`, que o CI liga em todo run que executa a suíte — PR
+  inclusive, desde a issue #299 —, e a mesma passada serve suíte e relatório. Sem `koverVerify` e sem piso: limiar calibrado antes de a linha de base existir é
   limiar calibrado no escuro. Linha de base de 2026-08-25: **82,7% de linhas**, 52,3% de ramos.
   `MainKt` fica fora do relatório por filtro — é o grafo de DI mais a janela, e contá-lo afunda o
   número sem apontar lacuna que se possa fechar.
+- **O push na `main` reaproveita a árvore verificada no PR** (jobs `gate` e `verified-tree` do
+  `ci.yml`; issue #299, plano [`ci-arvore-verificada-299-execucao.md`](docs/planos/ci-arvore-verificada-299-execucao.md)).
+  Depois do merge a `main` repetia ~11 min de Windows sobre o mesmo código. A identidade do código
+  testado é o **tree SHA**: no `pull_request` o checkout é `refs/pull/N/merge`, e o squash de um PR
+  cuja base não andou tem a mesma árvore — medido em 3 de 3 merges (#292, #296, #297). O PR verde
+  publica o artifact `ci-verified-tree-<tree>`; o `gate` o procura no push e, achando run de PR
+  verde do **próprio** repositório (fork edita o próprio `ci.yml` e forjaria o marcador), os jobs
+  publicam **NAO EXECUTADA** com o link do run. O gatilho `push` **não** foi removido: a `main` não
+  tem proteção de branch, e merge com a base adiantada gera árvore nunca testada — ali, e em push
+  direto (bump de release), marcador expirado (30 dias) ou falha de API, tudo roda. O preço é o
+  cache do Gradle: a `main` só grava quando roda de verdade.
 - **Cobertura alta não é a mesma coisa que costura certa.** `RemoteTeamDataSource` está em 1,9%
   porque os testes **herdam da classe real** e sobrescrevem os 20 métodos: o nome aparece em três
   arquivos de teste e nenhuma linha de HTTP executa (issue #94). Ao ver uma classe `open` com todo

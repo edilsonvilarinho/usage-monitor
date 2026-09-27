@@ -21,16 +21,110 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Issue #299: depois do merge, o push na `main` repetia a suite inteira (~11 min
+  # de Windows) sobre o MESMO codigo que o PR acabara de testar. A identidade do
+  # codigo testado e o tree SHA: no `pull_request` o checkout e
+  # `refs/pull/N/merge`, e squash/rebase/merge de um PR cuja base nao andou
+  # produzem na `main` um commit com a mesma arvore. O job `verified-tree`, no
+  # fim do run de PR, publica um artifact com o nome da arvore; este job o
+  # procura no push.
+  #
+  # Nao e o gatilho `push` removido: a `main` nao tem protecao de branch, entao
+  # um PR pode ser mergeado com a base ja adiantada, e a arvore resultante nunca
+  # foi testada. Nesse caso -- e em push direto (bump de release), PR de fork ou
+  # marcador expirado -- nao ha artifact com o nome certo e tudo roda.
+  #
+  # Qualquer falha de API vira `skip=false`: na duvida, roda.
+  gate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: read
+
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+      reason: ${{ steps.check.outputs.reason }}
+
+    steps:
+      - name: Check verified tree
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+
+          skip=false
+          reason=''
+          finish() {
+            echo "skip=$skip" >> "$GITHUB_OUTPUT"
+            echo "reason=$reason" >> "$GITHUB_OUTPUT"
+            echo "skip=$skip ${reason}"
+            exit 0
+          }
+
+          if [ "$EVENT" != "push" ]; then
+            finish
+          fi
+
+          if ! tree="$(gh api "repos/$REPO/git/commits/$SHA" --jq '.tree.sha')" || [ -z "$tree" ]; then
+            echo "Leitura da arvore de $SHA falhou; rodando tudo por precaucao."
+            finish
+          fi
+          echo "Arvore de $SHA: $tree"
+
+          # So artifact de run cujo head e este repositorio. PR de fork roda com o
+          # `ci.yml` do proprio fork e poderia publicar o marcador sem testar nada.
+          if ! runs="$(gh api "repos/$REPO/actions/artifacts?name=ci-verified-tree-$tree&per_page=100" \
+            --jq '.artifacts[] | select(.workflow_run.head_repository_id == .workflow_run.repository_id) | .workflow_run.id')"; then
+            echo "Consulta de artifacts falhou; rodando tudo por precaucao."
+            finish
+          fi
+
+          for run_id in $runs; do
+            if ! run="$(gh api "repos/$REPO/actions/runs/$run_id" \
+              --jq '[.event, (.conclusion // ""), .path, ((.pull_requests[0].number // "") | tostring)] | @tsv')"; then
+              continue
+            fi
+            IFS=$'\t' read -r event conclusion path pr <<< "$run"
+            echo "Candidato: run $run_id event=$event conclusion=$conclusion path=$path pr=$pr"
+            case "$path" in
+              .github/workflows/ci.yml*) ;;
+              *) continue ;;
+            esac
+            if [ "$event" = "pull_request" ] && [ "$conclusion" = "success" ]; then
+              skip=true
+              reason="arvore $tree ja verificada no run https://github.com/$REPO/actions/runs/$run_id"
+              if [ -n "$pr" ]; then
+                reason="$reason (PR #$pr)"
+              fi
+              finish
+            fi
+          done
+
+          echo "Nenhum run de PR verde com a arvore $tree; rodando tudo."
+          finish
+
   tests:
     # windows-latest, nao ubuntu: os testes de componente usam
     # `runDesktopComposeUiTest` e nunca rodaram headless em Linux. O repositorio
     # nao tem nenhuma configuracao de headless/xvfb, entao um alvo Linux seria
     # um gate nao comprovado.
     runs-on: windows-latest
+    needs: gate
 
     permissions:
       contents: read
       pull-requests: read
+
+    # `verified-tree` so publica o marcador quando a suite rodou de fato: PR que
+    # so mexeu em docs tem check verde sem teste nenhum, e isso nao verifica
+    # arvore nenhuma.
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
 
     steps:
       # Recorte por path feito aqui, e nao no gatilho. `gh` ja vem instalado no
@@ -40,12 +134,20 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GATE_SKIP: ${{ needs.gate.outputs.skip }}
+          GATE_REASON: ${{ needs.gate.outputs.reason }}
         run: |
           set -euo pipefail
 
           # Push so chega ate aqui quando o `paths-ignore` do gatilho ja aprovou.
+          # Resta saber se a arvore ja foi testada no PR (job `gate`).
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            if [ "$GATE_SKIP" = "true" ]; then
+              echo "relevant=false" >> "$GITHUB_OUTPUT"
+              echo "reason=$GATE_REASON" >> "$GITHUB_OUTPUT"
+            else
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
 
@@ -71,6 +173,7 @@ jobs:
           echo "relevant=$relevant changed=$changed"
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "reason=nenhum arquivo fora de server/, docs/ e *.md" >> "$GITHUB_OUTPUT"
 
       # Checkout sem condicao: `tools/ci/test-summary.mjs` precisa existir no disco
       # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
@@ -118,6 +221,12 @@ jobs:
           # So a `main` grava. Um cache no ref de uma PR pode ser reutilizado
           # por reexecucoes da mesma PR, mas nao por outras PRs nem pela branch
           # base; PRs ainda podem restaurar o cache da `main`.
+          #
+          # Com o job `gate` (issue #299) a `main` so grava quando roda de
+          # verdade: push direto (bump de release) ou merge com a base ja
+          # adiantada. Entre esses runs os PRs restauram o ultimo cache gravado,
+          # e uma dependencia nova fica fria ate o proximo. Trade-off aceito:
+          # cache velho degrada para download, nao para falha.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
@@ -126,21 +235,19 @@ jobs:
       - name: Run tests
         if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
-        env:
-          # A instrumentacao do Kover custa 6 a 7 s por passada (medido: 47 s
-          # limpo contra 53 s instrumentado) e so serve se alguem for ler o
-          # relatorio. Ela entra na `main`, onde o relatorio sai logo abaixo, e
-          # fica fora do PR. A mesma passada serve as duas coisas: gerar o
-          # relatorio num segundo `allTests` seria rodar a suite duas vezes.
-          WITH_COVERAGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           $ErrorActionPreference = 'Stop'
           # Tres forks nos 4 vCPU do runner (issue #295). A corrida de extracao
           # do Skiko que proibia forks no CI e resolvida por `extractSkikoNative`,
           # que o `build.gradle.kts` pendura antes do `desktopTest` com N > 1.
-          $arguments = @('allTests', '--build-cache', '-PtestForks=3')
-          if ($env:WITH_COVERAGE -eq 'true') { $arguments += '-Pcoverage' }
-          .\gradlew.bat @arguments
+          #
+          # `-Pcoverage` em todo run que executa a suite, PR inclusive. A
+          # instrumentacao custa 6 a 7 s (medido: 47 s limpo contra 53 s
+          # instrumentado) e antes so entrava no push da `main`; com a `main`
+          # reaproveitando a arvore verificada no PR (issue #299), o PR passou a
+          # ser o unico run da maioria das mudancas, e cobertura so na `main`
+          # quase nunca sairia. A mesma passada serve suite e relatorio.
+          .\gradlew.bat allTests --build-cache -PtestForks=3 -Pcoverage
 
       # O resumo sai em TODO run, verde inclusive. Um check que so diz
       # "Successful in 5m" nao permite saber se a suite rodou -- foi um verde de
@@ -152,22 +259,28 @@ jobs:
         shell: pwsh
         run: node tools/ci/test-summary.mjs --title "Desktop (allTests)" --glob "build/test-results/**/*.xml" --require
 
+      # O motivo vem do filtro: diff sem arquivo de desktop no PR, ou arvore ja
+      # verificada no PR quando e push na `main` (job `gate`). Por env, e nao
+      # interpolado no script, porque o texto carrega URL e parenteses.
       - name: Report skipped suite
         if: steps.filter.outputs.relevant != 'true'
         shell: pwsh
+        env:
+          SKIP_REASON: ${{ steps.filter.outputs.reason }}
+          EVALUATED: ${{ steps.filter.outputs.changed }}
         run: |
           node tools/ci/test-summary.mjs `
             --title "Desktop (allTests)" `
-            --skipped "nenhum arquivo fora de server/, docs/ e *.md" `
-            --evaluated "${{ steps.filter.outputs.changed }}"
+            --skipped $env:SKIP_REASON `
+            --evaluated "$env:EVALUATED"
 
-      # Relatorio de cobertura so no push para `main`. Sem `koverVerify` e sem
-      # piso: o limiar so faz sentido depois de a linha de base existir, e uma
-      # trava ligada no mesmo commit que produz o primeiro numero e uma trava
-      # calibrada no escuro. `:desktopTest` ja rodou instrumentado acima, entao
-      # aqui ele sai UP-TO-DATE e o passo so agrega.
+      # Relatorio de cobertura em todo run que executa a suite. Sem
+      # `koverVerify` e sem piso: o limiar so faz sentido depois de a linha de
+      # base existir, e uma trava ligada no mesmo commit que produz o primeiro
+      # numero e uma trava calibrada no escuro. `:desktopTest` ja rodou
+      # instrumentado acima, entao aqui ele sai UP-TO-DATE e o passo so agrega.
       - name: Coverage report
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
+        if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -175,7 +288,7 @@ jobs:
           node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
 
       - name: Upload coverage report
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.relevant == 'true'
+        if: steps.filter.outputs.relevant == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kover-report
@@ -206,6 +319,7 @@ jobs:
   # lendo o codigo.
   installer-scenarios:
     runs-on: windows-latest
+    needs: gate
 
     permissions:
       contents: read
@@ -225,12 +339,22 @@ jobs:
       - name: Detect installer changes
         id: filter
         shell: pwsh
+        env:
+          GATE_SKIP: ${{ needs.gate.outputs.skip }}
+          GATE_REASON: ${{ needs.gate.outputs.reason }}
         run: |
           $ErrorActionPreference = 'Stop'
+          # No push, o unico recorte e a arvore ja verificada no PR (job `gate`).
           if ('${{ github.event_name }}' -ne 'pull_request') {
-            "relevant=true" >> $env:GITHUB_OUTPUT
+            if ($env:GATE_SKIP -eq 'true') {
+              "relevant=false" >> $env:GITHUB_OUTPUT
+              "reason=$env:GATE_REASON" >> $env:GITHUB_OUTPUT
+            } else {
+              "relevant=true" >> $env:GITHUB_OUTPUT
+            }
             exit 0
           }
+          "reason=nenhuma mudanca em src/installer/ nem em src/desktopMain/kotlin/com/usagemonitor/update/" >> $env:GITHUB_OUTPUT
           git fetch --no-tags origin '${{ github.event.pull_request.base.ref }}'
           $changed = git diff --name-only "origin/${{ github.event.pull_request.base.ref }}...HEAD"
           # Falha do git nao pode virar "nada mudou": com ErrorActionPreference
@@ -350,10 +474,12 @@ jobs:
       - name: Report skipped scenarios
         if: steps.filter.outputs.relevant != 'true'
         shell: pwsh
+        env:
+          SKIP_REASON: ${{ steps.filter.outputs.reason }}
         run: |
           node tools/ci/test-summary.mjs `
             --title "Cenarios do instalador" `
-            --skipped "nenhuma mudanca em src/installer/ nem em src/desktopMain/kotlin/com/usagemonitor/update/"
+            --skipped $env:SKIP_REASON
 
   # Cenarios do `linux-updater.sh`. Job separado do `installer-scenarios`, que e
   # Windows: o roteiro daqui promove diretorios, espera PID e exercita rollback
@@ -368,6 +494,7 @@ jobs:
   linux-updater-scenarios:
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
+    needs: gate
 
     permissions:
       contents: read
@@ -406,10 +533,19 @@ jobs:
       - name: Detect linux updater changes
         id: filter
         shell: bash
+        env:
+          GATE_SKIP: ${{ needs.gate.outputs.skip }}
+          GATE_REASON: ${{ needs.gate.outputs.reason }}
         run: |
           set -uo pipefail
+          # No push, o unico recorte e a arvore ja verificada no PR (job `gate`).
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            if [ "$GATE_SKIP" = "true" ]; then
+              echo "relevant=false" >> "$GITHUB_OUTPUT"
+              echo "reason=$GATE_REASON" >> "$GITHUB_OUTPUT"
+            else
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
 
@@ -439,6 +575,7 @@ jobs:
           done
 
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+          echo "reason=nenhuma mudanca em src/desktopMain/resources/update/, src/installer/linux/ nem em src/desktopMain/kotlin/com/usagemonitor/update/" >> "$GITHUB_OUTPUT"
 
       # Um check verde que nao rodou cenario nenhum e indistinguivel de um que
       # rodou. O roteiro termina com "N verificacoes, M falhas", e essa linha vai
@@ -500,10 +637,60 @@ jobs:
       - name: Report skipped scenarios
         if: steps.filter.outputs.relevant != 'true'
         shell: bash
+        env:
+          SKIP_REASON: ${{ steps.filter.outputs.reason }}
         run: |
           {
             echo "## Cenarios do updater Linux (${{ matrix.name }}) -- NAO EXECUTADA"
             echo
-            echo "nenhuma mudanca em src/desktopMain/resources/update/, src/installer/linux/ nem em src/desktopMain/kotlin/com/usagemonitor/update/"
+            echo "$SKIP_REASON"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Par do job `gate`: publica o marcador de que a arvore deste run de PR passou
+  # por tudo. `needs` sem `if: always()` so roda com os tres jobs verdes; e o
+  # `relevant` do `tests` exige que a suite tenha rodado de fato -- check verde
+  # de PR que so mexeu em docs nao verifica arvore nenhuma.
+  #
+  # Artifact e nao cache: cache gravado em ref de PR nao e legivel pela `main`,
+  # e o artifact tem API de busca por nome e diz de qual run e repositorio veio,
+  # que e o que o `gate` confere. 30 dias de retencao; PR mergeado depois disso
+  # so perde o atalho, e a `main` roda tudo.
+  verified-tree:
+    if: github.event_name == 'pull_request' && needs.tests.outputs.relevant == 'true'
+    needs: [tests, installer-scenarios, linux-updater-scenarios]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Resolve tested tree
+        id: tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # No `pull_request`, `github.sha` e o commit de `refs/pull/N/merge`:
+          # exatamente o que o checkout dos outros jobs testou.
+          SHA: ${{ github.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          tree="$(gh api "repos/$REPO/git/commits/$SHA" --jq '.tree.sha')"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          printf 'tree=%s\ncommit=%s\npr=%s\nrun=%s\n' "$tree" "$SHA" "$PR" "${{ github.run_id }}" > verified-tree.txt
+          cat verified-tree.txt
+          {
+            echo "## Arvore verificada"
+            echo
+            echo "\`$tree\` (commit de merge \`$SHA\`). O push na \`main\` com esta mesma arvore pula a suite."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish verified tree marker
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-verified-tree-${{ steps.tree.outputs.tree }}
+          path: verified-tree.txt
+          if-no-files-found: error
+          retention-days: 30
