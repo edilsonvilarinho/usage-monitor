@@ -49,7 +49,7 @@ via `gh`.
 | # | Atividade | Comando | Resultado |
 |---|---|---|---|
 | A1 | Jobs `gate` e `verified-tree`, `needs`/motivo nos três jobs, cobertura em todo run que executa a suíte; CLAUDE.md, comentário do Kover e este plano | `actionlint -shellcheck= .github/workflows/ci.yml` (1.7.12); script do `gate` extraído do YAML e rodado contra a API real com `EVENT=push` e `SHA=686eaa3` | lint sem achado. Sem marcador: `skip=false`, "rodando tudo". Com o nome do artifact trocado por `test-reports` (existente, de run de PR verde): `skip=true` citando o run `36280893779`. `EVENT=pull_request`: `skip=false` |
-| A2 | Run do PR deste trabalho publica o marcador; push do merge pula a suíte | CI do PR + push na `main` | pendente |
+| A2 | Run do PR deste trabalho publica o marcador; push do merge pula a suíte | CI do PR #300 (run `36282413749`) + push de `578a901` na `main` (run `36282581911`) | PR verde em todos os jobs, artifact `ci-verified-tree-7a7de1125f1cf7872feedf31f8c370b9a2a3daed`; árvore de `578a901` = `7a7de11…`, igual. No push, `gate` com `skip=true … ja verificada no run …/36282413749`; `tests` e cenários publicaram **NAO EXECUTADA**. Run da `main` em **44 s** (00:28:05–00:28:49), contra ~11 min antes |
 | A3 | Caso negativo: próximo bump de release (push direto) roda completo e grava cache/cobertura | push do bump | pendente |
 
 ## Problemas em aberto e riscos
