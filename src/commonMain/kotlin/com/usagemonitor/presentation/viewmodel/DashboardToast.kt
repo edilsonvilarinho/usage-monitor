@@ -1,10 +1,13 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
+import kotlinx.datetime.Instant
 
 sealed interface DashboardToast {
     data class RateLimit(
-        val source: ApiSource
+        val source: ApiSource,
+        /** Até quando a fonte fica sem ir à rede; nulo quando não há backoff armado. */
+        val retryAt: Instant? = null
     ) : DashboardToast
 
     data class ServiceUnavailable(

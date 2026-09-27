@@ -107,6 +107,33 @@ class AnthropicRepositoryImplTest {
         assertEquals("b@example.com", stats.accountContext?.email)
     }
 
+    @Test
+    fun `a failed token refresh never reaches the usage endpoint`() = runTest {
+        // Token vencido recebe 429 com `Retry-After` de uma hora no lugar de 401
+        // (issue #269): mandá-lo pareceria rate limit durante uma hora.
+        var apiCalls = 0
+        val repository = AnthropicRepositoryImpl(
+            credentialDataSource = object : CredentialDataSource {
+                override suspend fun loadAnthropicSession(): AnthropicSession {
+                    throw com.usagemonitor.domain.entity.RateLimitedException("Token refresh HTTP 429: {}")
+                }
+
+                override suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean = true
+            },
+            apiDataSource = object : RemoteApiDataSource(noopHttpClient()) {
+                override suspend fun fetchAnthropicUsage(accessToken: String): AnthropicUsageResponse {
+                    apiCalls += 1
+                    return successResponse()
+                }
+            }
+        )
+
+        val error = repository.getUsage().exceptionOrNull()
+
+        assertTrue(error is com.usagemonitor.domain.entity.RateLimitedException, "erro: $error")
+        assertEquals(0, apiCalls)
+    }
+
     private fun successResponse(): AnthropicUsageResponse {
         return AnthropicUsageResponse(
             fiveHour = AnthropicUsageWindow(

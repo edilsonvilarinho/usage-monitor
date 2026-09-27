@@ -250,6 +250,7 @@ internal fun ApiUsageCardHeader(
     apiName: String,
     accountContext: UsageAccountContext?,
     notices: Set<ApiUsageNotice>,
+    lastReadingAt: Instant?,
     planLabel: String?,
     accent: Color?,
     emoji: AccountEmoji?,
@@ -363,6 +364,7 @@ internal fun ApiUsageCardHeader(
                     notices = notices,
                     source = source,
                     language = language,
+                    lastReadingAgeMinutes = lastReadingAt?.let { at -> (now - at).inWholeMinutes.coerceAtLeast(0) },
                     iconSize = density.actionIconSize
                 )
             }

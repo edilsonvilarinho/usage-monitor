@@ -105,6 +105,8 @@ internal class AppViewModels(
         onNextRefreshAtChanged = { instant ->
             graph.settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds())
         },
+        persistedRateLimitBackoffs = readPersistedRateLimitBackoffs(graph.settings),
+        onRateLimitBackoffChanged = { backoffs -> persistRateLimitBackoffs(graph.settings, backoffs) },
         breadcrumbs = breadcrumbs
     )
 

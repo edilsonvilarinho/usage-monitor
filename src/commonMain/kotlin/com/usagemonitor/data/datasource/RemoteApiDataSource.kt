@@ -24,6 +24,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 
+/**
+ * O User-Agent do Claude Code é obrigatório em `/api/oauth/usage`, não decoração:
+ * o ai-usagebar registrou que sem ele o endpoint responde 429 direto (issue #269,
+ * `CHANGELOG.md:2344-2347` de lá). Não troque por [USAGE_MONITOR_USER_AGENT]. O
+ * patch da versão não é validado pelo servidor, e por isso não foi mexido.
+ */
 private const val CLAUDE_USER_AGENT = "claude-code/1.0.0"
 private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
 private const val GITHUB_API_VERSION = "2022-11-28"
@@ -359,6 +365,9 @@ open class RemoteApiDataSource(
         sourceName: String
     ): HttpResponse {
         if (!response.status.isSuccess()) {
+            // O 429 sai tipado, com o `Retry-After`: é por ele que o agendamento
+            // arma o backoff (issue #269). A mensagem é a mesma dos outros status.
+            throwIfRateLimited(response, sourceName)
             val body = response.bodyAsText()
             throw IllegalStateException("$sourceName HTTP ${response.status.value}: $body")
         }

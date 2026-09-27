@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.detectSpike
+import com.usagemonitor.domain.entity.isReadingFreshEnough
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 
@@ -19,14 +20,6 @@ import kotlinx.datetime.TimeZone
 // linhas (#304). Nenhuma lê nem escreve o cache do view model.
 
 internal const val HTTP_RATE_LIMIT_MARKER = "HTTP 429"
-
-/**
- * Fontes locais (issue #267) cuja última leitura sobrevive a uma falha, como a do
- * Codex. O dado guardado leva [ApiUsageNotice.SOURCE_UNSTABLE]: sem a marca o card
- * mostrava números congelados — janelas deslizantes de 5h/7d que não andam mais —
- * como se fossem da coleta corrente.
- */
-private val LOCAL_SESSION_CACHE_SOURCES = setOf(ApiSource.GEMINI, ApiSource.CURSOR, ApiSource.ANTIGRAVITY)
 
 /** O reset conhecido mais próximo ainda no futuro, entre todas as cotas. */
 internal fun earliestKnownQuotaReset(snapshot: List<ApiUsageStats>, now: Instant): Instant? {
@@ -92,25 +85,45 @@ internal fun buildDashboardUiState(
 }
 
 /**
- * O que fica no card de um alvo cuja coleta falhou: nada, a leitura anterior
- * intacta (recarga que pediu para preservar) ou a leitura anterior marcada com
- * [ApiUsageNotice.SOURCE_UNSTABLE] — Codex e as fontes locais mantêm a última
- * leitura válida, mas não podem apresentá-la como se fosse da coleta corrente.
+ * O que fica no card de um alvo cuja coleta falhou (issue #269).
+ *
+ * A regra vale para **toda** fonte: a última leitura boa continua na tela marcada
+ * com [ApiUsageNotice.SOURCE_UNSTABLE]. Antes só Codex e as fontes locais a
+ * guardavam, e um 429 ou timeout da Anthropic fazia o card sumir — da tela e do
+ * cache em disco.
+ *
+ * Três casos apagam a leitura:
+ * - credencial recusada ou configuração faltando: o número pertence a um acesso
+ *   que já não vale, e o banner manda agir;
+ * - leitura mais velha que `MAX_STALE_READING_AGE`: semanas sem coletar não podem
+ *   parecer o consumo de agora;
+ * - Codex com leitura que não passa em [isPersistableDashboardStats].
  */
 internal fun statsRetainedAfterFailure(
     target: UsageTargetKey,
     existingStats: ApiUsageStats?,
-    preserveDataOnFailure: Boolean
+    /** Quando o painel coletou esta leitura; vale o `fetchedAt` dela quando já veio carimbada do cache. */
+    lastSuccessAt: Instant?,
+    error: UiApiError?,
+    now: Instant
 ): ApiUsageStats? {
     if (existingStats == null) {
         return null
     }
-    val canPreserveCodexCache = target.source == ApiSource.CODEX && isPersistableDashboardStats(existingStats)
-    val canPreserveLocalIntegrationCache = target.source in LOCAL_SESSION_CACHE_SOURCES
-    if (canPreserveCodexCache || canPreserveLocalIntegrationCache) {
-        return existingStats.copy(notices = existingStats.notices + ApiUsageNotice.SOURCE_UNSTABLE)
+    if (error != null && (error.isUnauthorizedIssue || error.isConfigurationIssue)) {
+        return null
     }
-    return if (preserveDataOnFailure) existingStats else null
+    val fetchedAt = existingStats.fetchedAt ?: lastSuccessAt
+    if (!isReadingFreshEnough(fetchedAt, now)) {
+        return null
+    }
+    if (target.source == ApiSource.CODEX && !isPersistableDashboardStats(existingStats)) {
+        return null
+    }
+    return existingStats.copy(
+        notices = existingStats.notices + ApiUsageNotice.SOURCE_UNSTABLE,
+        fetchedAt = fetchedAt
+    )
 }
 
 /** O erro que a tela mostra para uma falha de coleta, com a mensagem já saneada. */
@@ -218,4 +231,14 @@ internal fun spikesOf(
             minFactor = minFactor
         )
     }
+}
+
+/**
+ * O passo da trilha para um 429 (issue #269): o `Retry-After` recebido, a
+ * tentativa e o prazo calculado. Sem token e sem e-mail — só o nome da fonte.
+ */
+internal fun rateLimitBreadcrumb(source: ApiSource, decision: RateLimitDecision): String {
+    val retryAfter = decision.retryAfter?.let { "${it.inWholeSeconds}s" } ?: "ausente"
+    return "${source.name}: 429 — Retry-After $retryAfter, tentativa ${decision.attempt + 1}, " +
+        "espera ${decision.wait.inWholeSeconds}s, backoff até ${decision.until}"
 }

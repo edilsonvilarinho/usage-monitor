@@ -190,6 +190,10 @@ internal class LocalCredentialDataSource(
         // cliente não liga `expectSuccess` — e a falha chegava à tela como
         // "sem access_token", sem status nem motivo.
         if (!httpResponse.status.isSuccess()) {
+            // Um 429 do endpoint de token também arma o backoff (issue #269, lição
+            // do ai-usagebar): sem isso o poll seguinte renovaria de novo e
+            // prolongaria o próprio bloqueio.
+            throwIfRateLimited(httpResponse, "Token refresh")
             val body = httpResponse.bodyAsText()
             throw IllegalStateException(
                 "Token refresh falhou (HTTP ${httpResponse.status.value}): $body"

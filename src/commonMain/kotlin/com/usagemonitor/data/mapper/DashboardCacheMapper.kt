@@ -28,7 +28,8 @@ fun ApiUsageStats.toCacheDto(): ApiUsageStatsCacheDto {
         accountWorkspaceName = accountContext?.workspaceName,
         profileLabel = profileLabel,
         notices = notices.map { notice -> notice.name },
-        planLabel = planLabel
+        planLabel = planLabel,
+        fetchedAtEpochMillis = fetchedAt?.toEpochMilliseconds()
     )
 }
 
@@ -48,10 +49,10 @@ private fun QuotaInfo.toCacheDto(): QuotaInfoCacheDto {
 }
 
 fun DashboardCacheDto.toDomain(): List<ApiUsageStats> {
-    return entries.mapNotNull { entry -> entry.toDomainOrNull() }
+    return entries.mapNotNull { entry -> entry.toDomainOrNull(savedAtEpochMillis) }
 }
 
-private fun ApiUsageStatsCacheDto.toDomainOrNull(): ApiUsageStats? {
+private fun ApiUsageStatsCacheDto.toDomainOrNull(savedAtEpochMillis: Long): ApiUsageStats? {
     val parsedTargetKey = UsageTargetKey.fromStorageKey(targetKey) ?: return null
     val parsedSource = runCatching { ApiSource.valueOf(source) }.getOrNull() ?: return null
     val parsedQuotas = quotas.mapNotNull { quota -> quota.toDomainOrNull() }
@@ -86,7 +87,8 @@ private fun ApiUsageStatsCacheDto.toDomainOrNull(): ApiUsageStats? {
             accountContext = parsedAccountContext,
             profileLabel = profileLabel,
             notices = notices.mapNotNull { name -> runCatching { ApiUsageNotice.valueOf(name) }.getOrNull() }.toSet(),
-            planLabel = planLabel
+            planLabel = planLabel,
+            fetchedAt = Instant.fromEpochMilliseconds(fetchedAtEpochMillis ?: savedAtEpochMillis)
         )
     }.getOrNull()
 }

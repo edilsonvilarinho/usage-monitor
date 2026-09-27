@@ -416,6 +416,31 @@ class LocalCredentialDataSourceTest {
     }
 
     @Test
+    fun `429 from the token endpoint arms the backoff like the usage endpoint`() = runTest {
+        val nearExpiry = System.currentTimeMillis() + 60 * 1000L
+        writeCredentials(accessToken = "old-token", refreshToken = "rt", expiresAt = nearExpiry)
+        val dataSource = LocalCredentialDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel("""{"type":"error"}"""),
+                    status = HttpStatusCode.TooManyRequests,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.RetryAfter to listOf("90")
+                    )
+                )
+            },
+            homeDirProvider = homeDirProvider
+        )
+
+        val error = assertFailsWith<com.usagemonitor.domain.entity.RateLimitedException> {
+            dataSource.loadAnthropicSession()
+        }
+        assertEquals(kotlin.time.Duration.parse("90s"), error.retryAfter)
+        assertTrue(error.message.orEmpty().contains("HTTP 429"), error.message)
+    }
+
+    @Test
     fun `refresh failure does not touch the credentials file`() = runTest {
         val nearExpiry = System.currentTimeMillis() + 60 * 1000L
         writeCredentials(accessToken = "old-token", refreshToken = "rt", expiresAt = nearExpiry)

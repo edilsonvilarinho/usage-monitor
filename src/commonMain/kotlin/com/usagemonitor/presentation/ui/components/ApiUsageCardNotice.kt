@@ -33,15 +33,17 @@ internal fun CardNoticeHint(
     notices: Set<ApiUsageNotice>,
     source: ApiSource,
     language: AppLanguage,
+    /** Idade da leitura mantida (issue #269); nula quando o painel não sabe quando ela foi coletada. */
+    lastReadingAgeMinutes: Long? = null,
     iconSize: Dp,
     modifier: Modifier = Modifier
 ) {
     // Mesma ordem estável dos banners que este hint substituiu.
-    val texts = remember(notices, source, language) {
+    val texts = remember(notices, source, language, lastReadingAgeMinutes) {
         notices
             .toList()
             .sortedBy { notice -> notice.ordinal }
-            .map { notice -> noticeText(notice = notice, source = source, language = language) }
+            .map { notice -> noticeText(notice, source, language, lastReadingAgeMinutes) }
     }
     if (texts.isEmpty()) return
 
@@ -85,7 +87,12 @@ private fun noticeHintTitle(count: Int, language: AppLanguage): String {
     }
 }
 
-private fun noticeText(notice: ApiUsageNotice, source: ApiSource, language: AppLanguage): String {
+private fun noticeText(
+    notice: ApiUsageNotice,
+    source: ApiSource,
+    language: AppLanguage,
+    lastReadingAgeMinutes: Long?
+): String {
     return when (notice) {
         ApiUsageNotice.WEEKLY_QUOTA_UNAVAILABLE -> {
             if (language == AppLanguage.PT) {
@@ -97,11 +104,7 @@ private fun noticeText(notice: ApiUsageNotice, source: ApiSource, language: AppL
         // Fora do Codex a marca é posta pelo painel quando guarda a última leitura
         // depois de uma falha (issue #267): a frase do contrato do Codex não se aplica.
         ApiUsageNotice.SOURCE_UNSTABLE -> if (source != ApiSource.CODEX) {
-            if (language == AppLanguage.PT) {
-                "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."
-            } else {
-                "The latest refresh failed. These numbers are from the last valid reading and may be out of date."
-            }
+            staleReadingText(language, lastReadingAgeMinutes)
         } else {
             if (language == AppLanguage.PT) {
                 "Fonte de uso do Codex instável: o contrato mudou e os limites podem oscilar até estabilizar."
@@ -116,5 +119,36 @@ private fun noticeText(notice: ApiUsageNotice, source: ApiSource, language: AppL
                 "Usage credits missing from this snapshot. The balance on claude.ai still holds."
             }
         }
+    }
+}
+
+/**
+ * A leitura mantida depois de uma falha, com a idade quando o painel a conhece
+ * (issue #269): "podem estar desatualizados" sem dizer quanto não deixa decidir se
+ * o número ainda serve.
+ */
+internal fun staleReadingText(language: AppLanguage, ageMinutes: Long?): String {
+    if (ageMinutes == null) {
+        return if (language == AppLanguage.PT) {
+            "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."
+        } else {
+            "The latest refresh failed. These numbers are from the last valid reading and may be out of date."
+        }
+    }
+    val age = formatReadingAge(ageMinutes, language)
+    return if (language == AppLanguage.PT) {
+        "A coleta mais recente falhou. Os números são da última leitura válida, coletada há $age."
+    } else {
+        "The latest refresh failed. These numbers are from the last valid reading, taken $age ago."
+    }
+}
+
+private fun formatReadingAge(minutes: Long, language: AppLanguage): String {
+    val hours = minutes / 60
+    return when {
+        minutes < 1 -> if (language == AppLanguage.PT) "menos de 1 min" else "less than 1 min"
+        hours < 1 -> "$minutes min"
+        hours < 48 -> "${hours}h${(minutes % 60).toString().padStart(2, '0')}"
+        else -> if (language == AppLanguage.PT) "${hours / 24} dias" else "${hours / 24} days"
     }
 }

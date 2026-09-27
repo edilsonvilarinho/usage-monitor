@@ -103,6 +103,8 @@ fun ApiUsageCard(
     quotas: List<QuotaInfo>,
     accountContext: UsageAccountContext? = null,
     notices: Set<ApiUsageNotice> = emptySet(),
+    /** Quando a leitura mantida depois de uma falha foi coletada (issue #269); nulo é desconhecido. */
+    lastReadingAt: Instant? = null,
     /** Plano da conta ("Max 20x"); `null` quando o fornecedor não informa. */
     planLabel: String? = null,
     /**
@@ -289,6 +291,7 @@ fun ApiUsageCard(
                     apiName = apiName,
                     accountContext = accountContext,
                     notices = notices,
+                    lastReadingAt = lastReadingAt,
                     planLabel = planLabel,
                     accent = accent,
                     emoji = emoji,

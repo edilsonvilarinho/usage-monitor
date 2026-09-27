@@ -20,6 +20,7 @@ import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -61,7 +62,11 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
         assertEquals(1, state.errors.size)
         assertEquals(ApiSource.ANTHROPIC, state.errors.first().source)
         assertTrue(state.errors.first().isRateLimitIssue)
-        assertEquals(DashboardToast.RateLimit(ApiSource.ANTHROPIC), viewModel.toastMessage.value)
+        // O 429 arma o backoff: o toast diz até quando (issue #269).
+        val toast = assertIs<DashboardToast.RateLimit>(viewModel.toastMessage.value)
+        assertEquals(ApiSource.ANTHROPIC, toast.source)
+        assertNotNull(toast.retryAt)
+        assertEquals(toast.retryAt, state.errors.first().retryAt)
         viewModel.onDestroy()
     }
 
@@ -101,7 +106,11 @@ class DashboardViewModelToastTest : DashboardViewModelTestSupport() {
         assertEquals(1, state.errors.size)
         assertEquals(ApiSource.ANTHROPIC, state.errors.first().source)
         assertTrue(state.errors.first().isRateLimitIssue)
-        assertEquals(DashboardToast.RateLimit(ApiSource.ANTHROPIC), viewModel.toastMessage.value)
+        // O 429 arma o backoff: o toast diz até quando (issue #269).
+        val toast = assertIs<DashboardToast.RateLimit>(viewModel.toastMessage.value)
+        assertEquals(ApiSource.ANTHROPIC, toast.source)
+        assertNotNull(toast.retryAt)
+        assertEquals(toast.retryAt, state.errors.first().retryAt)
         viewModel.onDestroy()
     }
 

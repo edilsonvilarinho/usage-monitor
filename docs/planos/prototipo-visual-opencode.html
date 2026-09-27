@@ -1367,7 +1367,14 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 </div>
 <p class="note"><b>Gemini CLI é atividade observada</b>, com o mesmo desenho do OpenCode Zen Free e do Kilo: tokens por modelo em 5h e 7d, sem barra de percentual contra teto, porque contagem local não conhece limite da conta Google. Sem <code>~/.gemini/tmp</code> o card mostra o estado vazio e <b>não</b> um banner — o Gemini CLI nunca rodou na máquina.</p>
 <p class="note"><b>Cursor e Antigravity são cotas</b>, e por isso entram em histórico, limiar, projeção e HUD. As duas fontes têm mais de uma cota do mesmo <code>periodType</code> — franquias do mesmo ciclo mensal, um limite semanal por grupo de modelos —, e o título do bloco leva o nome da franquia ou do grupo antes da janela: sem isso, dois blocos diriam "Semanal". A janela intacta do Antigravity (<code>Claude/GPT</code> em 0%) <b>não mostra reinício</b>: o CLI informa "agora + 7 dias", que anda a cada chamada.</p>
-<p class="note"><b>Falha que não se resolve tentando de novo é configuração.</b> Não instalado, versão do CLI anterior à verificada, sessão ausente ou recusada, plano do Cursor sem nada medido e a coleta do Antigravity pausada pelo disjuntor saem como banner sem botão e sem toast a cada coleta. Quando a coleta falha depois de uma leitura boa, o card mantém os números com o aviso de exclamação no cabeçalho: "A coleta mais recente falhou. Os números são da última leitura válida e podem estar desatualizados."</p>
+<p class="note"><b>Falha que não se resolve tentando de novo é configuração.</b> Não instalado, versão do CLI anterior à verificada, sessão ausente ou recusada, plano do Cursor sem nada medido e a coleta do Antigravity pausada pelo disjuntor saem como banner sem botão e sem toast a cada coleta. Quando a coleta falha depois de uma leitura boa, o card mantém os números com o aviso de exclamação no cabeçalho: "A coleta mais recente falhou. Os números são da última leitura válida, coletada há 12 min." — com a idade quando o painel a conhece. Desde a issue #269 isso vale para <b>toda</b> fonte, a Anthropic inclusive; credencial recusada, configuração pendente e leitura com mais de 7 dias apagam os números.</p>
+<div class="cap">429 com backoff armado (issue #269) — banner com a hora, sem "Tentar novamente"</div>
+<div class="panel">
+  <div class="pbody">
+    <div class="banner warn"><span class="bar"></span><span class="bd"><b>Anthropic — Padrão temporariamente limitado</b><br>A API respondeu HTTP 429. O app não consulta esta conta até 14:32 BRT, porque cada tentativa durante o limite só o prolonga. Os números da última leitura continuam no card.</span></div>
+  </div>
+</div>
+<p class="note"><b>Durante o backoff nada vai à rede</b>, nem o clique no ↻ do card ou no anel da HUD: ele vira o toast "Anthropic limitado temporariamente - aguarde até 14:32 BRT." Um botão de tentar de novo seria ignorado pelo próprio backoff, e por isso não existe.</p>
 
 <!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
 <h2 id="historico">5 · Histórico</h2>

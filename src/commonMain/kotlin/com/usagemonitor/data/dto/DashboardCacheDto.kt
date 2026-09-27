@@ -27,7 +27,10 @@ data class ApiUsageStatsCacheDto(
     val accountWorkspaceName: String? = null,
     val profileLabel: String? = null,
     val notices: List<String> = emptyList(),
-    val planLabel: String? = null
+    val planLabel: String? = null,
+    // Default nulo mantém legível o cache anterior à #269; a leitura dele herda
+    // o `savedAtEpochMillis` do arquivo.
+    val fetchedAtEpochMillis: Long? = null
 )
 
 @Serializable

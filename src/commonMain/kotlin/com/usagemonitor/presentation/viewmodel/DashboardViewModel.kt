@@ -9,6 +9,8 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
+import com.usagemonitor.domain.entity.RateLimitedException
+import com.usagemonitor.domain.entity.isReadingFreshEnough
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage
@@ -129,6 +131,9 @@ class DashboardViewModel(
     private val config: DashboardViewModelConfig = DashboardViewModelConfig(),
     private val persistedNextRefreshAt: Instant? = null,
     private val onNextRefreshAtChanged: (Instant) -> Unit = {},
+    /** Prazos de backoff gravados antes do último encerramento (issue #269). */
+    persistedRateLimitBackoffs: Map<UsageTargetKey, Instant> = emptyMap(),
+    onRateLimitBackoffChanged: (Map<UsageTargetKey, Instant>) -> Unit = {},
     /**
      * Trilha de eventos do relatório de bug.
      *
@@ -190,8 +195,6 @@ class DashboardViewModel(
     )
     val appUpdateState: StateFlow<AppUpdateUiState?> = updates.state
     private val stateMutex = Mutex()
-    private val fetchMutex = Mutex()
-    private val pendingFetchMutex = Mutex()
     private val cachedStatsByTarget = mutableMapOf<UsageTargetKey, ApiUsageStats>()
     private val cachedErrorsByTarget = mutableMapOf<UsageTargetKey, UiApiError>()
     private val cachedRiskByTarget = mutableMapOf<UsageTargetKey, Map<QuotaSeriesKey, QuotaRiskSummary>>()
@@ -202,7 +205,8 @@ class DashboardViewModel(
     @Volatile private var scheduledRefreshAt: Instant = initialScheduledRefreshAt
     private var countdownJob: Job? = null
     private var initFetchJob: Job? = null
-    private var pendingFetchRequest: PendingFetchRequest? = null
+    private val scheduler = DashboardRefreshScheduler(persistedRateLimitBackoffs, onRateLimitBackoffChanged)
+    private val fetchQueue = DashboardFetchQueue(allTargets = ::enabledTargets, perform = ::performFetch)
 
     init {
         val isPersistedRefreshStillPending = persistedNextRefreshAt != null && persistedNextRefreshAt > clock.now()
@@ -253,6 +257,7 @@ class DashboardViewModel(
                 val enabled = enabledTargets()
                 cachedStats.forEach { stats ->
                     if (isPersistableDashboardStats(stats) &&
+                        isReadingFreshEnough(stats.fetchedAt, clock.now()) &&
                         stats.targetKey in enabled &&
                         stats.targetKey !in cachedStatsByTarget
                     ) {
@@ -365,69 +370,20 @@ class DashboardViewModel(
     private suspend fun requestFetch(
         targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean = false
-    ) {
-        if (!fetchMutex.tryLock()) {
-            enqueuePendingFetch(targets, preserveDataOnFailure)
-            fetchMutex.withLock {
-                drainPendingFetchQueue() ?: return
-            }
-            return
-        }
-
-        try {
-            drainFetchRequests(PendingFetchRequest(targets, preserveDataOnFailure))
-        } finally {
-            fetchMutex.unlock()
-        }
-    }
-
-    private suspend fun drainFetchRequests(initialRequest: PendingFetchRequest) {
-        var currentRequest: PendingFetchRequest? = initialRequest
-
-        while (currentRequest != null) {
-            performFetch(
-                targets = currentRequest.targets,
-                preserveDataOnFailure = currentRequest.preserveDataOnFailure
-            )
-            currentRequest = dequeuePendingFetch()
-        }
-    }
-
-    private suspend fun drainPendingFetchQueue(): PendingFetchRequest? {
-        val pendingRequest = dequeuePendingFetch() ?: return null
-        drainFetchRequests(pendingRequest)
-        return pendingRequest
-    }
-
-    private suspend fun enqueuePendingFetch(
-        targets: Set<UsageTargetKey>,
-        preserveDataOnFailure: Boolean
-    ) {
-        pendingFetchMutex.withLock {
-            pendingFetchRequest = mergePendingFetch(
-                existing = pendingFetchRequest,
-                targets = targets,
-                preserveDataOnFailure = preserveDataOnFailure,
-                allTargets = ::enabledTargets
-            )
-        }
-    }
-
-    private suspend fun dequeuePendingFetch(): PendingFetchRequest? {
-        return pendingFetchMutex.withLock {
-            val request = pendingFetchRequest ?: return@withLock null
-            pendingFetchRequest = null
-            request
-        }
-    }
+    ) = fetchQueue.request(targets, preserveDataOnFailure)
 
     private suspend fun performFetch(
         targets: Set<UsageTargetKey>,
         preserveDataOnFailure: Boolean
     ) {
         val enabled = enabledTargets()
-        val effectiveTargets = targets.filterTo(linkedSetOf()) { target -> target in enabled }
         val snapshotCapturedAt = clock.now()
+        scheduler.retainOnly(enabled)
+        // Alvo em backoff não vai à rede (issue #269): cada chamada durante o
+        // limite só o prolonga. A leitura dele fica como está.
+        val effectiveTargets = targets.filterTo(linkedSetOf()) { target ->
+            target in enabled && !scheduler.isInBackoff(target, snapshotCapturedAt)
+        }
 
         if (effectiveTargets.isEmpty()) {
             stateMutex.withLock {
@@ -461,6 +417,7 @@ class DashboardViewModel(
                 result
                     .onSuccess { stats ->
                         if (isPersistableDashboardStats(stats)) {
+                            scheduler.recordSuccess(target, snapshotCapturedAt)
                             statsUpdates[target] = stats
                             errorUpdates[target] = null
                             persistSnapshot(stats, snapshotCapturedAt)
@@ -493,7 +450,9 @@ class DashboardViewModel(
                         val retained = statsRetainedAfterFailure(
                             target = target,
                             existingStats = cachedStatsByTarget[target],
-                            preserveDataOnFailure = preserveDataOnFailure
+                            lastSuccessAt = scheduler.lastSuccessAt(target),
+                            error = errorUpdates[target],
+                            now = snapshotCapturedAt
                         )
                         if (retained == null) {
                             cachedStatsByTarget.remove(target)
@@ -565,6 +524,11 @@ class DashboardViewModel(
         // O alvo carrega `profileId`, que é interno do app e não identifica
         // ninguém; o apelido do perfil, que é o e-mail digitado, fica de fora.
         breadcrumbs.record(BreadcrumbCategory.USE_CASE, "atualização de ${target.source.name} pedida")
+        // Clique durante o backoff não vai à rede, e diz até quando (issue #269).
+        scheduler.backoffUntil(target, clock.now())?.let { until ->
+            _toastMessage.value = DashboardToast.RateLimit(target.source, retryAt = until)
+            return
+        }
         invalidateAntigravityReadingIfRequested(target.source)
         scheduleNextRefresh()
         viewModelScope.launch {
@@ -648,8 +612,11 @@ class DashboardViewModel(
         }
 
         if (message.contains(HTTP_RATE_LIMIT_MARKER, ignoreCase = true)) {
-            _toastMessage.value = DashboardToast.RateLimit(source)
-            return uiError
+            val decision = scheduler.recordRateLimit(target, (error as? RateLimitedException)?.retryAfter, clock.now())
+            // A medição da #269: o que o servidor pediu e o que o app decidiu.
+            breadcrumbs.record(BreadcrumbCategory.API_CALL, rateLimitBreadcrumb(source, decision))
+            _toastMessage.value = DashboardToast.RateLimit(source, retryAt = decision.until)
+            return uiError.copy(retryAt = decision.until)
         }
 
         if (uiError.isServiceUnavailableIssue) {
@@ -701,7 +668,9 @@ class DashboardViewModel(
     private suspend fun persistDashboardCache() {
         val cacheUseCase = saveDashboardCache ?: return
         val snapshot = stateMutex.withLock {
-            cachedStatsByTarget.values.filter { stats -> isPersistableDashboardStats(stats) }
+            cachedStatsByTarget.values
+                .filter { stats -> isPersistableDashboardStats(stats) }
+                .map { stats -> stats.copy(fetchedAt = stats.fetchedAt ?: scheduler.lastSuccessAt(stats.targetKey)) }
         }
         if (snapshot.isEmpty()) {
             return
