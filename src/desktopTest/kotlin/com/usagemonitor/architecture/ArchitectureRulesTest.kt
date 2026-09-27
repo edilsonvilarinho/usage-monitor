@@ -138,9 +138,7 @@ class ArchitectureRulesTest {
         const val MAX_FUNCTION_LINES = 300
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
-        val FILE_CEILINGS: Map<String, Int> = mapOf(
-            "src/commonMain/kotlin/com/usagemonitor/presentation/ui/components/SettingsDialogContent.kt" to 1853
-        )
+        val FILE_CEILINGS: Map<String, Int> = emptyMap()
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FUNCTION_CEILINGS: Map<String, Int> = emptyMap()
