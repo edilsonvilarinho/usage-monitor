@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -42,6 +43,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -49,18 +51,14 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
-import com.usagemonitor.domain.entity.isSamePeriod
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
-private const val HISTORY_TOOLTIP_PADDING_PX = 8f
-private const val HISTORY_TOOLTIP_OFFSET_PX = 10f
-private const val HISTORY_PLOT_HORIZONTAL_INSET_PX = 14f
+internal const val HISTORY_TOOLTIP_PADDING_PX = 8f
+internal const val HISTORY_TOOLTIP_OFFSET_PX = 10f
+internal const val HISTORY_PLOT_HORIZONTAL_INSET_PX = 14f
 private val HISTORY_PLOT_HEIGHT = 120.dp
 private val HISTORY_TOOLTIP_BAND_HEIGHT = 48.dp
 private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HEIGHT
@@ -68,9 +66,9 @@ private val HISTORY_FRAME_HEIGHT = HISTORY_PLOT_HEIGHT + HISTORY_TOOLTIP_BAND_HE
 // larga e a palavra passou a quebrar letra a letra dentro do emblema.
 private val HISTORY_ANNOTATION_LABEL_WIDTH = 84.dp
 private const val HISTORY_RESET_CLUSTER_GAP_PX = 24f
-private const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
-private const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
-private const val HISTORY_PAN_SENSITIVITY = 0.1f
+internal const val HISTORY_MIN_ZOOM_WIDTH_FRACTION = 0.05f
+internal const val HISTORY_ZOOM_STEP_FACTOR = 0.85f
+internal const val HISTORY_PAN_SENSITIVITY = 0.1f
 
 internal data class HistoryRangeAnnotations(
     val startIndex: Int,
@@ -233,20 +231,11 @@ internal fun UsageHistoryLineChart(
             }
 
             if (valueLabels.isNotEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .height(HISTORY_PLOT_HEIGHT),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    valueLabels.forEach { label ->
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = axisTextColor
-                        )
-                    }
-                }
+                HistoryValueAxisLabels(
+                    labels = valueLabels,
+                    color = axisTextColor,
+                    modifier = Modifier.align(Alignment.BottomStart)
+                )
             }
 
             val startPadding = if (valueLabels.isNotEmpty()) 48.dp else 0.dp
@@ -262,152 +251,21 @@ internal fun UsageHistoryLineChart(
                     .onSizeChanged { plotSize = it }
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val strokeWidth = 1.75.dp.toPx()
-                    val gridStroke = 1.dp.toPx()
-                    val activeMarkerRadius = 4.dp.toPx()
-                    val activeMarkerHaloRadius = 7.dp.toPx()
-                    val resetPathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
-                    val rangeStartPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull)
-                    val rangeEndPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull)
-
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, 0f),
-                        end = Offset(size.width, 0f),
-                        strokeWidth = gridStroke
+                    drawHistoryPlot(
+                        colors = HistoryPlotColors(
+                            line = lineColor,
+                            fill = fillColor,
+                            grid = gridColor,
+                            indicator = chartIndicatorColor,
+                            indicatorHalo = chartIndicatorHaloColor
+                        ),
+                        plotPoints = plotPoints,
+                        previousPlotPoints = previousPlotPoints,
+                        resetClusterPoints = resetClusterPoints,
+                        rangeAnnotations = rangeAnnotations,
+                        activePoint = activePoint,
+                        revealFraction = revealFraction
                     )
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, size.height * 0.5f),
-                        end = Offset(size.width, size.height * 0.5f),
-                        strokeWidth = gridStroke
-                    )
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, size.height),
-                        end = Offset(size.width, size.height),
-                        strokeWidth = gridStroke
-                    )
-
-                    resetClusterPoints.forEach { (_, resetPoint) ->
-                        drawLine(
-                            color = chartIndicatorColor.copy(alpha = 0.4f),
-                            start = Offset(resetPoint.x, 0f),
-                            end = Offset(resetPoint.x, size.height),
-                            strokeWidth = gridStroke * 1.5f,
-                            pathEffect = resetPathEffect
-                        )
-                    }
-
-                    // Linha de referência do período anterior (issue #215):
-                    // tracejada e em tom neutro — nunca a cor de acento —,
-                    // porque ela não é a série que a tela está medindo, é só
-                    // contexto para ler a corrente contra ela. Desenhada
-                    // antes da linha atual para ficar atrás dela.
-                    if (previousPlotPoints.size > 1) {
-                        val previousPath = Path()
-                        previousPlotPoints.forEachIndexed { index, point ->
-                            if (index == 0) {
-                                previousPath.moveTo(point.x, point.y)
-                            } else {
-                                previousPath.lineTo(point.x, point.y)
-                            }
-                        }
-                        clipRect(right = size.width * revealFraction) {
-                            drawPath(
-                                path = previousPath,
-                                color = gridColor,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round,
-                                    pathEffect = resetPathEffect
-                                )
-                            )
-                        }
-                    }
-
-                    if (plotPoints.size > 1) {
-                        val path = Path()
-                        val fillPath = Path()
-
-                        plotPoints.forEachIndexed { index, point ->
-                            if (index == 0) {
-                                path.moveTo(point.x, point.y)
-                                fillPath.moveTo(point.x, size.height)
-                                fillPath.lineTo(point.x, point.y)
-                            } else {
-                                path.lineTo(point.x, point.y)
-                                fillPath.lineTo(point.x, point.y)
-                            }
-                        }
-
-                        val lastPoint = plotPoints.last()
-                        fillPath.lineTo(lastPoint.x, size.height)
-                        fillPath.close()
-
-                        clipRect(right = size.width * revealFraction) {
-                            // Massa sob a curva principal (issue #223): o
-                            // preenchimento chapado nasceu só pro saldo do
-                            // DeepSeek e nunca foi generalizado — a leitura
-                            // percentual (a mais vista da tela) ficava só no
-                            // traço de 1-2px sobre a grade. `fillColor` já é
-                            // opacidade fixa sobre `accentColor`, sem
-                            // gradiente; geometria de `fillPath` já era
-                            // unit-agnostic, só o desenho estava condicionado.
-                            drawPath(path = fillPath, color = fillColor)
-                            drawPath(
-                                path = path,
-                                color = lineColor,
-                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                            )
-                        }
-                    }
-
-                    if (rangeStartPoint != null && rangeStartPoint.index != activePoint?.index) {
-                        drawCircle(
-                            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
-                            radius = activeMarkerHaloRadius,
-                            center = Offset(rangeStartPoint.x, rangeStartPoint.y)
-                        )
-                        drawCircle(
-                            color = lineColor.copy(alpha = 0.9f),
-                            radius = activeMarkerRadius,
-                            center = Offset(rangeStartPoint.x, rangeStartPoint.y),
-                            style = Stroke(width = 2.dp.toPx())
-                        )
-                    }
-
-                    if (rangeEndPoint != null && rangeEndPoint.index != activePoint?.index) {
-                        drawCircle(
-                            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
-                            radius = activeMarkerHaloRadius,
-                            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
-                        )
-                        drawCircle(
-                            color = lineColor.copy(alpha = 0.92f),
-                            radius = activeMarkerRadius,
-                            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
-                        )
-                    }
-
-                    if (activePoint != null) {
-                        drawLine(
-                            color = chartIndicatorColor.copy(alpha = 0.18f),
-                            start = Offset(activePoint.x, 0f),
-                            end = Offset(activePoint.x, size.height),
-                            strokeWidth = gridStroke
-                        )
-                        drawCircle(
-                            color = chartIndicatorHaloColor,
-                            radius = activeMarkerHaloRadius,
-                            center = Offset(activePoint.x, activePoint.y)
-                        )
-                        drawCircle(
-                            color = chartIndicatorColor,
-                            radius = activeMarkerRadius,
-                            center = Offset(activePoint.x, activePoint.y)
-                        )
-                    }
                 }
 
                 HistoryRangeAnnotationLabels(
@@ -457,71 +315,24 @@ internal fun UsageHistoryLineChart(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .onPointerEvent(PointerEventType.Scroll) { event ->
-                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
-                        val plotPointerX = coerceFramePointerToPlotPointerX(
-                            framePointerX = change.position.x,
-                            plotStartX = startPaddingPx,
-                            plotWidth = plotSize.width.toFloat()
-                        ) ?: return@onPointerEvent
-                        val pointerIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
-                        val pointerFraction = pointerIndex
-                            ?.let { index -> buildTimelineFractions(windowedPoints).getOrNull(index) }
-                            ?: 0.5f
-                        zoomRange = applyChartScroll(
-                            current = zoomRange,
-                            scrollDeltaY = change.scrollDelta.y,
-                            scrollDeltaX = change.scrollDelta.x,
-                            pointerFraction = pointerFraction,
-                            shiftPressed = event.keyboardModifiers.isShiftPressed
-                        )
-                        change.consume()
-                    }
-                    .onPointerEvent(PointerEventType.Enter) { event ->
-                        val framePointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
-                        val plotPointerX = framePointerToPlotPointerX(
-                            framePointerX = framePointerX,
-                            plotStartX = startPaddingPx,
-                            plotWidth = plotSize.width.toFloat()
-                        ) ?: return@onPointerEvent
-                        hoveredIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
-                    }
-                    .onPointerEvent(PointerEventType.Move) { event ->
-                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
-                        val plotPointerX = coerceFramePointerToPlotPointerX(
-                            framePointerX = change.position.x,
-                            plotStartX = startPaddingPx,
-                            plotWidth = plotSize.width.toFloat()
-                        )
-                        hoveredIndex = plotPointerX?.let { pointerX -> findClosestPlotPointIndex(plotPoints, pointerX) }
-                    }
-                    .onPointerEvent(PointerEventType.Exit) {
-                        hoveredIndex = null
-                    }
+                    .historyChartPointerInput(
+                        plotStartX = startPaddingPx,
+                        plotWidth = { plotSize.width.toFloat() },
+                        plotPoints = plotPoints,
+                        windowedPoints = windowedPoints,
+                        zoomRange = { zoomRange },
+                        onZoomRangeChange = { range -> zoomRange = range },
+                        onHoveredIndexChange = { index -> hoveredIndex = index }
+                    )
             )
         }
 
         if (timeLabels.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = if (valueLabels.isNotEmpty()) 48.dp else 0.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                timeLabels.forEachIndexed { index, label ->
-                    Text(
-                        modifier = Modifier.weight(1f),
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = axisTextColor,
-                        textAlign = when (index) {
-                            0 -> TextAlign.Start
-                            1 -> TextAlign.Center
-                            else -> TextAlign.End
-                        }
-                    )
-                }
-            }
+            HistoryTimeAxisLabels(
+                labels = timeLabels,
+                color = axisTextColor,
+                startPadding = if (valueLabels.isNotEmpty()) 48.dp else 0.dp
+            )
         }
 
         // A cor não basta para dizer "isto é o período anterior" — o
@@ -538,6 +349,287 @@ internal fun UsageHistoryLineChart(
                 color = axisTextColor
             )
         }
+    }
+}
+
+
+
+@Composable
+private fun HistoryValueAxisLabels(labels: List<String>, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.height(HISTORY_PLOT_HEIGHT),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        labels.forEach { label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryTimeAxisLabels(labels: List<String>, color: Color, startPadding: Dp) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = startPadding),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        labels.forEachIndexed { index, label ->
+            Text(
+                modifier = Modifier.weight(1f),
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                textAlign = when (index) {
+                    0 -> TextAlign.Start
+                    1 -> TextAlign.Center
+                    else -> TextAlign.End
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Roda do mouse amplia e desloca; o ponteiro escolhe o ponto em foco.
+ *
+ * `zoomRange` e `plotWidth` entram como leitura, não como valor: dois eventos
+ * de rolagem podem chegar entre duas recomposições, e o segundo precisa partir
+ * do recorte que o primeiro acabou de gravar.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.historyChartPointerInput(
+    plotStartX: Float,
+    plotWidth: () -> Float,
+    plotPoints: List<ChartPlotPoint>,
+    windowedPoints: List<UsageHistoryPoint>,
+    zoomRange: () -> ClosedFloatingPointRange<Float>,
+    onZoomRangeChange: (ClosedFloatingPointRange<Float>) -> Unit,
+    onHoveredIndexChange: (Int?) -> Unit
+): Modifier = this
+    .onPointerEvent(PointerEventType.Scroll) { event ->
+        val change = event.changes.firstOrNull() ?: return@onPointerEvent
+        val plotPointerX = coerceFramePointerToPlotPointerX(
+            framePointerX = change.position.x,
+            plotStartX = plotStartX,
+            plotWidth = plotWidth()
+        ) ?: return@onPointerEvent
+        val pointerIndex = findClosestPlotPointIndex(plotPoints, plotPointerX)
+        val pointerFraction = pointerIndex
+            ?.let { index -> buildTimelineFractions(windowedPoints).getOrNull(index) }
+            ?: 0.5f
+        onZoomRangeChange(
+            applyChartScroll(
+                current = zoomRange(),
+                scrollDeltaY = change.scrollDelta.y,
+                scrollDeltaX = change.scrollDelta.x,
+                pointerFraction = pointerFraction,
+                shiftPressed = event.keyboardModifiers.isShiftPressed
+            )
+        )
+        change.consume()
+    }
+    .onPointerEvent(PointerEventType.Enter) { event ->
+        val framePointerX = event.changes.firstOrNull()?.position?.x ?: return@onPointerEvent
+        val plotPointerX = framePointerToPlotPointerX(
+            framePointerX = framePointerX,
+            plotStartX = plotStartX,
+            plotWidth = plotWidth()
+        ) ?: return@onPointerEvent
+        onHoveredIndexChange(findClosestPlotPointIndex(plotPoints, plotPointerX))
+    }
+    .onPointerEvent(PointerEventType.Move) { event ->
+        val change = event.changes.firstOrNull() ?: return@onPointerEvent
+        val plotPointerX = coerceFramePointerToPlotPointerX(
+            framePointerX = change.position.x,
+            plotStartX = plotStartX,
+            plotWidth = plotWidth()
+        )
+        onHoveredIndexChange(plotPointerX?.let { pointerX -> findClosestPlotPointIndex(plotPoints, pointerX) })
+    }
+    .onPointerEvent(PointerEventType.Exit) {
+        onHoveredIndexChange(null)
+    }
+
+private class HistoryPlotColors(
+    val line: Color,
+    val fill: Color,
+    val grid: Color,
+    val indicator: Color,
+    val indicatorHalo: Color
+)
+
+/**
+ * O desenho do gráfico: grade, marcas de reinício, linha do período anterior,
+ * curva com preenchimento e os marcadores de início, fim e ponto em foco.
+ *
+ * Fora do composable porque é só pintura — nenhum estado nasce aqui —, e o
+ * corpo inteiro dentro do `Canvas` era o que levava `UsageHistoryLineChart`
+ * acima do limite de 300 linhas (#306).
+ */
+private fun DrawScope.drawHistoryPlot(
+    colors: HistoryPlotColors,
+    plotPoints: List<ChartPlotPoint>,
+    previousPlotPoints: List<ChartPlotPoint>,
+    resetClusterPoints: List<Pair<ResetMarker, ChartPlotPoint>>,
+    rangeAnnotations: HistoryRangeAnnotations?,
+    activePoint: ChartPlotPoint?,
+    revealFraction: Float
+) {
+    val lineColor = colors.line
+    val fillColor = colors.fill
+    val gridColor = colors.grid
+    val chartIndicatorColor = colors.indicator
+    val chartIndicatorHaloColor = colors.indicatorHalo
+    val strokeWidth = 1.75.dp.toPx()
+    val gridStroke = 1.dp.toPx()
+    val activeMarkerRadius = 4.dp.toPx()
+    val activeMarkerHaloRadius = 7.dp.toPx()
+    val resetPathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
+    val rangeStartPoint = rangeAnnotations?.startIndex?.let(plotPoints::getOrNull)
+    val rangeEndPoint = rangeAnnotations?.endIndex?.let(plotPoints::getOrNull)
+
+    drawLine(
+        color = gridColor,
+        start = Offset(0f, 0f),
+        end = Offset(size.width, 0f),
+        strokeWidth = gridStroke
+    )
+    drawLine(
+        color = gridColor,
+        start = Offset(0f, size.height * 0.5f),
+        end = Offset(size.width, size.height * 0.5f),
+        strokeWidth = gridStroke
+    )
+    drawLine(
+        color = gridColor,
+        start = Offset(0f, size.height),
+        end = Offset(size.width, size.height),
+        strokeWidth = gridStroke
+    )
+
+    resetClusterPoints.forEach { (_, resetPoint) ->
+        drawLine(
+            color = chartIndicatorColor.copy(alpha = 0.4f),
+            start = Offset(resetPoint.x, 0f),
+            end = Offset(resetPoint.x, size.height),
+            strokeWidth = gridStroke * 1.5f,
+            pathEffect = resetPathEffect
+        )
+    }
+
+    // Linha de referência do período anterior (issue #215):
+    // tracejada e em tom neutro — nunca a cor de acento —,
+    // porque ela não é a série que a tela está medindo, é só
+    // contexto para ler a corrente contra ela. Desenhada
+    // antes da linha atual para ficar atrás dela.
+    if (previousPlotPoints.size > 1) {
+        val previousPath = Path()
+        previousPlotPoints.forEachIndexed { index, point ->
+            if (index == 0) {
+                previousPath.moveTo(point.x, point.y)
+            } else {
+                previousPath.lineTo(point.x, point.y)
+            }
+        }
+        clipRect(right = size.width * revealFraction) {
+            drawPath(
+                path = previousPath,
+                color = gridColor,
+                style = Stroke(
+                    width = strokeWidth,
+                    cap = StrokeCap.Round,
+                    pathEffect = resetPathEffect
+                )
+            )
+        }
+    }
+
+    if (plotPoints.size > 1) {
+        val path = Path()
+        val fillPath = Path()
+
+        plotPoints.forEachIndexed { index, point ->
+            if (index == 0) {
+                path.moveTo(point.x, point.y)
+                fillPath.moveTo(point.x, size.height)
+                fillPath.lineTo(point.x, point.y)
+            } else {
+                path.lineTo(point.x, point.y)
+                fillPath.lineTo(point.x, point.y)
+            }
+        }
+
+        val lastPoint = plotPoints.last()
+        fillPath.lineTo(lastPoint.x, size.height)
+        fillPath.close()
+
+        clipRect(right = size.width * revealFraction) {
+            // Massa sob a curva principal (issue #223): o
+            // preenchimento chapado nasceu só pro saldo do
+            // DeepSeek e nunca foi generalizado — a leitura
+            // percentual (a mais vista da tela) ficava só no
+            // traço de 1-2px sobre a grade. `fillColor` já é
+            // opacidade fixa sobre `accentColor`, sem
+            // gradiente; geometria de `fillPath` já era
+            // unit-agnostic, só o desenho estava condicionado.
+            drawPath(path = fillPath, color = fillColor)
+            drawPath(
+                path = path,
+                color = lineColor,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+        }
+    }
+
+    if (rangeStartPoint != null && rangeStartPoint.index != activePoint?.index) {
+        drawCircle(
+            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
+            radius = activeMarkerHaloRadius,
+            center = Offset(rangeStartPoint.x, rangeStartPoint.y)
+        )
+        drawCircle(
+            color = lineColor.copy(alpha = 0.9f),
+            radius = activeMarkerRadius,
+            center = Offset(rangeStartPoint.x, rangeStartPoint.y),
+            style = Stroke(width = 2.dp.toPx())
+        )
+    }
+
+    if (rangeEndPoint != null && rangeEndPoint.index != activePoint?.index) {
+        drawCircle(
+            color = chartIndicatorHaloColor.copy(alpha = 0.95f),
+            radius = activeMarkerHaloRadius,
+            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
+        )
+        drawCircle(
+            color = lineColor.copy(alpha = 0.92f),
+            radius = activeMarkerRadius,
+            center = Offset(rangeEndPoint.x, rangeEndPoint.y)
+        )
+    }
+
+    if (activePoint != null) {
+        drawLine(
+            color = chartIndicatorColor.copy(alpha = 0.18f),
+            start = Offset(activePoint.x, 0f),
+            end = Offset(activePoint.x, size.height),
+            strokeWidth = gridStroke
+        )
+        drawCircle(
+            color = chartIndicatorHaloColor,
+            radius = activeMarkerHaloRadius,
+            center = Offset(activePoint.x, activePoint.y)
+        )
+        drawCircle(
+            color = chartIndicatorColor,
+            radius = activeMarkerRadius,
+            center = Offset(activePoint.x, activePoint.y)
+        )
     }
 }
 
@@ -661,633 +753,4 @@ private fun HistoryTooltipBubble(
             }
         }
     }
-}
-
-internal data class ValueAxis(
-    val min: Float,
-    val max: Float
-)
-
-internal data class ChartPlotPoint(
-    val index: Int,
-    val point: UsageHistoryPoint,
-    val x: Float,
-    val y: Float
-)
-
-internal data class ResetMarker(
-    val representativeIndex: Int,
-    val count: Int
-)
-
-internal data class HistoryTooltipModel(
-    val title: String?,
-    val subtitle: String,
-    val metrics: List<TooltipMetric>
-)
-
-internal fun filteredPoints(points: List<UsageHistoryPoint>, unit: UsageUnit): List<UsageHistoryPoint> {
-    return if (unit == UsageUnit.CURRENCY_USD) {
-        points.filter { it.displayUsed > 0L }
-    } else {
-        points
-    }
-}
-
-internal fun buildTimelineFractions(points: List<UsageHistoryPoint>): List<Float> {
-    if (points.isEmpty()) {
-        return emptyList()
-    }
-    if (points.size == 1) {
-        return listOf(0f)
-    }
-
-    val start = points.first().capturedAt.toEpochMilliseconds()
-    val end = points.last().capturedAt.toEpochMilliseconds()
-    if (end <= start) {
-        val maxIndex = max(points.lastIndex, 1)
-        return points.indices.map { index -> index.toFloat() / maxIndex.toFloat() }
-    }
-
-    val total = (end - start).toFloat()
-    return points.map { point ->
-        ((point.capturedAt.toEpochMilliseconds() - start) / total).coerceIn(0f, 1f)
-    }
-}
-
-internal fun buildValueAxis(points: List<UsageHistoryPoint>, unit: UsageUnit): ValueAxis? {
-    val values = points.map { it.displayUsed }
-    if (values.isEmpty()) {
-        return null
-    }
-
-    return when (unit) {
-        UsageUnit.CURRENCY_USD -> buildAbsoluteAxis(values, minimumDisplayRange = 100f)
-        UsageUnit.REQUESTS -> buildAbsoluteAxis(values, minimumDisplayRange = 10f)
-        else -> null
-    }
-}
-
-internal fun buildPlotPoints(
-    points: List<UsageHistoryPoint>,
-    chartWidth: Float,
-    chartHeight: Float,
-    axis: ValueAxis?,
-    horizontalInsetPx: Float = HISTORY_PLOT_HORIZONTAL_INSET_PX
-): List<ChartPlotPoint> {
-    if (points.isEmpty() || chartWidth <= 0f || chartHeight <= 0f) {
-        return emptyList()
-    }
-
-    val plotValues = if (axis != null) {
-        val range = (axis.max - axis.min).coerceAtLeast(1f)
-        points.map { point ->
-            ((point.displayUsed.toFloat() - axis.min) / range).coerceIn(0f, 1f)
-        }
-    } else {
-        points.map { it.normalizedUsage }
-    }
-    val xFractions = buildTimelineFractions(points)
-    val inset = resolvePlotHorizontalInset(chartWidth, horizontalInsetPx)
-    val usableWidth = (chartWidth - inset * 2f).coerceAtLeast(0f)
-
-    return points.mapIndexed { index, point ->
-        val xFraction = if (points.size == 1) 0.5f else xFractions[index]
-        val y = chartHeight - (plotValues[index] * chartHeight)
-        ChartPlotPoint(
-            index = index,
-            point = point,
-            x = if (points.size == 1) {
-                chartWidth * xFraction
-            } else {
-                inset + (usableWidth * xFraction)
-            },
-            y = y
-        )
-    }
-}
-
-internal fun resolvePlotHorizontalInset(
-    chartWidth: Float,
-    preferredInsetPx: Float = HISTORY_PLOT_HORIZONTAL_INSET_PX
-): Float {
-    if (chartWidth <= 0f) {
-        return 0f
-    }
-
-    return preferredInsetPx.coerceAtMost((chartWidth / 2f) - 1f).coerceAtLeast(0f)
-}
-
-internal fun findClosestPlotPointIndex(plotPoints: List<ChartPlotPoint>, pointerX: Float): Int? {
-    if (plotPoints.isEmpty()) {
-        return null
-    }
-
-    var closestPoint = plotPoints.first()
-    var bestDistance = abs(pointerX - closestPoint.x)
-
-    for (point in plotPoints.drop(1)) {
-        val distance = abs(pointerX - point.x)
-        if (distance <= bestDistance) {
-            closestPoint = point
-            bestDistance = distance
-        }
-    }
-
-    return closestPoint.index
-}
-
-internal fun clampTooltipLeft(
-    desiredCenterX: Float,
-    tooltipWidth: Float,
-    containerWidth: Float,
-    horizontalPadding: Float = HISTORY_TOOLTIP_PADDING_PX
-): Float {
-    if (containerWidth <= 0f) {
-        return horizontalPadding
-    }
-
-    val unclampedLeft = desiredCenterX - (tooltipWidth / 2f)
-    val minLeft = horizontalPadding
-    val maxLeft = (containerWidth - tooltipWidth - horizontalPadding).coerceAtLeast(minLeft)
-    return unclampedLeft.coerceIn(minLeft, maxLeft)
-}
-
-internal fun framePointerToPlotPointerX(
-    framePointerX: Float,
-    plotStartX: Float,
-    plotWidth: Float
-): Float? {
-    if (plotWidth <= 0f) {
-        return null
-    }
-
-    val translatedPointerX = framePointerX - plotStartX
-    if (translatedPointerX < 0f || translatedPointerX > plotWidth) {
-        return null
-    }
-
-    return translatedPointerX
-}
-
-internal fun coerceFramePointerToPlotPointerX(
-    framePointerX: Float,
-    plotStartX: Float,
-    plotWidth: Float
-): Float? {
-    if (plotWidth <= 0f) {
-        return null
-    }
-
-    return (framePointerX - plotStartX).coerceIn(0f, plotWidth)
-}
-
-internal fun buildHistoryTooltipModel(
-    activePoint: ChartPlotPoint?,
-    points: List<UsageHistoryPoint>,
-    unit: UsageUnit,
-    language: AppLanguage,
-    title: String?,
-    subtitle: String?,
-    comparisonPoint: UsageHistoryPoint? = null
-): HistoryTooltipModel? {
-    if (activePoint == null) {
-        return null
-    }
-
-    val point = activePoint.point
-    val fallbackComparisonPoint = points.getOrNull(activePoint.index - 1)
-    val timestamp = formatTooltipTimestamp(point.capturedAt)
-    val contextualSubtitle = if (subtitle.isNullOrBlank()) {
-        timestamp
-    } else {
-        "$subtitle · $timestamp"
-    }
-
-    return HistoryTooltipModel(
-        title = title,
-        subtitle = contextualSubtitle,
-        metrics = buildHistoryTooltipMetrics(
-            point = point,
-            comparisonPoint = comparisonPoint ?: fallbackComparisonPoint,
-            unit = unit,
-            language = language
-        )
-    )
-}
-
-internal fun buildHistoryTooltipMetrics(
-    point: UsageHistoryPoint,
-    comparisonPoint: UsageHistoryPoint?,
-    unit: UsageUnit,
-    language: AppLanguage
-): List<TooltipMetric> {
-    val usageLabel = when (unit) {
-        UsageUnit.CURRENCY_USD -> if (language == AppLanguage.PT) "Saldo" else "Balance"
-        else -> if (language == AppLanguage.PT) "Uso" else "Usage"
-    }
-    val changeLabel = if (language == AppLanguage.PT) "Variação" else "Change"
-    val windowLabel = if (language == AppLanguage.PT) "Janela" else "Window"
-
-    return buildList {
-        add(
-            TooltipMetric(
-                label = usageLabel,
-                value = formatTooltipUsageValue(point = point, unit = unit, language = language)
-            )
-        )
-        add(
-            TooltipMetric(
-                label = changeLabel,
-                value = formatTooltipDeltaValue(
-                    point = point,
-                    comparisonPoint = comparisonPoint,
-                    unit = unit,
-                    language = language
-                )
-            )
-        )
-        add(
-            TooltipMetric(
-                label = windowLabel,
-                value = formatTooltipWindowValue(
-                    instant = point.periodEndAt,
-                    unit = unit,
-                    language = language
-                )
-            )
-        )
-    }
-}
-
-internal fun buildTimeReferenceLabels(points: List<UsageHistoryPoint>): List<String> {
-    if (points.isEmpty()) {
-        return emptyList()
-    }
-
-    val middlePoint = points[points.lastIndex / 2]
-    return listOf(
-        formatTimeReference(points.first().capturedAt, points.first().capturedAt, points.last().capturedAt),
-        formatTimeReference(middlePoint.capturedAt, points.first().capturedAt, points.last().capturedAt),
-        formatTimeReference(points.last().capturedAt, points.first().capturedAt, points.last().capturedAt)
-    )
-}
-
-internal fun detectHistoryRangeAnnotations(
-    points: List<UsageHistoryPoint>,
-    unit: UsageUnit
-): HistoryRangeAnnotations? {
-    if (points.isEmpty()) {
-        return null
-    }
-
-    val resetIndices = mutableListOf<Int>()
-    for (index in 1 until points.size) {
-        val previous = points[index - 1]
-        val current = points[index]
-        val periodChanged = !isSamePeriod(current.periodEndAt, previous.periodEndAt)
-        val usageDropped = unit != UsageUnit.CURRENCY_USD && current.displayUsed < previous.displayUsed
-        if (periodChanged || usageDropped) {
-            resetIndices += index
-        }
-    }
-
-    return HistoryRangeAnnotations(
-        startIndex = 0,
-        endIndex = points.lastIndex,
-        resetIndices = resetIndices
-    )
-}
-
-internal fun clusterResetIndices(
-    resetIndices: List<Int>,
-    plotPoints: List<ChartPlotPoint>,
-    minPixelGap: Float
-): List<ResetMarker> {
-    if (resetIndices.isEmpty()) {
-        return emptyList()
-    }
-
-    val sortedIndices = resetIndices.sorted()
-    val clusters = mutableListOf<MutableList<Int>>()
-
-    for (index in sortedIndices) {
-        val point = plotPoints.getOrNull(index) ?: continue
-        val lastCluster = clusters.lastOrNull()
-        val lastPoint = lastCluster?.lastOrNull()?.let(plotPoints::getOrNull)
-        if (lastCluster != null && lastPoint != null && abs(point.x - lastPoint.x) < minPixelGap) {
-            lastCluster += index
-        } else {
-            clusters += mutableListOf(index)
-        }
-    }
-
-    return clusters.map { cluster ->
-        ResetMarker(representativeIndex = cluster.last(), count = cluster.size)
-    }
-}
-
-internal fun zoomedPoints(
-    points: List<UsageHistoryPoint>,
-    zoomRange: ClosedFloatingPointRange<Float>
-): List<UsageHistoryPoint> {
-    if (points.isEmpty() || zoomRange == 0f..1f) {
-        return points
-    }
-
-    val fractions = buildTimelineFractions(points)
-    val filtered = points.filterIndexed { index, _ ->
-        fractions[index] >= zoomRange.start && fractions[index] <= zoomRange.endInclusive
-    }
-    return filtered.ifEmpty { points }
-}
-
-internal fun applyChartScroll(
-    current: ClosedFloatingPointRange<Float>,
-    scrollDeltaY: Float,
-    scrollDeltaX: Float,
-    pointerFraction: Float,
-    shiftPressed: Boolean,
-    minWidth: Float = HISTORY_MIN_ZOOM_WIDTH_FRACTION
-): ClosedFloatingPointRange<Float> {
-    val width = current.endInclusive - current.start
-    val effectivePanDelta = if (shiftPressed) scrollDeltaY else scrollDeltaX
-    val isPan = shiftPressed || abs(scrollDeltaX) > abs(scrollDeltaY)
-
-    if (isPan) {
-        if (effectivePanDelta == 0f) {
-            return current
-        }
-        val panDelta = effectivePanDelta * width * HISTORY_PAN_SENSITIVITY
-        var newStart = current.start + panDelta
-        var newEnd = current.endInclusive + panDelta
-        if (newStart < 0f) {
-            newEnd -= newStart
-            newStart = 0f
-        }
-        if (newEnd > 1f) {
-            newStart -= (newEnd - 1f)
-            newEnd = 1f
-        }
-        return newStart.coerceAtLeast(0f)..newEnd.coerceAtMost(1f)
-    }
-
-    if (scrollDeltaY == 0f) {
-        return current
-    }
-
-    val zoomingIn = scrollDeltaY < 0f
-    val zoomFactor = if (zoomingIn) HISTORY_ZOOM_STEP_FACTOR else 1f / HISTORY_ZOOM_STEP_FACTOR
-    val newWidth = (width * zoomFactor).coerceIn(minWidth, 1f)
-    val anchor = pointerFraction.coerceIn(0f, 1f)
-    var newStart = anchor - (anchor - current.start) * (newWidth / width)
-    var newEnd = newStart + newWidth
-    if (newStart < 0f) {
-        newEnd -= newStart
-        newStart = 0f
-    }
-    if (newEnd > 1f) {
-        newStart -= (newEnd - 1f)
-        newEnd = 1f
-    }
-    return newStart.coerceAtLeast(0f)..newEnd.coerceAtMost(1f)
-}
-
-private fun buildAbsoluteAxis(values: List<Long>, minimumDisplayRange: Float): ValueAxis? {
-    val minValue = values.minOrNull()?.toFloat() ?: return null
-    val maxValue = values.maxOrNull()?.toFloat() ?: return null
-    val rawRange = (maxValue - minValue).coerceAtLeast(0f)
-    val displayRange = max(rawRange * 1.25f, minimumDisplayRange)
-    val axisMax = maxValue.coerceAtLeast(minValue)
-    val axisMin = (axisMax - displayRange).coerceAtLeast(0f)
-
-    return ValueAxis(
-        min = axisMin,
-        max = axisMax
-    )
-}
-
-private fun buildHistoryTooltipTop(
-    pointY: Float,
-    tooltipHeight: Float,
-    frameHeight: Float
-): Float {
-    if (tooltipHeight <= 0f || frameHeight <= 0f) {
-        return HISTORY_TOOLTIP_PADDING_PX
-    }
-
-    val desiredTop = pointY - tooltipHeight - HISTORY_TOOLTIP_OFFSET_PX
-    val maxTop = (frameHeight - tooltipHeight - HISTORY_TOOLTIP_PADDING_PX)
-        .coerceAtLeast(HISTORY_TOOLTIP_PADDING_PX)
-    return desiredTop.coerceIn(HISTORY_TOOLTIP_PADDING_PX, maxTop)
-}
-
-private fun formatTimeReference(instant: Instant, rangeStart: Instant, rangeEnd: Instant): String {
-    val totalHours = (rangeEnd.toEpochMilliseconds() - rangeStart.toEpochMilliseconds()) / 3_600_000.0
-    val localDateTime = instant.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
-
-    return if (totalHours > 48.0) {
-        "${localDateTime.date.dayOfMonth.toString().padStart(2, '0')}/${localDateTime.date.monthNumber.toString().padStart(2, '0')}"
-    } else {
-        "${localDateTime.hour.toString().padStart(2, '0')}:${localDateTime.minute.toString().padStart(2, '0')}"
-    }
-}
-
-private fun formatTooltipUsageValue(
-    point: UsageHistoryPoint,
-    unit: UsageUnit,
-    language: AppLanguage
-): String {
-    return when (unit) {
-        UsageUnit.CURRENCY_USD -> formatCurrencyValue(point.displayUsed)
-        UsageUnit.REQUESTS -> {
-            if (point.displayTotal > 0L) {
-                val percentage = formatPercentage(point.displayUsed, point.displayTotal)
-                "${formatCountValue(point.displayUsed)}/${formatCountValue(point.displayTotal)} req ($percentage)"
-            } else {
-                "${formatCountValue(point.displayUsed)} req"
-            }
-        }
-
-        UsageUnit.PERCENTAGE -> {
-            if (point.total > 0L) {
-                "${point.used}/${point.total} % (${formatPercentage(point.used, point.total)})"
-            } else {
-                "${point.used} %"
-            }
-        }
-
-        UsageUnit.TOKENS -> {
-            if (point.displayTotal > 0L) {
-                val percentage = formatPercentage(point.displayUsed, point.displayTotal)
-                "${formatCountValue(point.displayUsed)}/${formatCountValue(point.displayTotal)} tok ($percentage)"
-            } else {
-                "${formatCountValue(point.displayUsed)} tok"
-            }
-        }
-    }
-}
-
-private fun formatTooltipDeltaValue(
-    point: UsageHistoryPoint,
-    comparisonPoint: UsageHistoryPoint?,
-    unit: UsageUnit,
-    language: AppLanguage
-): String {
-    if (comparisonPoint == null) {
-        return if (language == AppLanguage.PT) "Sem base anterior" else "No previous point"
-    }
-
-    val baseUnavailableLabel = if (language == AppLanguage.PT) "base indisponível" else "base unavailable"
-    return when (unit) {
-        UsageUnit.CURRENCY_USD -> {
-            val delta = point.displayUsed - comparisonPoint.displayUsed
-            val absolute = formatSignedCurrencyValue(delta)
-            appendRelativeVariation(
-                absoluteValue = absolute,
-                deltaValue = delta.toDouble(),
-                baseValue = comparisonPoint.displayUsed.toDouble(),
-                baseUnavailableLabel = baseUnavailableLabel
-            )
-        }
-
-        UsageUnit.REQUESTS -> {
-            val delta = point.displayUsed - comparisonPoint.displayUsed
-            val absolute = "${formatSignedCountValue(delta)} req"
-            appendRelativeVariation(
-                absoluteValue = absolute,
-                deltaValue = delta.toDouble(),
-                baseValue = comparisonPoint.displayUsed.toDouble(),
-                baseUnavailableLabel = baseUnavailableLabel
-            )
-        }
-
-        UsageUnit.PERCENTAGE -> {
-            val delta = point.used - comparisonPoint.used
-            val absolute = "${formatSignedCountValue(delta)} p.p."
-            appendRelativeVariation(
-                absoluteValue = absolute,
-                deltaValue = delta.toDouble(),
-                baseValue = comparisonPoint.used.toDouble(),
-                baseUnavailableLabel = baseUnavailableLabel
-            )
-        }
-
-        UsageUnit.TOKENS -> {
-            val delta = point.displayUsed - comparisonPoint.displayUsed
-            val absolute = "${formatSignedCountValue(delta)} tok"
-            appendRelativeVariation(
-                absoluteValue = absolute,
-                deltaValue = delta.toDouble(),
-                baseValue = comparisonPoint.displayUsed.toDouble(),
-                baseUnavailableLabel = baseUnavailableLabel
-            )
-        }
-    }
-}
-
-private fun appendRelativeVariation(
-    absoluteValue: String,
-    deltaValue: Double,
-    baseValue: Double,
-    baseUnavailableLabel: String
-): String {
-    if (baseValue <= 0.0) {
-        return "$absoluteValue ($baseUnavailableLabel)"
-    }
-
-    val relativePercent = (deltaValue * 100.0 / baseValue).roundToInt()
-    val relativePrefix = if (relativePercent > 0) "+" else ""
-    return "$absoluteValue (${relativePrefix}${relativePercent}%)"
-}
-
-private fun formatTooltipWindowValue(
-    instant: Instant,
-    unit: UsageUnit,
-    language: AppLanguage
-): String {
-    val localDateTime = instant.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
-    if (unit == UsageUnit.CURRENCY_USD && localDateTime.year >= 9999) {
-        return if (language == AppLanguage.PT) "Sem expiração" else "No expiry"
-    }
-
-    return formatTooltipTimestamp(instant)
-}
-
-private fun formatTooltipTimestamp(instant: Instant): String {
-    val localDateTime = instant.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
-    val day = localDateTime.date.dayOfMonth.toString().padStart(2, '0')
-    val month = localDateTime.date.monthNumber.toString().padStart(2, '0')
-    val hour = localDateTime.hour.toString().padStart(2, '0')
-    val minute = localDateTime.minute.toString().padStart(2, '0')
-    return "$day/$month $hour:$minute BRT"
-}
-
-private fun formatCentsLabel(cents: Long): String {
-    val dollars = cents / 100
-    val remainder = abs(cents % 100)
-    return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
-}
-
-private fun buildValueLabels(axis: ValueAxis?, unit: UsageUnit): List<String> {
-    if (axis == null) {
-        return emptyList()
-    }
-
-    val middle = ((axis.max + axis.min) / 2f).toLong()
-    return when (unit) {
-        UsageUnit.CURRENCY_USD -> listOf(
-            formatCentsLabel(axis.max.toLong()),
-            formatCentsLabel(middle),
-            formatCentsLabel(axis.min.toLong())
-        )
-
-        UsageUnit.REQUESTS -> listOf(
-            formatCountValue(axis.max.toLong()),
-            formatCountValue(middle),
-            formatCountValue(axis.min.toLong())
-        )
-
-        else -> emptyList()
-    }
-}
-
-private fun formatCurrencyValue(cents: Long): String {
-    val sign = if (cents < 0L) "-" else ""
-    val absoluteCents = abs(cents)
-    val dollars = absoluteCents / 100
-    val remainder = absoluteCents % 100
-    return "${sign}\$${dollars}.${remainder.toString().padStart(2, '0')}"
-}
-
-private fun formatSignedCurrencyValue(cents: Long): String {
-    val prefix = if (cents > 0L) "+" else ""
-    return prefix + formatCurrencyValue(cents)
-}
-
-private fun formatCountValue(value: Long): String {
-    return when {
-        value >= 1_000_000L -> "${trimDecimal(value / 1_000_000.0)}M"
-        value >= 1_000L -> "${trimDecimal(value / 1_000.0)}K"
-        else -> value.toString()
-    }
-}
-
-private fun formatSignedCountValue(value: Long): String {
-    val prefix = if (value > 0L) "+" else ""
-    return prefix + formatCountValue(value)
-}
-
-private fun formatPercentage(used: Long, total: Long): String {
-    if (total <= 0L) {
-        return "—"
-    }
-
-    val percentage = (used * 100.0 / total.toDouble()).roundToInt()
-    return "$percentage%"
-}
-
-private fun trimDecimal(value: Double): String {
-    val text = "%.1f".format(value)
-    return text.removeSuffix(".0").removeSuffix(",0")
 }
