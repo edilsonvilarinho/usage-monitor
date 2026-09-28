@@ -266,6 +266,18 @@ automática: sem ela a beta só é anunciada.
   estável do mesmo número.
 - **Publicação**: skill `usage-monitor-release-beta`. A estável segue na `usage-monitor-release`, e a
   versão-base dela e de `lastReleaseTagVersion()` ignora tags beta (`--exclude "*-beta*"`).
+- **Ciclo de vida, todo pela skill** (`patch|minor|major`, `next`, `promote`, `withdraw`, `restore`):
+  - *Não existe "mover a beta para a main"*: a tag já aponta para um commit da `main`. **Promover** é
+    publicar a estável `vX.Y.Z` da série aberta como tag e build **novos** — nunca editar a release beta
+    para estável/Latest, porque os binários dela se chamam `X.Y.Z-beta.N` (`CURRENT_APP_VERSION`,
+    instalador, recibo).
+  - **Corrigir** uma beta ruim é seguir em frente: `next` publica `beta.N+1`, que alcança inclusive quem
+    ficou na ruim.
+  - **Retirar** é esconder a release como rascunho (`gh release edit --draft=true`): o app ignora
+    rascunho e a API anônima não o mostra; `restore` desfaz com `--draft=false --prerelease
+    --latest=false`. Quem já instalou **fica** na beta (sem downgrade) até chegar versão maior. Apagar
+    release ou tag fica fora da skill: não ganha nada sobre o rascunho e perde o registro; nome de tag
+    retirada nunca é reusado.
 
 **Ajuda dentro do app** (`presentation/ui/help/` + `desktopMain/help/HelpMediaPlayer.kt` +
 `desktopMain/presentation/ui/HelpWindow.kt` + `src/desktopMain/resources/help/*.gif`; issue #184,

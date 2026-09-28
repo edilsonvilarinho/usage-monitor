@@ -9,9 +9,16 @@ Configurações recebe.
 ## Usage
 
 ```
-/release-beta minor   # nova série: próxima estável minor, beta.1
-/release-beta next    # continua a série aberta: beta.N+1
+/release-beta minor      # nova série: próxima estável minor, beta.1
+/release-beta next       # continua a série aberta: beta.N+1 (é assim que se corrige uma beta ruim)
+/release-beta promote    # publica a estável vX.Y.Z da série aberta (fluxo da /release, versão fixa)
+/release-beta withdraw   # esconde a beta (vira rascunho): ninguém novo a recebe; reversível
+/release-beta restore    # desfaz o withdraw, de volta como prerelease e nunca Latest
 ```
+
+Não existe "mover a beta para a main": a tag já aponta para um commit da `main`. Não existe rollback
+para quem já instalou: o app nunca faz downgrade — sai da beta quando chega versão maior. Nunca apagar
+release nem tag, e nunca editar uma beta para estável/Latest. Detalhes na skill completa.
 
 ## Steps
 
