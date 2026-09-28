@@ -20,8 +20,11 @@ Release this repository in a way that stays aligned with the current build, inst
    - `git fetch origin && git status --short --branch`
    - `git log --oneline -5`
 5. Pick the version. **There is no version bump commit** (#344): the version comes from the tag.
-   - Current version: `git describe --tags --abbrev=0 --match "v[0-9]*"`; compute the next
-     `X.Y.Z` from the release type.
+   - Current version: `git describe --tags --abbrev=0 --match "v[0-9]*" --exclude "*-beta*"`;
+     compute the next `X.Y.Z` from the release type. Beta tags (`vX.Y.Z-beta.N`, issue #355) are
+     never the base: without `--exclude` a beta would become the "current" stable version. If an open
+     beta series `vX.Y.Z-beta.N` exists, releasing it as stable means tagging that same `X.Y.Z`.
+     Beta releases have their own skill, `usage-monitor-release-beta`.
    - `build.gradle.kts` resolves `version` from `-PappVersion` (the release workflow passes the tag)
      and, without it, from that same `git describe` — never edit a version literal there or in
      `src/installer/UsageMonitor.nsi` (its `!ifndef` default only serves direct `makensis` runs).

@@ -17,7 +17,8 @@ plugins {
 // o container do `build-linux` nem tem git.
 fun lastReleaseTagVersion(): String = runCatching {
     providers.exec {
-        commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
+        // `--exclude`: tag beta (`vX.Y.Z-beta.N`, issue #355) nao e a versao estavel de base.
+        commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", "--exclude", "*-beta*")
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim().removePrefix("v")
 }.getOrDefault("")
