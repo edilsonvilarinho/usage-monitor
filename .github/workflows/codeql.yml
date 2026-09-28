@@ -8,6 +8,10 @@ on:
   push:
     branches:
       - main
+    # Mudanca so de docs nao muda codigo analisavel (#344).
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   schedule:
     - cron: '17 3 * * 1'
   workflow_dispatch:

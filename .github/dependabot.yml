@@ -5,16 +5,30 @@ version: 2
 # ecossistema, porque cada um tem ciclo de release proprio e um PR que
 # misturasse Gradle e npm teria de ser revertido em duas partes se um dos
 # dois quebrar.
+#
+# `groups` junta minor e patch de cada ecossistema num PR so (#344): eram ~6 PRs
+# por semana, cada um com a suite inteira. Major continua sozinho -- e o que pode
+# quebrar, e merece revisao e revert proprios.
 updates:
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      gradle-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/server"
     schedule:
       interval: "weekly"
+    groups:
+      server-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   # As proprias Actions do CI/release sao dependencia: uma tag como @v4 pode
   # ser movida para um commit novo sem o repositorio saber. O Dependabot abre
@@ -24,3 +38,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
