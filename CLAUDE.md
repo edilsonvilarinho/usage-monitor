@@ -357,6 +357,10 @@ Helvetica em vez de falhar.
 Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-and-release.md), seção
 "CI e testes — decisões". Regras:
 
+- **Plataformas** ("Platform reality" no `CONTRIBUTING.md`, #342): a suíte só roda no Windows e nenhum
+  teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
+  merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
+
 - Workflows: `ci.yml` (desktop no Windows + instalador) e `ci-server.yml` (servidor). Cache do Gradle
   pela `gradle/actions/setup-gradle`, gravado só na `main`.
 - CI roda com `-PtestForks=3`; localmente 1. Com forks, `extractSkikoNative` roda antes. **Verde
