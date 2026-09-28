@@ -34,15 +34,16 @@ first launch.
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/ci.yml` | `allTests` on Windows, on push to `main` and on pull request |
-| `.github/workflows/ci-server.yml` | `typecheck` and `vitest` for `server/`, when `server/**` changes |
+| `.github/workflows/ci.yml` | Everything on pull request and push to `main`: desktop suite (Windows, plus Linux as advisory), installer and Linux updater scenarios, team server, pricing parity — each only when its paths changed; `ci-ok` aggregates |
 | `.github/workflows/release-linux.yml` | on `v*` tags: publishes Windows, Linux and macOS artifacts |
 | `.github/workflows/codeql.yml` | CodeQL on push to `main`, weekly and manually |
 
-Both test jobs publish a summary to `$GITHUB_STEP_SUMMARY` — test counts and slowest classes when
-they run, and an explicit **not executed** notice with the reason when the path filter skips them. A
-job that passes in five seconds without running a single test is otherwise indistinguishable from one
-that ran the suite.
+The `changes` job decides which areas the diff touches (`HEAD^1..HEAD` on a pull request, whose
+checkout is the merge commit; `before..sha` on push; any git failure means "run everything") and
+writes that table to the run summary. A job for an untouched area is skipped at job level, so no
+runner starts. `ci-ok` runs always, treats `skipped` as success and `failure`/`cancelled` as failure,
+and is the single check branch protection should require. Every test job that runs publishes counts
+and slowest classes to `$GITHUB_STEP_SUMMARY`, and `--require` fails it when no XML was produced.
 
 The release is tag-only (#344). The version comes from the tag: `build.gradle.kts` reads
 `-PappVersion`, which the release workflow passes, and falls back to
@@ -75,8 +76,8 @@ every fork tries to unpack at once.
 
 ### Coverage
 
-Kover instrumentation is opt-in via `-Pcoverage`, because it costs 6–7 s per run. Only the push to
-`main` turns it on.
+Kover instrumentation is opt-in via `-Pcoverage`, because it costs 6–7 s per run. CI turns it on in
+every run of `desktop-windows`.
 
 ```bat
 gradlew.bat allTests -Pcoverage
@@ -270,8 +271,8 @@ eram descobertas por acidente.
 
 ## CI e testes
 
-Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e `ci-server.yml`
-(suíte do servidor no Ubuntu). O plano com as medições está em
+Um workflow, `ci.yml`, desde a #344 (antes eram `ci.yml` e `ci-server.yml`, cada um com o próprio
+recorte por path). O plano com as medições está em
 [`docs/planos/ci-testes-detalhe-e-velocidade-execucao.md`](planos/ci-testes-detalhe-e-velocidade-execucao.md).
 
 - **O cache do Gradle é da `gradle/actions/setup-gradle`, não do `cache: 'gradle'` do `setup-java`.**
@@ -300,13 +301,14 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
     paralela: `ComponentTest`, com 103 testes e 120 s no CI, terminava sozinho num fork enquanto os
     outros esperavam. Foi dividido em `ComponentTest`, `SettingsDialogContentTest` e `HistoryScreenTest`
     (~30–40 s cada). Teste de tela novo vai no arquivo da tela dele, não num arquivo genérico.
-- **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
-  Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
-  não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois
-  jobs publicam no `$GITHUB_STEP_SUMMARY` — contagem e classes mais lentas quando rodam, **NAO
-  EXECUTADA** com motivo e contagem de arquivos quando não. O `--require` do
-  `tools/ci/test-summary.mjs` derruba o job quando a suíte devia rodar e não produziu XML: é o que faz
-  "passou sem executar" ficar vermelho.
+- **O recorte por path mora num job só (`changes`), e o check obrigatório é o `ci-ok`** (#344).
+  Rodar 5 min de Windows por um typo no README é a lentidão que a issue #93 reclama; mas um check
+  obrigatório que o filtro impede de disparar trava o PR em "Expected — Waiting for status", e por
+  isso o recorte morava **dentro** de cada job, que subia runner só para anunciar **NAO EXECUTADA**
+  — 9 a 10 jobs, dois deles Windows, num PR só de docs. Agora o job pulado nem sobe runner, e o
+  `ci-ok` (`if: always()`) é o único check que precisa existir: `skipped` conta como sucesso. O
+  `--require` do `tools/ci/test-summary.mjs` continua derrubando o job que devia rodar a suíte e não
+  produziu XML — é o que faz "passou sem executar" ficar vermelho.
 - **Um parser de JUnit XML para os dois jobs** (`tools/ci/test-summary.mjs`), e por isso o `vitest`
   escreve no mesmo formato (`npm run test:ci`). Duas implementações divergiriam justamente na
   contagem, que é o número que o resumo existe para dar. Sem dependência externa: no job do desktop
@@ -323,17 +325,14 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   limiar calibrado no escuro. Linha de base de 2026-08-25: **82,7% de linhas**, 52,3% de ramos.
   `MainKt` fica fora do relatório por filtro — é o grafo de DI mais a janela, e contá-lo afunda o
   número sem apontar lacuna que se possa fechar.
-- **O push na `main` reaproveita a árvore verificada no PR** (jobs `gate` e `verified-tree` do
-  `ci.yml`; issue #299, plano [`ci-arvore-verificada-299-execucao.md`](planos/ci-arvore-verificada-299-execucao.md)).
-  Depois do merge a `main` repetia ~11 min de Windows sobre o mesmo código. A identidade do código
-  testado é o **tree SHA**: no `pull_request` o checkout é `refs/pull/N/merge`, e o squash de um PR
-  cuja base não andou tem a mesma árvore — medido em 3 de 3 merges (#292, #296, #297). O PR verde
-  publica o artifact `ci-verified-tree-<tree>`; o `gate` o procura no push e, achando run de PR
-  verde do **próprio** repositório (fork edita o próprio `ci.yml` e forjaria o marcador), os jobs
-  publicam **NAO EXECUTADA** com o link do run. O gatilho `push` **não** foi removido: a `main` não
-  tem proteção de branch, e merge com a base adiantada gera árvore nunca testada — ali, e em push
-  direto (bump de release), marcador expirado (30 dias) ou falha de API, tudo roda. O preço é o
-  cache do Gradle: a `main` só grava quando roda de verdade.
+- **O push na `main` roda a suíte de novo, e isso é aceito** (#344, revertendo a decisão da #299).
+  A #299 pulava a suíte na `main` quando a árvore do squash batia com a de um PR verde (jobs `gate` e
+  `verified-tree`, artifact `ci-verified-tree-<tree>`), e o release esperava um marcador do CI da
+  `main` (`release-gate-marker` + `resolve-ci-gate`, polling de até 15 min). O conjunto somava ~350
+  linhas de YAML, subia runners só para dizer "pulei" e amarrava o release a um run da `main`
+  disparado pelo próprio commit de bump — o sintoma que abriu a #344. Com a versão vinda da tag e o
+  `verify` próprio do release, ninguém espera pelo CI da `main`; repositório público não paga o
+  minuto, e o run da `main` é o que grava o cache do Gradle.
 - **Cobertura alta não é a mesma coisa que costura certa.** `RemoteTeamDataSource` está em 1,9%
   porque os testes **herdam da classe real** e sobrescrevem os 20 métodos: o nome aparece em três
   arquivos de teste e nenhuma linha de HTTP executa (issue #94). Ao ver uma classe `open` com todo

@@ -361,8 +361,10 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
   merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
 
-- Workflows: `ci.yml` (desktop no Windows + instalador) e `ci-server.yml` (servidor). Cache do Gradle
-  pela `gradle/actions/setup-gradle`, gravado só na `main`.
+- Workflows (#344): `ci.yml` único — job `changes` recorta por path, jobs em paralelo só do que
+  mudou, **`ci-ok` é o check único** (pulado conta como sucesso); `release-linux.yml` só por tag,
+  **versão vem da tag** (`-PappVersion`), sem commit de bump. Cache do Gradle pela
+  `gradle/actions/setup-gradle`, gravado só na `main` — tag e CodeQL só leem.
 - CI roda com `-PtestForks=3`; localmente 1. Com forks, `extractSkikoNative` roda antes. **Verde
   local e vermelho no CI em teste de UI: olhe o `~/.skiko` antes do teste.**
 - Teste de tela usa `ScreenTestTheme` (`Reduced`); teste de primitiva que anima usa `AppTheme`.
@@ -371,7 +373,7 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - **`delay` em `runTest` é tempo virtual**: espera de estado de view model usa `yield()` +
   `Thread.sleep` (`pauseForBackgroundWork`). `awaitSettledState` espera a coleta inteira
   (`refreshingTargets` vazio), não o primeiro `Success`.
-- Cobertura opt-in por `-Pcoverage`, sem piso. Push na `main` reaproveita a árvore verificada no PR.
+- Cobertura opt-in por `-Pcoverage`, sem piso.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
 ## Convenções de código
