@@ -25,6 +25,10 @@ import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_REMOVE_TEST_TA
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.CARDS_ONLY_MODE_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.CODEX_ACCOUNTS_ADD_TEST_TAG
+import com.usagemonitor.presentation.ui.components.CodexAccountsSettings
+import com.usagemonitor.presentation.ui.components.CodexProfileUiModel
+import com.usagemonitor.presentation.ui.components.codexAccountSwitchTestTag
 import com.usagemonitor.presentation.ui.components.HUD_MODE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.REDUCED_MOTION_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
@@ -479,6 +483,44 @@ class SettingsDialogContentTest {
         onNodeWithTag(REDUCED_MOTION_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
+    }
+
+    /** Contas Codex extras (issue #329): seção própria na aba Contas, abaixo das da Anthropic. */
+    @Test
+    fun `SettingsDialogContent lists extra Codex accounts and emits their actions`() = runDesktopComposeUiTest {
+        var toggled: Pair<String, Boolean>? = null
+        var added = false
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.CODEX),
+                    autoStartEnabled = false,
+                    initialTab = SettingsTab.ACCOUNTS,
+                    codexAccounts = CodexAccountsSettings(
+                        profiles = listOf(CodexProfileUiModel("codex-work", "work", "C:/codex-work", enabled = true)),
+                        error = "Sem auth.json em C:/vazio.",
+                        onAdd = { added = true },
+                        onToggle = { id, checked -> toggled = id to checked }
+                    ),
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithText("Contas Codex extras").assertExists()
+        onNodeWithText("C:/codex-work").assertExists()
+        onNodeWithText("Sem auth.json em C:/vazio.").assertExists()
+        onNodeWithTag(codexAccountSwitchTestTag("codex-work")).performScrollTo().performClick()
+        onNodeWithTag(CODEX_ACCOUNTS_ADD_TEST_TAG).performScrollTo().performClick()
+
+        assertEquals("codex-work" to false, toggled)
+        assertEquals(true, added)
     }
 
     /** Anel de uso da bandeja (issue #328): fecha a seção Sistema da aba Geral. */

@@ -115,6 +115,7 @@ internal class AppViewModels(
         isAppVisible = graph.isAppVisible,
         isBusy = cliBusy,
         anthropicProfiles = graph.enabledAnthropicProfiles,
+        codexProfiles = graph.enabledCodexProfiles,
         persistedNextRefreshAt = graph.persistedNextRefreshAt,
         onNextRefreshAtChanged = { instant ->
             graph.settings.putLong(NEXT_REFRESH_AT_KEY, instant.toEpochMilliseconds())

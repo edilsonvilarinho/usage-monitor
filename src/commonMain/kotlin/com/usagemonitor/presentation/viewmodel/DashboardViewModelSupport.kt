@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -130,13 +131,16 @@ internal fun statsRetainedAfterFailure(
 internal fun uiApiErrorOf(
     target: UsageTargetKey,
     error: Throwable,
-    profiles: List<AnthropicProfileRef>
+    profiles: List<AnthropicProfileRef>,
+    codexProfiles: List<CodexProfileRef> = emptyList()
 ): UiApiError {
     val source = target.source
-    val targetLabel = if (source == ApiSource.ANTHROPIC) {
-        profiles.firstOrNull { it.id == target.profileId }?.let { "Anthropic — ${it.label}" }
-    } else {
-        null
+    // Conta extra do Codex (issue #329) ganha o mesmo rótulo da Anthropic: com
+    // duas contas, "Codex" sozinho no banner não diz qual falhou.
+    val targetLabel = when (source) {
+        ApiSource.ANTHROPIC -> profiles.firstOrNull { it.id == target.profileId }?.let { "Anthropic — ${it.label}" }
+        ApiSource.CODEX -> codexProfiles.firstOrNull { it.id == target.profileId }?.let { "Codex — ${it.label}" }
+        else -> null
     }
     val originalMessage = error.message ?: error::class.simpleName ?: "erro desconhecido"
     // Falha de conectividade (proxy ausente/incorreto, DNS, timeout de conexão)
@@ -160,16 +164,21 @@ internal fun uiApiErrorOf(
 /** Um alvo por fonte habilitada, e um por perfil na Anthropic, na ordem das fontes. */
 internal fun enabledTargetsOf(
     enabledSources: Set<ApiSource>,
-    profiles: List<AnthropicProfileRef>
+    profiles: List<AnthropicProfileRef>,
+    codexProfiles: List<CodexProfileRef> = emptyList()
 ): Set<UsageTargetKey> {
     val targets = linkedSetOf<UsageTargetKey>()
     enabledSources.sortedBy { it.ordinal }.forEach { source ->
-        if (source == ApiSource.ANTHROPIC) {
-            profiles.forEach { profile ->
+        when (source) {
+            ApiSource.ANTHROPIC -> profiles.forEach { profile ->
                 targets += UsageTargetKey(ApiSource.ANTHROPIC, profile.id)
             }
-        } else {
-            targets += UsageTargetKey.forSource(source)
+            // A conta padrão segue sem perfil; as extras vêm depois dela (issue #329).
+            ApiSource.CODEX -> {
+                targets += UsageTargetKey.forSource(source)
+                codexProfiles.forEach { profile -> targets += UsageTargetKey(ApiSource.CODEX, profile.id) }
+            }
+            else -> targets += UsageTargetKey.forSource(source)
         }
     }
     return targets

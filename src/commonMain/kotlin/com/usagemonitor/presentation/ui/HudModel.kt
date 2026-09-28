@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.runtime.Immutable
+import com.usagemonitor.domain.entity.anthropicProfileId
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CodexQuotaLabels
@@ -346,8 +347,8 @@ internal fun buildHudAccounts(
                 originLabel = hudSourceOrigin(first.stats.source, language),
                 accountKey = first.stats.accountContext?.key,
                 refreshing = target in refreshingTargets,
-                accountAccent = target.profileId?.let { profileId -> accountColors[profileId] },
-                accountEmoji = target.profileId?.let { profileId -> accountEmojis[profileId] },
+                accountAccent = target.anthropicProfileId?.let { profileId -> accountColors[profileId] },
+                accountEmoji = target.anthropicProfileId?.let { profileId -> accountEmojis[profileId] },
                 sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language)
             )
         }

@@ -125,7 +125,11 @@ internal fun runUsageMonitor(
     val profileRecords by graph.profileRegistry.profiles.collectAsState()
     val profileResolution = resolveAnthropicProfiles(graph.profileRegistry, profileRecords)
     graph.enabledAnthropicProfiles.value = profileResolution.enabledProfiles
-    val availableTargets = remember(profileRecords) { availableUsageTargets(profileRecords) }
+    // Contas Codex extras (issue #329): o flow do view model segue o registro.
+    val codexRecords by graph.codexProfileRegistry.profiles.collectAsState()
+    val enabledCodexProfiles = codexRecords.filter { it.enabled }.map { it.ref }
+    graph.enabledCodexProfiles.value = enabledCodexProfiles
+    val availableTargets = remember(profileRecords, codexRecords) { availableUsageTargets(profileRecords, codexRecords) }
     val profileUiModels = buildAnthropicProfileUiModels(
         records = profileRecords,
         inspections = profileResolution.inspections,
@@ -214,6 +218,7 @@ internal fun runUsageMonitor(
         enabledProfiles = profileResolution.enabledProfiles,
         teamSettings = teamSettings,
         decorations = decorations,
+        enabledCodexProfiles = enabledCodexProfiles,
         pendingCrash = pendingCrash,
         onQuit = shutdownApplication
     )

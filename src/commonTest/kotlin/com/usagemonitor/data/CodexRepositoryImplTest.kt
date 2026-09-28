@@ -9,11 +9,14 @@ import com.usagemonitor.data.dto.CodexRolloutRateLimitsDto
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
 import com.usagemonitor.data.parser.CodexRolloutRateLimit
+import com.usagemonitor.data.repository.CodexProfileSources
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.entity.UsageTargetKey
 import io.ktor.client.HttpClient
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -238,5 +241,34 @@ class CodexRepositoryImplTest {
         )
 
         assertEquals(listOf("Codex 5h", "Codex 7d"), repository.getUsage().getOrThrow().quotas.map { it.label })
+    }
+
+    @Test
+    fun `an extra account reads its own directory and carries its target and label`() = runTest {
+        val workAuth = object : CodexAuthDataSource {
+            override suspend fun loadSession(): CodexSession = session("token-w", "user-w", "workspace-w", "work@example.com")
+        }
+        val repository = CodexRepositoryImpl(
+            authDataSource = object : CodexAuthDataSource {
+                override suspend fun loadSession(): CodexSession = error("A conta padrão não pode ser lida aqui")
+            },
+            apiDataSource = FakeCodexDataSource(),
+            profileSources = { profile -> if (profile.id == "codex-work") CodexProfileSources(workAuth) else null }
+        )
+
+        val stats = repository.getUsage(CodexProfileRef("codex-work", "trabalho")).getOrThrow()
+
+        assertEquals(UsageTargetKey(ApiSource.CODEX, "codex-work"), stats.targetKey)
+        assertEquals("trabalho", stats.profileLabel)
+        assertEquals("work@example.com", stats.accountContext?.email)
+    }
+
+    @Test
+    fun `a profile no longer in the registry fails instead of reading the default account`() = runTest {
+        val repository = repositoryWith(FakeCodexDataSource())
+
+        val result = repository.getUsage(CodexProfileRef("codex-gone", "antiga"))
+
+        assertTrue(result.isFailure)
     }
 }

@@ -219,6 +219,30 @@ internal class SettingsActions(
         feedback.showToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
     }
 
+    /** Issue #329: o diretório vira conta extra já habilitada, e a coleta dela sai na hora. */
+    fun addCodexProfile() {
+        val selectedDirectory = chooseCodexHomeDirectory() ?: return
+        graph.codexProfileRegistry.add(selectedDirectory)
+            .onSuccess { modal.codexProfileError = null }
+            .onFailure { failure -> modal.codexProfileError = failure.message }
+        refreshCodexProfiles()
+    }
+
+    fun toggleCodexProfile(profileId: String, checked: Boolean) {
+        graph.codexProfileRegistry.setEnabled(profileId, checked)
+        refreshCodexProfiles()
+    }
+
+    fun removeCodexProfile(profileId: String) {
+        graph.codexProfileRegistry.remove(profileId)
+        refreshCodexProfiles()
+    }
+
+    private fun refreshCodexProfiles() {
+        graph.enabledCodexProfiles.value = graph.codexProfileRegistry.enabledProfiles
+        viewModels.dashboard.refresh(ApiSource.CODEX)
+    }
+
     fun rescanAnthropicProfiles() {
         graph.profileRegistry.rescan(restoreRemoved = true)
         refreshEnabledProfiles()

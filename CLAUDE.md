@@ -93,6 +93,8 @@ ser esquecidas:
 - Antigravity: argumento por lista, nunca por shell; disjuntor e TTL de 5 min obrigatórios.
 - Codex: uma janela ao vivo basta; limite por modelo vem do rollout local, soma depois das janelas
   ao vivo e nunca derruba a fonte. `CodexQuotaLabels` é chave de série — não renomear.
+- Contas Codex extras (`CodexProfileRegistry`): a padrão segue **sem** `profileId`; id das extras
+  começa com `codex-`. Cor/emoji por conta leem `anthropicProfileId`, nunca `profileId` cru.
 
 ### Camada presentation (`commonMain/presentation/`)
 

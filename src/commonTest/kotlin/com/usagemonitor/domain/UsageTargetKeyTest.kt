@@ -3,6 +3,7 @@ package com.usagemonitor.domain
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.anthropicProfileId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -24,7 +25,25 @@ class UsageTargetKeyTest {
     }
 
     @Test
-    fun `rejects profile suffix for non Anthropic source`() {
-        assertNull(UsageTargetKey.fromStorageKey("CODEX:profile-a"))
+    fun `rejects profile suffix for sources without profiles`() {
+        assertNull(UsageTargetKey.fromStorageKey("MINIMAX:profile-a"))
+    }
+
+    /** Issue #329: conta Codex extra tem perfil; a padrão continua sem, e a chave antiga não muda. */
+    @Test
+    fun `Codex keeps the bare key for the default account and round trips extra profiles`() {
+        assertEquals("CODEX", UsageTargetKey.forSource(ApiSource.CODEX).storageKey)
+        assertEquals(UsageTargetKey(ApiSource.CODEX), UsageTargetKey.fromStorageKey("CODEX"))
+
+        val extra = UsageTargetKey(ApiSource.CODEX, "codex-a")
+        assertEquals("CODEX:codex-a", extra.storageKey)
+        assertEquals(extra, UsageTargetKey.fromStorageKey(extra.storageKey))
+    }
+
+    /** Cor e emoji por conta são da Anthropic: um perfil Codex não pode achar a cor de outro. */
+    @Test
+    fun `only Anthropic targets expose an Anthropic profile id`() {
+        assertEquals("profile-a", UsageTargetKey(ApiSource.ANTHROPIC, "profile-a").anthropicProfileId)
+        assertNull(UsageTargetKey(ApiSource.CODEX, "codex-a").anthropicProfileId)
     }
 }

@@ -164,6 +164,20 @@ export function Settings() {
                   ))}
                 </AppPanelBody>
               </AppPanel>
+              {/* Issue #329: contas Codex extras, um diretório CODEX_HOME por conta. */}
+              <AppPanel>
+                <AppPanelHeader title="Contas Codex extras" subtitle="a padrão (~/.codex) já tem card" actions={<AppButton>Adicionar</AppButton>} />
+                <AppPanelBody flush>
+                  <AppDataRow mark={<AppSourceMark source="codex" />} last>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, minWidth: 0 }}>
+                      <AppValue size="sm">codex-trabalho</AppValue>
+                      <AppKey>C:/Users/dev/codex-trabalho</AppKey>
+                    </div>
+                    <AppSwitch checked />
+                    <AppIconButton variant="ghost" glyph="×" label="Remover codex-trabalho" />
+                  </AppDataRow>
+                </AppPanelBody>
+              </AppPanel>
             </React.Fragment>
           ) : null}
 

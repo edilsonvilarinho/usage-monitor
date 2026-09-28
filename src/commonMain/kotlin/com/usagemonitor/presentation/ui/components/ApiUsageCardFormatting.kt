@@ -10,6 +10,7 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.usagemonitor.domain.entity.anthropicProfileId
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -186,8 +187,8 @@ internal fun accentColorFor(
 /**
  * O acento de um alvo: a cor que o usuário deu à conta (issue #275) ou, sem
  * escolha, o acento da fonte. Dono único para o card, a HUD e as Configurações —
- * três cópias divergiriam na conta sem perfil. Só a Anthropic tem perfil, e o
- * mapa é por `profileId`.
+ * três cópias divergiriam na conta sem perfil. O mapa é por `profileId` de perfil
+ * Anthropic; conta Codex extra (issue #329) fica com o acento da fonte.
  */
 @Composable
 @ReadOnlyComposable
@@ -195,7 +196,7 @@ internal fun accountAccentColor(
     targetKey: UsageTargetKey,
     accountColors: Map<String, AccountAccent>
 ): Color {
-    val chosen = targetKey.profileId?.let { profileId -> accountColors[profileId] }
+    val chosen = targetKey.anthropicProfileId?.let { profileId -> accountColors[profileId] }
     return chosen?.current ?: accentColorFor(source = targetKey.source, accents = AppAccents.current)
 }
 

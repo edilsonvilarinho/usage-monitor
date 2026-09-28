@@ -191,6 +191,7 @@ fun SettingsDialogContent(
     onRemoveAnthropicProfile: (String) -> Unit = {},
     onRescanAnthropicProfiles: () -> Unit = {},
     expandedProfileId: String? = null,
+    codexAccounts: CodexAccountsSettings = CodexAccountsSettings(),
     onToggleProfileExpanded: (String) -> Unit = {},
     teamSettings: TeamIntegrationSettings = TeamIntegrationSettings(),
     teamConnection: TeamConnectionUiState = TeamConnectionUiState(),
@@ -357,7 +358,8 @@ fun SettingsDialogContent(
                                 onAddAnthropicProfile = onAddAnthropicProfile,
                                 onRemoveAnthropicProfile = onRemoveAnthropicProfile,
                                 onRescanAnthropicProfiles = onRescanAnthropicProfiles,
-                                onToggleProfileExpanded = onToggleProfileExpanded
+                                onToggleProfileExpanded = onToggleProfileExpanded,
+                                codexAccounts = codexAccounts
                             )
 
                             SettingsTab.TEAM -> {

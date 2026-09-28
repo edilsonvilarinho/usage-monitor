@@ -21,15 +21,16 @@ data class UsageTargetKey(
     val profileId: String? = null
 ) {
     init {
-        if (source == ApiSource.ANTHROPIC) {
-            require(!profileId.isNullOrBlank()) { "O alvo Anthropic exige um perfil." }
-        } else {
-            require(profileId == null) { "Somente alvos Anthropic podem informar perfil." }
+        when (source) {
+            ApiSource.ANTHROPIC -> require(!profileId.isNullOrBlank()) { "O alvo Anthropic exige um perfil." }
+            // Codex: sem perfil é a conta padrão; com perfil, uma conta extra (issue #329).
+            ApiSource.CODEX -> require(profileId == null || profileId.isNotBlank()) { "Perfil Codex vazio." }
+            else -> require(profileId == null) { "Somente alvos Anthropic e Codex podem informar perfil." }
         }
     }
 
     val storageKey: String
-        get() = if (source == ApiSource.ANTHROPIC) {
+        get() = if (profileId != null) {
             "${source.name}:${profileId}"
         } else {
             source.name
@@ -62,3 +63,12 @@ data class UsageTargetKey(
         }
     }
 }
+
+/**
+ * O perfil Anthropic do alvo, ou `null` para qualquer outra fonte. Cor e emoji por
+ * conta (issues #275 e #287) são mapas por `profileId` de perfil **Anthropic**; com
+ * contas Codex extras (issue #329) o `profileId` sozinho deixou de dizer de qual
+ * registro ele é.
+ */
+val UsageTargetKey.anthropicProfileId: String?
+    get() = profileId.takeIf { source == ApiSource.ANTHROPIC }

@@ -15,6 +15,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.Window
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -64,6 +65,7 @@ internal fun MainWindowHost(
     enabledProfiles: List<AnthropicProfileRef>,
     teamSettings: TeamIntegrationSettings,
     decorations: CardDecorations,
+    enabledCodexProfiles: List<CodexProfileRef> = emptyList(),
     pendingCrash: PendingCrashReport?,
     onQuit: () -> Unit
 ) {
@@ -134,7 +136,7 @@ internal fun MainWindowHost(
                 windowMode = shell.windowMode,
                 onWindowModeChange = if (shell.cardsOnlyMode) actions.changeWindowMode else null
             ) {
-                MainDashboard(viewModels, shell, actions, enabledApis, enabledProfiles, teamSettings, decorations)
+                MainDashboard(viewModels, shell, actions, enabledApis, enabledProfiles, teamSettings, decorations, enabledCodexProfiles)
             }
             // Dentro da janela principal, e não da de Configurações: é ela que a
             // captura enquadra, e é ela que existe no arranque depois de uma queda.
@@ -153,7 +155,8 @@ private fun MainDashboard(
     enabledApis: Set<com.usagemonitor.domain.entity.ApiSource>,
     enabledProfiles: List<AnthropicProfileRef>,
     teamSettings: TeamIntegrationSettings,
-    decorations: CardDecorations
+    decorations: CardDecorations,
+    enabledCodexProfiles: List<CodexProfileRef>
 ) {
     DashboardScreen(
         viewModel = viewModels.dashboard,
@@ -162,7 +165,7 @@ private fun MainDashboard(
         cardOrder = shell.cardOrder,
         minimizedCards = shell.minimizedCards,
         onMoveCardToIndex = { target, targetIndex ->
-            val visibleTargets = enabledUsageTargets(enabledSources = enabledApis, enabledProfiles = enabledProfiles)
+            val visibleTargets = enabledUsageTargets(enabledSources = enabledApis, enabledProfiles = enabledProfiles, enabledCodexProfiles = enabledCodexProfiles)
             shell.moveCard(target, targetIndex, visibleTargets)
         },
         onToggleCardMinimized = shell::toggleCardMinimized,

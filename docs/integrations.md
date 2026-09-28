@@ -94,6 +94,16 @@ from the same terminal.
   Measured on this machine: 215 ms for the first read, only `codex` found, so no extra quota — the
   model-limit path is covered by fixtures shaped like the codenotch report, not by a real account.
 
+- **Extra accounts** (issue #329). The default account (`~/.codex`) keeps the bare target
+  `UsageTargetKey(CODEX)` — card order, persisted backoff and the dashboard cache written before
+  this version stay valid. Each extra account is a directory used as `CODEX_HOME` by the Codex CLI
+  (`auth.json`, `cap_sid` and `sessions/` directly inside it, not under `.codex`), stored by
+  `CodexProfileRegistry` in the `codexProfiles` preference node with an id prefixed `codex-` so it
+  never collides with an Anthropic `profileId`. `CodexRepositoryImpl.getUsage(profile)` reads that
+  directory through `codexProfileSources` and stamps `targetKey`/`profileLabel` on the stats. The app
+  never refreshes the token: a directory no CLI uses ends up with an expired session, and the card
+  says so. Out of scope by decision: per-account color/emoji, CLI-session filter and team sync.
+
 ### Codex CLI local sessions
 
 - This is a separate local source from the remote Codex quota card. It reads rollout files below
