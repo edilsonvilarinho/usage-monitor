@@ -49,3 +49,4 @@ e o resultado, não a intenção.
 | A2 | 2026-09-28 | este commit | Novidades abrem de beta para beta seguinte e de beta para estável | ✅ Concluída | `desktopTest --tests "com.usagemonitor.domain.ReleaseNotesTest"` → `tests="24" failures="0"` |
 | A3 | 2026-09-28 | este commit | `AppUpdateInfo.isPrerelease` com default lido do sufixo da versão | ✅ Concluída | `desktopTest --tests "com.usagemonitor.domain.*"` → 355 casos, 0 falhas; `AppUpdateInfoTest` `tests="3" failures="0"` |
 | B1 | 2026-09-28 | este commit | `GitHubReleaseDto` lê `prerelease` e `draft` (default `false`) | ✅ Concluída | `desktopTest --tests "com.usagemonitor.data.GitHubReleaseDtoTest"` → `tests="6" failures="0"` |
+| B2 | 2026-09-28 | este commit | `RemoteApiDataSource.fetchGitHubReleases` (`/releases?per_page=20`) | ✅ Concluída | `desktopTest --tests "com.usagemonitor.data.RemoteApiDataSourceHttpTest"` → `tests="16" failures="0"` |
