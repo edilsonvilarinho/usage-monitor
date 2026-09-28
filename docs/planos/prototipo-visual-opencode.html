@@ -1140,6 +1140,15 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
   </div>
 </div>
 
+<div class="statusbar" style="margin-top:var(--s3)">
+  <!-- Issue #355: build beta leva o selo ao lado do número. -->
+  <span>v39.0.0-beta.1</span>
+  <span class="v sm" style="color:var(--warn);background:color-mix(in srgb, var(--warn) 8%, transparent);border-radius:4px;padding:2px 6px">● Beta</span>
+  <span>Próxima coleta em 06:41</span>
+  <span class="sp"></span>
+</div>
+<p class="note"><b>Build beta</b> (issue #355): o selo <code>BetaReleasePill</code> fica ao lado do número, e a dica da versão diz <span class="v sm">Versão beta do app</span>. Estável não tem selo.</p>
+
 <p class="note"><b>Menu, e não um segmentado com três rótulos.</b> O segmentado mostra todas as opções o tempo todo e custa a largura das três; numa barra de estado de 30dp que já carrega até cinco ações, <code>Padrão · Somente os cards · Barra HUD</code> não cabe. O menu mostra a corrente sob demanda e continua dizendo <b>quais</b> modos existem, que é metade da queixa da issue.</p>
 <p class="note"><b>Ele abre para cima.</b> O rodapé é a última linha da janela e popup nesta plataforma é camada <b>dentro</b> dela, recortada pelos limites — um menu que só soubesse abrir para baixo nasceria fora da janela. A posição é presa aos limites nos dois eixos, e o caso está afirmado por teste numa cena de 240×320dp, que é o piso de arrasto da janela principal.</p>
 <p class="note"><b>O item selecionado carrega marca e realce, nunca só o realce</b>, e o espaço da marca é reservado em todas as linhas — sem isso o rótulo da selecionada anda para o lado a cada troca de opção. O realce é o mesmo contêiner do segmentado e do item de navegação das Configurações: não há um segundo desenho de seleção neste app.</p>

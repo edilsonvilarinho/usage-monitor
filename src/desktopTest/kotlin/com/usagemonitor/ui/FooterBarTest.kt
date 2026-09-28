@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
@@ -20,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.FOOTER_ADMIN_OVERVIEW_TEST_TAG
+import com.usagemonitor.presentation.ui.components.FOOTER_BETA_BADGE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_COUNTDOWN_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_EXPORT_SNAPSHOT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FOOTER_HELP_TEST_TAG
@@ -70,6 +74,38 @@ class FooterBarTest {
             .assertTextEquals("02:05")
         onNodeWithContentDescription("Abrir configurações").assertIsDisplayed()
         onAllNodesWithText("Histórico").assertCountEquals(0)
+    }
+
+    /** Issue #355: build beta mostra o selo ao lado do número; estável, não. */
+    @Test
+    fun `FooterBar marks a beta build next to the version`() = runDesktopComposeUiTest {
+        val fixedNow = Instant.parse("2025-01-01T12:00:00Z")
+        var version by mutableStateOf("42.0.0-beta.1")
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(640.dp)) {
+                    FooterBar(
+                        appVersion = version,
+                        language = AppLanguage.PT,
+                        nextRefreshAt = fixedNow + 125.seconds,
+                        onRefresh = {},
+                        onOpenSettings = {},
+                        nowProvider = { fixedNow },
+                        countdownUpdatesEnabled = false
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true).assertTextEquals("v42.0.0-beta.1")
+        onNodeWithTag(FOOTER_BETA_BADGE_TEST_TAG).assertIsDisplayed()
+        onNodeWithText("Beta").assertIsDisplayed()
+
+        version = "42.0.0"
+        waitForIdle()
+
+        onNodeWithTag(FOOTER_BETA_BADGE_TEST_TAG).assertDoesNotExist()
     }
 
     /**
