@@ -6,7 +6,10 @@ import com.usagemonitor.domain.repository.AppUpdateRepository
 class CheckForAppUpdateUseCase(
     private val repository: AppUpdateRepository
 ) {
-    suspend operator fun invoke(currentVersion: String): Result<AppUpdateInfo?> {
-        return repository.getLatestAvailableUpdate(currentVersion)
+    suspend operator fun invoke(
+        currentVersion: String,
+        includePrereleases: Boolean = false
+    ): Result<AppUpdateInfo?> {
+        return repository.getLatestAvailableUpdate(currentVersion, includePrereleases)
     }
 }

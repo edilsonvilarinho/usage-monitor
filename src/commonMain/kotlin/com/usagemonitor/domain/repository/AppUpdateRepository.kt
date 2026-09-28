@@ -17,7 +17,18 @@ import com.usagemonitor.domain.entity.ReleaseNotes
 const val UPDATE_FEED_URL_ENV_VAR = "USAGE_MONITOR_UPDATE_FEED_URL"
 
 interface AppUpdateRepository {
-    suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?>
+    /**
+     * A maior versão publicada acima de [currentVersion], ou `null` se não há.
+     *
+     * [includePrereleases] é o canal beta (issue #355): desligado, só a release
+     * estável mais recente conta; ligado, betas e estáveis concorrem pela
+     * precedência do SemVer. Nunca oferece versão **menor** que a atual — quem
+     * desliga o canal estando numa beta fica nela até sair uma estável maior.
+     */
+    suspend fun getLatestAvailableUpdate(
+        currentVersion: String,
+        includePrereleases: Boolean = false
+    ): Result<AppUpdateInfo?>
 
     /**
      * Notas da release de [version], já filtradas para o que o usuário percebe.

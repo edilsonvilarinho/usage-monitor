@@ -246,7 +246,10 @@ class ReleaseNotesControllerTest {
         var lastPreviousVersion: String? = null
             private set
 
-        override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+        override suspend fun getLatestAvailableUpdate(
+            currentVersion: String,
+            includePrereleases: Boolean
+        ): Result<AppUpdateInfo?> {
             throw UnsupportedOperationException("Não utilizado neste teste")
         }
 

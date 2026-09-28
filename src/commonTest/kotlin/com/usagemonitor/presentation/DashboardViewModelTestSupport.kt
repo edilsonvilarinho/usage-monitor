@@ -183,7 +183,10 @@ abstract class DashboardViewModelTestSupport {
 
     protected fun updateUseCase(block: suspend () -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
         val repository = object : AppUpdateRepository {
-            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+            override suspend fun getLatestAvailableUpdate(
+                currentVersion: String,
+                includePrereleases: Boolean
+            ): Result<AppUpdateInfo?> {
                 return block()
             }
 
