@@ -2,6 +2,8 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.AppUpdateInfo
+import com.usagemonitor.presentation.ui.components.BETA_UPDATES_LABEL_EN
+import com.usagemonitor.presentation.ui.components.BETA_UPDATES_LABEL_PT
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.ui.help.HelpCatalog
@@ -62,6 +64,16 @@ class HelpCatalogTest {
         for (language in AppLanguage.entries) {
             val label = updateBannerContent(AppUpdateUiState.Ready(update), language).actionLabel
             requireNotNull(label)
+            val steps = HelpCatalog.entry(HelpTopic.UPDATES, language).steps
+            assertTrue(steps.any { step -> "\"$label\"" in step }, "passo sem \"$label\" em $language")
+        }
+    }
+
+    /** Issue #355: o passo do canal beta cita o rótulo real do interruptor. */
+    @Test
+    fun `the updates steps quote the real beta switch label`() {
+        AppLanguage.entries.forEach { language ->
+            val label = if (language == AppLanguage.PT) BETA_UPDATES_LABEL_PT else BETA_UPDATES_LABEL_EN
             val steps = HelpCatalog.entry(HelpTopic.UPDATES, language).steps
             assertTrue(steps.any { step -> "\"$label\"" in step }, "passo sem \"$label\" em $language")
         }

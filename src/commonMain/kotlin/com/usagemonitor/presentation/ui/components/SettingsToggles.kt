@@ -287,6 +287,10 @@ fun AutoUpdateToggle(
  * de ligar — que beta pode ter defeitos, e que desligar **não volta** para a
  * estável anterior.
  */
+/** Constantes porque o passo da ajuda cita o rótulo, e uma cópia literal lá divergiria. */
+internal const val BETA_UPDATES_LABEL_PT = "Receber versões beta"
+internal const val BETA_UPDATES_LABEL_EN = "Receive beta updates"
+
 @Composable
 fun BetaUpdatesToggle(
     enabled: Boolean,
@@ -297,7 +301,7 @@ fun BetaUpdatesToggle(
 ) {
     val isPt = language == AppLanguage.PT
     SettingsOptionRow(
-        label = if (isPt) "Receber versões beta" else "Receive beta updates",
+        label = if (isPt) BETA_UPDATES_LABEL_PT else BETA_UPDATES_LABEL_EN,
         description = if (isPt) {
             "Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova."
         } else {
