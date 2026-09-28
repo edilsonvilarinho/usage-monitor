@@ -1,5 +1,8 @@
 package com.usagemonitor.domain
 
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.hours
+import kotlin.test.assertNull
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
@@ -134,5 +137,31 @@ class QuotaInfoTest {
         )
 
         assertEquals(com.usagemonitor.domain.entity.PeriodType.INTERVAL, quota.periodType)
+    }
+
+    @Test
+    fun `elapsed fraction measures how much of the window has passed`() {
+        val start = Instant.parse("2026-09-27T10:00:00Z")
+        val quota = QuotaInfo(
+            label = "5h",
+            used = 10L,
+            total = 100L,
+            periodEndAt = start + 5.hours,
+            unit = UsageUnit.PERCENTAGE,
+            periodStartAt = start
+        )
+
+        assertEquals(0.5f, quota.elapsedFractionAt(start + 150.minutes))
+        assertEquals(0f, quota.elapsedFractionAt(start - 1.hours))
+    }
+
+    @Test
+    fun `elapsed fraction is unknown without start, without reset or after expiry`() {
+        val start = Instant.parse("2026-09-27T10:00:00Z")
+        val quota = QuotaInfo(label = "5h", used = 10L, total = 100L, periodEndAt = start + 5.hours, unit = UsageUnit.PERCENTAGE)
+
+        assertNull(quota.elapsedFractionAt(start + 1.hours), "Sem início informado não há marca")
+        assertNull(quota.copy(periodStartAt = start, hasKnownResetAt = false).elapsedFractionAt(start + 1.hours))
+        assertNull(quota.copy(periodStartAt = start).elapsedFractionAt(start + 6.hours), "Janela vencida")
     }
 }

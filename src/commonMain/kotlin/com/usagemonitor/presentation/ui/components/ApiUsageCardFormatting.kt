@@ -579,26 +579,9 @@ internal fun buildQuotaTooltipMetrics(
         label = if (language == AppLanguage.PT) "Reset" else "Reset",
         value = resetLabel(quota = quota, language = language, now = now)
     )
+    metrics.addElapsedWindowMetric(quota = quota, language = language, now = now)
     metrics.addProjectionMetric(risk = risk, language = language)
     return metrics
-}
-
-// A projeção só entra na tooltip quando o card resumido suprime a tooltip própria
-// do RiskSemaphoreDot — evita TooltipBox aninhado dentro do badge.
-private fun MutableList<TooltipMetric>.addProjectionMetric(
-    risk: QuotaRiskSummary?,
-    language: AppLanguage
-) {
-    if (risk == null) {
-        return
-    }
-
-    add(
-        TooltipMetric(
-            label = riskDotTooltipTitle(language),
-            value = riskLevelLabel(risk.level, language)
-        )
-    )
 }
 
 internal fun quotaTooltipUsageValue(quota: QuotaInfo, language: AppLanguage): String {

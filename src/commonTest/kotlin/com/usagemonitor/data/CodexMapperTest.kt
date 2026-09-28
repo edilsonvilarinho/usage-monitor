@@ -1,5 +1,6 @@
 package com.usagemonitor.data
 
+import kotlinx.datetime.Instant
 import com.usagemonitor.data.dto.CodexRateLimitDto
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
@@ -116,5 +117,12 @@ class CodexMapperTest {
         const val SEVEN_DAYS = 604_800L
         const val THIRTY_DAYS = 30L * 24L * 60L * 60L
         const val THIRTY_ONE_DAYS = 31L * 24L * 60L * 60L
+    }
+
+    @Test
+    fun `window start is the reset minus limit_window_seconds`() {
+        val quota = CodexMapper.toUsageStats(response(window(10L, FIVE_HOURS), null)).quotas.single()
+
+        assertEquals(Instant.fromEpochSeconds(1_777_398_377L - FIVE_HOURS), quota.periodStartAt)
     }
 }

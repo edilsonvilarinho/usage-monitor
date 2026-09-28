@@ -78,7 +78,9 @@ object CodexMapper {
                 total = PERCENT_SCALE,
                 periodEndAt = Instant.fromEpochSeconds(window.resetAt),
                 periodType = periodType,
-                unit = UsageUnit.PERCENTAGE
+                unit = UsageUnit.PERCENTAGE,
+                periodStartAt = Instant.fromEpochSeconds(window.resetAt - window.limitWindowSeconds)
+                    .takeIf { window.limitWindowSeconds > 0L }
             )
         )
     }

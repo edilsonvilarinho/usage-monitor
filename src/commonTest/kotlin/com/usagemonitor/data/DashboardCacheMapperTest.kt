@@ -354,4 +354,29 @@ class DashboardCacheMapperTest {
         assertEquals(fetchedAt, restored.fetchedAt)
         assertEquals(fixedInstant, legacy.fetchedAt)
     }
+
+    @Test
+    fun `round trip preserves the window start`() {
+        val original = ApiUsageStats(
+            source = ApiSource.MINIMAX,
+            apiName = "MiniMax",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "MiniMax-M*",
+                    used = 10L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    unit = UsageUnit.REQUESTS,
+                    periodStartAt = Instant.parse("2025-01-01T07:00:00Z")
+                )
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(original.toCacheDto())
+        ).toDomain()
+
+        assertEquals(original.quotas.single().periodStartAt, restored.single().quotas.single().periodStartAt)
+    }
 }

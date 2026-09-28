@@ -1,5 +1,6 @@
 package com.usagemonitor.data
 
+import kotlinx.datetime.Instant
 import com.usagemonitor.data.dto.BaseRespDto
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import com.usagemonitor.data.dto.ModelRemainDto
@@ -158,5 +159,13 @@ class MiniMaxMapperTest {
         assertEquals(2, result.quotas.size)
         assertEquals("MiniMax-M*", result.quotas[0].label)
         assertEquals("MiniMax-M*", result.quotas[1].label)
+    }
+
+    @Test
+    fun `window start comes from start_time and weekly_start_time`() {
+        val quotas = MiniMaxMapper.toUsageStats(sampleResponse).quotas
+
+        assertEquals(Instant.fromEpochMilliseconds(1777075200000L), quotas[0].periodStartAt)
+        assertEquals(Instant.fromEpochMilliseconds(1776643200000L), quotas[1].periodStartAt)
     }
 }

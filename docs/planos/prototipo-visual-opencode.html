@@ -393,6 +393,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .track > i { display: block; height: 100%; background: var(--fg); }
 .track.ok > i { background: var(--ok); } .track.warn > i { background: var(--warn); }
 .track.crit > i { background: var(--crit); } .track.info > i { background: var(--info); }
+/* Marca de ritmo (#327): fração da janela já decorrida, altura inteira do trilho */
+.track { position: relative; }
+.track > b { position: absolute; top: -1px; bottom: -1px; width: 2px; margin-left: -1px; background: var(--fg); }
 
 /* Indicador de estado: ponto + texto, nunca só cor */
 .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
@@ -862,14 +865,14 @@ table.dt td.num, table.dt th.num { text-align: right; }
           <div class="row">
             <div class="stack" style="gap:3px;flex:1">
               <div class="hstack"><span class="k">Sessão 5h</span><span class="sp"></span><span class="v">68%</span></div>
-              <div class="track warn"><i style="width:68%"></i></div>
+              <div class="track warn" title="Janela decorrida: 42% (marca na barra)"><i style="width:68%"></i><b style="left:42%"></b></div>
               <span class="k dim">Reinício: Qua 13h00 BRT</span>
             </div>
           </div>
           <div class="row">
             <div class="stack" style="gap:3px;flex:1">
               <div class="hstack"><span class="k">Semanal</span><span class="sp"></span><span class="v">41%</span></div>
-              <div class="track ok"><i style="width:41%"></i></div>
+              <div class="track ok" title="Janela decorrida: 55% (marca na barra)"><i style="width:41%"></i><b style="left:55%"></b></div>
               <span class="k dim">Reinício: Sáb 15/08 21h00 BRT</span>
             </div>
           </div>

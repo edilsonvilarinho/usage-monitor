@@ -30,7 +30,8 @@ object MiniMaxMapper {
                 total = dto.currentIntervalTotalCount,
                 periodEndAt = periodEnd,
                 periodType = PeriodType.INTERVAL,
-                unit = UsageUnit.REQUESTS
+                unit = UsageUnit.REQUESTS,
+                periodStartAt = Instant.fromEpochMilliseconds(dto.startTime).takeIf { dto.startTime > 0L }
             )
 
             if (dto.currentWeeklyTotalCount > 0L) {
@@ -41,7 +42,8 @@ object MiniMaxMapper {
                     total = dto.currentWeeklyTotalCount,
                     periodEndAt = weeklyEnd,
                     periodType = PeriodType.WEEKLY,
-                    unit = UsageUnit.REQUESTS
+                    unit = UsageUnit.REQUESTS,
+                    periodStartAt = Instant.fromEpochMilliseconds(dto.weeklyStartTime).takeIf { dto.weeklyStartTime > 0L }
                 )
                 listOf(intervalQuota, weeklyQuota)
             } else {

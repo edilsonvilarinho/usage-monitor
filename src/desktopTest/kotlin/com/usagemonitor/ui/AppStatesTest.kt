@@ -180,6 +180,33 @@ class AppStatesTest {
     }
 
     /**
+     * A marca de ritmo (issue #327) é só pintura, então só bitmap a pega: ela
+     * muda pixels **apenas** na coluna da fração pedida, e na altura inteira do
+     * trilho — não nos 2px internos que o padding deixa ao preenchimento.
+     */
+    @Test
+    fun `a marca de ritmo pinta so a coluna da fracao e ocupa a altura do trilho`() {
+        val plain = renderTrack(uiScalePercent = 100, fraction = 0.2f)
+        val marked = renderTrack(uiScalePercent = 100, fraction = 0.2f, marker = 0.6f)
+
+        val columns = mutableSetOf<Int>()
+        val rows = mutableSetOf<Int>()
+        for (y in 0 until minOf(plain.height, marked.height)) {
+            for (x in 0 until minOf(plain.width, marked.width)) {
+                if (plain[x, y] != marked[x, y]) {
+                    columns += x
+                    rows += y
+                }
+            }
+        }
+
+        val expected = (TRACK_WIDTH_DP * 0.6f).toInt()
+        assertTrue(columns.isNotEmpty(), "A marca não pintou nada")
+        assertTrue(columns.all { x -> x in (expected - 2)..(expected + 2) }, "Colunas pintadas: $columns")
+        assertEquals(TRACK_HEIGHT_PX, rows.size, "Linhas pintadas: $rows")
+    }
+
+    /**
      * A barra anima a largura, mas tem de **chegar**: depois do idle, o bitmap de
      * uma barra que foi de 20% a 70% é o mesmo de uma que nasceu em 70%. Uma mola
      * que parasse perto do alvo, ou uma animação que nunca terminasse, apareceria
@@ -315,13 +342,13 @@ class AppStatesTest {
         assertEquals(0, countDifferencesOffCorners(settled, reduced))
     }
 
-    private fun renderTrack(uiScalePercent: Int, fraction: Float): PixelMap {
+    private fun renderTrack(uiScalePercent: Int, fraction: Float, marker: Float? = null): PixelMap {
         lateinit var pixels: PixelMap
         runDesktopComposeUiTest {
             setContent {
                 AppTheme(isDark = true, uiScalePercent = uiScalePercent) {
                     Box(modifier = Modifier.width(TRACK_WIDTH_DP.dp).height(40.dp)) {
-                        AppProgressTrack(fraction = fraction, tone = AppTone.CRITICAL)
+                        AppProgressTrack(fraction = fraction, tone = AppTone.CRITICAL, marker = marker)
                     }
                 }
             }

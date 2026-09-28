@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
@@ -174,11 +176,15 @@ private fun QuotaRowContent(
         }
 
         if (hasTrack) {
+            // Marca de ritmo (issue #327): onde o uso estaria em ritmo constante.
+            val elapsedLabel = elapsedWindowLabel(quota = quota, language = language, now = now)
             AppProgressTrack(
                 fraction = quota.percentageUsed,
                 tone = quotaTone(quota = quota, risk = risk),
+                marker = quota.elapsedFractionAt(now),
                 modifier = Modifier
                     .testTag(quotaProgressTrackTag(quota.label))
+                    .semantics { if (elapsedLabel != null) stateDescription = elapsedLabel }
                     .alpha(staleAlpha)
             )
         }
