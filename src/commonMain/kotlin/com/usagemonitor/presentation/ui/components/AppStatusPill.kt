@@ -79,6 +79,19 @@ fun AppStatusPill(
     }
 }
 
+/**
+ * Selo do canal beta (issue #355): a pílula com a palavra "Beta" no tom de
+ * atenção. Um dono só para o texto e o tom, porque a janela de novidades e o
+ * rodapé o mostram, e dois desenhos para o mesmo dado obrigariam a reaprender a
+ * ler. "Beta" é igual nos dois idiomas.
+ */
+@Composable
+fun BetaReleasePill(modifier: Modifier = Modifier) {
+    AppStatusPill(label = BETA_RELEASE_LABEL, tone = AppTone.WARNING, modifier = modifier)
+}
+
+internal const val BETA_RELEASE_LABEL = "Beta"
+
 /** O fundo que a pílula pinta sobre [surface]; puro, para o teste de contraste. */
 internal fun statusPillBackground(tone: Color, surface: Color): Color {
     return tone.copy(alpha = STATUS_PILL_TINT_ALPHA).compositeOver(surface)

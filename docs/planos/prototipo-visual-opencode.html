@@ -1340,6 +1340,18 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
 <p class="note"><b>O cabeçalho não repete o título da moldura.</b> A barra da janela já diz <span class="v sm">Novidades da versão 39.0.0</span>; o mesmo texto duas vezes a 40dp de distância gasta a altura que a lista precisa. E a superfície da lista <b>para de crescer quando os itens acabam</b>, em vez de esticar até o rodapé — com três itens numa janela de 520dp, o resto era uma caixa vazia.</p>
 
+<div class="panel"><div class="pbody">
+  <div class="cap">Beta (issue #355) — mesmo diálogo, título com "beta" e selo no cabeçalho</div>
+  <div class="win" style="max-width:520px">
+    <div class="wbar"><span class="wdot"></span><span class="wtitle">Novidades da versão beta 39.0.0-beta.1</span><span class="wclose">✕</span></div>
+    <div class="wbody" style="padding:0">
+      <div class="sec"><span class="secmark"></span><span class="sect">Novidades</span><span class="secsub">Atualizado de 38.0.0 · 27/09/2026</span><span style="flex:1"></span><span class="v sm" style="color:var(--warn);background:color-mix(in srgb, var(--warn) 8%, transparent);border-radius:4px;padding:2px 6px">● Beta</span></div>
+    </div>
+  </div>
+</div></div>
+
+<p class="note"><b>O selo é a <code>AppStatusPill</code> no tom de atenção com a palavra "Beta"</b> (<code>BetaReleasePill</code>, dona única do texto e do tom). A palavra está sempre escrita; o tom sozinho não marca beta. O rodapé usa o mesmo selo ao lado do número da versão.</p>
+
 <p class="note"><b>Sem itens não há janela</b>, e não uma janela vazia: lista vazia numa tela de novidades afirma que a versão não trouxe nada. E <b>fechar é a primária</b> — a tela informa, não propõe trabalho; "Ver no GitHub" leva para fora do app.</p>
 
 <p class="note"><b>Ela abre uma vez.</b> Quem decide é a preferência <code>releaseNotesSeenVersion</code>, gravada <b>ao abrir</b>: a janela sobe quando a versão em execução difere dela. Release sem nada a mostrar também marca — retentar a cada abertura seria requisição perpétua por uma resposta que não muda. Falha de rede <b>não</b> marca, e a abertura seguinte tenta de novo.</p>
