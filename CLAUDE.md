@@ -165,6 +165,10 @@ o módulo, não para um método. Medida e números em
 Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que roda no `allTests`
 — a regra não depende de revisão lembrar dela.
 
+- **Comportamento nativo medido numa plataforma só nasce restrito a ela** (issue #340): chamada ao
+  sistema de janelas medida só no Windows entra atrás de função pura com teste da lista de
+  plataformas (precedente: `hudUsesHitRegion`); liberar outra plataforma é decisão com medição.
+  `window.shape`/`setShape` só em `HudWindow.kt` e `DesktopWindowFrame.kt` — outro arquivo falha.
 - **Direção das camadas por import**: `domain` não importa Ktor, Compose, `kotlinx.serialization`,
   `java.io`, `data` nem `presentation`; `data` não importa `presentation` nem Compose;
   `presentation` não importa `data`. Quando a apresentação precisa de algo de `data`, o contrato
