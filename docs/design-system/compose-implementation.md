@@ -173,6 +173,25 @@ Antes de desenhar um retângulo novo, procure aqui.
     a cor já atravessava cinco assinaturas, e trocá-las todas por causa do emoji mexeria em código
     que a issue não pede.
 
+### Armadilhas de teste de tela
+
+Movidas do `CLAUDE.md` em 2026-09-28 pela skill `usage-monitor-token-cleanup`; o `CLAUDE.md` guarda
+o ponteiro. **Cada uma custou uma suíte vermelha**:
+
+1. `weight` dentro de `FlowRow` não tem referência de largura: o Compose deixa o filho **sem
+   posicionar** e o sintoma é `assertIsDisplayed` falhando com `boundsInRoot` válido.
+2. Ação que virou ícone precisa de `contentDescription` na **semântica**, não só de `onClickLabel` —
+   é `onNodeWithContentDescription` que as suítes usam. `AppIconButton` já traz os dois.
+3. `BasicTextField` mescla descendentes: o placeholder precisa de `clearAndSetSemantics`, ou o campo
+   vazio passa a "conter" o texto de exemplo e duplica nós para o `onNodeWithText`.
+4. Tela que ficou mais alta obriga a subir a altura da **cena** do teste de componente (1024 × 768
+   por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
+5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
+   `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
+6. Borda que precisa ocupar layout é **fundo mais padding**, nunca `Modifier.border`: ele arredonda o
+   traço para cima e pinta sobre o conteúdo, e só bitmap (`captureToImage`) pega o defeito — seção
+   abaixo.
+
 ### Armadilha: `Modifier.border` numa caixa fina (issue #83)
 
 `Modifier.border` arredonda o traço **para cima** (`ceil(width.toPx())`, `Border.kt`) e o pinta

@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-release-beta
-description: Manage the usage-monitor beta channel end to end — cut a beta (annotated vX.Y.Z-beta.N tag published as a GitHub prerelease, offered only to users who turned on "Receber versões beta"), promote the open beta series to the stable release, withdraw a bad beta (hide it, reversibly) or restore it. Use when Claude needs to ship, promote, withdraw, undo, or troubleshoot a beta release for this project; a stable release that is not a beta promotion uses usage-monitor-release.
+description: Beta channel of usage-monitor — publish a vX.Y.Z-beta.N prerelease for opted-in users, fix it with the next beta, promote the series to stable, or withdraw/restore a beta. Use for any beta release task; plain stable releases use usage-monitor-release.
 ---
 
 # Usage Monitor Beta Release

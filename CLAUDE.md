@@ -151,18 +151,15 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 Manual, sem framework. `AppGraph.kt` monta data sources, repositórios e use cases (sequência
 `HttpClient(OkHttp)` → datasources → repos → use cases); `AppViewModels.kt` monta os view models e é
 o **dono único do encerramento** (`shutdown()`, idempotente), chamado pela saída do app, pelo
-`onDispose` da composição e pelo shutdown hook — antes eram três cópias divergentes, o hook não
-fechava o índice do Codex e a saída pela janela não fechava o `profileRegistry`.
+`onDispose` da composição e pelo shutdown hook — nunca uma segunda cópia (histórico no plano #298).
 `Main.kt` só faz o arranque e compõe os hosts (`MainWindowHost`, `ModalWindowsHost`,
 `SettingsWindowHost`, `AppTrayHost`, `HudWindowHost`); estado de shell e de modais mora em
 `AppShellState`/`AppModalState`. Os arquivos ficaram no pacote `com.usagemonitor`, e não num
 subpacote, para não abrir a visibilidade dos helpers `internal`/`private` que eles usam.
 
-**O `gradle.properties` dá 3 GB ao daemon, e isso não é mais paliativo de um método gigante.** O
-`main()` de ~2.400 linhas foi quebrado (#298), e o build sem a folga continua em
-`OutOfMemoryError: GC overhead limit exceeded`, agora num composable de ~165 linhas: falta heap para
-o módulo, não para um método. Medida e números em
-[`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md).
+**O `gradle.properties` dá 3 GB ao daemon, e não é paliativo:** sem a folga o build cai em
+`OutOfMemoryError: GC overhead limit exceeded` — falta heap para o módulo, não para um método. Medida
+em [`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md) (M7).
 
 ## Regras de arquitetura e tamanho
 
@@ -180,12 +177,9 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 - **Arquivo de produção ≤ 800 linhas; função ≤ 300**, medida por varredura de chaves que ignora
   comentário e string. Nada de arquivo-deus nem composable-deus: estado, efeitos e ações de uma
   janela moram em arquivos próprios, e um host compõe.
-- **As exceções eram uma lista congelada com teto exato** (`FILE_CEILINGS`/`FUNCTION_CEILINGS`), e
-  **as duas estão vazias desde as issues #302–#309**. O mecanismo continua no teste, mas não há
-  item para ele congelar: arquivo ou função acima do limite falha direto. **Exceção nova não entra
-  na lista** — divida o arquivo. Vários arquivos ficaram entre 750 e 800 linhas
-  (`DashboardViewModel`, `LocalCliSessionDataSource`, `ApiUsageCardFormatting`, `AutoStartManager`):
-  a próxima mudança neles começa extraindo, não crescendo.
+- **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
+  divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas (`DashboardViewModel`, `LocalCliSessionDataSource`,
+  `ApiUsageCardFormatting`, `AutoStartManager`), a próxima mudança começa extraindo, não crescendo.
 
 ## Integração com time (`server/`)
 
@@ -238,11 +232,10 @@ precisão.
 **Nenhuma tela reimplementa uma primitiva.** Antes de escrever `Surface`, `Card`, `Modifier.border`,
 `.background` com cor de superfície ou `RoundedCornerShape`, procure em
 `presentation/ui/components/` — `AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e os vizinhos
-`AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt` e
-`AppTooltip.kt`, que saíram dos dois primeiros pelo limite de 800 linhas (#308). Se a primitiva não
-existir, o commit que a cria e o commit que a consome são o mesmo — primitiva construída e não
-adotada não conserta nada, e é exatamente assim que `AppWindowScaffold`, `AppToolbar`, `AppTooltip` e
-`AppEmptyState` ficaram meses com adoção zero.
+`AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt`, `AppTooltip.kt`
+e `AppStatusPill.kt`. Se a primitiva não existir, o commit que a cria e o commit que a consome são o
+mesmo: primitiva sem adoção não conserta nada (histórico em
+[`compose-implementation.md`](docs/design-system/compose-implementation.md)).
 
 **Cor de acento sai de `AppAccents.current` e de `AppTone`**, nunca de `darkAppAccents` ou
 `lightAppAccents` diretamente. Um `val` de topo de arquivo é resolvido uma vez por processo e não lê
@@ -276,25 +269,13 @@ Regras:
   nunca `AlertDialog`.
 - Tipografia: Plex Mono em `label*`/`title*`/`headline*`/`display*`, Plex Sans em `body*`; carga do
   classpath, **nunca** `composeResources`. Número é `label*`.
-- Primitivas stateless em `presentation/ui/components/App*.kt` — procure antes de desenhar
-  retângulo. Aba × segmentado × chip têm papéis distintos. Cor nunca informa sozinha. Acento é
+- Primitivas são stateless. Aba × segmentado × chip têm papéis distintos. Cor nunca informa sozinha. Acento é
   identidade de fonte. `AppSwitch` ligado é verde.
 
-**Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
-
-1. `weight` dentro de `FlowRow` não tem referência de largura: o Compose deixa o filho **sem
-   posicionar** e o sintoma é `assertIsDisplayed` falhando com `boundsInRoot` válido.
-2. Ação que virou ícone precisa de `contentDescription` na **semântica**, não só de `onClickLabel` —
-   é `onNodeWithContentDescription` que as suítes usam. `AppIconButton` já traz os dois.
-3. `BasicTextField` mescla descendentes: o placeholder precisa de `clearAndSetSemantics`, ou o campo
-   vazio passa a "conter" o texto de exemplo e duplica nós para o `onNodeWithText`.
-4. Tela que ficou mais alta obriga a subir a altura da **cena** do teste de componente (1024 × 768
-   por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
-5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
-   `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
-6. Borda que precisa ocupar layout é **fundo mais padding**, nunca `Modifier.border`: ele arredonda o
-   traço para cima e pinta sobre o conteúdo, e só bitmap (`captureToImage`) pega o defeito. Histórico
-   (issue #83) em [`compose-implementation.md`](docs/design-system/compose-implementation.md).
+**Antes de escrever teste de tela, leia "Armadilhas de teste de tela"** em
+[`compose-implementation.md`](docs/design-system/compose-implementation.md) — seis defeitos
+(`FlowRow`+`weight`, semântica de ícone, placeholder, altura da cena, `modifier` do campo, borda) que
+já custaram uma suíte vermelha cada.
 
 **Janelas, cards e tooltips**: decisões e histórico em [`docs/presentation.md`](docs/presentation.md),
 seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes de mexer.** Regras:
