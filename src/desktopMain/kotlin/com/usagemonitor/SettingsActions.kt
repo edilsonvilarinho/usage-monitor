@@ -69,6 +69,10 @@ internal class SettingsActions(
         shell.changeReducedMotion(enabled)
     }
 
+    fun changeTrayUsageRing(enabled: Boolean) {
+        shell.changeTrayUsageRing(enabled)
+    }
+
     /**
      * O registro do Windows pode recusar a escrita; nesse caso o estado volta ao
      * que o sistema realmente tem e o aviso precisa dizer que falhou.

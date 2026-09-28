@@ -58,6 +58,9 @@ export function Settings() {
               </span>
               <AppSwitch checked={false} label="Reduzir animações"
                 hint="Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa." />
+              {/* Issue #328: desligado por padrão; o anel mostra o maior percentual vigente. */}
+              <AppSwitch checked={false} label="Anel de uso na bandeja"
+                hint="Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta." />
             </React.Fragment>
           ) : null}
 

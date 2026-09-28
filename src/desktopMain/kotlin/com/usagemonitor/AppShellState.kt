@@ -45,6 +45,8 @@ internal class AppShellState(
     var uiScaleSaveGeneration by mutableStateOf(0)
 
     var reducedMotion by mutableStateOf(readPersistedReducedMotion(settings))
+
+    var trayUsageRing by mutableStateOf(readPersistedTrayUsageRing(settings))
         private set
 
     /**
@@ -161,6 +163,11 @@ internal class AppShellState(
     fun changeReducedMotion(enabled: Boolean) {
         reducedMotion = enabled
         persistReducedMotion(settings, enabled)
+    }
+
+    fun changeTrayUsageRing(enabled: Boolean) {
+        trayUsageRing = enabled
+        persistTrayUsageRing(settings, enabled)
     }
 
     fun changeTheme(preset: AppThemePreset) {

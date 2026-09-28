@@ -59,6 +59,7 @@ const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
 const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
 const val REDUCED_MOTION_SWITCH_TEST_TAG = "reducedMotionSwitch"
+const val TRAY_USAGE_RING_SWITCH_TEST_TAG = "trayUsageRingSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
@@ -132,6 +133,8 @@ fun SettingsDialogContent(
     reducedMotion: Boolean = false,
     /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
     onReducedMotionChange: (Boolean) -> Unit = {},
+    trayUsageRing: Boolean = false,
+    onTrayUsageRingChange: (Boolean) -> Unit = {},
     /** Abre o diálogo de relatório de bug. Default vazio: os geradores de captura não o abrem. */
     onReportBug: () -> Unit = {},
     onThemeChange: (AppThemePreset) -> Unit,
@@ -316,6 +319,8 @@ fun SettingsDialogContent(
                                 onWindowOpacityChange = onWindowOpacityChange,
                                 onUiScaleChange = onUiScaleChange,
                                 onReducedMotionChange = onReducedMotionChange,
+                                trayUsageRing = trayUsageRing,
+                                onTrayUsageRingChange = onTrayUsageRingChange,
                                 onReportBug = onReportBug
                             )
 

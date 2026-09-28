@@ -64,6 +64,8 @@ internal fun SettingsWindowHost(
             onUiScaleChange = actions::changeUiScale,
             reducedMotion = shell.reducedMotion,
             onReducedMotionChange = actions::changeReducedMotion,
+            trayUsageRing = shell.trayUsageRing,
+            onTrayUsageRingChange = actions::changeTrayUsageRing,
             onReportBug = actions::reportBug,
             onThemeChange = actions::changeTheme,
             onLanguageChange = actions::changeLanguage,

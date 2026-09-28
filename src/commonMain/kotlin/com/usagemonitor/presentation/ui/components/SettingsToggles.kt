@@ -163,6 +163,38 @@ fun ReducedMotionToggle(
 }
 
 /**
+ * Anel de uso no ícone da bandeja (issue #328): o maior percentual entre as cotas
+ * vigentes, lido sem abrir a janela. O texto diz de qual cota é o número, porque
+ * o anel não diz — quem quer saber a fonte passa o ponteiro no ícone.
+ */
+@Composable
+fun TrayUsageRingToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Anel de uso na bandeja" else "Usage ring in the tray",
+        description = if (isPt) {
+            "Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta."
+        } else {
+            "Draws the highest percentage among the current quotas around the tray icon. The icon tooltip still lists every account."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(TRAY_USAGE_RING_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/**
  * Atualização automática: baixar a versão nova em segundo plano e aplicá-la ao
  * fechar o app.
  *

@@ -14,6 +14,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.hudDefaultShouldSwitch
 import com.usagemonitor.presentation.ui.hudTraySummary
+import com.usagemonitor.presentation.ui.trayUsageRingFraction
 import com.usagemonitor.presentation.ui.usageAlertMessage
 import kotlinx.datetime.Clock
 import androidx.compose.ui.input.key.type
@@ -40,10 +41,13 @@ internal fun ApplicationScope.AppTrayHost(
     val language = shell.language
     val trayState = rememberTrayState()
     val worstRisk by viewModels.usageAlert.worstRisk.collectAsState()
-    val trayIcon = remember(iconImage, worstRisk) { TrayRiskIconPainter(iconImage, worstRisk) }
     // O tooltip resume as contas — "Anthropic — Padrão 87% · Codex 0%" —, como o
     // do Codenotch: mesmas contas e mesma ordem da HUD (`buildHudAccounts`).
     val quotaRisks by viewModels.usageAlert.quotaRisks.collectAsState()
+    // Anel de uso (issue #328): o painter só muda quando o percentual muda, e
+    // não a cada recomposição — o `Tray` reconstrói a imagem AWT a cada troca.
+    val ringFraction = if (shell.trayUsageRing) trayUsageRingFraction(quotaRisks, Clock.System.now()) else null
+    val trayIcon = remember(iconImage, worstRisk, ringFraction) { TrayRiskIconPainter(iconImage, worstRisk, ringFraction) }
     val switchToHudByDefault = hudDefaultShouldSwitch(shell.hudDefaultPending, quotaRisks.isNotEmpty(), modal.anyOpen)
     LaunchedEffect(switchToHudByDefault) {
         if (switchToHudByDefault) {

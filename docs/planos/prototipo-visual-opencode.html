@@ -827,12 +827,20 @@ table.dt td.num, table.dt th.num { text-align: right; }
     </div>
     <figcaption>bandeja · atenção e crítico</figcaption>
   </figure>
+  <figure>
+    <div class="hstack" style="gap:var(--s3)">
+      <svg width="32" height="32" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/><circle cx="12" cy="12" r="10.3" fill="none" stroke="#101010" stroke-width="3.4"/><circle cx="12" cy="12" r="10.3" fill="none" stroke="#E0E0E0" stroke-width="3.4" stroke-dasharray="26.54 64.72" transform="rotate(-90 12 12)"/></svg>
+      <svg width="32" height="32" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/><circle cx="12" cy="12" r="10.3" fill="none" stroke="#101010" stroke-width="3.4"/><circle cx="12" cy="12" r="10.3" fill="none" stroke="var(--crit)" stroke-width="3.4" stroke-dasharray="60.84 64.72" transform="rotate(-90 12 12)"/><circle cx="19" cy="19" r="5" fill="var(--crit)" stroke="var(--bg)" stroke-width="1.6"/></svg>
+    </div>
+    <figcaption>bandeja · anel de uso (opcional, #328)</figcaption>
+  </figure>
 </div>
 <div class="hstack" style="gap:var(--s3);margin-top:var(--s6)">
   <svg width="28" height="28" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="var(--fg)"/><path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" stroke-width="2.1" fill="none" stroke-linecap="round"/><path d="M12 6.5v6.6" stroke="var(--bg)" stroke-width="2.1" stroke-linecap="round"/></svg>
   <span style="font-family:var(--mono);font-size:var(--t20);font-weight:500;letter-spacing:-.01em">usage monitor</span>
 </div>
 <p class="note"><b>Verificação pendente:</b> o <code>.icns</code> do macOS não é validável na máquina Windows onde a implementação roda. Ele é montado por script determinístico e a checagem real acontece no job <code>build-macos</code> do release. O <code>.ico</code> sai do <code>build-ico.ps1</code> que já existe no repositório. O ícone da bandeja recebe o ponto de risco por cima — <code>ON_TRACK</code> não acende nada, porque ponto verde permanente vira decoração.</p>
+<p class="note"><b>Anel de uso (issue #328), desligado por padrão</b> — "Anel de uso na bandeja", última linha de Configurações › Geral › Sistema. Arco do topo no sentido horário com o <b>maior</b> percentual entre as cotas vigentes de todas as contas; saldo em dinheiro e janela vencida ficam de fora, e sem cota elegível não há anel (anel vazio diria 0% sem ninguém ter medido). Trilho escuro na volta inteira para o arco ler sobre bandeja clara ou escura. Cor pelos cortes de 75 e 90 dos alertas; abaixo deles cinza claro, não verde, pelo mesmo motivo do ponto. O anel não diz de qual conta é o número: o tooltip do ícone continua listando cada uma. O ponto de risco continua por cima.</p>
 
 <!-- ═══════════════════════════════ DASHBOARD ═════════════════════════ -->
 <h2 id="dashboard">4 · Dashboard</h2>
@@ -1972,6 +1980,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Iniciar com o sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sempre visível</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Mantém a janela acima das demais.</span></div><span class="sw"></span></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Anel de uso na bandeja</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta.</span></div><span class="sw"></span></div>
       </div></div>
 
       <div class="panel"><div class="phead"><span class="ptitle">Diagnóstico</span><span class="sp"></span><button class="btn primary" type="button">Reportar um bug</button></div><div class="pbody flush">

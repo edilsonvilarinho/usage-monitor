@@ -30,6 +30,7 @@ import com.usagemonitor.presentation.ui.components.REDUCED_MOTION_SWITCH_TEST_TA
 import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
+import com.usagemonitor.presentation.ui.components.TRAY_USAGE_RING_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.UI_SCALE_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.WINDOW_OPACITY_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
@@ -476,6 +477,34 @@ class SettingsDialogContentTest {
 
         onNodeWithText("Reduzir animações").assertExists()
         onNodeWithTag(REDUCED_MOTION_SWITCH_TEST_TAG).performScrollTo().performClick()
+
+        assertEquals(true, enabled)
+    }
+
+    /** Anel de uso da bandeja (issue #328): fecha a seção Sistema da aba Geral. */
+    @Test
+    fun `SettingsDialogContent emits the tray usage ring change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    trayUsageRing = false,
+                    onTrayUsageRingChange = { value -> enabled = value },
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> }
+                )
+            }
+        }
+
+        onNodeWithText("Anel de uso na bandeja").assertExists()
+        onNodeWithTag(TRAY_USAGE_RING_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
     }
