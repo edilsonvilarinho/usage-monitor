@@ -309,6 +309,71 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # A suite no Linux antes da tag (issue #342). Sem este job o Linux so era
+  # exercitado no empacotamento do release, depois da tag -- quando uma falha ja
+  # custa um novo patch. O ai-usagebar criou o job de Linux dele pelo mesmo
+  # motivo. Ele NAO pega a #340: o defeito ali era o gerenciador de janelas real
+  # (Gala/X11), que nenhum teste exercita. Pega o resto do "passa no Windows,
+  # quebra no Linux": logica com caminho ou relogio, fonte, renderizacao Skia e
+  # os testes de bitmap.
+  #
+  # Nasce SEM bloquear (`continue-on-error`) e fora do `verified-tree`: o
+  # comentario do job `tests` registra que a suite nunca rodou headless em
+  # Linux, e um gate nao comprovado so ensina a ignorar vermelho. Vira
+  # obrigatorio depois de runs verdes seguidos, registrados no plano da #342.
+  #
+  # Depende do `tests` para reusar o filtro de arquivos dele; o preco e rodar
+  # depois do Windows, e nao junto.
+  tests-linux:
+    runs-on: ubuntu-latest
+    needs: tests
+    if: needs.tests.outputs.relevant == 'true'
+    continue-on-error: true
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup JDK
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # `xvfb-run` porque parte dos testes de desktop consulta o
+      # `GraphicsEnvironment` do AWT, que sem display cai em headless. O Xvfb
+      # ja vem no ubuntu-latest. Forks como no Windows: `extractSkikoNative`
+      # resolve a corrida de extracao antes do `desktopTest`.
+      # Como no `build-linux` do release: o `gradlew` esta no git sem o bit de
+      # execucao.
+      - name: Run tests
+        run: |
+          chmod +x ./gradlew
+          xvfb-run -a ./gradlew allTests --build-cache -PtestForks=3
+
+      - name: Publish test summary
+        if: always()
+        run: node tools/ci/test-summary.mjs --title "Desktop no Linux (allTests)" --glob "build/test-results/**/*.xml" --require
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports-linux
+          path: |
+            build/reports/tests/**
+            build/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Job separado do `tests` de proposito: o roteiro instala e desinstala de
   # verdade, mexe no registro do runner e leva alguns minutos. Amarra-lo ao job
   # rapido faria toda mudanca de Kotlin esperar por ele.

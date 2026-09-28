@@ -21,3 +21,4 @@ escrever o que o CI não exercita e testar no Linux antes da tag.
 |---|---|---|---|
 | A1 | "Platform reality" no `CONTRIBUTING.md`; PR template pede plataformas testadas, teste que falha na `main` e validação no Linux ao tocar host de janela; linha no `CLAUDE.md` | leitura do diff (`git diff`) | só documentação; sem teste a rodar |
 | A2 | Seção "Fora do alcance dos testes" no `docs/hud-notch.md`: tabela comportamento × plataforma, só com medições já registradas no documento (célula vazia = não medido); link do `CONTRIBUTING.md` passa a apontar para ela | leitura do diff | só documentação |
+| A3 | Job `tests-linux` no `ci.yml` (ubuntu-latest, `xvfb-run -a ./gradlew allTests -PtestForks=3`), depois do `tests` para reusar o filtro, `continue-on-error` e fora do `verified-tree` até provar verde — o comentário do job `tests` registra que a suíte nunca rodou headless em Linux | sem validador de YAML local; o spike é o primeiro run no PR | resultado do run na linha A3b |
