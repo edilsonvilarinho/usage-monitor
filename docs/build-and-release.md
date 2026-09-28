@@ -140,6 +140,17 @@ validated in the `build-macos` release job.
 
 `TargetFormat.Exe` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). **O `Msi` saiu**: os dois instaladores de Windows gravavam no mesmo `%LOCALAPPDATA%\Usage Monitor`, e o do MSI nunca poderia se atualizar sozinho — `selectArtifact` só aceita `WINDOWS_NSIS`. O `upgradeUuid` continua no `build.gradle.kts` porque é o UpgradeCode das instalações MSI que já existem, e é por ele que o `UsageMonitor.nsi` as encontra e remove antes de instalar. O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
 
+**Versão de pacote de uma beta** (issue #355): o plugin do Compose valida `packageVersion` por formato
+e recusa `X.Y.Z-beta.N` em três deles — medido com `createDistributable -PappVersion=99.0.0-beta.1`,
+que falha na **configuração**: Exe exige `MAJOR.MINOR.BUILD` numérico, Dmg exige versão e build
+version numéricas, Rpm proíbe `-`; Deb aceita. Por isso `packageVersion` recebe só o número-base
+(`packageBaseVersion`), e Deb/Rpm recebem `X.Y.Z~beta.N` (`linuxPackageVersion`) — o `~` é ordenado
+**antes** da estável do mesmo número pelos dois gerenciadores de pacote. A string completa continua
+onde é o app que lê: `CURRENT_APP_VERSION`, `/DPRODUCT_VERSION` do NSIS (nome do `Setup.exe`,
+`DisplayVersion` e recibo), tarball e nome dos assets publicados. Conferido na imagem gerada:
+`Usage Monitor.cfg` com `-Djpackage.app-version=99.0.0` e `CURRENT_APP_VERSION = "99.0.0-beta.1"`.
+O `Setup.exe` beta não foi gerado nesta máquina (sem NSIS); quem o prova é o job `build-windows`.
+
 **Confiança TLS do sistema** (`SystemTrustStore.kt`, issue #325): o `HttpClient(OkHttp)` usa um `X509TrustManager` composto — `cacerts` da JVM primeiro, repositório do sistema depois (`Windows-ROOT` no Windows, `KeychainStore` no macOS). Antivírus que inspecionam HTTPS (Kaspersky, ESET) reassinam o tráfego com uma CA instalada no repositório do Windows, e o runtime empacotado só conhecia o `cacerts` embarcado. **`jdk.crypto.mscapi` entra no `modules(...)` só no build Windows**: medido, o runtime da v41.1.0 instalado declarava `MODULES="… java.sql jdk.crypto.ec"`, sem ele — `Windows-ROOT` nem existia no app —, e o módulo só existe no JDK do Windows, então sem a condição o jlink do Linux/macOS falharia. Repositório do sistema que não carrega devolve `null`, e o cliente fica com o padrão da JVM. Linux continua só com o `cacerts`: não existe um repositório único entre distribuições. A validação de ponta a ponta exige máquina com antivírus inspecionando HTTPS e não foi feita.
 
 Auto-start (`AutoStartManager`): registro `Run` no Windows, `.desktop` no Linux, LaunchAgent (`~/Library/LaunchAgents/com.usagemonitor.app.plist` + `launchctl`) no macOS. O enum `Platform` é exaustivo em três `when` do arquivo — valor novo quebra a compilação nos três.

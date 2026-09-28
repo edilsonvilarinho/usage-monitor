@@ -26,6 +26,15 @@ version = providers.gradleProperty("appVersion").orNull?.trim()?.removePrefix("v
     ?: lastReleaseTagVersion().ifBlank { "1.0.0" }
 
 val appVersion = version.toString()
+
+// Beta (`X.Y.Z-beta.N`, issue #355): o plugin do Compose recusa o sufixo em Exe
+// (`MAJOR.MINOR.BUILD`), Dmg (versao e build version so numericas) e Rpm (sem `-`)
+// -- medido com `createDistributable -PappVersion=99.0.0-beta.1`, que falha na
+// configuracao. Esses formatos levam so o numero; Deb e Rpm levam `~beta.N`, que
+// os dois gerenciadores ordenam ANTES da estavel do mesmo numero. `CURRENT_APP_VERSION`,
+// o instalador NSIS, o tarball e o recibo continuam com a string completa.
+val packageBaseVersion = appVersion.substringBefore("-")
+val linuxPackageVersion = appVersion.replace("-", "~")
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
 
 kotlin {
@@ -127,7 +136,7 @@ compose.desktop {
                 TargetFormat.Dmg
             )
             packageName = "Usage Monitor"
-            packageVersion = appVersion
+            packageVersion = packageBaseVersion
             // `java.logging` cobre o commons-logging que o PDFBox traz: hoje ele
             // acha o SLF4J que o Ktor ja poe no classpath, mas o fallback dele e o
             // `Jdk14Logger`, de `java.util.logging`. Modulo faltando no runtime
@@ -157,6 +166,8 @@ compose.desktop {
             }
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.png"))
+                debPackageVersion = linuxPackageVersion
+                rpmPackageVersion = linuxPackageVersion
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.icns"))
