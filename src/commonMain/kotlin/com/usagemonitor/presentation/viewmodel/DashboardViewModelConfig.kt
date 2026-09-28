@@ -48,6 +48,12 @@ data class DashboardViewModelConfig(
      * exato do vencimento tende a devolver ainda a janela velha.
      */
     val quotaResetGrace: Duration = 20.seconds,
+    /**
+     * Espera depois de uma volta do laço de coleta que lançou (issue #326). A
+     * volta seguinte recalcula tudo do zero; sem a espera, uma falha que se
+     * repete viraria laço quente.
+     */
+    val pollLoopRecoveryDelay: Duration = 30.seconds,
     val maxConcurrentSourceFetches: Int = 3,
     val autoStartInitialFetch: Boolean = true,
     val autoStartCountdown: Boolean = true,

@@ -44,7 +44,8 @@ class DashboardViewModelCadenceTest : DashboardViewModelTestSupport() {
         scheduler: TestCoroutineScheduler,
         fetchTimes: MutableList<Long>,
         busy: MutableStateFlow<Boolean>,
-        profiles: List<AnthropicProfileRef> = listOf(AnthropicProfileRef.DEFAULT)
+        profiles: List<AnthropicProfileRef> = listOf(AnthropicProfileRef.DEFAULT),
+        clock: Clock = VirtualClock(startedAt, scheduler)
     ): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
@@ -60,7 +61,7 @@ class DashboardViewModelCadenceTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(object : DeepSeekRepository { override suspend fun getUsage() = unused }),
             MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
             historyUseCase(mutableListOf()),
-            clock = VirtualClock(startedAt, scheduler),
+            clock = clock,
             isBusy = busy,
             anthropicProfiles = MutableStateFlow(profiles),
             config = DashboardViewModelConfig(
@@ -140,6 +141,34 @@ class DashboardViewModelCadenceTest : DashboardViewModelTestSupport() {
         assertEquals(2, fetchTimes.size)
         val gap = fetchTimes[1] - fetchTimes[0]
         assertTrue(gap >= 800, "Intervalo entre contas: ${gap}ms")
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a failing tick does not stop the collection loop`() = runTest {
+        val fetchTimes = Collections.synchronizedList(mutableListOf<Long>())
+        // Issue #326: a primeira leitura do relógio a partir dos 5 min lança, e
+        // ela acontece dentro de uma volta do laço. Antes do try/catch essa volta
+        // encerrava o laço para sempre e a coleta dos 5 min nunca saía.
+        val virtual = VirtualClock(startedAt, testScheduler)
+        var failed = false
+        val failingOnce = object : Clock {
+            override fun now(): Instant {
+                if (!failed && testScheduler.currentTime >= 5.minutes.inWholeMilliseconds) {
+                    failed = true
+                    error("relógio indisponível")
+                }
+                return virtual.now()
+            }
+        }
+        val viewModel = cadenceViewModel(testScheduler, fetchTimes, MutableStateFlow(false), clock = failingOnce)
+
+        runCurrent()
+        advanceTimeBy(6.minutes)
+        runCurrent()
+
+        assertTrue(failed, "A falha injetada não aconteceu")
+        assertTrue(fetchTimes.any { time -> time >= 5.minutes.inWholeMilliseconds }, "O laço parou: $fetchTimes")
         viewModel.onDestroy()
     }
 }

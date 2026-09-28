@@ -63,6 +63,7 @@ depois de conferir o código. O que já medimos antes de começar:
 | # | Atividade | Comando | Resultado |
 |---|---|---|---|
 | A0 | Plano no repositório | `git switch -c feat/competitive-gaps-324-329` | branch criada de `616d123f`; só documentação |
+| A1 | #326: corpo do laço extraído para `runCountdownTick` e isolado por `try/catch` (rethrow de `CancellationException`, breadcrumb `ERROR`, espera `pollLoopRecoveryDelay` = 30 s). Teste novo com relógio que lança uma vez na volta dos 5 min | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.DashboardViewModelCadenceTest"` com e sem o `catch` | Com o `catch`: verde. Sem ele: `a failing tick does not stop the collection loop FAILED`. A 1ª versão do teste (injeção por `onNextRefreshAtChanged`) passava **sem** a correção, porque o callback só roda quando o prazo muda e não lançava dentro do laço; foi descartada |
 
 ## Problemas em aberto e riscos
 

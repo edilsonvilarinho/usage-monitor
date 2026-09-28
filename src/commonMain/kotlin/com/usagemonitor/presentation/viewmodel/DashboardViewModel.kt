@@ -32,6 +32,7 @@ import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -346,28 +347,42 @@ class DashboardViewModel(
             }
             launch { isAppVisible.collect { visible -> if (visible) nudgeCountdown() } }
             while (true) {
-                val now = clock.now()
-                val visible = isAppVisible.value
-                val tick = stateMutex.withLock {
-                    scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, isBusy.value, config)
-                }
-                val dispatch = if (visible) tick.due else tick.byReset
-                if (dispatch.isNotEmpty()) {
-                    scheduler.recordAttempt(dispatch, now)
-                    viewModelScope.launch { requestFetch(dispatch, preserveDataOnFailure = true) }
-                }
-                val nextPoll = publishNextPoll(now)
-                val nextReset = nextQuotaResetTarget()
-                val wakeUpAt = listOfNotNull(nextPoll.takeIf { visible }, nextReset).minOrNull()
-                val waitMillis = wakeUpAt?.let { (it - now).inWholeMilliseconds.coerceAtLeast(0L) } ?: Long.MAX_VALUE
-                val signalled = withTimeoutOrNull(waitMillis) { pollWakeUpSignal.receive() } != null
-                if (!signalled && wakeUpAt != null &&
-                    looksLikeWakeFromSleep(wakeUpAt, clock.now(), config.sleepJumpThreshold)
-                ) {
-                    breadcrumbs.record(BreadcrumbCategory.USE_CASE, "volta do sleep: todas as fontes devidas")
-                    scheduler.forgetAttempts()
+                // Uma volta que lança não pode encerrar o laço (issue #326): o
+                // `SupervisorJob` manteria o app vivo e a coleta pararia calada,
+                // com o card mostrando o último número para sempre.
+                try {
+                    runCountdownTick()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    breadcrumbs.record(BreadcrumbCategory.ERROR, "laço de coleta falhou: ${failure::class.simpleName}")
+                    delay(config.pollLoopRecoveryDelay)
                 }
             }
+        }
+    }
+
+    private suspend fun runCountdownTick() {
+        val now = clock.now()
+        val visible = isAppVisible.value
+        val tick = stateMutex.withLock {
+            scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, isBusy.value, config)
+        }
+        val dispatch = if (visible) tick.due else tick.byReset
+        if (dispatch.isNotEmpty()) {
+            scheduler.recordAttempt(dispatch, now)
+            viewModelScope.launch { requestFetch(dispatch, preserveDataOnFailure = true) }
+        }
+        val nextPoll = publishNextPoll(now)
+        val nextReset = nextQuotaResetTarget()
+        val wakeUpAt = listOfNotNull(nextPoll.takeIf { visible }, nextReset).minOrNull()
+        val waitMillis = wakeUpAt?.let { (it - now).inWholeMilliseconds.coerceAtLeast(0L) } ?: Long.MAX_VALUE
+        val signalled = withTimeoutOrNull(waitMillis) { pollWakeUpSignal.receive() } != null
+        if (!signalled && wakeUpAt != null &&
+            looksLikeWakeFromSleep(wakeUpAt, clock.now(), config.sleepJumpThreshold)
+        ) {
+            breadcrumbs.record(BreadcrumbCategory.USE_CASE, "volta do sleep: todas as fontes devidas")
+            scheduler.forgetAttempts()
         }
     }
 
