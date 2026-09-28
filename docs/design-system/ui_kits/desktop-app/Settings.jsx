@@ -47,6 +47,9 @@ export function Settings() {
               <AppSwitch checked={dark} onChange={setDark} label="Tema escuro" />
               <AppSwitch checked={false} disabled label="Atualização automática"
                 reason="Instalação .deb: aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma árvore que o próximo apt upgrade desfaz." />
+              {/* Issue #355: canal beta, desligado por padrão; desligar não faz downgrade. */}
+              <AppSwitch checked={false} label="Receber versões beta"
+                hint="Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova." />
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', width: 190 }}>Idioma</span>
                 <AppSegmentedControl items={['PT', 'EN']} value={lang} onChange={setLang} />

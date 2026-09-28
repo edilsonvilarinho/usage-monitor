@@ -64,6 +64,7 @@ const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
 const val AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG = "autoUpdateFeedOverride"
+const val BETA_UPDATES_SWITCH_TEST_TAG = "betaUpdatesSwitch"
 const val THEME_PRESET_TEST_TAG_PREFIX = "themePreset_"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
@@ -160,6 +161,9 @@ fun SettingsDialogContent(
     lastUpdateReceipt: AppUpdateReceipt? = null,
     autoUpdateFeedOverride: String? = null,
     onAutoUpdateChange: (Boolean) -> Unit = {},
+    /** Canal beta (issue #355). Default desligado, como a preferência. */
+    receiveBetaUpdates: Boolean = false,
+    onReceiveBetaUpdatesChange: (Boolean) -> Unit = {},
     onWindowOpacityChange: (Int) -> Unit = {},
     alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
     onAlertSettingsChange: (UsageAlertSettings) -> Unit = {},
@@ -231,27 +235,7 @@ fun SettingsDialogContent(
     // a aba curta abrir rolada pela posição que a aba longa deixou para trás.
     val scrollState = remember(selectedTab) { ScrollState(0) }
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // Evento que já existia quando o diálogo abriu é de uma edição anterior —
-    // reexibi-lo faria a tela abrir avisando algo que o usuário nem acabou de
-    // fazer.
-    val staleToastId = remember { toastEvent?.id }
-
-    // Host próprio: o diálogo é uma janela separada e o SnackbarHost do
-    // dashboard não desenha por cima dela. O `dismiss` antes de mostrar impede
-    // que mexer em vários controles seguidos enfileire avisos e o usuário fique
-    // assistindo à fila esvaziar depois de já ter parado.
-    LaunchedEffect(toastEvent?.id) {
-        val event = toastEvent ?: return@LaunchedEffect
-        if (event.id == staleToastId) {
-            return@LaunchedEffect
-        }
-        snackbarHostState.currentSnackbarData?.dismiss()
-        snackbarHostState.showSnackbar(
-            message = settingsToastMessage(event.toast, currentLanguage),
-            duration = SnackbarDuration.Short
-        )
-    }
+    SettingsToastEffect(toastEvent = toastEvent, snackbarHostState = snackbarHostState, language = currentLanguage)
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -317,6 +301,8 @@ fun SettingsDialogContent(
                                 onCardsOnlyModeChange = onCardsOnlyModeChange,
                                 onHudModeChange = onHudModeChange,
                                 onAutoUpdateChange = onAutoUpdateChange,
+                                receiveBetaUpdates = receiveBetaUpdates,
+                                onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange,
                                 onWindowOpacityChange = onWindowOpacityChange,
                                 onUiScaleChange = onUiScaleChange,
                                 onReducedMotionChange = onReducedMotionChange,
@@ -414,6 +400,39 @@ fun SettingsDialogContent(
             )
             }
         }
+    }
+}
+
+/**
+ * O aviso curto das Configurações. Saiu de [SettingsDialogContent], que passou do
+ * limite de 300 linhas com o canal beta (issue #355).
+ *
+ * Host próprio: o diálogo é uma janela separada e o SnackbarHost do dashboard não
+ * desenha por cima dela. O `dismiss` antes de mostrar impede que mexer em vários
+ * controles seguidos enfileire avisos e o usuário fique assistindo à fila
+ * esvaziar depois de já ter parado.
+ */
+@Composable
+private fun SettingsToastEffect(
+    toastEvent: SettingsToastEvent?,
+    snackbarHostState: SnackbarHostState,
+    language: AppLanguage
+) {
+    // Evento que já existia quando o diálogo abriu é de uma edição anterior —
+    // reexibi-lo faria a tela abrir avisando algo que o usuário nem acabou de
+    // fazer.
+    val staleToastId = remember { toastEvent?.id }
+
+    LaunchedEffect(toastEvent?.id) {
+        val event = toastEvent ?: return@LaunchedEffect
+        if (event.id == staleToastId) {
+            return@LaunchedEffect
+        }
+        snackbarHostState.currentSnackbarData?.dismiss()
+        snackbarHostState.showSnackbar(
+            message = settingsToastMessage(event.toast, language),
+            duration = SnackbarDuration.Short
+        )
     }
 }
 

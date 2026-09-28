@@ -12,6 +12,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.update.AutoUpdateController
 import com.usagemonitor.update.isEnabled
+import com.usagemonitor.update.receivesBetaUpdates
 
 /**
  * A janela de Configurações. O estado vem dos donos dele — [AppShellState],
@@ -81,6 +82,8 @@ internal fun SettingsWindowHost(
             lastUpdateReceipt = autoUpdate.lastReceipt,
             autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
             onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },
+            receiveBetaUpdates = autoUpdate.receivesBetaUpdates(),
+            onReceiveBetaUpdatesChange = { enabled -> autoUpdate.setReceiveBetaUpdates(enabled) },
             onWindowOpacityChange = actions::changeWindowOpacity,
             alertSettings = alertSettings,
             onAlertSettingsChange = actions::changeAlertSettings,

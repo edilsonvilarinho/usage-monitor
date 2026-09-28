@@ -279,6 +279,42 @@ fun AutoUpdateToggle(
 }
 
 /**
+ * Canal beta (issue #355): receber também as versões marcadas como beta, para
+ * testar mudanças antes da release estável.
+ *
+ * Independe da atualização automática: sem ela a beta só é anunciada, como
+ * qualquer versão. O texto diz as duas coisas que o usuário precisa saber antes
+ * de ligar — que beta pode ter defeitos, e que desligar **não volta** para a
+ * estável anterior.
+ */
+@Composable
+fun BetaUpdatesToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) "Receber versões beta" else "Receive beta updates",
+        description = if (isPt) {
+            "Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova."
+        } else {
+            "Also offers beta versions, which arrive before the stable release and may have bugs. Turning it off does not roll back: the app stays on the beta until a newer stable release comes out."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(BETA_UPDATES_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/**
  * O motivo que acompanha o interruptor, por plataforma.
  *
  * A [platform] entrou porque dois dos motivos **mudam de conteúdo** conforme o
