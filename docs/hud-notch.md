@@ -249,6 +249,17 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     **trilha** de cada arco a cada 3,6s, defasada 120° entre arcos, com ou sem consumo. A trilha é "o
     que falta", não o dado — iluminá-la não sugere percentual. `HudNotchTest` afirma que um anel em
     1%/0% se mexe com a política contínua (e falha sem o brilho da trilha).
+  - **Profundidade estática e execução legível** (pedido depois de olhar a HUD na borda direita:
+    "muito flat, tudo chapado"). A captura mostrava arcos de 2,5dp em cor sólida, trilha a 10% × 1,6
+    quase invisível, miolo vazio e o cometa de 1,5dp sumindo contra o notch. Agora, sem depender da
+    política de movimento: brilho do tom sob cada arco (12%, dobro do traço), **ponta acesa** — rampa a
+    branco nos últimos 70° e um ponto de luz no fim do valor, nunca além dele, nenhum em arco cheio —,
+    **poço radial** no miolo atrás da marca (estático; o teste de bitmap que afirma o miolo igual com e
+    sem sessão continua passando) e trilha a 2,2×. O cometa passou a 0,8 do traço, ganhou a **pista**
+    da órbita a 14% (lê "gira" mesmo parado) e um halo radial na cabeça com miolo branco. O halo manda
+    no alcance: `appUsageRingOrbitReach` foi de 3,4dp para 5,3dp, dentro dos 8dp do respiro e dos 6dp
+    de meio vão — `HudNotchGeometryTest` afirma. Intensidades medidas em bitmap nos dois temas: com 16%
+    de brilho e 35% na ponta o laranja do tema claro desbotava para bege.
   - **A órbita é por fora para a marca não encolher** (E11). Por dentro do último arco de cota ela
     comia o miolo, e a marca da conta trabalhando caía de 14dp para 8dp — justo a conta que merecia
     atenção ficava com o ícone menor. Ela passa `appUsageRingOrbitReach` (3,4dp, contando a cabeça do
