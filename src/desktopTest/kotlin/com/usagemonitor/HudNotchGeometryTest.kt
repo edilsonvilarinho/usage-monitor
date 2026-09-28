@@ -115,6 +115,32 @@ class HudNotchGeometryTest {
     }
 
     /**
+     * No Windows, com 50% de opacidade o fundo de alfa 1/255 da janela
+     * transparente arredonda para zero e o ponteiro atravessa a HUD; 55% foi o
+     * menor valor medido que ainda recebe o hover. Fora do Windows a preferência
+     * vale inteira.
+     */
+    @Test
+    fun `a opacidade da HUD tem piso so no Windows`() {
+        assertEquals(55, hudWindowOpacityPercent(50, AutoStartManager.Platform.WINDOWS))
+        assertEquals(55, hudWindowOpacityPercent(55, AutoStartManager.Platform.WINDOWS))
+        assertEquals(80, hudWindowOpacityPercent(80, AutoStartManager.Platform.WINDOWS))
+        assertEquals(100, hudWindowOpacityPercent(100, AutoStartManager.Platform.WINDOWS))
+        assertEquals(50, hudWindowOpacityPercent(50, AutoStartManager.Platform.LINUX))
+        assertEquals(50, hudWindowOpacityPercent(50, AutoStartManager.Platform.MACOS))
+        assertEquals(100, hudWindowOpacityPercent(250, AutoStartManager.Platform.LINUX))
+    }
+
+    /** Sem repintar depois da troca, a HUD do Windows fica sem hover até sair do modo. */
+    @Test
+    fun `a HUD so repinta depois da opacidade no Windows`() {
+        assertTrue(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.WINDOWS))
+        assertFalse(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.LINUX))
+        assertFalse(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.MACOS))
+        assertFalse(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.OTHER))
+    }
+
+    /**
      * Issue #294: parada e aberta são a mesma janela, e só a área de clique muda.
      * O recorte parado contém o notch inteiro com a margem de sombra, encosta na
      * borda da tela, fica dentro da janela e deixa de fora o espaço do balão —

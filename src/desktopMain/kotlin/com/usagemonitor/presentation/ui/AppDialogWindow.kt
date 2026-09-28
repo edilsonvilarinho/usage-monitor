@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.ApplyWindowMinimumSize
+import com.usagemonitor.AutoStartManager
 import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.activateWindow
 import com.usagemonitor.domain.entity.BreadcrumbCategory
@@ -94,8 +95,8 @@ internal val LocalModalWindowOnScreen = compositionLocalOf { true }
  * é a queda de [visible] que esmaece e esconde (ver [ModalWindowHost]). Antes só o × da barra
  * esmaecia; o resto fechava seco.
  *
- * Com "Reduzir animações", ou numa plataforma sem translucidez de janela
- * (alguns Linux), abre e fecha na hora.
+ * Com "Reduzir animações", fora do Windows ou sem translucidez de janela, abre e
+ * fecha na hora ([shouldAnimateModalWindow]).
  *
  * [diagnosticName] vai para a trilha junto com o tempo até o primeiro quadro,
  * e é fixo de propósito: o título pode carregar o apelido do perfil, que costuma
@@ -244,6 +245,7 @@ private fun WindowScope.ModalWindowBody(
     content: @Composable () -> Unit
 ) {
     val opacitySupported = remember { isWindowOpacitySupported() }
+    val platform = remember { AutoStartManager.currentPlatform() }
     val scale = remember { Animatable(1f) }
     val currentEnvironment by rememberUpdatedState(environment)
     val currentDiagnosticName by rememberUpdatedState(diagnosticName)
@@ -253,7 +255,7 @@ private fun WindowScope.ModalWindowBody(
         // reabrir no meio da saída.
         host.requests.collectLatest { request ->
             val motion = currentEnvironment.motion
-            val animated = shouldAnimateModalWindow(motion, opacitySupported)
+            val animated = shouldAnimateModalWindow(motion, opacitySupported, platform)
             if (request.visible) {
                 if (host.onScreen) {
                     // Já na tela, ou saindo: volta à opacidade cheia e vem para a
@@ -365,9 +367,19 @@ private fun WindowScope.ModalWindowBody(
  * abrir janela. Sem translucidez a janela não tem como esmaecer, e animar só a
  * escala dentro de uma janela opaca é exatamente o salto que o host existe para
  * eliminar.
+ *
+ * **Só no Windows**, onde o esmaecimento foi medido (issue #340). No X11 a
+ * opacidade da janela é a propriedade `_NET_WM_WINDOW_OPACITY`, aplicada pelo
+ * compositor, e voltar a 1 é *apagar* a propriedade: no elementary OS o modal de
+ * Configurações ficou translúcido depois de a opacidade ter mudado, e a janela que
+ * nunca sai de 1 não depende de o compositor atender a remoção.
  */
-internal fun shouldAnimateModalWindow(motion: AppMotionPolicy, opacitySupported: Boolean): Boolean {
-    return opacitySupported && !motion.reduced
+internal fun shouldAnimateModalWindow(
+    motion: AppMotionPolicy,
+    opacitySupported: Boolean,
+    platform: AutoStartManager.Platform
+): Boolean {
+    return platform == AutoStartManager.Platform.WINDOWS && opacitySupported && !motion.reduced
 }
 
 /** A linha da trilha com o tempo até o primeiro quadro. Sem título: ver [AppDialogWindow]. */
