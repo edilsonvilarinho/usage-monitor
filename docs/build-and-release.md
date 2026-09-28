@@ -60,7 +60,9 @@ the independent CodeQL run or the local `allTests` preflight performed by the re
 The cache comes from `gradle/actions/setup-gradle`, **not** from `setup-java`'s `cache: 'gradle'`.
 The latter archives `~/.gradle` with the daemon still alive, and on Windows `tar` dies on the `.lock`
 files. Only `main` writes the cache: a cache written from a pull request run is scoped to that PR and
-no other run can read it.
+no other run can read it. Tag runs (release) and CodeQL only read: each tag is a new ref, so a cache
+written there is never read again, and those writes pushed the repository past the 10 GB limit and
+evicted `main`'s cache (#344).
 
 ### Parallel test forks
 
@@ -351,4 +353,6 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   seguinte compila do zero, falha de compilação é determinística, e um build up-to-date faria
   `Perform CodeQL Analysis` reprovar alto com *No source code was seen*. O preço aceito é o cache
   Linux disputar os 10 GB do repositório com o cache Windows do `ci.yml`; se aquele voltar a dizer
-  `gradle cache is not found`, a saída é `cache-read-only: true` no CodeQL.
+  `gradle cache is not found`, a saída é `cache-read-only: true` no CodeQL. **Foi aplicada na #344**:
+  o repositório chegou a 11,96 GB, a maior parte gravada em ref de tag pelo `setup-java
+  cache: 'gradle'` do `build-macos` (~0,5 GB por release, nunca relido). Tag e CodeQL só leem.

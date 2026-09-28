@@ -477,7 +477,15 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      # `setup-java cache: 'gradle'` gravava ~0,5 GB por release num escopo de tag
+      # que nenhum run seguinte le (cada tag e um ref novo), e empurrava o cache
+      # do repositorio acima dos 10 GB -- despejando o cache da `main` que deixa o
+      # PR rapido (#344). Tag so le, como o `build-windows`.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: true
 
       - name: Extract version
         id: version
