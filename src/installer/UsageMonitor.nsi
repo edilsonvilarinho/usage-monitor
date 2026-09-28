@@ -44,8 +44,10 @@ SetCompressor zlib
 ; -----------------------------------------------
 ; General
 ; -----------------------------------------------
+; A versao real vem da tag (#344): `buildNsisInstaller` passa /DPRODUCT_VERSION.
+; Este default so vale para `makensis` direto e nao e mais atualizado por release.
 !ifndef PRODUCT_VERSION
-!define PRODUCT_VERSION "41.3.1"
+!define PRODUCT_VERSION "1.0.0"
 !endif
 
 ; Payload e destino parametrizaveis. Os defaults sao exatamente os caminhos que o

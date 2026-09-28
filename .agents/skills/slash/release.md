@@ -1,6 +1,6 @@
 # /release — Release Workflow
 
-Cria uma versão: bump, build, tag e GitHub Release com assets.
+Cria uma versão: tag anotada; o CI gera os pacotes e o GitHub Release.
 
 > Fluxo mecânico — sem Plan Mode, sem subagentes.
 
@@ -24,62 +24,42 @@ git status && git log --oneline -5
 
 `main` deve estar limpo e atualizado com origin. Se não, parar e informar.
 
-## Step 2 — Bump version
+## Step 2 — Pick the version
 
-**build.gradle.kts** (line ~90):
-```
-packageVersion = "X.Y.Z"
-```
-
-**src/installer/UsageMonitor.nsi** (line ~11):
-```
-!define PRODUCT_VERSION "X.Y.Z"
-```
-
-Calcular nova versão baseada no tipo (patch/minor/major) e atualizar ambos arquivos com Edit tool.
-
-## Step 3 — Commit
+Sem commit de bump (#344): a versão vem da tag.
 
 ```bash
-git add build.gradle.kts src/installer/UsageMonitor.nsi
-git commit -m "chore: bump version to v<X.Y.Z>"
+git describe --tags --abbrev=0 --match "v[0-9]*"
 ```
 
-## Step 4 — Build
+Calcular a próxima versão pelo tipo (patch/minor/major). Não editar `build.gradle.kts` nem
+`src/installer/UsageMonitor.nsi`: o release passa `-PappVersion` a partir da tag.
+
+## Step 3 — Verify locally
 
 ```bash
-powershell -ExecutionPolicy Bypass -File build-with-icon.ps1
+gradlew.bat allTests
 ```
 
-Se falhar, parar — não criar tag nem release com build quebrado. Verificar que `build/installer/UsageMonitor-Setup-<X.Y.Z>.exe` existe (~60 MB).
+Se falhar, parar — a tag é o que dispara o release.
 
-## Step 5 — Create annotated git tag
+## Step 4 — Create annotated tag and push only the tag
 
 ```bash
 git tag -a v<X.Y.Z> -m "v<X.Y.Z>"
+git push origin v<X.Y.Z>
 ```
 
-## Step 6 — Push commit and tag
+A tag precisa apontar para um commit que já está na `main` remota e ser anotada, ou o job
+`verify-version` recusa.
+
+## Step 5 — Watch the release workflow
+
+O workflow `Release Desktop Packages` gera os pacotes de Windows, Linux e macOS, roda o `verify` e
+publica o GitHub Release com as notas geradas dos commits. Não usar `gh release create` à mão.
 
 ```bash
-git push origin main && git push origin v<X.Y.Z>
-```
-
-## Step 7 — Collect changelog
-
-```bash
-git log --oneline <previous-tag>..HEAD
-```
-
-Agrupar por tipo: `feat`, `fix`, `chore`.
-
-## Step 8 — Create GitHub Release with assets
-
-```bash
-gh release create v<X.Y.Z> \
-  "build/installer/UsageMonitor-Setup-<X.Y.Z>.exe" \
-  --title "v<X.Y.Z>" \
-  --notes "## What's Changed\n\n### Features\n- ...\n\n### Bug Fixes\n- ...\n\n**Full changelog:** https://github.com/edilsonvilarinho/usage-monitor/compare/v<prev>...v<X.Y.Z>"
+gh run watch $(gh run list --workflow=release-linux.yml --limit 1 --json databaseId -q '.[0].databaseId')
 ```
 
 Compartilhar a URL do GitHub Release.

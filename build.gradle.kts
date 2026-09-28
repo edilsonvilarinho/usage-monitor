@@ -8,7 +8,22 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-version = "41.3.1"
+// A versao vem da tag (#344): o release roda com `-PappVersion=X.Y.Z`, lido do `vX.Y.Z`,
+// e nenhum commit de bump passa pela `main`. Sem a propriedade, a ultima tag alcancavel,
+// para `run` e `packageInstaller` locais seguirem com versao numerica valida para o
+// jpackage. Sem git ou sem tag (checkout raso do CI) cai em 1.0.0 -- nao 0.0.0, que o
+// plugin do Compose recusa na configuracao (`MAJOR` do Dmg tem de ser > 0). So os testes
+// rodam ali, e eles nao leem `CURRENT_APP_VERSION`. O `git` so e chamado sem a propriedade --
+// o container do `build-linux` nem tem git.
+fun lastReleaseTagVersion(): String = runCatching {
+    providers.exec {
+        commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().removePrefix("v")
+}.getOrDefault("")
+
+version = providers.gradleProperty("appVersion").orNull?.trim()?.removePrefix("v")
+    ?: lastReleaseTagVersion().ifBlank { "1.0.0" }
 
 val appVersion = version.toString()
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
@@ -157,6 +172,9 @@ compose.desktop {
 }
 
 val generateAppVersionSource by tasks.registering {
+    // Sem este input a troca de `-PappVersion` nao invalida a tarefa: o script nao muda
+    // mais a cada release, e o `AppVersion.kt` antigo sairia do cache.
+    inputs.property("appVersion", appVersion)
     outputs.dir(generatedAppVersionDir)
 
     doLast {
