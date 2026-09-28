@@ -64,8 +64,8 @@ off on elementary OS (X11) for three releases while every test stayed green. So:
 
 - If your change touches a window host (`HudWindow.kt`, `DesktopWindowFrame.kt`, `Main.kt`, any
   `*WindowHost`), **open the build on Linux (X11) before merging**, or say in the PR that you
-  could not and what is at risk. [`docs/hud-notch.md`](docs/hud-notch.md)
-  records what was measured on which platform.
+  could not and what is at risk. [`docs/hud-notch.md`](docs/hud-notch.md#fora-do-alcance-dos-testes)
+  lists what was measured on which platform.
 - Native window behaviour measured on one platform ships restricted to it (see `hudUsesHitRegion`),
   and `ArchitectureRulesTest` fails a `window.shape` outside the files that own it.
 - **Say which platforms you tested on** in the PR — OS, version and desktop/window manager. If you

@@ -20,3 +20,4 @@ escrever o que o CI não exercita e testar no Linux antes da tag.
 | # | Atividade | Comando | Resultado |
 |---|---|---|---|
 | A1 | "Platform reality" no `CONTRIBUTING.md`; PR template pede plataformas testadas, teste que falha na `main` e validação no Linux ao tocar host de janela; linha no `CLAUDE.md` | leitura do diff (`git diff`) | só documentação; sem teste a rodar |
+| A2 | Seção "Fora do alcance dos testes" no `docs/hud-notch.md`: tabela comportamento × plataforma, só com medições já registradas no documento (célula vazia = não medido); link do `CONTRIBUTING.md` passa a apontar para ela | leitura do diff | só documentação |
