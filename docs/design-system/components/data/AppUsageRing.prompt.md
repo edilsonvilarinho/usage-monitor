@@ -42,8 +42,25 @@ would pulse the weekly while the 5h is the critical one. Without the policy the 
 disappears and the word still says it.
 
 **The orbit sits outside so the mark never shrinks.** Inside the last quota arc it ate the core, and the
-provider mark of the account that was working dropped from 14dp to 8dp. It reaches `gap + 0.3 × stroke` to
-the orbit line plus the comet head (`0.45 × stroke`) past the ring box (3.4dp at the HUD's 44dp), outside the canvas bounds: whoever places the ring leaves
+provider mark of the account that was working dropped from 14dp to 8dp. It reaches `gap + 0.4 × stroke` to
+the orbit line plus the head glow (`1.12 × stroke`) past the ring box (5.3dp at the HUD's 44dp), outside the canvas bounds: whoever places the ring leaves
 that much free around it — the notch's 8dp padding and half its 12dp item gap do.
 
-Track: `--pressed-layer`. Stroke 3dp, gap 1.5dp, 28dp box.
+**Static depth** (user feedback on the real HUD: "muito flat, tudo chapado"). Drawn regardless of motion
+policy, so tests and captures show it too:
+- a soft glow in the arc's own tone under each arc (12% opacity, twice the stroke) — weaker than the
+  attention halo, which is still the only one that breathes;
+- a **lit tip**: the last 70° ramp to white at 25% and a white bead (85%, 0.28 × stroke radius) sits on the
+  arc's end — it marks where the value is and never passes it. A full arc has no tip (start and end meet),
+  and arcs under 4° get none;
+- a **core well**: a radial disc of `--pressed-layer` (1.4× at the center, fading to zero at the innermost
+  arc) behind the provider mark. It is static and ignores `active`: the core never changes with the session;
+- the track weighs 2.2× `--pressed-layer` (was 1.6×: at 10% it vanished on the dark notch).
+
+**Active session reads as light, not a hairline.** The comet stroke is 0.8 × stroke (was 0.6 — 1.5dp at the
+HUD, lost against the notch); a full **lane** at 14% under it says "this orbits" even when parked; the head
+carries a radial `--info` glow of 1.4 × orbit stroke and a white core. The glow is what bounds the orbit now:
+`appUsageRingOrbitReach` counts it (5.3dp at the HUD's 44dp), still inside the notch's 8dp padding and half
+of its 12dp item gap.
+
+Track: `--pressed-layer` × 2.2. Stroke 3dp, gap 1.5dp, 28dp box (the HUD uses 44dp / 2.5dp / 1.5dp).

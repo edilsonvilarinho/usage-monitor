@@ -203,6 +203,7 @@ fun AppUsageRing(
         val strokePx = stroke.toPx()
         val gapPx = gap.toPx()
         val dash = PathEffect.dashPathEffect(floatArrayOf(strokePx, strokePx * 1.4f))
+        drawCoreWell(arcCount = arcs.size.coerceIn(1, MAX_RING_ARCS), strokePx = strokePx, gapPx = gapPx, tint = ladder.pressedLayer)
         arcs.take(MAX_RING_ARCS).forEachIndexed { index, arc ->
             val inset = strokePx / 2 + index * (strokePx + gapPx)
             val diameter = this.size.minDimension - inset * 2
@@ -249,6 +250,18 @@ fun AppUsageRing(
                         style = Stroke(width = strokePx * RING_HALO_WIDTH, cap = StrokeCap.Round)
                     )
                 }
+                // Brilho de base, estático: o arco deixa de ser um traço chapado
+                // colado no fundo. Mais fraco que o halo de atenção, que continua
+                // sendo o único que respira.
+                drawArc(
+                    color = colors[index].value.copy(alpha = colors[index].value.alpha * RING_GLOW_ALPHA),
+                    startAngle = -90f,
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokePx * RING_GLOW_WIDTH, cap = StrokeCap.Round)
+                )
                 val alpha = if (focused) pulse else 1f
                 drawArc(
                     color = colors[index].value.copy(alpha = colors[index].value.alpha * alpha),
@@ -259,6 +272,7 @@ fun AppUsageRing(
                     size = arcSize,
                     style = Stroke(width = strokePx, cap = StrokeCap.Round)
                 )
+                drawLitTip(sweep = sweep, topLeft = topLeft, arcSize = arcSize, strokePx = strokePx)
                 if (glint != null) {
                     drawRingGlint(
                         phase = glint - index * GLINT_ARC_DELAY,
@@ -288,6 +302,14 @@ fun AppUsageRing(
                 1f to activeColor.copy(alpha = 0f),
                 center = center
             )
+            // A pista da órbita: diz "isto gira" mesmo parado, sem a política
+            // contínua, e dá ao cometa um trilho em vez de um traço solto.
+            drawCircle(
+                color = activeColor.copy(alpha = ACTIVE_LANE_ALPHA),
+                radius = radius,
+                center = center,
+                style = Stroke(width = orbitStroke * ACTIVE_LANE_WIDTH_FRACTION)
+            )
             rotate(degrees = spin) {
                 drawArc(
                     brush = tail,
@@ -299,17 +321,102 @@ fun AppUsageRing(
                     style = Stroke(width = orbitStroke, cap = StrokeCap.Butt)
                 )
                 val head = Math.toRadians(ACTIVE_ARC_SWEEP.toDouble())
+                val headCenter = Offset(
+                    center.x + radius * cos(head).toFloat(),
+                    center.y + radius * sin(head).toFloat()
+                )
+                // Halo da cabeça: é ele que faz o cometa ler como luz, não como
+                // traço fino. Cabe em [appUsageRingOrbitReach].
+                val glowRadius = orbitStroke * ACTIVE_HEAD_GLOW_RADIUS_FRACTION
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0f to activeColor.copy(alpha = ACTIVE_HEAD_GLOW_ALPHA),
+                        1f to activeColor.copy(alpha = 0f),
+                        center = headCenter,
+                        radius = glowRadius
+                    ),
+                    radius = glowRadius,
+                    center = headCenter
+                )
                 drawCircle(
                     color = activeColor,
                     radius = orbitStroke * ACTIVE_HEAD_RADIUS_FRACTION,
-                    center = Offset(
-                        center.x + radius * cos(head).toFloat(),
-                        center.y + radius * sin(head).toFloat()
-                    )
+                    center = headCenter
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = ACTIVE_HEAD_CORE_ALPHA),
+                    radius = orbitStroke * ACTIVE_HEAD_RADIUS_FRACTION * ACTIVE_HEAD_CORE_FRACTION,
+                    center = headCenter
                 )
             }
         }
     }
+}
+
+/**
+ * O poço do miolo: um disco com a camada de pressão no centro, sumindo até a
+ * borda do arco de dentro. Dá fundo à marca do fornecedor, que antes flutuava
+ * sobre o vazio. Estático e independente da sessão ativa: o miolo não muda com
+ * ela (há teste de bitmap afirmando).
+ */
+private fun DrawScope.drawCoreWell(arcCount: Int, strokePx: Float, gapPx: Float, tint: Color) {
+    val radius = size.minDimension / 2f - arcCount * (strokePx + gapPx)
+    if (radius <= 0f) {
+        return
+    }
+    drawCircle(
+        brush = Brush.radialGradient(
+            0f to tint.copy(alpha = tint.alpha * CORE_WELL_CENTER_WEIGHT),
+            1f to tint.copy(alpha = 0f),
+            center = center,
+            radius = radius
+        ),
+        radius = radius,
+        center = center
+    )
+}
+
+/**
+ * A ponta do arco acesa: os últimos graus clareiam até um ponto de luz no fim do
+ * traço. O ponto marca **onde** o valor está e dá volume ao arco; nunca passa da
+ * ponta. Arco cheio não tem ponta — ali início e fim coincidem, e um ponto no
+ * topo diria um fim que não existe.
+ */
+private fun DrawScope.drawLitTip(sweep: Float, topLeft: Offset, arcSize: Size, strokePx: Float) {
+    if (sweep < TIP_MIN_SWEEP_DEGREES || sweep >= 360f - TIP_FULL_EPSILON_DEGREES) {
+        return
+    }
+    val pivot = Offset(topLeft.x + arcSize.width / 2f, topLeft.y + arcSize.height / 2f)
+    val span = minOf(TIP_SPAN_DEGREES, sweep)
+    val light = Color.White.copy(alpha = TIP_LIGHT_ALPHA)
+    val ramp = Brush.sweepGradient(
+        0f to Color.Transparent,
+        1f - span / 360f to Color.Transparent,
+        1f to light,
+        center = pivot
+    )
+    val tipAngle = -90f + sweep
+    rotate(degrees = tipAngle, pivot = pivot) {
+        drawArc(
+            brush = ramp,
+            startAngle = -span,
+            sweepAngle = span,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokePx, cap = StrokeCap.Butt)
+        )
+    }
+    val radians = Math.toRadians(tipAngle.toDouble())
+    val radius = arcSize.width / 2f
+    drawCircle(
+        color = Color.White.copy(alpha = TIP_BEAD_ALPHA),
+        radius = strokePx * TIP_BEAD_RADIUS_FRACTION,
+        center = Offset(
+            pivot.x + radius * cos(radians).toFloat(),
+            pivot.y + radius * sin(radians).toFloat()
+        )
+    )
 }
 
 /**
@@ -390,10 +497,25 @@ const val MAX_RING_ARCS = 3
  */
 fun appUsageRingOrbitReach(stroke: Dp, gap: Dp): Dp {
     val orbitStroke = stroke * ACTIVE_ARC_STROKE_FRACTION
-    return gap + orbitStroke / 2 + orbitStroke * ACTIVE_HEAD_RADIUS_FRACTION
+    val head = maxOf(ACTIVE_HEAD_RADIUS_FRACTION, ACTIVE_HEAD_GLOW_RADIUS_FRACTION)
+    return gap + orbitStroke / 2 + orbitStroke * head
 }
 
-private const val RING_TRACK_WEIGHT = 1.6f
+// Era 1,6: com a `pressedLayer` a 10% a trilha sumia no escuro, e o anel lia
+// como traço solto, sem o "quanto falta".
+private const val RING_TRACK_WEIGHT = 2.2f
+/** Brilho estático sob cada arco; o halo de atenção (até 28%) continua acima dele. Mais forte, borrava o arco no tema claro. */
+private const val RING_GLOW_ALPHA = 0.12f
+private const val RING_GLOW_WIDTH = 2f
+/** A ponta acesa: rampa até branco nos últimos graus e um ponto de luz no fim. */
+private const val TIP_SPAN_DEGREES = 70f
+private const val TIP_LIGHT_ALPHA = 0.25f
+private const val TIP_BEAD_ALPHA = 0.85f
+private const val TIP_BEAD_RADIUS_FRACTION = 0.28f
+private const val TIP_MIN_SWEEP_DEGREES = 4f
+private const val TIP_FULL_EPSILON_DEGREES = 1f
+/** O centro do poço do miolo, em múltiplos da `pressedLayer`. */
+private const val CORE_WELL_CENTER_WEIGHT = 1.4f
 /** Uma volta do reflexo; a fase vai até [GLINT_CYCLE_SPAN], e o que passa de 1 é pausa. */
 // Mais forte e mais frequente que a primeira versão (4,2s, pico 42%, 48°, pausa
 // maior que a passagem): no app ela não se via.
@@ -417,6 +539,16 @@ private const val RING_BREATH_MIN_ALPHA = 0.8f
 private const val RING_HALO_WIDTH = 2f
 private const val RING_HALO_MAX_ALPHA = 0.28f
 private const val ACTIVE_ARC_SWEEP = 130f
-private const val ACTIVE_ARC_STROKE_FRACTION = 0.6f
+// Era 0,6 (1,5dp na HUD): o cometa sumia contra o notch escuro.
+private const val ACTIVE_ARC_STROKE_FRACTION = 0.8f
+/** A pista inteira da órbita, fina e quase transparente. */
+private const val ACTIVE_LANE_ALPHA = 0.14f
+private const val ACTIVE_LANE_WIDTH_FRACTION = 0.5f
+/** Halo radial da cabeça do cometa; é ele que define o alcance da órbita. */
+private const val ACTIVE_HEAD_GLOW_RADIUS_FRACTION = 1.4f
+private const val ACTIVE_HEAD_GLOW_ALPHA = 0.45f
+/** O miolo branco da cabeça, para ela ler como ponto de luz. */
+private const val ACTIVE_HEAD_CORE_ALPHA = 0.7f
+private const val ACTIVE_HEAD_CORE_FRACTION = 0.45f
 /** A cabeça do cometa, um pouco mais larga que o traço para ler como ponto. */
 private const val ACTIVE_HEAD_RADIUS_FRACTION = 0.75f
