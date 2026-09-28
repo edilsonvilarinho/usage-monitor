@@ -69,6 +69,7 @@ depois de conferir o código. O que já medimos antes de começar:
 | A4 | #328: preferência `trayUsageRing` (default `false`) de `PreferencesSettings` até o `TrayUsageRingToggle` na seção Sistema; `trayUsageRingFraction` (maior percentual entre cotas vigentes, sem `CURRENCY_USD` nem janela vencida); `TrayRiskIconPainter` desenha trilho escuro + arco. Protótipo (figura e nota na seção da marca) e `brand-tray.html` atualizados | `gradlew.bat desktopTest --tests` `presentation.TrayUsageRingTest`, `TrayRiskIconTest`, `TrayUsageRingPreferencesTest`, `ui.SettingsDialogContentTest` | 3/3, 4/4, 2/2, 18/18 verdes. `TrayRiskIconTest` mede pixel num bitmap 64×64: com 50% a borda direita tem a cor do arco e a esquerda não |
 | A5 | #324: `CodexRolloutRateLimitParser` (último `rate_limits` por `limit_id`), `LocalCodexRolloutRateLimitDataSource` (5 rollouts mais novos, 256 KB finais), `CodexMapper.modelLimitQuotas` (sem `codex`, sem plano divergente, sem janela vencida, percentual truncado), `CodexRepositoryImpl` soma depois das janelas ao vivo e ignora falha do rollout; `CodexQuotaLabels.groupOf` no título do card e da HUD. `docs/integrations.md` §Codex corrigido (a exigência das duas janelas não existia mais no código) | `gradlew.bat desktopTest --tests` `CodexRolloutRateLimitParserTest`, `CodexMapperTest`, `CodexRepositoryImplTest`, `LocalCodexRolloutRateLimitDataSourceTest`, `ApiUsageCardFormattingTest`, `HudModelTest`; teste descartável lendo o `~/.codex` real | 2/2, 11/11, 7/7, 4/4, 13/13, 34/34 verdes. Leitura real: 215 ms, um limite (`codex`, `plus`), nenhuma cota extra — a conta não tem limite por modelo. O caminho do limite por modelo só está coberto por fixture |
 | A6 | #329, escopo escolhido pelo usuário ("Cards por conta"): `CodexProfileRef`; `UsageTargetKey` aceita perfil no Codex (a conta padrão segue sem, chave `CODEX` intacta); `CodexRepository.getUsage(profile)` + `CodexProfileSources`; `CodexProfileRegistry` (nó `codexProfiles`, id `codex-…`, recusa diretório sem `auth.json` e o da conta padrão); `DashboardTargetFetcher` extraído do view model (754 → 743 linhas); `enabledTargetsOf`/`availableUsageTargets` com as extras depois da padrão; `uiApiErrorOf` nomeia "Codex — <conta>"; `anthropicProfileId` nas três consultas de cor/emoji; seção "Contas Codex extras" em Configurações › Contas. Protótipo (§12d) e kit `Settings.jsx` atualizados | `gradlew.bat desktopTest --tests` `DashboardViewModelCodexProfilesTest`, `CodexRepositoryImplTest`, `UsageTargetKeyTest`, `CodexProfileRegistryTest`, `ui.SettingsDialogContentTest` | 3/3, 9/9, 5/5, 4/4, 19/19 verdes. O primeiro `allTests` reprovou em `ArchitectureRulesTest` (`SettingsDialogContent`: 313 linhas, limite 300): os cinco parâmetros do Codex viraram `CodexAccountsSettings` e a seção passou a ser composta dentro de `AnthropicAccountsTab`. Depois, `gradlew.bat allTests`: 2345 testes, 0 falhas. Na mesma rodada reprovada caiu também `DashboardViewModelRefreshPersistenceTest > refresh persists the new scheduled time via callback` (`Condition not met within real-time timeout`); isolado com `--rerun-tasks`, 3 de 3 verdes — é a instabilidade sob carga já registrada no plano da #317, anterior a esta branch. Não houve teste com duas contas Codex reais: a leitura por diretório está coberta por fake do `CodexAuthDataSource` |
+| A7 | Fechamento: suíte completa na ponta da branch, desvios e achados registrados | `gradlew.bat allTests` (depois do commit da A6) | 2345 testes, 0 falhas, 0 ignorados. Nenhuma verificação manual no app empacotado nesta rodada: bandeja, Configurações › Contas e marca de ritmo foram provados só por teste de componente e bitmap |
 
 ## Problemas em aberto e riscos
 
@@ -84,4 +85,20 @@ depois de conferir o código. O que já medimos antes de começar:
 
 ## Desvios do plano e achados da execução
 
-(preenchido na A7)
+- **Premissa errada na #324.** A issue dizia que o Codex descartava leitura com `secondary_window: null`.
+  O código já aceitava uma janela só; o que exigia as duas era o `docs/integrations.md`, desatualizado.
+  Corrigido em comentário na issue antes da execução, e o escopo virou "limite por modelo pelo rollout".
+- **A primeira versão do teste da #326 não provava nada**: a injeção pelo `onNextRefreshAtChanged`
+  passava sem a correção, porque o callback só roda quando o prazo muda. Trocada por um relógio que
+  lança dentro da volta; o teste novo reprova sem o `catch`.
+- **Limite de 800 linhas cobrou duas extrações**: `QuotaTooltipMetrics.kt` saiu do
+  `ApiUsageCardFormatting.kt` (796 → 779) na A3, e `DashboardTargetFetcher.kt` do
+  `DashboardViewModel.kt` (754 → 743) na A6. O limite de 300 linhas por função cobrou o
+  `CodexAccountsSettings` na A6.
+- **Escopo da #329 decidido pelo usuário no meio da execução** ("Cards por conta"): cor, emoji, filtro
+  de sessões CLI e envio ao time por conta ficaram de fora. Motivo medido: 216 usos de `profileId`
+  que significavam "perfil Anthropic".
+- **`buildHttpClient` virou `internal`** (A2): o parâmetro novo é de tipo interno, e o compilador
+  recusa expor tipo interno em função pública. Nenhum chamador fora do módulo.
+- **Instabilidade conhecida reapareceu** na primeira rodada completa da A6
+  (`DashboardViewModelRefreshPersistenceTest`), verde isolada 3 de 3. Não corrigida aqui.
