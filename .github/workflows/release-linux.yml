@@ -365,7 +365,7 @@ jobs:
 
       # `gradle/gradle-build-action` esta deprecated (sucessora e
       # `gradle/actions/setup-gradle`, ja usada em `ci.yml`). `gradle-version`
-      # saiu por ser redundante: `gradle-wrapper.properties` ja fixa 8.6, e
+      # saiu por ser redundante: `gradle-wrapper.properties` ja fixa a versao, e
       # `gradlew.bat` usa a propria distribuicao do wrapper.
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3

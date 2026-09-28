@@ -41,7 +41,7 @@ kotlin {
         // --- commonMain ---
         // CÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³digo compartilhado: domain, data e presentation.
         // Depende apenas de bibliotecas multiplataforma.
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 // Compose runtime e componentes visuais
                 implementation(libs.compose.runtime)
@@ -69,7 +69,7 @@ kotlin {
         // - engine OkHttp do Ktor
         // - leitura de ficheiros com java.io.File
         // - entry point da janela Compose
-        val desktopMain by getting {
+        getByName("desktopMain") {
             kotlin.srcDir(generatedAppVersionDir)
             dependencies {
                 // Compose Desktop: inclui janela nativa para o SO atual
@@ -95,7 +95,7 @@ kotlin {
 
         // --- commonTest ---
         // Testes unitÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡rios: domain, mappers, ViewModel
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
                 implementation(libs.kotlinx.coroutines.test)
@@ -105,7 +105,7 @@ kotlin {
 
         // --- desktopTest ---
         // Testes de componente Compose para Desktop
-        val desktopTest by getting {
+        getByName("desktopTest") {
             dependencies {
                 implementation(libs.kotlin.test)
                 implementation(libs.compose.ui.test)
@@ -169,7 +169,7 @@ compose.desktop {
     }
 }
 
-val generateAppVersionSource by tasks.registering {
+val generateAppVersionSource = tasks.register("generateAppVersionSource") {
     // Sem este input a troca de `-PappVersion` nao invalida a tarefa: o script nao muda
     // mais a cada release, e o `AppVersion.kt` antigo sairia do cache.
     inputs.property("appVersion", appVersion)
