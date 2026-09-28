@@ -44,16 +44,16 @@ they run, and an explicit **not executed** notice with the reason when the path 
 job that passes in five seconds without running a single test is otherwise indistinguishable from one
 that ran the suite.
 
-The release workflow waits for the SHA-specific `ci-release-gate-*` artifact from the preceding
-push to `main`. When that marker proves that the remote CI suite and installer scenarios really
-passed, `verify` reuses the result and does not repeat the expensive checks. A missing, expired,
-invalid or unreadable marker makes `verify` run its existing `allTests` and installer scenarios as
-a fallback. `publish-release` depends on `verify` in both paths, so a release is never published
-without a successful validation gate.
+The release is tag-only (#344). The version comes from the tag: `build.gradle.kts` reads
+`-PappVersion`, which the release workflow passes, and falls back to
+`git describe --tags --abbrev=0` for local builds (`1.0.0` without git or tags, since the Compose
+plugin rejects a `0` major at configuration time). There is no version bump commit, so cutting a
+release pushes nothing to `main` and triggers no `CI` or `CodeQL` run there.
 
-A normal release still produces three visible workflow runs for the same commit: `CI`, `CodeQL`
-and `Release Desktop Packages`. The change removes duplicated validation work; it does not remove
-the independent CodeQL run or the local `allTests` preflight performed by the release skill.
+`verify-version` rejects a tag that is not `vX.Y.Z`, is lightweight, or points outside `main`.
+`verify` (Windows `allTests` plus installer scenarios) runs in parallel with the four builds, and
+`publish-release` requires both. A manual dispatch with `publish: false` builds and verifies an
+existing tag without publishing.
 
 ### Gradle cache
 

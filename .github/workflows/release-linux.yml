@@ -1,5 +1,9 @@
 name: Release Desktop Packages
 
+# Release so por tag (#344). A versao vem da tag: nenhum commit de bump passa pela
+# `main`, entao lancar um release nao dispara `CI` nem `CodeQL` na `main`, e este
+# workflow nao espera por eles. Ele valida a tag, roda o proprio `verify` em
+# paralelo com os builds, e so `publish-release` exige os dois.
 on:
   push:
     tags:
@@ -10,190 +14,141 @@ on:
         description: 'Tag to release (e.g. v22.1.0). Must already exist on the remote.'
         required: true
         type: string
+      publish:
+        description: 'Publish the GitHub Release. Off = dry run: build and verify only.'
+        required: false
+        default: true
+        type: boolean
+
+# Duas execucoes da mesma tag nunca correm juntas, e nenhuma cancela a outra: um
+# release publicado pela metade e pior que um release atrasado.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  # O push da tag normalmente acontece logo depois do push na main. O CI da
-  # main ja executa os mesmos testes que este workflow usava como verify, entao
-  # espera o marcador daquele run e evita trabalho remoto duplicado.
-  #
-  # A ausencia do marcador nunca libera o release: ela apenas seleciona o
-  # verify local abaixo como fallback. Isso cobre tag manual, CI pulado, marker
-  # expirado, falha do CI e falha da API do GitHub.
-  resolve-ci-gate:
+  # Modelo do `akitaonrails/ai-usagebar`: antes de gastar runner de macOS, a tag
+  # tem de ser `vX.Y.Z`, anotada e apontar para um commit que ja esta na `main`
+  # -- tag em branch de trabalho publicaria codigo que nunca passou por PR.
+  verify-version:
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
-      actions: read
 
     outputs:
-      target_sha: ${{ steps.resolve.outputs.target_sha }}
-      reuse_ci: ${{ steps.resolve.outputs.reuse_ci }}
-      reason: ${{ steps.resolve.outputs.reason }}
+      tag: ${{ steps.check.outputs.tag }}
+      version: ${{ steps.check.outputs.version }}
 
     steps:
-      - name: Resolve CI gate for release commit
-        id: resolve
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Check tag
+        id: check
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          EVENT: ${{ github.event_name }}
-          INPUT_TAG: ${{ inputs.tag }}
-          EVENT_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          set -uo pipefail
-
-          fallback() {
-            local message="$1"
-            echo "reuse_ci=false" >> "$GITHUB_OUTPUT"
-            echo "reason=$message" >> "$GITHUB_OUTPUT"
-            echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
-            echo "$message; o verify do release sera executado."
-            exit 0
-          }
-
-          target_sha="$EVENT_SHA"
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            if [ -z "$INPUT_TAG" ]; then
-              target_sha=''
-              fallback 'tag de release ausente'
-            fi
-
-            if ! target_sha="$(gh api "repos/$REPOSITORY/commits/$INPUT_TAG" --jq '.sha' 2>/dev/null)" || [ -z "$target_sha" ]; then
-              target_sha=''
-              fallback "nao foi possivel resolver a tag $INPUT_TAG"
-            fi
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$tag' nao e uma tag vX.Y.Z"
+            exit 1
           fi
+          # O checkout pode materializar a tag como leve; buscar de novo traz o
+          # objeto que esta no remoto, que e o que se quer conferir.
+          git fetch --force --no-tags origin "refs/tags/$tag:refs/tags/$tag" "refs/heads/main:refs/remotes/origin/main"
+          if [ "$(git cat-file -t "refs/tags/$tag")" != "tag" ]; then
+            echo "::error::a tag '$tag' e leve; release exige tag anotada (git tag -a)"
+            exit 1
+          fi
+          commit="$(git rev-list -n 1 "refs/tags/$tag")"
+          if ! git merge-base --is-ancestor "$commit" refs/remotes/origin/main; then
+            echo "::error::a tag '$tag' aponta para $commit, que nao esta na main"
+            exit 1
+          fi
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Release $tag"
+            echo
+            echo "Commit \`$commit\`, versao \`$version\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "Commit alvo do release: $target_sha"
-          marker_name="ci-release-gate-$target_sha"
-          deadline=$((SECONDS + 900))
-
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            if ! artifact_runs="$(gh api "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100" \
-              --jq '.artifacts[] | select(.expired == false) | select(.workflow_run.head_repository_id == .workflow_run.repository_id) | .workflow_run.id' 2>/dev/null)"; then
-              fallback 'consulta do marcador no GitHub falhou'
-            fi
-
-            for run_id in $artifact_runs; do
-              [ -z "$run_id" ] && continue
-
-              if ! run="$(gh api "repos/$REPOSITORY/actions/runs/$run_id" \
-                --jq '[.event, (.conclusion // ""), .path, .head_branch, .head_sha] | @tsv' 2>/dev/null)"; then
-                continue
-              fi
-
-              IFS=$'\t' read -r event conclusion path branch head_sha <<< "$run"
-              echo "Candidato: run $run_id event=$event conclusion=$conclusion path=$path branch=$branch sha=$head_sha"
-
-              case "$path" in
-                .github/workflows/ci.yml*) ;;
-                *) continue ;;
-              esac
-
-              if [ "$event" = "push" ] && \
-                [ "$conclusion" = "success" ] && \
-                [ "$branch" = "main" ] && \
-                [ "$head_sha" = "$target_sha" ]; then
-                reason="CI da main ja verificou $target_sha no run https://github.com/$REPOSITORY/actions/runs/$run_id"
-                echo "reuse_ci=true" >> "$GITHUB_OUTPUT"
-                echo "reason=$reason" >> "$GITHUB_OUTPUT"
-                echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
-                echo "$reason"
-                exit 0
-              fi
-            done
-
-            echo "Marcador $marker_name ainda nao esta disponivel; aguardando 15s."
-            sleep 15
-          done
-
-          fallback "marcador $marker_name nao apareceu em 15 minutos"
-
-  # Gate de testes do release. Roda em paralelo com os jobs de build (nenhum
-  # deles depende deste), e so `publish-release` o exige: falha aqui deixa os
-  # artefatos como artifacts do workflow, mas nenhum GitHub Release e criado.
-  # Encadear os builds atras dele somaria ~4 min a todo release sem ganho.
+  # Gate de testes do release. Roda em paralelo com os builds (nenhum depende
+  # dele) e so `publish-release` o exige: falha aqui deixa os pacotes como
+  # artifacts do workflow, mas nenhum GitHub Release e criado. Sempre roda: o
+  # release nao reaproveita run de outro workflow (#344).
   verify:
-    needs: resolve-ci-gate
-    # Mesmo motivo do `ci.yml`: os testes de componente Compose nunca rodaram
-    # headless em Linux.
+    needs: verify-version
+    # Mesmo motivo do `ci.yml`: a suite de referencia e a do Windows.
     runs-on: windows-latest
 
     permissions:
       contents: read
 
     steps:
-      - name: Reuse CI gate
-        if: needs['resolve-ci-gate'].outputs.reuse_ci == 'true'
-        shell: pwsh
-        env:
-          GATE_REASON: ${{ needs['resolve-ci-gate'].outputs.reason }}
-          TARGET_SHA: ${{ needs['resolve-ci-gate'].outputs.target_sha }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Write-Host "Reutilizando o gate da main para $env:TARGET_SHA."
-          Write-Host $env:GATE_REASON
-
       - name: Checkout
-        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: refs/tags/${{ needs.verify-version.outputs.tag }}
 
       - name: Setup JDK
-        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # `cache: 'gradle'` do setup-java NAO entra aqui, pelo mesmo motivo
-      # documentado em `ci.yml`: o post-step dele arquiva `~/.gradle` com o
-      # daemon vivo, e no Windows o `tar` falha nos `.lock`
-      # (`Device or resource busy`). Esse era exatamente o padrao que este job
-      # usava -- `cache is not found` silencioso a cada release, nunca medido
-      # porque o job so roda em tag. `cache-read-only: true` porque este job
-      # nunca escreve: quem grava e o push na main do `ci.yml`, mesmo runner
-      # (`windows-latest`), mesmo wrapper.
+      # Tag so le o cache: cada tag e um ref novo, e o que ela gravasse nunca
+      # seria lido de novo. Quem grava e o push na `main` do `ci.yml`, mesmo
+      # runner, mesmo wrapper.
       - name: Setup Gradle
-        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
           cache-read-only: true
 
+      # Mesmos forks do `ci.yml` (issue #295): `extractSkikoNative` roda antes.
       - name: Run tests
-        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat allTests
+          .\gradlew.bat allTests --build-cache -PtestForks=3
+
+      - name: Publish test summary
+        if: always()
+        shell: pwsh
+        run: node tools/ci/test-summary.mjs --title "Release (allTests)" --glob "build/test-results/**/*.xml" --require
 
       # O modo /UPDATE do instalador e script NSIS: o allTests nao o executa, e a
-      # unica forma de exercita-lo e compilar o instalador e roda-lo. Aqui, e nao
-      # so no ci.yml, porque este e o gate que decide se um release sai -- uma
-      # release com o /UPDATE quebrado atualiza a maquina de quem instalou.
+      # unica forma de exercita-lo e compilar o instalador e roda-lo. Aqui porque
+      # este e o gate que decide se um release sai.
       - name: Install NSIS
-        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         shell: pwsh
-        run: choco install nsis -y
+        run: |
+          if (Test-Path 'C:\Program Files (x86)\NSIS\makensis.exe') { exit 0 }
+          choco install nsis -y --no-progress
 
       - name: Run installer update scenarios
-        if: needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           .\src\installer\test\Invoke-UpdateScenarios.ps1
 
       - name: Upload test reports
-        if: failure() && needs['resolve-ci-gate'].outputs.reuse_ci != 'true'
+        if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-reports
           path: build/reports/tests/**
           if-no-files-found: ignore
+          retention-days: 7
 
   build-linux:
+    needs: verify-version
     # GitHub's standard hosted runners no longer expose Ubuntu 20.04 directly.
     # Keep the host on 22.04, but run jpackage inside an Ubuntu 20.04 container
     # so Debian dependency resolution stays compatible with elementary OS 6.1 /
@@ -207,20 +162,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: refs/tags/${{ needs.verify-version.outputs.tag }}
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-
-      - name: Extract version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Build focal packaging image
         run: |
@@ -277,13 +222,14 @@ jobs:
             --user "$(id -u):$(id -g)" \
             -e HOME=/tmp/usage-monitor-home \
             -e GRADLE_USER_HOME=/tmp/usage-monitor-gradle \
+            -e APP_VERSION="${{ needs.verify-version.outputs.version }}" \
             -v "$PWD:/workspace" \
             -w /workspace \
             usage-monitor-linux-packager:focal \
             bash -lc '
               set -euo pipefail
               mkdir -p "$HOME" "$GRADLE_USER_HOME"
-              ./gradlew createDistributable packageDistributionForCurrentOS
+              ./gradlew createDistributable packageDistributionForCurrentOS -PappVersion="$APP_VERSION"
             '
 
       - name: Validate Debian dependencies
@@ -304,7 +250,7 @@ jobs:
             exit 1
           fi
 
-          VERSION="${{ steps.version.outputs.VERSION }}"
+          VERSION="${{ needs.verify-version.outputs.version }}"
           APP_ROOT="build/compose/binaries/main/app"
           APP_DIR="$APP_ROOT/Usage Monitor"
           mkdir -p dist-build
@@ -326,7 +272,7 @@ jobs:
       - name: Validate the Linux tarball
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.VERSION }}"
+          VERSION="${{ needs.verify-version.outputs.version }}"
           TARBALL="usage-monitor_${VERSION}_linux_x64.tar.gz"
           TAR_PATH="dist-build/$TARBALL"
 
@@ -367,7 +313,7 @@ jobs:
       - name: Generate the user-space installer
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.VERSION }}"
+          VERSION="${{ needs.verify-version.outputs.version }}"
           TARBALL="usage-monitor_${VERSION}_linux_x64.tar.gz"
           SHA256="$(sha256sum "dist-build/$TARBALL" | cut -d' ' -f1)"
           INSTALLER="dist-build/install-usage-monitor_${VERSION}_linux_x64.sh"
@@ -399,6 +345,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
+    needs: verify-version
     runs-on: windows-latest
 
     permissions:
@@ -408,7 +355,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: refs/tags/${{ needs.verify-version.outputs.tag }}
 
       - name: Setup JDK
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -436,7 +383,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat packageInstaller
+          .\gradlew.bat packageInstaller "-PappVersion=${{ needs.verify-version.outputs.version }}"
 
           New-Item -ItemType Directory -Force -Path dist-build | Out-Null
           Get-ChildItem -File build\installer -Filter "UsageMonitor-Setup-*.exe" | Copy-Item -Destination dist-build -Force
@@ -461,6 +408,7 @@ jobs:
           - runner: macos-15-intel
             arch: x64
 
+    needs: verify-version
     runs-on: ${{ matrix.runner }}
 
     permissions:
@@ -470,7 +418,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: refs/tags/${{ needs.verify-version.outputs.tag }}
 
       - name: Setup JDK
         uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
@@ -487,23 +435,13 @@ jobs:
         with:
           cache-read-only: true
 
-      - name: Extract version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
-
       - name: Build macOS release artifacts
         run: |
           set -euo pipefail
           chmod +x ./gradlew
-          ./gradlew packageDmg
+          ./gradlew packageDmg -PappVersion="${{ needs.verify-version.outputs.version }}"
 
-          VERSION="${{ steps.version.outputs.VERSION }}"
+          VERSION="${{ needs.verify-version.outputs.version }}"
           DMG_PATH="build/compose/binaries/main/dmg/Usage Monitor-${VERSION}.dmg"
 
           if [ ! -f "$DMG_PATH" ]; then
@@ -524,8 +462,11 @@ jobs:
           if-no-files-found: error
 
   publish-release:
+    # `inputs.publish` so existe no disparo manual; o push da tag sempre publica.
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     needs:
+      - verify-version
       - verify
       - build-linux
       - build-windows
@@ -537,7 +478,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: refs/tags/${{ needs.verify-version.outputs.tag }}
           fetch-depth: 0
 
       - name: Download packaged artifacts
@@ -556,11 +497,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            current_tag="${{ inputs.tag }}"
-          else
-            current_tag="${GITHUB_REF#refs/tags/}"
-          fi
+          current_tag="${{ needs.verify-version.outputs.tag }}"
           echo "tag=$current_tag" >> "$GITHUB_OUTPUT"
           git fetch --force --tags
 
@@ -574,9 +511,11 @@ jobs:
 
           commit_lines="$(
             git log --no-merges --reverse --pretty='%s|%h' "$range_spec" | while IFS='|' read -r subject short_sha; do
-              if [ "$subject" = "chore: bump version to $current_tag" ]; then
-                continue
-              fi
+              # Ate a v41.3.1 cada release tinha commit de bump na `main`; desde a
+              # #344 a versao vem da tag, e o filtro so limpa intervalos antigos.
+              case "$subject" in
+                "chore: release v"*|"chore: bump version to "*) continue ;;
+              esac
 
               printf -- '- %s (`%s`)\n' "$subject" "$short_sha"
             done
