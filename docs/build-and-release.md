@@ -126,6 +126,11 @@ carrying a token the script generated. Without the ACK in 60 s it rolls back. Th
 Progress is reported as **text** ("Downloading 42%"), never an infinite animation — those hang
 `waitForIdle` in the component tests.
 
+**Beta channel** (issue #355): Settings → General → "Receive beta updates", off by default. Betas are
+`vX.Y.Z-beta.N` tags published as GitHub **prereleases**, never `latest`, so only users in the channel
+see them. Cut them with the `usage-monitor-release-beta` skill. Details in
+"Decisões de empacotamento e atualização" below.
+
 ## Branding
 
 `tools/brand/render_icons.py` generates the PNG, ICO and ICNS from a monogram described in code.
@@ -229,6 +234,38 @@ marca `releaseNotesSeenVersion`, nunca o recibo do instalador.**
   é ele que separa atualização de retrocesso, e retrocesso não é "não atualizou".
 - O recibo continua vivo para outras duas coisas: a linha "Última atualização" das Configurações e a
   poda do artefato aplicado (`shouldDiscardUpdateArtifacts`).
+
+**Canal beta** (issue #355; plano [`releases-beta-355-execucao.md`](planos/releases-beta-355-execucao.md)):
+interruptor "Receber versões beta" em Configurações → Geral, logo abaixo da atualização automática,
+desmarcado por padrão (`receiveBetaUpdates` em `PreferencesSettings`). Independe da atualização
+automática: sem ela a beta só é anunciada.
+- **Quem não optou está protegido pelo GitHub, não pelo app.** A beta é a tag `vX.Y.Z-beta.N`,
+  publicada pelo workflow com `prerelease: true` e `make_latest: false`. Fora do canal o app lê
+  `/releases/latest`, que a API nunca responde com prerelease — e isso vale também para as versões do
+  app anteriores ao canal, que não sabem que ele existe. Beta publicada como Latest é incidente: todo
+  usuário passaria a recebê-la.
+- **Dentro do canal**, `fetchGitHubReleases` lista `/releases?per_page=20`, descarta rascunho e oferece
+  a maior versão acima da atual. Com o feed sobrescrito (`USAGE_MONITOR_UPDATE_FEED_URL`) a listagem não
+  existe e o feed único vale para os dois canais.
+- **Ordenação SemVer em `AppVersionComparison.kt`**, ainda dono único: `42.0.0-beta.1 < 42.0.0-beta.2 <
+  42.0.0`. Antes o sufixo era descartado e as três comparavam iguais — a `beta.2` nunca seria oferecida a
+  quem estava na `beta.1`, nem a estável a quem estava na beta, e as novidades da estável cairiam em
+  marca silenciosa. O sufixo só conta com núcleo numérico legível: `sem-numero` continua comparando
+  igual a uma versão vazia (falha fechado).
+- **Desligar o canal não faz downgrade**: o repositório nunca oferece versão menor que a em execução, e
+  quem está numa beta fica nela até sair uma estável maior. Alternar o interruptor reconsulta na hora
+  (`startBetaChannelWatcher`), sem esperar o poll de 10 minutos.
+- **O Linux aceita só o sufixo `-beta.N`** (`isValidLinuxVersionName` e `linux-updater.sh`): o valor vira
+  nome de diretório, e abrir para qualquer identificador de pré-lançamento abriria caminho para `/` e
+  `..`.
+- **Destaque**: banner, balão da HUD, janela de novidades e rodapé dizem "beta" em **texto**; novidades e
+  rodapé levam ainda o selo `BetaReleasePill`. No balão da HUD o número desce para o detalhe — a linha
+  curta tem largura fixa e `42.10.10-beta.12` não cabe ao lado do estado (`HudNotchTextFitTest`).
+- **Notas de release**: a estável difere da estável anterior (lista a série beta inteira); a beta difere
+  da tag anterior, beta ou estável. Ordem com `versionsort.suffix=-` — sem ele o git põe a beta depois da
+  estável do mesmo número.
+- **Publicação**: skill `usage-monitor-release-beta`. A estável segue na `usage-monitor-release`, e a
+  versão-base dela e de `lastReleaseTagVersion()` ignora tags beta (`--exclude "*-beta*"`).
 
 **Ajuda dentro do app** (`presentation/ui/help/` + `desktopMain/help/HelpMediaPlayer.kt` +
 `desktopMain/presentation/ui/HelpWindow.kt` + `src/desktopMain/resources/help/*.gif`; issue #184,
