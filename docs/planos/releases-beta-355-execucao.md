@@ -66,11 +66,17 @@ e o resultado, não a intenção.
 | E1 | 2026-09-28 | `032ce41` | Skill `usage-monitor-release-beta` (+ espelhos `.codex/skills/` e `.agents/skills/slash/release-beta.md`): série nova ou continuação, mesmas pré-checagens da estável, tag `vX.Y.Z-beta.N`, confere prerelease, `latest` intacto e digests | ✅ Concluída | leitura cruzada com a skill estável; campos do `gh` conferidos (`gh release view --json` não tem `isLatest` → a skill usa `/releases/latest`); comandos de versão testados no repositório descartável. Execução real = F2 |
 | F1 | 2026-09-28 | `c65b824` | Seção "Canal beta" em `docs/build-and-release.md` (decisões + resumo em inglês na seção Auto-update) e regra curta no `CLAUDE.md` | ✅ Concluída | revisão do diff (só documentação) |
 | C1 | 2026-09-28 | — | Primitiva do selo beta | ↪ Absorvida em C4 | a regra do `CLAUDE.md` exige que primitiva nasça no mesmo commit do primeiro uso; `BetaReleasePill` reusa `AppStatusPill` |
-| F2 | 2026-09-28 | — | Validação ponta a ponta com uma beta publicada | ⏳ Pendente | exige: (1) PR mergeado na `main` — `verify-version` recusa tag fora dela; (2) abrir no Linux (X11), porque `SettingsWindowHost.kt` mudou (#342), pergunta que a própria skill faz antes da tag; (3) `/release-beta` → conferir release Pre-release, `/releases/latest` intacto, máquina sem opt-in sem oferta, com opt-in banner/HUD/novidades/rodapé em beta, e depois a estável chegando à beta com novidades. Não verificado nesta sessão: `Setup.exe` beta (sem NSIS local) e o workflow com tag real |
+| F2 | 2026-09-28 | este commit | Validação ponta a ponta com a beta `v41.5.0-beta.1` publicada | ✅ Concluída | PR #356 mergeado (`f2cf344`); `allTests` na `main` → 2394 casos, 0 falhas; tag pela skill `usage-monitor-release-beta`; workflow run `36492067350`: os 7 jobs verdes; `gh release view` → `isPrerelease: true`; `/releases/latest` → `v41.4.1`; 7 assets com `sha256:` (Setup.exe, .deb, .rpm, tarball, .sh, 2 DMGs); nota contra `v41.4.1`. Com o código do app contra a API real (teste temporário, não commitado): 41.4.1 canal OFF → nenhuma oferta; canal ON → `41.5.0-beta.1` (prerelease, 6 artefatos com SHA); 41.5.0-beta.1 OFF e ON → nenhuma (sem downgrade); 41.0.0 OFF → `41.4.1`; novidades da beta → 1 item |
 
 ## O que ficou fora do alcance desta sessão
 
-- **Nenhuma release foi publicada.** O workflow alterado (D2, D3) só roda de verdade com uma tag no
-  remoto apontando para a `main`; a lógica de shell foi testada fora dele.
-- **Plataformas testadas:** Windows (suíte completa, `createDistributable` com versão beta). O cenário do
-  updater do Linux rodou no Git Bash do Windows; nenhuma janela foi aberta no Linux.
+- **Nenhuma janela foi aberta.** O banner, o balão da HUD, as novidades e o rodapé em beta estão cobertos
+  por testes de componente, não por observação no app instalado; nenhuma janela foi aberta no Linux
+  (X11) — `SettingsWindowHost.kt` só repassa dois parâmetros, e o risco foi declarado no PR #356.
+- **A chegada da estável a quem está na beta** (`41.5.0-beta.N → 41.5.0`, com novidades) só acontece
+  na próxima release estável; a lógica está coberta por teste (`AppUpdateRepositoryImplTest`,
+  `ReleaseNotesTest`).
+- **Nomes dos pacotes Linux:** o jpackage gravou `41.5.0.beta.1` nos nomes do `.deb`/`.rpm` (o `~` da
+  versão virou `.` no nome do arquivo). O auto-update não usa esses pacotes — só o tarball.
+- **Plataformas testadas:** Windows (suíte, `createDistributable` beta) e CI (Windows, Linux em Arch,
+  Fedora e Ubuntu para o updater, macOS nos builds do release).
