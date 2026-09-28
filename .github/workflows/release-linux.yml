@@ -513,7 +513,19 @@ jobs:
           echo "tag=$current_tag" >> "$GITHUB_OUTPUT"
           git fetch --force --tags
 
-          previous_tag="$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$current_tag" | head -n 1 || true)"
+          # Canal beta (issue #355). `versionsort.suffix=-` ordena `v42.0.0-beta.1`
+          # ANTES de `v42.0.0` -- sem ele o git poe a beta depois da estavel e a nota
+          # da estavel sairia contra a propria beta. A anterior e a tag logo abaixo
+          # da atual nessa ordem: para a estavel, so entre estaveis (a nota lista a
+          # serie beta inteira); para a beta, entre todas (a nota lista o que mudou
+          # desde a beta ou estavel anterior).
+          all_tags="$(git -c versionsort.suffix=- tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$' || true)"
+          if [ "${{ needs.verify-version.outputs.prerelease }}" = "true" ]; then
+            candidate_tags="$all_tags"
+          else
+            candidate_tags="$(printf '%s\n' "$all_tags" | grep -Ev -- '-beta\.' || true)"
+          fi
+          previous_tag="$(printf '%s\n' "$candidate_tags" | awk -v cur="$current_tag" 'found && NF { print; exit } $0 == cur { found = 1 }')"
           range_spec="$current_tag"
 
           if [ -n "$previous_tag" ]; then
@@ -566,3 +578,9 @@ jobs:
           body_path: ${{ steps.release_notes.outputs.notes_path }}
           files: dist-build/*
           fail_on_unmatched_files: true
+          # Beta sai como prerelease e nunca vira `latest` (issue #355): o app fora do
+          # canal beta so le `/releases/latest`, que a API nunca responde com
+          # prerelease -- e isso que protege quem nao optou, inclusive versoes
+          # antigas do app, que nao conhecem o canal.
+          prerelease: ${{ needs.verify-version.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.verify-version.outputs.prerelease == 'true' && 'false' || 'true' }}
