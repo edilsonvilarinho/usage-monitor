@@ -20,6 +20,13 @@ data class GitHubReleaseDto(
     /** ISO 8601. Nulo é "não informado": a linha de data some, a janela fica. */
     @SerialName("published_at")
     val publishedAt: String? = null,
+    /**
+     * Release beta (issue #355). Só a listagem `/releases` a devolve com `true`:
+     * `/releases/latest` nunca traz prerelease. Ausente vale `false`.
+     */
+    val prerelease: Boolean = false,
+    /** Rascunho aparece na listagem para quem tem acesso de escrita; nunca é oferecido. */
+    val draft: Boolean = false,
     val assets: List<GitHubReleaseAssetDto> = emptyList()
 )
 
