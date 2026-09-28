@@ -60,6 +60,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlin.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 class DashboardViewModel(
     private val getAnthropicUsage: GetAnthropicUsageUseCase,
@@ -160,6 +161,12 @@ class DashboardViewModel(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val _nextRefreshAt = MutableStateFlow(initialScheduledRefreshAt)
+
+    // O último prazo **gravado**, não o da tela (issue #331). O inicial nunca é
+    // gravado, e no Windows o relógio fica parado por até ~15 ms: a primeira
+    // coleta saía no mesmo instante do construtor, o prazo dela empatava com o
+    // inicial e a gravação era pulada.
+    private val lastPersistedNextRefreshAt = AtomicReference(persistedNextRefreshAt)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
     private val _currentPollInterval = MutableStateFlow(pollIntervalFor(isBusy.value))
@@ -406,8 +413,8 @@ class DashboardViewModel(
     private fun publishNextPoll(now: Instant = clock.now()): Instant {
         val next = scheduler.nextPollAt(enabledTargets(), now, isBusy.value, config)
             ?: (now + pollIntervalFor(isBusy.value))
-        if (_nextRefreshAt.value != next) {
-            _nextRefreshAt.value = next
+        _nextRefreshAt.value = next
+        if (lastPersistedNextRefreshAt.getAndSet(next) != next) {
             onNextRefreshAtChanged(next)
         }
         return next

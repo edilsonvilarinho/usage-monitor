@@ -2,6 +2,8 @@ package com.usagemonitor.architecture
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -15,6 +17,8 @@ import kotlin.test.fail
  *   pacote raiz), que fica fora destas regras.
  * - Arquivo de produção até [MAX_FILE_LINES] linhas; função até
  *   [MAX_FUNCTION_LINES].
+ * - Recorte nativo de janela (`window.shape`) só nos arquivos de
+ *   [NATIVE_WINDOW_SHAPE_OWNERS] (issue #340).
  *
  * As listas de exceção **só encolhem**. O teto de cada item é o tamanho de hoje:
  * crescer falha, e diminuir também falha até o teto ser baixado — senão a folga
@@ -70,6 +74,34 @@ class ArchitectureRulesTest {
             }
         }
         assertCeilings(what = "função", limit = MAX_FUNCTION_LINES, measured = measured, ceilings = FUNCTION_CEILINGS)
+    }
+
+    /**
+     * `Window.shape` foi medido só no Windows, e no elementary OS (X11) o recorte
+     * da HUD não saía ao abrir: o balão aparecia cortado (issue #340). Recorte
+     * nativo novo fora destes arquivos precisa decidir, com medição, em que
+     * plataformas vale — a HUD decide por `hudUsesHitRegion`.
+     */
+    @Test
+    fun `recorte nativo de janela so nos arquivos que ja o controlam`() {
+        val violations = sources
+            .filter { source -> source.path !in NATIVE_WINDOW_SHAPE_OWNERS }
+            .filter { source -> NATIVE_WINDOW_SHAPE.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "Recorte nativo de janela fora dos donos (decida as plataformas, veja a issue #340):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    @Test
+    fun `o padrao do recorte pega a chamada nativa e ignora o argumento do Compose`() {
+        assertTrue(NATIVE_WINDOW_SHAPE.containsMatchIn("window.shape = null"))
+        assertTrue(NATIVE_WINDOW_SHAPE.containsMatchIn("frame.setShape(rect)"))
+        assertFalse(NATIVE_WINDOW_SHAPE.containsMatchIn("Surface(shape = RoundedCornerShape(6.dp))"))
+        assertFalse(NATIVE_WINDOW_SHAPE.containsMatchIn("if (window.shape == null) return"))
     }
 
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
@@ -136,6 +168,15 @@ class ArchitectureRulesTest {
     private companion object {
         const val MAX_FILE_LINES = 800
         const val MAX_FUNCTION_LINES = 300
+
+        /** `.shape = ` e `setShape(`; o argumento nomeado `shape =` do Compose não tem ponto. */
+        val NATIVE_WINDOW_SHAPE = Regex("""\.shape\s*=(?!=)|setShape\s*\(""")
+
+        /** Quem hoje chama `window.shape`: a HUD e os cantos arredondados das janelas. */
+        val NATIVE_WINDOW_SHAPE_OWNERS = setOf(
+            "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/DesktopWindowFrame.kt"
+        )
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FILE_CEILINGS: Map<String, Int> = emptyMap()
