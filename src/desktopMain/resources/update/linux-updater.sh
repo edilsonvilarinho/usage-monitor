@@ -108,8 +108,18 @@ abort() {
 
 # --- 1. validacao. Sem marcador, nada e tocado. ---
 
-case $version in
+# Numero com pontos e, opcionalmente, o sufixo -beta.N do canal beta (#355).
+# A mesma regra de isValidLinuxVersionName: o valor vira nome de diretorio.
+version_base=${version%%-beta.*}
+version_suffix=${version#"$version_base"}
+case $version_base in
     *[!0-9.]* | '' | *..* ) abort invalid-version ;;
+esac
+case $version_suffix in
+    '' ) ;;
+    -beta. | -beta.*[!0-9]* ) abort invalid-version ;;
+    -beta.* ) ;;
+    * ) abort invalid-version ;;
 esac
 
 if [ ! -f "$marker" ]; then

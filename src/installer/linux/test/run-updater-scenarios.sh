@@ -257,6 +257,28 @@ check 'current INTACTO' 38.0.0 "$(read_current "$work/root")"
 check 'motivo nomeado' invalid-version "$(receipt_field "$work/receipt" reason)"
 rm -rf "$work"
 
+# --- S8b: versao beta do canal beta (#355) ----------------------------------
+
+start 'S8b versao beta e promovida'
+work=$(mktemp -d)
+build_tree "$work/root" 38.0.0 39.0.0-beta.1
+build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
+sh "$(updater_copy "$work")" "$work/root" 39.0.0-beta.1 38.0.0 999999 tok-s8b     "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
+check 'exit 0' 0 $?
+check 'current aponta para a beta' 39.0.0-beta.1 "$(read_current "$work/root")"
+check 'recibo de sucesso' success "$(receipt_field "$work/receipt" status)"
+rm -rf "$work"
+
+start 'S8c sufixo fora do formato beta e recusado'
+work=$(mktemp -d)
+build_tree "$work/root" 38.0.0 39.0.0
+build_launcher "$work/bin/usage-monitor" "$work/ack" '' normal
+sh "$(updater_copy "$work")" "$work/root" '39.0.0-beta.1/../../x' 38.0.0 999999 tok-s8c     "$work/bin/usage-monitor" "$work/ack" "$work/receipt" "$work/log" > "$work/log" 2>&1
+check 'exit 1' 1 $?
+check 'current INTACTO' 38.0.0 "$(read_current "$work/root")"
+check 'motivo nomeado' invalid-version "$(receipt_field "$work/receipt" reason)"
+rm -rf "$work"
+
 # --- S9: marcador ausente ---------------------------------------------------
 
 start 'S9 marcador ausente aborta sem tocar em nada'
