@@ -1,16 +1,20 @@
 package com.usagemonitor.data
 
-import kotlinx.datetime.Instant
 import com.usagemonitor.data.dto.CodexRateLimitDto
+import com.usagemonitor.data.dto.CodexRolloutRateLimitWindowDto
+import com.usagemonitor.data.dto.CodexRolloutRateLimitsDto
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
 import com.usagemonitor.data.mapper.CodexMapper
+import com.usagemonitor.data.parser.CodexRolloutRateLimit
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlinx.datetime.Instant
 
 class CodexMapperTest {
 
@@ -124,5 +128,46 @@ class CodexMapperTest {
         val quota = CodexMapper.toUsageStats(response(window(10L, FIVE_HOURS), null)).quotas.single()
 
         assertEquals(Instant.fromEpochSeconds(1_777_398_377L - FIVE_HOURS), quota.periodStartAt)
+    }
+
+    @Test
+    fun `model limits from the rollout become extra quotas`() {
+        val now = Instant.fromEpochSeconds(1_790_000_000L)
+        val spark = rolloutLimit("spark", "GPT-5.3-Codex-Spark", plan = "prolite", secondaryUsed = 99.7)
+        val account = rolloutLimit("codex", null, plan = "prolite", secondaryUsed = 5.0)
+
+        val quotas = CodexMapper.modelLimitQuotas(listOf(account, spark), livePlanType = "prolite", now = now)
+
+        assertEquals(
+            listOf("Codex limit GPT-5.3-Codex-Spark (5h)", "Codex limit GPT-5.3-Codex-Spark (7d)"),
+            quotas.map { it.label }
+        )
+        assertEquals(listOf(PeriodType.INTERVAL, PeriodType.WEEKLY), quotas.map { it.periodType })
+        assertEquals(99L, quotas.last().used, "Truncado: 99,7% não é esgotado")
+        assertEquals(Instant.fromEpochSeconds(1_791_066_495L - 604_800L), quotas.last().periodStartAt)
+    }
+
+    @Test
+    fun `model limits of another plan or already reset are dropped`() {
+        val limits = listOf(rolloutLimit("spark", "Spark", plan = "pro", secondaryUsed = 100.0))
+
+        assertTrue(CodexMapper.modelLimitQuotas(limits, livePlanType = "plus", now = Instant.fromEpochSeconds(1_790_000_000L)).isEmpty())
+        assertTrue(
+            CodexMapper.modelLimitQuotas(limits, livePlanType = "pro", now = Instant.fromEpochSeconds(1_800_000_000L)).isEmpty(),
+            "Janelas vencidas"
+        )
+    }
+
+    private fun rolloutLimit(id: String, name: String?, plan: String, secondaryUsed: Double): CodexRolloutRateLimit {
+        return CodexRolloutRateLimit(
+            observedAt = Instant.fromEpochSeconds(1_789_999_000L),
+            limits = CodexRolloutRateLimitsDto(
+                limitId = id,
+                limitName = name,
+                primary = CodexRolloutRateLimitWindowDto(usedPercent = 0.0, windowMinutes = 300L, resetsAt = 1_790_567_009L),
+                secondary = CodexRolloutRateLimitWindowDto(usedPercent = secondaryUsed, windowMinutes = 10_080L, resetsAt = 1_791_066_495L),
+                planType = plan
+            )
+        )
     }
 }

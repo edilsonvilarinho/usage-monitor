@@ -4,18 +4,23 @@ import com.usagemonitor.data.datasource.CodexAuthDataSource
 import com.usagemonitor.data.datasource.CodexSession
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.dto.CodexRateLimitDto
+import com.usagemonitor.data.dto.CodexRolloutRateLimitWindowDto
+import com.usagemonitor.data.dto.CodexRolloutRateLimitsDto
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
+import com.usagemonitor.data.parser.CodexRolloutRateLimit
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
-import com.usagemonitor.domain.entity.PeriodType
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 class CodexRepositoryImplTest {
 
@@ -191,5 +196,47 @@ class CodexRepositoryImplTest {
                 resetAt = 1_777_398_377L
             )
         }
+    }
+
+    @Test
+    fun `rollout model limits are appended after the live windows`() = runTest {
+        val repository = CodexRepositoryImpl(
+            authDataSource = object : CodexAuthDataSource {
+                override suspend fun loadSession(): CodexSession = session("token", "user-a", "workspace-a", "codex@example.com")
+            },
+            apiDataSource = FakeCodexDataSource(),
+            rolloutRateLimits = {
+                listOf(
+                    CodexRolloutRateLimit(
+                        observedAt = Instant.fromEpochSeconds(1_789_999_000L),
+                        limits = CodexRolloutRateLimitsDto(
+                            limitId = "spark",
+                            limitName = "GPT-5.3-Codex-Spark",
+                            secondary = CodexRolloutRateLimitWindowDto(usedPercent = 100.0, windowMinutes = 10_080L, resetsAt = 1_791_066_495L),
+                            planType = "plus"
+                        )
+                    )
+                )
+            },
+            clock = object : Clock { override fun now(): Instant = Instant.fromEpochSeconds(1_790_000_000L) }
+        )
+
+        val result = repository.getUsage().getOrThrow()
+
+        assertEquals(listOf("Codex 5h", "Codex 7d", "Codex limit GPT-5.3-Codex-Spark (7d)"), result.quotas.map { it.label })
+        assertEquals(100L, result.quotas.last().used)
+    }
+
+    @Test
+    fun `a failing rollout read keeps the live reading`() = runTest {
+        val repository = CodexRepositoryImpl(
+            authDataSource = object : CodexAuthDataSource {
+                override suspend fun loadSession(): CodexSession = session("token", "user-a", "workspace-a", "codex@example.com")
+            },
+            apiDataSource = FakeCodexDataSource(),
+            rolloutRateLimits = { error("rollout ilegível") }
+        )
+
+        assertEquals(listOf("Codex 5h", "Codex 7d"), repository.getUsage().getOrThrow().quotas.map { it.label })
     }
 }

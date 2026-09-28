@@ -73,10 +73,26 @@ from the same terminal.
 
 - Reads the bearer token from `~/.codex/auth.json` (`tokens.access_token`) and the `cap_sid` cookie
   from `~/.codex/cap_sid`.
-- When the payload carries `primary_window` and `secondary_window`, the response itself is the
-  source of truth for the `5h` and `7d` quotas.
-- Snapshots are only accepted and stored when **both** quotas are present. An incomplete collection
-  keeps the last valid reading in cache and flags the source as unstable.
+- The response is the source of truth for every window it carries. Each window is classified by
+  `limit_window_seconds` (5h, 7d, 28–31 days, otherwise "reported"), not by the field it came in.
+- **One window is enough** (corrected on 2026-09-27, issue #324 — this section used to say both were
+  required, and the code had stopped requiring that): `CodexMapper` maps whatever is present, and
+  `isPersistableDashboardStats` only rejects an empty list. A duplicate or unknown window flags the
+  source as unstable.
+- **Model-level limits come from the local rollout** (issue #324). `wham/usage` returns the account
+  limit only; a per-model limit (`GPT-5.3-Codex-Spark` in codenotch#286, with the live read at 0%
+  while the model was blocked) appears in the `rate_limits` of each `token_count` event of
+  `$CODEX_HOME/sessions/**/rollout-*.jsonl`. Shape observed locally on 2026-09-27: `limit_id`
+  (`codex`, `premium`), `limit_name`, `primary`/`secondary` with `used_percent`, `window_minutes` and
+  `resets_at` (epoch seconds), `plan_type`. `LocalCodexRolloutRateLimitDataSource` reads the tail
+  (256 KB) of the five newest rollouts by date tree, `CodexRolloutRateLimitParser` keeps the latest
+  event per `limit_id`, and `CodexMapper.modelLimitQuotas` adds them **after** the live windows,
+  labelled `Codex limit <name> (5h|7d)` (`CodexQuotaLabels`, series key — do not rename). Dropped:
+  `limit_id = codex` (the live read already has it), a `plan_type` different from the live one (the
+  rollout is from another account), windows without percentage or duration, and windows already
+  reset. The percentage is truncated, like Anthropic's. A failed rollout read never fails the source.
+  Measured on this machine: 215 ms for the first read, only `codex` found, so no extra quota — the
+  model-limit path is covered by fixtures shaped like the codenotch report, not by a real account.
 
 ### Codex CLI local sessions
 

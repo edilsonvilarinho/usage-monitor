@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import androidx.compose.runtime.Immutable
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.CodexQuotaLabels
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -375,6 +376,7 @@ internal fun hudSourceOrigin(source: ApiSource, language: AppLanguage): String {
 /** O grupo da cota, pelos donos dos rótulos de cada fonte. */
 private fun quotaGroupOf(quota: QuotaInfo): String? =
     AntigravityQuotaLabels.groupOf(quota.label) ?: CursorQuotaLabels.groupOf(quota.label)
+        ?: CodexQuotaLabels.groupOf(quota.label)
 
 /**
  * O título do bloco expandido do card sem o prefixo do grupo: "Gemini · Semanal"

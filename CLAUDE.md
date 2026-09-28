@@ -91,6 +91,8 @@ ser esquecidas:
   `modules(...)` **só** no build Windows (jlink de outro SO falharia).
 - Tipos com credencial (`CursorSessionCredentials`) não são `data class` — o `toString` vaza o token.
 - Antigravity: argumento por lista, nunca por shell; disjuntor e TTL de 5 min obrigatórios.
+- Codex: uma janela ao vivo basta; limite por modelo vem do rollout local, soma depois das janelas
+  ao vivo e nunca derruba a fonte. `CodexQuotaLabels` é chave de série — não renomear.
 
 ### Camada presentation (`commonMain/presentation/`)
 

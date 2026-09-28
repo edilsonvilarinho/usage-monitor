@@ -13,6 +13,7 @@ import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CodexQuotaLabels
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -137,6 +138,7 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
     // limite semanal por grupo de modelos, e o Cursor, várias franquias no mesmo
     // ciclo. Sem o grupo, os blocos do card diriam "Semanal" ou "Mensal" todos iguais.
     val group = AntigravityQuotaLabels.groupOf(quota.label) ?: CursorQuotaLabels.groupOf(quota.label)
+        ?: CodexQuotaLabels.groupOf(quota.label)
     return group?.let { "$it · $periodTitle" } ?: periodTitle
 }
 

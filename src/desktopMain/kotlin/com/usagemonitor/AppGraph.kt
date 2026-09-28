@@ -8,6 +8,7 @@ import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalCodexActivityDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalCodexRolloutRateLimitDataSource
 import com.usagemonitor.data.datasource.LocalCodexCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
@@ -169,7 +170,11 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
         apiDataSource = remoteApiDataSource,
         apiKeyReader = { apiKeySettings.value.forSource(ApiSource.MINIMAX) }
     )
-    val codexRepository = CodexRepositoryImpl(LocalCodexAuthDataSource(), remoteApiDataSource)
+    val codexRepository = CodexRepositoryImpl(
+        authDataSource = LocalCodexAuthDataSource(),
+        apiDataSource = remoteApiDataSource,
+        rolloutRateLimits = LocalCodexRolloutRateLimitDataSource()
+    )
     val deepSeekRepository = DeepSeekRepositoryImpl(
         apiDataSource = remoteApiDataSource,
         apiKeyReader = { apiKeySettings.value.forSource(ApiSource.DEEPSEEK) }
