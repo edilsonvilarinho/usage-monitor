@@ -58,7 +58,7 @@ import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import java.io.File
 import java.util.prefs.Preferences
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * O grafo de dependências do app: preferências, clientes HTTP, data sources,

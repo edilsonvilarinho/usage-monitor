@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /** Identidade da máquina que empurra dados para o servidor de time. */
 data class TeamMemberIdentity(

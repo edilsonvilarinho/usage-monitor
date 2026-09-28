@@ -10,7 +10,7 @@ import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.entity.worstHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Qual das três leituras a janela do time mostra.

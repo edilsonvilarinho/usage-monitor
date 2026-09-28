@@ -1,7 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -65,7 +65,7 @@ internal class HudWindowDiagnostics(
         platform: String = AutoStartManager.currentPlatform().name.lowercase()
     ) {
         val entry = HudWindowDiagnosticsEntry(
-            ts = kotlinx.datetime.Instant.fromEpochMilliseconds(nowMillis).toString(),
+            ts = kotlin.time.Instant.fromEpochMilliseconds(nowMillis).toString(),
             pid = pid,
             version = version,
             platform = platform,

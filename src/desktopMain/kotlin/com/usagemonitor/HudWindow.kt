@@ -70,11 +70,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import com.usagemonitor.domain.entity.ApiUsageStats
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.

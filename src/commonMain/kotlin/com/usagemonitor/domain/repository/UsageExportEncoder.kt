@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.UsageExportFormat
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Serializa em texto (CSV ou JSON) o que as telas exportam.

@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Agrega todas as cotas de uso de UMA API (Anthropic ou MiniMax).

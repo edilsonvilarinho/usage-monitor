@@ -3,7 +3,7 @@ package com.usagemonitor.data.dto
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 data class UsageSnapshotRecord(
     val source: ApiSource,

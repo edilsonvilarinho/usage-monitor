@@ -8,7 +8,7 @@ import com.usagemonitor.data.mapper.toDomain
 import com.usagemonitor.domain.entity.CliRangeWindow
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.toTeamBreakdown
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

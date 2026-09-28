@@ -1,7 +1,7 @@
 package com.usagemonitor.domain.repository
 
 import com.usagemonitor.domain.entity.PRESENCE_MAX_CLOCK_OFFSET_MILLIS
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.concurrent.Volatile
 import kotlin.math.absoluteValue
 

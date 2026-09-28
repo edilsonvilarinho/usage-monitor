@@ -15,7 +15,7 @@ import com.usagemonitor.domain.entity.decodeRateLimitBackoffs
 import com.usagemonitor.domain.entity.encodeRateLimitBackoffs
 import com.usagemonitor.domain.entity.isReadingFreshEnough
 import com.usagemonitor.domain.entity.rateLimitBackoff
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -101,7 +101,7 @@ class RefreshScheduleTest {
 
     @Test
     fun `a reset counts once, after the grace, and never when unknown`() {
-        fun statsResetting(at: kotlinx.datetime.Instant, known: Boolean = true) = ApiUsageStats(
+        fun statsResetting(at: kotlin.time.Instant, known: Boolean = true) = ApiUsageStats(
             source = ApiSource.ANTHROPIC,
             apiName = "Anthropic",
             quotas = listOf(

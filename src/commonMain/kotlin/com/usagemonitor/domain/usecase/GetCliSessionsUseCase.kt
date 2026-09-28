@@ -6,7 +6,7 @@ import com.usagemonitor.domain.entity.CliSessionIndexReport
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.repository.CliSessionRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Sincroniza o índice e devolve a lista de sessões da janela pedida.

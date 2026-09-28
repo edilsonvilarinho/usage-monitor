@@ -29,7 +29,7 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.anthropicProfileId
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats

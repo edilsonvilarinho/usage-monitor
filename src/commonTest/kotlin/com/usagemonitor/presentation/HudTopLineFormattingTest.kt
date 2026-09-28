@@ -9,7 +9,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.hudQuotaShortLabel
 import com.usagemonitor.presentation.ui.components.hudQuotaChipText
 import com.usagemonitor.presentation.ui.orderedByCardOrder
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

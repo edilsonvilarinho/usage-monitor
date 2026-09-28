@@ -2,7 +2,7 @@ package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsagePeriodComparison
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

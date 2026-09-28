@@ -1,6 +1,6 @@
 package com.usagemonitor.data.datasource
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /** Fonte local de mensagens com uso registrado pelo Gemini CLI. */
 interface GeminiUsageDataSource {

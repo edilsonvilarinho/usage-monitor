@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.OpenRouterQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Mesmo padrão do [DeepSeekMapper]: saldo pré-pago, `used = 0`, `total` é o

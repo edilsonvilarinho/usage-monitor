@@ -26,7 +26,7 @@ import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Uma conta na barra HUD: o que o notch mostra em repouso e o que o painel

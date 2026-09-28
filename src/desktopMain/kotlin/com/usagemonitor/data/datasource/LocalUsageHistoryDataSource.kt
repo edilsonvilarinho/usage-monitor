@@ -10,7 +10,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.requiresUsageAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.minus
 import java.io.File
 import java.sql.Connection

@@ -12,7 +12,7 @@ import com.usagemonitor.domain.entity.isVersionNewer
 import com.usagemonitor.domain.entity.parseReleaseNoteItems
 import com.usagemonitor.domain.repository.AppUpdateRepository
 import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 private const val RELEASE_REPOSITORY_OWNER = "edilsonvilarinho"
 private const val RELEASE_REPOSITORY_NAME = "usage-monitor"

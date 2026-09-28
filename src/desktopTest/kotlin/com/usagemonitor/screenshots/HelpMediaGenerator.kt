@@ -60,7 +60,7 @@ import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 
 /**

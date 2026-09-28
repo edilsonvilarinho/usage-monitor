@@ -4,8 +4,8 @@ import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.decodeRateLimitBackoffs
 import com.usagemonitor.domain.entity.encodeRateLimitBackoffs
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 private const val RATE_LIMIT_BACKOFFS_KEY = "rateLimitBackoffUntil"
 

@@ -2,7 +2,7 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * O valor do anel da bandeja (issue #328): o **maior** percentual entre as cotas

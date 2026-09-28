@@ -6,7 +6,7 @@ import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.math.roundToLong
 
 /**

@@ -38,7 +38,7 @@ import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 

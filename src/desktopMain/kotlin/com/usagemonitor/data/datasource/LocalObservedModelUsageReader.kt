@@ -2,7 +2,7 @@ package com.usagemonitor.data.datasource
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 
 internal data class ObservedModelUsageSnapshot(

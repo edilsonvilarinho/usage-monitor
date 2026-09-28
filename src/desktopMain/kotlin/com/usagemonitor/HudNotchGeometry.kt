@@ -15,7 +15,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Geometria do notch da HUD: em que borda ele mora, o tamanho recolhido e o

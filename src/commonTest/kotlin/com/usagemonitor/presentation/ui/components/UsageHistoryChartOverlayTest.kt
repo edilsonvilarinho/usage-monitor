@@ -2,7 +2,7 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.ui.graphics.Color
 import com.usagemonitor.domain.entity.UsageHistoryPoint
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

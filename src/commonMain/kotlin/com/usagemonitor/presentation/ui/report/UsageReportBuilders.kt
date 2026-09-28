@@ -18,7 +18,7 @@ import com.usagemonitor.presentation.ui.formatQuantity
 import com.usagemonitor.presentation.ui.shortSessionId
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 

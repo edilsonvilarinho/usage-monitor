@@ -8,7 +8,7 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.hasSuspectClockSkew
 import com.usagemonitor.domain.entity.toTeamPresence
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

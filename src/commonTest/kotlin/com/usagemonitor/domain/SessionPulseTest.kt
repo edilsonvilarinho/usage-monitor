@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.mergeSessionPulses
 import com.usagemonitor.domain.entity.toSessionPulse
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

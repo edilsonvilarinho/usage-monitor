@@ -8,7 +8,7 @@ import com.usagemonitor.domain.entity.isSamePeriod
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 

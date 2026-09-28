@@ -1,7 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -291,7 +291,7 @@ internal class StartupDiagnostics(
         const val KEPT_LINES = 100
 
         private fun isoOf(epochMillis: Long): String {
-            return kotlinx.datetime.Instant.fromEpochMilliseconds(epochMillis).toString()
+            return kotlin.time.Instant.fromEpochMilliseconds(epochMillis).toString()
         }
 
         private fun currentProcessStartMillis(): Long? {

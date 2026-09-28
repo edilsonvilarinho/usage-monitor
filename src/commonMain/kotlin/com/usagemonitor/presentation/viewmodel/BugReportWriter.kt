@@ -1,6 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * O que gravar em disco.

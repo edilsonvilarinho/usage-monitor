@@ -5,8 +5,8 @@ import com.usagemonitor.domain.repository.GeminiUsageException
 import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import java.io.File
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days

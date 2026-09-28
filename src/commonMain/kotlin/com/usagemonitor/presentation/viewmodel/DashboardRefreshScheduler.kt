@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.isTargetDue
 import com.usagemonitor.domain.entity.nextDueAt
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.rateLimitBackoff
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.time.Duration
 
 /**

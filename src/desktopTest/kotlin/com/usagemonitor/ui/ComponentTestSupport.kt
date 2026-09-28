@@ -21,7 +21,7 @@ import com.usagemonitor.presentation.viewmodel.AppUpdateReleaseOpener
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UnsupportedAppUpdateReleaseOpener
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 internal fun emptyDashboardViewModel(enabledApis: MutableStateFlow<Set<ApiSource>>): DashboardViewModel {
     val anthropicRepo = object : AnthropicRepository {

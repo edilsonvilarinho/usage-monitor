@@ -22,7 +22,7 @@ import com.usagemonitor.presentation.ui.components.BUG_REPORT_STATUS_TEST_TAG
 import com.usagemonitor.presentation.viewmodel.BugReportSaveRequest
 import com.usagemonitor.presentation.viewmodel.BugReportSaveResult
 import com.usagemonitor.presentation.viewmodel.BugReportWriter
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder

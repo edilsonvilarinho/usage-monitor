@@ -4,7 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.sql.Connection
 
 /** Um lote pronto para envio, já com as sessões dos turnos que carrega. */

@@ -6,7 +6,7 @@ import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionTail
 import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.SESSION_TAIL_WINDOW_BYTES
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.File

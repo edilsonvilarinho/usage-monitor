@@ -21,7 +21,7 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.UsageHistoryRepository
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class UsageHistoryRepositoryImpl(
     private val dataSource: UsageHistoryDataSource

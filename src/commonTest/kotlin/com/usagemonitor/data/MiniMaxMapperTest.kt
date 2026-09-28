@@ -1,6 +1,6 @@
 package com.usagemonitor.data
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.data.dto.BaseRespDto
 import com.usagemonitor.data.dto.MiniMaxTokenPlanResponse
 import com.usagemonitor.data.dto.ModelRemainDto

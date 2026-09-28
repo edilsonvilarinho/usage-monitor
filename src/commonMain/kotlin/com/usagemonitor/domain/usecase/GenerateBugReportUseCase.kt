@@ -3,7 +3,7 @@ package com.usagemonitor.domain.usecase
 import com.usagemonitor.domain.entity.BugReportEnvelope
 import com.usagemonitor.domain.entity.BugReportMachineInfo
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Monta o pacote de diagnóstico: descrição do usuário + máquina + trilha lida.

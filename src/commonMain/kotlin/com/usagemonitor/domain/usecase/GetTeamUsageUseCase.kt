@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.toTeamBreakdown
 import com.usagemonitor.domain.repository.TeamUsageRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Consumo do time de uma conta na janela pedida.

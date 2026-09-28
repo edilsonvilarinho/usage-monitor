@@ -34,7 +34,7 @@ import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.theme.appTween
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A contagem até a próxima coleta (issue #185). O tique mora aqui e não em quem

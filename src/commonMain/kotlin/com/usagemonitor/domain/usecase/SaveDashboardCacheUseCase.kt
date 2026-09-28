@@ -2,7 +2,7 @@ package com.usagemonitor.domain.usecase
 
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.DashboardCacheRepository
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class SaveDashboardCacheUseCase(
     private val repository: DashboardCacheRepository

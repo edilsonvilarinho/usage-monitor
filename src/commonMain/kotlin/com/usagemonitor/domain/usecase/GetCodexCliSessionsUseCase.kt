@@ -3,7 +3,7 @@ package com.usagemonitor.domain.usecase
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 class GetCodexCliSessionsUseCase(
     private val repository: CodexCliSessionRepository,
@@ -26,5 +26,5 @@ data class CodexCliSessionListResult(
     val sessions: List<CodexCliSessionSummary>,
     val indexReport: CodexCliSessionIndexReport? = null,
     val indexError: Throwable? = null,
-    val readAt: kotlinx.datetime.Instant
+    val readAt: kotlin.time.Instant
 )

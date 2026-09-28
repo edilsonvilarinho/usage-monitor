@@ -4,7 +4,7 @@ import com.usagemonitor.data.datasource.LocalGeminiUsageDataSource
 import com.usagemonitor.domain.repository.GeminiUsageException
 import com.usagemonitor.domain.repository.GeminiUsageFailureKind
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path

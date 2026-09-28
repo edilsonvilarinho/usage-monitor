@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.monthlyBudgetStatusOf
 import com.usagemonitor.domain.entity.startOfMonthMillis
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals

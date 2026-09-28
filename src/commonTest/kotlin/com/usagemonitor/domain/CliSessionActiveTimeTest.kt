@@ -6,7 +6,7 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

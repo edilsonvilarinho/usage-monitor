@@ -13,7 +13,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.viewmodel.allQuotaRisks
 import com.usagemonitor.presentation.viewmodel.allSourceRisks
 import com.usagemonitor.presentation.viewmodel.worstQuotaSnapshot
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

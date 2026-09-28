@@ -8,7 +8,7 @@ import com.usagemonitor.domain.entity.OpenCodeGoQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Converte a resposta do OpenCode Go nas três cotas percentuais do domínio.

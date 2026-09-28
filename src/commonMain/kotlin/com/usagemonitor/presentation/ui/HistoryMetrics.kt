@@ -23,7 +23,7 @@ import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.roundToLong
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

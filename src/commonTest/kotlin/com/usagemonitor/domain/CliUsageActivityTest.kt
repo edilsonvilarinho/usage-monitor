@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.ModelPricingTable
 import com.usagemonitor.domain.entity.burnRateOf
 import com.usagemonitor.domain.entity.toActivityHeatmap
 import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals

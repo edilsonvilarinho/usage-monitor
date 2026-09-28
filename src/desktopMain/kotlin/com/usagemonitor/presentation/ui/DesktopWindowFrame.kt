@@ -65,8 +65,8 @@ import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import java.awt.Cursor
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusDot

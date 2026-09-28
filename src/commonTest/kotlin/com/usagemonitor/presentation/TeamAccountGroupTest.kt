@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

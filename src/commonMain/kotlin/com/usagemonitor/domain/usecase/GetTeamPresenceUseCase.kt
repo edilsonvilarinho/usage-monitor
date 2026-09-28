@@ -8,8 +8,8 @@ import com.usagemonitor.domain.entity.toTeamPresence
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamServerClockOffset
 import com.usagemonitor.domain.repository.TeamUsageRepository
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Quem está conectado numa conta, agora.
