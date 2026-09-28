@@ -122,8 +122,16 @@ internal class CodexProfileRegistry(
         return ID_PREFIX + UUID.nameUUIDFromBytes(normalizePath(path).toByteArray(StandardCharsets.UTF_8)).toString()
     }
 
+    /**
+     * Canônico dos **dois** lados da comparação: o diretório escolhido chega
+     * canonicalizado, e o `CODEX_HOME` pode vir em nome curto 8.3 (`RUNNER~1`) ou
+     * por link simbólico. Comparar canônico com cru deixava a conta padrão entrar
+     * como extra — o CI do Windows pegou isso com o `TEMP` do runner.
+     */
     private fun normalizePath(path: String): String {
-        return File(path).absoluteFile.normalize().path.trimEnd(File.separatorChar).lowercase()
+        val file = File(path)
+        val resolved = runCatching { file.canonicalFile }.getOrElse { file.absoluteFile.normalize() }
+        return resolved.path.trimEnd(File.separatorChar).lowercase()
     }
 
     private companion object {
