@@ -39,8 +39,8 @@ fica deprecado — ele deixa de ser opcional.
 - **A5** — kotlinx-datetime 0.6.1 → 0.8.0 com `Clock`/`Instant` migrados para `kotlin.time` (um
   commit: a versão e o import não compilam separados).
 - **A6** — acessores `compose.*` do plugin → coordenadas explícitas no version catalog, ainda na
-  1.7.1; `material-icons-extended` fixado em 1.7.3.
-- **A7** — Compose Multiplatform 1.7.1 → 1.12.1.
+  1.7.1, sem mudar versão; Material3 e ícones com chave de versão própria.
+- **A7** — Compose Multiplatform 1.7.1 → 1.12.1; `material-icons-extended` fixado em 1.7.3.
 - **A8** — mídias de ajuda regeneradas, se o Compose novo mudar o desenho.
 - **A9** — Gradle wrapper 8.6 → 9.8.0.
 - **A10** — commons-compress 1.27.1 → 1.28.0.
@@ -57,3 +57,4 @@ fica deprecado — ele deixa de ser opcional.
 | A3 — kotlinx-serialization 1.11.0 | `gradlew.bat allTests` | `BUILD SUCCESSFUL in 5m 48s`, 2354 testes, 0 falhas, incluindo os de mapper em `commonTest/data`; nenhum aviso de serialização e nenhuma mudança de código |
 | A4 — Ktor 3.6.0 | `gradlew.bat allTests`; `javap` em `ktor-client-core-jvm-3.6.0.jar` | `BUILD SUCCESSFUL in 5m 59s`, 2354 testes, 0 falhas, sem mudança de código. Os testes de `NetworkFailure` montam as exceções à mão, então a hierarquia foi conferida no jar: `ConnectTimeoutException extends java.net.ConnectException` e `HttpRequestTimeoutException extends java.io.IOException`, como na 3.0.3; o socket timeout do Ktor na JVM continua sendo `java.net.SocketTimeoutException` (não há classe própria no jar). A classificação por tipo segue valendo |
 | A5 — kotlinx-datetime 0.8.0 + `Clock`/`Instant` em `kotlin.time` | `sed` sobre os 243 arquivos com `kotlinx.datetime.Clock`/`Instant` (imports e 9 nomes qualificados); `gradlew.bat compileKotlinDesktop compileTestKotlinDesktop`; `gradlew.bat allTests` | 244 arquivos, 293 linhas trocadas uma a uma, nenhuma outra edição de código. Com Kotlin 2.4 os tipos de `kotlin.time` não pedem `@OptIn(ExperimentalTime::class)`, então o item do "fora do escopo" da issue deixa de existir. `DISTANT_FUTURE`, `parse`, `fromEpochMilliseconds`, `toLocalDateTime` e aritmética com `Duration` compilam sem ajuste; os erros do `DashboardScreen.kt:206/216` somem. Compilação 1m 3s, 0 erros; `BUILD SUCCESSFUL in 4m 42s`, 2354 testes, 0 falhas (inclui `ArchitectureRulesTest`). `AGENTS.md` atualizado: o domain usa `kotlin.time` para relógio e instante |
+| A6 — acessores `compose.*` → version catalog | `gradlew.bat dependencies --configuration desktopRuntimeClasspath` e `desktopTestRuntimeClasspath` antes/depois + `diff`; `gradlew.bat allTests` | `runtime`, `foundation`, `material3`, `material-icons-extended`, `components-resources` e `ui-test` com coordenada explícita; `compose.desktop.currentOs` segue no plugin (não está deprecado). Material3 e ícones ganharam chave própria (`compose-material3`, `compose-material-icons`), ainda em 1.7.1 — a A7 é que move os ícones para 1.7.3. Os dois classpaths (431 e 481 linhas) saíram **idênticos**; `BUILD SUCCESSFUL in 5m 43s`, 2354 testes, 0 falhas |
