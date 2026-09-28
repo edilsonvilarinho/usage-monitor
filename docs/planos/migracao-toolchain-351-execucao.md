@@ -53,3 +53,4 @@ fica deprecado — ele deixa de ser opcional.
 |---|---|---|
 | A0 — plano e linha de base | `gradlew.bat allTests --rerun-tasks` na `main` (`22f37f6`), Windows 11, JDK 17, heap de 3 GB do `gradle.properties` | `BUILD SUCCESSFUL in 5m 41s`, 14 tarefas executadas; 2354 testes, 0 falhas, 0 ignorados |
 | A1 — Kotlin 2.4.20 | `gradlew.bat compileKotlinDesktop compileTestKotlinDesktop`; `gradlew.bat allTests` | Compila com o Compose 1.7.1 (a saída de emergência não foi usada), 3m 2s. O KGP avisa `Deprecated Gradle Version` (8.6; mínimo vira 8.14.4 no Kotlin 2.5) — resolvido na A9. 76 avisos de compilação (50 de opt-in `ExperimentalCoroutinesApi` nos testes), nenhum erro; o heap de 3 GB bastou. `BUILD SUCCESSFUL in 4m 43s`, 2354 testes, 0 falhas |
+| A2 — kotlinx-coroutines 1.11.0 | `gradlew.bat allTests` | `BUILD SUCCESSFUL in 6m 4s`, 2354 testes, 0 falhas; nenhuma mudança de código (o Ktor 3.0.3 aceita a 1.11) |
