@@ -284,101 +284,37 @@ Regras:
    por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
 5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
    `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
-6. `Modifier.border` arredonda o traço **para cima** (`ceil(width.toPx())`, `Border.kt`) e o pinta
-   **depois** do conteúdo. Numa caixa de 4dp o anel de 1dp vira 2px a partir de densidade 1,05 e come
-   a caixa inteira: a barra de cota ficava cinza com a cota em 37% nas escalas de 105% e 110%
-   (issue #83). Borda que precisa ocupar layout é **fundo mais padding** — o `roundToPx` do padding
-   acompanha a altura, e é o `box-sizing: border-box` que o protótipo já especificava. O defeito é de
-   **pintura**: `boundsInRoot` devolvia a altura cheia nas duas escalas, então só bitmap
-   (`captureToImage`) o pega.
+6. Borda que precisa ocupar layout é **fundo mais padding**, nunca `Modifier.border`: ele arredonda o
+   traço para cima e pinta sobre o conteúdo, e só bitmap (`captureToImage`) pega o defeito. Histórico
+   (issue #83) em [`compose-implementation.md`](docs/design-system/compose-implementation.md).
 
-**Escala da interface** (`AppTheme(uiScalePercent = …)` + `UiScalePreferences.kt` + slider na aba
-Geral): a escala troca a **densidade** da composição, nunca a escala tipográfica. Subir só a
-tipografia deixaria ícone, padding, altura de linha e alvo de clique — todos `Dp` fixos — do tamanho
-anterior, e o rodapé continuaria pequeno ao lado de um texto maior; densidade é o único ponto em que
-dp e sp crescem juntos e as proporções do protótipo permanecem. Só `density` é multiplicado:
-multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
+**Janelas, cards e tooltips**: decisões e histórico em [`docs/presentation.md`](docs/presentation.md),
+seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes de mexer.** Regras:
 
-- **O padrão persistido é 115 e o default do parâmetro é 100.** O neutro existe para o
-  `ScreenshotGenerator`, o `TourGifGenerator` e os testes de componente manterem a geometria de
-  referência — as capturas do README **não** são geradas na escala do app.
-- **Cada janela precisa receber o valor.** `Window`/`DialogWindow` do Compose Desktop têm composição
-  própria e a plataforma reprovisiona `LocalDensity` na raiz de cada uma: provisionar na janela pai
-  não atravessa para a filha, e a janela esquecida renderiza a 100% sem erro nenhum.
-- **A moldura não escala sozinha.** Densidade maior mostra o mesmo conteúdo maior dentro da mesma
-  janela, ou seja, menos conteúdo. `scaledWindowSize` corrige a janela principal pela razão entre a
-  escala aplicada e a nova — nunca contra 100, ou duas mudanças seguidas multiplicariam duas vezes —
-  e nos tamanhos default das outras janelas o fator entra na criação. Tamanho **persistido** é
-  escolha do usuário e não é reescalado, com uma exceção de uma vez só: quem já tinha janela salva
-  antes desta versão a recebe corrigida de 100 para o padrão novo, e é `hasPersistedUiScale` — chave
-  presente, não valor igual ao default — que fecha essa porta depois.
-- O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
-  AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
-
-**Monitores** (`ScreenLocator.kt`; issue #273): toda medida de tela lia o monitor padrão
-(`defaultScreenDevice`, `maximumWindowBounds`). As janelas com posição salva (Histórico, Sessões CLI,
-Uso e Presença do time) eram presas ao primário ao reabrir, e a principal nem guardava posição. Agora
-`workAreaForPosition` encaixa a janela na área útil do monitor que contém o retângulo salvo (a maior
-interseção), e a principal grava `windowX`/`windowY`, negativos inclusive. Sem posição, ou com o
-retângulo fora de todo monitor, vale o padrão. As funções de escolha recebem a lista de monitores e são
-puras (`ScreenLocatorTest`, com monitor à direita, à esquerda e acima). **Monitores com escalas
-diferentes só se validam em máquina real**: cada monitor tem o próprio espaço de usuário escalado e o
-app trata pixel como dp. Os testes não pegam isso.
-- O teste que prova a fiação (`AppThemeScaleTest`) mede **pixels** (`boundsInRoot`), não `Dp`: a
-  conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
-  100dp nos dois casos — um teste que passa sem medir nada.
-
-**Densidade do dashboard** (`DashboardScreen.SuccessContent` + `ResponsiveDashboardCardGrid`): a
-janela principal usa o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
-na vertical e `AppSpacing.md` entre cards —, e não o `AppSpacing.lg` das outras cinco. É a única
-janela que o usuário deixa estreita ao lado do editor, e ali 16dp de margem mais 16dp de vão eram
-largura que faltava dentro do card. A coluna rolável **não** reserva folga para a barra de rolagem:
-ela flutua sobre o padding direito da grade. Somadas, as duas davam 28dp à direita contra 16 à
-esquerda.
-
-**Movimento da grade** (`ResponsiveDashboardCardGrid` + `previewCardOrder`): os cards deslizam para
-a vaga nova pela mola `GENTLE` ao reordenar, ao minimizar um vizinho e na troca de colunas; a
-primeira colocação é salto, e por isso as capturas não mudam. Durante o arrasto a grade já é
-disposta na ordem em que o card cairia, com as caixas do alvo **congeladas** no início — medir contra
-caixas que se movem com a prévia faria o vão pular de lado a cada quadro.
-
-**Modo somente cards** (`DesktopWindowFrame(compact)` + `DashboardScreen(showFooter)` +
-`CardsOnlyModePreferences.kt`): a janela sem barra de título e sem rodapé. **Não é valor novo em
-enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `Boolean` em
-`PreferencesSettings`, ao lado de "manter sempre visível".
-- **A faixa de título só é composta durante o hover.** Ela carrega a `WindowDraggableArea`, que usa
-  arrasto **imediato**; o card usa `detectDragGesturesAfterLongPress`. Com a faixa presente o tempo
-  todo, o arrasto da janela venceria a pressão longa e reordenar o primeiro card seria impossível.
-  Invisível ela também não pode ser clicável: um botão de fechar transparente é pior que nenhum.
-- **Três saídas, e nenhuma é dispensável**: a faixa, o item na bandeja e `Ctrl+Shift+M`. O modo
-  esconde o botão de fechar e a engrenagem; com a janela coberta por outra, só o teclado resta. A
-  bandeja também passou a abrir as Configurações, que só existiam no rodapé.
-- A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
-  as capturas do README continuam com a moldura inteira.
-
-**Menu de modos no rodapé** (`WindowMode` + `AppMenu` + `FooterBar`; issue #187): o ícone que abre
-as três molduras — padrão, somente os cards e barra HUD — com a corrente marcada. Antes dele as duas
-molduras reduzidas só eram alcançadas por dois interruptores no meio da seção "Sistema" das
-Configurações, por `Ctrl+Shift+M`/`Ctrl+Shift+H` ou pela bandeja, e por isso só eram descobertas por
-acidente.
-- **`WindowMode` é enum novo, e as preferências continuam sendo dois booleanos.** `cardsOnlyMode` e
-  `hudMode` seguem separados em `PreferencesSettings`, e a exclusão mútua continua sendo regra dos
-  setters em `AppShellState.kt` (`changeHudMode`/`changeCardsOnlyMode`): o enum descreve o que o **controle** oferece, não como o estado é guardado.
-  Os rótulos são os **mesmos** das Configurações — dois nomes para a mesma moldura fariam o passo da
-  ajuda apontar para um controle que a tela chama de outra coisa.
-- **`AppMenu` é primitiva nova, e é `Popup` com a superfície deste sistema — não o `DropdownMenu` do
-  Material.** Aquele traz a própria superfície, o próprio raio, a própria animação de entrada e a
-  própria altura de item, e nenhum dos quatro é o deste sistema. O item selecionado carrega **marca
-  além do realce**, com o espaço da marca reservado em todas as linhas: sem isso o rótulo da
-  selecionada anda para o lado a cada troca de opção.
-- **O menu abre para cima quando não cabe abaixo**, e isso está afirmado por teste numa cena de
-  240×320dp — o piso de arrasto da janela principal. Popup no Compose Desktop é camada **dentro** da
-  janela, recortada pelos limites dela (a #164 pagou isso), e o rodapé é a última linha: um menu que
-  só soubesse abrir para baixo nasceria fora da janela.
-- **Ele existe só no modo padrão**, porque o rodapé só é composto ali. Os caminhos de volta continuam
-  sendo os quatro que já existiam, e nenhum deles some. `onWindowModeChange = null` esconde o
-  controle — mesmo padrão de `onOpenAdminOverview`, e é o que mantém os geradores de captura
-  intactos.
+- Escala da interface troca só a **densidade**, nunca `fontScale`. Padrão persistido 115, default do
+  parâmetro 100 (geradores de captura e testes). **Cada** `Window`/`DialogWindow` recebe o valor.
+  `scaledWindowSize` corrige pela razão aplicada/nova; tamanho persistido não é reescalado
+  (`hasPersistedUiScale`); redimensionar no commit com debounce. `AppThemeScaleTest` mede pixel.
+- Monitores: `workAreaForPosition` (`ScreenLocator.kt`) encaixa no monitor de maior interseção, nunca
+  `defaultScreenDevice`. Escalas diferentes por monitor só se validam em máquina real.
+- Dashboard usa o corpo denso (`AppSpacing.md`/`sm`); a coluna rolável não reserva folga para a barra.
+- Grade anima com mola `GENTLE`, primeira colocação é salto; no arrasto as caixas do alvo ficam
+  congeladas (`previewCardOrder`).
+- Somente cards: dois booleanos, sem enum; faixa de título só composta no hover (senão o arrasto
+  imediato da janela vence a pressão longa do card); três saídas obrigatórias: faixa, bandeja e
+  `Ctrl+Shift+M`.
+- Menu de modos (`WindowMode` + `AppMenu`): o enum é do controle, o estado segue em dois booleanos com
+  exclusão nos setters de `AppShellState.kt`; rótulos iguais aos das Configurações; `AppMenu` é
+  `Popup` próprio, nunca `DropdownMenu`; abre para cima se não cabe; só no modo padrão
+  (`onWindowModeChange = null` esconde).
+- Tooltip de cota não abre abaixo de 320dp de card (`shouldShowQuotaTooltip`, constante própria, não
+  `NarrowCardWidthThreshold`); a `testTag` do bloco de cota mora no conteúdo; a explicação do
+  semáforo é o `footnote` da tooltip. Cabeçalho tem ponto **e** palavra do pior risco
+  (`worstQuotaRisk`, pela ordem do enum); sem projeção conhecida, sem badge.
+- Saldo pré-pago (`hasKnownResetAt = false`, persistido em `has_known_reset_at`) usa **tempo de
+  autonomia** (`BALANCE_*_RUNWAY_MILLIS`, 7/14 dias), nunca a razão até o reset.
+- Aviso de fonte é hint (`CardNoticeHint`), nunca `AppBanner`: um ícone por card, sem piso de
+  largura, frases inteiras no `contentDescription`.
 
 **Barra HUD — notch** (`HudWindow.kt`, `HudNotch.kt`, `HudBalloon.kt`, `HudHandles.kt`,
 `HudNotchGeometry.kt`, `HudModel.kt`; issue #164): decisões e histórico em
@@ -400,68 +336,8 @@ acidente.
 - Movimento contínuo (órbita de sessão, pulso de atenção) só atrás de `AppMotionPolicy.continuous`.
 - Balão é conteúdo da janela, nunca `Popup`; nenhum formato novo de percentual/reset/rótulo.
 
-**Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
-abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e
-a janela do modo somente cards tem ~230dp úteis — ali a tooltip cobre o card inteiro, escondendo
-justamente o número que o ponteiro apontava. Constante **própria** e não reuso de
-`NarrowCardWidthThreshold`, que coincide no valor mas responde a outra pergunta: uma é sobre apertar
-padding, a outra é sobre o popup caber. O preço está aceito: em card estreito não há caminho visual
-para a projeção de uso, e ela volta abrindo a janela. Só as tooltips de **cota** caem — as de uma
-linha (nome truncado da API, botão de sessão) ficam, porque não cobrem nada.
-- **A `testTag` do bloco de cota mora no conteúdo, não no `HoverTooltipBox`.** Presa à tooltip, ela
-  desapareceria da árvore junto com ela em card estreito, e os testes que buscam `quotaBlockTag`
-  passariam a não encontrar nó nenhum.
-- **A explicação do semáforo é o `footnote` da tooltip da cota.** O ponto colorido nunca teve
-  tooltip própria — os dois usos de `RiskSemaphoreDot` passam `showTooltip = false`, porque dois
-  `TooltipBox` aninhados disputam o mesmo hover —, e por isso a frase de `riskDotTooltipSubtitle`
-  não chegava à tela em tamanho nenhum de janela. A métrica `Projeção de uso` continua ao lado: ela
-  diz qual é o estado, o rodapé diz o que ele significa.
-- **O estado da fonte tem ponto e palavra no cabeçalho** (`API_USAGE_CARD_STATUS_TAG` +
-  `worstQuotaRisk`): o `RiskSemaphoreDot` de cada cota é só ponto, e sozinho ele deixava a cor
-  informando o estado — que é exatamente o que este sistema visual não faz. O badge resume o **pior**
-  risco entre as cotas pela ordem do enum, não pelo percentual: 40% às onze da manhã pode ser pior
-  que 80% dez minutos antes do reinício. Cota vencida não entra, e sem projeção conhecida não há
-  badge — "Normal" ali seria uma garantia que ninguém deu. Os rótulos saem de `riskLevelLabel`, que
-  já existia. O badge inteiro também abre um `HoverTooltipBox` persistente: ele informa a cota que
-  determinou o pior estado e reutiliza a explicação da projeção, inclusive para `Normal` — a cota
-  deve resetar antes de esgotar — e para `Atenção`/`Crítico` — a cota deve esgotar antes do reset.
-- **Saldo pré-pago não usa a régua de razão** (`riskSummary` com `hasKnownResetAt = false`): aquela
-  régua pergunta "quanto do tempo até o reset a cota aguenta", e um saldo não reseta. O DeepSeek
-  grava `periodEndAt = Instant.DISTANT_FUTURE`, o que dava razão de ~0,002 e fazia **qualquer**
-  consumo maior que zero virar `WILL_EXCEED` — card em Crítico permanente, ponto de risco da bandeja
-  aceso para sempre e a tooltip prometendo um reset uma linha abaixo de "Saldo não expira"
-  (issue #109). Sem reset a pergunta é absoluta: **tempo de autonomia**, com
-  `BALANCE_CRITICAL_RUNWAY_MILLIS` (7 dias) e `BALANCE_WARNING_RUNWAY_MILLIS` (14 dias), e a data
-  prevista continua preenchida **inclusive em `ON_TRACK`** — ali ela é a resposta a "quando acaba",
-  não o aviso. A conta em si já estava certa e não mudou: para `CURRENCY_USD`,
-  `calculatePositiveDelta` soma as **quedas** do saldo e `remaining` é o saldo atual.
-  - **`hasKnownResetAt` passou a ser persistido** (`usage_snapshots.has_known_reset_at`, `DEFAULT 1`,
-    migração por `hasColumn` como a de `account_id`). Sem a coluna o histórico só via `periodEndAt`,
-    e ele não distingue "reset distante" de "não existe reset": DeepSeek grava `DISTANT_FUTURE`,
-    Kilo e OpenCode gravam o próprio `capturedAt`, os créditos da Anthropic gravam outra sentinela.
-    A decisão lê o **último** ponto da série, então a primeira coleta depois da migração já corrige a
-    cota — não é preciso reescrever histórico.
-  - **`currentSegment` não foi tocado**, e é por isso que Kilo e OpenCode continuam sem projeção
-    nenhuma: com `periodEndAt = capturedAt` cada coleta parece um reset, o segmento fica com um ponto
-    e o forecast devolve `InsufficientData`. Mesma raiz, sintoma oposto, issue própria — ligá-la aqui
-    acenderia projeção em duas fontes sem verificação delas.
-
-**Aviso de fonte é hint, não banner** (`CardNoticeHint` em `ApiUsageCardNotice.kt`): os
-`ApiUsageNotice` saem como uma exclamação âmbar (`Icons.Rounded.ErrorOutline`) no cabeçalho, ao
-lado do badge de status, e o texto vive na tooltip. Eram `AppBanner` empilhados abaixo das cotas,
-e como o texto deles não muda entre coletas, na janela estreita os dois avisos do Codex ocupavam
-mais altura que o `39%` que o card existe para mostrar (issue #76). Um ícone por card, não um por
-aviso: a tooltip lista todos, com bullet só a partir do segundo.
-- **Este hint não tem piso de largura**, ao contrário da tooltip de cota: aquele piso existe porque
-  o popup cobre o número que o ponteiro apontava, e este não aponta número nenhum. Sem tooltip o
-  aviso ficaria inacessível justamente na janela estreita, que é onde ele mais atrapalhava.
-- **As frases inteiras vão no `contentDescription` do ícone.** Sem hover a tooltip não existe na
-  árvore, então é por ela que leitor de tela e testes chegam ao aviso — os dois asserts de notice
-  em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
-
-**Regras que continuam valendo**: animação infinita só atrás de `AppMotionPolicy.continuous`
-(sem a política ela trava o `waitForIdle`); `ShimmerBox` foi apagado — não tinha chamador; nenhuma composable nova em `runUsageMonitor` — ele só compõe os hosts; nenhum
-`Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
+**Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
+hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
 **Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em
 código — `monogram.svg` ao lado é referência e não é lido. O `.icns` só é validado no job
@@ -522,8 +398,4 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 | Cursor | `GET https://cursor.com/api/usage-summary` (rota não documentada) | Cookie `WorkosCursorSessionToken` montado da sessão do editor em `state.vscdb`, lida em read-only e nunca persistida |
 | Antigravity CLI | `agy --sandbox --print-timeout 30s --output-format json --print /usage` (processo local) | Sessão já autenticada do próprio CLI; o app nunca inicia login |
 
-Response Anthropic retorna `five_hour`/`seven_day` com `utilization` em **percentual** (0–100) e `resets_at` em ISO 8601 (pode ser nulo), mais `extra_usage`/`spend` com os créditos de uso em unidades menores da moeda da conta.
-
-Response MiniMax retorna `model_remains[]` com cotas em **requests** (não tokens), timestamps em epoch milliseconds.
-
-Response OpenCode Go retorna `usage.{rolling,weekly,monthly}`, cada uma com `status` (`ok` ou `rate-limited`), `percent` (0–100) e `resetsAt` em ISO 8601. **Não devolve valor em dinheiro** — nem gasto, nem limite. O endpoint **não está documentado publicamente** (PR anomalyco/opencode#16513, merged em 2026-08-11) e não declara versão; sem `Authorization` responde `401 AuthError`, e com chave válida sem plano Go responde `403 EntitlementError`. O saldo pago do Zen **não tem endpoint**: `/zen/v1/balance` responde 404.
+Formato das respostas (unidades, campos, códigos de erro): [`docs/integrations.md`](docs/integrations.md#formato-das-respostas).

@@ -168,3 +168,15 @@ Antes de desenhar um retângulo novo, procure aqui.
   - Mapa paralelo ao das cores (`accountEmojis`), e não um objeto de identidade que juntasse os dois:
     a cor já atravessava cinco assinaturas, e trocá-las todas por causa do emoji mexeria em código
     que a issue não pede.
+
+### Armadilha: `Modifier.border` numa caixa fina (issue #83)
+
+`Modifier.border` arredonda o traço **para cima** (`ceil(width.toPx())`, `Border.kt`) e o pinta
+**depois** do conteúdo. Numa caixa de 4dp o anel de 1dp vira 2px a partir de densidade 1,05 e come
+a caixa inteira: a barra de cota ficava cinza com a cota em 37% nas escalas de 105% e 110%
+(issue #83). Borda que precisa ocupar layout é **fundo mais padding** — o `roundToPx` do padding
+acompanha a altura, e é o `box-sizing: border-box` que o protótipo já especificava. O defeito é de
+**pintura**: `boundsInRoot` devolvia a altura cheia nas duas escalas, então só bitmap
+(`captureToImage`) o pega.
+
+`ShimmerBox` foi apagado — não tinha chamador.

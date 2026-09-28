@@ -275,6 +275,14 @@ For personal usage, this integration follows the individual-account source refer
   last reading. A refresh requested by the user always calls it again.
 - The collector does not call undocumented IDE RPCs and never stores or logs the CLI output.
 
+## Formato das respostas
+
+Response Anthropic retorna `five_hour`/`seven_day` com `utilization` em **percentual** (0–100) e `resets_at` em ISO 8601 (pode ser nulo), mais `extra_usage`/`spend` com os créditos de uso em unidades menores da moeda da conta.
+
+Response MiniMax retorna `model_remains[]` com cotas em **requests** (não tokens), timestamps em epoch milliseconds.
+
+Response OpenCode Go retorna `usage.{rolling,weekly,monthly}`, cada uma com `status` (`ok` ou `rate-limited`), `percent` (0–100) e `resetsAt` em ISO 8601. **Não devolve valor em dinheiro** — nem gasto, nem limite. O endpoint **não está documentado publicamente** (PR anomalyco/opencode#16513, merged em 2026-08-11) e não declara versão; sem `Authorization` responde `401 AuthError`, e com chave válida sem plano Go responde `403 EntitlementError`. O saldo pago do Zen **não tem endpoint**: `/zen/v1/balance` responde 404.
+
 ## Decisões de implementação
 
 > Movido do `CLAUDE.md` em 2026-09-27 pela skill `usage-monitor-token-cleanup` (#319). O `CLAUDE.md` guarda as regras curtas e aponta para cá; o texto abaixo é o original, com os links relativos ajustados a este diretório.

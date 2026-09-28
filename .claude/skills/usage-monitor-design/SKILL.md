@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-design
-description: Apply the Usage Monitor design system when writing or reviewing any visible surface of this repository — Compose screens, dialogs, the tray, the PDF report, and throwaway mocks. Contains the token layer, the published primitive contracts, the precedence rules against the approved prototype, and the UI kit. Use when Claude needs to draw, change, or audit a screen, or to build a visual prototype for this project.
+description: Apply the Usage Monitor design system (tokens, primitive contracts, precedence over the prototype, UI kit) when drawing, changing, or auditing any visible surface — Compose screens, dialogs, tray, PDF report — or building a visual prototype for this project.
 ---
 
 # Usage Monitor — design system
