@@ -45,3 +45,4 @@ e o resultado, não a intenção.
 | # | Data | Commit | Atividade | Estado | Evidência |
 |---|---|---|---|---|---|
 | A0 | 2026-09-28 | este commit | Abrir o plano de execução | ✅ Concluída | revisão do diff (só documentação) |
+| A1 | 2026-09-28 | este commit | Ordenação SemVer com pré-lançamento em `compareAppVersions` + `isPrereleaseVersion` | ✅ Concluída | `desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.data.AppUpdate*" --tests "com.usagemonitor.update.*"` → 54 classes, 0 falhas; `AppVersionComparisonTest` `tests="10" failures="0"` |
