@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -18,16 +19,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ReleaseNotes
+import com.usagemonitor.domain.entity.isPrereleaseVersion
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
+import com.usagemonitor.presentation.ui.components.BetaReleasePill
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 const val RELEASE_NOTES_CONTENT_TAG = "releaseNotesContent"
+const val RELEASE_NOTES_BETA_BADGE_TAG = "releaseNotesBetaBadge"
 
 /**
  * Novidades da versão que acabou de ser instalada.
@@ -44,6 +48,13 @@ fun ReleaseNotesContent(
     modifier: Modifier = Modifier
 ) {
     val isPt = language == AppLanguage.PT
+    // Beta ganha selo no cabeçalho (issue #355): a janela é a mesma da estável,
+    // e sem ele só o sufixo do número diria que a versão é de teste.
+    val betaBadge: (@Composable RowScope.() -> Unit)? = if (isPrereleaseVersion(notes.version)) {
+        { BetaReleasePill(modifier = Modifier.testTag(RELEASE_NOTES_BETA_BADGE_TAG)) }
+    } else {
+        null
+    }
 
     Column(
         modifier = modifier
@@ -56,7 +67,8 @@ fun ReleaseNotesContent(
         AppSectionHeader(
             title = if (isPt) "Novidades" else "What's new",
             subtitle = releaseNotesSubtitle(notes, isPt),
-            markerColor = MaterialTheme.colorScheme.primary
+            markerColor = MaterialTheme.colorScheme.primary,
+            trailing = betaBadge
         )
 
         // O Box é que estica; a superfície dentro dele cresce só até onde a
@@ -120,7 +132,13 @@ fun ReleaseNotesContent(
 private val BULLET_COLUMN_WIDTH = 16.dp
 
 fun releaseNotesTitle(version: String, isPt: Boolean): String {
-    return if (isPt) "Novidades da versão $version" else "What's new in $version"
+    val isBeta = isPrereleaseVersion(version)
+    return when {
+        isBeta && isPt -> "Novidades da versão beta $version"
+        isBeta -> "What's new in beta $version"
+        isPt -> "Novidades da versão $version"
+        else -> "What's new in $version"
+    }
 }
 
 /**

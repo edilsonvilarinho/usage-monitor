@@ -148,6 +148,31 @@ class ReleaseNotesTest {
         )
     }
 
+    /**
+     * Issue #355: com o sufixo descartado, `42.0.0-beta.2 → 42.0.0` comparava
+     * igual, caía em marca silenciosa, e quem testou a beta nunca via as
+     * novidades da estável.
+     */
+    @Test
+    fun `moving from a beta to its stable release opens the notes`() {
+        assertEquals(
+            ReleaseNotesDecision.SHOW,
+            releaseNotesDecision(currentVersion = "42.0.0", seenVersion = "42.0.0-beta.2", hasUpdateReceipt = true)
+        )
+    }
+
+    @Test
+    fun `moving to the next beta opens the notes`() {
+        assertEquals(
+            ReleaseNotesDecision.SHOW,
+            releaseNotesDecision(currentVersion = "42.0.0-beta.2", seenVersion = "42.0.0-beta.1", hasUpdateReceipt = false)
+        )
+        assertEquals(
+            ReleaseNotesDecision.SHOW,
+            releaseNotesDecision(currentVersion = "42.0.0-beta.1", seenVersion = "41.0.0", hasUpdateReceipt = false)
+        )
+    }
+
     @Test
     fun `a rollback re-marks instead of announcing a version that is not running`() {
         // O `health-timeout` do linux-updater.sh: o app novo chega a abrir a

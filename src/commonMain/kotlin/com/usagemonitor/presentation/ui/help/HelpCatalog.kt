@@ -3,6 +3,8 @@ package com.usagemonitor.presentation.ui.help
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.UPDATE_RESTART_ACTION_EN
 import com.usagemonitor.presentation.ui.UPDATE_RESTART_ACTION_PT
+import com.usagemonitor.presentation.ui.components.BETA_UPDATES_LABEL_EN
+import com.usagemonitor.presentation.ui.components.BETA_UPDATES_LABEL_PT
 
 /**
  * Tópicos da janela de ajuda.
@@ -345,7 +347,10 @@ object HelpCatalog {
                 "Com a versão baixada, a faixa no topo do dashboard — ou, na barra HUD, o balão da " +
                     "engrenagem, que ganha um ponto colorido — oferece o botão " +
                     "\"$UPDATE_RESTART_ACTION_PT\"; sem clicar nele, a troca acontece no próximo " +
-                    "fechamento do app."
+                    "fechamento do app.",
+                "Para testar versões antes da estável, ligue \"$BETA_UPDATES_LABEL_PT\" logo abaixo. " +
+                    "A faixa, o balão da HUD, as novidades e o rodapé dizem \"beta\"; desligar não " +
+                    "volta para a versão anterior — o app fica na beta até sair uma estável mais nova."
             ),
             mediaId = "updates"
         )
@@ -603,7 +608,10 @@ object HelpCatalog {
                 "Once the version is downloaded, the strip at the top of the dashboard — or, in the HUD " +
                     "bar, the gear balloon, marked with a colored dot — offers the " +
                     "\"$UPDATE_RESTART_ACTION_EN\" button; without clicking it, the swap happens the next " +
-                    "time the app closes."
+                    "time the app closes.",
+                "To try versions before the stable release, turn on \"$BETA_UPDATES_LABEL_EN\" right " +
+                    "below. The strip, the HUD balloon, what's new and the footer say \"beta\"; turning it " +
+                    "off does not roll back — the app stays on the beta until a newer stable comes out."
             ),
             mediaId = "updates"
         )

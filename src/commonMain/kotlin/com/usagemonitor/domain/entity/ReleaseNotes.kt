@@ -71,7 +71,9 @@ enum class ReleaseNotesDecision {
  *   de a correção ser publicada.
  * - **Marca igual à versão em execução**: nada a fazer. Igualdade textual,
  *   exata e barata.
- * - **Versão em execução mais nova**: abre.
+ * - **Versão em execução mais nova**: abre. Pela precedência do SemVer de
+ *   [compareAppVersions], isso inclui `42.0.0-beta.1 → 42.0.0-beta.2` e
+ *   `42.0.0-beta.2 → 42.0.0` (issue #355).
  * - **Resto**: marca em silêncio. Cobre o retrocesso — anunciar a 38.0.1 vindo
  *   da 38.0.2 seria falso, e é este ramo que reconcilia a marca depois de um
  *   `health-timeout` do updater do Linux, em que o app novo chega a abrir a

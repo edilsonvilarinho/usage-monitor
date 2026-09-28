@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -34,6 +35,8 @@ internal class DashboardUpdateCoordinator(
     private val appUpdateReleaseOpener: AppUpdateReleaseOpener,
     private val appUpdateInstaller: AppUpdateInstaller?,
     private val autoUpdateEnabled: StateFlow<Boolean>,
+    /** Canal beta (issue #355): lido a cada verificação, nunca congelado. */
+    private val receiveBetaUpdates: StateFlow<Boolean>,
     private val onRestartAndUpdateRequested: () -> Unit,
     private val onUpdateScheduleFailure: (String, String) -> Unit,
     private val currentAppVersion: String,
@@ -109,7 +112,7 @@ internal class DashboardUpdateCoordinator(
         val updateUseCase = checkForAppUpdate ?: return
 
         updateMutex.withLock {
-            updateUseCase(currentAppVersion)
+            updateUseCase(currentAppVersion, includePrereleases = receiveBetaUpdates.value)
                 .onSuccess { update ->
                     lastUpdateCheckFailureKey = null
                     if (update == null) {
@@ -281,6 +284,27 @@ internal class DashboardUpdateCoordinator(
                 if (current != null) {
                     _state.value = AppUpdateUiState.Available(current.update)
                 }
+            }
+        }
+    }
+
+    /**
+     * Reage ao interruptor do canal beta com uma verificação imediata, nos dois
+     * sentidos (issue #355).
+     *
+     * Ligar sem isso deixaria o usuário esperando até 10 minutos para ver a beta
+     * que acabou de pedir — o mesmo defeito que [startAutoUpdateSwitchWatcher]
+     * corrige para o outro interruptor. Desligar também reconsulta: uma beta
+     * anunciada e ainda não instalada deixa de ser oferecida. Nenhum dos dois
+     * faz downgrade — o repositório só oferece versão maior que a em execução.
+     *
+     * O `drop(1)` descarta o valor inicial do `StateFlow`: a verificação da
+     * abertura é a do laço, e duplicá-la seria uma requisição a mais ao GitHub.
+     */
+    fun startBetaChannelWatcher() {
+        scope.launch {
+            receiveBetaUpdates.drop(1).collect {
+                checkForUpdate()
             }
         }
     }

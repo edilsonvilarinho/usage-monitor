@@ -13,6 +13,7 @@ import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -289,13 +290,156 @@ class AppUpdateRepositoryImplTest {
         assertEquals("network down", result.exceptionOrNull()?.message)
     }
 
+    @Test
+    fun `without the beta channel the listing is never read`() = runTest {
+        var listed = false
+        val remote = object : RemoteApiDataSource(noopHttpClient()) {
+            override suspend fun fetchLatestGitHubRelease(
+                owner: String,
+                repository: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto = release(tag = "v8.1.0")
+
+            override suspend fun fetchGitHubReleases(
+                owner: String,
+                repository: String,
+                perPage: Int
+            ): List<GitHubReleaseDto> {
+                listed = true
+                return emptyList()
+            }
+        }
+
+        val update = AppUpdateRepositoryImpl(remote) { null }
+            .getLatestAvailableUpdate(currentVersion = currentVersion, includePrereleases = false)
+            .getOrNull()
+
+        assertEquals("8.1.0", update?.version)
+        assertFalse(update!!.isPrerelease)
+        assertFalse(listed)
+    }
+
+    @Test
+    fun `the beta channel offers the highest release, beta or stable`() = runTest {
+        val repo = AppUpdateRepositoryImpl(
+            fakeListing(
+                release(tag = "v8.1.0"),
+                release(tag = "v8.2.0-beta.2", prerelease = true),
+                release(tag = "v8.2.0-beta.1", prerelease = true)
+            )
+        ) { null }
+
+        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion, includePrereleases = true)
+            .getOrNull()
+
+        assertEquals("8.2.0-beta.2", update?.version)
+        assertTrue(update!!.isPrerelease)
+    }
+
+    @Test
+    fun `the beta channel moves a beta to its stable release`() = runTest {
+        val repo = AppUpdateRepositoryImpl(
+            fakeListing(
+                release(tag = "v8.2.0"),
+                release(tag = "v8.2.0-beta.2", prerelease = true)
+            )
+        ) { null }
+
+        val update = repo.getLatestAvailableUpdate(currentVersion = "8.2.0-beta.2", includePrereleases = true)
+            .getOrNull()
+
+        assertEquals("8.2.0", update?.version)
+        assertFalse(update!!.isPrerelease)
+    }
+
+    @Test
+    fun `the beta channel never offers a draft`() = runTest {
+        val repo = AppUpdateRepositoryImpl(
+            fakeListing(
+                release(tag = "v9.0.0-beta.1", prerelease = true, draft = true),
+                release(tag = "v8.1.0")
+            )
+        ) { null }
+
+        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion, includePrereleases = true)
+            .getOrNull()
+
+        assertEquals("8.1.0", update?.version)
+    }
+
+    /**
+     * Desligar o canal estando numa beta não faz downgrade: `/releases/latest`
+     * devolve a estável anterior, que é menor que a beta em execução.
+     */
+    @Test
+    fun `leaving the beta channel never downgrades`() = runTest {
+        val repo = AppUpdateRepositoryImpl(fakeRemote(release(tag = "v8.1.0"))) { null }
+
+        val result = repo.getLatestAvailableUpdate(currentVersion = "8.2.0-beta.1", includePrereleases = false)
+
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `the beta channel with an empty listing has no update`() = runTest {
+        val repo = AppUpdateRepositoryImpl(fakeListing()) { null }
+
+        val result = repo.getLatestAvailableUpdate(currentVersion = currentVersion, includePrereleases = true)
+
+        assertTrue(result.isSuccess)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `a GitHub prerelease without a suffix is still announced as beta`() = runTest {
+        val repo = AppUpdateRepositoryImpl(fakeListing(release(tag = "v8.3.0", prerelease = true))) { null }
+
+        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion, includePrereleases = true)
+            .getOrNull()
+
+        assertTrue(update!!.isPrerelease)
+    }
+
+    /** O servidor do smoke test serve uma release só; a listagem não existe ali. */
+    @Test
+    fun `the feed override is used by the beta channel too`() = runTest {
+        var seenOverride: String? = "nao lido"
+        val remote = object : RemoteApiDataSource(noopHttpClient()) {
+            override suspend fun fetchLatestGitHubRelease(
+                owner: String,
+                repository: String,
+                feedUrlOverride: String?
+            ): GitHubReleaseDto {
+                seenOverride = feedUrlOverride
+                return release(tag = "v9.0.0-beta.1", prerelease = true)
+            }
+
+            override suspend fun fetchGitHubReleases(
+                owner: String,
+                repository: String,
+                perPage: Int
+            ): List<GitHubReleaseDto> = error("listagem não deve ser lida com feed sobrescrito")
+        }
+        val repo = AppUpdateRepositoryImpl(remote) { "http://localhost:8099/release.json" }
+
+        val update = repo.getLatestAvailableUpdate(currentVersion = currentVersion, includePrereleases = true)
+            .getOrNull()
+
+        assertEquals("http://localhost:8099/release.json", seenOverride)
+        assertEquals("9.0.0-beta.1", update?.version)
+    }
+
     private fun release(
         tag: String,
-        assets: List<GitHubReleaseAssetDto> = emptyList()
+        assets: List<GitHubReleaseAssetDto> = emptyList(),
+        prerelease: Boolean = false,
+        draft: Boolean = false
     ): GitHubReleaseDto {
         return GitHubReleaseDto(
             tagName = tag,
             htmlUrl = releasePageUrl,
+            prerelease = prerelease,
+            draft = draft,
             assets = assets
         )
     }
@@ -342,6 +486,18 @@ class AppUpdateRepositoryImplTest {
                 feedUrlOverride: String?
             ): GitHubReleaseDto {
                 return release
+            }
+        }
+    }
+
+    private fun fakeListing(vararg releases: GitHubReleaseDto): RemoteApiDataSource {
+        return object : RemoteApiDataSource(noopHttpClient()) {
+            override suspend fun fetchGitHubReleases(
+                owner: String,
+                repository: String,
+                perPage: Int
+            ): List<GitHubReleaseDto> {
+                return releases.toList()
             }
         }
     }

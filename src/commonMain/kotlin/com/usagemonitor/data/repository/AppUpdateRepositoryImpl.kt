@@ -2,12 +2,15 @@ package com.usagemonitor.data.repository
 
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.dto.GitHubReleaseAssetDto
+import com.usagemonitor.data.dto.GitHubReleaseDto
 import com.usagemonitor.domain.entity.AppUpdateArchitecture
 import com.usagemonitor.domain.entity.AppUpdateArtifact
 import com.usagemonitor.domain.entity.AppUpdateArtifactKind
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.ReleaseNotes
+import com.usagemonitor.domain.entity.compareAppVersions
+import com.usagemonitor.domain.entity.isPrereleaseVersion
 import com.usagemonitor.domain.entity.isVersionNewer
 import com.usagemonitor.domain.entity.parseReleaseNoteItems
 import com.usagemonitor.domain.repository.AppUpdateRepository
@@ -26,13 +29,12 @@ class AppUpdateRepositoryImpl(
     private val envVarReader: () -> String? = { System.getenv(UPDATE_FEED_URL_ENV_VAR) }
 ) : AppUpdateRepository {
 
-    override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+    override suspend fun getLatestAvailableUpdate(
+        currentVersion: String,
+        includePrereleases: Boolean
+    ): Result<AppUpdateInfo?> {
         return Result.runCatching {
-            val latestRelease = remoteApiDataSource.fetchLatestGitHubRelease(
-                owner = RELEASE_REPOSITORY_OWNER,
-                repository = RELEASE_REPOSITORY_NAME,
-                feedUrlOverride = envVarReader()
-            )
+            val latestRelease = fetchCandidateRelease(includePrereleases) ?: return@runCatching null
             val latestVersion = latestRelease.tagName.removePrefix("v")
 
             if (!isVersionNewer(latestVersion, currentVersion)) {
@@ -42,9 +44,36 @@ class AppUpdateRepositoryImpl(
             AppUpdateInfo(
                 version = latestVersion,
                 releasePageUrl = latestRelease.htmlUrl,
-                artifacts = mapArtifacts(latestRelease.assets)
+                artifacts = mapArtifacts(latestRelease.assets),
+                isPrerelease = latestRelease.prerelease || isPrereleaseVersion(latestVersion)
             )
         }
+    }
+
+    /**
+     * Fora do canal beta, `/releases/latest` — que o GitHub nunca responde com
+     * prerelease, e é o que protege quem não optou. No canal beta, a maior
+     * versão não-rascunho da listagem. Com o feed sobrescrito (smoke test) a
+     * listagem não existe, e o feed único vale para os dois canais.
+     */
+    private suspend fun fetchCandidateRelease(includePrereleases: Boolean): GitHubReleaseDto? {
+        val feedUrlOverride = envVarReader()
+        if (!includePrereleases || !feedUrlOverride.isNullOrBlank()) {
+            return remoteApiDataSource.fetchLatestGitHubRelease(
+                owner = RELEASE_REPOSITORY_OWNER,
+                repository = RELEASE_REPOSITORY_NAME,
+                feedUrlOverride = feedUrlOverride
+            )
+        }
+
+        return remoteApiDataSource.fetchGitHubReleases(
+            owner = RELEASE_REPOSITORY_OWNER,
+            repository = RELEASE_REPOSITORY_NAME
+        )
+            .filterNot { release -> release.draft }
+            .maxWithOrNull { left, right ->
+                compareAppVersions(left.tagName.removePrefix("v"), right.tagName.removePrefix("v"))
+            }
     }
 
     override suspend fun getReleaseNotes(

@@ -42,6 +42,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Clock
 import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.isPrereleaseVersion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 
 const val FOOTER_ADMIN_OVERVIEW_TEST_TAG = "footerAdminOverview"
@@ -95,6 +96,7 @@ enum class WindowMode {
  * qualquer outro lugar da tela onde a versão apareça.
  */
 const val FOOTER_VERSION_TEST_TAG = "footerVersion"
+const val FOOTER_BETA_BADGE_TEST_TAG = "footerBetaBadge"
 const val FOOTER_COUNTDOWN_TEST_TAG = "footerCountdown"
 
 /**
@@ -213,7 +215,13 @@ private fun FooterCompactStatusGroup(
     modifier: Modifier = Modifier
 ) {
     val refreshLabel = formatRefreshCountdown(secondsUntilRefresh)
-    val versionTooltip = if (language == AppLanguage.PT) "Versão do app" else "App version"
+    val isBeta = isPrereleaseVersion(appVersion)
+    val versionTooltip = when {
+        isBeta && language == AppLanguage.PT -> "Versão beta do app"
+        isBeta -> "App beta version"
+        language == AppLanguage.PT -> "Versão do app"
+        else -> "App version"
+    }
     val refreshTooltip = nextRefreshLabel(language)
 
     FlowRow(
@@ -226,6 +234,11 @@ private fun FooterCompactStatusGroup(
             tooltipLabel = versionTooltip,
             testTag = FOOTER_VERSION_TEST_TAG
         )
+        // Build beta leva o selo ao lado do número (issue #355): é o lugar em que
+        // o usuário confere qual versão está rodando.
+        if (isBeta) {
+            BetaReleasePill(modifier = Modifier.testTag(FOOTER_BETA_BADGE_TEST_TAG))
+        }
         FooterCompactBadge(
             text = refreshLabel,
             tooltipLabel = refreshTooltip,

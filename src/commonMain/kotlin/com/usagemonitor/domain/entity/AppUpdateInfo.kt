@@ -14,7 +14,13 @@ data class AppUpdateInfo(
      * tipo desconhecido: um `.exe` que não é o instalador NSIS não pode chegar
      * perto do caminho que executa o instalador em silêncio.
      */
-    val artifacts: List<AppUpdateArtifact> = emptyList()
+    val artifacts: List<AppUpdateArtifact> = emptyList(),
+    /**
+     * A atualização oferecida é beta (issue #355). O default lê o sufixo da
+     * versão; o repositório soma a marca `prerelease` do GitHub, para que uma
+     * release marcada à mão também seja anunciada como beta.
+     */
+    val isPrerelease: Boolean = isPrereleaseVersion(version)
 )
 
 data class AppUpdateArtifact(

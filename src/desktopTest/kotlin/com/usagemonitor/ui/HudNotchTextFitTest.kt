@@ -163,14 +163,19 @@ class HudNotchTextFitTest {
         val failures = mutableSetOf<String>()
         var scale by mutableStateOf(scales.first())
         val update = AppUpdateInfo(version = "138.100.100", releasePageUrl = "https://example.com")
-        val states = listOf(
-            AppUpdateUiState.Available(update),
-            AppUpdateUiState.Downloading(update, percent = 100),
-            AppUpdateUiState.Downloading(update, percent = null),
-            AppUpdateUiState.Ready(update),
-            AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD),
-            AppUpdateUiState.Failed(update, AppUpdateFailureReason.SCHEDULE)
-        )
+        // Beta (issue #355): o número é mais comprido e a linha curta troca
+        // "versão" por "beta"; dois dígitos em cada parte e no contador.
+        val beta = AppUpdateInfo(version = "42.10.10-beta.12", releasePageUrl = "https://example.com")
+        val states = listOf(update, beta).flatMap { info ->
+            listOf(
+                AppUpdateUiState.Available(info),
+                AppUpdateUiState.Downloading(info, percent = 100),
+                AppUpdateUiState.Downloading(info, percent = null),
+                AppUpdateUiState.Ready(info),
+                AppUpdateUiState.Failed(info, AppUpdateFailureReason.DOWNLOAD),
+                AppUpdateUiState.Failed(info, AppUpdateFailureReason.SCHEDULE)
+            )
+        }
         val contents = AppLanguage.entries.flatMap { language ->
             states.map { state -> updateBannerContent(state, language) }
         }

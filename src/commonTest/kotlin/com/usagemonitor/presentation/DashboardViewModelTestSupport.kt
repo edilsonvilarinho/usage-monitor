@@ -181,10 +181,14 @@ abstract class DashboardViewModelTestSupport {
         return GetUsageHistoryUseCase(historyRepository)
     }
 
-    protected fun updateUseCase(block: suspend () -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
+    /** [block] recebe o `includePrereleases` pedido — o canal beta (issue #355). */
+    protected fun updateUseCase(block: suspend (Boolean) -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
         val repository = object : AppUpdateRepository {
-            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
-                return block()
+            override suspend fun getLatestAvailableUpdate(
+                currentVersion: String,
+                includePrereleases: Boolean
+            ): Result<AppUpdateInfo?> {
+                return block(includePrereleases)
             }
 
             // Fora do que estes testes exercitam: a janela de novidades tem

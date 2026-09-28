@@ -44,7 +44,9 @@ internal fun GeneralSettingsTab(
     onReducedMotionChange: (Boolean) -> Unit,
     onReportBug: () -> Unit,
     trayUsageRing: Boolean = false,
-    onTrayUsageRingChange: (Boolean) -> Unit = {}
+    onTrayUsageRingChange: (Boolean) -> Unit = {},
+    receiveBetaUpdates: Boolean = false,
+    onReceiveBetaUpdatesChange: (Boolean) -> Unit = {}
 ) {
     val isPt = currentLanguage == AppLanguage.PT
 
@@ -124,6 +126,12 @@ internal fun GeneralSettingsTab(
             lastReceipt = lastUpdateReceipt,
             feedUrlOverride = autoUpdateFeedOverride,
             onToggle = onAutoUpdateChange
+        )
+        // Logo abaixo: escolhe *quais* versões a linha de cima baixa.
+        BetaUpdatesToggle(
+            enabled = receiveBetaUpdates,
+            language = currentLanguage,
+            onToggle = onReceiveBetaUpdatesChange
         )
         AlwaysOnTopToggle(
             enabled = alwaysOnTopEnabled,

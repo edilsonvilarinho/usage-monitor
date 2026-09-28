@@ -138,7 +138,11 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
   versão por plataforma; Windows só NSIS per-user; Linux só árvore XDG gerenciada. Texto de
   reinício diz **o que** reinicia. Progresso é texto, não animação.
 - Novidades: gatilho é `CURRENT_APP_VERSION` ≠ `releaseNotesSeenVersion`, **nunca** o recibo.
-  Ordenação de versões só em `AppVersionComparison.kt`.
+  Ordenação de versões só em `AppVersionComparison.kt` (SemVer: `X.Y.Z-beta.N < X.Y.Z`).
+- Canal beta (#355): tag `vX.Y.Z-beta.N` publicada como prerelease e **nunca** `latest` — é isso que
+  protege quem não optou. Opt-in `receiveBetaUpdates`; desligar não faz downgrade; só o sufixo
+  `-beta.N` é aceito (workflow e updater do Linux). Exe/Dmg levam só o número; Deb/Rpm `~beta.N`.
+  Publicação pela skill `usage-monitor-release-beta`.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia
   imutável dos bytes; laço de quadros em `desktopMain`; `gradlew.bat generateHelpMedia` regenera.
 

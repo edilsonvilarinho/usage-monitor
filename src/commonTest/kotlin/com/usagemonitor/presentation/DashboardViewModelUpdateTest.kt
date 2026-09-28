@@ -166,9 +166,80 @@ class DashboardViewModelUpdateTest : DashboardViewModelTestSupport() {
         }
     }
 
+    @Test
+    fun `the check asks for prereleases only when the beta channel is on`() = runTest {
+        val channels = mutableListOf<Boolean>()
+        val betaChannel = MutableStateFlow(true)
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = { Result.success(null) },
+            onCheck = { includePrereleases -> channels += includePrereleases },
+            receiveBetaUpdates = betaChannel,
+            config = virtualTimeConfig(testScheduler)
+        )
+        viewModel.cancelCountdown()
+
+        try {
+            runCurrent()
+
+            assertEquals(listOf(true), channels)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    /**
+     * Ligar o canal verifica na hora; sem isso a beta pedida só apareceria no
+     * poll seguinte, até 10 minutos depois (issue #355).
+     */
+    @Test
+    fun `toggling the beta channel rechecks immediately`() = runTest {
+        val channels = mutableListOf<Boolean>()
+        val betaChannel = MutableStateFlow(false)
+        val viewModel = updateViewModel(
+            recordedSnapshots = mutableListOf(),
+            checkForUpdate = {
+                if (channels.last()) {
+                    Result.success(AppUpdateInfo("7.1.0-beta.1", "https://example.com/releases/tag/v7.1.0-beta.1"))
+                } else {
+                    Result.success(null)
+                }
+            },
+            onCheck = { includePrereleases -> channels += includePrereleases },
+            receiveBetaUpdates = betaChannel,
+            config = virtualTimeConfig(testScheduler)
+        )
+        viewModel.cancelCountdown()
+
+        try {
+            runCurrent()
+            assertEquals(listOf(false), channels)
+            assertNull(viewModel.appUpdateState.value)
+
+            betaChannel.value = true
+            runCurrent()
+
+            assertEquals(listOf(false, true), channels)
+            val updateState = viewModel.appUpdateState.value
+            assertIs<AppUpdateUiState.Available>(updateState)
+            assertEquals(true, updateState.update.isPrerelease)
+
+            // Desligar reconsulta e retira a beta ainda não instalada.
+            betaChannel.value = false
+            runCurrent()
+
+            assertEquals(listOf(false, true, false), channels)
+            assertNull(viewModel.appUpdateState.value)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
     private fun updateViewModel(
         recordedSnapshots: MutableList<ApiUsageStats>,
         checkForUpdate: suspend () -> Result<AppUpdateInfo?>,
+        onCheck: (Boolean) -> Unit = {},
+        receiveBetaUpdates: MutableStateFlow<Boolean> = MutableStateFlow(false),
         releaseOpener: AppUpdateReleaseOpener = object : AppUpdateReleaseOpener {
             override fun open(releasePageUrl: String): Result<Unit> = Result.success(Unit)
         },
@@ -194,7 +265,11 @@ class DashboardViewModelUpdateTest : DashboardViewModelTestSupport() {
             GetDeepSeekUsageUseCase(deepSeekRepo),
             MutableStateFlow(emptySet()),
             historyUseCase(recordedSnapshots),
-            checkForAppUpdate = updateUseCase { checkForUpdate() },
+            checkForAppUpdate = updateUseCase { includePrereleases ->
+                onCheck(includePrereleases)
+                checkForUpdate()
+            },
+            receiveBetaUpdates = receiveBetaUpdates,
             appUpdateReleaseOpener = releaseOpener,
             currentAppVersion = "7.0.0",
             clock = Clock.System,

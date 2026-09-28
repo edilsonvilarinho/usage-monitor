@@ -130,7 +130,10 @@ internal fun dashboardViewModelWithAvailableUpdate(enabledApis: MutableStateFlow
         ) = throw UnsupportedOperationException("Não utilizado neste teste")
     }
     val updateRepository = object : AppUpdateRepository {
-        override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+        override suspend fun getLatestAvailableUpdate(
+            currentVersion: String,
+            includePrereleases: Boolean
+        ): Result<AppUpdateInfo?> {
             return Result.success(
                 AppUpdateInfo(
                     version = "7.1.0",
@@ -186,7 +189,10 @@ internal fun dashboardViewModelWithAvailableUpdateAction(
         ) = throw UnsupportedOperationException("Não utilizado neste teste")
     }
     val updateRepository = object : AppUpdateRepository {
-        override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
+        override suspend fun getLatestAvailableUpdate(
+            currentVersion: String,
+            includePrereleases: Boolean
+        ): Result<AppUpdateInfo?> {
             return Result.success(
                 AppUpdateInfo(
                     version = "7.1.0",

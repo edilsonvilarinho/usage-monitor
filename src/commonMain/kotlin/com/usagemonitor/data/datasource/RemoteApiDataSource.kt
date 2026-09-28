@@ -37,6 +37,9 @@ private const val ANTHROPIC_BETA_OAUTH = "oauth-2025-04-20"
 /** O GET de uso da Anthropic; a renovação do token tem o próprio prazo, de 25 s. */
 private const val ANTHROPIC_USAGE_TIMEOUT_MILLIS = 15_000L
 private const val GITHUB_API_VERSION = "2022-11-28"
+
+/** Janela do canal beta: 20 releases cobrem meses de betas e estáveis intercaladas. */
+internal const val GITHUB_RELEASES_PAGE_SIZE = 20
 private const val USAGE_MONITOR_USER_AGENT = "UsageMonitorDesktop"
 
 // Aberto para permitir fakes em testes unitários (substituem chamadas HTTP reais).
@@ -353,6 +356,34 @@ open class RemoteApiDataSource(
     ): GitHubReleaseDto {
         val url = feedUrlOverride?.takeIf { it.isNotBlank() }
             ?: "https://api.github.com/repos/$owner/$repository/releases/latest"
+        val response = requireSuccess(
+            response = httpClient.get(url) {
+                header("Accept", "application/vnd.github+json")
+                header("User-Agent", USAGE_MONITOR_USER_AGENT)
+                header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+                contentType(ContentType.Application.Json)
+            },
+            sourceName = "GitHub release"
+        )
+
+        return response.body()
+    }
+
+    /**
+     * As releases mais recentes, **incluindo** prereleases e rascunhos visíveis —
+     * é a rota do canal beta (issue #355). `/releases/latest` nunca devolve
+     * prerelease, e é isso que mantém quem não optou fora das betas; quem optou
+     * precisa da listagem para escolher a maior versão.
+     *
+     * Sem [feedUrlOverride]: o servidor do smoke test serve **uma** release, não
+     * uma lista, e quem chama cai em [fetchLatestGitHubRelease] nesse caso.
+     */
+    open suspend fun fetchGitHubReleases(
+        owner: String,
+        repository: String,
+        perPage: Int = GITHUB_RELEASES_PAGE_SIZE
+    ): List<GitHubReleaseDto> {
+        val url = "https://api.github.com/repos/$owner/$repository/releases?per_page=$perPage"
         val response = requireSuccess(
             response = httpClient.get(url) {
                 header("Accept", "application/vnd.github+json")

@@ -29,8 +29,11 @@ git status && git log --oneline -5
 Sem commit de bump (#344): a versão vem da tag.
 
 ```bash
-git describe --tags --abbrev=0 --match "v[0-9]*"
+git describe --tags --abbrev=0 --match "v[0-9]*" --exclude "*-beta*"
 ```
+
+Tags beta (`vX.Y.Z-beta.N`, issue #355) ficam de fora: beta tem skill própria
+(`usage-monitor-release-beta`) e nunca é a base da estável.
 
 Calcular a próxima versão pelo tipo (patch/minor/major). Não editar `build.gradle.kts` nem
 `src/installer/UsageMonitor.nsi`: o release passa `-PappVersion` a partir da tag.
