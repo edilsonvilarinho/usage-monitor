@@ -3,7 +3,7 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaHourlyDistribution
 import com.usagemonitor.domain.entity.QuotaWindowSummary
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

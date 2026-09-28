@@ -3,7 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BugReportEnvelope
 import com.usagemonitor.domain.entity.BugReportMachineInfo
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.net.URI
 import kotlin.test.Test
 import kotlin.test.assertEquals

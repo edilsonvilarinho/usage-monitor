@@ -8,7 +8,7 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.tallyHealth
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Qual das duas leituras a janela mostra.

@@ -26,7 +26,7 @@ import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.seriesKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 private const val COMPACT_QUOTA_BADGE_TAG = "compactQuotaBadge"
 

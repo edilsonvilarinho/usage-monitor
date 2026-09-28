@@ -14,7 +14,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.detectSpike
 import com.usagemonitor.domain.entity.isReadingFreshEnough
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 
 // Regras sem estado do `DashboardViewModel`, fora da classe pelo limite de 800

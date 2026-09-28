@@ -39,8 +39,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.theme.AppShapes
 

@@ -51,7 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import androidx.compose.runtime.getValue

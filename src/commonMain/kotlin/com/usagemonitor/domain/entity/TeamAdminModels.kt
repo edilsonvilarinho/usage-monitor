@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Chave de time como o painel de administração a mostra.

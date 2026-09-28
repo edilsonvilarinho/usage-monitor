@@ -16,7 +16,7 @@ import com.usagemonitor.presentation.ui.hudDefaultShouldSwitch
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.trayUsageRingFraction
 import com.usagemonitor.presentation.ui.usageAlertMessage
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import androidx.compose.ui.input.key.type
 import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.repository.BreadcrumbRecorder

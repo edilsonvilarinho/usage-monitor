@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.recordFailure
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * As ações do rodapé e dos cards, montadas uma vez para as duas portas — o

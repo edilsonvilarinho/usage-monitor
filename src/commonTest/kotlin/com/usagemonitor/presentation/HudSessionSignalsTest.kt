@@ -10,7 +10,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudSessionSignal
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.hudSessionSignals
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

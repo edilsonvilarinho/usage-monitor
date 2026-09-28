@@ -9,7 +9,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Representa todos os estados possíveis da UI do Dashboard.

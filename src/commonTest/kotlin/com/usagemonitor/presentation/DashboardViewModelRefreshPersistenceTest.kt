@@ -14,7 +14,7 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -98,7 +98,7 @@ class DashboardViewModelRefreshPersistenceTest : DashboardViewModelTestSupport()
 
     @Test
     fun `refresh persists the new scheduled time via callback`() = runTest {
-        val lastPersistedInstant = java.util.concurrent.atomic.AtomicReference<kotlinx.datetime.Instant?>(null)
+        val lastPersistedInstant = java.util.concurrent.atomic.AtomicReference<kotlin.time.Instant?>(null)
 
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
@@ -147,7 +147,7 @@ class DashboardViewModelRefreshPersistenceTest : DashboardViewModelTestSupport()
             private val instant = Clock.System.now()
             override fun now() = instant
         }
-        val persisted = java.util.concurrent.atomic.AtomicReference<kotlinx.datetime.Instant?>(null)
+        val persisted = java.util.concurrent.atomic.AtomicReference<kotlin.time.Instant?>(null)
         val viewModel = DashboardViewModel(
             GetAnthropicUsageUseCase(object : AnthropicRepository {
                 override suspend fun getUsage() = Result.success(sampleAnthropicStats)

@@ -14,7 +14,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class CodexMapperTest {
 

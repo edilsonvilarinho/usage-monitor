@@ -1,7 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.ApiSource
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 sealed interface DashboardToast {
     data class RateLimit(

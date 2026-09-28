@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.presentation.ui.components.sessionPulseHint
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

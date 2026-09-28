@@ -7,7 +7,7 @@ import com.usagemonitor.data.dto.CodexCliTurnContextLineDto
 import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliSessionTurn
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive

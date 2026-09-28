@@ -16,7 +16,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.components.HistoryChartOverlay
 import com.usagemonitor.presentation.ui.components.UsageHistoryLineChart
 import androidx.compose.ui.graphics.Color
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 
 /**

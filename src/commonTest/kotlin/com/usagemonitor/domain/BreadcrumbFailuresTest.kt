@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.presentation.viewmodel.recordFailure
 import kotlinx.coroutines.CancellationException
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -1,6 +1,6 @@
 package com.usagemonitor.data.datasource
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Fonte local para ler atividade observada do OpenCode.

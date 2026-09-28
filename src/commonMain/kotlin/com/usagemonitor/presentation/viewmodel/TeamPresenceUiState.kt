@@ -2,7 +2,7 @@ package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TeamAccountEmailSource
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 sealed interface TeamPresenceUiState {
 

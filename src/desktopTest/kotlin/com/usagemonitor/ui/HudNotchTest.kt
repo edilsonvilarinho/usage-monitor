@@ -98,7 +98,7 @@ import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.coroutines.channels.Channel
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

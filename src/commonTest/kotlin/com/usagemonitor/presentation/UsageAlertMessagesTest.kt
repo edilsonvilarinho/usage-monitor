@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.usageAlertMessage
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

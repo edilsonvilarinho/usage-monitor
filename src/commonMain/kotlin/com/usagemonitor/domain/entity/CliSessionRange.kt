@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Janela temporal aplicada à lista de sessões CLI.

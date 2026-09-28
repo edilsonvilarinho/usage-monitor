@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Um turno do assistente dentro de uma sessão do Claude Code.

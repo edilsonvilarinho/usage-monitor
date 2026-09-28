@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.quotaHourlyDistributionOf
 import com.usagemonitor.domain.entity.quotaWindowStatsOf
 import com.usagemonitor.domain.entity.quotaWindowsOf
 import com.usagemonitor.domain.entity.splitIntoQuotaWindows
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals

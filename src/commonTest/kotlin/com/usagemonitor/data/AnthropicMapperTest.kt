@@ -1,6 +1,6 @@
 package com.usagemonitor.data
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.data.dto.AnthropicExtraUsage
 import com.usagemonitor.data.dto.AnthropicSpend
 import com.usagemonitor.data.dto.AnthropicSpendAmount

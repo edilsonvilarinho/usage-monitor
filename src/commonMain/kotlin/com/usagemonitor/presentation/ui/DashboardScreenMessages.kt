@@ -4,7 +4,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.presentation.viewmodel.DashboardToast
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 

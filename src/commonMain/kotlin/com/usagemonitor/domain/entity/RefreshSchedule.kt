@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes

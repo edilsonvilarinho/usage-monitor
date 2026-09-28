@@ -40,7 +40,7 @@ Arquitetura em tres camadas com dependencia unidirecional: `presentation -> doma
 
 ## Domain layer constraints
 
-- **Zero imports** de Ktor, Compose ou bibliotecas de infra. Apenas Kotlin puro + `kotlinx.datetime`.
+- **Zero imports** de Ktor, Compose ou bibliotecas de infra. Apenas Kotlin puro (`Clock` e `Instant` vêm de `kotlin.time`) + `kotlinx.datetime` (fuso, data local, período).
 - Entidades e contratos do domain nao conhecem HTTP, JSON, ficheiros locais ou UI.
 - `LocalCredentialDataSource` e `LocalCodexAuthDataSource` ficam em `desktopMain`, nao em `commonMain`, porque leem ficheiros do utilizador.
 

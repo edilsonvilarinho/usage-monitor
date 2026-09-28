@@ -64,7 +64,7 @@ import com.usagemonitor.presentation.ui.components.TEAM_TREND_CHART_TAG
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageView
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals

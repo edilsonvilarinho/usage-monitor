@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.mergeSessionPulses
 import com.usagemonitor.domain.entity.toSessionPulse
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.repository.TeamUsageRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Sessões desta máquina com interação nos últimos minutos, por conta Anthropic.

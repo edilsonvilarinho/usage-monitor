@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Representa a cota de uso de um recurso específico (modelo ou tipo de API).

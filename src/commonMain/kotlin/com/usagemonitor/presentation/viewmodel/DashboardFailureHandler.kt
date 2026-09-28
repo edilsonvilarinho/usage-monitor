@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.RateLimitedException
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * O funil de toda falha de coleta do [DashboardViewModel]: classifica, grava na

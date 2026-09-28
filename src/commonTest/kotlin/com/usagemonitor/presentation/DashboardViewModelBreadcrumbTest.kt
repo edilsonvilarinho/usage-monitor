@@ -14,7 +14,7 @@ import com.usagemonitor.domain.usecase.GetDeepSeekUsageUseCase
 import com.usagemonitor.domain.usecase.GetMiniMaxUsageUseCase
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

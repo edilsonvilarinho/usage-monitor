@@ -10,8 +10,8 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.GeminiRepository
 import com.usagemonitor.domain.repository.GeminiUsageException
 import kotlinx.coroutines.CancellationException
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 

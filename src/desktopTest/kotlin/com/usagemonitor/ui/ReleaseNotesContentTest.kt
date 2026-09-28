@@ -14,7 +14,7 @@ import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.presentation.ui.ReleaseNotesContent
 import com.usagemonitor.presentation.ui.releaseNotesSubtitle
 import com.usagemonitor.presentation.ui.releaseNotesTitle
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

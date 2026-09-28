@@ -16,7 +16,7 @@ import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.sql.Connection

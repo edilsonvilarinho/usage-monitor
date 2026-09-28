@@ -1,6 +1,6 @@
 package com.usagemonitor.presentation.ui
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally

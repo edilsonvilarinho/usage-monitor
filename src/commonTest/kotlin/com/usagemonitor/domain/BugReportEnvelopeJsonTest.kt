@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.Breadcrumb
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.entity.BugReportEnvelope
 import com.usagemonitor.domain.entity.BugReportMachineInfo
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

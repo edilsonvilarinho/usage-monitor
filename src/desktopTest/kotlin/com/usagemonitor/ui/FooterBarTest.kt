@@ -30,7 +30,7 @@ import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.WindowMode
 import kotlinx.coroutines.channels.Channel
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals

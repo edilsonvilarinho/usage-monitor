@@ -17,7 +17,7 @@ import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.repository.TeamServerClockOffset
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.repository.TeamUsageTrendData
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 private const val NOT_CONFIGURED_MESSAGE =
     "Integração com time incompleta: informe servidor, chave e apelido nas Configurações."

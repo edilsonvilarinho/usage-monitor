@@ -4,7 +4,7 @@ import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.TeamUsageTrend
 import com.usagemonitor.domain.entity.buildTeamUsageTrend
 import com.usagemonitor.domain.repository.TeamUsageRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone

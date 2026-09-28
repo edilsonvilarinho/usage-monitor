@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.repository.CursorUsageException
 import com.usagemonitor.domain.repository.CursorUsageFailureKind
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals

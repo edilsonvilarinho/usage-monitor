@@ -42,7 +42,7 @@ import com.usagemonitor.presentation.ui.PRESENCE_STATE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_WORKING_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TeamPresenceContent
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

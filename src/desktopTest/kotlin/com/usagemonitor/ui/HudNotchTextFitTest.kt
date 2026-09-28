@@ -24,7 +24,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.hudSessionSignals
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
