@@ -11,6 +11,7 @@ import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
 import com.usagemonitor.presentation.ui.hudRingMarkSize
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -99,6 +100,18 @@ class HudNotchGeometryTest {
                 assertTrue(docked.notchCenterInWindow + handlesHalf <= along, "$edge em $fraction: engrenagem fora")
             }
         }
+    }
+
+    /**
+     * O recorte só foi medido no Windows. No elementary OS (X11) tirar o recorte
+     * ao abrir não surtia efeito e o balão aparecia só como a tira da margem.
+     */
+    @Test
+    fun `o recorte de clique so vale no Windows`() {
+        assertTrue(hudUsesHitRegion(AutoStartManager.Platform.WINDOWS))
+        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.LINUX))
+        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.MACOS))
+        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.OTHER))
     }
 
     /**

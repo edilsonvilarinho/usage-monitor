@@ -93,6 +93,11 @@ import kotlinx.datetime.Instant
  * origem de uma janela transparente mostra um quadro do conteúdo antigo no lugar
  * novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e na de
  * baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
+ *
+ * **O recorte é só do Windows** ([hudUsesHitRegion]). No elementary OS 6.1 (X11)
+ * o `shape = null` da abertura não tirava o recorte: o balão pintava só dentro
+ * da margem de 16dp e as alças saíam cortadas. Fora do Windows a janela fica sem
+ * recorte — o balão abre inteiro, e a área vazia dele pode engolir clique.
  */
 @Composable
 internal fun HudWindowHost(
@@ -224,6 +229,7 @@ internal fun HudWindowHost(
     } else {
         hudDockedWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
+    val hitRegionSupported = remember { hudUsesHitRegion(AutoStartManager.currentPlatform()) }
     val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes)
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
@@ -325,7 +331,8 @@ internal fun HudWindowHost(
         LaunchedEffect(windowOpacityPercent) {
             applyWindowOpacity(window, windowOpacityPercent)
         }
-        ApplyHudHitRegion(window, hitRegion, scale)
+        // Recorte só no Windows: no elementary OS (X11) o balão saía cortado.
+        if (hitRegionSupported) ApplyHudHitRegion(window, hitRegion, scale)
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
             val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
@@ -569,6 +576,15 @@ private fun ScreenWorkArea.inCompositionDp(scale: Float): ScreenWorkArea = Scree
 )
 
 /**
+ * Se a HUD recorta a área de clique da janela parada por `Window.shape`. Só no
+ * Windows, onde o recorte foi medido (C11, spike da #294); no Linux (X11) tirar
+ * o recorte ao abrir não surtia efeito e o balão ficava cortado. macOS nunca foi
+ * medido e fica do lado seguro.
+ */
+internal fun hudUsesHitRegion(platform: AutoStartManager.Platform): Boolean =
+    platform == AutoStartManager.Platform.WINDOWS
+
+/**
  * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
  * antes de abrir o balão, já sai sem o recorte.
  */
@@ -589,7 +605,8 @@ private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: F
  *
  * `Window.shape` exige suporte a janela recortada (`PERPIXEL_TRANSPARENT`). Sem
  * ele a HUD continua funcionando sem recorte: a área do balão volta a engolir
- * clique, mas o notch não pisca — o defeito menor dos dois.
+ * clique, mas o notch não pisca — o defeito menor dos dois. Fora do Windows o
+ * host nem o compõe ([hudUsesHitRegion]).
  */
 private class HudHitRegionApplier {
     private var applied: java.awt.Rectangle? = null

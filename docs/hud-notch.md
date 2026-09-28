@@ -129,9 +129,17 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     clique fora do recorte chega à janela de baixo (sem recorte, engolido).
   - **O recorte também corta a pintura**, e por isso a sombra e os arcos de dica das alças cabem na
     margem de 16dp. Sem suporte a `PERPIXEL_TRANSPARENT` o `setShape` lança e a HUD segue sem
-    recorte: a área do balão volta a engolir clique, mas o notch não pisca. **macOS e Linux não foram
-    medidos.** `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
+    recorte: a área do balão volta a engolir clique, mas o notch não pisca. `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
     em `Path2D`, que nunca é igual ao pedido.
+  - **O recorte é só do Windows** (`hudUsesHitRegion`, issue #340). Relato de usuário no elementary OS 6.1
+    (Ubuntu 20.04, X11, Gala), notch na borda direita: com o ponteiro em cima, o balão aparecia só
+    como a tira de 16dp da margem, com a cauda, e as alças saíam como círculos cortados. O
+    `shape = null` da abertura não tirava o recorte ali. **Regressão da #294** (`d3ff05b`, v41.0.0):
+    o mesmo usuário, na mesma máquina, abria o balão inteiro até 25/09, quando a janela ainda
+    redimensionava ao abrir e não havia recorte. O Windows é a única plataforma medida, e só
+    nele o host aplica `Window.shape`; no Linux e no macOS a janela fica sem recorte — o balão abre
+    inteiro, e o preço aceito é a área vazia dele poder engolir o clique da janela de baixo com o
+    notch parado. Esse custo no Linux ainda não foi medido.
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número

@@ -328,7 +328,7 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
   que só abre — #317). Botões do card têm dona única (`cardActionsFor`).
 - **O tamanho é da geometria** (`hudNotchSizes`), nunca medido da composição; 1dp de folga por texto
   (`HudNotchTextFitTest`). Janela com origem e tamanho fixos ao abrir; área de clique recortada por
-  `Window.shape`; nenhum redimensionamento AWT por quadro.
+  `Window.shape` **só no Windows** (`hudUsesHitRegion`, #340); nenhum redimensionamento AWT por quadro.
 - Arrasto só pela mão, medido por `hudDragWindowBounds`; posição é borda + fração + monitor; parado
   mora na área útil, fora da barra de tarefas.
 - Clique num anel recoleta aquela conta; botão direito vai a somente cards. Atualização pendente é o
