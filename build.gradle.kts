@@ -121,6 +121,12 @@ compose.desktop {
             // image so aparece no app empacotado, nunca no `gradlew run` Ã¢â‚¬â€ por isso
             // vai declarado, e nao descoberto no primeiro relatorio que falhar.
             modules("java.sql", "java.logging")
+            // `Windows-ROOT` (repositório de certificados do Windows, issue #325) mora
+            // em `jdk.crypto.mscapi`, que so existe no JDK do Windows: declarado sem
+            // condicao, o jlink do build Linux/macOS falharia com modulo inexistente.
+            if (System.getProperty("os.name").startsWith("Windows")) {
+                modules("jdk.crypto.mscapi")
+            }
 
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.ico"))

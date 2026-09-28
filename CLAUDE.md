@@ -87,6 +87,8 @@ ser esquecidas:
 - Endpoint não documentado degrada por campo ausente e **falha** com resposta vazia (preserva o
   cache). Número que a API não informa não é derivado.
 - Proxy: só vale após reiniciar; falha de conectividade é classificada por **tipo** de exceção.
+- TLS: `cacerts` + repositório do SO (`SystemTrustStore.kt`); `jdk.crypto.mscapi` entra no
+  `modules(...)` **só** no build Windows (jlink de outro SO falharia).
 - Tipos com credencial (`CursorSessionCredentials`) não são `data class` — o `toString` vaza o token.
 - Antigravity: argumento por lista, nunca por shell; disjuntor e TTL de 5 min obrigatórios.
 

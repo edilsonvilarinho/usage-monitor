@@ -22,9 +22,10 @@ import okhttp3.Credentials
  * proxy (host/porta/autenticador) é a parte nova e arriscada, e mora aqui
  * isolada da criação do client em si.
  */
-fun buildHttpClient(
+internal fun buildHttpClient(
     effectiveProxy: ProxyEnvironmentConfig?,
-    followRedirects: Boolean = true
+    followRedirects: Boolean = true,
+    tlsTrust: TlsTrust? = buildSystemTlsTrust()
 ): HttpClient {
     return HttpClient(OkHttp) {
         this.followRedirects = followRedirects
@@ -43,6 +44,12 @@ fun buildHttpClient(
             level = LogLevel.NONE
         }
         engine {
+            // Repositório de certificados do sistema além do `cacerts` (issue #325).
+            if (tlsTrust != null) {
+                config {
+                    sslSocketFactory(tlsTrust.socketFactory, tlsTrust.trustManager)
+                }
+            }
             if (effectiveProxy != null) {
                 proxy = ProxyBuilder.http(Url("${effectiveProxy.scheme}://${effectiveProxy.host}:${effectiveProxy.port}"))
                 val username = effectiveProxy.username
