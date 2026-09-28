@@ -66,7 +66,9 @@ import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.datetime.Clock
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -332,7 +334,7 @@ internal fun HudWindowHost(
             applyWindowOpacity(window, windowOpacityPercent)
         }
         // Recorte só no Windows: no elementary OS (X11) o balão saía cortado.
-        if (hitRegionSupported) ApplyHudHitRegion(window, hitRegion, scale)
+        ApplyHudHitRegion(window, hitRegion, scale, supported = hitRegionSupported)
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
             val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
@@ -587,10 +589,21 @@ internal fun hudUsesHitRegion(platform: AutoStartManager.Platform): Boolean =
 /**
  * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
  * antes de abrir o balão, já sai sem o recorte.
+ *
+ * Fora do Windows ([supported] falso) não aplica nada — só grava que pulou, para
+ * o próximo relato vir com o que a HUD fez (issue #342).
  */
 @Composable
-private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float) {
-    val applier = remember { HudHitRegionApplier() }
+private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float, supported: Boolean) {
+    val diagnostics = remember { HudWindowDiagnostics() }
+    val applier = remember { HudHitRegionApplier(onEvent = diagnostics::record) }
+    LaunchedEffect(supported) {
+        val event = if (supported) HudHitRegionEvent.ENABLED else HudHitRegionEvent.SKIPPED
+        withContext(Dispatchers.IO) { diagnostics.record(event) }
+    }
+    if (!supported) {
+        return
+    }
     SideEffect {
         applier.apply(window, region, scale)
     }
@@ -608,7 +621,9 @@ private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: F
  * clique, mas o notch não pisca — o defeito menor dos dois. Fora do Windows o
  * host nem o compõe ([hudUsesHitRegion]).
  */
-private class HudHitRegionApplier {
+private class HudHitRegionApplier(
+    private val onEvent: (HudHitRegionEvent, String?) -> Unit
+) {
     private var applied: java.awt.Rectangle? = null
     private var hasApplied = false
 
@@ -626,5 +641,11 @@ private class HudHitRegionApplier {
         hasApplied = true
         applied = shape
         runCatching { window.shape = shape }
+            .onFailure { error -> onEvent(HudHitRegionEvent.SET_FAILED, "${error::class.simpleName}: ${error.message}") }
+            .onSuccess {
+                if (shape == null && window.shape != null) {
+                    onEvent(HudHitRegionEvent.CLEAR_NOT_EFFECTIVE, null)
+                }
+            }
     }
 }
