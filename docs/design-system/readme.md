@@ -296,7 +296,8 @@ charts and previews are the one place this system allows it.
 - **Fonts come from Google Fonts**, not from the app's embedded TTFs. If the app ships specific
   IBM Plex files (subset, hinted, or a different version), add them and replace
   `tokens/fonts.css` with local `@font-face` rules.
-- The prototype's section 15 lists open questions it does not decide (Compose Desktop 1.7.1 font
-  loading signature, the macOS `.icns` validation). Those remain open here too.
+- The prototype's section 15 lists open questions it does not decide (the macOS `.icns`
+  validation). Those remain open here too. The font loading signature, once open, is settled:
+  `Font(resource, weight, style)`, checked on Compose Desktop 1.7.1 and again on 1.12.1 (#351).
 - Team-trend and active-time features depend on server 0.6.0+/0.7.0+; the kit shows the
   supported case and the degraded banner, not every server version combination.

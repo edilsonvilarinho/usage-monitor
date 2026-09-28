@@ -5,7 +5,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/edilsonvilarinho/usage-monitor/ci.yml?branch=main&label=CI)](https://github.com/edilsonvilarinho/usage-monitor/actions/workflows/ci.yml)
 [![Última release](https://img.shields.io/github/v/release/edilsonvilarinho/usage-monitor?sort=semver&display_name=tag)](https://github.com/edilsonvilarinho/usage-monitor/releases/latest)
 ![Plataformas](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?logo=kotlin&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&logoColor=white)
 [![Licença: MIT](https://img.shields.io/github/license/edilsonvilarinho/usage-monitor)](LICENSE)
 
 [English](README.md) · Português (Brasil)

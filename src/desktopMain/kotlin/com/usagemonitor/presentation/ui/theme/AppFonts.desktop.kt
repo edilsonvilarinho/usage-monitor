@@ -10,8 +10,8 @@ import androidx.compose.ui.text.platform.Font
  *
  * A sobrecarga usada é `Font(resource: String, weight, style)` de
  * `androidx.compose.ui.text.platform` — confirmada por inspeção do
- * `ui-text-desktop-1.7.1.jar`, onde ela convive com a variante que recebe um
- * `java.io.File`. A de recurso é a correta aqui: o app empacotado não expõe os
+ * `ui-text-desktop-1.7.1.jar` e de novo no `ui-text-desktop-1.12.1.jar` (#351),
+ * onde ela convive com a variante que recebe um `java.io.File`. A de recurso é a correta aqui: o app empacotado não expõe os
  * TTFs como arquivos soltos no disco, e um caminho absoluto não sobreviveria ao
  * jpackage.
  *
