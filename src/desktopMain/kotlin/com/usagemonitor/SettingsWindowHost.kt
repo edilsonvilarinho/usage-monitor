@@ -7,6 +7,7 @@ import androidx.compose.ui.window.DialogState
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.AppDialogWindow
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
+import com.usagemonitor.presentation.ui.components.CodexAccountsSettings
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.update.AutoUpdateController
@@ -34,6 +35,7 @@ internal fun SettingsWindowHost(
     val apiKeySettings by graph.apiKeySettings.collectAsState()
     val alertSettings by graph.alertSettingsFlow.collectAsState()
     val teamSettings by graph.teamSettingsFlow.collectAsState()
+    val codexRecords by graph.codexProfileRegistry.profiles.collectAsState()
     val proxySettings by graph.proxySettingsFlow.collectAsState()
     val teamSyncStatus by viewModels.teamSync.syncStatus.collectAsState()
     val language = shell.language
@@ -64,6 +66,8 @@ internal fun SettingsWindowHost(
             onUiScaleChange = actions::changeUiScale,
             reducedMotion = shell.reducedMotion,
             onReducedMotionChange = actions::changeReducedMotion,
+            trayUsageRing = shell.trayUsageRing,
+            onTrayUsageRingChange = actions::changeTrayUsageRing,
             onReportBug = actions::reportBug,
             onThemeChange = actions::changeTheme,
             onLanguageChange = actions::changeLanguage,
@@ -98,6 +102,13 @@ internal fun SettingsWindowHost(
             onRescanAnthropicProfiles = actions::rescanAnthropicProfiles,
             expandedProfileId = modal.expandedAnthropicProfileId,
             onToggleProfileExpanded = actions::toggleProfileExpanded,
+            codexAccounts = CodexAccountsSettings(
+                profiles = buildCodexProfileUiModels(codexRecords),
+                error = modal.codexProfileError,
+                onAdd = actions::addCodexProfile,
+                onToggle = actions::toggleCodexProfile,
+                onRemove = actions::removeCodexProfile
+            ),
             teamSettings = teamSettings,
             teamConnection = feedback.teamConnection,
             onTeamEnabledChange = actions::changeTeamEnabled,

@@ -8,6 +8,7 @@ import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalCodexActivityDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
+import com.usagemonitor.data.datasource.LocalCodexRolloutRateLimitDataSource
 import com.usagemonitor.data.datasource.LocalCodexCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalCodexDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalCredentialDataSource
@@ -28,6 +29,7 @@ import com.usagemonitor.data.repository.AntigravityRepositoryImpl
 import com.usagemonitor.data.repository.AppUpdateRepositoryImpl
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.CodexCliSessionRepositoryImpl
+import com.usagemonitor.data.repository.CodexProfileSources
 import com.usagemonitor.data.repository.CodexRepositoryImpl
 import com.usagemonitor.data.repository.CursorRepositoryImpl
 import com.usagemonitor.data.repository.DashboardCacheRepositoryImpl
@@ -109,6 +111,10 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
         resolveAnthropicProfiles(profileRegistry, profileRegistry.profiles.value).enabledProfiles
     )
 
+    // Contas Codex extras (issue #329): a padrão continua fora do registro.
+    val codexProfileRegistry = CodexProfileRegistry(preferencesNode)
+    val enabledCodexProfiles = MutableStateFlow(codexProfileRegistry.enabledProfiles)
+
     // A chave do servidor é segredo e vai para um arquivo com permissão restrita
     // ao dono, não para as preferências — estas são gravadas em claro no registro.
     // `StateFlow`: o repositório e o serviço de envio leem as credenciais de fora
@@ -169,7 +175,12 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
         apiDataSource = remoteApiDataSource,
         apiKeyReader = { apiKeySettings.value.forSource(ApiSource.MINIMAX) }
     )
-    val codexRepository = CodexRepositoryImpl(LocalCodexAuthDataSource(), remoteApiDataSource)
+    val codexRepository = CodexRepositoryImpl(
+        authDataSource = LocalCodexAuthDataSource(),
+        apiDataSource = remoteApiDataSource,
+        rolloutRateLimits = LocalCodexRolloutRateLimitDataSource(),
+        profileSources = { profile -> codexProfileRegistry.directoryOf(profile.id)?.let(::codexProfileSources) }
+    )
     val deepSeekRepository = DeepSeekRepositoryImpl(
         apiDataSource = remoteApiDataSource,
         apiKeyReader = { apiKeySettings.value.forSource(ApiSource.DEEPSEEK) }
@@ -245,4 +256,20 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
             .toSet()
             .ifEmpty { DEFAULT_ENABLED_APIS }
     }
+}
+
+/**
+ * As leituras de uma conta Codex extra pelo diretório dela (issue #329): o
+ * diretório **é** o `CODEX_HOME`, então `auth.json`, `cap_sid` e `sessions/`
+ * ficam direto nele, e não num `.codex` abaixo, como na conta padrão.
+ */
+internal fun codexProfileSources(home: File): CodexProfileSources {
+    return CodexProfileSources(
+        auth = LocalCodexAuthDataSource(
+            homeDirProvider = { home.path },
+            authFileProvider = { dir -> File(dir, "auth.json") },
+            capSidFileProvider = { dir -> File(dir, "cap_sid") }
+        ),
+        rolloutRateLimits = LocalCodexRolloutRateLimitDataSource(codexHome = { home })
+    )
 }

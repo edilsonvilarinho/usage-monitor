@@ -7,7 +7,7 @@ const NAV = [
   { glyph: '◉', label: 'Conectados agora' }
 ];
 
-function Quota({ label, value, percent, level, reset, last }) {
+function Quota({ label, value, percent, level, reset, marker, last }) {
   return (
     <AppDataRow last={last} hoverable={false}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
@@ -16,7 +16,7 @@ function Quota({ label, value, percent, level, reset, last }) {
           <span style={{ flex: 1 }} />
           <AppValue size="primary">{value}</AppValue>
         </div>
-        <AppProgressTrack percent={percent} level={level} label={label} />
+        <AppProgressTrack percent={percent} level={level} label={label} marker={marker} />
         {reset ? <AppKey dim>{reset}</AppKey> : null}
       </div>
     </AppDataRow>
@@ -102,8 +102,8 @@ const CARDS = [
     tooltip: 'Projeção de uso · Cota Sessão 5h · Status Atenção · No ritmo atual, a cota deve esgotar antes do reset. Previsão: Qua 13/08 13h00 BRT.',
     nav: 4,
     quotas: [
-      { label: 'Sessão 5h', value: '68%', percent: 68, level: 'warn', reset: 'Reinício: Qua 13h00 BRT' },
-      { label: 'Semanal', value: '41%', percent: 41, level: 'ok', reset: 'Reinício: Sáb 15/08 21h00 BRT' },
+      { label: 'Sessão 5h', value: '68%', percent: 68, level: 'warn', marker: 42, reset: 'Reinício: Qua 13h00 BRT' },
+      { label: 'Semanal', value: '41%', percent: 41, level: 'ok', marker: 55, reset: 'Reinício: Sáb 15/08 21h00 BRT' },
       { label: 'Créditos de uso', value: 'US$ 190,00 / 500,00', percent: 38, level: 'info', reset: 'Reinicia no início do mês' }
     ]
   },
@@ -130,7 +130,7 @@ const CARDS = [
     tooltip: 'Projeção de uso · Cota Codex 5h · Status Crítico · No ritmo atual, a cota deve esgotar antes do reset. Previsão: Qua 13/08 18h51 BRT.',
     nav: 1,
     quotas: [
-      { label: 'Codex 5h', value: '75%', percent: 75, level: 'crit', reset: 'Reinício: Qua 20h51 BRT' },
+      { label: 'Codex 5h', value: '75%', percent: 75, level: 'crit', marker: 30, reset: 'Reinício: Qua 20h51 BRT' },
       { label: 'Codex 7d', value: '12%', percent: 12, level: 'ok', reset: 'Reinício: Ter 01/09 15h51 BRT' }
     ]
   },

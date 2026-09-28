@@ -60,6 +60,9 @@ internal class AppModalState(bugReportOpenAtStart: Boolean) {
     /** Estado efêmero do editor de conta nas Configurações; reabrir o diálogo pode colapsá-lo. */
     var expandedAnthropicProfileId by mutableStateOf<String?>(null)
 
+    /** Por que o último diretório Codex não entrou (issue #329); some na próxima tentativa. */
+    var codexProfileError by mutableStateOf<String?>(null)
+
     /** Alguma janela modal na tela; a troca automática para a HUD espera todas fecharem. */
     val anyOpen: Boolean
         get() = isSettingsOpen || isHelpOpen || historySource != null || isCliSessionsOpen ||

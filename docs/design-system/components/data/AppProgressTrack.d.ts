@@ -11,6 +11,8 @@ export interface AppProgressTrackProps {
   color?: string;
   /** Accessible name — the quota's name ("Sessão 5h"). */
   label?: string;
+  /** Pace marker: share of the quota window already elapsed (0–100). Omit when the source gives no window start. */
+  marker?: number;
   style?: CSSProperties;
 }
 

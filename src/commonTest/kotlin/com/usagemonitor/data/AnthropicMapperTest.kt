@@ -1,5 +1,6 @@
 package com.usagemonitor.data
 
+import kotlinx.datetime.Instant
 import com.usagemonitor.data.dto.AnthropicExtraUsage
 import com.usagemonitor.data.dto.AnthropicSpend
 import com.usagemonitor.data.dto.AnthropicSpendAmount
@@ -366,5 +367,20 @@ class AnthropicMapperTest {
         assertEquals(55134L, credits.rawUsed)
         assertEquals(57000L, credits.rawTotal)
         assertEquals("BRL", credits.currencyCode)
+    }
+
+    @Test
+    fun `window start is the reset minus the window named by the response`() {
+        val quotas = AnthropicMapper.toUsageStats(sampleResponse).quotas
+
+        assertEquals(Instant.parse("2025-01-01T00:00:00Z"), quotas[0].periodStartAt)
+        assertEquals(Instant.parse("2024-12-31T00:00:00Z"), quotas[1].periodStartAt)
+    }
+
+    @Test
+    fun `window without reset has no start`() {
+        val response = sampleResponse.copy(fiveHour = AnthropicUsageWindow(utilization = 1.0, resetsAt = null))
+
+        assertNull(AnthropicMapper.toUsageStats(response).quotas[0].periodStartAt)
     }
 }

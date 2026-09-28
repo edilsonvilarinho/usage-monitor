@@ -42,7 +42,9 @@ internal fun GeneralSettingsTab(
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit,
     onReducedMotionChange: (Boolean) -> Unit,
-    onReportBug: () -> Unit
+    onReportBug: () -> Unit,
+    trayUsageRing: Boolean = false,
+    onTrayUsageRingChange: (Boolean) -> Unit = {}
 ) {
     val isPt = currentLanguage == AppLanguage.PT
 
@@ -140,12 +142,19 @@ internal fun GeneralSettingsTab(
         HudModeToggle(
             enabled = hudMode,
             language = currentLanguage,
-            onToggle = onHudModeChange,
+            onToggle = onHudModeChange
+        )
+        // Fecha a seção: é o que o app mostra fora da janela, na bandeja, e
+        // não mais uma moldura dela.
+        TrayUsageRingToggle(
+            enabled = trayUsageRing,
+            language = currentLanguage,
+            onToggle = onTrayUsageRingChange,
             showDivider = false
         )
     }
 
-    // Seção própria, e não mais uma linha em "Sistema": aquelas quatro são
+    // Seção própria, e não mais uma linha em "Sistema": aquelas são
     // interruptores de comportamento contínuo do app, e esta é uma ação que o
     // usuário dispara uma vez. A ação vai no `trailing` do cabeçalho porque age
     // sobre a seção inteira -- mesmo lugar do "Adicionar" da aba Contas.

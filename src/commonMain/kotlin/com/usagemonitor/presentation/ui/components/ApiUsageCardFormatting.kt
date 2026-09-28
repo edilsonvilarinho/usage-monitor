@@ -10,9 +10,11 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import com.usagemonitor.domain.entity.anthropicProfileId
 import com.usagemonitor.domain.entity.AntigravityQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CodexQuotaLabels
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
@@ -137,6 +139,7 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
     // limite semanal por grupo de modelos, e o Cursor, várias franquias no mesmo
     // ciclo. Sem o grupo, os blocos do card diriam "Semanal" ou "Mensal" todos iguais.
     val group = AntigravityQuotaLabels.groupOf(quota.label) ?: CursorQuotaLabels.groupOf(quota.label)
+        ?: CodexQuotaLabels.groupOf(quota.label)
     return group?.let { "$it · $periodTitle" } ?: periodTitle
 }
 
@@ -184,8 +187,8 @@ internal fun accentColorFor(
 /**
  * O acento de um alvo: a cor que o usuário deu à conta (issue #275) ou, sem
  * escolha, o acento da fonte. Dono único para o card, a HUD e as Configurações —
- * três cópias divergiriam na conta sem perfil. Só a Anthropic tem perfil, e o
- * mapa é por `profileId`.
+ * três cópias divergiriam na conta sem perfil. O mapa é por `profileId` de perfil
+ * Anthropic; conta Codex extra (issue #329) fica com o acento da fonte.
  */
 @Composable
 @ReadOnlyComposable
@@ -193,7 +196,7 @@ internal fun accountAccentColor(
     targetKey: UsageTargetKey,
     accountColors: Map<String, AccountAccent>
 ): Color {
-    val chosen = targetKey.profileId?.let { profileId -> accountColors[profileId] }
+    val chosen = targetKey.anthropicProfileId?.let { profileId -> accountColors[profileId] }
     return chosen?.current ?: accentColorFor(source = targetKey.source, accents = AppAccents.current)
 }
 
@@ -579,26 +582,9 @@ internal fun buildQuotaTooltipMetrics(
         label = if (language == AppLanguage.PT) "Reset" else "Reset",
         value = resetLabel(quota = quota, language = language, now = now)
     )
+    metrics.addElapsedWindowMetric(quota = quota, language = language, now = now)
     metrics.addProjectionMetric(risk = risk, language = language)
     return metrics
-}
-
-// A projeção só entra na tooltip quando o card resumido suprime a tooltip própria
-// do RiskSemaphoreDot — evita TooltipBox aninhado dentro do badge.
-private fun MutableList<TooltipMetric>.addProjectionMetric(
-    risk: QuotaRiskSummary?,
-    language: AppLanguage
-) {
-    if (risk == null) {
-        return
-    }
-
-    add(
-        TooltipMetric(
-            label = riskDotTooltipTitle(language),
-            value = riskLevelLabel(risk.level, language)
-        )
-    )
 }
 
 internal fun quotaTooltipUsageValue(quota: QuotaInfo, language: AppLanguage): String {

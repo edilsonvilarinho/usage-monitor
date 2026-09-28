@@ -3,15 +3,18 @@ package com.usagemonitor
 import androidx.compose.ui.input.key.key
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.CodexProfileUiModel
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.viewmodel.TeamPulseTarget
+import com.usagemonitor.presentation.viewmodel.enabledTargetsOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import java.io.File
@@ -130,13 +133,20 @@ internal fun buildSessionPulseTargets(
         .map { target -> TeamPulseTarget(profileId = target.profileId, accountKey = target.accountKey) }
 }
 
-internal fun availableUsageTargets(records: List<AnthropicProfileRecord>): List<UsageTargetKey> {
+internal fun availableUsageTargets(
+    records: List<AnthropicProfileRecord>,
+    codexRecords: List<CodexProfileRecord> = emptyList()
+): List<UsageTargetKey> {
     val targets = mutableListOf<UsageTargetKey>()
     ApiSource.entries.forEach { source ->
-        if (source == ApiSource.ANTHROPIC) {
-            records.forEach { record -> targets += UsageTargetKey(source, record.id) }
-        } else {
-            targets += UsageTargetKey.forSource(source)
+        when (source) {
+            ApiSource.ANTHROPIC -> records.forEach { record -> targets += UsageTargetKey(source, record.id) }
+            // A conta Codex padrão e depois as extras (issue #329).
+            ApiSource.CODEX -> {
+                targets += UsageTargetKey.forSource(source)
+                codexRecords.forEach { record -> targets += UsageTargetKey(source, record.id) }
+            }
+            else -> targets += UsageTargetKey.forSource(source)
         }
     }
     return targets
@@ -144,18 +154,9 @@ internal fun availableUsageTargets(records: List<AnthropicProfileRecord>): List<
 
 internal fun enabledUsageTargets(
     enabledSources: Set<ApiSource>,
-    enabledProfiles: List<AnthropicProfileRef>
-): Set<UsageTargetKey> {
-    val targets = linkedSetOf<UsageTargetKey>()
-    enabledSources.sortedBy { it.ordinal }.forEach { source ->
-        if (source == ApiSource.ANTHROPIC) {
-            enabledProfiles.forEach { profile -> targets += UsageTargetKey(source, profile.id) }
-        } else {
-            targets += UsageTargetKey.forSource(source)
-        }
-    }
-    return targets
-}
+    enabledProfiles: List<AnthropicProfileRef>,
+    enabledCodexProfiles: List<CodexProfileRef> = emptyList()
+): Set<UsageTargetKey> = enabledTargetsOf(enabledSources, enabledProfiles, enabledCodexProfiles)
 
 internal fun chooseAnthropicConfigDirectory(): File? {
     val chooser = JFileChooser()
@@ -168,3 +169,18 @@ internal fun chooseAnthropicConfigDirectory(): File? {
         null
     }
 }
+
+internal fun chooseCodexHomeDirectory(): File? {
+    val chooser = JFileChooser()
+    chooser.dialogTitle = "Selecionar diretório do Codex (CODEX_HOME)"
+    chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+    chooser.isAcceptAllFileFilterUsed = false
+    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+        chooser.selectedFile
+    } else {
+        null
+    }
+}
+
+internal fun buildCodexProfileUiModels(records: List<CodexProfileRecord>): List<CodexProfileUiModel> =
+    records.map { record -> CodexProfileUiModel(record.id, record.label, record.directory, record.enabled) }

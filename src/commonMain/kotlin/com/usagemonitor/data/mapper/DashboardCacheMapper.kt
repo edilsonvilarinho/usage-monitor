@@ -44,7 +44,8 @@ private fun QuotaInfo.toCacheDto(): QuotaInfoCacheDto {
         unit = unit.name,
         rawUsed = rawUsed,
         rawTotal = rawTotal,
-        currencyCode = currencyCode
+        currencyCode = currencyCode,
+        periodStartAtEpochMillis = periodStartAt?.toEpochMilliseconds()
     )
 }
 
@@ -106,6 +107,7 @@ private fun QuotaInfoCacheDto.toDomainOrNull(): QuotaInfo? {
         unit = parsedUnit,
         rawUsed = rawUsed,
         rawTotal = rawTotal,
-        currencyCode = currencyCode
+        currencyCode = currencyCode,
+        periodStartAt = periodStartAtEpochMillis?.let(Instant::fromEpochMilliseconds)
     )
 }

@@ -39,7 +39,8 @@ internal fun AnthropicAccountsTab(
     onAddAnthropicProfile: () -> Unit,
     onRemoveAnthropicProfile: (String) -> Unit,
     onRescanAnthropicProfiles: () -> Unit,
-    onToggleProfileExpanded: (String) -> Unit
+    onToggleProfileExpanded: (String) -> Unit,
+    codexAccounts: CodexAccountsSettings = CodexAccountsSettings()
 ) {
     // As duas ações vão para o `trailing` do cabeçalho, como no protótipo: elas
     // agem sobre a lista inteira, e no corpo competiam com as linhas de perfil.
@@ -95,6 +96,8 @@ internal fun AnthropicAccountsTab(
             }
         }
     }
+    // Issue #329: abaixo das contas Anthropic, na mesma aba.
+    CodexAccountsSection(language = currentLanguage, settings = codexAccounts)
 }
 
 /**

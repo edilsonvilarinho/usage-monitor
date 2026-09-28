@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageSpike
@@ -32,6 +33,7 @@ import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -133,6 +135,8 @@ class DashboardViewModel(
     private val isBusy: StateFlow<Boolean> = MutableStateFlow(false),
     private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
         MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
+    /** Contas Codex extras (issue #329); a padrão (`~/.codex`) não entra aqui. */
+    private val codexProfiles: StateFlow<List<CodexProfileRef>> = MutableStateFlow(emptyList()),
     private val config: DashboardViewModelConfig = DashboardViewModelConfig(),
     private val persistedNextRefreshAt: Instant? = null,
     private val onNextRefreshAtChanged: (Instant) -> Unit = {},
@@ -226,7 +230,13 @@ class DashboardViewModel(
         scheduler = scheduler,
         clock = clock,
         profiles = { anthropicProfiles.value },
+        codexProfiles = { codexProfiles.value },
         onToast = { toast -> _toastMessage.value = toast }
+    )
+    private val targetFetcher = DashboardTargetFetcher(
+        getAnthropicUsage, getMiniMaxUsage, getCodexUsage, getDeepSeekUsage, getOpenCodeUsage, getOpenCodeGoUsage,
+        getKiloUsage, getOpenRouterUsage, getGeminiUsage, getCursorUsage, getAntigravityUsage,
+        anthropicProfiles, codexProfiles
     )
     private val fetchQueue = DashboardFetchQueue(allTargets = ::enabledTargets, perform = ::performFetch)
 
@@ -346,28 +356,42 @@ class DashboardViewModel(
             }
             launch { isAppVisible.collect { visible -> if (visible) nudgeCountdown() } }
             while (true) {
-                val now = clock.now()
-                val visible = isAppVisible.value
-                val tick = stateMutex.withLock {
-                    scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, isBusy.value, config)
-                }
-                val dispatch = if (visible) tick.due else tick.byReset
-                if (dispatch.isNotEmpty()) {
-                    scheduler.recordAttempt(dispatch, now)
-                    viewModelScope.launch { requestFetch(dispatch, preserveDataOnFailure = true) }
-                }
-                val nextPoll = publishNextPoll(now)
-                val nextReset = nextQuotaResetTarget()
-                val wakeUpAt = listOfNotNull(nextPoll.takeIf { visible }, nextReset).minOrNull()
-                val waitMillis = wakeUpAt?.let { (it - now).inWholeMilliseconds.coerceAtLeast(0L) } ?: Long.MAX_VALUE
-                val signalled = withTimeoutOrNull(waitMillis) { pollWakeUpSignal.receive() } != null
-                if (!signalled && wakeUpAt != null &&
-                    looksLikeWakeFromSleep(wakeUpAt, clock.now(), config.sleepJumpThreshold)
-                ) {
-                    breadcrumbs.record(BreadcrumbCategory.USE_CASE, "volta do sleep: todas as fontes devidas")
-                    scheduler.forgetAttempts()
+                // Uma volta que lança não pode encerrar o laço (issue #326): o
+                // `SupervisorJob` manteria o app vivo e a coleta pararia calada,
+                // com o card mostrando o último número para sempre.
+                try {
+                    runCountdownTick()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    breadcrumbs.record(BreadcrumbCategory.ERROR, "laço de coleta falhou: ${failure::class.simpleName}")
+                    delay(config.pollLoopRecoveryDelay)
                 }
             }
+        }
+    }
+
+    private suspend fun runCountdownTick() {
+        val now = clock.now()
+        val visible = isAppVisible.value
+        val tick = stateMutex.withLock {
+            scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, isBusy.value, config)
+        }
+        val dispatch = if (visible) tick.due else tick.byReset
+        if (dispatch.isNotEmpty()) {
+            scheduler.recordAttempt(dispatch, now)
+            viewModelScope.launch { requestFetch(dispatch, preserveDataOnFailure = true) }
+        }
+        val nextPoll = publishNextPoll(now)
+        val nextReset = nextQuotaResetTarget()
+        val wakeUpAt = listOfNotNull(nextPoll.takeIf { visible }, nextReset).minOrNull()
+        val waitMillis = wakeUpAt?.let { (it - now).inWholeMilliseconds.coerceAtLeast(0L) } ?: Long.MAX_VALUE
+        val signalled = withTimeoutOrNull(waitMillis) { pollWakeUpSignal.receive() } != null
+        if (!signalled && wakeUpAt != null &&
+            looksLikeWakeFromSleep(wakeUpAt, clock.now(), config.sleepJumpThreshold)
+        ) {
+            breadcrumbs.record(BreadcrumbCategory.USE_CASE, "volta do sleep: todas as fontes devidas")
+            scheduler.forgetAttempts()
         }
     }
 
@@ -454,7 +478,7 @@ class DashboardViewModel(
                         val result = sourceFetchSemaphore.withPermit {
                             runCatching {
                                 withTimeout(config.timeoutFor(target.source)) {
-                                    fetchTarget(target).getOrThrow()
+                                    targetFetcher.fetch(target).getOrThrow()
                                 }
                             }
                         }
@@ -600,26 +624,6 @@ class DashboardViewModel(
         viewModelScope.cancel()
     }
 
-    private suspend fun fetchTarget(target: UsageTargetKey): Result<ApiUsageStats> {
-        return when (target.source) {
-            ApiSource.ANTHROPIC -> {
-                val profile = anthropicProfiles.value.firstOrNull { it.id == target.profileId }
-                    ?: return Result.failure(IllegalStateException("Perfil Anthropic não configurado."))
-                getAnthropicUsage(profile)
-            }
-            ApiSource.MINIMAX -> getMiniMaxUsage()
-            ApiSource.CODEX -> getCodexUsage()
-            ApiSource.DEEPSEEK -> getDeepSeekUsage()
-            ApiSource.OPENCODE -> getOpenCodeUsage()
-            ApiSource.OPENCODE_GO -> getOpenCodeGoUsage()
-            ApiSource.KILO -> getKiloUsage()
-            ApiSource.OPENROUTER -> getOpenRouterUsage()
-            ApiSource.GEMINI -> getGeminiUsage()
-            ApiSource.CURSOR -> getCursorUsage()
-            ApiSource.ANTIGRAVITY -> getAntigravityUsage()
-        }
-    }
-
     private fun publishUiState(enabledTargets: Set<UsageTargetKey>) {
         _uiState.value = buildDashboardUiState(
             enabledTargets = enabledTargets,
@@ -650,7 +654,7 @@ class DashboardViewModel(
         _refreshingSources.value = _refreshingTargets.value.mapTo(linkedSetOf()) { target -> target.source }
     }
 
-    private fun enabledTargets(): Set<UsageTargetKey> = enabledTargetsOf(enabledApis.value, anthropicProfiles.value)
+    private fun enabledTargets(): Set<UsageTargetKey> = targetFetcher.enabledTargets(enabledApis.value)
 
     private suspend fun persistDashboardCache() {
         val cacheUseCase = saveDashboardCache ?: return

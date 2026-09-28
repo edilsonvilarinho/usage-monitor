@@ -58,6 +58,9 @@ export function Settings() {
               </span>
               <AppSwitch checked={false} label="Reduzir animações"
                 hint="Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa." />
+              {/* Issue #328: desligado por padrão; o anel mostra o maior percentual vigente. */}
+              <AppSwitch checked={false} label="Anel de uso na bandeja"
+                hint="Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta." />
             </React.Fragment>
           ) : null}
 
@@ -159,6 +162,20 @@ export function Settings() {
                       <AppIconButton variant="ghost" glyph="×" label={'Remover ' + nome} />
                     </AppDataRow>
                   ))}
+                </AppPanelBody>
+              </AppPanel>
+              {/* Issue #329: contas Codex extras, um diretório CODEX_HOME por conta. */}
+              <AppPanel>
+                <AppPanelHeader title="Contas Codex extras" subtitle="a padrão (~/.codex) já tem card" actions={<AppButton>Adicionar</AppButton>} />
+                <AppPanelBody flush>
+                  <AppDataRow mark={<AppSourceMark source="codex" />} last>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, minWidth: 0 }}>
+                      <AppValue size="sm">codex-trabalho</AppValue>
+                      <AppKey>C:/Users/dev/codex-trabalho</AppKey>
+                    </div>
+                    <AppSwitch checked />
+                    <AppIconButton variant="ghost" glyph="×" label="Remover codex-trabalho" />
+                  </AppDataRow>
                 </AppPanelBody>
               </AppPanel>
             </React.Fragment>

@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.AnthropicProfileRef
 import com.usagemonitor.domain.entity.BreadcrumbCategory
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.RateLimitedException
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.sanitizeBreadcrumbErrorMessage
@@ -18,11 +19,12 @@ internal class DashboardFailureHandler(
     private val scheduler: DashboardRefreshScheduler,
     private val clock: Clock,
     private val profiles: () -> List<AnthropicProfileRef>,
+    private val codexProfiles: () -> List<CodexProfileRef> = { emptyList() },
     private val onToast: (DashboardToast) -> Unit
 ) {
     fun handle(target: UsageTargetKey, error: Throwable): UiApiError {
         val source = target.source
-        val uiError = uiApiErrorOf(target, error, profiles())
+        val uiError = uiApiErrorOf(target, error, profiles(), codexProfiles())
         val message = uiError.message
 
         // Funil único de toda falha de coleta, e por isso o único ponto de

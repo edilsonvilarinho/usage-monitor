@@ -11,6 +11,9 @@ import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlinx.datetime.Instant
 import kotlin.math.roundToLong
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 object AnthropicMapper {
 
@@ -29,14 +32,16 @@ object AnthropicMapper {
                 label = AnthropicQuotaLabels.FIVE_HOUR,
                 periodType = PeriodType.INTERVAL,
                 window = response.fiveHour,
-                maxCapacity = MAX_CAPACITY_5H
+                maxCapacity = MAX_CAPACITY_5H,
+                windowLength = 5.hours
             ))
 
             add(createQuota(
                 label = AnthropicQuotaLabels.SEVEN_DAY,
                 periodType = PeriodType.WEEKLY,
                 window = response.sevenDay,
-                maxCapacity = MAX_CAPACITY_7D
+                maxCapacity = MAX_CAPACITY_7D,
+                windowLength = 7.days
             ))
 
             val extraCredits = credits.quota
@@ -66,7 +71,8 @@ object AnthropicMapper {
         label: String,
         periodType: PeriodType,
         window: AnthropicUsageWindow,
-        maxCapacity: Long
+        maxCapacity: Long,
+        windowLength: Duration
     ): QuotaInfo {
         val resetsAt = window.resetsAt
         val periodEndAt = if (resetsAt != null) {
@@ -86,7 +92,9 @@ object AnthropicMapper {
             periodType = periodType,
             unit = UsageUnit.PERCENTAGE,
             rawUsed = rawUsed,
-            rawTotal = maxCapacity
+            rawTotal = maxCapacity,
+            // A duração é o nome da janela na própria resposta; sem reset não há início.
+            periodStartAt = if (resetsAt != null) periodEndAt - windowLength else null
         )
     }
 }

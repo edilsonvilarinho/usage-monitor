@@ -29,7 +29,14 @@ data class QuotaInfo(
      * Campo com default para não quebrar caches e histórico já gravados. Só tem
      * efeito nas cotas cujos valores são dinheiro — as demais o ignoram.
      */
-    val currencyCode: String = "USD"
+    val currencyCode: String = "USD",
+    /**
+     * Início da janela, quando a fonte o informa (issue #327). `null` é "não
+     * informado", e nada o deriva: sem ele a barra não ganha a marca de ritmo.
+     * Anthropic o dá pelo nome da janela (`five_hour`, `seven_day`), Codex por
+     * `limit_window_seconds` e MiniMax por `start_time`.
+     */
+    val periodStartAt: Instant? = null
 ) {
     /**
      * Percentual de uso no período atual (valor entre 0.0 e 1.0).
@@ -59,6 +66,22 @@ data class QuotaInfo(
      */
     fun isExpiredAt(now: Instant): Boolean {
         return hasKnownResetAt && periodEndAt <= now
+    }
+
+    /**
+     * Fração da janela já decorrida em [now] (0,0 a 1,0) — onde o uso estaria se
+     * fosse consumido em ritmo constante até o reset (issue #327). `null` quando
+     * a fonte não informou o início, quando não há reset conhecido (saldo
+     * pré-pago não tem janela) ou quando a janela já venceu.
+     */
+    fun elapsedFractionAt(now: Instant): Float? {
+        val start = periodStartAt ?: return null
+        if (!hasKnownResetAt || periodEndAt <= start || isExpiredAt(now)) {
+            return null
+        }
+        val elapsed = (now - start).inWholeMilliseconds.toDouble()
+        val length = (periodEndAt - start).inWholeMilliseconds.toDouble()
+        return (elapsed / length).coerceIn(0.0, 1.0).toFloat()
     }
 }
 

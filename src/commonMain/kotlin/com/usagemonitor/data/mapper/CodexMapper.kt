@@ -1,6 +1,9 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.domain.entity.codexPlanLabel
+import com.usagemonitor.data.dto.CodexRolloutRateLimitWindowDto
+import com.usagemonitor.data.parser.CodexRolloutRateLimit
+import com.usagemonitor.domain.entity.CodexQuotaLabels
 import com.usagemonitor.data.dto.CodexUsageResponse
 import com.usagemonitor.data.dto.CodexUsageWindowDto
 import com.usagemonitor.domain.entity.ApiSource
@@ -14,6 +17,8 @@ import kotlinx.datetime.Instant
 object CodexMapper {
 
     private const val PERCENT_SCALE = 100L
+    /** `limit_id` do limite da conta, o mesmo que o `wham/usage` devolve. */
+    private const val ACCOUNT_LIMIT_ID = "codex"
     private const val SECONDS_PER_DAY = 24L * 60L * 60L
     private const val FIVE_HOUR_SECONDS = 5L * 60L * 60L
     private const val SEVEN_DAY_SECONDS = 7L * SECONDS_PER_DAY
@@ -57,12 +62,7 @@ object CodexMapper {
     }
 
     private fun mapWindow(window: CodexUsageWindowDto): CodexWindowMapping {
-        val periodType = when {
-            window.limitWindowSeconds == FIVE_HOUR_SECONDS -> PeriodType.INTERVAL
-            window.limitWindowSeconds == SEVEN_DAY_SECONDS -> PeriodType.WEEKLY
-            window.limitWindowSeconds in MONTHLY_MIN_SECONDS..MONTHLY_MAX_SECONDS -> PeriodType.MONTHLY
-            else -> PeriodType.REPORTED
-        }
+        val periodType = periodTypeOf(window.limitWindowSeconds)
         val label = when (periodType) {
             PeriodType.INTERVAL -> "Codex 5h"
             PeriodType.WEEKLY -> "Codex 7d"
@@ -78,9 +78,62 @@ object CodexMapper {
                 total = PERCENT_SCALE,
                 periodEndAt = Instant.fromEpochSeconds(window.resetAt),
                 periodType = periodType,
-                unit = UsageUnit.PERCENTAGE
+                unit = UsageUnit.PERCENTAGE,
+                periodStartAt = Instant.fromEpochSeconds(window.resetAt - window.limitWindowSeconds)
+                    .takeIf { window.limitWindowSeconds > 0L }
             )
         )
+    }
+
+    /**
+     * Cotas dos limites por modelo lidos do rollout (issue #324), para somar às da
+     * leitura ao vivo — nunca para substituí-las.
+     *
+     * Fica de fora: o `limit_id` `codex`, que é o limite da conta que o
+     * `wham/usage` já devolve; limite de outro plano que o da leitura ao vivo, que
+     * é o sinal de que o rollout é de outra conta; e janela sem percentual, sem
+     * duração ou já vencida em [now]. O percentual é truncado, como na Anthropic:
+     * 99,6% não pode aparecer como esgotado.
+     */
+    fun modelLimitQuotas(limits: List<CodexRolloutRateLimit>, livePlanType: String, now: Instant): List<QuotaInfo> {
+        return limits
+            .filter { rateLimit -> rateLimit.limits.limitId != ACCOUNT_LIMIT_ID }
+            .filter { rateLimit -> rateLimit.limits.planType == null || rateLimit.limits.planType == livePlanType }
+            .flatMap { rateLimit ->
+                val name = rateLimit.limits.limitName?.takeIf { it.isNotBlank() } ?: rateLimit.limits.limitId.orEmpty()
+                listOfNotNull(rateLimit.limits.primary, rateLimit.limits.secondary)
+                    .mapNotNull { window -> modelLimitQuota(name, window, now) }
+            }
+    }
+
+    private fun modelLimitQuota(name: String, window: CodexRolloutRateLimitWindowDto, now: Instant): QuotaInfo? {
+        val usedPercent = window.usedPercent ?: return null
+        val minutes = window.windowMinutes?.takeIf { it > 0L } ?: return null
+        val resetsAt = window.resetsAt?.let(Instant::fromEpochSeconds) ?: return null
+        if (name.isBlank() || resetsAt <= now) return null
+        val seconds = minutes * 60L
+        val periodType = periodTypeOf(seconds)
+        val windowLabel = when (periodType) {
+            PeriodType.INTERVAL -> "5h"
+            PeriodType.WEEKLY -> "7d"
+            PeriodType.MONTHLY, PeriodType.REPORTED -> "${minutes}m"
+        }
+        return QuotaInfo(
+            label = CodexQuotaLabels.modelLimit(name, windowLabel),
+            used = usedPercent.toLong().coerceIn(0L, PERCENT_SCALE),
+            total = PERCENT_SCALE,
+            periodEndAt = resetsAt,
+            periodType = periodType,
+            unit = UsageUnit.PERCENTAGE,
+            periodStartAt = Instant.fromEpochSeconds(resetsAt.epochSeconds - seconds)
+        )
+    }
+
+    private fun periodTypeOf(seconds: Long): PeriodType = when {
+        seconds == FIVE_HOUR_SECONDS -> PeriodType.INTERVAL
+        seconds == SEVEN_DAY_SECONDS -> PeriodType.WEEKLY
+        seconds in MONTHLY_MIN_SECONDS..MONTHLY_MAX_SECONDS -> PeriodType.MONTHLY
+        else -> PeriodType.REPORTED
     }
 
     private fun periodRank(periodType: PeriodType): Int {

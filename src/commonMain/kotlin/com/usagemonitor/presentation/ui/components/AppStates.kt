@@ -37,6 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -169,12 +172,19 @@ fun AppStatusIndicator(
  * tela — a cota muda a cada dez minutos em todo card ao mesmo tempo. A mola é a
  * [AppMotion.Springs.GENTLE], sem rebote: barra que passa do valor antes de
  * voltar mostra um percentual que não é verdade.
+ *
+ * **[marker] é a marca de ritmo** (issue #327): um traço de [MARKER_WIDTH] na
+ * altura inteira do trilho, na fração da janela já decorrida. É pintado por
+ * `drawWithContent` antes do padding, então ocupa os 4dp e não os 2dp internos,
+ * e fica por cima do preenchimento. Não anda por mola: é o relógio, e ele não
+ * salta. Quem passa a marca é responsável por dizer em texto o que ela é.
  */
 @Composable
 fun AppProgressTrack(
     fraction: Float,
     tone: AppTone,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    marker: Float? = null
 ) {
     val safe by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
@@ -186,6 +196,7 @@ fun AppProgressTrack(
         animationSpec = appTween(AppMotion.normal),
         label = "appProgressTone"
     )
+    val markerColor = MaterialTheme.colorScheme.onSurface
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -194,6 +205,14 @@ fun AppProgressTrack(
             // filhos e dispensa clip interno.
             .clip(AppShapes.extraSmall)
             .background(MaterialTheme.colorScheme.outlineVariant)
+            .drawWithContent {
+                drawContent()
+                if (marker != null) {
+                    val width = MARKER_WIDTH.toPx()
+                    val x = (size.width * marker.coerceIn(0f, 1f) - width / 2f).coerceIn(0f, size.width - width)
+                    drawRect(color = markerColor, topLeft = Offset(x, 0f), size = Size(width, size.height))
+                }
+            }
             .padding(AppBorderWidth)
     ) {
         Box(
@@ -215,6 +234,9 @@ fun AppProgressTrack(
  * numa barra de 1000dp, e a mola continuaria pedindo quadros sem nada mudar.
  */
 private const val PROGRESS_VISIBILITY_THRESHOLD = 0.001f
+
+/** Largura da marca de ritmo: com 1dp ela sumia ao lado do limite do preenchimento. */
+private val MARKER_WIDTH = 2.dp
 
 /**
  * Aviso: barra de severidade, título, descrição e ação.

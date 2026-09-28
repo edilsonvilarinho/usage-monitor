@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.datetime.Instant
+import com.usagemonitor.domain.entity.anthropicProfileId
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
@@ -139,7 +140,7 @@ internal fun ResponsiveDashboardCardGrid(
                             apiName = stats.displayTitle(),
                             planLabel = stats.planLabel,
                             accent = accountAccentColor(stats.targetKey, accountColors),
-                            emoji = stats.targetKey.profileId?.let { profileId -> accountEmojis[profileId] },
+                            emoji = stats.targetKey.anthropicProfileId?.let { profileId -> accountEmojis[profileId] },
                             quotas = stats.quotas,
                             accountContext = stats.accountContext,
                             notices = stats.notices,

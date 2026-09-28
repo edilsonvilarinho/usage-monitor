@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CodexQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
@@ -118,6 +119,22 @@ class ApiUsageCardFormattingTest {
     fun `percentage quotas keep hiding the detail line`() {
         assertNull(quotaDetailText(fiveHourQuota, showUsageDetails = true))
         assertNull(quotaDetailText(fiveHourQuota, showUsageDetails = false))
+    }
+
+    /** Issue #324: o limite por modelo do rollout não pode dizer "Semanal" como o da conta. */
+    @Test
+    fun `Codex model limit quota is titled by the limit name`() {
+        val quota = QuotaInfo(
+            label = CodexQuotaLabels.modelLimit("GPT-5.3-Codex-Spark", "7d"),
+            used = 100L,
+            total = 100L,
+            periodEndAt = Instant.parse("2026-10-01T00:00:00Z"),
+            periodType = PeriodType.WEEKLY,
+            unit = UsageUnit.PERCENTAGE
+        )
+
+        assertEquals("GPT-5.3-Codex-Spark · Semanal", expandedQuotaTitle(quota, AppLanguage.PT))
+        assertNull(CodexQuotaLabels.groupOf("Codex 7d"))
     }
 
     @Test
