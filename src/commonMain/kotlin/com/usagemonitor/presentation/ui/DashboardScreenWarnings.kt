@@ -462,10 +462,19 @@ internal fun updateBannerContent(
 ): UpdateBannerContent {
     val isPt = language == AppLanguage.PT
     val version = state.update.version
+    // Beta diz "beta" em texto em toda frase (issue #355): a cor da faixa é a
+    // mesma da estável, e cor nunca informa sozinha.
+    val isBeta = state.update.isPrerelease
+    val versionNoun = when {
+        isBeta && isPt -> "versão beta"
+        isBeta -> "beta version"
+        isPt -> "versão"
+        else -> "version"
+    }
 
-    return when (state) {
+    val content = when (state) {
         is AppUpdateUiState.Available -> UpdateBannerContent(
-            title = if (isPt) "Nova versão $version disponível" else "Version $version is available",
+            title = if (isPt) "Nova $versionNoun $version disponível" else "${versionNoun.capitalized()} $version is available",
             actionLabel = if (isPt) "Baixar atualização" else "Download update",
             tone = AppTone.INFO,
             headline = if (isPt) "Nova versão $version" else "New version $version",
@@ -476,10 +485,10 @@ internal fun updateBannerContent(
             title = when {
                 // Sem tamanho declarado não há porcentagem, e inventar uma seria
                 // pior que dizer só "baixando".
-                state.percent == null && isPt -> "Baixando a versão $version…"
-                state.percent == null -> "Downloading version $version…"
-                isPt -> "Baixando a versão $version — ${state.percent}%"
-                else -> "Downloading version $version — ${state.percent}%"
+                state.percent == null && isPt -> "Baixando a $versionNoun $version…"
+                state.percent == null -> "Downloading $versionNoun $version…"
+                isPt -> "Baixando a $versionNoun $version — ${state.percent}%"
+                else -> "Downloading $versionNoun $version — ${state.percent}%"
             },
             actionLabel = null,
             tone = AppTone.INFO,
@@ -496,9 +505,9 @@ internal fun updateBannerContent(
 
         is AppUpdateUiState.Ready -> UpdateBannerContent(
             title = if (isPt) {
-                "Versão $version pronta — será aplicada ao fechar o Usage Monitor"
+                "${versionNoun.capitalized()} $version pronta — será aplicada ao fechar o Usage Monitor"
             } else {
-                "Version $version is ready — applies when Usage Monitor closes"
+                "${versionNoun.capitalized()} $version is ready — applies when Usage Monitor closes"
             },
             actionLabel = if (isPt) UPDATE_RESTART_ACTION_PT else UPDATE_RESTART_ACTION_EN,
             tone = AppTone.OK,
@@ -507,7 +516,7 @@ internal fun updateBannerContent(
         )
 
         is AppUpdateUiState.Failed -> UpdateBannerContent(
-            title = updateFailureTitle(version = version, reason = state.reason, isPt = isPt),
+            title = updateFailureTitle(version = version, noun = versionNoun, reason = state.reason, isPt = isPt),
             // O caminho manual é o comportamento que o app sempre teve; a falha
             // do automático devolve o usuário a ele em vez de deixá-lo sem saída.
             actionLabel = if (isPt) "Baixar manualmente" else "Download manually",
@@ -515,6 +524,27 @@ internal fun updateBannerContent(
             headline = if (isPt) "Falha na versão $version" else "Version $version failed",
             detail = updateFailureDetail(reason = state.reason, isPt = isPt)
         )
+    }
+
+    if (!isBeta) {
+        return content
+    }
+    // A linha curta do balão da HUD tem largura fixa de uma linha, e o número de
+    // uma beta ("42.10.10-beta.12") não cabe ao lado do estado — medido em
+    // `HudNotchTextFitTest`. O estado fica com a palavra "beta"; o número desce
+    // para o detalhe, que tem duas linhas.
+    return content.copy(
+        headline = betaUpdateHeadline(state = state, isPt = isPt),
+        detail = "$version · ${content.detail}"
+    )
+}
+
+private fun betaUpdateHeadline(state: AppUpdateUiState, isPt: Boolean): String {
+    return when (state) {
+        is AppUpdateUiState.Available -> if (isPt) "Nova versão beta" else "New beta version"
+        is AppUpdateUiState.Downloading -> if (isPt) "Baixando a beta" else "Downloading beta"
+        is AppUpdateUiState.Ready -> if (isPt) "Beta pronta" else "Beta ready"
+        is AppUpdateUiState.Failed -> if (isPt) "Falha na beta" else "Beta failed"
     }
 }
 
@@ -528,23 +558,27 @@ private fun updateFailureDetail(reason: AppUpdateFailureReason, isPt: Boolean): 
 
 private fun updateFailureTitle(
     version: String,
+    /** "versão"/"version", ou a forma com "beta" (issue #355). */
+    noun: String,
     reason: AppUpdateFailureReason,
     isPt: Boolean
 ): String {
     return when (reason) {
         AppUpdateFailureReason.DOWNLOAD -> if (isPt) {
-            "Falha ao baixar a versão $version"
+            "Falha ao baixar a $noun $version"
         } else {
-            "Could not download version $version"
+            "Could not download $noun $version"
         }
 
         AppUpdateFailureReason.SCHEDULE -> if (isPt) {
-            "Falha ao iniciar a instalação da versão $version"
+            "Falha ao iniciar a instalação da $noun $version"
         } else {
-            "Could not start the version $version install"
+            "Could not start the $noun $version install"
         }
     }
 }
+
+private fun String.capitalized(): String = replaceFirstChar { char -> char.uppercaseChar() }
 
 internal data class DashboardWarning(
     val target: UsageTargetKey,

@@ -1303,7 +1303,12 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
   <div class="cap" style="margin-top:var(--s3)">Falhou — a versão instalada continua intacta</div>
   <div class="banner warn"><span class="bar"></span><span class="bt" style="flex:1">Falha ao baixar a versão 38.0.0</span><button class="btn" type="button">Baixar manualmente</button></div>
+
+  <div class="cap" style="margin-top:var(--s3)">Beta — canal beta ligado nas Configurações (issue #355)</div>
+  <div class="banner info"><span class="bar"></span><span class="bt" style="flex:1">Nova versão beta 39.0.0-beta.1 disponível</span><button class="btn" type="button">Baixar atualização</button></div>
 </div></div>
+
+<p class="note"><b>Beta diz "beta" em texto, em todo estado</b> (issue #355): <span class="v sm">Nova versão beta…</span>, <span class="v sm">Baixando a versão beta…</span>, <span class="v sm">Versão beta … pronta</span>, <span class="v sm">Falha ao baixar a versão beta…</span>. O tom é o mesmo da estável — cor nunca informa sozinha. No balão da engrenagem da HUD a linha curta vira <span class="v sm">Nova versão beta</span> sem o número, que desce para o detalhe (<span class="v sm">39.0.0-beta.1 · Baixe pela página da versão</span>): o número de uma beta não cabe na linha de largura fixa ao lado do estado.</p>
 
 <p class="note"><b>Três decisões que a imagem não mostra.</b> O progresso é <b>texto</b>, nunca indicador animado: animação infinita trava o <code>waitForIdle</code> dos testes de componente, e é a mesma regra que já vale para o resto do app. <b>Baixando não tem botão</b> — não há o que fazer além de esperar. E <b>falha devolve o caminho manual</b>, que é o comportamento que o app sempre teve: a atualização automática que não deu certo não pode deixar o usuário sem saída.</p>
 
