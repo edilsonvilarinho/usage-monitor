@@ -51,6 +51,26 @@ Parallel forks (`-PtestForks=4`) are opt-in and only safe on a machine with a wa
 - **No new infinite animations.** They hang `waitForIdle` in the component tests. Progress is text,
   not a spinner.
 
+### Platform reality
+
+The maintainer works on **Windows**, and CI runs the suite **only on Windows**. Linux and macOS
+builds are packaged by the release workflow from the tag, but no test runs on them before that. What
+no test exercises on any platform is the **window system itself**: transparency, `Window.shape`,
+`alwaysOnTop` against the taskbar, window position and per-monitor scale. Component tests draw into
+an offscreen scene with no AWT window and no window manager.
+
+That is how #340 shipped: the HUD's click clip, measured only on Windows 11, left the balloon cut
+off on elementary OS (X11) for three releases while every test stayed green. So:
+
+- If your change touches a window host (`HudWindow.kt`, `DesktopWindowFrame.kt`, `Main.kt`, any
+  `*WindowHost`), **open the build on Linux (X11) before merging**, or say in the PR that you
+  could not and what is at risk. [`docs/hud-notch.md`](docs/hud-notch.md#fora-do-alcance-dos-testes)
+  lists what was measured on which platform.
+- Native window behaviour measured on one platform ships restricted to it (see `hudUsesHitRegion`),
+  and `ArchitectureRulesTest` fails a `window.shape` outside the files that own it.
+- **Say which platforms you tested on** in the PR — OS, version and desktop/window manager. If you
+  tested on Linux or macOS, that is worth more than it sounds.
+
 ## Code conventions
 
 - **Identifiers in English, comments in Portuguese.** This is the existing convention throughout the

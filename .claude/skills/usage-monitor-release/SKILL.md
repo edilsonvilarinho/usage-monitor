@@ -30,6 +30,14 @@ Release this repository in a way that stays aligned with the current build, inst
    - `gradlew.bat allTests` — mandatory. The tag is what triggers the release; a broken suite discovered after the push means a burned tag on the remote.
    - Do not package locally as a release gate. `build-windows` already runs `packageInstaller`, and `build-linux`/`build-macos` cover the other two OSes. Local packaging duplicates CI and proves only one platform.
    - `gradlew.bat packageInstaller` only when the task is debugging the installer itself (see the `usage-monitor-nsis-installer` skill).
+   - **Window hosts changed? Stop before the tag** (#342). Run
+     `git diff --name-only $(git describe --tags --abbrev=0)..HEAD` and look for `HudWindow.kt`,
+     `DesktopWindowFrame.kt`, `Main.kt` or any `*WindowHost*.kt`. If one changed, no test covers
+     what broke in #340 — the window system. List the rows of
+     [`docs/hud-notch.md` › "Fora do alcance dos testes"](../../../docs/hud-notch.md#fora-do-alcance-dos-testes)
+     that the change touches and ask the maintainer whether the build was opened on Linux (X11).
+     This is the **only** confirmation this skill asks for: without it, v41.0.0 shipped a HUD that
+     was broken on Linux for three releases. If nothing in the list changed, continue without asking.
 8. Publish. Invoking this skill **is** the request to publish — never stop to ask for confirmation:
    - commit the version bump with the temporary agent git identity
    - create the annotated tag `vX.Y.Z`
@@ -44,7 +52,7 @@ Release this repository in a way that stays aligned with the current build, inst
 ## Guardrails
 
 - Do not release from a dirty tree unless the user explicitly wants that risk.
-- Do not ask the user to confirm the tag or the push. The skill invocation is the authorization; asking again is unwanted friction.
+- Do not ask the user to confirm the tag or the push. The skill invocation is the authorization; asking again is unwanted friction. The one exception is step 7: a window host changed since the last tag (#342).
 - Do not forget that release artifacts are published by CI from `v*` tags.
 - Do not reintroduce local packaging as a release gate; CI owns packaging for all three OSes.
 - Do not forget that the GitHub Release body should show the commit summary for the new version.

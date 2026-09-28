@@ -287,3 +287,23 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   translucidez própria (a opacidade é só a preferência do usuário); cota sem projeção continua na HUD
   (o percentual é fato medido); nenhum formato novo — percentual de `compactPercentageLabel`, reset de
   `resetShortLabel`, rótulo curto de `hudQuotaShortLabel`.
+
+## Fora do alcance dos testes
+
+Os testes de componente desenham numa cena fora de tela, sem janela AWT e sem gerenciador de
+janelas; os de geometria provam a conta, não o que o sistema faz com ela. O que depende do sistema
+de janelas só se sabe **medindo na máquina** — como o Codenotch escreve no `TASKS.md` o que o render
+fora de tela não enxerga. Esta é a lista a conferir quando um host de janela muda ("Platform
+reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "funciona".
+
+| Comportamento | Windows 11 | Linux | macOS |
+|---|---|---|---|
+| Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340) — desligado | |
+| Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |
+| Janela transparente que muda de origem mostra quadro antigo | medido (#294, 39–49 de ~668 quadros) | | |
+| `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
+| Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
+| Escalas diferentes por monitor | só em máquina real | | |
+| Maximizar zera o recorte dos cantos (`DesktopWindowFrame`, `shape = null`) | em uso desde maio | risco da #340, sem relato | |
+
+Ao medir um item, preencha a célula com a data, a máquina e a issue, no mesmo commit da mudança.

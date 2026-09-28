@@ -39,6 +39,12 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop / window manager (Linux)
+      description: "For example: elementary OS / Gala (X11), GNOME (Wayland), KDE Plasma (X11). Visual bugs often depend on it."
+
   - type: dropdown
     id: area
     attributes:
@@ -81,7 +87,8 @@ body:
       label: Diagnostics
       description: |
         If the problem is with startup or with an update, attach the relevant file from
-        `~/.usage-monitor/diagnostics/` — `startup.jsonl`, or `linux-update.log` on Linux.
+        `~/.usage-monitor/diagnostics/` — `startup.jsonl`, or `linux-update.log` on Linux. For the
+        HUD notch, attach `hud-window.jsonl` and `startup.jsonl`.
         Screenshots help for anything visual.
       render: text
 
