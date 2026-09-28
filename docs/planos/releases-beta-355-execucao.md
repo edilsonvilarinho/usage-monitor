@@ -51,3 +51,4 @@ e o resultado, não a intenção.
 | B1 | 2026-09-28 | este commit | `GitHubReleaseDto` lê `prerelease` e `draft` (default `false`) | ✅ Concluída | `desktopTest --tests "com.usagemonitor.data.GitHubReleaseDtoTest"` → `tests="6" failures="0"` |
 | B2 | 2026-09-28 | este commit | `RemoteApiDataSource.fetchGitHubReleases` (`/releases?per_page=20`) | ✅ Concluída | `desktopTest --tests "com.usagemonitor.data.RemoteApiDataSourceHttpTest"` → `tests="16" failures="0"` |
 | B3 | 2026-09-28 | este commit | `getLatestAvailableUpdate(currentVersion, includePrereleases)`: canal beta pela listagem, sem rascunho, sem downgrade; use case repassa o flag | ✅ Concluída | `allTests` → 2378 casos, 0 falhas; `AppUpdateRepositoryImplTest` `tests="22" failures="0"` |
+| B4 | 2026-09-28 | este commit | Preferência `receiveBetaUpdates` (default `false`) | ✅ Concluída | `desktopTest --tests "com.usagemonitor.BetaUpdatePreferencesTest"` → `tests="4" failures="0"` |
