@@ -98,6 +98,8 @@ class DashboardViewModel(
      */
     private val appUpdateInstaller: AppUpdateInstaller? = null,
     private val autoUpdateEnabled: StateFlow<Boolean> = MutableStateFlow(false),
+    /** Canal beta das Configurações (issue #355); desligado, só releases estáveis. */
+    private val receiveBetaUpdates: StateFlow<Boolean> = MutableStateFlow(false),
     /**
      * Encerramento ordenado pedido pela faixa ("Reiniciar o app e atualizar").
      * O view model não sabe fechar a aplicação; quem sabe é o `Main.kt`.
@@ -204,6 +206,7 @@ class DashboardViewModel(
         appUpdateReleaseOpener = appUpdateReleaseOpener,
         appUpdateInstaller = appUpdateInstaller,
         autoUpdateEnabled = autoUpdateEnabled,
+        receiveBetaUpdates = receiveBetaUpdates,
         onRestartAndUpdateRequested = onRestartAndUpdateRequested,
         onUpdateScheduleFailure = onUpdateScheduleFailure,
         currentAppVersion = currentAppVersion,
@@ -268,6 +271,7 @@ class DashboardViewModel(
             updates.startCheckLoop()
         }
         updates.startAutoUpdateSwitchWatcher()
+        updates.startBetaChannelWatcher()
         if (config.autoStartCountdown) {
             startCountdown()
         }

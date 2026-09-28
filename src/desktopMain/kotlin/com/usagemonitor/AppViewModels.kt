@@ -108,6 +108,7 @@ internal class AppViewModels(
         appUpdateReleaseOpener = graph.appUpdateReleaseOpener,
         appUpdateInstaller = autoUpdate.installer,
         autoUpdateEnabled = autoUpdate.enabled,
+        receiveBetaUpdates = autoUpdate.receiveBetaUpdates,
         onRestartAndUpdateRequested = { autoUpdate.requestRestart() },
         onUpdateScheduleFailure = ::writeUpdateScheduleFailureReceipt,
         currentAppVersion = CURRENT_APP_VERSION,
