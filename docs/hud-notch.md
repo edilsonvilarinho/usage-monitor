@@ -287,6 +287,15 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   translucidez própria (a opacidade é só a preferência do usuário); cota sem projeção continua na HUD
   (o percentual é fato medido); nenhum formato novo — percentual de `compactPercentageLabel`, reset de
   `resetShortLabel`, rótulo curto de `hudQuotaShortLabel`.
+- **Opacidade no Windows: piso de 55% e repintura depois da troca** (`hudWindowOpacityPercent`,
+  `hudRepaintsAfterOpacityChange`). A janela transparente do Compose no Windows só recebe o mouse
+  onde o fundo tem alfa 1/255 (`JLayeredPaneWithTransparencyHack`), e o sistema multiplica esse alfa
+  pela opacidade. Relato: com a opacidade em 50% e de volta a 100%, a HUD perdia o hover até sair e
+  voltar ao modo. Medido com uma sonda (janela transparente igual à da HUD, `Robot` sobre ela,
+  eventos AWT contados): mudar a opacidade refaz a camada **sem** esse fundo — 100 → 50 → 100 sem
+  repintar dá zero eventos, repintando volta; e 50% nunca recebe o mouse, nem repintando
+  (1 × 127/255 arredonda para zero), enquanto 55% a 99% recebem. Os dois ajustes são só do Windows
+  (#340); no Linux e no macOS a preferência vale inteira e sem repintura.
 
 ## Fora do alcance dos testes
 

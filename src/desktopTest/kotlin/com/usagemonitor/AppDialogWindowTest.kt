@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.AutoStartManager.Platform
 import com.usagemonitor.presentation.ui.modalOpenedBreadcrumb
 import com.usagemonitor.presentation.ui.shouldAnimateModalWindow
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
@@ -12,14 +13,14 @@ class AppDialogWindowTest {
 
     @Test
     fun `the live app animates modal windows where the platform can fade them`() {
-        assertTrue(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = true))
-        assertTrue(shouldAnimateModalWindow(AppMotionPolicy.Static, opacitySupported = true))
+        assertTrue(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = true, Platform.WINDOWS))
+        assertTrue(shouldAnimateModalWindow(AppMotionPolicy.Static, opacitySupported = true, Platform.WINDOWS))
     }
 
     /** "Reduzir animações" abre e fecha na hora, mesmo onde daria para esmaecer. */
     @Test
     fun `reduced motion opens modal windows at once`() {
-        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Reduced, opacitySupported = true))
+        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Reduced, opacitySupported = true, Platform.WINDOWS))
     }
 
     /**
@@ -28,7 +29,18 @@ class AppDialogWindowTest {
      */
     @Test
     fun `without window translucency modal windows open at once`() {
-        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = false))
+        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = false, Platform.WINDOWS))
+    }
+
+    /**
+     * O esmaecimento pela opacidade da janela só foi medido no Windows. No
+     * elementary OS o modal de Configurações ficou translúcido (issue #340).
+     */
+    @Test
+    fun `modal windows fade only on Windows`() {
+        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = true, Platform.LINUX))
+        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = true, Platform.MACOS))
+        assertFalse(shouldAnimateModalWindow(AppMotionPolicy.Live, opacitySupported = true, Platform.OTHER))
     }
 
     /** O nome é fixo: o título pode trazer o apelido do perfil, e a trilha vira issue pública. */

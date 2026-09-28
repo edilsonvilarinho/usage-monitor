@@ -148,8 +148,10 @@ paints after the content.
 
 **Transparency and blur.** No blur, no acrylic. **One transparent window**: the HUD notch, so it can
 have its silhouette and shadow; it is notch-sized at rest because a transparent pixel swallows the
-click (measured on Windows 11). Every window, the HUD included, keeps the user-set opacity (50–100%)
-applied to the whole window by the OS, not per element.
+click (measured on Windows 11). The main window and the HUD keep the user-set opacity (50–100%)
+applied to the whole window by the OS, not per element — except that on Windows the HUD never goes
+below 55%: at 50% the transparent window stops receiving the pointer. Modal windows use window
+opacity only for their own fade, and only on Windows.
 
 **Hover.** A `--hover-layer` is added over the surface below, text goes from `--muted` to
 `--fg`. Elevated surfaces (the dashboard card) also **lift**: one depth level up and 1dp higher,

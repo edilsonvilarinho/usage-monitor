@@ -60,6 +60,10 @@ quadros, um percentual que não é verdade.
     da criação. Agora a janela aparece com opacidade 0, o host espera dois quadros (com teto de
     500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e esmaece a
     janela AWT com o conteúdo indo de 0,96 a 1 pela mola `GENTLE`.
+  - **O esmaecimento é só do Windows** (`shouldAnimateModalWindow`, #340). No X11 a opacidade da
+    janela é a propriedade `_NET_WM_WINDOW_OPACITY`, aplicada pelo compositor, e voltar a 1 é apagar
+    a propriedade. No elementary OS o modal de Configurações ficou translúcido depois de a opacidade
+    ter mudado; fora do Windows o modal abre e fecha na hora e a janela nunca sai de 1.
   - **O pedido chega por `StateFlow`, nunca por recomposição dentro da janela** (`ModalWindowHost`).
     Janela escondida não recompõe — o relógio de quadros para junto com a pintura —, e a primeira
     versão, com `LaunchedEffect(visible)` dentro da janela, abria e fechava uma vez e **nunca mais

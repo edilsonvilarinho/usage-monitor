@@ -23,7 +23,9 @@ notes all go through one host:
   and what the eye saw was the window popping. Now the window appears **transparent**, the host waits
   two frames, then fades the AWT window's opacity 0 → 1 (`--dur-select`) while the content grows
   0.96 → 1 on the GENTLE spring. Window opacity, not content alpha: content fading inside an opaque
-  window would show the window's own ground, not what is behind it.
+  window would show the window's own ground, not what is behind it. **Windows only**: on X11 the
+  compositor applies window opacity, and on elementary OS a modal stayed translucent; elsewhere the
+  window opens and closes at once, at full opacity.
 - **Every close takes the same path**: the × button, Alt+F4, Esc and the content's own "Fechar" all
   just ask to close, and the drop of `visible` fades (140ms, scale back to 0.96) and hides. Before,
   only the × faded.

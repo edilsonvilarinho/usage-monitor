@@ -331,7 +331,7 @@ internal fun HudWindowHost(
         }
     ) {
         LaunchedEffect(windowOpacityPercent) {
-            applyWindowOpacity(window, windowOpacityPercent)
+            applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
         }
         // Recorte só no Windows: no elementary OS (X11) o balão saía cortado.
         ApplyHudHitRegion(window, hitRegion, scale, supported = hitRegionSupported)
@@ -585,6 +585,45 @@ private fun ScreenWorkArea.inCompositionDp(scale: Float): ScreenWorkArea = Scree
  */
 internal fun hudUsesHitRegion(platform: AutoStartManager.Platform): Boolean =
     platform == AutoStartManager.Platform.WINDOWS
+
+/**
+ * A opacidade que a HUD usa, a partir da preferência do usuário.
+ *
+ * No Windows a janela transparente do Compose só recebe o mouse onde o fundo tem
+ * alfa 1/255 (`JLayeredPaneWithTransparencyHack`), e o sistema multiplica esse alfa
+ * pela opacidade da janela: em 50% dá 1 × 127/255, que arredonda para zero, e o
+ * ponteiro atravessa a HUD — o hover some. Medido no Windows 11 com uma janela
+ * transparente igual à da HUD: 50% nunca recebe o mouse; 55%, 60%… 99% recebem.
+ * Por isso o piso de [HUD_WINDOWS_MIN_OPACITY_PERCENT] só no Windows; fora dele o
+ * fundo de alfa 1/255 não existe e a preferência vale inteira (issue #340).
+ */
+internal fun hudWindowOpacityPercent(percent: Int, platform: AutoStartManager.Platform): Int {
+    val clamped = clampWindowOpacityPercent(percent)
+    if (platform != AutoStartManager.Platform.WINDOWS) {
+        return clamped
+    }
+    return maxOf(clamped, HUD_WINDOWS_MIN_OPACITY_PERCENT)
+}
+
+/**
+ * Se a HUD precisa ser repintada depois de mudar a opacidade. No Windows, mudar a
+ * opacidade refaz a camada da janela sem o fundo de alfa 1/255 e o mouse passa a
+ * atravessá-la até a próxima pintura AWT: medido, 100 → 50 → 100 sem repintar fica
+ * sem hover; repintando, volta. Era o hover que só voltava saindo e entrando no
+ * modo HUD.
+ */
+internal fun hudRepaintsAfterOpacityChange(platform: AutoStartManager.Platform): Boolean =
+    platform == AutoStartManager.Platform.WINDOWS
+
+private fun applyHudWindowOpacity(window: java.awt.Window, percent: Int, platform: AutoStartManager.Platform) {
+    applyWindowOpacity(window, hudWindowOpacityPercent(percent, platform))
+    if (hudRepaintsAfterOpacityChange(platform)) {
+        window.repaint()
+    }
+}
+
+/** O menor valor medido em que a HUD transparente ainda recebe o mouse no Windows. */
+internal const val HUD_WINDOWS_MIN_OPACITY_PERCENT = 55
 
 /**
  * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
