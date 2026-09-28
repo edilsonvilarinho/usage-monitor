@@ -25,6 +25,11 @@ Release this repository in a way that stays aligned with the current build, inst
      never the base: without `--exclude` a beta would become the "current" stable version. If an open
      beta series `vX.Y.Z-beta.N` exists, releasing it as stable means tagging that same `X.Y.Z`.
      Beta releases have their own skill, `usage-monitor-release-beta`.
+   - **Open beta series?** (`git -c versionsort.suffix=- tag --sort=-version:refname --list "v*-beta.*" | head -n 1`
+     with no stable of the same `X.Y.Z`). Promoting it is `usage-monitor-release-beta promote`. A
+     stable **lower** than the series (a `patch` of the previous stable while `X.Y.Z-beta.N` is open)
+     is fine for everyone else but **never reaches the testers** — `X.Y.Z-beta.N` is higher. Say so
+     in the report, and if the fix matters to them, follow it with a `next` beta.
    - `build.gradle.kts` resolves `version` from `-PappVersion` (the release workflow passes the tag)
      and, without it, from that same `git describe` — never edit a version literal there or in
      `src/installer/UsageMonitor.nsi` (its `!ifndef` default only serves direct `makensis` runs).

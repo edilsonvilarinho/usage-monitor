@@ -1,13 +1,30 @@
 ---
 name: usage-monitor-release-beta
-description: Cut and publish a beta (prerelease) of the usage-monitor app — an annotated vX.Y.Z-beta.N tag that the release workflow publishes as a GitHub prerelease, offered only to users who turned on "Receber versões beta" in Settings. Use when Claude needs to ship, publish, or troubleshoot a beta release for this project; for a stable release use usage-monitor-release.
+description: Manage the usage-monitor beta channel end to end — cut a beta (annotated vX.Y.Z-beta.N tag published as a GitHub prerelease, offered only to users who turned on "Receber versões beta"), promote the open beta series to the stable release, withdraw a bad beta (hide it, reversibly) or restore it. Use when Claude needs to ship, promote, withdraw, undo, or troubleshoot a beta release for this project; a stable release that is not a beta promotion uses usage-monitor-release.
 ---
 
 # Usage Monitor Beta Release
 
-Publish a beta for the users who opted into the beta channel (issue #355). It is the stable release
-flow ([usage-monitor-release](../usage-monitor-release/SKILL.md)) with a different tag and a
-different promise: **a beta never becomes `latest`**, so nobody outside the channel receives it.
+Run the whole life of a beta for the users who opted into the beta channel (issue #355). Publishing
+is the stable release flow ([usage-monitor-release](../usage-monitor-release/SKILL.md)) with a
+different tag and a different promise: **a beta never becomes `latest`**, so nobody outside the
+channel receives it.
+
+## Operations (the argument picks one)
+
+| Argument | What it does | Section |
+|---|---|---|
+| `patch` / `minor` / `major` | Publish `beta.1` of a new series for the next stable of that type | Workflow |
+| `next` | Publish `beta.N+1` of the open series (the way to **fix** a bad beta) | Workflow |
+| `promote` | Publish the stable `vX.Y.Z` of the open series — the beta "goes to main/master" | Promote |
+| `withdraw [tag]` | Hide a beta: nobody new is offered it (reversible) | Withdraw |
+| `restore [tag]` | Undo a `withdraw` | Restore |
+
+There is **no "move the beta to main"**: the tag already points to a commit on `main` —
+`verify-version` refuses anything else. The code is merged *before* the beta exists; what "going to
+stable" means is publishing a new, stable build of that code (`promote`). There is also **no
+rollback** for testers who already installed a beta: the app never downgrades. They leave the beta
+when a higher version reaches them — the next beta or the stable.
 
 ## How the channel works (read before tagging)
 
@@ -33,11 +50,13 @@ different promise: **a beta never becomes `latest`**, so nobody outside the chan
 2. Invoking this skill already means "cut and publish the beta". Do not ask for confirmation to tag or
    push — go through the whole flow and report the result. The only question allowed is the one in
    step 6 (window hosts).
-3. Pick the beta series from the request:
+3. Pick the operation from the request (see the table above). `promote`, `withdraw` and `restore`
+   have their own sections below; this workflow is for publishing a beta:
    - `patch` / `minor` / `major` — start a new series for the next stable of that type:
      `N = 1`.
    - `next` (or no type while a series is open) — continue the open series: `N + 1`.
    - If the request is ambiguous and there is no open series, ask which type.
+   - An **open series** is `vX.Y.Z-beta.*` with no stable `vX.Y.Z` yet.
 4. Verify that `main` is clean and matches `origin/main` — the tag must point to a commit already on
    the remote `main`, or `verify-version` refuses it:
    - `git fetch origin --tags && git status --short --branch`
@@ -80,9 +99,74 @@ different promise: **a beta never becomes `latest`**, so nobody outside the chan
    previous tag (beta or stable); the stable release later diffs against the previous **stable**, so it
    lists the whole series. Do not write them by hand.
 
+## Promote — the open series becomes the stable release
+
+The stable is a **new tag and a new build**, never the beta release edited into a stable one. The beta
+binaries carry `X.Y.Z-beta.N` in `CURRENT_APP_VERSION`, in the installer name and in the receipt; an
+edited release would hand every user a build that calls itself beta. Never run
+`gh release edit ... --prerelease=false` or `--latest` on a beta.
+
+1. Find the open series: `git -c versionsort.suffix=- tag --sort=-version:refname --list "v*-beta.*" | head -n 1`
+   gives `vX.Y.Z-beta.N`. Refuse if `vX.Y.Z` already exists (nothing to promote) or if there is no
+   beta tag.
+2. Decide **what** becomes stable:
+   - default — the current `origin/main` (the beta code plus whatever was merged after it). Say in
+     the report which commits are new since the last beta:
+     `git log --oneline vX.Y.Z-beta.N..origin/main`.
+   - `promote exact` — the very commit the testers ran: tag `vX.Y.Z` on `vX.Y.Z-beta.N^{commit}`.
+     `verify-version` accepts it, because that commit is on `main`.
+3. Run the stable flow of [usage-monitor-release](../usage-monitor-release/SKILL.md) from its step 4
+   (clean `main` = `origin/main`, `allTests`, the #342 window-host question, annotated tag, push only
+   the tag, watch the workflow, check every artifact) with the version fixed to `X.Y.Z` — do **not**
+   bump it by type. For `promote exact`, create the tag on the beta commit:
+   `git -c user.name=claude -c user.email=claude@anthropic.com tag -a vX.Y.Z vX.Y.Z-beta.N^{commit} -m "vX.Y.Z"`.
+4. Confirm: `gh release view vX.Y.Z --json isPrerelease` → `false`, and `/releases/latest` → `vX.Y.Z`.
+   The stable notes diff against the previous **stable**, so they list the whole beta series.
+5. Result: users outside the channel receive `X.Y.Z` as a normal update; testers on
+   `X.Y.Z-beta.N` receive it too (`beta.N < X.Y.Z`) and see its "Novidades". The series is closed —
+   the next beta starts a new one.
+
+## Withdraw — a bad beta stops being offered
+
+Withdrawing **hides** the release; it does not delete anything and it is reversible (`restore`).
+The client ignores drafts, and anonymous API calls — the ones the app makes — do not see them.
+
+1. Target: the tag in the request, or the highest `v*-beta.*`. Refuse a stable tag: withdrawing a
+   stable is not this skill's job.
+2. `gh release edit vX.Y.Z-beta.N --repo edilsonvilarinho/usage-monitor --draft=true`
+3. Confirm it is hidden from what the app reads:
+   `gh api "repos/edilsonvilarinho/usage-monitor/releases?per_page=20" --jq '.[] | select(.draft == false) | .tag_name'`
+   must not list it (this call is authenticated and sees drafts only with `draft: true`), and
+   `/releases/latest` is unchanged.
+4. Report what it does **not** undo, every time:
+   - testers who already installed that beta **stay on it** — there is no downgrade. They move when a
+     higher version reaches them;
+   - an auto-update already downloaded but not yet applied is still applied on the next exit.
+5. What to do next — say it in the report:
+   - **fix forward** (the normal path): merge the fix and run this skill with `next` —
+     `vX.Y.Z-beta.N+1` is offered to everyone in the channel, including those stuck on the bad one;
+   - **abandon the series**: `promote` a stable that does not include the bad change, or start a new
+     series later. Never reuse a withdrawn tag name — a client may already know it.
+6. The tag stays on the remote. Deleting the release or the tag (`gh release delete --cleanup-tag`)
+   is permanent and **not** part of this skill: it gains nothing over the draft and loses the record.
+   If the maintainer really wants it, tell them the command and let them run it.
+
+## Restore — undo a withdraw
+
+1. `gh release edit vX.Y.Z-beta.N --repo edilsonvilarinho/usage-monitor --draft=false --prerelease --latest=false`
+   — the three flags together, so it comes back exactly as a beta and never as Latest.
+2. Confirm `isPrerelease: true`, `/releases/latest` unchanged, and that the channel sees it again
+   (the non-draft listing above lists it).
+3. If a newer beta or the stable of the series already exists, restoring an older beta changes nothing
+   for anyone — say so instead of restoring.
+
 ## Guardrails
 
-- Never publish a stable version from this skill; `vX.Y.Z` tags belong to `usage-monitor-release`.
+- Never publish a stable version from this skill except through `promote`, which runs the stable
+  flow of `usage-monitor-release` with the version fixed to the open series.
+- Never turn a beta release into a stable or Latest one by editing it; `restore` always passes
+  `--prerelease --latest=false`.
+- Never delete a release or a tag; `withdraw` hides it as a draft.
 - Never tag a suffix other than `-beta.N`.
 - Never tag a beta whose `X.Y.Z` is already released as stable.
 - Do not release from a dirty tree unless the user explicitly wants that risk.
