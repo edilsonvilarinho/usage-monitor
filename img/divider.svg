@@ -1,0 +1,12 @@
+<!-- Divisor do README: a linha do horizonte do banner (G5), parada. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 24" width="880" height="24" role="presentation">
+<defs>
+<linearGradient id="d" x1="0" x2="1"><stop offset="0" stop-color="#E8AE63" stop-opacity="0"/><stop offset=".5" stop-color="#E8AE63" stop-opacity=".6"/><stop offset="1" stop-color="#E8AE63" stop-opacity="0"/></linearGradient>
+<linearGradient id="ion" x1="0" x2="1"><stop offset="0" stop-color="#42A5F5" stop-opacity="0"/><stop offset=".75" stop-color="#9FD3FF" stop-opacity=".5"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>
+<radialGradient id="h"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".3" stop-color="#FFF0CB" stop-opacity=".7"/><stop offset="1" stop-color="#E8AE63" stop-opacity="0"/></radialGradient>
+</defs>
+<rect x="40" y="11.4" width="800" height="1.2" fill="url(#d)"/>
+<rect x="340" y="10" width="100" height="4" rx="2" fill="url(#ion)" opacity=".5"/>
+<rect x="360" y="11.4" width="80" height="1.2" fill="url(#ion)"/>
+<circle cx="440" cy="12" r="7" fill="url(#h)"/><circle cx="440" cy="12" r="2" fill="#fff"/>
+</svg>

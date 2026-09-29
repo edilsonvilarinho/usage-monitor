@@ -1,0 +1,47 @@
+<!-- Banner do README (rodada G5 da skill usage-monitor-visual-options). Toca uma vez e para no quadro final; prefers-reduced-motion mostra direto o quadro final. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 220" width="880" height="220" role="img" aria-label="Usage Monitor — Quotas, usage and cost of every AI coding tool you pay for.">
+<style>
+.g5ttl{font:600 40px ui-monospace,'SFMono-Regular','Cascadia Mono',Consolas,'Liberation Mono',monospace;letter-spacing:-.5px}
+.g5sub{font:400 14px ui-monospace,'SFMono-Regular','Cascadia Mono',Consolas,'Liberation Mono',monospace;fill:#BFA98A}
+.g5chip{font:400 11px ui-monospace,'SFMono-Regular','Cascadia Mono',Consolas,'Liberation Mono',monospace;fill:#8E8171}
+.g5a{transform-box:view-box;transform-origin:0 0}
+.g5t{animation:g5f 360ms ease-out both}
+@keyframes g5f{0%{opacity:0}100%{opacity:1}}
+.g5line{stroke-dasharray:790;animation:g5line 1500ms cubic-bezier(.45,.05,.35,1) both}
+@keyframes g5line{0%{stroke-dashoffset:790}100%{stroke-dashoffset:0}}
+.g5head{opacity:0;animation:g5head 1750ms cubic-bezier(.45,.05,.35,1) both}
+@keyframes g5head{0%{transform:translateX(0);opacity:1}86%{transform:translateX(790px);opacity:1}100%{transform:translateX(790px);opacity:0}}
+.g5end{animation:g5f 300ms ease-out 1500ms both}
+.g5c{animation:g5c 300ms ease-out both}
+@keyframes g5c{0%{opacity:.15;fill:#8E8171}40%{opacity:1;fill:#FFF0CB}100%{opacity:1;fill:#8E8171}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+<defs>
+<linearGradient id="g5bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0D0F15"/><stop offset="1" stop-color="#030508"/></linearGradient>
+<linearGradient id="g5disk" x1="0" x2="1"><stop offset="0" stop-color="#B4501E" stop-opacity=".35"/><stop offset=".5" stop-color="#E8AE63" stop-opacity=".85"/><stop offset="1" stop-color="#FFF0CB"/></linearGradient>
+<radialGradient id="g5glow"><stop offset=".3" stop-color="#E8AE63" stop-opacity=".24"/><stop offset="1" stop-color="#E8AE63" stop-opacity="0"/></radialGradient>
+<radialGradient id="g5flash"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".3" stop-color="#FFF0CB" stop-opacity=".7"/><stop offset="1" stop-color="#E8AE63" stop-opacity="0"/></radialGradient>
+<linearGradient id="g5title" x1="0" x2="1"><stop offset="0" stop-color="#FFF0CB"/><stop offset="1" stop-color="#E8AE63"/></linearGradient>
+<linearGradient id="g5jet" x1="0" x2="1"><stop offset="0" stop-color="#FFF0CB"/><stop offset=".35" stop-color="#E8AE63" stop-opacity=".7"/><stop offset="1" stop-color="#E8AE63" stop-opacity="0"/></linearGradient>
+<linearGradient id="g5ion" x1="0" x2="1"><stop offset="0" stop-color="#42A5F5" stop-opacity="0"/><stop offset=".75" stop-color="#9FD3FF" stop-opacity=".55"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>
+</defs>
+<rect x=".5" y=".5" width="879" height="219" rx="10" fill="url(#g5bg)" stroke="#2A2622"/>
+<circle cx="108.2" cy="74.7" r="0.46" fill="#FFF0CB" opacity="0.18"/><circle cx="630.6" cy="160.3" r="0.60" fill="#FFF0CB" opacity="0.23"/><circle cx="334.7" cy="177.1" r="0.77" fill="#FFF0CB" opacity="0.30"/><circle cx="219.8" cy="146.8" r="0.67" fill="#FFF0CB" opacity="0.52"/><circle cx="275.2" cy="107.4" r="0.77" fill="#FFF0CB" opacity="0.45"/><circle cx="261.7" cy="15.5" r="0.88" fill="#FFF0CB" opacity="0.20"/><circle cx="201.1" cy="15.1" r="0.86" fill="#FFF0CB" opacity="0.26"/><circle cx="571.5" cy="193.1" r="1.10" fill="#FFF0CB" opacity="0.42"/><circle cx="449.4" cy="41.4" r="1.04" fill="#FFF0CB" opacity="0.48"/><circle cx="638.7" cy="46.4" r="0.75" fill="#FFF0CB" opacity="0.48"/><circle cx="346.4" cy="123.9" r="0.50" fill="#FFF0CB" opacity="0.43"/><circle cx="604.5" cy="181.4" r="1.00" fill="#FFF0CB" opacity="0.21"/><circle cx="359.3" cy="167.4" r="0.88" fill="#FFF0CB" opacity="0.24"/><circle cx="186.5" cy="46.5" r="1.12" fill="#FFF0CB" opacity="0.33"/><circle cx="433.7" cy="142.1" r="0.49" fill="#FFF0CB" opacity="0.46"/><circle cx="829.5" cy="84.6" r="0.97" fill="#FFF0CB" opacity="0.20"/><circle cx="678.4" cy="107.7" r="1.09" fill="#FFF0CB" opacity="0.39"/><circle cx="523.7" cy="70.2" r="0.83" fill="#FFF0CB" opacity="0.30"/><circle cx="876.0" cy="164.8" r="0.77" fill="#FFF0CB" opacity="0.24"/><circle cx="648.8" cy="14.1" r="0.94" fill="#FFF0CB" opacity="0.49"/><circle cx="581.0" cy="112.4" r="0.97" fill="#FFF0CB" opacity="0.39"/><circle cx="205.4" cy="114.7" r="0.81" fill="#FFF0CB" opacity="0.22"/><circle cx="684.5" cy="132.3" r="0.40" fill="#FFF0CB" opacity="0.48"/><circle cx="312.5" cy="195.3" r="0.63" fill="#FFF0CB" opacity="0.20"/><circle cx="284.5" cy="80.8" r="0.82" fill="#FFF0CB" opacity="0.41"/><circle cx="491.9" cy="169.1" r="0.82" fill="#FFF0CB" opacity="0.23"/><circle cx="304.6" cy="25.6" r="1.15" fill="#FFF0CB" opacity="0.39"/><circle cx="819.9" cy="209.9" r="0.53" fill="#FFF0CB" opacity="0.27"/><circle cx="657.9" cy="51.0" r="1.11" fill="#FFF0CB" opacity="0.41"/><circle cx="264.2" cy="190.0" r="0.66" fill="#FFF0CB" opacity="0.43"/><circle cx="638.2" cy="208.6" r="0.48" fill="#FFF0CB" opacity="0.48"/><circle cx="9.1" cy="144.8" r="1.02" fill="#FFF0CB" opacity="0.49"/><circle cx="777.9" cy="175.2" r="0.50" fill="#FFF0CB" opacity="0.20"/><circle cx="326.2" cy="3.6" r="1.20" fill="#FFF0CB" opacity="0.49"/><circle cx="12.2" cy="157.1" r="1.08" fill="#FFF0CB" opacity="0.33"/><circle cx="672.3" cy="127.7" r="0.40" fill="#FFF0CB" opacity="0.34"/><circle cx="470.5" cy="181.6" r="0.82" fill="#FFF0CB" opacity="0.17"/><circle cx="373.7" cy="14.6" r="1.02" fill="#FFF0CB" opacity="0.21"/><circle cx="534.1" cy="194.3" r="0.89" fill="#FFF0CB" opacity="0.34"/><circle cx="777.7" cy="9.2" r="0.68" fill="#FFF0CB" opacity="0.19"/><circle cx="800.4" cy="83.9" r="0.57" fill="#FFF0CB" opacity="0.37"/><circle cx="69.9" cy="81.7" r="0.91" fill="#FFF0CB" opacity="0.46"/><circle cx="74.6" cy="73.1" r="0.51" fill="#FFF0CB" opacity="0.43"/><circle cx="119.0" cy="71.8" r="1.07" fill="#FFF0CB" opacity="0.31"/><circle cx="746.5" cy="156.5" r="0.99" fill="#FFF0CB" opacity="0.17"/><circle cx="707.7" cy="80.0" r="0.84" fill="#FFF0CB" opacity="0.33"/>
+<g class="g5t"><text x="40" y="80" class="g5ttl" fill="url(#g5title)">Usage Monitor</text></g>
+<g class="g5t" style="animation-delay:150ms"><text x="41" y="190" class="g5sub">Quotas, usage and cost of every AI coding tool you pay for.</text></g>
+<path d="M 45 118 H 835" stroke="#E8AE63" stroke-opacity=".55" stroke-width="1.2" class="g5line"/>
+<text x="45" y="150" class="g5chip g5c" style="animation-delay:0ms">Claude Code</text><text x="131.6" y="150" class="g5chip g5c" style="animation-delay:164ms">Codex</text><text x="178.6" y="150" class="g5chip g5c" style="animation-delay:254ms">MiniMax</text><text x="238.79999999999998" y="150" class="g5chip g5c" style="animation-delay:368ms">DeepSeek</text><text x="305.59999999999997" y="150" class="g5chip g5c" style="animation-delay:495ms">OpenCode</text><text x="372.4" y="150" class="g5chip g5c" style="animation-delay:622ms">Kilo</text><text x="412.79999999999995" y="150" class="g5chip g5c" style="animation-delay:698ms">OpenRouter</text><text x="492.79999999999995" y="150" class="g5chip g5c" style="animation-delay:850ms">Gemini CLI</text><text x="572.8" y="150" class="g5chip g5c" style="animation-delay:1002ms">Cursor</text><text x="626.4" y="150" class="g5chip g5c" style="animation-delay:1104ms">Antigravity</text>
+<g transform="translate(45 118)"><g class="g5a g5head">
+<rect x="-150" y="-4" width="150" height="8" rx="4" fill="url(#g5ion)" opacity=".5"/>
+<rect x="-110" y="-1" width="110" height="2" fill="url(#g5ion)"/>
+<circle r="10" fill="url(#g5flash)"/><circle r="2.6" fill="#fff"/>
+</g></g>
+<g class="g5end"><g transform="translate(835 118)"><g class="g5a "><g transform="rotate(-12)">
+<circle r="17.5" fill="url(#g5glow)"/>
+<path d="M -16.099999999999998 0 A 16.099999999999998 2.8979999999999997 0 0 1 16.099999999999998 0" fill="none" stroke="url(#g5disk)" stroke-width="1.12" opacity=".6"/>
+<path d="M -8.4 0 A 8.4 8.4 0 0 1 8.4 0" fill="none" stroke="#FFE6BE" stroke-opacity=".38" stroke-width="0.63"/>
+<circle r="7" fill="#030508"/>
+<circle r="7.21" fill="none" stroke="#FFF0CB" stroke-opacity=".85" stroke-width="1"/>
+<path d="M -16.099999999999998 0 A 16.099999999999998 2.8979999999999997 0 0 0 16.099999999999998 0" fill="none" stroke="url(#g5disk)" stroke-width="1.12"/>
+</g></g></g></g>
+</svg>

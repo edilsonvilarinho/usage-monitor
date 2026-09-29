@@ -95,5 +95,6 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Dado novo (percentuais e pílula) | D5 · horizonte de eventos (480 ms, cascata 50 ms) | D1 desvio para o vermelho, D2 lente, D3 plasma que conta, D4 onda gravitacional |
 | Modais: abrir, fechar e apresentar dados (todas as janelas e o `AppDialog`) | E9 · filamentos de plasma (680/220 ms) | E1 jato relativístico, E2 horizonte de eventos, E3 varredura do disco, E4 condensação da nebulosa, E5 captura orbital, E6 farol do pulsar, E7 buraco de minhoca, E8 malha do espaço-tempo, E10 estrela de nêutrons |
 | Balão da conta, indicador de execução e balão da engrenagem | F10 · cometa com cauda de íons (restante em destaque, cauda de íons, versão e contagem em linha própria; o botão dentro do aviso não coube e ficou abaixo) | F1 telemetria de sonda, F2 jatos polares, F3 companheira binária, F4 anel de fótons, F5 acreção de partículas, F6 anel de detritos, F7 sinal de rádio, F8 espiral de lente, F9 coroa de plasma |
+| Banner do README (`img/banner.svg`, SVG+CSS que toca uma vez; o GitHub não roda JS) | G5 · cometa com cauda de íons (1500 ms; a linha parada virou `img/divider.svg`) | G1 horizonte de eventos, G2 jato relativístico, G3 varredura do disco, G4 anel de Einstein |
 
-Próxima rodada usa a próxima letra livre (G, H, …).
+Próxima rodada usa a próxima letra livre (H, I, …).
