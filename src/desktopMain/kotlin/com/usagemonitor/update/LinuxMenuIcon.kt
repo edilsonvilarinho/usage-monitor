@@ -63,8 +63,8 @@ internal fun rewriteLinuxMenuIconLine(desktopEntryText: String, stableIconPath: 
  *
  * Nunca lê da árvore versionada, que é exatamente o caminho que o
  * `linux-updater.sh` está prestes a podar: o app já carrega os próprios
- * bytes do ícone no classpath, os mesmos do ícone da janela
- * ([com.usagemonitor.loadWindowIcon]).
+ * bytes do ícone no classpath: o de 512 px, com o nome escrito, que é o
+ * tamanho em que os menus de aplicativos o mostram.
  *
  * Nunca lança: falha aqui é cosmética — o pior caso é o ícone do menu
  * continuar errado — e não pode derrubar o arranque do app. Pela mesma razão

@@ -133,9 +133,13 @@ see them. Cut them with the `usage-monitor-release-beta` skill. Details in
 
 ## Branding
 
-`tools/brand/render_icons.py` generates the PNG, ICO and ICNS from a monogram described in code.
-The `monogram.svg` beside it is reference material and is not read by the script. The `.icns` is only
-validated in the `build-macos` release job.
+`tools/brand/render_icons.py` generates the PNG, ICO and ICNS of the Gargantua icon with the name
+(round I10), described in code with Pillow only. The drawing changes with the *logical* size: the full
+name from 96px, the initials U·M from 32 to 64px, the core with its disk at 24px and below. The ICO is
+written by hand with one PNG entry per size (16/24/32/48/64/256), because Pillow's ICO writer
+downsizes a single image. The windows load `app_icon_window.png` (64px) and the tray
+`app_icon_tray.png` (32px); the 512px `app_icon.png` goes to the Linux menu and jpackage. The
+`.icns` is only validated in the `build-macos` release job.
 
 ## Decisões de empacotamento e atualização
 

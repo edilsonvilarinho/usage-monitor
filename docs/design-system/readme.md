@@ -225,12 +225,15 @@ Claude asterisk, the OpenAI knot, the Cursor cube and the others are small monoc
 card headers and by the foreground inside a HUD ring. The provider name is always written beside
 the mark, so it is decorative for semantics. Control glyphs stay Unicode.
 
-**Brand mark.** Own geometric monogram, built by a deterministic script: three stems joined by a
-bowl, reads as **U** and **M** overlapped at large sizes and keeps a distinct silhouette at 16px,
-where the tray icon lives. In `assets/`: `mark.svg`, `mark-on-light.svg`, `lockup.svg`, and the
-tray states `mark-tray-warn.svg` / `mark-tray-crit.svg`. `ON_TRACK` lights nothing — a permanent
-green dot is decoration. This mark comes from the owner's own approved prototype; nothing was
-invented here.
+**App icon.** Gargantua with the name (round I10 of `usage-monitor-visual-options`, chosen by the
+owner), built by `tools/brand/render_icons.py` and drawn **per size**, because 16px cannot carry a
+word: from 96px the core with its disk over **USAGE MONITOR**; from 32 to 64px the initials
+**U·M** with a miniature Gargantua as the middle dot; at 24px and below the core with its disk
+alone. The band is picked by *logical* size (a 32px `@2x` chunk is a 16pt icon). Windows get the
+64px initials, the tray the 32px core, the Linux menu and the installers the full name. In
+`assets/`: `app-icon.png`, `app-icon-initials.png`, `app-icon-tray.png`, all written by the
+script. The tray risk dot and usage ring are drawn over the core; `ON_TRACK` lights nothing — a
+permanent green dot is decoration.
 
 ---
 
@@ -240,7 +243,7 @@ invented here.
 | --- | --- |
 | `styles.css` | Global entry point. `@import` lines only. |
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
-| `assets/` | Monogram, light variant, lockup, tray badge states |
+| `assets/` | App icon per size band (full name, initials, tray core), written by `render_icons.py` |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip · AppGlyphChip |
 | `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing · AppGargantuaRing (HUD) |
