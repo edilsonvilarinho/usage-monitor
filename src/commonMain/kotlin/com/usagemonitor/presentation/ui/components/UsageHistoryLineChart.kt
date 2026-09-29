@@ -220,7 +220,7 @@ internal fun UsageHistoryLineChart(
     }
 
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().appModalRevealRow(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (overlays.isNotEmpty()) {

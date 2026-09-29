@@ -94,7 +94,7 @@ fun TurnSeriesChart(
     val plotBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
     val markerColor = MaterialTheme.colorScheme.error
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier.fillMaxWidth().appModalRevealRow(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (visibleSeries.isEmpty()) {
             Box(
                 modifier = Modifier

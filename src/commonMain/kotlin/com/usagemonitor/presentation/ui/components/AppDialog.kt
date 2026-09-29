@@ -1,6 +1,8 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.foundation.background
@@ -19,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +42,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.usagemonitor.presentation.ui.theme.AppDepth
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.appTweenSpec
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
-import com.usagemonitor.presentation.ui.theme.appSpring
 import com.usagemonitor.presentation.ui.theme.appTween
 
 /**
@@ -56,9 +61,11 @@ import com.usagemonitor.presentation.ui.theme.appTween
  * de que os modais eram acusados. A API é a do `AlertDialog` (título, texto e os
  * dois botões por slot) para a troca ser mecânica nas telas.
  *
- * **Entrada: o fundo escurece por fade e o cartão entra com fade e escala de
- * 0,96 a 1** pela mola `GENTLE` — sem rebote, porque o cartão carrega texto que
- * precisa assentar legível. É a mesma escala de partida do [AppMenu].
+ * **Entrada: o fundo escurece por fade e o cartão toca o E9** (filamentos de
+ * plasma, o mesmo das janelas modais): o cartão aparece em ~100 ms e um
+ * filamento corre sob o título, o texto e a fileira de botões, em cascata,
+ * revelando cada faixa da esquerda para a direita. O cartão não escala — o
+ * texto está no lugar final desde o primeiro quadro.
  *
  * **A saída é seca**, e é deliberado: quem fecha o diálogo é o chamador, que o
  * tira da composição no mesmo clique que dispara a ação. Segurá-lo composto para
@@ -92,20 +99,28 @@ fun AppDialog(
         visibility.targetState = true
         val transition = rememberTransition(visibility, label = "appDialog")
         val scrimAlphaSpec = appTween<Float>(AppMotion.normal)
-        val cardAlphaSpec = appTween<Float>(AppMotion.normal)
-        val cardScaleSpec = appSpring<Float>(AppMotion.Springs.GENTLE, visibilityThreshold = 0.001f)
         val scrimAlpha by transition.animateFloat(
             transitionSpec = { scrimAlphaSpec },
             label = "appDialogScrim"
         ) { shown -> if (shown) 1f else 0f }
-        val cardAlpha by transition.animateFloat(
-            transitionSpec = { cardAlphaSpec },
-            label = "appDialogAlpha"
-        ) { shown -> if (shown) 1f else 0f }
-        val cardScale by transition.animateFloat(
-            transitionSpec = { cardScaleSpec },
-            label = "appDialogScale"
-        ) { shown -> if (shown) 1f else APP_DIALOG_ENTER_SCALE }
+        val motion = LocalAppMotionPolicy.current
+        val reveal = remember {
+            ModalRevealState(if (motion.reduced) ModalRevealPhase.SETTLED else ModalRevealPhase.OPENING)
+                .also { state -> state.replayEnabled = !motion.reduced }
+        }
+        LaunchedEffect(reveal) {
+            if (reveal.phase == ModalRevealPhase.OPENING) {
+                try {
+                    animate(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = appTweenSpec(AppGargantuaTokens.filamentOpenMillis, motion, LinearEasing)
+                    ) { value, _ -> reveal.progress = value }
+                } finally {
+                    reveal.settle()
+                }
+            }
+        }
 
         val scrimColor = Color.Black.copy(alpha = APP_DIALOG_SCRIM_ALPHA)
         val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
@@ -133,11 +148,8 @@ fun AppDialog(
             AppDialogCard(
                 modifier = modifier
                     .onGloballyPositioned { coordinates -> cardBounds = coordinates.boundsInRoot() }
-                    .graphicsLayer {
-                        alpha = cardAlpha
-                        scaleX = cardScale
-                        scaleY = cardScale
-                    },
+                    .graphicsLayer { alpha = modalFilamentWindowAlpha(reveal.phase, reveal.progress) },
+                reveal = reveal,
                 title = title,
                 text = text,
                 confirmButton = confirmButton,
@@ -150,6 +162,7 @@ fun AppDialog(
 @Composable
 private fun AppDialogCard(
     modifier: Modifier,
+    reveal: ModalRevealState,
     title: (@Composable () -> Unit)?,
     text: (@Composable () -> Unit)?,
     confirmButton: @Composable () -> Unit,
@@ -166,38 +179,49 @@ private fun AppDialogCard(
             .padding(AppSpacing.lg),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
     ) {
-        if (title != null) {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                ProvideTextStyle(MaterialTheme.typography.titleSmall) {
-                    title()
-                }
+        // O cartão é superfície própria: dentro de uma janela modal ele não
+        // entra na cascata dela, tem o relógio dele.
+        CompositionLocalProvider(LocalModalReveal provides reveal) {
+            AppDialogCardRows(title, text, confirmButton, dismissButton)
+        }
+    }
+}
+
+@Composable
+private fun AppDialogCardRows(
+    title: (@Composable () -> Unit)?,
+    text: (@Composable () -> Unit)?,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: (@Composable () -> Unit)?
+) {
+    if (title != null) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            ProvideTextStyle(MaterialTheme.typography.titleSmall) {
+                Box(modifier = Modifier.appModalRevealRow()) { title() }
             }
         }
-        if (text != null) {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-                ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
-                    text()
-                }
+    }
+    if (text != null) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+            ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
+                Box(modifier = Modifier.appModalRevealRow()) { text() }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (dismissButton != null) {
-                dismissButton()
-            }
-            confirmButton()
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().appModalRevealRow(),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (dismissButton != null) {
+            dismissButton()
         }
+        confirmButton()
     }
 }
 
 /** O fundo escurecido; o clique nele pede para fechar. */
 const val APP_DIALOG_SCRIM_TAG = "app_dialog_scrim"
-
-/** Mesma escala de partida do [AppMenu]: as duas superfícies nascem do mesmo jeito. */
-internal const val APP_DIALOG_ENTER_SCALE = 0.96f
 
 /** Mesmo escurecimento que o `Dialog` da plataforma aplicava. */
 private const val APP_DIALOG_SCRIM_ALPHA = 0.32f

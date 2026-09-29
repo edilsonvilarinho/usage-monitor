@@ -53,7 +53,7 @@ fun ActivityHeatmapGrid(
     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
 
     Column(
-        modifier = modifier.horizontalScroll(rememberScrollState()).testTag(ACTIVITY_HEATMAP_TAG),
+        modifier = modifier.appModalRevealRow().horizontalScroll(rememberScrollState()).testTag(ACTIVITY_HEATMAP_TAG),
         verticalArrangement = Arrangement.spacedBy(CELL_SPACING)
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(CELL_SPACING)) {

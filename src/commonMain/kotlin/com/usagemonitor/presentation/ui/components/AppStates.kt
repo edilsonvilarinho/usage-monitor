@@ -265,6 +265,7 @@ fun AppBanner(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .appModalRevealRow()
             .clip(AppShapes.small)
             .background(MaterialTheme.colorScheme.surface)
             .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
@@ -480,6 +481,8 @@ private fun AppCenteredState(
  * [key] decide o que é "outra tela": por default a classe do estado, então
  * `Success` → `Success` (o tique do laço ao vivo) atualiza no lugar, sem
  * transição — animar a cada 5s seria o pisca que o laço existe para evitar.
+ * A mesma chave decide quando o E9 repete dentro de modal
+ * ([AppModalRevealScope]).
  */
 @Composable
 fun <S : Any> AppStateCrossfade(
@@ -503,7 +506,11 @@ fun <S : Any> AppStateCrossfade(
         },
         label = label
     ) { current ->
-        content(current)
+        // Dentro de modal, a tela que entra refaz o E9 nas linhas dela: seção
+        // nova das Configurações, dado que chegou depois da abertura, detalhe.
+        AppModalRevealScope(replayKey = key(current)) {
+            content(current)
+        }
     }
 }
 

@@ -36,5 +36,9 @@ object AppGargantuaTokens {
     const val rollMillis = 480
     /** Cascata entre os caracteres que rolam, da esquerda para a direita (D5). */
     const val rollStaggerMillis = 50
+    /** Abertura de modal: filamentos de plasma revelam cada linha (E9). */
+    const val filamentOpenMillis = 680
+    /** Fechamento de modal: os filamentos recolhem, de baixo para cima (E9). */
+    const val filamentCloseMillis = 220
     const val diskTilt = -12f
 }

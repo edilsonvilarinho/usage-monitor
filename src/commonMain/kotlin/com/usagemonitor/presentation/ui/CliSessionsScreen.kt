@@ -2,6 +2,8 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.rememberSettledRevealKey
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -244,15 +246,20 @@ private fun CliSessionsList(
             NoticeText(state.indexWarning, MaterialTheme.colorScheme.error)
         }
 
+        // Aba nova nasce num escopo que toca o E9; a faixa troca a chave só
+        // quando a leitura nova chega.
+        val revealKey = rememberSettledRevealKey(state.range, settled = !state.isRefreshing)
         if (state.view == CliSessionsView.BREAKDOWN) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                CliUsageBreakdownPane(
-                    breakdown = state.breakdown,
-                    errorMessage = state.breakdownError,
-                    language = language,
-                    budget = state.budget,
-                    accountCredits = state.accountCredits
-                )
+                AppModalRevealScope(replayKey = revealKey) {
+                    CliUsageBreakdownPane(
+                        breakdown = state.breakdown,
+                        errorMessage = state.breakdownError,
+                        language = language,
+                        budget = state.budget,
+                        accountCredits = state.accountCredits
+                    )
+                }
             }
             return@AppWindowScaffold
         }

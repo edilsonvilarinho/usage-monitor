@@ -51,6 +51,9 @@
   /* Finite: a changed digit rolls through the event horizon (D5), 50ms cascade. */
   --dur-gargantua-roll: 480ms;
   --dur-gargantua-roll-stagger: 50ms;
+  /* Finite: every modal window and AppDialog opens and closes (E9, plasma filaments). */
+  --dur-gargantua-filament-open: 680ms;
+  --dur-gargantua-filament-close: 220ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

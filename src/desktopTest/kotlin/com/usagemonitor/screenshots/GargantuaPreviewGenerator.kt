@@ -33,6 +33,22 @@ import com.usagemonitor.presentation.ui.rememberHudPresence
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import com.usagemonitor.presentation.ui.components.AppCellValue
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
+import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
+import com.usagemonitor.presentation.ui.components.AppDataRow
+import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
+import com.usagemonitor.presentation.ui.components.AppDivider
+import com.usagemonitor.presentation.ui.components.AppMetricBlock
+import com.usagemonitor.presentation.ui.components.LocalModalReveal
+import com.usagemonitor.presentation.ui.components.ModalRevealPhase
+import com.usagemonitor.presentation.ui.components.ModalRevealState
+import com.usagemonitor.presentation.ui.components.modalFilamentWindowAlpha
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
+import com.usagemonitor.presentation.ui.theme.AppShapes
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 
@@ -66,6 +82,7 @@ fun main(args: Array<String>) {
     recordPresence(output)
     recordRefresh(output)
     recordBalloon(output)
+    recordModal(output)
     println("Prévia Gargantua: ${output.absolutePath}")
 }
 
@@ -173,6 +190,82 @@ private fun recordBalloon(output: File) {
         recorder.close()
     }
 }
+
+/**
+ * E9 · filamentos de plasma: um modal de sessões montado com as primitivas de
+ * verdade abre (a moldura esmaece e cada linha é revelada atrás do filamento,
+ * em ordem de leitura), fica parado e fecha. O relógio é o mesmo
+ * [ModalRevealState] que o host da janela modal dirige.
+ */
+private fun recordModal(output: File) {
+    val reveal = ModalRevealState(ModalRevealPhase.OPENING)
+    val recorder = SceneRecorder(widthDp = 640, heightDp = 400, frameMillis = 20L)
+    try {
+        recorder.setContent {
+            CompositionLocalProvider(LocalModalReveal provides reveal) {
+                PreviewModal(alpha = { modalFilamentWindowAlpha(reveal.phase, reveal.progress) })
+            }
+        }
+        reveal.begin(ModalRevealPhase.OPENING)
+        recorder.animate(AppGargantuaTokens.filamentOpenMillis.toLong()) { t -> reveal.progress = t }
+        reveal.settle()
+        recorder.animate(1_200) { }
+        reveal.begin(ModalRevealPhase.CLOSING)
+        recorder.animate(AppGargantuaTokens.filamentCloseMillis.toLong()) { t -> reveal.progress = t }
+        recorder.animate(400) { }
+        GifEncoder.write(File(output, "modal-gargantua-filaments.gif"), recorder.frames)
+    } finally {
+        recorder.close()
+    }
+}
+
+@Composable
+private fun PreviewModal(alpha: () -> Float) {
+    Box(Modifier.fillMaxSize().padding(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { this.alpha = alpha() }
+                .clip(AppShapes.large)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, AppShapes.large)
+        ) {
+            Text(
+                "Sessões CLI — Anthropic · Padrão",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            )
+            AppDivider()
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppMetricBlock("Sessões", "12", Modifier.weight(1f))
+                    AppMetricBlock("Tokens (com cache)", "18,4 M", Modifier.weight(1f))
+                    AppMetricBlock("Custo estimado", "US$ 22,31", Modifier.weight(1f))
+                }
+                AppDataSurfaceFlush {
+                    AppColumnHeaderRow {
+                        listOf("Sessão", "Projeto", "Tokens", "Custo").forEach { label ->
+                            AppColumnHeaderLabel(label, Modifier.weight(1f))
+                        }
+                    }
+                    PREVIEW_SESSIONS.forEach { row ->
+                        AppDataRow {
+                            row.forEach { cell -> AppCellValue(cell, Modifier.weight(1f)) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val PREVIEW_SESSIONS = listOf(
+    listOf("7c4a1f92", "api-gateway", "4,40 M", "US$ 5,48"),
+    listOf("e21b0c55", "usage-monitor", "6,12 M", "US$ 7,90"),
+    listOf("3f9d2a10", "docs-site", "1,08 M", "US$ 1,32"),
+    listOf("a0c77e31", "infra-terraform", "3,77 M", "US$ 4,61"),
+    listOf("91be4f02", "api-gateway", "0,92 M", "US$ 1,15")
+)
 
 @OptIn(ExperimentalComposeUiApi::class)
 private fun captureGargantua(
