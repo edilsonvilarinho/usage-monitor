@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -56,6 +58,8 @@ import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
+import com.usagemonitor.presentation.ui.components.drawGargantuaJet
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.components.appDepth
@@ -120,7 +124,9 @@ internal fun HudBalloon(
     tailCenter: () -> Float,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
-    bodyHeight: Dp
+    bodyHeight: Dp,
+    reveal: () -> GargantuaJetFrame = { GargantuaJetFrame.Settled },
+    beamOrigin: () -> Float = { 0f }
 ) {
     val surface = MaterialTheme.colorScheme.surface
     val box = hudBalloonBoxSize(edge, bodyHeight)
@@ -138,8 +144,30 @@ internal fun HudBalloon(
             // A cauda é desenhada **depois** do corpo: ela cobre o trecho da borda
             // do corpo onde encosta, e os dois leem como uma forma só.
             .drawWithContent {
-                drawContent()
-                drawPath(hudBalloonTailPath(edge, size.width, size.height, tailCenter(), HUD_BALLOON_GAP.toPx(), HUD_BALLOON_TAIL_BASE.toPx()), surface)
+                val tail = tailCenter()
+                val frame = reveal()
+                val tailPath = hudBalloonTailPath(edge, size.width, size.height, tail, HUD_BALLOON_GAP.toPx(), HUD_BALLOON_TAIL_BASE.toPx())
+                if (frame.settled) {
+                    drawContent()
+                    drawPath(tailPath, surface)
+                    return@drawWithContent
+                }
+                // B3 · jato relativístico: o balão se desdobra ao longo da borda a
+                // partir da linha do feixe, e o feixe sai do anel por cima dele.
+                val shown = hudBalloonRevealRect(edge, size.width, size.height, tail, frame.unfold)
+                clipRect(shown.left, shown.top, shown.right, shown.bottom) {
+                    this@drawWithContent.drawContent()
+                    drawPath(tailPath, surface)
+                }
+                val origin = -beamOrigin()
+                val depth = if (edge.isHorizontal) size.height else size.width
+                drawGargantuaJet(
+                    from = hudBalloonPoint(edge, size.width, size.height, tail, origin),
+                    to = hudBalloonPoint(edge, size.width, size.height, tail, origin + (depth - origin) * frame.beamEnd),
+                    alpha = frame.beamAlpha,
+                    width = HUD_JET_WIDTH.toPx(),
+                    flashRadius = HUD_JET_FLASH.toPx()
+                )
             }
     ) {
         Box(
@@ -175,15 +203,9 @@ internal fun hudBalloonTailPath(
     val half = base / 2
     val center = tailCenter.coerceIn(half + CORNER_CLEARANCE_PX, (along - half - CORNER_CLEARANCE_PX).coerceAtLeast(half))
     val depth = gap + 1f
-    val map: (Float, Float) -> Offset = when (edge) {
-        HudEdge.TOP -> { a, c -> Offset(a, c) }
-        HudEdge.BOTTOM -> { a, c -> Offset(a, height - c) }
-        HudEdge.LEFT -> { a, c -> Offset(c, a) }
-        HudEdge.RIGHT -> { a, c -> Offset(width - c, a) }
-    }
     val path = Path()
     // Pontos de controle do `clip-path` do Codenotch (32 × 36), normalizados.
-    fun point(x: Float, y: Float): Offset = map(center - half + y * base, depth - x * depth)
+    fun point(x: Float, y: Float): Offset = hudBalloonPoint(edge, width, height, center - half + y * base, depth - x * depth)
     val start = point(0f, 0f)
     path.moveTo(start.x, start.y)
     val c1 = point(0f, 0.25f)
@@ -200,6 +222,36 @@ internal fun hudBalloonTailPath(
 
 /** A cauda não encosta no canto arredondado do corpo. */
 private const val CORNER_CLEARANCE_PX = 12f
+
+/**
+ * Um ponto da caixa do balão dado em ([along] da borda, [depth] a partir do lado
+ * do notch). Profundidade negativa sai da caixa em direção ao notch — é por onde
+ * o feixe do jato vem do anel.
+ */
+internal fun hudBalloonPoint(edge: HudEdge, width: Float, height: Float, along: Float, depth: Float): Offset = when (edge) {
+    HudEdge.TOP -> Offset(along, depth)
+    HudEdge.BOTTOM -> Offset(along, height - depth)
+    HudEdge.LEFT -> Offset(depth, along)
+    HudEdge.RIGHT -> Offset(width - depth, along)
+}
+
+/**
+ * O trecho visível do balão desdobrando (B3): a profundidade inteira e, ao longo
+ * da borda, [unfold] de cada lado a partir da linha do feixe em [tailCenter].
+ * Com `unfold = 1` é a caixa inteira; com `0`, largura zero sobre a linha.
+ */
+internal fun hudBalloonRevealRect(edge: HudEdge, width: Float, height: Float, tailCenter: Float, unfold: Float): Rect {
+    val along = if (edge.isHorizontal) width else height
+    val line = tailCenter.coerceIn(0f, along)
+    val shown = unfold.coerceIn(0f, 1f)
+    val start = line - line * shown
+    val end = line + (along - line) * shown
+    return if (edge.isHorizontal) Rect(start, 0f, end, height) else Rect(0f, start, width, end)
+}
+
+/** Espessura do feixe e raio do clarão na origem, iguais ao protótipo B3. */
+private val HUD_JET_WIDTH = 1.6.dp
+private val HUD_JET_FLASH = 8.dp
 
 /** O conteúdo do balão de uma conta. */
 @Composable

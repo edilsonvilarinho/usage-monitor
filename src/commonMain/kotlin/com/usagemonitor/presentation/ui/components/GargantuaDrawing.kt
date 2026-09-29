@@ -138,6 +138,38 @@ internal fun DrawScope.drawGargantuaRefreshLight(ripple: Float?, completion: Flo
 
 private const val REFRESH_RIPPLES = 3
 
+/**
+ * B3 · o feixe do jato relativístico, de [from] (centro do anel) até [to]:
+ * branco na origem, quente no meio e dourado sumindo na ponta, com um halo largo
+ * e fraco no lugar do blur (sem `BlurEffect`) e um clarão pequeno na origem.
+ */
+internal fun DrawScope.drawGargantuaJet(from: Offset, to: Offset, alpha: Float, width: Float, flashRadius: Float) {
+    if (alpha <= 0f || from == to) return
+    val beam = Brush.linearGradient(
+        0f to Color.White.copy(alpha = alpha),
+        0.3f to Space.hot.copy(alpha = alpha * 0.9f),
+        1f to Space.gold.copy(alpha = 0f),
+        start = from, end = to
+    )
+    val halo = Brush.linearGradient(
+        0f to Space.gold.copy(alpha = alpha * 0.35f),
+        1f to Space.gold.copy(alpha = 0f),
+        start = from, end = to
+    )
+    drawLine(halo, from, to, strokeWidth = width * 4f, cap = StrokeCap.Round)
+    drawLine(beam, from, to, strokeWidth = width, cap = StrokeCap.Round)
+    drawCircle(
+        brush = Brush.radialGradient(
+            0f to Color.White.copy(alpha = alpha * 0.6f),
+            0.3f to Space.hot.copy(alpha = alpha * 0.42f),
+            1f to Color.Transparent,
+            center = from, radius = flashRadius
+        ),
+        radius = flashRadius,
+        center = from
+    )
+}
+
 private fun DrawScope.drawShock(progress: Float, reach: Float, width: Float, color: Color) {
     if (progress <= 0f || progress >= 1f) return
     val grown = 1f - (1f - progress) * (1f - progress) * (1f - progress)

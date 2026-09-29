@@ -109,7 +109,8 @@ export function Hud() {
         as ações do rodapé no hover, como o anel (#317). Clique num anel atualiza aquela conta; botão direito não faz nada;
         "Abrir" da bandeja traz o notch para a frente. O arco
         de sessão ativa é um cometa azul externo (2,6s). O disco de acreção dourado, a lente gravitacional e
-        os filamentos animam em 14s (4s ao atualizar); a atenção respira em 3,2s. Os arcos de quota e
+        os filamentos animam em 14s (4s ao atualizar); a atenção respira em 3,2s. O balão abre
+        pelo jato relativístico: feixe do anel pela cauda e desdobrar a partir dele (520ms/240ms). Os arcos de quota e
         as marcas dos provedores ficam ancorados. Movimento contínuo só com a política ligada e sem
         reduzir animações — esta referência mantém a cena completa e estática, como os testes.
       </span>

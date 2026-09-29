@@ -1,6 +1,10 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.animation.core.AnimationVector1D
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,13 +66,18 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.HudNotchSizes
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
-import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.rememberLatestNonNull
+import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
+import com.usagemonitor.presentation.ui.components.gargantuaJetCloseFrame
+import com.usagemonitor.presentation.ui.components.gargantuaJetOpenFrame
 import com.usagemonitor.presentation.ui.theme.AppDepth
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.appTweenSpec
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.appSpring
@@ -198,6 +208,10 @@ internal fun HudNotch(
     val lastShown = rememberLatestNonNull(shownIndex)
     // Centro de cada anel ao longo da borda, em px do contêiner.
     val ringCenters = remember { mutableStateMapOf<Int, Float>() }
+    // A profundidade do centro de cada anel (e da engrenagem), de onde o feixe
+    // do jato sai. Lida só no desenho do balão, então não precisa ser estado.
+    val ringDepths = remember { HashMap<Int, Float>() }
+    val balloonBox = remember { HudBalloonBox() }
     var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     // A caixa de cada conta no corpo do notch, para achar o anel de um clique.
     // Não é estado: é lida no gesto, nunca na composição.
@@ -277,6 +291,7 @@ internal fun HudNotch(
                                 Offset(coordinates.size.width / 2f, coordinates.size.height / 2f)
                             )
                             ringCenters[index] = if (edge.isHorizontal) center.x else center.y
+                            ringDepths[index] = if (edge.isHorizontal) center.y else center.x
                         }
                     }
                 )
@@ -344,6 +359,7 @@ internal fun HudNotch(
                                 Offset(coordinates.size.width / 2f, coordinates.size.height / 2f)
                             )
                             ringCenters[APP_BALLOON] = if (edge.isHorizontal) center.x else center.y
+                            ringDepths[APP_BALLOON] = if (edge.isHorizontal) center.y else center.x
                         }
                     }
                 )
@@ -351,10 +367,12 @@ internal fun HudNotch(
             AnimatedVisibility(
                 visible = open && shownIndex != null,
                 modifier = Modifier.layoutId(HudNotchPart.BALLOON),
-                enter = balloonEnter(edge),
-                exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+                // B3 · jato relativístico: a transição toda é o quadro abaixo.
+                enter = EnterTransition.None,
+                exit = ExitTransition.None
             ) {
                 val index = lastShown ?: 0
+                val jet = gargantuaJetProgress(index)
                 val account = accounts.getOrNull(index)
                 val app = appBalloon.takeIf { index == APP_BALLOON }
                 if (account != null || app != null) {
@@ -362,14 +380,22 @@ internal fun HudNotch(
                         edge = edge,
                         bodyHeight = if (app != null) appBalloonHeight else hudBalloonHeight(account!!),
                         tailCenter = { (ringCenters[index] ?: 0f) - balloonAlong.value },
-                        modifier = Modifier.hoverable(balloonHover),
-                        content = {
-                            AppStateCrossfade(state = index, key = { shown -> shown }) { shown ->
-                                val shownAccount = accounts.getOrNull(shown)
-                                when {
-                                    shown == APP_BALLOON -> appBalloon?.invoke()
-                                    shownAccount != null -> HudAccountBalloonContent(shownAccount, language, accountActions)
+                        reveal = jet,
+                        beamOrigin = { balloonBox.depthTo(edge, ringDepths[index]) },
+                        modifier = Modifier
+                            .hoverable(balloonHover)
+                            .onPlaced { coordinates ->
+                                val root = rootCoordinates
+                                if (root != null && root.isAttached && coordinates.isAttached) {
+                                    balloonBox.bounds = root.localBoundingBoxOf(coordinates)
                                 }
+                            },
+                        // Sem crossfade na troca: o jato repetido já é a transição,
+                        // e o conteúdo antigo apagando dentro do desdobrar novo sujava.
+                        content = {
+                            when {
+                                index == APP_BALLOON -> appBalloon?.invoke()
+                                account != null -> HudAccountBalloonContent(account, language, accountActions)
                             }
                         }
                     )
@@ -430,8 +456,11 @@ private fun hudNotchMeasurePolicy(
         val margin = HUD_SHADOW_MARGIN.roundToPx()
         val maxStart = (alongLength - margin - balloonAlongSize).coerceAtLeast(0).toFloat()
         val target = (ring - balloonAlongSize / 2f).coerceIn(margin.toFloat().coerceAtMost(maxStart), maxStart)
-        if (!placement.placed) {
+        // Trocar de anel repete o jato a partir do anel novo (B3): o balão salta
+        // para lá em vez de deslizar, senão desdobraria no meio do caminho.
+        if (!placement.placed || placement.index != shownIndex) {
             placement.placed = true
+            placement.index = shownIndex
             placement.target = target
             scope.launch { balloonAlong.snapTo(target) }
             balloonStart = target.roundToInt()
@@ -552,32 +581,6 @@ private val HANDLE_SLIDE = 14.dp
 /** Abaixo do notch: a alça que desliza de dentro dele sai de trás, não por cima. */
 private const val HANDLE_Z_INDEX = -1f
 
-/**
- * O balão desce do notch: fade, escala a partir do lado do notch e um
- * deslizamento curto, todos pela mola `GENTLE` — sem o rebote, que somado ao
- * balão trocando de conta fazia a abertura tremer.
- */
-@Composable
-private fun balloonEnter(edge: HudEdge): EnterTransition {
-    val slide = with(LocalDensity.current) { BALLOON_SLIDE.roundToPx() }
-    return fadeIn(appTween(AppMotion.slow, AppMotion.emphasizedEasing)) +
-        scaleIn(
-            appSpring(AppMotion.Springs.GENTLE),
-            initialScale = BALLOON_ENTER_SCALE,
-            transformOrigin = balloonOrigin(edge)
-        ) +
-        slideIn(appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = IntOffset.VisibilityThreshold)) {
-            when (edge) {
-                HudEdge.TOP -> IntOffset(0, -slide)
-                HudEdge.BOTTOM -> IntOffset(0, slide)
-                HudEdge.LEFT -> IntOffset(-slide, 0)
-                HudEdge.RIGHT -> IntOffset(slide, 0)
-            }
-        }
-}
-
-private val BALLOON_SLIDE = 8.dp
-
 /** O arco parado volta depois de as alças saírem, não por cima delas. */
 private const val HINT_RETURN_DELAY_MS = 120
 
@@ -587,18 +590,71 @@ private const val HINT_RETURN_DELAY_MS = 120
  */
 private class HudBalloonPlacement {
     var placed = false
+    var index: Int? = null
     var target = 0f
 }
 
-/** O balão cresce a partir do lado do notch. */
-private fun balloonOrigin(edge: HudEdge): TransformOrigin = when (edge) {
-    HudEdge.TOP -> TransformOrigin(0.5f, 0f)
-    HudEdge.BOTTOM -> TransformOrigin(0.5f, 1f)
-    HudEdge.LEFT -> TransformOrigin(0f, 0.5f)
-    HudEdge.RIGHT -> TransformOrigin(1f, 0.5f)
-}
-
-private const val BALLOON_ENTER_SCALE = 0.94f
-
 /** Meio pixel: abaixo disso o balão já está no anel. */
 private const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
+
+/**
+ * Onde a caixa do balão ficou no contêiner, para o feixe saber de onde vem. Não
+ * é estado: é escrita no `onPlaced` e lida no desenho.
+ */
+private class HudBalloonBox {
+    var bounds: Rect? = null
+
+    /** Da borda do balão que encosta no notch até [ringDepth], em direção ao notch. */
+    fun depthTo(edge: HudEdge, ringDepth: Float?): Float {
+        val box = bounds ?: return 0f
+        val ring = ringDepth ?: return 0f
+        return when (edge) {
+            HudEdge.TOP -> box.top - ring
+            HudEdge.BOTTOM -> ring - box.bottom
+            HudEdge.LEFT -> box.left - ring
+            HudEdge.RIGHT -> ring - box.right
+        }.coerceAtLeast(0f)
+    }
+}
+
+/**
+ * O quadro do jato (B3) movido pela própria transição do `AnimatedVisibility`:
+ * entrando, [gargantuaJetOpenFrame] em [AppGargantuaTokens.jetOpenMillis];
+ * saindo, [gargantuaJetCloseFrame] em [AppGargantuaTokens.jetCloseMillis]. A
+ * saída espera esta animação terminar. Com "Reduzir animações" o tween vira
+ * `snap()` e o balão abre e fecha de uma vez.
+ */
+@Composable
+private fun AnimatedVisibilityScope.gargantuaJetProgress(index: Int): () -> GargantuaJetFrame {
+    val policy = LocalAppMotionPolicy.current
+    val progress = transition.animateFloat(
+        transitionSpec = {
+            val millis = if (targetState == EnterExitState.Visible) AppGargantuaTokens.jetOpenMillis else AppGargantuaTokens.jetCloseMillis
+            appTweenSpec(millis, policy, LinearEasing)
+        },
+        label = "gargantuaJet"
+    ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
+    // Trocar de anel (ou ir para a engrenagem) com o balão aberto repete a
+    // abertura a partir do anel novo. Nasce em zero já na composição da troca,
+    // para o conteúdo novo não aparecer inteiro por um quadro.
+    val previous = remember { HudShownIndex() }
+    val switched = remember(index) { Animatable(if (previous.value != null && previous.value != index) 0f else 1f) }
+    SideEffect { previous.value = index }
+    LaunchedEffect(switched) {
+        if (switched.value < 1f) {
+            switched.animateTo(1f, appTweenSpec(AppGargantuaTokens.jetOpenMillis, policy, LinearEasing))
+        }
+    }
+    return {
+        when {
+            transition.targetState != EnterExitState.Visible -> gargantuaJetCloseFrame(1f - progress.value)
+            switched.value < 1f -> gargantuaJetOpenFrame(switched.value)
+            else -> gargantuaJetOpenFrame(progress.value)
+        }
+    }
+}
+
+/** O último balão mostrado, lido na troca; não é estado, só memória entre composições. */
+private class HudShownIndex {
+    var value: Int? = null
+}

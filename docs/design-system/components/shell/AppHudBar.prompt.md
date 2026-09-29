@@ -46,9 +46,12 @@ account has CLI sessions with a growing or saturated context or no reply since t
 words of the data and never "Atenção" (the quota risk word) nor "aguardando você" (the app sees
 transcripts, not processes); the plan and the origin of the reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
 refresh for that account. A curved tail — Codenotch's `TooltipTail` — points at the ring; moving to
-another ring slides the balloon on the `GENTLE` spring. Enter: fade + 0.94 scale + an 8dp slide on
-`GENTLE`, all from the notch side — the `EXPRESSIVE` rebound, on top of the window growing, read as a
-tremor; exit: 90ms fade. Depth `OVERLAY`. The balloon is window content, never a popup.
+another ring (or to the gear) jumps the balloon there and replays the jet from the new ring. Enter and exit are the Gargantua
+**relativistic jet (B3)**, the same for the account and the gear balloon: a thin warm beam leaves the
+ring centre through the tail and crosses the balloon, which unfolds along the edge from the beam line
+(`--dur-gargantua-jet-open` 520ms); closing folds back to the line and pulls the beam into the ring
+(`--dur-gargantua-jet-close` 240ms). The box never resizes — the unfold is a clip. Reduced motion:
+instant cut. Depth `OVERLAY`. The balloon is window content, never a popup.
 
 **Handles** (Codenotch's `MoveHandle` and `SettingsOrb`). Hovered, a 32dp disc past each end of the
 notch: the **hand** at the near end (top or left) moves the notch — **only the hand**: dragging the body

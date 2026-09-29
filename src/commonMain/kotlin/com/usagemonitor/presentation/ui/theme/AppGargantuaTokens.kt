@@ -28,5 +28,9 @@ object AppGargantuaTokens {
     const val birthMillis = 1_100
     /** Colapso ao desativar uma API (C2, colapso com clarão). */
     const val collapseMillis = 480
+    /** Abertura do balão de uma conta ou da engrenagem (B3, jato relativístico). */
+    const val jetOpenMillis = 520
+    /** Fechamento do balão: dobra de volta e o feixe recolhe (B3). */
+    const val jetCloseMillis = 240
     const val diskTilt = -12f
 }

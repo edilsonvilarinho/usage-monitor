@@ -57,8 +57,8 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   do usado exibido, "<1%" nas duas pontas, nada para saldo e atividade observada); cotas do mesmo grupo
   (Antigravity, Cursor) numa caixa sob o nome dele; o rodapé **"Plus · via Codex"** — plano e origem da
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
-  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
-  mola `GENTLE` com crossfade do conteúdo.
+  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel repete a abertura pelo
+  jato a partir do anel novo (ver as alças, abaixo).
 - **Instalação nova** (issue #277, revista com a HUD como único modo): sem API habilitada o notch diz
   "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`), e as Configurações abrem sozinhas uma vez
   por arranque (`OpenSettingsWithoutApis` em `Main.kt`) — fechá-las não as reabre, e a engrenagem
@@ -88,7 +88,18 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     hover abrindo, alternar fecharia o balão que o próprio ponteiro acabou de abrir. Fechar é sair do
     notch ou passar num anel. O reinício do app continua sendo o clique no botão do balão — abrir no
     hover não torna o reinício um gesto de rotina.
-  As alças e o balão entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`.
+  As alças entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`. O balão
+  (de conta e da engrenagem, o mesmo) abre pelo **jato relativístico (B3)**: um feixe fino sai do
+  centro do anel pela cauda e atravessa o balão, que se desdobra ao longo da borda a partir da linha
+  do feixe (`jetOpenMillis` 520ms); fechar dobra de volta e recolhe o feixe para dentro do anel
+  (`jetCloseMillis` 240ms). Quadro puro em `GargantuaBalloonJet.kt`, movido pela transição do
+  `AnimatedVisibility` (a saída espera o quadro terminar); recorte e feixe desenhados pelo `HudBalloon`
+  sem mudar a caixa, e o feixe atravessa o notch por fora dela. O recorte da janela volta
+  `jetCloseMillis` + 60ms depois de recolher, senão cortaria o fim do fechamento. Escolhido entre 5
+  protótipos HTML (onda de choque, lente gravitacional, jato, luz de acreção no contorno, ondas
+  gravitacionais). **Trocar de anel (ou ir para a engrenagem) com o balão aberto repete o jato a partir
+  do anel novo**: o balão salta para lá (`HudBalloonPlacement.index`), sem deslizar nem crossfade — o
+  usuário pediu a animação também na troca, e desdobrar enquanto desliza lia como tremor.
 - **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
   no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
   cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**

@@ -53,6 +53,7 @@ import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.rememberHudPresence
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -531,8 +532,12 @@ internal fun hudGearDescription(language: AppLanguage): String =
 /** Uma passada de hover: o `Exit` de um quadro na divisa não fecha o painel. */
 private const val HUD_COLLAPSE_DELAY_MILLIS = 150L
 
-/** A saída do balão (fade de 90ms) com folga; a janela encolhe depois dela. */
-private const val HUD_COLLAPSE_SETTLE_MILLIS = 200L
+/**
+ * A saída do balão (o jato dobrando, [AppGargantuaTokens.jetCloseMillis]) com
+ * folga; a janela encolhe e o recorte volta depois dela, senão o recorte do
+ * notch corta a pintura do fechamento.
+ */
+private const val HUD_COLLAPSE_SETTLE_MILLIS = AppGargantuaTokens.jetCloseMillis + 60L
 
 /** O monitor sob o ponteiro; `null` se o AWT não souber dizer. */
 private fun pointerScreen(): ScreenInfo? =

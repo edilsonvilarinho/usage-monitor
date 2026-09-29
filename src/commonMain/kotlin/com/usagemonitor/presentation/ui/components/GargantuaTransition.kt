@@ -81,12 +81,12 @@ fun gargantuaCollapseFrame(progress: Float): GargantuaFrame {
     )
 }
 
-private fun span(t: Float, start: Float, end: Float): Float = ((t - start) / (end - start)).coerceIn(0f, 1f)
+internal fun span(t: Float, start: Float, end: Float): Float = ((t - start) / (end - start)).coerceIn(0f, 1f)
 
-private fun pulse(t: Float): Float = if (t <= 0f || t >= 1f) 0f else sin(t * PI).toFloat()
+internal fun pulse(t: Float): Float = if (t <= 0f || t >= 1f) 0f else sin(t * PI).toFloat()
 
-private fun easeOut(t: Float): Float = 1f - (1f - t).pow(3)
+internal fun easeOut(t: Float): Float = 1f - (1f - t).pow(3)
 
-private fun easeIn(t: Float): Float = t * t * t
+internal fun easeIn(t: Float): Float = t * t * t
 
-private fun easeInOut(t: Float): Float = if (t < 0.5f) 4f * t * t * t else 1f - (-2f * t + 2f).pow(3) / 2f
+internal fun easeInOut(t: Float): Float = if (t < 0.5f) 4f * t * t * t else 1f - (-2f * t + 2f).pow(3) / 2f
