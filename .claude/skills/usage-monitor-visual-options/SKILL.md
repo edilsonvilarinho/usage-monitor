@@ -5,7 +5,10 @@ description: Generate N animated HTML options side by side for a visual or anima
 
 # Usage Monitor — opções visuais em HTML
 
-O usuário escolhe mudança visual **vendo**, nunca no escuro. Esta skill recebe **o que mudar** e
+O usuário escolhe mudança visual **vendo**, nunca no escuro: duas rodadas de visual feito direto no
+Kotlin foram recusadas ("muito 2D", "disco chamativo"), e todas as rodadas com opções lado a lado
+saíram escolhidas de primeira. O objetivo dele é a HUD "mais bonita, tema espacial", sem perder a
+leitura do dado. Esta skill recebe **o que mudar** e
 **quantas opções** (ex.: `/usage-monitor-visual-options animação do balão 5`) e entrega N protótipos
 animados lado a lado, no tema vigente, para ele escolher — e só depois disso vem o Compose.
 
@@ -13,9 +16,8 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 
 ## 1. Antes de desenhar
 
-1. Ler o tema vigente e o histórico do que já foi escolhido e recusado. A fonte é a memória do
-   projeto (`gargantua-hud-design`); a tabela abaixo é a cópia versionada dela. **Não reproponha uma
-   opção já recusada com o mesmo nome ou o mesmo gesto.**
+1. Ler o tema vigente e o histórico do que já foi escolhido e recusado — a tabela no fim desta skill
+   é a fonte. **Não reproponha uma opção já recusada com o mesmo nome ou o mesmo gesto.**
 2. Ler a seção da tela em [`docs/hud-notch.md`](../../../docs/hud-notch.md) (HUD) ou em
    [`docs/presentation.md`](../../../docs/presentation.md) (demais telas), e o contrato da primitiva em
    `docs/design-system/components/**/*.prompt.md`. A skill `usage-monitor-design` tem a precedência.
@@ -60,17 +62,16 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 
 1. Abrir o arquivo no painel do navegador (`mcp__Claude_Browser__*`), ler o console (sem erro) e
    tirar 2–3 screenshots no meio das animações (`FREEZE`) para ver que cada efeito aparece de fato.
-2. Copiar o HTML para a pasta de protótipos da memória (`memory/gargantua-prototypes/`) — `build/`
-   some com `clean`.
-3. **Mostrar no chat**: o usuário prefere ver ali. Publicar como widget (`show_widget`, largura
+2. **Mostrar no chat**: o usuário prefere ver ali. Publicar como widget (`show_widget`, largura
    680 px — reorganizar em grade ou um palco com seletor de opção) e também mandar o arquivo com
    `SendUserFile` (display render).
-4. Na resposta: uma linha por opção com o gesto e o tempo, e perguntar a direção (pode combinar
+3. Na resposta: uma linha por opção com o gesto e o tempo, e perguntar a direção (pode combinar
    opções). Não comece o Kotlin antes da escolha.
 
 ## 5. Depois da escolha
 
-- Registrar na memória `gargantua-hud-design` (e na tabela abaixo) a escolhida e as não escolhidas.
+- Registrar a escolhida e as não escolhidas na tabela abaixo, **no mesmo commit** da implementação
+  (nada disso vai para a memória: a skill é a fonte).
 - Implementar como **função pura de quadro** em `commonMain` (padrão `GargantuaTransition.kt`,
   `GargantuaBalloonJet.kt`, `GargantuaRoll.kt`) com teste em `commonTest`; durações em
   `AppGargantuaTokens` com espelho em `docs/design-system/tokens/motion.css`; tween via
