@@ -30,6 +30,7 @@ import com.usagemonitor.presentation.ui.HudAccountBalloonContent
 import com.usagemonitor.presentation.ui.HUD_BALLOON_RING_LEGEND_TAG_PREFIX
 import com.usagemonitor.presentation.ui.HUD_BALLOON_SESSION_SIGNALS_TAG
 import com.usagemonitor.presentation.ui.HudSessionSignal
+import com.usagemonitor.presentation.ui.HudUsedLeft
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.domain.entity.AppLanguage
@@ -144,8 +145,8 @@ class HudNotchTest {
     private val accounts = listOf(
         account(
             "INFORMATA2", "Crítico", AppTone.CRITICAL,
-            HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "28% usado · 72% restante", periodType = PeriodType.INTERVAL),
-            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "9% usado · 91% restante", periodType = PeriodType.WEEKLY)
+            HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeft = HudUsedLeft("28% usado", "72% restante"), periodType = PeriodType.INTERVAL),
+            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeft = HudUsedLeft("9% usado", "91% restante"), periodType = PeriodType.WEEKLY)
         ).copy(
             // O emoji da conta (#287) no fixture principal: o teste de geometria
             // que percorre as quatro bordas afirma que o selo não muda o notch
@@ -249,7 +250,8 @@ class HudNotchTest {
         onNodeWithText("Max 20x").assertIsDisplayed()
         onNodeWithText("Reinicia 22h59").assertIsDisplayed()
         onNodeWithText("Reinicia Ter 21h00").assertIsDisplayed()
-        onNodeWithText("28% usado · 72% restante").assertIsDisplayed()
+        // F10: o restante e o usado em dois textos, lidos como uma linha só.
+        onNodeWithContentDescription("28% usado · 72% restante").assertIsDisplayed()
         onNodeWithText("DeepSeek").assertDoesNotExist()
 
         hoverRing(DEEPSEEK_RING)
@@ -1232,8 +1234,8 @@ class HudNotchTest {
         }
         onNodeWithTag(HUD_BALLOON_SESSION_SIGNALS_TAG).assertIsDisplayed()
         onNodeWithText("Sessões CLI").assertIsDisplayed()
-        onNodeWithText("Contexto saturado · 1 sessão").assertIsDisplayed()
-        onNodeWithText("Sem resposta há 2h10").assertIsDisplayed()
+        // F10: os sinais são as linhas do detalhe do aviso, um por linha.
+        onNodeWithText("Contexto saturado · 1 sessão\nSem resposta há 2h10").assertIsDisplayed()
 
         shown = accounts.first().copy(sessionSignals = emptyList())
         waitForIdle()

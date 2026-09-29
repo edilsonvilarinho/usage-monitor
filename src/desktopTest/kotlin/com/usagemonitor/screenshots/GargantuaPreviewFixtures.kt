@@ -6,6 +6,8 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
+import com.usagemonitor.presentation.ui.HudSessionSignal
+import com.usagemonitor.presentation.ui.HudUsedLeft
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 
@@ -58,7 +60,15 @@ internal object GargantuaPreviewFixtures {
             quotas = quotas,
             focusIndex = quotas.indices.maxBy { index -> quotas[index].fraction },
             sessionActive = source == ApiSource.ANTHROPIC,
-            accountEmoji = if (source == ApiSource.ANTHROPIC) AccountEmoji.HOUSE else null
+            accountEmoji = if (source == ApiSource.ANTHROPIC) AccountEmoji.HOUSE else null,
+            // O balão da conta completo (F10): o aviso de sessões e a linha de plano.
+            sessionSignals = if (source == ApiSource.ANTHROPIC) {
+                listOf(HudSessionSignal("Contexto crescendo · 1 sessão", AppTone.WARNING))
+            } else {
+                emptyList()
+            },
+            planLabel = if (source == ApiSource.ANTHROPIC) "Pro" else null,
+            originLabel = if (source == ApiSource.ANTHROPIC) "via Claude Code" else null
         )
     }
 
@@ -70,8 +80,19 @@ internal object GargantuaPreviewFixtures {
         percentText = "$percent%",
         fraction = percent / 100f,
         tone = tone,
-        resetText = null,
+        resetText = when (period) {
+            PeriodType.INTERVAL -> "21h30"
+            PeriodType.WEEKLY -> "Ter 1h00"
+            else -> "01/10"
+        },
         hasForecast = true,
+        title = when (period) {
+            PeriodType.INTERVAL -> "Sessão 5h"
+            PeriodType.WEEKLY -> "Semanal"
+            PeriodType.MONTHLY -> "Mensal"
+            else -> label
+        },
+        usedLeft = HudUsedLeft(used = "$percent% usado", left = "${100 - percent}% restante"),
         periodType = period
     )
 }

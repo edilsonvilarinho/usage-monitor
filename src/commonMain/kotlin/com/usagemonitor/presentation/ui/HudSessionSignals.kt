@@ -69,6 +69,15 @@ internal fun hudSessionSignals(
     return signals
 }
 
+/**
+ * O tom do aviso de sessões no balão (F10): o do sinal mais grave. A lista já vem
+ * em ordem de gravidade ([hudSessionSignals]), então é o primeiro; vazia não abre
+ * aviso, e o neutro é só um default.
+ */
+internal fun hudSessionSignalsTone(signals: List<HudSessionSignal>): AppTone {
+    return signals.firstOrNull()?.tone ?: AppTone.NEUTRAL
+}
+
 private fun sessions(count: Int, pt: Boolean): String = when {
     pt && count == 1 -> "1 sessão"
     pt -> "$count sessões"

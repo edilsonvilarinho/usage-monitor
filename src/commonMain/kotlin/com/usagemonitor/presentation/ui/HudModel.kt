@@ -201,11 +201,26 @@ data class HudQuota(
     val title: String = shortLabel,
     /** Grupo de modelos (Antigravity) ou franquia (Cursor); as cotas dele ficam numa caixa. */
     val group: String? = null,
-    /** "87% usado · 13% restante"; `null` onde não há teto (saldo, atividade observada). */
-    val usedLeftText: String? = null,
+    /** "87% usado" e "13% restante"; `null` onde não há teto (saldo, atividade observada). */
+    val usedLeft: HudUsedLeft? = null,
     /** A janela da cota; decide a posição do anel. `null` conta como `REPORTED`, por dentro. */
     val periodType: PeriodType? = null
-)
+) {
+    /** "87% usado · 13% restante": a linha inteira, para leitor de tela e trilha. */
+    val usedLeftText: String?
+        get() = usedLeft?.text
+}
+
+/**
+ * As duas metades da linha de baixo de cada cota no balão (F10): o **restante**
+ * vai à esquerda, na cor do texto, e o usado à direita, apagado — o que interessa
+ * numa olhada é quanto sobra. Os textos já vêm na língua do app.
+ */
+@Immutable
+data class HudUsedLeft(val used: String, val left: String) {
+    val text: String
+        get() = "$used · $left"
+}
 
 /** Uma linha de texto do notch: a janela (`null` sem janela a distinguir) e o percentual. */
 @Immutable
@@ -319,7 +334,7 @@ internal fun buildHudAccounts(
                     hasForecast = entry.risk != null,
                     title = hudQuotaTitle(entry.quota, language),
                     group = quotaGroupOf(entry.quota),
-                    usedLeftText = hudUsedLeftText(entry.quota, language),
+                    usedLeft = hudUsedLeft(entry.quota, language),
                     periodType = entry.quota.periodType
                 )
             }
@@ -394,14 +409,21 @@ internal fun hudQuotaTitle(quota: QuotaInfo, language: AppLanguage): String {
  *
  * Sem teto não há restante: saldo pré-pago e atividade observada devolvem `null`.
  */
-internal fun hudUsedLeftText(quota: QuotaInfo, language: AppLanguage): String? {
+internal fun hudUsedLeftText(quota: QuotaInfo, language: AppLanguage): String? = hudUsedLeft(quota, language)?.text
+
+/** As duas metades de [hudUsedLeftText], separadas para o balão (F10). */
+internal fun hudUsedLeft(quota: QuotaInfo, language: AppLanguage): HudUsedLeft? {
     if (quota.unit == UsageUnit.CURRENCY_USD || quota.isExtraCreditsQuota) return null
     if (quota.unit != UsageUnit.PERCENTAGE && quota.total <= 0L) return null
     val exact = quota.percentageUsed.coerceIn(0f, 1f) * 100f
     val usedWhole = exact.toInt()
     val used = if (exact > 0f && exact < 1f) "<1" else usedWhole.toString()
     val left = if (exact > 99f && exact < 100f) "<1" else (100 - usedWhole).coerceAtLeast(0).toString()
-    return if (language == AppLanguage.PT) "$used% usado · $left% restante" else "$used% used · $left% left"
+    return if (language == AppLanguage.PT) {
+        HudUsedLeft(used = "$used% usado", left = "$left% restante")
+    } else {
+        HudUsedLeft(used = "$used% used", left = "$left% left")
+    }
 }
 
 /**

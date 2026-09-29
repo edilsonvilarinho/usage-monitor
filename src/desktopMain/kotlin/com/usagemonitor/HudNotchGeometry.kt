@@ -257,10 +257,9 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
                 HUD_BALLOON_QUOTA_BLOCK * run.quotas.size + HUD_BALLOON_SECTION_GAP * (run.quotas.size - 1)
         }
     }
-    // Os sinais de sessão (issue #265): título da seção e uma linha por sinal.
+    // Os sinais de sessão (issue #265), num aviso desde o F10.
     if (account.sessionSignals.isNotEmpty()) {
-        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_GROUP_HEADER +
-            HUD_BALLOON_FOOTER * account.sessionSignals.size
+        height += HUD_BALLOON_SECTION_GAP + hudSessionBannerHeight(account.sessionSignals.size)
     }
     if (account.detailLine != null) {
         height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
@@ -270,8 +269,17 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
     return height
 }
 
+/**
+ * O aviso dos sinais de sessão no balão da conta (F10): o mesmo `AppBanner` do
+ * aviso de atualização, título numa linha e um sinal por linha de detalhe.
+ */
+internal fun hudSessionBannerHeight(signals: Int): Dp = 8.dp * 2 + 16.dp + 17.dp * signals
+
 /** As linhas do balão da engrenagem. */
 internal val HUD_APP_BALLOON_ACTIONS = HUD_BALLOON_ACTIONS
+
+/** F10: versão e contagem numa linha própria, sob o título. */
+internal val HUD_APP_BALLOON_STATUS = 16.dp
 
 /**
  * O aviso de atualização no balão da engrenagem é um `AppBanner` (issue #291): a
@@ -292,11 +300,12 @@ internal val HUD_APP_BALLOON_UPDATE_TEXT_WIDTH =
     HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2 - 2.dp - AppSpacing.md
 
 /**
- * A altura do balão da engrenagem: título com a contagem, a fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
+ * A altura do balão da engrenagem: título, a linha de versão e contagem (F10), a
+ * fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
  * com ação — o botão, na altura de controle do sistema.
  */
 internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
-    var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +
+    var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER + HUD_APP_BALLOON_STATUS +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
     if (hasUpdateIndicator) {
         height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_BANNER

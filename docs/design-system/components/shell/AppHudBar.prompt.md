@@ -27,8 +27,9 @@ informs alone. Horizontal on top/bottom, a column on the sides, where a long wor
 wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
 seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and the focus quota with its
 window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip
-holds **only the accounts**. The countdown to the next collection lives in the **gear balloon
-header** (#269): with the adaptive cadence (60 s while a CLI session is active) it restarted every
+holds **only the accounts**. The countdown to the next collection lives in the **gear balloon**,
+on its own line under the title with the version since F10 ("v41.5.0 · próxima coleta em ◷ 00:25";
+a long beta version ellipsizes before the countdown does) (#269): with the adaptive cadence (60 s while a CLI session is active) it restarted every
 minute on the screen edge. Its icon is a 12dp **draining clock** (a sector that starts full after a
 poll and empties clockwise from 12 o'clock) on the **same line** as `mm:ss` (#293); the full turn is
 the cadence in force. A bare progress line on the notch border was tried and rejected: without the
@@ -38,11 +39,13 @@ Skia's whole-pixel rounding, or the last item of the strip breaks at fractional 
 **Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon
 for **that account only** — Codenotch's card, not a panel of every account. Header with the provider
 mark in the source accent, the card title and the state; per quota the card's title and
-"Reinicia 22h59", an `AppProgressTrack` and **"68% usado · 32% restante"** (used truncated like the
-ring, left derived from it, "<1%" at both ends, nothing for balances); quotas of one group
-(Antigravity models, Cursor allowances) in a box under the group name; **"Sessões CLI"** when the
-account has CLI sessions with a growing or saturated context or no reply since the last request
-(issue #265) — one line per signal, "Contexto saturado · 1 sessão", "Sem resposta há 2h10", in the
+"Reinicia 22h59", an `AppProgressTrack` and, since F10, **"32% restante"** on the left in the text
+colour with **"68% usado"** dimmed on the right (used truncated like the ring, left derived from it,
+"<1%" at both ends, nothing for balances; screen readers still get one line, "68% usado · 32%
+restante"); quotas of one group (Antigravity models, Cursor allowances) in a box under the group
+name; a **"Sessões CLI"** `AppBanner` when the account has CLI sessions with a growing or saturated
+context or no reply since the last request (issue #265) — the worst signal's tone only on the 2dp
+bar, one detail line per signal, "Contexto saturado · 1 sessão", "Sem resposta há 2h10", in the
 words of the data and never "Atenção" (the quota risk word) nor "aguardando você" (the app sees
 transcripts, not processes); the plan and the origin of the reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
 refresh for that account. A curved tail — Codenotch's `TooltipTail` — points at the ring; moving to
@@ -121,5 +124,5 @@ motion turns it off.
 inclined gold accretion disc, gravitational lens and moving filaments remain inside the indicator;
 the existing HUD surface, balloons, account ordering, gestures and API data contracts are
 unchanged. All eleven APIs reuse the same renderer with the existing provider mark. Quota arcs
-never rotate. Session activity is the blue external comet. Refresh accelerates the decorative
+never rotate. Session activity is the blue external comet, with a straight thin **ion tail** (F10) leaving its head backwards, 18° outwards, sized to stay inside the orbit reach. Refresh accelerates the decorative
 disc, never the provider logo. A complete static scene is drawn with reduced motion and in tests.

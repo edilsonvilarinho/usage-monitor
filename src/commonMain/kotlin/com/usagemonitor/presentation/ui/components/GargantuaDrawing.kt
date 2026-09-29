@@ -202,7 +202,58 @@ internal fun DrawScope.drawGargantuaActivity(phase: Float, stroke: Float, gap: F
             Brush.radialGradient(listOf(color.copy(alpha = 0.45f), Color.Transparent), point, glow),
             glow, point
         )
+        drawGargantuaIonTail(point, angle, radius, orbitStroke, color)
         drawCircle(color, orbitStroke * 0.75f, point)
         drawCircle(Color.White.copy(alpha = 0.7f), orbitStroke * 0.34f, point)
     }
 }
+
+/**
+ * F10 · a cauda de íons: um traço reto e fino que sai da cabeça para trás, um
+ * pouco inclinado para fora, como a cauda de íons de um cometa de verdade ao
+ * lado da de poeira (o arco curvo). Lê "em movimento" sem o cometa ficar mais
+ * forte. O comprimento é o que cabe: a ponta não passa do halo da cabeça, então
+ * a órbita continua dentro de `appUsageRingOrbitReach`.
+ */
+private fun DrawScope.drawGargantuaIonTail(head: Offset, angle: Double, radius: Float, orbitStroke: Float, color: Color) {
+    val tilt = ION_TAIL_TILT_DEGREES * PI / 180
+    val length = gargantuaIonTailLength(radius, orbitStroke * ION_TAIL_ALLOWANCE, ION_TAIL_TILT_DEGREES)
+        .coerceAtMost(orbitStroke * ION_TAIL_MAX)
+    if (length <= 0f) return
+    // O cometa anda no sentido horário: para trás é a tangente oposta; para fora, o raio.
+    val back = Offset(sin(angle).toFloat(), -cos(angle).toFloat())
+    val out = Offset(cos(angle).toFloat(), sin(angle).toFloat())
+    val direction = back * cos(tilt).toFloat() + out * sin(tilt).toFloat()
+    val end = head + direction * length
+    drawLine(
+        brush = Brush.linearGradient(
+            0f to Color.White.copy(alpha = 0.9f),
+            0.4f to color.copy(alpha = 0.75f),
+            1f to Color.Transparent,
+            start = head,
+            end = end
+        ),
+        start = head,
+        end = end,
+        strokeWidth = orbitStroke * ION_TAIL_WIDTH,
+        cap = StrokeCap.Round
+    )
+}
+
+/**
+ * Quanto a cauda de íons pode ter sem a ponta passar de [radius] + [allowance]
+ * do centro: saindo de um ponto no raio [radius], inclinada [tiltDegrees] para
+ * fora da tangente. Raiz da equação |cabeça + L·direção| = [radius] + [allowance].
+ */
+internal fun gargantuaIonTailLength(radius: Float, allowance: Float, tiltDegrees: Float): Float {
+    if (radius <= 0f || allowance <= 0f) return 0f
+    val outward = radius * sin(tiltDegrees * PI / 180).toFloat()
+    val limit = radius + allowance
+    return -outward + kotlin.math.sqrt(outward * outward + limit * limit - radius * radius)
+}
+
+private const val ION_TAIL_TILT_DEGREES = 18f
+/** A folga além da cabeça, dentro do halo dela (1,4 do traço da órbita). */
+private const val ION_TAIL_ALLOWANCE = 1.2f
+private const val ION_TAIL_MAX = 4f
+private const val ION_TAIL_WIDTH = 0.5f

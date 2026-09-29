@@ -29,10 +29,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_APP_BALLOON_ACTIONS
+import com.usagemonitor.HUD_APP_BALLOON_STATUS
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_BANNER
 import com.usagemonitor.HUD_BALLOON_ACTIONS
 import com.usagemonitor.HUD_BALLOON_BAR_ROW
@@ -51,16 +54,15 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudQuotaRuns
+import com.usagemonitor.hudSessionBannerHeight
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
-import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
 import com.usagemonitor.presentation.ui.components.drawGargantuaJet
-import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
@@ -326,26 +328,17 @@ internal fun HudAccountBalloonContent(
         // não são cota, e a palavra do cabeçalho continua sendo só do risco dela.
         if (account.sessionSignals.isNotEmpty()) {
             Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
-            Column(modifier = Modifier.fillMaxWidth().testTag(HUD_BALLOON_SESSION_SIGNALS_TAG)) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Sessões CLI" else "CLI sessions",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    modifier = Modifier.height(HUD_BALLOON_GROUP_HEADER)
-                )
-                account.sessionSignals.forEach { signal ->
-                    // Tom e palavra juntos: o texto diz o sinal, a cor só reforça.
-                    Text(
-                        text = signal.text,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = signal.tone.color(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.height(HUD_BALLOON_FOOTER)
-                    )
-                }
-            }
+            // F10: um aviso, como o da atualização no balão da engrenagem. O tom
+            // do pior sinal fica só na barra de 2dp; a frase de cada sinal diz o
+            // que ele é, uma por linha.
+            AppBanner(
+                title = if (language == AppLanguage.PT) "Sessões CLI" else "CLI sessions",
+                description = account.sessionSignals.joinToString("\n") { signal -> signal.text },
+                tone = hudSessionSignalsTone(account.sessionSignals),
+                modifier = Modifier
+                    .height(hudSessionBannerHeight(account.sessionSignals.size))
+                    .testTag(HUD_BALLOON_SESSION_SIGNALS_TAG)
+            )
         }
         account.detailLine?.let { detail ->
             Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
@@ -405,15 +398,42 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
     ) {
         AppProgressTrack(fraction = quota.fraction, tone = quota.tone)
     }
-    // Saldo e atividade observada não têm teto: ali a linha é o valor do card.
-    Text(
-        text = quota.usedLeftText ?: quota.percentText,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.height(HUD_BALLOON_QUOTA_DETAIL)
-    )
+    val usedLeft = quota.usedLeft
+    if (usedLeft == null) {
+        // Saldo e atividade observada não têm teto: ali a linha é o valor do card.
+        Text(
+            text = quota.percentText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.height(HUD_BALLOON_QUOTA_DETAIL)
+        )
+        return
+    }
+    // F10: o restante à esquerda, na cor do texto, e o usado à direita, apagado.
+    // A linha continua uma só para o leitor de tela: "7% usado · 93% restante".
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HUD_BALLOON_QUOTA_DETAIL)
+            .clearAndSetSemantics { contentDescription = usedLeft.text },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = usedLeft.left,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = usedLeft.used,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
 }
 
 /** A coluna do balão da engrenagem. */
@@ -459,15 +479,32 @@ internal fun HudAppBalloonContent(
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
+        }
+        // F10: versão e contagem numa linha própria, sob o título. No cabeçalho as
+        // duas disputavam a largura com o nome do app.
+        Row(
+            modifier = Modifier.fillMaxWidth().height(HUD_APP_BALLOON_STATUS),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Text(
                 text = "v$appVersion",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag(HUD_APP_BALLOON_VERSION_TEST_TAG)
+                // Quem cede com uma beta longa é a versão, nunca a contagem.
+                modifier = Modifier.weight(1f, fill = false).testTag(HUD_APP_BALLOON_VERSION_TEST_TAG)
             )
-            countdown?.invoke()
+            if (countdown != null) {
+                Text(
+                    text = if (language == AppLanguage.PT) "· próxima coleta em" else "· next fetch in",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                countdown()
+            }
         }
         Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
         Box(
@@ -485,6 +522,10 @@ internal fun HudAppBalloonContent(
                 tone = indicator.tone,
                 modifier = Modifier.height(HUD_APP_BALLOON_UPDATE_BANNER).testTag(HUD_APP_BALLOON_UPDATE_BANNER_TAG)
             )
+            // O botão fica abaixo do aviso, e não dentro dele como o F10 desenhava:
+            // "Reiniciar o app e atualizar" não cabe na largura interna do aviso
+            // (192dp) a partir de 105% de escala, e o rótulo não encurta — ele diz
+            // o que reinicia. `HudNotchTextFitTest` mede.
             val actionLabel = indicator.actionLabel
             if (actionLabel != null && onUpdateAction != null) {
                 Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))

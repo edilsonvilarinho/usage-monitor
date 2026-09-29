@@ -52,9 +52,11 @@ linhas que ele substituiu. `HudEdge` é enum novo.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
-  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189), barra e
-  **"68% usado · 32% restante"** (`hudUsedLeftText`: usado truncado como o anel, restante derivado
-  do usado exibido, "<1%" nas duas pontas, nada para saldo e atividade observada); cotas do mesmo grupo
+  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189), barra e,
+  desde o F10, **"32% restante"** à esquerda na cor do texto e **"68% usado"** à direita, apagado
+  (`HudUsedLeft` por `hudUsedLeft`: usado truncado como o anel, restante derivado do usado exibido,
+  "<1%" nas duas pontas, nada para saldo e atividade observada; para o leitor de tela a linha continua
+  uma só, "68% usado · 32% restante"); cotas do mesmo grupo
   (Antigravity, Cursor) numa caixa sob o nome dele; o rodapé **"Plus · via Codex"** — plano e origem da
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
   (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel repete a abertura pelo
@@ -64,8 +66,10 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   por arranque (`OpenSettingsWithoutApis` em `Main.kt`) — fechá-las não as reabre, e a engrenagem
   continua levando até lá. A troca automática da janela padrão para a HUD na primeira coleta
   (`hudDefaultPending`, notificação com os caminhos de volta) saiu junto com a janela padrão.
-- **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): a seção
-  "Sessões CLI", entre as cotas e o rodapé, só quando há o que dizer. Uma linha por sinal: contexto
+- **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): o aviso
+  "Sessões CLI" (um `AppBanner` desde o F10, com o tom do sinal mais grave só na barra de 2dp —
+  `hudSessionSignalsTone`; altura `hudSessionBannerHeight`), entre as cotas e o rodapé, só quando há o
+  que dizer. Uma linha de detalhe por sinal: contexto
   saturado, contexto crescendo (as duas contagens saem do mesmo `SessionPulse` que faz o botão de
   sessões piscar) e sem resposta (`stalledSessions`, que antes só ia para a bandeja). O texto usa as
   palavras do dado — "Contexto saturado · 1 sessão", "Sem resposta há 2h10" — e **nunca** "Atenção",
@@ -251,6 +255,21 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   mede os textos antes da composição, não muda. Não rola na primeira composição nem com "Reduzir
   animações". Escolhido entre 5 protótipos HTML (desvio para o vermelho, lente, plasma que conta,
   onda gravitacional, horizonte de eventos).
+- **Balão da conta, execução e engrenagem: F10 · cometa com cauda de íons** (rodada F, escolhida entre
+  dez protótipos HTML; 2026-09-29). Três mudanças juntas:
+  - **Conta**: o **restante** vira o número da linha de baixo de cada cota, à esquerda e na cor do
+    texto, e o usado vai à direita, apagado — numa olhada o que interessa é quanto sobra. As Sessões
+    CLI viraram aviso (acima).
+  - **Execução**: o cometa ganhou uma **cauda de íons** — traço reto e fino que sai da cabeça para
+    trás, 18° para fora da tangente, ao lado da cauda curva (a de poeira). Lê "em movimento" sem o
+    cometa ficar mais forte. O comprimento é o que cabe (`gargantuaIonTailLength`): a ponta para em
+    1,2 traço além da cabeça, dentro do halo, então `appUsageRingOrbitReach` não muda e
+    `HudNotchGeometryTest` continua valendo. Parado sem a política contínua, como o cometa.
+  - **Engrenagem**: versão e contagem saíram do cabeçalho para uma linha própria sob o título
+    (`HUD_APP_BALLOON_STATUS`), "v41.5.0 · próxima coleta em ◷ 00:25"; com uma beta longa quem cede
+    é a versão, com reticências. O F10 punha o botão da atualização **dentro** do aviso: medido,
+    "Reiniciar o app e atualizar" não cabe nem na largura interna inteira do aviso (192dp) a partir de
+    105% de escala, e o rótulo não encurta — diz o que reinicia. O botão continua abaixo do aviso.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
