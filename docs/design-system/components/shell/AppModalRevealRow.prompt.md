@@ -33,4 +33,15 @@ demo). Unmarked content appears with the frame. **Never nest** a marked row insi
 be clipped twice. Outside a modal (`LocalModalReveal` is null: the HUD, its balloons, cards) the
 modifier does nothing.
 
-**Reduced motion and non-Windows**: no filaments, the window opens and closes at once.
+**Replay on content change** (`AppModalRevealScope(replayKey)`). A scope plays E9 again on its own
+rows when it is first composed with the window already settled, and every time its key changes:
+Settings section, Help topic, data arriving after the open and list ↔ detail (every
+`AppStateCrossfade` target is a scope), tabs, time range, quota and account (History, CLI and Codex
+sessions, team usage), sub-tab, sort and page (the breakdown). Keys come from the **loaded** data
+(`rememberSettledRevealKey`), never from the click, or the replay would run over the stale faded
+content and again on arrival. Live ticks and typed filters never replay. States form a chain: a row
+registers with its scope and the window; a moving window (open/close) wins, otherwise the innermost
+scope that is playing.
+
+**Reduced motion and non-Windows**: no filaments, the window opens and closes at once, and no scope
+replays (`replayEnabled` follows the window's own decision).

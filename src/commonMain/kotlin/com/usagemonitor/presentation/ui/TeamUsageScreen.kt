@@ -4,6 +4,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.unit.Dp
 import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.rememberSettledRevealKey
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -426,13 +428,18 @@ private fun TeamUsageList(
             )
         }
     ) {
-        TeamUsageHeader(
-            state = state,
-            language = language,
-            onSelectRange = onSelectRange,
-            onSelectView = onSelectView,
-            onExportReport = onExportReport
-        )
+        // Aba nova nasce num escopo que toca o E9; a janela troca a chave só
+        // quando a leitura nova chega, e aí os totais do cabeçalho tocam junto.
+        val revealKey = rememberSettledRevealKey(state.range, settled = !state.isRefreshing)
+        AppModalRevealScope(replayKey = revealKey) {
+            TeamUsageHeader(
+                state = state,
+                language = language,
+                onSelectRange = onSelectRange,
+                onSelectView = onSelectView,
+                onExportReport = onExportReport
+            )
+        }
 
         // Sem este aviso a diferença para o modal de uma conta parece defeito:
         // lá a janela de 5h começa no reset da quota daquela conta, e aqui não
@@ -471,21 +478,25 @@ private fun TeamUsageList(
 
         if (view == TeamUsageView.TREND) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                TeamTrendPane(trend = state.trend, language = language)
+                AppModalRevealScope(replayKey = revealKey) {
+                    TeamTrendPane(trend = state.trend, language = language)
+                }
             }
             return@AppWindowScaffold
         }
 
         if (view == TeamUsageView.BREAKDOWN) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                CliUsageBreakdownPane(
-                    breakdown = state.breakdown,
-                    errorMessage = null,
-                    language = language,
-                    // Sem orçamento nem créditos: os dois são da máquina e da conta
-                    // desta instalação, não do time que a janela mostra.
-                    hint = TeamUsageLabels.breakdownHint(language)
-                )
+                AppModalRevealScope(replayKey = revealKey) {
+                    CliUsageBreakdownPane(
+                        breakdown = state.breakdown,
+                        errorMessage = null,
+                        language = language,
+                        // Sem orçamento nem créditos: os dois são da máquina e da conta
+                        // desta instalação, não do time que a janela mostra.
+                        hint = TeamUsageLabels.breakdownHint(language)
+                    )
+                }
             }
             return@AppWindowScaffold
         }
@@ -504,98 +515,102 @@ private fun TeamUsageList(
             group.worstHealth != null || group.members.any { member -> member.worstHealth != null }
         }
 
-        TeamColumnHeader(
-            language = language,
-            hasStatusColumn = hasStatusColumn,
-            hasActionColumn = state.isAdminOverview
-        )
+        // A lista de integrantes refaz o E9 quando a aba volta para ela (o
+        // escopo nasce) e quando a leitura de uma janela nova chega.
+        AppModalRevealScope(replayKey = revealKey) {
+            TeamColumnHeader(
+                language = language,
+                hasStatusColumn = hasStatusColumn,
+                hasActionColumn = state.isAdminOverview
+            )
 
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            val listState = rememberLazyListState()
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                val listState = rememberLazyListState()
 
-            // Sem espaço entre itens, como na lista da máquina: cada linha traz a
-            // própria divisória, e o vão de 8dp entre elas era justamente o que
-            // desfazia a leitura de tabela — conta, integrante e sessão viravam
-            // três blocos soltos do mesmo peso.
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
-            ) {
-                for (emailGroup in state.emailGroups) {
-                    // Cabeçalho só na visão global: no modal de uma conta só, a
-                    // conta já é a da janela e repeti-la aqui seria ruído.
-                    if (state.isAdminOverview) {
-                        item(key = "email:${emailGroup.groupKey}") {
-                            Box(modifier = appItemMotion()) {
-                                TeamAccountGroupHeader(
-                                    group = emailGroup,
-                                    share = state.tokenShareOf(emailGroup),
-                                    expanded = state.isEmailExpanded(emailGroup),
-                                    language = language,
-                                    hasStatusColumn = hasStatusColumn,
-                                    hasActionColumn = state.isAdminOverview,
-                                    onToggle = { onToggleAccount(emailGroup.groupKey) }
-                                )
-                            }
-                        }
-                    }
-
-                    if (!state.isEmailExpanded(emailGroup)) {
-                        continue
-                    }
-
-                    for (account in emailGroup.accounts) {
-                        // Um degrau por nível que existe acima do integrante: a
-                        // faixa da conta só é desenhada na visão global, e a
-                        // sub-faixa de uuid só quando o mesmo e-mail tem mais de
-                        // uma conta. No modal de uma conta os dois somem e o
-                        // recuo é zero, que é a geometria de sempre.
-                        val hasUuidHeader = emailGroup.accounts.size > 1
-                        val memberIndent = when {
-                            !state.isAdminOverview -> 0.dp
-                            hasUuidHeader -> TEAM_NEST_INDENT * 2
-                            else -> TEAM_NEST_INDENT
-                        }
-                        val sessionIndent = memberIndent + TEAM_SESSION_INDENT
-
-                        if (hasUuidHeader) {
-                            item(key = "uuid:${account.accountKey}") {
+                // Sem espaço entre itens, como na lista da máquina: cada linha traz a
+                // própria divisória, e o vão de 8dp entre elas era justamente o que
+                // desfazia a leitura de tabela — conta, integrante e sessão viravam
+                // três blocos soltos do mesmo peso.
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
+                ) {
+                    for (emailGroup in state.emailGroups) {
+                        // Cabeçalho só na visão global: no modal de uma conta só, a
+                        // conta já é a da janela e repeti-la aqui seria ruído.
+                        if (state.isAdminOverview) {
+                            item(key = "email:${emailGroup.groupKey}") {
                                 Box(modifier = appItemMotion()) {
-                                    TeamAccountUuidHeader(
-                                        account = account,
+                                    TeamAccountGroupHeader(
+                                        group = emailGroup,
+                                        share = state.tokenShareOf(emailGroup),
+                                        expanded = state.isEmailExpanded(emailGroup),
                                         language = language,
-                                        indent = TEAM_NEST_INDENT
+                                        hasStatusColumn = hasStatusColumn,
+                                        hasActionColumn = state.isAdminOverview,
+                                        onToggle = { onToggleAccount(emailGroup.groupKey) }
                                     )
                                 }
                             }
                         }
 
-                    for (member in account.members) {
-                        teamMemberItems(
-                            member = member,
-                            state = state,
-                            language = language,
-                            memberIndent = memberIndent,
-                            sessionIndent = sessionIndent,
-                            hasStatusColumn = hasStatusColumn,
-                            localDeviceId = localDeviceId,
-                            onToggleMember = onToggleMember,
-                            onRequestRemoveMember = onRequestRemoveMember,
-                            onOpenSession = onOpenSession,
-                            onRequestRemoveSession = onRequestRemoveSession
-                        )
-                    }
+                        if (!state.isEmailExpanded(emailGroup)) {
+                            continue
+                        }
+
+                        for (account in emailGroup.accounts) {
+                            // Um degrau por nível que existe acima do integrante: a
+                            // faixa da conta só é desenhada na visão global, e a
+                            // sub-faixa de uuid só quando o mesmo e-mail tem mais de
+                            // uma conta. No modal de uma conta os dois somem e o
+                            // recuo é zero, que é a geometria de sempre.
+                            val hasUuidHeader = emailGroup.accounts.size > 1
+                            val memberIndent = when {
+                                !state.isAdminOverview -> 0.dp
+                                hasUuidHeader -> TEAM_NEST_INDENT * 2
+                                else -> TEAM_NEST_INDENT
+                            }
+                            val sessionIndent = memberIndent + TEAM_SESSION_INDENT
+
+                            if (hasUuidHeader) {
+                                item(key = "uuid:${account.accountKey}") {
+                                    Box(modifier = appItemMotion()) {
+                                        TeamAccountUuidHeader(
+                                            account = account,
+                                            language = language,
+                                            indent = TEAM_NEST_INDENT
+                                        )
+                                    }
+                                }
+                            }
+
+                        for (member in account.members) {
+                            teamMemberItems(
+                                member = member,
+                                state = state,
+                                language = language,
+                                memberIndent = memberIndent,
+                                sessionIndent = sessionIndent,
+                                hasStatusColumn = hasStatusColumn,
+                                localDeviceId = localDeviceId,
+                                onToggleMember = onToggleMember,
+                                onRequestRemoveMember = onRequestRemoveMember,
+                                onOpenSession = onOpenSession,
+                                onRequestRemoveSession = onRequestRemoveSession
+                            )
+                        }
+                        }
                     }
                 }
-            }
 
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(listState),
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .testTag(TEAM_LIST_SCROLLBAR_TAG)
-            )
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(listState),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .testTag(TEAM_LIST_SCROLLBAR_TAG)
+                )
+            }
         }
     }
 }

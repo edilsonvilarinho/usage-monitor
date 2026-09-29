@@ -36,6 +36,8 @@ import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.rememberSettledRevealKey
 import com.usagemonitor.presentation.ui.components.AppMetricBlock
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
@@ -153,24 +155,33 @@ fun CodexCliSessionsScreen(
             }
         }
 
-        when (val current = state) {
-            CodexCliSessionsUiState.Loading -> AppLoadingState(
-                message = if (language == AppLanguage.PT) "Lendo rollouts locais…" else "Reading local rollouts…",
-                modifier = Modifier.fillMaxSize()
-            )
-            is CodexCliSessionsUiState.Error -> AppErrorState(
-                message = current.message,
-                retryLabel = if (language == AppLanguage.PT) "Tentar novamente" else "Retry",
-                onRetry = viewModel::refresh,
-                modifier = Modifier.fillMaxSize()
-            )
-            is CodexCliSessionsUiState.Success -> CodexCliSessionContent(
-                state = current,
-                language = language,
-                onOpenSession = viewModel::openSession,
-                onCloseDetail = viewModel::closeDetail,
-                modifier = Modifier.fillMaxSize()
-            )
+        // Dado que chega, faixa nova e lista ↔ detalhe refazem o E9 no conteúdo;
+        // a faixa troca a chave só quando a leitura dela chega.
+        val success = state as? CodexCliSessionsUiState.Success
+        val revealKey = rememberSettledRevealKey(
+            key = if (success == null) state::class else listOf(success.range, success.detail != null),
+            settled = success?.isRefreshing != true
+        )
+        AppModalRevealScope(replayKey = revealKey) {
+            when (val current = state) {
+                CodexCliSessionsUiState.Loading -> AppLoadingState(
+                    message = if (language == AppLanguage.PT) "Lendo rollouts locais…" else "Reading local rollouts…",
+                    modifier = Modifier.fillMaxSize()
+                )
+                is CodexCliSessionsUiState.Error -> AppErrorState(
+                    message = current.message,
+                    retryLabel = if (language == AppLanguage.PT) "Tentar novamente" else "Retry",
+                    onRetry = viewModel::refresh,
+                    modifier = Modifier.fillMaxSize()
+                )
+                is CodexCliSessionsUiState.Success -> CodexCliSessionContent(
+                    state = current,
+                    language = language,
+                    onOpenSession = viewModel::openSession,
+                    onCloseDetail = viewModel::closeDetail,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }
