@@ -32,6 +32,19 @@
   --spring-expressive: 420ms cubic-bezier(.34, 1.3, .64, 1);  /* 0.75 / 600 — HUD, menu */
 
   --stagger: 60ms;
+
+  /* Gargantua HUD only: continuous && !reduced. Quota arcs never rotate or
+     change length; only plasma pulses travel inside the drawn sweep. */
+  --dur-gargantua-orbit: 14000ms;
+  --dur-gargantua-attention: 3200ms;
+  --dur-gargantua-active: 2600ms;
+  --dur-gargantua-refresh: 4000ms;
+  --dur-gargantua-ripple: 1300ms;       /* fetching: gravitational waves */
+  --dur-gargantua-refresh-wave: 800ms;  /* fetch done: one final wave */
+  --dur-gargantua-flow: 2800ms;
+  /* Finite: API enabled / app start (cascade 140ms) and API disabled. */
+  --dur-gargantua-birth: 1100ms;
+  --dur-gargantua-collapse: 480ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

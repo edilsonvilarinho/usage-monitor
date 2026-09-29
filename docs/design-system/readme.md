@@ -137,9 +137,16 @@ ambient stays at 6dp because the dashboard gap is 12dp. **In dark, black shadow 
 (measured: 10dp darkens `#131010` by 3/255) — there the volume comes from light: highlight, sheen
 and the lit top border. Hierarchy is still read by layer and divider first.
 
-**Backgrounds.** No imagery, no illustration, no pattern, no texture. **One gradient only**: the
+**Backgrounds.** No imagery, no illustration, no pattern, no texture. **One surface gradient only**: the
 neutral top sheen of panels, cards and the HUD. Never an accent gradient, never behind a chart. The only graphics are data: line charts, bar series, a per-hour activity heatmap,
 stacked composition bars — all drawn in accent colors on `--raised`.
+**HUD exception — Gargantua (2026-09-28).** `AppGargantuaRing` has a procedural dark core,
+inclined gold accretion disc and gravitational lens inside its 64dp indicator. Dedicated
+`--gargantua-*` colours are scenery, never data, identity or a window background. Up to three
+quota arcs retain semantic colours and faithful percentages outside the scene; each is plasma in its own
+tone inside a glass tube (translucent wall, reflections lit from the upper left) and never changes
+length. The scene stays quiet so it never competes with the arcs or the session comet. This exception applies only to the HUD indicator; its surface and balloons
+keep the selected theme.
 
 **Borders and dividers.** 1px `--border` everywhere. A row owns its **bottom** divider (which is
 why a list needs no gap and the nested guide comes out continuous). The nested-group stroke is
@@ -176,7 +183,11 @@ General) turns every transition into an instant swap and stops anything continuo
 a **static skeleton**, never a shimmer. A refreshing card turns its refresh glyph (tinted `--info`)
 only while continuous motion is on; otherwise the glyph stays still and the label says
 "Atualizando…". Numbers that change (quota percent, metric value) slide in the direction of the
-change (`AppAnimatedNumber`).
+change (`AppAnimatedNumber`). Gargantua's decorative filaments use a 14000ms orbit, accelerating to
+4000ms while refreshing; attention breathes over 3200ms and the blue active-session comet orbits
+over 2600ms; plasma pulses cross each quota arc in 2800ms, fading out before either end. All
+require `continuous && !reduced`; the static scene remains complete. Quota arcs never rotate or
+change length, and provider marks never rotate.
 
 **Cards.** There are no "cards" in the decorative sense. There is one data surface: `--surface`
 fill, 1px border lit on top, radius 8, `--shadow-card`, top sheen and highlight, optional 2px
@@ -232,7 +243,7 @@ invented here.
 | `assets/` | Monogram, light variant, lockup, tray badge states |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip · AppGlyphChip |
-| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing · AppGargantuaRing (HUD) |
 | `components/feedback/` | AppBanner · AppDialog · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
@@ -261,8 +272,11 @@ strip with a notch** docked to a screen edge (see `AppHudBar.prompt.md`) and add
 the eighth: one arc per quota, never a ring per vendor. Its third round stopped the notch from
 growing: hovering a ring opens a **balloon for that account only**, with the card's own buttons, and
 a move hand and a gear sit past its ends — the gear holding everything the footer offers. No new
-primitive: the balloon reuses the card's `CardActionButton` and the footer's action row. Nothing else
-was invented.
+primitive: the balloon reuses the card's `CardActionButton` and the footer's action row. The
+Gargantua pass adds a dedicated HUD indicator, `AppGargantuaRing`: 64dp instead of 44dp, with a
+decorative accretion scene separated from the quota arcs. `AppUsageRing` remains unchanged for
+other consumers. Both the scene and provider mapping support all eleven sources; provider marks,
+account colours and account badges remain identification, with no provider-specific animation.
 
 ### The conformance pass — 2026-08-27
 

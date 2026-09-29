@@ -56,6 +56,7 @@ import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.rememberHudPresence
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.updateBannerAction
@@ -158,7 +159,9 @@ internal fun HudWindowHost(
             onRestartAndUpdate = { viewModel.restartAndUpdateNow() }
         )
     }
-    val accounts = buildHudAccounts(
+    // Conta que nasce ou colapsa (API ativada/desativada, início do app) fica na
+    // lista durante a transição; a geometria segue essa lista.
+    val accounts = rememberHudPresence(buildHudAccounts(
         quotaRisks = quotaRisks,
         cardOrder = cardOrder,
         language = language,
@@ -169,7 +172,7 @@ internal fun HudWindowHost(
         accountEmojis = accountEmojis,
         sessionPulses = cliSessionPulses,
         stalledSessions = stalled
-    )
+    ), motion)
 
     // O monitor do notch (issue #273). Era sempre o padrão: o arrasto era preso a
     // ele e o encaixe usava as bordas dele, e o notch não saía do primário. Agora

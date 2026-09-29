@@ -277,6 +277,14 @@ tasks.register<JavaExec>("generateScreenshots") {
     args(layout.projectDirectory.dir("img").asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("generateGargantuaPreview") {
+    group = "documentation"
+    description = "Renderiza a HUD Gargantua e suas animacoes com dados sinteticos."
+    mainClass.set("com.usagemonitor.screenshots.GargantuaPreviewGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(layout.buildDirectory.dir("gargantua-preview").get().asFile.absolutePath)
+}
+
 tasks.register<JavaExec>("generateTourGif") {
     group = "documentation"
     description = "Renderiza offscreen o GIF de tour do README com dados sinteticos."

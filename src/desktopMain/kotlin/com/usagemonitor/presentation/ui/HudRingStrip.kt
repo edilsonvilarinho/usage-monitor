@@ -1,12 +1,5 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -22,10 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -57,28 +49,15 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
+import com.usagemonitor.presentation.ui.components.AppGargantuaRing
+import com.usagemonitor.presentation.ui.components.appGargantuaMarkSize
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppStatusPill
-import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.color
-import com.usagemonitor.presentation.ui.theme.AppMotion
-import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
-import com.usagemonitor.presentation.ui.theme.appSpring
-
-/** O anel "pressionado" enquanto a conta recoleta. */
-private const val RING_REFRESH_SCALE = 0.9f
-
-/** A marca gira uma volta por segundo, o ritmo do glifo de recarga do card. */
-private const val RING_REFRESH_TURN_MILLIS = 1_000
-
-/**
- * Quanto a marca cresce no pulso de coleta concluída (issue #322). Pouco: é
- * aviso de "chegou leitura", não de estado — estado é a pílula e o arco.
- */
-private const val MARK_PULSE_SCALE = 1.15f
 
 /** A faixa de anéis, do tamanho do notch. */
 @Composable
@@ -99,17 +78,23 @@ internal fun HudRingStrip(
         if (accounts.isEmpty()) {
             AppStatusIndicator(label = fallbackLabel, tone = fallbackTone)
         } else {
+            val birthOrder = hudBirthOrder(accounts)
             accounts.forEachIndexed { index, account ->
-                HudRingItem(
-                    account = account,
-                    vertical = !edge.isHorizontal,
-                    compact = compact,
-                    language = language,
-                    onHovered = { onRingHovered(index) },
-                    onRefresh = { onRingRefresh(index) },
-                    onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
-                    onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
-                )
+                // Por chave: a conta que colapsa no meio da faixa não pode herdar
+                // o estado (pulso, transição) da vizinha.
+                key(account.targetKey) {
+                    HudRingItem(
+                        account = account,
+                        birthOrder = birthOrder[index],
+                        vertical = !edge.isHorizontal,
+                        compact = compact,
+                        language = language,
+                        onHovered = { onRingHovered(index) },
+                        onRefresh = { onRingRefresh(index) },
+                        onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
+                        onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
+                    )
+                }
             }
         }
         // A faixa é só das contas. A contagem até a próxima coleta mora no balão
@@ -143,6 +128,7 @@ internal const val HUD_STRIP_LINE_TEST_TAG = "hud-strip-line"
 @Composable
 private fun HudRingItem(
     account: HudAccount,
+    birthOrder: Int?,
     vertical: Boolean,
     /** A célula do Codenotch: anel e percentual embaixo, sem a palavra. */
     compact: Boolean,
@@ -152,39 +138,9 @@ private fun HudRingItem(
     onItemPlaced: (LayoutCoordinates) -> Unit,
     onPlaced: (LayoutCoordinates) -> Unit
 ) {
-    // Coletando, o anel fica pressionado — o `refreshRing` do Codenotch — e a
-    // marca gira, só com a política contínua.
-    val pressScale by animateFloatAsState(
-        targetValue = if (account.refreshing) RING_REFRESH_SCALE else 1f,
-        animationSpec = appSpring(AppMotion.Springs.SNAPPY),
-        label = "hudRingRefreshScale"
-    )
     val policy = LocalAppMotionPolicy.current
-    val markTurn = if (account.refreshing && policy.continuous) {
-        val transition = rememberInfiniteTransition(label = "hudRingRefresh")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(RING_REFRESH_TURN_MILLIS, easing = LinearEasing)),
-            label = "hudRingRefreshAngle"
-        )
-        angle
-    } else {
-        0f
-    }
-    // Pulso da marca quando a coleta da conta termina (issue #322): uma subida
-    // e uma volta em tween — sem mola, para não passar do alvo —, nunca em laço.
-    // Com "Reduzir animações" não há pulso.
-    val markPulse = remember { Animatable(1f) }
-    var wasRefreshing by remember { mutableStateOf(account.refreshing) }
-    LaunchedEffect(account.refreshing) {
-        val pulse = shouldPulseProviderMark(wasRefreshing, account.refreshing, policy)
-        wasRefreshing = account.refreshing
-        if (pulse) {
-            markPulse.animateTo(MARK_PULSE_SCALE, tween(AppMotion.normal, easing = AppMotion.enterEasing))
-            markPulse.animateTo(1f, tween(AppMotion.slow, easing = AppMotion.exitEasing))
-        }
-    }
+    // Nascimento (API ativada, início do app) e colapso (API desativada).
+    val frame = rememberHudRingFrame(account.presence, birthOrder, policy)
     val refreshLabel = hudRefreshAccountLabel(account, language)
     // A ação é **declarada** na semântica, não instalada: um `clickable` aqui
     // consumiria o `down` e o arrasto pelo corpo nunca começaria.
@@ -215,14 +171,10 @@ private fun HudRingItem(
         // com a órbita de sessão ativa.
         Box(
             modifier = Modifier
-                .onGloballyPositioned(onPlaced)
-                .graphicsLayer {
-                    scaleX = pressScale
-                    scaleY = pressScale
-                },
+                .onGloballyPositioned(onPlaced),
             contentAlignment = Alignment.Center
         ) {
-            AppUsageRing(
+            AppGargantuaRing(
                 arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
                 description = description,
                 size = HUD_RING_SIZE,
@@ -230,16 +182,19 @@ private fun HudRingItem(
                 gap = HUD_RING_GAP,
                 active = account.sessionActive,
                 attention = account.needsAttention,
-                attentionIndex = account.attentionRingIndex
+                attentionIndex = account.attentionRingIndex,
+                refreshing = account.refreshing,
+                frame = frame
             )
             AppProviderMark(
                 source = account.source,
-                tint = account.accountAccent?.current ?: MaterialTheme.colorScheme.onSurface,
+                // O núcleo é sempre escuro, inclusive dentro de um preset claro.
+                tint = account.accountAccent?.dark ?: AppGargantuaTokens.mark,
                 size = hudRingMarkSize(account.rings.size),
                 modifier = Modifier.graphicsLayer {
-                    rotationZ = markTurn
-                    scaleX = markPulse.value
-                    scaleY = markPulse.value
+                    scaleX = frame.markScale * frame.scale
+                    scaleY = frame.markScale * frame.scale
+                    alpha = frame.mark
                 }
             )
             // O emoji da conta (issue #287), selo no canto de cima à direita do
@@ -255,6 +210,7 @@ private fun HudRingItem(
                         .align(Alignment.TopEnd)
                         .offset(x = HUD_EMOJI_BADGE_OVERSHOOT, y = -HUD_EMOJI_BADGE_OVERSHOOT)
                         .testTag(HUD_ACCOUNT_EMOJI_TEST_TAG)
+                        .graphicsLayer { alpha = frame.mark }
                 )
             }
         }
@@ -267,7 +223,10 @@ private fun HudRingItem(
         // Compacta, a linha única já é a cota em foco.
         val emphasized = if (compact) account.emphasizedStripLineIndex?.let { 0 } else account.emphasizedStripLineIndex
         val emphasisColor = account.tone.color()
-        Column(horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start) {
+        Column(
+            modifier = Modifier.graphicsLayer { alpha = frame.text },
+            horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start
+        ) {
             stripLines.forEachIndexed { index, line ->
                 HudStripLineText(line, percentColor = if (index == emphasized) emphasisColor else null)
             }
@@ -285,7 +244,7 @@ private fun HudRingItem(
             // à esquerda elas destoavam do anel e dos percentuais, centrados.
             textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
-            modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG)
+            modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG).graphicsLayer { alpha = frame.text }
         )
     }
     if (vertical || compact) {
@@ -347,23 +306,11 @@ private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
 }
 
 /**
- * A marca cabe no miolo que os arcos deixam livre: cada arco come um traço e um
- * vão de cada lado. 70% do miolo deixa ar entre a marca e o arco de dentro.
+ * A marca cabe dentro do horizonte escuro, acima do disco de acreção.
  *
  * A sessão ativa não entra na conta: a órbita dela gira por fora do anel. Quando
  * ela morava por dentro, a marca da conta trabalhando caía de 14dp para 8dp.
  */
 internal fun hudRingMarkSize(arcs: Int): Dp {
-    val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
-    return ((HUD_RING_SIZE - used) * 0.7f).coerceAtLeast(6.dp)
-}
-
-/**
- * A marca pulsa quando a coleta da conta **termina** — `refreshing` passa de
- * verdadeiro a falso —, não quando começa nem na primeira composição. O fim
- * vale também para coleta que falhou: o `finally` do view model desmarca o alvo
- * nos dois casos, e o pulso diz "o app olhou agora", não "o número mudou".
- */
-internal fun shouldPulseProviderMark(wasRefreshing: Boolean, refreshing: Boolean, policy: AppMotionPolicy): Boolean {
-    return wasRefreshing && !refreshing && !policy.reduced
+    return appGargantuaMarkSize(HUD_RING_SIZE, HUD_RING_STROKE, HUD_RING_GAP, arcs)
 }

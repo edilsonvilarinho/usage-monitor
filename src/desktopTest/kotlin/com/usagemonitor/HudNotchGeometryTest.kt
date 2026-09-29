@@ -403,8 +403,8 @@ class HudNotchGeometryTest {
 
     /**
      * Uma linha por janela (#286): o notch engrossa só o que as linhas pedem,
-     * e nunca fica mais fino que o anel. Com o anel de 44dp (#322), uma e duas
-     * janelas cabem na altura dele; a terceira engrossa.
+     * e nunca fica mais fino que o anel. Com o anel de 44dp (#322) a terceira
+     * janela engrossava; com o Gargantua de 64dp as três cabem na altura dele.
      */
     @Test
     fun `cada janela a mais engrossa o notch de cima em uma linha`() {
@@ -420,7 +420,7 @@ class HudNotchGeometryTest {
             maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 3 + statusPillHeight(1))
         )
         assertEquals(expected, thickness)
-        assertTrue(thickness[2] > thickness[1], "a terceira janela ainda engrossa o notch")
+        assertEquals(HUD_RING_SIZE, thickness[2], "três janelas cabem na altura do anel Gargantua")
     }
 
     /**

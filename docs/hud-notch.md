@@ -224,12 +224,15 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **A faixa do modo padrão também ganhou botão**, e deixou de ser clicável inteira: com o botão
     dentro dela, clicar fora dele faria a mesma ação sem nada indicar. O preço é a faixa passar de
     ~34dp para ~46dp de altura, pela altura de controle do botão.
-- **A marca pulsa a cada coleta concluída** (issue #322, `shouldPulseProviderMark`): 1 → 1,15 em
-  `AppMotion.normal` e volta em `AppMotion.slow`, por tween — sem mola, para não passar do alvo — e uma
-  vez só, quando `refreshing` da conta cai de verdadeiro para falso. Vale também para coleta que
-  falhou (o `finally` do view model desmarca o alvo nos dois casos): o pulso diz "o app olhou agora",
-  não "o número mudou". Não é contínuo, então não depende de `continuous`; com "Reduzir animações"
-  não há pulso. Durante a coleta a marca continua girando, como antes.
+- **Coleta: ondas gravitacionais** (R1, `drawGargantuaRefreshLight`, `shouldPlayRefreshWave`;
+  2026-09-28). Substituiu o anel "pressionado" (escala 0,9) e o pulso da marca (issue #322), que o
+  usuário achou ruins; escolhida entre quatro protótipos HTML (ondas, varredura de sonda, recarga de
+  plasma, tique-taque). Coletando: três ondas finas defasadas saem do anel a cada `rippleMillis`
+  (1,3s) e o disco acelera para `refreshMillis` — contínuo, só com `continuous && !reduced`.
+  Concluído: o plasma desliza do valor antigo ao novo (a mola de sempre) e uma onda final mais forte
+  toca uma vez (`refreshWaveMillis`, 800ms) quando `refreshing` cai de verdadeiro para falso — também
+  em coleta que falhou: a onda diz "o app olhou agora", não "o número mudou". É finita, então só
+  "Reduzir animações" a desliga. A marca não gira nem pulsa mais.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
@@ -296,6 +299,32 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   repintar dá zero eventos, repintando volta; e 50% nunca recebe o mouse, nem repintando
   (1 × 127/255 arredonda para zero), enquanto 55% a 99% recebem. Os dois ajustes são só do Windows
   (#340); no Linux e no macOS a preferência vale inteira e sem repintura.
+- **Indicador Gargantua** (`AppGargantuaRing`, `GargantuaDrawing.kt`, `GargantuaQuotaArc.kt`,
+  `AppGargantuaTokens`; 2026-09-28). O anel passou de 44dp para 64dp com o buraco negro de
+  Interestelar no miolo. A primeira versão tinha disco de filamentos finos que sumia atrás da marca e
+  arcos de cota em cor chapada. A segunda
+  (disco de seis faixas com Doppler, arcos com gradiente e ponta incandescente) foi recusada pelo
+  usuário: disco chamativo demais, atrapalhando a leitura do indicador, e arcos ainda planos. Três
+  direções foram prototipadas em HTML (tubo iluminado, órbitas 3D inclinadas, vidro com plasma) e
+  a escolhida foi **vidro com plasma**: a trilha é um tubo de vidro com reflexos vindos do alto à
+  esquerda (`GargantuaQuotaArc.kt`), a cota é plasma no tom semântico dentro dele, e o cenário
+  ficou discreto — sombra em 62% do miolo, anel de fótons, lente fina e uma faixa de disco
+  translúcida com Doppler (token `ember`). Tudo cabe no miolo livre; o disco não atravessa os
+  arcos. **Decisão:** a regra anterior era "arco imóvel pixel a pixel"; agora três pulsos de luz
+  correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas.
+- **Nascimento e colapso** (`HudPresence`, `mergeHudPresence`, `rememberHudPresence`,
+  `GargantuaTransition.kt`; 2026-09-28). Pedido: ativar uma API mostra um buraco negro surgindo e
+  desativar some com um colapso. Prototipados em HTML (3 nascimentos, 4 colapsos); escolhidos
+  **S1 · onda de choque** (1,1s) e **C2 · colapso com clarão** (480ms). Depois o pedido cresceu: o
+  início do app e a abertura da HUD também nascem, em cascata de 140ms entre contas.
+  **Decisão de geometria:** a janela continua saindo de `hudNotchSizes`, sem redimensionamento por
+  quadro. A conta que nasce já ocupa o espaço e se revela nele; a que sai fica na lista marcada
+  `LEAVING`, **no mesmo lugar**, até o colapso acabar, e só então o notch encolhe num passo só. Os
+  itens da faixa são compostos com `key(targetKey)`, senão a conta que colapsa no meio herdaria o
+  estado da vizinha. Presença é enum próprio (não valor novo em enum existente). "Reduzir
+  animações" entrega a lista viva, sem transição. O invariante passou a
+  ser o **comprimento**: `GargantuaHudTest` exige pixels iguais entre quadros além do fim do arco e
+  nenhuma luz em cota zerada. Sem `continuous && !reduced` não há fluxo.
 
 ## Fora do alcance dos testes
 

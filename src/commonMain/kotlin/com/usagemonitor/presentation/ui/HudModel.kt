@@ -87,7 +87,13 @@ data class HudAccount(
      * #265), já em texto. Vazio é "nada a dizer": o balão não abre a seção.
      * Dono único: [hudSessionSignals].
      */
-    val sessionSignals: List<HudSessionSignal> = emptyList()
+    val sessionSignals: List<HudSessionSignal> = emptyList(),
+    /**
+     * Se a conta está nascendo (API ativada), saindo (API desativada) ou parada
+     * na faixa. Dono único: [mergeHudPresence]; `buildHudAccounts` sempre entrega
+     * [HudPresence.SHOWN].
+     */
+    val presence: HudPresence = HudPresence.SHOWN
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
