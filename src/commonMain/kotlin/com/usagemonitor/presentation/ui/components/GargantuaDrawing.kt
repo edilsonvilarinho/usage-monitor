@@ -98,6 +98,39 @@ private fun DrawScope.drawAccretionDisk(room: Float, phase: Float, front: Boolea
     }
 }
 
+/**
+ * Luz do nascimento e do colapso: clarão central e duas ondas de choque. As
+ * ondas param 3dp além do anel (proporção do tamanho), dentro do respiro que o
+ * notch já reserva para a órbita de sessão.
+ */
+internal fun DrawScope.drawGargantuaTransitionLight(frame: GargantuaFrame) {
+    val ring = size.minDimension / 2f
+    if (frame.flash > 0f) {
+        val radius = ring * frame.flashRadius
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to Color.White.copy(alpha = frame.flash),
+                0.3f to Space.hot.copy(alpha = frame.flash * 0.7f),
+                1f to Color.Transparent,
+                center = center, radius = radius
+            ),
+            radius = radius
+        )
+    }
+    drawShock(frame.nearShock, ring * 1.1f, ring * 0.09f, Color(0xFFFFE6BE))
+    drawShock(frame.farShock, ring * 0.95f, ring * 0.06f, Space.gold)
+}
+
+private fun DrawScope.drawShock(progress: Float, reach: Float, width: Float, color: Color) {
+    if (progress <= 0f || progress >= 1f) return
+    val grown = 1f - (1f - progress) * (1f - progress) * (1f - progress)
+    drawCircle(
+        color.copy(alpha = (1f - progress) * 0.8f),
+        radius = reach * grown,
+        style = Stroke(width * (1f - progress) + width * 0.1f)
+    )
+}
+
 /** Mesma margem externa contratada por appUsageRingOrbitReach (5,3dp na HUD). */
 internal fun DrawScope.drawGargantuaActivity(phase: Float, stroke: Float, gap: Float, color: Color) {
     val orbitStroke = stroke * 0.8f

@@ -51,6 +51,16 @@ decorative filaments, the plasma pulses and the active comet move; quota arcs ke
 anchor and the provider mark never spins. Refresh completion may use the
 existing finite provider-mark pulse. Finite quota interpolation never overshoots the real value.
 
+**Birth and collapse.** When an API is enabled, and when the app starts or the HUD opens, each
+indicator is born (S1, shockwave, `--dur-gargantua-birth` 1100ms, 140ms cascade between accounts):
+a point of light flashes, two shockwaves travel out to about 3dp past the ring, the horizon opens
+from the centre, the plasma fills up to the value (never past it), then the mark and the text fade
+in. When an API is disabled the indicator collapses (C2, `--dur-gargantua-collapse` 480ms): the
+text leaves first, the plasma retracts, the ring shrinks to a point and ends in a small flash. The
+item keeps its slot until the collapse ends; only then does the notch shrink, in one step. Both are
+finite transitions: Reduced motion makes them an instant cut. Chosen from HTML prototypes (3 births,
+4 collapses) by the user.
+
 **Accessibility.** The mark and decorative scene are hidden from accessibility. One indicator
 description identifies the account, windows, values, state and refresh action; active-session
 meaning stays in words in that description or balloon. Disabling motion never hides information.

@@ -8,6 +8,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +48,9 @@ fun AppGargantuaRing(
     active: Boolean = false,
     attention: Boolean = false,
     attentionIndex: Int = 0,
-    refreshing: Boolean = false
+    refreshing: Boolean = false,
+    /** Nascimento ou colapso em andamento; parado por padrão. */
+    frame: GargantuaFrame = GargantuaFrame.Settled
 ) {
     val policy = LocalAppMotionPolicy.current
     val moving = policy.continuous && !policy.reduced
@@ -70,28 +75,43 @@ fun AppGargantuaRing(
         sweep.asState()
     }
     val activeColor = AppTone.INFO.color()
-    Canvas(modifier.size(size).semantics { contentDescription = description }) {
-        val strokePx = stroke.toPx()
-        val gapPx = gap.toPx()
-        val coreSpace = this.size.minDimension / 2f - arcs.size.coerceIn(1, MAX_RING_ARCS) * (strokePx + gapPx)
-        drawGargantuaCore(coreSpace, phase.value)
-        arcs.take(MAX_RING_ARCS).forEachIndexed { index, arc ->
-            val radius = this.size.minDimension / 2f - strokePx / 2 - index * (strokePx + gapPx)
-            if (radius <= 0f) return@forEachIndexed
-            val glow = if (attention && index == attentionIndex && moving) {
-                0.18f + 0.2f * ((sin(breath.value * PI * 2).toFloat() + 1f) / 2f)
-            } else 0.25f
-            drawGargantuaQuotaArc(
-                color = colors[index].value,
-                sweep = sweeps[index].value.coerceIn(0f, 1f) * 360f,
-                radius = radius,
-                stroke = strokePx,
-                hasForecast = arc.hasForecast,
-                glow = glow,
-                flow = if (moving) flow.value else null
-            )
+    Box(modifier.size(size).semantics { contentDescription = description }) {
+        Canvas(
+            Modifier.matchParentSize().graphicsLayer {
+                scaleX = frame.scale
+                scaleY = frame.scale
+                alpha = frame.alpha
+            }
+        ) {
+            val strokePx = stroke.toPx()
+            val gapPx = gap.toPx()
+            val coreSpace = this.size.minDimension / 2f - arcs.size.coerceIn(1, MAX_RING_ARCS) * (strokePx + gapPx)
+            if (frame.core > 0f) {
+                scale(frame.core, pivot = center) { drawGargantuaCore(coreSpace, phase.value) }
+            }
+            arcs.take(MAX_RING_ARCS).forEachIndexed { index, arc ->
+                val radius = this.size.minDimension / 2f - strokePx / 2 - index * (strokePx + gapPx)
+                if (radius <= 0f) return@forEachIndexed
+                val glow = if (attention && index == attentionIndex && moving) {
+                    0.18f + 0.2f * ((sin(breath.value * PI * 2).toFloat() + 1f) / 2f)
+                } else 0.25f
+                drawGargantuaQuotaArc(
+                    color = colors[index].value,
+                    sweep = sweeps[index].value.coerceIn(0f, 1f) * frame.arcs * 360f,
+                    radius = radius,
+                    stroke = strokePx,
+                    hasForecast = arc.hasForecast,
+                    glow = glow,
+                    flow = if (moving) flow.value else null,
+                    glass = frame.glass
+                )
+            }
+            if (active) drawGargantuaActivity(activity.value, strokePx, gapPx, activeColor)
         }
-        if (active) drawGargantuaActivity(activity.value, strokePx, gapPx, activeColor)
+        // Clarão e ondas ficam fora da escala: o indicador encolhe, a luz não.
+        if (!frame.settled) {
+            Canvas(Modifier.matchParentSize()) { drawGargantuaTransitionLight(frame) }
+        }
     }
 }
 

@@ -35,11 +35,13 @@ internal fun DrawScope.drawGargantuaQuotaArc(
     stroke: Float,
     hasForecast: Boolean,
     glow: Float,
-    flow: Float?
+    flow: Float?,
+    /** Opacidade do vidro; só fica abaixo de 1 enquanto o indicador nasce. */
+    glass: Float = 1f
 ) {
     val topLeft = center - Offset(radius, radius)
     val arcSize = Size(radius * 2, radius * 2)
-    drawGlassTube(radius, stroke, hasForecast)
+    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass)
     if (sweep <= 0f) return
     drawArc(color.copy(alpha = glow), -90f, sweep, false, topLeft, arcSize,
         style = Stroke(stroke * 2.4f, cap = StrokeCap.Round))
@@ -50,18 +52,18 @@ internal fun DrawScope.drawGargantuaQuotaArc(
     // O reflexo do vidro passa por cima do plasma, só onde há plasma.
     val inner = radius - stroke * 0.3f
     drawArc(
-        reflection(maxAlpha = 0.4f, power = 2), -90f, sweep, false,
+        reflection(maxAlpha = 0.4f * glass, power = 2), -90f, sweep, false,
         center - Offset(inner, inner), Size(inner * 2, inner * 2),
         style = Stroke(stroke * 0.16f)
     )
 }
 
 /** Parede translúcida, reflexo forte na borda de dentro e fraco na de fora. */
-private fun DrawScope.drawGlassTube(radius: Float, stroke: Float, hasForecast: Boolean) {
+private fun DrawScope.drawGlassTube(radius: Float, stroke: Float, hasForecast: Boolean, glass: Float) {
     val dash = if (hasForecast) null else PathEffect.dashPathEffect(floatArrayOf(stroke, stroke * 1.4f))
-    drawCircle(Color.White.copy(alpha = 0.06f), radius, style = Stroke(stroke * 1.4f, pathEffect = dash))
-    drawCircle(reflection(maxAlpha = 0.28f, power = 3), radius - stroke / 2, style = Stroke(stroke * 0.18f))
-    drawCircle(reflection(maxAlpha = 0.12f, power = 1), radius + stroke / 2, style = Stroke(stroke * 0.14f))
+    drawCircle(Color.White.copy(alpha = 0.06f * glass), radius, style = Stroke(stroke * 1.4f, pathEffect = dash))
+    drawCircle(reflection(maxAlpha = 0.28f * glass, power = 3), radius - stroke / 2, style = Stroke(stroke * 0.18f))
+    drawCircle(reflection(maxAlpha = 0.12f * glass, power = 1), radius + stroke / 2, style = Stroke(stroke * 0.14f))
 }
 
 /** Branco cuja opacidade segue a luz: máximo voltado para a fonte, zero do lado oposto. */

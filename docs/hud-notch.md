@@ -308,7 +308,18 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   ficou discreto — sombra em 62% do miolo, anel de fótons, lente fina e uma faixa de disco
   translúcida com Doppler (token `ember`). Tudo cabe no miolo livre; o disco não atravessa os
   arcos. **Decisão:** a regra anterior era "arco imóvel pixel a pixel"; agora três pulsos de luz
-  correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas. O invariante passou a
+  correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas.
+- **Nascimento e colapso** (`HudPresence`, `mergeHudPresence`, `rememberHudPresence`,
+  `GargantuaTransition.kt`; 2026-09-28). Pedido: ativar uma API mostra um buraco negro surgindo e
+  desativar some com um colapso. Prototipados em HTML (3 nascimentos, 4 colapsos); escolhidos
+  **S1 · onda de choque** (1,1s) e **C2 · colapso com clarão** (480ms). Depois o pedido cresceu: o
+  início do app e a abertura da HUD também nascem, em cascata de 140ms entre contas.
+  **Decisão de geometria:** a janela continua saindo de `hudNotchSizes`, sem redimensionamento por
+  quadro. A conta que nasce já ocupa o espaço e se revela nele; a que sai fica na lista marcada
+  `LEAVING`, **no mesmo lugar**, até o colapso acabar, e só então o notch encolhe num passo só. Os
+  itens da faixa são compostos com `key(targetKey)`, senão a conta que colapsa no meio herdaria o
+  estado da vizinha. Presença é enum próprio (não valor novo em enum existente). "Reduzir
+  animações" entrega a lista viva, sem transição. O invariante passou a
   ser o **comprimento**: `GargantuaHudTest` exige pixels iguais entre quadros além do fim do arco e
   nenhuma luz em cota zerada. Sem `continuous && !reduced` não há fluxo.
 

@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -94,17 +95,23 @@ internal fun HudRingStrip(
         if (accounts.isEmpty()) {
             AppStatusIndicator(label = fallbackLabel, tone = fallbackTone)
         } else {
+            val birthOrder = hudBirthOrder(accounts)
             accounts.forEachIndexed { index, account ->
-                HudRingItem(
-                    account = account,
-                    vertical = !edge.isHorizontal,
-                    compact = compact,
-                    language = language,
-                    onHovered = { onRingHovered(index) },
-                    onRefresh = { onRingRefresh(index) },
-                    onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
-                    onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
-                )
+                // Por chave: a conta que colapsa no meio da faixa não pode herdar
+                // o estado (pulso, transição) da vizinha.
+                key(account.targetKey) {
+                    HudRingItem(
+                        account = account,
+                        birthOrder = birthOrder[index],
+                        vertical = !edge.isHorizontal,
+                        compact = compact,
+                        language = language,
+                        onHovered = { onRingHovered(index) },
+                        onRefresh = { onRingRefresh(index) },
+                        onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
+                        onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
+                    )
+                }
             }
         }
         // A faixa é só das contas. A contagem até a próxima coleta mora no balão
@@ -138,6 +145,7 @@ internal const val HUD_STRIP_LINE_TEST_TAG = "hud-strip-line"
 @Composable
 private fun HudRingItem(
     account: HudAccount,
+    birthOrder: Int?,
     vertical: Boolean,
     /** A célula do Codenotch: anel e percentual embaixo, sem a palavra. */
     compact: Boolean,
@@ -155,6 +163,8 @@ private fun HudRingItem(
         label = "hudRingRefreshScale"
     )
     val policy = LocalAppMotionPolicy.current
+    // Nascimento (API ativada, início do app) e colapso (API desativada).
+    val frame = rememberHudRingFrame(account.presence, birthOrder, policy)
     // Pulso da marca quando a coleta da conta termina (issue #322): uma subida
     // e uma volta em tween — sem mola, para não passar do alvo —, nunca em laço.
     // Com "Reduzir animações" não há pulso.
@@ -216,7 +226,8 @@ private fun HudRingItem(
                 active = account.sessionActive,
                 attention = account.needsAttention,
                 attentionIndex = account.attentionRingIndex,
-                refreshing = account.refreshing
+                refreshing = account.refreshing,
+                frame = frame
             )
             AppProviderMark(
                 source = account.source,
@@ -224,8 +235,9 @@ private fun HudRingItem(
                 tint = account.accountAccent?.dark ?: AppGargantuaTokens.mark,
                 size = hudRingMarkSize(account.rings.size),
                 modifier = Modifier.graphicsLayer {
-                    scaleX = markPulse.value
-                    scaleY = markPulse.value
+                    scaleX = markPulse.value * frame.markScale * frame.scale
+                    scaleY = markPulse.value * frame.markScale * frame.scale
+                    alpha = frame.mark
                 }
             )
             // O emoji da conta (issue #287), selo no canto de cima à direita do
@@ -241,6 +253,7 @@ private fun HudRingItem(
                         .align(Alignment.TopEnd)
                         .offset(x = HUD_EMOJI_BADGE_OVERSHOOT, y = -HUD_EMOJI_BADGE_OVERSHOOT)
                         .testTag(HUD_ACCOUNT_EMOJI_TEST_TAG)
+                        .graphicsLayer { alpha = frame.mark }
                 )
             }
         }
@@ -253,7 +266,10 @@ private fun HudRingItem(
         // Compacta, a linha única já é a cota em foco.
         val emphasized = if (compact) account.emphasizedStripLineIndex?.let { 0 } else account.emphasizedStripLineIndex
         val emphasisColor = account.tone.color()
-        Column(horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start) {
+        Column(
+            modifier = Modifier.graphicsLayer { alpha = frame.text },
+            horizontalAlignment = if (vertical || compact) Alignment.CenterHorizontally else Alignment.Start
+        ) {
             stripLines.forEachIndexed { index, line ->
                 HudStripLineText(line, percentColor = if (index == emphasized) emphasisColor else null)
             }
@@ -271,7 +287,7 @@ private fun HudRingItem(
             // à esquerda elas destoavam do anel e dos percentuais, centrados.
             textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
-            modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG)
+            modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG).graphicsLayer { alpha = frame.text }
         )
     }
     if (vertical || compact) {

@@ -20,5 +20,9 @@ object AppGargantuaTokens {
     const val activeMillis = 2_600
     /** Uma passada de luz ao longo do arco de quota, do início até a ponta. */
     const val flowMillis = 2_800
+    /** Nascimento ao ativar uma API ou iniciar o app (S1, onda de choque). */
+    const val birthMillis = 1_100
+    /** Colapso ao desativar uma API (C2, colapso com clarão). */
+    const val collapseMillis = 480
     const val diskTilt = -12f
 }

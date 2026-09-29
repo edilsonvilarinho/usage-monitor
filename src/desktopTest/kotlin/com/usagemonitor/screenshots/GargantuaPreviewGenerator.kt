@@ -12,6 +12,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
@@ -22,6 +25,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudNotch
+import com.usagemonitor.presentation.ui.rememberHudPresence
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
@@ -55,7 +59,33 @@ fun main(args: Array<String>) {
     } finally {
         recorder.close()
     }
+    recordPresence(output)
     println("Prévia Gargantua: ${output.absolutePath}")
+}
+
+/**
+ * Início do app (nascimento em cascata), API desativada (colapso) e reativada
+ * (nascimento), pela mesma lista com presença que a janela da HUD usa.
+ */
+private fun recordPresence(output: File) {
+    val all = GargantuaPreviewFixtures.showcase
+    var live by mutableStateOf(all)
+    val recorder = SceneRecorder(widthDp = 920, heightDp = 132, frameMillis = 40L)
+    try {
+        recorder.setContent {
+            CompositionLocalProvider(LocalAppMotionPolicy provides AppMotionPolicy.Live) {
+                PreviewNotch(rememberHudPresence(live, AppMotionPolicy.Live), HudEdge.TOP)
+            }
+        }
+        recorder.animate(2_000) { }
+        live = all.filterIndexed { index, _ -> index != 1 }
+        recorder.animate(1_200) { }
+        live = all
+        recorder.animate(1_800) { }
+        GifEncoder.write(File(output, "hud-gargantua-presence.gif"), recorder.frames)
+    } finally {
+        recorder.close()
+    }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
