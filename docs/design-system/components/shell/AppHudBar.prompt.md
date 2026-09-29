@@ -18,7 +18,7 @@ the edge, like the hardware notch Codenotch imitates, not as a pill floating nex
 the 10dp radius ceiling: it is a silhouette, not a panel. Depth `DIALOG`, top sheen, lit border.
 
 **The notch never grows.** Per account in the user's card order (never risk order — the first account
-used to swap by itself): an `AppUsageRing` (one arc per quota, up to three), **one line per ring with
+used to swap by itself): an `AppGargantuaRing` (one arc per quota, up to three), **one line per ring with
 the window and its percentage** — `7d 72%` over `5h 45%`, outer ring first, `labelSmall` with the
 window in `onSurfaceVariant` — and the **status word — always**. A single-quota account keeps the bare
 `labelMedium` percentage. It used to be one number, the quota in focus (worst risk), with no window:
@@ -76,7 +76,7 @@ advances — `label*` is Plex Mono — and every balloon row has a fixed height,
 a sum. The open area reserves the **tallest** balloon, so switching rings never resizes the window.
 The collapsed width is the max of the widest line and the word, so a collection that turns `9%` into
 `88%` does not resize it either. Each window adds a 14dp line to the text column: the top-edge content is
-44dp with one window (the ring decides), 46dp with two and 60dp with three — the state word is an
+64dp with one, two or three windows (the indicator decides) — the state word is an
 `AppStatusPill` (issue #322), 18dp tall.
 
 **Window, measured.** A click on a transparent pixel of a transparent window is swallowed on Windows
@@ -99,8 +99,10 @@ refresh action in semantics. Ways back to the full window: "Padrão" in the gear
 item, Ctrl+Shift+H.
 
 **Identification.** The provider mark (`AppProviderMark`) sits in the middle of each ring in the
-foreground color — the arcs around it already carry the risk colors. The account label is the card
-title ("Anthropic — Padrão", never just "Padrão"). Rings are 44dp so the mark stays legible with three arcs (14dp; it was 8.4dp at 36dp, issue #322). The tray icon
+light foreground on the permanently dark core; a chosen account colour keeps its dark variant.
+The arcs around it carry risk colours independently. The account label is the card
+title ("Anthropic — Padrão", never just "Padrão"). Indicators are 64dp with a 2.5dp stroke and a
+1.5dp gap, reserving a legible core even with three arcs. The tray icon
 tooltip summarises every account with its focus percentage **and its window** ("7d 72%"), cut at
 Windows' 127 characters — one entry per window would overflow with three accounts.
 
@@ -111,3 +113,10 @@ number neutral. The pill next to it writes the state, so color still never infor
 **Mark pulse (issue #322).** When an account's collection finishes, its provider mark scales to 1.15
 and back (tween 180ms + 240ms, once). Not continuous, so it does not wait for `continuous`; reduced
 motion turns it off.
+
+**Gargantua scene.** `AppGargantuaRing.prompt.md` owns the drawing and motion contract. Its
+inclined gold accretion disc, gravitational lens and moving filaments remain inside the indicator;
+the existing HUD surface, balloons, account ordering, gestures and API data contracts are
+unchanged. All eleven APIs reuse the same renderer with the existing provider mark. Quota arcs
+never rotate. Session activity is the blue external comet. Refresh accelerates the decorative
+disc, never the provider logo. A complete static scene is drawn with reduced motion and in tests.

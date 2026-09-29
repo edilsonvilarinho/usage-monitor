@@ -296,6 +296,21 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   repintar dá zero eventos, repintando volta; e 50% nunca recebe o mouse, nem repintando
   (1 × 127/255 arredonda para zero), enquanto 55% a 99% recebem. Os dois ajustes são só do Windows
   (#340); no Linux e no macOS a preferência vale inteira e sem repintura.
+- **Indicador Gargantua** (`AppGargantuaRing`, `GargantuaDrawing.kt`, `GargantuaQuotaArc.kt`,
+  `AppGargantuaTokens`; 2026-09-28). O anel passou de 44dp para 64dp com o buraco negro de
+  Interestelar no miolo. A primeira versão tinha disco de filamentos finos que sumia atrás da marca e
+  arcos de cota em cor chapada. A segunda
+  (disco de seis faixas com Doppler, arcos com gradiente e ponta incandescente) foi recusada pelo
+  usuário: disco chamativo demais, atrapalhando a leitura do indicador, e arcos ainda planos. Três
+  direções foram prototipadas em HTML (tubo iluminado, órbitas 3D inclinadas, vidro com plasma) e
+  a escolhida foi **vidro com plasma**: a trilha é um tubo de vidro com reflexos vindos do alto à
+  esquerda (`GargantuaQuotaArc.kt`), a cota é plasma no tom semântico dentro dele, e o cenário
+  ficou discreto — sombra em 62% do miolo, anel de fótons, lente fina e uma faixa de disco
+  translúcida com Doppler (token `ember`). Tudo cabe no miolo livre; o disco não atravessa os
+  arcos. **Decisão:** a regra anterior era "arco imóvel pixel a pixel"; agora três pulsos de luz
+  correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas. O invariante passou a
+  ser o **comprimento**: `GargantuaHudTest` exige pixels iguais entre quadros além do fim do arco e
+  nenhuma luz em cota zerada. Sem `continuous && !reduced` não há fluxo.
 
 ## Fora do alcance dos testes
 

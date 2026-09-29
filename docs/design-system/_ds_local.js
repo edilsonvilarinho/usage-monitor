@@ -23,6 +23,7 @@
     'components/data/AppDataTable.jsx',
     'components/data/AppColumnHeader.jsx',
     'components/data/AppUsageRing.jsx',
+    'components/data/AppGargantuaRing.jsx',
     'components/feedback/AppBanner.jsx',
     'components/feedback/AppEmptyState.jsx',
     'components/feedback/AppLoadingState.jsx',
@@ -71,7 +72,9 @@
       var re = /function\s+([A-Za-z_$][\w$]*)/g, m;
       while ((m = re.exec(src)) !== null) names.push(m[1]);
       var code = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]] }).code;
-      var mod = new Function('React', code + '\nreturn {' + names.join(',') + '};')(React);
+      var dependencies = Object.keys(ns);
+      var values = dependencies.map(function (name) { return ns[name]; });
+      var mod = new Function('React', ...dependencies, code + '\nreturn {' + names.join(',') + '};')(React, ...values);
       Object.assign(ns, mod);
     }
     return ns;

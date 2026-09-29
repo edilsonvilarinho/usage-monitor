@@ -21,4 +21,9 @@
      controle interativo, é ponto+palavra de risco — o mínimo que cabe sem
      virar ilegível. */
   --h-hud: 24px;
+
+  /* Gargantua HUD indicator. Geometry and drawing share these dimensions. */
+  --gargantua-size: 64px;
+  --gargantua-stroke: 2.5px;
+  --gargantua-gap: 1.5px;
 }

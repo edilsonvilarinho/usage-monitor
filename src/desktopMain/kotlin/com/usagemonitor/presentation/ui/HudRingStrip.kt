@@ -1,11 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -57,22 +53,21 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
+import com.usagemonitor.presentation.ui.components.AppGargantuaRing
+import com.usagemonitor.presentation.ui.components.appGargantuaMarkSize
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppStatusPill
-import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.appSpring
 
 /** O anel "pressionado" enquanto a conta recoleta. */
 private const val RING_REFRESH_SCALE = 0.9f
-
-/** A marca gira uma volta por segundo, o ritmo do glifo de recarga do card. */
-private const val RING_REFRESH_TURN_MILLIS = 1_000
 
 /**
  * Quanto a marca cresce no pulso de coleta concluída (issue #322). Pouco: é
@@ -152,37 +147,27 @@ private fun HudRingItem(
     onItemPlaced: (LayoutCoordinates) -> Unit,
     onPlaced: (LayoutCoordinates) -> Unit
 ) {
-    // Coletando, o anel fica pressionado — o `refreshRing` do Codenotch — e a
-    // marca gira, só com a política contínua.
+    // Coletando, o anel fica pressionado e o disco acelera; a marca permanece
+    // de pé para que o fornecedor continue reconhecível.
     val pressScale by animateFloatAsState(
         targetValue = if (account.refreshing) RING_REFRESH_SCALE else 1f,
         animationSpec = appSpring(AppMotion.Springs.SNAPPY),
         label = "hudRingRefreshScale"
     )
     val policy = LocalAppMotionPolicy.current
-    val markTurn = if (account.refreshing && policy.continuous) {
-        val transition = rememberInfiniteTransition(label = "hudRingRefresh")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(RING_REFRESH_TURN_MILLIS, easing = LinearEasing)),
-            label = "hudRingRefreshAngle"
-        )
-        angle
-    } else {
-        0f
-    }
     // Pulso da marca quando a coleta da conta termina (issue #322): uma subida
     // e uma volta em tween — sem mola, para não passar do alvo —, nunca em laço.
     // Com "Reduzir animações" não há pulso.
     val markPulse = remember { Animatable(1f) }
     var wasRefreshing by remember { mutableStateOf(account.refreshing) }
-    LaunchedEffect(account.refreshing) {
+    LaunchedEffect(account.refreshing, policy) {
         val pulse = shouldPulseProviderMark(wasRefreshing, account.refreshing, policy)
         wasRefreshing = account.refreshing
         if (pulse) {
             markPulse.animateTo(MARK_PULSE_SCALE, tween(AppMotion.normal, easing = AppMotion.enterEasing))
             markPulse.animateTo(1f, tween(AppMotion.slow, easing = AppMotion.exitEasing))
+        } else {
+            markPulse.snapTo(1f)
         }
     }
     val refreshLabel = hudRefreshAccountLabel(account, language)
@@ -222,7 +207,7 @@ private fun HudRingItem(
                 },
             contentAlignment = Alignment.Center
         ) {
-            AppUsageRing(
+            AppGargantuaRing(
                 arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
                 description = description,
                 size = HUD_RING_SIZE,
@@ -230,14 +215,15 @@ private fun HudRingItem(
                 gap = HUD_RING_GAP,
                 active = account.sessionActive,
                 attention = account.needsAttention,
-                attentionIndex = account.attentionRingIndex
+                attentionIndex = account.attentionRingIndex,
+                refreshing = account.refreshing
             )
             AppProviderMark(
                 source = account.source,
-                tint = account.accountAccent?.current ?: MaterialTheme.colorScheme.onSurface,
+                // O núcleo é sempre escuro, inclusive dentro de um preset claro.
+                tint = account.accountAccent?.dark ?: AppGargantuaTokens.mark,
                 size = hudRingMarkSize(account.rings.size),
                 modifier = Modifier.graphicsLayer {
-                    rotationZ = markTurn
                     scaleX = markPulse.value
                     scaleY = markPulse.value
                 }
@@ -347,15 +333,13 @@ private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
 }
 
 /**
- * A marca cabe no miolo que os arcos deixam livre: cada arco come um traço e um
- * vão de cada lado. 70% do miolo deixa ar entre a marca e o arco de dentro.
+ * A marca cabe dentro do horizonte escuro, acima do disco de acreção.
  *
  * A sessão ativa não entra na conta: a órbita dela gira por fora do anel. Quando
  * ela morava por dentro, a marca da conta trabalhando caía de 14dp para 8dp.
  */
 internal fun hudRingMarkSize(arcs: Int): Dp {
-    val used = (HUD_RING_STROKE + HUD_RING_GAP) * 2 * arcs.coerceIn(1, 3)
-    return ((HUD_RING_SIZE - used) * 0.7f).coerceAtLeast(6.dp)
+    return appGargantuaMarkSize(HUD_RING_SIZE, HUD_RING_STROKE, HUD_RING_GAP, arcs)
 }
 
 /**

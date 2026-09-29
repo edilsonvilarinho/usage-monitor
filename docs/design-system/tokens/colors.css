@@ -45,6 +45,15 @@
   --cread:     #4CAF50;
   --cwrite:    #FFA726;
   --savings:   #26C6DA;
+
+  /* HUD Gargantua: decorative scene inside the indicator only. These stay
+     dark in every theme; never use them for a quota or a window surface. */
+  --gargantua-night: #080B12;
+  --gargantua-core:  #030508;
+  --gargantua-gold:  #E8AE63;
+  --gargantua-hot:   #FFF0CB;
+  --gargantua-dust:  #8C643F;
+  --gargantua-ember: #B4501E; /* receding side of the disc (Doppler) */
 }
 
 @media (prefers-color-scheme: light) {
