@@ -93,5 +93,6 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Coleta | R1 · ondas gravitacionais (1300/800 ms) | varredura de sonda, recarga de plasma, tique-taque |
 | Abrir balão (conta e engrenagem, e troca de anel) | B3 · jato relativístico (520/240 ms) | B1 onda de choque, B2 lente gravitacional, B4 luz de acreção no contorno, B5 ondas gravitacionais |
 | Dado novo (percentuais e pílula) | D5 · horizonte de eventos (480 ms, cascata 50 ms) | D1 desvio para o vermelho, D2 lente, D3 plasma que conta, D4 onda gravitacional |
+| Modais: abrir, fechar e apresentar dados (todas as janelas e o `AppDialog`) | E9 · filamentos de plasma (680/220 ms) | E1 jato relativístico, E2 horizonte de eventos, E3 varredura do disco, E4 condensação da nebulosa, E5 captura orbital, E6 farol do pulsar, E7 buraco de minhoca, E8 malha do espaço-tempo, E10 estrela de nêutrons |
 
-Próxima rodada usa a próxima letra livre (E, F, …).
+Próxima rodada usa a próxima letra livre (F, G, …).

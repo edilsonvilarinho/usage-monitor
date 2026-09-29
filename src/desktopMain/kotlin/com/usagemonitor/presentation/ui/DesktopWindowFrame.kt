@@ -38,8 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -107,13 +105,6 @@ fun WindowScope.DesktopDialogFrame(
     iconPainter: Painter?,
     windowState: WindowState? = null,
     onCloseRequest: () -> Unit,
-    /**
-     * Escala do conteúdo, lida no desenho. Quem a anima é o host da janela
-     * (`AppDialogWindow`), que é quem sabe quando a janela está de fato na tela:
-     * a moldura animando sozinha começava antes do primeiro quadro pintado, e a
-     * entrada se perdia no custo de criar a janela.
-     */
-    contentScale: () -> Float = { 1f },
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
@@ -136,14 +127,7 @@ fun WindowScope.DesktopDialogFrame(
     }
 
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                val scale = contentScale()
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(0.5f, 0.3f)
-            },
+        modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

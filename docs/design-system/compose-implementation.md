@@ -58,8 +58,20 @@ quadros, um percentual que não é verdade.
   - **A entrada espera o primeiro quadro pintado.** A escala da moldura começava ao compor, dentro de
     uma janela que o sistema mostrava de uma vez e opaca, e os quadros iniciais se perdiam no custo
     da criação. Agora a janela aparece com opacidade 0, o host espera dois quadros (com teto de
-    500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e esmaece a
-    janela AWT com o conteúdo indo de 0,96 a 1 pela mola `GENTLE`.
+    500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e toca o E9.
+  - **E9 · filamentos de plasma** (rodada E da skill `usage-monitor-visual-options`, escolhida entre
+    dez; `GargantuaModalFilaments.kt`, `filamentOpenMillis` 680 / `filamentCloseMillis` 220). A
+    moldura esmaece em ~100 ms (opacidade da janela AWT) e um filamento corre sob cada linha marcada
+    com `appModalRevealRow`, em ordem de leitura — topo, depois esquerda, pela caixa que a linha
+    publica, nunca pela ordem de composição (a navegação lateral seria composta antes do conteúdo e
+    iria inteira na frente). A linha é **recortada** atrás da cabeça: o dado está no lugar final desde
+    o primeiro quadro, nada cresce nem passa do valor. Fechar recolhe da direita para a esquerda, de
+    baixo para cima, e a janela só some nos últimos 15%. A escala 0,96 → 1 saiu: com o dado sendo
+    revelado, o conteúdo inteiro crescendo por cima era dois gestos. As primitivas de linha
+    (`AppDataRow`, `AppSectionHeader`, `AppToolbar`, `AppColumnHeaderRow`, `AppGroupBand`,
+    `AppMetricBlock`, `AppStatusBar`, `AppBanner`, item do `AppSettingsNav`) já se marcam; bloco que
+    não passa por elas (gráficos, a demo da Ajuda) se marca na tela. Conteúdo sem marca aparece com
+    a moldura. O `AppDialog` toca o mesmo E9 no cartão, com relógio próprio.
   - **O esmaecimento é só do Windows** (`shouldAnimateModalWindow`, #340). No X11 a opacidade da
     janela é a propriedade `_NET_WM_WINDOW_OPACITY`, aplicada pelo compositor, e voltar a 1 é apagar
     a propriedade. No elementary OS o modal de Configurações ficou translúcido depois de a opacidade

@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.appModalRevealRow
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppDataRow
@@ -133,63 +135,66 @@ fun HelpContent(
                     // inteira; a seção some.
                     val mediaHeight = minOf(HELP_MEDIA_HEIGHT, maxHeight * HELP_MEDIA_HEIGHT_SHARE)
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                            .padding(AppSpacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
-                    ) {
-                        AppDataSurfaceFlush(
-                            header = {
-                                AppSectionHeader(
+                    // Tópico novo refaz o E9 no conteúdo; a lista de tópicos fica parada.
+                    AppModalRevealScope(replayKey = selectedTopic) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(scrollState)
+                                .padding(AppSpacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
+                        ) {
+                            AppDataSurfaceFlush(
+                                header = {
+                                    AppSectionHeader(
+                                        title = entry.title,
+                                        subtitle = entry.summary,
+                                        markerColor = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            ) {
+                                HelpMediaFrame(
+                                    media = media,
                                     title = entry.title,
-                                    subtitle = entry.summary,
-                                    markerColor = MaterialTheme.colorScheme.primary
+                                    isPt = isPt,
+                                    height = mediaHeight,
+                                    modifier = Modifier.padding(AppSpacing.md)
+                                )
+                                Text(
+                                    text = entry.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.appModalRevealRow().padding(
+                                        start = AppSpacing.md,
+                                        end = AppSpacing.md,
+                                        bottom = AppSpacing.md
+                                    )
                                 )
                             }
-                        ) {
-                            HelpMediaFrame(
-                                media = media,
-                                title = entry.title,
-                                isPt = isPt,
-                                height = mediaHeight,
-                                modifier = Modifier.padding(AppSpacing.md)
-                            )
-                            Text(
-                                text = entry.description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(
-                                    start = AppSpacing.md,
-                                    end = AppSpacing.md,
-                                    bottom = AppSpacing.md
-                                )
-                            )
-                        }
 
-                        AppDataSurfaceFlush(
-                            header = {
-                                AppSectionHeader(title = if (isPt) "Como ativar" else "How to enable")
-                            }
-                        ) {
-                            entry.steps.forEachIndexed { index, step ->
-                                AppDataRow(showDivider = index != entry.steps.lastIndex) {
-                                    // O número é rótulo, e rótulo é mono: é a
-                                    // largura fixa do dígito que alinha os
-                                    // textos dos passos entre si.
-                                    Text(
-                                        text = "${index + 1}.",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.width(STEP_NUMBER_WIDTH)
-                                    )
-                                    Text(
-                                        text = step,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                            AppDataSurfaceFlush(
+                                header = {
+                                    AppSectionHeader(title = if (isPt) "Como ativar" else "How to enable")
+                                }
+                            ) {
+                                entry.steps.forEachIndexed { index, step ->
+                                    AppDataRow(showDivider = index != entry.steps.lastIndex) {
+                                        // O número é rótulo, e rótulo é mono: é a
+                                        // largura fixa do dígito que alinha os
+                                        // textos dos passos entre si.
+                                        Text(
+                                            text = "${index + 1}.",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.width(STEP_NUMBER_WIDTH)
+                                        )
+                                        Text(
+                                            text = step,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -243,6 +248,7 @@ private fun HelpMediaFrame(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .appModalRevealRow()
             .height(height)
             .appSurfaceBlock(shape = AppShapes.small),
         contentAlignment = Alignment.Center

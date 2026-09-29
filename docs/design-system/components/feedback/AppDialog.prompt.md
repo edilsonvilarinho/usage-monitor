@@ -20,9 +20,12 @@ desktop it has no transition at all. The card popping in over a scrim that darke
 "abrupt" opening the modals were blamed for. The Compose API keeps the `AlertDialog` slots (`title`,
 `text`, `confirmButton`, `dismissButton`) so every call site migrated mechanically.
 
-**Entry: the scrim fades in (`--dur-select`) and the card enters with fade + scale 0.96 → 1** on the
-GENTLE spring — no rebound, because the card carries text that must settle legible. Same starting
-scale as `AppMenu`: the two surfaces are born the same way.
+**Entry: the scrim fades in (`--dur-select`) and the card plays E9, the plasma filaments** of every
+modal window (`--dur-gargantua-filament-open`, 680ms): the card fades in within ~100ms and a filament
+runs under the title, the text and the action row in turn, revealing each one left to right behind
+its head. The card never scales — the text sits in its final place from the first frame and is only
+clipped. The card has its own clock (`ModalRevealState`), so inside a modal window it does not join
+the window's cascade. With reduced motion the card appears whole at once.
 
 **The exit is dry, on purpose.** The caller removes the dialog in the same click that fires the
 action; holding it composed to animate out would force every caller to keep content it already

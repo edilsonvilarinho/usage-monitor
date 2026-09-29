@@ -33,7 +33,8 @@
     'components/shell/AppToolbar.jsx',
     'components/shell/AppUpdateStrip.jsx',
     'components/shell/AppSettingsNav.jsx',
-    'components/shell/AppHudBar.jsx'
+    'components/shell/AppHudBar.jsx',
+    'components/shell/AppModalRevealRow.jsx'
   ];
 
   function published() {

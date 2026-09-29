@@ -121,7 +121,7 @@ fun TeamTrendChart(
     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
     val peak = trend.peakDailyCostMicros
 
-    AppDataSurface(modifier = modifier.testTag(TEAM_TREND_CHART_TAG)) {
+    AppDataSurface(modifier = modifier.appModalRevealRow().testTag(TEAM_TREND_CHART_TAG)) {
         // Cabeçalho do gráfico: o que ele mede à esquerda, de quem é cada cor à
         // direita. A frase mora aqui e não num painel acima porque é legenda do
         // gráfico, não texto da tela.
