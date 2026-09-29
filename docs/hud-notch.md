@@ -57,8 +57,8 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   do usado exibido, "<1%" nas duas pontas, nada para saldo e atividade observada); cotas do mesmo grupo
   (Antigravity, Cursor) numa caixa sob o nome dele; o rodapé **"Plus · via Codex"** — plano e origem da
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
-  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
-  mola `GENTLE` com crossfade do conteúdo.
+  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel repete a abertura pelo
+  jato a partir do anel novo (ver as alças, abaixo).
 - **Instalação nova** (issue #277, revista com a HUD como único modo): sem API habilitada o notch diz
   "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`), e as Configurações abrem sozinhas uma vez
   por arranque (`OpenSettingsWithoutApis` em `Main.kt`) — fechá-las não as reabre, e a engrenagem
@@ -88,7 +88,18 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     hover abrindo, alternar fecharia o balão que o próprio ponteiro acabou de abrir. Fechar é sair do
     notch ou passar num anel. O reinício do app continua sendo o clique no botão do balão — abrir no
     hover não torna o reinício um gesto de rotina.
-  As alças e o balão entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`.
+  As alças entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`. O balão
+  (de conta e da engrenagem, o mesmo) abre pelo **jato relativístico (B3)**: um feixe fino sai do
+  centro do anel pela cauda e atravessa o balão, que se desdobra ao longo da borda a partir da linha
+  do feixe (`jetOpenMillis` 520ms); fechar dobra de volta e recolhe o feixe para dentro do anel
+  (`jetCloseMillis` 240ms). Quadro puro em `GargantuaBalloonJet.kt`, movido pela transição do
+  `AnimatedVisibility` (a saída espera o quadro terminar); recorte e feixe desenhados pelo `HudBalloon`
+  sem mudar a caixa, e o feixe atravessa o notch por fora dela. O recorte da janela volta
+  `jetCloseMillis` + 60ms depois de recolher, senão cortaria o fim do fechamento. Escolhido entre 5
+  protótipos HTML (onda de choque, lente gravitacional, jato, luz de acreção no contorno, ondas
+  gravitacionais). **Trocar de anel (ou ir para a engrenagem) com o balão aberto repete o jato a partir
+  do anel novo**: o balão salta para lá (`HudBalloonPlacement.index`), sem deslizar nem crossfade — o
+  usuário pediu a animação também na troca, e desdobrar enquanto desliza lia como tremor.
 - **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
   no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
   cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**
@@ -229,6 +240,17 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   toca uma vez (`refreshWaveMillis`, 800ms) quando `refreshing` cai de verdadeiro para falso — também
   em coleta que falhou: a onda diz "o app olhou agora", não "o número mudou". É finita, então só
   "Reduzir animações" a desliga. A marca não gira nem pulsa mais.
+- **Dado novo: horizonte de eventos** (D5, `GargantuaRoll.kt`; 2026-09-29). Quando o texto de uma
+  linha ("7d 56%" → "7d 61%") ou a palavra da pílula muda, só os caracteres diferentes rolam como
+  odômetro: o antigo sobe e some, o novo nasce de baixo, e a base de cada um acende uma borda fina de
+  luz quente (`rollMillis` 480ms, cascata `rollStaggerMillis` 50ms, curva padrão sem rebote). O
+  começo comum não rola (o rótulo "7d " fica parado) e o resto compara pela direita
+  (`gargantuaRollGlyphs`: "9%" → "12%" rola o 9 e faz nascer o 1). A pílula rola a palavra inteira
+  (`AppStatusPill(rollLabelChanges = true)`, só na HUD). O efeito é **desenho** sobre o `Text` do
+  valor novo — recorte dos que mudam e o antigo medido por `TextMeasurer` —, então a geometria, que
+  mede os textos antes da composição, não muda. Não rola na primeira composição nem com "Reduzir
+  animações". Escolhido entre 5 protótipos HTML (desvio para o vermelho, lente, plasma que conta,
+  onda gravitacional, horizonte de eventos).
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco

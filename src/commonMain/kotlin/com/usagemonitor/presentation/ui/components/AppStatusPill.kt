@@ -12,6 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,7 +59,12 @@ fun AppStatusPill(
     tone: AppTone,
     modifier: Modifier = Modifier,
     maxLines: Int = 1,
-    textAlign: TextAlign = TextAlign.Start
+    textAlign: TextAlign = TextAlign.Start,
+    /**
+     * A palavra rola pelo horizonte quando o estado muda (D5, [rememberGargantuaRoll]).
+     * Só a barra HUD liga: fora dela a pílula não é dado que se atualiza sozinho.
+     */
+    rollLabelChanges: Boolean = false
 ) {
     val color = tone.color()
     Row(
@@ -68,14 +76,29 @@ fun AppStatusPill(
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
     ) {
         AppStatusDot(tone = tone)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = textAlign
-        )
+        if (rollLabelChanges) {
+            // A palavra leva o tom como span: a antiga sai rolando na cor dela.
+            val text = buildAnnotatedString { withStyle(SpanStyle(color = color)) { append(label) } }
+            val style = MaterialTheme.typography.labelSmall.copy(color = color, textAlign = textAlign)
+            val roll = rememberGargantuaRoll(text, whole = true)
+            Text(
+                text = text,
+                style = style,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+                onTextLayout = roll.onTextLayout,
+                modifier = Modifier.gargantuaRoll(roll, style)
+            )
+        } else {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = textAlign
+            )
+        }
     }
 }
 

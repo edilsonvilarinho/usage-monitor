@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
@@ -80,6 +82,12 @@ internal class SceneRecorder(
             frames += GifFrame(step(), frameMillis.toInt())
         }
         frames += GifFrame(step(), durationMillis.toInt())
+    }
+
+    /** Leva o ponteiro a ([xDp], [yDp]) da cena, para hover que só o mouse abre. */
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun moveMouse(xDp: Float, yDp: Float) {
+        scene.sendPointerEvent(PointerEventType.Move, Offset(xDp * SCALE, yDp * SCALE))
     }
 
     @OptIn(ExperimentalComposeUiApi::class)

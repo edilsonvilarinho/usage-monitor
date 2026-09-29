@@ -47,6 +47,8 @@ import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.HUD_RING_TEXT_GAP
 import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.components.gargantuaRoll
+import com.usagemonitor.presentation.ui.components.rememberGargantuaRoll
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppGargantuaRing
@@ -244,6 +246,7 @@ private fun HudRingItem(
             // à esquerda elas destoavam do anel e dos percentuais, centrados.
             textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
+            rollLabelChanges = true,
             modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG).graphicsLayer { alpha = frame.text }
         )
     }
@@ -282,26 +285,24 @@ private fun HudRingItem(
 private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
     val numberColor = percentColor ?: MaterialTheme.colorScheme.onSurface
     val label = line.label
-    if (label == null) {
-        Text(
-            text = line.percentText,
-            style = MaterialTheme.typography.labelMedium,
-            color = numberColor,
-            maxLines = 1,
-            modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG)
-        )
-        return
-    }
-    Text(
-        text = buildAnnotatedString {
-            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(label) }
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    // As cores vão como span, para o número antigo sair rolando no tom dele (D5).
+    val text = buildAnnotatedString {
+        if (label != null) {
+            withStyle(SpanStyle(color = labelColor)) { append(label) }
             append(" ")
-            withStyle(SpanStyle(color = numberColor)) { append(line.percentText) }
-        },
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurface,
+        }
+        withStyle(SpanStyle(color = numberColor)) { append(line.percentText) }
+    }
+    val style = (if (label == null) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall)
+        .copy(color = MaterialTheme.colorScheme.onSurface)
+    val roll = rememberGargantuaRoll(text)
+    Text(
+        text = text,
+        style = style,
         maxLines = 1,
-        modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG)
+        onTextLayout = roll.onTextLayout,
+        modifier = Modifier.testTag(HUD_STRIP_LINE_TEST_TAG).gargantuaRoll(roll, style)
     )
 }
 

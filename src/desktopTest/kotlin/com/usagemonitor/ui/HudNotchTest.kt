@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppUsageRing
 import androidx.compose.foundation.background
@@ -177,9 +178,10 @@ class HudNotchTest {
         onRefreshAccount: (UsageTargetKey) -> Unit = {},
         accountActions: (@Composable (HudAccount) -> Unit)? = null,
         dragging: Boolean = false,
-        onGearClick: () -> Unit = {}
+        onGearClick: () -> Unit = {},
+        motion: AppMotionPolicy = AppMotionPolicy.Static
     ) {
-        AppTheme(isDark = true) {
+        AppTheme(isDark = true, motion = motion) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
                 HudNotch(
                     accounts = list,
@@ -1272,6 +1274,123 @@ class HudNotchTest {
     private val RING_ENTRANCE_SETTLE_MILLIS = 1_500L
 
     /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */
+    // ------------------------------------------------------------ B3 · jato relativístico
+
+    /**
+     * O balão abre pelo jato: no começo só o feixe atravessa a caixa (quase nada
+     * pintado), e ao fim dos [AppGargantuaTokens.jetOpenMillis] ele está inteiro.
+     */
+    @Test
+    fun `o balao abre desdobrando a partir do feixe`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true) }
+        mainClock.autoAdvance = false
+        onNodeWithContentDescription(INFORMATA_RING).performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis * 15L / 100)
+        val crossing = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        val open = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        assertTrue(open > 0, "o balão aberto não pintou nada")
+        assertTrue(crossing * 5 < open, "no começo o balão já estava pintado: $crossing de $open")
+    }
+
+    /** Trocar de anel com o balão aberto repete o jato a partir do anel novo. */
+    @Test
+    fun `trocar de anel repete a abertura pelo feixe`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true) }
+        hoverRing(INFORMATA_RING)
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        mainClock.autoAdvance = false
+        onNodeWithContentDescription(DEEPSEEK_RING).performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis * 15L / 100)
+        val crossing = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        val open = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        onNodeWithText("DeepSeek").assertIsDisplayed()
+        assertTrue(crossing * 5 < open, "a troca não repetiu o jato: $crossing de $open")
+    }
+
+    /**
+     * Com "Reduzir animações" não há quadro intermediário: o balão sai do nada
+     * direto para inteiro, sem feixe nem desdobrar.
+     */
+    @Test
+    fun `reduzir animacoes abre o balao inteiro de uma vez`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true, motion = AppMotionPolicy.Reduced) }
+        mainClock.autoAdvance = false
+        onNodeWithContentDescription(INFORMATA_RING).performMouseInput { moveTo(center) }
+        val frames = (1..6).mapNotNull {
+            mainClock.advanceTimeByFrame()
+            val balloon = onAllNodesWithTag(HUD_BALLOON_TEST_TAG).fetchSemanticsNodes()
+            if (balloon.isEmpty()) null else paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        }
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        val settled = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        assertTrue(frames.isNotEmpty(), "o balão não abriu")
+        assertEquals(settled, frames.last())
+        assertTrue(frames.all { painted -> painted == 0 || painted == settled }, "quadro intermediário: $frames de $settled")
+    }
+
+    // ------------------------------------------------------------ D5 · horizonte de eventos
+
+    /** A conta principal com o 7d em [percent]. */
+    private fun withWeekly(percent: String): List<HudAccount> {
+        val first = accounts.first()
+        val quotas = first.quotas.map { quota -> if (quota.shortLabel == "7d") quota.copy(percentText = percent) else quota }
+        return listOf(first.copy(quotas = quotas)) + accounts.drop(1)
+    }
+
+    /** Dado novo rola pelo horizonte: no meio da troca a linha não é a final, e no fim é. */
+    @Test
+    fun `percentual novo rola so os digitos que mudaram`() = runDesktopComposeUiTest {
+        var list by mutableStateOf(withWeekly("9%"))
+        setContent { notch(list = list) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        list = withWeekly("12%")
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis / 3L)
+        val rolling = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis * 2L)
+        val settled = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        assertTrue(differs(rolling, settled), "no meio da troca a linha já estava parada")
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis.toLong())
+        assertTrue(!differs(settled, onNodeWithText("7d 12%").captureToImage().toPixelMap()), "a linha ainda se mexia depois da troca")
+    }
+
+    /** Com "Reduzir animações" o dado novo aparece de uma vez. */
+    @Test
+    fun `reduzir animacoes troca o percentual sem rolar`() = runDesktopComposeUiTest {
+        var list by mutableStateOf(withWeekly("9%"))
+        setContent { notch(list = list, motion = AppMotionPolicy.Reduced) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        list = withWeekly("12%")
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        val first = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis * 2L)
+        assertTrue(!differs(first, onNodeWithText("7d 12%").captureToImage().toPixelMap()), "com animação reduzida o número rolou")
+    }
+
+    /**
+     * Pixels da caixa do balão que não são o fundo. O canto (0, 0) fica na faixa
+     * da cauda do lado do notch, fora do corpo arredondado: é sempre o fundo.
+     */
+    private fun paintedPixels(pixels: PixelMap): Int {
+        val background = pixels[0, 0]
+        var count = 0
+        for (x in 0 until pixels.width) {
+            for (y in 0 until pixels.height) {
+                val pixel = pixels[x, y]
+                val distance = kotlin.math.abs(pixel.red - background.red) +
+                    kotlin.math.abs(pixel.green - background.green) +
+                    kotlin.math.abs(pixel.blue - background.blue)
+                if (distance > 0.06f) count++
+            }
+        }
+        return count
+    }
+
     private fun ComposeUiTest.hoverRing(description: String) {
         onNodeWithContentDescription(description).performMouseInput { moveTo(center) }
         waitForIdle()

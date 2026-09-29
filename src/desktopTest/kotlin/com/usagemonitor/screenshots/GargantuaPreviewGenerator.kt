@@ -25,6 +25,10 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudNotch
+import com.usagemonitor.presentation.ui.HudAppBalloonContent
+import com.usagemonitor.presentation.ui.components.FooterActionGroup
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.hudAppBalloonHeight
 import com.usagemonitor.presentation.ui.rememberHudPresence
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -61,6 +65,7 @@ fun main(args: Array<String>) {
     }
     recordPresence(output)
     recordRefresh(output)
+    recordBalloon(output)
     println("Prévia Gargantua: ${output.absolutePath}")
 }
 
@@ -104,10 +109,66 @@ private fun recordRefresh(output: File) {
         shown = all.map { account -> account.copy(refreshing = true) }
         recorder.animate(1_800) { }
         shown = all.map { account ->
-            account.copy(quotas = account.quotas.map { quota -> quota.copy(fraction = (quota.fraction + 0.08f).coerceAtMost(1f)) })
+            account.copy(
+                quotas = account.quotas.map { quota ->
+                    val fraction = (quota.fraction + 0.08f).coerceAtMost(1f)
+                    // O texto acompanha o arco, para a prévia mostrar o rolar do D5.
+                    val percentText = if (quota.percentText.endsWith("%")) "${(fraction * 100).toInt()}%" else quota.percentText
+                    quota.copy(fraction = fraction, percentText = percentText)
+                }
+            )
         }
         recorder.animate(1_400) { }
         GifEncoder.write(File(output, "hud-gargantua-refresh.gif"), recorder.frames)
+    } finally {
+        recorder.close()
+    }
+}
+
+/**
+ * B3 · jato relativístico com o ponteiro de verdade: abre no primeiro anel, troca
+ * para os outros e para a engrenagem (cada troca repete o jato) e fecha. A borda
+ * direita é a das capturas de referência do usuário.
+ */
+private fun recordBalloon(output: File) {
+    val accounts = GargantuaPreviewFixtures.showcase
+    var expanded by mutableStateOf(false)
+    val recorder = SceneRecorder(widthDp = 460, heightDp = 540, frameMillis = 30L)
+    try {
+        recorder.setContent {
+            CompositionLocalProvider(LocalAppMotionPolicy provides AppMotionPolicy.Live) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                    HudNotch(
+                        accounts = accounts,
+                        edge = HudEdge.RIGHT,
+                        sizes = hudNotchSizes(accounts, HudEdge.RIGHT, "Carregando", hasUpdateIndicator = false),
+                        fallbackLabel = "Carregando",
+                        expanded = expanded,
+                        appBalloon = {
+                            HudAppBalloonContent(
+                                language = AppLanguage.PT,
+                                appVersion = "41.5.0",
+                                countdown = null,
+                                updateIndicator = null,
+                                actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) }
+                            )
+                        },
+                        appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
+                        gearDescription = "Configurações"
+                    )
+                }
+            }
+        }
+        expanded = true
+        recorder.animate(300) { }
+        // Centros dos três anéis e da engrenagem nesta cena, em dp.
+        for ((x, y) in listOf(416f to 124f, 416f to 240f, 416f to 360f, 416f to 486f)) {
+            recorder.moveMouse(x, y)
+            recorder.animate(1_200) { }
+        }
+        expanded = false
+        recorder.animate(600) { }
+        GifEncoder.write(File(output, "hud-gargantua-balloon.gif"), recorder.frames)
     } finally {
         recorder.close()
     }

@@ -58,6 +58,13 @@ plasma slides from the old value to the new one and one stronger wave plays once
 (`--dur-gargantua-refresh-wave`, 800ms); finite, so only Reduced motion removes it. The ring is no
 longer pressed and the mark no longer spins or pulses.
 
+**New data (D5, event horizon).** When a strip line ("7d 56%" → "7d 61%") or the state word changes,
+only the characters that changed roll like an odometer: the old one rises and disappears, the new one
+comes from below, and the base of each flashes a thin hot rim (`--dur-gargantua-roll` 480ms,
+`--dur-gargantua-roll-stagger` 50ms, standard curve, never an overshoot). The label ("7d ") never
+rolls; the rest is compared from the right. Drawing only, over the new value's text — the HUD
+geometry is unchanged. Not on first composition, not with Reduced motion.
+
 **Birth and collapse.** When an API is enabled, and when the app starts or the HUD opens, each
 indicator is born (S1, shockwave, `--dur-gargantua-birth` 1100ms, 140ms cascade between accounts):
 a point of light flashes, two shockwaves travel out to about 3dp past the ring, the horizon opens
@@ -67,6 +74,14 @@ text leaves first, the plasma retracts, the ring shrinks to a point and ends in 
 item keeps its slot until the collapse ends; only then does the notch shrink, in one step. Both are
 finite transitions: Reduced motion makes them an instant cut. Chosen from HTML prototypes (3 births,
 4 collapses) by the user.
+
+**Balloon (B3, relativistic jet).** The HUD balloon of an account and of the gear opens with a thin
+beam — white at the ring centre, hot in the middle, gold fading at the tip, 1.6dp with a wide faint
+halo and an 8dp flash at the origin — that crosses the balloon; the balloon unfolds along the edge
+from the beam line (`--dur-gargantua-jet-open` 520ms). Closing folds it back and retracts the beam
+(`--dur-gargantua-jet-close` 240ms). Moving to another ring or to the gear replays the opening from
+the new ring. Data never animates: the bars keep their length, only the clip
+grows. Chosen from 5 HTML prototypes by the user.
 
 **Accessibility.** The mark and decorative scene are hidden from accessibility. One indicator
 description identifies the account, windows, values, state and refresh action; active-session
