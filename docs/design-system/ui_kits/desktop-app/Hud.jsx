@@ -106,8 +106,8 @@ export function Hud() {
         tem o tamanho da área aberta enquanto o ponteiro está no notch: cresce de uma vez ao
         entrar e encolhe depois de o balão sair, sem mover o notch. Só a mão move (solte perto de
         qualquer borda: ele gruda na mais próxima, gravado como borda + fração); a engrenagem abre
-        as ações do rodapé no hover, como o anel (#317). Clique num anel atualiza aquela conta; botão direito vai direto a
-        "Somente cards"; "Padrão" na engrenagem, Ctrl+Shift+H e a bandeja voltam à janela. O arco
+        as ações do rodapé no hover, como o anel (#317). Clique num anel atualiza aquela conta; botão direito não faz nada;
+        o interruptor "Barra HUD", Ctrl+Shift+H e a bandeja voltam à janela. O arco
         de sessão ativa é um cometa azul externo (2,6s). O disco de acreção dourado, a lente gravitacional e
         os filamentos animam em 14s (4s ao atualizar); a atenção respira em 3,2s. Os arcos de quota e
         as marcas dos provedores ficam ancorados. Movimento contínuo só com a política ligada e sem

@@ -46,7 +46,6 @@ import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.FooterBar
-import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -435,14 +434,14 @@ private fun recordPresence(outputDir: File) {
 }
 
 /**
- * Modos de janela: a mesma janela em três tamanhos, um de cada vez.
+ * Modos de janela: a mesma janela em dois tamanhos, um de cada vez.
  *
  * A primeira versão desenhava a barra HUD **por cima** da grade de cards, para
  * a pílula não ficar sozinha num quadro vazio. Foi vista em uso e recusada: as
  * duas exibições se misturaram — a linha do HUD parecia conteúdo de um card, e o
- * quadro passou a mostrar um estado que o app não tem. As três aparecem agora em
- * sequência, com fade entre elas, e o vazio em volta das duas últimas é o
- * assunto: é a área de tela que o modo devolve.
+ * quadro passou a mostrar um estado que o app não tem. As duas aparecem agora em
+ * sequência, com fade entre elas, e o vazio em volta da HUD é o assunto: é a
+ * área de tela que o modo devolve.
  */
 private fun recordWindowModes(outputDir: File) {
     val state = DemoState()
@@ -468,27 +467,8 @@ private fun recordWindowModes(outputDir: File) {
                                 onRefresh = {},
                                 onOpenSettings = {},
                                 nowProvider = { ScreenshotFixtures.NOW },
-                                countdownUpdatesEnabled = false,
-                                // O ícone que abre as três molduras (issue #187).
-                                // A demo é justamente a deste tópico: sem ele,
-                                // ela mostraria um rodapé que o app não tem mais.
-                                // O menu **aberto** fica de fora — ele é popup, e
-                                // o gravador compõe a cena offscreen, onde a
-                                // camada de popup não entra no quadro.
-                                windowMode = WindowMode.STANDARD,
-                                onWindowModeChange = {}
+                                countdownUpdatesEnabled = false
                             )
-                        }
-
-                        // Sem barra de título e sem rodapé, e mais estreita: é
-                        // assim que a janela fica ao lado do editor.
-                        WindowModeShot.CARDS_ONLY -> Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(modifier = Modifier.width(CARDS_ONLY_DEMO_WIDTH).fillMaxHeight()) {
-                                DemoDashboardBackdrop(padding = AppSpacing.sm)
-                            }
                         }
 
                         WindowModeShot.HUD -> Box(
@@ -526,17 +506,13 @@ private fun recordWindowModes(outputDir: File) {
         recorder.animate(700) {}
         recorder.hold(1_700)
 
-        mode = WindowModeShot.CARDS_ONLY
-        recorder.animate(WINDOW_MODE_FADE_MILLIS + 200L) {}
-        recorder.hold(1_700)
-
         mode = WindowModeShot.HUD
         recorder.animate(WINDOW_MODE_FADE_MILLIS + 200L) {}
         recorder.hold(2_000)
     }
 }
 
-private enum class WindowModeShot { NORMAL, CARDS_ONLY, HUD }
+private enum class WindowModeShot { NORMAL, HUD }
 
 /** Aparência: tema, idioma e escala, na aba Geral das Configurações. */
 private fun recordAppearance(outputDir: File) {
@@ -672,8 +648,6 @@ private val HUD_DEMO_SIZES = hudNotchSizes(
     hasUpdateIndicator = false
 )
 
-/** Largura da janela no modo somente cards: uma coluna de cards ao lado do editor. */
-private val CARDS_ONLY_DEMO_WIDTH = 420.dp
 
 private const val WINDOW_MODE_FADE_MILLIS = 300
 

@@ -63,45 +63,9 @@ fun AlwaysOnTopToggle(
 }
 
 /**
- * Modo somente cards: esconde a barra de título e o rodapé da janela.
- *
- * O texto de apoio não é decoração. Ligado, o modo tira da tela o botão de
- * fechar e a engrenagem das configurações, e quem não souber como voltar fica
- * com um app que não consegue desligar — as três saídas têm de estar escritas
- * onde o interruptor é acionado.
- */
-@Composable
-fun CardsOnlyModeToggle(
-    enabled: Boolean,
-    language: AppLanguage = AppLanguage.PT,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    showDivider: Boolean = true
-) {
-    val isPt = language == AppLanguage.PT
-    SettingsOptionRow(
-        label = if (isPt) "Somente os cards" else "Cards only",
-        description = if (isPt) {
-            "Esconde a barra de título e o rodapé. Para voltar: Ctrl+Shift+M, o ícone na bandeja ou a faixa que aparece ao passar o mouse no topo da janela."
-        } else {
-            "Hides the title bar and the footer. To return: Ctrl+Shift+M, the tray icon, or the strip that appears when hovering the top of the window."
-        },
-        showDivider = showDivider,
-        modifier = modifier
-    ) {
-        AppSwitch(
-            checked = enabled,
-            onCheckedChange = { onToggle(it) },
-            modifier = Modifier.testTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG)
-        )
-    }
-}
-
-/**
- * Barra HUD (issue #164): terceiro chrome, ainda mais discreto que o modo
- * somente cards — uma faixa de 24dp ancorada no topo da tela, sem título, sem
- * cards. Mesma razão de existir do texto de apoio do modo somente cards: as
- * saídas têm de estar escritas onde o interruptor liga.
+ * Barra HUD (issue #164): a moldura reduzida do app — um notch colado numa borda
+ * da tela, sem título, sem cards. As saídas têm de estar escritas onde o
+ * interruptor liga.
  */
 @Composable
 fun HudModeToggle(

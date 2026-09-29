@@ -317,7 +317,7 @@ object AppSurfaceLadders {
  * sistema define uma vez.
  */
 object AppChrome {
-    /** Barra de título das janelas, e a faixa de hover do modo somente cards. */
+    /** Barra de título das janelas. */
     val titleBar: Dp = 34.dp
 
     /** Barra de controles fixada no topo de uma janela que fatia por tempo. */

@@ -116,7 +116,6 @@ internal fun HudWindowHost(
     iconImage: Painter?,
     hudScreenArea: ScreenWorkArea,
     onOpenFull: () -> Unit,
-    onSwitchToCardsOnly: () -> Unit,
     /** As ações do rodapé, que aqui moram no balão da engrenagem. */
     actions: AppShellActions,
     /** Perfis marcados como parte do time: decidem os botões de time no balão. */
@@ -328,7 +327,6 @@ internal fun HudWindowHost(
             handleHudWindowKey(
                 event = event,
                 onOpenFull = onOpenFull,
-                onSwitchToCardsOnly = onSwitchToCardsOnly,
                 onOpenHelp = actions.openHelp
             )
         }
@@ -371,8 +369,6 @@ internal fun HudWindowHost(
                             onRefresh = { viewModel.refresh(account.targetKey) }
                         )
                     },
-                    // Botão direito (issue #215): direto para "Somente cards".
-                    onSwitchToCardsOnly = onSwitchToCardsOnly,
                     // A engrenagem da ponta de longe abre o balão com o que o
                     // rodapé do modo padrão oferece — aqui não há rodapé.
                     appBalloon = {
@@ -412,23 +408,20 @@ private fun hudUpdateIndicatorOf(state: AppUpdateUiState, language: AppLanguage)
     )
 }
 
-/** `Ctrl+Shift+H` volta à janela padrão, `Ctrl+Shift+M` vai a "Somente cards", `F1` abre a ajuda. */
+/** `Ctrl+Shift+H` volta à janela padrão, `F1` abre a ajuda. */
 private fun handleHudWindowKey(
     event: KeyEvent,
     onOpenFull: () -> Unit,
-    onSwitchToCardsOnly: () -> Unit,
     onOpenHelp: () -> Unit
 ): Boolean {
     val isDown = event.type == KeyEventType.KeyDown
     val hudToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.H
-    val cardsOnlyToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.M
     val help = isDown && event.key == Key.F1
     when {
         hudToggle -> onOpenFull()
-        cardsOnlyToggle -> onSwitchToCardsOnly()
         help -> onOpenHelp()
     }
-    return hudToggle || cardsOnlyToggle || help
+    return hudToggle || help
 }
 
 /**
@@ -466,7 +459,6 @@ private fun HudWindowAppBalloon(
         },
         updateIndicator = updateIndicator,
         onUpdateAction = updateAction,
-        onWindowModeChange = actions.changeWindowMode,
         actions = {
             FooterActionGroup(
                 language = language,

@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.moveVisibleCardToIndex
 import com.usagemonitor.presentation.ui.normalizeCardOrder
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
@@ -15,12 +14,11 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 
 /**
  * As preferências de aparência e de moldura que o app inteiro lê: escala, tema,
- * idioma, movimento, opacidade, modos de janela e a arrumação dos cards.
+ * idioma, movimento, opacidade, barra HUD e a arrumação dos cards.
  *
  * Cada mudança passa por um método, que grava e aplica a regra de negócio no
- * mesmo lugar — a exclusão entre a barra HUD e o modo somente cards, por
- * exemplo, era um par de lambdas locais em `runUsageMonitor` que qualquer outro
- * trecho do lambda podia contornar escrevendo direto no `var`.
+ * mesmo lugar — regra espalhada em lambdas locais de `runUsageMonitor` podia
+ * ser contornada por qualquer trecho que escrevesse direto no `var`.
  *
  * A escala e a opacidade são exceção: o controle deslizante muda o valor a cada
  * pixel, e quem grava é o coletor com debounce de `AppPreferenceEffects`.
@@ -83,6 +81,12 @@ internal class AppShellState(
     var monthlyBudgetMicros by mutableStateOf(readPersistedBudgetMicros(settings))
         private set
 
+    // A migração do modo somente cards (removido) grava `hudMode`; tem de rodar
+    // antes de qualquer leitura da chave, a da instalação nova inclusive.
+    init {
+        migrateCardsOnlyModeToHud(settings)
+    }
+
     // HUD padrão na instalação nova (issue #277): lido na construção, antes de
     // qualquer gravação, porque o coletor da janela principal grava
     // `windowPlacement` e daí em diante toda execução parece antiga. A troca em
@@ -91,11 +95,6 @@ internal class AppShellState(
         private set
 
     var hudMode by mutableStateOf(readPersistedHudMode(settings))
-        private set
-
-    // Modo somente cards: sem barra de título e sem rodapé. Booleano grava direto,
-    // sem o coletor com debounce que a opacidade e a escala precisam.
-    var cardsOnlyMode by mutableStateOf(readPersistedCardsOnlyMode(settings))
         private set
 
     var cardOrder by mutableStateOf(
@@ -112,48 +111,14 @@ internal class AppShellState(
     )
         private set
 
-    /** A moldura corrente, na forma que o menu de modos oferece. */
-    val windowMode: WindowMode
-        get() = when {
-            hudMode -> WindowMode.HUD
-            cardsOnlyMode -> WindowMode.CARDS_ONLY
-            else -> WindowMode.STANDARD
-        }
-
     /**
-     * Barra HUD (issue #164): mutuamente exclusiva com o modo somente cards — só
-     * uma moldura reduzida por vez faz sentido. Qualquer escolha de modo encerra a
-     * troca pendente da instalação nova, inclusive a própria troca.
+     * Barra HUD (issue #164). Qualquer escolha encerra a troca pendente da
+     * instalação nova, inclusive a própria troca.
      */
     fun changeHudMode(enabled: Boolean) {
-        if (enabled) {
-            cardsOnlyMode = false
-            persistCardsOnlyMode(settings, false)
-        }
         hudMode = enabled
         persistHudMode(settings, enabled)
         clearPendingHudDefault()
-    }
-
-    fun changeCardsOnlyMode(enabled: Boolean) {
-        clearPendingHudDefault()
-        if (enabled) {
-            hudMode = false
-            persistHudMode(settings, false)
-        }
-        cardsOnlyMode = enabled
-        persistCardsOnlyMode(settings, enabled)
-    }
-
-    fun changeWindowMode(mode: WindowMode) {
-        when (mode) {
-            WindowMode.STANDARD -> {
-                changeCardsOnlyMode(false)
-                changeHudMode(false)
-            }
-            WindowMode.CARDS_ONLY -> changeCardsOnlyMode(true)
-            WindowMode.HUD -> changeHudMode(true)
-        }
     }
 
     fun changeUiScale(percent: Int) {

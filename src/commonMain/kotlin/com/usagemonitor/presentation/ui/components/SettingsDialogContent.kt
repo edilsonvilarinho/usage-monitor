@@ -56,7 +56,6 @@ const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
-const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
 const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
 const val REDUCED_MOTION_SWITCH_TEST_TAG = "reducedMotionSwitch"
 const val TRAY_USAGE_RING_SWITCH_TEST_TAG = "trayUsageRingSwitch"
@@ -125,14 +124,13 @@ fun SettingsDialogContent(
     configuredApiKeys: Set<ApiSource> = emptySet(),
     autoStartEnabled: Boolean,
     alwaysOnTopEnabled: Boolean = false,
-    cardsOnlyMode: Boolean = false,
     hudMode: Boolean = false,
     windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
     reducedMotion: Boolean = false,
-    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
+    /** Default vazio pela mesma razão de [onHudModeChange]. */
     onReducedMotionChange: (Boolean) -> Unit = {},
     trayUsageRing: Boolean = false,
     onTrayUsageRingChange: (Boolean) -> Unit = {},
@@ -143,8 +141,6 @@ fun SettingsDialogContent(
     onAutoStartChange: (Boolean) -> Unit,
     onAlwaysOnTopChange: (Boolean) -> Unit = {},
     /** Default vazio para não arrastar os geradores de captura e os testes de componente. */
-    onCardsOnlyModeChange: (Boolean) -> Unit = {},
-    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
     onHudModeChange: (Boolean) -> Unit = {},
     autoUpdateEnabled: Boolean = false,
     /**
@@ -283,7 +279,6 @@ fun SettingsDialogContent(
                                 currentLanguage = currentLanguage,
                                 autoStartEnabled = autoStartEnabled,
                                 alwaysOnTopEnabled = alwaysOnTopEnabled,
-                                cardsOnlyMode = cardsOnlyMode,
                                 hudMode = hudMode,
                                 windowOpacityPercent = windowOpacityPercent,
                                 windowOpacityEnabled = windowOpacityEnabled,
@@ -298,7 +293,6 @@ fun SettingsDialogContent(
                                 onLanguageChange = onLanguageChange,
                                 onAutoStartChange = onAutoStartChange,
                                 onAlwaysOnTopChange = onAlwaysOnTopChange,
-                                onCardsOnlyModeChange = onCardsOnlyModeChange,
                                 onHudModeChange = onHudModeChange,
                                 onAutoUpdateChange = onAutoUpdateChange,
                                 receiveBetaUpdates = receiveBetaUpdates,

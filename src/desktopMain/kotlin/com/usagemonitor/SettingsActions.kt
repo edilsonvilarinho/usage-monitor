@@ -93,11 +93,6 @@ internal class SettingsActions(
         feedback.showToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
     }
 
-    fun changeCardsOnlyMode(enabled: Boolean) {
-        shell.changeCardsOnlyMode(enabled)
-        feedback.showToast(SettingsToast.Saved(SettingsField.CARDS_ONLY_MODE))
-    }
-
     fun changeHudMode(enabled: Boolean) {
         shell.changeHudMode(enabled)
         feedback.showToast(SettingsToast.Saved(SettingsField.HUD_MODE))

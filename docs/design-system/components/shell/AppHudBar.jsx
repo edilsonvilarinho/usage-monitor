@@ -133,12 +133,6 @@ export function AppHudBar({
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>v{version}</span>
             {countdown ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{refreshFraction !== undefined ? clockIcon(refreshFraction) : '↻'} {countdown}</span> : null}
           </div>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Modo de janela</span>
-          {['Padrão', 'Somente os cards', 'Barra HUD'].map((mode) => (
-            <span key={mode} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: mode === 'Barra HUD' ? 'var(--fg)' : 'var(--muted)' }}>
-              <span style={{ display: 'inline-block', width: 16 }}>{mode === 'Barra HUD' ? '✓' : ''}</span>{mode}
-            </span>
-          ))}
           <div style={{ display: 'flex', gap: 6, color: 'var(--muted)' }}>⤓ ↻ ⚙ ?</div>
           {update ? (
             <>

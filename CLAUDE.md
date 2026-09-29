@@ -289,13 +289,8 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 - Dashboard usa o corpo denso (`AppSpacing.md`/`sm`); a coluna rolável não reserva folga para a barra.
 - Grade anima com mola `GENTLE`, primeira colocação é salto; no arrasto as caixas do alvo ficam
   congeladas (`previewCardOrder`).
-- Somente cards: dois booleanos, sem enum; faixa de título só composta no hover (senão o arrasto
-  imediato da janela vence a pressão longa do card); três saídas obrigatórias: faixa, bandeja e
-  `Ctrl+Shift+M`.
-- Menu de modos (`WindowMode` + `AppMenu`): o enum é do controle, o estado segue em dois booleanos com
-  exclusão nos setters de `AppShellState.kt`; rótulos iguais aos das Configurações; `AppMenu` é
-  `Popup` próprio, nunca `DropdownMenu`; abre para cima se não cabe; só no modo padrão
-  (`onWindowModeChange = null` esconde).
+- Somente cards e o menu de modos (`WindowMode`) foram removidos; `cardsOnlyMode=true` salvo migra
+  para a HUD uma vez (`migrateCardsOnlyModeToHud`). Não reintroduzir moldura reduzida além da HUD.
 - Tooltip de cota não abre abaixo de 320dp de card (`shouldShowQuotaTooltip`, constante própria, não
   `NarrowCardWidthThreshold`); a `testTag` do bloco de cota mora no conteúdo; a explicação do
   semáforo é o `footnote` da tooltip. Cabeçalho tem ponto **e** palavra do pior risco
@@ -309,7 +304,7 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 `HudNotchGeometry.kt`, `HudModel.kt`; issue #164): decisões e histórico em
 [`docs/hud-notch.md`](docs/hud-notch.md). **Leia antes de mexer na HUD.** Regras:
 
-- `hudMode` é booleano, exclusivo com somente cards pelos setters de `AppShellState.kt`; `HudEdge` é
+- `hudMode` é booleano, com setter em `AppShellState.kt`; `HudEdge` é
   enum próprio. A janela principal fica escondida com geometria intacta.
 - Um anel por conta, até três arcos; janela mais longa por fora; uma linha por anel com janela e
   percentual; palavra do **pior** risco. Faixa compacta acima de 45% da borda.
@@ -320,7 +315,7 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
   `Window.shape` **só no Windows** (`hudUsesHitRegion`, #340); nenhum redimensionamento AWT por quadro.
 - Arrasto só pela mão, medido por `hudDragWindowBounds`; posição é borda + fração + monitor; parado
   mora na área útil, fora da barra de tarefas.
-- Clique num anel recoleta aquela conta; botão direito vai a somente cards. Atualização pendente é o
+- Clique num anel recoleta aquela conta; botão direito não faz nada. Atualização pendente é o
   ponto da engrenagem; reiniciar só pelo botão do balão.
 - Movimento contínuo (órbita de sessão, pulso de atenção) só atrás de `AppMotionPolicy.continuous`.
 - Balão é conteúdo da janela, nunca `Popup`; nenhum formato novo de percentual/reset/rótulo.

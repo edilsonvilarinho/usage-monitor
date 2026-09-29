@@ -6,12 +6,12 @@
 `HudNotchGeometry.kt` + `HudModel.kt` + `AppShellActions.kt` + `CardActions.kt` + `AppUsageRing` +
 `HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, redesenhada no plano
 [`profundidade-movimento-hud-notch-execucao.md`](planos/profundidade-movimento-hud-notch-execucao.md)):
-terceiro chrome, ainda mais discreto que o modo somente cards. A janela principal fica **escondida**
+a moldura reduzida única do app (o modo somente cards saiu em setembro de 2026). A janela principal fica **escondida**
 (`visible = !hudMode`), com a geometria intacta, e sobra um **notch colado numa borda da tela** numa
 janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`). O desenho vem do
 Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
-**Não é valor novo em enum existente**: `hudMode` continua um booleano, exclusivo com o modo somente
-cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
+**Não é valor novo em enum existente**: `hudMode` continua um booleano (setter em `AppShellState.kt`),
+e `HudEdge` é enum novo.
 - **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos). **A janela mais
   longa fica por fora** (`HudAccount.rings`, issue #278): mensal, semanal, a janela curta, e saldo e
   créditos (`REPORTED`) por dentro. Na ordem da API a 5h ficava por fora da semanal, o contrário de
@@ -185,12 +185,12 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     **sem apagar** a gravação: quando ele volta, o notch volta junto.
 - **Um gesto só** (`hudPressGesture`): **clique num anel recoleta aquela conta** (decisão da rodada 3,
   como o `refreshRing` do Codenotch — o gesto entrega a posição do `down` e o notch acha o anel pela
-  caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; botão
-  direito vai direto a "Somente cards" (sem popup — seria recortado dentro desta janela). No corpo o
+  caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; o botão
+  direito é engolido sem ação (levava ao modo somente cards, removido). No corpo o
   gesto é `draggable = false`: passar do limiar só desiste do clique, e **mover é só pela mão**, que usa o
   mesmo gesto com arrasto. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
   consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
-  `MouseInfo`, incremental. Saídas para a janela padrão: "Padrão" no balão da engrenagem, bandeja,
+  `MouseInfo`, incremental. Saídas para a janela padrão: interruptor "Barra HUD" nas Configurações, bandeja,
   `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
 - **Contagem até a próxima coleta só no balão da engrenagem** (#185, #269): ela ficava no fim da
   faixa, e com a cadência adaptativa (60 s com sessão CLI ativa) virou um número que reiniciava a cada

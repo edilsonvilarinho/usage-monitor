@@ -145,7 +145,6 @@ internal fun HudNotch(
     onDragEnd: () -> Unit = {},
     /** Clique num anel: recoleta aquela conta, como no Codenotch. */
     onRefreshAccount: (UsageTargetKey) -> Unit = {},
-    onSwitchToCardsOnly: () -> Unit = {},
     /** Os botões do card de cada conta, na fileira de baixo do balão dela. */
     accountActions: (@Composable (HudAccount) -> Unit)? = null,
     /**
@@ -250,8 +249,7 @@ internal fun HudNotch(
                             ringItemBounds.indexAt(position)
                                 ?.let { index -> currentAccounts.getOrNull(index) }
                                 ?.let { account -> currentOnRefreshAccount(account.targetKey) }
-                        },
-                        onSecondaryClick = onSwitchToCardsOnly
+                        }
                     )
                     .semantics { contentDescription = HUD_NOTCH_DESCRIPTION }
             ) {

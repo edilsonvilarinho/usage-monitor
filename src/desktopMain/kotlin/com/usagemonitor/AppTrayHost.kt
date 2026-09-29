@@ -86,14 +86,7 @@ internal fun ApplicationScope.AppTrayHost(
                     modal.isHelpOpen = true
                 }
             )
-            Item(
-                text = when {
-                    shell.cardsOnlyMode -> if (pt) "Sair do modo somente cards" else "Exit cards only mode"
-                    else -> if (pt) "Somente os cards" else "Cards only"
-                },
-                onClick = { shell.changeCardsOnlyMode(!shell.cardsOnlyMode) }
-            )
-            // Mesmo padrão (issue #164): com a janela reduzida à barra, a bandeja
+            // Issue #164: com a janela reduzida à barra, a bandeja
             // continua sendo um caminho de volta.
             Item(
                 text = when {

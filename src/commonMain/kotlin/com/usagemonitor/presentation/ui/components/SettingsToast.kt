@@ -8,7 +8,6 @@ enum class SettingsField {
     LANGUAGE,
     AUTO_START,
     ALWAYS_ON_TOP,
-    CARDS_ONLY_MODE,
     HUD_MODE,
     WINDOW_OPACITY,
     UI_SCALE,
@@ -89,7 +88,6 @@ private fun savedMessage(field: SettingsField, isPt: Boolean): String {
         SettingsField.LANGUAGE -> "Idioma salvo"
         SettingsField.AUTO_START -> "Inicialização com sistema salva"
         SettingsField.ALWAYS_ON_TOP -> "Preferência de janela salva"
-        SettingsField.CARDS_ONLY_MODE -> "Modo somente cards salvo"
         SettingsField.HUD_MODE -> "Barra HUD salva"
         SettingsField.WINDOW_OPACITY -> "Opacidade salva"
         SettingsField.UI_SCALE -> "Tamanho da interface salvo"
@@ -114,7 +112,6 @@ private fun fieldLabel(field: SettingsField, isPt: Boolean): String {
         SettingsField.LANGUAGE -> if (isPt) "idioma" else "Language"
         SettingsField.AUTO_START -> if (isPt) "inicialização com sistema" else "System startup"
         SettingsField.ALWAYS_ON_TOP -> if (isPt) "manter sempre visível" else "Always on top"
-        SettingsField.CARDS_ONLY_MODE -> if (isPt) "modo somente cards" else "Cards only mode"
         SettingsField.HUD_MODE -> if (isPt) "barra HUD" else "HUD strip"
         SettingsField.WINDOW_OPACITY -> if (isPt) "opacidade da janela" else "Window opacity"
         SettingsField.UI_SCALE -> if (isPt) "tamanho da interface" else "Interface size"

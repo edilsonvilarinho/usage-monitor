@@ -5,20 +5,17 @@ import com.russhwolf.settings.PreferencesSettings
 private const val CARDS_ONLY_MODE_KEY = "cardsOnlyMode"
 
 /**
- * Modo "somente os cards": a janela principal sem barra de título e sem rodapé.
+ * O modo "somente os cards" saiu do app: a barra HUD passou a ser a moldura
+ * reduzida única. Quem o tinha ligado escolheu a janela mais discreta, e a
+ * equivalente hoje é a HUD — cair na janela padrão desfaria a escolha.
  *
- * Mora no mesmo armazenamento das demais preferências (registro no Windows, plist
- * no macOS, via `PreferencesSettings`) e **não** em `~/.usage-monitor/`: ali ficam
- * a chave do servidor de time e o token de administração, que são segredos; a
- * moldura da janela não é.
- *
- * Default `false`: o modo esconde os controles de fechar e de configurações, e um
- * app que abre pela primeira vez sem eles não tem como ser explicado.
+ * Roda antes da leitura de `hudMode` e apaga a chave, para a migração valer uma
+ * vez só: desligar a HUD depois não pode ser revertido por ela no arranque seguinte.
  */
-internal fun readPersistedCardsOnlyMode(settings: PreferencesSettings): Boolean {
-    return settings.getBoolean(CARDS_ONLY_MODE_KEY, false)
-}
-
-internal fun persistCardsOnlyMode(settings: PreferencesSettings, enabled: Boolean) {
-    settings.putBoolean(CARDS_ONLY_MODE_KEY, enabled)
+internal fun migrateCardsOnlyModeToHud(settings: PreferencesSettings) {
+    if (!settings.hasKey(CARDS_ONLY_MODE_KEY)) return
+    if (settings.getBoolean(CARDS_ONLY_MODE_KEY, false)) {
+        persistHudMode(settings, true)
+    }
+    settings.remove(CARDS_ONLY_MODE_KEY)
 }

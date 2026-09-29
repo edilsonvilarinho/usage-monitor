@@ -4,7 +4,6 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
-import com.usagemonitor.presentation.ui.components.WindowMode
 
 /**
  * As ações do app: as do rodapé do modo padrão e as que o card de uma conta abre.
@@ -22,7 +21,6 @@ internal class AppShellActions(
     val refreshAll: () -> Unit,
     val openSettings: () -> Unit,
     val openHelp: () -> Unit,
-    val changeWindowMode: (WindowMode) -> Unit,
     /** Escreve o retrato das cotas e devolve o caminho; `null` é diálogo cancelado. */
     val exportSnapshot: suspend (List<ApiUsageStats>) -> String?,
     val onExportFailure: (Throwable) -> Unit,

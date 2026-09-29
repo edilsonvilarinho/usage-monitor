@@ -9,8 +9,8 @@ private const val HUD_DEFAULT_PENDING_KEY = "hudDefaultPending"
 private const val MAIN_WINDOW_PLACEMENT_KEY = "windowPlacement"
 
 /**
- * Barra HUD (issue #164): terceiro chrome da janela principal, ainda mais
- * discreto que o modo somente cards — uma notch colado numa borda da tela da
+ * Barra HUD (issue #164): a moldura reduzida da janela principal, mais
+ * discreto que a janela padrão — um notch colado numa borda da
  * tela, sem título, sem cards.
  *
  * Mesmo armazenamento das demais preferências de moldura (registro no

@@ -271,12 +271,7 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
 }
 
 /** As linhas do balão da engrenagem. */
-internal val HUD_APP_BALLOON_CAPTION = 16.dp
-internal val HUD_APP_BALLOON_MODE_ROW = 24.dp
 internal val HUD_APP_BALLOON_ACTIONS = HUD_BALLOON_ACTIONS
-
-/** Quantos modos de janela o balão da engrenagem lista: os três do rodapé. */
-internal const val HUD_APP_BALLOON_MODES = 3
 
 /**
  * O aviso de atualização no balão da engrenagem é um `AppBanner` (issue #291): a
@@ -297,13 +292,11 @@ internal val HUD_APP_BALLOON_UPDATE_TEXT_WIDTH =
     HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2 - 2.dp - AppSpacing.md
 
 /**
- * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
- * fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
+ * A altura do balão da engrenagem: título com a contagem, a fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
  * com ação — o botão, na altura de controle do sistema.
  */
 internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
     var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +
-        HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_CAPTION + HUD_APP_BALLOON_MODE_ROW * HUD_APP_BALLOON_MODES +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
     if (hasUpdateIndicator) {
         height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_BANNER

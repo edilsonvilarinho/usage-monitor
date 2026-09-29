@@ -50,7 +50,6 @@ import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.FooterBar
-import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.RefreshWarningDialog
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
@@ -135,23 +134,6 @@ fun DashboardScreen(
      */
     onOpenTeamPresenceOverview: (() -> Unit)? = null,
     /**
-     * `false` no modo somente cards: a barra de estado sai da janela.
-     *
-     * Com ela saem a versão, a contagem regressiva e as quatro ações do rodapé —
-     * inclusive a engrenagem. Quem liga o modo recebe as saídas por escrito no
-     * próprio interruptor, e a bandeja continua abrindo as Configurações.
-     */
-    showFooter: Boolean = true,
-    /** A moldura corrente da janela — marcada no menu de modos do rodapé. */
-    windowMode: WindowMode = WindowMode.STANDARD,
-    /**
-     * Troca a moldura da janela (issue #187); `null` esconde o menu.
-     *
-     * Repassado ao rodapé sem interpretação: quem sabe que os dois modos são
-     * mutuamente exclusivos é `AppShellState`, dono das duas preferências.
-     */
-    onWindowModeChange: ((WindowMode) -> Unit)? = null,
-    /**
      * Exporta o retrato corrente das cotas (issue #215). Recebe a lista que já
      * está na tela — o mesmo `uiState.data` — e devolve o caminho gravado, ou
      * `null` quando o usuário cancelou o diálogo. `null` aqui (o parâmetro,
@@ -227,9 +209,6 @@ fun DashboardScreen(
 
     Scaffold(
         bottomBar = {
-            if (!showFooter) {
-                return@Scaffold
-            }
             FooterBar(
                 appVersion = appVersion,
                 language = language,
@@ -240,8 +219,6 @@ fun DashboardScreen(
                 countdownUpdatesEnabled = countdownUpdatesEnabled,
                 onOpenAdminOverview = onOpenAdminOverview,
                 onOpenTeamPresence = onOpenTeamPresenceOverview,
-                windowMode = windowMode,
-                onWindowModeChange = onWindowModeChange,
                 onExportSnapshot = handleExportSnapshot
             )
         },

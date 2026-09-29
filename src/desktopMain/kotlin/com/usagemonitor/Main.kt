@@ -251,7 +251,6 @@ internal fun runUsageMonitor(
             iconImage = iconImage,
             hudScreenArea = screenWorkArea,
             onOpenFull = { shell.changeHudMode(false) },
-            onSwitchToCardsOnly = { shell.changeCardsOnlyMode(true) },
             actions = shellActions,
             // O que o card de cada conta oferece, para os botões do balão.
             teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),

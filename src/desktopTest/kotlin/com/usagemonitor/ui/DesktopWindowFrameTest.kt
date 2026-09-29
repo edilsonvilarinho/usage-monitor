@@ -19,7 +19,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.presentation.ui.COMPACT_EXIT_DESCRIPTION
 import com.usagemonitor.presentation.ui.TitleBarButton
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppChrome
@@ -62,28 +61,6 @@ class DesktopWindowFrameTest {
 
         onNodeWithText("×").assertIsDisplayed()
         onNodeWithText("×").assertHeightIsEqualTo(AppChrome.titleBar - 1.dp)
-    }
-
-    /**
-     * Minimizar, maximizar e fechar são o vocabulário de janela que todo sistema
-     * desenha igual; o quadrado do modo somente cards, não — e por isso só ele
-     * carrega descrição. É a semântica que o leitor de tela lê, não a tooltip.
-     */
-    @Test
-    fun `o glifo que nao se explica carrega descricao`() = runDesktopComposeUiTest {
-        setContent {
-            AppTheme(isDark = true) {
-                Box(modifier = Modifier.width(400.dp).height(120.dp)) {
-                    TitleBarButton(
-                        label = "▣",
-                        onClick = {},
-                        description = COMPACT_EXIT_DESCRIPTION
-                    )
-                }
-            }
-        }
-
-        onNodeWithContentDescription(COMPACT_EXIT_DESCRIPTION).assertIsDisplayed()
     }
 
     @Test

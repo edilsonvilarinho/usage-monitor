@@ -15,10 +15,10 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.semantics.onClick
 
 /**
- * Um gesto só para as ações do notch: mover (só pela mão), clicar num anel e —
- * com o botão direito, #215 — trocar direto para "Somente cards". O que separa
- * clique de arrasto é o limiar de deslocamento; o botão direito é decidido no
- * próprio `down` e nunca vira arrasto. Nenhuma coordenada sai daqui.
+ * Um gesto só para as ações do notch: mover (só pela mão) e clicar num anel. O
+ * que separa clique de arrasto é o limiar de deslocamento. O botão direito é
+ * decidido no próprio `down` e engolido: não vira arrasto nem recoleta conta —
+ * levava ao modo somente cards (#215), que saiu do app. Nenhuma coordenada sai daqui.
  *
  * Sem [draggable], passar do limiar só desiste do clique: o ponteiro que
  * escorregou não recoleta a conta, e o `move` não é consumido.
@@ -30,14 +30,12 @@ internal fun Modifier.hudPressGesture(
     onDragMove: () -> Unit,
     onDragEnd: () -> Unit,
     /** Recebe a posição do `down`, no nó do gesto: é por ela que o notch acha o anel. */
-    onClick: (Offset) -> Unit,
-    onSecondaryClick: () -> Unit = {}
+    onClick: (Offset) -> Unit
 ): Modifier {
     val currentDragStart by rememberUpdatedState(onDragStart)
     val currentDragMove by rememberUpdatedState(onDragMove)
     val currentDragEnd by rememberUpdatedState(onDragEnd)
     val currentClick by rememberUpdatedState(onClick)
-    val currentSecondaryClick by rememberUpdatedState(onSecondaryClick)
 
     return pointerInput(Unit) {
         awaitEachGesture {
@@ -62,7 +60,6 @@ internal fun Modifier.hudPressGesture(
                     change.consume()
                     if (!change.pressed) break
                 }
-                currentSecondaryClick()
                 return@awaitEachGesture
             }
 

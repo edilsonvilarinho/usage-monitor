@@ -123,18 +123,11 @@ internal fun MainWindowHost(
             applyWindowOpacity(window, shell.windowOpacityPercent)
         }
         AppTheme(preset = shell.themePreset, uiScalePercent = shell.uiScalePercent, motion = shell.motion) {
-            // O menu de molduras (issues #187 e #215) só é composto na faixa
-            // revelada do modo somente cards; em Padrão o rodapé já o tem.
             DesktopWindowFrame(
                 title = "Usage Monitor",
                 iconPainter = iconImage,
                 windowState = windows.main,
-                onCloseRequest = onQuit,
-                compact = shell.cardsOnlyMode,
-                onExitCompact = { shell.changeCardsOnlyMode(false) },
-                language = shell.language,
-                windowMode = shell.windowMode,
-                onWindowModeChange = if (shell.cardsOnlyMode) actions.changeWindowMode else null
+                onCloseRequest = onQuit
             ) {
                 MainDashboard(viewModels, shell, actions, enabledApis, enabledProfiles, teamSettings, decorations, enabledCodexProfiles)
             }
@@ -186,9 +179,6 @@ private fun MainDashboard(
         teamSessionPulses = decorations.teamSessionPulses,
         accountColors = decorations.accountColors,
         accountEmojis = decorations.accountEmojis,
-        showFooter = !shell.cardsOnlyMode,
-        windowMode = shell.windowMode,
-        onWindowModeChange = actions.changeWindowMode,
         onExportSnapshot = actions.exportSnapshot,
         onExportFailure = actions.onExportFailure
     )
@@ -230,9 +220,8 @@ private fun MainBugReport(graph: AppGraph, shell: AppShellState, modal: AppModal
 }
 
 /**
- * Os atalhos da janela principal. `Ctrl+Shift+M` e `Ctrl+Shift+H` são saídas das
- * molduras reduzidas que funcionam com a janela coberta por outra; `F1` é a tecla
- * que o sistema reserva para a ajuda e não colide com as duas.
+ * Os atalhos da janela principal. `Ctrl+Shift+H` alterna a barra HUD com a janela
+ * coberta por outra; `F1` é a tecla que o sistema reserva para a ajuda.
  */
 private fun handleMainWindowShortcut(
     event: KeyEvent,
@@ -241,18 +230,16 @@ private fun handleMainWindowShortcut(
     breadcrumbs: com.usagemonitor.domain.repository.BreadcrumbRecorder
 ): Boolean {
     val isDown = event.type == KeyEventType.KeyDown
-    val isCardsOnlyToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.M
     val isHudToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.H
     val isHelpShortcut = isDown && event.key == Key.F1
     when {
-        isCardsOnlyToggle -> shell.changeCardsOnlyMode(!shell.cardsOnlyMode)
         isHudToggle -> shell.changeHudMode(!shell.hudMode)
         isHelpShortcut -> {
             breadcrumbs.recordScreenOpened("Ajuda (F1)")
             modal.isHelpOpen = true
         }
     }
-    return isCardsOnlyToggle || isHudToggle || isHelpShortcut
+    return isHudToggle || isHelpShortcut
 }
 
 /** Piso horizontal do Dashboard; abaixo disso os cards já operam em coluna única. */
