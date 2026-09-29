@@ -56,7 +56,6 @@ const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
-const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
 const val REDUCED_MOTION_SWITCH_TEST_TAG = "reducedMotionSwitch"
 const val TRAY_USAGE_RING_SWITCH_TEST_TAG = "trayUsageRingSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
@@ -123,14 +122,12 @@ fun SettingsDialogContent(
     enabledApis: Set<ApiSource>,
     configuredApiKeys: Set<ApiSource> = emptySet(),
     autoStartEnabled: Boolean,
-    alwaysOnTopEnabled: Boolean = false,
-    hudMode: Boolean = false,
     windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
     reducedMotion: Boolean = false,
-    /** Default vazio pela mesma razão de [onHudModeChange]. */
+    /** Default vazio pela mesma razão de [onAutoUpdateChange]. */
     onReducedMotionChange: (Boolean) -> Unit = {},
     trayUsageRing: Boolean = false,
     onTrayUsageRingChange: (Boolean) -> Unit = {},
@@ -139,9 +136,6 @@ fun SettingsDialogContent(
     onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
-    onAlwaysOnTopChange: (Boolean) -> Unit = {},
-    /** Default vazio para não arrastar os geradores de captura e os testes de componente. */
-    onHudModeChange: (Boolean) -> Unit = {},
     autoUpdateEnabled: Boolean = false,
     /**
      * Default `UNAVAILABLE`: quem não passa a origem não tem o mecanismo, e o
@@ -278,8 +272,6 @@ fun SettingsDialogContent(
                                 currentTheme = currentTheme,
                                 currentLanguage = currentLanguage,
                                 autoStartEnabled = autoStartEnabled,
-                                alwaysOnTopEnabled = alwaysOnTopEnabled,
-                                hudMode = hudMode,
                                 windowOpacityPercent = windowOpacityPercent,
                                 windowOpacityEnabled = windowOpacityEnabled,
                                 uiScalePercent = uiScalePercent,
@@ -292,8 +284,6 @@ fun SettingsDialogContent(
                                 onThemeChange = onThemeChange,
                                 onLanguageChange = onLanguageChange,
                                 onAutoStartChange = onAutoStartChange,
-                                onAlwaysOnTopChange = onAlwaysOnTopChange,
-                                onHudModeChange = onHudModeChange,
                                 onAutoUpdateChange = onAutoUpdateChange,
                                 receiveBetaUpdates = receiveBetaUpdates,
                                 onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange,

@@ -7,8 +7,6 @@ enum class SettingsField {
     THEME,
     LANGUAGE,
     AUTO_START,
-    ALWAYS_ON_TOP,
-    HUD_MODE,
     WINDOW_OPACITY,
     UI_SCALE,
     ALERTS,
@@ -87,8 +85,6 @@ private fun savedMessage(field: SettingsField, isPt: Boolean): String {
         SettingsField.THEME -> "Tema salvo"
         SettingsField.LANGUAGE -> "Idioma salvo"
         SettingsField.AUTO_START -> "Inicialização com sistema salva"
-        SettingsField.ALWAYS_ON_TOP -> "Preferência de janela salva"
-        SettingsField.HUD_MODE -> "Barra HUD salva"
         SettingsField.WINDOW_OPACITY -> "Opacidade salva"
         SettingsField.UI_SCALE -> "Tamanho da interface salvo"
         SettingsField.ALERTS -> "Preferências de alerta salvas"
@@ -111,8 +107,6 @@ private fun fieldLabel(field: SettingsField, isPt: Boolean): String {
         SettingsField.THEME -> if (isPt) "tema" else "Theme"
         SettingsField.LANGUAGE -> if (isPt) "idioma" else "Language"
         SettingsField.AUTO_START -> if (isPt) "inicialização com sistema" else "System startup"
-        SettingsField.ALWAYS_ON_TOP -> if (isPt) "manter sempre visível" else "Always on top"
-        SettingsField.HUD_MODE -> if (isPt) "barra HUD" else "HUD strip"
         SettingsField.WINDOW_OPACITY -> if (isPt) "opacidade da janela" else "Window opacity"
         SettingsField.UI_SCALE -> if (isPt) "tamanho da interface" else "Interface size"
         SettingsField.ALERTS -> if (isPt) "preferências de alerta" else "Alert preferences"

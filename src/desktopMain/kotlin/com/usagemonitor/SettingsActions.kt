@@ -88,16 +88,6 @@ internal class SettingsActions(
         )
     }
 
-    fun changeAlwaysOnTop(enabled: Boolean) {
-        shell.changeAlwaysOnTop(enabled)
-        feedback.showToast(SettingsToast.Saved(SettingsField.ALWAYS_ON_TOP))
-    }
-
-    fun changeHudMode(enabled: Boolean) {
-        shell.changeHudMode(enabled)
-        feedback.showToast(SettingsToast.Saved(SettingsField.HUD_MODE))
-    }
-
     /**
      * As Configurações fecham: o formulário mora na janela principal, e a janela
      * de Configurações ficaria por cima dele — e dentro da captura. A captura

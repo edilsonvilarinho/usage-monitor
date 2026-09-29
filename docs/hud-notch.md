@@ -4,14 +4,16 @@
 
 **Barra HUD — notch** (`HudWindow.kt` + `HudNotch.kt` + `HudBalloon.kt` + `HudHandles.kt` +
 `HudNotchGeometry.kt` + `HudModel.kt` + `AppShellActions.kt` + `CardActions.kt` + `AppUsageRing` +
-`HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, redesenhada no plano
+`HudWindowPreferences.kt` + `AppWindowAnchor.kt`; issue #164, redesenhada no plano
 [`profundidade-movimento-hud-notch-execucao.md`](planos/profundidade-movimento-hud-notch-execucao.md)):
-a moldura reduzida única do app (o modo somente cards saiu em setembro de 2026). A janela principal fica **escondida**
-(`visible = !hudMode`), com a geometria intacta, e sobra um **notch colado numa borda da tela** numa
-janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`). O desenho vem do
-Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
-**Não é valor novo em enum existente**: `hudMode` continua um booleano (setter em `AppShellState.kt`),
-e `HudEdge` é enum novo.
+**o único modo de visualização do app** desde setembro de 2026 (plano
+[`hud-modo-unico-execucao.md`](planos/hud-modo-unico-execucao.md)): a janela principal com o dashboard,
+o modo somente cards e o seletor de modos saíram. O que existe é um **notch colado numa borda da
+tela** numa janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`), sempre
+composta. Ela é a âncora do app (`anchorAppWindow`): pai do diálogo de arquivo, alvo da captura do
+relatório de bug, janela ativada pela bandeja e pela segunda instância, e o ponto em que o ACK de
+atualização sai. O desenho vem do Codenotch; a regra de conteúdo vem das seis versões da barra de
+linhas que ele substituiu. `HudEdge` é enum novo.
 - **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos). **A janela mais
   longa fica por fora** (`HudAccount.rings`, issue #278): mensal, semanal, a janela curta, e saldo e
   créditos (`REPORTED`) por dentro. Na ordem da API a 5h ficava por fora da semanal, o contrário de
@@ -57,17 +59,11 @@ e `HudEdge` é enum novo.
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
   (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
   mola `GENTLE` com crossfade do conteúdo.
-- **HUD padrão na instalação nova** (`markHudDefaultPendingOnFreshInstall` + `hudDefaultShouldSwitch`;
-  issue #277). **Não é o default da leitura**: `readPersistedHudMode` continua `false`, e quem já usa o
-  app nunca é arrastado para a HUD. Instalação nova é `hudMode` e `windowPlacement` ausentes e nenhum
-  recibo de atualização (a regra de `ReleaseNotesDecision`), lida **antes** de o coletor da janela
-  gravar qualquer coisa. Nesse caso o app grava o modo padrão e marca `hudDefaultPending`. A troca sai
-  na primeira coleta com alguma conta e **sem janela modal aberta**: na primeira execução quem está
-  aberta é Configurações, e a instalação nova sobe sem API habilitada — abrir direto no notch mostraria
-  "Carregando" para sempre. Ela manda uma notificação, uma vez só, com os três caminhos de volta.
-  **Mora no bloco da bandeja**, porque a bandeja é um desses caminhos: sem ela o app não troca
-  sozinho. Qualquer escolha de modo antes da troca apaga a pendência, porque a escolha do usuário
-  vence. E sem API habilitada o notch diz "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`).
+- **Instalação nova** (issue #277, revista com a HUD como único modo): sem API habilitada o notch diz
+  "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`), e as Configurações abrem sozinhas uma vez
+  por arranque (`OpenSettingsWithoutApis` em `Main.kt`) — fechá-las não as reabre, e a engrenagem
+  continua levando até lá. A troca automática da janela padrão para a HUD na primeira coleta
+  (`hudDefaultPending`, notificação com os caminhos de volta) saiu junto com a janela padrão.
 - **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): a seção
   "Sessões CLI", entre as cotas e o rodapé, só quando há o que dizer. Uma linha por sinal: contexto
   saturado, contexto crescendo (as duas contagens saem do mesmo `SessionPulse` que faz o botão de
@@ -190,8 +186,8 @@ e `HudEdge` é enum novo.
   gesto é `draggable = false`: passar do limiar só desiste do clique, e **mover é só pela mão**, que usa o
   mesmo gesto com arrasto. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
   consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
-  `MouseInfo`, incremental. Saídas para a janela padrão: interruptor "Barra HUD" nas Configurações, bandeja,
-  `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
+  `MouseInfo`, incremental. Não há saída para outra janela: "Abrir" da bandeja e a segunda instância
+  trazem a janela da HUD para a frente (`focusHud` → `activateWindow`), e `F1` é o único atalho.
 - **Contagem até a próxima coleta só no balão da engrenagem** (#185, #269): ela ficava no fim da
   faixa, e com a cadência adaptativa (60 s com sessão CLI ativa) virou um número que reiniciava a cada
   minuto na borda da tela. A faixa passou a ser só das contas — `hudNotchSizes` não tem mais

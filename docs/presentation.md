@@ -152,20 +152,18 @@ multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
   própria e a plataforma reprovisiona `LocalDensity` na raiz de cada uma: provisionar na janela pai
   não atravessa para a filha, e a janela esquecida renderiza a 100% sem erro nenhum.
 - **A moldura não escala sozinha.** Densidade maior mostra o mesmo conteúdo maior dentro da mesma
-  janela, ou seja, menos conteúdo. `scaledWindowSize` corrige a janela principal pela razão entre a
-  escala aplicada e a nova — nunca contra 100, ou duas mudanças seguidas multiplicariam duas vezes —
-  e nos tamanhos default das outras janelas o fator entra na criação. Tamanho **persistido** é
-  escolha do usuário e não é reescalado, com uma exceção de uma vez só: quem já tinha janela salva
-  antes desta versão a recebe corrigida de 100 para o padrão novo, e é `hasPersistedUiScale` — chave
-  presente, não valor igual ao default — que fecha essa porta depois.
-- O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
-  AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
+  janela, ou seja, menos conteúdo. A HUD se dimensiona pela própria geometria, que já recebe a
+  escala; nos tamanhos default das janelas modais o fator entra na criação. Tamanho **persistido** é
+  escolha do usuário e não é reescalado. (`scaledWindowSize`, que corrigia a janela principal pela
+  razão entre a escala aplicada e a nova, saiu com ela.)
+- A gravação acontece no commit do coletor com debounce, não no callback do slider. O conteúdo, esse,
+  escala ao vivo.
 
 **Monitores** (`ScreenLocator.kt`; issue #273): toda medida de tela lia o monitor padrão
 (`defaultScreenDevice`, `maximumWindowBounds`). As janelas com posição salva (Histórico, Sessões CLI,
-Uso e Presença do time) eram presas ao primário ao reabrir, e a principal nem guardava posição. Agora
+Uso e Presença do time) eram presas ao primário ao reabrir. Agora
 `workAreaForPosition` encaixa a janela na área útil do monitor que contém o retângulo salvo (a maior
-interseção), e a principal grava `windowX`/`windowY`, negativos inclusive. Sem posição, ou com o
+interseção), negativos inclusive; a HUD grava o monitor à parte (`HudWindowPreferences.kt`). Sem posição, ou com o
 retângulo fora de todo monitor, vale o padrão. As funções de escolha recebem a lista de monitores e são
 puras (`ScreenLocatorTest`, com monitor à direita, à esquerda e acima). **Monitores com escalas
 diferentes só se validam em máquina real**: cada monitor tem o próprio espaço de usuário escalado e o
@@ -174,8 +172,23 @@ app trata pixel como dp. Os testes não pegam isso.
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
 
+**Janela principal e dashboard — removidos do app** (setembro de 2026, plano
+[`hud-modo-unico-execucao.md`](planos/hud-modo-unico-execucao.md)): a barra HUD é o único modo de
+visualização. Saíram `MainWindowHost`, `DesktopWindowFrame`, a geometria persistida da janela
+(`windowWidth`/`windowHeight`/`windowPlacement`/`windowX`/`windowY`), "Manter sempre visível"
+(`alwaysOnTop`), o interruptor "Barra HUD", `Ctrl+Shift+H` e o sinal de janela minimizada
+(`isAppVisible`: a HUD nunca minimiza). As chaves antigas ficam órfãs no registro, sem leitura.
+- **O relatório de bug ganhou janela própria** (`BugReportWindow` em `AppWindowAnchor.kt`, uma
+  `AppDialogWindow`): ele morava dentro da janela principal, e a HUD tem o tamanho do notch. É também
+  a janela que abre no arranque depois de uma queda. A captura passa a ser da HUD.
+- **Perdas aceitas**: reordenar cards por arrasto, minimizar card, o card completo com "tentar de
+  novo" e a tela vazia "Abrir configurações". A HUD segue lendo o `cardOrder` gravado; recoletar é
+  clique no anel; sem API as Configurações abrem sozinhas.
+- `DashboardScreen`, a grade e o card continuam no código, consumidos só por testes e pelos geradores
+  de captura. As duas seções abaixo descrevem esse código, não uma tela do app.
+
 **Densidade do dashboard** (`DashboardScreen.SuccessContent` + `ResponsiveDashboardCardGrid`): a
-janela principal usa o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
+janela principal usava o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
 na vertical e `AppSpacing.md` entre cards —, e não o `AppSpacing.lg` das outras cinco. É a única
 janela que o usuário deixa estreita ao lado do editor, e ali 16dp de margem mais 16dp de vão eram
 largura que faltava dentro do card. A coluna rolável **não** reserva folga para a barra de rolagem:
@@ -193,10 +206,8 @@ moldura reduzida única. Saíram `DesktopWindowFrame(compact)` com a faixa revel
 `DashboardScreen(showFooter)`, o enum `WindowMode` com o menu do rodapé e da faixa, as linhas de modo
 no balão da engrenagem da HUD, o interruptor "Somente os cards", o item da bandeja, `Ctrl+Shift+M` e o
 botão direito da HUD (hoje engolido pelo `hudPressGesture`, sem ação).
-- **Quem tinha o modo ligado vai para a HUD**: `migrateCardsOnlyModeToHud` (`CardsOnlyModePreferences.kt`)
-  roda no `init` de `AppShellState`, antes de qualquer leitura de `hudMode`, grava `hudMode=true` e
-  apaga a chave `cardsOnlyMode` — uma vez só, para desligar a HUD depois não ser desfeito no arranque
-  seguinte. Chave ausente não grava nada: a regra da instalação nova lê a ausência de `hudMode`.
+- Uma migração de `cardsOnlyMode=true` para `hudMode=true` entrou no primeiro commit e saiu no
+  seguinte, quando a HUD passou a ser o único modo e `hudMode` deixou de existir.
 - `AppMenu` continua primitiva publicada, sem consumidor no app.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):

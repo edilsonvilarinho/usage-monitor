@@ -5,7 +5,6 @@ import com.usagemonitor.presentation.ui.components.CardActionButton
 import com.usagemonitor.presentation.ui.components.CardIconActionButton
 import com.usagemonitor.presentation.ui.components.RefreshGlyph
 import com.usagemonitor.presentation.ui.components.cardActionsFor
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -434,85 +433,50 @@ private fun recordPresence(outputDir: File) {
 }
 
 /**
- * Modos de janela: a mesma janela em dois tamanhos, um de cada vez.
+ * Barra HUD: o notch aberto no balão da primeira conta, sozinho no quadro.
  *
- * A primeira versão desenhava a barra HUD **por cima** da grade de cards, para
- * a pílula não ficar sozinha num quadro vazio. Foi vista em uso e recusada: as
- * duas exibições se misturaram — a linha do HUD parecia conteúdo de um card, e o
- * quadro passou a mostrar um estado que o app não tem. As duas aparecem agora em
- * sequência, com fade entre elas, e o vazio em volta da HUD é o assunto: é a
- * área de tela que o modo devolve.
+ * Mostrava antes a janela padrão e depois a HUD, com fade; a janela padrão saiu
+ * do app, e o vazio em volta do notch é o assunto — é a área de tela que ele deixa.
  */
 private fun recordWindowModes(outputDir: File) {
     val state = DemoState()
-    var mode by mutableStateOf(WindowModeShot.NORMAL)
 
     record(outputDir, HelpTopic.WINDOW_MODES, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
-                Crossfade(
-                    targetState = mode,
-                    animationSpec = tween(WINDOW_MODE_FADE_MILLIS),
-                    modifier = Modifier.fillMaxSize()
-                ) { shot ->
-                    when (shot) {
-                        WindowModeShot.NORMAL -> Column(modifier = Modifier.fillMaxSize()) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                DemoDashboardBackdrop()
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // O notch aberto, como ele fica com o ponteiro no primeiro
+                    // anel: o balão daquela conta. Os tamanhos são os da
+                    // geometria, a mesma que dimensiona a janela no app.
+                    HudNotch(
+                        accounts = ScreenshotFixtures.hudAccounts,
+                        edge = HudEdge.TOP,
+                        sizes = HUD_DEMO_SIZES,
+                        fallbackLabel = "Carregando",
+                        expanded = true,
+                        initialBalloonIndex = 0,
+                        // Os botões do card da conta, pela mesma regra do card
+                        // (conta do time marcada, como na captura do dashboard).
+                        accountActions = { account ->
+                            cardActionsFor(account.targetKey, setOf("padrao")).forEach { action ->
+                                CardActionButton(action, AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
                             }
-                            FooterBar(
-                                appVersion = APP_VERSION,
-                                language = AppLanguage.PT,
-                                nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(437),
-                                onRefresh = {},
-                                onOpenSettings = {},
-                                nowProvider = { ScreenshotFixtures.NOW },
-                                countdownUpdatesEnabled = false
-                            )
+                            CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
+                                RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
+                            }
                         }
-
-                        WindowModeShot.HUD -> Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // O notch aberto, como ele fica com o ponteiro no
-                            // primeiro anel: o balão daquela conta. Os tamanhos
-                            // são os da geometria, a mesma que dimensiona a
-                            // janela no app: sem literal à mão.
-                            HudNotch(
-                                accounts = ScreenshotFixtures.hudAccounts,
-                                edge = HudEdge.TOP,
-                                sizes = HUD_DEMO_SIZES,
-                                fallbackLabel = "Carregando",
-                                expanded = true,
-                                initialBalloonIndex = 0,
-                                // Os botões do card da conta, pela mesma regra do card
-                                // (conta do time marcada, como na captura do dashboard).
-                                accountActions = { account ->
-                                    cardActionsFor(account.targetKey, setOf("padrao")).forEach { action ->
-                                        CardActionButton(action, AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
-                                    }
-                                    CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
-                                        RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
-                                    }
-                                }
-                            )
-                        }
-                    }
+                    )
                 }
             }
         }
 
         recorder.animate(700) {}
-        recorder.hold(1_700)
-
-        mode = WindowModeShot.HUD
-        recorder.animate(WINDOW_MODE_FADE_MILLIS + 200L) {}
-        recorder.hold(2_000)
+        recorder.hold(3_000)
     }
 }
-
-private enum class WindowModeShot { NORMAL, HUD }
 
 /** Aparência: tema, idioma e escala, na aba Geral das Configurações. */
 private fun recordAppearance(outputDir: File) {
@@ -527,12 +491,10 @@ private fun recordAppearance(outputDir: File) {
                     currentLanguage = AppLanguage.PT,
                     enabledApis = ScreenshotFixtures.enabledApis,
                     autoStartEnabled = true,
-                    alwaysOnTopEnabled = false,
                     windowOpacityPercent = 92,
                     onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
-                    onAlwaysOnTopChange = {},
                     onApiToggle = { _, _ -> },
                     anthropicProfiles = ScreenshotFixtures.anthropicProfiles
                 )
@@ -649,7 +611,6 @@ private val HUD_DEMO_SIZES = hudNotchSizes(
 )
 
 
-private const val WINDOW_MODE_FADE_MILLIS = 300
 
 // --- Máquina de gravação -----------------------------------------------------
 

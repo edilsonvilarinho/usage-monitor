@@ -8,7 +8,7 @@ Open `index.html`. The left rail switches screens; the top strip switches theme.
 | Screen | File | Interaction |
 | --- | --- | --- |
 | Dashboard | `Dashboard.jsx` | minimize/expand any card; card status-bar icons open History, CLI Sessions, Team, Presence; footer opens Settings |
-| Barra HUD | `Hud.jsx` | static — third chrome, 24dp strip anchored to the top edge (issue #164) |
+| Barra HUD | `Hud.jsx` | static — the only view of the app since September 2026 (issue #164); `Dashboard.jsx` stays as the card reference, no longer a screen |
 | Histórico | `History.jsx` | range segments; current vs. previous period |
 | Sessões CLI | `CliSessions.jsx` | tabs Sessões/Resumo/Tendência; window segments; live text filter; row opens the detail |
 | Detalhe de sessão | `SessionDetail.jsx` | collapse/expand the Avançado block |

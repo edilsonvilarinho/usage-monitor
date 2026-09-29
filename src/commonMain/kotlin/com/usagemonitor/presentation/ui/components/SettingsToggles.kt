@@ -39,61 +39,6 @@ fun AutoStartToggle(
     }
 }
 
-@Composable
-fun AlwaysOnTopToggle(
-    enabled: Boolean,
-    language: AppLanguage = AppLanguage.PT,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    showDivider: Boolean = true
-) {
-    val isPt = language == AppLanguage.PT
-    SettingsOptionRow(
-        label = if (isPt) "Manter sempre visível" else "Always on top",
-        description = if (isPt) {
-            "Mantém a janela acima das demais."
-        } else {
-            "Keeps the window above the others."
-        },
-        showDivider = showDivider,
-        modifier = modifier
-    ) {
-        AppSwitch(checked = enabled, onCheckedChange = { onToggle(it) })
-    }
-}
-
-/**
- * Barra HUD (issue #164): a moldura reduzida do app — um notch colado numa borda
- * da tela, sem título, sem cards. As saídas têm de estar escritas onde o
- * interruptor liga.
- */
-@Composable
-fun HudModeToggle(
-    enabled: Boolean,
-    language: AppLanguage = AppLanguage.PT,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    showDivider: Boolean = true
-) {
-    val isPt = language == AppLanguage.PT
-    SettingsOptionRow(
-        label = if (isPt) "Barra HUD" else "HUD strip",
-        description = if (isPt) {
-            "Troca a janela por um notch colado numa borda da tela, com um anel e a palavra do estado por conta; o ponteiro em cima abre cada cota. Para voltar: clique no notch, Ctrl+Shift+H ou o ícone na bandeja."
-        } else {
-            "Replaces the window with a notch docked to a screen edge, with a ring and the status word per account; hovering opens every quota. To return: click the notch, Ctrl+Shift+H, or the tray icon."
-        },
-        showDivider = showDivider,
-        modifier = modifier
-    ) {
-        AppSwitch(
-            checked = enabled,
-            onCheckedChange = { onToggle(it) },
-            modifier = Modifier.testTag(HUD_MODE_SWITCH_TEST_TAG)
-        )
-    }
-}
-
 /**
  * "Reduzir animações": para quem se incomoda com movimento, e para máquina lenta
  * em que a transição vira tranco. O texto diz o que some — as transições **e** o

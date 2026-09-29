@@ -113,7 +113,6 @@ internal class AppViewModels(
         onUpdateScheduleFailure = ::writeUpdateScheduleFailureReceipt,
         currentAppVersion = CURRENT_APP_VERSION,
         spikeFactorProvider = { graph.alertSettingsFlow.value.effectiveSpikeFactor },
-        isAppVisible = graph.isAppVisible,
         isBusy = cliBusy,
         anthropicProfiles = graph.enabledAnthropicProfiles,
         codexProfiles = graph.enabledCodexProfiles,
@@ -206,7 +205,6 @@ internal class AppViewModels(
         teamTargetsProvider = {
             buildSessionPulseTargets(registry = graph.profileRegistry, settings = graph.teamSettingsFlow.value)
         },
-        isAppVisible = graph.isAppVisible,
         intervalMillis = SESSION_PULSE_INTERVAL_MILLIS,
         breadcrumbs = breadcrumbs
     )

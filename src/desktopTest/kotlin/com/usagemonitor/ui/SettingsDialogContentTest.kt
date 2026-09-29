@@ -28,7 +28,6 @@ import com.usagemonitor.presentation.ui.components.CODEX_ACCOUNTS_ADD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.CodexAccountsSettings
 import com.usagemonitor.presentation.ui.components.CodexProfileUiModel
 import com.usagemonitor.presentation.ui.components.codexAccountSwitchTestTag
-import com.usagemonitor.presentation.ui.components.HUD_MODE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.REDUCED_MOTION_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -394,36 +393,6 @@ class SettingsDialogContentTest {
         assertEquals("MINIMAX:minimax-rotated", savedKey)
         assertEquals(0, toggleCalls)
         onNodeWithTag(apiSelectorSwitchTestTag(ApiSource.MINIMAX)).performScrollTo().assertIsOn()
-    }
-
-    /**
-     * Issue #164: o interruptor da barra HUD mora na seção Sistema, ao lado das
-     * outras propriedades da moldura da janela.
-     */
-    @Test
-    fun `SettingsDialogContent emits the hud mode change`() = runDesktopComposeUiTest {
-        var enabled: Boolean? = null
-
-        setContent {
-            ScreenTestTheme(isDark = true) {
-                SettingsDialogContent(
-                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
-                    enabledApis = setOf(ApiSource.ANTHROPIC),
-                    autoStartEnabled = false,
-                    hudMode = false,
-                    onHudModeChange = { value -> enabled = value },
-                    onThemeChange = {},
-                    onLanguageChange = {},
-                    onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
-                )
-            }
-        }
-
-        onNodeWithTag(HUD_MODE_SWITCH_TEST_TAG).performScrollTo().performClick()
-
-        assertEquals(true, enabled)
     }
 
     /** "Reduzir animações" mora em Aparência, ao lado da escala da interface. */

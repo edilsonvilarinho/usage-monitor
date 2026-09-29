@@ -14,7 +14,6 @@ import androidx.compose.ui.window.rememberDialogState
 import androidx.compose.ui.window.rememberWindowState
 import com.russhwolf.settings.PreferencesSettings
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.time.Duration.Companion.milliseconds
@@ -24,7 +23,6 @@ import kotlin.math.roundToInt
 
 /** O estado de cada janela do app: tamanho, posição e disposição. */
 internal class AppWindowStates(
-    val main: WindowState,
     val history: WindowState,
     val cliSessions: WindowState,
     val codexCliSessions: WindowState,
@@ -32,8 +30,8 @@ internal class AppWindowStates(
     val teamPresence: WindowState,
     val teamKeys: DialogState,
     val settings: DialogState,
-    /** A janela principal tinha tamanho gravado no arranque, antes de o coletor gravar o atual. */
-    val mainHadPersistedSize: Boolean
+    /** O relatório de bug: a HUD é pequena demais para hospedar o formulário. */
+    val bugReport: DialogState
 )
 
 /**
@@ -50,13 +48,11 @@ internal fun rememberAppWindowStates(
     workArea: ScreenWorkArea
 ): AppWindowStates {
     val scale = uiScaleFactor(uiScalePercent)
-    val persistedMain = remember(settings) { readPersistedMainWindowState(settings) }
     val persistedHistory = remember(settings) { readPersistedHistoryWindowState(settings) }
     val persistedCliSessions = remember(settings) { readPersistedCliSessionsWindowState(settings) }
     val persistedTeamUsage = remember(settings) { readPersistedTeamUsageWindowState(settings) }
     val persistedTeamPresence = remember(settings) { readPersistedTeamPresenceWindowState(settings) }
     return AppWindowStates(
-        main = rememberPersistedMainWindowState(persistedMain, uiScalePercent, workArea),
         history = rememberPersistedHistoryWindowState(persistedHistory, uiScalePercent, workArea),
         cliSessions = rememberPersistedCliSessionsWindowState(persistedCliSessions, uiScalePercent, workArea),
         codexCliSessions = rememberWindowState(
@@ -69,35 +65,20 @@ internal fun rememberAppWindowStates(
         // 620 o conteúdo ficava com menos de 470 — estreito demais para as
         // linhas de rótulo + controle das seções de Time.
         settings = rememberDialogState(size = fitWindowSize(DpSize(820.dp * scale, 720.dp * scale), workArea)),
-        mainHadPersistedSize = persistedMain.widthDp != null
+        bugReport = rememberDialogState(size = fitWindowSize(DpSize(640.dp * scale, 680.dp * scale), workArea))
     )
 }
 
 /** A moldura de uma janela que pode ser gravada: posição, tamanho e disposição. */
 private data class WindowFrame(val position: WindowPosition, val size: DpSize, val placement: WindowPlacement)
 
-/**
- * Grava a geometria das janelas com debounce de 250ms — o arrasto emitiria uma
- * gravação por pixel. A principal grava também a posição (issue #273: sem ela a
- * janela voltava ao monitor principal a cada abertura) e publica se está
- * minimizada, que é o que suspende a leitura do time no semáforo.
- */
+/** Grava a geometria das janelas com debounce de 250ms — o arrasto emitiria uma gravação por pixel. */
 @OptIn(FlowPreview::class)
 @Composable
 internal fun PersistAppWindowStates(
     windows: AppWindowStates,
-    settings: PreferencesSettings,
-    isAppVisible: MutableStateFlow<Boolean>
+    settings: PreferencesSettings
 ) {
-    LaunchedEffect(windows.main, settings) {
-        snapshotFlow { windows.main.isMinimized to mainWindowSnapshotOf(windows.main) }
-            .distinctUntilChanged()
-            .debounce(250.milliseconds)
-            .collect { (isMinimized, snapshot) ->
-                isAppVisible.value = !isMinimized
-                persistMainWindowState(settings = settings, snapshot = snapshot)
-            }
-    }
     PersistWindowFrame(windows.history, settings) { frame ->
         persistHistoryWindowState(
             settings = settings,
@@ -163,52 +144,6 @@ private fun PersistWindowFrame(state: WindowState, settings: PreferencesSettings
             .debounce(250.milliseconds)
             .collect { frame -> persist(frame) }
     }
-}
-
-@Composable
-internal fun rememberPersistedMainWindowState(
-    persistedState: PersistedMainWindowState,
-    uiScalePercent: Int,
-    workArea: ScreenWorkArea
-) = when {
-    persistedState.widthDp != null && persistedState.heightDp != null -> {
-        val desired = DpSize(width = persistedState.composeWidth, height = persistedState.composeHeight)
-        // O monitor em que a janela ficou, não o primário (issue #273).
-        val area = remember(persistedState, workArea) {
-            workAreaForPosition(persistedState.xDp?.dp, persistedState.yDp?.dp, desired, fallback = workArea)
-        }
-        val size = fitWindowSize(desired, area)
-        val x = persistedState.xDp
-        val y = persistedState.yDp
-        rememberWindowState(
-            placement = persistedState.composePlacement,
-            size = size,
-            position = if (x != null && y != null) {
-                fitWindowPosition(x = x.dp, y = y.dp, size = size, workArea = area)
-            } else {
-                WindowPosition.PlatformDefault
-            }
-        )
-    }
-
-    persistedState.placement == PersistedWindowPlacement.MAXIMIZED -> {
-        rememberWindowState(
-            placement = persistedState.composePlacement
-        )
-    }
-
-    // 800×600 é o default do próprio `rememberWindowState`, agora explícito para
-    // acompanhar a escala: na primeira execução não há tamanho persistido, e sem
-    // isto o app subiria com a moldura de 100% e o conteúdo de 115%.
-    else -> rememberWindowState(
-        size = fitWindowSize(
-            DpSize(
-                width = 800.dp * uiScaleFactor(uiScalePercent),
-                height = 600.dp * uiScaleFactor(uiScalePercent)
-            ),
-            workArea
-        )
-    )
 }
 
 /**

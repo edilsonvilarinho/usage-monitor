@@ -31,8 +31,8 @@ import kotlin.test.assertTrue
  * O cromo das janelas não tinha teste nenhum.
  *
  * Ele vive em `desktopMain` porque mexe com a janela AWT, e a maior parte dele é
- * `WindowScope.` — `DesktopWindowFrame`, `DesktopTitleBar`, `DesktopDialogTitleBar`
- * e `CompactTitleBarOverlay` todos precisam de uma janela real para o
+ * `WindowScope.` — `DesktopDialogFrame` e `DesktopDialogTitleBar` precisam de
+ * uma janela real para o
  * `WindowDraggableArea`, e `runDesktopComposeUiTest` não fornece uma. O que dá
  * para exercitar aqui é o botão de cromo, que é o único que não depende do escopo
  * de janela — e é ele que carrega as três decisões que este arquivo registra: a

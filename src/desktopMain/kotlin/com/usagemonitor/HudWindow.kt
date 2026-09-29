@@ -16,8 +16,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpOffset
@@ -80,11 +78,12 @@ import kotlin.time.Instant
 /**
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
  *
- * Ela era a janela principal encolhida, e isso obrigava o antigo `main()` a guardar a
- * geometria de antes, proibir o coletor de gravar a pílula como "tamanho
- * normal", ordenar textualmente o piso de tamanho e redimensionar a janela AWT a
- * cada quadro — a fonte do tranco. Agora a principal fica escondida com a
- * geometria intacta, e esta janela é só do notch.
+ * É a **única** janela de visualização do app: a janela principal com o
+ * dashboard saiu quando a HUD virou o único modo. Por isso ela é também a âncora
+ * do app — diálogo de arquivo, captura do relatório de bug, ativação pela bandeja
+ * e pela segunda instância —, entregue por [onWindowReady]. Antes disso ela foi a
+ * janela principal encolhida, com a geometria de antes guardada à parte e a
+ * janela AWT redimensionada a cada quadro — a fonte do tranco.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
  * 11, C11 do plano de execução). Por isso, parada, ela só aceita clique no notch:
@@ -115,7 +114,11 @@ internal fun HudWindowHost(
     windowOpacityPercent: Int,
     iconImage: Painter?,
     hudScreenArea: ScreenWorkArea,
-    onOpenFull: () -> Unit,
+    /**
+     * A janela AWT, uma vez composta. Quem recebe faz o que a janela principal
+     * fazia ao nascer: registrar o arranque e confirmar a atualização.
+     */
+    onWindowReady: suspend (java.awt.Window) -> Unit,
     /** As ações do rodapé, que aqui moram no balão da engrenagem. */
     actions: AppShellActions,
     /** Perfis marcados como parte do time: decidem os botões de time no balão. */
@@ -324,13 +327,12 @@ internal fun HudWindowHost(
         resizable = false,
         alwaysOnTop = true,
         onKeyEvent = { event ->
-            handleHudWindowKey(
-                event = event,
-                onOpenFull = onOpenFull,
-                onOpenHelp = actions.openHelp
-            )
+            handleHudWindowKey(event = event, onOpenHelp = actions.openHelp)
         }
     ) {
+        LaunchedEffect(window) {
+            onWindowReady(window)
+        }
         LaunchedEffect(windowOpacityPercent) {
             applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
         }
@@ -408,20 +410,13 @@ private fun hudUpdateIndicatorOf(state: AppUpdateUiState, language: AppLanguage)
     )
 }
 
-/** `Ctrl+Shift+H` volta à janela padrão, `F1` abre a ajuda. */
-private fun handleHudWindowKey(
-    event: KeyEvent,
-    onOpenFull: () -> Unit,
-    onOpenHelp: () -> Unit
-): Boolean {
-    val isDown = event.type == KeyEventType.KeyDown
-    val hudToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.H
-    val help = isDown && event.key == Key.F1
-    when {
-        hudToggle -> onOpenFull()
-        help -> onOpenHelp()
+/** `F1` abre a ajuda, a tecla que o sistema reserva para ela. */
+private fun handleHudWindowKey(event: KeyEvent, onOpenHelp: () -> Unit): Boolean {
+    val help = event.type == KeyEventType.KeyDown && event.key == Key.F1
+    if (help) {
+        onOpenHelp()
     }
-    return hudToggle || help
+    return help
 }
 
 /**
