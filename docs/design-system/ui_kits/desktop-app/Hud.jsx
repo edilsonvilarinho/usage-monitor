@@ -100,14 +100,14 @@ export function Hud() {
       </Screen>
 
       <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', maxWidth: '58ch', borderLeft: '2px solid var(--border)', paddingLeft: 'var(--s3)' }}>
-        Janela própria, transparente e sempre no topo; a janela principal fica escondida com a
-        geometria intacta. O notch não cresce: o detalhe é o balão de uma conta, a do anel sob o
+        Janela própria, transparente e sempre no topo: o único modo de visualização do app, sem
+        janela principal. O notch não cresce: o detalhe é o balão de uma conta, a do anel sob o
         ponteiro. Clique em pixel transparente é engolido no Windows (medido), então a janela só
         tem o tamanho da área aberta enquanto o ponteiro está no notch: cresce de uma vez ao
         entrar e encolhe depois de o balão sair, sem mover o notch. Só a mão move (solte perto de
         qualquer borda: ele gruda na mais próxima, gravado como borda + fração); a engrenagem abre
-        as ações do rodapé no hover, como o anel (#317). Clique num anel atualiza aquela conta; botão direito vai direto a
-        "Somente cards"; "Padrão" na engrenagem, Ctrl+Shift+H e a bandeja voltam à janela. O arco
+        as ações do rodapé no hover, como o anel (#317). Clique num anel atualiza aquela conta; botão direito não faz nada;
+        "Abrir" da bandeja traz o notch para a frente. O arco
         de sessão ativa é um cometa azul externo (2,6s). O disco de acreção dourado, a lente gravitacional e
         os filamentos animam em 14s (4s ao atualizar); a atenção respira em 3,2s. Os arcos de quota e
         as marcas dos provedores ficam ancorados. Movimento contínuo só com a política ligada e sem

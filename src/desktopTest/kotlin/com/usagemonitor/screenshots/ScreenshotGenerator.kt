@@ -276,12 +276,10 @@ private class ScreenshotGenerator(private val outputDir: File) {
             currentLanguage = AppLanguage.PT,
             enabledApis = ScreenshotFixtures.enabledApis,
             autoStartEnabled = true,
-            alwaysOnTopEnabled = false,
             windowOpacityPercent = 92,
             onThemeChange = {},
             onLanguageChange = {},
             onAutoStartChange = {},
-            onAlwaysOnTopChange = {},
             onApiToggle = { _, _ -> },
             anthropicProfiles = ScreenshotFixtures.anthropicProfiles
         )

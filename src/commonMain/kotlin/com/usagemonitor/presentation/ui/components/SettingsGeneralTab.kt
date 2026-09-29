@@ -20,9 +20,6 @@ internal fun GeneralSettingsTab(
     currentTheme: AppThemePreset,
     currentLanguage: AppLanguage,
     autoStartEnabled: Boolean,
-    alwaysOnTopEnabled: Boolean,
-    cardsOnlyMode: Boolean,
-    hudMode: Boolean,
     windowOpacityPercent: Int,
     windowOpacityEnabled: Boolean,
     uiScalePercent: Int,
@@ -35,9 +32,6 @@ internal fun GeneralSettingsTab(
     onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
-    onAlwaysOnTopChange: (Boolean) -> Unit,
-    onCardsOnlyModeChange: (Boolean) -> Unit,
-    onHudModeChange: (Boolean) -> Unit,
     onAutoUpdateChange: (Boolean) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit,
@@ -133,27 +127,7 @@ internal fun GeneralSettingsTab(
             language = currentLanguage,
             onToggle = onReceiveBetaUpdatesChange
         )
-        AlwaysOnTopToggle(
-            enabled = alwaysOnTopEnabled,
-            language = currentLanguage,
-            onToggle = onAlwaysOnTopChange
-        )
-        // Ao lado de "manter sempre visível": as duas são propriedades da
-        // moldura da janela, não do conteúdo dela.
-        CardsOnlyModeToggle(
-            enabled = cardsOnlyMode,
-            language = currentLanguage,
-            onToggle = onCardsOnlyModeChange
-        )
-        // Terceiro chrome, mesma seção: as duas reduzem a moldura da janela,
-        // só que a um extremo diferente.
-        HudModeToggle(
-            enabled = hudMode,
-            language = currentLanguage,
-            onToggle = onHudModeChange
-        )
-        // Fecha a seção: é o que o app mostra fora da janela, na bandeja, e
-        // não mais uma moldura dela.
+        // Fecha a seção: é o que o app mostra fora da barra HUD, na bandeja.
         TrayUsageRingToggle(
             enabled = trayUsageRing,
             language = currentLanguage,

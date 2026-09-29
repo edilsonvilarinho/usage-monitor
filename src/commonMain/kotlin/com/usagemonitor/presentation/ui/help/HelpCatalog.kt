@@ -269,33 +269,22 @@ object HelpCatalog {
         )
 
         HelpTopic.WINDOW_MODES -> HelpEntry(
-            title = "Modos de janela",
-            summary = "A janela reduzida aos cards, ou a uma barra flutuante sempre visível.",
-            description = "O modo somente cards tira a barra de título e o rodapé e deixa a grade de " +
-                "cards; a faixa de título volta enquanto o ponteiro está sobre o topo da janela. A " +
-                "barra HUD vai mais longe: esconde a janela e deixa um notch colado numa borda da " +
+            title = "Barra HUD",
+            summary = "O app inteiro num notch flutuante, sempre visível.",
+            description = "O app mora num notch colado numa borda da " +
                 "tela, sempre no topo das outras, com um anel por conta — um arco por cota —, o " +
                 "percentual de cada janela (7d, 5h) e a palavra do estado. Com o ponteiro sobre um anel abre-se o balão " +
                 "daquela conta: cada cota com a barra, quanto foi usado e quanto resta e a hora " +
                 "em que ela reinicia, o plano e de onde veio a leitura, e os mesmos botões do " +
                 "card. Clicar num anel atualiza aquela conta. Nas pontas do notch ficam a mão, " +
-                "que o move, e a engrenagem, que abre o que o rodapé oferece — inclusive quanto " +
-                "falta para a próxima coleta automática. Os dois modos são exclusivos: " +
-                "ligar um desliga o outro.",
+                "que o move, e a engrenagem, que abre versão, atualização, exportação, " +
+                "Configurações e Ajuda — inclusive quanto falta para a próxima coleta automática.",
             steps = listOf(
-                "No rodapé da janela (modo Padrão), clique no ícone \"Modo de janela\" e escolha " +
-                    "\"Padrão\", \"Somente os cards\" ou \"Barra HUD\".",
-                "No modo Somente cards, o mesmo menu está na faixa revelada ao passar o mouse no " +
-                    "topo — troca direto para a Barra HUD sem passar pelo Padrão.",
-                "Na Barra HUD, passe o ponteiro sobre a engrenagem da ponta do notch e escolha \"Padrão\" ou " +
-                    "\"Somente os cards\"; o botão direito sobre o notch troca direto para " +
-                    "Somente cards.",
-                "Pelas Configurações: abra \"Geral\" e use \"Somente os cards\" ou \"Barra HUD\".",
-                "Pelo teclado: Ctrl+Shift+M alterna o modo somente cards e Ctrl+Shift+H alterna a " +
-                    "barra HUD.",
-                "O menu do ícone da bandeja tem as duas entradas — é o caminho de volta quando a " +
-                    "janela está coberta por outra.",
-                "Na barra HUD, arraste pela mão da ponta do notch (só ela move) e solte " +
+                "Passe o ponteiro sobre a engrenagem na ponta do notch para abrir \"Configurações\", " +
+                    "\"Ajuda\", \"Atualizar agora\" e a exportação.",
+                "O menu do ícone da bandeja tem \"Abrir\", que traz o notch para a frente quando " +
+                    "ele está coberto por outra janela.",
+                "Arraste pela mão da ponta do notch (só ela move) e solte " +
                     "perto de qualquer borda, de qualquer monitor — em cima, embaixo ou nas " +
                     "laterais: ele gruda na mais próxima e fica ali na próxima abertura.",
                 // Leitura, não ativação: fica no fim da lista, e a descrição mantém
@@ -307,9 +296,8 @@ object HelpCatalog {
                     "do anel e ao lado do nome no balão e no card.",
                 "Sessões do Claude Code com o contexto crescendo ou saturado, ou sem resposta " +
                     "desde o último pedido, aparecem na seção \"Sessões CLI\" do balão da conta.",
-                "Numa instalação nova o app abre na janela padrão, para a configuração, e passa " +
-                    "sozinho para a barra HUD na primeira coleta; qualquer modo escolhido antes " +
-                    "disso vale no lugar."
+                "Sem nenhuma API habilitada o notch diz \"Nenhuma API\" e as Configurações abrem " +
+                    "sozinhas no arranque."
             ),
             mediaId = "window-modes"
         )
@@ -533,33 +521,22 @@ object HelpCatalog {
         )
 
         HelpTopic.WINDOW_MODES -> HelpEntry(
-            title = "Window modes",
-            summary = "The window cut down to the cards, or to a floating always-on-top strip.",
-            description = "Cards only mode drops the title bar and the footer and leaves the card " +
-                "grid; the title strip comes back while the pointer is over the top of the window. " +
-                "The HUD strip goes further: it hides the window and leaves a notch docked to a " +
+            title = "HUD strip",
+            summary = "The whole app in a floating, always-on-top notch.",
+            description = "The app lives in a notch docked to a " +
                 "screen edge, always above other windows, with one ring per account — one arc per " +
                 "quota —, each window's percentage (7d, 5h) and the status word. Hovering a ring opens that " +
                 "account's balloon: each quota with its bar, how much is used and left and when " +
                 "it resets, the plan and where the reading came from, and the card's own buttons. " +
                 "Clicking a ring refreshes that account. At the ends of the notch sit the hand, " +
-                "which moves it, and the gear, which opens what the footer offers — including how " +
-                "long is left until the next automatic collection. The two modes are " +
-                "mutually exclusive: turning one on turns the other off.",
+                "which moves it, and the gear, which opens version, update, export, Settings and " +
+                "Help — including how long is left until the next automatic collection.",
             steps = listOf(
-                "In the window footer (Standard mode), click the \"Window mode\" icon and pick " +
-                    "\"Standard\", \"Cards only\" or \"HUD strip\".",
-                "In Cards only mode, the same menu is in the strip revealed by hovering the top — " +
-                    "it jumps straight to the HUD strip without going through Standard.",
-                "On the HUD strip, hover the gear at the end of the notch and pick \"Standard\" or " +
-                    "\"Cards only\"; the right mouse button over the notch switches straight to " +
-                    "Cards only.",
-                "From Settings: open \"General\" and use \"Cards only\" or \"HUD strip\".",
-                "From the keyboard: Ctrl+Shift+M toggles cards only mode and Ctrl+Shift+H toggles " +
-                    "the HUD strip.",
-                "The tray icon menu carries both entries — that is the way back when the window is " +
-                    "covered by another one.",
-                "On the HUD strip, drag the hand at the end of the notch (only the hand moves it) and " +
+                "Hover the gear at the end of the notch to open \"Settings\", \"Help\", " +
+                    "\"Refresh now\" and the export.",
+                "The tray icon menu has \"Open\", which brings the notch to the front when another " +
+                    "window covers it.",
+                "Drag the hand at the end of the notch (only the hand moves it) and " +
                     "drop it near any edge of any monitor — top, bottom or the sides: it docks to " +
                     "the nearest one and stays there next time.",
                 "To read the rings: the outer one is the longest window (the weekly one) and the " +
@@ -570,9 +547,8 @@ object HelpCatalog {
                     "corner of the ring and next to the name in the balloon and on the card.",
                 "Claude Code sessions with a growing or saturated context, or with no reply since " +
                     "the last request, show up in the \"CLI sessions\" section of the account's balloon.",
-                "On a fresh install the app opens in the standard window, for setup, and moves to " +
-                    "the HUD strip by itself on the first collection; any mode picked before that " +
-                    "wins instead."
+                "With no API enabled the notch says \"No APIs\" and Settings open by themselves " +
+                    "at startup."
             ),
             mediaId = "window-modes"
         )

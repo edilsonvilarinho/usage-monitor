@@ -7,7 +7,7 @@ private const val REDUCED_MOTION_KEY = "reducedMotion"
 /**
  * "Reduzir animações": transições trocam de uma vez e nada gira nem pulsa.
  *
- * Mora em `PreferencesSettings` pela mesma razão do modo somente cards: não é
+ * Mora em `PreferencesSettings` pela mesma razão da barra HUD: não é
  * segredo, e `~/.usage-monitor/` é onde ficam as chaves.
  *
  * Default `false`. O sistema operacional tem a própria preferência, mas o JVM

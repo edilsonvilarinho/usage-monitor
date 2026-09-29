@@ -133,7 +133,7 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 - Auto-start: entrada com `--autostart`; o **nome** do valor `Run` não muda. Agendador de Tarefas
   foi medido e recusado.
 - Segunda instância nunca sai calada: pedido em `~/.usage-monitor/focus.request`, atendido por
-  `restoreMainWindow`. `activateWindow` alterna `alwaysOnTop` `false → true → anterior`.
+  `focusHud` (a janela da HUD). `activateWindow` alterna `alwaysOnTop` `false → true → anterior`.
 - Atualização automática: SHA-256 contra o `digest` da API do GitHub; flags de build e piso de
   versão por plataforma; Windows só NSIS per-user; Linux só árvore XDG gerenciada. Texto de
   reinício diz **o que** reinicia. Progresso é texto, não animação.
@@ -152,8 +152,10 @@ Manual, sem framework. `AppGraph.kt` monta data sources, repositórios e use cas
 `HttpClient(OkHttp)` → datasources → repos → use cases); `AppViewModels.kt` monta os view models e é
 o **dono único do encerramento** (`shutdown()`, idempotente), chamado pela saída do app, pelo
 `onDispose` da composição e pelo shutdown hook — nunca uma segunda cópia (histórico no plano #298).
-`Main.kt` só faz o arranque e compõe os hosts (`MainWindowHost`, `ModalWindowsHost`,
-`SettingsWindowHost`, `AppTrayHost`, `HudWindowHost`); estado de shell e de modais mora em
+`Main.kt` só faz o arranque e compõe os hosts (`HudWindowHost`, `ModalWindowsHost`,
+`BugReportWindow`, `SettingsWindowHost`, `AppTrayHost`). **Não há janela principal**: a HUD é a
+única de visualização e a âncora do app (`anchorAppWindow`: `graph.mainWindow`, registro de
+arranque e ACK de atualização); estado de shell e de modais mora em
 `AppShellState`/`AppModalState`. Os arquivos ficaram no pacote `com.usagemonitor`, e não num
 subpacote, para não abrir a visibilidade dos helpers `internal`/`private` que eles usam.
 
@@ -282,20 +284,13 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 
 - Escala da interface troca só a **densidade**, nunca `fontScale`. Padrão persistido 115, default do
   parâmetro 100 (geradores de captura e testes). **Cada** `Window`/`DialogWindow` recebe o valor.
-  `scaledWindowSize` corrige pela razão aplicada/nova; tamanho persistido não é reescalado
-  (`hasPersistedUiScale`); redimensionar no commit com debounce. `AppThemeScaleTest` mede pixel.
+  Gravar no commit com debounce. `AppThemeScaleTest` mede pixel.
 - Monitores: `workAreaForPosition` (`ScreenLocator.kt`) encaixa no monitor de maior interseção, nunca
   `defaultScreenDevice`. Escalas diferentes por monitor só se validam em máquina real.
-- Dashboard usa o corpo denso (`AppSpacing.md`/`sm`); a coluna rolável não reserva folga para a barra.
-- Grade anima com mola `GENTLE`, primeira colocação é salto; no arrasto as caixas do alvo ficam
-  congeladas (`previewCardOrder`).
-- Somente cards: dois booleanos, sem enum; faixa de título só composta no hover (senão o arrasto
-  imediato da janela vence a pressão longa do card); três saídas obrigatórias: faixa, bandeja e
-  `Ctrl+Shift+M`.
-- Menu de modos (`WindowMode` + `AppMenu`): o enum é do controle, o estado segue em dois booleanos com
-  exclusão nos setters de `AppShellState.kt`; rótulos iguais aos das Configurações; `AppMenu` é
-  `Popup` próprio, nunca `DropdownMenu`; abre para cima se não cabe; só no modo padrão
-  (`onWindowModeChange = null` esconde).
+- **A barra HUD é o único modo de visualização** (plano `hud-modo-unico-execucao.md`): saíram a janela
+  principal com o dashboard, o modo somente cards, o menu de modos (`WindowMode`), "Manter sempre
+  visível" e `Ctrl+Shift+H`/`Ctrl+Shift+M`. Não reintroduzir seletor de modo nem segunda moldura.
+  `DashboardScreen` e a grade de cards só existem para testes e geradores de captura.
 - Tooltip de cota não abre abaixo de 320dp de card (`shouldShowQuotaTooltip`, constante própria, não
   `NarrowCardWidthThreshold`); a `testTag` do bloco de cota mora no conteúdo; a explicação do
   semáforo é o `footnote` da tooltip. Cabeçalho tem ponto **e** palavra do pior risco
@@ -309,8 +304,8 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 `HudNotchGeometry.kt`, `HudModel.kt`; issue #164): decisões e histórico em
 [`docs/hud-notch.md`](docs/hud-notch.md). **Leia antes de mexer na HUD.** Regras:
 
-- `hudMode` é booleano, exclusivo com somente cards pelos setters de `AppShellState.kt`; `HudEdge` é
-  enum próprio. A janela principal fica escondida com geometria intacta.
+- A HUD está sempre composta — não há `hudMode`; `HudEdge` é enum próprio. Sem API habilitada as
+  Configurações abrem sozinhas uma vez por arranque (`OpenSettingsWithoutApis`).
 - Um anel por conta, até três arcos; janela mais longa por fora; uma linha por anel com janela e
   percentual; palavra do **pior** risco. Faixa compacta acima de 45% da borda.
 - O notch não cresce: o balão é de **uma** conta (hover no anel) ou da engrenagem (hover ou clique,
@@ -320,7 +315,7 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
   `Window.shape` **só no Windows** (`hudUsesHitRegion`, #340); nenhum redimensionamento AWT por quadro.
 - Arrasto só pela mão, medido por `hudDragWindowBounds`; posição é borda + fração + monitor; parado
   mora na área útil, fora da barra de tarefas.
-- Clique num anel recoleta aquela conta; botão direito vai a somente cards. Atualização pendente é o
+- Clique num anel recoleta aquela conta; botão direito não faz nada. Atualização pendente é o
   ponto da engrenagem; reiniciar só pelo botão do balão.
 - Movimento contínuo (órbita de sessão, pulso de atenção) só atrás de `AppMotionPolicy.continuous`.
 - Balão é conteúdo da janela, nunca `Popup`; nenhum formato novo de percentual/reset/rótulo.

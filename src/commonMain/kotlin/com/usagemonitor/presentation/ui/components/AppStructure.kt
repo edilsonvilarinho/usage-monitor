@@ -85,7 +85,7 @@ private val ROW_MIN_HEIGHT = 32.dp
 /**
  * Corpo de uma janela: fundo, padding e o espaçamento entre blocos.
  *
- * Não desenha barra de título — no desktop ela é `DesktopWindowFrame`, que vive
+ * Não desenha barra de título — no desktop ela é `DesktopDialogFrame`, que vive
  * em `desktopMain` porque mexe com a janela AWT. Aqui fica só o que é comum às
  * seis janelas: a cor de fundo, a margem e a [statusBar] opcional, que é sempre
  * a última linha e nunca rola junto com o conteúdo.

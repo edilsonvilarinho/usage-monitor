@@ -270,22 +270,6 @@ export function Dashboard({ onOpen, warnings = [] }) {
           }
           right={
             <React.Fragment>
-              {/* Acesso rápido às três molduras (issue #187): menu e não
-                  segmentado, porque três rótulos lado a lado não cabem numa
-                  barra de estado que já carrega as demais ações. */}
-              <AppMenu
-                open={modeMenuOpen}
-                value={windowMode}
-                options={[
-                  { id: 'standard', label: 'Padrão' },
-                  { id: 'cards', label: 'Somente os cards' },
-                  { id: 'hud', label: 'Barra HUD' }
-                ]}
-                onSelect={(id) => { setWindowMode(id); setModeMenuOpen(false); }}
-                onDismiss={() => setModeMenuOpen(false)}
-              >
-                <AppIconButton glyph="▤" label="Modo de janela" onClick={() => setModeMenuOpen(!modeMenuOpen)} />
-              </AppMenu>
               <AppButton variant="ghost">Atualizar tudo</AppButton>
               <AppButton variant="ghost" onClick={() => onOpen && onOpen(4)}>Configurações</AppButton>
             </React.Fragment>

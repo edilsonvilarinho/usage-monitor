@@ -38,7 +38,6 @@ internal fun buildShellActions(
             breadcrumbs.recordScreenOpened("Ajuda")
             modal.isHelpOpen = true
         },
-        changeWindowMode = shell::changeWindowMode,
         // Retrato do Dashboard (issue #215): o mesmo writer das Sessões CLI e do
         // Time, um diálogo de arquivo só.
         exportSnapshot = { stats ->

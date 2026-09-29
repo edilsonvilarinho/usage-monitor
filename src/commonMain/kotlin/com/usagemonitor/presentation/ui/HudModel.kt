@@ -219,17 +219,6 @@ data class HudStripLine(val label: String?, val percentText: String) {
 const val MAX_HUD_RINGS = 3
 
 /**
- * A troca automática para a HUD na instalação nova (issue #277): pendente, com
- * ao menos uma conta para o notch mostrar e **sem janela modal aberta**. Na
- * primeira execução quem está aberta costuma ser Configurações, e esconder a
- * janela principal no meio da configuração tiraria o chão de quem configura.
- * Sem conta nenhuma o notch diria "Carregando" para sempre.
- */
-internal fun hudDefaultShouldSwitch(pending: Boolean, hasHudAccounts: Boolean, modalOpen: Boolean): Boolean {
-    return pending && hasHudAccounts && !modalOpen
-}
-
-/**
  * A palavra do notch sem conta. "Carregando" é o estado de quem ainda vai ter
  * dado; sem API habilitada nenhuma coleta vem, e a palavra mentiria para sempre.
  * A saída — as Configurações — está no balão da engrenagem.

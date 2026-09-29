@@ -12,7 +12,6 @@ import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.rememberTrayState
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.buildHudAccounts
-import com.usagemonitor.presentation.ui.hudDefaultShouldSwitch
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.trayUsageRingFraction
 import com.usagemonitor.presentation.ui.usageAlertMessage
@@ -23,10 +22,7 @@ import com.usagemonitor.domain.repository.BreadcrumbRecorder
 
 /**
  * O ícone da bandeja: ponto de risco, resumo das contas no tooltip, menu com os
- * caminhos de volta das molduras reduzidas e as notificações de alerta.
- *
- * Também mora aqui a troca para a HUD na instalação nova (issue #277): a bandeja
- * é um dos caminhos de volta, e sem ela o app não troca sozinho.
+ * atalhos que a barra HUD não tem espaço para mostrar e as notificações de alerta.
  */
 @Composable
 internal fun ApplicationScope.AppTrayHost(
@@ -35,7 +31,7 @@ internal fun ApplicationScope.AppTrayHost(
     modal: AppModalState,
     iconImage: Painter?,
     breadcrumbs: com.usagemonitor.domain.repository.BreadcrumbRecorder,
-    onRestoreMainWindow: () -> Unit,
+    onFocusHud: () -> Unit,
     onQuit: () -> Unit
 ) {
     val language = shell.language
@@ -48,14 +44,6 @@ internal fun ApplicationScope.AppTrayHost(
     // não a cada recomposição — o `Tray` reconstrói a imagem AWT a cada troca.
     val ringFraction = if (shell.trayUsageRing) trayUsageRingFraction(quotaRisks, Clock.System.now()) else null
     val trayIcon = remember(iconImage, worstRisk, ringFraction) { TrayRiskIconPainter(iconImage, worstRisk, ringFraction) }
-    val switchToHudByDefault = hudDefaultShouldSwitch(shell.hudDefaultPending, quotaRisks.isNotEmpty(), modal.anyOpen)
-    LaunchedEffect(switchToHudByDefault) {
-        if (switchToHudByDefault) {
-            shell.changeHudMode(true)
-            val notice = hudDefaultNotice(language)
-            trayState.sendNotification(Notification(notice.first, notice.second, Notification.Type.Info))
-        }
-    }
     val tooltip = hudTraySummary(
         appName = "Usage Monitor",
         accounts = buildHudAccounts(quotaRisks, shell.cardOrder, language, Clock.System.now())
@@ -66,12 +54,12 @@ internal fun ApplicationScope.AppTrayHost(
         icon = trayIcon,
         state = trayState,
         tooltip = tooltip,
-        onAction = onRestoreMainWindow,
+        onAction = onFocusHud,
         menu = {
-            Item(text = if (pt) "Abrir" else "Open", onClick = onRestoreMainWindow)
+            Item(text = if (pt) "Abrir" else "Open", onClick = onFocusHud)
             Item(text = if (pt) "Atualizar agora" else "Refresh now", onClick = { viewModels.dashboard.refresh() })
-            // Configurações e Ajuda entram por causa das molduras reduzidas: com
-            // o rodapé escondido, a bandeja e o teclado são os únicos caminhos.
+            // Configurações e Ajuda também estão no balão da engrenagem; aqui
+            // valem para a barra HUD coberta ou fora da tela.
             Item(
                 text = if (pt) "Configurações" else "Settings",
                 onClick = {
@@ -85,22 +73,6 @@ internal fun ApplicationScope.AppTrayHost(
                     breadcrumbs.recordScreenOpened("Ajuda (bandeja)")
                     modal.isHelpOpen = true
                 }
-            )
-            Item(
-                text = when {
-                    shell.cardsOnlyMode -> if (pt) "Sair do modo somente cards" else "Exit cards only mode"
-                    else -> if (pt) "Somente os cards" else "Cards only"
-                },
-                onClick = { shell.changeCardsOnlyMode(!shell.cardsOnlyMode) }
-            )
-            // Mesmo padrão (issue #164): com a janela reduzida à barra, a bandeja
-            // continua sendo um caminho de volta.
-            Item(
-                text = when {
-                    shell.hudMode -> if (pt) "Sair da barra HUD" else "Exit HUD strip"
-                    else -> if (pt) "Barra HUD" else "HUD strip"
-                },
-                onClick = { shell.changeHudMode(!shell.hudMode) }
             )
             Separator()
             Item(text = if (pt) "Sair" else "Quit", onClick = onQuit)
@@ -116,20 +88,5 @@ internal fun ApplicationScope.AppTrayHost(
                 Notification(title = message.title, message = message.body, type = Notification.Type.Warning)
             )
         }
-    }
-}
-
-/**
- * O aviso da troca para a HUD (issue #277): o que aconteceu e os três caminhos
- * de volta que existem mesmo com a janela escondida. Uma vez só — a troca não se
- * repete, porque a pendência é apagada nela.
- */
-internal fun hudDefaultNotice(language: AppLanguage): Pair<String, String> {
-    return if (language == AppLanguage.PT) {
-        "Usage Monitor agora na barra HUD" to
-            "Para voltar à janela padrão: Ctrl+Shift+H, o menu da bandeja ou a engrenagem na ponta do notch."
-    } else {
-        "Usage Monitor is now on the HUD strip" to
-            "To go back to the standard window: Ctrl+Shift+H, the tray menu or the gear at the end of the notch."
     }
 }

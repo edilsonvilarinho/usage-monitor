@@ -3,8 +3,6 @@ package com.usagemonitor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.window.WindowPlacement
-import androidx.compose.ui.window.WindowState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -30,7 +28,6 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun AppPreferenceEffects(
     shell: AppShellState,
     settings: PreferencesSettings,
-    windows: AppWindowStates,
     availableTargets: List<UsageTargetKey>,
     feedback: AppSettingsFeedback,
     breadcrumbs: BreadcrumbRecorder
@@ -40,7 +37,7 @@ internal fun AppPreferenceEffects(
     }
     AutoStartResolution(shell, settings, breadcrumbs)
     OpacityPersistence(shell, settings)
-    UiScalePersistence(shell, settings, windows.main, windows.mainHadPersistedSize)
+    UiScalePersistence(shell, settings)
 
     // Quem grava é o coletor com debounce; o aviso sai daqui, onde o toast
     // existe. A geração inicial não conta: ninguém mexeu em nada.
@@ -105,54 +102,28 @@ private fun OpacityPersistence(shell: AppShellState, settings: PreferencesSettin
     }
 }
 
+/**
+ * Grava a escala no commit, não a cada tique do slider: o conteúdo já escala ao
+ * vivo pela densidade. A HUD e as janelas modais se dimensionam pela própria
+ * geometria, então não há moldura para redimensionar aqui.
+ */
 @OptIn(FlowPreview::class)
 @Composable
-private fun UiScalePersistence(
-    shell: AppShellState,
-    settings: PreferencesSettings,
-    mainWindow: WindowState,
-    mainHadPersistedSize: Boolean
-) {
+private fun UiScalePersistence(shell: AppShellState, settings: PreferencesSettings) {
     // Primeira execução depois da atualização que subiu a escala default de 100
-    // para 115: a janela gravada ficou do tamanho de antes. Vale a mesma regra do
-    // slider, uma vez só — gravar a escala fecha a porta, porque a chave passa a
-    // existir.
-    LaunchedEffect(settings, mainWindow) {
-        if (hasPersistedUiScale(settings)) {
-            return@LaunchedEffect
+    // para 115: gravar a escala fecha a porta, porque a chave passa a existir.
+    LaunchedEffect(settings) {
+        if (!hasPersistedUiScale(settings)) {
+            persistUiScalePercent(settings, shell.uiScalePercent)
         }
-        persistUiScalePercent(settings, shell.uiScalePercent)
-        if (!mainHadPersistedSize || mainWindow.placement != WindowPlacement.Floating) {
-            return@LaunchedEffect
-        }
-        mainWindow.size = scaledWindowSize(
-            current = mainWindow.size,
-            fromPercent = 100,
-            toPercent = shell.uiScalePercent,
-            maxSize = availableWindowSizeDp()
-        )
     }
-    // Gravar e redimensionar no commit, não a cada tique do slider. O conteúdo já
-    // escala ao vivo pela densidade; o que espera o debounce é o disco e a moldura.
-    LaunchedEffect(settings, mainWindow) {
+    LaunchedEffect(settings) {
         snapshotFlow { shell.uiScalePercent }
             .distinctUntilChanged()
             .drop(1)
             .debounce(250.milliseconds)
             .collect { percent ->
                 persistUiScalePercent(settings, percent)
-                val previous = shell.appliedUiScalePercent
-                shell.appliedUiScalePercent = percent
-                // Maximizada não tem tamanho próprio para escalar; o sistema já a
-                // prende à tela inteira.
-                if (mainWindow.placement == WindowPlacement.Floating) {
-                    mainWindow.size = scaledWindowSize(
-                        current = mainWindow.size,
-                        fromPercent = previous,
-                        toPercent = percent,
-                        maxSize = availableWindowSizeDp()
-                    )
-                }
                 shell.uiScaleSaveGeneration += 1
             }
     }

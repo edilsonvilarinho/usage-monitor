@@ -22,7 +22,6 @@ import com.usagemonitor.hudDockedWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
-import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_VERSION_TEST_TAG
@@ -33,7 +32,6 @@ import com.usagemonitor.presentation.ui.HUD_BALLOON_SESSION_SIGNALS_TAG
 import com.usagemonitor.presentation.ui.HudSessionSignal
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
-import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.hudAppBalloonHeight
@@ -111,7 +109,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Herda as asserções da barra de linhas que ele substitui — o que a HUD promete
  * não mudou com o desenho: clique abre a janela, arrasto não abre, botão direito
- * vai direto a "Somente cards", a contagem sai uma vez só, o reset só aberto.
+ * não faz nada, a contagem sai uma vez só, o reset só aberto.
  */
 @OptIn(ExperimentalTestApi::class)
 class HudNotchTest {
@@ -178,7 +176,6 @@ class HudNotchTest {
         onDragEnd: () -> Unit = {},
         onRefreshAccount: (UsageTargetKey) -> Unit = {},
         accountActions: (@Composable (HudAccount) -> Unit)? = null,
-        onSwitchToCardsOnly: () -> Unit = {},
         dragging: Boolean = false,
         onGearClick: () -> Unit = {}
     ) {
@@ -197,7 +194,6 @@ class HudNotchTest {
                     onDragEnd = onDragEnd,
                     onRefreshAccount = onRefreshAccount,
                     accountActions = accountActions,
-                    onSwitchToCardsOnly = onSwitchToCardsOnly,
                     dragging = dragging,
                     onGearClick = onGearClick,
                     gearDescription = GEAR
@@ -471,17 +467,16 @@ class HudNotchTest {
         assertTrue(moves >= 3, "esperava o arrasto continuar depois de recompor, veio $moves")
     }
 
+    /** O botão direito levava ao modo somente cards, que saiu do app; hoje é engolido. */
     @Test
-    fun `botao direito troca direto para somente cards sem abrir nem arrastar`() = runDesktopComposeUiTest {
+    fun `botao direito nao recoleta nem arrasta`() = runDesktopComposeUiTest {
         var opens = 0
-        var switches = 0
         val events = mutableListOf<String>()
         setContent {
             notch(
                 onDragStart = { events += "start" },
                 onDragEnd = { events += "end" },
-                onRefreshAccount = { opens += 1 },
-                onSwitchToCardsOnly = { switches += 1 }
+                onRefreshAccount = { opens += 1 }
             )
         }
 
@@ -492,7 +487,6 @@ class HudNotchTest {
         }
         waitForIdle()
 
-        assertEquals(1, switches)
         assertEquals(0, opens)
         assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
     }
@@ -634,15 +628,14 @@ class HudNotchTest {
 
     // ------------------------------------------------------------ balão da engrenagem (rodada 3)
 
-    /** O conteúdo de teste do balão da engrenagem: os modos e uma ação do rodapé. */
+    /** O conteúdo de teste do balão da engrenagem: uma ação do rodapé. */
     @Composable
-    private fun appBalloonFixture(onMode: (WindowMode) -> Unit, onRefresh: () -> Unit) {
+    private fun appBalloonFixture(onRefresh: () -> Unit) {
         HudAppBalloonContent(
             language = AppLanguage.PT,
             appVersion = CURRENT_APP_VERSION,
             countdown = null,
             updateIndicator = null,
-            onWindowModeChange = onMode,
             actions = {
                 FooterActionGroup(language = AppLanguage.PT, onRefresh = onRefresh, onOpenSettings = {})
             }
@@ -650,7 +643,7 @@ class HudNotchTest {
     }
 
     @Composable
-    private fun notchWithActions(onMode: (WindowMode) -> Unit = {}, onRefresh: () -> Unit = {}) {
+    private fun notchWithActions(onRefresh: () -> Unit = {}) {
         AppTheme(isDark = true) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
                 HudNotch(
@@ -659,7 +652,7 @@ class HudNotchTest {
                     sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false),
                     fallbackLabel = "Carregando",
                     expanded = true,
-                    appBalloon = { appBalloonFixture(onMode, onRefresh) },
+                    appBalloon = { appBalloonFixture(onRefresh) },
                     appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
                     gearDescription = GEAR
                 )
@@ -677,7 +670,7 @@ class HudNotchTest {
         waitForIdle()
         onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
         onNodeWithTag(HUD_APP_BALLOON_VERSION_TEST_TAG).assertTextEquals("v$CURRENT_APP_VERSION")
-        onNodeWithText("Modo de janela").assertIsDisplayed()
+        onNodeWithText("Modo de janela").assertDoesNotExist()
         // A mesma fileira do rodapé, pelas mesmas descrições.
         onNodeWithContentDescription("Atualizar agora").performClick()
         assertEquals(1, refreshes)
@@ -713,20 +706,6 @@ class HudNotchTest {
         onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
     }
 
-    @Test
-    fun `os modos de janela saem do balao da engrenagem com o corrente marcado`() = runDesktopComposeUiTest {
-        val chosen = mutableListOf<WindowMode>()
-        setContent { notchWithActions(onMode = { mode -> chosen += mode }) }
-
-        onNodeWithContentDescription(GEAR).performClick()
-        waitForIdle()
-        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.HUD.name).assertIsSelected()
-        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.STANDARD.name).performClick()
-        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.CARDS_ONLY.name).performClick()
-
-        assertEquals(listOf(WindowMode.STANDARD, WindowMode.CARDS_ONLY), chosen)
-    }
-
     /** Com o balão da engrenagem aberto, passar por um anel mostra aquela conta. */
     @Test
     fun `um anel sob o ponteiro troca o balao da engrenagem pelo da conta`() = runDesktopComposeUiTest {
@@ -760,7 +739,6 @@ class HudNotchTest {
                                 appVersion = CURRENT_APP_VERSION,
                                 countdown = null,
                                 updateIndicator = update,
-                                onWindowModeChange = {},
                                 actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
                                 onUpdateAction = action
                             )
@@ -786,7 +764,6 @@ class HudNotchTest {
                     appVersion = CURRENT_APP_VERSION,
                     countdown = null,
                     updateIndicator = update,
-                    onWindowModeChange = {},
                     actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
                     onUpdateAction = onUpdateAction
                 )
@@ -856,7 +833,6 @@ class HudNotchTest {
                     appVersion = CURRENT_APP_VERSION,
                     countdown = { countdownOf(now + 2.minutes + 5.seconds) },
                     updateIndicator = null,
-                    onWindowModeChange = {},
                     actions = {}
                 )
             }

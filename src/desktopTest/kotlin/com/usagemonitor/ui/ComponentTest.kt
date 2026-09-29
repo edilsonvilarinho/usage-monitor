@@ -83,7 +83,6 @@ import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppUsageRing
 import com.usagemonitor.presentation.ui.components.FOOTER_VERSION_TEST_TAG
-import com.usagemonitor.presentation.ui.components.FOOTER_WINDOW_MODE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.LanguageSelector
 import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
@@ -92,7 +91,6 @@ import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
-import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
 import com.usagemonitor.presentation.ui.components.accountAccentColor
 import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
@@ -2082,46 +2080,6 @@ class ComponentTest {
 
     // ── FooterBar ───────────────────────────────────────────────────────
 
-    /**
-     * O menu de modos (issue #187) mora no rodapé, e o rodapé mora na
-     * `DashboardScreen`: sem este repasse o controle existiria no `FooterBar` e
-     * nunca chegaria à tela. `null` no callback é o estado dos geradores de
-     * captura, que montam a tela sem despachar nada.
-     */
-    @Test
-    fun `DashboardScreen repassa o menu de modos de janela ao rodape`() = runDesktopComposeUiTest {
-        val enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
-        val viewModel = emptyDashboardViewModel(enabledApis)
-        viewModel.cancelCountdown()
-        val chosen = mutableListOf<WindowMode>()
-
-        setContent {
-            ScreenTestTheme(isDark = true) {
-                DashboardScreen(
-                    viewModel = viewModel,
-                    appVersion = "7.0.0",
-                    language = AppLanguage.PT,
-                    cardOrder = emptyList(),
-                    minimizedCards = emptySet(),
-                    onMoveCardToIndex = { _, _ -> },
-                    onToggleCardMinimized = {},
-                    onOpenHistory = { _, _ -> },
-                    onOpenSettings = {},
-                    countdownUpdatesEnabled = false,
-                    windowMode = WindowMode.STANDARD,
-                    onWindowModeChange = { mode -> chosen += mode }
-                )
-            }
-        }
-
-        onNodeWithTag(FOOTER_WINDOW_MODE_TEST_TAG).performClick()
-        waitForIdle()
-        onNodeWithText("Barra HUD").performClick()
-        waitForIdle()
-
-        assertEquals(listOf(WindowMode.HUD), chosen)
-    }
-
     @Test
     fun `DashboardScreen shows refresh warning dialog and only refreshes on confirm`() = runDesktopComposeUiTest {
         val enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX))
@@ -2273,40 +2231,6 @@ class ComponentTest {
 
         onNodeWithTag(APP_UPDATE_BANNER_ACTION_TAG).performClick()
         assertEquals(true, opened)
-        viewModel.onDestroy()
-    }
-
-    /**
-     * Issue #70: no modo somente cards a barra de estado sai da janela, e com
-     * ela a versão, a contagem regressiva e as quatro ações do rodapé.
-     */
-    @Test
-    fun `DashboardScreen hides the footer in cards only mode`() = runDesktopComposeUiTest {
-        val enabledApis = MutableStateFlow(emptySet<ApiSource>())
-        val viewModel = emptyDashboardViewModel(enabledApis)
-        viewModel.cancelCountdown()
-
-        setContent {
-            ScreenTestTheme(isDark = true) {
-                DashboardScreen(
-                    viewModel = viewModel,
-                    appVersion = "7.0.0",
-                    language = AppLanguage.PT,
-                    cardOrder = emptyList(),
-                    minimizedCards = emptySet(),
-                    onMoveCardToIndex = { _, _ -> },
-                    onToggleCardMinimized = {},
-                    onOpenHistory = { _, _ -> },
-                    onOpenSettings = {},
-                    showFooter = false,
-                    countdownUpdatesEnabled = false
-                )
-            }
-        }
-
-        onNodeWithTag(FOOTER_VERSION_TEST_TAG, useUnmergedTree = true).assertDoesNotExist()
-        onAllNodesWithContentDescription("Abrir configurações").assertCountEquals(0)
-        onAllNodesWithContentDescription("Atualizar agora").assertCountEquals(0)
         viewModel.onDestroy()
     }
 
