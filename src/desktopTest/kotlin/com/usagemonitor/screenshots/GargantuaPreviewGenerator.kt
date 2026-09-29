@@ -60,6 +60,7 @@ fun main(args: Array<String>) {
         recorder.close()
     }
     recordPresence(output)
+    recordRefresh(output)
     println("Prévia Gargantua: ${output.absolutePath}")
 }
 
@@ -83,6 +84,30 @@ private fun recordPresence(output: File) {
         live = all
         recorder.animate(1_800) { }
         GifEncoder.write(File(output, "hud-gargantua-presence.gif"), recorder.frames)
+    } finally {
+        recorder.close()
+    }
+}
+
+/** R1: coletando (ondas) e concluído (plasma desliza ao valor novo e onda final). */
+private fun recordRefresh(output: File) {
+    val all = GargantuaPreviewFixtures.showcase
+    var shown by mutableStateOf(all)
+    val recorder = SceneRecorder(widthDp = 920, heightDp = 132, frameMillis = 40L)
+    try {
+        recorder.setContent {
+            CompositionLocalProvider(LocalAppMotionPolicy provides AppMotionPolicy.Live) {
+                PreviewNotch(shown, HudEdge.TOP)
+            }
+        }
+        recorder.animate(600) { }
+        shown = all.map { account -> account.copy(refreshing = true) }
+        recorder.animate(1_800) { }
+        shown = all.map { account ->
+            account.copy(quotas = account.quotas.map { quota -> quota.copy(fraction = (quota.fraction + 0.08f).coerceAtMost(1f)) })
+        }
+        recorder.animate(1_400) { }
+        GifEncoder.write(File(output, "hud-gargantua-refresh.gif"), recorder.frames)
     } finally {
         recorder.close()
     }

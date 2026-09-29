@@ -224,12 +224,15 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **A faixa do modo padrão também ganhou botão**, e deixou de ser clicável inteira: com o botão
     dentro dela, clicar fora dele faria a mesma ação sem nada indicar. O preço é a faixa passar de
     ~34dp para ~46dp de altura, pela altura de controle do botão.
-- **A marca pulsa a cada coleta concluída** (issue #322, `shouldPulseProviderMark`): 1 → 1,15 em
-  `AppMotion.normal` e volta em `AppMotion.slow`, por tween — sem mola, para não passar do alvo — e uma
-  vez só, quando `refreshing` da conta cai de verdadeiro para falso. Vale também para coleta que
-  falhou (o `finally` do view model desmarca o alvo nos dois casos): o pulso diz "o app olhou agora",
-  não "o número mudou". Não é contínuo, então não depende de `continuous`; com "Reduzir animações"
-  não há pulso. Durante a coleta a marca continua girando, como antes.
+- **Coleta: ondas gravitacionais** (R1, `drawGargantuaRefreshLight`, `shouldPlayRefreshWave`;
+  2026-09-28). Substituiu o anel "pressionado" (escala 0,9) e o pulso da marca (issue #322), que o
+  usuário achou ruins; escolhida entre quatro protótipos HTML (ondas, varredura de sonda, recarga de
+  plasma, tique-taque). Coletando: três ondas finas defasadas saem do anel a cada `rippleMillis`
+  (1,3s) e o disco acelera para `refreshMillis` — contínuo, só com `continuous && !reduced`.
+  Concluído: o plasma desliza do valor antigo ao novo (a mola de sempre) e uma onda final mais forte
+  toca uma vez (`refreshWaveMillis`, 800ms) quando `refreshing` cai de verdadeiro para falso — também
+  em coleta que falhou: a onda diz "o app olhou agora", não "o número mudou". É finita, então só
+  "Reduzir animações" a desliga. A marca não gira nem pulsa mais.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco

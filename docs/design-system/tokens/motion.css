@@ -39,6 +39,8 @@
   --dur-gargantua-attention: 3200ms;
   --dur-gargantua-active: 2600ms;
   --dur-gargantua-refresh: 4000ms;
+  --dur-gargantua-ripple: 1300ms;       /* fetching: gravitational waves */
+  --dur-gargantua-refresh-wave: 800ms;  /* fetch done: one final wave */
   --dur-gargantua-flow: 2800ms;
   /* Finite: API enabled / app start (cascade 140ms) and API disabled. */
   --dur-gargantua-birth: 1100ms;

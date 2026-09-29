@@ -16,6 +16,10 @@ object AppGargantuaTokens {
     val mark = Color(0xFFF2EDED)
     const val orbitMillis = 14_000
     const val refreshMillis = 4_000
+    /** Coletando: período de cada onda gravitacional (R1). */
+    const val rippleMillis = 1_300
+    /** Coleta concluída: a onda final (R1). */
+    const val refreshWaveMillis = 800
     const val attentionMillis = 3_200
     const val activeMillis = 2_600
     /** Uma passada de luz ao longo do arco de quota, do início até a ponta. */

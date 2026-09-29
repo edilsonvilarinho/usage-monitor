@@ -51,6 +51,13 @@ decorative filaments, the plasma pulses and the active comet move; quota arcs ke
 anchor and the provider mark never spins. Refresh completion may use the
 existing finite provider-mark pulse. Finite quota interpolation never overshoots the real value.
 
+**Refresh (R1, gravitational waves).** While an account is being fetched, three thin staggered
+waves leave the ring every 1300ms (`--dur-gargantua-ripple`) and the disc speeds up to 4000ms;
+continuous, so only with `continuous && !reduced`. When the fetch ends (also a failed one) the
+plasma slides from the old value to the new one and one stronger wave plays once
+(`--dur-gargantua-refresh-wave`, 800ms); finite, so only Reduced motion removes it. The ring is no
+longer pressed and the mark no longer spins or pulses.
+
 **Birth and collapse.** When an API is enabled, and when the app starts or the HUD opens, each
 indicator is born (S1, shockwave, `--dur-gargantua-birth` 1100ms, 140ms cascade between accounts):
 a point of light flashes, two shockwaves travel out to about 3dp past the ring, the horizon opens

@@ -121,6 +121,23 @@ internal fun DrawScope.drawGargantuaTransitionLight(frame: GargantuaFrame) {
     drawShock(frame.farShock, ring * 0.95f, ring * 0.06f, Space.gold)
 }
 
+/**
+ * R1 · ondas gravitacionais. Coletando, três ondas finas defasadas saem do anel
+ * ([ripple] é a fase, `null` fora da coleta); ao concluir, uma onda mais forte
+ * ([completion] em `0..1`). Ficam no respiro que a órbita de sessão já reserva.
+ */
+internal fun DrawScope.drawGargantuaRefreshLight(ripple: Float?, completion: Float) {
+    val ring = size.minDimension / 2f
+    if (ripple != null) {
+        for (wave in 0 until REFRESH_RIPPLES) {
+            drawShock((ripple + wave / REFRESH_RIPPLES.toFloat()) % 1f, ring * 1.06f, ring * 0.034f, Color(0xFFFFE6BE))
+        }
+    }
+    drawShock(completion, ring * 1.16f, ring * 0.0625f, Space.hot)
+}
+
+private const val REFRESH_RIPPLES = 3
+
 private fun DrawScope.drawShock(progress: Float, reach: Float, width: Float, color: Color) {
     if (progress <= 0f || progress >= 1f) return
     val grown = 1f - (1f - progress) * (1f - progress) * (1f - progress)

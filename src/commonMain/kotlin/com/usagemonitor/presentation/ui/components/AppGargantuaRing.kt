@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -25,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppMotion
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.appSpringSpec
 import com.usagemonitor.presentation.ui.theme.appTween
@@ -59,6 +63,21 @@ fun AppGargantuaRing(
     val activity = gargantuaPhase(moving && active, AppGargantuaTokens.activeMillis)
     val breath = gargantuaPhase(moving && attention, AppGargantuaTokens.attentionMillis)
     val flow = gargantuaPhase(moving, AppGargantuaTokens.flowMillis)
+    // Coletando: ondas gravitacionais saem do anel (contínuo, atrás da política).
+    val ripple = gargantuaPhase(moving && refreshing, AppGargantuaTokens.rippleMillis)
+    // Coleta concluída: uma onda final, uma vez. Finita, então só "Reduzir" a desliga.
+    val completion = remember { Animatable(1f) }
+    var wasRefreshing by remember { mutableStateOf(refreshing) }
+    LaunchedEffect(refreshing, policy) {
+        val wave = shouldPlayRefreshWave(wasRefreshing, refreshing, policy)
+        wasRefreshing = refreshing
+        if (wave) {
+            completion.snapTo(0f)
+            completion.animateTo(1f, tween(AppGargantuaTokens.refreshWaveMillis, easing = LinearEasing))
+        } else {
+            completion.snapTo(1f)
+        }
+    }
     val colors = List(MAX_RING_ARCS) { index ->
         animateColorAsState(
             targetValue = arcs.getOrNull(index)?.tone?.color() ?: Color.Transparent,
@@ -112,6 +131,12 @@ fun AppGargantuaRing(
         if (!frame.settled) {
             Canvas(Modifier.matchParentSize()) { drawGargantuaTransitionLight(frame) }
         }
+        val rippling = moving && refreshing
+        if (rippling || completion.value < 1f) {
+            Canvas(Modifier.matchParentSize()) {
+                drawGargantuaRefreshLight(if (rippling) ripple.value else null, completion.value)
+            }
+        }
     }
 }
 
@@ -130,4 +155,14 @@ private fun gargantuaPhase(enabled: Boolean, durationMillis: Int): State<Float> 
 fun appGargantuaMarkSize(size: Dp, stroke: Dp, gap: Dp, arcs: Int): Dp {
     val innerRadius = size / 2 - (stroke + gap) * arcs.coerceIn(1, MAX_RING_ARCS)
     return (innerRadius * 0.88f).coerceAtLeast(6.dp)
+}
+
+/**
+ * A onda final toca quando a coleta **termina** — `refreshing` cai de verdadeiro
+ * a falso —, não quando começa nem na primeira composição. Vale também para
+ * coleta que falhou (o view model desmarca o alvo nos dois casos): a onda diz
+ * "o app olhou agora", não "o número mudou". Com "Reduzir animações", nada.
+ */
+fun shouldPlayRefreshWave(wasRefreshing: Boolean, refreshing: Boolean, policy: AppMotionPolicy): Boolean {
+    return wasRefreshing && !refreshing && !policy.reduced
 }
