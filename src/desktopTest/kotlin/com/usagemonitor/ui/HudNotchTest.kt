@@ -1330,6 +1330,48 @@ class HudNotchTest {
         assertTrue(frames.all { painted -> painted == 0 || painted == settled }, "quadro intermediário: $frames de $settled")
     }
 
+    // ------------------------------------------------------------ D5 · horizonte de eventos
+
+    /** A conta principal com o 7d em [percent]. */
+    private fun withWeekly(percent: String): List<HudAccount> {
+        val first = accounts.first()
+        val quotas = first.quotas.map { quota -> if (quota.shortLabel == "7d") quota.copy(percentText = percent) else quota }
+        return listOf(first.copy(quotas = quotas)) + accounts.drop(1)
+    }
+
+    /** Dado novo rola pelo horizonte: no meio da troca a linha não é a final, e no fim é. */
+    @Test
+    fun `percentual novo rola so os digitos que mudaram`() = runDesktopComposeUiTest {
+        var list by mutableStateOf(withWeekly("9%"))
+        setContent { notch(list = list) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        list = withWeekly("12%")
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis / 3L)
+        val rolling = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis * 2L)
+        val settled = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        assertTrue(differs(rolling, settled), "no meio da troca a linha já estava parada")
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis.toLong())
+        assertTrue(!differs(settled, onNodeWithText("7d 12%").captureToImage().toPixelMap()), "a linha ainda se mexia depois da troca")
+    }
+
+    /** Com "Reduzir animações" o dado novo aparece de uma vez. */
+    @Test
+    fun `reduzir animacoes troca o percentual sem rolar`() = runDesktopComposeUiTest {
+        var list by mutableStateOf(withWeekly("9%"))
+        setContent { notch(list = list, motion = AppMotionPolicy.Reduced) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        list = withWeekly("12%")
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        val first = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis * 2L)
+        assertTrue(!differs(first, onNodeWithText("7d 12%").captureToImage().toPixelMap()), "com animação reduzida o número rolou")
+    }
+
     /**
      * Pixels da caixa do balão que não são o fundo. O canto (0, 0) fica na faixa
      * da cauda do lado do notch, fora do corpo arredondado: é sempre o fundo.

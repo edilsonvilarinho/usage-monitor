@@ -109,7 +109,14 @@ private fun recordRefresh(output: File) {
         shown = all.map { account -> account.copy(refreshing = true) }
         recorder.animate(1_800) { }
         shown = all.map { account ->
-            account.copy(quotas = account.quotas.map { quota -> quota.copy(fraction = (quota.fraction + 0.08f).coerceAtMost(1f)) })
+            account.copy(
+                quotas = account.quotas.map { quota ->
+                    val fraction = (quota.fraction + 0.08f).coerceAtMost(1f)
+                    // O texto acompanha o arco, para a prévia mostrar o rolar do D5.
+                    val percentText = if (quota.percentText.endsWith("%")) "${(fraction * 100).toInt()}%" else quota.percentText
+                    quota.copy(fraction = fraction, percentText = percentText)
+                }
+            )
         }
         recorder.animate(1_400) { }
         GifEncoder.write(File(output, "hud-gargantua-refresh.gif"), recorder.frames)

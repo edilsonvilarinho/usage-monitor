@@ -58,6 +58,13 @@ plasma slides from the old value to the new one and one stronger wave plays once
 (`--dur-gargantua-refresh-wave`, 800ms); finite, so only Reduced motion removes it. The ring is no
 longer pressed and the mark no longer spins or pulses.
 
+**New data (D5, event horizon).** When a strip line ("7d 56%" → "7d 61%") or the state word changes,
+only the characters that changed roll like an odometer: the old one rises and disappears, the new one
+comes from below, and the base of each flashes a thin hot rim (`--dur-gargantua-roll` 480ms,
+`--dur-gargantua-roll-stagger` 50ms, standard curve, never an overshoot). The label ("7d ") never
+rolls; the rest is compared from the right. Drawing only, over the new value's text — the HUD
+geometry is unchanged. Not on first composition, not with Reduced motion.
+
 **Birth and collapse.** When an API is enabled, and when the app starts or the HUD opens, each
 indicator is born (S1, shockwave, `--dur-gargantua-birth` 1100ms, 140ms cascade between accounts):
 a point of light flashes, two shockwaves travel out to about 3dp past the ring, the horizon opens

@@ -240,6 +240,17 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   toca uma vez (`refreshWaveMillis`, 800ms) quando `refreshing` cai de verdadeiro para falso — também
   em coleta que falhou: a onda diz "o app olhou agora", não "o número mudou". É finita, então só
   "Reduzir animações" a desliga. A marca não gira nem pulsa mais.
+- **Dado novo: horizonte de eventos** (D5, `GargantuaRoll.kt`; 2026-09-29). Quando o texto de uma
+  linha ("7d 56%" → "7d 61%") ou a palavra da pílula muda, só os caracteres diferentes rolam como
+  odômetro: o antigo sobe e some, o novo nasce de baixo, e a base de cada um acende uma borda fina de
+  luz quente (`rollMillis` 480ms, cascata `rollStaggerMillis` 50ms, curva padrão sem rebote). O
+  começo comum não rola (o rótulo "7d " fica parado) e o resto compara pela direita
+  (`gargantuaRollGlyphs`: "9%" → "12%" rola o 9 e faz nascer o 1). A pílula rola a palavra inteira
+  (`AppStatusPill(rollLabelChanges = true)`, só na HUD). O efeito é **desenho** sobre o `Text` do
+  valor novo — recorte dos que mudam e o antigo medido por `TextMeasurer` —, então a geometria, que
+  mede os textos antes da composição, não muda. Não rola na primeira composição nem com "Reduzir
+  animações". Escolhido entre 5 protótipos HTML (desvio para o vermelho, lente, plasma que conta,
+  onda gravitacional, horizonte de eventos).
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco

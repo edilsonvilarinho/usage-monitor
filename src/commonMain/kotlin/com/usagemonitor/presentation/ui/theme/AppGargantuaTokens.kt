@@ -32,5 +32,9 @@ object AppGargantuaTokens {
     const val jetOpenMillis = 520
     /** Fechamento do balão: dobra de volta e o feixe recolhe (B3). */
     const val jetCloseMillis = 240
+    /** Dado novo: cada caractere que mudou rola pelo horizonte (D5). */
+    const val rollMillis = 480
+    /** Cascata entre os caracteres que rolam, da esquerda para a direita (D5). */
+    const val rollStaggerMillis = 50
     const val diskTilt = -12f
 }
