@@ -35,10 +35,22 @@ import kotlin.system.exitProcess
 // seria um segundo dono da mesma resposta.
 internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 
+// O ícone muda de desenho com o tamanho (`tools/brand/render_icons.py`): o de
+// 512 px traz o nome escrito, que reduzido a 16 px viraria borrão. Janela e
+// bandeja leem cada um a faixa que é desenhada para o tamanho em que aparecem.
+private const val WINDOW_ICON_RESOURCE_PATH = "/icons/app_icon_window.png"
+private const val TRAY_ICON_RESOURCE_PATH = "/icons/app_icon_tray.png"
+
 internal const val CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
 
-internal fun loadWindowIcon() = runCatching {
-    val stream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return@runCatching null
+/** Ícone das janelas: as iniciais U·M, legíveis em 32–64 px. */
+internal fun loadWindowIcon() = loadIconResource(WINDOW_ICON_RESOURCE_PATH)
+
+/** Base do ícone da bandeja: só o núcleo com o disco, que é o que se lê em 16 px. */
+internal fun loadTrayIcon() = loadIconResource(TRAY_ICON_RESOURCE_PATH)
+
+private fun loadIconResource(path: String) = runCatching {
+    val stream = object {}.javaClass.getResourceAsStream(path) ?: return@runCatching null
     stream.use { resourceStream ->
         ImageIO.read(resourceStream).toPainter()
     }
@@ -162,6 +174,7 @@ internal fun runUsageMonitor(
     val settingsActions = remember { SettingsActions(graph, viewModels, shell, modal, feedback, compositionScope) }
 
     val iconImage = remember { loadWindowIcon() }
+    val trayIconImage = remember { loadTrayIcon() }
     // A área útil é lida uma vez e vale para todas as janelas.
     val screenWorkArea = remember { availableWindowAreaDp() }
     val windows = rememberAppWindowStates(settings, shell.uiScalePercent, screenWorkArea)
@@ -190,7 +203,7 @@ internal fun runUsageMonitor(
     FocusRequestService(startup, focusHud)
 
     if (isTraySupported) {
-        AppTrayHost(viewModels, shell, modal, iconImage, breadcrumbs, focusHud, shutdownApplication)
+        AppTrayHost(viewModels, shell, modal, trayIconImage, breadcrumbs, focusHud, shutdownApplication)
     }
 
     // As ações do rodapé moram no balão da engrenagem da barra HUD.

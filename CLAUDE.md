@@ -323,9 +323,10 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
-**Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em
-código — `monogram.svg` ao lado é referência e não é lido. O `.icns` só é validado no job
-`build-macos` do release.
+**Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS do ícone Gargantua com o nome (I10),
+desenhado **por tamanho lógico**: ≥ 96 px nome inteiro, 32–64 px `U·M`, ≤ 24 px só o núcleo. Janela
+lê `app_icon_window.png`, bandeja `app_icon_tray.png` — nunca o de 512 px, que traz texto. O `.icns`
+só é validado no job `build-macos` do release.
 
 **Relatório PDF**: a IBM Plex Mono vai embutida (`PDType0Font.load` com subconjunto) e o
 saneamento WinAnsi de `UsageReportDocument.sanitized` **permanece** — a fonte tem os acentos, mas
