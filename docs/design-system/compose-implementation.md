@@ -72,6 +72,17 @@ quadros, um percentual que não é verdade.
     `AppMetricBlock`, `AppStatusBar`, `AppBanner`, item do `AppSettingsNav`) já se marcam; bloco que
     não passa por elas (gráficos, a demo da Ajuda) se marca na tela. Conteúdo sem marca aparece com
     a moldura. O `AppDialog` toca o mesmo E9 no cartão, com relógio próprio.
+  - **O E9 repete quando o conteúdo troca** (`AppModalRevealScope`), só nas linhas do trecho que
+    trocou: seção das Configurações, tópico da Ajuda, dado que chega depois da abertura e lista ↔
+    detalhe (pelo `AppStateCrossfade`, que já envolve cada estado); abas, faixa de tempo, cota e
+    conta do Histórico; abas e faixa das Sessões CLI, Codex e do Uso do time; sub-aba, ordem e
+    página do Resumo. O estado é uma cadeia: a linha se registra no escopo e na janela, a janela em
+    movimento manda (abrir e fechar), e parada manda o escopo mais interno que toca. **A chave é do
+    dado carregado, não do clique** (`rememberSettledRevealKey`): trocar a faixa relê o banco, e a
+    chave do clique tocaria sobre o conteúdo antigo esmaecido e de novo na chegada. O tique do laço
+    ao vivo e o filtro digitado **não** repetem — filamento a cada 5 s ou a cada tecla seria pisca.
+    Repete só numa janela que abriu animada (`ModalRevealState.replayEnabled`, o mesmo critério da
+    abertura).
   - **O esmaecimento é só do Windows** (`shouldAnimateModalWindow`, #340). No X11 a opacidade da
     janela é a propriedade `_NET_WM_WINDOW_OPACITY`, aplicada pelo compositor, e voltar a 1 é apagar
     a propriedade. No elementary OS o modal de Configurações ficou translúcido depois de a opacidade

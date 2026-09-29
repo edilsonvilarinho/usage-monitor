@@ -49,7 +49,10 @@ import com.usagemonitor.presentation.ui.components.ModalRevealState
 import com.usagemonitor.presentation.ui.components.modalFilamentWindowAlpha
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.HudCountdown
 import org.jetbrains.skia.EncodedImageFormat
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import java.io.File
 
 /** Captura a HUD real e sua animação contínua, com dados públicos inteiramente sintéticos. */
@@ -66,6 +69,10 @@ fun main(args: Array<String>) {
         PreviewNotch(GargantuaPreviewFixtures.showcase, HudEdge.TOP)
     }
     captureGargantua(output, "hud-gargantua-providers", 1080, 720) { ProviderMatrix() }
+    // F10: o anel com sessão ativa ampliado 6×, para ver a cauda de íons do cometa.
+    captureGargantua(output, "hud-gargantua-comet", 110, 132, scale = 6f) {
+        PreviewNotch(GargantuaPreviewFixtures.showcase.take(1), HudEdge.TOP)
+    }
     val recorder = SceneRecorder(widthDp = 920, heightDp = 132, frameMillis = 50L)
     try {
         recorder.setContent {
@@ -165,7 +172,18 @@ private fun recordBalloon(output: File) {
                             HudAppBalloonContent(
                                 language = AppLanguage.PT,
                                 appVersion = "41.5.0",
-                                countdown = null,
+                                // Parada em 00:25, de um ciclo de 60 s: a linha de versão e contagem do F10.
+                                countdown = {
+                                    val fixedNow = Instant.fromEpochMilliseconds(0)
+                                    HudCountdown(
+                                        nextRefreshAt = fixedNow + 25.seconds,
+                                        description = "Próxima coleta em 00:25",
+                                        interval = 60.seconds,
+                                        nowProvider = { fixedNow },
+                                        waitNextTick = {},
+                                        updatesEnabled = false
+                                    )
+                                },
                                 updateIndicator = null,
                                 actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) }
                             )
@@ -274,9 +292,10 @@ private fun captureGargantua(
     width: Int,
     height: Int,
     isDark: Boolean = true,
+    scale: Float = 2f,
     content: @Composable () -> Unit
 ) {
-    val scene = ImageComposeScene(width = width * 2, height = height * 2, density = Density(2f))
+    val scene = ImageComposeScene(width = (width * scale).toInt(), height = (height * scale).toInt(), density = Density(scale))
     try {
         scene.setContent {
             AppTheme(isDark = isDark, motion = AppMotionPolicy.Reduced) {

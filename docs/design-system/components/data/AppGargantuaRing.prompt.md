@@ -21,7 +21,7 @@ Balances and observed activity never become invented quota percentages. The perc
 word remain beside the indicator, with the existing compact-mode semantics.
 
 **Geometry.** `--gargantua-size: 64px`, stroke 2.5px, gap 1.5px. The larger core keeps provider marks
-legible at three quotas. Quota arcs sit outside the disc. The blue active-session comet orbits
+legible at three quotas. Quota arcs sit outside the disc. The blue active-session comet (with a straight ion tail beside its curved dust tail since F10, never past the head's halo) orbits
 outside the outer quota and retains its reserved reach in HUD sizing; it must not be clipped by
 the indicator, neighbour, notch or desktop window. The account emoji remains a separate badge.
 

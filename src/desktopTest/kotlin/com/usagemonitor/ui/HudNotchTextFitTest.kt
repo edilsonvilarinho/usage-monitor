@@ -184,7 +184,8 @@ class HudNotchTextFitTest {
                 val measurer = rememberTextMeasurer()
                 val density = LocalDensity.current
                 val typography = MaterialTheme.typography
-                // O botão desconta o padding horizontal de 12dp de cada lado.
+                // O botão desconta o padding horizontal de 12dp de cada lado. Ele fica
+                // abaixo do aviso: dentro dele (F10) o rótulo não cabia.
                 val buttonText = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2
                 fun overflow(text: String, style: TextStyle, width: Dp, lines: Int, height: Dp): String? {
                     val result = measurer.measure(
@@ -214,6 +215,12 @@ class HudNotchTextFitTest {
                         overflow(label, typography.labelLarge, buttonText, 1, AppChrome.control)
                             ?.let { failure -> failures += "$scale%: $failure" }
                     }
+                }
+                // F10: os sinais de sessão viraram as linhas do aviso da conta, com
+                // a mesma largura de texto do aviso de atualização e uma linha cada.
+                SESSION_SIGNAL_SAMPLES.forEach { signal ->
+                    overflow(signal, typography.bodySmall, HUD_APP_BALLOON_UPDATE_TEXT_WIDTH, 1, 17.dp)
+                        ?.let { failure -> failures += "$scale%: $failure" }
                 }
             }
         }
@@ -260,3 +267,14 @@ class HudNotchTextFitTest {
         assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
     }
 }
+
+/** Os sinais mais compridos que `hudSessionSignals` produz, nas duas línguas. */
+private val SESSION_SIGNAL_SAMPLES = listOf(
+    "Contexto saturado · 12 sessões",
+    "Contexto crescendo · 12 sessões",
+    "Context saturated · 12 sessions",
+    "Context growing · 12 sessions",
+    "12 sem resposta · até 23h59",
+    "12 with no reply · up to 23h59",
+    "Sem resposta há 23h59"
+)
