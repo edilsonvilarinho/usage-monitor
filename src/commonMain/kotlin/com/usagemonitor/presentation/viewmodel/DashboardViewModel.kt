@@ -6,7 +6,6 @@ import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AnthropicProfileRef
 import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
-import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
@@ -467,10 +466,7 @@ class DashboardViewModel(
         }
 
         if (effectiveTargets.isEmpty()) {
-            stateMutex.withLock {
-                pruneDisabledTargets(enabled)
-                publishUiState(enabled)
-            }
+            pruneAndPublish()
             return
         }
 
@@ -523,7 +519,8 @@ class DashboardViewModel(
                     // Sequencial, como era no laço único: a conexão do SQLite é
                     // serializada e disputada pelo indexador de sessões CLI.
                     historyMutex.withLock {
-                        persistSnapshot(fetched, capturedAt)
+                        // Falha do histórico não pode degradar a coleta principal.
+                        recordUsageSnapshot(fetched, capturedAt)
                         refreshHistoryDerivedState(target, fetched, capturedAt)
                     }
                 } else {
@@ -574,6 +571,14 @@ class DashboardViewModel(
 
     fun refresh(source: ApiSource) {
         if (source !in enabledApis.value) {
+            // Desligar a fonte nas Configurações chega aqui: sem podar e republicar,
+            // o anel dela ficava na HUD até a próxima coleta de outra fonte.
+            viewModelScope.launch {
+                pruneAndPublish()
+                persistDashboardCache()
+                publishNextPoll()
+                nudgeCountdown()
+            }
             return
         }
 
@@ -644,6 +649,12 @@ class DashboardViewModel(
         )
     }
 
+    private suspend fun pruneAndPublish() = stateMutex.withLock {
+        val enabled = enabledTargets()
+        pruneDisabledTargets(enabled)
+        publishUiState(enabled)
+    }
+
     private fun pruneDisabledTargets(enabledTargets: Set<UsageTargetKey>) {
         cachedStatsByTarget.keys.removeAll { target -> target !in enabledTargets }
         cachedErrorsByTarget.keys.removeAll { target -> target !in enabledTargets }
@@ -680,13 +691,6 @@ class DashboardViewModel(
         cacheUseCase(snapshot, clock.now())
     }
 
-    private suspend fun persistSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
-        val persistenceResult = recordUsageSnapshot(stats, capturedAt)
-        if (persistenceResult.isFailure) {
-            // Persistencia de historico nao pode degradar o refresh principal.
-        }
-    }
-
     /**
      * @param overwriteExisting `false` no caminho do cache de disco: uma coleta
      * pode ter completado no meio do restore, e a projeção dela é a mais nova.
@@ -699,14 +703,7 @@ class DashboardViewModel(
         overwriteExisting: Boolean = true
     ) {
         val historyUseCase = getUsageHistory ?: return
-        val series = runCatching {
-            historyUseCase(
-                source = stats.source,
-                range = HistoryRange.LAST_7_DAYS,
-                accountKey = stats.accountContext?.key,
-                now = capturedAt
-            )
-        }.getOrNull()?.series ?: return
+        val series = lastWeekSeriesOf(historyUseCase, stats, capturedAt) ?: return
 
         val risks = riskSummariesOf(series)
         // A anomalia de gasto sai do **mesmo** relatório, e não de uma leitura
