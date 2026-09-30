@@ -86,7 +86,8 @@ internal fun ModalWindowsHost(
             modal.isCliSessionsOpen = false
             viewModels.cliSessions.closeWindow()
         },
-        openGeneration = modal.cliSessionsOpenGeneration
+        openGeneration = modal.cliSessionsOpenGeneration,
+        prewarm = true
     ) {
         CliSessionsScreen(viewModel = viewModels.cliSessions, language = language)
     }

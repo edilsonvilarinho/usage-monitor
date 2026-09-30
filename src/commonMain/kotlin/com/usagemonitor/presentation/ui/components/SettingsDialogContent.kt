@@ -264,7 +264,10 @@ fun SettingsDialogContent(
                 AppStateCrossfade(
                     state = selectedTab,
                     key = { tab -> tab },
-                    label = "settingsTab"
+                    label = "settingsTab",
+                    // A troca de seção não repete o E9: é navegação, e o dado já
+                    // está pronto. Os filamentos da abertura continuam.
+                    revealOnChange = false
                 ) { tab ->
                     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                         when (tab) {

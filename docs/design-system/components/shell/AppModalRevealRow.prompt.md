@@ -10,8 +10,8 @@ chosen among ten). Compose: `Modifier.appModalRevealRow()` + `ModalRevealState`
 ))}
 ```
 
-**Opening (`--dur-gargantua-filament-open`, 680ms).** The window (or the dialog card) fades in within
-~100ms. Each marked row starts `0.5 / count` after the previous one, from 8% in; a filament (ember
+**Opening (`--dur-gargantua-filament-open`, 340ms).** The window (or the dialog card) fades in within
+~50ms. Each marked row starts `0.5 / count` after the previous one, from 8% in; a filament (ember
 tail, gold body, hot head with a small point of light) runs under the row's bottom edge, and the row
 is revealed left to right behind the head within 35% of the clock. The filament fades right after.
 
@@ -35,9 +35,11 @@ modifier does nothing.
 
 **Replay on content change** (`AppModalRevealScope(replayKey)`). A scope plays E9 again on its own
 rows when it is first composed with the window already settled, and every time its key changes:
-Settings section, Help topic, data arriving after the open and list ↔ detail (every
-`AppStateCrossfade` target is a scope), tabs, time range, quota and account (History, CLI and Codex
-sessions, team usage), sub-tab, sort and page (the breakdown). Keys come from the **loaded** data
+Help topic, data arriving after the open and list ↔ detail (every `AppStateCrossfade` target is
+a scope unless it passes `revealOnChange = false`), tabs, time range, quota and account (History, CLI and Codex
+sessions, team usage), sub-tab, sort and page (the breakdown). **Not the Settings section**: switching
+it is navigation over data that is already there, and revealing the new section row by row read as
+slow; it keeps only the 180ms fade. Keys come from the **loaded** data
 (`rememberSettledRevealKey`), never from the click, or the replay would run over the stale faded
 content and again on arrival. Live ticks and typed filters never replay. States form a chain: a row
 registers with its scope and the window; a moving window (open/close) wins, otherwise the innermost

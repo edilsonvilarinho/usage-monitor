@@ -266,7 +266,8 @@ Regras:
 - Motion: tween para cor/opacidade, mola para posição/tamanho; só `GENTLE`/`SNAPPY`/`EXPRESSIVE`;
   **sem overshoot em dado**. `AppMotionPolicy` nasce `Static`; só o `Main` passa a preferência, e
   **a todas as janelas**.
-- Modais: todas por `AppDialogWindow`; a janela nasce na primeira abertura e depois só se esconde;
+- Modais: todas por `AppDialogWindow`; a janela nasce na primeira abertura (ou no pré-aquecimento
+  opt-in, só Windows) e depois só se esconde;
   pedido por `StateFlow`; nome na trilha é fixo (`diagnosticName`). Diálogo interno é `AppDialog`,
   nunca `AlertDialog`.
 - Tipografia: Plex Mono em `label*`/`title*`/`headline*`/`display*`, Plex Sans em `body*`; carga do

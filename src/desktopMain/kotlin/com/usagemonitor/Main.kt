@@ -43,6 +43,15 @@ private const val TRAY_ICON_RESOURCE_PATH = "/icons/app_icon_tray.png"
 
 internal const val CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
 
+/**
+ * Espera do pré-aquecimento das modais, contada da HUD **pintada**, e não do início
+ * da composição. Os 10 s fixos da primeira versão perdiam o caso real: o usuário
+ * abriu as Configurações 4 s depois da HUD e pegou a janela fria (745 ms do clique
+ * ao quadro). As Configurações vêm primeiro — são as mais abertas —, as demais depois.
+ */
+private const val SETTINGS_PREWARM_DELAY_MILLIS = 800L
+private const val OTHER_MODALS_PREWARM_DELAY_MILLIS = 2_500L
+
 /** Ícone das janelas: as iniciais U·M, legíveis em 32–64 px. */
 internal fun loadWindowIcon() = loadIconResource(WINDOW_ICON_RESOURCE_PATH)
 
@@ -215,6 +224,21 @@ internal fun runUsageMonitor(
     val accountColors = remember(profileRecords) { accountColorsOf(profileRecords) }
     val accountEmojis = remember(profileRecords) { accountEmojisOf(profileRecords) }
 
+    // Pré-aquecimento das modais (ver `AppDialogWindow`): só depois de o arranque
+    // assentar, para não disputar a CPU com ele.
+    var hudShown by remember { mutableStateOf(false) }
+    var settingsPrewarmReady by remember { mutableStateOf(false) }
+    var modalPrewarmReady by remember { mutableStateOf(false) }
+    LaunchedEffect(hudShown) {
+        if (!hudShown) {
+            return@LaunchedEffect
+        }
+        delay(SETTINGS_PREWARM_DELAY_MILLIS)
+        settingsPrewarmReady = true
+        delay(OTHER_MODALS_PREWARM_DELAY_MILLIS - SETTINGS_PREWARM_DELAY_MILLIS)
+        modalPrewarmReady = true
+    }
+
     // O que as janelas modais recebem igual, montado uma vez: esquecer a escala
     // ou o movimento numa delas renderizaria errado sem erro nenhum.
     val modalEnvironment = ModalWindowEnvironment(
@@ -223,7 +247,8 @@ internal fun runUsageMonitor(
         uiScalePercent = shell.uiScalePercent,
         motion = shell.motion,
         screenWorkArea = screenWorkArea,
-        breadcrumbs = breadcrumbs
+        breadcrumbs = breadcrumbs,
+        prewarmReady = modalPrewarmReady
     )
     ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamSettings, releaseNotes)
     BugReportWindow(graph, shell, modal, pendingCrash, windows, modalEnvironment)
@@ -241,7 +266,10 @@ internal fun runUsageMonitor(
             windowOpacityPercent = shell.windowOpacityPercent,
             iconImage = iconImage,
             hudScreenArea = screenWorkArea,
-            onWindowReady = { window -> anchorAppWindow(window, graph, startup) },
+            onWindowReady = { window ->
+                anchorAppWindow(window, graph, startup)
+                hudShown = true
+            },
             actions = shellActions,
             // O que o card de cada conta oferece, para os botões do balão.
             teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
@@ -264,7 +292,7 @@ internal fun runUsageMonitor(
         autoUpdate = autoUpdate,
         profileUiModels = profileUiModels,
         state = windows.settings,
-        environment = modalEnvironment
+        environment = modalEnvironment.copy(prewarmReady = settingsPrewarmReady)
     )
 }
 

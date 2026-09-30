@@ -55,7 +55,7 @@
   --dur-gargantua-roll: 480ms;
   --dur-gargantua-roll-stagger: 50ms;
   /* Finite: every modal window and AppDialog opens and closes (E9, plasma filaments). */
-  --dur-gargantua-filament-open: 680ms;
+  --dur-gargantua-filament-open: 340ms;
   --dur-gargantua-filament-close: 220ms;
   /* Continuous: quota without a forecast, debris ring (J7). One loop = 8 laps
      of 16s on the centre line; inner fragments take more laps, outer fewer. */

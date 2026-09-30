@@ -10,7 +10,7 @@ const KEYFRAMES = `
 @media (prefers-reduced-motion: reduce) { .app-modal-row, .app-modal-row > i { animation: none !important } .app-modal-row > i { display: none } }
 `;
 
-const OPEN_MILLIS = 680;
+const OPEN_MILLIS = 340;
 
 export function AppModalRevealRow({ index = 0, count = 1, children, style }) {
   const delay = Math.round(OPEN_MILLIS * (0.08 + (index * 0.5) / Math.max(1, count)));

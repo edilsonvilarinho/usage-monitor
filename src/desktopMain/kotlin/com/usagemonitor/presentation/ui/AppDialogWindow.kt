@@ -43,6 +43,8 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.theme.appTweenSpec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -59,7 +61,13 @@ internal data class ModalWindowEnvironment(
     val uiScalePercent: Int,
     val motion: AppMotionPolicy,
     val screenWorkArea: ScreenWorkArea,
-    val breadcrumbs: BreadcrumbRecorder
+    val breadcrumbs: BreadcrumbRecorder,
+    /**
+     * O arranque já assentou e as janelas que pedem pré-aquecimento podem nascer
+     * escondidas (ver [AppDialogWindow]). Nasce `false`: o arranque já leva de 5 a
+     * 8 s, e janela nenhuma disputa a CPU com ele.
+     */
+    val prewarmReady: Boolean = false
 )
 
 /**
@@ -86,7 +94,7 @@ internal val LocalModalWindowOnScreen = compositionLocalOf { true }
  * **A entrada espera o primeiro quadro pintado.** A janela aparece
  * **transparente**, o host aguarda dois quadros e só então toca o E9
  * (filamentos de plasma, [AppGargantuaTokens.filamentOpenMillis]): a moldura
- * esmaece em ~100 ms e um filamento corre sob cada linha marcada com
+ * esmaece em ~50 ms e um filamento corre sob cada linha marcada com
  * `appModalRevealRow`, em ordem de leitura, revelando o texto atrás da cabeça.
  * A opacidade é a da janela AWT, e não do conteúdo: conteúdo esmaecendo numa
  * janela opaca mostraria o fundo dela, não o que está atrás. A escala de 0,96
@@ -100,6 +108,16 @@ internal val LocalModalWindowOnScreen = compositionLocalOf { true }
  *
  * Com "Reduzir animações", fora do Windows ou sem translucidez de janela, abre e
  * fecha na hora ([shouldAnimateModalWindow]).
+ *
+ * **[prewarm] tira a primeira abertura do caminho do clique.** Mesmo viva, a
+ * janela pagava na primeira abertura o peer nativo, o contexto do Skia, a carga
+ * das classes do conteúdo e o primeiro layout — a trilha do 41.6.0-beta.2 media
+ * 230 a 515 ms só do pedido ao quadro, fora a criação da janela, contra 42 a 89 ms
+ * das reaberturas. Com [ModalWindowEnvironment.prewarmReady], a janela nasce,
+ * aparece **transparente e sem foco** por dois quadros e se esconde: a primeira
+ * abertura de verdade vira reabertura. Um pré-aquecimento por vez, e só onde a
+ * janela esmaece ([shouldPrewarmModalWindow]). Opt-in porque cada janela viva
+ * guarda contexto de GPU: só as abertas com frequência pedem.
  *
  * [diagnosticName] vai para a trilha junto com o tempo até o primeiro quadro,
  * e é fixo de propósito: o título pode carregar o apelido do perfil, que costuma
@@ -117,9 +135,10 @@ internal fun AppDialogWindow(
     onCloseRequest: () -> Unit,
     /** Muda a cada pedido de abertura: traz para a frente a janela que já está aberta. */
     openGeneration: Int = 0,
+    prewarm: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val host = rememberModalWindowHost(visible, openGeneration) ?: return
+    val host = rememberModalWindowHost(visible, openGeneration, prewarmNow(prewarm, environment)) ?: return
 
     Window(
         onCloseRequest = onCloseRequest,
@@ -160,9 +179,10 @@ internal fun AppDialogWindow(
     minHeightDp: Int,
     onCloseRequest: () -> Unit,
     openGeneration: Int = 0,
+    prewarm: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val host = rememberModalWindowHost(visible, openGeneration) ?: return
+    val host = rememberModalWindowHost(visible, openGeneration, prewarmNow(prewarm, environment)) ?: return
 
     DialogWindow(
         onCloseRequest = onCloseRequest,
@@ -205,6 +225,9 @@ private data class ModalRequest(val visible: Boolean, val generation: Int)
 private class ModalWindowHost(initial: ModalRequest) {
     val requests = MutableStateFlow(initial)
 
+    /** Nasceu pelo pré-aquecimento, e não por um pedido de abertura. */
+    val bornForPrewarm: Boolean = !initial.visible
+
     /** A janela AWT está visível — ainda que transparente, entrando ou saindo. */
     var onScreen by mutableStateOf(false)
 
@@ -218,14 +241,15 @@ private class ModalWindowHost(initial: ModalRequest) {
 }
 
 /**
- * `null` até o primeiro pedido de abertura: janela que nunca foi aberta não
- * existe. Daí em diante ela só se esconde.
+ * `null` até o primeiro pedido de abertura — ou até o pré-aquecimento, quando a
+ * janela o pede: janela que nunca foi aberta não existe. Daí em diante ela só se
+ * esconde.
  */
 @Composable
-private fun rememberModalWindowHost(visible: Boolean, openGeneration: Int): ModalWindowHost? {
+private fun rememberModalWindowHost(visible: Boolean, openGeneration: Int, prewarm: Boolean): ModalWindowHost? {
     val request = ModalRequest(visible, openGeneration)
     val holder = remember { LastValue<ModalWindowHost>() }
-    if (holder.value == null && visible) {
+    if (holder.value == null && (visible || prewarm)) {
         holder.value = ModalWindowHost(request)
     }
     val host = holder.value ?: return null
@@ -254,8 +278,12 @@ private fun WindowScope.ModalWindowBody(
     val currentDiagnosticName by rememberUpdatedState(diagnosticName)
 
     LaunchedEffect(host) {
+        if (host.bornForPrewarm) {
+            prewarmWindow(window, host, currentEnvironment.breadcrumbs, currentDiagnosticName)
+        }
         // `collectLatest`: um pedido novo cancela a transição em curso, como
-        // reabrir no meio da saída.
+        // reabrir no meio da saída. Um pedido que chegou durante o pré-aquecimento
+        // espera no fluxo e é atendido aqui.
         host.requests.collectLatest { request ->
             val motion = currentEnvironment.motion
             val animated = shouldAnimateModalWindow(motion, opacitySupported, platform)
@@ -373,6 +401,70 @@ internal fun shouldAnimateModalWindow(
     platform: AutoStartManager.Platform
 ): Boolean {
     return platform == AutoStartManager.Platform.WINDOWS && opacitySupported && !motion.reduced
+}
+
+/**
+ * Se a janela pode nascer pré-aquecida. Função pura, testada pela lista de
+ * plataformas (issue #340): mostrar a janela transparente só esconde alguma coisa
+ * onde a opacidade foi medida — no Windows. No X11 a opacidade é pedido ao
+ * compositor, e uma janela "invisível" que ele não atendesse piscaria no arranque.
+ */
+internal fun shouldPrewarmModalWindow(opacitySupported: Boolean, platform: AutoStartManager.Platform): Boolean {
+    return platform == AutoStartManager.Platform.WINDOWS && opacitySupported
+}
+
+@Composable
+private fun prewarmNow(requested: Boolean, environment: ModalWindowEnvironment): Boolean {
+    val allowed = remember {
+        shouldPrewarmModalWindow(isWindowOpacitySupported(), AutoStartManager.currentPlatform())
+    }
+    return requested && allowed && environment.prewarmReady
+}
+
+/** Um pré-aquecimento por vez: juntos, eles disputariam a mesma thread de interface. */
+private val modalPrewarmLock = Mutex()
+
+/**
+ * Mostra a janela transparente e sem foco por dois quadros e a esconde. É o que
+ * paga, fora do clique, o peer nativo, o contexto do Skia, a carga das classes e
+ * o primeiro layout. `contentOnScreen` fica `false`: conteúdo com laço próprio não
+ * o liga. Não conta como abertura.
+ */
+private suspend fun prewarmWindow(
+    window: java.awt.Window,
+    host: ModalWindowHost,
+    breadcrumbs: BreadcrumbRecorder,
+    diagnosticName: String
+) {
+    modalPrewarmLock.withLock {
+        // Pedida enquanto esperava a vez: a abertura normal cobre tudo.
+        if (host.requests.value.visible) {
+            return
+        }
+        val startedAt = System.nanoTime()
+        val wasFocusable = window.focusableWindowState
+        window.focusableWindowState = false
+        setWindowOpacity(window, 0f)
+        host.onScreen = true
+        try {
+            withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
+                withFrameNanos { }
+                withFrameNanos { }
+            }
+        } finally {
+            host.onScreen = false
+            window.focusableWindowState = wasFocusable
+        }
+        breadcrumbs.record(
+            BreadcrumbCategory.NAVIGATION,
+            modalPrewarmedBreadcrumb(diagnosticName, (System.nanoTime() - startedAt) / 1_000_000)
+        )
+    }
+}
+
+/** A linha da trilha do pré-aquecimento; não conta como abertura. */
+internal fun modalPrewarmedBreadcrumb(diagnosticName: String, elapsedMillis: Long): String {
+    return "janela $diagnosticName pré-aquecida em $elapsedMillis ms"
 }
 
 /** A linha da trilha com o tempo até o primeiro quadro. Sem título: ver [AppDialogWindow]. */

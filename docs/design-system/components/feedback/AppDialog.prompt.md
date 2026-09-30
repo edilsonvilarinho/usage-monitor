@@ -21,7 +21,7 @@ desktop it has no transition at all. The card popping in over a scrim that darke
 `text`, `confirmButton`, `dismissButton`) so every call site migrated mechanically.
 
 **Entry: the scrim fades in (`--dur-select`) and the card plays E9, the plasma filaments** of every
-modal window (`--dur-gargantua-filament-open`, 680ms): the card fades in within ~100ms and a filament
+modal window (`--dur-gargantua-filament-open`, 340ms): the card fades in within ~50ms and a filament
 runs under the title, the text and the action row in turn, revealing each one left to right behind
 its head. The card never scales — the text sits in its final place from the first frame and is only
 clipped. The card has its own clock (`ModalRevealState`), so inside a modal window it does not join
