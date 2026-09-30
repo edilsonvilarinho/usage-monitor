@@ -46,14 +46,19 @@
   --cwrite:    #FFA726;
   --savings:   #26C6DA;
 
-  /* HUD Gargantua: decorative scene inside the indicator only. These stay
-     dark in every theme; never use them for a quota or a window surface. */
+  /* HUD Gargantua: decorative scene inside the indicator only. The palette
+     stays the same in every theme; never use it for a quota or a window
+     surface. What the scene draws in light (glass wall, reflections, white
+     debris, lens) turns into ink on a light surface — see the two tokens
+     below and AppGargantuaRing.prompt.md, "Light surfaces". */
   --gargantua-night: #080B12;
   --gargantua-core:  #030508;
   --gargantua-gold:  #E8AE63;
   --gargantua-hot:   #FFF0CB;
   --gargantua-dust:  #8C643F;
   --gargantua-ember: #B4501E; /* receding side of the disc (Doppler) */
+  --gargantua-glass-ink: #FFFFFF;
+  --gargantua-lens:      #FFE6BE;
 }
 
 @media (prefers-color-scheme: light) {
@@ -85,6 +90,9 @@
     --cread:   #2E7D32;
     --cwrite:  #8A5000;
     --savings: #00697A;
+
+    --gargantua-glass-ink: var(--fg);
+    --gargantua-lens:      var(--gargantua-dust);
   }
 }
 
@@ -116,6 +124,9 @@
   --cread:   #2E7D32;
   --cwrite:  #8A5000;
   --savings: #00697A;
+
+  --gargantua-glass-ink: var(--fg);
+  --gargantua-lens:      var(--gargantua-dust);
 }
 
 :root[data-app-theme="dark"] {
