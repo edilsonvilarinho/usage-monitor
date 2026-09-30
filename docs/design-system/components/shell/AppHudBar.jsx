@@ -38,9 +38,10 @@ export function AppHudBar({
     <div style={{
       display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center',
       justifyContent: 'center', gap: 12, padding: horizontal ? `8px ${12 + shoulder}px` : `${12 + shoulder}px 8px`,
-      background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
-      border: '1px solid var(--border-top)', ...flat,
-      boxShadow: 'inset 0 1px 0 var(--highlight), var(--shadow-dialog)'
+      // M1 · horizonte de eventos: núcleo escuro e anel de fótons com Doppler (--hud-* em colors.css).
+      background: 'var(--hud-body), var(--hud-rim)', backgroundClip: 'padding-box, padding-box, border-box',
+      border: '1px solid transparent', ...flat,
+      boxShadow: 'var(--hud-inner-glow), var(--shadow-dialog)'
     }}>
       {accounts.length === 0 ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>

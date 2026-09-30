@@ -19,8 +19,6 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -28,7 +26,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -40,7 +37,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.Layout
@@ -69,7 +65,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appDepth
-import com.usagemonitor.presentation.ui.components.appSheen
+import com.usagemonitor.presentation.ui.components.gargantuaHorizonBody
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.rememberLatestNonNull
 import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
@@ -80,7 +76,6 @@ import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.appTweenSpec
 import com.usagemonitor.presentation.ui.theme.AppMotion
-import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 import com.usagemonitor.presentation.ui.theme.appSpring
 import com.usagemonitor.presentation.ui.theme.appTween
 import kotlin.math.roundToInt
@@ -236,7 +231,6 @@ internal fun HudNotch(
     } else {
         sizes.collapsed
     }
-    val ladder = AppSurfaceLadders.current
 
     // Ao longo da borda o balão segue o anel pela mola `GENTLE`. A primeira
     // posição de cada abertura é salto, senão ele entraria deslizando a partir
@@ -258,10 +252,9 @@ internal fun HudNotch(
                     .requiredSize(notchSize)
                     .testTag(HUD_CONTENT_TEST_TAG)
                     .appDepth(AppDepth.DIALOG, shape)
-                    .clip(shape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .appSheen()
-                    .border(1.dp, ladder.borderTop, shape)
+                    // O corpo é o horizonte de eventos (M1): núcleo escuro e
+                    // anel de fótons com Doppler na borda.
+                    .gargantuaHorizonBody(shape)
                     .hoverable(notchHover)
                     .onPlaced { coordinates -> ringItemBounds.body = coordinates }
                     // Só a mão move. Arrastando pelo corpo o notch saía do lugar

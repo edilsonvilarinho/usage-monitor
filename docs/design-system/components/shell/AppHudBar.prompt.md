@@ -15,7 +15,17 @@ the main window is hidden with its geometry intact while it is shown.
 **Shape.** Docked to a screen edge (`top`, `bottom`, `left`, `right`): flat and flush on the screen
 side, 14dp corners on the inner side, 8dp **concave shoulders** joining the two — it reads as part of
 the edge, like the hardware notch Codenotch imitates, not as a pill floating next to it. Exempt from
-the 10dp radius ceiling: it is a silhouette, not a panel. Depth `DIALOG`, top sheen, lit border.
+the 10dp radius ceiling: it is a silhouette, not a panel. Depth `DIALOG`.
+
+**Body: the event horizon (M1).** In dark themes the body is the black hole's own dark core
+(`--gargantua-horizon` `#07080B`, one step above the ring core so each ring's centre still reads) with
+no top sheen, and a 2.5dp inner filament of hot light at 8%. In every theme the border is a 1dp
+**photon ring with Doppler**, from ember at the bottom-left (the receding side) through gold to hot at
+the top-right — the same direction as the ring's disc. Light themes keep the preset surface and sheen;
+only the rim changes, in the darker ember/dust/gold so it shows on a light surface. The rim breathes
+between 85% and 100% every 6s (`--dur-gargantua-horizon-breath`), only with `continuous && !reduced`;
+otherwise it holds frame zero (92.5%). Paint only, inside the same box: nothing resizes. Balloons and
+handles keep the theme surface. Chosen among ten HTML options (round M).
 
 **The notch never grows.** Per account in the user's card order (never risk order — the first account
 used to swap by itself): an `AppGargantuaRing` (one arc per quota, up to three), **one line per ring with

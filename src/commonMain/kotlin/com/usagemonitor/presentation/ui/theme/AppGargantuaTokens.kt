@@ -8,6 +8,11 @@ object AppGargantuaTokens {
     val size = 64.dp
     val night = Color(0xFF080B12)
     val core = Color(0xFF030508)
+    /**
+     * Corpo da HUD no tema escuro (M1 · horizonte de eventos). Um degrau acima do
+     * [core], senão o miolo de cada anel sumiria contra o fundo.
+     */
+    val horizon = Color(0xFF07080B)
     val gold = Color(0xFFE8AE63)
     val hot = Color(0xFFFFF0CB)
     val dust = Color(0xFF8C643F)
@@ -53,5 +58,7 @@ object AppGargantuaTokens {
      * (J7). Na linha central são 8 voltas de 16 s; por dentro, mais voltas.
      */
     const val debrisCycleMillis = 128_000
+    /** O anel de fótons da borda da HUD respira entre 85% e 100% (M1). */
+    const val horizonBreathMillis = 6_000
     const val diskTilt = -12f
 }
