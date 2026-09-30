@@ -479,26 +479,25 @@ internal fun HudAppBalloonContent(
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
-        }
-        // F10: versão e contagem numa linha própria, sob o título. No cabeçalho as
-        // duas disputavam a largura com o nome do app.
-        Row(
-            modifier = Modifier.fillMaxWidth().height(HUD_APP_BALLOON_STATUS),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+            // A versão mora ao lado do nome, e a contagem sozinha na linha de baixo.
+            // Dividindo a linha com "próxima coleta em", sobravam ~50dp para a versão
+            // e "v41.6.0-beta.2" saía cortada em "v41.6.0…". `HudNotchTextFitTest` mede.
             Text(
                 text = "v$appVersion",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // Quem cede com uma beta longa é a versão, nunca a contagem.
-                modifier = Modifier.weight(1f, fill = false).testTag(HUD_APP_BALLOON_VERSION_TEST_TAG)
+                modifier = Modifier.testTag(HUD_APP_BALLOON_VERSION_TEST_TAG)
             )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().height(HUD_APP_BALLOON_STATUS),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             if (countdown != null) {
                 Text(
-                    text = if (language == AppLanguage.PT) "· próxima coleta em" else "· next fetch in",
+                    text = if (language == AppLanguage.PT) "Próxima coleta em" else "Next fetch in",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
