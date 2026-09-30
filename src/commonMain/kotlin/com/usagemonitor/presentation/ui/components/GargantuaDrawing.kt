@@ -23,7 +23,7 @@ private const val DISK_STREAKS = 3
  * discreto de propósito — quem informa são os arcos e o cometa de sessão.
  * A fase é determinística para captura; tudo cabe em `room`.
  */
-internal fun DrawScope.drawGargantuaCore(room: Float, phase: Float) {
+internal fun DrawScope.drawGargantuaCore(room: Float, phase: Float, scene: GargantuaScene = GargantuaScene.Dark) {
     if (room <= 0f) return
     val horizon = room * 0.62f
     drawCircle(
@@ -35,17 +35,16 @@ internal fun DrawScope.drawGargantuaCore(room: Float, phase: Float) {
         ),
         radius = room
     )
-    drawGargantuaLens(room, horizon)
-    drawAccretionDisk(room, phase, front = false)
+    drawGargantuaLens(room, horizon, scene.lens)
+    drawAccretionDisk(room, phase, front = false, scene)
     // O horizonte oculta o lado de trás do disco. A marca é composta depois.
     drawCircle(Space.core, radius = horizon)
     drawCircle(Space.hot.copy(alpha = 0.8f), horizon + room * 0.01f, style = Stroke(room * 0.022f))
-    drawAccretionDisk(room, phase, front = true)
+    drawAccretionDisk(room, phase, front = true, scene)
 }
 
 /** Anel de Einstein fino: o lado de trás do disco dobrado por cima e por baixo. */
-private fun DrawScope.drawGargantuaLens(room: Float, horizon: Float) {
-    val light = Color(0xFFFFE6BE)
+private fun DrawScope.drawGargantuaLens(room: Float, horizon: Float, light: Color) {
     val upper = horizon + room * 0.10f
     drawArc(
         light.copy(alpha = 0.35f), 194f, 152f, false,
@@ -64,7 +63,7 @@ private fun DrawScope.drawGargantuaLens(room: Float, horizon: Float) {
  * Uma faixa translúcida no plano do disco, mais clara no lado que se aproxima
  * (Doppler). Velocidades inteiras por ciclo mantêm o laço sem salto.
  */
-private fun DrawScope.drawAccretionDisk(room: Float, phase: Float, front: Boolean) {
+private fun DrawScope.drawAccretionDisk(room: Float, phase: Float, front: Boolean, scene: GargantuaScene) {
     rotate(Space.diskTilt, pivot = center) {
         val diskCenter = center + Offset(0f, room * 0.08f)
         val radiusX = room * 0.95f
@@ -73,9 +72,9 @@ private fun DrawScope.drawAccretionDisk(room: Float, phase: Float, front: Boolea
         val origin = diskCenter - Offset(radiusX, radiusY)
         drawArc(
             brush = Brush.horizontalGradient(
-                0f to Space.ember.copy(alpha = 0.25f),
-                0.5f to Space.gold.copy(alpha = 0.55f),
-                1f to Space.hot.copy(alpha = 0.8f),
+                0f to scene.diskNear,
+                0.5f to scene.diskMiddle,
+                1f to scene.diskFar,
                 startX = origin.x, endX = origin.x + bounds.width
             ),
             startAngle = if (front) 0f else 180f, sweepAngle = 180f, useCenter = false,
@@ -90,7 +89,7 @@ private fun DrawScope.drawAccretionDisk(room: Float, phase: Float, front: Boolea
             val edge = abs(sin(angle * PI / 180).toFloat())
             val visibleSweep = minOf(20f, if (front) 180f - angle else 360f - angle)
             drawArc(
-                Color(0xFFFFF8E6).copy(alpha = 0.45f * edge),
+                scene.streak.copy(alpha = scene.streak.alpha * edge),
                 angle, visibleSweep, false, origin, bounds,
                 style = Stroke(room * 0.035f, cap = StrokeCap.Round)
             )

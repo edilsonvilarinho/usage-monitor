@@ -62,7 +62,8 @@ internal fun HelpWindow(
         diagnosticName = "ajuda",
         minWidthDp = HELP_MIN_WINDOW_WIDTH_DP,
         minHeightDp = HELP_MIN_WINDOW_HEIGHT_DP,
-        onCloseRequest = onCloseRequest
+        onCloseRequest = onCloseRequest,
+        prewarm = true
     ) {
         val media = if (LocalModalWindowOnScreen.current) {
             rememberHelpMedia(HelpCatalog.mediaId(selectedTopic))

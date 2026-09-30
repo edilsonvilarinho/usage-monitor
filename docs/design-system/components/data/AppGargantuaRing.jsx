@@ -88,8 +88,8 @@ export function AppGargantuaRing({
           </linearGradient>
         </defs>
         <circle cx="32" cy="32" r={room} fill={`url(#${uid}-well)`} />
-        <path d={arc(194, 346, horizon + room * .1)} fill="none" stroke="#FFE6BE" strokeOpacity=".35" strokeWidth={room * .05} />
-        <path d={arc(27, 153, horizon + room * .08)} fill="none" stroke="#FFE6BE" strokeOpacity=".18" strokeWidth={room * .025} />
+        <path d={arc(194, 346, horizon + room * .1)} fill="none" stroke="var(--gargantua-lens)" strokeOpacity=".35" strokeWidth={room * .05} />
+        <path d={arc(27, 153, horizon + room * .08)} fill="none" stroke="var(--gargantua-lens)" strokeOpacity=".18" strokeWidth={room * .025} />
         {disk(false)}
         <circle cx="32" cy="32" r={horizon} fill="var(--gargantua-core)" />
         <circle cx="32" cy="32" r={horizon + room * .01} fill="none" stroke={LIGHT} strokeOpacity=".8" strokeWidth={room * .022} />
@@ -108,9 +108,9 @@ export function AppGargantuaRing({
               const lap = moving ? { animation: `gargantua-debris calc(var(--dur-gargantua-debris) / ${fragment.laps}) linear infinite`, transformOrigin: '32px 32px' } : {};
               return <path key={key} className="gargantua-motion" style={lap}
                 d={arc(fragment.start, fragment.start + fragment.sweep, radius + fragment.offset * stroke)} fill="none"
-                stroke={fragment.gold ? 'var(--gargantua-gold)' : '#fff'} strokeOpacity={fragment.alpha * (.6 + .4 * lit)}
+                stroke={fragment.gold ? 'var(--gargantua-gold)' : 'var(--gargantua-glass-ink)'} strokeOpacity={fragment.alpha * (.6 + .4 * lit)}
                 strokeWidth={fragment.width * stroke} strokeLinecap="round" />;
-            }) : <circle cx="32" cy="32" r={radius} fill="none" stroke="#fff" strokeOpacity=".06" strokeWidth={stroke * 1.4} />}
+            }) : <circle cx="32" cy="32" r={radius} fill="none" stroke="var(--gargantua-glass-ink)" strokeOpacity=".06" strokeWidth={stroke * 1.4} />}
             <circle cx="32" cy="32" r={radius - stroke / 2} fill="none" stroke={`url(#${uid}-glass)`} strokeWidth={stroke * .18} />
             <circle cx="32" cy="32" r={radius + stroke / 2} fill="none" stroke={`url(#${uid}-glass)`} strokeOpacity=".4" strokeWidth={stroke * .14} />
             {fraction > 0 ? <g transform="rotate(-90 32 32)">

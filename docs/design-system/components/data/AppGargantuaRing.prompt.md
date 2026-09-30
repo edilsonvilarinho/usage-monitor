@@ -37,7 +37,18 @@ and ember on the receding side. Three faint filaments cross it (integer turns pe
 loop never jumps). A stronger six-band disc was tried and rejected: it drew the eye away from the
 indicator. Gold `#E8AE63`, hot `#FFF0CB`, dust
 `#8C643F`, ember `#B4501E` are dedicated decorative tokens. They carry no provider, quota, status or active-session meaning.
-The HUD surface keeps the selected theme and its existing surface primitive. No star field, image,
+The HUD surface keeps the selected theme and its existing surface primitive.
+
+**Light surfaces.** The scene was drawn for a dark surface: glass wall, reflections, white debris,
+lens and the plasma's white core are white or cream at low opacity and vanished on a light
+surface — the track of an unused quota disappeared entirely, and the white core over the darker
+light-theme accents read as a hollow tube. On a light surface (decided by the surface luminance,
+like the account accents — 26 presets) light becomes **ink**, same geometry: wall, reflections and
+white debris use the theme's `onSurface` (`--gargantua-glass-ink`; wall 10%, reflections at 55%
+of their dark opacity), the lens uses dust (`--gargantua-lens`), the disc runs ember 35% → gold
+80% → dust 85% with ember filaments, and the plasma core lightens only 22% towards white (60% on
+dark). The event horizon stays black in every theme. Compose: `GargantuaScene`. The dark render is
+pixel-identical to before. No star field, image,
 new window backdrop or per-provider palette: the scene is confined to the circular indicator.
 
 **Provider identity.** Reuse `AppProviderMark` in the foreground; its orientation stays fixed.

@@ -96,6 +96,7 @@ fun AppGargantuaRing(
         sweep.asState()
     }
     val activeColor = AppTone.INFO.color()
+    val scene = gargantuaScene()
     Box(modifier.size(size).semantics { contentDescription = description }) {
         Canvas(
             Modifier.matchParentSize().graphicsLayer {
@@ -108,7 +109,7 @@ fun AppGargantuaRing(
             val gapPx = gap.toPx()
             val coreSpace = this.size.minDimension / 2f - arcs.size.coerceIn(1, MAX_RING_ARCS) * (strokePx + gapPx)
             if (frame.core > 0f) {
-                scale(frame.core, pivot = center) { drawGargantuaCore(coreSpace, phase.value) }
+                scale(frame.core, pivot = center) { drawGargantuaCore(coreSpace, phase.value, scene) }
             }
             arcs.take(MAX_RING_ARCS).forEachIndexed { index, arc ->
                 val radius = this.size.minDimension / 2f - strokePx / 2 - index * (strokePx + gapPx)
@@ -125,7 +126,8 @@ fun AppGargantuaRing(
                     glow = glow,
                     flow = if (moving) flow.value else null,
                     glass = frame.glass,
-                    debris = debris.value
+                    debris = debris.value,
+                    scene = scene
                 )
             }
             if (active) drawGargantuaActivity(activity.value, strokePx, gapPx, activeColor)

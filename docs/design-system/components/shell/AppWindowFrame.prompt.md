@@ -21,8 +21,8 @@ notes all go through one host:
 - **Entry waits for the first painted frame.** The frame's own scale used to start at composition,
   inside a window the OS showed at once and fully opaque; the first frames were lost to creation cost
   and what the eye saw was the window popping. Now the window appears **transparent**, the host waits
-  two frames, then plays **E9, the plasma filaments** (`--dur-gargantua-filament-open`, 680ms; see
-  `AppModalRevealRow`): the AWT window's opacity reaches 1 within ~100ms and a filament runs under
+  two frames, then plays **E9, the plasma filaments** (`--dur-gargantua-filament-open`, 340ms; see
+  `AppModalRevealRow`): the AWT window's opacity reaches 1 within ~50ms and a filament runs under
   every marked row in reading order, revealing it left to right. Nothing scales and no data moves.
   Window opacity, not content alpha: content fading inside an opaque
   window would show the window's own ground, not what is behind it. **Windows only**: on X11 the

@@ -39,22 +39,24 @@ internal fun DrawScope.drawGargantuaQuotaArc(
     /** Opacidade do vidro; só fica abaixo de 1 enquanto o indicador nasce. */
     glass: Float = 1f,
     /** Fase do anel de detritos (J7), `0..1`; zero com o movimento contínuo desligado. */
-    debris: Float = 0f
+    debris: Float = 0f,
+    /** Tinta do vidro conforme o fundo ([gargantuaScene]). */
+    scene: GargantuaScene = GargantuaScene.Dark
 ) {
     val topLeft = center - Offset(radius, radius)
     val arcSize = Size(radius * 2, radius * 2)
-    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass, debris)
+    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass, debris, scene)
     if (sweep <= 0f) return
     drawArc(color.copy(alpha = glow), -90f, sweep, false, topLeft, arcSize,
         style = Stroke(stroke * 2.4f, cap = StrokeCap.Round))
     drawArc(color, -90f, sweep, false, topLeft, arcSize, style = Stroke(stroke * 0.9f, cap = StrokeCap.Round))
-    drawArc(lerp(color, Color.White, 0.6f), -90f, sweep, false, topLeft, arcSize,
+    drawArc(lerp(color, Color.White, scene.plasmaHighlight), -90f, sweep, false, topLeft, arcSize,
         style = Stroke(stroke * 0.35f, cap = StrokeCap.Round))
     if (flow != null) drawPlasmaPulses(sweep, radius, stroke, flow)
     // O reflexo do vidro passa por cima do plasma, só onde há plasma.
     val inner = radius - stroke * 0.3f
     drawArc(
-        reflection(maxAlpha = 0.4f * glass, power = 2), -90f, sweep, false,
+        reflection(maxAlpha = 0.4f * glass * scene.reflectionScale, power = 2, ink = scene.ink), -90f, sweep, false,
         center - Offset(inner, inner), Size(inner * 2, inner * 2),
         style = Stroke(stroke * 0.16f)
     )
@@ -65,14 +67,22 @@ internal fun DrawScope.drawGargantuaQuotaArc(
  * projeção, a parede vira o anel de detritos (J7): a forma muda junto com a
  * cor, então a ausência de veredito não depende só do tom.
  */
-private fun DrawScope.drawGlassTube(radius: Float, stroke: Float, hasForecast: Boolean, glass: Float, debris: Float) {
+private fun DrawScope.drawGlassTube(
+    radius: Float,
+    stroke: Float,
+    hasForecast: Boolean,
+    glass: Float,
+    debris: Float,
+    scene: GargantuaScene
+) {
     if (hasForecast) {
-        drawCircle(Color.White.copy(alpha = 0.06f * glass), radius, style = Stroke(stroke * 1.4f))
+        drawCircle(scene.ink.copy(alpha = scene.wallAlpha * glass), radius, style = Stroke(stroke * 1.4f))
     } else {
-        drawDebrisRing(radius, stroke, glass, debris)
+        drawDebrisRing(radius, stroke, glass, debris, scene.ink)
     }
-    drawCircle(reflection(maxAlpha = 0.28f * glass, power = 3), radius - stroke / 2, style = Stroke(stroke * 0.18f))
-    drawCircle(reflection(maxAlpha = 0.12f * glass, power = 1), radius + stroke / 2, style = Stroke(stroke * 0.14f))
+    val reflections = glass * scene.reflectionScale
+    drawCircle(reflection(maxAlpha = 0.28f * reflections, power = 3, ink = scene.ink), radius - stroke / 2, style = Stroke(stroke * 0.18f))
+    drawCircle(reflection(maxAlpha = 0.12f * reflections, power = 1, ink = scene.ink), radius + stroke / 2, style = Stroke(stroke * 0.14f))
 }
 
 /**
@@ -80,12 +90,12 @@ private fun DrawScope.drawGlassTube(radius: Float, stroke: Float, hasForecast: B
  * brilho segue a mesma luz do vidro; nenhum fragmento sai do tubo nem passa
  * da opacidade do reflexo, para não competir com o plasma.
  */
-private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float, phase: Float) {
+private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float, phase: Float, ink: Color) {
     for (fragment in gargantuaDebrisField) {
         val start = gargantuaDebrisAngle(fragment, phase)
         val middle = (start + fragment.sweepDegrees / 2f) * PI / 180
         val lit = (0.5 + 0.5 * cos(middle - LIGHT_DEGREES * PI / 180)).toFloat()
-        val tint = if (fragment.gold) AppGargantuaTokens.gold else Color.White
+        val tint = if (fragment.gold) AppGargantuaTokens.gold else ink
         val orbit = radius + fragment.radialOffset * stroke
         drawArc(
             tint.copy(alpha = fragment.alpha * (0.6f + 0.4f * lit) * glass), start, fragment.sweepDegrees, false,
@@ -95,14 +105,17 @@ private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float,
     }
 }
 
-/** Branco cuja opacidade segue a luz: máximo voltado para a fonte, zero do lado oposto. */
-private fun DrawScope.reflection(maxAlpha: Float, power: Int): Brush {
+/**
+ * [ink] cuja opacidade segue a luz: máximo voltado para a fonte, zero do lado
+ * oposto. Branco no escuro; no claro, a tinta do tema desenha o mesmo contorno.
+ */
+private fun DrawScope.reflection(maxAlpha: Float, power: Int, ink: Color): Brush {
     val stops = Array(REFLECTION_STOPS + 1) { index ->
         val fraction = index / REFLECTION_STOPS.toFloat()
         val lit = (0.5 + 0.5 * cos(fraction * 2 * PI - LIGHT_DEGREES * PI / 180)).toFloat()
         var shaded = 1f
         repeat(power) { shaded *= lit }
-        fraction to Color.White.copy(alpha = maxAlpha * shaded)
+        fraction to ink.copy(alpha = maxAlpha * shaded)
     }
     return Brush.sweepGradient(*stops, center = center)
 }

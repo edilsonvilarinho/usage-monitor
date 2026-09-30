@@ -16,6 +16,8 @@ import com.usagemonitor.HUD_APP_BALLOON_UPDATE_DETAIL_LINES
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TEXT_WIDTH
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.HUD_BALLOON_WIDTH
+import com.usagemonitor.HUD_COUNTDOWN_GAP
+import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.domain.entity.ActiveSessionAlert
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -256,6 +258,45 @@ class HudNotchTextFitTest {
                                 }
                             }
                         )
+                    }
+                }
+            }
+        }
+        for (next in scales) {
+            scale = next
+            waitForIdle()
+        }
+        assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
+    }
+
+    /**
+     * O cabeçalho do balão da engrenagem: "Usage Monitor" e a versão instalada
+     * numa linha, a contagem sozinha na de baixo. Dividindo a linha com "próxima
+     * coleta em", a versão ficava com ~50dp e "v41.6.0-beta.2" saía "v41.6.0…".
+     * A beta com dois dígitos em cada parte é o pior caso.
+     */
+    @Test
+    fun `a versao e a contagem cabem inteiras no balao da engrenagem`() = runDesktopComposeUiTest {
+        val failures = mutableSetOf<String>()
+        var scale by mutableStateOf(scales.first())
+        val inner = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2
+        setContent {
+            AppTheme(isDark = true, uiScalePercent = scale) {
+                val measurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val typography = MaterialTheme.typography
+                fun width(text: String, style: TextStyle): Dp {
+                    return with(density) { measurer.measure(text, style, maxLines = 1).size.width.toDp() }
+                }
+                val header = width("Usage Monitor", typography.titleSmall) + 6.dp + width("v42.10.10-beta.12", typography.labelSmall)
+                if (header > inner) {
+                    failures += "$scale%: cabeçalho mede $header > $inner"
+                }
+                listOf("Próxima coleta em", "Next fetch in").forEach { label ->
+                    val status = width(label, typography.labelSmall) + 4.dp + HUD_COUNTDOWN_ICON + HUD_COUNTDOWN_GAP +
+                        width("00:00", typography.labelSmall)
+                    if (status > inner) {
+                        failures += "$scale%: \"$label\" com a contagem mede $status > $inner"
                     }
                 }
             }

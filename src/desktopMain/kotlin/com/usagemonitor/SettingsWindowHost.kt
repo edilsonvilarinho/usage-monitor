@@ -50,7 +50,8 @@ internal fun SettingsWindowHost(
         minWidthDp = 320,
         minHeightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
         onCloseRequest = { modal.isSettingsOpen = false },
-        openGeneration = modal.settingsOpenGeneration
+        openGeneration = modal.settingsOpenGeneration,
+        prewarm = true
     ) {
         SettingsDialogContent(
             currentTheme = shell.themePreset,

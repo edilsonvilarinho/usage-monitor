@@ -2,7 +2,9 @@ package com.usagemonitor
 
 import com.usagemonitor.AutoStartManager.Platform
 import com.usagemonitor.presentation.ui.modalOpenedBreadcrumb
+import com.usagemonitor.presentation.ui.modalPrewarmedBreadcrumb
 import com.usagemonitor.presentation.ui.shouldAnimateModalWindow
+import com.usagemonitor.presentation.ui.shouldPrewarmModalWindow
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,6 +55,28 @@ class AppDialogWindowTest {
         assertEquals(
             "janela histórico pintada em 34 ms (reabertura)",
             modalOpenedBreadcrumb("histórico", elapsedMillis = 34, firstOpen = false)
+        )
+    }
+
+    /**
+     * A janela pré-aquecida aparece transparente por dois quadros: só onde a
+     * opacidade da janela foi medida. Em qualquer outro caso, a primeira abertura
+     * continua criando a janela no clique.
+     */
+    @Test
+    fun `modal windows are prewarmed only on Windows with window translucency`() {
+        assertTrue(shouldPrewarmModalWindow(opacitySupported = true, Platform.WINDOWS))
+        assertFalse(shouldPrewarmModalWindow(opacitySupported = false, Platform.WINDOWS))
+        assertFalse(shouldPrewarmModalWindow(opacitySupported = true, Platform.LINUX))
+        assertFalse(shouldPrewarmModalWindow(opacitySupported = true, Platform.MACOS))
+        assertFalse(shouldPrewarmModalWindow(opacitySupported = true, Platform.OTHER))
+    }
+
+    @Test
+    fun `the prewarm breadcrumb is not an open`() {
+        assertEquals(
+            "janela Configurações pré-aquecida em 310 ms",
+            modalPrewarmedBreadcrumb("Configurações", elapsedMillis = 310)
         )
     }
 }

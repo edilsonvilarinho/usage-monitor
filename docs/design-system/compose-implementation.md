@@ -55,12 +55,22 @@ quadros, um percentual que não é verdade.
     parando pelo `closeWindow()` de cada ViewModel; conteúdo com laço próprio (a demo da Ajuda) lê
     `LocalModalWindowOnScreen` para não rodar escondido. Quem guarda o assunto num anulável (a
     fonte do histórico, as notas) usa `rememberLastNonNull`, senão a janela esmaeceria vazia.
+  - **Pré-aquecimento (opt-in `prewarm = true`).** Mesmo viva, a primeira abertura seguia lenta: a
+    trilha do 41.6.0-beta.2 mediu 230–515 ms do pedido ao quadro (fora a criação da janela e os
+    680 ms do E9), contra 42–89 ms das reaberturas. Contado da HUD pintada — 0,8 s para as
+    Configurações, 2,5 s para as demais (`ModalWindowEnvironment.prewarmReady`); os 10 s fixos da
+    primeira versão perderam o clique real, 4 s depois da HUD —, Configurações, Sessões CLI e Ajuda nascem, aparecem
+    **transparentes e sem foco** (`focusableWindowState = false`) por dois quadros e se escondem —
+    uma por vez (`Mutex`), sem contar como abertura (linha "pré-aquecida" na trilha). Só no Windows
+    com translucidez (`shouldPrewarmModalWindow`, #340). Histórico não entra: precisa de fonte.
+    Janela nova só pede o pré-aquecimento se for aberta com frequência — cada uma viva guarda
+    contexto de GPU.
   - **A entrada espera o primeiro quadro pintado.** A escala da moldura começava ao compor, dentro de
     uma janela que o sistema mostrava de uma vez e opaca, e os quadros iniciais se perdiam no custo
     da criação. Agora a janela aparece com opacidade 0, o host espera dois quadros (com teto de
     500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e toca o E9.
   - **E9 · filamentos de plasma** (rodada E da skill `usage-monitor-visual-options`, escolhida entre
-    dez; `GargantuaModalFilaments.kt`, `filamentOpenMillis` 680 / `filamentCloseMillis` 220). A
+    dez; `GargantuaModalFilaments.kt`, `filamentOpenMillis` 340 (era 680; encurtado junto com o pré-aquecimento, a pedido do usuário) / `filamentCloseMillis` 220). A
     moldura esmaece em ~100 ms (opacidade da janela AWT) e um filamento corre sob cada linha marcada
     com `appModalRevealRow`, em ordem de leitura — topo, depois esquerda, pela caixa que a linha
     publica, nunca pela ordem de composição (a navegação lateral seria composta antes do conteúdo e
@@ -73,8 +83,11 @@ quadros, um percentual que não é verdade.
     não passa por elas (gráficos, a demo da Ajuda) se marca na tela. Conteúdo sem marca aparece com
     a moldura. O `AppDialog` toca o mesmo E9 no cartão, com relógio próprio.
   - **O E9 repete quando o conteúdo troca** (`AppModalRevealScope`), só nas linhas do trecho que
-    trocou: seção das Configurações, tópico da Ajuda, dado que chega depois da abertura e lista ↔
-    detalhe (pelo `AppStateCrossfade`, que já envolve cada estado); abas, faixa de tempo, cota e
+    trocou: tópico da Ajuda, dado que chega depois da abertura e lista ↔ detalhe (pelo
+    `AppStateCrossfade`, que já envolve cada estado); **menos a seção das Configurações**
+    (`revealOnChange = false`): ali a troca é navegação com o dado pronto, e a aba nova revelada linha
+    a linha lia como lenta — medido, a troca aquecida custa 50–150 ms de CPU e o resto era animação;
+    fica só o fade de 180 ms; abas, faixa de tempo, cota e
     conta do Histórico; abas e faixa das Sessões CLI, Codex e do Uso do time; sub-aba, ordem e
     página do Resumo. O estado é uma cadeia: a linha se registra no escopo e na janela, a janela em
     movimento manda (abrir e fechar), e parada manda o escopo mais interno que toca. **A chave é do

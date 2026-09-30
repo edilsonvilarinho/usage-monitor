@@ -28,8 +28,9 @@ wraps to two lines. **Compact** when the full strip would take more than 45% of 
 side edge (L1: sides share no titles or tabs, so three accounts stay full on a laptop): each account becomes Codenotch's cell — ring and the focus quota with its
 window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip
 holds **only the accounts**. The countdown to the next collection lives in the **gear balloon**,
-on its own line under the title with the version since F10 ("v41.5.0 · próxima coleta em ◷ 00:25";
-a long beta version ellipsizes before the countdown does) (#269): with the adaptive cadence (60 s while a CLI session is active) it restarted every
+on its own line under the title ("Próxima coleta em ◷ 00:25"); the installed version sits on the
+title line, right-aligned next to "Usage Monitor", never ellipsized — sharing the countdown line it
+had ~50dp and "v41.6.0-beta.2" came out as "v41.6.0…" (#269): with the adaptive cadence (60 s while a CLI session is active) it restarted every
 minute on the screen edge. Its icon is a 12dp **draining clock** (a sector that starts full after a
 poll and empties clockwise from 12 o'clock) on the **same line** as `mm:ss` (#293); the full turn is
 the cadence in force. A bare progress line on the notch border was tried and rejected: without the

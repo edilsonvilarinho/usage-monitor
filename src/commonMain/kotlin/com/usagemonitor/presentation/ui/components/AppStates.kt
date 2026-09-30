@@ -490,6 +490,12 @@ fun <S : Any> AppStateCrossfade(
     modifier: Modifier = Modifier,
     key: (S) -> Any = { current -> current::class },
     label: String = "appStateCrossfade",
+    /**
+     * Dentro de modal, a tela que entra refaz o E9. `false` onde a troca é
+     * navegação pura e o dado já está pronto — as seções das Configurações: os
+     * filamentos revelavam a aba nova linha a linha e a troca lia como lenta.
+     */
+    revealOnChange: Boolean = true,
     content: @Composable (S) -> Unit
 ) {
     val enterFade = appTween<Float>(AppMotion.normal, AppMotion.emphasizedEasing)
@@ -508,7 +514,11 @@ fun <S : Any> AppStateCrossfade(
     ) { current ->
         // Dentro de modal, a tela que entra refaz o E9 nas linhas dela: seção
         // nova das Configurações, dado que chegou depois da abertura, detalhe.
-        AppModalRevealScope(replayKey = key(current)) {
+        if (revealOnChange) {
+            AppModalRevealScope(replayKey = key(current)) {
+                content(current)
+            }
+        } else {
             content(current)
         }
     }

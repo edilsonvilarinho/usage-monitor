@@ -283,8 +283,10 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     1,2 traço além da cabeça, dentro do halo, então `appUsageRingOrbitReach` não muda e
     `HudNotchGeometryTest` continua valendo. Parado sem a política contínua, como o cometa.
   - **Engrenagem**: versão e contagem saíram do cabeçalho para uma linha própria sob o título
-    (`HUD_APP_BALLOON_STATUS`), "v41.5.0 · próxima coleta em ◷ 00:25"; com uma beta longa quem cede
-    é a versão, com reticências. O F10 punha o botão da atualização **dentro** do aviso: medido,
+    (`HUD_APP_BALLOON_STATUS`). **Corrigido depois**: dividindo a linha com "próxima coleta em", a
+    versão ficava com ~50dp e "v41.6.0-beta.2" saía "v41.6.0…". A versão voltou ao cabeçalho, à
+    direita do nome e sem reticências, e a linha de baixo é só "Próxima coleta em ◷ 00:25";
+    `HudNotchTextFitTest` mede as duas linhas com a beta mais longa. O F10 punha o botão da atualização **dentro** do aviso: medido,
     "Reiniciar o app e atualizar" não cabe nem na largura interna inteira do aviso (192dp) a partir de
     105% de escala, e o rótulo não encurta — diz o que reinicia. O botão continua abaixo do aviso.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
