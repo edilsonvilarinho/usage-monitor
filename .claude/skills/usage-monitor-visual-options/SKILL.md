@@ -101,7 +101,8 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Trilha de cota sem projeção (era o tracejado cinza; laço contínuo atrás da política) | J7 · anel de detritos (órbitas de 16 s na linha central, laço de 128 s com voltas inteiras) | J1 poeira de acreção, J2 contas de plasma, J3 tracejado Doppler, J4 tubo oco, J5 graduação com radar, J6 onda gravitacional, J8 rastro que se perde, J9 névoa de nebulosa, J10 sonda em órbita; a primeira rodada, estática, foi recusada ("queria com animação") |
 | Desligar uma API: o anel sai e o notch acompanha (antes: C2 480 ms e o notch saltando no fim) | K1 · colapso lento, depois assenta (850 + 450 ms; notch desenhado recolhendo, janela só no fim) | K2 maré (tudo junto, 950 ms), K3 onda gravitacional que fecha, K4 as vizinhas ocupam a vaga |
 | Muitas contas: quando a faixa completa não cabe na borda | L1 · borda lateral pode mais (80%; em cima e embaixo continua 45%) | L2 compacta só quem está em dia, L3 degrau sem pílula, L4 duas colunas na lateral |
+| Corpo do notch mais alinhado ao Gargantua (era a laje plana `#1B1818`) | M1 · horizonte de eventos (núcleo escuro no tema escuro, anel de fótons de 1dp com Doppler, respira em 6 s) | M2 disco na borda da tela, M3 lente gravitacional, M4 poço do espaço-tempo, M5 luz de acreção, M6 fóton no contorno, M7 jatos entre as contas, M8 silhueta de maré, M9 vidro fumê, M10 órbita que liga as contas |
 
-Próxima rodada usa a próxima letra livre (M, N, …). Trilha, fundo ou estado contínuo: as opções
+Próxima rodada usa a próxima letra livre (N, O, …). Trilha, fundo ou estado contínuo: as opções
 já nascem animadas (laço atrás da política), nunca só o quadro parado. Ícone de sistema não anima: nessa rodada o
 card mostra os tamanhos reais (lupa ×4 no 16 px) sobre barra clara e escura, e não um laço.

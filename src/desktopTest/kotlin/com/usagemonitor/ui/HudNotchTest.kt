@@ -54,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.test.captureToImage
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
@@ -1313,6 +1314,87 @@ class HudNotchTest {
         return kotlin.math.abs(a.red - b.red) < tolerance &&
             kotlin.math.abs(a.green - b.green) < tolerance &&
             kotlin.math.abs(a.blue - b.blue) < tolerance
+    }
+
+    // ------------------------------------------------ corpo: horizonte (M1)
+
+    /** Um notch sem contas: nenhum anel se mexendo no quadro, só o corpo. */
+    private fun ComposeUiTest.horizonBody(dark: Boolean, motion: AppMotionPolicy = AppMotionPolicy.Static) {
+        setContent {
+            AppTheme(isDark = dark, motion = motion) {
+                Box(modifier = Modifier.size(900.dp, 600.dp)) {
+                    HudNotch(
+                        accounts = emptyList(),
+                        edge = HudEdge.TOP,
+                        sizes = hudNotchSizes(emptyList(), HudEdge.TOP, "Nenhuma API", false),
+                        fallbackLabel = "Nenhuma API",
+                        expanded = false,
+                        onHoverChange = {},
+                        onDragStart = {},
+                        onDragMove = {},
+                        onDragEnd = {},
+                        onRefreshAccount = {},
+                        gearDescription = GEAR
+                    )
+                }
+            }
+        }
+    }
+
+    /** Ponto do corpo longe do texto e do filete: depois do ombro de 8dp e do filete. */
+    private fun PixelMap.bodyPixel(): Color = this[22, height / 2]
+
+    /** A borda de dentro (embaixo, no topo da tela), do lado quente. */
+    private fun PixelMap.rimPixel(): Color = this[width * 3 / 4, height - 1]
+
+    @Test
+    fun `no tema escuro o corpo e o nucleo escuro e a borda e luz quente`() = runDesktopComposeUiTest {
+        horizonBody(dark = true)
+        val pixels = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+        val body = pixels.bodyPixel()
+        val horizon = AppGargantuaTokens.horizon
+        assertTrue(
+            kotlin.math.abs(body.red - horizon.red) + kotlin.math.abs(body.green - horizon.green) +
+                kotlin.math.abs(body.blue - horizon.blue) < 0.02f,
+            "o corpo devia ser o núcleo escuro: $body"
+        )
+        val rim = pixels.rimPixel()
+        assertTrue(rim.red - rim.blue > 0.08f, "a borda devia ser luz quente, não cinza: $rim")
+    }
+
+    @Test
+    fun `no tema claro o corpo continua a superficie e so a borda ganha o doppler`() = runDesktopComposeUiTest {
+        horizonBody(dark = false)
+        val pixels = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+        assertTrue(pixels.bodyPixel().luminance() > 0.5f, "o tema claro não pode virar núcleo escuro: ${pixels.bodyPixel()}")
+        val rim = pixels.rimPixel()
+        assertTrue(rim.red - rim.blue > 0.08f, "a borda devia ter o tom da paleta Gargantua: $rim")
+    }
+
+    /**
+     * A respiração do anel de fótons é contínua: com a política, dois instantes
+     * pintam a borda diferente; sem ela, fica o quadro zero.
+     */
+    @Test
+    fun `a borda respira so com a politica continua`() {
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var second: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                horizonBody(dark = true, motion = policy)
+                mainClock.advanceTimeBy(500)
+                first = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(AppGargantuaTokens.horizonBreathMillis / 4L)
+                second = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+            }
+            return first to second
+        }
+
+        val (liveA, liveB) = frames(AppMotionPolicy.Live)
+        assertTrue(liveA.rimPixel() != liveB.rimPixel(), "com a política contínua a borda devia ter respirado")
+        val (staticA, staticB) = frames(AppMotionPolicy.Static)
+        assertTrue(!differs(staticA, staticB), "sem a política a borda devia ficar parada")
     }
 
     private fun differs(a: PixelMap, b: PixelMap): Boolean {

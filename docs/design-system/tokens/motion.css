@@ -57,6 +57,8 @@
   /* Finite: every modal window and AppDialog opens and closes (E9, plasma filaments). */
   --dur-gargantua-filament-open: 340ms;
   --dur-gargantua-filament-close: 220ms;
+  /* Continuous: the HUD rim (photon ring) breathes between 85% and 100% (M1). */
+  --dur-gargantua-horizon-breath: 6000ms;
   /* Continuous: quota without a forecast, debris ring (J7). One loop = 8 laps
      of 16s on the centre line; inner fragments take more laps, outer fewer. */
   --dur-gargantua-debris: 128000ms;

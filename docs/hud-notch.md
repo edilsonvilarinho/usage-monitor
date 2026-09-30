@@ -138,7 +138,24 @@ linhas que ele substituiu. `HudEdge` é enum novo.
 - **Forma** (`HudNotchShape`): reta e rente na borda, cantos de 14dp do lado de dentro e **ombros
   côncavos** de 8dp ligando os dois. Isenta do teto de raio de 10dp: é silhueta, não painel. Desenhada
   para o topo e levada às outras bordas refletindo/girando os pontos, de controle inclusive.
-  Profundidade `DIALOG`, brilho de topo, borda com luz.
+  Profundidade `DIALOG`.
+- **Corpo: horizonte de eventos** (M1, `GargantuaHorizonBody.kt`, `Modifier.gargantuaHorizonBody`;
+  2026-09-29). Pedido: a barra "mais alinhada ao tema Gargantua" — o tema morava só nos anéis, e o
+  corpo era a laje plana de qualquer painel. Nos temas escuros o fundo vira o núcleo escuro
+  (`AppGargantuaTokens.horizon`, `#07080B`, um degrau acima do `core` para o miolo de cada anel não
+  sumir), sem o brilho de topo, com um filete de luz quente a 8% rente à borda por dentro. Em qualquer
+  tema a borda é um **anel de fótons** de 1dp com Doppler, na direção do disco do anel: brasa embaixo à
+  esquerda, dourado, quente em cima à direita (`gargantuaHorizonRimColors`). Nos temas claros a
+  superfície do preset e o brilho de topo ficam — o texto é `onSurface`, e um corpo escuro o
+  apagaria —, e a borda usa brasa/poeira/dourado, mais opacos, para aparecer no claro. Escuro ou claro
+  sai da luminância da `surface`, não de uma lista dos 26 presets. O brilho **respira** entre 85% e
+  100% em `horizonBreathMillis` (6s), só com `continuous && !reduced`; sem isso fica o quadro zero
+  (92,5%). O laço é lido só no desenho: repinta a borda sem recompor o notch. Pintura dentro da mesma
+  caixa, nenhuma geometria muda. Balões e alças continuam na superfície do tema. `HudNotchTest` mede o
+  corpo e a borda nos dois temas e a respiração com e sem a política. Escolhida entre dez protótipos
+  HTML: M2 disco na borda da tela, M3 lente gravitacional, M4 poço do espaço-tempo, M5 luz de
+  acreção, M6 fóton no contorno, M7 jatos entre as contas, M8 silhueta de maré, M9 vidro fumê, M10
+  órbita que liga as contas.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
   `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada só aceita clique no notch: ela tem
   sempre o tamanho da aberta, e a área de clique é recortada por `Window.shape` (`hudRestHitRegion`:
