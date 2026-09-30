@@ -94,6 +94,7 @@ import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.HudQuota
+import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
@@ -556,6 +557,58 @@ class HudNotchTest {
                 assertEquals(sizes.collapsed.height, bounds.height, "$edge: altura")
             }
         }
+    }
+
+    // ------------------------------------------------------------ saída de conta (K1)
+
+    /**
+     * Desligar uma API (K1): durante o colapso o notch não se mexe; depois a vaga
+     * fecha e o notch recolhe **dentro da janela** até o tamanho sem a conta,
+     * enquanto as que ficam passam de compactas a completas. Sem salto no fim.
+     */
+    @Test
+    fun `ao sair uma conta o notch recolhe ate o tamanho sem ela e as vizinhas desdobram`() = runDesktopComposeUiTest {
+        val staying = listOf(
+            account("Padrão", "Crítico", AppTone.CRITICAL,
+                HudQuota("7d", "26%", 0.26f, AppTone.OK, resetText = null, hasForecast = true),
+                HudQuota("5h", "92%", 0.92f, AppTone.CRITICAL, resetText = null, hasForecast = true)),
+            account("Codex", "Normal", AppTone.OK,
+                HudQuota("7d", "28%", 0.28f, AppTone.OK, resetText = null, hasForecast = true),
+                HudQuota("5h", "22%", 0.22f, AppTone.OK, resetText = null, hasForecast = true))
+        )
+        val leaving = account("Go", "Sem projeção", AppTone.NEUTRAL,
+            HudQuota("mensal", "3%", 0.03f, AppTone.NEUTRAL, resetText = null, hasForecast = false)
+        ).copy(presence = HudPresence.LEAVING)
+        val all = staying + leaving
+        // O teto exato da faixa completa das duas: com a terceira, compacta.
+        val budget = hudNotchSizes(staying, HudEdge.RIGHT, "", false).collapsed.height
+        val before = hudNotchSizes(all, HudEdge.RIGHT, "", false, maxAlong = budget)
+        val after = hudNotchSizes(staying, HudEdge.RIGHT, "", false, maxAlong = budget)
+        assertTrue(before.compact && !after.compact)
+        mainClock.autoAdvance = false
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.size(600.dp, 900.dp)) {
+                    HudNotch(accounts = all, edge = HudEdge.RIGHT, sizes = before, settledSizes = after, fallbackLabel = "")
+                }
+            }
+        }
+        val height = { onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot().height }
+        mainClock.advanceTimeByFrame()
+        assertEquals(before.collapsed.height, height(), "o notch mudou antes do colapso acabar")
+        onAllNodesWithText("Normal").assertCountEquals(0)
+
+        mainClock.advanceTimeBy(AppGargantuaTokens.collapseMillis - 50L)
+        assertEquals(before.collapsed.height, height(), "o notch mudou durante o colapso")
+
+        mainClock.advanceTimeBy(50L + AppGargantuaTokens.departureSettleMillis / 2L)
+        val middle = height()
+        assertTrue(middle < before.collapsed.height && middle > after.collapsed.height, "no meio da vaga o notch devia estar recolhendo: $middle")
+
+        mainClock.advanceTimeBy(AppGargantuaTokens.departureSettleMillis.toLong())
+        assertEquals(after.collapsed.height, height(), "assentado, o notch tem o tamanho sem a conta")
+        onNodeWithText("Normal").assertIsDisplayed()
+        onNodeWithText("5h 22%").assertIsDisplayed()
     }
 
     // ------------------------------------------------------------ alças (rodada 3)

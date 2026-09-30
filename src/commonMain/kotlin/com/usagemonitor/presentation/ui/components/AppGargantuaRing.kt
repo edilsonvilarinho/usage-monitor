@@ -63,6 +63,8 @@ fun AppGargantuaRing(
     val activity = gargantuaPhase(moving && active, AppGargantuaTokens.activeMillis)
     val breath = gargantuaPhase(moving && attention, AppGargantuaTokens.attentionMillis)
     val flow = gargantuaPhase(moving, AppGargantuaTokens.flowMillis)
+    // Cota sem projeção: anel de detritos em órbita (J7), só quando algum arco precisa.
+    val debris = gargantuaPhase(moving && arcs.any { arc -> !arc.hasForecast }, AppGargantuaTokens.debrisCycleMillis)
     // Coletando: ondas gravitacionais saem do anel (contínuo, atrás da política).
     val ripple = gargantuaPhase(moving && refreshing, AppGargantuaTokens.rippleMillis)
     // Coleta concluída: uma onda final, uma vez. Finita, então só "Reduzir" a desliga.
@@ -122,7 +124,8 @@ fun AppGargantuaRing(
                     hasForecast = arc.hasForecast,
                     glow = glow,
                     flow = if (moving) flow.value else null,
-                    glass = frame.glass
+                    glass = frame.glass,
+                    debris = debris.value
                 )
             }
             if (active) drawGargantuaActivity(activity.value, strokePx, gapPx, activeColor)

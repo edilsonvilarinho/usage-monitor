@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
@@ -201,6 +202,26 @@ internal fun hudNotchSizes(
 }
 
 /**
+ * Os tamanhos da lista em tela e da mesma lista sem as contas que estão saindo
+ * (K1). A janela usa o primeiro até a vaga fechar — nenhum redimensionamento
+ * por quadro —, e o notch é desenhado recolhendo até o segundo dentro dela.
+ * Sem ninguém saindo, os dois são o mesmo.
+ */
+internal fun hudNotchSizesWithDeparture(
+    accounts: List<HudAccount>,
+    edge: HudEdge,
+    fallbackLabel: String,
+    hasUpdateIndicator: Boolean,
+    maxAlong: Dp,
+    hasUpdateAction: Boolean
+): Pair<HudNotchSizes, HudNotchSizes> {
+    val sizes = hudNotchSizes(accounts, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction)
+    val staying = accounts.filter { account -> account.presence != HudPresence.LEAVING }
+    if (staying.size == accounts.size) return sizes to sizes
+    return sizes to hudNotchSizes(staying, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction)
+}
+
+/**
  * As alças do notch aberto, uma além de cada ponta, como o `MoveHandle` e o
  * `SettingsOrb` do Codenotch: a mão na ponta de perto (em cima, à esquerda) e a
  * engrenagem na de longe. Um disco de 32dp é o alvo de clique que o resto do app
@@ -212,9 +233,12 @@ internal val HUD_HANDLE_GAP = 6.dp
 
 /**
  * A fração da borda que a faixa completa pode ocupar antes de virar compacta.
- * Menos da metade: o notch divide a borda com títulos e abas de outras janelas.
+ * Em cima e embaixo, menos da metade: o notch divide a borda com títulos e abas
+ * de outras janelas. Nas laterais não há título nem aba, e o teto sobe para 80%
+ * (L1): com os 45% de cima, três contas numa tela de notebook compactavam e a
+ * segunda janela e a pílula sumiam da faixa.
  */
-internal const val HUD_MAX_ALONG_FRACTION = 0.45f
+internal fun hudMaxAlongFraction(edge: HudEdge): Float = if (edge.isHorizontal) 0.45f else 0.8f
 
 /** Largura do balão: o teto do card do Codenotch (246px), com folga para "Reinicia ter 21h00". */
 internal val HUD_BALLOON_WIDTH = 264.dp

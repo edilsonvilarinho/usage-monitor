@@ -145,6 +145,26 @@ class GargantuaHudTest {
     }
 
     @Test
+    fun `sem projecao os detritos orbitam na trilha e param sem movimento continuo`() {
+        val (first, second) = frames(AppMotionPolicy.Live, 0f, hasForecast = false)
+        val frameSize = HUD_RING_SIZE.value + 16f
+        val scale = first.width / frameSize
+        val dataRadius = (HUD_RING_SIZE.value / 2 - HUD_RING_STROKE.value / 2 -
+            HUD_RING_STROKE.value - HUD_RING_GAP.value) * scale
+        var orbited = false
+        for (y in 0 until first.height) {
+            for (x in 0 until first.width) {
+                val outside = hypot(x + 0.5f - first.width / 2f, y + 0.5f - first.height / 2f) >= dataRadius
+                if (outside && first[x, y] != second[x, y]) orbited = true
+            }
+        }
+        // Com projeção a mesma cota zerada fica imóvel (teste acima): o que anda aqui é o detrito.
+        assertTrue(orbited, "o anel de detritos deve orbitar na trilha da cota sem projeção")
+        val static = frames(AppMotionPolicy.Static, 0f, hasForecast = false)
+        assertFalse(differs(static.first, static.second), "detritos orbitando fora da política de movimento")
+    }
+
+    @Test
     fun `a animacao nao altera os valores nem a descricao acessivel das janelas`() = runDesktopComposeUiTest {
         val account = GargantuaPreviewFixtures.showcase.first()
         val description = hudRingDescription(account, AppLanguage.PT)
@@ -206,7 +226,8 @@ class GargantuaHudTest {
         policy: AppMotionPolicy,
         fraction: Float,
         settle: Boolean = true,
-        signals: Boolean = false
+        signals: Boolean = false,
+        hasForecast: Boolean = true
     ): Pair<PixelMap, PixelMap> {
         lateinit var first: PixelMap
         lateinit var second: PixelMap
@@ -217,7 +238,10 @@ class GargantuaHudTest {
                     // Fundo opaco evita acumular alfa de antialiasing entre frames.
                     Box(Modifier.testTag(FRAME).background(Color.Black).padding(8.dp)) {
                         AppGargantuaRing(
-                            arcs = listOf(AppRingArc(fraction, AppTone.WARNING), AppRingArc(0f, AppTone.OK)),
+                            arcs = listOf(
+                                AppRingArc(fraction, AppTone.WARNING, hasForecast = hasForecast),
+                                AppRingArc(0f, AppTone.OK)
+                            ),
                             description = "Conta · 7d · 5h",
                             size = HUD_RING_SIZE,
                             stroke = HUD_RING_STROKE,

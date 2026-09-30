@@ -98,6 +98,10 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Banner do README (`img/banner.svg`, SVG+CSS que toca uma vez; o GitHub não roda JS) | G5 · cometa com cauda de íons (1500 ms; a linha parada virou `img/divider.svg`) | G1 horizonte de eventos, G2 jato relativístico, G3 varredura do disco, G4 anel de Einstein |
 | Ícone do app, só tema (estático; 128/48/32/16 px e barras de tarefas clara e escura) | nenhuma — o usuário pediu uma rodada com o nome | H1 horizonte de eventos, H2 anel de cota, H3 monograma no disco, H4 anel de Einstein, H5 jato relativístico, H6 cometa de íons, H7 o notch, H8 medidor do espaço-tempo, H9 eclipse, H10 órbitas em U |
 | Ícone do app com o nome (`tools/brand/render_icons.py`) | I10 · nome por tamanho (≥ 96 px USAGE MONITOR, 32–64 px U·M, ≤ 24 px só o núcleo) | I1 U de acreção, I2 M de horizonte, I3 UM entrelaçado, I4 U medidor, I5 "um" no horizonte, I6 U·M (virou a faixa do meio da I10), I7 U de cometa, I8 notch em U, I9 M de sinal |
+| Trilha de cota sem projeção (era o tracejado cinza; laço contínuo atrás da política) | J7 · anel de detritos (órbitas de 16 s na linha central, laço de 128 s com voltas inteiras) | J1 poeira de acreção, J2 contas de plasma, J3 tracejado Doppler, J4 tubo oco, J5 graduação com radar, J6 onda gravitacional, J8 rastro que se perde, J9 névoa de nebulosa, J10 sonda em órbita; a primeira rodada, estática, foi recusada ("queria com animação") |
+| Desligar uma API: o anel sai e o notch acompanha (antes: C2 480 ms e o notch saltando no fim) | K1 · colapso lento, depois assenta (850 + 450 ms; notch desenhado recolhendo, janela só no fim) | K2 maré (tudo junto, 950 ms), K3 onda gravitacional que fecha, K4 as vizinhas ocupam a vaga |
+| Muitas contas: quando a faixa completa não cabe na borda | L1 · borda lateral pode mais (80%; em cima e embaixo continua 45%) | L2 compacta só quem está em dia, L3 degrau sem pílula, L4 duas colunas na lateral |
 
-Próxima rodada usa a próxima letra livre (J, K, …). Ícone de sistema não anima: nessa rodada o
+Próxima rodada usa a próxima letra livre (M, N, …). Trilha, fundo ou estado contínuo: as opções
+já nascem animadas (laço atrás da política), nunca só o quadro parado. Ícone de sistema não anima: nessa rodada o
 card mostra os tamanhos reais (lupa ×4 no 16 px) sobre barra clara e escura, e não um laço.

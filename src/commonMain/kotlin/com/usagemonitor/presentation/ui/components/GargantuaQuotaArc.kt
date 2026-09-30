@@ -4,11 +4,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -37,11 +37,13 @@ internal fun DrawScope.drawGargantuaQuotaArc(
     glow: Float,
     flow: Float?,
     /** Opacidade do vidro; só fica abaixo de 1 enquanto o indicador nasce. */
-    glass: Float = 1f
+    glass: Float = 1f,
+    /** Fase do anel de detritos (J7), `0..1`; zero com o movimento contínuo desligado. */
+    debris: Float = 0f
 ) {
     val topLeft = center - Offset(radius, radius)
     val arcSize = Size(radius * 2, radius * 2)
-    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass)
+    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass, debris)
     if (sweep <= 0f) return
     drawArc(color.copy(alpha = glow), -90f, sweep, false, topLeft, arcSize,
         style = Stroke(stroke * 2.4f, cap = StrokeCap.Round))
@@ -58,12 +60,39 @@ internal fun DrawScope.drawGargantuaQuotaArc(
     )
 }
 
-/** Parede translúcida, reflexo forte na borda de dentro e fraco na de fora. */
-private fun DrawScope.drawGlassTube(radius: Float, stroke: Float, hasForecast: Boolean, glass: Float) {
-    val dash = if (hasForecast) null else PathEffect.dashPathEffect(floatArrayOf(stroke, stroke * 1.4f))
-    drawCircle(Color.White.copy(alpha = 0.06f * glass), radius, style = Stroke(stroke * 1.4f, pathEffect = dash))
+/**
+ * Parede translúcida, reflexo forte na borda de dentro e fraco na de fora. Sem
+ * projeção, a parede vira o anel de detritos (J7): a forma muda junto com a
+ * cor, então a ausência de veredito não depende só do tom.
+ */
+private fun DrawScope.drawGlassTube(radius: Float, stroke: Float, hasForecast: Boolean, glass: Float, debris: Float) {
+    if (hasForecast) {
+        drawCircle(Color.White.copy(alpha = 0.06f * glass), radius, style = Stroke(stroke * 1.4f))
+    } else {
+        drawDebrisRing(radius, stroke, glass, debris)
+    }
     drawCircle(reflection(maxAlpha = 0.28f * glass, power = 3), radius - stroke / 2, style = Stroke(stroke * 0.18f))
     drawCircle(reflection(maxAlpha = 0.12f * glass, power = 1), radius + stroke / 2, style = Stroke(stroke * 0.14f))
+}
+
+/**
+ * Fragmentos em órbitas próprias, cada um no raio e na velocidade dele. O
+ * brilho segue a mesma luz do vidro; nenhum fragmento sai do tubo nem passa
+ * da opacidade do reflexo, para não competir com o plasma.
+ */
+private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float, phase: Float) {
+    for (fragment in gargantuaDebrisField) {
+        val start = gargantuaDebrisAngle(fragment, phase)
+        val middle = (start + fragment.sweepDegrees / 2f) * PI / 180
+        val lit = (0.5 + 0.5 * cos(middle - LIGHT_DEGREES * PI / 180)).toFloat()
+        val tint = if (fragment.gold) AppGargantuaTokens.gold else Color.White
+        val orbit = radius + fragment.radialOffset * stroke
+        drawArc(
+            tint.copy(alpha = fragment.alpha * (0.6f + 0.4f * lit) * glass), start, fragment.sweepDegrees, false,
+            center - Offset(orbit, orbit), Size(orbit * 2, orbit * 2),
+            style = Stroke(fragment.width * stroke, cap = StrokeCap.Round)
+        )
+    }
 }
 
 /** Branco cuja opacidade segue a luz: máximo voltado para a fonte, zero do lado oposto. */

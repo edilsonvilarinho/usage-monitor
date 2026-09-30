@@ -24,8 +24,8 @@ window in `onSurfaceVariant` — and the **status word — always**. A single-qu
 `labelMedium` percentage. It used to be one number, the quota in focus (worst risk), with no window:
 the same spot read 45% on one poll and 72% on the next without anything changing (#286). Color never
 informs alone. Horizontal on top/bottom, a column on the sides, where a long word ("Sem projeção")
-wraps to two lines. **Compact** when the full strip would take more than 45% of the edge (six or
-seven APIs on a laptop screen): each account becomes Codenotch's cell — ring and the focus quota with its
+wraps to two lines. **Compact** when the full strip would take more than 45% of the top or bottom edge, or 80% of a
+side edge (L1: sides share no titles or tabs, so three accounts stay full on a laptop): each account becomes Codenotch's cell — ring and the focus quota with its
 window under it (`7d 72%`), no word, which stays in the balloon and the ring description. The strip
 holds **only the accounts**. The countdown to the next collection lives in the **gear balloon**,
 on its own line under the title with the version since F10 ("v41.5.0 · próxima coleta em ◷ 00:25";

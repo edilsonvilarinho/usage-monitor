@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import com.usagemonitor.HUD_HANDLE_GAP
 import com.usagemonitor.HUD_SHADOW_MARGIN
 import com.usagemonitor.HudEdge
@@ -141,6 +142,12 @@ internal fun HudNotch(
     sizes: HudNotchSizes,
     fallbackLabel: String,
     fallbackTone: AppTone = AppTone.NEUTRAL,
+    /**
+     * O tamanho sem as contas que estão saindo (K1). Enquanto a vaga fecha, o
+     * notch é desenhado recolhendo de [sizes] até ele, dentro da janela, que só
+     * ajusta o tamanho no fim; `null` mantém [sizes] até a conta sair.
+     */
+    settledSizes: HudNotchSizes? = null,
     expanded: Boolean = false,
     dragging: Boolean = false,
     updateIndicator: HudUpdateIndicator? = null,
@@ -220,6 +227,15 @@ internal fun HudNotch(
     val currentOnRefreshAccount by rememberUpdatedState(onRefreshAccount)
 
     val shape = remember(edge) { HudNotchShape(edge) }
+    // A saída (K1): enquanto a vaga fecha, o notch recolhe junto. O passo mais
+    // lento manda, para o corpo nunca ficar menor que as contas dentro dele.
+    val departures = rememberHudDepartures(accounts)
+    val settle = departures.values.minOrNull()
+    val notchSize = if (settle != null && settledSizes != null) {
+        lerp(sizes.collapsed, settledSizes.collapsed, settle)
+    } else {
+        sizes.collapsed
+    }
     val ladder = AppSurfaceLadders.current
 
     // Ao longo da borda o balão segue o anel pela mola `GENTLE`. A primeira
@@ -239,7 +255,7 @@ internal fun HudNotch(
             Box(
                 modifier = Modifier
                     .layoutId(HudNotchPart.NOTCH)
-                    .requiredSize(sizes.collapsed)
+                    .requiredSize(notchSize)
                     .testTag(HUD_CONTENT_TEST_TAG)
                     .appDepth(AppDepth.DIALOG, shape)
                     .clip(shape)
@@ -272,8 +288,11 @@ internal fun HudNotch(
                     edge = edge,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
-                    size = sizes.collapsed,
+                    size = notchSize,
                     compact = sizes.compact,
+                    settledCompact = settledSizes?.compact ?: sizes.compact,
+                    departures = departures,
+                    settle = settle,
                     onRingHovered = { index -> balloonIndex = index },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },

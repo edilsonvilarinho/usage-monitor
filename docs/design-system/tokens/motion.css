@@ -44,7 +44,10 @@
   --dur-gargantua-flow: 2800ms;
   /* Finite: API enabled / app start (cascade 140ms) and API disabled. */
   --dur-gargantua-birth: 1100ms;
-  --dur-gargantua-collapse: 480ms;
+  --dur-gargantua-collapse: 850ms;
+  /* Finite, after the collapse: the slot closes, the notch retracts and the
+     neighbours unfold their lines (K1). The window resizes once, at the end. */
+  --dur-gargantua-departure-settle: 450ms;
   /* Finite: account/gear balloon opens and closes (B3, relativistic jet). */
   --dur-gargantua-jet-open: 520ms;
   --dur-gargantua-jet-close: 240ms;
@@ -54,6 +57,9 @@
   /* Finite: every modal window and AppDialog opens and closes (E9, plasma filaments). */
   --dur-gargantua-filament-open: 680ms;
   --dur-gargantua-filament-close: 220ms;
+  /* Continuous: quota without a forecast, debris ring (J7). One loop = 8 laps
+     of 16s on the centre line; inner fragments take more laps, outer fewer. */
+  --dur-gargantua-debris: 128000ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

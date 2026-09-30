@@ -1,6 +1,8 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 
 /**
  * O momento de uma conta na faixa da HUD. Enum próprio (não valor novo em enum
@@ -58,6 +60,43 @@ fun settleHudPresence(displayed: List<HudAccount>, key: UsageTargetKey): List<Hu
             account.targetKey != key -> account
             account.presence == HudPresence.LEAVING -> null
             else -> account.copy(presence = HudPresence.SHOWN)
+        }
+    }
+}
+
+/**
+ * A saída inteira de uma conta (K1): o colapso (C2) e, depois dele, o
+ * assentamento. A conta fica na lista, marcada [HudPresence.LEAVING], até o fim
+ * dos dois, e só então a janela ajusta o tamanho — um passo só, já sem vão.
+ */
+fun hudDepartureMillis(): Int = AppGargantuaTokens.collapseMillis + AppGargantuaTokens.departureSettleMillis
+
+/**
+ * Quanto a vaga da conta que sai já fechou, em `0..1`, [elapsedMillis] depois
+ * de ela começar a sair: zero durante o colapso, e depois a curva padrão, sem
+ * rebote — o notch não passa do tamanho final.
+ */
+fun hudDepartureSettle(elapsedMillis: Float): Float {
+    val collapse = AppGargantuaTokens.collapseMillis.toFloat()
+    val linear = ((elapsedMillis - collapse) / AppGargantuaTokens.departureSettleMillis).coerceIn(0f, 1f)
+    return FastOutSlowInEasing.transform(linear)
+}
+
+/**
+ * A fração do vão que fica antes de cada conta da faixa enquanto alguma sai.
+ * [settle] traz, por conta, o assentamento de quem sai e `null` para quem fica.
+ * A primeira não tem vão; quem sai leva o seu junto; e a primeira que fica,
+ * quando todas antes dela saem, perde o vão com a de trás. Assentado, o
+ * resultado é o da lista sem as contas que saíram.
+ */
+fun hudLeadingGapScales(settle: List<Float?>): List<Float> {
+    return settle.mapIndexed { index, progress ->
+        val previous = settle.subList(0, index)
+        when {
+            index == 0 -> 0f
+            progress != null -> 1f - progress
+            previous.all { value -> value != null } -> 1f - (previous.last() ?: 0f)
+            else -> 1f
         }
     }
 }

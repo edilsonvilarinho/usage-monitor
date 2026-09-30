@@ -6,6 +6,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.GargantuaFrame
 import com.usagemonitor.presentation.ui.components.gargantuaBirthFrame
 import com.usagemonitor.presentation.ui.components.gargantuaCollapseFrame
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -99,5 +100,33 @@ class HudPresenceTest {
             assertTrue(birth.arcs in 0f..1f && collapse.arcs in 0f..1f, "arco fora do valor em $t")
             assertTrue(birth.flash in 0f..1f && collapse.flash in 0f..1f)
         }
+    }
+
+    @Test
+    fun `a vaga so fecha depois do colapso e termina parada sem rebote`() {
+        val collapse = AppGargantuaTokens.collapseMillis.toFloat()
+        assertEquals(0f, hudDepartureSettle(0f))
+        assertEquals(0f, hudDepartureSettle(collapse))
+        assertEquals(1f, hudDepartureSettle(hudDepartureMillis().toFloat()))
+        assertEquals(1f, hudDepartureSettle(hudDepartureMillis() + 500f))
+        var previous = 0f
+        for (step in 0..130) {
+            val settle = hudDepartureSettle(step * 10f)
+            assertTrue(settle in previous..1f, "a vaga voltou ou passou do fim em ${step * 10} ms: $settle")
+            previous = settle
+        }
+    }
+
+    @Test
+    fun `o vao de quem sai vai junto e a lista assentada fica sem vao sobrando`() {
+        // Nada saindo: o vão de sempre, menos antes da primeira.
+        assertEquals(listOf(0f, 1f, 1f), hudLeadingGapScales(listOf(null, null, null)))
+        // A do meio sai: o vão dela fecha com a vaga.
+        assertEquals(listOf(0f, 0.25f, 1f), hudLeadingGapScales(listOf(null, 0.75f, null)))
+        // A primeira sai: quem vira a primeira perde o vão com ela.
+        assertEquals(listOf(0f, 0.25f, 1f), hudLeadingGapScales(listOf(0.75f, null, null)))
+        // Assentado, é o vão da lista sem ela: a nova primeira fica sem vão.
+        assertEquals(listOf(0f, 0f, 1f), hudLeadingGapScales(listOf(1f, null, null)))
+        assertEquals(listOf(0f, 1f, 0f), hudLeadingGapScales(listOf(null, null, 1f)))
     }
 }

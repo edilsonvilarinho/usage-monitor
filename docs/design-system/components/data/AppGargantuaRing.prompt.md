@@ -16,7 +16,11 @@ tone body and a bright white-tinted core, with the glass reflection passing over
 pulses may travel along the plasma, fading out near both ends, so no pixel beyond the value ever
 changes. A zero quota shows only the empty glass. Outer first,
 longest window first, at most three; the balloon keeps every quota. A quota without a forecast has
-a dashed track. Preserve the supplied fraction, period, semantic tone and absence of a projection.
+no glass wall: its track is a **debris ring** (J7) — irregular fragments (length, gap, width,
+radius and brightness vary, about one in three gold, the rest white, opacity 12–32% lit from the
+upper left) that stay inside the tube and orbit at their own speeds, inner ones faster, so they
+overtake each other. Shape changes with the colour, so "no verdict" never rests on tone alone.
+The fragment table is fixed (seed 31) and identical on every account. Preserve the supplied fraction, period, semantic tone and absence of a projection.
 Balances and observed activity never become invented quota percentages. The percent and status
 word remain beside the indicator, with the existing compact-mode semantics.
 
@@ -46,8 +50,11 @@ the existing provider-mark mapping handles the vendor. No vendor-name branching 
 movement. Defaults and captures are static, with the entire scene, identity and values still
 visible. Reduced motion also suppresses finite entrances and refresh completion pulses. The
 base decorative orbit is 14000ms, the attention breath 3200ms, the active comet 2600ms, and the
-disc accelerates to 4000ms while refreshing, the plasma pulses cross each arc in 2800ms. Only
-decorative filaments, the plasma pulses and the active comet move; quota arcs keep their length and
+disc accelerates to 4000ms while refreshing, the plasma pulses cross each arc in 2800ms. The
+debris ring of a quota without a forecast closes its loop in 128000ms (`--dur-gargantua-debris`):
+8 whole laps of 16s on the centre line, 6–10 by radius, so it never jumps; with continuous motion
+off it is the frozen frame. Only decorative filaments, the plasma pulses, the debris ring and the
+active comet move; quota arcs keep their length and
 anchor and the provider mark never spins. Refresh completion may use the
 existing finite provider-mark pulse. Finite quota interpolation never overshoots the real value.
 
@@ -69,9 +76,12 @@ geometry is unchanged. Not on first composition, not with Reduced motion.
 indicator is born (S1, shockwave, `--dur-gargantua-birth` 1100ms, 140ms cascade between accounts):
 a point of light flashes, two shockwaves travel out to about 3dp past the ring, the horizon opens
 from the centre, the plasma fills up to the value (never past it), then the mark and the text fade
-in. When an API is disabled the indicator collapses (C2, `--dur-gargantua-collapse` 480ms): the
+in. When an API is disabled the indicator collapses (C2, `--dur-gargantua-collapse` 850ms): the
 text leaves first, the plasma retracts, the ring shrinks to a point and ends in a small flash. The
-item keeps its slot until the collapse ends; only then does the notch shrink, in one step. Both are
+item keeps its slot until the collapse ends; then, over `--dur-gargantua-departure-settle` (450ms,
+K1), the slot closes, the notch is drawn retracting inside the unchanged window and, if the strip
+changes density, the remaining accounts cross-fade from compact to full. The window resizes once, at
+the end. Both are
 finite transitions: Reduced motion makes them an instant cut. Chosen from HTML prototypes (3 births,
 4 collapses) by the user.
 
