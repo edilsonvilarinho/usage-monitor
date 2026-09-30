@@ -111,6 +111,39 @@ class QuotaWindowAnalysisTest {
         assertNull(quotaHourlyDistributionOf(noReset, UsageUnit.PERCENTAGE, PeriodType.INTERVAL))
     }
 
+    // A 5h da Anthropic sem sessão vem sem `resets_at`: 0% e a sentinela.
+    private fun idle(at: String) = point(at, 0, "2100-01-01T00:00:00Z", hasKnownResetAt = false)
+
+    @Test
+    fun `idle readings without a reset do not hide the windows before them`() {
+        val points = twoWindows + idle("2026-09-27T11:00:00Z") + idle("2026-09-27T12:00:00Z")
+
+        val windows = quotaWindowsOf(points, UsageUnit.PERCENTAGE, PeriodType.INTERVAL)
+
+        assertEquals(2, windows.size)
+        assertEquals(listOf(100, 30), windows.map { it.peakPercent })
+        assertEquals(false, windows.last().isOpen, "a leitura mais nova é ociosa e o reinício passou")
+        val distribution = quotaHourlyDistributionOf(points, UsageUnit.PERCENTAGE, PeriodType.INTERVAL)!!
+        assertEquals(120.0, distribution.percentByHour.sum(), 0.001)
+    }
+
+    @Test
+    fun `idle readings between two sessions do not become a window`() {
+        val points = listOf(
+            point("2026-09-27T01:00:00Z", 10, first),
+            point("2026-09-27T02:00:00Z", 40, first),
+            idle("2026-09-27T06:00:00Z"),
+            idle("2026-09-27T07:00:00Z"),
+            point("2026-09-27T08:00:00Z", 5, "2026-09-27T13:00:00Z"),
+            point("2026-09-27T09:00:00Z", 25, "2026-09-27T13:00:00Z")
+        )
+
+        val windows = quotaWindowsOf(points, UsageUnit.PERCENTAGE, PeriodType.INTERVAL)
+
+        assertEquals(listOf(40, 25), windows.map { it.peakPercent })
+        assertEquals(listOf(false, true), windows.map { it.isOpen })
+    }
+
     @Test
     fun `hourly distribution uses local BRT hours and ignores the reset drop`() {
         val distribution = quotaHourlyDistributionOf(
