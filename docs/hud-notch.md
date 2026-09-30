@@ -23,7 +23,16 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   palavra ("anel externo 7d 9% · anel interno 5h 28%"). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
   esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, **uma linha por anel com a janela**
   (`HudAccount.stripLines`: "7d 72%" sobre "5h 45%", na ordem dos anéis) e a **palavra do estado**:
-  cor nunca informa sozinha. Cota sem projeção tem a trilha **tracejada**.
+  cor nunca informa sozinha. Cota sem projeção tem a trilha em **anel de detritos** (J7, rodada de
+  opções em HTML): no lugar da parede de vidro, fragmentos irregulares de comprimento, vão,
+  espessura, raio e brilho (cerca de um em três dourado) que ficam dentro do tubo e orbitam cada um
+  na sua velocidade, os de dentro mais rápido. Tabela fixa em `GargantuaDebris.kt` (semente 31, a
+  mesma do protótipo), laço de 128 s (`debrisCycleMillis`) com voltas inteiras, então não salta.
+  Contínuo, atrás de `AppMotionPolicy.continuous`; parado, é o quadro zero. A fase só roda quando
+  algum arco está sem projeção.
+  - **Era um tracejado cinza a 6%** (traço = espessura, vão = 1,4×). Sumia no fundo escuro e não
+    falava a língua do disco; a forma diferente continua sendo o que diz "sem veredito", não a cor.
+    As alternativas J1–J10 estão na tabela da skill `usage-monitor-visual-options`.
   - **Era um número só, o da cota em foco, sem dizer a janela** (issue #286). O foco é o pior risco, e
     ele troca de janela sozinho: o mesmo lugar dizia 45% numa coleta e 72% na seguinte sem nada ter
     mudado no consumo. As linhas não mudam de lugar. A janela vai em `onSurfaceVariant` e o número em
@@ -45,10 +54,18 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     `HudNotchTextFitTest` media até 0,6dp a mais entre 110% e 144%. Com duas janelas o notch de cima
     vai a 46dp (28 das linhas + 18 da pílula). O estado sem contas continua `AppStatusIndicator`.
   - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
-    completa passa de `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda, cada conta vira a célula do
+    completa passa de `hudMaxAlongFraction(edge)` do comprimento da borda — 45% em cima e embaixo, 80%
+    nas laterais (L1) —, cada conta vira a célula do
     Codenotch — anel e a cota em foco com a janela embaixo (`focusLine`, "7d 72%"), sem a palavra. Com sete APIs numa tela de notebook a faixa
     completa atravessava a borda de cima; compacta ela cai para menos da metade. A palavra não some da
     HUD: fica no cabeçalho do balão e na descrição do anel. Com poucas contas nada muda.
+  - **O teto é por borda** (L1, rodada de opções em HTML). Era 45% em toda borda, e três contas de
+    duas janelas na lateral de uma tela de notebook já compactavam: a faixa perdia a segunda janela e a
+    pílula, e o usuário leu isso como dado escondido. Os 45% vêm da borda de cima, que divide espaço
+    com títulos e abas; nas laterais não há nenhum dos dois, e o teto passou a 80%.
+    `HudNotchGeometryTest` prende as três contas completas na lateral e compactas com o teto de cima.
+    Recusadas: L2 compactar só as contas em dia (a palavra "Normal" ficaria só no balão), L3 um degrau
+    sem pílula e L4 duas colunas na lateral.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
@@ -352,7 +369,7 @@ linhas que ele substituiu. `HudEdge` é enum novo.
 - **Nascimento e colapso** (`HudPresence`, `mergeHudPresence`, `rememberHudPresence`,
   `GargantuaTransition.kt`; 2026-09-28). Pedido: ativar uma API mostra um buraco negro surgindo e
   desativar some com um colapso. Prototipados em HTML (3 nascimentos, 4 colapsos); escolhidos
-  **S1 · onda de choque** (1,1s) e **C2 · colapso com clarão** (480ms). Depois o pedido cresceu: o
+  **S1 · onda de choque** (1,1s) e **C2 · colapso com clarão** (hoje 850ms, ver a saída K1 abaixo). Depois o pedido cresceu: o
   início do app e a abertura da HUD também nascem, em cascata de 140ms entre contas.
   **Decisão de geometria:** a janela continua saindo de `hudNotchSizes`, sem redimensionamento por
   quadro. A conta que nasce já ocupa o espaço e se revela nele; a que sai fica na lista marcada
@@ -362,6 +379,20 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   animações" entrega a lista viva, sem transição. O invariante passou a
   ser o **comprimento**: `GargantuaHudTest` exige pixels iguais entre quadros além do fim do arco e
   nenhuma luz em cota zerada. Sem `continuous && !reduced` não há fluxo.
+  - **Saída em dois tempos (K1 · colapso lento, depois assenta).** Com 480ms de colapso, a vaga vazia e
+    o notch saltando no fim — no mesmo quadro em que as contas restantes trocavam de compacto para
+    completo —, desligar uma API lia "bruto". Agora o colapso dura 850ms (`collapseMillis`; o texto
+    sai nos primeiros ~210ms) e, depois dele, 450ms de assentamento (`departureSettleMillis`,
+    `hudDepartureSettle`, curva padrão sem rebote): a vaga fecha, o notch **é desenhado** recolhendo
+    até `settledSizes` (a geometria da lista sem quem sai) e, se o modo muda, as contas que ficam
+    trocam de compacto para completo por fade cruzado, com o anel deslizando entre as duas posições.
+    A conta fica `LEAVING` até o fim dos dois tempos (`hudDepartureMillis`), e só então a janela
+    ajusta o tamanho — num passo só, já sem vão. Nenhum redimensionamento AWT por quadro; a área de
+    clique fica a de antes durante os 450ms. O vão entre contas passou a ser de cada item
+    (`hudLeadingGapScales`), para quem sai levar o seu junto; parado dá o mesmo que `spacedBy`. O anel
+    é o mesmo nó nos dois modos: um anel novo reanimaria os arcos do zero. Com vários desligamentos
+    juntos, o notch segue o passo mais lento. `HudNotchTest` mede o notch parado no colapso, no meio
+    da vaga e assentado. Recusadas: K2 tudo junto, K3 onda que fecha, K4 as vizinhas ocupam a vaga.
 
 ## Fora do alcance dos testes
 

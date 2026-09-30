@@ -10,6 +10,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.GargantuaFrame
 import com.usagemonitor.presentation.ui.components.gargantuaBirthFrame
 import com.usagemonitor.presentation.ui.components.gargantuaCollapseFrame
@@ -47,7 +48,8 @@ internal fun rememberHudPresence(accounts: List<HudAccount>, policy: AppMotionPo
 internal fun hudPresenceMillis(presence: HudPresence, birthOrder: Int?): Int = when (presence) {
     HudPresence.SHOWN -> 0
     HudPresence.ENTERING -> (birthOrder ?: 0) * HUD_BIRTH_STAGGER_MILLIS + AppGargantuaTokens.birthMillis
-    HudPresence.LEAVING -> AppGargantuaTokens.collapseMillis
+    // O colapso e, depois dele, a vaga fechando (K1): a conta só sai da lista no fim.
+    HudPresence.LEAVING -> hudDepartureMillis()
 }
 
 /**
@@ -77,4 +79,26 @@ internal fun rememberHudRingFrame(presence: HudPresence, birthOrder: Int?, polic
         presence == HudPresence.LEAVING -> gargantuaCollapseFrame(progress.value)
         else -> GargantuaFrame.Settled
     }
+}
+
+/**
+ * O assentamento de cada conta que sai (K1), por chave: zero durante o colapso,
+ * e de 0 a 1 enquanto a vaga fecha ([hudDepartureSettle]). Conta que fica não
+ * entra no mapa. Com "Reduzir animações" ninguém fica `LEAVING`, e o mapa é vazio.
+ */
+@Composable
+internal fun rememberHudDepartures(accounts: List<HudAccount>): Map<UsageTargetKey, Float> {
+    val departures = HashMap<UsageTargetKey, Float>()
+    for (account in accounts) {
+        if (account.presence != HudPresence.LEAVING) continue
+        key(account.targetKey) {
+            val elapsed = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                val total = hudDepartureMillis()
+                elapsed.animateTo(total.toFloat(), tween(total, easing = LinearEasing))
+            }
+            departures[account.targetKey] = hudDepartureSettle(elapsed.value)
+        }
+    }
+    return departures
 }

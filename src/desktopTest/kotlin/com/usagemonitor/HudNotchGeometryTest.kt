@@ -372,7 +372,7 @@ class HudNotchGeometryTest {
         val many = (1..7).map { index -> account("Conta $index", "Sem projeção", listOf("5h" to "3%")) }
         val few = many.take(2)
         for (edge in HudEdge.entries) {
-            val budget = if (edge.isHorizontal) 1366.dp * HUD_MAX_ALONG_FRACTION else 768.dp * HUD_MAX_ALONG_FRACTION
+            val budget = (if (edge.isHorizontal) 1366.dp else 768.dp) * hudMaxAlongFraction(edge)
             val unbounded = hudNotchSizes(many, edge, "", hasUpdateIndicator = false)
             val bounded = hudNotchSizes(many, edge, "", hasUpdateIndicator = false, maxAlong = budget)
             val along = { size: DpSize -> if (edge.isHorizontal) size.width else size.height }
@@ -384,6 +384,24 @@ class HudNotchGeometryTest {
             assertTrue(along(bounded.collapsed) < along(unbounded.collapsed) * ratio, "$edge: compacta devia encolher")
             assertTrue(!hudNotchSizes(few, edge, "", false, maxAlong = budget).compact, "$edge: duas contas cabem completas")
         }
+    }
+
+    /**
+     * L1: três contas de duas janelas na lateral de uma tela de notebook ficam
+     * completas. Com o teto de cima (45%) elas compactavam, e o print mostrava a
+     * faixa sem a segunda janela e sem a pílula.
+     */
+    @Test
+    fun `a borda lateral aceita tres contas completas numa tela de notebook`() {
+        val three = (1..3).map { index -> account("Conta $index", "Normal", listOf("7d" to "28%", "5h" to "22%")) }
+        for (edge in listOf(HudEdge.LEFT, HudEdge.RIGHT)) {
+            val lateral = hudNotchSizes(three, edge, "", false, maxAlong = 768.dp * hudMaxAlongFraction(edge))
+            assertTrue(!lateral.compact, "$edge: três contas deviam caber completas")
+            val topBudget = hudNotchSizes(three, edge, "", false, maxAlong = 768.dp * hudMaxAlongFraction(HudEdge.TOP))
+            assertTrue(topBudget.compact, "$edge: com o teto de cima a mesma faixa compactava")
+        }
+        assertEquals(0.45f, hudMaxAlongFraction(HudEdge.TOP))
+        assertEquals(0.45f, hudMaxAlongFraction(HudEdge.BOTTOM))
     }
 
     @Test

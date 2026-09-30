@@ -27,7 +27,12 @@ object AppGargantuaTokens {
     /** Nascimento ao ativar uma API ou iniciar o app (S1, onda de choque). */
     const val birthMillis = 1_100
     /** Colapso ao desativar uma API (C2, colapso com clarão). */
-    const val collapseMillis = 480
+    const val collapseMillis = 850
+    /**
+     * Depois do colapso, a vaga fecha, o notch recolhe e as vizinhas desdobram as
+     * linhas (K1). Com 480 ms de colapso e o notch saltando no fim, a saída lia bruta.
+     */
+    const val departureSettleMillis = 450
     /** Abertura do balão de uma conta ou da engrenagem (B3, jato relativístico). */
     const val jetOpenMillis = 520
     /** Fechamento do balão: dobra de volta e o feixe recolhe (B3). */
@@ -40,5 +45,10 @@ object AppGargantuaTokens {
     const val filamentOpenMillis = 680
     /** Fechamento de modal: os filamentos recolhem, de baixo para cima (E9). */
     const val filamentCloseMillis = 220
+    /**
+     * Trilha de cota sem projeção: o anel de detritos fecha o laço nesse ciclo
+     * (J7). Na linha central são 8 voltas de 16 s; por dentro, mais voltas.
+     */
+    const val debrisCycleMillis = 128_000
     const val diskTilt = -12f
 }

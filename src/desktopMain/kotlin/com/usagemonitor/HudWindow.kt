@@ -217,14 +217,16 @@ internal fun HudWindowHost(
     }
 
     val scale = uiScaleFactor(uiScalePercent)
-    val sizes = hudNotchSizes(
+    // A janela mede a lista com quem está saindo, até a vaga fechar; o notch
+    // recolhe até a lista sem ela por dentro da janela (K1).
+    val (sizes, settledSizes) = hudNotchSizesWithDeparture(
         accounts = accounts,
         edge = placement.edge,
         fallbackLabel = fallbackLabel,
         hasUpdateIndicator = updateIndicator != null,
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
         maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
-            uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION,
+            uiScaleFactor(uiScalePercent) * hudMaxAlongFraction(placement.edge),
         hasUpdateAction = updateAction != null
     )
     val composedArea = screenArea.inCompositionDp(scale)
@@ -347,6 +349,7 @@ internal fun HudWindowHost(
                     accounts = accounts,
                     edge = edge,
                     sizes = sizes,
+                    settledSizes = settledSizes,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
                     expanded = expanded && !dragging,

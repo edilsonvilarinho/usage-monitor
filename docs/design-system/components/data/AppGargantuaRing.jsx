@@ -9,6 +9,32 @@ function halfEllipse(cx, cy, rx, ry, front) {
   return `M${cx - rx} ${cy} A${rx} ${ry} 0 0 ${front ? 0 : 1} ${cx + rx} ${cy}`;
 }
 
+// Anel de detritos (J7): trilha de cota sem projeção. Mesma semente (31) e mesma
+// ordem de sorteio de `GargantuaDebris.kt`; voltas inteiras por ciclo, então o laço não salta.
+function debrisField() {
+  let seed = 31;
+  const next = () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+  const fragments = [];
+  let cursor = 0;
+  while (cursor < 360 - 2.9) {
+    const sweep = (.04 + next() * .22) * 180 / Math.PI;
+    const gap = (.05 + next() * .14) * 180 / Math.PI;
+    const width = (.5 + next() * 1.4) / 2.5;
+    const gold = next() > .7;
+    const alpha = .12 + next() * .2;
+    const offset = (next() - .5) * .8;
+    fragments.push({ start: cursor, sweep, width, gold, alpha, offset, laps: Math.round(8 / (1 + offset * .9)) });
+    cursor += sweep + gap;
+  }
+  return fragments;
+}
+const DEBRIS = debrisField();
+
 // O cenário é discreto; a cota é plasma num tubo de vidro e seu comprimento nunca anima.
 export function AppGargantuaRing({
   arcs = [], size = 64, stroke = 2.5, gap = 1.5, provider, providerColor,
@@ -41,6 +67,7 @@ export function AppGargantuaRing({
         @keyframes gargantua-filaments { to { stroke-dashoffset: -136; } }
         @keyframes gargantua-comet { to { transform: rotate(360deg); } }
         @keyframes gargantua-attention { 50% { opacity: .5; } }
+        @keyframes gargantua-debris { to { transform: rotate(360deg); } }
         @keyframes gargantua-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--flow-to); } }
         @media (prefers-reduced-motion: reduce) { .gargantua-motion { animation: none !important; } }
       `}</style>
@@ -75,7 +102,15 @@ export function AppGargantuaRing({
           const length = circumference * fraction;
           const dash = `${length} ${circumference}`;
           return <g key={index}>
-            <circle cx="32" cy="32" r={radius} fill="none" stroke="#fff" strokeOpacity=".06" strokeWidth={stroke * 1.4} strokeDasharray={ring.forecast === false ? `${stroke} ${stroke * 1.4}` : undefined} />
+            {ring.forecast === false ? DEBRIS.map((fragment, key) => {
+              const middle = (fragment.start + fragment.sweep / 2) * Math.PI / 180;
+              const lit = .5 + .5 * Math.cos(middle + 135 * Math.PI / 180);
+              const lap = moving ? { animation: `gargantua-debris calc(var(--dur-gargantua-debris) / ${fragment.laps}) linear infinite`, transformOrigin: '32px 32px' } : {};
+              return <path key={key} className="gargantua-motion" style={lap}
+                d={arc(fragment.start, fragment.start + fragment.sweep, radius + fragment.offset * stroke)} fill="none"
+                stroke={fragment.gold ? 'var(--gargantua-gold)' : '#fff'} strokeOpacity={fragment.alpha * (.6 + .4 * lit)}
+                strokeWidth={fragment.width * stroke} strokeLinecap="round" />;
+            }) : <circle cx="32" cy="32" r={radius} fill="none" stroke="#fff" strokeOpacity=".06" strokeWidth={stroke * 1.4} />}
             <circle cx="32" cy="32" r={radius - stroke / 2} fill="none" stroke={`url(#${uid}-glass)`} strokeWidth={stroke * .18} />
             <circle cx="32" cy="32" r={radius + stroke / 2} fill="none" stroke={`url(#${uid}-glass)`} strokeOpacity=".4" strokeWidth={stroke * .14} />
             {fraction > 0 ? <g transform="rotate(-90 32 32)">
