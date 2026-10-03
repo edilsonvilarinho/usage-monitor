@@ -3,7 +3,7 @@ package com.usagemonitor.presentation.ui.components
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.math.roundToInt
 
 /*

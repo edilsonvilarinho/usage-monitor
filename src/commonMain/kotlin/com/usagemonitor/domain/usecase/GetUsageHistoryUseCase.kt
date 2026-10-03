@@ -5,8 +5,8 @@ import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.repository.UsageHistoryRepository
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 class GetUsageHistoryUseCase(
     private val repository: UsageHistoryRepository,

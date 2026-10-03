@@ -85,7 +85,7 @@ private val ROW_MIN_HEIGHT = 32.dp
 /**
  * Corpo de uma janela: fundo, padding e o espaçamento entre blocos.
  *
- * Não desenha barra de título — no desktop ela é `DesktopWindowFrame`, que vive
+ * Não desenha barra de título — no desktop ela é `DesktopDialogFrame`, que vive
  * em `desktopMain` porque mexe com a janela AWT. Aqui fica só o que é comum às
  * seis janelas: a cor de fundo, a margem e a [statusBar] opcional, que é sempre
  * a última linha e nunca rola junto com o conteúdo.
@@ -124,7 +124,7 @@ fun AppStatusBar(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth().appModalRevealRow()) {
         AppDivider()
         Row(
             modifier = Modifier
@@ -152,7 +152,7 @@ fun AppToolbar(
     content: @Composable RowScope.() -> Unit
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = TOOLBAR_HEIGHT),
+        modifier = modifier.fillMaxWidth().appModalRevealRow().heightIn(min = TOOLBAR_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing),
         content = content
@@ -250,6 +250,7 @@ fun AppSectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .appModalRevealRow()
             .heightIn(min = TOOLBAR_HEIGHT)
             .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -310,7 +311,7 @@ fun AppGroupBand(
     horizontalPadding: Dp = AppSpacing.md,
     trailing: @Composable (RowScope.() -> Unit)? = null
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth().appModalRevealRow()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -486,7 +487,7 @@ fun AppDataRow(
         Modifier
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth().appModalRevealRow()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -534,6 +535,7 @@ fun AppColumnHeaderRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .appModalRevealRow()
             .padding(horizontal = horizontalPadding)
             .padding(start = startGutter),
         horizontalArrangement = Arrangement.spacedBy(spacing),
@@ -613,6 +615,7 @@ fun AppMetricBlock(
 ) {
     Column(
         modifier = modifier
+            .appModalRevealRow()
             .clip(AppShapes.small)
             .background(MaterialTheme.colorScheme.surface)
             .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)

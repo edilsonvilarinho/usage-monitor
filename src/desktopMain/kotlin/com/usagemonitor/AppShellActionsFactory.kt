@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.recordFailure
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * As ações do rodapé e dos cards, montadas uma vez para as duas portas — o
@@ -38,7 +38,6 @@ internal fun buildShellActions(
             breadcrumbs.recordScreenOpened("Ajuda")
             modal.isHelpOpen = true
         },
-        changeWindowMode = shell::changeWindowMode,
         // Retrato do Dashboard (issue #215): o mesmo writer das Sessões CLI e do
         // Time, um diálogo de arquivo só.
         exportSnapshot = { stats ->

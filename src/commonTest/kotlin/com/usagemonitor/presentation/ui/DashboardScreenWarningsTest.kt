@@ -38,7 +38,7 @@ class DashboardScreenWarningsTest {
     @Test
     fun `rate limit with an armed backoff shows the retry time instead of a button`() {
         val target = UsageTargetKey.forSource(ApiSource.ANTHROPIC)
-        val retryAt = kotlinx.datetime.Instant.parse("2026-09-27T17:32:00Z")
+        val retryAt = kotlin.time.Instant.parse("2026-09-27T17:32:00Z")
         val armed = warningFor(
             error = UiApiError(target = target, message = "Anthropic HTTP 429: {}", retryAt = retryAt),
             language = AppLanguage.PT

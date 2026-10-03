@@ -13,7 +13,7 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isObservedActivitySource
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 fun ApiUsageStats.toCacheDto(): ApiUsageStatsCacheDto {
     return ApiUsageStatsCacheDto(

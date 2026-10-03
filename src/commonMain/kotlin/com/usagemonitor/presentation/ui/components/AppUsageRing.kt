@@ -45,9 +45,10 @@ data class AppRingArc(
     val fraction: Float,
     val tone: AppTone,
     /**
-     * Sem projeção, a trilha do arco é **tracejada**: cor nenhuma pode sugerir um
-     * estado que ninguém calculou, e o tracejado diz "aqui não há veredito" sem
-     * depender de tom.
+     * Sem projeção, a trilha do arco muda de forma — **tracejada** no
+     * `AppUsageRing`, anel de detritos no `AppGargantuaRing` (J7): cor nenhuma
+     * pode sugerir um estado que ninguém calculou, e a trilha diz "aqui não há
+     * veredito" sem depender de tom.
      */
     val hasForecast: Boolean = true
 )

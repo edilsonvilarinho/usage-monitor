@@ -141,15 +141,17 @@ internal class LinuxInstallLayout(val rootPath: String) {
 /**
  * Versão aceitável como nome de diretório.
  *
- * Dígitos e pontos, no máximo quatro componentes. Não é validação de semver: é a
- * defesa contra `..`, `/` e nome vazio, porque o valor vem de uma release remota
- * e vira caminho no disco.
+ * Dígitos e pontos, no máximo quatro componentes, e opcionalmente o sufixo
+ * `-beta.N` do canal beta (issue #355). Não é validação de semver: é a defesa
+ * contra `..`, `/` e nome vazio, porque o valor vem de uma release remota e vira
+ * caminho no disco — por isso o sufixo aceito é **só** esse, e não qualquer
+ * identificador de pré-lançamento. `linux-updater.sh` repete a mesma regra.
  */
 internal fun isValidLinuxVersionName(version: String): Boolean {
     return LINUX_VERSION_PATTERN.matches(version)
 }
 
-private val LINUX_VERSION_PATTERN = Regex("""^\d+(\.\d+){0,3}$""")
+private val LINUX_VERSION_PATTERN = Regex("""^\d+(\.\d+){0,3}(-beta\.\d+)?$""")
 
 /**
  * Raiz de dados XDG, com a regra da especificação: **variável relativa é

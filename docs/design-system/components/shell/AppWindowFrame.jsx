@@ -1,11 +1,7 @@
 import React from 'react';
 
 const MARK = (
-  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none' }}>
-    <rect width="24" height="24" rx="5" fill="var(--fg)" />
-    <path d="M7 6.5v7.2a2.6 2.6 0 0 0 2.6 2.6h4.8a2.6 2.6 0 0 0 2.6-2.6V6.5" stroke="var(--bg)" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-    <path d="M12 6.5v6.6" stroke="var(--bg)" strokeWidth="2.4" strokeLinecap="round" />
-  </svg>
+  <img src="../../assets/app-icon-tray.png" width="14" height="14" alt="" aria-hidden="true" style={{ flex: 'none' }} />
 );
 
 function WinBtn({ glyph, label, close = false }) {

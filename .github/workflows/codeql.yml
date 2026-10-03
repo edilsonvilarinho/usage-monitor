@@ -8,6 +8,10 @@ on:
   push:
     branches:
       - main
+    # Mudanca so de docs nao muda codigo analisavel (#344).
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   schedule:
     - cron: '17 3 * * 1'
   workflow_dispatch:
@@ -46,7 +50,7 @@ jobs:
 
       - name: Setup JDK
         if: matrix.language == 'java-kotlin'
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -63,21 +67,17 @@ jobs:
       # JVM da propria action. Mesma SHA ja pinada em `ci.yml` e
       # `release-linux.yml`, entao nao e dependencia nova.
       #
-      # Trade-off aceito: este cache e Linux e passa a disputar os 10 GB de cache
-      # do repositorio com o cache Windows do `ci.yml`. Se `gradle cache is not
-      # found` voltar a aparecer la de forma recorrente, a saida e
-      # `cache-read-only: true` aqui -- o job perde a gravacao e mantem a leitura.
+      # So le, inclusive na `main` (#344): o cache do repositorio passou dos
+      # 10 GB e o excesso despejava o cache da `main` que o CI usa. Quem grava o
+      # cache Linux e o job `desktop-linux` do `ci.yml`, no push na `main`.
       - name: Setup Gradle
         if: matrix.language == 'java-kotlin'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
-          # Mesmo criterio de `ci.yml`: um cache no ref de uma PR pode ser
-          # reutilizado por reexecucoes da mesma PR, mas nao por outras PRs nem
-          # pela branch base; PRs ainda podem restaurar o cache da `main`.
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-read-only: true
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -115,6 +115,6 @@ jobs:
           exit 1
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           category: "/language:${{ matrix.language }}"

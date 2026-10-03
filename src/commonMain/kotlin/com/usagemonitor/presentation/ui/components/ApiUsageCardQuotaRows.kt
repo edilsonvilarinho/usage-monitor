@@ -22,7 +22,7 @@ import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.seriesKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * As cotas do card expandido, uma por linha.

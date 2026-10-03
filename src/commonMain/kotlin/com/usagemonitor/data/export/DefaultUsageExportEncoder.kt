@@ -6,7 +6,7 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.repository.UsageExportEncoder
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /** A porta de exportação sobre [UsageExporter] e [CodexCliUsageExporter]. */
 object DefaultUsageExportEncoder : UsageExportEncoder {

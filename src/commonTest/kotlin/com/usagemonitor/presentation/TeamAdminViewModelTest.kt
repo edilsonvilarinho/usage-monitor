@@ -27,7 +27,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -420,7 +420,7 @@ class GetAdminTeamOverviewUseCaseTest {
 
         val result = GetAdminTeamOverviewUseCase(
             repository = repository,
-            clock = object : kotlinx.datetime.Clock {
+            clock = object : kotlin.time.Clock {
                 override fun now(): Instant = ADMIN_FIXED_NOW
             }
         )(range = CliSessionRange.LAST_5H)

@@ -43,11 +43,7 @@ internal fun storedLanguage(settings: Settings): AppLanguage {
 
 internal const val AUTO_START_KEY = "autoStart"
 
-internal const val ALWAYS_ON_TOP_KEY = "alwaysOnTop"
-
 internal const val CARD_ORDER_KEY = "cardOrder"
-
-internal const val MINIMIZED_CARDS_KEY = "minimizedCards"
 
 internal const val NEXT_REFRESH_AT_KEY = "nextRefreshAtMillis"
 

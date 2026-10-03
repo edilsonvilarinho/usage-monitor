@@ -16,8 +16,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpOffset
@@ -55,7 +53,9 @@ import com.usagemonitor.presentation.ui.components.nextRefreshLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.rememberHudPresence
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.updateBannerAction
@@ -66,22 +66,25 @@ import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import com.usagemonitor.domain.entity.ApiUsageStats
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
  *
- * Ela era a janela principal encolhida, e isso obrigava o antigo `main()` a guardar a
- * geometria de antes, proibir o coletor de gravar a pílula como "tamanho
- * normal", ordenar textualmente o piso de tamanho e redimensionar a janela AWT a
- * cada quadro — a fonte do tranco. Agora a principal fica escondida com a
- * geometria intacta, e esta janela é só do notch.
+ * É a **única** janela de visualização do app: a janela principal com o
+ * dashboard saiu quando a HUD virou o único modo. Por isso ela é também a âncora
+ * do app — diálogo de arquivo, captura do relatório de bug, ativação pela bandeja
+ * e pela segunda instância —, entregue por [onWindowReady]. Antes disso ela foi a
+ * janela principal encolhida, com a geometria de antes guardada à parte e a
+ * janela AWT redimensionada a cada quadro — a fonte do tranco.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
  * 11, C11 do plano de execução). Por isso, parada, ela só aceita clique no notch:
@@ -93,6 +96,11 @@ import kotlinx.datetime.Instant
  * origem de uma janela transparente mostra um quadro do conteúdo antigo no lugar
  * novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e na de
  * baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
+ *
+ * **O recorte é só do Windows** ([hudUsesHitRegion]). No elementary OS 6.1 (X11)
+ * o `shape = null` da abertura não tirava o recorte: o balão pintava só dentro
+ * da margem de 16dp e as alças saíam cortadas. Fora do Windows a janela fica sem
+ * recorte — o balão abre inteiro, e a área vazia dele pode engolir clique.
  */
 @Composable
 internal fun HudWindowHost(
@@ -107,8 +115,11 @@ internal fun HudWindowHost(
     windowOpacityPercent: Int,
     iconImage: Painter?,
     hudScreenArea: ScreenWorkArea,
-    onOpenFull: () -> Unit,
-    onSwitchToCardsOnly: () -> Unit,
+    /**
+     * A janela AWT, uma vez composta. Quem recebe faz o que a janela principal
+     * fazia ao nascer: registrar o arranque e confirmar a atualização.
+     */
+    onWindowReady: suspend (java.awt.Window) -> Unit,
     /** As ações do rodapé, que aqui moram no balão da engrenagem. */
     actions: AppShellActions,
     /** Perfis marcados como parte do time: decidem os botões de time no balão. */
@@ -151,7 +162,9 @@ internal fun HudWindowHost(
             onRestartAndUpdate = { viewModel.restartAndUpdateNow() }
         )
     }
-    val accounts = buildHudAccounts(
+    // Conta que nasce ou colapsa (API ativada/desativada, início do app) fica na
+    // lista durante a transição; a geometria segue essa lista.
+    val accounts = rememberHudPresence(buildHudAccounts(
         quotaRisks = quotaRisks,
         cardOrder = cardOrder,
         language = language,
@@ -162,7 +175,7 @@ internal fun HudWindowHost(
         accountEmojis = accountEmojis,
         sessionPulses = cliSessionPulses,
         stalledSessions = stalled
-    )
+    ), motion)
 
     // O monitor do notch (issue #273). Era sempre o padrão: o arrasto era preso a
     // ele e o encaixe usava as bordas dele, e o notch não saía do primário. Agora
@@ -204,14 +217,16 @@ internal fun HudWindowHost(
     }
 
     val scale = uiScaleFactor(uiScalePercent)
-    val sizes = hudNotchSizes(
+    // A janela mede a lista com quem está saindo, até a vaga fechar; o notch
+    // recolhe até a lista sem ela por dentro da janela (K1).
+    val (sizes, settledSizes) = hudNotchSizesWithDeparture(
         accounts = accounts,
         edge = placement.edge,
         fallbackLabel = fallbackLabel,
         hasUpdateIndicator = updateIndicator != null,
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
         maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
-            uiScaleFactor(uiScalePercent) * HUD_MAX_ALONG_FRACTION,
+            uiScaleFactor(uiScalePercent) * hudMaxAlongFraction(placement.edge),
         hasUpdateAction = updateAction != null
     )
     val composedArea = screenArea.inCompositionDp(scale)
@@ -224,6 +239,7 @@ internal fun HudWindowHost(
     } else {
         hudDockedWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
+    val hitRegionSupported = remember { hudUsesHitRegion(AutoStartManager.currentPlatform()) }
     val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes)
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
@@ -314,18 +330,17 @@ internal fun HudWindowHost(
         resizable = false,
         alwaysOnTop = true,
         onKeyEvent = { event ->
-            handleHudWindowKey(
-                event = event,
-                onOpenFull = onOpenFull,
-                onSwitchToCardsOnly = onSwitchToCardsOnly,
-                onOpenHelp = actions.openHelp
-            )
+            handleHudWindowKey(event = event, onOpenHelp = actions.openHelp)
         }
     ) {
-        LaunchedEffect(windowOpacityPercent) {
-            applyWindowOpacity(window, windowOpacityPercent)
+        LaunchedEffect(window) {
+            onWindowReady(window)
         }
-        ApplyHudHitRegion(window, hitRegion, scale)
+        LaunchedEffect(windowOpacityPercent) {
+            applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
+        }
+        // Recorte só no Windows: no elementary OS (X11) o balão saía cortado.
+        ApplyHudHitRegion(window, hitRegion, scale, supported = hitRegionSupported)
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
             val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
@@ -334,6 +349,7 @@ internal fun HudWindowHost(
                     accounts = accounts,
                     edge = edge,
                     sizes = sizes,
+                    settledSizes = settledSizes,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
                     expanded = expanded && !dragging,
@@ -359,8 +375,6 @@ internal fun HudWindowHost(
                             onRefresh = { viewModel.refresh(account.targetKey) }
                         )
                     },
-                    // Botão direito (issue #215): direto para "Somente cards".
-                    onSwitchToCardsOnly = onSwitchToCardsOnly,
                     // A engrenagem da ponta de longe abre o balão com o que o
                     // rodapé do modo padrão oferece — aqui não há rodapé.
                     appBalloon = {
@@ -400,23 +414,13 @@ private fun hudUpdateIndicatorOf(state: AppUpdateUiState, language: AppLanguage)
     )
 }
 
-/** `Ctrl+Shift+H` volta à janela padrão, `Ctrl+Shift+M` vai a "Somente cards", `F1` abre a ajuda. */
-private fun handleHudWindowKey(
-    event: KeyEvent,
-    onOpenFull: () -> Unit,
-    onSwitchToCardsOnly: () -> Unit,
-    onOpenHelp: () -> Unit
-): Boolean {
-    val isDown = event.type == KeyEventType.KeyDown
-    val hudToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.H
-    val cardsOnlyToggle = isDown && event.isCtrlPressed && event.isShiftPressed && event.key == Key.M
-    val help = isDown && event.key == Key.F1
-    when {
-        hudToggle -> onOpenFull()
-        cardsOnlyToggle -> onSwitchToCardsOnly()
-        help -> onOpenHelp()
+/** `F1` abre a ajuda, a tecla que o sistema reserva para ela. */
+private fun handleHudWindowKey(event: KeyEvent, onOpenHelp: () -> Unit): Boolean {
+    val help = event.type == KeyEventType.KeyDown && event.key == Key.F1
+    if (help) {
+        onOpenHelp()
     }
-    return hudToggle || cardsOnlyToggle || help
+    return help
 }
 
 /**
@@ -454,7 +458,6 @@ private fun HudWindowAppBalloon(
         },
         updateIndicator = updateIndicator,
         onUpdateAction = updateAction,
-        onWindowModeChange = actions.changeWindowMode,
         actions = {
             FooterActionGroup(
                 language = language,
@@ -532,8 +535,12 @@ internal fun hudGearDescription(language: AppLanguage): String =
 /** Uma passada de hover: o `Exit` de um quadro na divisa não fecha o painel. */
 private const val HUD_COLLAPSE_DELAY_MILLIS = 150L
 
-/** A saída do balão (fade de 90ms) com folga; a janela encolhe depois dela. */
-private const val HUD_COLLAPSE_SETTLE_MILLIS = 200L
+/**
+ * A saída do balão (o jato dobrando, [AppGargantuaTokens.jetCloseMillis]) com
+ * folga; a janela encolhe e o recorte volta depois dela, senão o recorte do
+ * notch corta a pintura do fechamento.
+ */
+private const val HUD_COLLAPSE_SETTLE_MILLIS = AppGargantuaTokens.jetCloseMillis + 60L
 
 /** O monitor sob o ponteiro; `null` se o AWT não souber dizer. */
 private fun pointerScreen(): ScreenInfo? =
@@ -569,12 +576,71 @@ private fun ScreenWorkArea.inCompositionDp(scale: Float): ScreenWorkArea = Scree
 )
 
 /**
+ * Se a HUD recorta a área de clique da janela parada por `Window.shape`. Só no
+ * Windows, onde o recorte foi medido (C11, spike da #294); no Linux (X11) tirar
+ * o recorte ao abrir não surtia efeito e o balão ficava cortado. macOS nunca foi
+ * medido e fica do lado seguro.
+ */
+internal fun hudUsesHitRegion(platform: AutoStartManager.Platform): Boolean =
+    platform == AutoStartManager.Platform.WINDOWS
+
+/**
+ * A opacidade que a HUD usa, a partir da preferência do usuário.
+ *
+ * No Windows a janela transparente do Compose só recebe o mouse onde o fundo tem
+ * alfa 1/255 (`JLayeredPaneWithTransparencyHack`), e o sistema multiplica esse alfa
+ * pela opacidade da janela: em 50% dá 1 × 127/255, que arredonda para zero, e o
+ * ponteiro atravessa a HUD — o hover some. Medido no Windows 11 com uma janela
+ * transparente igual à da HUD: 50% nunca recebe o mouse; 55%, 60%… 99% recebem.
+ * Por isso o piso de [HUD_WINDOWS_MIN_OPACITY_PERCENT] só no Windows; fora dele o
+ * fundo de alfa 1/255 não existe e a preferência vale inteira (issue #340).
+ */
+internal fun hudWindowOpacityPercent(percent: Int, platform: AutoStartManager.Platform): Int {
+    val clamped = clampWindowOpacityPercent(percent)
+    if (platform != AutoStartManager.Platform.WINDOWS) {
+        return clamped
+    }
+    return maxOf(clamped, HUD_WINDOWS_MIN_OPACITY_PERCENT)
+}
+
+/**
+ * Se a HUD precisa ser repintada depois de mudar a opacidade. No Windows, mudar a
+ * opacidade refaz a camada da janela sem o fundo de alfa 1/255 e o mouse passa a
+ * atravessá-la até a próxima pintura AWT: medido, 100 → 50 → 100 sem repintar fica
+ * sem hover; repintando, volta. Era o hover que só voltava saindo e entrando no
+ * modo HUD.
+ */
+internal fun hudRepaintsAfterOpacityChange(platform: AutoStartManager.Platform): Boolean =
+    platform == AutoStartManager.Platform.WINDOWS
+
+private fun applyHudWindowOpacity(window: java.awt.Window, percent: Int, platform: AutoStartManager.Platform) {
+    applyWindowOpacity(window, hudWindowOpacityPercent(percent, platform))
+    if (hudRepaintsAfterOpacityChange(platform)) {
+        window.repaint()
+    }
+}
+
+/** O menor valor medido em que a HUD transparente ainda recebe o mouse no Windows. */
+internal const val HUD_WINDOWS_MIN_OPACITY_PERCENT = 55
+
+/**
  * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
  * antes de abrir o balão, já sai sem o recorte.
+ *
+ * Fora do Windows ([supported] falso) não aplica nada — só grava que pulou, para
+ * o próximo relato vir com o que a HUD fez (issue #342).
  */
 @Composable
-private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float) {
-    val applier = remember { HudHitRegionApplier() }
+private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float, supported: Boolean) {
+    val diagnostics = remember { HudWindowDiagnostics() }
+    val applier = remember { HudHitRegionApplier(onEvent = diagnostics::record) }
+    LaunchedEffect(supported) {
+        val event = if (supported) HudHitRegionEvent.ENABLED else HudHitRegionEvent.SKIPPED
+        withContext(Dispatchers.IO) { diagnostics.record(event) }
+    }
+    if (!supported) {
+        return
+    }
     SideEffect {
         applier.apply(window, region, scale)
     }
@@ -589,9 +655,12 @@ private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: F
  *
  * `Window.shape` exige suporte a janela recortada (`PERPIXEL_TRANSPARENT`). Sem
  * ele a HUD continua funcionando sem recorte: a área do balão volta a engolir
- * clique, mas o notch não pisca — o defeito menor dos dois.
+ * clique, mas o notch não pisca — o defeito menor dos dois. Fora do Windows o
+ * host nem o compõe ([hudUsesHitRegion]).
  */
-private class HudHitRegionApplier {
+private class HudHitRegionApplier(
+    private val onEvent: (HudHitRegionEvent, String?) -> Unit
+) {
     private var applied: java.awt.Rectangle? = null
     private var hasApplied = false
 
@@ -609,5 +678,11 @@ private class HudHitRegionApplier {
         hasApplied = true
         applied = shape
         runCatching { window.shape = shape }
+            .onFailure { error -> onEvent(HudHitRegionEvent.SET_FAILED, "${error::class.simpleName}: ${error.message}") }
+            .onSuccess {
+                if (shape == null && window.shape != null) {
+                    onEvent(HudHitRegionEvent.CLEAR_NOT_EFFECTIVE, null)
+                }
+            }
     }
 }

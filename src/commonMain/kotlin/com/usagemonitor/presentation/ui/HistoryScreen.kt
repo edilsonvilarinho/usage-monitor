@@ -1,6 +1,8 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.rememberSettledRevealKey
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.HistoryRange
@@ -212,42 +214,20 @@ fun HistoryScreen(
                                     onSelectQuotaView = viewModel::selectQuotaView
                                 )
 
-                                if (current.report.series.isEmpty()) {
-                                    Text(
-                                        text = if (language == AppLanguage.PT) {
-                                            "Sem dados para o intervalo selecionado."
-                                        } else {
-                                            "No data for the selected range."
-                                        },
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                } else {
-                                    val accentColor = accentColorForHistorySource(
-                                        source = current.report.source,
-                                        accents = AppAccents.current
-                                    )
-                                    if (current.report.source == ApiSource.DEEPSEEK) {
-                                        DeepSeekHistoryContent(
-                                            report = current.report,
-                                            accentColor = accentColor,
-                                            language = language,
-                                            selectedRange = current.selectedRange
-                                        )
-                                    } else if (current.report.source.isObservedActivitySource()) {
-                                        OpenCodeHistoryContent(
-                                            report = current.report,
-                                            accentColor = accentColor,
-                                            language = language,
-                                            selectedRange = current.selectedRange
-                                        )
-                                    } else {
-                                        GroupedHistoryContent(
-                                            state = current,
-                                            accentColor = accentColor,
-                                            language = language
-                                        )
-                                    }
+                                // Fonte, conta, faixa e cota refazem o E9 no relatório
+                                // quando a leitura nova chega — não no clique, que
+                                // tocaria sobre o conteúdo antigo esmaecido.
+                                val revealKey = rememberSettledRevealKey(
+                                    key = listOf(
+                                        current.selectedSource,
+                                        current.selectedAccount,
+                                        current.selectedRange,
+                                        current.selectedQuotaView
+                                    ),
+                                    settled = !current.isRefreshing
+                                )
+                                AppModalRevealScope(replayKey = revealKey) {
+                                    HistoryReportContent(current = current, language = language)
                                 }
                             }
                         }
@@ -262,6 +242,48 @@ fun HistoryScreen(
                     .fillMaxHeight()
             )
         }
+    }
+}
+
+/** O relatório abaixo dos controles: vazio, saldo DeepSeek, atividade observada ou por cota. */
+@Composable
+private fun HistoryReportContent(current: HistoryUiState.Success, language: AppLanguage) {
+    if (current.report.series.isEmpty()) {
+        Text(
+            text = if (language == AppLanguage.PT) {
+                "Sem dados para o intervalo selecionado."
+            } else {
+                "No data for the selected range."
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    val accentColor = accentColorForHistorySource(
+        source = current.report.source,
+        accents = AppAccents.current
+    )
+    if (current.report.source == ApiSource.DEEPSEEK) {
+        DeepSeekHistoryContent(
+            report = current.report,
+            accentColor = accentColor,
+            language = language,
+            selectedRange = current.selectedRange
+        )
+    } else if (current.report.source.isObservedActivitySource()) {
+        OpenCodeHistoryContent(
+            report = current.report,
+            accentColor = accentColor,
+            language = language,
+            selectedRange = current.selectedRange
+        )
+    } else {
+        GroupedHistoryContent(
+            state = current,
+            accentColor = accentColor,
+            language = language
+        )
     }
 }
 

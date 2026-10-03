@@ -5,17 +5,19 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_HORIZONTAL
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_VERTICAL
 import com.usagemonitor.presentation.ui.theme.AppChrome
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.time.Duration
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Geometria do notch da HUD: em que borda ele mora, o tamanho recolhido e o
@@ -42,15 +44,11 @@ internal enum class HudEdge {
 }
 
 /**
- * Anel de uma conta: 44dp, três arcos concêntricos no máximo e a marca do
- * fornecedor no miolo. Era 28dp sem marca; com dois arcos o miolo de 28dp ficava
- * com 10dp, pouco para reconhecer o asterisco do Claude. Com 36dp a marca ficava
- * em 14dp com duas janelas e 8,4dp com três (issue #322: "os ícones dos modelos
- * estão pequenos demais"); com 44dp ela vai a 19,6dp e 14dp pela mesma fórmula de
- * `hudRingMarkSize`, e o notch de cima com duas janelas deixa de crescer por
- * texto — o anel passa a ser o mais alto.
+ * Gargantua: 64dp para separar disco de acreção, marca e até três quotas.
+ * A geometria compartilha o token com o desenho; o compacto continua sendo
+ * escolhido pelo espaço real disponível na borda.
  */
-internal val HUD_RING_SIZE = 44.dp
+internal val HUD_RING_SIZE = AppGargantuaTokens.size
 
 /**
  * O selo do emoji da conta (issue #287): uma caixa no canto de cima à direita do
@@ -204,6 +202,26 @@ internal fun hudNotchSizes(
 }
 
 /**
+ * Os tamanhos da lista em tela e da mesma lista sem as contas que estão saindo
+ * (K1). A janela usa o primeiro até a vaga fechar — nenhum redimensionamento
+ * por quadro —, e o notch é desenhado recolhendo até o segundo dentro dela.
+ * Sem ninguém saindo, os dois são o mesmo.
+ */
+internal fun hudNotchSizesWithDeparture(
+    accounts: List<HudAccount>,
+    edge: HudEdge,
+    fallbackLabel: String,
+    hasUpdateIndicator: Boolean,
+    maxAlong: Dp,
+    hasUpdateAction: Boolean
+): Pair<HudNotchSizes, HudNotchSizes> {
+    val sizes = hudNotchSizes(accounts, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction)
+    val staying = accounts.filter { account -> account.presence != HudPresence.LEAVING }
+    if (staying.size == accounts.size) return sizes to sizes
+    return sizes to hudNotchSizes(staying, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction)
+}
+
+/**
  * As alças do notch aberto, uma além de cada ponta, como o `MoveHandle` e o
  * `SettingsOrb` do Codenotch: a mão na ponta de perto (em cima, à esquerda) e a
  * engrenagem na de longe. Um disco de 32dp é o alvo de clique que o resto do app
@@ -215,9 +233,12 @@ internal val HUD_HANDLE_GAP = 6.dp
 
 /**
  * A fração da borda que a faixa completa pode ocupar antes de virar compacta.
- * Menos da metade: o notch divide a borda com títulos e abas de outras janelas.
+ * Em cima e embaixo, menos da metade: o notch divide a borda com títulos e abas
+ * de outras janelas. Nas laterais não há título nem aba, e o teto sobe para 80%
+ * (L1): com os 45% de cima, três contas numa tela de notebook compactavam e a
+ * segunda janela e a pílula sumiam da faixa.
  */
-internal const val HUD_MAX_ALONG_FRACTION = 0.45f
+internal fun hudMaxAlongFraction(edge: HudEdge): Float = if (edge.isHorizontal) 0.45f else 0.8f
 
 /** Largura do balão: o teto do card do Codenotch (246px), com folga para "Reinicia ter 21h00". */
 internal val HUD_BALLOON_WIDTH = 264.dp
@@ -260,10 +281,9 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
                 HUD_BALLOON_QUOTA_BLOCK * run.quotas.size + HUD_BALLOON_SECTION_GAP * (run.quotas.size - 1)
         }
     }
-    // Os sinais de sessão (issue #265): título da seção e uma linha por sinal.
+    // Os sinais de sessão (issue #265), num aviso desde o F10.
     if (account.sessionSignals.isNotEmpty()) {
-        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_GROUP_HEADER +
-            HUD_BALLOON_FOOTER * account.sessionSignals.size
+        height += HUD_BALLOON_SECTION_GAP + hudSessionBannerHeight(account.sessionSignals.size)
     }
     if (account.detailLine != null) {
         height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
@@ -273,13 +293,17 @@ internal fun hudBalloonHeight(account: HudAccount): Dp {
     return height
 }
 
+/**
+ * O aviso dos sinais de sessão no balão da conta (F10): o mesmo `AppBanner` do
+ * aviso de atualização, título numa linha e um sinal por linha de detalhe.
+ */
+internal fun hudSessionBannerHeight(signals: Int): Dp = 8.dp * 2 + 16.dp + 17.dp * signals
+
 /** As linhas do balão da engrenagem. */
-internal val HUD_APP_BALLOON_CAPTION = 16.dp
-internal val HUD_APP_BALLOON_MODE_ROW = 24.dp
 internal val HUD_APP_BALLOON_ACTIONS = HUD_BALLOON_ACTIONS
 
-/** Quantos modos de janela o balão da engrenagem lista: os três do rodapé. */
-internal const val HUD_APP_BALLOON_MODES = 3
+/** F10: versão e contagem numa linha própria, sob o título. */
+internal val HUD_APP_BALLOON_STATUS = 16.dp
 
 /**
  * O aviso de atualização no balão da engrenagem é um `AppBanner` (issue #291): a
@@ -300,13 +324,12 @@ internal val HUD_APP_BALLOON_UPDATE_TEXT_WIDTH =
     HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2 - 2.dp - AppSpacing.md
 
 /**
- * A altura do balão da engrenagem: título com a contagem, os modos de janela, a
+ * A altura do balão da engrenagem: título, a linha de versão e contagem (F10), a
  * fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
  * com ação — o botão, na altura de controle do sistema.
  */
 internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
-    var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER +
-        HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_CAPTION + HUD_APP_BALLOON_MODE_ROW * HUD_APP_BALLOON_MODES +
+    var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER + HUD_APP_BALLOON_STATUS +
         HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
     if (hasUpdateIndicator) {
         height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_BANNER

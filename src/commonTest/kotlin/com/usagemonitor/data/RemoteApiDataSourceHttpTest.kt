@@ -361,6 +361,53 @@ class RemoteApiDataSourceHttpTest {
         assertEquals("""GitHub release HTTP 404: {"message":"not found"}""", error.message)
     }
 
+    @Test
+    fun `fetchGitHubReleases lists releases including prereleases`() = runTest {
+        var requestedUrl = ""
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient { request ->
+                requestedUrl = request.url.toString()
+                respond(
+                    content = ByteReadChannel(
+                        """
+                        [
+                          {"tag_name":"v42.0.0-beta.1","html_url":"https://example.test/b1","prerelease":true,"assets":[]},
+                          {"tag_name":"v41.0.0","html_url":"https://example.test/41","assets":[]}
+                        ]
+                        """.trimIndent()
+                    ),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        )
+
+        val releases = dataSource.fetchGitHubReleases("owner", "repo")
+
+        assertEquals("https://api.github.com/repos/owner/repo/releases?per_page=20", requestedUrl)
+        assertEquals(listOf("v42.0.0-beta.1", "v41.0.0"), releases.map { it.tagName })
+        assertEquals(listOf(true, false), releases.map { it.prerelease })
+    }
+
+    @Test
+    fun `fetchGitHubReleases throws readable error on non-2xx`() = runTest {
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel("""{"message":"boom"}"""),
+                    status = HttpStatusCode.InternalServerError,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+        )
+
+        val error = assertFailsWith<IllegalStateException> {
+            dataSource.fetchGitHubReleases("owner", "repo")
+        }
+
+        assertEquals("""GitHub release HTTP 500: {"message":"boom"}""", error.message)
+    }
+
     private fun jsonHttpClient(handler: io.ktor.client.engine.mock.MockRequestHandler): HttpClient {
         return HttpClient(MockEngine(handler)) {
             install(ContentNegotiation) {

@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.monthlyBudgetStatusOf
 import com.usagemonitor.domain.entity.startOfMonthMillis
 import com.usagemonitor.domain.repository.CliSessionRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 
 /**

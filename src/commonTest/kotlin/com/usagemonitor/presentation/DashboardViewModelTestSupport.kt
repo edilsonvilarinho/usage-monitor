@@ -36,8 +36,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.yield
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 
@@ -181,10 +181,14 @@ abstract class DashboardViewModelTestSupport {
         return GetUsageHistoryUseCase(historyRepository)
     }
 
-    protected fun updateUseCase(block: suspend () -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
+    /** [block] recebe o `includePrereleases` pedido — o canal beta (issue #355). */
+    protected fun updateUseCase(block: suspend (Boolean) -> Result<AppUpdateInfo?>): CheckForAppUpdateUseCase {
         val repository = object : AppUpdateRepository {
-            override suspend fun getLatestAvailableUpdate(currentVersion: String): Result<AppUpdateInfo?> {
-                return block()
+            override suspend fun getLatestAvailableUpdate(
+                currentVersion: String,
+                includePrereleases: Boolean
+            ): Result<AppUpdateInfo?> {
+                return block(includePrereleases)
             }
 
             // Fora do que estes testes exercitam: a janela de novidades tem

@@ -9,7 +9,8 @@
   - **Cadência adaptativa, o `shouldRefresh` do Codenotch** (`isTargetDue` em `RefreshSchedule.kt`, estado em `DashboardRefreshScheduler`): 60 s com sessão CLI rodando (`isBusy`, ligado em `AppViewModels` a `SessionPulseViewModel.activeTargets`), 5 min sem nenhuma, já no reset vencido desde a última tentativa, nunca em backoff. Uso não anda enquanto nada o usa, e bater no endpoint numa tarde parada só gasta orçamento de rate limit. As constantes ficam em `DashboardViewModelConfig`; se a trilha mostrar 429 da Anthropic a 60 s, o próximo degrau é 300 s (o valor do ai-usagebar), e o ajuste é uma linha.
   - **Volta do laço que lança não encerra o laço** (issue #326): cada volta de `startCountdown` roda em `runCountdownTick` dentro de `try/catch`; a falha vira breadcrumb `ERROR` e a volta seguinte espera `pollLoopRecoveryDelay` (30 s). Sem isso o `SupervisorJob` mantinha o app vivo com a coleta automática morta, que é o defeito do codenotch#316 (11 dias com o número congelado). `CancellationException` continua subindo, senão `onDestroy` não encerraria o laço. Teste: `DashboardViewModelCadenceTest.a failing tick does not stop the collection loop`, que reprova sem o `catch`.
   - **Um laço só**, que coleta só os alvos devidos e dorme até a próxima cadência, o próximo reset ou um sinal (coleta nova, sessão começando, janela voltando). A tentativa é marcada **no despacho** (`recordAttempt`), não no fim: o laço não pode escolher o mesmo alvo duas vezes. A janela minimizada segura só a cadência; o reset coleta mesmo escondida.
-  - **`refresh(target)`/`refresh(source)` mexem só no alvo pedido.** Antes a atualização de uma conta reiniciava a contagem de todas — o clique numa célula gastava o orçamento de rate limit das outras. A contagem do rodapé e do balão é a do alvo mais próximo (`publishNextPoll`), gravada em `nextRefreshAtMillis`; reabrir o app dentro dela não coleta de novo (`initialAttemptAnchor`).
+  - **`refresh(target)`/`refresh(source)` mexem só no alvo pedido.** Antes a atualização de uma conta reiniciava a contagem de todas — o clique numa célula gastava o orçamento de rate limit das outras. A contagem do rodapé e do balão é a do alvo mais próximo (`publishNextPoll`), gravada em `nextRefreshAtMillis`; reabrir o app dentro dela não coleta de novo (`initialAttemptAnchor`). A gravação compara com o **último prazo gravado**, nunca com o da tela (issue #331): o prazo inicial não é gravado, e no Windows o relógio fica parado por até ~15 ms — a primeira coleta empatava com ele e a gravação era pulada. Era a falha "intermitente" do `DashboardViewModelRefreshPersistenceTest`, que virou sistemática na suíte completa; o teste com relógio congelado reproduz o empate sempre.
+  - **`refresh(source)` de fonte já desligada poda e republica na hora** (`pruneAndPublish`), sem ir à rede. É o par que `SettingsActions.toggleApi` e `removeApiKey` chamam depois de tirar a fonte de `enabledApis`; antes o ramo era um `return` seco e o anel da fonte ficava na HUD até a coleta seguinte de outra fonte.
   - **Contas Anthropic devidas juntas saem espaçadas** por `anthropicStagger` (800 ms, `anthropicStaggerOrder`): o ai-usagebar registrou 429 com várias contas batendo juntas nos endpoints de uso e de token.
   - **Volta do sleep**: espera que termina mais de `sleepJumpThreshold` (2 min) depois do pedido é o PC acordando (`looksLikeWakeFromSleep`, o substituto na JVM do `didWakeNotification`), e todo alvo fica devido.
   - A fila de coletas (`DashboardFetchQueue`) e o funil de falhas (`DashboardFailureHandler`) saíram do view model pelo limite de 800 linhas.
@@ -72,7 +73,7 @@
 
 - **Comparativo período a período** (`UsagePeriodComparison`): a leitura do histórico passou a começar em `HistoryRange.previousWindowStart`, e os pontos anteriores entram no delta e, desde a #215, no gráfico como linha tracejada neutra (some sob zoom e quando há série sobreposta). Compara o **delta** de cada janela, nunca o acumulado: o acumulado zera no reset e a comparação viraria função de quando o reset caiu. Sem ponto na janela anterior não há comparação (zero ali significaria "não consumiu", quando foi "não havia dado"), e `changeRatio` é `null` com anterior zerado em vez de "infinito por cento". `TOTAL` não tem janela anterior. Série que só existe na janela anterior é descartada, e `lastUpdatedAt` continua sendo o carimbo da janela **corrente**.
 - **Semanal sobreposta à intervalar** (issue #320, `HistoryChartOverlay`): o card agrupado (`buildGenericHistoryGroups`) desenhava só a série `INTERVAL`; a `WEEKLY` existia só como tabela, e a progressão dela no intervalo não aparecia em lugar nenhum. Agora as duas dividem o gráfico, com legenda escrita (`5h`/`7d`, de `quotaWindowLabel`). A principal continua dona do que depende de índice — zoom, ponto em foco, reinícios —, e a sobreposta é casada **por carimbo de tempo**, nunca por índice: as duas saem da mesma coleta, mas nada garante a mesma contagem de pontos. Só com as duas percentuais (eixo 0–100% comum). Com sobreposição a linha do período anterior some: três traçados deixam de ser legíveis, e o comparativo continua na tabela.
-- **Análise por janela** (issue #320, `QuotaWindowAnalysis.kt`): "Consumido no período" somava os deltas de todas as janelas do intervalo e dividia pelo total de **uma** — trinta janelas de 5h numa semana davam 173%. `quotaWindowsOf` corta a série pelo mesmo critério de reinício da previsão (`splitIntoQuotaWindows`, que o `currentSegment` do repositório passou a usar: a última janela **é** o trecho corrente) e devolve por janela pico, instante em que esgotou (`null` = não esgotou), consumo em pontos percentuais e ritmo por hora. `quotaWindowStatsOf` faz as médias só sobre janelas **fechadas** — a aberta ainda sobe. `quotaHourlyDistributionOf` soma as subidas por hora BRT; a queda do reinício não entra. Tudo calculado **antes** da amostragem do Total: um ponto a cada N pode descartar justamente o pico ou o 100%. Saldo, cota reportada e série sem reinício conhecido não têm janela.
+- **Análise por janela** (issue #320, `QuotaWindowAnalysis.kt`): "Consumido no período" somava os deltas de todas as janelas do intervalo e dividia pelo total de **uma** — trinta janelas de 5h numa semana davam 173%. `quotaWindowsOf` corta a série pelo mesmo critério de reinício da previsão (`splitIntoQuotaWindows`, que o `currentSegment` do repositório passou a usar: a última janela **é** o trecho corrente) e devolve por janela pico, instante em que esgotou (`null` = não esgotou), consumo em pontos percentuais e ritmo por hora. `quotaWindowStatsOf` faz as médias só sobre janelas **fechadas** — a aberta ainda sobe. `quotaHourlyDistributionOf` soma as subidas por hora BRT; a queda do reinício não entra. Tudo calculado **antes** da amostragem do Total: um ponto a cada N pode descartar justamente o pico ou o 100%. Saldo, cota reportada e série sem **nenhum** reinício conhecido não têm janela. A leitura ociosa sem `resets_at` (5h da Anthropic sem sessão, Antigravity intacto) fica fora das janelas e da distribuição por hora; antes o **último** ponto decidia pela série inteira, e uma leitura ociosa apagava o painel "Janelas 5h" da Anthropic enquanto o Codex — que descarta a janela sem reinício no mapper — o mostrava.
 - **Seletor `5h | 7d | Ambas`** (issue #320, `HistoryQuotaView`, enum próprio — `BOTH` não é tipo de período): `selectQuotaView` só republica o `Success`, sem reler o SQLite, e a escolha sobrevive à troca de intervalo. Aparece só quando alguma família tem as duas janelas (`quotaViewLabels`); os rótulos saem das séries via `quotaWindowLabel`, porque a intervalar do MiniMax não é de 5 horas. O Codex passou para `GroupedHistoryContent` e ganha um card só para 5h+7d; reportada e mensal mantêm título e subtítulo da própria série. Na tabela, "Consumido no período" só fica para série **sem** janelas; com janelas entram "Janelas no intervalo" (com quantas esgotaram), "Pico médio por janela" e "Consumo médio por janela".
 - **Painel de janelas** (issue #320, `HistoryWindowAnalysis.kt`): abaixo da tabela de cada série visível, as janelas do intervalo (mais recentes primeiro, teto `HISTORY_WINDOW_ROW_LIMIT` = 8; as demais ficam no resumo agregado) com início **observado**, pico, tempo até esgotar contado da primeira leitura e ritmo; `null` vira `—`, nunca zero. Abaixo, 24 barras do consumo por hora BRT; a frase da hora de pico é a informação e o `contentDescription` do `Canvas`, as barras não levam número. Série sem janela e sem distribuição não ganha painel — um painel dizendo "sem janelas" seria cromo.
 - **Troca de intervalo sem piscar** (issue #320): `HistoryViewModel.reload(keepContent)` mantém o `Success` da mesma fonte com `isRefreshing = true` e o intervalo novo já marcado, e a tela esmaece o conteúdo (`REFRESHING_CONTENT_ALPHA`) até a leitura chegar. Antes cada troca publicava `Loading` e a janela inteira virava "Carregando histórico..." entre dois gráficos da mesma fonte. Trocar de **fonte** continua passando por `Loading`: o relatório anterior é de outra API. A entrada dos cards, a revelação da linha e o esmaecimento passaram para `appTween`, e com "Reduzir animações" viram salto — antes usavam `tween` cru e ignoravam a preferência.
@@ -152,20 +153,18 @@ multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
   própria e a plataforma reprovisiona `LocalDensity` na raiz de cada uma: provisionar na janela pai
   não atravessa para a filha, e a janela esquecida renderiza a 100% sem erro nenhum.
 - **A moldura não escala sozinha.** Densidade maior mostra o mesmo conteúdo maior dentro da mesma
-  janela, ou seja, menos conteúdo. `scaledWindowSize` corrige a janela principal pela razão entre a
-  escala aplicada e a nova — nunca contra 100, ou duas mudanças seguidas multiplicariam duas vezes —
-  e nos tamanhos default das outras janelas o fator entra na criação. Tamanho **persistido** é
-  escolha do usuário e não é reescalado, com uma exceção de uma vez só: quem já tinha janela salva
-  antes desta versão a recebe corrigida de 100 para o padrão novo, e é `hasPersistedUiScale` — chave
-  presente, não valor igual ao default — que fecha essa porta depois.
-- O redimensionamento acontece no commit do coletor com debounce, não no callback do slider: janela
-  AWT reposicionada por pixel arrastado é inutilizável. O conteúdo, esse, escala ao vivo.
+  janela, ou seja, menos conteúdo. A HUD se dimensiona pela própria geometria, que já recebe a
+  escala; nos tamanhos default das janelas modais o fator entra na criação. Tamanho **persistido** é
+  escolha do usuário e não é reescalado. (`scaledWindowSize`, que corrigia a janela principal pela
+  razão entre a escala aplicada e a nova, saiu com ela.)
+- A gravação acontece no commit do coletor com debounce, não no callback do slider. O conteúdo, esse,
+  escala ao vivo.
 
 **Monitores** (`ScreenLocator.kt`; issue #273): toda medida de tela lia o monitor padrão
 (`defaultScreenDevice`, `maximumWindowBounds`). As janelas com posição salva (Histórico, Sessões CLI,
-Uso e Presença do time) eram presas ao primário ao reabrir, e a principal nem guardava posição. Agora
+Uso e Presença do time) eram presas ao primário ao reabrir. Agora
 `workAreaForPosition` encaixa a janela na área útil do monitor que contém o retângulo salvo (a maior
-interseção), e a principal grava `windowX`/`windowY`, negativos inclusive. Sem posição, ou com o
+interseção), negativos inclusive; a HUD grava o monitor à parte (`HudWindowPreferences.kt`). Sem posição, ou com o
 retângulo fora de todo monitor, vale o padrão. As funções de escolha recebem a lista de monitores e são
 puras (`ScreenLocatorTest`, com monitor à direita, à esquerda e acima). **Monitores com escalas
 diferentes só se validam em máquina real**: cada monitor tem o próprio espaço de usuário escalado e o
@@ -174,8 +173,23 @@ app trata pixel como dp. Os testes não pegam isso.
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
 
+**Janela principal e dashboard — removidos do app** (setembro de 2026, plano
+[`hud-modo-unico-execucao.md`](planos/hud-modo-unico-execucao.md)): a barra HUD é o único modo de
+visualização. Saíram `MainWindowHost`, `DesktopWindowFrame`, a geometria persistida da janela
+(`windowWidth`/`windowHeight`/`windowPlacement`/`windowX`/`windowY`), "Manter sempre visível"
+(`alwaysOnTop`), o interruptor "Barra HUD", `Ctrl+Shift+H` e o sinal de janela minimizada
+(`isAppVisible`: a HUD nunca minimiza). As chaves antigas ficam órfãs no registro, sem leitura.
+- **O relatório de bug ganhou janela própria** (`BugReportWindow` em `AppWindowAnchor.kt`, uma
+  `AppDialogWindow`): ele morava dentro da janela principal, e a HUD tem o tamanho do notch. É também
+  a janela que abre no arranque depois de uma queda. A captura passa a ser da HUD.
+- **Perdas aceitas**: reordenar cards por arrasto, minimizar card, o card completo com "tentar de
+  novo" e a tela vazia "Abrir configurações". A HUD segue lendo o `cardOrder` gravado; recoletar é
+  clique no anel; sem API as Configurações abrem sozinhas.
+- `DashboardScreen`, a grade e o card continuam no código, consumidos só por testes e pelos geradores
+  de captura. As duas seções abaixo descrevem esse código, não uma tela do app.
+
 **Densidade do dashboard** (`DashboardScreen.SuccessContent` + `ResponsiveDashboardCardGrid`): a
-janela principal usa o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
+janela principal usava o **corpo denso** do protótipo — `AppSpacing.md` na horizontal, `AppSpacing.sm`
 na vertical e `AppSpacing.md` entre cards —, e não o `AppSpacing.lg` das outras cinco. É a única
 janela que o usuário deixa estreita ao lado do editor, e ali 16dp de margem mais 16dp de vão eram
 largura que faltava dentro do card. A coluna rolável **não** reserva folga para a barra de rolagem:
@@ -188,47 +202,18 @@ primeira colocação é salto, e por isso as capturas não mudam. Durante o arra
 disposta na ordem em que o card cairia, com as caixas do alvo **congeladas** no início — medir contra
 caixas que se movem com a prévia faria o vão pular de lado a cada quadro.
 
-**Modo somente cards** (`DesktopWindowFrame(compact)` + `DashboardScreen(showFooter)` +
-`CardsOnlyModePreferences.kt`): a janela sem barra de título e sem rodapé. **Não é valor novo em
-enum nenhum** — são dois booleanos, um por moldura, e a preferência é um `Boolean` em
-`PreferencesSettings`, ao lado de "manter sempre visível".
-- **A faixa de título só é composta durante o hover.** Ela carrega a `WindowDraggableArea`, que usa
-  arrasto **imediato**; o card usa `detectDragGesturesAfterLongPress`. Com a faixa presente o tempo
-  todo, o arrasto da janela venceria a pressão longa e reordenar o primeiro card seria impossível.
-  Invisível ela também não pode ser clicável: um botão de fechar transparente é pior que nenhum.
-- **Três saídas, e nenhuma é dispensável**: a faixa, o item na bandeja e `Ctrl+Shift+M`. O modo
-  esconde o botão de fechar e a engrenagem; com a janela coberta por outra, só o teclado resta. A
-  bandeja também passou a abrir as Configurações, que só existiam no rodapé.
-- A escala neutra dos geradores de captura não conhece o modo: `showFooter` é `true` por default, e
-  as capturas do README continuam com a moldura inteira.
-
-**Menu de modos no rodapé** (`WindowMode` + `AppMenu` + `FooterBar`; issue #187): o ícone que abre
-as três molduras — padrão, somente os cards e barra HUD — com a corrente marcada. Antes dele as duas
-molduras reduzidas só eram alcançadas por dois interruptores no meio da seção "Sistema" das
-Configurações, por `Ctrl+Shift+M`/`Ctrl+Shift+H` ou pela bandeja, e por isso só eram descobertas por
-acidente.
-- **`WindowMode` é enum novo, e as preferências continuam sendo dois booleanos.** `cardsOnlyMode` e
-  `hudMode` seguem separados em `PreferencesSettings`, e a exclusão mútua continua sendo regra dos
-  setters em `AppShellState.kt` (`changeHudMode`/`changeCardsOnlyMode`): o enum descreve o que o **controle** oferece, não como o estado é guardado.
-  Os rótulos são os **mesmos** das Configurações — dois nomes para a mesma moldura fariam o passo da
-  ajuda apontar para um controle que a tela chama de outra coisa.
-- **`AppMenu` é primitiva nova, e é `Popup` com a superfície deste sistema — não o `DropdownMenu` do
-  Material.** Aquele traz a própria superfície, o próprio raio, a própria animação de entrada e a
-  própria altura de item, e nenhum dos quatro é o deste sistema. O item selecionado carrega **marca
-  além do realce**, com o espaço da marca reservado em todas as linhas: sem isso o rótulo da
-  selecionada anda para o lado a cada troca de opção.
-- **O menu abre para cima quando não cabe abaixo**, e isso está afirmado por teste numa cena de
-  240×320dp — o piso de arrasto da janela principal. Popup no Compose Desktop é camada **dentro** da
-  janela, recortada pelos limites dela (a #164 pagou isso), e o rodapé é a última linha: um menu que
-  só soubesse abrir para baixo nasceria fora da janela.
-- **Ele existe só no modo padrão**, porque o rodapé só é composto ali. Os caminhos de volta continuam
-  sendo os quatro que já existiam, e nenhum deles some. `onWindowModeChange = null` esconde o
-  controle — mesmo padrão de `onOpenAdminOverview`, e é o que mantém os geradores de captura
-  intactos.
+**Modo somente cards e menu de modos — removidos** (setembro de 2026): a barra HUD passou a ser a
+moldura reduzida única. Saíram `DesktopWindowFrame(compact)` com a faixa revelada no hover,
+`DashboardScreen(showFooter)`, o enum `WindowMode` com o menu do rodapé e da faixa, as linhas de modo
+no balão da engrenagem da HUD, o interruptor "Somente os cards", o item da bandeja, `Ctrl+Shift+M` e o
+botão direito da HUD (hoje engolido pelo `hudPressGesture`, sem ação).
+- Uma migração de `cardsOnlyMode=true` para `hudMode=true` entrou no primeiro commit e saiu no
+  seguinte, quando a HUD passou a ser o único modo e `hudMode` deixou de existir.
+- `AppMenu` continua primitiva publicada, sem consumidor no app.
 
 **Piso de largura da tooltip de cota** (`shouldShowQuotaTooltip` em `ApiUsageCardDensity.kt`):
 abaixo de 320dp de card o popup não abre. Ele tem piso de 180dp e cinco a seis linhas de métrica, e
-a janela do modo somente cards tem ~230dp úteis — ali a tooltip cobre o card inteiro, escondendo
+a janela do antigo modo somente cards tinha ~230dp úteis — ali a tooltip cobre o card inteiro, escondendo
 justamente o número que o ponteiro apontava. Constante **própria** e não reuso de
 `NarrowCardWidthThreshold`, que coincide no valor mas responde a outra pergunta: uma é sobre apertar
 padding, a outra é sobre o popup caber. O preço está aceito: em card estreito não há caminho visual

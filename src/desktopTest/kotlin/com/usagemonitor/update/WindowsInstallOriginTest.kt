@@ -61,6 +61,37 @@ class WindowsInstallOriginTest {
         assertEquals(WindowsInstallOrigin.NSIS_PER_USER, origin)
     }
 
+    /**
+     * Os caminhos são tratados como caminhos do Windows em texto, e não pelo
+     * `java.io.File` de quem roda: no Linux a barra invertida não é separador, e
+     * esta classe falhava no job `tests-linux` (issue #342).
+     */
+    @Test
+    fun `forward slashes and dot segments resolve like the Windows path`() {
+        val origin = WindowsInstallOriginResolver.resolve(
+            isWindows = true,
+            installLocation = "C:/Users/someone/AppData/Local/Temp/../Usage Monitor",
+            executableCandidates = listOf("""C:\Users\someone\AppData\Local\Usage Monitor\.\Usage Monitor.exe"""),
+            hasNsisUninstaller = true
+        )
+
+        assertEquals(WindowsInstallOrigin.NSIS_PER_USER, origin)
+    }
+
+    // Antes um relativo virava absoluto pelo diretório atual; esta resposta
+    // autoriza a atualização automática, então relativo não autoriza nada.
+    @Test
+    fun `relative paths never authorize the update`() {
+        val origin = WindowsInstallOriginResolver.resolve(
+            isWindows = true,
+            installLocation = """Usage Monitor""",
+            executableCandidates = listOf("""Usage Monitor\Usage Monitor.exe"""),
+            hasNsisUninstaller = true
+        )
+
+        assertEquals(WindowsInstallOrigin.UNMANAGED, origin)
+    }
+
     @Test
     fun `quoted registry value is accepted`() {
         val origin = WindowsInstallOriginResolver.resolve(

@@ -8,7 +8,7 @@ import com.usagemonitor.domain.entity.TeamAccountUsage
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.toTeamBreakdown
 import com.usagemonitor.domain.repository.TeamAdminRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Consumo de **todas** as contas do servidor, para o painel do administrador.

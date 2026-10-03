@@ -13,7 +13,9 @@ import com.usagemonitor.domain.entity.shouldDiscardUpdateArtifacts
 import com.usagemonitor.domain.repository.AppUpdateInstaller
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.persistAutoUpdateEnabled
+import com.usagemonitor.persistReceiveBetaUpdates
 import com.usagemonitor.readPersistedAutoUpdateEnabled
+import com.usagemonitor.readPersistedReceiveBetaUpdates
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,7 +79,13 @@ internal class AutoUpdateController(
     val lastReceipt: AppUpdateReceipt?,
     /** Valor de USAGE_MONITOR_UPDATE_FEED_URL, quando definida. */
     val feedUrlOverride: String?,
-    private val persist: (Boolean) -> Unit
+    private val persist: (Boolean) -> Unit,
+    /**
+     * Canal beta (issue #355). Independe de [enabled]: sem atualização
+     * automática a beta é só anunciada, como qualquer versão.
+     */
+    val receiveBetaUpdates: MutableStateFlow<Boolean> = MutableStateFlow(false),
+    private val persistReceiveBetaUpdates: (Boolean) -> Unit = {}
 ) {
 
     /**
@@ -98,6 +106,11 @@ internal class AutoUpdateController(
     fun setEnabled(value: Boolean) {
         enabled.value = value
         persist(value)
+    }
+
+    fun setReceiveBetaUpdates(value: Boolean) {
+        receiveBetaUpdates.value = value
+        persistReceiveBetaUpdates(value)
     }
 
     /**
@@ -126,6 +139,9 @@ internal class AutoUpdateController(
  */
 @Composable
 internal fun AutoUpdateController.isEnabled(): Boolean = enabled.collectAsState().value
+
+@Composable
+internal fun AutoUpdateController.receivesBetaUpdates(): Boolean = receiveBetaUpdates.collectAsState().value
 
 @Composable
 internal fun rememberAutoUpdateController(
@@ -157,7 +173,9 @@ internal fun rememberAutoUpdateController(
             // I/O de disco para um valor que não muda com a janela aberta.
             lastReceipt = readUpdateReceipt(),
             feedUrlOverride = System.getenv(UPDATE_FEED_URL_ENV_VAR),
-            persist = { value -> persistAutoUpdateEnabled(settings, value) }
+            persist = { value -> persistAutoUpdateEnabled(settings, value) },
+            receiveBetaUpdates = MutableStateFlow(readPersistedReceiveBetaUpdates(settings)),
+            persistReceiveBetaUpdates = { value -> persistReceiveBetaUpdates(settings, value) }
         )
     }
 

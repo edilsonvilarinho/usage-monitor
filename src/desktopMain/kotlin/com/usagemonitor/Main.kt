@@ -5,7 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.window.Window
@@ -16,8 +18,8 @@ import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
+import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.update.ensureLinuxMenuIconCurrent
-import com.usagemonitor.update.readUpdateReceipt
 import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import kotlinx.coroutines.Dispatchers
@@ -33,10 +35,31 @@ import kotlin.system.exitProcess
 // seria um segundo dono da mesma resposta.
 internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 
+// O ícone muda de desenho com o tamanho (`tools/brand/render_icons.py`): o de
+// 512 px traz o nome escrito, que reduzido a 16 px viraria borrão. Janela e
+// bandeja leem cada um a faixa que é desenhada para o tamanho em que aparecem.
+private const val WINDOW_ICON_RESOURCE_PATH = "/icons/app_icon_window.png"
+private const val TRAY_ICON_RESOURCE_PATH = "/icons/app_icon_tray.png"
+
 internal const val CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
 
-internal fun loadWindowIcon() = runCatching {
-    val stream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return@runCatching null
+/**
+ * Espera do pré-aquecimento das modais, contada da HUD **pintada**, e não do início
+ * da composição. Os 10 s fixos da primeira versão perdiam o caso real: o usuário
+ * abriu as Configurações 4 s depois da HUD e pegou a janela fria (745 ms do clique
+ * ao quadro). As Configurações vêm primeiro — são as mais abertas —, as demais depois.
+ */
+private const val SETTINGS_PREWARM_DELAY_MILLIS = 800L
+private const val OTHER_MODALS_PREWARM_DELAY_MILLIS = 2_500L
+
+/** Ícone das janelas: as iniciais U·M, legíveis em 32–64 px. */
+internal fun loadWindowIcon() = loadIconResource(WINDOW_ICON_RESOURCE_PATH)
+
+/** Base do ícone da bandeja: só o núcleo com o disco, que é o que se lê em 16 px. */
+internal fun loadTrayIcon() = loadIconResource(TRAY_ICON_RESOURCE_PATH)
+
+private fun loadIconResource(path: String) = runCatching {
+    val stream = object {}.javaClass.getResourceAsStream(path) ?: return@runCatching null
     stream.use { resourceStream ->
         ImageIO.read(resourceStream).toPainter()
     }
@@ -139,7 +162,7 @@ internal fun runUsageMonitor(
     val dashboardState by viewModels.dashboard.uiState.collectAsState()
 
     val shell = remember {
-        AppShellState(settings, hasUpdateReceipt = readUpdateReceipt() != null, initialTargets = availableTargets)
+        AppShellState(settings, initialTargets = availableTargets)
     }
     // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
     // é o mesmo arranque que abre o relatório, então ela foi oferecida.
@@ -160,11 +183,13 @@ internal fun runUsageMonitor(
     val settingsActions = remember { SettingsActions(graph, viewModels, shell, modal, feedback, compositionScope) }
 
     val iconImage = remember { loadWindowIcon() }
+    val trayIconImage = remember { loadTrayIcon() }
     // A área útil é lida uma vez e vale para todas as janelas.
     val screenWorkArea = remember { availableWindowAreaDp() }
     val windows = rememberAppWindowStates(settings, shell.uiScalePercent, screenWorkArea)
-    PersistAppWindowStates(windows, settings, graph.isAppVisible)
-    AppPreferenceEffects(shell, settings, windows, availableTargets, feedback, breadcrumbs)
+    PersistAppWindowStates(windows, settings)
+    AppPreferenceEffects(shell, settings, availableTargets, feedback, breadcrumbs)
+    OpenSettingsWithoutApis(dashboardState, modal)
     SessionWindowBindings(viewModels, modal, dashboardState, shell.monthlyBudgetMicros)
 
     val shutdownApplication = remember(viewModels, singleInstanceGuard) {
@@ -178,24 +203,19 @@ internal fun runUsageMonitor(
     // fechar o banco.
     autoUpdate.bindRestart(shutdownApplication)
 
-    // Em modo HUD a janela principal está escondida: "Abrir" (bandeja, segunda
-    // instância) é pedir a janela, e a barra dá lugar a ela.
-    val restoreMainWindow = {
-        if (shell.hudMode) {
-            shell.changeHudMode(false)
-        }
-        windows.main.isMinimized = false
+    // A barra HUD é a única janela de visualização: "Abrir" (bandeja, segunda
+    // instância) traz a janela dela para a frente.
+    val focusHud = {
         graph.mainWindow?.let { window -> activateWindow(window) }
         Unit
     }
-    FocusRequestService(startup, restoreMainWindow)
+    FocusRequestService(startup, focusHud)
 
     if (isTraySupported) {
-        AppTrayHost(viewModels, shell, modal, iconImage, breadcrumbs, restoreMainWindow, shutdownApplication)
+        AppTrayHost(viewModels, shell, modal, trayIconImage, breadcrumbs, focusHud, shutdownApplication)
     }
 
-    // As ações do rodapé têm duas portas — o rodapé e a engrenagem da barra HUD —
-    // e são montadas uma vez só.
+    // As ações do rodapé moram no balão da engrenagem da barra HUD.
     val shellActions = buildShellActions(
         graph, viewModels, shell, modal, profileRecords, profileResolution, dashboardState, teamSettings
     )
@@ -203,25 +223,21 @@ internal fun runUsageMonitor(
     val teamSessionPulses by viewModels.sessionPulse.teamPulses.collectAsState()
     val accountColors = remember(profileRecords) { accountColorsOf(profileRecords) }
     val accountEmojis = remember(profileRecords) { accountEmojisOf(profileRecords) }
-    val decorations = CardDecorations(cliSessionPulses, teamSessionPulses, accountColors, accountEmojis)
 
-    MainWindowHost(
-        graph = graph,
-        viewModels = viewModels,
-        shell = shell,
-        modal = modal,
-        startup = startup,
-        windows = windows,
-        workArea = screenWorkArea,
-        iconImage = iconImage,
-        actions = shellActions,
-        enabledProfiles = profileResolution.enabledProfiles,
-        teamSettings = teamSettings,
-        decorations = decorations,
-        enabledCodexProfiles = enabledCodexProfiles,
-        pendingCrash = pendingCrash,
-        onQuit = shutdownApplication
-    )
+    // Pré-aquecimento das modais (ver `AppDialogWindow`): só depois de o arranque
+    // assentar, para não disputar a CPU com ele.
+    var hudShown by remember { mutableStateOf(false) }
+    var settingsPrewarmReady by remember { mutableStateOf(false) }
+    var modalPrewarmReady by remember { mutableStateOf(false) }
+    LaunchedEffect(hudShown) {
+        if (!hudShown) {
+            return@LaunchedEffect
+        }
+        delay(SETTINGS_PREWARM_DELAY_MILLIS)
+        settingsPrewarmReady = true
+        delay(OTHER_MODALS_PREWARM_DELAY_MILLIS - SETTINGS_PREWARM_DELAY_MILLIS)
+        modalPrewarmReady = true
+    }
 
     // O que as janelas modais recebem igual, montado uma vez: esquecer a escala
     // ou o movimento numa delas renderizaria errado sem erro nenhum.
@@ -231,14 +247,14 @@ internal fun runUsageMonitor(
         uiScalePercent = shell.uiScalePercent,
         motion = shell.motion,
         screenWorkArea = screenWorkArea,
-        breadcrumbs = breadcrumbs
+        breadcrumbs = breadcrumbs,
+        prewarmReady = modalPrewarmReady
     )
     ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamSettings, releaseNotes)
+    BugReportWindow(graph, shell, modal, pendingCrash, windows, modalEnvironment)
 
-    // A barra HUD numa janela própria (`HudWindow.kt`), sem mexer na geometria
-    // da janela principal.
-    if (shell.hudMode) {
-        HudWindowHost(
+    // A barra HUD numa janela própria (`HudWindow.kt`): a única de visualização.
+    HudWindowHost(
             settings = settings,
             viewModel = viewModels.dashboard,
             usageAlertViewModel = viewModels.usageAlert,
@@ -250,8 +266,10 @@ internal fun runUsageMonitor(
             windowOpacityPercent = shell.windowOpacityPercent,
             iconImage = iconImage,
             hudScreenArea = screenWorkArea,
-            onOpenFull = { shell.changeHudMode(false) },
-            onSwitchToCardsOnly = { shell.changeCardsOnlyMode(true) },
+            onWindowReady = { window ->
+                anchorAppWindow(window, graph, startup)
+                hudShown = true
+            },
             actions = shellActions,
             // O que o card de cada conta oferece, para os botões do balão.
             teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
@@ -263,7 +281,6 @@ internal fun runUsageMonitor(
             activeTargets = viewModels.sessionPulse.activeTargets,
             stalledSessions = viewModels.sessionPulse.stalledSessions
         )
-    }
 
     SettingsWindowHost(
         graph = graph,
@@ -275,7 +292,7 @@ internal fun runUsageMonitor(
         autoUpdate = autoUpdate,
         profileUiModels = profileUiModels,
         state = windows.settings,
-        environment = modalEnvironment
+        environment = modalEnvironment.copy(prewarmReady = settingsPrewarmReady)
     )
 }
 
@@ -313,18 +330,35 @@ private fun AppBackgroundWork(graph: AppGraph, viewModels: AppViewModels, single
 }
 
 /**
- * Atende a segunda instância pelo mesmo caminho do item "Abrir" da bandeja, e
- * não um segundo: um segundo seria outro lugar para esquecer de desminimizar. A
- * leitura vai para a IO porque este efeito roda na thread da interface.
+ * Sem API habilitada o notch diz "Nenhuma API" e não tem o que mostrar — é o
+ * estado da instalação nova. As Configurações abrem sozinhas uma vez por
+ * arranque; fechá-las não as reabre, e a engrenagem continua levando até lá.
  */
 @Composable
-private fun FocusRequestService(startup: AppStartup, restoreMainWindow: () -> Unit) {
+private fun OpenSettingsWithoutApis(dashboardState: UiState, modal: AppModalState) {
+    val noApis = dashboardState is UiState.NoApisEnabled
+    var offered by remember { mutableStateOf(false) }
+    LaunchedEffect(noApis) {
+        if (noApis && !offered) {
+            offered = true
+            modal.openSettings()
+        }
+    }
+}
+
+/**
+ * Atende a segunda instância pelo mesmo caminho do item "Abrir" da bandeja, e
+ * não um segundo. A leitura vai para a IO porque este efeito roda na thread da
+ * interface.
+ */
+@Composable
+private fun FocusRequestService(startup: AppStartup, focusHud: () -> Unit) {
     LaunchedEffect(startup) {
         while (isActive) {
             delay(FocusRequestChannel.POLL_INTERVAL_MILLIS)
             val focusRequested = withContext(Dispatchers.IO) { startup.focusRequests.consume() }
             if (focusRequested) {
-                restoreMainWindow()
+                focusHud()
                 withContext(Dispatchers.IO) { startup.record(StartupOutcome.FOCUS_REQUEST_SERVED) }
             }
         }

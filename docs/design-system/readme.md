@@ -137,9 +137,16 @@ ambient stays at 6dp because the dashboard gap is 12dp. **In dark, black shadow 
 (measured: 10dp darkens `#131010` by 3/255) — there the volume comes from light: highlight, sheen
 and the lit top border. Hierarchy is still read by layer and divider first.
 
-**Backgrounds.** No imagery, no illustration, no pattern, no texture. **One gradient only**: the
+**Backgrounds.** No imagery, no illustration, no pattern, no texture. **One surface gradient only**: the
 neutral top sheen of panels, cards and the HUD. Never an accent gradient, never behind a chart. The only graphics are data: line charts, bar series, a per-hour activity heatmap,
 stacked composition bars — all drawn in accent colors on `--raised`.
+**HUD exception — Gargantua (2026-09-28).** `AppGargantuaRing` has a procedural dark core,
+inclined gold accretion disc and gravitational lens inside its 64dp indicator. Dedicated
+`--gargantua-*` colours are scenery, never data, identity or a window background. Up to three
+quota arcs retain semantic colours and faithful percentages outside the scene; each is plasma in its own
+tone inside a glass tube (translucent wall, reflections lit from the upper left) and never changes
+length. The scene stays quiet so it never competes with the arcs or the session comet. This exception applies only to the HUD indicator; its surface and balloons
+keep the selected theme.
 
 **Borders and dividers.** 1px `--border` everywhere. A row owns its **bottom** divider (which is
 why a list needs no gap and the nested guide comes out continuous). The nested-group stroke is
@@ -148,8 +155,10 @@ paints after the content.
 
 **Transparency and blur.** No blur, no acrylic. **One transparent window**: the HUD notch, so it can
 have its silhouette and shadow; it is notch-sized at rest because a transparent pixel swallows the
-click (measured on Windows 11). Every window, the HUD included, keeps the user-set opacity (50–100%)
-applied to the whole window by the OS, not per element.
+click (measured on Windows 11). The main window and the HUD keep the user-set opacity (50–100%)
+applied to the whole window by the OS, not per element — except that on Windows the HUD never goes
+below 55%: at 50% the transparent window stops receiving the pointer. Modal windows use window
+opacity only for their own fade, and only on Windows.
 
 **Hover.** A `--hover-layer` is added over the surface below, text goes from `--muted` to
 `--fg`. Elevated surfaces (the dashboard card) also **lift**: one depth level up and 1dp higher,
@@ -174,7 +183,11 @@ General) turns every transition into an instant swap and stops anything continuo
 a **static skeleton**, never a shimmer. A refreshing card turns its refresh glyph (tinted `--info`)
 only while continuous motion is on; otherwise the glyph stays still and the label says
 "Atualizando…". Numbers that change (quota percent, metric value) slide in the direction of the
-change (`AppAnimatedNumber`).
+change (`AppAnimatedNumber`). Gargantua's decorative filaments use a 14000ms orbit, accelerating to
+4000ms while refreshing; attention breathes over 3200ms and the blue active-session comet orbits
+over 2600ms; plasma pulses cross each quota arc in 2800ms, fading out before either end. All
+require `continuous && !reduced`; the static scene remains complete. Quota arcs never rotate or
+change length, and provider marks never rotate.
 
 **Cards.** There are no "cards" in the decorative sense. There is one data surface: `--surface`
 fill, 1px border lit on top, radius 8, `--shadow-card`, top sheen and highlight, optional 2px
@@ -212,12 +225,15 @@ Claude asterisk, the OpenAI knot, the Cursor cube and the others are small monoc
 card headers and by the foreground inside a HUD ring. The provider name is always written beside
 the mark, so it is decorative for semantics. Control glyphs stay Unicode.
 
-**Brand mark.** Own geometric monogram, built by a deterministic script: three stems joined by a
-bowl, reads as **U** and **M** overlapped at large sizes and keeps a distinct silhouette at 16px,
-where the tray icon lives. In `assets/`: `mark.svg`, `mark-on-light.svg`, `lockup.svg`, and the
-tray states `mark-tray-warn.svg` / `mark-tray-crit.svg`. `ON_TRACK` lights nothing — a permanent
-green dot is decoration. This mark comes from the owner's own approved prototype; nothing was
-invented here.
+**App icon.** Gargantua with the name (round I10 of `usage-monitor-visual-options`, chosen by the
+owner), built by `tools/brand/render_icons.py` and drawn **per size**, because 16px cannot carry a
+word: from 96px the core with its disk over **USAGE MONITOR**; from 32 to 64px the initials
+**U·M** with a miniature Gargantua as the middle dot; at 24px and below the core with its disk
+alone. The band is picked by *logical* size (a 32px `@2x` chunk is a 16pt icon). Windows get the
+64px initials, the tray the 32px core, the Linux menu and the installers the full name. In
+`assets/`: `app-icon.png`, `app-icon-initials.png`, `app-icon-tray.png`, all written by the
+script. The tray risk dot and usage ring are drawn over the core; `ON_TRACK` lights nothing — a
+permanent green dot is decoration.
 
 ---
 
@@ -227,12 +243,12 @@ invented here.
 | --- | --- |
 | `styles.css` | Global entry point. `@import` lines only. |
 | `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
-| `assets/` | Monogram, light variant, lockup, tray badge states |
+| `assets/` | App icon per size band (full name, initials, tray core), written by `render_icons.py` |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip · AppGlyphChip |
-| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing · AppGargantuaRing (HUD) |
 | `components/feedback/` | AppBanner · AppDialog · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState |
-| `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar |
+| `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar · AppModalRevealRow (E9, how every modal opens and closes) |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |
 | `ui_kits/desktop-app/` | Click-through recreation: Dashboard, cards-only mode, History, CLI Sessions, Session detail, Team usage, Presence, Settings |
 | `_ds_local.js` | Mount helper so cards and kits render before/without the compiled bundle |
@@ -259,8 +275,11 @@ strip with a notch** docked to a screen edge (see `AppHudBar.prompt.md`) and add
 the eighth: one arc per quota, never a ring per vendor. Its third round stopped the notch from
 growing: hovering a ring opens a **balloon for that account only**, with the card's own buttons, and
 a move hand and a gear sit past its ends — the gear holding everything the footer offers. No new
-primitive: the balloon reuses the card's `CardActionButton` and the footer's action row. Nothing else
-was invented.
+primitive: the balloon reuses the card's `CardActionButton` and the footer's action row. The
+Gargantua pass adds a dedicated HUD indicator, `AppGargantuaRing`: 64dp instead of 44dp, with a
+decorative accretion scene separated from the quota arcs. `AppUsageRing` remains unchanged for
+other consumers. Both the scene and provider mapping support all eleven sources; provider marks,
+account colours and account badges remain identification, with no provider-specific animation.
 
 ### The conformance pass — 2026-08-27
 
@@ -296,7 +315,8 @@ charts and previews are the one place this system allows it.
 - **Fonts come from Google Fonts**, not from the app's embedded TTFs. If the app ships specific
   IBM Plex files (subset, hinted, or a different version), add them and replace
   `tokens/fonts.css` with local `@font-face` rules.
-- The prototype's section 15 lists open questions it does not decide (Compose Desktop 1.7.1 font
-  loading signature, the macOS `.icns` validation). Those remain open here too.
+- The prototype's section 15 lists open questions it does not decide (the macOS `.icns`
+  validation). Those remain open here too. The font loading signature, once open, is settled:
+  `Font(resource, weight, style)`, checked on Compose Desktop 1.7.1 and again on 1.12.1 (#351).
 - Team-trend and active-time features depend on server 0.6.0+/0.7.0+; the kit shows the
   supported case and the degraded banner, not every server version combination.

@@ -45,6 +45,25 @@
   --cread:     #4CAF50;
   --cwrite:    #FFA726;
   --savings:   #26C6DA;
+
+  /* HUD Gargantua: decorative scene inside the indicator only. The palette
+     stays the same in every theme; never use it for a quota or a window
+     surface. What the scene draws in light (glass wall, reflections, white
+     debris, lens) turns into ink on a light surface — see the two tokens
+     below and AppGargantuaRing.prompt.md, "Light surfaces". */
+  --gargantua-night: #080B12;
+  --gargantua-core:  #030508;
+  --gargantua-gold:  #E8AE63;
+  --gargantua-hot:   #FFF0CB;
+  --gargantua-dust:  #8C643F;
+  --gargantua-ember: #B4501E; /* receding side of the disc (Doppler) */
+  --gargantua-glass-ink: #FFFFFF;
+  --gargantua-lens:      #FFE6BE;
+  --gargantua-horizon: #07080B; /* HUD body in dark themes (M1); one step above the core */
+  /* HUD body (M1, event horizon): dark core and a photon-ring rim with Doppler. */
+  --hud-body: linear-gradient(transparent, transparent), linear-gradient(#07080B, #07080B);
+  --hud-rim: linear-gradient(to top right, rgb(180 80 30 / .35), rgb(232 174 99 / .40), rgb(255 240 203 / .60));
+  --hud-inner-glow: inset 0 0 0 2.5px rgb(255 240 203 / .08);
 }
 
 @media (prefers-color-scheme: light) {
@@ -76,6 +95,13 @@
     --cread:   #2E7D32;
     --cwrite:  #8A5000;
     --savings: #00697A;
+
+    --gargantua-glass-ink: var(--fg);
+    --gargantua-lens:      var(--gargantua-dust);
+    /* HUD body (M1) in light themes: the surface stays, only the rim takes the Doppler. */
+    --hud-body: linear-gradient(var(--sheen), transparent 56px), linear-gradient(var(--surface), var(--surface));
+    --hud-rim: linear-gradient(to top right, rgb(180 80 30 / .55), rgb(140 100 63 / .70), rgb(232 174 99 / .95));
+    --hud-inner-glow: inset 0 1px 0 var(--highlight);
   }
 }
 
@@ -107,6 +133,13 @@
   --cread:   #2E7D32;
   --cwrite:  #8A5000;
   --savings: #00697A;
+
+  --gargantua-glass-ink: var(--fg);
+  --gargantua-lens:      var(--gargantua-dust);
+  /* HUD body (M1) in light themes: the surface stays, only the rim takes the Doppler. */
+  --hud-body: linear-gradient(var(--sheen), transparent 56px), linear-gradient(var(--surface), var(--surface));
+  --hud-rim: linear-gradient(to top right, rgb(180 80 30 / .55), rgb(140 100 63 / .70), rgb(232 174 99 / .95));
+  --hud-inner-glow: inset 0 1px 0 var(--highlight);
 }
 
 :root[data-app-theme="dark"] {
@@ -137,4 +170,8 @@
   --cread:   #4CAF50;
   --cwrite:  #FFA726;
   --savings: #26C6DA;
+  /* HUD body (M1, event horizon): dark core and a photon-ring rim with Doppler. */
+  --hud-body: linear-gradient(transparent, transparent), linear-gradient(#07080B, #07080B);
+  --hud-rim: linear-gradient(to top right, rgb(180 80 30 / .35), rgb(232 174 99 / .40), rgb(255 240 203 / .60));
+  --hud-inner-glow: inset 0 0 0 2.5px rgb(255 240 203 / .08);
 }

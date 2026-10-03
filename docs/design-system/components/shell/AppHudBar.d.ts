@@ -4,6 +4,7 @@ import type { AppRingLevel } from '../data/AppUsageRing';
 export interface AppHudQuota {
   /** `5h`, `7d`, `Saldo` — last word of the quota label, for the ring description. */
   short: string;
+  period?: 'monthly' | 'weekly' | 'interval';
   /** The card's quota title in the balloon: `Sessão 5h`, `Semanal`. */
   title?: string;
   /** The card's truncated percentage. */
@@ -19,6 +20,9 @@ export interface AppHudQuota {
 
 export interface AppHudAccount {
   label: string;
+  provider?: string;
+  color?: string;
+  refreshing?: boolean;
   /** Word of the account's worst quota — always shown, even at rest. */
   statusLabel: string;
   level: AppRingLevel;
@@ -64,6 +68,8 @@ export interface AppHudBarProps {
   updateAction?: string;
   /** Glyphs of the card's buttons shown in an account balloon (refresh is always last). */
   actions?: string[];
+  continuous?: boolean;
+  reduced?: boolean;
   style?: CSSProperties;
 }
 

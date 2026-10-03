@@ -1,7 +1,5 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -40,8 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -65,16 +61,13 @@ import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import java.awt.Cursor
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import com.usagemonitor.domain.entity.AppLanguage
+import kotlin.time.Clock
+import kotlin.time.Instant
 import com.usagemonitor.presentation.ui.components.AppDivider
 import com.usagemonitor.presentation.ui.components.AppStatusDot
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
-import com.usagemonitor.presentation.ui.components.WindowMode
-import com.usagemonitor.presentation.ui.components.WindowModeMenuButton
 import com.usagemonitor.presentation.ui.components.formatRefreshCountdown
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppMotion
@@ -85,9 +78,6 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 // `applyWindowShape` continua reagindo a `componentResized`, senão a máscara
 // ficaria com o tamanho da janela anterior depois de qualquer redimensionamento.
 private val WindowCornerRadius = 10.dp
-
-/** Descrição semântica do botão que devolve a moldura completa da janela. */
-internal const val COMPACT_EXIT_DESCRIPTION = "Sair do modo somente cards"
 
 /**
  * Altura da barra de título das seis janelas.
@@ -110,171 +100,11 @@ private fun WindowScope.applyWindowShape(density: androidx.compose.ui.unit.Densi
 }
 
 @Composable
-fun WindowScope.DesktopWindowFrame(
-    title: String,
-    iconPainter: Painter?,
-    windowState: WindowState,
-    onCloseRequest: () -> Unit,
-    /**
-     * Modo somente cards: a barra de título sai do fluxo e vira uma faixa
-     * revelada ao passar o mouse no topo da janela.
-     */
-    compact: Boolean = false,
-    /** Volta ao modo normal; `null` esconde o botão correspondente na faixa. */
-    onExitCompact: (() -> Unit)? = null,
-    /**
-     * Idioma do menu de modos revelado no modo "Somente cards"
-     * ([onWindowModeChange]). Sem efeito quando ele é `null`.
-     */
-    language: AppLanguage = AppLanguage.PT,
-    /** A moldura em que a janela está agora — marcada no menu, quando existe. */
-    windowMode: WindowMode = WindowMode.STANDARD,
-    /**
-     * Troca de moldura direto da faixa revelada do modo "Somente cards", sem
-     * passar pelo Padrão primeiro (issue #215).
-     *
-     * `null` esconde o controle — mesmo padrão de [onExitCompact]: os
-     * geradores de captura montam a moldura sem despachar nada.
-     */
-    onWindowModeChange: ((WindowMode) -> Unit)? = null,
-    content: @Composable () -> Unit
-) {
-    val density = LocalDensity.current
-    val isMaximized = windowState.placement == WindowPlacement.Maximized
-
-    // Cantos arredondados pressupõem a janela flutuando sobre o desktop. A
-    // barra HUD não passa mais por aqui: ela tem janela própria
-    // (`HudWindowHost`).
-    DisposableEffect(isMaximized, density) {
-        if (isMaximized) {
-            window.shape = null
-        } else {
-            applyWindowShape(density, WindowCornerRadius)
-            val listener = object : java.awt.event.ComponentAdapter() {
-                override fun componentResized(e: java.awt.event.ComponentEvent) {
-                    applyWindowShape(density, WindowCornerRadius)
-                }
-            }
-            window.addComponentListener(listener)
-            return@DisposableEffect onDispose { window.removeComponentListener(listener) }
-        }
-        onDispose {}
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (!compact) {
-                DesktopTitleBar(
-                    title = title,
-                    iconPainter = iconPainter,
-                    windowState = windowState,
-                    onCloseRequest = onCloseRequest
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(MaterialTheme.colorScheme.background)
-            ) {
-                content()
-
-                if (compact) {
-                    CompactTitleBarOverlay(
-                        title = title,
-                        iconPainter = iconPainter,
-                        windowState = windowState,
-                        onCloseRequest = onCloseRequest,
-                        onExitCompact = onExitCompact,
-                        language = language,
-                        windowMode = windowMode,
-                        onWindowModeChange = onWindowModeChange,
-                        modifier = Modifier.align(Alignment.TopStart)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * A barra de título do modo somente cards: existe só enquanto o mouse está nela.
- *
- * **Sobreposta, e não linha da `Column`.** Entrando no fluxo, revelar a barra
- * empurraria os cards para baixo a cada passagem do mouse pelo topo.
- *
- * **Só é composta quando o ponteiro está dentro.** A `WindowDraggableArea` que ela
- * carrega usa arrasto imediato, e o card usa arrasto **depois de pressão longa**:
- * com a faixa sempre presente, o arrasto da janela venceria a pressão longa e
- * reordenar o primeiro card ficaria impossível na faixa superior. Fora do hover
- * não há área de arrasto nenhuma; dentro dela, mover a janela é o que se espera.
- *
- * A transição é única, não um laço: animação infinita trava o `waitForIdle`.
- */
-@Composable
-private fun WindowScope.CompactTitleBarOverlay(
-    title: String,
-    iconPainter: Painter?,
-    windowState: WindowState,
-    onCloseRequest: () -> Unit,
-    onExitCompact: (() -> Unit)?,
-    language: AppLanguage,
-    windowMode: WindowMode,
-    onWindowModeChange: ((WindowMode) -> Unit)?,
-    modifier: Modifier = Modifier
-) {
-    val hoverInteraction = remember { MutableInteractionSource() }
-    val isHovered by hoverInteraction.collectIsHoveredAsState()
-    val revealAlpha by animateFloatAsState(
-        targetValue = if (isHovered) 1f else 0f,
-        animationSpec = tween(durationMillis = AppMotion.fast, easing = AppMotion.enterEasing),
-        label = "compactTitleBarAlpha"
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(TITLE_BAR_HEIGHT)
-            .hoverable(hoverInteraction)
-    ) {
-        // Invisível não pode continuar clicável: um botão de fechar transparente
-        // no canto superior direito é pior que botão nenhum.
-        if (revealAlpha <= 0.01f) {
-            return@Box
-        }
-
-        Column(modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = revealAlpha }) {
-            DesktopTitleBar(
-                title = title,
-                iconPainter = iconPainter,
-                windowState = windowState,
-                onCloseRequest = onCloseRequest,
-                onExitCompact = onExitCompact,
-                language = language,
-                windowMode = windowMode,
-                onWindowModeChange = onWindowModeChange
-            )
-        }
-    }
-}
-
-@Composable
 fun WindowScope.DesktopDialogFrame(
     title: String,
     iconPainter: Painter?,
     windowState: WindowState? = null,
     onCloseRequest: () -> Unit,
-    /**
-     * Escala do conteúdo, lida no desenho. Quem a anima é o host da janela
-     * (`AppDialogWindow`), que é quem sabe quando a janela está de fato na tela:
-     * a moldura animando sozinha começava antes do primeiro quadro pintado, e a
-     * entrada se perdia no custo de criar a janela.
-     */
-    contentScale: () -> Float = { 1f },
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
@@ -297,14 +127,7 @@ fun WindowScope.DesktopDialogFrame(
     }
 
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                val scale = contentScale()
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(0.5f, 0.3f)
-            },
+        modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -324,106 +147,6 @@ fun WindowScope.DesktopDialogFrame(
             }
         }
     }
-}
-
-@Composable
-private fun WindowScope.DesktopTitleBar(
-    title: String,
-    iconPainter: Painter?,
-    windowState: WindowState,
-    onCloseRequest: () -> Unit,
-    /** Presente só na faixa do modo somente cards. */
-    onExitCompact: (() -> Unit)? = null,
-    /**
-     * Os três a seguir existem só para o menu de modos (issue #215) — sem
-     * efeito na barra de título normal, que não os recebe.
-     */
-    language: AppLanguage = AppLanguage.PT,
-    windowMode: WindowMode = WindowMode.STANDARD,
-    onWindowModeChange: ((WindowMode) -> Unit)? = null
-) {
-    WindowDraggableArea {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 34dp: a barra é cromo, e oito dp a menos por janela são oito
-                // dp a mais de dado em seis janelas.
-                .height(TITLE_BAR_HEIGHT)
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(start = AppSpacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (iconPainter != null) {
-                    Icon(
-                        painter = iconPainter,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.Unspecified
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Primeiro do grupo, mesmo lugar do rodapé: as demais agem
-                // sobre o conteúdo da janela, esta troca a moldura dela — e é
-                // a saída direta para a Barra HUD que a issue #215 pedia (sem
-                // o botão ▣ ao lado, a única volta seria pelo Padrão).
-                if (onWindowModeChange != null) {
-                    WindowModeMenuButton(
-                        language = language,
-                        windowMode = windowMode,
-                        onWindowModeChange = onWindowModeChange
-                    )
-                }
-                if (onExitCompact != null) {
-                    TitleBarButton(
-                        label = "▣",
-                        description = COMPACT_EXIT_DESCRIPTION,
-                        onClick = onExitCompact
-                    )
-                }
-                TitleBarButton(
-                    label = "—",
-                    onClick = { windowState.isMinimized = true }
-                )
-                TitleBarButton(
-                    label = if (windowState.placement == WindowPlacement.Maximized) "❐" else "□",
-                    onClick = {
-                        windowState.placement = if (windowState.placement == WindowPlacement.Maximized) {
-                            WindowPlacement.Floating
-                        } else {
-                            WindowPlacement.Maximized
-                        }
-                    }
-                )
-                TitleBarButton(
-                    label = "×",
-                    hoverColor = MaterialTheme.colorScheme.error,
-                    onClick = onCloseRequest
-                )
-            }
-        }
-    }
-
-    // `AppDivider`, e não o `HorizontalDivider` do Material com meia opacidade:
-    // o sistema tem uma divisória só, de 1dp em `outlineVariant`, e a moldura da
-    // janela não é exceção.
-    AppDivider()
 }
 
 @Composable
@@ -504,7 +227,7 @@ internal fun TitleBarButton(
      * Descrição semântica de ações cujo glifo não se explica.
      *
      * Minimizar, maximizar e fechar são o vocabulário de janela que todo sistema
-     * desenha igual; o quadrado do modo somente cards, não.
+     * desenha igual e dispensam descrição; um glifo fora dele, não.
      */
     description: String? = null,
     hoverColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)

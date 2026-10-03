@@ -1,6 +1,6 @@
 package com.usagemonitor.presentation.ui
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import com.usagemonitor.domain.entity.UsageExportFormat

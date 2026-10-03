@@ -11,7 +11,7 @@ import com.usagemonitor.domain.entity.CodexCliSessionTurn
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream

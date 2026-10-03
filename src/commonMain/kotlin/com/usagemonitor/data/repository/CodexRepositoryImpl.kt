@@ -11,7 +11,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.repository.CodexRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /** As duas leituras locais de uma conta Codex: sessão (`auth.json` + `cap_sid`) e rollout. */
 class CodexProfileSources(

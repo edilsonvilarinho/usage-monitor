@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /** Classificação observada no campo `session_meta.source` do rollout. */
 enum class CodexCliRolloutSource {

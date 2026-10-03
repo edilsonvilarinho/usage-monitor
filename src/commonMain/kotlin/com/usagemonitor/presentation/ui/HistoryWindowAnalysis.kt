@@ -31,7 +31,7 @@ import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.roundToLong
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /** Janelas listadas por painel; as mais antigas ficam só no resumo agregado. */
 internal const val HISTORY_WINDOW_ROW_LIMIT = 8

@@ -6,7 +6,7 @@ import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionTailOutcome
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import java.sql.DriverManager
 import kotlin.io.path.createTempDirectory

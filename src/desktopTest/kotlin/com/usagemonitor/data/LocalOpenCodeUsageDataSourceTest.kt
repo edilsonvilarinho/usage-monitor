@@ -2,7 +2,7 @@ package com.usagemonitor.data
 
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import java.nio.file.Files
 import java.sql.DriverManager

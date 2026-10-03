@@ -147,11 +147,15 @@ class LinuxInstallLayoutTest {
     }
 
     @Test
-    fun `version names accept up to four numeric components`() {
-        listOf("1", "1.2", "39.0.0", "39.0.0.1").forEach { value ->
+    fun `version names accept up to four numeric components and a beta suffix`() {
+        listOf("1", "1.2", "39.0.0", "39.0.0.1", "39.0.0-beta.1", "39.0.0-beta.12").forEach { value ->
             assertTrue(isValidLinuxVersionName(value), "recusou '$value'")
         }
-        listOf("", "v39", "39.0.0-rc1", "39..0", "39.0.0.1.2", "..", "39/0").forEach { value ->
+        listOf(
+            "", "v39", "39.0.0-rc1", "39..0", "39.0.0.1.2", "..", "39/0",
+            "39.0.0-beta", "39.0.0-beta.", "39.0.0-beta.1x", "39.0.0-beta.1/..", "../..-beta.1",
+            "39.0.0-beta.1-beta.2"
+        ).forEach { value ->
             assertFalse(isValidLinuxVersionName(value), "aceitou '$value'")
         }
     }

@@ -40,8 +40,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -88,6 +88,54 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
             val state = viewModel.uiState.value as? UiState.Success ?: return@awaitCondition false
             state.data.singleOrNull() == emptyKiloStats
         }
+
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `disabling a source drops its reading without a new fetch`() = runTest {
+        val enabledApis = MutableStateFlow(setOf(ApiSource.DEEPSEEK, ApiSource.KILO))
+        val deepSeekStats = ApiUsageStats(source = ApiSource.DEEPSEEK, apiName = "DeepSeek", quotas = emptyList())
+        val kiloStats = ApiUsageStats(source = ApiSource.KILO, apiName = "Kilo Free", quotas = emptyList())
+        var deepSeekCalls = 0
+        val viewModel = DashboardViewModel(
+            getAnthropicUsage = GetAnthropicUsageUseCase(object : AnthropicRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getMiniMaxUsage = GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getCodexUsage = GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            getDeepSeekUsage = GetDeepSeekUsageUseCase(object : DeepSeekRepository {
+                override suspend fun getUsage(): Result<ApiUsageStats> {
+                    deepSeekCalls += 1
+                    return Result.success(deepSeekStats)
+                }
+            }),
+            enabledApis = enabledApis,
+            recordUsageSnapshot = historyUseCase(mutableListOf()),
+            getKiloUsage = GetKiloUsageUseCase(object : KiloRepository {
+                override suspend fun getUsage(): Result<ApiUsageStats> = Result.success(kiloStats)
+            }),
+            config = manualRefreshConfig()
+        )
+
+        viewModel.refresh()
+        awaitCondition { (viewModel.uiState.value as? UiState.Success)?.data?.size == 2 }
+        val callsBeforeDisable = deepSeekCalls
+
+        // O mesmo par que `SettingsActions.toggleApi` faz ao desligar a fonte.
+        enabledApis.value = setOf(ApiSource.KILO)
+        viewModel.refresh(ApiSource.DEEPSEEK)
+
+        awaitCondition { (viewModel.uiState.value as? UiState.Success)?.data == listOf(kiloStats) }
+        assertEquals(callsBeforeDisable, deepSeekCalls)
+
+        enabledApis.value = emptySet()
+        viewModel.refresh(ApiSource.KILO)
+        awaitCondition { viewModel.uiState.value == UiState.NoApisEnabled }
 
         viewModel.onDestroy()
     }

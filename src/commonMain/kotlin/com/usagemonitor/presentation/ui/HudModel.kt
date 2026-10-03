@@ -26,7 +26,7 @@ import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import com.usagemonitor.presentation.ui.components.toneFor
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Uma conta na barra HUD: o que o notch mostra em repouso e o que o painel
@@ -87,7 +87,13 @@ data class HudAccount(
      * #265), já em texto. Vazio é "nada a dizer": o balão não abre a seção.
      * Dono único: [hudSessionSignals].
      */
-    val sessionSignals: List<HudSessionSignal> = emptyList()
+    val sessionSignals: List<HudSessionSignal> = emptyList(),
+    /**
+     * Se a conta está nascendo (API ativada), saindo (API desativada) ou parada
+     * na faixa. Dono único: [mergeHudPresence]; `buildHudAccounts` sempre entrega
+     * [HudPresence.SHOWN].
+     */
+    val presence: HudPresence = HudPresence.SHOWN
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -199,7 +205,22 @@ data class HudQuota(
     val usedLeft: HudUsedLeft? = null,
     /** A janela da cota; decide a posição do anel. `null` conta como `REPORTED`, por dentro. */
     val periodType: PeriodType? = null
-)
+) {
+    /** "87% usado · 13% restante": a linha inteira, para leitor de tela e trilha. */
+    val usedLeftText: String?
+        get() = usedLeft?.text
+}
+
+/**
+ * As duas metades da linha de baixo de cada cota no balão (F10): o **restante**
+ * vai à esquerda, na cor do texto, e o usado à direita, apagado — o que interessa
+ * numa olhada é quanto sobra. Os textos já vêm na língua do app.
+ */
+@Immutable
+data class HudUsedLeft(val used: String, val left: String) {
+    val text: String
+        get() = "$used · $left"
+}
 
 /** Uma linha de texto do notch: a janela (`null` sem janela a distinguir) e o percentual. */
 @Immutable
@@ -209,23 +230,8 @@ data class HudStripLine(val label: String?, val percentText: String) {
         get() = if (label == null) percentText else "$label $percentText"
 }
 
-/** Textos esquerdo e direito abaixo da barra de progresso no balão. */
-@Immutable
-data class HudUsedLeft(val usedText: String, val leftText: String)
-
 /** Os anéis que cabem num notch sem virarem um alvo de tiro. */
 const val MAX_HUD_RINGS = 3
-
-/**
- * A troca automática para a HUD na instalação nova (issue #277): pendente, com
- * ao menos uma conta para o notch mostrar e **sem janela modal aberta**. Na
- * primeira execução quem está aberta costuma ser Configurações, e esconder a
- * janela principal no meio da configuração tiraria o chão de quem configura.
- * Sem conta nenhuma o notch diria "Carregando" para sempre.
- */
-internal fun hudDefaultShouldSwitch(pending: Boolean, hasHudAccounts: Boolean, modalOpen: Boolean): Boolean {
-    return pending && hasHudAccounts && !modalOpen
-}
 
 /**
  * A palavra do notch sem conta. "Carregando" é o estado de quem ainda vai ter
@@ -403,6 +409,9 @@ internal fun hudQuotaTitle(quota: QuotaInfo, language: AppLanguage): String {
  *
  * Sem teto não há restante: saldo pré-pago e atividade observada devolvem `null`.
  */
+internal fun hudUsedLeftText(quota: QuotaInfo, language: AppLanguage): String? = hudUsedLeft(quota, language)?.text
+
+/** As duas metades de [hudUsedLeftText], separadas para o balão (F10). */
 internal fun hudUsedLeft(quota: QuotaInfo, language: AppLanguage): HudUsedLeft? {
     if (quota.unit == UsageUnit.CURRENCY_USD || quota.isExtraCreditsQuota) return null
     if (quota.unit != UsageUnit.PERCENTAGE && quota.total <= 0L) return null
@@ -411,9 +420,9 @@ internal fun hudUsedLeft(quota: QuotaInfo, language: AppLanguage): HudUsedLeft? 
     val used = if (exact > 0f && exact < 1f) "<1" else usedWhole.toString()
     val left = if (exact > 99f && exact < 100f) "<1" else (100 - usedWhole).coerceAtLeast(0).toString()
     return if (language == AppLanguage.PT) {
-        HudUsedLeft("$used% usado", "$left% restante")
+        HudUsedLeft(used = "$used% usado", left = "$left% restante")
     } else {
-        HudUsedLeft("$used% used", "$left% left")
+        HudUsedLeft(used = "$used% used", left = "$left% left")
     }
 }
 

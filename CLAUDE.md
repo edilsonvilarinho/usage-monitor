@@ -133,12 +133,16 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 - Auto-start: entrada com `--autostart`; o **nome** do valor `Run` não muda. Agendador de Tarefas
   foi medido e recusado.
 - Segunda instância nunca sai calada: pedido em `~/.usage-monitor/focus.request`, atendido por
-  `restoreMainWindow`. `activateWindow` alterna `alwaysOnTop` `false → true → anterior`.
+  `focusHud` (a janela da HUD). `activateWindow` alterna `alwaysOnTop` `false → true → anterior`.
 - Atualização automática: SHA-256 contra o `digest` da API do GitHub; flags de build e piso de
   versão por plataforma; Windows só NSIS per-user; Linux só árvore XDG gerenciada. Texto de
   reinício diz **o que** reinicia. Progresso é texto, não animação.
 - Novidades: gatilho é `CURRENT_APP_VERSION` ≠ `releaseNotesSeenVersion`, **nunca** o recibo.
-  Ordenação de versões só em `AppVersionComparison.kt`.
+  Ordenação de versões só em `AppVersionComparison.kt` (SemVer: `X.Y.Z-beta.N < X.Y.Z`).
+- Canal beta (#355): tag `vX.Y.Z-beta.N` publicada como prerelease e **nunca** `latest` — é isso que
+  protege quem não optou. Opt-in `receiveBetaUpdates`; desligar não faz downgrade; só o sufixo
+  `-beta.N` é aceito (workflow e updater do Linux). Exe/Dmg levam só o número; Deb/Rpm `~beta.N`.
+  Publicação pela skill `usage-monitor-release-beta`.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia
   imutável dos bytes; laço de quadros em `desktopMain`; `gradlew.bat generateHelpMedia` regenera.
 
@@ -147,24 +151,27 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 Manual, sem framework. `AppGraph.kt` monta data sources, repositórios e use cases (sequência
 `HttpClient(OkHttp)` → datasources → repos → use cases); `AppViewModels.kt` monta os view models e é
 o **dono único do encerramento** (`shutdown()`, idempotente), chamado pela saída do app, pelo
-`onDispose` da composição e pelo shutdown hook — antes eram três cópias divergentes, o hook não
-fechava o índice do Codex e a saída pela janela não fechava o `profileRegistry`.
-`Main.kt` só faz o arranque e compõe os hosts (`MainWindowHost`, `ModalWindowsHost`,
-`SettingsWindowHost`, `AppTrayHost`, `HudWindowHost`); estado de shell e de modais mora em
+`onDispose` da composição e pelo shutdown hook — nunca uma segunda cópia (histórico no plano #298).
+`Main.kt` só faz o arranque e compõe os hosts (`HudWindowHost`, `ModalWindowsHost`,
+`BugReportWindow`, `SettingsWindowHost`, `AppTrayHost`). **Não há janela principal**: a HUD é a
+única de visualização e a âncora do app (`anchorAppWindow`: `graph.mainWindow`, registro de
+arranque e ACK de atualização); estado de shell e de modais mora em
 `AppShellState`/`AppModalState`. Os arquivos ficaram no pacote `com.usagemonitor`, e não num
 subpacote, para não abrir a visibilidade dos helpers `internal`/`private` que eles usam.
 
-**O `gradle.properties` dá 3 GB ao daemon, e isso não é mais paliativo de um método gigante.** O
-`main()` de ~2.400 linhas foi quebrado (#298), e o build sem a folga continua em
-`OutOfMemoryError: GC overhead limit exceeded`, agora num composable de ~165 linhas: falta heap para
-o módulo, não para um método. Medida e números em
-[`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md).
+**O `gradle.properties` dá 3 GB ao daemon, e não é paliativo:** sem a folga o build cai em
+`OutOfMemoryError: GC overhead limit exceeded` — falta heap para o módulo, não para um método. Medida
+em [`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md) (M7).
 
 ## Regras de arquitetura e tamanho
 
 Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que roda no `allTests`
 — a regra não depende de revisão lembrar dela.
 
+- **Comportamento nativo medido numa plataforma só nasce restrito a ela** (issue #340): chamada ao
+  sistema de janelas medida só no Windows entra atrás de função pura com teste da lista de
+  plataformas (precedente: `hudUsesHitRegion`); liberar outra plataforma é decisão com medição.
+  `window.shape`/`setShape` só em `HudWindow.kt` e `DesktopWindowFrame.kt` — outro arquivo falha.
 - **Direção das camadas por import**: `domain` não importa Ktor, Compose, `kotlinx.serialization`,
   `java.io`, `data` nem `presentation`; `data` não importa `presentation` nem Compose;
   `presentation` não importa `data`. Quando a apresentação precisa de algo de `data`, o contrato
@@ -172,12 +179,9 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 - **Arquivo de produção ≤ 800 linhas; função ≤ 300**, medida por varredura de chaves que ignora
   comentário e string. Nada de arquivo-deus nem composable-deus: estado, efeitos e ações de uma
   janela moram em arquivos próprios, e um host compõe.
-- **As exceções eram uma lista congelada com teto exato** (`FILE_CEILINGS`/`FUNCTION_CEILINGS`), e
-  **as duas estão vazias desde as issues #302–#309**. O mecanismo continua no teste, mas não há
-  item para ele congelar: arquivo ou função acima do limite falha direto. **Exceção nova não entra
-  na lista** — divida o arquivo. Vários arquivos ficaram entre 750 e 800 linhas
-  (`DashboardViewModel`, `LocalCliSessionDataSource`, `ApiUsageCardFormatting`, `AutoStartManager`):
-  a próxima mudança neles começa extraindo, não crescendo.
+- **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
+  divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas (`DashboardViewModel`, `LocalCliSessionDataSource`,
+  `ApiUsageCardFormatting`, `AutoStartManager`), a próxima mudança começa extraindo, não crescendo.
 
 ## Integração com time (`server/`)
 
@@ -230,11 +234,10 @@ precisão.
 **Nenhuma tela reimplementa uma primitiva.** Antes de escrever `Surface`, `Card`, `Modifier.border`,
 `.background` com cor de superfície ou `RoundedCornerShape`, procure em
 `presentation/ui/components/` — `AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e os vizinhos
-`AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt` e
-`AppTooltip.kt`, que saíram dos dois primeiros pelo limite de 800 linhas (#308). Se a primitiva não
-existir, o commit que a cria e o commit que a consome são o mesmo — primitiva construída e não
-adotada não conserta nada, e é exatamente assim que `AppWindowScaffold`, `AppToolbar`, `AppTooltip` e
-`AppEmptyState` ficaram meses com adoção zero.
+`AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt`, `AppTooltip.kt`
+e `AppStatusPill.kt`. Se a primitiva não existir, o commit que a cria e o commit que a consome são o
+mesmo: primitiva sem adoção não conserta nada (histórico em
+[`compose-implementation.md`](docs/design-system/compose-implementation.md)).
 
 **Cor de acento sai de `AppAccents.current` e de `AppTone`**, nunca de `darkAppAccents` ou
 `lightAppAccents` diretamente. Um `val` de topo de arquivo é resolvido uma vez por processo e não lê
@@ -263,50 +266,32 @@ Regras:
 - Motion: tween para cor/opacidade, mola para posição/tamanho; só `GENTLE`/`SNAPPY`/`EXPRESSIVE`;
   **sem overshoot em dado**. `AppMotionPolicy` nasce `Static`; só o `Main` passa a preferência, e
   **a todas as janelas**.
-- Modais: todas por `AppDialogWindow`; a janela nasce na primeira abertura e depois só se esconde;
+- Modais: todas por `AppDialogWindow`; a janela nasce na primeira abertura (ou no pré-aquecimento
+  opt-in, só Windows) e depois só se esconde;
   pedido por `StateFlow`; nome na trilha é fixo (`diagnosticName`). Diálogo interno é `AppDialog`,
   nunca `AlertDialog`.
 - Tipografia: Plex Mono em `label*`/`title*`/`headline*`/`display*`, Plex Sans em `body*`; carga do
   classpath, **nunca** `composeResources`. Número é `label*`.
-- Primitivas stateless em `presentation/ui/components/App*.kt` — procure antes de desenhar
-  retângulo. Aba × segmentado × chip têm papéis distintos. Cor nunca informa sozinha. Acento é
+- Primitivas são stateless. Aba × segmentado × chip têm papéis distintos. Cor nunca informa sozinha. Acento é
   identidade de fonte. `AppSwitch` ligado é verde.
 
-**Armadilhas pagas uma vez cada** — todas custaram uma suíte vermelha:
-
-1. `weight` dentro de `FlowRow` não tem referência de largura: o Compose deixa o filho **sem
-   posicionar** e o sintoma é `assertIsDisplayed` falhando com `boundsInRoot` válido.
-2. Ação que virou ícone precisa de `contentDescription` na **semântica**, não só de `onClickLabel` —
-   é `onNodeWithContentDescription` que as suítes usam. `AppIconButton` já traz os dois.
-3. `BasicTextField` mescla descendentes: o placeholder precisa de `clearAndSetSemantics`, ou o campo
-   vazio passa a "conter" o texto de exemplo e duplica nós para o `onNodeWithText`.
-4. Tela que ficou mais alta obriga a subir a altura da **cena** do teste de componente (1024 × 768
-   por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
-5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
-   `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
-6. Borda que precisa ocupar layout é **fundo mais padding**, nunca `Modifier.border`: ele arredonda o
-   traço para cima e pinta sobre o conteúdo, e só bitmap (`captureToImage`) pega o defeito. Histórico
-   (issue #83) em [`compose-implementation.md`](docs/design-system/compose-implementation.md).
+**Antes de escrever teste de tela, leia "Armadilhas de teste de tela"** em
+[`compose-implementation.md`](docs/design-system/compose-implementation.md) — seis defeitos
+(`FlowRow`+`weight`, semântica de ícone, placeholder, altura da cena, `modifier` do campo, borda) que
+já custaram uma suíte vermelha cada.
 
 **Janelas, cards e tooltips**: decisões e histórico em [`docs/presentation.md`](docs/presentation.md),
 seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes de mexer.** Regras:
 
 - Escala da interface troca só a **densidade**, nunca `fontScale`. Padrão persistido 115, default do
   parâmetro 100 (geradores de captura e testes). **Cada** `Window`/`DialogWindow` recebe o valor.
-  `scaledWindowSize` corrige pela razão aplicada/nova; tamanho persistido não é reescalado
-  (`hasPersistedUiScale`); redimensionar no commit com debounce. `AppThemeScaleTest` mede pixel.
+  Gravar no commit com debounce. `AppThemeScaleTest` mede pixel.
 - Monitores: `workAreaForPosition` (`ScreenLocator.kt`) encaixa no monitor de maior interseção, nunca
   `defaultScreenDevice`. Escalas diferentes por monitor só se validam em máquina real.
-- Dashboard usa o corpo denso (`AppSpacing.md`/`sm`); a coluna rolável não reserva folga para a barra.
-- Grade anima com mola `GENTLE`, primeira colocação é salto; no arrasto as caixas do alvo ficam
-  congeladas (`previewCardOrder`).
-- Somente cards: dois booleanos, sem enum; faixa de título só composta no hover (senão o arrasto
-  imediato da janela vence a pressão longa do card); três saídas obrigatórias: faixa, bandeja e
-  `Ctrl+Shift+M`.
-- Menu de modos (`WindowMode` + `AppMenu`): o enum é do controle, o estado segue em dois booleanos com
-  exclusão nos setters de `AppShellState.kt`; rótulos iguais aos das Configurações; `AppMenu` é
-  `Popup` próprio, nunca `DropdownMenu`; abre para cima se não cabe; só no modo padrão
-  (`onWindowModeChange = null` esconde).
+- **A barra HUD é o único modo de visualização** (plano `hud-modo-unico-execucao.md`): saíram a janela
+  principal com o dashboard, o modo somente cards, o menu de modos (`WindowMode`), "Manter sempre
+  visível" e `Ctrl+Shift+H`/`Ctrl+Shift+M`. Não reintroduzir seletor de modo nem segunda moldura.
+  `DashboardScreen` e a grade de cards só existem para testes e geradores de captura.
 - Tooltip de cota não abre abaixo de 320dp de card (`shouldShowQuotaTooltip`, constante própria, não
   `NarrowCardWidthThreshold`); a `testTag` do bloco de cota mora no conteúdo; a explicação do
   semáforo é o `footnote` da tooltip. Cabeçalho tem ponto **e** palavra do pior risco
@@ -320,18 +305,18 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 `HudNotchGeometry.kt`, `HudModel.kt`; issue #164): decisões e histórico em
 [`docs/hud-notch.md`](docs/hud-notch.md). **Leia antes de mexer na HUD.** Regras:
 
-- `hudMode` é booleano, exclusivo com somente cards pelos setters de `AppShellState.kt`; `HudEdge` é
-  enum próprio. A janela principal fica escondida com geometria intacta.
+- A HUD está sempre composta — não há `hudMode`; `HudEdge` é enum próprio. Sem API habilitada as
+  Configurações abrem sozinhas uma vez por arranque (`OpenSettingsWithoutApis`).
 - Um anel por conta, até três arcos; janela mais longa por fora; uma linha por anel com janela e
   percentual; palavra do **pior** risco. Faixa compacta acima de 45% da borda.
 - O notch não cresce: o balão é de **uma** conta (hover no anel) ou da engrenagem (hover ou clique,
   que só abre — #317). Botões do card têm dona única (`cardActionsFor`).
 - **O tamanho é da geometria** (`hudNotchSizes`), nunca medido da composição; 1dp de folga por texto
   (`HudNotchTextFitTest`). Janela com origem e tamanho fixos ao abrir; área de clique recortada por
-  `Window.shape`; nenhum redimensionamento AWT por quadro.
+  `Window.shape` **só no Windows** (`hudUsesHitRegion`, #340); nenhum redimensionamento AWT por quadro.
 - Arrasto só pela mão, medido por `hudDragWindowBounds`; posição é borda + fração + monitor; parado
   mora na área útil, fora da barra de tarefas.
-- Clique num anel recoleta aquela conta; botão direito vai a somente cards. Atualização pendente é o
+- Clique num anel recoleta aquela conta; botão direito não faz nada. Atualização pendente é o
   ponto da engrenagem; reiniciar só pelo botão do balão.
 - Movimento contínuo (órbita de sessão, pulso de atenção) só atrás de `AppMotionPolicy.continuous`.
 - Balão é conteúdo da janela, nunca `Popup`; nenhum formato novo de percentual/reset/rótulo.
@@ -339,9 +324,10 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
-**Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS a partir do monograma descrito em
-código — `monogram.svg` ao lado é referência e não é lido. O `.icns` só é validado no job
-`build-macos` do release.
+**Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS do ícone Gargantua com o nome (I10),
+desenhado **por tamanho lógico**: ≥ 96 px nome inteiro, 32–64 px `U·M`, ≤ 24 px só o núcleo. Janela
+lê `app_icon_window.png`, bandeja `app_icon_tray.png` — nunca o de 512 px, que traz texto. O `.icns`
+só é validado no job `build-macos` do release.
 
 **Relatório PDF**: a IBM Plex Mono vai embutida (`PDType0Font.load` com subconjunto) e o
 saneamento WinAnsi de `UsageReportDocument.sanitized` **permanece** — a fonte tem os acentos, mas
@@ -353,8 +339,14 @@ Helvetica em vez de falhar.
 Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-and-release.md), seção
 "CI e testes — decisões". Regras:
 
-- Workflows: `ci.yml` (desktop no Windows + instalador) e `ci-server.yml` (servidor). Cache do Gradle
-  pela `gradle/actions/setup-gradle`, gravado só na `main`.
+- **Plataformas** ("Platform reality" no `CONTRIBUTING.md`, #342): a suíte só roda no Windows e nenhum
+  teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
+  merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
+
+- Workflows (#344): `ci.yml` único — job `changes` recorta por path, jobs em paralelo só do que
+  mudou, **`ci-ok` é o check único** (pulado conta como sucesso); `release-linux.yml` só por tag,
+  **versão vem da tag** (`-PappVersion`), sem commit de bump. Cache do Gradle pela
+  `gradle/actions/setup-gradle`, gravado só na `main` — tag e CodeQL só leem.
 - CI roda com `-PtestForks=3`; localmente 1. Com forks, `extractSkikoNative` roda antes. **Verde
   local e vermelho no CI em teste de UI: olhe o `~/.skiko` antes do teste.**
 - Teste de tela usa `ScreenTestTheme` (`Reduced`); teste de primitiva que anima usa `AppTheme`.
@@ -363,7 +355,7 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - **`delay` em `runTest` é tempo virtual**: espera de estado de view model usa `yield()` +
   `Thread.sleep` (`pauseForBackgroundWork`). `awaitSettledState` espera a coleta inteira
   (`refreshingTargets` vazio), não o primeiro `Success`.
-- Cobertura opt-in por `-Pcoverage`, sem piso. Push na `main` reaproveita a árvore verificada no PR.
+- Cobertura opt-in por `-Pcoverage`, sem piso.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
 ## Convenções de código

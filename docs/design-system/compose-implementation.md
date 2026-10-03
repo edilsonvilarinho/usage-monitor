@@ -55,11 +55,51 @@ quadros, um percentual que não é verdade.
     parando pelo `closeWindow()` de cada ViewModel; conteúdo com laço próprio (a demo da Ajuda) lê
     `LocalModalWindowOnScreen` para não rodar escondido. Quem guarda o assunto num anulável (a
     fonte do histórico, as notas) usa `rememberLastNonNull`, senão a janela esmaeceria vazia.
+  - **Pré-aquecimento (opt-in `prewarm = true`).** Mesmo viva, a primeira abertura seguia lenta: a
+    trilha do 41.6.0-beta.2 mediu 230–515 ms do pedido ao quadro (fora a criação da janela e os
+    680 ms do E9), contra 42–89 ms das reaberturas. Contado da HUD pintada — 0,8 s para as
+    Configurações, 2,5 s para as demais (`ModalWindowEnvironment.prewarmReady`); os 10 s fixos da
+    primeira versão perderam o clique real, 4 s depois da HUD —, Configurações, Sessões CLI e Ajuda nascem, aparecem
+    **transparentes e sem foco** (`focusableWindowState = false`) por dois quadros e se escondem —
+    uma por vez (`Mutex`), sem contar como abertura (linha "pré-aquecida" na trilha). Só no Windows
+    com translucidez (`shouldPrewarmModalWindow`, #340). Histórico não entra: precisa de fonte.
+    Janela nova só pede o pré-aquecimento se for aberta com frequência — cada uma viva guarda
+    contexto de GPU.
   - **A entrada espera o primeiro quadro pintado.** A escala da moldura começava ao compor, dentro de
     uma janela que o sistema mostrava de uma vez e opaca, e os quadros iniciais se perdiam no custo
     da criação. Agora a janela aparece com opacidade 0, o host espera dois quadros (com teto de
-    500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e esmaece a
-    janela AWT com o conteúdo indo de 0,96 a 1 pela mola `GENTLE`.
+    500 ms: janela minimizada não recebe quadro e ficaria transparente para sempre) e toca o E9.
+  - **E9 · filamentos de plasma** (rodada E da skill `usage-monitor-visual-options`, escolhida entre
+    dez; `GargantuaModalFilaments.kt`, `filamentOpenMillis` 340 (era 680; encurtado junto com o pré-aquecimento, a pedido do usuário) / `filamentCloseMillis` 220). A
+    moldura esmaece em ~100 ms (opacidade da janela AWT) e um filamento corre sob cada linha marcada
+    com `appModalRevealRow`, em ordem de leitura — topo, depois esquerda, pela caixa que a linha
+    publica, nunca pela ordem de composição (a navegação lateral seria composta antes do conteúdo e
+    iria inteira na frente). A linha é **recortada** atrás da cabeça: o dado está no lugar final desde
+    o primeiro quadro, nada cresce nem passa do valor. Fechar recolhe da direita para a esquerda, de
+    baixo para cima, e a janela só some nos últimos 15%. A escala 0,96 → 1 saiu: com o dado sendo
+    revelado, o conteúdo inteiro crescendo por cima era dois gestos. As primitivas de linha
+    (`AppDataRow`, `AppSectionHeader`, `AppToolbar`, `AppColumnHeaderRow`, `AppGroupBand`,
+    `AppMetricBlock`, `AppStatusBar`, `AppBanner`, item do `AppSettingsNav`) já se marcam; bloco que
+    não passa por elas (gráficos, a demo da Ajuda) se marca na tela. Conteúdo sem marca aparece com
+    a moldura. O `AppDialog` toca o mesmo E9 no cartão, com relógio próprio.
+  - **O E9 repete quando o conteúdo troca** (`AppModalRevealScope`), só nas linhas do trecho que
+    trocou: tópico da Ajuda, dado que chega depois da abertura e lista ↔ detalhe (pelo
+    `AppStateCrossfade`, que já envolve cada estado); **menos a seção das Configurações**
+    (`revealOnChange = false`): ali a troca é navegação com o dado pronto, e a aba nova revelada linha
+    a linha lia como lenta — medido, a troca aquecida custa 50–150 ms de CPU e o resto era animação;
+    fica só o fade de 180 ms; abas, faixa de tempo, cota e
+    conta do Histórico; abas e faixa das Sessões CLI, Codex e do Uso do time; sub-aba, ordem e
+    página do Resumo. O estado é uma cadeia: a linha se registra no escopo e na janela, a janela em
+    movimento manda (abrir e fechar), e parada manda o escopo mais interno que toca. **A chave é do
+    dado carregado, não do clique** (`rememberSettledRevealKey`): trocar a faixa relê o banco, e a
+    chave do clique tocaria sobre o conteúdo antigo esmaecido e de novo na chegada. O tique do laço
+    ao vivo e o filtro digitado **não** repetem — filamento a cada 5 s ou a cada tecla seria pisca.
+    Repete só numa janela que abriu animada (`ModalRevealState.replayEnabled`, o mesmo critério da
+    abertura).
+  - **O esmaecimento é só do Windows** (`shouldAnimateModalWindow`, #340). No X11 a opacidade da
+    janela é a propriedade `_NET_WM_WINDOW_OPACITY`, aplicada pelo compositor, e voltar a 1 é apagar
+    a propriedade. No elementary OS o modal de Configurações ficou translúcido depois de a opacidade
+    ter mudado; fora do Windows o modal abre e fecha na hora e a janela nunca sai de 1.
   - **O pedido chega por `StateFlow`, nunca por recomposição dentro da janela** (`ModalWindowHost`).
     Janela escondida não recompõe — o relógio de quadros para junto com a pintura —, e a primeira
     versão, com `LaunchedEffect(visible)` dentro da janela, abria e fechava uma vez e **nunca mais
@@ -168,6 +208,25 @@ Antes de desenhar um retângulo novo, procure aqui.
   - Mapa paralelo ao das cores (`accountEmojis`), e não um objeto de identidade que juntasse os dois:
     a cor já atravessava cinco assinaturas, e trocá-las todas por causa do emoji mexeria em código
     que a issue não pede.
+
+### Armadilhas de teste de tela
+
+Movidas do `CLAUDE.md` em 2026-09-28 pela skill `usage-monitor-token-cleanup`; o `CLAUDE.md` guarda
+o ponteiro. **Cada uma custou uma suíte vermelha**:
+
+1. `weight` dentro de `FlowRow` não tem referência de largura: o Compose deixa o filho **sem
+   posicionar** e o sintoma é `assertIsDisplayed` falhando com `boundsInRoot` válido.
+2. Ação que virou ícone precisa de `contentDescription` na **semântica**, não só de `onClickLabel` —
+   é `onNodeWithContentDescription` que as suítes usam. `AppIconButton` já traz os dois.
+3. `BasicTextField` mescla descendentes: o placeholder precisa de `clearAndSetSemantics`, ou o campo
+   vazio passa a "conter" o texto de exemplo e duplica nós para o `onNodeWithText`.
+4. Tela que ficou mais alta obriga a subir a altura da **cena** do teste de componente (1024 × 768
+   por padrão), nunca a do `Box` interno — o `Box` não é o que limita o `LazyColumn`.
+5. O `modifier` de um campo composto desce até o `BasicTextField`, não fica na coluna: ele carrega a
+   `testTag`, e `performTextInput` exige o `RequestFocus` que só o campo tem.
+6. Borda que precisa ocupar layout é **fundo mais padding**, nunca `Modifier.border`: ele arredonda o
+   traço para cima e pinta sobre o conteúdo, e só bitmap (`captureToImage`) pega o defeito — seção
+   abaixo.
 
 ### Armadilha: `Modifier.border` numa caixa fina (issue #83)
 

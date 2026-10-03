@@ -32,6 +32,36 @@
   --spring-expressive: 420ms cubic-bezier(.34, 1.3, .64, 1);  /* 0.75 / 600 — HUD, menu */
 
   --stagger: 60ms;
+
+  /* Gargantua HUD only: continuous && !reduced. Quota arcs never rotate or
+     change length; only plasma pulses travel inside the drawn sweep. */
+  --dur-gargantua-orbit: 14000ms;
+  --dur-gargantua-attention: 3200ms;
+  --dur-gargantua-active: 2600ms;
+  --dur-gargantua-refresh: 4000ms;
+  --dur-gargantua-ripple: 1300ms;       /* fetching: gravitational waves */
+  --dur-gargantua-refresh-wave: 800ms;  /* fetch done: one final wave */
+  --dur-gargantua-flow: 2800ms;
+  /* Finite: API enabled / app start (cascade 140ms) and API disabled. */
+  --dur-gargantua-birth: 1100ms;
+  --dur-gargantua-collapse: 850ms;
+  /* Finite, after the collapse: the slot closes, the notch retracts and the
+     neighbours unfold their lines (K1). The window resizes once, at the end. */
+  --dur-gargantua-departure-settle: 450ms;
+  /* Finite: account/gear balloon opens and closes (B3, relativistic jet). */
+  --dur-gargantua-jet-open: 520ms;
+  --dur-gargantua-jet-close: 240ms;
+  /* Finite: a changed digit rolls through the event horizon (D5), 50ms cascade. */
+  --dur-gargantua-roll: 480ms;
+  --dur-gargantua-roll-stagger: 50ms;
+  /* Finite: every modal window and AppDialog opens and closes (E9, plasma filaments). */
+  --dur-gargantua-filament-open: 340ms;
+  --dur-gargantua-filament-close: 220ms;
+  /* Continuous: the HUD rim (photon ring) breathes between 85% and 100% (M1). */
+  --dur-gargantua-horizon-breath: 6000ms;
+  /* Continuous: quota without a forecast, debris ring (J7). One loop = 8 laps
+     of 16s on the centre line; inner fragments take more laps, outer fewer. */
+  --dur-gargantua-debris: 128000ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

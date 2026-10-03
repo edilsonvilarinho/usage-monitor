@@ -13,7 +13,6 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.MAX_HUD_RINGS
 import com.usagemonitor.presentation.ui.TRAY_TOOLTIP_MAX_CHARS
 import com.usagemonitor.presentation.ui.buildHudAccounts
-import com.usagemonitor.presentation.ui.hudDefaultShouldSwitch
 import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.hudRingDescription
 import com.usagemonitor.presentation.ui.hudRingPositionLabel
@@ -25,7 +24,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.viewmodel.HudQuotaEntry
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -289,15 +288,6 @@ class HudModelTest {
         assertEquals(listOf("Contexto saturado · 1 sessão"), accounts.first().sessionSignals.map { signal -> signal.text })
         assertTrue(accounts.last().sessionSignals.isEmpty())
         assertTrue(hudRingDescription(accounts.first(), AppLanguage.PT).endsWith("· Contexto saturado · 1 sessão"))
-    }
-
-    /** Instalação nova (#277): troca só com conta para mostrar e sem modal aberto. */
-    @Test
-    fun `a troca para a hud espera conta e nenhuma janela modal`() {
-        assertTrue(hudDefaultShouldSwitch(pending = true, hasHudAccounts = true, modalOpen = false))
-        assertFalse(hudDefaultShouldSwitch(pending = true, hasHudAccounts = false, modalOpen = false))
-        assertFalse(hudDefaultShouldSwitch(pending = true, hasHudAccounts = true, modalOpen = true))
-        assertFalse(hudDefaultShouldSwitch(pending = false, hasHudAccounts = true, modalOpen = false))
     }
 
     /** Sem API habilitada o notch não pode prometer "Carregando" para sempre. */

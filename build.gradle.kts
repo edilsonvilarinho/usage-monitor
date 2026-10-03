@@ -8,9 +8,34 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-version = "41.3.0"
+// A versao vem da tag (#344): o release roda com `-PappVersion=X.Y.Z`, lido do `vX.Y.Z`,
+// e nenhum commit de bump passa pela `main`. Sem a propriedade, a ultima tag alcancavel,
+// para `run` e `packageInstaller` locais seguirem com versao numerica valida para o
+// jpackage. Sem git ou sem tag (checkout raso do CI) cai em 1.0.0 -- nao 0.0.0, que o
+// plugin do Compose recusa na configuracao (`MAJOR` do Dmg tem de ser > 0). So os testes
+// rodam ali, e eles nao leem `CURRENT_APP_VERSION`. O `git` so e chamado sem a propriedade --
+// o container do `build-linux` nem tem git.
+fun lastReleaseTagVersion(): String = runCatching {
+    providers.exec {
+        // `--exclude`: tag beta (`vX.Y.Z-beta.N`, issue #355) nao e a versao estavel de base.
+        commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", "--exclude", "*-beta*")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().removePrefix("v")
+}.getOrDefault("")
+
+version = providers.gradleProperty("appVersion").orNull?.trim()?.removePrefix("v")
+    ?: lastReleaseTagVersion().ifBlank { "1.0.0" }
 
 val appVersion = version.toString()
+
+// Beta (`X.Y.Z-beta.N`, issue #355): o plugin do Compose recusa o sufixo em Exe
+// (`MAJOR.MINOR.BUILD`), Dmg (versao e build version so numericas) e Rpm (sem `-`)
+// -- medido com `createDistributable -PappVersion=99.0.0-beta.1`, que falha na
+// configuracao. Esses formatos levam so o numero; Deb e Rpm levam `~beta.N`, que
+// os dois gerenciadores ordenam ANTES da estavel do mesmo numero. `CURRENT_APP_VERSION`,
+// o instalador NSIS, o tarball e o recibo continuam com a string completa.
+val packageBaseVersion = appVersion.substringBefore("-")
+val linuxPackageVersion = appVersion.replace("-", "~")
 val generatedAppVersionDir = layout.buildDirectory.dir("generated/app-version/desktopMain/kotlin")
 
 kotlin {
@@ -26,15 +51,14 @@ kotlin {
         // --- commonMain ---
         // CÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³digo compartilhado: domain, data e presentation.
         // Depende apenas de bibliotecas multiplataforma.
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 // Compose runtime e componentes visuais
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.materialIconsExtended)
-                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
-                implementation(compose.components.resources)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.material.icons)
+                implementation(libs.compose.components.resources)
 
                 // Ktor ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â cliente HTTP (engine vem no desktopMain)
                 implementation(libs.ktor.client.core)
@@ -55,7 +79,7 @@ kotlin {
         // - engine OkHttp do Ktor
         // - leitura de ficheiros com java.io.File
         // - entry point da janela Compose
-        val desktopMain by getting {
+        getByName("desktopMain") {
             kotlin.srcDir(generatedAppVersionDir)
             dependencies {
                 // Compose Desktop: inclui janela nativa para o SO atual
@@ -81,7 +105,7 @@ kotlin {
 
         // --- commonTest ---
         // Testes unitÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡rios: domain, mappers, ViewModel
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(libs.kotlin.test)
                 implementation(libs.kotlinx.coroutines.test)
@@ -91,11 +115,10 @@ kotlin {
 
         // --- desktopTest ---
         // Testes de componente Compose para Desktop
-        val desktopTest by getting {
+        getByName("desktopTest") {
             dependencies {
                 implementation(libs.kotlin.test)
-                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
-                implementation(compose.uiTest)
+                implementation(libs.compose.ui.test)
             }
         }
     }
@@ -114,7 +137,7 @@ compose.desktop {
                 TargetFormat.Dmg
             )
             packageName = "Usage Monitor"
-            packageVersion = appVersion
+            packageVersion = packageBaseVersion
             // `java.logging` cobre o commons-logging que o PDFBox traz: hoje ele
             // acha o SLF4J que o Ktor ja poe no classpath, mas o fallback dele e o
             // `Jdk14Logger`, de `java.util.logging`. Modulo faltando no runtime
@@ -144,6 +167,8 @@ compose.desktop {
             }
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.png"))
+                debPackageVersion = linuxPackageVersion
+                rpmPackageVersion = linuxPackageVersion
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.icns"))
@@ -156,7 +181,10 @@ compose.desktop {
     }
 }
 
-val generateAppVersionSource by tasks.registering {
+val generateAppVersionSource = tasks.register("generateAppVersionSource") {
+    // Sem este input a troca de `-PappVersion` nao invalida a tarefa: o script nao muda
+    // mais a cada release, e o `AppVersion.kt` antigo sairia do cache.
+    inputs.property("appVersion", appVersion)
     outputs.dir(generatedAppVersionDir)
 
     doLast {
@@ -247,6 +275,14 @@ tasks.register<JavaExec>("generateScreenshots") {
     mainClass.set("com.usagemonitor.screenshots.ScreenshotGeneratorKt")
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(layout.projectDirectory.dir("img").asFile.absolutePath)
+}
+
+tasks.register<JavaExec>("generateGargantuaPreview") {
+    group = "documentation"
+    description = "Renderiza a HUD Gargantua e suas animacoes com dados sinteticos."
+    mainClass.set("com.usagemonitor.screenshots.GargantuaPreviewGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(layout.buildDirectory.dir("gargantua-preview").get().asFile.absolutePath)
 }
 
 tasks.register<JavaExec>("generateTourGif") {

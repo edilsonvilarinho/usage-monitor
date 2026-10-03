@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.seriesKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.worstQuotaRisk
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * A cota que hoje pesa mais no risco global — a fonte, a cota vencedora e a

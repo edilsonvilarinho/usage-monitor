@@ -39,97 +39,6 @@ fun AutoStartToggle(
     }
 }
 
-@Composable
-fun AlwaysOnTopToggle(
-    enabled: Boolean,
-    language: AppLanguage = AppLanguage.PT,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    showDivider: Boolean = true
-) {
-    val isPt = language == AppLanguage.PT
-    SettingsOptionRow(
-        label = if (isPt) "Manter sempre visível" else "Always on top",
-        description = if (isPt) {
-            "Mantém a janela acima das demais."
-        } else {
-            "Keeps the window above the others."
-        },
-        showDivider = showDivider,
-        modifier = modifier
-    ) {
-        AppSwitch(checked = enabled, onCheckedChange = { onToggle(it) })
-    }
-}
-
-/**
- * Modo somente cards: esconde a barra de título e o rodapé da janela.
- *
- * O texto de apoio não é decoração. Ligado, o modo tira da tela o botão de
- * fechar e a engrenagem das configurações, e quem não souber como voltar fica
- * com um app que não consegue desligar — as três saídas têm de estar escritas
- * onde o interruptor é acionado.
- */
-@Composable
-fun CardsOnlyModeToggle(
-    enabled: Boolean,
-    language: AppLanguage = AppLanguage.PT,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    showDivider: Boolean = true
-) {
-    val isPt = language == AppLanguage.PT
-    SettingsOptionRow(
-        label = if (isPt) "Somente os cards" else "Cards only",
-        description = if (isPt) {
-            "Esconde a barra de título e o rodapé. Para voltar: Ctrl+Shift+M, o ícone na bandeja ou a faixa que aparece ao passar o mouse no topo da janela."
-        } else {
-            "Hides the title bar and the footer. To return: Ctrl+Shift+M, the tray icon, or the strip that appears when hovering the top of the window."
-        },
-        showDivider = showDivider,
-        modifier = modifier
-    ) {
-        AppSwitch(
-            checked = enabled,
-            onCheckedChange = { onToggle(it) },
-            modifier = Modifier.testTag(CARDS_ONLY_MODE_SWITCH_TEST_TAG)
-        )
-    }
-}
-
-/**
- * Barra HUD (issue #164): terceiro chrome, ainda mais discreto que o modo
- * somente cards — uma faixa de 24dp ancorada no topo da tela, sem título, sem
- * cards. Mesma razão de existir do texto de apoio do modo somente cards: as
- * saídas têm de estar escritas onde o interruptor liga.
- */
-@Composable
-fun HudModeToggle(
-    enabled: Boolean,
-    language: AppLanguage = AppLanguage.PT,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    showDivider: Boolean = true
-) {
-    val isPt = language == AppLanguage.PT
-    SettingsOptionRow(
-        label = if (isPt) "Barra HUD" else "HUD strip",
-        description = if (isPt) {
-            "Troca a janela por um notch colado numa borda da tela, com um anel e a palavra do estado por conta; o ponteiro em cima abre cada cota. Para voltar: clique no notch, Ctrl+Shift+H ou o ícone na bandeja."
-        } else {
-            "Replaces the window with a notch docked to a screen edge, with a ring and the status word per account; hovering opens every quota. To return: click the notch, Ctrl+Shift+H, or the tray icon."
-        },
-        showDivider = showDivider,
-        modifier = modifier
-    ) {
-        AppSwitch(
-            checked = enabled,
-            onCheckedChange = { onToggle(it) },
-            modifier = Modifier.testTag(HUD_MODE_SWITCH_TEST_TAG)
-        )
-    }
-}
-
 /**
  * "Reduzir animações": para quem se incomoda com movimento, e para máquina lenta
  * em que a transição vira tranco. O texto diz o que some — as transições **e** o
@@ -274,6 +183,46 @@ fun AutoUpdateToggle(
             onCheckedChange = { onToggle(it) },
             enabled = isSupported,
             modifier = Modifier.testTag(AUTO_UPDATE_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/**
+ * Canal beta (issue #355): receber também as versões marcadas como beta, para
+ * testar mudanças antes da release estável.
+ *
+ * Independe da atualização automática: sem ela a beta só é anunciada, como
+ * qualquer versão. O texto diz as duas coisas que o usuário precisa saber antes
+ * de ligar — que beta pode ter defeitos, e que desligar **não volta** para a
+ * estável anterior.
+ */
+/** Constantes porque o passo da ajuda cita o rótulo, e uma cópia literal lá divergiria. */
+internal const val BETA_UPDATES_LABEL_PT = "Receber versões beta"
+internal const val BETA_UPDATES_LABEL_EN = "Receive beta updates"
+
+@Composable
+fun BetaUpdatesToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = if (isPt) BETA_UPDATES_LABEL_PT else BETA_UPDATES_LABEL_EN,
+        description = if (isPt) {
+            "Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova."
+        } else {
+            "Also offers beta versions, which arrive before the stable release and may have bugs. Turning it off does not roll back: the app stays on the beta until a newer stable release comes out."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(BETA_UPDATES_SWITCH_TEST_TAG)
         )
     }
 }

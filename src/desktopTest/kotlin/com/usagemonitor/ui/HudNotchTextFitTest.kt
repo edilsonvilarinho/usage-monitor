@@ -16,6 +16,8 @@ import com.usagemonitor.HUD_APP_BALLOON_UPDATE_DETAIL_LINES
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TEXT_WIDTH
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.HUD_BALLOON_WIDTH
+import com.usagemonitor.HUD_COUNTDOWN_GAP
+import com.usagemonitor.HUD_COUNTDOWN_ICON
 import com.usagemonitor.domain.entity.ActiveSessionAlert
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -24,7 +26,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.hudSessionSignals
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.updateBannerContent
 import com.usagemonitor.presentation.viewmodel.AppUpdateFailureReason
@@ -163,14 +165,19 @@ class HudNotchTextFitTest {
         val failures = mutableSetOf<String>()
         var scale by mutableStateOf(scales.first())
         val update = AppUpdateInfo(version = "138.100.100", releasePageUrl = "https://example.com")
-        val states = listOf(
-            AppUpdateUiState.Available(update),
-            AppUpdateUiState.Downloading(update, percent = 100),
-            AppUpdateUiState.Downloading(update, percent = null),
-            AppUpdateUiState.Ready(update),
-            AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD),
-            AppUpdateUiState.Failed(update, AppUpdateFailureReason.SCHEDULE)
-        )
+        // Beta (issue #355): o número é mais comprido e a linha curta troca
+        // "versão" por "beta"; dois dígitos em cada parte e no contador.
+        val beta = AppUpdateInfo(version = "42.10.10-beta.12", releasePageUrl = "https://example.com")
+        val states = listOf(update, beta).flatMap { info ->
+            listOf(
+                AppUpdateUiState.Available(info),
+                AppUpdateUiState.Downloading(info, percent = 100),
+                AppUpdateUiState.Downloading(info, percent = null),
+                AppUpdateUiState.Ready(info),
+                AppUpdateUiState.Failed(info, AppUpdateFailureReason.DOWNLOAD),
+                AppUpdateUiState.Failed(info, AppUpdateFailureReason.SCHEDULE)
+            )
+        }
         val contents = AppLanguage.entries.flatMap { language ->
             states.map { state -> updateBannerContent(state, language) }
         }
@@ -179,7 +186,8 @@ class HudNotchTextFitTest {
                 val measurer = rememberTextMeasurer()
                 val density = LocalDensity.current
                 val typography = MaterialTheme.typography
-                // O botão desconta o padding horizontal de 12dp de cada lado.
+                // O botão desconta o padding horizontal de 12dp de cada lado. Ele fica
+                // abaixo do aviso: dentro dele (F10) o rótulo não cabia.
                 val buttonText = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - AppSpacing.md * 2
                 fun overflow(text: String, style: TextStyle, width: Dp, lines: Int, height: Dp): String? {
                     val result = measurer.measure(
@@ -209,6 +217,12 @@ class HudNotchTextFitTest {
                         overflow(label, typography.labelLarge, buttonText, 1, AppChrome.control)
                             ?.let { failure -> failures += "$scale%: $failure" }
                     }
+                }
+                // F10: os sinais de sessão viraram as linhas do aviso da conta, com
+                // a mesma largura de texto do aviso de atualização e uma linha cada.
+                SESSION_SIGNAL_SAMPLES.forEach { signal ->
+                    overflow(signal, typography.bodySmall, HUD_APP_BALLOON_UPDATE_TEXT_WIDTH, 1, 17.dp)
+                        ?.let { failure -> failures += "$scale%: $failure" }
                 }
             }
         }
@@ -254,4 +268,54 @@ class HudNotchTextFitTest {
         }
         assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
     }
+
+    /**
+     * O cabeçalho do balão da engrenagem: "Usage Monitor" e a versão instalada
+     * numa linha, a contagem sozinha na de baixo. Dividindo a linha com "próxima
+     * coleta em", a versão ficava com ~50dp e "v41.6.0-beta.2" saía "v41.6.0…".
+     * A beta com dois dígitos em cada parte é o pior caso.
+     */
+    @Test
+    fun `a versao e a contagem cabem inteiras no balao da engrenagem`() = runDesktopComposeUiTest {
+        val failures = mutableSetOf<String>()
+        var scale by mutableStateOf(scales.first())
+        val inner = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2
+        setContent {
+            AppTheme(isDark = true, uiScalePercent = scale) {
+                val measurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val typography = MaterialTheme.typography
+                fun width(text: String, style: TextStyle): Dp {
+                    return with(density) { measurer.measure(text, style, maxLines = 1).size.width.toDp() }
+                }
+                val header = width("Usage Monitor", typography.titleSmall) + 6.dp + width("v42.10.10-beta.12", typography.labelSmall)
+                if (header > inner) {
+                    failures += "$scale%: cabeçalho mede $header > $inner"
+                }
+                listOf("Próxima coleta em", "Next fetch in").forEach { label ->
+                    val status = width(label, typography.labelSmall) + 4.dp + HUD_COUNTDOWN_ICON + HUD_COUNTDOWN_GAP +
+                        width("00:00", typography.labelSmall)
+                    if (status > inner) {
+                        failures += "$scale%: \"$label\" com a contagem mede $status > $inner"
+                    }
+                }
+            }
+        }
+        for (next in scales) {
+            scale = next
+            waitForIdle()
+        }
+        assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
+    }
 }
+
+/** Os sinais mais compridos que `hudSessionSignals` produz, nas duas línguas. */
+private val SESSION_SIGNAL_SAMPLES = listOf(
+    "Contexto saturado · 12 sessões",
+    "Contexto crescendo · 12 sessões",
+    "Context saturated · 12 sessions",
+    "Context growing · 12 sessions",
+    "12 sem resposta · até 23h59",
+    "12 with no reply · up to 23h59",
+    "Sem resposta há 23h59"
+)

@@ -58,7 +58,7 @@ import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import java.io.File
 import java.util.prefs.Preferences
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * O grafo de dependências do app: preferências, clientes HTTP, data sources,
@@ -126,7 +126,6 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
     // consome são os view models, que vivem fora dela — é delas que sai o fator
     // da detecção de anomalia e o limiar de sessão sem resposta.
     val alertSettingsFlow = MutableStateFlow(readPersistedAlertSettings(settings))
-    val isAppVisible = MutableStateFlow(true)
 
     /**
      * Referência da janela principal para quem vive fora do `Window`: a bandeja,

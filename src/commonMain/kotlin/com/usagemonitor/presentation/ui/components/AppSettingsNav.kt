@@ -131,6 +131,7 @@ private fun AppSettingsNavItem(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .appModalRevealRow()
             .clip(AppShapes.small)
             .selectable(selected = selected, onClick = onClick)
             .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.sm)

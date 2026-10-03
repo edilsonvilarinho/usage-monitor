@@ -51,7 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import androidx.compose.runtime.getValue
@@ -232,7 +232,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
     }
 
     /** O notch parado: é o que fica na tela o dia inteiro. */
-    fun hudRest() = capture("hud-rest", widthDp = HUD_SHOT_WIDTH_DP, heightDp = 64) {
+    fun hudRest() = capture("hud-rest", widthDp = HUD_SHOT_WIDTH_DP, heightDp = HUD_SHOT_REST_HEIGHT_DP) {
         HudShot(expanded = false, balloonIndex = 0)
     }
 
@@ -276,12 +276,10 @@ private class ScreenshotGenerator(private val outputDir: File) {
             currentLanguage = AppLanguage.PT,
             enabledApis = ScreenshotFixtures.enabledApis,
             autoStartEnabled = true,
-            alwaysOnTopEnabled = false,
             windowOpacityPercent = 92,
             onThemeChange = {},
             onLanguageChange = {},
             onAutoStartChange = {},
-            onAlwaysOnTopChange = {},
             onApiToggle = { _, _ -> },
             anthropicProfiles = ScreenshotFixtures.anthropicProfiles
         )
@@ -534,15 +532,16 @@ internal fun fixedHistoryViewModel(): HistoryViewModel {
 /** Largura das capturas da HUD: o notch de três contas com folga para o balão. */
 private const val HUD_SHOT_WIDTH_DP = 900
 
-/** O balão mais alto das contas de exemplo termina em ~316dp; o resto seria fundo vazio. */
-private const val HUD_SHOT_OPEN_HEIGHT_DP = 332
-
 private val HUD_SHOT_SIZES = hudNotchSizes(
     accounts = ScreenshotFixtures.hudAccounts,
     edge = HudEdge.TOP,
     fallbackLabel = "Carregando",
     hasUpdateIndicator = false
 )
+
+/** A cena acompanha a geometria, inclusive o respiro da sombra. */
+private val HUD_SHOT_OPEN_HEIGHT_DP = kotlin.math.ceil(HUD_SHOT_SIZES.expanded.height.value + 16f).toInt()
+private val HUD_SHOT_REST_HEIGHT_DP = kotlin.math.ceil(HUD_SHOT_SIZES.collapsed.height.value + 16f).toInt()
 
 /**
  * O notch colado na borda de cima, com os tamanhos da geometria — a mesma que

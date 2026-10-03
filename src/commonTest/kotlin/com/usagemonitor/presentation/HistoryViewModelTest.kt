@@ -14,7 +14,7 @@ import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -354,7 +354,7 @@ private fun GetUsageHistoryUseCase(
     repo: UsageHistoryRepository,
     nowProvider: () -> Instant
 ): GetUsageHistoryUseCase {
-    return GetUsageHistoryUseCase(repo, clock = object : kotlinx.datetime.Clock {
+    return GetUsageHistoryUseCase(repo, clock = object : kotlin.time.Clock {
         override fun now(): Instant = nowProvider()
     })
 }

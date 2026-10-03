@@ -1,21 +1,29 @@
 package com.usagemonitor.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -24,15 +32,21 @@ import com.usagemonitor.presentation.ui.components.APP_TABS_INDICATOR_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppGroupBand
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSettingsNav
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
+import com.usagemonitor.presentation.ui.components.LocalModalReveal
+import com.usagemonitor.presentation.ui.components.ModalRevealPhase
+import com.usagemonitor.presentation.ui.components.ModalRevealState
 import com.usagemonitor.presentation.ui.components.appNestedGroupGuide
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * As primitivas estruturais são consumidas por todas as telas, então um defeito
@@ -291,5 +305,98 @@ class AppStructureTest {
         onNodeWithText("Conta · 3f9c").assertIsDisplayed()
         onNodeWithText("2 de 5 online").assertIsDisplayed()
         onNodeWithText("Apagar").assertIsDisplayed()
+    }
+
+    /**
+     * E9: numa janela modal a linha é revelada da esquerda para a direita atrás
+     * da cabeça do filamento. O dado não se move — a metade de lá simplesmente
+     * ainda não foi pintada —, e parado a linha volta inteira.
+     */
+    @Test
+    fun `a linha de dados e revelada pelo filamento e parada aparece inteira`() = runDesktopComposeUiTest {
+        val reveal = ModalRevealState(ModalRevealPhase.OPENING)
+        // Uma linha só: começa em 8% e chega à metade da largura em ~15%.
+        reveal.progress = 0.152f
+        setContent {
+            AppTheme(isDark = true) {
+                CompositionLocalProvider(LocalModalReveal provides reveal) {
+                    Box(modifier = Modifier.width(400.dp).height(60.dp)) {
+                        AppDataRow(showDivider = false) {
+                            Box(modifier = Modifier.fillMaxWidth().height(24.dp).background(Color.White))
+                        }
+                    }
+                }
+            }
+        }
+        waitForIdle()
+
+        val half = onRoot().captureToImage().toPixelMap()
+        val middle = half.height / 2
+        assertEquals(Color.White, half[100, middle], "a metade já revelada tem o dado")
+        assertTrue(half[300, middle].red < 0.5f, "a metade de lá ainda não foi pintada")
+        val filament = (150 until 220).map { x -> half[x, rowBottom(half)] }
+        assertTrue(
+            filament.any { it.red > 0.6f && it.red > it.blue + 0.15f },
+            "o filamento quente corre sob a linha"
+        )
+
+        reveal.settle()
+        waitForIdle()
+        val settled = onRoot().captureToImage().toPixelMap()
+        assertEquals(Color.White, settled[300, settled.height / 2])
+    }
+
+    /**
+     * E9 repetido: com a janela parada na tela, trocar a chave do escopo (aba,
+     * faixa, página) volta a revelar as linhas dele; numa janela que abriu sem
+     * animação ("Reduzir animações", fora do Windows) nada repete.
+     */
+    @Test
+    fun `trocar a chave do escopo refaz a revelacao so numa janela animada`() {
+        for (animated in listOf(true, false)) {
+            runDesktopComposeUiTest {
+                val root = ModalRevealState().apply {
+                    settle()
+                    replayEnabled = animated
+                }
+                var tab by mutableStateOf("Sessões")
+                mainClock.autoAdvance = false
+                setContent {
+                    AppTheme(isDark = true) {
+                        CompositionLocalProvider(LocalModalReveal provides root) {
+                            Box(modifier = Modifier.width(400.dp).height(60.dp)) {
+                                AppModalRevealScope(replayKey = tab) {
+                                    AppDataRow(showDivider = false) {
+                                        Box(modifier = Modifier.fillMaxWidth().height(24.dp).background(Color.White))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // O escopo nasce com a janela já parada: toca uma vez; deixa assentar.
+                mainClock.advanceTimeBy(AppGargantuaTokens.filamentOpenMillis * 2L)
+                val before = onRoot().captureToImage().toPixelMap()
+                assertEquals(Color.White, before[300, before.height / 2], "animated=$animated: assentada")
+
+                tab = "Resumo"
+                mainClock.advanceTimeBy(AppGargantuaTokens.filamentOpenMillis * 15L / 100)
+                val replaying = onRoot().captureToImage().toPixelMap()
+                if (animated) {
+                    assertTrue(replaying[300, replaying.height / 2].red < 0.5f, "a aba nova refaz a revelação")
+                } else {
+                    assertEquals(Color.White, replaying[300, replaying.height / 2], "sem animação, corte seco")
+                }
+
+                mainClock.advanceTimeBy(AppGargantuaTokens.filamentOpenMillis * 2L)
+                val after = onRoot().captureToImage().toPixelMap()
+                assertEquals(Color.White, after[300, after.height / 2], "animated=$animated: termina inteira")
+            }
+        }
+    }
+
+    /** A última fileira pintada da linha: o filamento mora colado nela. */
+    private fun rowBottom(pixels: PixelMap): Int {
+        return (pixels.height - 1 downTo 0).first { y -> pixels[100, y] != pixels[100, pixels.height - 1] }
     }
 }

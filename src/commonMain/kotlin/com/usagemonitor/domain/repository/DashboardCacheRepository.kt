@@ -1,7 +1,7 @@
 package com.usagemonitor.domain.repository
 
 import com.usagemonitor.domain.entity.ApiUsageStats
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Persiste o último snapshot exibido no dashboard para reidratar a UI

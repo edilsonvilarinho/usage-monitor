@@ -12,6 +12,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.update.AutoUpdateController
 import com.usagemonitor.update.isEnabled
+import com.usagemonitor.update.receivesBetaUpdates
 
 /**
  * A janela de Configurações. O estado vem dos donos dele — [AppShellState],
@@ -49,7 +50,8 @@ internal fun SettingsWindowHost(
         minWidthDp = 320,
         minHeightDp = DEFAULT_MODAL_MIN_HEIGHT.value.toInt(),
         onCloseRequest = { modal.isSettingsOpen = false },
-        openGeneration = modal.settingsOpenGeneration
+        openGeneration = modal.settingsOpenGeneration,
+        prewarm = true
     ) {
         SettingsDialogContent(
             currentTheme = shell.themePreset,
@@ -57,9 +59,6 @@ internal fun SettingsWindowHost(
             enabledApis = enabledApis,
             configuredApiKeys = apiKeySettings.configuredSources(),
             autoStartEnabled = shell.autoStartEnabled,
-            alwaysOnTopEnabled = shell.alwaysOnTopEnabled,
-            cardsOnlyMode = shell.cardsOnlyMode,
-            hudMode = shell.hudMode,
             windowOpacityPercent = shell.windowOpacityPercent,
             windowOpacityEnabled = shell.windowOpacitySupported,
             uiScalePercent = shell.uiScalePercent,
@@ -72,15 +71,14 @@ internal fun SettingsWindowHost(
             onThemeChange = actions::changeTheme,
             onLanguageChange = actions::changeLanguage,
             onAutoStartChange = actions::changeAutoStart,
-            onAlwaysOnTopChange = actions::changeAlwaysOnTop,
-            onCardsOnlyModeChange = actions::changeCardsOnlyMode,
-            onHudModeChange = actions::changeHudMode,
             autoUpdateEnabled = autoUpdate.isEnabled(),
             autoUpdateSupport = autoUpdate.support,
             autoUpdatePlatform = autoUpdate.platform,
             lastUpdateReceipt = autoUpdate.lastReceipt,
             autoUpdateFeedOverride = autoUpdate.feedUrlOverride,
             onAutoUpdateChange = { enabled -> autoUpdate.setEnabled(enabled) },
+            receiveBetaUpdates = autoUpdate.receivesBetaUpdates(),
+            onReceiveBetaUpdatesChange = { enabled -> autoUpdate.setReceiveBetaUpdates(enabled) },
             onWindowOpacityChange = actions::changeWindowOpacity,
             alertSettings = alertSettings,
             onAlertSettingsChange = actions::changeAlertSettings,

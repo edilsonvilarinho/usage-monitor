@@ -4,14 +4,16 @@
 
 **Barra HUD — notch** (`HudWindow.kt` + `HudNotch.kt` + `HudBalloon.kt` + `HudHandles.kt` +
 `HudNotchGeometry.kt` + `HudModel.kt` + `AppShellActions.kt` + `CardActions.kt` + `AppUsageRing` +
-`HudModePreferences.kt` + `HudWindowPreferences.kt`; issue #164, redesenhada no plano
+`HudWindowPreferences.kt` + `AppWindowAnchor.kt`; issue #164, redesenhada no plano
 [`profundidade-movimento-hud-notch-execucao.md`](planos/profundidade-movimento-hud-notch-execucao.md)):
-terceiro chrome, ainda mais discreto que o modo somente cards. A janela principal fica **escondida**
-(`visible = !hudMode`), com a geometria intacta, e sobra um **notch colado numa borda da tela** numa
-janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`). O desenho vem do
-Codenotch; a regra de conteúdo vem das seis versões da barra de linhas que ele substituiu.
-**Não é valor novo em enum existente**: `hudMode` continua um booleano, exclusivo com o modo somente
-cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
+**o único modo de visualização do app** desde setembro de 2026 (plano
+[`hud-modo-unico-execucao.md`](planos/hud-modo-unico-execucao.md)): a janela principal com o dashboard,
+o modo somente cards e o seletor de modos saíram. O que existe é um **notch colado numa borda da
+tela** numa janela própria, transparente, sem decoração e sempre no topo (`HudWindowHost`), sempre
+composta. Ela é a âncora do app (`anchorAppWindow`): pai do diálogo de arquivo, alvo da captura do
+relatório de bug, janela ativada pela bandeja e pela segunda instância, e o ponto em que o ACK de
+atualização sai. O desenho vem do Codenotch; a regra de conteúdo vem das seis versões da barra de
+linhas que ele substituiu. `HudEdge` é enum novo.
 - **Um anel por conta, um arco por cota** (`AppUsageRing`, até três concêntricos). **A janela mais
   longa fica por fora** (`HudAccount.rings`, issue #278): mensal, semanal, a janela curta, e saldo e
   créditos (`REPORTED`) por dentro. Na ordem da API a 5h ficava por fora da semanal, o contrário de
@@ -21,7 +23,16 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   palavra ("anel externo 7d 9% · anel interno 5h 28%"). O Codenotch faz um anel por fornecedor com a pior janela, e um percentual só
   esconde a 7d estourada atrás de uma 5h em 12%. Ao lado, **uma linha por anel com a janela**
   (`HudAccount.stripLines`: "7d 72%" sobre "5h 45%", na ordem dos anéis) e a **palavra do estado**:
-  cor nunca informa sozinha. Cota sem projeção tem a trilha **tracejada**.
+  cor nunca informa sozinha. Cota sem projeção tem a trilha em **anel de detritos** (J7, rodada de
+  opções em HTML): no lugar da parede de vidro, fragmentos irregulares de comprimento, vão,
+  espessura, raio e brilho (cerca de um em três dourado) que ficam dentro do tubo e orbitam cada um
+  na sua velocidade, os de dentro mais rápido. Tabela fixa em `GargantuaDebris.kt` (semente 31, a
+  mesma do protótipo), laço de 128 s (`debrisCycleMillis`) com voltas inteiras, então não salta.
+  Contínuo, atrás de `AppMotionPolicy.continuous`; parado, é o quadro zero. A fase só roda quando
+  algum arco está sem projeção.
+  - **Era um tracejado cinza a 6%** (traço = espessura, vão = 1,4×). Sumia no fundo escuro e não
+    falava a língua do disco; a forma diferente continua sendo o que diz "sem veredito", não a cor.
+    As alternativas J1–J10 estão na tabela da skill `usage-monitor-visual-options`.
   - **Era um número só, o da cota em foco, sem dizer a janela** (issue #286). O foco é o pior risco, e
     ele troca de janela sozinho: o mesmo lugar dizia 45% numa coleta e 72% na seguinte sem nada ter
     mudado no consumo. As linhas não mudam de lugar. A janela vai em `onSurfaceVariant` e o número em
@@ -43,33 +54,39 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     `HudNotchTextFitTest` media até 0,6dp a mais entre 110% e 144%. Com duas janelas o notch de cima
     vai a 46dp (28 das linhas + 18 da pílula). O estado sem contas continua `AppStatusIndicator`.
   - **Com contas demais para a borda a faixa fica compacta** (`HudNotchSizes.compact`, E9): se a faixa
-    completa passa de `HUD_MAX_ALONG_FRACTION` (45%) do comprimento da borda, cada conta vira a célula do
+    completa passa de `hudMaxAlongFraction(edge)` do comprimento da borda — 45% em cima e embaixo, 80%
+    nas laterais (L1) —, cada conta vira a célula do
     Codenotch — anel e a cota em foco com a janela embaixo (`focusLine`, "7d 72%"), sem a palavra. Com sete APIs numa tela de notebook a faixa
     completa atravessava a borda de cima; compacta ela cai para menos da metade. A palavra não some da
     HUD: fica no cabeçalho do balão e na descrição do anel. Com poucas contas nada muda.
+  - **O teto é por borda** (L1, rodada de opções em HTML). Era 45% em toda borda, e três contas de
+    duas janelas na lateral de uma tela de notebook já compactavam: a faixa perdia a segunda janela e a
+    pílula, e o usuário leu isso como dado escondido. Os 45% vêm da borda de cima, que divide espaço
+    com títulos e abas; nas laterais não há nenhum dos dois, e o teto passou a 80%.
+    `HudNotchGeometryTest` prende as três contas completas na lateral e compactas com o teto de cima.
+    Recusadas: L2 compactar só as contas em dia (a palavra "Normal" ficaria só no balão), L3 um degrau
+    sem pílula e L4 duas colunas na lateral.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
-  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189), barra e
-  **"68% usado · 32% restante"** (`hudUsedLeftText`: usado truncado como o anel, restante derivado
-  do usado exibido, "<1%" nas duas pontas, nada para saldo e atividade observada); cotas do mesmo grupo
+  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189), barra e,
+  desde o F10, **"32% restante"** à esquerda na cor do texto e **"68% usado"** à direita, apagado
+  (`HudUsedLeft` por `hudUsedLeft`: usado truncado como o anel, restante derivado do usado exibido,
+  "<1%" nas duas pontas, nada para saldo e atividade observada; para o leitor de tela a linha continua
+  uma só, "68% usado · 32% restante"); cotas do mesmo grupo
   (Antigravity, Cursor) numa caixa sob o nome dele; o rodapé **"Plus · via Codex"** — plano e origem da
   leitura, `hudSourceOrigin` com `when` exaustivo sobre `ApiSource`; e os **botões do card**. A cauda
-  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel desliza o balão pela
-  mola `GENTLE` com crossfade do conteúdo.
-- **HUD padrão na instalação nova** (`markHudDefaultPendingOnFreshInstall` + `hudDefaultShouldSwitch`;
-  issue #277). **Não é o default da leitura**: `readPersistedHudMode` continua `false`, e quem já usa o
-  app nunca é arrastado para a HUD. Instalação nova é `hudMode` e `windowPlacement` ausentes e nenhum
-  recibo de atualização (a regra de `ReleaseNotesDecision`), lida **antes** de o coletor da janela
-  gravar qualquer coisa. Nesse caso o app grava o modo padrão e marca `hudDefaultPending`. A troca sai
-  na primeira coleta com alguma conta e **sem janela modal aberta**: na primeira execução quem está
-  aberta é Configurações, e a instalação nova sobe sem API habilitada — abrir direto no notch mostraria
-  "Carregando" para sempre. Ela manda uma notificação, uma vez só, com os três caminhos de volta.
-  **Mora no bloco da bandeja**, porque a bandeja é um desses caminhos: sem ela o app não troca
-  sozinho. Qualquer escolha de modo antes da troca apaga a pendência, porque a escolha do usuário
-  vence. E sem API habilitada o notch diz "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`).
-- **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): a seção
-  "Sessões CLI", entre as cotas e o rodapé, só quando há o que dizer. Uma linha por sinal: contexto
+  (a cunha do `TooltipTail` do Codenotch) aponta para o anel, e trocar de anel repete a abertura pelo
+  jato a partir do anel novo (ver as alças, abaixo).
+- **Instalação nova** (issue #277, revista com a HUD como único modo): sem API habilitada o notch diz
+  "Nenhuma API" em vez de "Carregando" (`hudFallbackLabel`), e as Configurações abrem sozinhas uma vez
+  por arranque (`OpenSettingsWithoutApis` em `Main.kt`) — fechá-las não as reabre, e a engrenagem
+  continua levando até lá. A troca automática da janela padrão para a HUD na primeira coleta
+  (`hudDefaultPending`, notificação com os caminhos de volta) saiu junto com a janela padrão.
+- **Sinais de sessão CLI no balão** (`HudSessionSignal` + `hudSessionSignals`; issue #265): o aviso
+  "Sessões CLI" (um `AppBanner` desde o F10, com o tom do sinal mais grave só na barra de 2dp —
+  `hudSessionSignalsTone`; altura `hudSessionBannerHeight`), entre as cotas e o rodapé, só quando há o
+  que dizer. Uma linha de detalhe por sinal: contexto
   saturado, contexto crescendo (as duas contagens saem do mesmo `SessionPulse` que faz o botão de
   sessões piscar) e sem resposta (`stalledSessions`, que antes só ia para a bandeja). O texto usa as
   palavras do dado — "Contexto saturado · 1 sessão", "Sem resposta há 2h10" — e **nunca** "Atenção",
@@ -92,7 +109,18 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     hover abrindo, alternar fecharia o balão que o próprio ponteiro acabou de abrir. Fechar é sair do
     notch ou passar num anel. O reinício do app continua sendo o clique no botão do balão — abrir no
     hover não torna o reinício um gesto de rotina.
-  As alças e o balão entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`.
+  As alças entram **deslizando de dentro do notch**, com fade e escala pela mola `GENTLE`. O balão
+  (de conta e da engrenagem, o mesmo) abre pelo **jato relativístico (B3)**: um feixe fino sai do
+  centro do anel pela cauda e atravessa o balão, que se desdobra ao longo da borda a partir da linha
+  do feixe (`jetOpenMillis` 520ms); fechar dobra de volta e recolhe o feixe para dentro do anel
+  (`jetCloseMillis` 240ms). Quadro puro em `GargantuaBalloonJet.kt`, movido pela transição do
+  `AnimatedVisibility` (a saída espera o quadro terminar); recorte e feixe desenhados pelo `HudBalloon`
+  sem mudar a caixa, e o feixe atravessa o notch por fora dela. O recorte da janela volta
+  `jetCloseMillis` + 60ms depois de recolher, senão cortaria o fim do fechamento. Escolhido entre 5
+  protótipos HTML (onda de choque, lente gravitacional, jato, luz de acreção no contorno, ondas
+  gravitacionais). **Trocar de anel (ou ir para a engrenagem) com o balão aberto repete o jato a partir
+  do anel novo**: o balão salta para lá (`HudBalloonPlacement.index`), sem deslizar nem crossfade — o
+  usuário pediu a animação também na troca, e desdobrar enquanto desliza lia como tremor.
 - **Identificação, como no Codenotch e no ai-usagebar**: a **marca do fornecedor** (`AppProviderMark`)
   no miolo de cada anel, na cor do texto — em volta dela os arcos já carregam a cor de risco —, e no
   cabeçalho do balão no acento da fonte. O rótulo da conta é o **título do card**
@@ -110,7 +138,24 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
 - **Forma** (`HudNotchShape`): reta e rente na borda, cantos de 14dp do lado de dentro e **ombros
   côncavos** de 8dp ligando os dois. Isenta do teto de raio de 10dp: é silhueta, não painel. Desenhada
   para o topo e levada às outras bordas refletindo/girando os pontos, de controle inclusive.
-  Profundidade `DIALOG`, brilho de topo, borda com luz.
+  Profundidade `DIALOG`.
+- **Corpo: horizonte de eventos** (M1, `GargantuaHorizonBody.kt`, `Modifier.gargantuaHorizonBody`;
+  2026-09-29). Pedido: a barra "mais alinhada ao tema Gargantua" — o tema morava só nos anéis, e o
+  corpo era a laje plana de qualquer painel. Nos temas escuros o fundo vira o núcleo escuro
+  (`AppGargantuaTokens.horizon`, `#07080B`, um degrau acima do `core` para o miolo de cada anel não
+  sumir), sem o brilho de topo, com um filete de luz quente a 8% rente à borda por dentro. Em qualquer
+  tema a borda é um **anel de fótons** de 1dp com Doppler, na direção do disco do anel: brasa embaixo à
+  esquerda, dourado, quente em cima à direita (`gargantuaHorizonRimColors`). Nos temas claros a
+  superfície do preset e o brilho de topo ficam — o texto é `onSurface`, e um corpo escuro o
+  apagaria —, e a borda usa brasa/poeira/dourado, mais opacos, para aparecer no claro. Escuro ou claro
+  sai da luminância da `surface`, não de uma lista dos 26 presets. O brilho **respira** entre 85% e
+  100% em `horizonBreathMillis` (6s), só com `continuous && !reduced`; sem isso fica o quadro zero
+  (92,5%). O laço é lido só no desenho: repinta a borda sem recompor o notch. Pintura dentro da mesma
+  caixa, nenhuma geometria muda. Balões e alças continuam na superfície do tema. `HudNotchTest` mede o
+  corpo e a borda nos dois temas e a respiração com e sem a política. Escolhida entre dez protótipos
+  HTML: M2 disco na borda da tela, M3 lente gravitacional, M4 poço do espaço-tempo, M5 luz de
+  acreção, M6 fóton no contorno, M7 jatos entre as contas, M8 silhueta de maré, M9 vidro fumê, M10
+  órbita que liga as contas.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
   `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada só aceita clique no notch: ela tem
   sempre o tamanho da aberta, e a área de clique é recortada por `Window.shape` (`hudRestHitRegion`:
@@ -129,9 +174,17 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     clique fora do recorte chega à janela de baixo (sem recorte, engolido).
   - **O recorte também corta a pintura**, e por isso a sombra e os arcos de dica das alças cabem na
     margem de 16dp. Sem suporte a `PERPIXEL_TRANSPARENT` o `setShape` lança e a HUD segue sem
-    recorte: a área do balão volta a engolir clique, mas o notch não pisca. **macOS e Linux não foram
-    medidos.** `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
+    recorte: a área do balão volta a engolir clique, mas o notch não pisca. `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
     em `Path2D`, que nunca é igual ao pedido.
+  - **O recorte é só do Windows** (`hudUsesHitRegion`, issue #340). Relato de usuário no elementary OS 6.1
+    (Ubuntu 20.04, X11, Gala), notch na borda direita: com o ponteiro em cima, o balão aparecia só
+    como a tira de 16dp da margem, com a cauda, e as alças saíam como círculos cortados. O
+    `shape = null` da abertura não tirava o recorte ali. **Regressão da #294** (`d3ff05b`, v41.0.0):
+    o mesmo usuário, na mesma máquina, abria o balão inteiro até 25/09, quando a janela ainda
+    redimensionava ao abrir e não havia recorte. O Windows é a única plataforma medida, e só
+    nele o host aplica `Window.shape`; no Linux e no macOS a janela fica sem recorte — o balão abre
+    inteiro, e o preço aceito é a área vazia dele poder engolir o clique da janela de baixo com o
+    notch parado. Esse custo no Linux ainda não foi medido.
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número
@@ -177,13 +230,13 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
     **sem apagar** a gravação: quando ele volta, o notch volta junto.
 - **Um gesto só** (`hudPressGesture`): **clique num anel recoleta aquela conta** (decisão da rodada 3,
   como o `refreshRing` do Codenotch — o gesto entrega a posição do `down` e o notch acha o anel pela
-  caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; botão
-  direito vai direto a "Somente cards" (sem popup — seria recortado dentro desta janela). No corpo o
+  caixa de cada conta; fora dos anéis nada acontece), com o anel "pressionado" enquanto coleta; o botão
+  direito é engolido sem ação (levava ao modo somente cards, removido). No corpo o
   gesto é `draggable = false`: passar do limiar só desiste do clique, e **mover é só pela mão**, que usa o
   mesmo gesto com arrasto. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
   consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
-  `MouseInfo`, incremental. Saídas para a janela padrão: "Padrão" no balão da engrenagem, bandeja,
-  `Ctrl+Shift+H`; "Abrir" da bandeja e a segunda instância saem da HUD antes de ativar a janela.
+  `MouseInfo`, incremental. Não há saída para outra janela: "Abrir" da bandeja e a segunda instância
+  trazem a janela da HUD para a frente (`focusHud` → `activateWindow`), e `F1` é o único atalho.
 - **Contagem até a próxima coleta só no balão da engrenagem** (#185, #269): ela ficava no fim da
   faixa, e com a cadência adaptativa (60 s com sessão CLI ativa) virou um número que reiniciava a cada
   minuto na borda da tela. A faixa passou a ser só das contas — `hudNotchSizes` não tem mais
@@ -216,12 +269,43 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   - **A faixa do modo padrão também ganhou botão**, e deixou de ser clicável inteira: com o botão
     dentro dela, clicar fora dele faria a mesma ação sem nada indicar. O preço é a faixa passar de
     ~34dp para ~46dp de altura, pela altura de controle do botão.
-- **A marca pulsa a cada coleta concluída** (issue #322, `shouldPulseProviderMark`): 1 → 1,15 em
-  `AppMotion.normal` e volta em `AppMotion.slow`, por tween — sem mola, para não passar do alvo — e uma
-  vez só, quando `refreshing` da conta cai de verdadeiro para falso. Vale também para coleta que
-  falhou (o `finally` do view model desmarca o alvo nos dois casos): o pulso diz "o app olhou agora",
-  não "o número mudou". Não é contínuo, então não depende de `continuous`; com "Reduzir animações"
-  não há pulso. Durante a coleta a marca continua girando, como antes.
+- **Coleta: ondas gravitacionais** (R1, `drawGargantuaRefreshLight`, `shouldPlayRefreshWave`;
+  2026-09-28). Substituiu o anel "pressionado" (escala 0,9) e o pulso da marca (issue #322), que o
+  usuário achou ruins; escolhida entre quatro protótipos HTML (ondas, varredura de sonda, recarga de
+  plasma, tique-taque). Coletando: três ondas finas defasadas saem do anel a cada `rippleMillis`
+  (1,3s) e o disco acelera para `refreshMillis` — contínuo, só com `continuous && !reduced`.
+  Concluído: o plasma desliza do valor antigo ao novo (a mola de sempre) e uma onda final mais forte
+  toca uma vez (`refreshWaveMillis`, 800ms) quando `refreshing` cai de verdadeiro para falso — também
+  em coleta que falhou: a onda diz "o app olhou agora", não "o número mudou". É finita, então só
+  "Reduzir animações" a desliga. A marca não gira nem pulsa mais.
+- **Dado novo: horizonte de eventos** (D5, `GargantuaRoll.kt`; 2026-09-29). Quando o texto de uma
+  linha ("7d 56%" → "7d 61%") ou a palavra da pílula muda, só os caracteres diferentes rolam como
+  odômetro: o antigo sobe e some, o novo nasce de baixo, e a base de cada um acende uma borda fina de
+  luz quente (`rollMillis` 480ms, cascata `rollStaggerMillis` 50ms, curva padrão sem rebote). O
+  começo comum não rola (o rótulo "7d " fica parado) e o resto compara pela direita
+  (`gargantuaRollGlyphs`: "9%" → "12%" rola o 9 e faz nascer o 1). A pílula rola a palavra inteira
+  (`AppStatusPill(rollLabelChanges = true)`, só na HUD). O efeito é **desenho** sobre o `Text` do
+  valor novo — recorte dos que mudam e o antigo medido por `TextMeasurer` —, então a geometria, que
+  mede os textos antes da composição, não muda. Não rola na primeira composição nem com "Reduzir
+  animações". Escolhido entre 5 protótipos HTML (desvio para o vermelho, lente, plasma que conta,
+  onda gravitacional, horizonte de eventos).
+- **Balão da conta, execução e engrenagem: F10 · cometa com cauda de íons** (rodada F, escolhida entre
+  dez protótipos HTML; 2026-09-29). Três mudanças juntas:
+  - **Conta**: o **restante** vira o número da linha de baixo de cada cota, à esquerda e na cor do
+    texto, e o usado vai à direita, apagado — numa olhada o que interessa é quanto sobra. As Sessões
+    CLI viraram aviso (acima).
+  - **Execução**: o cometa ganhou uma **cauda de íons** — traço reto e fino que sai da cabeça para
+    trás, 18° para fora da tangente, ao lado da cauda curva (a de poeira). Lê "em movimento" sem o
+    cometa ficar mais forte. O comprimento é o que cabe (`gargantuaIonTailLength`): a ponta para em
+    1,2 traço além da cabeça, dentro do halo, então `appUsageRingOrbitReach` não muda e
+    `HudNotchGeometryTest` continua valendo. Parado sem a política contínua, como o cometa.
+  - **Engrenagem**: versão e contagem saíram do cabeçalho para uma linha própria sob o título
+    (`HUD_APP_BALLOON_STATUS`). **Corrigido depois**: dividindo a linha com "próxima coleta em", a
+    versão ficava com ~50dp e "v41.6.0-beta.2" saía "v41.6.0…". A versão voltou ao cabeçalho, à
+    direita do nome e sem reticências, e a linha de baixo é só "Próxima coleta em ◷ 00:25";
+    `HudNotchTextFitTest` mede as duas linhas com a beta mais longa. O F10 punha o botão da atualização **dentro** do aviso: medido,
+    "Reiniciar o app e atualizar" não cabe nem na largura interna inteira do aviso (192dp) a partir de
+    105% de escala, e o rótulo não encurta — diz o que reinicia. O botão continua abaixo do aviso.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
   órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
@@ -279,3 +363,72 @@ cards por regra dos setters em `AppShellState.kt`, e `HudEdge` é enum novo.
   translucidez própria (a opacidade é só a preferência do usuário); cota sem projeção continua na HUD
   (o percentual é fato medido); nenhum formato novo — percentual de `compactPercentageLabel`, reset de
   `resetShortLabel`, rótulo curto de `hudQuotaShortLabel`.
+- **Opacidade no Windows: piso de 55% e repintura depois da troca** (`hudWindowOpacityPercent`,
+  `hudRepaintsAfterOpacityChange`). A janela transparente do Compose no Windows só recebe o mouse
+  onde o fundo tem alfa 1/255 (`JLayeredPaneWithTransparencyHack`), e o sistema multiplica esse alfa
+  pela opacidade. Relato: com a opacidade em 50% e de volta a 100%, a HUD perdia o hover até sair e
+  voltar ao modo. Medido com uma sonda (janela transparente igual à da HUD, `Robot` sobre ela,
+  eventos AWT contados): mudar a opacidade refaz a camada **sem** esse fundo — 100 → 50 → 100 sem
+  repintar dá zero eventos, repintando volta; e 50% nunca recebe o mouse, nem repintando
+  (1 × 127/255 arredonda para zero), enquanto 55% a 99% recebem. Os dois ajustes são só do Windows
+  (#340); no Linux e no macOS a preferência vale inteira e sem repintura.
+- **Indicador Gargantua** (`AppGargantuaRing`, `GargantuaDrawing.kt`, `GargantuaQuotaArc.kt`,
+  `AppGargantuaTokens`; 2026-09-28). O anel passou de 44dp para 64dp com o buraco negro de
+  Interestelar no miolo. A primeira versão tinha disco de filamentos finos que sumia atrás da marca e
+  arcos de cota em cor chapada. A segunda
+  (disco de seis faixas com Doppler, arcos com gradiente e ponta incandescente) foi recusada pelo
+  usuário: disco chamativo demais, atrapalhando a leitura do indicador, e arcos ainda planos. Três
+  direções foram prototipadas em HTML (tubo iluminado, órbitas 3D inclinadas, vidro com plasma) e
+  a escolhida foi **vidro com plasma**: a trilha é um tubo de vidro com reflexos vindos do alto à
+  esquerda (`GargantuaQuotaArc.kt`), a cota é plasma no tom semântico dentro dele, e o cenário
+  ficou discreto — sombra em 62% do miolo, anel de fótons, lente fina e uma faixa de disco
+  translúcida com Doppler (token `ember`). Tudo cabe no miolo livre; o disco não atravessa os
+  arcos. **Decisão:** a regra anterior era "arco imóvel pixel a pixel"; agora três pulsos de luz
+  correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas.
+- **Nascimento e colapso** (`HudPresence`, `mergeHudPresence`, `rememberHudPresence`,
+  `GargantuaTransition.kt`; 2026-09-28). Pedido: ativar uma API mostra um buraco negro surgindo e
+  desativar some com um colapso. Prototipados em HTML (3 nascimentos, 4 colapsos); escolhidos
+  **S1 · onda de choque** (1,1s) e **C2 · colapso com clarão** (hoje 850ms, ver a saída K1 abaixo). Depois o pedido cresceu: o
+  início do app e a abertura da HUD também nascem, em cascata de 140ms entre contas.
+  **Decisão de geometria:** a janela continua saindo de `hudNotchSizes`, sem redimensionamento por
+  quadro. A conta que nasce já ocupa o espaço e se revela nele; a que sai fica na lista marcada
+  `LEAVING`, **no mesmo lugar**, até o colapso acabar, e só então o notch encolhe num passo só. Os
+  itens da faixa são compostos com `key(targetKey)`, senão a conta que colapsa no meio herdaria o
+  estado da vizinha. Presença é enum próprio (não valor novo em enum existente). "Reduzir
+  animações" entrega a lista viva, sem transição. O invariante passou a
+  ser o **comprimento**: `GargantuaHudTest` exige pixels iguais entre quadros além do fim do arco e
+  nenhuma luz em cota zerada. Sem `continuous && !reduced` não há fluxo.
+  - **Saída em dois tempos (K1 · colapso lento, depois assenta).** Com 480ms de colapso, a vaga vazia e
+    o notch saltando no fim — no mesmo quadro em que as contas restantes trocavam de compacto para
+    completo —, desligar uma API lia "bruto". Agora o colapso dura 850ms (`collapseMillis`; o texto
+    sai nos primeiros ~210ms) e, depois dele, 450ms de assentamento (`departureSettleMillis`,
+    `hudDepartureSettle`, curva padrão sem rebote): a vaga fecha, o notch **é desenhado** recolhendo
+    até `settledSizes` (a geometria da lista sem quem sai) e, se o modo muda, as contas que ficam
+    trocam de compacto para completo por fade cruzado, com o anel deslizando entre as duas posições.
+    A conta fica `LEAVING` até o fim dos dois tempos (`hudDepartureMillis`), e só então a janela
+    ajusta o tamanho — num passo só, já sem vão. Nenhum redimensionamento AWT por quadro; a área de
+    clique fica a de antes durante os 450ms. O vão entre contas passou a ser de cada item
+    (`hudLeadingGapScales`), para quem sai levar o seu junto; parado dá o mesmo que `spacedBy`. O anel
+    é o mesmo nó nos dois modos: um anel novo reanimaria os arcos do zero. Com vários desligamentos
+    juntos, o notch segue o passo mais lento. `HudNotchTest` mede o notch parado no colapso, no meio
+    da vaga e assentado. Recusadas: K2 tudo junto, K3 onda que fecha, K4 as vizinhas ocupam a vaga.
+
+## Fora do alcance dos testes
+
+Os testes de componente desenham numa cena fora de tela, sem janela AWT e sem gerenciador de
+janelas; os de geometria provam a conta, não o que o sistema faz com ela. O que depende do sistema
+de janelas só se sabe **medindo na máquina** — como o Codenotch escreve no `TASKS.md` o que o render
+fora de tela não enxerga. Esta é a lista a conferir quando um host de janela muda ("Platform
+reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "funciona".
+
+| Comportamento | Windows 11 | Linux | macOS |
+|---|---|---|---|
+| Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340) — desligado | |
+| Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |
+| Janela transparente que muda de origem mostra quadro antigo | medido (#294, 39–49 de ~668 quadros) | | |
+| `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
+| Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
+| Escalas diferentes por monitor | só em máquina real | | |
+| Maximizar zera o recorte dos cantos (`DesktopWindowFrame`, `shape = null`) | em uso desde maio | risco da #340, sem relato | |
+
+Ao medir um item, preencha a célula com a data, a máquina e a issue, no mesmo commit da mudança.

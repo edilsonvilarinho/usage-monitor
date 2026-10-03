@@ -3,7 +3,7 @@ package com.usagemonitor.domain
 import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

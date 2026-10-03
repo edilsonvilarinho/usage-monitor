@@ -36,6 +36,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.presentation.ui.components.AppLoadingState
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
@@ -191,15 +192,17 @@ internal fun CliUsageBreakdownPane(
         // paginar nela, e oferecer os controles desligados seria pior que
         // escondê-los.
         if (axis == BreakdownAxis.ACTIVITY) {
-            BreakdownList(
-                isEmpty = false,
-                query = "",
-                language = language,
-                modifier = Modifier.weight(1f)
-            ) {
-                summary()
-                item(key = "activity") {
-                    ActivityPanel(breakdown = breakdown, language = language)
+            AppModalRevealScope(replayKey = axis) {
+                BreakdownList(
+                    isEmpty = false,
+                    query = "",
+                    language = language,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    summary()
+                    item(key = "activity") {
+                        ActivityPanel(breakdown = breakdown, language = language)
+                    }
                 }
             }
             return@Column
@@ -279,14 +282,18 @@ internal fun CliUsageBreakdownPane(
             onPageSizeChange = { size -> pageSize = size }
         )
 
-        BreakdownList(
-            isEmpty = page.items.isEmpty(),
-            query = query,
-            language = language,
-            modifier = Modifier.weight(1f),
-            header = summary
-        ) {
-            rows()
+        // Sub-aba, ordem, direção e página refazem o E9 na lista; o filtro não —
+        // tocar a cada tecla seria pisca, não apresentação.
+        AppModalRevealScope(replayKey = listOf(axis, sort, descending, pageIndex, pageSize)) {
+            BreakdownList(
+                isEmpty = page.items.isEmpty(),
+                query = query,
+                language = language,
+                modifier = Modifier.weight(1f),
+                header = summary
+            ) {
+                rows()
+            }
         }
     }
 }

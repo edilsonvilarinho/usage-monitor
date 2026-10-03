@@ -3,7 +3,7 @@ package com.usagemonitor.data.repository
 import com.usagemonitor.data.datasource.DashboardCacheDataSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.DashboardCacheRepository
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class DashboardCacheRepositoryImpl(
     private val dataSource: DashboardCacheDataSource

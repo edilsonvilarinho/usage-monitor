@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.STALLED_SESSION_MAX_AGE_MILLIS
 import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.detectStalledSessions
 import com.usagemonitor.domain.repository.CliSessionRepository
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 
 /**
  * Sessões desta máquina cujo último pedido não recebeu resposta dentro do limiar.

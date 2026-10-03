@@ -34,33 +34,36 @@ first launch.
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/ci.yml` | `allTests` on Windows, on push to `main` and on pull request |
-| `.github/workflows/ci-server.yml` | `typecheck` and `vitest` for `server/`, when `server/**` changes |
+| `.github/workflows/ci.yml` | Everything on pull request and push to `main`: desktop suite (Windows, plus Linux as advisory), installer and Linux updater scenarios, team server, pricing parity — each only when its paths changed; `ci-ok` aggregates |
 | `.github/workflows/release-linux.yml` | on `v*` tags: publishes Windows, Linux and macOS artifacts |
 | `.github/workflows/codeql.yml` | CodeQL on push to `main`, weekly and manually |
 
-Both test jobs publish a summary to `$GITHUB_STEP_SUMMARY` — test counts and slowest classes when
-they run, and an explicit **not executed** notice with the reason when the path filter skips them. A
-job that passes in five seconds without running a single test is otherwise indistinguishable from one
-that ran the suite.
+The `changes` job decides which areas the diff touches (`HEAD^1..HEAD` on a pull request, whose
+checkout is the merge commit; `before..sha` on push; any git failure means "run everything") and
+writes that table to the run summary. A job for an untouched area is skipped at job level, so no
+runner starts. `ci-ok` runs always, treats `skipped` as success and `failure`/`cancelled` as failure,
+and is the single check branch protection should require. Every test job that runs publishes counts
+and slowest classes to `$GITHUB_STEP_SUMMARY`, and `--require` fails it when no XML was produced.
 
-The release workflow waits for the SHA-specific `ci-release-gate-*` artifact from the preceding
-push to `main`. When that marker proves that the remote CI suite and installer scenarios really
-passed, `verify` reuses the result and does not repeat the expensive checks. A missing, expired,
-invalid or unreadable marker makes `verify` run its existing `allTests` and installer scenarios as
-a fallback. `publish-release` depends on `verify` in both paths, so a release is never published
-without a successful validation gate.
+The release is tag-only (#344). The version comes from the tag: `build.gradle.kts` reads
+`-PappVersion`, which the release workflow passes, and falls back to
+`git describe --tags --abbrev=0` for local builds (`1.0.0` without git or tags, since the Compose
+plugin rejects a `0` major at configuration time). There is no version bump commit, so cutting a
+release pushes nothing to `main` and triggers no `CI` or `CodeQL` run there.
 
-A normal release still produces three visible workflow runs for the same commit: `CI`, `CodeQL`
-and `Release Desktop Packages`. The change removes duplicated validation work; it does not remove
-the independent CodeQL run or the local `allTests` preflight performed by the release skill.
+`verify-version` rejects a tag that is not `vX.Y.Z`, is lightweight, or points outside `main`.
+`verify` (Windows `allTests` plus installer scenarios) runs in parallel with the four builds, and
+`publish-release` requires both. A manual dispatch with `publish: false` builds and verifies an
+existing tag without publishing.
 
 ### Gradle cache
 
 The cache comes from `gradle/actions/setup-gradle`, **not** from `setup-java`'s `cache: 'gradle'`.
 The latter archives `~/.gradle` with the daemon still alive, and on Windows `tar` dies on the `.lock`
 files. Only `main` writes the cache: a cache written from a pull request run is scoped to that PR and
-no other run can read it.
+no other run can read it. Tag runs (release) and CodeQL only read: each tag is a new ref, so a cache
+written there is never read again, and those writes pushed the repository past the 10 GB limit and
+evicted `main`'s cache (#344).
 
 ### Parallel test forks
 
@@ -73,8 +76,8 @@ every fork tries to unpack at once.
 
 ### Coverage
 
-Kover instrumentation is opt-in via `-Pcoverage`, because it costs 6–7 s per run. Only the push to
-`main` turns it on.
+Kover instrumentation is opt-in via `-Pcoverage`, because it costs 6–7 s per run. CI turns it on in
+every run of `desktop-windows`.
 
 ```bat
 gradlew.bat allTests -Pcoverage
@@ -123,11 +126,20 @@ carrying a token the script generated. Without the ACK in 60 s it rolls back. Th
 Progress is reported as **text** ("Downloading 42%"), never an infinite animation — those hang
 `waitForIdle` in the component tests.
 
+**Beta channel** (issue #355): Settings → General → "Receive beta updates", off by default. Betas are
+`vX.Y.Z-beta.N` tags published as GitHub **prereleases**, never `latest`, so only users in the channel
+see them. Cut them with the `usage-monitor-release-beta` skill. Details in
+"Decisões de empacotamento e atualização" below.
+
 ## Branding
 
-`tools/brand/render_icons.py` generates the PNG, ICO and ICNS from a monogram described in code.
-The `monogram.svg` beside it is reference material and is not read by the script. The `.icns` is only
-validated in the `build-macos` release job.
+`tools/brand/render_icons.py` generates the PNG, ICO and ICNS of the Gargantua icon with the name
+(round I10), described in code with Pillow only. The drawing changes with the *logical* size: the full
+name from 96px, the initials U·M from 32 to 64px, the core with its disk at 24px and below. The ICO is
+written by hand with one PNG entry per size (16/24/32/48/64/256), because Pillow's ICO writer
+downsizes a single image. The windows load `app_icon_window.png` (64px) and the tray
+`app_icon_tray.png` (32px); the 512px `app_icon.png` goes to the Linux menu and jpackage. The
+`.icns` is only validated in the `build-macos` release job.
 
 ## Decisões de empacotamento e atualização
 
@@ -136,6 +148,17 @@ validated in the `build-macos` release job.
 ### Empacotamento
 
 `TargetFormat.Exe` (Windows), `Deb`/`Rpm` (Linux) e `Dmg` (macOS). **O `Msi` saiu**: os dois instaladores de Windows gravavam no mesmo `%LOCALAPPDATA%\Usage Monitor`, e o do MSI nunca poderia se atualizar sozinho — `selectArtifact` só aceita `WINDOWS_NSIS`. O `upgradeUuid` continua no `build.gradle.kts` porque é o UpgradeCode das instalações MSI que já existem, e é por ele que o `UsageMonitor.nsi` as encontra e remove antes de instalar. O jpackage **não faz cross-compile**: o `.dmg` só sai rodando em macOS, por isso o release depende do job `build-macos` (`macos-latest` arm64 + `macos-15-intel` x64) em `.github/workflows/release-linux.yml`. Os DMGs vão sem assinatura Apple — o Gatekeeper exige liberação manual, documentada no README.
+
+**Versão de pacote de uma beta** (issue #355): o plugin do Compose valida `packageVersion` por formato
+e recusa `X.Y.Z-beta.N` em três deles — medido com `createDistributable -PappVersion=99.0.0-beta.1`,
+que falha na **configuração**: Exe exige `MAJOR.MINOR.BUILD` numérico, Dmg exige versão e build
+version numéricas, Rpm proíbe `-`; Deb aceita. Por isso `packageVersion` recebe só o número-base
+(`packageBaseVersion`), e Deb/Rpm recebem `X.Y.Z~beta.N` (`linuxPackageVersion`) — o `~` é ordenado
+**antes** da estável do mesmo número pelos dois gerenciadores de pacote. A string completa continua
+onde é o app que lê: `CURRENT_APP_VERSION`, `/DPRODUCT_VERSION` do NSIS (nome do `Setup.exe`,
+`DisplayVersion` e recibo), tarball e nome dos assets publicados. Conferido na imagem gerada:
+`Usage Monitor.cfg` com `-Djpackage.app-version=99.0.0` e `CURRENT_APP_VERSION = "99.0.0-beta.1"`.
+O `Setup.exe` beta não foi gerado nesta máquina (sem NSIS); quem o prova é o job `build-windows`.
 
 **Confiança TLS do sistema** (`SystemTrustStore.kt`, issue #325): o `HttpClient(OkHttp)` usa um `X509TrustManager` composto — `cacerts` da JVM primeiro, repositório do sistema depois (`Windows-ROOT` no Windows, `KeychainStore` no macOS). Antivírus que inspecionam HTTPS (Kaspersky, ESET) reassinam o tráfego com uma CA instalada no repositório do Windows, e o runtime empacotado só conhecia o `cacerts` embarcado. **`jdk.crypto.mscapi` entra no `modules(...)` só no build Windows**: medido, o runtime da v41.1.0 instalado declarava `MODULES="… java.sql jdk.crypto.ec"`, sem ele — `Windows-ROOT` nem existia no app —, e o módulo só existe no JDK do Windows, então sem a condição o jlink do Linux/macOS falharia. Repositório do sistema que não carrega devolve `null`, e o cliente fica com o padrão da JVM. Linux continua só com o `cacerts`: não existe um repositório único entre distribuições. A validação de ponta a ponta exige máquina com antivírus inspecionando HTTPS e não foi feita.
 
@@ -216,6 +239,50 @@ marca `releaseNotesSeenVersion`, nunca o recibo do instalador.**
 - O recibo continua vivo para outras duas coisas: a linha "Última atualização" das Configurações e a
   poda do artefato aplicado (`shouldDiscardUpdateArtifacts`).
 
+**Canal beta** (issue #355; plano [`releases-beta-355-execucao.md`](planos/releases-beta-355-execucao.md)):
+interruptor "Receber versões beta" em Configurações → Geral, logo abaixo da atualização automática,
+desmarcado por padrão (`receiveBetaUpdates` em `PreferencesSettings`). Independe da atualização
+automática: sem ela a beta só é anunciada.
+- **Quem não optou está protegido pelo GitHub, não pelo app.** A beta é a tag `vX.Y.Z-beta.N`,
+  publicada pelo workflow com `prerelease: true` e `make_latest: false`. Fora do canal o app lê
+  `/releases/latest`, que a API nunca responde com prerelease — e isso vale também para as versões do
+  app anteriores ao canal, que não sabem que ele existe. Beta publicada como Latest é incidente: todo
+  usuário passaria a recebê-la.
+- **Dentro do canal**, `fetchGitHubReleases` lista `/releases?per_page=20`, descarta rascunho e oferece
+  a maior versão acima da atual. Com o feed sobrescrito (`USAGE_MONITOR_UPDATE_FEED_URL`) a listagem não
+  existe e o feed único vale para os dois canais.
+- **Ordenação SemVer em `AppVersionComparison.kt`**, ainda dono único: `42.0.0-beta.1 < 42.0.0-beta.2 <
+  42.0.0`. Antes o sufixo era descartado e as três comparavam iguais — a `beta.2` nunca seria oferecida a
+  quem estava na `beta.1`, nem a estável a quem estava na beta, e as novidades da estável cairiam em
+  marca silenciosa. O sufixo só conta com núcleo numérico legível: `sem-numero` continua comparando
+  igual a uma versão vazia (falha fechado).
+- **Desligar o canal não faz downgrade**: o repositório nunca oferece versão menor que a em execução, e
+  quem está numa beta fica nela até sair uma estável maior. Alternar o interruptor reconsulta na hora
+  (`startBetaChannelWatcher`), sem esperar o poll de 10 minutos.
+- **O Linux aceita só o sufixo `-beta.N`** (`isValidLinuxVersionName` e `linux-updater.sh`): o valor vira
+  nome de diretório, e abrir para qualquer identificador de pré-lançamento abriria caminho para `/` e
+  `..`.
+- **Destaque**: banner, balão da HUD, janela de novidades e rodapé dizem "beta" em **texto**; novidades e
+  rodapé levam ainda o selo `BetaReleasePill`. No balão da HUD o número desce para o detalhe — a linha
+  curta tem largura fixa e `42.10.10-beta.12` não cabe ao lado do estado (`HudNotchTextFitTest`).
+- **Notas de release**: a estável difere da estável anterior (lista a série beta inteira); a beta difere
+  da tag anterior, beta ou estável. Ordem com `versionsort.suffix=-` — sem ele o git põe a beta depois da
+  estável do mesmo número.
+- **Publicação**: skill `usage-monitor-release-beta`. A estável segue na `usage-monitor-release`, e a
+  versão-base dela e de `lastReleaseTagVersion()` ignora tags beta (`--exclude "*-beta*"`).
+- **Ciclo de vida, todo pela skill** (`patch|minor|major`, `next`, `promote`, `withdraw`, `restore`):
+  - *Não existe "mover a beta para a main"*: a tag já aponta para um commit da `main`. **Promover** é
+    publicar a estável `vX.Y.Z` da série aberta como tag e build **novos** — nunca editar a release beta
+    para estável/Latest, porque os binários dela se chamam `X.Y.Z-beta.N` (`CURRENT_APP_VERSION`,
+    instalador, recibo).
+  - **Corrigir** uma beta ruim é seguir em frente: `next` publica `beta.N+1`, que alcança inclusive quem
+    ficou na ruim.
+  - **Retirar** é esconder a release como rascunho (`gh release edit --draft=true`): o app ignora
+    rascunho e a API anônima não o mostra; `restore` desfaz com `--draft=false --prerelease
+    --latest=false`. Quem já instalou **fica** na beta (sem downgrade) até chegar versão maior. Apagar
+    release ou tag fica fora da skill: não ganha nada sobre o rascunho e perde o registro; nome de tag
+    retirada nunca é reusado.
+
 **Ajuda dentro do app** (`presentation/ui/help/` + `desktopMain/help/HelpMediaPlayer.kt` +
 `desktopMain/presentation/ui/HelpWindow.kt` + `src/desktopMain/resources/help/*.gif`; issue #184,
 plano [`modal-de-ajuda-184-execucao.md`](planos/modal-de-ajuda-184-execucao.md)): doze tópicos
@@ -268,8 +335,8 @@ eram descobertas por acidente.
 
 ## CI e testes
 
-Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e `ci-server.yml`
-(suíte do servidor no Ubuntu). O plano com as medições está em
+Um workflow, `ci.yml`, desde a #344 (antes eram `ci.yml` e `ci-server.yml`, cada um com o próprio
+recorte por path). O plano com as medições está em
 [`docs/planos/ci-testes-detalhe-e-velocidade-execucao.md`](planos/ci-testes-detalhe-e-velocidade-execucao.md).
 
 - **O cache do Gradle é da `gradle/actions/setup-gradle`, não do `cache: 'gradle'` do `setup-java`.**
@@ -298,13 +365,14 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
     paralela: `ComponentTest`, com 103 testes e 120 s no CI, terminava sozinho num fork enquanto os
     outros esperavam. Foi dividido em `ComponentTest`, `SettingsDialogContentTest` e `HistoryScreenTest`
     (~30–40 s cada). Teste de tela novo vai no arquivo da tela dele, não num arquivo genérico.
-- **O filtro por path continua, e um job que pulou a suíte tem de dizer que pulou.** Rodar 5 min de
-  Windows por um typo no README é a lentidão que a issue #93 reclama; mas um `Successful in 5s` que
-  não executou teste nenhum é indistinguível de um que executou, e foi ele que abriu a issue. Os dois
-  jobs publicam no `$GITHUB_STEP_SUMMARY` — contagem e classes mais lentas quando rodam, **NAO
-  EXECUTADA** com motivo e contagem de arquivos quando não. O `--require` do
-  `tools/ci/test-summary.mjs` derruba o job quando a suíte devia rodar e não produziu XML: é o que faz
-  "passou sem executar" ficar vermelho.
+- **O recorte por path mora num job só (`changes`), e o check obrigatório é o `ci-ok`** (#344).
+  Rodar 5 min de Windows por um typo no README é a lentidão que a issue #93 reclama; mas um check
+  obrigatório que o filtro impede de disparar trava o PR em "Expected — Waiting for status", e por
+  isso o recorte morava **dentro** de cada job, que subia runner só para anunciar **NAO EXECUTADA**
+  — 9 a 10 jobs, dois deles Windows, num PR só de docs. Agora o job pulado nem sobe runner, e o
+  `ci-ok` (`if: always()`) é o único check que precisa existir: `skipped` conta como sucesso. O
+  `--require` do `tools/ci/test-summary.mjs` continua derrubando o job que devia rodar a suíte e não
+  produziu XML — é o que faz "passou sem executar" ficar vermelho.
 - **Um parser de JUnit XML para os dois jobs** (`tools/ci/test-summary.mjs`), e por isso o `vitest`
   escreve no mesmo formato (`npm run test:ci`). Duas implementações divergiriam justamente na
   contagem, que é o número que o resumo existe para dar. Sem dependência externa: no job do desktop
@@ -321,17 +389,14 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   limiar calibrado no escuro. Linha de base de 2026-08-25: **82,7% de linhas**, 52,3% de ramos.
   `MainKt` fica fora do relatório por filtro — é o grafo de DI mais a janela, e contá-lo afunda o
   número sem apontar lacuna que se possa fechar.
-- **O push na `main` reaproveita a árvore verificada no PR** (jobs `gate` e `verified-tree` do
-  `ci.yml`; issue #299, plano [`ci-arvore-verificada-299-execucao.md`](planos/ci-arvore-verificada-299-execucao.md)).
-  Depois do merge a `main` repetia ~11 min de Windows sobre o mesmo código. A identidade do código
-  testado é o **tree SHA**: no `pull_request` o checkout é `refs/pull/N/merge`, e o squash de um PR
-  cuja base não andou tem a mesma árvore — medido em 3 de 3 merges (#292, #296, #297). O PR verde
-  publica o artifact `ci-verified-tree-<tree>`; o `gate` o procura no push e, achando run de PR
-  verde do **próprio** repositório (fork edita o próprio `ci.yml` e forjaria o marcador), os jobs
-  publicam **NAO EXECUTADA** com o link do run. O gatilho `push` **não** foi removido: a `main` não
-  tem proteção de branch, e merge com a base adiantada gera árvore nunca testada — ali, e em push
-  direto (bump de release), marcador expirado (30 dias) ou falha de API, tudo roda. O preço é o
-  cache do Gradle: a `main` só grava quando roda de verdade.
+- **O push na `main` roda a suíte de novo, e isso é aceito** (#344, revertendo a decisão da #299).
+  A #299 pulava a suíte na `main` quando a árvore do squash batia com a de um PR verde (jobs `gate` e
+  `verified-tree`, artifact `ci-verified-tree-<tree>`), e o release esperava um marcador do CI da
+  `main` (`release-gate-marker` + `resolve-ci-gate`, polling de até 15 min). O conjunto somava ~350
+  linhas de YAML, subia runners só para dizer "pulei" e amarrava o release a um run da `main`
+  disparado pelo próprio commit de bump — o sintoma que abriu a #344. Com a versão vinda da tag e o
+  `verify` próprio do release, ninguém espera pelo CI da `main`; repositório público não paga o
+  minuto, e o run da `main` é o que grava o cache do Gradle.
 - **Cobertura alta não é a mesma coisa que costura certa.** `RemoteTeamDataSource` está em 1,9%
   porque os testes **herdam da classe real** e sobrescrevem os 20 métodos: o nome aparece em três
   arquivos de teste e nenhuma linha de HTTP executa (issue #94). Ao ver uma classe `open` com todo
@@ -351,4 +416,6 @@ Dois workflows: `ci.yml` (suíte desktop no Windows + cenários do instalador) e
   seguinte compila do zero, falha de compilação é determinística, e um build up-to-date faria
   `Perform CodeQL Analysis` reprovar alto com *No source code was seen*. O preço aceito é o cache
   Linux disputar os 10 GB do repositório com o cache Windows do `ci.yml`; se aquele voltar a dizer
-  `gradle cache is not found`, a saída é `cache-read-only: true` no CodeQL.
+  `gradle cache is not found`, a saída é `cache-read-only: true` no CodeQL. **Foi aplicada na #344**:
+  o repositório chegou a 11,96 GB, a maior parte gravada em ref de tag pelo `setup-java
+  cache: 'gradle'` do `build-macos` (~0,5 GB por release, nunca relido). Tag e CodeQL só leem.

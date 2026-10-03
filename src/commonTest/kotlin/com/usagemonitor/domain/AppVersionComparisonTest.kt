@@ -1,19 +1,56 @@
 package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.compareAppVersions
+import com.usagemonitor.domain.entity.isPrereleaseVersion
 import com.usagemonitor.domain.entity.isVersionNewer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AppVersionComparisonTest {
 
+    /**
+     * Precedência do SemVer (issue #355): antes o sufixo era descartado e
+     * `beta.1`, `beta.2` e a estável comparavam iguais — o canal beta nunca
+     * oferecia a próxima beta nem a estável a quem já estava numa beta.
+     */
     @Test
-    fun `pre-release suffix is stripped via substringBefore dash`() {
-        // Comportamento atual: "8.0.1-beta" -> [8,0,1] que é > "8.0.0".
+    fun `prerelease versions follow semver precedence`() {
+        assertTrue(compareAppVersions("42.0.0-beta.1", "42.0.0-beta.2") < 0)
+        assertTrue(compareAppVersions("42.0.0-beta.2", "42.0.0") < 0)
+        assertTrue(compareAppVersions("42.0.0-beta.9", "42.0.0-beta.10") < 0)
+        assertTrue(compareAppVersions("42.0.0-beta.1", "41.9.9") > 0)
+        assertEquals(0, compareAppVersions("v42.0.0-beta.1", "42.0.0-beta.1"))
+    }
+
+    @Test
+    fun `a prerelease of the next version is newer than the current stable`() {
         assertTrue(isVersionNewer(candidateVersion = "8.0.1-beta", currentVersion = "8.0.0"))
-        // E "8.0.0-beta" tratado igual a "8.0.0".
         assertEquals(false, isVersionNewer(candidateVersion = "8.0.0-beta", currentVersion = "8.0.0"))
+        assertTrue(isVersionNewer(candidateVersion = "8.0.0", currentVersion = "8.0.0-beta"))
+    }
+
+    @Test
+    fun `prerelease identifiers compare the semver way`() {
+        // Número antes de texto; lista mais curta antes quando é prefixo.
+        assertTrue(compareAppVersions("1.0.0-1", "1.0.0-beta") < 0)
+        assertTrue(compareAppVersions("1.0.0-alpha", "1.0.0-beta") < 0)
+        assertTrue(compareAppVersions("1.0.0-beta", "1.0.0-beta.1") < 0)
+        assertTrue(compareAppVersions("1.0.0-beta.99999999999", "1.0.0-beta.100000000000") < 0)
+    }
+
+    @Test
+    fun `build metadata does not affect precedence`() {
+        assertEquals(0, compareAppVersions("42.0.0+abc", "42.0.0"))
+    }
+
+    @Test
+    fun `detects prerelease versions`() {
+        assertTrue(isPrereleaseVersion("42.0.0-beta.1"))
+        assertTrue(isPrereleaseVersion("v42.0.0-beta.1"))
+        assertFalse(isPrereleaseVersion("42.0.0"))
+        assertFalse(isPrereleaseVersion("sem-numero"))
     }
 
     /**

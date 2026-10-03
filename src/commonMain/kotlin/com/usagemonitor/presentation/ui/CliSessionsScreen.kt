@@ -2,6 +2,8 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
+import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.rememberSettledRevealKey
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -231,14 +233,19 @@ private fun CliSessionsList(
             )
         }
     ) {
-        CliSessionsHeader(
-            state = state,
-            language = language,
-            onSelectRange = onSelectRange,
-            onSelectView = onSelectView,
-            onExport = onExport,
-            onExportReport = onExportReport
-        )
+        // Aba nova nasce num escopo que toca o E9; a faixa troca a chave só
+        // quando a leitura nova chega, e aí os totais do cabeçalho tocam junto.
+        val revealKey = rememberSettledRevealKey(state.range, settled = !state.isRefreshing)
+        AppModalRevealScope(replayKey = revealKey) {
+            CliSessionsHeader(
+                state = state,
+                language = language,
+                onSelectRange = onSelectRange,
+                onSelectView = onSelectView,
+                onExport = onExport,
+                onExportReport = onExportReport
+            )
+        }
 
         if (state.indexWarning != null) {
             NoticeText(state.indexWarning, MaterialTheme.colorScheme.error)
@@ -246,13 +253,15 @@ private fun CliSessionsList(
 
         if (state.view == CliSessionsView.BREAKDOWN) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                CliUsageBreakdownPane(
-                    breakdown = state.breakdown,
-                    errorMessage = state.breakdownError,
-                    language = language,
-                    budget = state.budget,
-                    accountCredits = state.accountCredits
-                )
+                AppModalRevealScope(replayKey = revealKey) {
+                    CliUsageBreakdownPane(
+                        breakdown = state.breakdown,
+                        errorMessage = state.breakdownError,
+                        language = language,
+                        budget = state.budget,
+                        accountCredits = state.accountCredits
+                    )
+                }
             }
             return@AppWindowScaffold
         }
@@ -262,45 +271,59 @@ private fun CliSessionsList(
             return@AppWindowScaffold
         }
 
-        // Fora da `LazyColumn`, e não `stickyHeader`: a faixa é do painel, não da
-        // rolagem, e é o mesmo desenho que a tela de presença já usa.
-        CliSessionColumnHeader(
-            language = language,
-            modifier = Modifier.padding(end = SCROLLBAR_GUTTER)
-        )
+        // Voltar para a aba Sessões compõe a lista de novo: o escopo nasce e toca o
+        // E9; a faixa nova toca quando a leitura dela chega.
+        AppModalRevealScope(replayKey = revealKey) {
+            CliSessionsTable(state, language, onOpenSession, Modifier.weight(1f))
+        }
+    }
+}
 
-        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            val listState = rememberLazyListState()
+@Composable
+private fun CliSessionsTable(
+    state: CliSessionsUiState.Success,
+    language: AppLanguage,
+    onOpenSession: (String) -> Unit,
+    listModifier: Modifier
+) {
+    // Fora da `LazyColumn`, e não `stickyHeader`: a faixa é do painel, não da
+    // rolagem, e é o mesmo desenho que a tela de presença já usa.
+    CliSessionColumnHeader(
+        language = language,
+        modifier = Modifier.padding(end = SCROLLBAR_GUTTER)
+    )
 
-            LazyColumn(
-                state = listState,
-                // A barra fica por cima da área de conteúdo; sem a folga à direita
-                // ela cobriria a borda do painel, que ocupa a largura inteira.
-                //
-                // Sem espaço entre itens: a linha traz a própria divisória, e um
-                // vão entre elas desfaria a leitura de tabela.
-                modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
-            ) {
-                items(items = state.sessions, key = { session -> session.sessionId }) { session ->
-                    Box(modifier = appItemMotion()) {
-                        CliSessionRow(
-                            session = session,
-                            language = language,
-                            onOpen = { onOpenSession(session.sessionId) },
-                            stalledForMillis = state.stalledSessions[session.sessionId]
-                        )
-                    }
+    Box(modifier = listModifier.fillMaxWidth()) {
+        val listState = rememberLazyListState()
+
+        LazyColumn(
+            state = listState,
+            // A barra fica por cima da área de conteúdo; sem a folga à direita
+            // ela cobriria a borda do painel, que ocupa a largura inteira.
+            //
+            // Sem espaço entre itens: a linha traz a própria divisória, e um
+            // vão entre elas desfaria a leitura de tabela.
+            modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
+        ) {
+            items(items = state.sessions, key = { session -> session.sessionId }) { session ->
+                Box(modifier = appItemMotion()) {
+                    CliSessionRow(
+                        session = session,
+                        language = language,
+                        onOpen = { onOpenSession(session.sessionId) },
+                        stalledForMillis = state.stalledSessions[session.sessionId]
+                    )
                 }
             }
-
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(listState),
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .testTag(LIST_SCROLLBAR_TAG)
-            )
         }
+
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(listState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .testTag(LIST_SCROLLBAR_TAG)
+        )
     }
 }
 

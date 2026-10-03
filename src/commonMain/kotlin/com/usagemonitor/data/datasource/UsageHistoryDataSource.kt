@@ -5,7 +5,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 interface UsageHistoryDataSource {
     suspend fun insertSnapshot(stats: ApiUsageStats, capturedAt: Instant)

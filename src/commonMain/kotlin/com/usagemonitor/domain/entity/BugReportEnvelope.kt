@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * O pacote de diagnóstico inteiro: o que o usuário descreveu, o que a máquina é

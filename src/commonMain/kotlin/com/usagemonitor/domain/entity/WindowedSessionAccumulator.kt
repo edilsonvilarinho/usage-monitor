@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Dobra os grupos de turnos por modelo de uma sessão num único [CliSessionSummary].

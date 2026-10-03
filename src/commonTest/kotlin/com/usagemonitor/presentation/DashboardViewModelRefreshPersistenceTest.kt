@@ -14,7 +14,7 @@ import com.usagemonitor.presentation.viewmodel.DashboardViewModelConfig
 import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -98,7 +98,7 @@ class DashboardViewModelRefreshPersistenceTest : DashboardViewModelTestSupport()
 
     @Test
     fun `refresh persists the new scheduled time via callback`() = runTest {
-        val lastPersistedInstant = java.util.concurrent.atomic.AtomicReference<kotlinx.datetime.Instant?>(null)
+        val lastPersistedInstant = java.util.concurrent.atomic.AtomicReference<kotlin.time.Instant?>(null)
 
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage() = Result.success(sampleAnthropicStats)
@@ -132,6 +132,46 @@ class DashboardViewModelRefreshPersistenceTest : DashboardViewModelTestSupport()
 
         assertEquals(viewModel.nextRefreshAt.value, lastPersistedInstant.get())
         assertFalse(lastPersistedInstant.get() == null)
+        viewModel.onDestroy()
+    }
+
+    /**
+     * Issue #331: o prazo inicial nunca é gravado, e com o relógio parado entre o
+     * construtor e a coleta — no Windows ele avança em passos de até ~15 ms — o
+     * prazo da coleta empatava com ele e a gravação era pulada. O relógio
+     * congelado reproduz o empate sempre, em vez de só sob carga.
+     */
+    @Test
+    fun `first fetch persists the schedule even when it ties with the initial one`() = runTest {
+        val frozen = object : Clock {
+            private val instant = Clock.System.now()
+            override fun now() = instant
+        }
+        val persisted = java.util.concurrent.atomic.AtomicReference<kotlin.time.Instant?>(null)
+        val viewModel = DashboardViewModel(
+            GetAnthropicUsageUseCase(object : AnthropicRepository {
+                override suspend fun getUsage() = Result.success(sampleAnthropicStats)
+            }),
+            GetMiniMaxUsageUseCase(object : MiniMaxRepository {
+                override suspend fun getUsage() = Result.success(sampleMiniMaxStats)
+            }),
+            GetCodexUsageUseCase(object : CodexRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            GetDeepSeekUsageUseCase(object : DeepSeekRepository {
+                override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+            }),
+            defaultEnabledApis(),
+            historyUseCase(mutableListOf()),
+            clock = frozen,
+            config = noAutoStartConfig(),
+            onNextRefreshAtChanged = { instant -> persisted.set(instant) }
+        )
+        val initial = viewModel.nextRefreshAt.value
+
+        awaitConditionRealTime { persisted.get() != null }
+
+        assertEquals(initial, persisted.get())
         viewModel.onDestroy()
     }
 }

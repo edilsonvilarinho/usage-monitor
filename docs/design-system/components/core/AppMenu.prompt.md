@@ -3,21 +3,23 @@ Dropdown menu anchored to a control: one choice from a short list, the current o
 ```jsx
 <AppMenu
   open={open}
-  value="standard"
-  options={[{ id: 'standard', label: 'Padrão' },
-            { id: 'cards', label: 'Somente os cards' },
-            { id: 'hud', label: 'Barra HUD' }]}
-  onSelect={setMode}
+  value="week"
+  options={[{ id: 'day', label: 'Hoje' },
+            { id: 'week', label: '7 dias' },
+            { id: 'month', label: '30 dias' }]}
+  onSelect={setRange}
   onDismiss={() => setOpen(false)}
 >
-  <AppIconButton glyph="▤" label="Modo de janela" onClick={() => setOpen(!open)} />
+  <AppIconButton glyph="▤" label="Período" onClick={() => setOpen(!open)} />
 </AppMenu>
 ```
 
 **Menu or segmented control?** The segmented control shows every option all the time and costs the
 width of all of them; the menu shows the current one and the rest on demand. Use the segmented
 control on a toolbar with room, the menu on a status bar that has none — three window-mode labels
-side by side do not fit on a 30dp bar that already carries five actions.
+side by side did not fit on a 30dp bar that already carries five actions. (Its first consumer, the
+window-mode menu, was removed with the cards-only mode in September 2026; the primitive stays
+published without a consumer in the app.)
 
 **Not the platform's own menu.** That one brings its own surface, radius, entry animation and item
 height, and none of the four belong to this system. Dressing it from the outside would leave two

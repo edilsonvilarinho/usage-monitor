@@ -17,7 +17,7 @@ Este documento descreve como as skills operacionais deste repositório funcionam
 | Skill | Objetivo |
 |---|---|
 | `usage-monitor-commit-push` | Staging explícito, verificação estreita, commit com identidade de agente temporária, push e restauração da identidade original |
-| `usage-monitor-release` | Bump de versão, verificação, tag anotada `vX.Y.Z` e acompanhamento do workflow de CI que publica os artefatos |
+| `usage-monitor-release` | Versão pela tag (sem commit de bump), verificação, tag anotada `vX.Y.Z` e acompanhamento do workflow de CI que publica os artefatos |
 | `usage-monitor-nsis-installer` | Build e diagnóstico do instalador Windows, incluindo as lições de freeze já documentadas |
 
 ## Como cada agente carrega as skills

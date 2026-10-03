@@ -1,6 +1,6 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -25,21 +25,26 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.ApplyWindowMinimumSize
+import com.usagemonitor.AutoStartManager
 import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.activateWindow
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.isWindowOpacitySupported
+import com.usagemonitor.presentation.ui.components.LocalModalReveal
+import com.usagemonitor.presentation.ui.components.ModalRevealPhase
+import com.usagemonitor.presentation.ui.components.ModalRevealState
+import com.usagemonitor.presentation.ui.components.modalFilamentWindowAlpha
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
-import com.usagemonitor.presentation.ui.theme.appSpringSpec
 import com.usagemonitor.presentation.ui.theme.appTweenSpec
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -56,7 +61,13 @@ internal data class ModalWindowEnvironment(
     val uiScalePercent: Int,
     val motion: AppMotionPolicy,
     val screenWorkArea: ScreenWorkArea,
-    val breadcrumbs: BreadcrumbRecorder
+    val breadcrumbs: BreadcrumbRecorder,
+    /**
+     * O arranque já assentou e as janelas que pedem pré-aquecimento podem nascer
+     * escondidas (ver [AppDialogWindow]). Nasce `false`: o arranque já leva de 5 a
+     * 8 s, e janela nenhuma disputa a CPU com ele.
+     */
+    val prewarmReady: Boolean = false
 )
 
 /**
@@ -80,22 +91,33 @@ internal val LocalModalWindowOnScreen = compositionLocalOf { true }
  * dependem disso: quem os para é o `closeWindow()` de cada ViewModel, chamado
  * por quem fecha, como antes.
  *
- * **A entrada espera o primeiro quadro pintado.** A escala que a moldura já
- * fazia começava ao compor, dentro de uma janela que o sistema mostrava de uma
- * vez, 100% opaca — os quadros iniciais se perdiam no custo da criação e o que
- * se via era o salto da janela. Agora a janela aparece **transparente**, o host
- * aguarda dois quadros e só então esmaece a janela de 0 a 1 (tween de
- * [AppMotion.normal]) com o conteúdo crescendo de [MODAL_ENTER_SCALE] a 1 pela
- * mola `GENTLE`. A opacidade é a da janela AWT, e não do conteúdo: conteúdo
- * esmaecendo numa janela opaca mostraria o fundo dela, não o que está atrás.
+ * **A entrada espera o primeiro quadro pintado.** A janela aparece
+ * **transparente**, o host aguarda dois quadros e só então toca o E9
+ * (filamentos de plasma, [AppGargantuaTokens.filamentOpenMillis]): a moldura
+ * esmaece em ~50 ms e um filamento corre sob cada linha marcada com
+ * `appModalRevealRow`, em ordem de leitura, revelando o texto atrás da cabeça.
+ * A opacidade é a da janela AWT, e não do conteúdo: conteúdo esmaecendo numa
+ * janela opaca mostraria o fundo dela, não o que está atrás. A escala de 0,96
+ * que a entrada fazia saiu com o E9 — o dado não se move, só é revelado.
  *
  * **Todo fechamento passa pelo mesmo caminho**: ×, Alt+F4, Esc e os botões
  * "Fechar" do conteúdo só chamam [onCloseRequest], quem chama baixa [visible], e
- * é a queda de [visible] que esmaece e esconde (ver [ModalWindowHost]). Antes só o × da barra
- * esmaecia; o resto fechava seco.
+ * é a queda de [visible] que recolhe os filamentos
+ * ([AppGargantuaTokens.filamentCloseMillis]), esmaece e esconde (ver
+ * [ModalWindowHost]).
  *
- * Com "Reduzir animações", ou numa plataforma sem translucidez de janela
- * (alguns Linux), abre e fecha na hora.
+ * Com "Reduzir animações", fora do Windows ou sem translucidez de janela, abre e
+ * fecha na hora ([shouldAnimateModalWindow]).
+ *
+ * **[prewarm] tira a primeira abertura do caminho do clique.** Mesmo viva, a
+ * janela pagava na primeira abertura o peer nativo, o contexto do Skia, a carga
+ * das classes do conteúdo e o primeiro layout — a trilha do 41.6.0-beta.2 media
+ * 230 a 515 ms só do pedido ao quadro, fora a criação da janela, contra 42 a 89 ms
+ * das reaberturas. Com [ModalWindowEnvironment.prewarmReady], a janela nasce,
+ * aparece **transparente e sem foco** por dois quadros e se esconde: a primeira
+ * abertura de verdade vira reabertura. Um pré-aquecimento por vez, e só onde a
+ * janela esmaece ([shouldPrewarmModalWindow]). Opt-in porque cada janela viva
+ * guarda contexto de GPU: só as abertas com frequência pedem.
  *
  * [diagnosticName] vai para a trilha junto com o tempo até o primeiro quadro,
  * e é fixo de propósito: o título pode carregar o apelido do perfil, que costuma
@@ -113,9 +135,10 @@ internal fun AppDialogWindow(
     onCloseRequest: () -> Unit,
     /** Muda a cada pedido de abertura: traz para a frente a janela que já está aberta. */
     openGeneration: Int = 0,
+    prewarm: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val host = rememberModalWindowHost(visible, openGeneration) ?: return
+    val host = rememberModalWindowHost(visible, openGeneration, prewarmNow(prewarm, environment)) ?: return
 
     Window(
         onCloseRequest = onCloseRequest,
@@ -156,9 +179,10 @@ internal fun AppDialogWindow(
     minHeightDp: Int,
     onCloseRequest: () -> Unit,
     openGeneration: Int = 0,
+    prewarm: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val host = rememberModalWindowHost(visible, openGeneration) ?: return
+    val host = rememberModalWindowHost(visible, openGeneration, prewarmNow(prewarm, environment)) ?: return
 
     DialogWindow(
         onCloseRequest = onCloseRequest,
@@ -201,6 +225,9 @@ private data class ModalRequest(val visible: Boolean, val generation: Int)
 private class ModalWindowHost(initial: ModalRequest) {
     val requests = MutableStateFlow(initial)
 
+    /** Nasceu pelo pré-aquecimento, e não por um pedido de abertura. */
+    val bornForPrewarm: Boolean = !initial.visible
+
     /** A janela AWT está visível — ainda que transparente, entrando ou saindo. */
     var onScreen by mutableStateOf(false)
 
@@ -214,14 +241,15 @@ private class ModalWindowHost(initial: ModalRequest) {
 }
 
 /**
- * `null` até o primeiro pedido de abertura: janela que nunca foi aberta não
- * existe. Daí em diante ela só se esconde.
+ * `null` até o primeiro pedido de abertura — ou até o pré-aquecimento, quando a
+ * janela o pede: janela que nunca foi aberta não existe. Daí em diante ela só se
+ * esconde.
  */
 @Composable
-private fun rememberModalWindowHost(visible: Boolean, openGeneration: Int): ModalWindowHost? {
+private fun rememberModalWindowHost(visible: Boolean, openGeneration: Int, prewarm: Boolean): ModalWindowHost? {
     val request = ModalRequest(visible, openGeneration)
     val holder = remember { LastValue<ModalWindowHost>() }
-    if (holder.value == null && visible) {
+    if (holder.value == null && (visible || prewarm)) {
         holder.value = ModalWindowHost(request)
     }
     val host = holder.value ?: return null
@@ -244,29 +272,33 @@ private fun WindowScope.ModalWindowBody(
     content: @Composable () -> Unit
 ) {
     val opacitySupported = remember { isWindowOpacitySupported() }
-    val scale = remember { Animatable(1f) }
+    val platform = remember { AutoStartManager.currentPlatform() }
+    val reveal = remember { ModalRevealState() }
     val currentEnvironment by rememberUpdatedState(environment)
     val currentDiagnosticName by rememberUpdatedState(diagnosticName)
 
     LaunchedEffect(host) {
+        if (host.bornForPrewarm) {
+            prewarmWindow(window, host, currentEnvironment.breadcrumbs, currentDiagnosticName)
+        }
         // `collectLatest`: um pedido novo cancela a transição em curso, como
-        // reabrir no meio da saída.
+        // reabrir no meio da saída. Um pedido que chegou durante o pré-aquecimento
+        // espera no fluxo e é atendido aqui.
         host.requests.collectLatest { request ->
             val motion = currentEnvironment.motion
-            val animated = shouldAnimateModalWindow(motion, opacitySupported)
+            val animated = shouldAnimateModalWindow(motion, opacitySupported, platform)
+            // Aba, faixa e dado novo só repetem o E9 numa janela que abriu com ele.
+            reveal.replayEnabled = animated
             if (request.visible) {
                 if (host.onScreen) {
                     // Já na tela, ou saindo: volta à opacidade cheia e vem para a
                     // frente, sem refazer a entrada.
                     host.contentOnScreen = true
+                    reveal.settle()
                     if (animated) {
-                        coroutineScope {
-                            launch { scale.animateTo(1f, appSpringSpec(AppMotion.Springs.GENTLE, motion)) }
-                            fadeWindow(window, target = 1f, durationMillis = AppMotion.fast, motion)
-                        }
+                        fadeWindow(window, target = 1f, durationMillis = AppMotion.fast, motion)
                     } else {
                         setWindowOpacity(window, 1f)
-                        scale.snapTo(1f)
                     }
                     activateWindow(window)
                     return@collectLatest
@@ -275,10 +307,10 @@ private fun WindowScope.ModalWindowBody(
                 val requestedAt = System.nanoTime()
                 if (animated) {
                     setWindowOpacity(window, 0f)
-                    scale.snapTo(MODAL_ENTER_SCALE)
+                    reveal.begin(ModalRevealPhase.OPENING)
                 } else {
                     setWindowOpacity(window, 1f)
-                    scale.snapTo(1f)
+                    reveal.settle()
                 }
                 host.onScreen = true
                 // Dois quadros: o primeiro recompõe o que mudou com a janela
@@ -301,22 +333,11 @@ private fun WindowScope.ModalWindowBody(
                 )
                 activateWindow(window)
                 if (animated) {
-                    coroutineScope {
-                        launch { scale.animateTo(1f, appSpringSpec(AppMotion.Springs.GENTLE, motion)) }
-                        fadeWindow(window, target = 1f, durationMillis = AppMotion.normal, motion)
-                    }
+                    playFilaments(window, reveal, ModalRevealPhase.OPENING, AppGargantuaTokens.filamentOpenMillis, motion)
                 }
             } else if (host.onScreen) {
                 if (animated) {
-                    coroutineScope {
-                        launch {
-                            scale.animateTo(
-                                MODAL_ENTER_SCALE,
-                                appTweenSpec(MODAL_EXIT_MILLIS, motion, AppMotion.exitEasing)
-                            )
-                        }
-                        fadeWindow(window, target = 0f, durationMillis = MODAL_EXIT_MILLIS, motion)
-                    }
+                    playFilaments(window, reveal, ModalRevealPhase.CLOSING, AppGargantuaTokens.filamentCloseMillis, motion)
                 }
                 // O conteúdo larga os laços próprios enquanto a janela ainda
                 // recompõe: escondida, a recomposição que os desligaria não vem.
@@ -348,10 +369,12 @@ private fun WindowScope.ModalWindowBody(
             title = title,
             iconPainter = environment.iconImage,
             windowState = windowState,
-            onCloseRequest = onCloseRequest,
-            contentScale = { scale.value }
+            onCloseRequest = onCloseRequest
         ) {
-            CompositionLocalProvider(LocalModalWindowOnScreen provides host.contentOnScreen) {
+            CompositionLocalProvider(
+                LocalModalWindowOnScreen provides host.contentOnScreen,
+                LocalModalReveal provides reveal
+            ) {
                 content()
             }
         }
@@ -365,9 +388,83 @@ private fun WindowScope.ModalWindowBody(
  * abrir janela. Sem translucidez a janela não tem como esmaecer, e animar só a
  * escala dentro de uma janela opaca é exatamente o salto que o host existe para
  * eliminar.
+ *
+ * **Só no Windows**, onde o esmaecimento foi medido (issue #340). No X11 a
+ * opacidade da janela é a propriedade `_NET_WM_WINDOW_OPACITY`, aplicada pelo
+ * compositor, e voltar a 1 é *apagar* a propriedade: no elementary OS o modal de
+ * Configurações ficou translúcido depois de a opacidade ter mudado, e a janela que
+ * nunca sai de 1 não depende de o compositor atender a remoção.
  */
-internal fun shouldAnimateModalWindow(motion: AppMotionPolicy, opacitySupported: Boolean): Boolean {
-    return opacitySupported && !motion.reduced
+internal fun shouldAnimateModalWindow(
+    motion: AppMotionPolicy,
+    opacitySupported: Boolean,
+    platform: AutoStartManager.Platform
+): Boolean {
+    return platform == AutoStartManager.Platform.WINDOWS && opacitySupported && !motion.reduced
+}
+
+/**
+ * Se a janela pode nascer pré-aquecida. Função pura, testada pela lista de
+ * plataformas (issue #340): mostrar a janela transparente só esconde alguma coisa
+ * onde a opacidade foi medida — no Windows. No X11 a opacidade é pedido ao
+ * compositor, e uma janela "invisível" que ele não atendesse piscaria no arranque.
+ */
+internal fun shouldPrewarmModalWindow(opacitySupported: Boolean, platform: AutoStartManager.Platform): Boolean {
+    return platform == AutoStartManager.Platform.WINDOWS && opacitySupported
+}
+
+@Composable
+private fun prewarmNow(requested: Boolean, environment: ModalWindowEnvironment): Boolean {
+    val allowed = remember {
+        shouldPrewarmModalWindow(isWindowOpacitySupported(), AutoStartManager.currentPlatform())
+    }
+    return requested && allowed && environment.prewarmReady
+}
+
+/** Um pré-aquecimento por vez: juntos, eles disputariam a mesma thread de interface. */
+private val modalPrewarmLock = Mutex()
+
+/**
+ * Mostra a janela transparente e sem foco por dois quadros e a esconde. É o que
+ * paga, fora do clique, o peer nativo, o contexto do Skia, a carga das classes e
+ * o primeiro layout. `contentOnScreen` fica `false`: conteúdo com laço próprio não
+ * o liga. Não conta como abertura.
+ */
+private suspend fun prewarmWindow(
+    window: java.awt.Window,
+    host: ModalWindowHost,
+    breadcrumbs: BreadcrumbRecorder,
+    diagnosticName: String
+) {
+    modalPrewarmLock.withLock {
+        // Pedida enquanto esperava a vez: a abertura normal cobre tudo.
+        if (host.requests.value.visible) {
+            return
+        }
+        val startedAt = System.nanoTime()
+        val wasFocusable = window.focusableWindowState
+        window.focusableWindowState = false
+        setWindowOpacity(window, 0f)
+        host.onScreen = true
+        try {
+            withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
+                withFrameNanos { }
+                withFrameNanos { }
+            }
+        } finally {
+            host.onScreen = false
+            window.focusableWindowState = wasFocusable
+        }
+        breadcrumbs.record(
+            BreadcrumbCategory.NAVIGATION,
+            modalPrewarmedBreadcrumb(diagnosticName, (System.nanoTime() - startedAt) / 1_000_000)
+        )
+    }
+}
+
+/** A linha da trilha do pré-aquecimento; não conta como abertura. */
+internal fun modalPrewarmedBreadcrumb(diagnosticName: String, elapsedMillis: Long): String {
+    return "janela $diagnosticName pré-aquecida em $elapsedMillis ms"
 }
 
 /** A linha da trilha com o tempo até o primeiro quadro. Sem título: ver [AppDialogWindow]. */
@@ -402,6 +499,36 @@ private suspend fun fadeWindow(
     }
 }
 
+/**
+ * Toca uma fase do E9: o relógio vai de 0 a 1 em [durationMillis], linear — a
+ * curva de cada linha está no quadro puro — e a opacidade da janela segue
+ * [modalFilamentWindowAlpha] no mesmo quadro. A abertura termina parada mesmo
+ * cancelada (um fechar no meio): a saída parte do conteúdo inteiro.
+ */
+private suspend fun playFilaments(
+    window: java.awt.Window,
+    reveal: ModalRevealState,
+    phase: ModalRevealPhase,
+    durationMillis: Int,
+    motion: AppMotionPolicy
+) {
+    reveal.begin(phase)
+    try {
+        animate(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = appTweenSpec(durationMillis, motion, LinearEasing)
+        ) { value, _ ->
+            reveal.progress = value
+            setWindowOpacity(window, modalFilamentWindowAlpha(phase, value))
+        }
+    } finally {
+        if (phase == ModalRevealPhase.OPENING) {
+            reveal.settle()
+        }
+    }
+}
+
 private fun setWindowOpacity(window: java.awt.Window, value: Float) {
     // Plataforma sem translucidez lança aqui; ficar opaca é melhor que não abrir.
     runCatching { window.opacity = value.coerceIn(0f, 1f) }
@@ -427,17 +554,11 @@ private class LastValue<T : Any> {
     var value: T? = null
 }
 
-/** Mesma escala de partida do `AppMenu` e do `AppDialog`. */
-internal const val MODAL_ENTER_SCALE = 0.96f
-
-/** Um pouco mais longa que a saída de menu: a janela é uma superfície maior. */
-private const val MODAL_EXIT_MILLIS = 140
-
 /**
  * Tempo até uma janela modal fechada estar de fato fora da tela: a saída mais
  * a folga para o esconder chegar à janela AWT. Quem precisa da tela limpa — a
  * captura do relatório de bug — espera isto.
  */
-internal const val MODAL_CLOSE_SETTLE_MILLIS = MODAL_EXIT_MILLIS + 80L
+internal const val MODAL_CLOSE_SETTLE_MILLIS = AppGargantuaTokens.filamentCloseMillis + 80L
 
 private const val FIRST_FRAME_TIMEOUT_MILLIS = 500L

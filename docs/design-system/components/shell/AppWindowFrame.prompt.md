@@ -21,11 +21,16 @@ notes all go through one host:
 - **Entry waits for the first painted frame.** The frame's own scale used to start at composition,
   inside a window the OS showed at once and fully opaque; the first frames were lost to creation cost
   and what the eye saw was the window popping. Now the window appears **transparent**, the host waits
-  two frames, then fades the AWT window's opacity 0 → 1 (`--dur-select`) while the content grows
-  0.96 → 1 on the GENTLE spring. Window opacity, not content alpha: content fading inside an opaque
-  window would show the window's own ground, not what is behind it.
+  two frames, then plays **E9, the plasma filaments** (`--dur-gargantua-filament-open`, 340ms; see
+  `AppModalRevealRow`): the AWT window's opacity reaches 1 within ~50ms and a filament runs under
+  every marked row in reading order, revealing it left to right. Nothing scales and no data moves.
+  Window opacity, not content alpha: content fading inside an opaque
+  window would show the window's own ground, not what is behind it. **Windows only**: on X11 the
+  compositor applies window opacity, and on elementary OS a modal stayed translucent; elsewhere the
+  window opens and closes at once, at full opacity.
 - **Every close takes the same path**: the × button, Alt+F4, Esc and the content's own "Fechar" all
-  just ask to close, and the drop of `visible` fades (140ms, scale back to 0.96) and hides. Before,
+  just ask to close, and the drop of `visible` retracts the filaments right to left, bottom row first
+  (`--dur-gargantua-filament-close`, 220ms), fades in the last 15% and hides. Before,
   only the × faded.
 - Platforms without window translucency, and "Reduzir animações", open and close at once.
 

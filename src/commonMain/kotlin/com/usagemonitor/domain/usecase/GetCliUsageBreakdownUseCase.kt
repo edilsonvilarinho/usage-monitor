@@ -7,8 +7,8 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.burnRateOf
 import com.usagemonitor.domain.entity.toActivityHeatmap
 import com.usagemonitor.domain.repository.CliSessionRepository
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 
 /**

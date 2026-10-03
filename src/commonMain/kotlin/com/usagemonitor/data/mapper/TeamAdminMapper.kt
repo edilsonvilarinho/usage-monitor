@@ -13,7 +13,7 @@ import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamKeyAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.entity.TeamKeyVerification
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 fun TeamVerificationDto.toDomain(): TeamKeyVerification {
     return TeamKeyVerification(

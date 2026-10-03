@@ -1,0 +1,137 @@
+package com.usagemonitor.presentation.ui.components
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+/** A luz vem do alto à esquerda, como na referência de vidro do protótipo. */
+private const val LIGHT_DEGREES = -135.0
+
+/** Paradas do gradiente de varredura que simula o reflexo ao longo do tubo. */
+private const val REFLECTION_STOPS = 24
+
+/** Pulsos de plasma por arco, igualmente espaçados no ciclo. */
+private const val FLOW_PULSES = 3
+
+/**
+ * Arco de quota como tubo de vidro com plasma dentro. O vidro (parede e
+ * reflexos) é a trilha; o plasma no tom semântico é o dado. Os pulsos que
+ * correm ficam dentro do sweep e se apagam nas pontas: o comprimento do arco
+ * nunca muda com a animação.
+ */
+internal fun DrawScope.drawGargantuaQuotaArc(
+    color: Color,
+    sweep: Float,
+    radius: Float,
+    stroke: Float,
+    hasForecast: Boolean,
+    glow: Float,
+    flow: Float?,
+    /** Opacidade do vidro; só fica abaixo de 1 enquanto o indicador nasce. */
+    glass: Float = 1f,
+    /** Fase do anel de detritos (J7), `0..1`; zero com o movimento contínuo desligado. */
+    debris: Float = 0f,
+    /** Tinta do vidro conforme o fundo ([gargantuaScene]). */
+    scene: GargantuaScene = GargantuaScene.Dark
+) {
+    val topLeft = center - Offset(radius, radius)
+    val arcSize = Size(radius * 2, radius * 2)
+    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass, debris, scene)
+    if (sweep <= 0f) return
+    drawArc(color.copy(alpha = glow), -90f, sweep, false, topLeft, arcSize,
+        style = Stroke(stroke * 2.4f, cap = StrokeCap.Round))
+    drawArc(color, -90f, sweep, false, topLeft, arcSize, style = Stroke(stroke * 0.9f, cap = StrokeCap.Round))
+    drawArc(lerp(color, Color.White, scene.plasmaHighlight), -90f, sweep, false, topLeft, arcSize,
+        style = Stroke(stroke * 0.35f, cap = StrokeCap.Round))
+    if (flow != null) drawPlasmaPulses(sweep, radius, stroke, flow)
+    // O reflexo do vidro passa por cima do plasma, só onde há plasma.
+    val inner = radius - stroke * 0.3f
+    drawArc(
+        reflection(maxAlpha = 0.4f * glass * scene.reflectionScale, power = 2, ink = scene.ink), -90f, sweep, false,
+        center - Offset(inner, inner), Size(inner * 2, inner * 2),
+        style = Stroke(stroke * 0.16f)
+    )
+}
+
+/**
+ * Parede translúcida, reflexo forte na borda de dentro e fraco na de fora. Sem
+ * projeção, a parede vira o anel de detritos (J7): a forma muda junto com a
+ * cor, então a ausência de veredito não depende só do tom.
+ */
+private fun DrawScope.drawGlassTube(
+    radius: Float,
+    stroke: Float,
+    hasForecast: Boolean,
+    glass: Float,
+    debris: Float,
+    scene: GargantuaScene
+) {
+    if (hasForecast) {
+        drawCircle(scene.ink.copy(alpha = scene.wallAlpha * glass), radius, style = Stroke(stroke * 1.4f))
+    } else {
+        drawDebrisRing(radius, stroke, glass, debris, scene.ink)
+    }
+    val reflections = glass * scene.reflectionScale
+    drawCircle(reflection(maxAlpha = 0.28f * reflections, power = 3, ink = scene.ink), radius - stroke / 2, style = Stroke(stroke * 0.18f))
+    drawCircle(reflection(maxAlpha = 0.12f * reflections, power = 1, ink = scene.ink), radius + stroke / 2, style = Stroke(stroke * 0.14f))
+}
+
+/**
+ * Fragmentos em órbitas próprias, cada um no raio e na velocidade dele. O
+ * brilho segue a mesma luz do vidro; nenhum fragmento sai do tubo nem passa
+ * da opacidade do reflexo, para não competir com o plasma.
+ */
+private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float, phase: Float, ink: Color) {
+    for (fragment in gargantuaDebrisField) {
+        val start = gargantuaDebrisAngle(fragment, phase)
+        val middle = (start + fragment.sweepDegrees / 2f) * PI / 180
+        val lit = (0.5 + 0.5 * cos(middle - LIGHT_DEGREES * PI / 180)).toFloat()
+        val tint = if (fragment.gold) AppGargantuaTokens.gold else ink
+        val orbit = radius + fragment.radialOffset * stroke
+        drawArc(
+            tint.copy(alpha = fragment.alpha * (0.6f + 0.4f * lit) * glass), start, fragment.sweepDegrees, false,
+            center - Offset(orbit, orbit), Size(orbit * 2, orbit * 2),
+            style = Stroke(fragment.width * stroke, cap = StrokeCap.Round)
+        )
+    }
+}
+
+/**
+ * [ink] cuja opacidade segue a luz: máximo voltado para a fonte, zero do lado
+ * oposto. Branco no escuro; no claro, a tinta do tema desenha o mesmo contorno.
+ */
+private fun DrawScope.reflection(maxAlpha: Float, power: Int, ink: Color): Brush {
+    val stops = Array(REFLECTION_STOPS + 1) { index ->
+        val fraction = index / REFLECTION_STOPS.toFloat()
+        val lit = (0.5 + 0.5 * cos(fraction * 2 * PI - LIGHT_DEGREES * PI / 180)).toFloat()
+        var shaded = 1f
+        repeat(power) { shaded *= lit }
+        fraction to ink.copy(alpha = maxAlpha * shaded)
+    }
+    return Brush.sweepGradient(*stops, center = center)
+}
+
+/** Pontos de luz viajando no plasma; somem perto das pontas para o laço não saltar. */
+private fun DrawScope.drawPlasmaPulses(sweep: Float, radius: Float, stroke: Float, flow: Float) {
+    val size = stroke * 0.96f
+    for (pulse in 0 until FLOW_PULSES) {
+        val position = (flow + pulse / FLOW_PULSES.toFloat()) % 1f
+        val fade = sin(position * PI).toFloat()
+        if (fade <= 0.01f) continue
+        val angle = (position * sweep - 90f) * PI / 180
+        val point = center + Offset(radius * cos(angle).toFloat(), radius * sin(angle).toFloat())
+        drawCircle(
+            Brush.radialGradient(listOf(Color.White.copy(alpha = 0.9f * fade), Color.Transparent), point, size),
+            size, point
+        )
+    }
+}

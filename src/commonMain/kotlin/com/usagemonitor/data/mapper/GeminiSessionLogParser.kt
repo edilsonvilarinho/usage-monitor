@@ -1,7 +1,7 @@
 package com.usagemonitor.data.mapper
 
 import com.usagemonitor.data.datasource.GeminiMessageUsage
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

@@ -28,7 +28,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.PeriodType
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * As janelas modais, menos as Configurações (`SettingsWindowHost`). Todas passam
@@ -86,7 +86,8 @@ internal fun ModalWindowsHost(
             modal.isCliSessionsOpen = false
             viewModels.cliSessions.closeWindow()
         },
-        openGeneration = modal.cliSessionsOpenGeneration
+        openGeneration = modal.cliSessionsOpenGeneration,
+        prewarm = true
     ) {
         CliSessionsScreen(viewModel = viewModels.cliSessions, language = language)
     }

@@ -2,7 +2,7 @@ package com.usagemonitor.data.parser
 
 import com.usagemonitor.data.dto.CodexRolloutRateLimitsDto
 import com.usagemonitor.data.dto.CodexRolloutTokenCountLineDto
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 
 /** Um `rate_limits` do rollout com o instante do evento que o trouxe. */

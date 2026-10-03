@@ -20,7 +20,7 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Identidade da máquina no formato do servidor.

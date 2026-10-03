@@ -160,6 +160,54 @@ class AppUpdateBannerTest {
         assertEquals("42% concluído", downloading.detail)
     }
 
+    /**
+     * Beta diz "beta" em texto em todo estado e nos dois idiomas (issue #355):
+     * a faixa tem o mesmo tom da estável, e cor nunca informa sozinha.
+     */
+    @Test
+    fun `a beta update says beta in every state and language`() {
+        val beta = AppUpdateInfo(version = "39.0.0-beta.1", releasePageUrl = "https://example.com")
+        val states = listOf(
+            AppUpdateUiState.Available(beta),
+            AppUpdateUiState.Downloading(beta, percent = 42),
+            AppUpdateUiState.Downloading(beta, percent = null),
+            AppUpdateUiState.Ready(beta),
+            AppUpdateUiState.Failed(beta, AppUpdateFailureReason.DOWNLOAD),
+            AppUpdateUiState.Failed(beta, AppUpdateFailureReason.SCHEDULE)
+        )
+        AppLanguage.entries.forEach { language ->
+            states.forEach { state ->
+                val content = updateBannerContent(state, language)
+                // "beta" como palavra, e não só dentro do número "-beta.1".
+                val word = Regex("""(^|\s)[Bb]eta(\s|$)""")
+                assertTrue(word.containsMatchIn(content.title), "$language $state: ${content.title}")
+                assertTrue(word.containsMatchIn(content.headline), "$language $state: ${content.headline}")
+                // O número não cabe na linha curta do balão e desce para o detalhe.
+                assertTrue(content.detail.startsWith("39.0.0-beta.1 · "), "$language $state: ${content.detail}")
+            }
+        }
+        assertEquals(
+            "Nova versão beta 39.0.0-beta.1 disponível",
+            updateBannerContent(AppUpdateUiState.Available(beta), AppLanguage.PT).title
+        )
+        assertEquals(
+            "Beta version 39.0.0-beta.1 is available",
+            updateBannerContent(AppUpdateUiState.Available(beta), AppLanguage.EN).title
+        )
+        assertEquals("Nova versão beta", updateBannerContent(AppUpdateUiState.Available(beta), AppLanguage.PT).headline)
+    }
+
+    @Test
+    fun `a stable update keeps its wording`() {
+        assertEquals("Nova versão 38.0.0 disponível", updateBannerContent(AppUpdateUiState.Available(update), AppLanguage.PT).title)
+        assertEquals("Version 38.0.0 is available", updateBannerContent(AppUpdateUiState.Available(update), AppLanguage.EN).title)
+        assertEquals("Version 38.0.0 ready", updateBannerContent(AppUpdateUiState.Ready(update), AppLanguage.EN).headline)
+        assertEquals(
+            "Could not download version 38.0.0",
+            updateBannerContent(AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD), AppLanguage.EN).title
+        )
+    }
+
     @Test
     fun `ready announces the exit behaviour and offers the restart`() = runDesktopComposeUiTest {
         var opened = false

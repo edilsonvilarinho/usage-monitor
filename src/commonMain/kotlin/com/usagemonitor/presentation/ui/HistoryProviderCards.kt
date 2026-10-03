@@ -32,7 +32,7 @@ import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 @Composable
 internal fun DeepSeekHistoryContent(

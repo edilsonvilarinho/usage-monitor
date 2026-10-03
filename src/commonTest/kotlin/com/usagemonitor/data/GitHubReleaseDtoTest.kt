@@ -4,7 +4,9 @@ import com.usagemonitor.data.dto.GitHubReleaseDto
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Desserialização do corpo de `GET /repos/{owner}/{repo}/releases/latest`.
@@ -38,6 +40,28 @@ class GitHubReleaseDtoTest {
             "https://github.com/edilsonvilarinho/usage-monitor/releases/download/v37.0.0/UsageMonitor-Setup-37.0.0.exe",
             setup.browserDownloadUrl
         )
+    }
+
+    @Test
+    fun `reads the prerelease and draft flags`() {
+        val release = json.decodeFromString<GitHubReleaseDto>(REAL_PAYLOAD)
+        assertFalse(release.prerelease)
+        assertFalse(release.draft)
+
+        val beta = json.decodeFromString<GitHubReleaseDto>(
+            """{"tag_name":"v42.0.0-beta.1","html_url":"https://example.test","prerelease":true,"draft":true}"""
+        )
+        assertTrue(beta.prerelease)
+        assertTrue(beta.draft)
+    }
+
+    @Test
+    fun `missing prerelease and draft flags default to false`() {
+        val release = json.decodeFromString<GitHubReleaseDto>(
+            """{"tag_name":"v41.0.0","html_url":"https://example.test"}"""
+        )
+        assertFalse(release.prerelease)
+        assertFalse(release.draft)
     }
 
     @Test

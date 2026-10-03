@@ -1,286 +1,197 @@
 name: CI
 
+# Um workflow so para desktop, instalador, updater Linux e servidor (#344). O job
+# `changes` decide o que o diff toca; cada job de verdade so sobe runner quando
+# e relevante, todos correm em paralelo, e `ci-ok` agrega o resultado num check
+# unico -- o que a protecao da `main` exige. Job pulado nao sobe runner e conta
+# como sucesso no `ci-ok`, entao PR so de docs termina em segundos sem travar o
+# check obrigatorio (o motivo pelo qual o filtro por path morava dentro dos jobs).
 on:
   push:
     branches:
       - main
     paths-ignore:
-      - 'server/**'
       - 'docs/**'
       - '**.md'
-  # Sem filtro de path no `pull_request`, de proposito. Um workflow que o filtro
-  # impede de disparar nunca reporta status, e um check obrigatorio nessa
-  # condicao trava o PR em "Expected - Waiting for status to be reported". O
-  # recorte por path passou para dentro do job, que assim sempre reporta
-  # `success` de verdade — sem depender de a protecao de branch tratar um job
-  # `skipped` como sucesso.
   pull_request:
+  workflow_dispatch:
 
+# PR: um push novo cancela o run anterior do mesmo PR. `main`: nunca cancela --
+# cada merge tem o seu run, e e ele que grava o cache do Gradle.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
-  # Issue #299: depois do merge, o push na `main` repetia a suite inteira (~11 min
-  # de Windows) sobre o MESMO codigo que o PR acabara de testar. A identidade do
-  # codigo testado e o tree SHA: no `pull_request` o checkout e
-  # `refs/pull/N/merge`, e squash/rebase/merge de um PR cuja base nao andou
-  # produzem na `main` um commit com a mesma arvore. O job `verified-tree`, no
-  # fim do run de PR, publica um artifact com o nome da arvore; este job o
-  # procura no push.
-  #
-  # Nao e o gatilho `push` removido: a `main` nao tem protecao de branch, entao
-  # um PR pode ser mergeado com a base ja adiantada, e a arvore resultante nunca
-  # foi testada. Nesse caso -- e em push direto (bump de release), PR de fork ou
-  # marcador expirado -- nao ha artifact com o nome certo e tudo roda.
-  #
-  # Qualquer falha de API vira `skip=false`: na duvida, roda.
-  gate:
+  # Recorte por path num lugar so, sem action de terceiros. Em PR o checkout e
+  # `refs/pull/N/merge`: o primeiro pai e a ponta da base, entao `HEAD^1..HEAD` e
+  # exatamente o que o PR muda sobre a base atual. No push, o intervalo e
+  # `before..sha`. Qualquer falha de git vira "tudo relevante": na duvida, roda.
+  changes:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      actions: read
-
     outputs:
-      skip: ${{ steps.check.outputs.skip }}
-      reason: ${{ steps.check.outputs.reason }}
+      desktop: ${{ steps.filter.outputs.desktop }}
+      installer: ${{ steps.filter.outputs.installer }}
+      linux_updater: ${{ steps.filter.outputs.linux_updater }}
+      server: ${{ steps.filter.outputs.server }}
 
     steps:
-      - name: Check verified tree
-        id: check
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Detect relevant changes
+        id: filter
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
           EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
         run: |
           set -uo pipefail
 
-          skip=false
-          reason=''
-          finish() {
-            echo "skip=$skip" >> "$GITHUB_OUTPUT"
-            echo "reason=$reason" >> "$GITHUB_OUTPUT"
-            echo "skip=$skip ${reason}"
+          all_true() {
+            echo "$1; tudo relevante."
+            for key in desktop installer linux_updater server; do
+              echo "$key=true" >> "$GITHUB_OUTPUT"
+            done
+            echo "## Recorte do CI" >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo "$1: todos os jobs rodam." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           }
 
-          if [ "$EVENT" != "push" ]; then
-            finish
-          fi
-
-          if ! tree="$(gh api "repos/$REPO/git/commits/$SHA" --jq '.tree.sha')" || [ -z "$tree" ]; then
-            echo "Leitura da arvore de $SHA falhou; rodando tudo por precaucao."
-            finish
-          fi
-          echo "Arvore de $SHA: $tree"
-
-          # So artifact de run cujo head e este repositorio. PR de fork roda com o
-          # `ci.yml` do proprio fork e poderia publicar o marcador sem testar nada.
-          if ! runs="$(gh api "repos/$REPO/actions/artifacts?name=ci-verified-tree-$tree&per_page=100" \
-            --jq '.artifacts[] | select(.workflow_run.head_repository_id == .workflow_run.repository_id) | .workflow_run.id')"; then
-            echo "Consulta de artifacts falhou; rodando tudo por precaucao."
-            finish
-          fi
-
-          for run_id in $runs; do
-            if ! run="$(gh api "repos/$REPO/actions/runs/$run_id" \
-              --jq '[.event, (.conclusion // ""), .path, ((.pull_requests[0].number // "") | tostring)] | @tsv')"; then
-              continue
-            fi
-            IFS=$'\t' read -r event conclusion path pr <<< "$run"
-            echo "Candidato: run $run_id event=$event conclusion=$conclusion path=$path pr=$pr"
-            case "$path" in
-              .github/workflows/ci.yml*) ;;
-              *) continue ;;
-            esac
-            if [ "$event" = "pull_request" ] && [ "$conclusion" = "success" ]; then
-              skip=true
-              reason="arvore $tree ja verificada no run https://github.com/$REPO/actions/runs/$run_id"
-              if [ -n "$pr" ]; then
-                reason="$reason (PR #$pr)"
+          case "$EVENT" in
+            pull_request)
+              range='HEAD^1..HEAD' ;;
+            push)
+              if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+                all_true "push sem commit anterior"
               fi
-              finish
-            fi
-          done
+              git fetch --no-tags --depth=1 origin "$BEFORE" || all_true "commit anterior $BEFORE inacessivel"
+              range="$BEFORE..HEAD" ;;
+            *)
+              all_true "disparo $EVENT" ;;
+          esac
 
-          echo "Nenhum run de PR verde com a arvore $tree; rodando tudo."
-          finish
-
-  tests:
-    # windows-latest, nao ubuntu: os testes de componente usam
-    # `runDesktopComposeUiTest` e nunca rodaram headless em Linux. O repositorio
-    # nao tem nenhuma configuracao de headless/xvfb, entao um alvo Linux seria
-    # um gate nao comprovado.
-    runs-on: windows-latest
-    needs: gate
-
-    permissions:
-      contents: read
-      pull-requests: read
-
-    # `verified-tree` so publica o marcador quando a suite rodou de fato: PR que
-    # so mexeu em docs tem check verde sem teste nenhum, e isso nao verifica
-    # arvore nenhuma.
-    outputs:
-      relevant: ${{ steps.filter.outputs.relevant }}
-
-    steps:
-      # Recorte por path feito aqui, e nao no gatilho. `gh` ja vem instalado no
-      # runner: nenhuma action de terceiros entra no caminho.
-      - name: Detect relevant changes
-        id: filter
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GATE_SKIP: ${{ needs.gate.outputs.skip }}
-          GATE_REASON: ${{ needs.gate.outputs.reason }}
-        run: |
-          set -euo pipefail
-
-          # Push so chega ate aqui quando o `paths-ignore` do gatilho ja aprovou.
-          # Resta saber se a arvore ja foi testada no PR (job `gate`).
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            if [ "$GATE_SKIP" = "true" ]; then
-              echo "relevant=false" >> "$GITHUB_OUTPUT"
-              echo "reason=$GATE_REASON" >> "$GITHUB_OUTPUT"
-            else
-              echo "relevant=true" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
+          if ! files="$(git diff --name-only "$range")"; then
+            all_true "git diff $range falhou"
           fi
 
-          files="$(gh api --paginate \
-            "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
-            --jq '.[].filename')"
-
-          relevant=false
+          desktop=false; installer=false; linux_updater=false; server=false
           changed=0
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             changed=$((changed + 1))
-            # Mesmo recorte do `paths-ignore` do gatilho de push.
             case "$file" in
-              server/*|docs/*|*.md) continue ;;
+              # Mudar o proprio workflow exercita tudo o que ele descreve.
+              .github/workflows/ci.yml)
+                desktop=true; installer=true; linux_updater=true; server=true ;;
             esac
-            echo "Desktop change: $file"
-            relevant=true
+            case "$file" in
+              server/*|docs/*|*.md) ;;
+              *) desktop=true ;;
+            esac
+            case "$file" in
+              src/installer/*|src/desktopMain/kotlin/com/usagemonitor/update/*) installer=true ;;
+            esac
+            case "$file" in
+              src/desktopMain/resources/update/*|src/installer/linux/*|src/desktopMain/kotlin/com/usagemonitor/update/*) linux_updater=true ;;
+            esac
+            case "$file" in
+              server/*|tools/ci/*) server=true ;;
+            esac
           done <<< "$files"
 
-          # Sem `break` no laco: a contagem completa entra no resumo do job, e e
-          # ela que diz quantos arquivos foram avaliados quando a suite nao roda.
-          echo "relevant=$relevant changed=$changed"
-          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          echo "reason=nenhum arquivo fora de server/, docs/ e *.md" >> "$GITHUB_OUTPUT"
+          {
+            echo "desktop=$desktop"
+            echo "installer=$installer"
+            echo "linux_updater=$linux_updater"
+            echo "server=$server"
+          } | tee -a "$GITHUB_OUTPUT"
 
-      # Checkout sem condicao: `tools/ci/test-summary.mjs` precisa existir no disco
-      # tambem no ramo em que a suite nao roda, que e justamente o que ele tem de
-      # anunciar. Sao ~5 s.
+          {
+            echo "## Recorte do CI"
+            echo
+            echo "$changed arquivo(s) em \`$range\`."
+            echo
+            echo "| Area | Roda |"
+            echo "|---|---|"
+            echo "| Desktop (Windows + Linux) | $desktop |"
+            echo "| Cenarios do instalador Windows | $installer |"
+            echo "| Cenarios do updater Linux | $linux_updater |"
+            echo "| Servidor de time | $server |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Paridade entre a tabela de precos do Kotlin e a do servidor. Um job so, que
+  # roda quando qualquer um dos dois lados muda; sao milissegundos de node, sem
+  # JDK nem `npm ci`.
+  pricing-parity:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Guarda de paridade entre a tabela de precos do domain Kotlin e a que o
-      # servidor publica. Ela roda AQUI e no `ci-server.yml` porque os filtros de
-      # path dos dois sao disjuntos -- este ignora `server/**` e aquele so dispara
-      # com `server/**` --, entao um step so deixaria metade das edicoes passar
-      # batida. Neste job ela cobre a edicao que mexe so no Kotlin.
-      #
-      # Antes do JDK de proposito: sao milissegundos de node contra minutos de
-      # Gradle, e divergencia de preco nao precisa esperar a suite. `node` ja vem
-      # no runner, e o script nao tem dependencia -- nao existe `npm ci` aqui.
       - name: Check pricing table parity
-        if: steps.filter.outputs.relevant == 'true'
-        shell: pwsh
         run: node tools/ci/check-pricing-parity.mjs
 
+  # windows-latest e a suite de referencia: os testes de componente usam
+  # `runDesktopComposeUiTest`, e o Linux (`desktop-linux`) ainda nao e gate.
+  desktop-windows:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Setup JDK
-        if: steps.filter.outputs.relevant == 'true'
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # O cache do Gradle NAO fica no `setup-java`. O post-step dele arquiva o
-      # `~/.gradle` com o daemon ainda vivo, e no Windows o tar falha nos `.lock`
-      # (`Device or resource busy`, e no run 32780176169 um
-      # `tar.exe failed with exit code 2`). O efeito era total e silencioso: todo
-      # run desde 23/08 comecava com `gradle cache is not found`, e
-      # `gh cache list` nao tinha UMA entrada Windows -- so as quatro do macOS,
-      # gravadas pelo release. Os ~57 s que o job gastava antes da primeira tarefa
-      # eram download; a mesma fase custa 0,44 s na maquina de desenvolvimento.
-      #
-      # Esta action para o daemon antes de arquivar e exclui os locks. E da
-      # Gradle Inc., e o job `build-windows` do release ja usa a antecessora dela
-      # (`gradle/gradle-build-action`), entao nao e precedente novo no repositorio.
+      # O cache do Gradle NAO fica no `setup-java`: o post-step dele arquiva o
+      # `~/.gradle` com o daemon vivo, e no Windows o tar falha nos `.lock` --
+      # todo run comecava com `gradle cache is not found`. Esta action para o
+      # daemon antes de arquivar. So a `main` grava: cache gravado em ref de PR
+      # nao e legivel por outro PR nem pela base.
       - name: Setup Gradle
-        if: steps.filter.outputs.relevant == 'true'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
-          # So a `main` grava. Um cache no ref de uma PR pode ser reutilizado
-          # por reexecucoes da mesma PR, mas nao por outras PRs nem pela branch
-          # base; PRs ainda podem restaurar o cache da `main`.
-          #
-          # Com o job `gate` (issue #299) a `main` so grava quando roda de
-          # verdade: push direto (bump de release) ou merge com a base ja
-          # adiantada. Entre esses runs os PRs restauram o ultimo cache gravado,
-          # e uma dependencia nova fica fria ate o proximo. Trade-off aceito:
-          # cache velho degrada para download, nao para falha.
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # MINIMAX_API_KEY fica deliberadamente indefinida: os testes injetam o
       # leitor da env var e `MiniMaxRepositoryImplTest` afirma a mensagem de
-      # variavel ausente. Defini-la aqui quebraria o teste.
+      # variavel ausente.
+      #
+      # Tres forks nos 4 vCPU do runner (issue #295); `extractSkikoNative` resolve
+      # a corrida de extracao do Skiko antes do `desktopTest`. `-Pcoverage` custa
+      # 6-7 s e a mesma passada serve suite e relatorio.
       - name: Run tests
-        if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          # Tres forks nos 4 vCPU do runner (issue #295). A corrida de extracao
-          # do Skiko que proibia forks no CI e resolvida por `extractSkikoNative`,
-          # que o `build.gradle.kts` pendura antes do `desktopTest` com N > 1.
-          #
-          # `-Pcoverage` em todo run que executa a suite, PR inclusive. A
-          # instrumentacao custa 6 a 7 s (medido: 47 s limpo contra 53 s
-          # instrumentado) e antes so entrava no push da `main`; com a `main`
-          # reaproveitando a arvore verificada no PR (issue #299), o PR passou a
-          # ser o unico run da maioria das mudancas, e cobertura so na `main`
-          # quase nunca sairia. A mesma passada serve suite e relatorio.
           .\gradlew.bat allTests --build-cache -PtestForks=3 -Pcoverage
 
-      # O resumo sai em TODO run, verde inclusive. Um check que so diz
-      # "Successful in 5m" nao permite saber se a suite rodou -- foi um verde de
-      # 5 s, com zero teste executado, que abriu a issue #93. O `--require`
-      # derruba o job quando a suite devia rodar e nao produziu XML nenhum: e o
-      # unico jeito de "passou sem executar" ficar vermelho.
+      # Sai em TODO run, verde inclusive: foi um verde de 5 s com zero teste que
+      # abriu a issue #93. `--require` derruba o job quando a suite devia rodar e
+      # nao produziu XML nenhum.
       - name: Publish test summary
-        if: always() && steps.filter.outputs.relevant == 'true'
+        if: always()
         shell: pwsh
-        run: node tools/ci/test-summary.mjs --title "Desktop (allTests)" --glob "build/test-results/**/*.xml" --require
+        run: node tools/ci/test-summary.mjs --title "Desktop no Windows (allTests)" --glob "build/test-results/**/*.xml" --require
 
-      # O motivo vem do filtro: diff sem arquivo de desktop no PR, ou arvore ja
-      # verificada no PR quando e push na `main` (job `gate`). Por env, e nao
-      # interpolado no script, porque o texto carrega URL e parenteses.
-      - name: Report skipped suite
-        if: steps.filter.outputs.relevant != 'true'
-        shell: pwsh
-        env:
-          SKIP_REASON: ${{ steps.filter.outputs.reason }}
-          EVALUATED: ${{ steps.filter.outputs.changed }}
-        run: |
-          node tools/ci/test-summary.mjs `
-            --title "Desktop (allTests)" `
-            --skipped $env:SKIP_REASON `
-            --evaluated "$env:EVALUATED"
-
-      # Relatorio de cobertura em todo run que executa a suite. Sem
-      # `koverVerify` e sem piso: o limiar so faz sentido depois de a linha de
-      # base existir, e uma trava ligada no mesmo commit que produz o primeiro
-      # numero e uma trava calibrada no escuro. `:desktopTest` ja rodou
-      # instrumentado acima, entao aqui ele sai UP-TO-DATE e o passo so agrega.
+      # Sem `koverVerify` e sem piso: relatorio, nao trava. `:desktopTest` ja
+      # rodou instrumentado acima e aqui sai UP-TO-DATE.
       - name: Coverage report
-        if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -288,7 +199,6 @@ jobs:
           node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
 
       - name: Upload coverage report
-        if: steps.filter.outputs.relevant == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kover-report
@@ -296,10 +206,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # Sobe sempre, nao so no `failure()`: sem o XML guardado nao ha como
-      # comparar duracao entre runs nem investigar intermitencia depois do fato.
       - name: Upload test reports
-        if: always() && steps.filter.outputs.relevant == 'true'
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-reports
@@ -309,79 +217,71 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Job separado do `tests` de proposito: o roteiro instala e desinstala de
-  # verdade, mexe no registro do runner e leva alguns minutos. Amarra-lo ao job
-  # rapido faria toda mudanca de Kotlin esperar por ele.
-  #
-  # O `allTests` NAO cobre nada disto: o modo /UPDATE e script NSIS, e a unica
-  # forma de exercita-lo e compilar o instalador e roda-lo. Foi exatamente assim
-  # que os dois defeitos da atividade A16 apareceram -- nenhum deles seria pego
-  # lendo o codigo.
-  installer-scenarios:
-    runs-on: windows-latest
-    needs: gate
-
-    permissions:
-      contents: read
+  # A suite no Linux antes da tag (issue #342). Pega o "passa no Windows, quebra
+  # no Linux" de logica com caminho, relogio, fonte e Skia -- nao o gerenciador de
+  # janelas real, que nenhum teste exercita. Nasce SEM bloquear
+  # (`continue-on-error`, e o `ci-ok` o ignora): vira gate depois da sequencia
+  # verde registrada no plano da #342. Corre em paralelo com o Windows.
+  desktop-linux:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout
-        # fetch-depth: 0 porque o filtro abaixo usa diff de tres pontos, que
-        # precisa de base comum. Com o checkout raso padrao e um fetch --depth=1
-        # da base, as duas historias nao se tocam e o git responde
-        # `fatal: ...: no merge base` -- o passo falha, o job falha, e os cenarios
-        # NUNCA rodam. Aconteceu de verdade: o CI do PR #85 ficou vermelho por
-        # isto, e o defeito ja estava catalogado como P1-09 na contra-auditoria.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          fetch-depth: 0
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Detect installer changes
-        id: filter
-        shell: pwsh
-        env:
-          GATE_SKIP: ${{ needs.gate.outputs.skip }}
-          GATE_REASON: ${{ needs.gate.outputs.reason }}
+      # Grava na `main`: e o cache Linux que o CodeQL le.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # `xvfb-run` porque parte dos testes consulta o `GraphicsEnvironment` do
+      # AWT, que sem display cai em headless. O `gradlew` esta no git sem o bit
+      # de execucao.
+      - name: Run tests
         run: |
-          $ErrorActionPreference = 'Stop'
-          # No push, o unico recorte e a arvore ja verificada no PR (job `gate`).
-          if ('${{ github.event_name }}' -ne 'pull_request') {
-            if ($env:GATE_SKIP -eq 'true') {
-              "relevant=false" >> $env:GITHUB_OUTPUT
-              "reason=$env:GATE_REASON" >> $env:GITHUB_OUTPUT
-            } else {
-              "relevant=true" >> $env:GITHUB_OUTPUT
-            }
-            exit 0
-          }
-          "reason=nenhuma mudanca em src/installer/ nem em src/desktopMain/kotlin/com/usagemonitor/update/" >> $env:GITHUB_OUTPUT
-          git fetch --no-tags origin '${{ github.event.pull_request.base.ref }}'
-          $changed = git diff --name-only "origin/${{ github.event.pull_request.base.ref }}...HEAD"
-          # Falha do git nao pode virar "nada mudou": com ErrorActionPreference
-          # Stop o pwsh NAO aborta em comando nativo, entao o filtro seguiria com
-          # a lista vazia e pularia os cenarios em silencio. Na duvida, roda.
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "git diff falhou ($LASTEXITCODE); rodando os cenarios por precaucao."
-            "relevant=true" >> $env:GITHUB_OUTPUT
-            exit 0
-          }
-          $relevant = $false
-          foreach ($file in $changed) {
-            if ($file -like 'src/installer/*' -or $file -like 'src/desktopMain/kotlin/com/usagemonitor/update/*') {
-              Write-Host "Installer-related change: $file"
-              $relevant = $true
-              break
-            }
-          }
-          "relevant=$($relevant.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          chmod +x ./gradlew
+          xvfb-run -a ./gradlew allTests --build-cache -PtestForks=3
 
-      # Retry porque `community.chocolatey.org` derrubou a `main` em 25/08 00:17
-      # (run 32793042676) com um 504 Gateway Timeout -- nenhum defeito de codigo,
-      # so uma chamada de rede unica no caminho critico. A deteccao de presenca e
-      # a mesma do `Resolve-MakeNsis` do roteiro: ja instalado, o passo nao chama
-      # o chocolatey nenhuma vez.
+      - name: Publish test summary
+        if: always()
+        run: node tools/ci/test-summary.mjs --title "Desktop no Linux (allTests)" --glob "build/test-results/**/*.xml" --require
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports-linux
+          path: |
+            build/reports/tests/**
+            build/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # O `allTests` NAO cobre o modo /UPDATE: e script NSIS, e a unica forma de
+  # exercita-lo e compilar o instalador e roda-lo. Job proprio porque instala e
+  # desinstala de verdade e mexe no registro do runner.
+  installer-windows:
+    needs: changes
+    if: needs.changes.outputs.installer == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Retry porque um 504 da `community.chocolatey.org` ja derrubou a `main`
+      # (run 32793042676). Ja instalado, o passo nao chama o chocolatey.
       - name: Install NSIS
-        if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -403,15 +303,9 @@ jobs:
             throw 'NSIS nao ficou disponivel depois de tres tentativas.'
           }
 
-      # So o cenario S7 usa: ele compila um MSI minimo para o instalador
-      # encontrar e remover. Sem WiX o roteiro pula esse cenario com aviso em vez
-      # de falhar, entao este passo e o que faz o S7 rodar de verdade aqui.
-      #
-      # A imagem do runner ja traz o WiX -- o passo levou 2 s no run 32841192171,
-      # que e o tempo de o chocolatey descobrir que nao ha o que fazer. A
-      # deteccao e a mesma do `Resolve-WixBin` do roteiro.
+      # So o cenario S7 usa (MSI minimo para o instalador remover). A imagem do
+      # runner ja traz o WiX; sem ele o roteiro pula o S7 com aviso.
       - name: Install WiX
-        if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
@@ -429,27 +323,17 @@ jobs:
             if ($LASTEXITCODE -eq 0) { break }
             Start-Sleep -Seconds (10 * $attempt)
           }
-          # Sem WiX o roteiro pula o S7 com aviso, entao aqui nao se lanca: o job
-          # perderia um cenario, nao os outros seis.
           if (-not (Test-Wix)) { Write-Host '::warning::WiX indisponivel; o cenario S7 sera pulado.' }
 
-      # O roteiro termina com "Verificacoes: N   Falhas: M". Essa linha e o unico
-      # numero que este job produz, e sem ela o check verde nao diz se rodaram
-      # nove cenarios ou nenhum -- o mesmo defeito que a issue #93 aponta nos
-      # jobs de teste. O try/catch existe porque uma assercao do roteiro *lanca*:
-      # sem ele o passo morreria antes de escrever o resumo. E o codigo de saida
-      # precisa ser reemitido a mao, ja que o epilogo do pwsh so olha o ultimo
-      # comando -- que aqui passou a ser o Add-Content.
+      # A linha "Verificacoes: N   Falhas: M" vai para o resumo: sem ela o check
+      # verde nao diz se rodaram nove cenarios ou nenhum. `*>&1` porque o roteiro
+      # fala por `Write-Host` (stream 6), e o codigo de saida e reemitido a mao.
       - name: Run installer update scenarios
-        if: steps.filter.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $exitCode = 0
           $output = @()
-          # `*>&1` e nao `2>&1`: o roteiro fala por `Write-Host`, que escreve no
-          # stream de informacao (6) e nao no de erro. Com `2>&1` o `Tee-Object`
-          # nao recebia linha nenhuma e a contagem nunca era encontrada -- medido.
           try {
             .\src\installer\test\Invoke-UpdateScenarios.ps1 *>&1 | Tee-Object -Variable output
             $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
@@ -468,36 +352,14 @@ jobs:
           ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
           exit $exitCode
 
-      # Mesmo tratamento dos jobs de teste: um check verde que nao rodou cenario
-      # nenhum tem de dizer isso. O checkout deste job ja e incondicional, entao
-      # o script esta no disco.
-      - name: Report skipped scenarios
-        if: steps.filter.outputs.relevant != 'true'
-        shell: pwsh
-        env:
-          SKIP_REASON: ${{ steps.filter.outputs.reason }}
-        run: |
-          node tools/ci/test-summary.mjs `
-            --title "Cenarios do instalador" `
-            --skipped $env:SKIP_REASON
-
-  # Cenarios do `linux-updater.sh`. Job separado do `installer-scenarios`, que e
-  # Windows: o roteiro daqui promove diretorios, espera PID e exercita rollback
-  # em POSIX sh, e nao ha runner que faca as duas coisas.
-  #
-  # Tres containers porque a promessa do script e `/bin/sh`, e `/bin/sh` e `dash`
-  # no Ubuntu e `bash` no Arch e no Fedora. Um bashismo que passe no Fedora
-  # quebra o update de quem usa Debian, e e essa a diferenca que a matriz existe
-  # para pegar. Os tres sao container -- inclusive o Ubuntu, que rodaria direto no
-  # runner: uniformizar tira do caminho a diferenca entre `sh` do runner e `sh`
-  # da imagem, que e justamente o que se quer medir.
-  linux-updater-scenarios:
+  # Cenarios do `linux-updater.sh` em tres `/bin/sh` diferentes: `dash` no
+  # Ubuntu, `bash` no Arch e no Fedora. Um bashismo que passe no Fedora quebra o
+  # update de quem usa Debian.
+  linux-updater:
+    needs: changes
+    if: needs.changes.outputs.linux_updater == 'true'
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
-    needs: gate
-
-    permissions:
-      contents: read
 
     strategy:
       fail-fast: false
@@ -505,83 +367,22 @@ jobs:
         include:
           - name: ubuntu
             image: 'ubuntu:24.04'
-            install: 'apt-get update && apt-get install -y --no-install-recommends git ca-certificates tar'
+            install: 'apt-get update && apt-get install -y --no-install-recommends ca-certificates tar'
           - name: arch
             image: 'archlinux:latest'
-            install: 'pacman -Sy --noconfirm git tar'
+            install: 'pacman -Sy --noconfirm tar'
           - name: fedora
             image: 'fedora:latest'
-            install: 'dnf -y install git tar'
+            install: 'dnf -y install tar'
 
     steps:
-      # Antes do checkout, e nao depois: `actions/checkout` precisa do `git` para
-      # trazer historia. Sem ele a action cai no download por API, o `git diff` do
-      # filtro falha, e o job passa a rodar os cenarios "por precaucao" sempre --
-      # verde, mas sem o filtro que ele deveria ter.
       - name: Install container dependencies
         run: ${{ matrix.install }}
 
       - name: Checkout
-        # fetch-depth: 0 pelo mesmo motivo do job do instalador do Windows: o
-        # filtro usa diff de tres pontos, que precisa de base comum, e com o
-        # checkout raso o git responde `no merge base` -- o passo falha, o job
-        # falha, e os cenarios NUNCA rodam.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
 
-      - name: Detect linux updater changes
-        id: filter
-        shell: bash
-        env:
-          GATE_SKIP: ${{ needs.gate.outputs.skip }}
-          GATE_REASON: ${{ needs.gate.outputs.reason }}
-        run: |
-          set -uo pipefail
-          # No push, o unico recorte e a arvore ja verificada no PR (job `gate`).
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            if [ "$GATE_SKIP" = "true" ]; then
-              echo "relevant=false" >> "$GITHUB_OUTPUT"
-              echo "reason=$GATE_REASON" >> "$GITHUB_OUTPUT"
-            else
-              echo "relevant=true" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
-          fi
-
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
-
-          if ! git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"; then
-            echo "git fetch falhou; rodando os cenarios por precaucao."
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if ! changed="$(git diff --name-only "origin/${{ github.event.pull_request.base.ref }}...HEAD")"; then
-            echo "git diff falhou; rodando os cenarios por precaucao."
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          relevant=false
-          for file in $changed; do
-            case "$file" in
-              src/desktopMain/resources/update/*|src/installer/linux/*|src/desktopMain/kotlin/com/usagemonitor/update/*)
-                echo "Linux updater change: $file"
-                relevant=true
-                break
-                ;;
-            esac
-          done
-
-          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
-          echo "reason=nenhuma mudanca em src/desktopMain/resources/update/, src/installer/linux/ nem em src/desktopMain/kotlin/com/usagemonitor/update/" >> "$GITHUB_OUTPUT"
-
-      # Um check verde que nao rodou cenario nenhum e indistinguivel de um que
-      # rodou. O roteiro termina com "N verificacoes, M falhas", e essa linha vai
-      # para o resumo -- o mesmo tratamento dos jobs de teste.
       - name: Run linux updater scenarios
-        if: steps.filter.outputs.relevant == 'true'
         shell: bash
         run: |
           set -uo pipefail
@@ -611,12 +412,10 @@ jobs:
           rm -f scenarios.log
           exit "$status"
 
-      # O instalador user-space nao tem cenario proprio: ele so faz sentido com o
-      # tarball da release, que nao existe aqui. O que da para afirmar sem ele e
-      # que o template continua sendo `sh` valido depois da substituicao -- que e
-      # exatamente o passo que o release faz antes de publicar.
+      # O instalador user-space so faz sentido com o tarball da release; aqui se
+      # afirma que o template segue `sh` valido depois da substituicao que o
+      # release faz.
       - name: Check the user-space installer template
-        if: steps.filter.outputs.relevant == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -634,108 +433,99 @@ jobs:
           rm -f installer.sh
           echo "Template do instalador: sintaxe valida, sem placeholder sobrado."
 
-      - name: Report skipped scenarios
-        if: steps.filter.outputs.relevant != 'true'
-        shell: bash
-        env:
-          SKIP_REASON: ${{ steps.filter.outputs.reason }}
-        run: |
-          {
-            echo "## Cenarios do updater Linux (${{ matrix.name }}) -- NAO EXECUTADA"
-            echo
-            echo "$SKIP_REASON"
-            echo
-          } >> "$GITHUB_STEP_SUMMARY"
+  # Servidor de time (`server/`): Node 20, typecheck e vitest com reporter JUnit
+  # -- o resumo sai do mesmo parser do desktop.
+  server:
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
 
-  # O release dispara a partir da tag, mas o mesmo commit acabou de passar por
-  # este CI na main. Publicar um marcador explicito permite que o workflow de
-  # release reutilize essa verificacao em vez de rodar allTests e os cenarios do
-  # instalador Windows uma segunda vez.
-  #
-  # O `relevant` do `tests` e obrigatorio: um run verde que pulou a suite porque
-  # o gate encontrou uma arvore ja verificada nao e um gate de release novo.
-  # Sem marcador, o release cai de volta no proprio `verify`.
-  release-gate-marker:
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      needs.tests.result == 'success' &&
-      needs['installer-scenarios'].result == 'success' &&
-      needs['linux-updater-scenarios'].result == 'success' &&
-      needs.tests.outputs.relevant == 'true'
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # `server/package.json` declara engines.node >=20.
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Publish test summary
+        if: always()
+        working-directory: .
+        run: node tools/ci/test-summary.mjs --title "Servidor de time" --glob "server/test-results/*.xml" --require
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports-server
+          path: server/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # O check unico que a protecao da `main` exige. `if: always()` para rodar
+  # mesmo quando algo falhou ou foi pulado; `skipped` e sucesso (area nao
+  # tocada), `failure`/`cancelled` derrubam. `desktop-linux` fica fora ate virar
+  # gate (#342).
+  ci-ok:
+    if: always()
     needs:
-      - tests
-      - installer-scenarios
-      - linux-updater-scenarios
+      - changes
+      - pricing-parity
+      - desktop-windows
+      - desktop-linux
+      - installer-windows
+      - linux-updater
+      - server
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-
     steps:
-      - name: Prepare release gate marker
+      - name: Check results
         env:
-          SHA: ${{ github.sha }}
-          RUN_ID: ${{ github.run_id }}
-          REPOSITORY: ${{ github.repository }}
+          RESULTS: |
+            changes=${{ needs.changes.result }}
+            pricing-parity=${{ needs.pricing-parity.result }}
+            desktop-windows=${{ needs.desktop-windows.result }}
+            installer-windows=${{ needs.installer-windows.result }}
+            linux-updater=${{ needs.linux-updater.result }}
+            server=${{ needs.server.result }}
+          ADVISORY: |
+            desktop-linux=${{ needs.desktop-linux.result }}
         run: |
           set -euo pipefail
-          printf 'commit=%s\nworkflow=CI\nrun=%s\nrepository=%s\n' \
-            "$SHA" "$RUN_ID" "$REPOSITORY" > release-gate.txt
-          cat release-gate.txt
-
-      - name: Upload release gate marker
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-release-gate-${{ github.sha }}
-          path: release-gate.txt
-          if-no-files-found: error
-          retention-days: 30
-
-  # Par do job `gate`: publica o marcador de que a arvore deste run de PR passou
-  # por tudo. `needs` sem `if: always()` so roda com os tres jobs verdes; e o
-  # `relevant` do `tests` exige que a suite tenha rodado de fato -- check verde
-  # de PR que so mexeu em docs nao verifica arvore nenhuma.
-  #
-  # Artifact e nao cache: cache gravado em ref de PR nao e legivel pela `main`,
-  # e o artifact tem API de busca por nome e diz de qual run e repositorio veio,
-  # que e o que o `gate` confere. 30 dias de retencao; PR mergeado depois disso
-  # so perde o atalho, e a `main` roda tudo.
-  verified-tree:
-    if: github.event_name == 'pull_request' && needs.tests.outputs.relevant == 'true'
-    needs: [tests, installer-scenarios, linux-updater-scenarios]
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Resolve tested tree
-        id: tree
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          # No `pull_request`, `github.sha` e o commit de `refs/pull/N/merge`:
-          # exatamente o que o checkout dos outros jobs testou.
-          SHA: ${{ github.sha }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          tree="$(gh api "repos/$REPO/git/commits/$SHA" --jq '.tree.sha')"
-          echo "tree=$tree" >> "$GITHUB_OUTPUT"
-          printf 'tree=%s\ncommit=%s\npr=%s\nrun=%s\n' "$tree" "$SHA" "$PR" "${{ github.run_id }}" > verified-tree.txt
-          cat verified-tree.txt
+          failed=0
           {
-            echo "## Arvore verificada"
+            echo "## CI"
             echo
-            echo "\`$tree\` (commit de merge \`$SHA\`). O push na \`main\` com esta mesma arvore pula a suite."
-            echo
+            echo "| Job | Resultado |"
+            echo "|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Publish verified tree marker
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-verified-tree-${{ steps.tree.outputs.tree }}
-          path: verified-tree.txt
-          if-no-files-found: error
-          retention-days: 30
+          while IFS='=' read -r job result; do
+            [ -z "$job" ] && continue
+            echo "| \`$job\` | $result |" >> "$GITHUB_STEP_SUMMARY"
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::$job terminou em $result"; failed=1 ;;
+            esac
+          done <<< "$RESULTS"
+          while IFS='=' read -r job result; do
+            [ -z "$job" ] && continue
+            echo "| \`$job\` (nao bloqueia, #342) | $result |" >> "$GITHUB_STEP_SUMMARY"
+          done <<< "$ADVISORY"
+          exit "$failed"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppGargantuaRing } from '../data/AppGargantuaRing';
 
 const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info: 'var(--info)', off: 'var(--muted)' };
 
@@ -20,7 +21,7 @@ const clockIcon = (fraction) => (
 
 export function AppHudBar({
   accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, refreshFraction, version = '38.2.0', update, updateHeadline, updateDetail, updateAction,
-  actions = ['⟲', '▣'], style
+  actions = ['⟲', '▣'], continuous = false, reduced = false, style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
   const open = balloon !== undefined && balloon !== null;
@@ -37,9 +38,10 @@ export function AppHudBar({
     <div style={{
       display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center',
       justifyContent: 'center', gap: 12, padding: horizontal ? `8px ${12 + shoulder}px` : `${12 + shoulder}px 8px`,
-      background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
-      border: '1px solid var(--border-top)', ...flat,
-      boxShadow: 'inset 0 1px 0 var(--highlight), var(--shadow-dialog)'
+      // M1 · horizonte de eventos: núcleo escuro e anel de fótons com Doppler (--hud-* em colors.css).
+      background: 'var(--hud-body), var(--hud-rim)', backgroundClip: 'padding-box, padding-box, border-box',
+      border: '1px solid transparent', ...flat,
+      boxShadow: 'var(--hud-inner-glow), var(--shadow-dialog)'
     }}>
       {accounts.length === 0 ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>
@@ -53,11 +55,14 @@ export function AppHudBar({
           .map(({ q }) => q);
         return (
           <div key={account.label} style={{ display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center', gap: horizontal ? 6 : 0 }}>
-            <AppUsageRing
-              size={44}
+            <AppGargantuaRing
+              size={64} stroke={2.5} gap={1.5}
+              provider={account.provider} providerColor={account.color}
               arcs={rings.map((q) => ({ fraction: q.fraction, level: q.level, forecast: q.forecast }))}
               active={account.active}
-              label={`${account.label} · ${account.statusLabel}`}
+              refreshing={account.refreshing} continuous={continuous} reduced={reduced}
+              attentionIndex={rings.findIndex((q) => q.level === account.level && ['warn', 'crit'].includes(q.level))}
+              label={`${account.label} · ${rings.map((q) => `${q.short} ${q.percent}`).join(' · ')} · ${account.statusLabel}${account.active ? ' · Sessão ativa' : ''}`}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: horizontal ? 'flex-start' : 'center' }}>
               {rings.length <= 1 ? (
@@ -129,12 +134,6 @@ export function AppHudBar({
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>v{version}</span>
             {countdown ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{refreshFraction !== undefined ? clockIcon(refreshFraction) : '↻'} {countdown}</span> : null}
           </div>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Modo de janela</span>
-          {['Padrão', 'Somente os cards', 'Barra HUD'].map((mode) => (
-            <span key={mode} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: mode === 'Barra HUD' ? 'var(--fg)' : 'var(--muted)' }}>
-              <span style={{ display: 'inline-block', width: 16 }}>{mode === 'Barra HUD' ? '✓' : ''}</span>{mode}
-            </span>
-          ))}
           <div style={{ display: 'flex', gap: 6, color: 'var(--muted)' }}>⤓ ↻ ⚙ ?</div>
           {update ? (
             <>
@@ -161,7 +160,7 @@ export function AppHudBar({
   return (
     <div style={{
       display: 'inline-flex', flexDirection: horizontal ? 'column' : 'row', alignItems: 'center', gap: 10,
-      transition: 'all var(--spring-expressive)', ...style
+      transition: reduced ? 'none' : 'all var(--spring-gentle)', ...style
     }}>
       {outer[0]}{outer[1]}
     </div>

@@ -104,7 +104,8 @@ object WindowsInstallOriginResolver {
             ?: return WindowsInstallOrigin.UNMANAGED
 
         val matches = executableCandidates.any { candidate ->
-            normalizedDirectory(File(candidate.trim().trim('"')).parent) == installDirectory
+            val executable = normalizedWindowsPath(candidate) ?: return@any false
+            executable.substringBeforeLast('\\', missingDelimiterValue = "") == installDirectory
         }
 
         return if (matches) WindowsInstallOrigin.NSIS_PER_USER else WindowsInstallOrigin.UNMANAGED
@@ -116,8 +117,38 @@ object WindowsInstallOriginResolver {
      * guarda o que o instalador escreveu — comparar por igualdade exata daria
      * `UNMANAGED` para a mesma pasta escrita com outra grafia.
      */
-    private fun normalizedDirectory(path: String?): String? {
+    private fun normalizedDirectory(path: String?): String? = normalizedWindowsPath(path)
+
+    /**
+     * Normaliza um caminho **do Windows** como texto: `/` vira `\`, `.` e `..`
+     * são resolvidos, a barra final sai e tudo vai a caixa baixa.
+     *
+     * Era `java.io.File`, e isso amarrava a função pura ao sistema em que ela
+     * roda: no Linux a barra invertida não é separador, o pai do executável dava
+     * nulo e os testes falhavam no job `tests-linux` (issue #342). Só caminho
+     * absoluto — letra de unidade ou UNC — é aceito: antes um relativo virava
+     * absoluto pelo diretório atual, e esta resposta autoriza a atualização
+     * automática.
+     */
+    private fun normalizedWindowsPath(path: String?): String? {
         val trimmed = path?.trim()?.trim('"')?.takeIf { it.isNotBlank() } ?: return null
-        return File(trimmed).absoluteFile.normalize().path.trimEnd('\\', '/').lowercase()
+        val unified = trimmed.replace('/', '\\')
+        val isUnc = unified.startsWith(UNC_PREFIX)
+        val isDrive = unified.length >= 3 && unified[0].isLetter() && unified[1] == ':' && unified[2] == '\\'
+        if (!isUnc && !isDrive) {
+            return null
+        }
+        val segments = ArrayDeque<String>()
+        for (segment in unified.removePrefix(UNC_PREFIX).split('\\')) {
+            when (segment) {
+                "", "." -> Unit
+                ".." -> if (segments.size > 1) segments.removeLast()
+                else -> segments.addLast(segment)
+            }
+        }
+        val prefix = if (isUnc) UNC_PREFIX else ""
+        return (prefix + segments.joinToString("\\")).lowercase()
     }
+
+    private const val UNC_PREFIX = "\\\\"
 }

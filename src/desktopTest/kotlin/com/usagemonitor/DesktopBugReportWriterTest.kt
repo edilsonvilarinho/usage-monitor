@@ -2,7 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.presentation.viewmodel.BugReportSaveRequest
 import com.usagemonitor.presentation.viewmodel.bugReportFileName
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -56,14 +56,13 @@ const val WINDOW_OPACITY_VALUE_TEST_TAG = "windowOpacityValue"
 const val UI_SCALE_VALUE_TEST_TAG = "uiScaleValue"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
-const val CARDS_ONLY_MODE_SWITCH_TEST_TAG = "cardsOnlyModeSwitch"
-const val HUD_MODE_SWITCH_TEST_TAG = "hudModeSwitch"
 const val REDUCED_MOTION_SWITCH_TEST_TAG = "reducedMotionSwitch"
 const val TRAY_USAGE_RING_SWITCH_TEST_TAG = "trayUsageRingSwitch"
 const val AUTO_UPDATE_SWITCH_TEST_TAG = "autoUpdateSwitch"
 const val AUTO_UPDATE_TEXT_BLOCK_TEST_TAG = "autoUpdateTextBlock"
 const val AUTO_UPDATE_RECEIPT_TEST_TAG = "autoUpdateReceipt"
 const val AUTO_UPDATE_FEED_OVERRIDE_TEST_TAG = "autoUpdateFeedOverride"
+const val BETA_UPDATES_SWITCH_TEST_TAG = "betaUpdatesSwitch"
 const val THEME_PRESET_TEST_TAG_PREFIX = "themePreset_"
 
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
@@ -123,15 +122,12 @@ fun SettingsDialogContent(
     enabledApis: Set<ApiSource>,
     configuredApiKeys: Set<ApiSource> = emptySet(),
     autoStartEnabled: Boolean,
-    alwaysOnTopEnabled: Boolean = false,
-    cardsOnlyMode: Boolean = false,
-    hudMode: Boolean = false,
     windowOpacityPercent: Int = MAX_WINDOW_OPACITY_PERCENT,
     windowOpacityEnabled: Boolean = true,
     uiScalePercent: Int = DEFAULT_UI_SCALE_PERCENT,
     onUiScaleChange: (Int) -> Unit = {},
     reducedMotion: Boolean = false,
-    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
+    /** Default vazio pela mesma razão de [onAutoUpdateChange]. */
     onReducedMotionChange: (Boolean) -> Unit = {},
     trayUsageRing: Boolean = false,
     onTrayUsageRingChange: (Boolean) -> Unit = {},
@@ -140,11 +136,6 @@ fun SettingsDialogContent(
     onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
-    onAlwaysOnTopChange: (Boolean) -> Unit = {},
-    /** Default vazio para não arrastar os geradores de captura e os testes de componente. */
-    onCardsOnlyModeChange: (Boolean) -> Unit = {},
-    /** Default vazio pela mesma razão de [onCardsOnlyModeChange]. */
-    onHudModeChange: (Boolean) -> Unit = {},
     autoUpdateEnabled: Boolean = false,
     /**
      * Default `UNAVAILABLE`: quem não passa a origem não tem o mecanismo, e o
@@ -160,6 +151,9 @@ fun SettingsDialogContent(
     lastUpdateReceipt: AppUpdateReceipt? = null,
     autoUpdateFeedOverride: String? = null,
     onAutoUpdateChange: (Boolean) -> Unit = {},
+    /** Canal beta (issue #355). Default desligado, como a preferência. */
+    receiveBetaUpdates: Boolean = false,
+    onReceiveBetaUpdatesChange: (Boolean) -> Unit = {},
     onWindowOpacityChange: (Int) -> Unit = {},
     alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT,
     onAlertSettingsChange: (UsageAlertSettings) -> Unit = {},
@@ -231,27 +225,7 @@ fun SettingsDialogContent(
     // a aba curta abrir rolada pela posição que a aba longa deixou para trás.
     val scrollState = remember(selectedTab) { ScrollState(0) }
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // Evento que já existia quando o diálogo abriu é de uma edição anterior —
-    // reexibi-lo faria a tela abrir avisando algo que o usuário nem acabou de
-    // fazer.
-    val staleToastId = remember { toastEvent?.id }
-
-    // Host próprio: o diálogo é uma janela separada e o SnackbarHost do
-    // dashboard não desenha por cima dela. O `dismiss` antes de mostrar impede
-    // que mexer em vários controles seguidos enfileire avisos e o usuário fique
-    // assistindo à fila esvaziar depois de já ter parado.
-    LaunchedEffect(toastEvent?.id) {
-        val event = toastEvent ?: return@LaunchedEffect
-        if (event.id == staleToastId) {
-            return@LaunchedEffect
-        }
-        snackbarHostState.currentSnackbarData?.dismiss()
-        snackbarHostState.showSnackbar(
-            message = settingsToastMessage(event.toast, currentLanguage),
-            duration = SnackbarDuration.Short
-        )
-    }
+    SettingsToastEffect(toastEvent = toastEvent, snackbarHostState = snackbarHostState, language = currentLanguage)
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -290,7 +264,10 @@ fun SettingsDialogContent(
                 AppStateCrossfade(
                     state = selectedTab,
                     key = { tab -> tab },
-                    label = "settingsTab"
+                    label = "settingsTab",
+                    // A troca de seção não repete o E9: é navegação, e o dado já
+                    // está pronto. Os filamentos da abertura continuam.
+                    revealOnChange = false
                 ) { tab ->
                     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                         when (tab) {
@@ -298,9 +275,6 @@ fun SettingsDialogContent(
                                 currentTheme = currentTheme,
                                 currentLanguage = currentLanguage,
                                 autoStartEnabled = autoStartEnabled,
-                                alwaysOnTopEnabled = alwaysOnTopEnabled,
-                                cardsOnlyMode = cardsOnlyMode,
-                                hudMode = hudMode,
                                 windowOpacityPercent = windowOpacityPercent,
                                 windowOpacityEnabled = windowOpacityEnabled,
                                 uiScalePercent = uiScalePercent,
@@ -313,10 +287,9 @@ fun SettingsDialogContent(
                                 onThemeChange = onThemeChange,
                                 onLanguageChange = onLanguageChange,
                                 onAutoStartChange = onAutoStartChange,
-                                onAlwaysOnTopChange = onAlwaysOnTopChange,
-                                onCardsOnlyModeChange = onCardsOnlyModeChange,
-                                onHudModeChange = onHudModeChange,
                                 onAutoUpdateChange = onAutoUpdateChange,
+                                receiveBetaUpdates = receiveBetaUpdates,
+                                onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange,
                                 onWindowOpacityChange = onWindowOpacityChange,
                                 onUiScaleChange = onUiScaleChange,
                                 onReducedMotionChange = onReducedMotionChange,
@@ -414,6 +387,39 @@ fun SettingsDialogContent(
             )
             }
         }
+    }
+}
+
+/**
+ * O aviso curto das Configurações. Saiu de [SettingsDialogContent], que passou do
+ * limite de 300 linhas com o canal beta (issue #355).
+ *
+ * Host próprio: o diálogo é uma janela separada e o SnackbarHost do dashboard não
+ * desenha por cima dela. O `dismiss` antes de mostrar impede que mexer em vários
+ * controles seguidos enfileire avisos e o usuário fique assistindo à fila
+ * esvaziar depois de já ter parado.
+ */
+@Composable
+private fun SettingsToastEffect(
+    toastEvent: SettingsToastEvent?,
+    snackbarHostState: SnackbarHostState,
+    language: AppLanguage
+) {
+    // Evento que já existia quando o diálogo abriu é de uma edição anterior —
+    // reexibi-lo faria a tela abrir avisando algo que o usuário nem acabou de
+    // fazer.
+    val staleToastId = remember { toastEvent?.id }
+
+    LaunchedEffect(toastEvent?.id) {
+        val event = toastEvent ?: return@LaunchedEffect
+        if (event.id == staleToastId) {
+            return@LaunchedEffect
+        }
+        snackbarHostState.currentSnackbarData?.dismiss()
+        snackbarHostState.showSnackbar(
+            message = settingsToastMessage(event.toast, language),
+            duration = SnackbarDuration.Short
+        )
     }
 }
 

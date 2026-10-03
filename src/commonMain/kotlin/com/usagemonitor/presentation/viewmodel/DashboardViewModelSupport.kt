@@ -13,8 +13,10 @@ import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.detectSpike
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.entity.isReadingFreshEnough
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 
 // Regras sem estado do `DashboardViewModel`, fora da classe pelo limite de 800
@@ -214,6 +216,20 @@ internal fun mergePendingFetch(
         }
     }
 }
+
+/** Os últimos sete dias da conta da leitura; falha do SQLite vira `null`, nunca derruba a coleta. */
+internal suspend fun lastWeekSeriesOf(
+    historyUseCase: GetUsageHistoryUseCase,
+    stats: ApiUsageStats,
+    capturedAt: Instant
+): List<UsageHistorySeries>? = runCatching {
+    historyUseCase(
+        source = stats.source,
+        range = HistoryRange.LAST_7_DAYS,
+        accountKey = stats.accountContext?.key,
+        now = capturedAt
+    )
+}.getOrNull()?.series
 
 internal fun riskSummariesOf(series: List<UsageHistorySeries>): Map<QuotaSeriesKey, QuotaRiskSummary> {
     return series

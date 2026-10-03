@@ -11,11 +11,12 @@ import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
 import com.usagemonitor.presentation.ui.hudRingMarkSize
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 class HudNotchGeometryTest {
 
@@ -99,6 +100,44 @@ class HudNotchGeometryTest {
                 assertTrue(docked.notchCenterInWindow + handlesHalf <= along, "$edge em $fraction: engrenagem fora")
             }
         }
+    }
+
+    /**
+     * O recorte só foi medido no Windows. No elementary OS (X11) tirar o recorte
+     * ao abrir não surtia efeito e o balão aparecia só como a tira da margem.
+     */
+    @Test
+    fun `o recorte de clique so vale no Windows`() {
+        assertTrue(hudUsesHitRegion(AutoStartManager.Platform.WINDOWS))
+        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.LINUX))
+        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.MACOS))
+        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.OTHER))
+    }
+
+    /**
+     * No Windows, com 50% de opacidade o fundo de alfa 1/255 da janela
+     * transparente arredonda para zero e o ponteiro atravessa a HUD; 55% foi o
+     * menor valor medido que ainda recebe o hover. Fora do Windows a preferência
+     * vale inteira.
+     */
+    @Test
+    fun `a opacidade da HUD tem piso so no Windows`() {
+        assertEquals(55, hudWindowOpacityPercent(50, AutoStartManager.Platform.WINDOWS))
+        assertEquals(55, hudWindowOpacityPercent(55, AutoStartManager.Platform.WINDOWS))
+        assertEquals(80, hudWindowOpacityPercent(80, AutoStartManager.Platform.WINDOWS))
+        assertEquals(100, hudWindowOpacityPercent(100, AutoStartManager.Platform.WINDOWS))
+        assertEquals(50, hudWindowOpacityPercent(50, AutoStartManager.Platform.LINUX))
+        assertEquals(50, hudWindowOpacityPercent(50, AutoStartManager.Platform.MACOS))
+        assertEquals(100, hudWindowOpacityPercent(250, AutoStartManager.Platform.LINUX))
+    }
+
+    /** Sem repintar depois da troca, a HUD do Windows fica sem hover até sair do modo. */
+    @Test
+    fun `a HUD so repinta depois da opacidade no Windows`() {
+        assertTrue(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.WINDOWS))
+        assertFalse(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.LINUX))
+        assertFalse(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.MACOS))
+        assertFalse(hudRepaintsAfterOpacityChange(AutoStartManager.Platform.OTHER))
     }
 
     /**
@@ -333,7 +372,7 @@ class HudNotchGeometryTest {
         val many = (1..7).map { index -> account("Conta $index", "Sem projeção", listOf("5h" to "3%")) }
         val few = many.take(2)
         for (edge in HudEdge.entries) {
-            val budget = if (edge.isHorizontal) 1366.dp * HUD_MAX_ALONG_FRACTION else 768.dp * HUD_MAX_ALONG_FRACTION
+            val budget = (if (edge.isHorizontal) 1366.dp else 768.dp) * hudMaxAlongFraction(edge)
             val unbounded = hudNotchSizes(many, edge, "", hasUpdateIndicator = false)
             val bounded = hudNotchSizes(many, edge, "", hasUpdateIndicator = false, maxAlong = budget)
             val along = { size: DpSize -> if (edge.isHorizontal) size.width else size.height }
@@ -345,6 +384,24 @@ class HudNotchGeometryTest {
             assertTrue(along(bounded.collapsed) < along(unbounded.collapsed) * ratio, "$edge: compacta devia encolher")
             assertTrue(!hudNotchSizes(few, edge, "", false, maxAlong = budget).compact, "$edge: duas contas cabem completas")
         }
+    }
+
+    /**
+     * L1: três contas de duas janelas na lateral de uma tela de notebook ficam
+     * completas. Com o teto de cima (45%) elas compactavam, e o print mostrava a
+     * faixa sem a segunda janela e sem a pílula.
+     */
+    @Test
+    fun `a borda lateral aceita tres contas completas numa tela de notebook`() {
+        val three = (1..3).map { index -> account("Conta $index", "Normal", listOf("7d" to "28%", "5h" to "22%")) }
+        for (edge in listOf(HudEdge.LEFT, HudEdge.RIGHT)) {
+            val lateral = hudNotchSizes(three, edge, "", false, maxAlong = 768.dp * hudMaxAlongFraction(edge))
+            assertTrue(!lateral.compact, "$edge: três contas deviam caber completas")
+            val topBudget = hudNotchSizes(three, edge, "", false, maxAlong = 768.dp * hudMaxAlongFraction(HudEdge.TOP))
+            assertTrue(topBudget.compact, "$edge: com o teto de cima a mesma faixa compactava")
+        }
+        assertEquals(0.45f, hudMaxAlongFraction(HudEdge.TOP))
+        assertEquals(0.45f, hudMaxAlongFraction(HudEdge.BOTTOM))
     }
 
     @Test
@@ -364,8 +421,8 @@ class HudNotchGeometryTest {
 
     /**
      * Uma linha por janela (#286): o notch engrossa só o que as linhas pedem,
-     * e nunca fica mais fino que o anel. Com o anel de 44dp (#322), uma e duas
-     * janelas cabem na altura dele; a terceira engrossa.
+     * e nunca fica mais fino que o anel. Com o anel de 44dp (#322) a terceira
+     * janela engrossava; com o Gargantua de 64dp as três cabem na altura dele.
      */
     @Test
     fun `cada janela a mais engrossa o notch de cima em uma linha`() {
@@ -381,7 +438,7 @@ class HudNotchGeometryTest {
             maxOf(HUD_RING_SIZE, HUD_STRIP_LINE * 3 + statusPillHeight(1))
         )
         assertEquals(expected, thickness)
-        assertTrue(thickness[2] > thickness[1], "a terceira janela ainda engrossa o notch")
+        assertEquals(HUD_RING_SIZE, thickness[2], "três janelas cabem na altura do anel Gargantua")
     }
 
     /**

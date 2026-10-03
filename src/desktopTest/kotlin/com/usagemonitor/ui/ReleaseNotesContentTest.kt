@@ -5,16 +5,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ReleaseNotes
+import com.usagemonitor.presentation.ui.RELEASE_NOTES_BETA_BADGE_TAG
 import com.usagemonitor.presentation.ui.ReleaseNotesContent
 import com.usagemonitor.presentation.ui.releaseNotesSubtitle
 import com.usagemonitor.presentation.ui.releaseNotesTitle
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -37,6 +39,25 @@ class ReleaseNotesContentTest {
     fun `the frame title carries the version`() {
         assertEquals("Novidades da versão 39.0.0", releaseNotesTitle("39.0.0", isPt = true))
         assertEquals("What's new in 39.0.0", releaseNotesTitle("39.0.0", isPt = false))
+    }
+
+    /** Issue #355: a beta diz que é beta no título da moldura e com um selo no cabeçalho. */
+    @Test
+    fun `a beta release is named and badged as beta`() = runDesktopComposeUiTest {
+        assertEquals("Novidades da versão beta 39.0.0-beta.1", releaseNotesTitle("39.0.0-beta.1", isPt = true))
+        assertEquals("What's new in beta 39.0.0-beta.1", releaseNotesTitle("39.0.0-beta.1", isPt = false))
+
+        showNotes(notes(version = "39.0.0-beta.1"))
+
+        onNodeWithTag(RELEASE_NOTES_BETA_BADGE_TAG).assertIsDisplayed()
+        onNodeWithText("Beta").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a stable release has no beta badge`() = runDesktopComposeUiTest {
+        showNotes(notes())
+
+        onNodeWithTag(RELEASE_NOTES_BETA_BADGE_TAG).assertDoesNotExist()
     }
 
     @Test
@@ -87,9 +108,10 @@ class ReleaseNotesContentTest {
 
     private fun notes(
         previousVersion: String? = "37.0.0",
-        publishedAt: Instant? = Instant.parse("2026-08-24T21:15:00Z")
+        publishedAt: Instant? = Instant.parse("2026-08-24T21:15:00Z"),
+        version: String = "39.0.0"
     ) = ReleaseNotes(
-        version = "39.0.0",
+        version = version,
         previousVersion = previousVersion,
         publishedAt = publishedAt,
         releasePageUrl = "https://github.com/edilsonvilarinho/usage-monitor/releases/tag/v39.0.0",

@@ -22,7 +22,6 @@ import com.usagemonitor.hudDockedWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
-import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_MODE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_VERSION_TEST_TAG
@@ -34,7 +33,6 @@ import com.usagemonitor.presentation.ui.HudSessionSignal
 import com.usagemonitor.presentation.ui.HudUsedLeft
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
-import com.usagemonitor.presentation.ui.components.WindowMode
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.hudAppBalloonHeight
@@ -56,8 +54,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.test.captureToImage
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.components.AppUsageRing
 import androidx.compose.foundation.background
@@ -95,11 +95,12 @@ import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.HudQuota
+import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import kotlinx.coroutines.channels.Channel
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -112,7 +113,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * Herda as asserções da barra de linhas que ele substitui — o que a HUD promete
  * não mudou com o desenho: clique abre a janela, arrasto não abre, botão direito
- * vai direto a "Somente cards", a contagem sai uma vez só, o reset só aberto.
+ * não faz nada, a contagem sai uma vez só, o reset só aberto.
  */
 @OptIn(ExperimentalTestApi::class)
 class HudNotchTest {
@@ -179,11 +180,11 @@ class HudNotchTest {
         onDragEnd: () -> Unit = {},
         onRefreshAccount: (UsageTargetKey) -> Unit = {},
         accountActions: (@Composable (HudAccount) -> Unit)? = null,
-        onSwitchToCardsOnly: () -> Unit = {},
         dragging: Boolean = false,
-        onGearClick: () -> Unit = {}
+        onGearClick: () -> Unit = {},
+        motion: AppMotionPolicy = AppMotionPolicy.Static
     ) {
-        AppTheme(isDark = true) {
+        AppTheme(isDark = true, motion = motion) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
                 HudNotch(
                     accounts = list,
@@ -198,7 +199,6 @@ class HudNotchTest {
                     onDragEnd = onDragEnd,
                     onRefreshAccount = onRefreshAccount,
                     accountActions = accountActions,
-                    onSwitchToCardsOnly = onSwitchToCardsOnly,
                     dragging = dragging,
                     onGearClick = onGearClick,
                     gearDescription = GEAR
@@ -252,8 +252,8 @@ class HudNotchTest {
         onNodeWithText("Max 20x").assertIsDisplayed()
         onNodeWithText("Reinicia 22h59").assertIsDisplayed()
         onNodeWithText("Reinicia Ter 21h00").assertIsDisplayed()
-        onNodeWithText("28% usado").assertIsDisplayed()
-        onNodeWithText("72% restante").assertIsDisplayed()
+        // F10 adaptado: o usado e o restante em dois textos, lidos como uma linha só.
+        onNodeWithContentDescription("28% usado · 72% restante").assertIsDisplayed()
         onNodeWithText("DeepSeek").assertDoesNotExist()
 
         hoverRing(DEEPSEEK_RING)
@@ -473,17 +473,16 @@ class HudNotchTest {
         assertTrue(moves >= 3, "esperava o arrasto continuar depois de recompor, veio $moves")
     }
 
+    /** O botão direito levava ao modo somente cards, que saiu do app; hoje é engolido. */
     @Test
-    fun `botao direito troca direto para somente cards sem abrir nem arrastar`() = runDesktopComposeUiTest {
+    fun `botao direito nao recoleta nem arrasta`() = runDesktopComposeUiTest {
         var opens = 0
-        var switches = 0
         val events = mutableListOf<String>()
         setContent {
             notch(
                 onDragStart = { events += "start" },
                 onDragEnd = { events += "end" },
-                onRefreshAccount = { opens += 1 },
-                onSwitchToCardsOnly = { switches += 1 }
+                onRefreshAccount = { opens += 1 }
             )
         }
 
@@ -494,7 +493,6 @@ class HudNotchTest {
         }
         waitForIdle()
 
-        assertEquals(1, switches)
         assertEquals(0, opens)
         assertTrue(events.isEmpty(), "esperava nenhum evento de arrasto, veio $events")
     }
@@ -560,6 +558,58 @@ class HudNotchTest {
                 assertEquals(sizes.collapsed.height, bounds.height, "$edge: altura")
             }
         }
+    }
+
+    // ------------------------------------------------------------ saída de conta (K1)
+
+    /**
+     * Desligar uma API (K1): durante o colapso o notch não se mexe; depois a vaga
+     * fecha e o notch recolhe **dentro da janela** até o tamanho sem a conta,
+     * enquanto as que ficam passam de compactas a completas. Sem salto no fim.
+     */
+    @Test
+    fun `ao sair uma conta o notch recolhe ate o tamanho sem ela e as vizinhas desdobram`() = runDesktopComposeUiTest {
+        val staying = listOf(
+            account("Padrão", "Crítico", AppTone.CRITICAL,
+                HudQuota("7d", "26%", 0.26f, AppTone.OK, resetText = null, hasForecast = true),
+                HudQuota("5h", "92%", 0.92f, AppTone.CRITICAL, resetText = null, hasForecast = true)),
+            account("Codex", "Normal", AppTone.OK,
+                HudQuota("7d", "28%", 0.28f, AppTone.OK, resetText = null, hasForecast = true),
+                HudQuota("5h", "22%", 0.22f, AppTone.OK, resetText = null, hasForecast = true))
+        )
+        val leaving = account("Go", "Sem projeção", AppTone.NEUTRAL,
+            HudQuota("mensal", "3%", 0.03f, AppTone.NEUTRAL, resetText = null, hasForecast = false)
+        ).copy(presence = HudPresence.LEAVING)
+        val all = staying + leaving
+        // O teto exato da faixa completa das duas: com a terceira, compacta.
+        val budget = hudNotchSizes(staying, HudEdge.RIGHT, "", false).collapsed.height
+        val before = hudNotchSizes(all, HudEdge.RIGHT, "", false, maxAlong = budget)
+        val after = hudNotchSizes(staying, HudEdge.RIGHT, "", false, maxAlong = budget)
+        assertTrue(before.compact && !after.compact)
+        mainClock.autoAdvance = false
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.size(600.dp, 900.dp)) {
+                    HudNotch(accounts = all, edge = HudEdge.RIGHT, sizes = before, settledSizes = after, fallbackLabel = "")
+                }
+            }
+        }
+        val height = { onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot().height }
+        mainClock.advanceTimeByFrame()
+        assertEquals(before.collapsed.height, height(), "o notch mudou antes do colapso acabar")
+        onAllNodesWithText("Normal").assertCountEquals(0)
+
+        mainClock.advanceTimeBy(AppGargantuaTokens.collapseMillis - 50L)
+        assertEquals(before.collapsed.height, height(), "o notch mudou durante o colapso")
+
+        mainClock.advanceTimeBy(50L + AppGargantuaTokens.departureSettleMillis / 2L)
+        val middle = height()
+        assertTrue(middle < before.collapsed.height && middle > after.collapsed.height, "no meio da vaga o notch devia estar recolhendo: $middle")
+
+        mainClock.advanceTimeBy(AppGargantuaTokens.departureSettleMillis.toLong())
+        assertEquals(after.collapsed.height, height(), "assentado, o notch tem o tamanho sem a conta")
+        onNodeWithText("Normal").assertIsDisplayed()
+        onNodeWithText("5h 22%").assertIsDisplayed()
     }
 
     // ------------------------------------------------------------ alças (rodada 3)
@@ -636,15 +686,14 @@ class HudNotchTest {
 
     // ------------------------------------------------------------ balão da engrenagem (rodada 3)
 
-    /** O conteúdo de teste do balão da engrenagem: os modos e uma ação do rodapé. */
+    /** O conteúdo de teste do balão da engrenagem: uma ação do rodapé. */
     @Composable
-    private fun appBalloonFixture(onMode: (WindowMode) -> Unit, onRefresh: () -> Unit) {
+    private fun appBalloonFixture(onRefresh: () -> Unit) {
         HudAppBalloonContent(
             language = AppLanguage.PT,
             appVersion = CURRENT_APP_VERSION,
             countdown = null,
             updateIndicator = null,
-            onWindowModeChange = onMode,
             actions = {
                 FooterActionGroup(language = AppLanguage.PT, onRefresh = onRefresh, onOpenSettings = {})
             }
@@ -652,7 +701,7 @@ class HudNotchTest {
     }
 
     @Composable
-    private fun notchWithActions(onMode: (WindowMode) -> Unit = {}, onRefresh: () -> Unit = {}) {
+    private fun notchWithActions(onRefresh: () -> Unit = {}) {
         AppTheme(isDark = true) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
                 HudNotch(
@@ -661,7 +710,7 @@ class HudNotchTest {
                     sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false),
                     fallbackLabel = "Carregando",
                     expanded = true,
-                    appBalloon = { appBalloonFixture(onMode, onRefresh) },
+                    appBalloon = { appBalloonFixture(onRefresh) },
                     appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
                     gearDescription = GEAR
                 )
@@ -679,7 +728,7 @@ class HudNotchTest {
         waitForIdle()
         onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
         onNodeWithTag(HUD_APP_BALLOON_VERSION_TEST_TAG).assertTextEquals("v$CURRENT_APP_VERSION")
-        onNodeWithText("Modo de janela").assertIsDisplayed()
+        onNodeWithText("Modo de janela").assertDoesNotExist()
         // A mesma fileira do rodapé, pelas mesmas descrições.
         onNodeWithContentDescription("Atualizar agora").performClick()
         assertEquals(1, refreshes)
@@ -715,20 +764,6 @@ class HudNotchTest {
         onNodeWithTag(HUD_BALLOON_TEST_TAG).assertDoesNotExist()
     }
 
-    @Test
-    fun `os modos de janela saem do balao da engrenagem com o corrente marcado`() = runDesktopComposeUiTest {
-        val chosen = mutableListOf<WindowMode>()
-        setContent { notchWithActions(onMode = { mode -> chosen += mode }) }
-
-        onNodeWithContentDescription(GEAR).performClick()
-        waitForIdle()
-        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.HUD.name).assertIsSelected()
-        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.STANDARD.name).performClick()
-        onNodeWithTag(HUD_APP_BALLOON_MODE_TAG_PREFIX + WindowMode.CARDS_ONLY.name).performClick()
-
-        assertEquals(listOf(WindowMode.STANDARD, WindowMode.CARDS_ONLY), chosen)
-    }
-
     /** Com o balão da engrenagem aberto, passar por um anel mostra aquela conta. */
     @Test
     fun `um anel sob o ponteiro troca o balao da engrenagem pelo da conta`() = runDesktopComposeUiTest {
@@ -762,7 +797,6 @@ class HudNotchTest {
                                 appVersion = CURRENT_APP_VERSION,
                                 countdown = null,
                                 updateIndicator = update,
-                                onWindowModeChange = {},
                                 actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
                                 onUpdateAction = action
                             )
@@ -788,7 +822,6 @@ class HudNotchTest {
                     appVersion = CURRENT_APP_VERSION,
                     countdown = null,
                     updateIndicator = update,
-                    onWindowModeChange = {},
                     actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
                     onUpdateAction = onUpdateAction
                 )
@@ -858,7 +891,6 @@ class HudNotchTest {
                     appVersion = CURRENT_APP_VERSION,
                     countdown = { countdownOf(now + 2.minutes + 5.seconds) },
                     updateIndicator = null,
-                    onWindowModeChange = {},
                     actions = {}
                 )
             }
@@ -1256,8 +1288,8 @@ class HudNotchTest {
         }
         onNodeWithTag(HUD_BALLOON_SESSION_SIGNALS_TAG).assertIsDisplayed()
         onNodeWithText("Sessões CLI").assertIsDisplayed()
-        onNodeWithText("Contexto saturado · 1 sessão").assertIsDisplayed()
-        onNodeWithText("Sem resposta há 2h10").assertIsDisplayed()
+        // F10: os sinais são as linhas do detalhe do aviso, um por linha.
+        onNodeWithText("Contexto saturado · 1 sessão\nSem resposta há 2h10").assertIsDisplayed()
 
         shown = accounts.first().copy(sessionSignals = emptyList())
         waitForIdle()
@@ -1284,6 +1316,87 @@ class HudNotchTest {
             kotlin.math.abs(a.blue - b.blue) < tolerance
     }
 
+    // ------------------------------------------------ corpo: horizonte (M1)
+
+    /** Um notch sem contas: nenhum anel se mexendo no quadro, só o corpo. */
+    private fun ComposeUiTest.horizonBody(dark: Boolean, motion: AppMotionPolicy = AppMotionPolicy.Static) {
+        setContent {
+            AppTheme(isDark = dark, motion = motion) {
+                Box(modifier = Modifier.size(900.dp, 600.dp)) {
+                    HudNotch(
+                        accounts = emptyList(),
+                        edge = HudEdge.TOP,
+                        sizes = hudNotchSizes(emptyList(), HudEdge.TOP, "Nenhuma API", false),
+                        fallbackLabel = "Nenhuma API",
+                        expanded = false,
+                        onHoverChange = {},
+                        onDragStart = {},
+                        onDragMove = {},
+                        onDragEnd = {},
+                        onRefreshAccount = {},
+                        gearDescription = GEAR
+                    )
+                }
+            }
+        }
+    }
+
+    /** Ponto do corpo longe do texto e do filete: depois do ombro de 8dp e do filete. */
+    private fun PixelMap.bodyPixel(): Color = this[22, height / 2]
+
+    /** A borda de dentro (embaixo, no topo da tela), do lado quente. */
+    private fun PixelMap.rimPixel(): Color = this[width * 3 / 4, height - 1]
+
+    @Test
+    fun `no tema escuro o corpo e o nucleo escuro e a borda e luz quente`() = runDesktopComposeUiTest {
+        horizonBody(dark = true)
+        val pixels = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+        val body = pixels.bodyPixel()
+        val horizon = AppGargantuaTokens.horizon
+        assertTrue(
+            kotlin.math.abs(body.red - horizon.red) + kotlin.math.abs(body.green - horizon.green) +
+                kotlin.math.abs(body.blue - horizon.blue) < 0.02f,
+            "o corpo devia ser o núcleo escuro: $body"
+        )
+        val rim = pixels.rimPixel()
+        assertTrue(rim.red - rim.blue > 0.08f, "a borda devia ser luz quente, não cinza: $rim")
+    }
+
+    @Test
+    fun `no tema claro o corpo continua a superficie e so a borda ganha o doppler`() = runDesktopComposeUiTest {
+        horizonBody(dark = false)
+        val pixels = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+        assertTrue(pixels.bodyPixel().luminance() > 0.5f, "o tema claro não pode virar núcleo escuro: ${pixels.bodyPixel()}")
+        val rim = pixels.rimPixel()
+        assertTrue(rim.red - rim.blue > 0.08f, "a borda devia ter o tom da paleta Gargantua: $rim")
+    }
+
+    /**
+     * A respiração do anel de fótons é contínua: com a política, dois instantes
+     * pintam a borda diferente; sem ela, fica o quadro zero.
+     */
+    @Test
+    fun `a borda respira so com a politica continua`() {
+        fun frames(policy: AppMotionPolicy): Pair<PixelMap, PixelMap> {
+            lateinit var first: PixelMap
+            lateinit var second: PixelMap
+            runDesktopComposeUiTest {
+                mainClock.autoAdvance = false
+                horizonBody(dark = true, motion = policy)
+                mainClock.advanceTimeBy(500)
+                first = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+                mainClock.advanceTimeBy(AppGargantuaTokens.horizonBreathMillis / 4L)
+                second = onNodeWithTag(HUD_CONTENT_TEST_TAG).captureToImage().toPixelMap()
+            }
+            return first to second
+        }
+
+        val (liveA, liveB) = frames(AppMotionPolicy.Live)
+        assertTrue(liveA.rimPixel() != liveB.rimPixel(), "com a política contínua a borda devia ter respirado")
+        val (staticA, staticB) = frames(AppMotionPolicy.Static)
+        assertTrue(!differs(staticA, staticB), "sem a política a borda devia ficar parada")
+    }
+
     private fun differs(a: PixelMap, b: PixelMap): Boolean {
         for (y in 0 until minOf(a.height, b.height)) {
             for (x in 0 until minOf(a.width, b.width)) {
@@ -1298,6 +1411,123 @@ class HudNotchTest {
     private val RING_ENTRANCE_SETTLE_MILLIS = 1_500L
 
     /** Põe o ponteiro no anel da conta, achado pela frase inteira da semântica dele. */
+    // ------------------------------------------------------------ B3 · jato relativístico
+
+    /**
+     * O balão abre pelo jato: no começo só o feixe atravessa a caixa (quase nada
+     * pintado), e ao fim dos [AppGargantuaTokens.jetOpenMillis] ele está inteiro.
+     */
+    @Test
+    fun `o balao abre desdobrando a partir do feixe`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true) }
+        mainClock.autoAdvance = false
+        onNodeWithContentDescription(INFORMATA_RING).performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis * 15L / 100)
+        val crossing = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        val open = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        assertTrue(open > 0, "o balão aberto não pintou nada")
+        assertTrue(crossing * 5 < open, "no começo o balão já estava pintado: $crossing de $open")
+    }
+
+    /** Trocar de anel com o balão aberto repete o jato a partir do anel novo. */
+    @Test
+    fun `trocar de anel repete a abertura pelo feixe`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true) }
+        hoverRing(INFORMATA_RING)
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        mainClock.autoAdvance = false
+        onNodeWithContentDescription(DEEPSEEK_RING).performMouseInput { moveTo(center) }
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis * 15L / 100)
+        val crossing = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        val open = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        onNodeWithText("DeepSeek").assertIsDisplayed()
+        assertTrue(crossing * 5 < open, "a troca não repetiu o jato: $crossing de $open")
+    }
+
+    /**
+     * Com "Reduzir animações" não há quadro intermediário: o balão sai do nada
+     * direto para inteiro, sem feixe nem desdobrar.
+     */
+    @Test
+    fun `reduzir animacoes abre o balao inteiro de uma vez`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true, motion = AppMotionPolicy.Reduced) }
+        mainClock.autoAdvance = false
+        onNodeWithContentDescription(INFORMATA_RING).performMouseInput { moveTo(center) }
+        val frames = (1..6).mapNotNull {
+            mainClock.advanceTimeByFrame()
+            val balloon = onAllNodesWithTag(HUD_BALLOON_TEST_TAG).fetchSemanticsNodes()
+            if (balloon.isEmpty()) null else paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        }
+        mainClock.advanceTimeBy(AppGargantuaTokens.jetOpenMillis + 100L)
+        val settled = paintedPixels(onNodeWithTag(HUD_BALLOON_TEST_TAG).captureToImage().toPixelMap())
+        assertTrue(frames.isNotEmpty(), "o balão não abriu")
+        assertEquals(settled, frames.last())
+        assertTrue(frames.all { painted -> painted == 0 || painted == settled }, "quadro intermediário: $frames de $settled")
+    }
+
+    // ------------------------------------------------------------ D5 · horizonte de eventos
+
+    /** A conta principal com o 7d em [percent]. */
+    private fun withWeekly(percent: String): List<HudAccount> {
+        val first = accounts.first()
+        val quotas = first.quotas.map { quota -> if (quota.shortLabel == "7d") quota.copy(percentText = percent) else quota }
+        return listOf(first.copy(quotas = quotas)) + accounts.drop(1)
+    }
+
+    /** Dado novo rola pelo horizonte: no meio da troca a linha não é a final, e no fim é. */
+    @Test
+    fun `percentual novo rola so os digitos que mudaram`() = runDesktopComposeUiTest {
+        var list by mutableStateOf(withWeekly("9%"))
+        setContent { notch(list = list) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        list = withWeekly("12%")
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis / 3L)
+        val rolling = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis * 2L)
+        val settled = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        assertTrue(differs(rolling, settled), "no meio da troca a linha já estava parada")
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis.toLong())
+        assertTrue(!differs(settled, onNodeWithText("7d 12%").captureToImage().toPixelMap()), "a linha ainda se mexia depois da troca")
+    }
+
+    /** Com "Reduzir animações" o dado novo aparece de uma vez. */
+    @Test
+    fun `reduzir animacoes troca o percentual sem rolar`() = runDesktopComposeUiTest {
+        var list by mutableStateOf(withWeekly("9%"))
+        setContent { notch(list = list, motion = AppMotionPolicy.Reduced) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        list = withWeekly("12%")
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        val first = onNodeWithText("7d 12%").captureToImage().toPixelMap()
+        mainClock.advanceTimeBy(AppGargantuaTokens.rollMillis * 2L)
+        assertTrue(!differs(first, onNodeWithText("7d 12%").captureToImage().toPixelMap()), "com animação reduzida o número rolou")
+    }
+
+    /**
+     * Pixels da caixa do balão que não são o fundo. O canto (0, 0) fica na faixa
+     * da cauda do lado do notch, fora do corpo arredondado: é sempre o fundo.
+     */
+    private fun paintedPixels(pixels: PixelMap): Int {
+        val background = pixels[0, 0]
+        var count = 0
+        for (x in 0 until pixels.width) {
+            for (y in 0 until pixels.height) {
+                val pixel = pixels[x, y]
+                val distance = kotlin.math.abs(pixel.red - background.red) +
+                    kotlin.math.abs(pixel.green - background.green) +
+                    kotlin.math.abs(pixel.blue - background.blue)
+                if (distance > 0.06f) count++
+            }
+        }
+        return count
+    }
+
     private fun ComposeUiTest.hoverRing(description: String) {
         onNodeWithContentDescription(description).performMouseInput { moveTo(center) }
         waitForIdle()

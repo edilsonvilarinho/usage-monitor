@@ -54,7 +54,7 @@ internal data class ScreenWorkArea(
  * `maximumWindowBounds` já desconta a barra de tarefas e vem em espaço de usuário —
  * já dividido pela escala do sistema —, o que a aproxima de `Dp` mas **não** a
  * iguala em todo monitor. É rede de segurança, não medida exata, pela mesma razão
- * documentada em [availableWindowSizeDp]. Falha na consulta devolve
+ * de a escala do sistema variar por monitor. Falha na consulta devolve
  * [ScreenWorkArea.Unknown], que não limita nada.
  */
 internal fun availableWindowAreaDp(): ScreenWorkArea {
@@ -118,7 +118,7 @@ internal fun fitWindowPosition(
 }
 
 // `Dp.Unspecified` é `NaN`, e comparar NaN por igualdade é o teste que falha em
-// silêncio: quem decide aqui é `isFinite`, como em `scaledWindowSize`.
+// silêncio: quem decide aqui é `isFinite`.
 private fun Dp.fittedTo(limit: Dp, margin: Dp): Dp {
     if (!value.isFinite() || !limit.value.isFinite()) {
         return this

@@ -1,6 +1,6 @@
 package com.usagemonitor.domain.entity
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -98,8 +98,12 @@ fun splitIntoQuotaWindows(points: List<UsageHistoryPoint>, unit: UsageUnit): Lis
 
 /**
  * As janelas da série, em ordem cronológica. Vazio para o que não tem janela:
- * saldo, cota reportada sem período e série cujo último ponto diz que não há
- * reinício conhecido.
+ * saldo, cota reportada sem período e série sem nenhum reinício conhecido.
+ *
+ * Ponto sem reinício conhecido é leitura ociosa — a 5h da Anthropic sem sessão
+ * vem sem `resets_at`, o Antigravity intacto também — e não forma janela. Antes
+ * era o **último** ponto que decidia, e uma leitura ociosa apagava todas as
+ * janelas anteriores do intervalo.
  */
 fun quotaWindowsOf(
     points: List<UsageHistoryPoint>,
@@ -110,8 +114,9 @@ fun quotaWindowsOf(
         return emptyList()
     }
 
+    // Da série inteira: com a leitura mais nova ociosa, a última janela fecha.
     val lastCapturedAt = points.last().capturedAt
-    val windows = splitIntoQuotaWindows(points, unit)
+    val windows = splitIntoQuotaWindows(windowedPoints(points), unit)
     return windows.mapIndexed { index, window ->
         val first = window.first()
         val last = window.last()
@@ -161,7 +166,7 @@ fun quotaHourlyDistributionOf(
     }
 
     val byHour = DoubleArray(HOURS_PER_DAY)
-    splitIntoQuotaWindows(points, unit).forEach { window ->
+    splitIntoQuotaWindows(windowedPoints(points), unit).forEach { window ->
         for (index in 1 until window.size) {
             val diff = window[index].displayUsed - window[index - 1].displayUsed
             if (diff > 0L) {
@@ -183,9 +188,16 @@ private fun hasQuotaWindows(points: List<UsageHistoryPoint>, unit: UsageUnit, pe
     if (periodType == PeriodType.REPORTED) {
         return false
     }
-    // Do último ponto, como a projeção: é ele que diz como a cota é agora.
-    val last = points.last()
-    return last.hasKnownResetAt && last.displayTotal > 0L
+    return points.any(::isWindowedPoint)
+}
+
+/** Os pontos que pertencem a alguma janela; os ociosos, sem reinício conhecido, ficam fora. */
+private fun windowedPoints(points: List<UsageHistoryPoint>): List<UsageHistoryPoint> {
+    return points.filter(::isWindowedPoint)
+}
+
+private fun isWindowedPoint(point: UsageHistoryPoint): Boolean {
+    return point.hasKnownResetAt && point.displayTotal > 0L
 }
 
 /** Divisor que leva unidade crua a pontos percentuais do total da janela. */

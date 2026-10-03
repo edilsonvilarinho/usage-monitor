@@ -3,7 +3,7 @@ package com.usagemonitor.domain
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.positiveDeltaOf
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

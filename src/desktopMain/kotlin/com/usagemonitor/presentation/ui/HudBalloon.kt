@@ -3,21 +3,8 @@ package com.usagemonitor.presentation.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.Icon
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,17 +22,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_APP_BALLOON_ACTIONS
-import com.usagemonitor.HUD_APP_BALLOON_CAPTION
-import com.usagemonitor.HUD_APP_BALLOON_MODE_ROW
+import com.usagemonitor.HUD_APP_BALLOON_STATUS
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_BANNER
 import com.usagemonitor.HUD_BALLOON_ACTIONS
 import com.usagemonitor.HUD_BALLOON_BAR_ROW
@@ -64,15 +54,15 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudQuotaRuns
+import com.usagemonitor.hudSessionBannerHeight
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
-import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.WindowMode
-import com.usagemonitor.presentation.ui.components.color
+import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
+import com.usagemonitor.presentation.ui.components.drawGargantuaJet
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.appSheen
@@ -136,7 +126,9 @@ internal fun HudBalloon(
     tailCenter: () -> Float,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
-    bodyHeight: Dp
+    bodyHeight: Dp,
+    reveal: () -> GargantuaJetFrame = { GargantuaJetFrame.Settled },
+    beamOrigin: () -> Float = { 0f }
 ) {
     val surface = MaterialTheme.colorScheme.surface
     val box = hudBalloonBoxSize(edge, bodyHeight)
@@ -154,8 +146,30 @@ internal fun HudBalloon(
             // A cauda é desenhada **depois** do corpo: ela cobre o trecho da borda
             // do corpo onde encosta, e os dois leem como uma forma só.
             .drawWithContent {
-                drawContent()
-                drawPath(hudBalloonTailPath(edge, size.width, size.height, tailCenter(), HUD_BALLOON_GAP.toPx(), HUD_BALLOON_TAIL_BASE.toPx()), surface)
+                val tail = tailCenter()
+                val frame = reveal()
+                val tailPath = hudBalloonTailPath(edge, size.width, size.height, tail, HUD_BALLOON_GAP.toPx(), HUD_BALLOON_TAIL_BASE.toPx())
+                if (frame.settled) {
+                    drawContent()
+                    drawPath(tailPath, surface)
+                    return@drawWithContent
+                }
+                // B3 · jato relativístico: o balão se desdobra ao longo da borda a
+                // partir da linha do feixe, e o feixe sai do anel por cima dele.
+                val shown = hudBalloonRevealRect(edge, size.width, size.height, tail, frame.unfold)
+                clipRect(shown.left, shown.top, shown.right, shown.bottom) {
+                    this@drawWithContent.drawContent()
+                    drawPath(tailPath, surface)
+                }
+                val origin = -beamOrigin()
+                val depth = if (edge.isHorizontal) size.height else size.width
+                drawGargantuaJet(
+                    from = hudBalloonPoint(edge, size.width, size.height, tail, origin),
+                    to = hudBalloonPoint(edge, size.width, size.height, tail, origin + (depth - origin) * frame.beamEnd),
+                    alpha = frame.beamAlpha,
+                    width = HUD_JET_WIDTH.toPx(),
+                    flashRadius = HUD_JET_FLASH.toPx()
+                )
             }
     ) {
         Box(
@@ -191,15 +205,9 @@ internal fun hudBalloonTailPath(
     val half = base / 2
     val center = tailCenter.coerceIn(half + CORNER_CLEARANCE_PX, (along - half - CORNER_CLEARANCE_PX).coerceAtLeast(half))
     val depth = gap + 1f
-    val map: (Float, Float) -> Offset = when (edge) {
-        HudEdge.TOP -> { a, c -> Offset(a, c) }
-        HudEdge.BOTTOM -> { a, c -> Offset(a, height - c) }
-        HudEdge.LEFT -> { a, c -> Offset(c, a) }
-        HudEdge.RIGHT -> { a, c -> Offset(width - c, a) }
-    }
     val path = Path()
     // Pontos de controle do `clip-path` do Codenotch (32 × 36), normalizados.
-    fun point(x: Float, y: Float): Offset = map(center - half + y * base, depth - x * depth)
+    fun point(x: Float, y: Float): Offset = hudBalloonPoint(edge, width, height, center - half + y * base, depth - x * depth)
     val start = point(0f, 0f)
     path.moveTo(start.x, start.y)
     val c1 = point(0f, 0.25f)
@@ -216,6 +224,36 @@ internal fun hudBalloonTailPath(
 
 /** A cauda não encosta no canto arredondado do corpo. */
 private const val CORNER_CLEARANCE_PX = 12f
+
+/**
+ * Um ponto da caixa do balão dado em ([along] da borda, [depth] a partir do lado
+ * do notch). Profundidade negativa sai da caixa em direção ao notch — é por onde
+ * o feixe do jato vem do anel.
+ */
+internal fun hudBalloonPoint(edge: HudEdge, width: Float, height: Float, along: Float, depth: Float): Offset = when (edge) {
+    HudEdge.TOP -> Offset(along, depth)
+    HudEdge.BOTTOM -> Offset(along, height - depth)
+    HudEdge.LEFT -> Offset(depth, along)
+    HudEdge.RIGHT -> Offset(width - depth, along)
+}
+
+/**
+ * O trecho visível do balão desdobrando (B3): a profundidade inteira e, ao longo
+ * da borda, [unfold] de cada lado a partir da linha do feixe em [tailCenter].
+ * Com `unfold = 1` é a caixa inteira; com `0`, largura zero sobre a linha.
+ */
+internal fun hudBalloonRevealRect(edge: HudEdge, width: Float, height: Float, tailCenter: Float, unfold: Float): Rect {
+    val along = if (edge.isHorizontal) width else height
+    val line = tailCenter.coerceIn(0f, along)
+    val shown = unfold.coerceIn(0f, 1f)
+    val start = line - line * shown
+    val end = line + (along - line) * shown
+    return if (edge.isHorizontal) Rect(start, 0f, end, height) else Rect(0f, start, width, end)
+}
+
+/** Espessura do feixe e raio do clarão na origem, iguais ao protótipo B3. */
+private val HUD_JET_WIDTH = 1.6.dp
+private val HUD_JET_FLASH = 8.dp
 
 /** O conteúdo do balão de uma conta. */
 @Composable
@@ -290,26 +328,17 @@ internal fun HudAccountBalloonContent(
         // não são cota, e a palavra do cabeçalho continua sendo só do risco dela.
         if (account.sessionSignals.isNotEmpty()) {
             Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
-            Column(modifier = Modifier.fillMaxWidth().testTag(HUD_BALLOON_SESSION_SIGNALS_TAG)) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Sessões CLI" else "CLI sessions",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    modifier = Modifier.height(HUD_BALLOON_GROUP_HEADER)
-                )
-                account.sessionSignals.forEach { signal ->
-                    // Tom e palavra juntos: o texto diz o sinal, a cor só reforça.
-                    Text(
-                        text = signal.text,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = signal.tone.color(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.height(HUD_BALLOON_FOOTER)
-                    )
-                }
-            }
+            // F10: um aviso, como o da atualização no balão da engrenagem. O tom
+            // do pior sinal fica só na barra de 2dp; a frase de cada sinal diz o
+            // que ele é, uma por linha.
+            AppBanner(
+                title = if (language == AppLanguage.PT) "Sessões CLI" else "CLI sessions",
+                description = account.sessionSignals.joinToString("\n") { signal -> signal.text },
+                tone = hudSessionSignalsTone(account.sessionSignals),
+                modifier = Modifier
+                    .height(hudSessionBannerHeight(account.sessionSignals.size))
+                    .testTag(HUD_BALLOON_SESSION_SIGNALS_TAG)
+            )
         }
         account.detailLine?.let { detail ->
             Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
@@ -370,26 +399,8 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
         AppProgressTrack(fraction = quota.fraction, tone = quota.tone)
     }
     val usedLeft = quota.usedLeft
-    if (usedLeft != null) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_QUOTA_DETAIL),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = usedLeft.usedText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-            Text(
-                text = usedLeft.leftText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-        }
-    } else {
+    if (usedLeft == null) {
+        // Saldo e atividade observada não têm teto: ali a linha é o valor do card.
         Text(
             text = quota.percentText,
             style = MaterialTheme.typography.labelSmall,
@@ -397,6 +408,30 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.height(HUD_BALLOON_QUOTA_DETAIL)
+        )
+        return
+    }
+    // A linha continua uma só para o leitor de tela: "7% usado · 93% restante".
+    // O usado fica à esquerda (acompanhando a barra) e o restante à direita.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HUD_BALLOON_QUOTA_DETAIL)
+            .clearAndSetSemantics { contentDescription = usedLeft.text },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = usedLeft.used,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        Text(
+            text = usedLeft.left,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
         )
     }
 }
@@ -407,17 +442,11 @@ internal const val HUD_APP_BALLOON_CONTENT_TEST_TAG = "hudAppBalloonContent"
 /** A versão instalada, exibida no cabeçalho do balão da engrenagem. */
 internal const val HUD_APP_BALLOON_VERSION_TEST_TAG = "hudAppBalloonVersion"
 
-/** Prefixo das linhas de modo de janela do balão da engrenagem, seguido do nome do modo. */
-internal const val HUD_APP_BALLOON_MODE_TAG_PREFIX = "hudAppBalloonMode_"
-
 /**
  * O balão da engrenagem: tudo o que o rodapé do modo padrão oferece, para quem
  * está na barra HUD e não tem rodapé.
  *
- * Título com a contagem até a próxima coleta; os três modos de janela em linhas,
- * o corrente marcado — **em linhas e não no menu do rodapé**, porque aquele é um
- * `Popup`, e popup no Compose Desktop é recortado pela própria janela, que aqui
- * é do tamanho do balão —; a fileira de ações do rodapé, a **mesma**
+ * Título com a contagem até a próxima coleta; a fileira de ações do rodapé, a **mesma**
  * ([actions] recebe o `FooterActionGroup`), com os mesmos ícones e descrições; e a
  * atualização pendente, quando há — um `AppBanner` e, com [onUpdateAction], a
  * **mesma** ação da faixa do modo padrão ("Reiniciar o app e atualizar") como
@@ -434,7 +463,6 @@ internal fun HudAppBalloonContent(
     appVersion: String,
     countdown: (@Composable () -> Unit)?,
     updateIndicator: HudUpdateIndicator?,
-    onWindowModeChange: (WindowMode) -> Unit,
     actions: @Composable () -> Unit,
     onUpdateAction: (() -> Unit)? = null
 ) {
@@ -451,31 +479,31 @@ internal fun HudAppBalloonContent(
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
+            // A versão mora ao lado do nome, e a contagem sozinha na linha de baixo.
+            // Dividindo a linha com "próxima coleta em", sobravam ~50dp para a versão
+            // e "v41.6.0-beta.2" saía cortada em "v41.6.0…". `HudNotchTextFitTest` mede.
             Text(
                 text = "v$appVersion",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag(HUD_APP_BALLOON_VERSION_TEST_TAG)
             )
-            countdown?.invoke()
         }
-        Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
-        Text(
-            text = if (language == AppLanguage.PT) "Modo de janela" else "Window mode",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier.height(HUD_APP_BALLOON_CAPTION)
-        )
-        WindowMode.entries.forEach { mode ->
-            HudModeRow(
-                label = mode.label(language),
-                selected = mode == WindowMode.HUD,
-                testTag = HUD_APP_BALLOON_MODE_TAG_PREFIX + mode.name,
-                onClick = { onWindowModeChange(mode) }
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth().height(HUD_APP_BALLOON_STATUS),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (countdown != null) {
+                Text(
+                    text = if (language == AppLanguage.PT) "Próxima coleta em" else "Next fetch in",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                countdown()
+            }
         }
         Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
         Box(
@@ -493,6 +521,10 @@ internal fun HudAppBalloonContent(
                 tone = indicator.tone,
                 modifier = Modifier.height(HUD_APP_BALLOON_UPDATE_BANNER).testTag(HUD_APP_BALLOON_UPDATE_BANNER_TAG)
             )
+            // O botão fica abaixo do aviso, e não dentro dele como o F10 desenhava:
+            // "Reiniciar o app e atualizar" não cabe na largura interna do aviso
+            // (192dp) a partir de 105% de escala, e o rótulo não encurta — ele diz
+            // o que reinicia. `HudNotchTextFitTest` mede.
             val actionLabel = indicator.actionLabel
             if (actionLabel != null && onUpdateAction != null) {
                 Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
@@ -505,57 +537,6 @@ internal fun HudAppBalloonContent(
         }
     }
 }
-
-/**
- * Uma linha de modo: a marca do corrente num espaço reservado em todas — sem ele
- * o rótulo andaria para o lado a cada troca, a regra do `AppMenu` —, hover e
- * pressão como camadas.
- */
-@Composable
-private fun HudModeRow(label: String, selected: Boolean, testTag: String, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val pressed by interaction.collectIsPressedAsState()
-    val ladder = AppSurfaceLadders.current
-    val layer = when {
-        pressed -> ladder.pressedLayer
-        hovered -> ladder.hoverLayer
-        else -> Color.Transparent
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(HUD_APP_BALLOON_MODE_ROW)
-            .clip(AppShapes.small)
-            .background(layer)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .semantics { this.selected = selected }
-            .testTag(testTag)
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Box(modifier = Modifier.size(MODE_MARK_SIZE), contentAlignment = Alignment.Center) {
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(MODE_MARK_SIZE)
-                )
-            }
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-    }
-}
-
-private val MODE_MARK_SIZE = 14.dp
 
 /** "Reinicia ter 21h00" / "Resets Tue 21h00" — o "Resets at 20:19" do Codenotch. */
 internal fun hudResetCaption(reset: String, language: AppLanguage): String {
