@@ -400,7 +400,7 @@ internal fun hudQuotaTitle(quota: QuotaInfo, language: AppLanguage): String {
 }
 
 /**
- * "87% usado · 13% restante", a linha de baixo de cada cota no Codenotch.
+ * "87% usado" na esquerda e "13% restante" na direita, abaixo da barra em cada cota no Codenotch.
  *
  * O usado é **truncado**, como [compactPercentageLabel] — o balão não pode dizer
  * 88% ao lado de um anel que diz 87% —, e o restante sai do usado exibido, para

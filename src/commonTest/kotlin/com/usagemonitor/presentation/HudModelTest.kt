@@ -18,7 +18,8 @@ import com.usagemonitor.presentation.ui.hudRingDescription
 import com.usagemonitor.presentation.ui.hudRingPositionLabel
 import com.usagemonitor.presentation.ui.hudSourceOrigin
 import com.usagemonitor.presentation.ui.hudTraySummary
-import com.usagemonitor.presentation.ui.hudUsedLeftText
+import com.usagemonitor.presentation.ui.hudUsedLeft
+import com.usagemonitor.presentation.ui.HudUsedLeft
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
@@ -432,9 +433,9 @@ class HudModelTest {
     fun `cada cota diz quanto foi usado e quanto resta, somando cem`() {
         val account = buildHudAccounts(listOf(entry(PADRAO, "Sessão 5h", used = 87, risk = null)), emptyList(), AppLanguage.PT, HUD_NOW).single()
 
-        assertEquals("87% usado · 13% restante", account.quotas.single().usedLeftText)
+        assertEquals(HudUsedLeft("87% usado", "13% restante"), account.quotas.single().usedLeft)
         val english = buildHudAccounts(listOf(entry(PADRAO, "Sessão 5h", used = 87, risk = null)), emptyList(), AppLanguage.EN, HUD_NOW).single()
-        assertEquals("87% used · 13% left", english.quotas.single().usedLeftText)
+        assertEquals(HudUsedLeft("87% used", "13% left"), english.quotas.single().usedLeft)
     }
 
     /** Truncar 0,4% daria "0% usado" com consumo real; o Codenotch diz "<1", e aqui também. */
@@ -443,8 +444,8 @@ class HudModelTest {
         val tiny = QuotaInfo("Tokens 7d", used = 4L, total = 1_000L, periodEndAt = HUD_NOW + 2.hours, unit = UsageUnit.TOKENS)
         val almostFull = QuotaInfo("Tokens 7d", used = 996L, total = 1_000L, periodEndAt = HUD_NOW + 2.hours, unit = UsageUnit.TOKENS)
 
-        assertEquals("<1% usado · 100% restante", hudUsedLeftText(tiny, AppLanguage.PT))
-        assertEquals("99% usado · <1% restante", hudUsedLeftText(almostFull, AppLanguage.PT))
+        assertEquals(HudUsedLeft("<1% usado", "100% restante"), hudUsedLeft(tiny, AppLanguage.PT))
+        assertEquals(HudUsedLeft("99% usado", "<1% restante"), hudUsedLeft(almostFull, AppLanguage.PT))
     }
 
     /** Saldo não tem teto: "restante" ali seria uma conta sem sentido. */
@@ -453,8 +454,8 @@ class HudModelTest {
         val balance = QuotaInfo("Saldo", used = 0L, total = 227L, periodEndAt = HUD_NOW, unit = UsageUnit.CURRENCY_USD)
         val observed = QuotaInfo("Tokens 5h", used = 5_000L, total = 0L, periodEndAt = HUD_NOW, unit = UsageUnit.TOKENS)
 
-        assertEquals(null, hudUsedLeftText(balance, AppLanguage.PT))
-        assertEquals(null, hudUsedLeftText(observed, AppLanguage.PT))
+        assertEquals(null, hudUsedLeft(balance, AppLanguage.PT))
+        assertEquals(null, hudUsedLeft(observed, AppLanguage.PT))
     }
 
     @Test
@@ -480,7 +481,7 @@ class HudModelTest {
 
         assertEquals("Gemini", hudQuota.group)
         assertEquals("Semanal", hudQuota.title)
-        assertEquals("5% usado · 95% restante", hudQuota.usedLeftText)
+        assertEquals(HudUsedLeft("5% usado", "95% restante"), hudQuota.usedLeft)
     }
 
     private fun entry(

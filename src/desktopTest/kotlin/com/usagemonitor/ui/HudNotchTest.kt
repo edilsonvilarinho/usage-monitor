@@ -252,7 +252,7 @@ class HudNotchTest {
         onNodeWithText("Max 20x").assertIsDisplayed()
         onNodeWithText("Reinicia 22h59").assertIsDisplayed()
         onNodeWithText("Reinicia Ter 21h00").assertIsDisplayed()
-        // F10: o restante e o usado em dois textos, lidos como uma linha só.
+        // F10 adaptado: o usado e o restante em dois textos, lidos como uma linha só.
         onNodeWithContentDescription("28% usado · 72% restante").assertIsDisplayed()
         onNodeWithText("DeepSeek").assertDoesNotExist()
 

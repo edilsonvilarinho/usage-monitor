@@ -411,24 +411,24 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
         )
         return
     }
-    // F10: o restante à esquerda, na cor do texto, e o usado à direita, apagado.
     // A linha continua uma só para o leitor de tela: "7% usado · 93% restante".
+    // O usado fica à esquerda (acompanhando a barra) e o restante à direita.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(HUD_BALLOON_QUOTA_DETAIL)
             .clearAndSetSemantics { contentDescription = usedLeft.text },
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = usedLeft.left,
+            text = usedLeft.used,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
         )
         Text(
-            text = usedLeft.used,
+            text = usedLeft.left,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
