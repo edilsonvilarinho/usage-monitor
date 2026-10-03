@@ -369,15 +369,36 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
     ) {
         AppProgressTrack(fraction = quota.fraction, tone = quota.tone)
     }
-    // Saldo e atividade observada não têm teto: ali a linha é o valor do card.
-    Text(
-        text = quota.usedLeftText ?: quota.percentText,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.height(HUD_BALLOON_QUOTA_DETAIL)
-    )
+    val usedLeft = quota.usedLeft
+    if (usedLeft != null) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_QUOTA_DETAIL),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = usedLeft.usedText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            Text(
+                text = usedLeft.leftText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+    } else {
+        Text(
+            text = quota.percentText,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.height(HUD_BALLOON_QUOTA_DETAIL)
+        )
+    }
 }
 
 /** A coluna do balão da engrenagem. */

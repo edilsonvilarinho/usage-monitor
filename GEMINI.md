@@ -34,7 +34,7 @@ Para aprofundar detalhes técnicos, de lifecycle ou troubleshooting do instalado
 Antes de commitar:
 ```bash
 git config user.name "gemini"
-git config user.email "gemini@google.com"
+git config user.email "gemini[bot]@users.noreply.github.com"
 ```
 
 Depois de commitar, restaurar:

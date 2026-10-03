@@ -37,6 +37,7 @@ import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudSessionSignal
+import com.usagemonitor.presentation.ui.HudUsedLeft
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
@@ -814,8 +815,8 @@ internal object ScreenshotFixtures {
             statusLabel = "Atenção",
             tone = AppTone.WARNING,
             quotas = listOf(
-                HudQuota("5h", "68%", 0.68f, AppTone.WARNING, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeftText = "68% usado · 32% restante", periodType = PeriodType.INTERVAL),
-                HudQuota("7d", "41%", 0.41f, AppTone.OK, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeftText = "41% usado · 59% restante", periodType = PeriodType.WEEKLY)
+                HudQuota("5h", "68%", 0.68f, AppTone.WARNING, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeft = HudUsedLeft("68% usado", "32% restante"), periodType = PeriodType.INTERVAL),
+                HudQuota("7d", "41%", 0.41f, AppTone.OK, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeft = HudUsedLeft("41% usado", "59% restante"), periodType = PeriodType.WEEKLY)
             ),
             focusIndex = 0,
             sessionActive = true,
@@ -830,8 +831,8 @@ internal object ScreenshotFixtures {
             statusLabel = "Normal",
             tone = AppTone.OK,
             quotas = listOf(
-                HudQuota("5h", "12%", 0.12f, AppTone.OK, resetText = "1h30", hasForecast = true, title = "Sessão 5h", usedLeftText = "12% usado · 88% restante", periodType = PeriodType.INTERVAL),
-                HudQuota("7d", "7%", 0.07f, AppTone.OK, resetText = "Qui 9h00", hasForecast = true, title = "Semanal", usedLeftText = "7% usado · 93% restante", periodType = PeriodType.WEEKLY)
+                HudQuota("5h", "12%", 0.12f, AppTone.OK, resetText = "1h30", hasForecast = true, title = "Sessão 5h", usedLeft = HudUsedLeft("12% usado", "88% restante"), periodType = PeriodType.INTERVAL),
+                HudQuota("7d", "7%", 0.07f, AppTone.OK, resetText = "Qui 9h00", hasForecast = true, title = "Semanal", usedLeft = HudUsedLeft("7% usado", "93% restante"), periodType = PeriodType.WEEKLY)
             ),
             focusIndex = 0,
             originLabel = "via Claude Code",
