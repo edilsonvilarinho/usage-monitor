@@ -44,6 +44,7 @@ import com.usagemonitor.HUD_BALLOON_GAP
 import com.usagemonitor.HUD_BALLOON_GROUP_HEADER
 import com.usagemonitor.HUD_BALLOON_GROUP_PADDING
 import com.usagemonitor.HUD_BALLOON_HEADER
+import com.usagemonitor.HUD_OBSERVED_HEADER_HEIGHT
 import com.usagemonitor.HUD_BALLOON_PADDING
 import com.usagemonitor.HUD_BALLOON_QUOTA_DETAIL
 import com.usagemonitor.HUD_BALLOON_QUOTA_TITLE
@@ -71,6 +72,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppChrome
 import com.usagemonitor.presentation.ui.theme.AppDepth
 import com.usagemonitor.presentation.ui.theme.AppShapes
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 
 /** O balão aberto: é por ele que testes acham qual conta está sendo detalhada. */
@@ -266,8 +268,9 @@ internal fun HudAccountBalloonContent(
     maxBodyHeight: Dp = Dp.Infinity
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag(HUD_BALLOON_CONTENT_TEST_TAG)) {
+        val observed = account.source.isObservedActivitySource()
         Row(
-            modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_HEADER),
+            modifier = Modifier.fillMaxWidth().height(if (observed) HUD_BALLOON_QUOTA_TITLE else HUD_BALLOON_HEADER),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -290,9 +293,13 @@ internal fun HudAccountBalloonContent(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            AppStatusIndicator(label = account.statusLabel, tone = account.tone)
+            if (!observed) AppStatusIndicator(label = account.statusLabel, tone = account.tone)
         }
-        if (account.source.isObservedActivitySource()) {
+        if (observed) {
+            Spacer(Modifier.height(AppSpacing.xs))
+            Box(Modifier.height(HUD_OBSERVED_HEADER_HEIGHT - HUD_BALLOON_QUOTA_TITLE - AppSpacing.xs)) {
+                AppStatusIndicator(label = account.statusLabel, tone = account.tone)
+            }
             HudObservedBalloonContent(account, language, maxBodyHeight)
         }
         val rings = account.rings

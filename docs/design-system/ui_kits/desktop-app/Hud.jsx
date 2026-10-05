@@ -71,12 +71,15 @@ export function Hud() {
         <AppHudBar accounts={ACCOUNTS} countdown="02:05" refreshFraction={0.21} />
       </Screen>
 
-      <Caption>1b · atividade local — requisições por modelo, sem percentual ou arco de cota (#377)</Caption>
+      <Caption>1b · atividade local — tabela compacta, direção 02 (#379), sem percentual ou arco de cota</Caption>
       <Screen tall>
         <AppHudBar accounts={[{ label: 'OpenCode Zen Free', provider: 'opencode', statusLabel: 'Atividade local', level: 'off', quotas: [],
           observedModels: [
-            { modelName: 'Big Pickle', unit: 'requests', fiveHours: 18, sevenDays: 120 },
-            { modelName: 'MiniMax M2.5 Free', unit: 'requests', fiveHours: 1, sevenDays: 12 }
+            { modelName: 'Big Pickle', unit: 'requests', fiveHours: 332, sevenDays: 332 },
+            { modelName: 'MiniMax M2.5 Free', unit: 'requests', fiveHours: 1, sevenDays: 1 },
+            { modelName: 'Trinity Large Preview Free', unit: 'requests', fiveHours: 12, sevenDays: 120 },
+            { modelName: 'Nemotron 3 Super Free', unit: 'requests', fiveHours: 0, sevenDays: 80 },
+            { modelName: 'Modelo com identificação extensa', unit: 'requests', fiveHours: 123456, sevenDays: 1234567 }
           ] }]} balloon={0} />
       </Screen>
 

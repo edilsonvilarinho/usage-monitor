@@ -34,6 +34,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.theme.AppDepth
@@ -553,13 +555,16 @@ fun AppColumnHeaderRow(
 @Composable
 fun AppColumnHeaderLabel(
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1,
+    textAlign: TextAlign? = null
 ) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
+        maxLines = maxLines,
+        textAlign = textAlign,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
     )
@@ -577,11 +582,14 @@ fun AppCellValue(
     value: String,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
-    maxLines: Int = 1
+    maxLines: Int = 1,
+    style: TextStyle = MaterialTheme.typography.labelMedium,
+    textAlign: TextAlign? = null
 ) {
     Text(
         text = value,
-        style = MaterialTheme.typography.labelMedium,
+        style = style,
+        textAlign = textAlign,
         color = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color,
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,

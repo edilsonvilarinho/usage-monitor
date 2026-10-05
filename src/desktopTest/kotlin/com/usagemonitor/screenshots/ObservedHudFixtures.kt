@@ -25,7 +25,7 @@ internal fun observedHudFixture(source: ApiSource): HudAccount {
         statusLabel = "Atividade local", tone = AppTone.NEUTRAL, quotas = emptyList(), focusIndex = 0,
         observedModels = names.mapIndexed { index, name -> HudObservedModel(name,
             if (tokens) UsageUnit.TOKENS else UsageUnit.REQUESTS,
-            if (tokens) 12_000L + index else 18L + index,
-            if (tokens) 75_000L + index else 120L + index) }
+            if (tokens) 12_000L + index else when (index) { 0 -> 332L; 1 -> 1L; 3 -> 0L; else -> 18L + index },
+            if (tokens) 75_000L + index else when (index) { 0 -> 332L; 1 -> 1L; else -> 120L + index }) }
     )
 }
