@@ -306,6 +306,11 @@ charts and previews are the one place this system allows it.
 
 ## CAVEATS
 
+**Observed HUD table (#379, 2026-10-05).** Direction 02 was selected: a 264dp balloon with the
+source title above `Atividade local`, one explicit unit and fixed model/5h/7-day column captions.
+Names and counts use the theme's primary text colour; the four-row scroll viewport is 196dp
+(49dp per row). See `components/shell/AppHudBar.prompt.md` for geometry and accessibility.
+
 - **No Kotlin/Compose source was read.** Values here come from the approved HTML prototype and
   the repo README. Compose theme files may name things differently; if a token name in
   `AppTheme` disagrees, the Kotlin side wins and this system should be corrected.

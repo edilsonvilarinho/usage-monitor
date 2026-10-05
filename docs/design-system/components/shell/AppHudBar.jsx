@@ -1,6 +1,35 @@
 import React from 'react';
 import { AppGargantuaRing } from '../data/AppGargantuaRing';
 import { AppDataRow } from '../data/AppDataRow';
+import { AppColumnHeader } from '../data/AppColumnHeader';
+
+// Direção 02 (#379): legendas fixas, duas contagens neutras e só os modelos rolando.
+function HudObservedTable({ models }) {
+  const tokens = models[0]?.unit === 'tokens';
+  const unit = tokens ? 'tokens' : 'requisições';
+  const cells = [{ label: 'MODELO', flex: .42 }, { label: <span style={{ whiteSpace: 'pre-line' }}>ÚLTIMAS{'\n'}5H</span>, flex: .29, align: 'right' },
+    { label: <span style={{ whiteSpace: 'pre-line' }}>ÚLTIMOS{'\n'}7 DIAS</span>, flex: .29, align: 'right' }];
+  return <>
+    <span style={{ fontFamily: 'var(--sans)', fontSize: 'var(--t12)', color: 'var(--muted)', lineHeight: '17px' }}>{tokens ? 'Tokens observados' : 'Requisições observadas'}</span>
+    <div style={{ paddingRight: 'var(--s3)' }}>
+      <AppColumnHeader items={cells} offset={0} style={{ padding: 0, gap: 'var(--s2)', height: 29, lineHeight: '14px', alignItems: 'flex-end', borderBottom: '1px solid var(--border)' }} />
+    </div>
+    <style>{`.hud-observed-models::-webkit-scrollbar { width: var(--s3); }
+      .hud-observed-models::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--r1); }`}</style>
+    <div className="hud-observed-models" style={{ maxHeight: 196, overflowY: 'auto', scrollbarGutter: 'stable' }}>
+      {models.map((model, index) => {
+        const five = model.fiveHours.toLocaleString('pt-BR');
+        const seven = model.sevenDays.toLocaleString('pt-BR');
+        return <AppDataRow key={model.modelName} last={index === models.length - 1} style={{ height: 49, boxSizing: 'border-box', padding: 'var(--s2) 0', gap: 'var(--s2)', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--fg)' }}>
+          <span title={model.modelName} style={{ flex: .42, minWidth: 0, fontSize: 'var(--t12)', fontWeight: 600, lineHeight: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{model.modelName}</span>
+          <span title={`Últimas 5h: ${five} ${unit}`} style={{ flex: .29, minWidth: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{five}</span>
+          <span title={`Últimos 7 dias: ${seven} ${unit}`} style={{ flex: .29, minWidth: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{seven}</span>
+        </AppDataRow>;
+      })}
+    </div>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Contagem local; limite oficial indisponível</span>
+  </>;
+}
 
 const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info: 'var(--info)', off: 'var(--muted)' };
 
@@ -104,27 +133,24 @@ export function AppHudBar({
   const account = typeof balloon === 'number' ? accounts[balloon] : null;
   const body = !open ? null : (
     <div style={{
-      width: 240, padding: 12, borderRadius: 'var(--r4)', background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
+      width: account?.observedModels ? 264 : 240, padding: 12, borderRadius: 'var(--r4)', background: 'linear-gradient(var(--sheen), transparent 56px), var(--surface)',
       border: '1px solid var(--border-top)', boxShadow: 'var(--shadow-overlay)', display: 'flex', flexDirection: 'column', gap: 10
     }}>
       {account ? (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 24 }}>
+          {account.observedModels ? <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s1)', height: 34, color: 'var(--fg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 16 }}>
+              <AppProviderMark source={account.provider} size={16} color={account.provider === 'gemini' ? 'var(--gemini)' : account.provider === 'kilo' ? 'var(--kilo)' : 'var(--oc)'} />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', fontWeight: 600 }}>{account.label}</span>
+            </div>
+            <AppStatusIndicator level="off">{account.statusLabel}</AppStatusIndicator>
+          </div> : <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 24 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t14)', fontWeight: 600, flex: 1 }}>{account.label}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: LEVELS[account.level] }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />{account.statusLabel}
             </span>
-          </div>
-          {account.observedModels ? <>
-            <div style={{ maxHeight: 244, overflowY: 'auto' }}>
-              {account.observedModels.map((model, index) => <AppDataRow key={model.modelName} last={index === account.observedModels.length - 1} style={{ display: 'block', height: 61, boxSizing: 'border-box', padding: 'var(--s2) 0', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--fg)' }}>
-                <div style={{ fontSize: 'var(--t12)', fontWeight: 600 }}>{model.modelName}</div>
-                <div>Últimas 5h — {model.fiveHours} {model.unit === 'tokens' ? 'tokens' : model.fiveHours === 1 ? 'requisição' : 'requisições'}</div>
-                <div>Últimos 7 dias — {model.sevenDays} {model.unit === 'tokens' ? 'tokens' : model.sevenDays === 1 ? 'requisição' : 'requisições'}</div>
-              </AppDataRow>)}
-            </div>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Contagem local; limite oficial indisponível</span>
-          </> : account.quotas.map((q) => (
+          </div>}
+          {account.observedModels ? <HudObservedTable models={account.observedModels} /> : account.quotas.map((q) => (
             <div key={q.short}>
               <div style={{ display: 'flex', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>
                 <span style={{ flex: 1, fontWeight: 600 }}>{q.title || q.short}</span>

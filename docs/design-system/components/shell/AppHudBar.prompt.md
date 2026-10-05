@@ -70,14 +70,24 @@ instant cut. Depth `OVERLAY`. The balloon is window content, never a popup.
 **Observed activity (#377).** Zen Free and Kilo Free count requests; Gemini CLI counts tokens.
 `observedModels` replaces quotas for these sources: the scene and provider mark remain, with no
 quota arcs. The resting/compact line sums all models in the last five hours (`5h 18 req.` or
-`5h 12K tok`), and the neutral status is `Atividade local`. The balloon groups the observations by
-model, with `Últimas 5h` and `Últimos 7 dias`, never percentages, reset, remaining or session quota.
-Use data rows, primary mono labels and neutral value text. The note says `Contagem local; limite
-oficial indisponível`. At most four 61dp model rows are visible; scroll the remaining rows, keep
-header/note/actions fixed, and reduce the viewport to the screen work area at the composition
-scale. Accessibility names every model, window and unit. History, collection and persistence stay
-unchanged. Kotlin geometry and composition share these dimensions; the web specimen uses the same
-244px viewport cap. With zero activity show a zero count, never a quota percentage.
+`5h 12K tok`), and the neutral status is `Atividade local`. **Direction 02, selected for #379:**
+the 264dp balloon uses a compact table: model at the left, `Últimas 5h` and `Últimos 7 dias` as
+two right-aligned columns, never percentages, reset, remaining or session quota. Title and provider
+mark have their own line; the neutral state sits below, so it cannot squeeze the title.
+`Requisições observadas` / `Tokens observados` states the unit once. All names and values explicitly
+use the selected theme's primary text colour. Model names use mono-12 semibold, wrap to two lines
+and expose the full name in the tooltip and accessibility. Numeric cells use mono-10, tabular
+alignment and locale thousands separators; the tooltip/accessibility retain the exact count even
+when a very large value is ellipsized. Columns share weights .42/.29/.29 and an 8dp gap, with a
+12dp scrollbar gutter in both the header and body. Reuse `AppColumnHeaderRow` / `AppDataRow` /
+`AppCellValue` in Compose and their web counterparts.
+The identity block is 34dp; unit line 17dp; column header 29dp (two 14dp lines plus divider).
+At most four 49dp model rows are visible (two 16dp name lines, 8dp vertical padding on each side,
+1dp divider), giving a 196dp viewport cap. Only model rows scroll; identity, unit, columns, note
+and actions stay fixed. Reduce the viewport to the screen work area at the composition scale.
+The note says `Contagem local; limite oficial indisponível`. Accessibility names every model,
+window and unit. History, collection and persistence stay unchanged. Kotlin geometry and
+composition share these dimensions. With zero activity show a zero count, never a quota percentage.
 
 **Handles** (Codenotch's `MoveHandle` and `SettingsOrb`). Hovered, a 32dp disc past each end of the
 notch: the **hand** at the near end (top or left) moves the notch — **only the hand**: dragging the body
