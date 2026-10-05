@@ -274,7 +274,8 @@ tasks.register<JavaExec>("generateScreenshots") {
 
     mainClass.set("com.usagemonitor.screenshots.ScreenshotGeneratorKt")
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
-    args(layout.projectDirectory.dir("img").asFile.absolutePath)
+    args(providers.gradleProperty("screenshotOutputDir").orElse(layout.projectDirectory.dir("img").asFile.absolutePath).get())
+    if (providers.gradleProperty("screenshotScenario").orNull == "observed") args("--observed")
 }
 
 tasks.register<JavaExec>("generateGargantuaPreview") {

@@ -61,7 +61,7 @@ export function Hud() {
           ['Kilo Free', 'kilo'], ['OpenRouter', 'openrouter'], ['Gemini CLI', 'gemini'],
           ['Cursor', 'cursor'], ['Antigravity', 'antigravity']
         ].map(([name, provider]) => <div key={name} style={{ width: 92, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <AppGargantuaRing provider={provider} arcs={[{ fraction: .68, level: 'ok' }, { fraction: .24, level: 'ok' }]} label={`${name} · Exemplo visual de cotas`} />
+          <AppGargantuaRing provider={provider} arcs={['OpenCode Zen', 'Kilo Free', 'Gemini CLI'].includes(name) ? [] : [{ fraction: .68, level: 'ok' }, { fraction: .24, level: 'ok' }]} label={`${name} · ${['OpenCode Zen', 'Kilo Free', 'Gemini CLI'].includes(name) ? 'Atividade local' : 'Exemplo visual de cotas'}`} />
           <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>{name}</span>
         </div>)}
       </div>
@@ -69,6 +69,15 @@ export function Hud() {
       <Caption>1 · parado no topo — anel, uma linha por janela e a palavra de cada conta</Caption>
       <Screen>
         <AppHudBar accounts={ACCOUNTS} countdown="02:05" refreshFraction={0.21} />
+      </Screen>
+
+      <Caption>1b · atividade local — requisições por modelo, sem percentual ou arco de cota (#377)</Caption>
+      <Screen tall>
+        <AppHudBar accounts={[{ label: 'OpenCode Zen Free', provider: 'opencode', statusLabel: 'Atividade local', level: 'off', quotas: [],
+          observedModels: [
+            { modelName: 'Big Pickle', unit: 'requests', fiveHours: 18, sevenDays: 120 },
+            { modelName: 'MiniMax M2.5 Free', unit: 'requests', fiveHours: 1, sevenDays: 12 }
+          ] }]} balloon={0} />
       </Screen>
 
       <Caption>2 · ponteiro no primeiro anel — balão só daquela conta, alças nas pontas</Caption>

@@ -67,6 +67,18 @@ ring centre through the tail and crosses the balloon, which unfolds along the ed
 (`--dur-gargantua-jet-close` 240ms). The box never resizes — the unfold is a clip. Reduced motion:
 instant cut. Depth `OVERLAY`. The balloon is window content, never a popup.
 
+**Observed activity (#377).** Zen Free and Kilo Free count requests; Gemini CLI counts tokens.
+`observedModels` replaces quotas for these sources: the scene and provider mark remain, with no
+quota arcs. The resting/compact line sums all models in the last five hours (`5h 18 req.` or
+`5h 12K tok`), and the neutral status is `Atividade local`. The balloon groups the observations by
+model, with `Últimas 5h` and `Últimos 7 dias`, never percentages, reset, remaining or session quota.
+Use data rows, primary mono labels and neutral value text. The note says `Contagem local; limite
+oficial indisponível`. At most four 61dp model rows are visible; scroll the remaining rows, keep
+header/note/actions fixed, and reduce the viewport to the screen work area at the composition
+scale. Accessibility names every model, window and unit. History, collection and persistence stay
+unchanged. Kotlin geometry and composition share these dimensions; the web specimen uses the same
+244px viewport cap. With zero activity show a zero count, never a quota percentage.
+
 **Handles** (Codenotch's `MoveHandle` and `SettingsOrb`). Hovered, a 32dp disc past each end of the
 notch: the **hand** at the near end (top or left) moves the notch — **only the hand**: dragging the body
 moved the notch when the intent was clicking a ring, so a slip on the body just drops the click — and

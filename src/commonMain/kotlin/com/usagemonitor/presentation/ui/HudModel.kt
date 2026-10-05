@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
+import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -19,6 +20,9 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
+import com.usagemonitor.presentation.ui.components.buildObservedUsageSummaries
+import com.usagemonitor.presentation.ui.components.compactObservedCount
+import com.usagemonitor.presentation.ui.components.localizedObservedCount
 import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
 import com.usagemonitor.presentation.ui.components.hudQuotaShortLabel
@@ -93,7 +97,9 @@ data class HudAccount(
      * na faixa. Dono único: [mergeHudPresence]; `buildHudAccounts` sempre entrega
      * [HudPresence.SHOWN].
      */
-    val presence: HudPresence = HudPresence.SHOWN
+    val presence: HudPresence = HudPresence.SHOWN,
+    /** Contagens locais por modelo; não são cotas nem arcos percentuais. */
+    val observedModels: List<HudObservedModel> = emptyList()
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -140,6 +146,14 @@ data class HudAccount(
      */
     val focusLine: HudStripLine
         get() {
+            if (source.isObservedActivitySource()) {
+                val unit = observedModels.firstOrNull()?.unit ?: UsageUnit.REQUESTS
+                val amount = observedModels.fold(0L) { total, model ->
+                    val value = model.amountFiveHours.coerceAtLeast(0L)
+                    if (Long.MAX_VALUE - total < value) Long.MAX_VALUE else total + value
+                }
+                return HudStripLine("5h", compactObservedCount(amount, unit))
+            }
             val current = focus
             val label = if (quotas.size > 1) current?.shortLabel else null
             return HudStripLine(label, current?.percentText.orEmpty())
@@ -180,6 +194,14 @@ data class HudAccount(
     val needsAttention: Boolean
         get() = tone == AppTone.WARNING || tone == AppTone.CRITICAL
 }
+
+@Immutable
+data class HudObservedModel(
+    val modelName: String,
+    val unit: UsageUnit,
+    val amountFiveHours: Long,
+    val amountSevenDays: Long
+)
 
 @Immutable
 data class HudQuota(
@@ -285,6 +307,13 @@ internal fun hudRingDescription(account: HudAccount, language: AppLanguage): Str
         account.planLabel?.let { plan -> append(" ($plan)") }
         append(" · ")
         append(account.statusLabel)
+        account.observedModels.forEach { model ->
+            append(" · ${model.modelName}")
+            append(if (language == AppLanguage.PT) " · Últimas 5h: " else " · Last 5h: ")
+            append(localizedObservedCount(model.amountFiveHours, model.unit, language))
+            append(if (language == AppLanguage.PT) " · Últimos 7 dias: " else " · Last 7 days: ")
+            append(localizedObservedCount(model.amountSevenDays, model.unit, language))
+        }
         rings.forEachIndexed { index, quota ->
             append(" · ")
             hudRingPositionLabel(index, rings.size, language)?.let { position -> append("$position ") }
@@ -323,8 +352,14 @@ internal fun buildHudAccounts(
         .groupBy { entry -> entry.stats.targetKey }
         .map { (target, entries) ->
             val first = entries.first()
+            val observed = first.stats.source.isObservedActivitySource()
+            val observedModels = if (observed) {
+                buildObservedUsageSummaries(entries.map { entry -> entry.quota }).map { summary ->
+                    HudObservedModel(summary.modelName, summary.unit, summary.amountFiveHours, summary.amountSevenDays)
+                }
+            } else emptyList()
             val worst = entries.maxByOrNull { entry -> entry.risk?.level?.ordinal ?: -1 }
-            val quotas = entries.map { entry ->
+            val quotas = if (observed) emptyList() else entries.map { entry ->
                 HudQuota(
                     shortLabel = hudQuotaShortLabel(entry.quota.label),
                     percentText = compactPercentageLabel(entry.quota),
@@ -347,8 +382,10 @@ internal fun buildHudAccounts(
             HudAccount(
                 targetKey = target,
                 label = first.stats.displayTitle(),
-                statusLabel = worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) } ?: noForecast,
-                tone = worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
+                statusLabel = if (observed) {
+                    if (language == AppLanguage.PT) "Atividade local" else "Local activity"
+                } else worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) } ?: noForecast,
+                tone = if (observed) AppTone.NEUTRAL else worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
                 quotas = quotas,
                 focusIndex = focusIndex,
                 sessionActive = target in activeTargets,
@@ -359,7 +396,8 @@ internal fun buildHudAccounts(
                 refreshing = target in refreshingTargets,
                 accountAccent = target.anthropicProfileId?.let { profileId -> accountColors[profileId] },
                 accountEmoji = target.anthropicProfileId?.let { profileId -> accountEmojis[profileId] },
-                sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language)
+                sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language),
+                observedModels = observedModels
             )
         }
 }
@@ -441,7 +479,7 @@ internal fun hudTraySummary(appName: String, accounts: List<HudAccount>): String
         return appName
     }
     val body = accounts.joinToString(" · ") { account ->
-        if (account.focus == null) account.label else "${account.label} ${account.focusLine.text}"
+        if (account.focus == null && !account.source.isObservedActivitySource()) account.label else "${account.label} ${account.focusLine.text}"
     }
     val full = "$appName — $body"
     return if (full.length <= TRAY_TOOLTIP_MAX_CHARS) full else full.take(TRAY_TOOLTIP_MAX_CHARS - 1) + "…"

@@ -1,5 +1,6 @@
 package com.usagemonitor.screenshots
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -108,6 +109,11 @@ fun main(args: Array<String>) {
     outputDir.mkdirs()
 
     val generator = ScreenshotGenerator(outputDir)
+    if ("--observed" in args) {
+        generator.observedHud()
+        println("Capturas de atividade observada geradas em ${outputDir.absolutePath}")
+        return
+    }
 
     generator.dashboard()
     generator.hud()
@@ -234,6 +240,29 @@ private class ScreenshotGenerator(private val outputDir: File) {
     /** O notch parado: é o que fica na tela o dia inteiro. */
     fun hudRest() = capture("hud-rest", widthDp = HUD_SHOT_WIDTH_DP, heightDp = HUD_SHOT_REST_HEIGHT_DP) {
         HudShot(expanded = false, balloonIndex = 0)
+    }
+
+    /** Fixtures locais, sem credenciais nem dados de contas reais (issue #377). */
+    fun observedHud() {
+        for (source in listOf(com.usagemonitor.domain.entity.ApiSource.OPENCODE, com.usagemonitor.domain.entity.ApiSource.KILO, com.usagemonitor.domain.entity.ApiSource.GEMINI)) {
+            val account = observedHudFixture(source)
+            for (dark in listOf(true, false)) {
+                for (edge in listOf(HudEdge.TOP, HudEdge.RIGHT)) {
+                    for (compact in listOf(false, true)) {
+                        capture("hud-observed-${source.name.lowercase()}-${if (dark) "dark" else "light"}-${edge.name.lowercase()}-${if (compact) "compact" else "full"}",
+                            widthDp = 800, heightDp = 500, isDark = dark) {
+                            val sizes = hudNotchSizes(listOf(account), edge, "Carregando", false,
+                                maxAlong = if (compact) 1.dp else androidx.compose.ui.unit.Dp.Infinity, maxWindowHeight = 500.dp)
+                            HudNotch(listOf(account), edge, sizes, "Carregando", expanded = true,
+                                initialBalloonIndex = 0, modifier = Modifier.fillMaxSize(), accountActions = {
+                                    CardActionButton(com.usagemonitor.presentation.ui.components.CardAction.HISTORY,
+                                        AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
+                                })
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun newIntegrations() = capture("new-integrations", widthDp = 1_040, heightDp = 570) {

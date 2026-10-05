@@ -227,7 +227,8 @@ internal fun HudWindowHost(
         // Mais que isso da borda e a faixa fica compacta (anel + percentual).
         maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
             uiScaleFactor(uiScalePercent) * hudMaxAlongFraction(placement.edge),
-        hasUpdateAction = updateAction != null
+        hasUpdateAction = updateAction != null,
+        maxWindowHeight = screenArea.size.height / scale
     )
     val composedArea = screenArea.inCompositionDp(scale)
     // Parada e aberta a janela é a mesma, com o notch no mesmo ponto da tela; quem

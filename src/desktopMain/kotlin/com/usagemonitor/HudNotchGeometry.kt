@@ -8,6 +8,7 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
+import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_HORIZONTAL
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_VERTICAL
@@ -166,7 +167,9 @@ internal fun hudNotchSizes(
     /** O comprimento que a faixa completa pode ter antes de virar compacta. */
     maxAlong: Dp = Dp.Infinity,
     /** A atualização pendente tem ação no balão da engrenagem (todo estado menos baixando). */
-    hasUpdateAction: Boolean = false
+    hasUpdateAction: Boolean = false,
+    /** Altura útil da tela, já na densidade de composição. */
+    maxWindowHeight: Dp = Dp.Infinity
 ): HudNotchSizes {
     val full = if (edge.isHorizontal) {
         horizontalCollapsed(accounts, fallbackLabel, compact = false)
@@ -187,8 +190,10 @@ internal fun hudNotchSizes(
         DpSize(collapsed.width, collapsed.height + handlesReach)
     }
     // O balão da engrenagem existe mesmo sem conta nenhuma: é a saída do modo.
+    val availableBalloonHeight = (maxWindowHeight - HUD_SHADOW_MARGIN * 2 -
+        if (edge.isHorizontal) collapsed.height + HUD_BALLOON_GAP else 0.dp).coerceAtLeast(0.dp)
     val tallest = maxOf(
-        accounts.maxOfOrNull { account -> hudBalloonHeight(account) } ?: 0.dp,
+        accounts.maxOfOrNull { account -> hudBalloonHeight(account, availableBalloonHeight) } ?: 0.dp,
         hudAppBalloonHeight(hasUpdateIndicator, hasUpdateAction)
     )
     // O balão não gira com a borda: é texto, e fica sempre de pé.
@@ -213,12 +218,13 @@ internal fun hudNotchSizesWithDeparture(
     fallbackLabel: String,
     hasUpdateIndicator: Boolean,
     maxAlong: Dp,
-    hasUpdateAction: Boolean
+    hasUpdateAction: Boolean,
+    maxWindowHeight: Dp = Dp.Infinity
 ): Pair<HudNotchSizes, HudNotchSizes> {
-    val sizes = hudNotchSizes(accounts, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction)
+    val sizes = hudNotchSizes(accounts, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction, maxWindowHeight)
     val staying = accounts.filter { account -> account.presence != HudPresence.LEAVING }
     if (staying.size == accounts.size) return sizes to sizes
-    return sizes to hudNotchSizes(staying, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction)
+    return sizes to hudNotchSizes(staying, edge, fallbackLabel, hasUpdateIndicator, maxAlong, hasUpdateAction, maxWindowHeight)
 }
 
 /**
@@ -271,7 +277,8 @@ private val HUD_BALLOON_QUOTA_BLOCK = HUD_BALLOON_QUOTA_TITLE + HUD_BALLOON_BAR_
  * dele, a linha de plano e origem e a fileira de botões do card. É a mesma sequência que `HudBalloon`
  * compõe, e `HudNotchTest` afirma que as duas batem.
  */
-internal fun hudBalloonHeight(account: HudAccount): Dp {
+internal fun hudBalloonHeight(account: HudAccount, maxHeight: Dp = Dp.Infinity): Dp {
+    if (account.source.isObservedActivitySource()) return hudObservedBalloonHeight(account, maxHeight)
     var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER
     hudQuotaRuns(account.quotas).forEach { run ->
         height += if (run.group == null) {
