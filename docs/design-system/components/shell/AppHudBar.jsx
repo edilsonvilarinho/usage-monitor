@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppGargantuaRing } from '../data/AppGargantuaRing';
+import { AppDataRow } from '../data/AppDataRow';
 
 const LEVELS = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--crit)', info: 'var(--info)', off: 'var(--muted)' };
 
@@ -50,7 +51,11 @@ export function AppHudBar({
       ) : accounts.map((account) => {
         // A janela mais longa por fora (#278); estável entre janelas iguais.
         const rank = { monthly: 3, weekly: 2, interval: 1 };
-        const rings = account.quotas.slice(0, 3).map((q, i) => ({ q, i }))
+        const observed = account.observedModels;
+        const observedTotal = observed?.reduce((sum, model) => sum + model.fiveHours, 0);
+        const abbreviatedTotal = observedTotal >= 1000000 ? `${(observedTotal / 1000000).toFixed(1).replace(/\.0$/, '')}M` : observedTotal >= 1000 ? `${(observedTotal / 1000).toFixed(1).replace(/\.0$/, '')}K` : observedTotal;
+        const observedSummary = observed ? `5h ${abbreviatedTotal} ${observed[0]?.unit === 'tokens' ? 'tok' : 'req.'}` : null;
+        const rings = (observed ? [] : account.quotas).slice(0, 3).map((q, i) => ({ q, i }))
           .sort((a, b) => (rank[b.q.period] || 0) - (rank[a.q.period] || 0) || a.i - b.i)
           .map(({ q }) => q);
         return (
@@ -62,10 +67,10 @@ export function AppHudBar({
               active={account.active}
               refreshing={account.refreshing} continuous={continuous} reduced={reduced}
               attentionIndex={rings.findIndex((q) => q.level === account.level && ['warn', 'crit'].includes(q.level))}
-              label={`${account.label} · ${rings.map((q) => `${q.short} ${q.percent}`).join(' · ')} · ${account.statusLabel}${account.active ? ' · Sessão ativa' : ''}`}
+              label={`${account.label} · ${observedSummary || rings.map((q) => `${q.short} ${q.percent}`).join(' · ')} · ${account.statusLabel}${account.active ? ' · Sessão ativa' : ''}`}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: horizontal ? 'flex-start' : 'center' }}>
-              {rings.length <= 1 ? (
+              {observed ? <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--fg)' }}>{observedSummary}</span> : rings.length <= 1 ? (
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', color: 'var(--fg)' }}>{rings[0] && rings[0].percent}</span>
               ) : rings.map((q) => (
                 <span key={q.short} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', letterSpacing: '.07em', color: 'var(--fg)' }}>
@@ -110,7 +115,16 @@ export function AppHudBar({
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />{account.statusLabel}
             </span>
           </div>
-          {account.quotas.map((q) => (
+          {account.observedModels ? <>
+            <div style={{ maxHeight: 244, overflowY: 'auto' }}>
+              {account.observedModels.map((model, index) => <AppDataRow key={model.modelName} last={index === account.observedModels.length - 1} style={{ display: 'block', height: 61, boxSizing: 'border-box', padding: 'var(--s2) 0', fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--fg)' }}>
+                <div style={{ fontSize: 'var(--t12)', fontWeight: 600 }}>{model.modelName}</div>
+                <div>Últimas 5h — {model.fiveHours} {model.unit === 'tokens' ? 'tokens' : model.fiveHours === 1 ? 'requisição' : 'requisições'}</div>
+                <div>Últimos 7 dias — {model.sevenDays} {model.unit === 'tokens' ? 'tokens' : model.sevenDays === 1 ? 'requisição' : 'requisições'}</div>
+              </AppDataRow>)}
+            </div>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)', color: 'var(--muted)' }}>Contagem local; limite oficial indisponível</span>
+          </> : account.quotas.map((q) => (
             <div key={q.short}>
               <div style={{ display: 'flex', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>
                 <span style={{ flex: 1, fontWeight: 600 }}>{q.title || q.short}</span>

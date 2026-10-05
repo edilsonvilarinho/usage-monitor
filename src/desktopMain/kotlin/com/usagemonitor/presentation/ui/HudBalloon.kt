@@ -52,6 +52,7 @@ import com.usagemonitor.HUD_BALLOON_TAIL_BASE
 import com.usagemonitor.HUD_BALLOON_WIDTH
 import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudQuotaRuns
 import com.usagemonitor.hudSessionBannerHeight
@@ -261,7 +262,8 @@ internal fun HudAccountBalloonContent(
     account: HudAccount,
     language: AppLanguage,
     /** Os botões do card desta conta; a fileira tem a altura reservada mesmo vazia. */
-    actions: (@Composable (HudAccount) -> Unit)? = null
+    actions: (@Composable (HudAccount) -> Unit)? = null,
+    maxBodyHeight: Dp = Dp.Infinity
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag(HUD_BALLOON_CONTENT_TEST_TAG)) {
         Row(
@@ -289,6 +291,9 @@ internal fun HudAccountBalloonContent(
                 modifier = Modifier.weight(1f)
             )
             AppStatusIndicator(label = account.statusLabel, tone = account.tone)
+        }
+        if (account.source.isObservedActivitySource()) {
+            HudObservedBalloonContent(account, language, maxBodyHeight)
         }
         val rings = account.rings
         // A posição do anel de cada cota, pela identidade: duas cotas iguais em

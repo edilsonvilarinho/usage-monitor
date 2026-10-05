@@ -27,6 +27,8 @@ export interface AppHudAccount {
   statusLabel: string;
   level: AppRingLevel;
   quotas: AppHudQuota[];
+  /** Local observations, never quota fractions; requests for Zen/Kilo, tokens for Gemini. */
+  observedModels?: { modelName: string; unit: 'requests' | 'tokens'; fiveHours: number; sevenDays: number }[];
   /** Index of the quota whose percent the notch prints: worst risk, then highest percent. */
   focus?: number;
   /** CLI session with a turn in the last 5 minutes. */
