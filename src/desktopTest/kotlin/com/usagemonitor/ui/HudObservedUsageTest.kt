@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -119,9 +120,11 @@ class HudObservedUsageTest {
             runDesktopComposeUiTest {
                 val account = fixture(ApiSource.OPENCODE, AppLanguage.PT)
                 var foreground = Color.Unspecified
+                var background = Color.Unspecified
                 setContent {
                     AppTheme(isDark = dark) {
                         foreground = MaterialTheme.colorScheme.onSurface
+                        background = MaterialTheme.colorScheme.surface
                         Box(Modifier.size(HUD_BALLOON_WIDTH, hudBalloonHeight(account))
                             .background(MaterialTheme.colorScheme.surface).padding(HUD_BALLOON_PADDING)) {
                             HudAccountBalloonContent(account, AppLanguage.PT)
@@ -129,15 +132,23 @@ class HudObservedUsageTest {
                     }
                 }
                 for (tag in listOf("hudObservedName:Model A", "hudObservedFiveHours:Model A", "hudObservedSevenDays:Model A")) {
-                    val pixels = onNodeWithTag(tag, useUnmergedTree = true).captureToImage().toPixelMap()
+                    val node = onNodeWithTag(tag, useUnmergedTree = true)
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                    assertTrue(layouts.isNotEmpty(), "$tag não expõe o texto disposto")
+                    for (layout in layouts) {
+                        assertEquals(foreground, layout.layoutInput.style.color, "$tag: cor do texto no tema dark=$dark")
+                    }
+                    assertTrue(contrastRatio(foreground, background) >= 4.5f, "$tag: contraste abaixo de AA")
+                    val pixels = node.captureToImage().toPixelMap()
                     var inkFound = false
                     for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
                         val pixel = pixels[x, y]
-                        if (kotlin.math.abs(pixel.red - foreground.red) < 0.03f &&
-                            kotlin.math.abs(pixel.green - foreground.green) < 0.03f &&
-                            kotlin.math.abs(pixel.blue - foreground.blue) < 0.03f) inkFound = true
+                        // Glifos pequenos podem conter só pixels suavizados no Linux;
+                        // a cor e o contraste AA são verificados antes da rasterização.
+                        if (contrastRatio(pixel, background) >= 1.5f) inkFound = true
                     }
-                    assertTrue(inkFound, "$tag não usa a cor do texto no tema dark=$dark")
+                    assertTrue(inkFound, "$tag não renderiza texto distinguível do fundo no tema dark=$dark")
                 }
             }
         }
@@ -222,6 +233,13 @@ class HudObservedUsageTest {
                 assertTrue(window.size.height <= screen.size.height)
             }
         }
+    }
+
+    private fun contrastRatio(first: Color, second: Color): Float {
+        val firstLuminance = first.luminance()
+        val secondLuminance = second.luminance()
+        return (maxOf(firstLuminance, secondLuminance) + 0.05f) /
+            (minOf(firstLuminance, secondLuminance) + 0.05f)
     }
 
     private fun fixture(source: ApiSource, language: AppLanguage, count: Int = 1): HudAccount = HudAccount(
