@@ -615,6 +615,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#cfg-contas">Contas</a>
   <a href="#cfg-time">Time</a>
   <a href="#cfg-bug">Relatório de bug</a>
+  <a href="#cfg-web">Acesso web local</a>
   <div class="grp">Saídas</div>
   <a href="#pdf">Relatório PDF</a>
   <a href="#chrome">Molduras e densidade</a>
@@ -2233,6 +2234,30 @@ o caso da chave que expirou, em que não há uma nova para digitar.</p>
     </div></div></div>
   </div>
 </div>
+
+<h2 id="cfg-web">12g · Configurações — Acesso pela rede local e HUD no navegador</h2>
+<p class="note"><b>#388, direção R3 — grade de anéis.</b> Seção abaixo do Proxy na aba <b>Rede</b> (sem aba nova:
+<code>SettingsTab</code> não ganha valor). Interruptor no cabeçalho, nasce desligado. Ligado mostra estado (ponto e
+palavra), um endereço por IPv4 privado da máquina com o token na URL e botão <b>Copiar</b>, a porta (padrão 47110) e
+<b>Gerar novo endereço</b>, que invalida os links copiados. O texto avisa que qualquer aparelho da rede com o endereço vê
+os dados de uso — nunca prompt ou resposta — e que o Windows pode pedir permissão no firewall. QR code ficou de fora:
+exigiria biblioteca nova para um atalho do "Copiar".</p>
+<div class="win" style="max-width:640px">
+  <div class="titlebar"><span class="t">Configurações › Rede</span></div>
+  <div class="body">
+    <div class="panel"><div class="phead"><span class="ptitle">Acesso pela rede local</span><span class="sp"></span><span class="st ok">Ativo</span></div>
+      <div class="pbody">
+        <p class="dim" style="font-size:var(--t12)">Mostra a HUD no navegador de outro aparelho desta rede. Qualquer pessoa da rede com o endereço completo vê os dados de uso — nunca prompt ou resposta. Ao ativar, o Windows pode pedir permissão no firewall.</p>
+        <div class="hstack"><span class="v sm">http://192.168.0.14:47110/?t=9f3c…e21a</span><span class="sp"></span><button class="btn">Copiar</button></div>
+        <div class="hstack"><span class="k">Porta</span><span class="v sm">47110</span><button class="btn">Gerar novo endereço</button></div>
+      </div></div>
+  </div>
+</div>
+<p class="note"><b>A página</b> (<code>src/desktopMain/resources/web/hud.html</code>): grade responsiva de cartões, um por
+conta, com o anel Gargantua a 2× (mesmo desenho do app), as linhas de cota com percentual e reinício em BRT, "Em uso
+agora" (sessão CLI ou uso detectado pela cota) e saldo em moeda para pré-pago. Atualiza a cada 30 s e, se o app cair,
+mantém a última leitura e diz isso. A cor do arco segue os limiares dos alertas (75/90) e o percentual está sempre
+escrito. A CSP não deixa carregar nada de fora; a fonte cai para a mono do sistema.</p>
 
 <h2 id="cfg-bug">12f · Relatório de bug</h2>
 <p class="lede">Aberto pelo botão <b>Reportar um bug</b> da aba Geral, e sozinho no arranque seguinte a uma queda. Ele tem <b>janela própria</b> (desde que a HUD virou o único modo, setembro de 2026): a HUD tem o tamanho do notch e não comporta o formulário. A captura enquadra a HUD, e o clique nas Configurações fecha aquela janela antes de abrir esta.</p>

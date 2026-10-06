@@ -144,6 +144,10 @@ compose.desktop {
             // image so aparece no app empacotado, nunca no `gradlew run` Ã¢â‚¬â€ por isso
             // vai declarado, e nao descoberto no primeiro relatorio que falhar.
             modules("java.sql", "java.logging")
+            // `com.sun.net.httpserver` (acesso web local, issue #388) mora em
+            // `jdk.httpserver`, presente no JDK das tres plataformas. Mesmo motivo
+            // do `java.logging`: faltando, so o app empacotado quebraria.
+            modules("jdk.httpserver")
             // `Windows-ROOT` (repositório de certificados do Windows, issue #325) mora
             // em `jdk.crypto.mscapi`, que so existe no JDK do Windows: declarado sem
             // condicao, o jlink do build Linux/macOS falharia com modulo inexistente.

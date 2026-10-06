@@ -1,5 +1,9 @@
 package com.usagemonitor
 
+import kotlin.time.Clock
+import com.usagemonitor.presentation.viewmodel.UiState
+import com.usagemonitor.domain.entity.buildUsageSnapshot
+import com.usagemonitor.data.export.JsonUsageSnapshotEncoder
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
@@ -243,6 +247,24 @@ internal class AppViewModels(
         combine(sessionPulse.activeTargets, quotaActivity.detectedTargets) { cli, detected -> cli + detected }
             .stateIn(busyBridgeScope, SharingStarted.Eagerly, emptySet())
 
+    /**
+     * HUD pela rede local (#388): o mesmo retrato que a HUD mostra — cotas do
+     * dashboard mais o arco de uso —, servido só quando o usuário liga a opção.
+     */
+    val webAccess = LocalWebAccessService(
+        snapshotJson = {
+            (dashboard.uiState.value as? UiState.Success)?.data?.let { stats ->
+                JsonUsageSnapshotEncoder.encode(buildUsageSnapshot(stats, hudActiveTargets.value, Clock.System.now()))
+            }
+        }
+    )
+
+    init {
+        busyBridgeScope.launch {
+            graph.webAccessSettingsFlow.collect { settings -> withContext(Dispatchers.IO) { webAccess.apply(settings) } }
+        }
+    }
+
     val usageAlert = UsageAlertViewModel(
         dashboardState = dashboard.uiState,
         cliPulses = sessionPulse.cliPulses,
@@ -304,6 +326,7 @@ internal class AppViewModels(
         sessionPulse.onDestroy()
         quotaActivity.onDestroy()
         comparison.onDestroy()
+        webAccess.stop()
         usageAlert.onDestroy()
         teamKeys.onDestroy()
         teamSync.onDestroy()

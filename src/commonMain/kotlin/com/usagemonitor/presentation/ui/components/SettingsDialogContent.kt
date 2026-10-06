@@ -211,6 +211,8 @@ fun SettingsDialogContent(
     onProxyUsernameChange: (String) -> Unit = {},
     onProxyPasswordChange: (String) -> Unit = {},
     onProxyTestConnection: () -> Unit = {},
+    /** Acesso web local (#388); `null` esconde a seção (geradores de captura, testes). */
+    webAccess: WebAccessSectionModel? = null,
     toastEvent: SettingsToastEvent? = null,
     /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
     initialTab: SettingsTab = SettingsTab.GENERAL,
@@ -369,6 +371,7 @@ fun SettingsDialogContent(
                                     onPasswordChange = onProxyPasswordChange,
                                     onTestConnection = onProxyTestConnection
                                 )
+                                webAccess?.let { model -> WebAccessSection(model, currentLanguage) }
                             }
                         }
                     }
