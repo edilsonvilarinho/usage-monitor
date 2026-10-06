@@ -2,15 +2,17 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Galeria A04 entregue; aguardando escolha de 1 direção por issue. Fase 2 (A05–A09) segue em paralelo.`
+**Estado atual:** `Direções escolhidas; Fase 2 em execução.`
+
+**Direções escolhidas (2026-10-06):** #382 → N6 Degraus de consumo · #384 → O1 Evolução mínima · #386 → P7 Mapa de calor · #387 → Q10 Configuração e conversa · #388 → R3 Grade de anéis.
 **Última atualização:** 2026-10-06
 **Branch:** `feat/issues-381-388`
 
 ### ▶ Atividade corrente
-A05 — extração em `LocalCliSessionDataSource.kt` (não depende da escolha visual).
+A06 — timing de turno do Claude e MAX de tokens no conflito do `message_id`.
 
 ### ⏭ Próxima atividade
-A06 — timing de turno do Claude e correção do `output_tokens` da primeira linha.
+A07 — versão de schema e timing de turno no índice do Codex.
 
 - A #383 está fechada (entregue em `e2e4ac88`, #390) e fica fora.
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
@@ -22,8 +24,8 @@ A06 — timing de turno do Claude e correção do `output_tokens` da primeira li
 | 1 | `1c90d4ad` | A01 | Plano registrado | Documento criado; nenhuma linha de produção alterada |
 | 2 | `70ea48df` | A02 | Medição de timing Claude/Codex e do modal Codex | Scripts read-only em scratchpad sobre transcripts e índice reais; números na seção "Medições" |
 | 3 | `70ea48df` | A03 | Viabilidade Telegram; firewall adiado para A21 | Bot API e FAQ oficiais consultados; ver "Medições" |
-
-| 4 | (este) | A04 | Galeria única em `docs/planos/issues-381-388-visual/` (rodadas N–R, 10 opções por issue) | `node docs/planos/issues-381-388-visual/build-gallery.cjs` → 87,4 KB; aberta no browser pane: console sem erro, nenhum palco com transbordo horizontal nas 5 abas |
+| 4 | `953db4c1` | A04 | Galeria única em `docs/planos/issues-381-388-visual/` (rodadas N–R, 10 opções por issue) | `node docs/planos/issues-381-388-visual/build-gallery.cjs` → 87,4 KB; aberta no browser pane: console sem erro, nenhum palco com transbordo horizontal nas 5 abas |
+| 5 | (este) | A05 | Escrita de turnos extraída para `LocalCliSessionTurnWriter.kt` (678 + 99 linhas), sem mudança de comportamento | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.architecture.*"` → 57 + 8 testes, 0 falhas |
 
 ## Medições (Fase 0)
 
