@@ -43,6 +43,11 @@ internal fun SettingsWindowHost(
     val webAccessSettings by graph.webAccessSettingsFlow.collectAsState()
     val webAccessStatus by viewModels.webAccess.status.collectAsState()
     val webAccessActions = remember(graph) { WebAccessActions(graph.webAccessSettingsDataSource, graph.webAccessSettingsFlow) }
+    val telegramSettings by graph.telegramSettingsFlow.collectAsState()
+    val telegramStatus by viewModels.telegramBot.status.collectAsState()
+    val telegramActions = remember(graph) {
+        TelegramBotActions(graph.telegramSettingsDataSource, graph.telegramSettingsFlow, viewModels.telegramBot)
+    }
     val language = shell.language
 
     AppDialogWindow(
@@ -135,6 +140,7 @@ internal fun SettingsWindowHost(
             onProxyPasswordChange = actions::changeProxyPassword,
             onProxyTestConnection = feedback::checkProxyConnection,
             webAccess = webAccessSectionModel(webAccessSettings, webAccessStatus, webAccessActions),
+            telegramBot = telegramBotSectionModel(telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions),
             toastEvent = feedback.toastEvent
         )
     }

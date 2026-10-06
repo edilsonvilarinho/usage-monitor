@@ -105,6 +105,7 @@ fun WebAccessSection(model: WebAccessSectionModel, language: AppLanguage, modifi
                     Text(
                         text = url,
                         style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                         maxLines = 1
                     )
@@ -116,7 +117,7 @@ fun WebAccessSection(model: WebAccessSectionModel, language: AppLanguage, modifi
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (pt) "Porta" else "Port", style = MaterialTheme.typography.labelMedium)
+                Text(if (pt) "Porta" else "Port", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
                 AppTextField(value = model.portText, onValueChange = model.onPortChange, modifier = Modifier.width(96.dp))
                 AppButton(
                     label = if (pt) "Gerar novo endereço" else "Generate new address",

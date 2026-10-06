@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.CodexCliHomeProvider
@@ -126,6 +127,10 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
     // Acesso web local (#388): token em arquivo de segredo, nunca no registro.
     val webAccessSettingsDataSource = LocalWebAccessSettingsDataSource()
     val webAccessSettingsFlow = MutableStateFlow(webAccessSettingsDataSource.load())
+
+    // Bot do Telegram (#387): token e conversas pareadas em arquivo de segredo.
+    val telegramSettingsDataSource = LocalTelegramSettingsDataSource()
+    val telegramSettingsFlow = MutableStateFlow(telegramSettingsDataSource.load())
 
     // Preferências de alerta como flow, e não como estado da composição: quem as
     // consome são os view models, que vivem fora dela — é delas que sai o fator

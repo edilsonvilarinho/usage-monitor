@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.data.datasource.TelegramBotApi
 import kotlin.time.Clock
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.domain.entity.buildUsageSnapshot
@@ -252,11 +254,7 @@ internal class AppViewModels(
      * dashboard mais o arco de uso —, servido só quando o usuário liga a opção.
      */
     val webAccess = LocalWebAccessService(
-        snapshotJson = {
-            (dashboard.uiState.value as? UiState.Success)?.data?.let { stats ->
-                JsonUsageSnapshotEncoder.encode(buildUsageSnapshot(stats, hudActiveTargets.value, Clock.System.now()))
-            }
-        }
+        snapshotJson = { currentSnapshot()?.let(JsonUsageSnapshotEncoder::encode) }
     )
 
     init {
@@ -272,6 +270,30 @@ internal class AppViewModels(
         stalledSessions = sessionPulse.stalledSessions,
         spikes = dashboard.spikes
     )
+
+    /** O retrato que a HUD mostra, para a web local (#388) e o `/status` do bot (#387). */
+    fun currentSnapshot(): UsageSnapshot? =
+        (dashboard.uiState.value as? UiState.Success)?.data?.let { stats ->
+            buildUsageSnapshot(stats, hudActiveTargets.value, Clock.System.now())
+        }
+
+    /**
+     * Bot do Telegram (#387): repassa os alertas da bandeja e atende comandos das
+     * conversas pareadas. Desligado até o usuário ligar e colar o token.
+     */
+    val telegramBot = TelegramBotService(
+        api = TelegramBotApi(graph.httpClient),
+        settingsFlow = graph.telegramSettingsFlow,
+        saveSettings = graph.telegramSettingsDataSource::save,
+        alertSettingsFlow = graph.alertSettingsFlow,
+        saveAlertSettings = { updated ->
+            graph.alertSettingsFlow.value = updated
+            persistAlertSettings(graph.settings, updated)
+        },
+        alerts = usageAlert.alerts,
+        snapshotProvider = ::currentSnapshot,
+        languageProvider = { storedLanguage(graph.settings) }
+    ).also { service -> service.start() }
 
     val teamKeys = TeamKeysAdminViewModel(
         listKeys = ListTeamKeysUseCase(graph.teamAdminRepository),
@@ -327,6 +349,7 @@ internal class AppViewModels(
         quotaActivity.onDestroy()
         comparison.onDestroy()
         webAccess.stop()
+        telegramBot.onDestroy()
         usageAlert.onDestroy()
         teamKeys.onDestroy()
         teamSync.onDestroy()

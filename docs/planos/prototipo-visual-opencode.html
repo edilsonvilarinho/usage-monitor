@@ -611,6 +611,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <div class="grp">Configurações</div>
   <a href="#cfg-geral">Geral</a>
   <a href="#cfg-alertas">Alertas</a>
+  <a href="#cfg-telegram">Bot do Telegram</a>
   <a href="#cfg-apis">APIs</a>
   <a href="#cfg-contas">Contas</a>
   <a href="#cfg-time">Time</a>
@@ -2119,6 +2120,32 @@ do limite, e é aí que mora o vazamento de custo. Por isso o múltiplo é <b>se
 resposta e pela mesma razão: escolha única entre alternativas. A referência é a <b>mediana</b> e não a média — com
 três a seis amostras, um único incidente anterior levantaria a média e esconderia o próximo, que é justamente o
 caso que a detecção existe para pegar. <b>Desligado o interruptor, o segmentado sai da tela.</b></p>
+
+<h2 id="cfg-telegram">12b-2 · Configurações — Alertas › Bot do Telegram</h2>
+<p class="note"><b>#387, direção Q10 — configuração e conversa.</b> Seção abaixo dos alertas, na mesma aba (sem aba nova).
+À esquerda: interruptor no cabeçalho, token mascarado, estado (ponto e palavra), conversas autorizadas com
+<b>Remover</b>, <b>Parear conversa</b> (código de 6 caracteres válido por 10 min, mostrado como o comando a enviar) e
+<b>Enviar teste</b>. À direita: conversa de exemplo com a resposta <b>real</b> do <code>/status</code> com os números de agora,
+mais dois comandos que mudam os alertas — a mão dupla fica visível antes de parear. Abaixo de 560dp as colunas empilham.
+Discord aparece como segunda fase, com o motivo.</p>
+<div class="win" style="max-width:660px">
+  <div class="titlebar"><span class="t">Configurações › Alertas</span></div>
+  <div class="body"><div class="panel">
+    <div class="phead"><span class="ptitle">Bot do Telegram</span><span class="sp"></span><span class="st ok">Conectado · 1 conversa(s)</span></div>
+    <div class="pbody"><div class="hstack" style="align-items:flex-start;gap:var(--s4)">
+      <div class="stack" style="flex:1">
+        <span class="k">Conversas autorizadas</span>
+        <div class="hstack"><span class="v sm">@edilson</span><span class="sp"></span><button class="btn">Remover</button></div>
+        <span class="v sm">No Telegram, envie ao bot: /start AB12CD</span><span class="k">Vale por mais 10 min.</span>
+        <div class="hstack"><button class="btn">Parear conversa</button><button class="btn">Enviar teste</button></div>
+      </div>
+      <div class="stack" style="flex:1">
+        <span class="k">você › /status</span><span class="v sm">bot › Anthropic · Padrão · em uso — Claude 5h 68% (13:05)</span>
+        <span class="k">você › /silencio 12-13</span><span class="v sm">bot › Silêncio 12:00 → 13:00 aplicado.</span>
+      </div>
+    </div></div>
+  </div></div>
+</div>
 
 <h2 id="cfg-apis">12c · Configurações — APIs</h2>
 <div class="win mid" style="max-width:none">

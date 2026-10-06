@@ -213,6 +213,8 @@ fun SettingsDialogContent(
     onProxyTestConnection: () -> Unit = {},
     /** Acesso web local (#388); `null` esconde a seção (geradores de captura, testes). */
     webAccess: WebAccessSectionModel? = null,
+    /** Bot do Telegram (#387); `null` esconde a seção. */
+    telegramBot: TelegramBotSectionModel? = null,
     toastEvent: SettingsToastEvent? = null,
     /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
     initialTab: SettingsTab = SettingsTab.GENERAL,
@@ -308,6 +310,7 @@ fun SettingsDialogContent(
                                     budgetText = monthlyBudgetText,
                                     onBudgetCommit = onMonthlyBudgetCommit
                                 )
+                                telegramBot?.let { model -> TelegramBotSection(model, currentLanguage) }
                             }
 
                             SettingsTab.APIS -> MonitoredApisTab(

@@ -92,7 +92,7 @@ internal fun ComparisonContent(
         }
     ) {
         AppToolbar(spacing = AppSpacing.sm) {
-            Text(ComparisonLabels.title(language), style = MaterialTheme.typography.titleMedium)
+            Text(ComparisonLabels.title(language), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.weight(1f))
             AppSegmentedControl(
                 options = CliSessionRange.entries.map { range -> AppSegment(CliSessionsLabels.rangeLabel(range, language)) },
