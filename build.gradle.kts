@@ -268,6 +268,16 @@ kover {
 // distribuido e ainda enxergar os composables `internal`.
 val desktopTestCompilation = kotlin.jvm("desktop").compilations.getByName("test")
 
+tasks.register<JavaExec>("probeHistoryWindow") {
+    group = "verification"
+    description = "Abre e reabre uma janela real de histórico com dados sintéticos para reproduzir a issue #389."
+    mainClass.set("com.usagemonitor.HistoryOpenProbe")
+    systemProperty("skiko.renderApi", providers.gradleProperty("historyProbeRenderApi").orElse("SOFTWARE").get())
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(providers.gradleProperty("historyProbeOutputDir").orElse("build/issue389-probe").get())
+    args(providers.gradleProperty("historyProbePrewarm").orElse("false").get())
+}
+
 tasks.register<JavaExec>("generateScreenshots") {
     group = "documentation"
     description = "Renderiza offscreen os prints do README com dados sinteticos."
