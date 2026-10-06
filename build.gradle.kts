@@ -276,6 +276,8 @@ tasks.register<JavaExec>("generateScreenshots") {
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(providers.gradleProperty("screenshotOutputDir").orElse(layout.projectDirectory.dir("img").asFile.absolutePath).get())
     if (providers.gradleProperty("screenshotScenario").orNull == "observed") args("--observed")
+    if (providers.gradleProperty("screenshotScenario").orNull == "history-baseline") args("--history-baseline")
+    if (providers.gradleProperty("screenshotScenario").orNull == "history-regression") args("--history-regression")
 }
 
 tasks.register<JavaExec>("generateGargantuaPreview") {
@@ -304,6 +306,7 @@ tasks.register<JavaExec>("generateHelpMedia") {
     mainClass.set("com.usagemonitor.screenshots.HelpMediaGeneratorKt")
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(layout.projectDirectory.dir("src/desktopMain/resources/help").asFile.absolutePath)
+    if (providers.gradleProperty("helpMediaTopic").orNull == "history") args("--history")
 }
 
 // Pre-extracao da nativa do Skiko antes dos forks paralelos -- ver o comentario

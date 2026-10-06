@@ -90,6 +90,13 @@ internal class SceneRecorder(
         scene.sendPointerEvent(PointerEventType.Move, Offset(xDp * SCALE, yDp * SCALE))
     }
 
+    /** Roda o scroll real do composable; cabeçalho e rodapé não são deslocados junto. */
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun scrollMouse(xDp: Float, yDp: Float, verticalDelta: Float) {
+        scene.sendPointerEvent(PointerEventType.Scroll, Offset(xDp * SCALE, yDp * SCALE),
+            scrollDelta = Offset(0f, verticalDelta))
+    }
+
     @OptIn(ExperimentalComposeUiApi::class)
     fun close() = scene.close()
 

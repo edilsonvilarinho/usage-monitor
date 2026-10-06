@@ -19,6 +19,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +42,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -102,6 +107,9 @@ fun AppMenu(
     onSelect: (Int) -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    maxWidth: Dp = Dp.Unspecified,
+    maxHeight: Dp = Dp.Unspecified,
+    wrapLabels: Boolean = false,
     anchor: @Composable () -> Unit
 ) {
     val visibility = remember { MutableTransitionState(false) }
@@ -155,12 +163,16 @@ fun AppMenu(
                     .clip(AppShapes.small)
                     .background(MaterialTheme.colorScheme.surface)
                     .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
+                    .widthIn(max = maxWidth)
                     .width(IntrinsicSize.Max)
+                    .heightIn(max = maxHeight)
+                    .verticalScroll(rememberScrollState())
             ) {
                 options.forEachIndexed { index, option ->
                     AppMenuItem(
                         option = option,
                         selected = index == selectedIndex,
+                        wrapLabel = wrapLabels,
                         onClick = { onSelect(index) }
                     )
                 }
@@ -173,6 +185,7 @@ fun AppMenu(
 private fun AppMenuItem(
     option: AppMenuOption,
     selected: Boolean,
+    wrapLabel: Boolean,
     onClick: () -> Unit
 ) {
     val container = if (selected) {
@@ -224,7 +237,8 @@ private fun AppMenuItem(
             text = option.label,
             style = MaterialTheme.typography.labelLarge,
             color = content,
-            maxLines = 1
+            maxLines = if (wrapLabel) Int.MAX_VALUE else 1,
+            modifier = Modifier.weight(1f)
         )
     }
 }

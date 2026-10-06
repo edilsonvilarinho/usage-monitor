@@ -35,13 +35,14 @@ de resposta para lugar nenhum.
 - **Custo das sessões do Claude Code** — transcripts locais abertos por sessão, projeto, branch e
   modelo, com custo estimado e um veredito de saúde do contexto. Sessões do Codex CLI também, só
   com tokens.
-- **Histórico e previsão** — tendência, esgotamento projetado, comparação com o período anterior e
-  orçamento mensal em USD.
+- **Histórico e previsão** — resumo antes do gráfico, detalhes expansíveis das cotas e janelas,
+  esgotamento projetado, comparação com o período anterior e orçamento mensal em USD.
 - **Alertas** — notificações na bandeja quando uma cota passa de 75/90/100% ou uma sessão satura,
   com horário de silêncio.
 - **Continua funcionando** — cada fonte falha sozinha e mantém a última leitura; limite de taxa
   recua.
-- **Exportação** — CSV e JSON de sessões e resumos, e relatório em PDF.
+- **Exportação** — CSV e JSON de sessões e resumos, e relatórios em PDF. O PDF do histórico respeita
+  fonte, conta, intervalo e cota selecionados e inclui todas as janelas disponíveis, mesmo recolhidas.
 - **Visão de time (opcional)** — um servidor que você hospeda agrega uma conta entre máquinas, com
   tendência de 30 dias e presença ao vivo. Veja [`server/README.md`](server/README.md).
 - **Desktop** — início automático, temas claro e escuro, inglês e português, escala da interface,

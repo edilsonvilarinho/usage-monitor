@@ -11,6 +11,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -29,6 +30,9 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.historyAccountChipTag
+import com.usagemonitor.presentation.ui.HISTORY_ACCOUNT_MENU_TAG
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.onNodeWithContentDescription
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
 import com.usagemonitor.presentation.ui.historyQuotaViewChipTag
@@ -490,21 +494,23 @@ class HistoryScreenTest {
 
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithText(accountA.displayLabel).fetchSemanticsNode()
+                onNodeWithTag(HISTORY_ACCOUNT_MENU_TAG).fetchSemanticsNode()
                 true
             }.getOrDefault(false)
         }
-        onNodeWithText("Conta").assertIsDisplayed()
+        onNodeWithTag(HISTORY_ACCOUNT_MENU_TAG).performClick()
         // Pela tag: o rótulo da conta é `email — workspace`, texto longo e livre
         // que também aparece no card do dashboard.
         onNodeWithTag(historyAccountChipTag(accountA)).assertIsSelected()
         onNodeWithTag(historyAccountChipTag(accountB)).performClick()
         waitUntil(timeoutMillis = 5_000) {
             runCatching {
-                onNodeWithTag(historyAccountChipTag(accountB)).assertIsSelected()
+                onNodeWithTag(HISTORY_ACCOUNT_MENU_TAG).assertContentDescriptionEquals("Conta: ${accountB.displayLabel}")
                 true
             }.getOrDefault(false)
         }
+        onNodeWithTag(HISTORY_ACCOUNT_MENU_TAG).performClick()
+        onNodeWithTag(historyAccountChipTag(accountB)).assertIsSelected()
         viewModel.onDestroy()
     }
 
@@ -599,7 +605,7 @@ class HistoryScreenTest {
         onNodeWithText("Codex atual").assertIsDisplayed()
         onNodeWithText("Janela reportada").assertIsDisplayed()
         onAllNodesWithText("API").assertCountEquals(0)
-        onNodeWithText("Intervalo").assertIsDisplayed()
+        onNodeWithContentDescription("Intervalo").assertIsDisplayed()
         onNodeWithText("Total").assertIsDisplayed()
         onAllNodesWithText("Início do recorte").assertCountEquals(0)
         onAllNodesWithText("Atual").assertCountEquals(0)
@@ -1092,8 +1098,11 @@ class HistoryScreenTest {
             }
         }
         waitUntil(timeoutMillis = 5_000) {
-            runCatching { onNodeWithText("Janelas 5h").fetchSemanticsNode(); true }.getOrDefault(false)
+            runCatching { onNodeWithText("▸ Janelas e distribuição horária").fetchSemanticsNode(); true }.getOrDefault(false)
         }
+
+        // A análise é secundária na direção 01 e precisa ser aberta explicitamente.
+        onNodeWithText("▸ Janelas e distribuição horária").performClick()
 
         onNodeWithText("Janelas 5h").assertIsDisplayed()
         onNodeWithText("3h 30min").assertIsDisplayed()

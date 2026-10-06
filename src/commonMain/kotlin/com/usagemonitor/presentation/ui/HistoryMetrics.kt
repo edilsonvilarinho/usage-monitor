@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -49,16 +51,7 @@ internal fun HistoryMetricsPanel(
 }
 
 @OptIn(ExperimentalLayoutApi::class)
-/**
- * As métricas da série, em duas colunas de pares rótulo→valor.
- *
- * Duas colunas e não uma: com uma, a tela do OpenCode — que tem duas séries por
- * modelo — passava de 2.400px de altura. Não é `FlowRow`: ali a linha mede pelo
- * conteúdo, o `weight` do valor fica sem referência e o Compose deixa o texto
- * **sem posicionar** — `isPlaced` falso, nó na árvore e nada na tela. Duas
- * `Column` com `weight(1f)` dentro de uma `Row` de largura cheia dão ao peso a
- * referência que ele precisa.
- */
+/** Métricas compartilhadas com o relatório, adaptadas à largura disponível. */
 @Composable
 internal fun HistoryMetrics(
     source: ApiSource,
@@ -76,34 +69,17 @@ internal fun HistoryMetrics(
     )
 }
 
-/**
- * A tabela de métricas: duas colunas de pares rótulo→valor.
- *
- * Duas colunas e não uma: com uma, a tela do OpenCode — que tem duas séries por
- * modelo — passava de 2.400px de altura. E **não** é `FlowRow`: ali a linha mede
- * pelo conteúdo, o `weight` do valor fica sem referência e o Compose deixa o
- * texto sem posicionar — `isPlaced` falso, nó presente na árvore e nada na tela,
- * que é como este layout falhou da primeira vez. Duas `Column` com `weight(1f)`
- * dentro de uma `Row` de largura cheia dão ao peso a referência que falta.
- */
+/** Uma coluna abaixo de 600dp; duas colunas largas com referência válida para weight. */
 @Composable
 internal fun HistoryMetricTable(entries: List<HistoryMetricEntry>) {
-    // Ímpar sobra para a esquerda: um buraco no fim da segunda coluna lê melhor
-    // que um no meio da primeira.
-    val half = (entries.size + 1) / 2
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.lg)
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            entries.take(half).forEach { entry ->
-                MetricItem(label = entry.label, value = entry.value)
-            }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            entries.drop(half).forEach { entry ->
-                MetricItem(label = entry.label, value = entry.value)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 600.dp) {
+            Column { entries.forEach { MetricItem(it.label, it.value) } }
+        } else {
+            val half = (entries.size + 1) / 2
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
+                Column(Modifier.weight(1f)) { entries.take(half).forEach { MetricItem(it.label, it.value) } }
+                Column(Modifier.weight(1f)) { entries.drop(half).forEach { MetricItem(it.label, it.value) } }
             }
         }
     }
@@ -310,18 +286,14 @@ private fun MetricItem(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
+            modifier = Modifier.weight(1f)
         )
         Text(
             text = value,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.End,
-            // Duas linhas, com reticências: com `maxLines = 1` e o `Clip` padrão,
-            // "A janela deve reiniciar antes do limite" saía cortada a meia palavra
-            // na coluna direita, sem sinal de que faltava texto (issue #320).
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            // A previsão completa pode ocupar várias linhas, sem truncar o conteúdo.
             modifier = Modifier.weight(1f)
         )
     }

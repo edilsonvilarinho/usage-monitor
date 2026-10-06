@@ -84,6 +84,11 @@ fun main(args: Array<String>) {
     val outputDir = File(args.firstOrNull() ?: "src/desktopMain/resources/help")
     outputDir.mkdirs()
 
+    if ("--history" in args) {
+        recordHistory(outputDir)
+        return
+    }
+
     recordDashboard(outputDir)
     recordHistory(outputDir)
     recordCliSessions(outputDir)
@@ -171,10 +176,10 @@ private fun recordDashboard(outputDir: File) {
     }
 }
 
-/** Histórico: o gráfico do intervalo e, deslocando, a previsão de esgotamento. */
+/** Histórico: resumo antes do gráfico, filtros e ação de relatório PDF. */
 private fun recordHistory(outputDir: File) {
-    val state = DemoState(contentHeight = 900.dp)
-    val historyViewModel = fixedHistoryViewModel()
+    val state = DemoState()
+    val historyViewModel = fixedHistoryViewModel(issue383HistoryReports().first())
 
     try {
         record(outputDir, HelpTopic.HISTORY, state) { recorder ->
@@ -184,14 +189,15 @@ private fun recordHistory(outputDir: File) {
                         viewModel = historyViewModel,
                         language = AppLanguage.PT,
                         onBack = {},
-                        focusedSource = ApiSource.ANTHROPIC
+                        focusedSource = ApiSource.ANTHROPIC,
+                        showSourceSelector = false
                     )
                 }
             }
 
             recorder.animate(1_000) {}
             recorder.hold(1_300)
-            recorder.panTo(state, to = 300.dp, durationMillis = 700)
+            recorder.animate(700) { recorder.scrollMouse(600f, 130f, 0.6f) }
             recorder.hold(1_500)
         }
     } finally {

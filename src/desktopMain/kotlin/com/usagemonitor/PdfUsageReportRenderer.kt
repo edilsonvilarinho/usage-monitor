@@ -37,6 +37,7 @@ class PdfUsageReportRenderer(private val language: AppLanguage) {
 
             for ((index, section) in document.sections.withIndex()) {
                 when (section) {
+                    is UsageReportSection.Paragraphs -> writer.paragraphs(section)
                     is UsageReportSection.KeyValues -> writer.keyValues(section)
                     is UsageReportSection.Table -> writer.table(section)
                     is UsageReportSection.Grid -> writer.grid(
@@ -292,6 +293,12 @@ private class PageWriter(private val pdf: PDDocument, private val language: AppL
             drawText(line, MARGIN, cursorY, regular, NOTE_SIZE, ON_SURFACE_VARIANT)
             cursorY -= NOTE_LINE_HEIGHT - NOTE_SIZE
         }
+    }
+
+    fun paragraphs(section: UsageReportSection.Paragraphs) {
+        heading(section.heading)
+        section.paragraphs.forEach { paragraph -> note(paragraph) }
+        cursorY -= SECTION_GAP
     }
 
     fun keyValues(section: UsageReportSection.KeyValues) {

@@ -130,6 +130,8 @@ object HelpCatalog {
                 "No card da fonte, clique em \"Abrir histórico\".",
                 "Escolha o intervalo na barra superior; sem ponto no período anterior não há " +
                     "comparativo, porque zero ali significaria \"não consumiu\".",
+                "O resumo precede o gráfico. Expanda \"Resumo das cotas\" e \"Janelas e distribuição horária\" para consultar os detalhes.",
+                "Abra \"Conta\" para selecionar outra conta. Clique em \"PDF\" para salvar fonte, conta, intervalo e cotas selecionadas. Zoom e seções recolhidas não retiram dados do relatório.",
                 "Nada é enviado para lugar nenhum: o histórico fica em ~/.usage-monitor/usage-history.db."
             ),
             mediaId = "history"
@@ -382,6 +384,8 @@ object HelpCatalog {
                 "On the source card, click \"Open history\".",
                 "Pick the range in the top bar; with no data point in the previous period there is " +
                     "no comparison, because zero there would mean \"consumed nothing\".",
+                "The summary precedes the chart. Expand \"Quota summary\" and \"Windows and hourly distribution\" to read the details.",
+                "Open \"Account\" to select another account. Click \"PDF\" to save the selected source, account, range and quotas. Zoom and collapsed sections do not remove report data.",
                 "Nothing is sent anywhere: the history lives in ~/.usage-monitor/usage-history.db."
             ),
             mediaId = "history"

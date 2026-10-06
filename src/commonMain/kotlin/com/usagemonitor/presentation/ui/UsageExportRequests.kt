@@ -25,7 +25,7 @@ import com.usagemonitor.presentation.ui.report.UsageReportDocument
  */
 sealed interface UsageExportPayload {
     data class Text(val content: String) : UsageExportPayload
-    data class Report(val document: UsageReportDocument) : UsageExportPayload
+    data class Report(val document: UsageReportDocument, val language: AppLanguage? = null) : UsageExportPayload
 }
 
 data class UsageExportRequest(

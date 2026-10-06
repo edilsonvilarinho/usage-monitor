@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,6 +86,30 @@ internal fun HistoryWindowAnalysisPanel(
 
 @Composable
 private fun HistoryWindowTable(windows: List<QuotaWindowSummary>, language: AppLanguage) {
+    val pt = language == AppLanguage.PT
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 600.dp) {
+            val newestFirst = windowRowsNewestFirst(windows)
+            Column {
+                newestFirst.forEachIndexed { index, window ->
+                    AppDataRow(showDivider = index != newestFirst.lastIndex) {
+                        Column(Modifier.fillMaxWidth()) {
+                            HistoryMetricTable(listOf(
+                                HistoryMetricEntry(if (pt) "Início observado" else "First reading", windowStartLabel(window, language)),
+                                HistoryMetricEntry(if (pt) "Pico" else "Peak", "${window.peakPercent} %"),
+                                HistoryMetricEntry(if (pt) "Esgotou em" else "Exhausted after", exhaustionLabel(window)),
+                                HistoryMetricEntry(if (pt) "Ritmo" else "Pace", paceLabel(window.averagePercentPerHour))
+                            ))
+                        }
+                    }
+                }
+            }
+        } else Column { HistoryWideWindowTable(windows, language) }
+    }
+}
+
+@Composable
+private fun HistoryWideWindowTable(windows: List<QuotaWindowSummary>, language: AppLanguage) {
     val pt = language == AppLanguage.PT
     AppColumnHeaderRow(startGutter = 0.dp) {
         AppColumnHeaderLabel(if (pt) "Início observado" else "First reading", Modifier.weight(1.4f))

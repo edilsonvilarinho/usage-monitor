@@ -17,14 +17,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.update
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.report.historyReportRequest
+import kotlin.time.Clock
 
 class HistoryViewModel(
     private val getUsageHistory: GetUsageHistoryUseCase,
     private val enabledApis: StateFlow<Set<ApiSource>>,
-    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
+    private val breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder,
+    private val exportWriter: UsageExportWriter? = null,
+    private val clock: Clock = Clock.System
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loadJob: Job? = null
+    private var exportJob: Job? = null
+    val canWriteReport: Boolean get() = exportWriter != null
     @Volatile private var loadRequestId: Long = 0L
 
     private val _uiState = MutableStateFlow<HistoryUiState>(HistoryUiState.Loading)
@@ -51,11 +60,12 @@ class HistoryViewModel(
      * anterior é de outra API e não pode ficar como se fosse desta.
      */
     private fun reload(keepContent: Boolean) {
+        exportJob?.cancel()
         val requestId = ++loadRequestId
         loadJob?.cancel()
         val current = _uiState.value
         if (keepContent && current is HistoryUiState.Success && current.selectedSource == selectedSource.value) {
-            _uiState.value = current.copy(selectedRange = selectedRange.value, isRefreshing = true)
+            _uiState.value = current.copy(selectedRange = selectedRange.value, isRefreshing = true, isExporting = false, exportOutcome = null)
         } else {
             _uiState.value = HistoryUiState.Loading
         }
@@ -118,8 +128,37 @@ class HistoryViewModel(
     }
 
     fun onDestroy() {
+        exportJob?.cancel()
         loadJob?.cancel()
         viewModelScope.cancel()
+    }
+
+    /** Captura o estado estabilizado; filtros novos nunca descrevem dados antigos. */
+    fun exportReport(language: AppLanguage) {
+        val writer = exportWriter ?: return
+        val snapshot = _uiState.value as? HistoryUiState.Success ?: return
+        if (snapshot.report.isEmpty || snapshot.isRefreshing || snapshot.isExporting) return
+        val requestId = loadRequestId
+        _uiState.value = snapshot.copy(isExporting = true, exportOutcome = null)
+        exportJob = viewModelScope.launch {
+            var outcome: CliExportOutcome? = null
+            try {
+                val request = historyReportRequest(snapshot, language, clock.now())
+                val path = writer.write(request)
+                if (path != null) outcome = CliExportOutcome.Saved(path)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                breadcrumbs.recordFailure("exportar histórico PDF", error)
+                outcome = CliExportOutcome.Failed(error.message ?: "erro desconhecido")
+            } finally {
+                _uiState.update { latest ->
+                    if (loadRequestId == requestId && latest is HistoryUiState.Success && latest.report == snapshot.report) {
+                        latest.copy(isExporting = false, exportOutcome = outcome)
+                    } else latest
+                }
+            }
+        }
     }
 
     private suspend fun loadHistory(requestId: Long) {
