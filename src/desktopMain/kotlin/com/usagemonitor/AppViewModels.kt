@@ -43,10 +43,12 @@ import com.usagemonitor.domain.usecase.UnblockTeamAccountUseCase
 import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.QuotaActivityTracker
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
@@ -60,6 +62,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
@@ -218,6 +224,15 @@ internal class AppViewModels(
         }
     }
 
+    // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
+    // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.
+    val quotaActivity = QuotaActivityTracker(dashboardState = dashboard.uiState)
+
+    /** Arco de sessão ativa da HUD: CLI (Claude e Codex) mais uso detectado pela cota. */
+    val hudActiveTargets: StateFlow<Set<UsageTargetKey>> =
+        combine(sessionPulse.activeTargets, quotaActivity.detectedTargets) { cli, detected -> cli + detected }
+            .stateIn(busyBridgeScope, SharingStarted.Eagerly, emptySet())
+
     val usageAlert = UsageAlertViewModel(
         dashboardState = dashboard.uiState,
         cliPulses = sessionPulse.cliPulses,
@@ -277,6 +292,7 @@ internal class AppViewModels(
         teamUsage.onDestroy()
         teamPresence.onDestroy()
         sessionPulse.onDestroy()
+        quotaActivity.onDestroy()
         usageAlert.onDestroy()
         teamKeys.onDestroy()
         teamSync.onDestroy()

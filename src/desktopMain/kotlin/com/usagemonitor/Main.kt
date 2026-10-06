@@ -278,7 +278,7 @@ internal fun runUsageMonitor(
             accountColors = accountColors,
             accountEmojis = accountEmojis,
             onCloseRequest = { shutdownApplication() },
-            activeTargets = viewModels.sessionPulse.activeTargets,
+            activeTargets = viewModels.hudActiveTargets,
             stalledSessions = viewModels.sessionPulse.stalledSessions
         )
 
