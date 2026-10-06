@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Usage Monitor</title>
+<style>
+/* Página da HUD na rede local (#388, direção R3 — grade de anéis). Tokens do
+   design system copiados à mão: a CSP não deixa carregar fonte nem CSS de fora. */
+:root { --bg:#131010; --surface:#1B1818; --raised:#211E1E; --border:#3D3838; --fg:#F2EDED; --muted:#B8B2B2;
+  --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --night:#080B12;
+  --anthropic:#4F8CFF; --codex:#27BFA3; --deepseek:#C084FC; --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E;
+  --openrouter:#FF6FA8; --gemini:#E2A5E9; --cursor:#C7E9A5;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace; --sans: "IBM Plex Sans", system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:14px; }
+header { display:flex; align-items:baseline; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); }
+h1 { font-family:var(--mono); font-size:16px; font-weight:600; margin:0; }
+.read { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); }
+main { padding:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; max-width:1200px; margin:0 auto; }
+.acc { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
+.name { font-size:12px; border-left:2px solid var(--c); padding-left:6px; align-self:stretch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.state { font-family:var(--mono); font-size:10px; color:var(--muted); align-self:stretch; }
+.state.on::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--ok); margin-right:5px; }
+.risk { font-family:var(--mono); font-size:11px; align-self:stretch; color:var(--c); }
+.risk::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--c); margin-right:5px; }
+.q { font-family:var(--mono); font-size:11px; color:var(--muted); align-self:stretch; display:flex; gap:6px; }
+.q b { color:var(--fg); font-weight:500; }
+.q span:last-child { margin-left:auto; }
+.big { font-family:var(--mono); font-size:20px; padding:28px 0; }
+.msg { grid-column:1/-1; color:var(--muted); font-family:var(--mono); font-size:12px; }
+canvas { width:120px; height:120px; }
+footer { padding:8px 16px 16px; color:var(--muted); font-size:11px; max-width:1200px; margin:0 auto; }
+</style>
+</head>
+<body>
+<header><h1>Usage Monitor</h1><span class="read" id="read">lendo…</span></header>
+<main id="grid"><p class="msg">Lendo o retrato do app…</p></main>
+<footer>Só metadados de uso. Nunca conteúdo de prompt ou resposta. A página relê a cada 30 s; o app coleta a cada 60 s com sessão CLI ativa e 5 min sem. A cor do arco e a palavra são o risco da projeção, as mesmas da HUD; cinza é cota sem projeção.</footer>
+<script>
+/*
+ * Biblioteca do anel Gargantua para protótipos HTML (skill usage-monitor-visual-options).
+ * Mesmo desenho do app (AppGargantuaRing / GargantuaDrawing.kt), em Canvas 2D:
+ *   drawRing(ctx, {arcs:[{f:0..1, t:'ok'|'warn'|'crit'}], mark:'claude'|'openai'}, phase, overrides)
+ *   ctx já transladado por PAD; o anel ocupa S×S (64 px = anel do app a 100%).
+ * Efeitos: flashAt, ringAt (onda), rrPath (contorno do balão), perimeter (pontos do contorno).
+ * Easing: seg(t,a,b), easeOut, easeIn, easeInOut. Nada aqui tem rebote: dado não passa do lugar.
+ */
+const TONE={ok:'#4CAF50',warn:'#FFA726',crit:'#EF5350'}, INFO='#42A5F5';
+const S=64, STROKE=2.5, GAP=1.5, PAD=28, W=S+PAD*2;
+const LIGHT=-135*Math.PI/180;
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const easeOut=t=>1-Math.pow(1-t,3), easeIn=t=>t*t*t, easeInOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+function hex(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16))}
+function rgba(c,a){const [r,g,b]=hex(c);return `rgba(${r},${g},${b},${a})`}
+function mix(c,w,k){const a=hex(c),b=hex(w);return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*k).toString(16).padStart(2,'0')).join('')}
+function drawCore(ctx,room,ph,o){
+  const c=S/2,h=room*.62*o.core;
+  ctx.globalAlpha=o.disk;
+  let g=ctx.createRadialGradient(c,c,Math.max(0,h*.9),c,c,room);
+  g.addColorStop(0,'rgba(232,174,99,.16)');g.addColorStop(1,'rgba(232,174,99,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(c,c,room,0,7);ctx.fill();
+  ctx.lineWidth=room*.05;ctx.strokeStyle='rgba(255,230,190,.35)';ctx.beginPath();ctx.arc(c,c,h+room*.1,Math.PI*1.08,Math.PI*1.92);ctx.stroke();
+  ctx.lineWidth=room*.025;ctx.strokeStyle='rgba(255,230,190,.18)';ctx.beginPath();ctx.arc(c,c,h+room*.08,Math.PI*.15,Math.PI*.85);ctx.stroke();
+  const disk=front=>{ctx.save();ctx.translate(c,c+room*.08);ctx.rotate(-12*Math.PI/180);
+    const rx=room*.95*o.diskScale,ry=rx*.16;const lg=ctx.createLinearGradient(-rx,0,rx,0);
+    lg.addColorStop(0,'rgba(180,80,30,.25)');lg.addColorStop(.5,'rgba(232,174,99,.55)');lg.addColorStop(1,'rgba(255,240,203,.8)');
+    ctx.strokeStyle=lg;ctx.lineWidth=room*.07;ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:Math.PI*2);ctx.stroke();
+    for(let k=0;k<3;k++){const a=((ph*360*(1+k%2))+k*120)%360;if(front!==(a<180))continue;const r=a*Math.PI/180,e=Math.abs(Math.sin(r));
+      ctx.strokeStyle=`rgba(255,248,230,${.45*e})`;ctx.lineWidth=room*.035;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,r,r+Math.min(.35,(front?Math.PI:Math.PI*2)-r));ctx.stroke();}
+    ctx.restore();};
+  disk(false);ctx.globalAlpha=1;
+  ctx.fillStyle='#030508';ctx.beginPath();ctx.arc(c,c,h,0,7);ctx.fill();
+  ctx.globalAlpha=o.disk;ctx.strokeStyle='rgba(255,240,203,.8)';ctx.lineWidth=room*.022;ctx.beginPath();ctx.arc(c,c,h+room*.01,0,7);ctx.stroke();
+  disk(true);ctx.globalAlpha=1;
+}
+function glassArc(ctx,r,tone,f,ph,o){
+  const c=S/2,a0=-Math.PI/2,end=a0+f*Math.PI*2,step=Math.PI/60;
+  ctx.globalAlpha=o.glass;ctx.lineCap='butt';
+  ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=STROKE*1.4;ctx.beginPath();ctx.arc(c,c,r,0,7);ctx.stroke();
+  for(let a=0;a<Math.PI*2;a+=step){const lit=.5+.5*Math.cos(a-LIGHT);
+    ctx.strokeStyle=`rgba(255,255,255,${.28*lit*lit*lit})`;ctx.lineWidth=.45;ctx.beginPath();ctx.arc(c,c,r-STROKE*.5,a,a+step+.01);ctx.stroke();
+    ctx.strokeStyle=`rgba(255,255,255,${.12*lit})`;ctx.lineWidth=.35;ctx.beginPath();ctx.arc(c,c,r+STROKE*.5,a,a+step+.01);ctx.stroke();}
+  ctx.globalAlpha=1;
+  if(f<=.001)return;
+  ctx.lineCap='round';
+  ctx.strokeStyle=rgba(tone,.25);ctx.lineWidth=STROKE*2.4;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  ctx.strokeStyle=tone;ctx.lineWidth=STROKE*.9;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  ctx.strokeStyle=mix(tone,'#ffffff',.6);ctx.lineWidth=STROKE*.35;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  for(let k=0;k<3;k++){const p=(ph+k/3)%1,fade=Math.sin(p*Math.PI);if(fade<.02)continue;
+    const x=c+r*Math.cos(a0+p*f*Math.PI*2),y=c+r*Math.sin(a0+p*f*Math.PI*2);const g=ctx.createRadialGradient(x,y,0,x,y,2.4);
+    g.addColorStop(0,`rgba(255,255,255,${.9*fade})`);g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,2.4,0,7);ctx.fill();}
+}
+function mark(ctx,kind,alpha,scale){
+  const c=S/2;ctx.save();ctx.globalAlpha=alpha;ctx.translate(c,c);ctx.scale(scale,scale);ctx.strokeStyle='#F2EDED';ctx.fillStyle='#F2EDED';
+  if(kind==='claude'){ctx.lineWidth=1.6;ctx.lineCap='round';for(let i=0;i<12;i++){const a=i*Math.PI/6+.13;const l=i%2?6.5:8.5;ctx.beginPath();ctx.moveTo(Math.cos(a)*1.5,Math.sin(a)*1.5);ctx.lineTo(Math.cos(a)*l,Math.sin(a)*l);ctx.stroke();}}
+  else{ctx.lineWidth=1.3;for(let i=0;i<6;i++){ctx.save();ctx.rotate(i*Math.PI/3);ctx.beginPath();ctx.ellipse(0,-3.2,2.6,5.4,0,0,Math.PI*2);ctx.stroke();ctx.restore();}}
+  ctx.restore();
+}
+const BASE={scale:1,core:1,disk:1,diskScale:1,glass:1,arcs:1,markAlpha:1,markScale:1,rot:0,stretch:1,alpha:1};
+function drawRing(ctx,acc,ph,o){
+  o={...BASE,...o};
+  const room=S/2-acc.arcs.length*(STROKE+GAP);
+  ctx.save();ctx.globalAlpha=o.alpha;
+  drawCore(ctx,room,ph/5,o);
+  acc.arcs.forEach((a,i)=>glassArc(ctx,S/2-STROKE/2-i*(STROKE+GAP),TONE[a.t],a.f*o.arcs,ph,o));
+  mark(ctx,acc.mark,o.markAlpha,o.markScale);
+  ctx.restore();ctx.globalAlpha=1;
+}
+
+const ACCENT = { ANTHROPIC:'anthropic', CODEX:'codex', DEEPSEEK:'deepseek', MINIMAX:'minimax', OPENCODE:'oc', OPENCODE_GO:'oc',
+  KILO:'kilo', OPENROUTER:'openrouter', GEMINI:'gemini', ANTIGRAVITY:'gemini', CURSOR:'cursor' };
+const token = new URLSearchParams(location.search).get('t') || '';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// O tom vem do risco da projeção, o mesmo da HUD; sem projeção, neutro — nunca limiar próprio.
+TONE.neutral = '#B8B2B2';
+const tone = risk => ({ ON_TRACK:'ok', AT_RISK:'warn', WILL_EXCEED:'crit' })[risk] || 'neutral';
+const RISK_WORD = { ON_TRACK:['Normal','ok'], AT_RISK:['Atenção','warn'], WILL_EXCEED:['Crítico','crit'] };
+const hhmm = iso => new Date(iso).toLocaleTimeString('pt-BR', { timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit' });
+const fmtReset = iso => { if (!iso) return ''; const d = new Date(iso);
+  return d.toLocaleString('pt-BR', { timeZone:'America/Sao_Paulo', weekday:'short', hour:'2-digit', minute:'2-digit' }) + ' BRT'; };
+const money = (cents, cur) => (cents / 100).toLocaleString('pt-BR', { style:'currency', currency: cur || 'USD' });
+
+function render(data) {
+  const grid = document.getElementById('grid');
+  if (!data.accounts.length) { grid.innerHTML = '<p class="msg">Nenhuma API habilitada no app.</p>'; return; }
+  grid.innerHTML = data.accounts.map((a, i) => {
+    const windowed = a.quotas.filter(q => q.percent !== null).slice(0, 3);
+    const balance = a.quotas.find(q => q.percent === null && q.unit === 'CURRENCY_USD');
+    const visual = windowed.length ? '<canvas width="240" height="240" data-i="' + i + '"></canvas>'
+      : balance ? '<div class="big">' + esc(money(balance.total - balance.used, balance.currency)) + '</div>'
+      : '<div class="big">—</div>';
+    const lines = a.quotas.map(q => '<div class="q"><b>' + esc(q.label) + '</b><span>'
+      + (q.percent !== null ? q.percent + '%' : q.unit === 'CURRENCY_USD' ? esc(money(q.total - q.used, q.currency)) : esc(q.used + (q.total ? ' / ' + q.total : '')))
+      + '</span><span>' + esc(fmtReset(q.resets_at)) + '</span></div>').join('');
+    return '<section class="acc"><div class="name" style="--c:var(--' + (ACCENT[a.source] || 'muted') + ')">' + esc(a.label) + '</div>'
+      + visual
+      + (RISK_WORD[a.worst_risk] ? '<div class="risk" style="--c:var(--' + RISK_WORD[a.worst_risk][1] + ')">' + RISK_WORD[a.worst_risk][0] + '</div>' : '')
+      + '<div class="state ' + (a.active ? 'on' : '') + '">' + (a.active ? 'Em uso agora' : 'Sem uso detectado') + '</div>' + lines + '</section>';
+  }).join('');
+  grid.querySelectorAll('canvas').forEach(cv => {
+    const a = data.accounts[Number(cv.dataset.i)];
+    const arcs = a.quotas.filter(q => q.percent !== null).slice(0, 3)
+      .sort((x, y) => ['MONTHLY','WEEKLY','INTERVAL','REPORTED'].indexOf(x.period) - ['MONTHLY','WEEKLY','INTERVAL','REPORTED'].indexOf(y.period))
+      .map(q => ({ f: Math.min(q.percent, 100) / 100, t: tone(q.risk) }));
+    const ctx = cv.getContext('2d');
+    // Canvas de 240 px: o anel de 64 px a 2× (128 px) centrado, com folga para o disco.
+    ctx.translate(PAD * 2, PAD * 2); ctx.scale(2, 2);
+    drawRing(ctx, { arcs, mark: a.source === 'ANTHROPIC' ? 'claude' : 'openai' }, .3, { markAlpha: (a.source === 'ANTHROPIC' || a.source === 'CODEX') ? 1 : 0 });
+  });
+  // Hora da coleta do app, não do pedido da página: o número pode ter até 5 min.
+  document.getElementById('read').textContent = data.last_collected_at
+    ? 'coleta ' + hhmm(data.last_collected_at) + ' BRT · página ' + hhmm(data.generated_at)
+    : 'sem coleta ainda';
+}
+
+async function load() {
+  try {
+    const res = await fetch('/api/snapshot?t=' + encodeURIComponent(token), { cache:'no-store' });
+    if (res.status === 401) { document.getElementById('grid').innerHTML = '<p class="msg">Token inválido. Copie o endereço de novo nas Configurações › Rede do app.</p>'; return; }
+    if (!res.ok) { document.getElementById('read').textContent = 'sem leitura ainda'; return; }
+    render(await res.json());
+  } catch (e) {
+    document.getElementById('read').textContent = 'app fora do ar — mantendo a última leitura';
+  }
+}
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

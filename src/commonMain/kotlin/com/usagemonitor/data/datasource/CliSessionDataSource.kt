@@ -1,5 +1,7 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.OutputThroughput
+
 import com.usagemonitor.domain.entity.CliSessionActiveTime
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionTail
@@ -92,4 +94,10 @@ interface CliSessionDataSource {
      * [com.usagemonitor.domain.entity.CliSessionTailOutcome.NOT_EVALUATED].
      */
     suspend fun readSessionTails(sessionIds: Collection<String>): List<CliSessionTail>
+
+    /**
+     * Vazão de saída por modelo desde [sinceEpochMillis] (#386). Padrão vazio:
+     * fonte sem índice de timing não mede vazão — e não inventa.
+     */
+    suspend fun readModelThroughputs(profileId: String?, sinceEpochMillis: Long): Map<String, OutputThroughput> = emptyMap()
 }

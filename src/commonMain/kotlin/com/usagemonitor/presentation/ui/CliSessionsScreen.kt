@@ -40,6 +40,7 @@ import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppErrorState
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.domain.entity.combinedThroughput
 import com.usagemonitor.presentation.ui.components.AppMetricBlock
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
@@ -454,6 +455,18 @@ private fun CliSessionsHeader(
                 AppMetricBlock(
                     label = CliSessionsLabels.activeTime(language),
                     value = formatActiveTime(activeMillis),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+                )
+            }
+
+            // Vazão do conjunto (total sobre total, #381); sem turno medido o
+            // bloco não aparece, pelo mesmo motivo do tempo ativo.
+            val throughput = state.sessions.map { session -> session.throughput }.combinedThroughput()
+            if (throughput?.tokensPerSecond != null) {
+                AppMetricBlock(
+                    label = CliSessionsLabels.throughput(language),
+                    value = formatThroughput(throughput),
+                    footer = CliSessionsLabels.throughputFooter(language),
                     modifier = Modifier.width(METRIC_BLOCK_WIDTH)
                 )
             }

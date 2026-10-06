@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.ui
 
+import kotlinx.datetime.toLocalDateTime
+
+import kotlinx.datetime.TimeZone
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -96,6 +100,7 @@ private fun HistoryWindowTable(windows: List<QuotaWindowSummary>, language: AppL
                         Column(Modifier.fillMaxWidth()) {
                             HistoryMetricTable(listOf(
                                 HistoryMetricEntry(if (pt) "Início observado" else "First reading", windowStartLabel(window, language)),
+                                HistoryMetricEntry(if (pt) "Ativa" else "Active", activeSpanLabel(window)),
                                 HistoryMetricEntry(if (pt) "Pico" else "Peak", "${window.peakPercent} %"),
                                 HistoryMetricEntry(if (pt) "Esgotou em" else "Exhausted after", exhaustionLabel(window)),
                                 HistoryMetricEntry(if (pt) "Ritmo" else "Pace", paceLabel(window.averagePercentPerHour))
@@ -113,6 +118,7 @@ private fun HistoryWideWindowTable(windows: List<QuotaWindowSummary>, language: 
     val pt = language == AppLanguage.PT
     AppColumnHeaderRow(startGutter = 0.dp) {
         AppColumnHeaderLabel(if (pt) "Início observado" else "First reading", Modifier.weight(1.4f))
+        AppColumnHeaderLabel(if (pt) "Ativa" else "Active", Modifier.weight(1.5f))
         AppColumnHeaderLabel(if (pt) "Pico" else "Peak", Modifier.weight(0.7f))
         AppColumnHeaderLabel(if (pt) "Esgotou em" else "Exhausted after", Modifier.weight(1f))
         AppColumnHeaderLabel(if (pt) "Ritmo" else "Pace", Modifier.weight(0.8f))
@@ -121,6 +127,7 @@ private fun HistoryWideWindowTable(windows: List<QuotaWindowSummary>, language: 
     newestFirst.forEachIndexed { index, window ->
         AppDataRow(showDivider = index != newestFirst.lastIndex) {
             AppCellValue(windowStartLabel(window, language), Modifier.weight(1.4f))
+            AppCellValue(activeSpanLabel(window), Modifier.weight(1.5f))
             AppCellValue("${window.peakPercent} %", Modifier.weight(0.7f))
             AppCellValue(exhaustionLabel(window), Modifier.weight(1f))
             AppCellValue(paceLabel(window.averagePercentPerHour), Modifier.weight(0.8f))
@@ -218,6 +225,21 @@ internal fun windowCountSubtitle(count: Int, language: AppLanguage): String {
     }
 }
 
+/**
+ * Faixa ativa da janela (#382): "08:12 → 11:40 · 3h 28min". Os horários são do
+ * dia da própria janela; a data já está na coluna de início. "—" sem subida.
+ */
+internal fun activeSpanLabel(window: QuotaWindowSummary): String {
+    val from = window.activeFrom ?: return "—"
+    val until = window.activeUntil ?: return "—"
+    return "${formatClock(from)} → ${formatClock(until)} · ${formatElapsed(from, until)}"
+}
+
+private fun formatClock(instant: Instant): String {
+    val local = instant.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
+    return "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
+}
+
 internal fun windowStartLabel(window: QuotaWindowSummary, language: AppLanguage): String {
     val start = formatInstant(window.firstObservedAt)
     if (!window.isOpen) {
@@ -262,5 +284,22 @@ private fun formatElapsed(from: Instant, to: Instant): String {
         hours == 0L -> "${rest}min"
         rest == 0L -> "${hours}h"
         else -> "${hours}h ${rest}min"
+    }
+}
+
+/**
+ * Legenda sob o gráfico (#382, direção N6): a faixa ativa da janela corrente e
+ * o que a faixa clara significa. `null` sem janela aberta com uso.
+ */
+internal fun currentActiveSpanCaption(series: UsageHistorySeries, language: AppLanguage): String? {
+    val window = series.windows.lastOrNull { candidate -> candidate.isOpen } ?: return null
+    if (window.activeFrom == null) {
+        return null
+    }
+    val span = activeSpanLabel(window)
+    return if (language == AppLanguage.PT) {
+        "Janela atual ativa $span. A faixa clara marca o trecho em que o uso subiu; o resto ficou ocioso."
+    } else {
+        "Current window active $span. The light band marks where usage rose; the rest was idle."
     }
 }

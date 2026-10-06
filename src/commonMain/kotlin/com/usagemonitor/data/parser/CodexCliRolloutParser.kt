@@ -1,5 +1,6 @@
 package com.usagemonitor.data.parser
 
+import com.usagemonitor.data.dto.CodexCliRequestMarkerLineDto
 import com.usagemonitor.data.dto.CodexCliRolloutTypeDto
 import com.usagemonitor.data.dto.CodexCliSessionMetaLineDto
 import com.usagemonitor.data.dto.CodexCliTokenUsageRecordLineDto
@@ -30,7 +31,11 @@ data class CodexCliParsedRollout(
     val unknownLines: Int = 0
 )
 
-/** Parser de contrato observável. Não desserializa `response_item` nem conteúdo de ferramenta. */
+/**
+ * Parser de contrato observável. De `response_item` lê só o envelope (tipo,
+ * instante, papel) para saber quando um pedido começou; nunca o conteúdo da
+ * mensagem ou da ferramenta.
+ */
 class CodexCliRolloutParser(
     private val json: Json = Json {
         ignoreUnknownKeys = true
@@ -44,6 +49,10 @@ class CodexCliRolloutParser(
         var sequence = 0
         val contexts = mutableMapOf<String, TurnContext>()
         val turns = mutableListOf<CodexCliSessionTurn>()
+        // Última entrada que dispara um pedido ao modelo: contexto de turno,
+        // saída de ferramenta ou mensagem do usuário. Medido em 2026-10-06:
+        // `token_usage_record − essa entrada` dá 32 tok/s de mediana (#381).
+        var lastRequestAt: Instant? = null
 
         for (rawLine in lines) {
             if (rawLine.isBlank()) {
@@ -91,6 +100,7 @@ class CodexCliRolloutParser(
                     }.getOrNull()
                     val payload = line?.payload
                     val turnId = payload?.turnId?.takeIf { value -> value.isNotBlank() }
+                    lastRequestAt = rawLine.requestTimestamp() ?: lastRequestAt
                     if (turnId != null) {
                         contexts[turnId] = TurnContext(
                             model = payload.model,
@@ -126,11 +136,28 @@ class CodexCliRolloutParser(
                         source = sourceMetadata?.source ?: CodexCliRolloutSource.UNKNOWN,
                         rawSource = sourceMetadata?.rawSource,
                         threadSource = sourceMetadata?.threadSource,
-                        usage = usage
+                        usage = usage,
+                        requestTs = lastRequestAt
                     )
+                    // A próxima resposta só tem pedido medido se uma nova entrada aparecer.
+                    lastRequestAt = null
                 }
 
-                EVENT_MSG_TYPE, RESPONSE_ITEM_TYPE, WORLD_STATE_TYPE -> Unit
+                RESPONSE_ITEM_TYPE -> {
+                    val marker = runCatching {
+                        json.decodeFromString<CodexCliRequestMarkerLineDto>(rawLine)
+                    }.getOrNull()
+                    val payload = marker?.payload
+                    val startsRequest = payload?.type in REQUEST_ITEM_TYPES ||
+                        (payload?.type == MESSAGE_ITEM_TYPE && payload.role == USER_ROLE)
+                    if (startsRequest) {
+                        lastRequestAt = marker?.timestamp
+                            ?.let { value -> runCatching { Instant.parse(value) }.getOrNull() }
+                            ?: lastRequestAt
+                    }
+                }
+
+                EVENT_MSG_TYPE, WORLD_STATE_TYPE -> Unit
                 else -> unknownLines++
             }
         }
@@ -141,6 +168,12 @@ class CodexCliRolloutParser(
             skippedLines = skippedLines,
             unknownLines = unknownLines
         )
+    }
+
+    private fun String.requestTimestamp(): Instant? {
+        return runCatching { json.decodeFromString<CodexCliRequestMarkerLineDto>(this) }.getOrNull()
+            ?.timestamp
+            ?.let { value -> runCatching { Instant.parse(value) }.getOrNull() }
     }
 
     private fun JsonElement?.asStringOrNull(): String? {
@@ -177,5 +210,8 @@ class CodexCliRolloutParser(
         const val EVENT_MSG_TYPE = "event_msg"
         const val RESPONSE_ITEM_TYPE = "response_item"
         const val WORLD_STATE_TYPE = "world_state"
+        const val MESSAGE_ITEM_TYPE = "message"
+        const val USER_ROLE = "user"
+        val REQUEST_ITEM_TYPES = setOf("function_call_output", "custom_tool_call_output")
     }
 }

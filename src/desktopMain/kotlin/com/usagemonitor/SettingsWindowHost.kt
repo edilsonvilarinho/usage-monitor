@@ -3,6 +3,7 @@ package com.usagemonitor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.window.DialogState
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.AppDialogWindow
@@ -39,6 +40,14 @@ internal fun SettingsWindowHost(
     val codexRecords by graph.codexProfileRegistry.profiles.collectAsState()
     val proxySettings by graph.proxySettingsFlow.collectAsState()
     val teamSyncStatus by viewModels.teamSync.syncStatus.collectAsState()
+    val webAccessSettings by graph.webAccessSettingsFlow.collectAsState()
+    val webAccessStatus by viewModels.webAccess.status.collectAsState()
+    val webAccessActions = remember(graph) { WebAccessActions(graph.webAccessSettingsDataSource, graph.webAccessSettingsFlow) }
+    val telegramSettings by graph.telegramSettingsFlow.collectAsState()
+    val telegramStatus by viewModels.telegramBot.status.collectAsState()
+    val telegramActions = remember(graph) {
+        TelegramBotActions(graph.telegramSettingsDataSource, graph.telegramSettingsFlow, viewModels.telegramBot)
+    }
     val language = shell.language
 
     AppDialogWindow(
@@ -130,6 +139,8 @@ internal fun SettingsWindowHost(
             onProxyUsernameChange = actions::changeProxyUsername,
             onProxyPasswordChange = actions::changeProxyPassword,
             onProxyTestConnection = feedback::checkProxyConnection,
+            webAccess = webAccessSectionModel(webAccessSettings, webAccessStatus, webAccessActions),
+            telegramBot = telegramBotSectionModel(telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions),
             toastEvent = feedback.toastEvent
         )
     }

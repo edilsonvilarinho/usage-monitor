@@ -44,7 +44,7 @@ internal fun selectedHistorySeries(state: HistoryUiState.Success): List<UsageHis
             weekly == null -> listOf(group.chartSeries)
             state.selectedQuotaView == HistoryQuotaView.WEEKLY -> listOf(weekly)
             state.selectedQuotaView == HistoryQuotaView.INTERVAL -> listOf(group.chartSeries)
-            else -> listOf(group.chartSeries, weekly)
+            else -> listOfNotNull(group.chartSeries, weekly, group.monthlySummary)
         }
     }
 }

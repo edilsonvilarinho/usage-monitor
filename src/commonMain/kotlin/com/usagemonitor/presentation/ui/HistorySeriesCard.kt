@@ -25,7 +25,8 @@ internal fun HistorySeriesCard(
     source: ApiSource, series: UsageHistorySeries, index: Int, accentColor: Color,
     language: AppLanguage, chartSelectionKey: String, titleOverride: String? = null,
     subtitleOverride: String? = null, weeklySummary: UsageHistorySeries? = null,
-    referenceAt: Instant? = null, quotaView: HistoryQuotaView = HistoryQuotaView.BOTH
+    referenceAt: Instant? = null, quotaView: HistoryQuotaView = HistoryQuotaView.BOTH,
+    monthlySummary: UsageHistorySeries? = null
 ) {
     var metricsExpanded by remember(chartSelectionKey) { mutableStateOf(true) }
     var analysisExpanded by remember(chartSelectionKey) { mutableStateOf(false) }
@@ -36,7 +37,7 @@ internal fun HistorySeriesCard(
         weeklySummary == null -> listOf(series)
         quotaView == HistoryQuotaView.WEEKLY -> listOf(weeklySummary)
         quotaView == HistoryQuotaView.INTERVAL -> listOf(series)
-        else -> listOf(series, weeklySummary)
+        else -> listOfNotNull(series, weeklySummary, monthlySummary)
     }
     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
         HistorySummary(historyMetricEntries(source, chartSeries, language, referenceAt), chartSelectionKey)
@@ -47,8 +48,21 @@ internal fun HistorySeriesCard(
                     chartSelectionKey = "$chartSelectionKey:${quotaView.name}", tooltipTitle = title, tooltipSubtitle = subtitle,
                     accentColor = accentColor, previousPoints = chartSeries.previousWindowPoints,
                     seriesLabel = quotaWindowLabel(chartSeries, language),
-                    overlays = historyChartOverlays(weeklySummary.takeIf { quotaView == HistoryQuotaView.BOTH }, series, AppAccents.current.output, language)
+                    overlays = historyChartOverlays(
+                        weeklySummary.takeIf { quotaView == HistoryQuotaView.BOTH }, series, AppAccents.current.output, language,
+                        monthlySummary = monthlySummary.takeIf { quotaView == HistoryQuotaView.BOTH && weeklySummary != null },
+                        monthlyColor = AppAccents.current.savings
+                    ),
+                    showActiveSpans = chartSeries.windows.isNotEmpty()
                 )
+                currentActiveSpanCaption(chartSeries, language)?.let { caption ->
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = AppSpacing.xs)
+                    )
+                }
             }
         }
         HistoryDetailsSection(
@@ -58,7 +72,11 @@ internal fun HistorySeriesCard(
             Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                 visibleSeries.forEach { item ->
                     HistoryMetricsPanel(
-                        title = if (weeklySummary != null) { if (item == weeklySummary) weeklySummaryLabel(language) else intervalSummaryLabel(language) } else if (language == AppLanguage.PT) "Resumo da série" else "Series summary",
+                        title = when {
+                            item == monthlySummary -> monthlySummaryLabel(language)
+                            weeklySummary != null -> if (item == weeklySummary) weeklySummaryLabel(language) else intervalSummaryLabel(language)
+                            else -> if (language == AppLanguage.PT) "Resumo da série" else "Series summary"
+                        },
                         source = source, series = item, language = language, referenceAt = referenceAt
                     )
                 }
@@ -70,7 +88,14 @@ internal fun HistorySeriesCard(
                 "historyAnalysis:$chartSelectionKey", analysisExpanded, { analysisExpanded = !analysisExpanded }, language
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                    visibleSeries.forEach { item -> HistoryWindowAnalysisPanel(item, if (item == weeklySummary) AppAccents.current.output else accentColor, language) }
+                    visibleSeries.forEach { item ->
+                        val itemColor = when (item) {
+                            weeklySummary -> AppAccents.current.output
+                            monthlySummary -> AppAccents.current.savings
+                            else -> accentColor
+                        }
+                        HistoryWindowAnalysisPanel(item, itemColor, language)
+                    }
                 }
             }
         }

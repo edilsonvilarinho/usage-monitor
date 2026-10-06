@@ -1,5 +1,9 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.ComparisonScreen
+
+import com.usagemonitor.presentation.ui.ComparisonLabels
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -107,6 +111,20 @@ internal fun ModalWindowsHost(
         openGeneration = modal.codexCliSessionsOpenGeneration
     ) {
         CodexCliSessionsScreen(viewModel = viewModels.codexCliSessions, language = language)
+    }
+
+    AppDialogWindow(
+        visible = modal.isComparisonOpen,
+        title = ComparisonLabels.title(language),
+        state = windows.comparison,
+        environment = environment,
+        diagnosticName = "comparação entre modelos",
+        minWidthDp = 860,
+        minHeightDp = 480,
+        onCloseRequest = { modal.isComparisonOpen = false },
+        openGeneration = modal.comparisonOpenGeneration
+    ) {
+        ComparisonScreen(viewModel = viewModels.comparison, language = language)
     }
 
     // A mesma origem nas duas telas do time: é ela que separa a sessão desta

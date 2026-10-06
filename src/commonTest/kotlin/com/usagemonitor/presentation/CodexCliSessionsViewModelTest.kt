@@ -129,6 +129,31 @@ class CodexCliSessionsViewModelTest {
     }
 
     @Test
+    fun `live tick never flags the screen as refreshing`() = runTest {
+        val repository = FakeRepository()
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            liveIntervalMillis = 5_000L
+        )
+        viewModel.openWindow()
+        testScheduler.runCurrent()
+
+        val observed = mutableListOf<Boolean>()
+        repeat(3) {
+            advanceTimeBy(4_999L)
+            testScheduler.runCurrent()
+            advanceTimeBy(1L)
+            observed += (viewModel.uiState.value as CodexCliSessionsUiState.Success).isRefreshing
+            testScheduler.runCurrent()
+        }
+
+        assertEquals(listOf(false, false, false), observed)
+        viewModel.closeWindow()
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `automatic refresh preserves and reloads the open detail`() = runTest {
         val repository = FakeRepository()
         val viewModel = viewModel(

@@ -307,7 +307,7 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     "Reiniciar o app e atualizar" não cabe nem na largura interna inteira do aviso (192dp) a partir de
     105% de escala, e o rótulo não encurta — diz o que reinicia. O botão continua abaixo do aviso.
 - **Sessão ativa e atenção são movimento contínuo, atrás da política**: o arco fino que gira **em
-  órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`) e o pulso do
+  órbita por fora** do anel (turno CLI nos últimos 5 min, `SessionPulseViewModel.activeTargets`, ou consumo da cota avançando nos últimos 10 min nas fontes sem CLI — `QuotaActivityTracker`, #385) e o pulso do
   anel de fora em `Atenção`/`Crítico` só existem com `AppMotionPolicy.continuous`. Sem ela o arco
   fica parado e o pulso some; a palavra continua dizendo o estado.
   - **Mais suave desde a #322.** A órbita virou **cometa**: 130° com a cauda num gradiente que se

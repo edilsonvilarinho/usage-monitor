@@ -140,7 +140,8 @@ internal fun DrawScope.drawHistoryPlot(
     resetClusterPoints: List<Pair<ResetMarker, ChartPlotPoint>>,
     rangeAnnotations: HistoryRangeAnnotations?,
     activePoint: ChartPlotPoint?,
-    revealFraction: Float
+    revealFraction: Float,
+    activeSpans: List<Pair<Float, Float>> = emptyList()
 ) {
     val lineColor = colors.line
     val fillColor = colors.fill
@@ -173,6 +174,24 @@ internal fun DrawScope.drawHistoryPlot(
         end = Offset(size.width, size.height),
         strokeWidth = gridStroke
     )
+
+    // Faixa ativa de cada janela (#382, direção N6): fundo claro da cor da série
+    // e uma chave fina no topo. Atrás de tudo — é contexto do traço, não dado.
+    // O que fica fora da faixa é o tempo ocioso da janela, sem desenho próprio.
+    val minimumSpanWidth = 2.dp.toPx()
+    activeSpans.forEach { (startX, endX) ->
+        val width = (endX - startX).coerceAtLeast(minimumSpanWidth)
+        drawRect(
+            color = lineColor.copy(alpha = 0.08f),
+            topLeft = Offset(startX, 0f),
+            size = androidx.compose.ui.geometry.Size(width, size.height)
+        )
+        val bracketY = gridStroke
+        val tick = 4.dp.toPx()
+        drawLine(lineColor.copy(alpha = 0.7f), Offset(startX, bracketY), Offset(startX + width, bracketY), gridStroke)
+        drawLine(lineColor.copy(alpha = 0.7f), Offset(startX, bracketY), Offset(startX, bracketY + tick), gridStroke)
+        drawLine(lineColor.copy(alpha = 0.7f), Offset(startX + width, bracketY), Offset(startX + width, bracketY + tick), gridStroke)
+    }
 
     resetClusterPoints.forEach { (_, resetPoint) ->
         drawLine(

@@ -44,18 +44,24 @@ import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTab
+import com.usagemonitor.presentation.ui.components.AppTabs
 import com.usagemonitor.presentation.ui.components.AppToolbar
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppWindowScaffold
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CodexCliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 
-private val CODEX_SESSION_ID_COLUMN = 170.dp
-private val CODEX_SESSION_PROJECT_COLUMN = 180.dp
+// Com a coluna de vazão (#384) as sete colunas somam 880dp com os vãos; ID e
+// projeto cederam 30dp cada para a linha continuar sem quebrar em 960dp.
+private val CODEX_SESSION_ID_COLUMN = 140.dp
+private val CODEX_SESSION_PROJECT_COLUMN = 150.dp
+private val CODEX_SESSION_THROUGHPUT_COLUMN = 84.dp
 private val CODEX_SESSION_MODEL_COLUMN = 130.dp
 private val CODEX_SESSION_RESPONSES_COLUMN = 84.dp
 private val CODEX_SESSION_TOKENS_COLUMN = 130.dp
@@ -116,12 +122,21 @@ fun CodexCliSessionsScreen(
             else -> true
         }
         if (showSessionToolbar) {
+            // Mesmo padrão do modal do Anthropic (#384): abas Sessões/Resumo à
+            // esquerda, selo ao vivo, janela e exportações. Sem botão de atualizar
+            // — o laço de 5 s já relê, e o botão sugeria que a tela não se atualiza.
             AppToolbar(spacing = AppSpacing.sm) {
-                Text(
-                    text = if (language == AppLanguage.PT) "Sessões Codex" else "Codex sessions",
-                    style = MaterialTheme.typography.titleMedium
+                AppTabs(
+                    tabs = listOf(
+                        AppTab(label = BreakdownLabels.tabSessions(language)),
+                        AppTab(label = BreakdownLabels.tabBreakdown(language))
+                    ),
+                    selectedIndex = if ((state as? CodexCliSessionsUiState.Success)?.view == CliSessionsView.BREAKDOWN) 1 else 0,
+                    onSelect = { index ->
+                        viewModel.selectView(if (index == 1) CliSessionsView.BREAKDOWN else CliSessionsView.SESSIONS)
+                    },
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.weight(1f))
                 LiveBadge(language = language)
                 AppSegmentedControl(
                     options = listOf(
@@ -138,11 +153,6 @@ fun CodexCliSessionsScreen(
                     onSelect = { index -> viewModel.setRange(CodexCliSessionRange.entries[index]) }
                 )
                 AppButton(
-                    label = if (language == AppLanguage.PT) "Atualizar" else "Refresh",
-                    onClick = viewModel::refresh,
-                    tone = AppButtonTone.PRIMARY
-                )
-                AppButton(
                     label = "CSV",
                     onClick = { viewModel.exportCurrent(UsageExportFormat.CSV) },
                     tone = AppButtonTone.GHOST
@@ -151,6 +161,10 @@ fun CodexCliSessionsScreen(
                     label = "JSON",
                     onClick = { viewModel.exportCurrent(UsageExportFormat.JSON) },
                     tone = AppButtonTone.GHOST
+                )
+                AppButton(
+                    label = ExportLabels.exportPdf(language),
+                    onClick = { viewModel.exportReport(language) }
                 )
             }
         }
@@ -171,7 +185,7 @@ fun CodexCliSessionsScreen(
                 is CodexCliSessionsUiState.Error -> AppErrorState(
                     message = current.message,
                     retryLabel = if (language == AppLanguage.PT) "Tentar novamente" else "Retry",
-                    onRetry = viewModel::refresh,
+                    onRetry = { viewModel.refresh() },
                     modifier = Modifier.fillMaxSize()
                 )
                 is CodexCliSessionsUiState.Success -> CodexCliSessionContent(
@@ -236,6 +250,12 @@ private fun CodexCliSessionContent(
         return
     }
 
+    CodexCliSessionMetrics(state.sessions, language)
+    if (state.view == CliSessionsView.BREAKDOWN) {
+        CodexCliSessionBreakdown(state.sessions, language, modifier)
+        return
+    }
+
     AppDataSurfaceFlush(
         modifier = modifier,
         header = { CodexSessionColumnHeader(language = language) }
@@ -285,6 +305,10 @@ private fun CodexSessionColumnHeader(language: AppLanguage) {
         AppColumnHeaderLabel(
             label = if (language == AppLanguage.PT) "Modelo" else "Model",
             modifier = Modifier.width(CODEX_SESSION_MODEL_COLUMN)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.throughput(language),
+            modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN)
         )
     }
 }
@@ -351,6 +375,10 @@ private fun CodexCliSessionRow(
                     value = session.primaryModel ?: "—",
                     modifier = Modifier.width(CODEX_SESSION_MODEL_COLUMN),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AppCellValue(
+                    value = formatThroughput(session.throughput),
+                    modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN)
                 )
             }
             Row(

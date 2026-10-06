@@ -10,7 +10,11 @@ import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.UsageExportRequest
+import com.usagemonitor.presentation.ui.codexReportRequest
 import com.usagemonitor.presentation.ui.exportRequestForCodexCliSessions
+import com.usagemonitor.presentation.ui.report.reportForCodexCliSessions
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +49,9 @@ sealed interface CodexCliSessionsUiState {
         val detail: CodexCliSessionDetail? = null,
         val detailLoading: Boolean = false,
         val isRefreshing: Boolean = false,
-        val exportOutcome: CodexCliExportOutcome? = null
+        val exportOutcome: CodexCliExportOutcome? = null,
+        /** Lista ou Resumo (#384) — o mesmo par de abas do modal do Anthropic. */
+        val view: CliSessionsView = CliSessionsView.SESSIONS
     ) : CodexCliSessionsUiState
 }
 
@@ -83,12 +89,20 @@ class CodexCliSessionsViewModel(
         if (autoLoad) refresh()
     }
 
-    fun refresh() {
+    /**
+     * Relê o índice. [showProgress] falso é a passada do laço ao vivo: ela roda a
+     * cada 5 s, e marcar `isRefreshing` em todas fazia a barra piscar
+     * "Atualizando…" sem parar — a tela parecia recarregar em vez de estar viva
+     * (#384). O selo AO VIVO já diz que a leitura é contínua.
+     */
+    fun refresh(showProgress: Boolean = true) {
         loadJob?.cancel()
         val requestedRange = range
         val current = _uiState.value
         if (current is CodexCliSessionsUiState.Success) {
-            _uiState.value = current.copy(isRefreshing = true)
+            if (showProgress) {
+                _uiState.value = current.copy(isRefreshing = true)
+            }
         } else {
             _uiState.value = CodexCliSessionsUiState.Loading
         }
@@ -121,7 +135,8 @@ class CodexCliSessionsViewModel(
                         detail = latest?.detail,
                         detailLoading = latest?.detailLoading ?: false,
                         exportOutcome = latest?.exportOutcome,
-                        isRefreshing = false
+                        isRefreshing = false,
+                        view = latest?.view ?: CliSessionsView.SESSIONS
                     )
                 },
                 onFailure = { error ->
@@ -189,6 +204,10 @@ class CodexCliSessionsViewModel(
             format = format,
             now = clock.now()
         )
+        publishExport(writer, request)
+    }
+
+    private fun publishExport(writer: UsageExportWriter, request: UsageExportRequest) {
         exportJob?.cancel()
         exportJob = scope.launch {
             val outcome = runCatching { writer.write(request) }.fold(
@@ -201,6 +220,25 @@ class CodexCliSessionsViewModel(
             val latest = _uiState.value as? CodexCliSessionsUiState.Success ?: return@launch
             _uiState.value = latest.copy(exportOutcome = outcome)
         }
+    }
+
+    fun selectView(view: CliSessionsView) {
+        val current = _uiState.value as? CodexCliSessionsUiState.Success ?: return
+        _uiState.value = current.copy(view = view)
+    }
+
+    /** PDF do recorte da tela, no idioma do app (#384). */
+    fun exportReport(language: AppLanguage) {
+        val writer = exportWriter ?: return
+        val current = _uiState.value as? CodexCliSessionsUiState.Success ?: return
+        val now = clock.now()
+        val request = codexReportRequest(
+            document = reportForCodexCliSessions(current.sessions, current.range, language, now),
+            range = current.range,
+            now = now,
+            language = language
+        )
+        publishExport(writer, request)
     }
 
     fun openWindow() {
@@ -220,7 +258,7 @@ class CodexCliSessionsViewModel(
         liveJob = scope.launch {
             while (true) {
                 delay(liveIntervalMillis)
-                refresh()
+                refresh(showProgress = false)
                 loadJob?.join()
                 reloadOpenDetail()
             }

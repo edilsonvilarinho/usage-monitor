@@ -101,11 +101,56 @@ fun reportRequest(
     document: UsageReportDocument,
     range: CliSessionRange,
     now: Instant,
+    /**
+     * Idioma do rodapé, do "continua" e dos dias da semana do PDF (#384). Sem ele
+     * o escritor usava o próprio padrão (PT), e um relatório pedido em inglês saía
+     * com o corpo em inglês e o rodapé em português.
+     */
+    language: AppLanguage? = null,
     timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
 ): UsageExportRequest {
     return UsageExportRequest(
         suggestedFileName = reportFileName(range, now, timeZone),
-        payload = UsageExportPayload.Report(document)
+        payload = UsageExportPayload.Report(document, language)
+    )
+}
+
+/** PDF da comparação: `usage-monitor-comparison-7d-2026-10-06.pdf` (#386). */
+fun comparisonReportRequest(
+    document: UsageReportDocument,
+    range: CliSessionRange,
+    now: Instant,
+    language: AppLanguage,
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+): UsageExportRequest {
+    val local = now.toLocalDateTime(timeZone).date
+    val month = local.monthNumber.toString().padStart(2, '0')
+    val day = local.dayOfMonth.toString().padStart(2, '0')
+    return UsageExportRequest(
+        suggestedFileName = "usage-monitor-comparison-${rangeSlug(range)}-${local.year}-$month-$day.pdf",
+        payload = UsageExportPayload.Report(document, language)
+    )
+}
+
+/** PDF do modal do Codex: `usage-monitor-codex-report-5h-2026-10-06.pdf`. */
+fun codexReportRequest(
+    document: UsageReportDocument,
+    range: CodexCliSessionRange,
+    now: Instant,
+    language: AppLanguage,
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+): UsageExportRequest {
+    val local = now.toLocalDateTime(timeZone).date
+    val month = local.monthNumber.toString().padStart(2, '0')
+    val day = local.dayOfMonth.toString().padStart(2, '0')
+    val rangeSlug = when (range) {
+        CodexCliSessionRange.LAST_5H -> "5h"
+        CodexCliSessionRange.LAST_7D -> "7d"
+        CodexCliSessionRange.ALL -> "total"
+    }
+    return UsageExportRequest(
+        suggestedFileName = "usage-monitor-codex-report-$rangeSlug-${local.year}-$month-$day.pdf",
+        payload = UsageExportPayload.Report(document, language)
     )
 }
 

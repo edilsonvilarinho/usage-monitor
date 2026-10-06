@@ -39,6 +39,10 @@ internal class AppModalState(bugReportOpenAtStart: Boolean) {
     var codexCliSessionsOpenGeneration by mutableStateOf(0)
         private set
 
+    var isComparisonOpen by mutableStateOf(false)
+    var comparisonOpenGeneration by mutableStateOf(0)
+        private set
+
     var isTeamUsageOpen by mutableStateOf(false)
     var teamUsageOpenGeneration by mutableStateOf(0)
         private set
@@ -83,6 +87,11 @@ internal class AppModalState(bugReportOpenAtStart: Boolean) {
     fun openCodexCliSessions() {
         isCodexCliSessionsOpen = true
         codexCliSessionsOpenGeneration++
+    }
+
+    fun openComparison() {
+        isComparisonOpen = true
+        comparisonOpenGeneration++
     }
 
     /** [profileId] nulo com [isAdminOverview] é a visão global do administrador. */

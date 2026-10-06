@@ -9,6 +9,24 @@ data class CodexCliRolloutTypeDto(
     val type: String? = null
 )
 
+/**
+ * Só o envelope de uma linha que pode iniciar um pedido ao modelo: tipo,
+ * instante e, no `payload`, o tipo do item e o papel. O conteúdo (mensagem,
+ * saída de ferramenta) não é declarado e nunca é lido.
+ */
+@Serializable
+data class CodexCliRequestMarkerLineDto(
+    val type: String? = null,
+    val timestamp: String? = null,
+    val payload: CodexCliRequestMarkerPayloadDto? = null
+)
+
+@Serializable
+data class CodexCliRequestMarkerPayloadDto(
+    val type: String? = null,
+    val role: String? = null
+)
+
 @Serializable
 data class CodexCliSessionMetaLineDto(
     val type: String? = null,

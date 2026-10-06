@@ -95,6 +95,11 @@ ser esquecidas:
   ao vivo e nunca derruba a fonte. `CodexQuotaLabels` é chave de série — não renomear.
 - Contas Codex extras (`CodexProfileRegistry`): a padrão segue **sem** `profileId`; id das extras
   começa com `codex-`. Cor/emoji por conta leem `anthropicProfileId`, nunca `profileId` cru.
+- Índice CLI (#381): `message.id` repetido **funde por `MAX`** (a saída cresce entre linhas); vazão é ponta a ponta
+  (`request_ts` → `last_line_ts`), soma de tokens e de tempo, nunca média de razões. Codex versiona em `codex_cli_index_meta`.
+- Acesso web local (#388) e bot Telegram (#387): opt-in, segredo em `~/.usage-monitor/{web-access,telegram}.json`, tipos
+  sem `data class`. Servidor só `GET`, token em toda rota (`MessageDigest.isEqual`); bot começa do agora e só atende
+  conversa pareada. Saem do `UsageSnapshot` — nunca prompt, resposta ou caminho.
 
 ### Camada presentation (`commonMain/presentation/`)
 
@@ -112,6 +117,7 @@ Decisões e histórico de cada funcionalidade em [`docs/presentation.md`](docs/p
 - **Ordem total e determinística** em toda lista publicada por `StateFlow`: duas leituras iguais têm
   de dar listas iguais, senão a tela recompõe a cada tique.
 - Leitura que falha **mantém** os números anteriores e publica só a mensagem.
+- Uso detectado pela cota (`QuotaActivityTracker`, #385) acende o arco da HUD e **nunca** entra no `cliBusy` (realimentaria o polling).
 - Nunca valor novo em `CliSessionRange` para cortes de tempo; use parâmetro (`sinceEpochMillis`).
 - Custo é recalculado dos tokens com `ModelPricingTable`, nunca rateado. Modelo sem tarifa não vira
   custo zero (`unpricedTurnCount`, `+` no valor). Ferramenta não entra em custo.
@@ -389,5 +395,6 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 | OpenCode Go | `GET https://opencode.ai/zen/go/v1/usage` | `Authorization: Bearer {apiKey}` lida de `~/.usage-monitor/api-keys.json` — a mesma chave do `chat/completions` do Zen |
 | Cursor | `GET https://cursor.com/api/usage-summary` (rota não documentada) | Cookie `WorkosCursorSessionToken` montado da sessão do editor em `state.vscdb`, lida em read-only e nunca persistida |
 | Antigravity CLI | `agy --sandbox --print-timeout 30s --output-format json --print /usage` (processo local) | Sessão já autenticada do próprio CLI; o app nunca inicia login |
+| Telegram (bot, opcional) | `https://api.telegram.org/bot{token}/getUpdates`, `sendMessage`, `deleteWebhook` | Token do bot em `~/.usage-monitor/telegram.json`; long polling de 25 s com timeout estendido |
 
 Formato das respostas (unidades, campos, códigos de erro): [`docs/integrations.md`](docs/integrations.md#formato-das-respostas).

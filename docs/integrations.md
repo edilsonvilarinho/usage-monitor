@@ -275,6 +275,26 @@ For personal usage, this integration follows the individual-account source refer
   last reading. A refresh requested by the user always calls it again.
 - The collector does not call undocumented IDE RPCs and never stores or logs the CLI output.
 
+## Telegram (bot de alertas e comandos, #387)
+
+Opcional, desligado por padrão. O usuário cria o bot no @BotFather e cola o token em Configurações › Alertas;
+token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de segredo, permissão só do dono).
+
+- **Só saída HTTPS** (`https://api.telegram.org/bot<token>/…`): `deleteWebhook` ao conectar (o `getUpdates` não funciona
+  com webhook), `getUpdates` em long polling de 25 s (o timeout da requisição é estendido para 35 s; o padrão do app,
+  20 s, cortaria toda espera) e `sendMessage`. Nenhuma porta aberta.
+- **Começa do agora**: a primeira chamada é `getUpdates(offset = -1)`, que devolve só o último update; o polling segue do
+  seguinte. O Telegram guarda updates por 24 h, e sem isso um `/alertas off` antigo seria reaplicado a cada arranque.
+- **Pareamento**: "Parear conversa" gera um código de 6 caracteres (sem 0/O/1/I) válido por 10 min; a conversa que mandar
+  `/start <código>` entra na lista. Conversa não pareada não recebe resposta nenhuma.
+- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/alertas on|off`, `/silencio 22-07|off`, `/limiar 75,90`, `/ajuda`.
+  Os que mudam algo passam por `applyBotCommand` e gravam nas mesmas preferências de alerta das Configurações.
+- **Alertas**: o serviço coleta o mesmo `UsageAlertViewModel.alerts` da bandeja — já deduplicado e respeitando o silêncio —
+  e manda o mesmo título e corpo (`usageAlertMessage`) a cada conversa pareada, com 1,1 s entre envios (limite do Telegram
+  ~1 mensagem/s por conversa). 429 espera o `retry_after`; 401/404 é token recusado e para até o usuário trocá-lo.
+- Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
+- **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
+
 ## Formato das respostas
 
 Response Anthropic retorna `five_hour`/`seven_day` com `utilization` em **percentual** (0–100) e `resets_at` em ISO 8601 (pode ser nulo), mais `extra_usage`/`spend` com os créditos de uso em unidades menores da moeda da conta.

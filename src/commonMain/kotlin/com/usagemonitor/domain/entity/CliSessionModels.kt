@@ -117,7 +117,9 @@ data class CliSessionSummary(
      */
     val activeMillis: Long? = null,
     /** O `.jsonl` de origem não existe mais (retenção do CLI); só o resumo sobrevive. */
-    val stale: Boolean = false
+    val stale: Boolean = false,
+    /** Vazão de saída dos turnos medidos na janela lida; `null` = nenhum turno medido (#381). */
+    val throughput: OutputThroughput? = null
 ) {
     val cacheWriteTokens: Long
         get() = cacheWrite5mTokens + cacheWrite1hTokens

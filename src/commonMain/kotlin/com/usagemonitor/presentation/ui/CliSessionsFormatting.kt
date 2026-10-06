@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.domain.entity.OutputThroughput
+
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.time.Instant
@@ -315,6 +317,16 @@ internal object CliSessionsLabels {
         return if (language == AppLanguage.PT) "Tempo ativo" else "Active time"
     }
 
+    /** Vazão de saída (#381). */
+    fun throughput(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Vazão" else "Throughput"
+    }
+
+    /** O que a vazão mede: do pedido à última linha, não a decodificação pura. */
+    fun throughputFooter(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "saída · ponta a ponta" else "output · end to end"
+    }
+
     fun costDistribution(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Distribuição de custo" else "Cost distribution"
     }
@@ -569,4 +581,13 @@ internal fun formatActiveTime(millis: Long): String {
         return "${minutes}min"
     }
     return "${hours}h${(minutes % 60L).toString().padStart(2, '0')}"
+}
+
+/**
+ * Vazão de saída em tokens por segundo, arredondada (#381). "—" quando nenhum
+ * turno foi medido — zero diria que foi medido e não produziu nada.
+ */
+internal fun formatThroughput(throughput: OutputThroughput?): String {
+    val rate = throughput?.tokensPerSecond ?: return "—"
+    return "${rate.roundToLong()} tok/s"
 }

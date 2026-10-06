@@ -376,15 +376,29 @@ internal fun historySeriesDisplaySubtitle(
 internal data class GenericHistoryCardModel(
     val baseLabel: String,
     val chartSeries: UsageHistorySeries,
-    val weeklySummary: UsageHistorySeries?
+    val weeklySummary: UsageHistorySeries?,
+    /**
+     * Cota mensal da mesma família (#382: OpenCode Go 30d, Codex mensal). Entra
+     * no mesmo card, como terceira série, só na visão "Todas" — sem valor novo em
+     * `HistoryQuotaView`, que quebraria os `when` exaustivos do seletor.
+     */
+    val monthlySummary: UsageHistorySeries? = null
 )
 
 private data class MutableGenericHistoryGroup(
     val baseLabel: String,
     var intervalSeries: UsageHistorySeries? = null,
     var weeklySeries: UsageHistorySeries? = null,
+    var monthlySeries: UsageHistorySeries? = null,
     var otherSeries: UsageHistorySeries? = null
 )
+
+/**
+ * Sufixos de janela que separam membros da mesma família de cota. O OpenCode Go
+ * escreve as janelas por extenso ("Go semanal", "Go mensal"); renomear os
+ * rótulos quebraria a série gravada, então quem aprende os nomes é o agrupador.
+ */
+private val QUOTA_WINDOW_SUFFIXES = listOf(" 5h", " 7d", " 30d", " semanal", " mensal")
 
 /**
  * Funde as séries INTERVAL (5h) e WEEKLY (7d) da mesma quota-família num único card:
@@ -396,17 +410,14 @@ internal fun buildGenericHistoryGroups(series: List<UsageHistorySeries>): List<G
     val grouped = linkedMapOf<String, MutableGenericHistoryGroup>()
 
     series.forEach { item ->
-        val baseLabel = when {
-            item.quotaLabel.endsWith(" 5h") -> item.quotaLabel.removeSuffix(" 5h")
-            item.quotaLabel.endsWith(" 7d") -> item.quotaLabel.removeSuffix(" 7d")
-            else -> item.quotaLabel
-        }
+        val suffix = QUOTA_WINDOW_SUFFIXES.firstOrNull { candidate -> item.quotaLabel.endsWith(candidate) }
+        val baseLabel = if (suffix == null) item.quotaLabel else item.quotaLabel.removeSuffix(suffix)
 
         val group = grouped.getOrPut(baseLabel) { MutableGenericHistoryGroup(baseLabel) }
         when (item.periodType) {
             PeriodType.INTERVAL -> group.intervalSeries = item
             PeriodType.WEEKLY -> group.weeklySeries = item
-            PeriodType.MONTHLY -> group.otherSeries = item
+            PeriodType.MONTHLY -> group.monthlySeries = item
             PeriodType.REPORTED -> group.otherSeries = item
         }
     }
@@ -414,9 +425,11 @@ internal fun buildGenericHistoryGroups(series: List<UsageHistorySeries>): List<G
     return grouped.values.map { group ->
         val interval = group.intervalSeries
         val weekly = group.weeklySeries
+        val monthly = group.monthlySeries
         when {
-            interval != null -> GenericHistoryCardModel(group.baseLabel, interval, weekly)
-            weekly != null -> GenericHistoryCardModel(group.baseLabel, weekly, null)
+            interval != null -> GenericHistoryCardModel(group.baseLabel, interval, weekly, monthly)
+            weekly != null -> GenericHistoryCardModel(group.baseLabel, weekly, null, monthly)
+            monthly != null -> GenericHistoryCardModel(group.baseLabel, monthly, null)
             else -> GenericHistoryCardModel(group.baseLabel, requireNotNull(group.otherSeries), null)
         }
     }
@@ -463,21 +476,22 @@ internal fun historyChartOverlays(
     weeklySummary: UsageHistorySeries?,
     primary: UsageHistorySeries,
     color: Color,
-    language: AppLanguage
+    language: AppLanguage,
+    monthlySummary: UsageHistorySeries? = null,
+    monthlyColor: Color = color
 ): List<HistoryChartOverlay> {
-    if (weeklySummary == null) {
+    if (primary.unit != UsageUnit.PERCENTAGE) {
         return emptyList()
     }
-    if (primary.unit != UsageUnit.PERCENTAGE || weeklySummary.unit != UsageUnit.PERCENTAGE) {
-        return emptyList()
-    }
-    return listOf(
-        HistoryChartOverlay(
-            points = weeklySummary.points,
-            label = quotaWindowLabel(weeklySummary, language),
-            color = color
-        )
-    )
+    return listOfNotNull(weeklySummary to color, monthlySummary to monthlyColor)
+        .mapNotNull { (series, seriesColor) ->
+            val overlay = series?.takeIf { it.unit == UsageUnit.PERCENTAGE } ?: return@mapNotNull null
+            HistoryChartOverlay(points = overlay.points, label = quotaWindowLabel(overlay, language), color = seriesColor)
+        }
+}
+
+internal fun monthlySummaryLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Cota mensal atual" else "Current monthly quota"
 }
 
 internal fun buildQuotaChartSelectionKey(

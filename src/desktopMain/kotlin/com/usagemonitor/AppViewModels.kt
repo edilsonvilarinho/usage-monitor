@@ -1,6 +1,13 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.data.datasource.TelegramBotApi
+import kotlin.time.Clock
+import com.usagemonitor.presentation.viewmodel.UiState
+import com.usagemonitor.domain.entity.buildUsageSnapshot
+import com.usagemonitor.data.export.JsonUsageSnapshotEncoder
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
+import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
@@ -43,10 +50,13 @@ import com.usagemonitor.domain.usecase.UnblockTeamAccountUseCase
 import com.usagemonitor.domain.usecase.UnclaimTeamKeyAccountUseCase
 import com.usagemonitor.domain.usecase.UpdateTeamKeyUseCase
 import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.ComparisonViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import com.usagemonitor.presentation.viewmodel.QuotaActivityTracker
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.TeamKeysAdminViewModel
 import com.usagemonitor.presentation.viewmodel.TeamPresenceViewModel
@@ -60,6 +70,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
@@ -218,6 +232,37 @@ internal class AppViewModels(
         }
     }
 
+    // Comparação entre modelos e APIs (#386): lê sob demanda, ao abrir a janela.
+    val comparison = ComparisonViewModel(
+        buildComparison = BuildModelComparisonUseCase(graph.cliSessionRepository, graph.codexCliSessionRepository),
+        dashboardState = dashboard.uiState,
+        exportWriter = graph.usageExportWriter,
+        breadcrumbs = breadcrumbs
+    )
+
+    // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
+    // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.
+    val quotaActivity = QuotaActivityTracker(dashboardState = dashboard.uiState)
+
+    /** Arco de sessão ativa da HUD: CLI (Claude e Codex) mais uso detectado pela cota. */
+    val hudActiveTargets: StateFlow<Set<UsageTargetKey>> =
+        combine(sessionPulse.activeTargets, quotaActivity.detectedTargets) { cli, detected -> cli + detected }
+            .stateIn(busyBridgeScope, SharingStarted.Eagerly, emptySet())
+
+    /**
+     * HUD pela rede local (#388): o mesmo retrato que a HUD mostra — cotas do
+     * dashboard mais o arco de uso —, servido só quando o usuário liga a opção.
+     */
+    val webAccess = LocalWebAccessService(
+        snapshotJson = { currentSnapshot()?.let(JsonUsageSnapshotEncoder::encode) }
+    )
+
+    init {
+        busyBridgeScope.launch {
+            graph.webAccessSettingsFlow.collect { settings -> withContext(Dispatchers.IO) { webAccess.apply(settings) } }
+        }
+    }
+
     val usageAlert = UsageAlertViewModel(
         dashboardState = dashboard.uiState,
         cliPulses = sessionPulse.cliPulses,
@@ -225,6 +270,30 @@ internal class AppViewModels(
         stalledSessions = sessionPulse.stalledSessions,
         spikes = dashboard.spikes
     )
+
+    /** O retrato que a HUD mostra, para a web local (#388) e o `/status` do bot (#387). */
+    fun currentSnapshot(): UsageSnapshot? {
+        val success = dashboard.uiState.value as? UiState.Success ?: return null
+        return buildUsageSnapshot(success.data, hudActiveTargets.value, Clock.System.now(), success.riskSummaries)
+    }
+
+    /**
+     * Bot do Telegram (#387): repassa os alertas da bandeja e atende comandos das
+     * conversas pareadas. Desligado até o usuário ligar e colar o token.
+     */
+    val telegramBot = TelegramBotService(
+        api = TelegramBotApi(graph.httpClient),
+        settingsFlow = graph.telegramSettingsFlow,
+        saveSettings = graph.telegramSettingsDataSource::save,
+        alertSettingsFlow = graph.alertSettingsFlow,
+        saveAlertSettings = { updated ->
+            graph.alertSettingsFlow.value = updated
+            persistAlertSettings(graph.settings, updated)
+        },
+        alerts = usageAlert.alerts,
+        snapshotProvider = ::currentSnapshot,
+        languageProvider = { storedLanguage(graph.settings) }
+    ).also { service -> service.start() }
 
     val teamKeys = TeamKeysAdminViewModel(
         listKeys = ListTeamKeysUseCase(graph.teamAdminRepository),
@@ -277,6 +346,10 @@ internal class AppViewModels(
         teamUsage.onDestroy()
         teamPresence.onDestroy()
         sessionPulse.onDestroy()
+        quotaActivity.onDestroy()
+        comparison.onDestroy()
+        webAccess.stop()
+        telegramBot.onDestroy()
         usageAlert.onDestroy()
         teamKeys.onDestroy()
         teamSync.onDestroy()

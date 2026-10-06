@@ -107,6 +107,26 @@ class LocalCodexCliSessionDataSourceTest {
         }
     }
 
+    @Test
+    fun `summary throughput comes from the turn context to the usage record`() = runTest {
+        withFixture { home, dataSource ->
+            rolloutFile(home).writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:04Z", 100, 40, 5, 128, 7, 233)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+
+            dataSource.syncIndex()
+
+            val throughput = dataSource.readSessions().single().throughput
+            assertEquals(128L, throughput?.outputTokens)
+            assertEquals(4_000L, throughput?.generationMillis)
+            assertEquals(32.0, throughput?.tokensPerSecond)
+        }
+    }
+
     private suspend fun withFixture(block: suspend (File, LocalCodexCliSessionDataSource) -> Unit) {
         val root = createTempDirectory("codex-cli-index").toFile()
         val home = File(root, "codex-home").also { it.mkdirs() }

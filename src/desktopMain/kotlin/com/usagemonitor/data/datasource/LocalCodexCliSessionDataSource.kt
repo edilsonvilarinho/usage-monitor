@@ -8,7 +8,11 @@ import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.CodexCliSessionTurn
+import com.usagemonitor.domain.entity.CodexCliModelUsage
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
+import com.usagemonitor.domain.entity.OutputThroughput
+import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
+import com.usagemonitor.domain.entity.combinedThroughput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -124,6 +128,60 @@ class LocalCodexCliSessionDataSource(
                     summary = buildSummary(connection, sessionId, turns),
                     turns = turns
                 )
+            }
+        }
+    }
+
+    /**
+     * Uso por modelo (#386), somado no SQL. A vazão usa o mesmo corte do índice
+     * do Claude: resposta sem pedido, sem duração ou acima do corte não entra.
+     */
+    override suspend fun readModelUsage(sinceEpochMillis: Long?): List<CodexCliModelUsage> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(
+                    """
+                    SELECT model,
+                           COUNT(*) AS responses,
+                           SUM(input_tokens) AS input_tokens,
+                           SUM(cached_input_tokens) AS cached_input_tokens,
+                           SUM(output_tokens) AS output_tokens,
+                           SUM(total_tokens) AS total_tokens,
+                           SUM(CASE WHEN request_ts IS NOT NULL AND ts > request_ts AND ts - request_ts < ?
+                                    THEN output_tokens ELSE 0 END) AS measured_output,
+                           SUM(CASE WHEN request_ts IS NOT NULL AND ts > request_ts AND ts - request_ts < ?
+                                    THEN ts - request_ts ELSE 0 END) AS measured_millis
+                    FROM codex_cli_turns
+                    WHERE model IS NOT NULL AND ts >= ?
+                    GROUP BY model
+                    """.trimIndent()
+                ).use { statement ->
+                    statement.setLong(1, TURN_GAP_CUTOFF_MILLIS)
+                    statement.setLong(2, TURN_GAP_CUTOFF_MILLIS)
+                    statement.setLong(3, sinceEpochMillis ?: 0L)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                val measuredMillis = rows.getLong("measured_millis")
+                                add(
+                                    CodexCliModelUsage(
+                                        model = rows.getString("model"),
+                                        responseCount = rows.getInt("responses"),
+                                        inputTokens = rows.getLong("input_tokens"),
+                                        cachedInputTokens = rows.getLong("cached_input_tokens"),
+                                        outputTokens = rows.getLong("output_tokens"),
+                                        totalTokens = rows.getLong("total_tokens"),
+                                        throughput = if (measuredMillis > 0L) {
+                                            OutputThroughput(rows.getLong("measured_output"), measuredMillis)
+                                        } else {
+                                            null
+                                        }
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -255,8 +313,40 @@ class LocalCodexCliSessionDataSource(
                 """.trimIndent()
             )
             ensureColumn(connection, "codex_cli_sessions", "originator", "TEXT")
+            ensureColumn(connection, "codex_cli_turns", "request_ts", "INTEGER")
+            statement.execute(
+                "CREATE TABLE IF NOT EXISTS codex_cli_index_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+            )
             statement.execute("CREATE INDEX IF NOT EXISTS idx_codex_cli_turns_session_ts ON codex_cli_turns(session_id, ts)")
             statement.execute("CREATE INDEX IF NOT EXISTS idx_codex_cli_sessions_last_file ON codex_cli_sessions(file_path)")
+        }
+        migrateIndexVersion(connection)
+    }
+
+    /**
+     * Relê todos os rollouts quando a versão do índice sobe — o mesmo desenho do
+     * índice do Claude (`cli_index_meta`). Apagar as linhas de arquivo basta: a
+     * varredura trata o arquivo como novo, e os turnos voltam pelo conflito de
+     * `(session_id, response_id)` sem duplicar, agora com `request_ts`.
+     */
+    private fun migrateIndexVersion(connection: Connection) {
+        val current = connection.prepareStatement(
+            "SELECT value FROM codex_cli_index_meta WHERE key = '$INDEX_VERSION_KEY'"
+        ).use { statement ->
+            statement.executeQuery().use { rows -> if (rows.next()) rows.getString(1)?.toIntOrNull() ?: 0 else 0 }
+        }
+        if (current >= CODEX_INDEX_VERSION) {
+            return
+        }
+        connection.createStatement().use { statement ->
+            statement.executeUpdate("DELETE FROM codex_cli_session_files")
+        }
+        connection.prepareStatement(
+            "INSERT INTO codex_cli_index_meta(key, value) VALUES ('$INDEX_VERSION_KEY', ?) " +
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).use { statement ->
+            statement.setString(1, CODEX_INDEX_VERSION.toString())
+            statement.executeUpdate()
         }
     }
 
@@ -304,11 +394,14 @@ class LocalCodexCliSessionDataSource(
     private fun insertTurn(connection: Connection, path: String, turn: CodexCliSessionTurn) {
         connection.prepareStatement(
             """
-            INSERT OR IGNORE INTO codex_cli_turns (
+            INSERT INTO codex_cli_turns (
               session_id, response_id, turn_id, seq, ts, model, cwd, source,
               raw_source, thread_source, input_tokens, cached_input_tokens,
-              cache_write_input_tokens, output_tokens, reasoning_output_tokens, total_tokens
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              cache_write_input_tokens, output_tokens, reasoning_output_tokens, total_tokens,
+              request_ts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id, response_id) DO UPDATE SET
+              request_ts = COALESCE(codex_cli_turns.request_ts, excluded.request_ts)
             """.trimIndent()
         ).use { statement ->
             statement.setString(1, turn.sessionId)
@@ -327,6 +420,12 @@ class LocalCodexCliSessionDataSource(
             statement.setLong(14, turn.usage.outputTokens)
             statement.setLong(15, turn.usage.reasoningOutputTokens)
             statement.setLong(16, turn.usage.totalTokens)
+            val requestTs = turn.requestTs
+            if (requestTs == null) {
+                statement.setNull(17, java.sql.Types.INTEGER)
+            } else {
+                statement.setLong(17, requestTs.toEpochMilliseconds())
+            }
             statement.executeUpdate()
         }
     }
@@ -485,7 +584,8 @@ class LocalCodexCliSessionDataSource(
                 outputTokens = rows.getLong("output_tokens"),
                 reasoningOutputTokens = rows.getLong("reasoning_output_tokens"),
                 totalTokens = rows.getLong("total_tokens")
-            )
+            ),
+            requestTs = rows.getLong("request_ts").takeUnless { rows.wasNull() }?.let(Instant::fromEpochMilliseconds)
         )
     }
 
@@ -535,7 +635,8 @@ class LocalCodexCliSessionDataSource(
             cacheWriteInputTokens = usage.sumOf { value -> value.cacheWriteInputTokens },
             outputTokens = usage.sumOf { value -> value.outputTokens },
             reasoningOutputTokens = usage.sumOf { value -> value.reasoningOutputTokens },
-            totalTokens = usage.sumOf { value -> value.totalTokens }
+            totalTokens = usage.sumOf { value -> value.totalTokens },
+            throughput = turns.map { turn -> turn.throughput }.combinedThroughput()
         )
     }
 
@@ -564,6 +665,10 @@ class LocalCodexCliSessionDataSource(
     )
 
     companion object {
+        /** Versão 1: `request_ts` por resposta (#381). */
+        private const val CODEX_INDEX_VERSION = 1
+        private const val INDEX_VERSION_KEY = "schema_version"
+
         fun defaultDatabaseFile(): File {
             val home = System.getProperty("user.home")
                 ?: throw IllegalStateException("Propriedade 'user.home' não disponível")

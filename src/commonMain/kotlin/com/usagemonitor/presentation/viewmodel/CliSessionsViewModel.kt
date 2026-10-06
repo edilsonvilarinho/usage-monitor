@@ -268,7 +268,8 @@ class CliSessionsViewModel(
             val request = reportRequest(
                 document = reportForCliSessions(state = current, language = language, now = now),
                 range = current.range,
-                now = now
+                now = now,
+                language = language
             )
             writeExport(writer, request)
         }

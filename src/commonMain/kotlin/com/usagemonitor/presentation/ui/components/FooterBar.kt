@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.CompareArrows
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Refresh
@@ -51,6 +52,8 @@ const val FOOTER_TEAM_PRESENCE_TEST_TAG = "footerTeamPresence"
 const val FOOTER_HELP_TEST_TAG = "footerHelp"
 
 /** Gatilho da exportação do retrato do Dashboard (issue #215). */
+
+internal const val FOOTER_COMPARISON_TEST_TAG = "footerComparison"
 const val FOOTER_EXPORT_SNAPSHOT_TEST_TAG = "footerExportSnapshot"
 
 /**
@@ -247,7 +250,8 @@ internal fun FooterActionGroup(
     onOpenAdminOverview: (() -> Unit)? = null,
     onOpenTeamPresence: (() -> Unit)? = null,
     onOpenHelp: () -> Unit = {},
-    onExportSnapshot: (() -> Unit)? = null
+    onExportSnapshot: (() -> Unit)? = null,
+    onOpenComparison: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier,
@@ -288,6 +292,23 @@ internal fun FooterActionGroup(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Groups,
+                    contentDescription = null,
+                    modifier = Modifier.size(FOOTER_ICON_SIZE),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Comparar (#386) é análise, como exportar: ocasional, antes das ações
+        // de todo dia.
+        if (onOpenComparison != null) {
+            FooterIconActionButton(
+                label = if (language == AppLanguage.PT) "Comparar modelos e APIs" else "Compare models and APIs",
+                onClick = onOpenComparison,
+                testTag = FOOTER_COMPARISON_TEST_TAG
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CompareArrows,
                     contentDescription = null,
                     modifier = Modifier.size(FOOTER_ICON_SIZE),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant

@@ -99,7 +99,9 @@ internal fun UsageHistoryLineChart(
      * mais o tracejado deixariam de ser legíveis, e a comparação continua na
      * tabela de métricas.
      */
-    overlays: List<HistoryChartOverlay> = emptyList()
+    overlays: List<HistoryChartOverlay> = emptyList(),
+    /** Faixa ativa de cada janela (#382); só cota com janela — saldo não tem. */
+    showActiveSpans: Boolean = false
 ) {
     val lineColor = accentColor
     val fillColor = accentColor.copy(alpha = 0.12f)
@@ -282,6 +284,7 @@ internal fun UsageHistoryLineChart(
                         resetClusterPoints = resetClusterPoints,
                         rangeAnnotations = rangeAnnotations,
                         activePoint = activePoint,
+                        activeSpans = if (showActiveSpans) activeSpanPlotRanges(windowedPoints, unit, plotPoints) else emptyList(),
                         revealFraction = revealFraction
                     )
                 }
