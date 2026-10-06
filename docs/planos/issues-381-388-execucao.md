@@ -2,15 +2,15 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fase 0 concluída (A01–A03). Próximo: galeria visual A04.`
+**Estado atual:** `Galeria A04 entregue; aguardando escolha de 1 direção por issue. Fase 2 (A05–A09) segue em paralelo.`
 **Última atualização:** 2026-10-06
 **Branch:** `feat/issues-381-388`
 
 ### ▶ Atividade corrente
-A04 — galeria visual única (#382, #384, #386, #387, #388).
+A05 — extração em `LocalCliSessionDataSource.kt` (não depende da escolha visual).
 
 ### ⏭ Próxima atividade
-A05 — extração em `LocalCliSessionDataSource.kt` antes de gravar timing de turno.
+A06 — timing de turno do Claude e correção do `output_tokens` da primeira linha.
 
 - A #383 está fechada (entregue em `e2e4ac88`, #390) e fica fora.
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
@@ -20,8 +20,10 @@ A05 — extração em `LocalCliSessionDataSource.kt` antes de gravar timing de t
 | # | commit | Atividade | O que mudou | Evidência |
 | --- | --- | --- | --- | --- |
 | 1 | `1c90d4ad` | A01 | Plano registrado | Documento criado; nenhuma linha de produção alterada |
-| 2 | (este) | A02 | Medição de timing Claude/Codex e do modal Codex | Scripts read-only em scratchpad sobre transcripts e índice reais; números na seção "Medições" |
-| 3 | (este) | A03 | Viabilidade Telegram; firewall adiado para A21 | Bot API e FAQ oficiais consultados; ver "Medições" |
+| 2 | `70ea48df` | A02 | Medição de timing Claude/Codex e do modal Codex | Scripts read-only em scratchpad sobre transcripts e índice reais; números na seção "Medições" |
+| 3 | `70ea48df` | A03 | Viabilidade Telegram; firewall adiado para A21 | Bot API e FAQ oficiais consultados; ver "Medições" |
+
+| 4 | (este) | A04 | Galeria única em `docs/planos/issues-381-388-visual/` (rodadas N–R, 10 opções por issue) | `node docs/planos/issues-381-388-visual/build-gallery.cjs` → 87,4 KB; aberta no browser pane: console sem erro, nenhum palco com transbordo horizontal nas 5 abas |
 
 ## Medições (Fase 0)
 
