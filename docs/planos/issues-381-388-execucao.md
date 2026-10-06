@@ -2,15 +2,15 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Fase 0 — plano registrado (A01). Próximo: medições A02/A03 e galeria visual A04.`
+**Estado atual:** `Fase 0 concluída (A01–A03). Próximo: galeria visual A04.`
 **Última atualização:** 2026-10-06
 **Branch:** `feat/issues-381-388`
 
 ### ▶ Atividade corrente
-A02 — medição de timing de turnos (Claude e Codex) e do "não atualiza" do modal Codex.
+A04 — galeria visual única (#382, #384, #386, #387, #388).
 
 ### ⏭ Próxima atividade
-A03 — medição de firewall do listener LAN (#388) e viabilidade Telegram (#387).
+A05 — extração em `LocalCliSessionDataSource.kt` antes de gravar timing de turno.
 
 - A #383 está fechada (entregue em `e2e4ac88`, #390) e fica fora.
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
@@ -19,7 +19,60 @@ A03 — medição de firewall do listener LAN (#388) e viabilidade Telegram (#38
 
 | # | commit | Atividade | O que mudou | Evidência |
 | --- | --- | --- | --- | --- |
-| 1 | (este) | A01 | Plano registrado | Documento criado; nenhuma linha de produção alterada |
+| 1 | `1c90d4ad` | A01 | Plano registrado | Documento criado; nenhuma linha de produção alterada |
+| 2 | (este) | A02 | Medição de timing Claude/Codex e do modal Codex | Scripts read-only em scratchpad sobre transcripts e índice reais; números na seção "Medições" |
+| 3 | (este) | A03 | Viabilidade Telegram; firewall adiado para A21 | Bot API e FAQ oficiais consultados; ver "Medições" |
+
+## Medições (Fase 0)
+
+### A02 — Claude Code (40 transcripts mais recentes de `~/.claude/projects/**`)
+
+- 1.910 `message.id` aparecem em mais de uma linha `assistant`; em 122 o `output_tokens` **cresce** entre a
+  primeira e a última linha.
+- Soma de `output_tokens` pela primeira linha = 1.968.230; pela maior = 2.085.792 → o índice atual
+  (`INSERT OR IGNORE` em `LocalCliSessionIndexSql.kt:229`, sem dedup prévia no parser) **subconta saída em
+  5,64%** nessa amostra. Input/cache não foram medidos aqui. Correção entra na A06: no conflito,
+  `output_tokens = MAX(...)` e horário da última linha.
+- `system/turn_duration` existe em só 41 linhas (é por turno do usuário, não por resposta) → não serve como
+  duração de geração.
+- Fórmula escolhida para tok/s: `output_tokens / (ts da última linha do message.id − ts da linha user/tool_result
+  imediatamente anterior)`, só com saída > 50 tokens e intervalo > 0,5 s. Resultado: n = 2.557, mediana
+  **95,3 tok/s** (p10 71,6; p90 123,1). Inclui latência até o primeiro token — é vazão ponta a ponta, rotular assim.
+- Alternativa `(última − primeira linha do mesmo id)` dá mediana 227,5 tok/s, mas ignora o tempo até a primeira
+  linha; descartada.
+
+### A02 — Codex (60 rollouts mais recentes de 385 em `~/.codex/sessions/**`)
+
+- Eventos: `token_usage_record` (2.570), `event_msg:token_count` (2.574), `task_started`/`task_complete`
+  (123/121, com `started_at`), `turn_aborted` com `duration_ms`.
+- Mesma fórmula: `output_tokens / (ts do token_usage_record − ts da última entrada: turn_context,
+  *_call_output ou mensagem user)`. n = 2.619, sem entrada ausente; mediana **32,5 tok/s** (p10 19,6; p90 51,0).
+- Precisa gravar o horário de início por resposta: o parser hoje ignora `response_item` e `event_msg`.
+
+### A02 — "Codex não atualiza em tempo real" (#384)
+
+- `CodexCliSessionsViewModel.openWindow()` já roda o laço de 5 s (`CLI_SESSION_LIVE_INTERVAL_MILLIS`), com
+  `refresh()` seguido de `loadJob?.join()` — o laço não se cancela sozinho.
+- Índice real (`~/.usage-monitor/codex-cli-history.db`, read-only): 32 sessões, 2.729 turnos, 0 sessões sem
+  originator; ler todas as sessões turno a turno levou ~12 ms. Hipótese de lentidão **refutada**.
+- `token_usage_record` sai ~0,5 s depois do `token_count` correspondente: o rollout é gravado durante o turno.
+- Diferenças restantes entre os modais são de UI: o Codex tem botão manual "Atualizar" e mostra "Atualizando…"
+  a cada tique; não tem aba de detalhamento nem PDF. **Não há defeito de dados provado.** A13 deixa de ser
+  `fix(codex-cli)` e vira paridade de UI dentro da A14, salvo reprodução do usuário com passos.
+
+### A03 — #388 firewall e #387 Telegram
+
+- Firewall: o usuário escolheu bind na LAN (`0.0.0.0`), que é exatamente o caso que o KDoc de
+  `FocusRequestChannel.kt` cita como gatilho do prompt. A medição exige alguém para responder ao diálogo do
+  Windows; fica na verificação manual da A21. Mitigação: serviço desligado por padrão e texto da seção avisando.
+- Telegram Bot API (core.telegram.org/bots/api e /bots/faq):
+  - `getUpdates(offset, limit 1–100, timeout em s, allowed_updates)`; `timeout` > 0 é long polling; updates
+    ficam no servidor até 24 h.
+  - `getUpdates` não funciona com webhook configurado → no pareamento, chamar `deleteWebhook`.
+  - Limites: ~1 msg/s por chat, 20 msg/min por grupo, ~30 msg/s global; excesso responde 429.
+  - `chat_id` vem de `message.chat.id` no update → pareamento: o app mostra um código, o usuário manda
+    `/start <código>` ao bot, o app grava esse `chat_id` como autorizado.
+  - Tudo é HTTPS de saída: cabe no Ktor client atual, sem listener. **Viável.**
 
 ## Contexto
 
