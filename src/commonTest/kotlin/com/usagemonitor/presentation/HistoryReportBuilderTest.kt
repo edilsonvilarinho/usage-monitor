@@ -35,9 +35,9 @@ class HistoryReportBuilderTest {
         val document = reportForHistory(state(listOf(base.copy(windows = windows))), AppLanguage.PT, captured)
         val table = document.sections.filterIsInstance<UsageReportSection.Table>().single { it.heading.startsWith("Janelas") }
         assertEquals(12, table.rows.size)
-        assertEquals("11 %", table.rows.first()[1])
-        assertEquals("0 %", table.rows.last()[1])
-        assertEquals("—", table.rows.first()[2])
+        assertEquals("11 %", table.rows.first()[2])
+        assertEquals("0 %", table.rows.last()[2])
+        assertEquals("—", table.rows.first()[3])
     }
     @Test fun `reported Codex quota does not invent forecast or consumption pace`() {
         val document = reportForHistory(state(listOf(series("Reportada", PeriodType.REPORTED)), source = ApiSource.CODEX), AppLanguage.PT, captured)

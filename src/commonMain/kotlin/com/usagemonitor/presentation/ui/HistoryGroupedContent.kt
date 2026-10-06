@@ -57,6 +57,7 @@ internal fun GroupedHistoryContent(
                     titleOverride = if (keepSeriesTitle) null else model.baseLabel,
                     subtitleOverride = if (keepSeriesTitle) null else genericHistorySubtitle(language),
                     weeklySummary = model.weeklySummary,
+                    monthlySummary = model.monthlySummary,
                     referenceAt = report.lastUpdatedAt,
                     quotaView = state.selectedQuotaView
                 )
@@ -85,7 +86,12 @@ internal fun quotaViewLabels(report: ApiUsageHistoryReport, language: AppLanguag
         when (view) {
             HistoryQuotaView.INTERVAL -> quotaWindowLabel(merged.chartSeries, language)
             HistoryQuotaView.WEEKLY -> quotaWindowLabel(weekly, language)
-            HistoryQuotaView.BOTH -> if (language == AppLanguage.PT) "Ambas" else "Both"
+            // Com a cota mensal no mesmo card, "Ambas" mentiria: são três janelas.
+            HistoryQuotaView.BOTH -> when {
+                merged.monthlySummary != null -> if (language == AppLanguage.PT) "Todas" else "All"
+                language == AppLanguage.PT -> "Ambas"
+                else -> "Both"
+            }
         }
     }
 }

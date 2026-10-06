@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.width
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.activeSpansOf
 import com.usagemonitor.domain.entity.isSamePeriod
 import kotlin.math.abs
 import kotlin.math.max
@@ -639,4 +640,17 @@ private fun formatPercentage(used: Long, total: Long): String {
 private fun trimDecimal(value: Double): String {
     val text = "%.1f".format(value)
     return text.removeSuffix(".0").removeSuffix(",0")
+}
+
+/** Faixas ativas (#382) em pixels do gráfico: início e fim de cada trecho em [plotPoints]. */
+internal fun activeSpanPlotRanges(
+    points: List<UsageHistoryPoint>,
+    unit: UsageUnit,
+    plotPoints: List<ChartPlotPoint>
+): List<Pair<Float, Float>> {
+    return activeSpansOf(points, unit).mapNotNull { span ->
+        val start = plotPoints.getOrNull(span.first) ?: return@mapNotNull null
+        val end = plotPoints.getOrNull(span.last) ?: return@mapNotNull null
+        start.x to end.x
+    }
 }

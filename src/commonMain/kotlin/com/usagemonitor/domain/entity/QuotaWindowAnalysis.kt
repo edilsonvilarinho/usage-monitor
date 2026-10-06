@@ -29,7 +29,15 @@ data class QuotaWindowSummary(
     /** [consumedPercent] por hora observada; `null` sem duas leituras separadas no tempo. */
     val averagePercentPerHour: Double?,
     /** A janela corrente, ainda não reiniciada no último ponto lido. */
-    val isOpen: Boolean
+    val isOpen: Boolean,
+    /**
+     * Faixa ativa da janela (#382): da última leitura parada antes da primeira
+     * subida até a leitura da última subida. A janela nem sempre esgota, e é esta
+     * faixa que diz quanto dela foi de fato usada. A precisão é a do polling — 60 s
+     * com sessão CLI, 5 min sem. `null` nos dois quando o uso não subiu na janela.
+     */
+    val activeFrom: Instant? = null,
+    val activeUntil: Instant? = null
 )
 
 /**
@@ -122,6 +130,7 @@ fun quotaWindowsOf(
         val last = window.last()
         val consumed = positiveDeltaOf(window, unit).toDouble() / percentBase(last)
         val hours = (last.capturedAt - first.capturedAt).inWholeMilliseconds / MILLIS_PER_HOUR
+        val activeSpan = activeSpanIn(window)
         QuotaWindowSummary(
             firstObservedAt = first.capturedAt,
             lastObservedAt = last.capturedAt,
@@ -131,8 +140,51 @@ fun quotaWindowsOf(
                 ?.capturedAt,
             consumedPercent = consumed,
             averagePercentPerHour = if (hours > 0.0) consumed / hours else null,
-            isOpen = index == windows.lastIndex && last.periodEndAt > lastCapturedAt
+            isOpen = index == windows.lastIndex && last.periodEndAt > lastCapturedAt,
+            activeFrom = activeSpan?.let { span -> window[span.first].capturedAt },
+            activeUntil = activeSpan?.let { span -> window[span.last].capturedAt }
         )
+    }
+}
+
+/**
+ * Trecho ativo de uma janela, em índices de [window] (#382).
+ *
+ * Começa na leitura **anterior** à primeira subida — o uso aconteceu depois
+ * dela — e termina na leitura da última subida. Uma janela cuja primeira leitura
+ * já tem uso foi usada antes de ser lida: o trecho começa nela. `null` quando o
+ * uso não subiu e a janela começou zerada.
+ */
+fun activeSpanIn(window: List<UsageHistoryPoint>): IntRange? {
+    if (window.isEmpty()) {
+        return null
+    }
+    val rises = (1 until window.size).filter { index -> window[index].displayUsed > window[index - 1].displayUsed }
+    val usedBeforeFirstReading = window.first().displayUsed > 0L
+    if (rises.isEmpty()) {
+        return if (usedBeforeFirstReading) 0..0 else null
+    }
+    val start = if (usedBeforeFirstReading) 0 else rises.first() - 1
+    return start..rises.last()
+}
+
+/**
+ * Trechos ativos de cada janela da série, em índices de [points], para o
+ * gráfico (#382, direção N6). Saldo não tem janela nem faixa ativa.
+ */
+fun activeSpansOf(points: List<UsageHistoryPoint>, unit: UsageUnit): List<IntRange> {
+    if (unit == UsageUnit.CURRENCY_USD) {
+        return emptyList()
+    }
+    var offset = 0
+    return buildList {
+        for (window in splitIntoQuotaWindows(points, unit)) {
+            val span = activeSpanIn(window)
+            if (span != null) {
+                add((span.first + offset)..(span.last + offset))
+            }
+            offset += window.size
+        }
     }
 }
 

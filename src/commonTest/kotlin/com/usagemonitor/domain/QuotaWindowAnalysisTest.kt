@@ -3,6 +3,8 @@ package com.usagemonitor.domain
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.activeSpanIn
+import com.usagemonitor.domain.entity.activeSpansOf
 import com.usagemonitor.domain.entity.quotaHourlyDistributionOf
 import com.usagemonitor.domain.entity.quotaWindowStatsOf
 import com.usagemonitor.domain.entity.quotaWindowsOf
@@ -46,6 +48,54 @@ class QuotaWindowAnalysisTest {
         point("2026-09-27T06:00:00Z", 0, second),
         point("2026-09-27T07:00:00Z", 30, second)
     )
+
+    @Test
+    fun `active span runs from the reading before the first rise to the last rise`() {
+        val window = listOf(
+            point("2026-09-27T06:00:00Z", 0, second),
+            point("2026-09-27T06:05:00Z", 0, second),
+            point("2026-09-27T06:10:00Z", 12, second),
+            point("2026-09-27T07:00:00Z", 30, second),
+            point("2026-09-27T08:00:00Z", 30, second)
+        )
+
+        assertEquals(1..3, activeSpanIn(window))
+    }
+
+    @Test
+    fun `window already used at its first reading starts the span there`() {
+        val window = listOf(
+            point("2026-09-27T06:00:00Z", 8, second),
+            point("2026-09-27T06:05:00Z", 8, second)
+        )
+
+        assertEquals(0..0, activeSpanIn(window))
+    }
+
+    @Test
+    fun `idle window has no active span`() {
+        val window = listOf(
+            point("2026-09-27T06:00:00Z", 0, second),
+            point("2026-09-27T07:00:00Z", 0, second)
+        )
+
+        assertNull(activeSpanIn(window))
+    }
+
+    @Test
+    fun `active spans are indexed across windows of the series`() {
+        assertEquals(listOf(0..2, 4..5), activeSpansOf(twoWindows, UsageUnit.PERCENTAGE))
+    }
+
+    @Test
+    fun `window summary carries the active span times`() {
+        val windows = quotaWindowsOf(twoWindows, UsageUnit.PERCENTAGE, PeriodType.INTERVAL)
+
+        assertEquals(Instant.parse("2026-09-27T01:00:00Z"), windows[0].activeFrom)
+        assertEquals(Instant.parse("2026-09-27T03:00:00Z"), windows[0].activeUntil)
+        assertEquals(Instant.parse("2026-09-27T06:00:00Z"), windows[1].activeFrom)
+        assertEquals(Instant.parse("2026-09-27T07:00:00Z"), windows[1].activeUntil)
+    }
 
     @Test
     fun `a reset starts a new window`() {

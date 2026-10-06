@@ -9,10 +9,10 @@
 **Branch:** `feat/issues-381-388`
 
 ### ▶ Atividade corrente
-A10 — faixa ativa por janela no histórico (#382).
+A13/A14 — modais CLI no padrão O1 (#384).
 
 ### ⏭ Próxima atividade
-A11 — agrupar janelas do OpenCode Go.
+A15 — PDF do Codex e idioma do PDF.
 
 - A #383 está fechada (entregue em `e2e4ac88`, #390) e fica fora.
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
@@ -28,7 +28,8 @@ A11 — agrupar janelas do OpenCode Go.
 | 5 | `6a2abef7` | A05 | Escrita de turnos extraída para `LocalCliSessionTurnWriter.kt` (678 + 99 linhas), sem mudança de comportamento | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.architecture.*"` → 57 + 8 testes, 0 falhas |
 | 6 | `aa04c4c3` | A06 | `cli_turns` ganha `request_ts`/`last_line_ts`; conflito do `message_id` funde por `MAX` (corrige subcontagem de saída de 5,64%); `INDEX_SCHEMA_VERSION` 3; `OutputThroughput` no domain e `CliSessionSummary.throughput` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.domain.OutputThroughputTest" --tests "com.usagemonitor.architecture.*"` → 62 + 4 + 8 testes, 0 falhas (5 testes novos de índice, 4 de domínio) |
 | 7 | `70533949` | A07 | Parser do Codex lê o envelope de `turn_context`/saída de ferramenta/mensagem do usuário como início do pedido; `codex_cli_turns.request_ts`; `codex_cli_index_meta` versão 1 relê os rollouts; `CodexCliSessionSummary.throughput`; `measuredThroughput` no domain | `gradlew.bat desktopTest --tests "com.usagemonitor.data.CodexCliRolloutParserTest" --tests "com.usagemonitor.data.LocalCodexCliSessionDataSourceTest" --tests "com.usagemonitor.domain.*"` → 5 + 4 + domínio, 0 falhas (3 testes novos) |
-| 8 | (este) | A09 | `usageProgressed`/`recentlyProgressed` no domain; `QuotaActivityTracker` publica alvos com consumo avançando (10 min); HUD usa `hudActiveTargets` = CLI ∪ detectado; `cliBusy` intocado | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaUsageProgressTest" --tests "com.usagemonitor.presentation.QuotaActivityTrackerTest" --tests "com.usagemonitor.presentation.SessionPulseViewModelTest" --tests "com.usagemonitor.architecture.*"` → 7 + 3 + 8 novos/arquitetura, 0 falhas |
+| 8 | `efe35630` | A09 | `usageProgressed`/`recentlyProgressed` no domain; `QuotaActivityTracker` publica alvos com consumo avançando (10 min); HUD usa `hudActiveTargets` = CLI ∪ detectado; `cliBusy` intocado | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaUsageProgressTest" --tests "com.usagemonitor.presentation.QuotaActivityTrackerTest" --tests "com.usagemonitor.presentation.SessionPulseViewModelTest" --tests "com.usagemonitor.architecture.*"` → 7 + 3 + 8 novos/arquitetura, 0 falhas |
+| 9 | (este) | A10–A12 | Faixa ativa por janela (domínio, gráfico com fundo e chave, legenda, coluna Ativa na tela e no PDF); OpenCode Go e Codex mensal num card só com a cota mensal em "Todas"; protótipo §5, kit `History.jsx` e `presentation.md` atualizados. Cruzamento com turnos CLI descartado (justificativa em `presentation.md`) | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaWindowAnalysisTest" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.architecture.*"` → 0 falhas (5 testes de faixa, 3 de agrupamento); `gradlew.bat generateScreenshots -PscreenshotScenario=history-baseline` → faixa e legenda conferidas em `history-anthropic-dark-1030.png` |
 
 ## Medições (Fase 0)
 
