@@ -1,12 +1,13 @@
 package com.usagemonitor.data.datasource
 
 import java.sql.Connection
+import java.sql.Types
 
 // Escrita dos turnos do índice de sessões do Claude CLI. Saiu de
 // `LocalCliSessionDataSource` pelo limite de 800 linhas antes de a gravação
 // passar a medir a vazão de cada turno (#381).
 
-/** Insere os turnos ignorando `message_id` repetido. Devolve as sessões tocadas. */
+/** Grava os turnos; `message_id` repetido funde com o já gravado ([INSERT_TURN_SQL]). Devolve as sessões tocadas. */
 internal fun insertCliTurns(
     connection: Connection,
     filePath: String,
@@ -40,6 +41,13 @@ internal fun insertCliTurns(
             statement.setLong(9, turn.cacheReadTokens)
             statement.setLong(10, turn.cacheWrite5mTokens)
             statement.setLong(11, turn.cacheWrite1hTokens)
+            val requestTimestamp = turn.requestTimestampMillis
+            if (requestTimestamp == null) {
+                statement.setNull(12, Types.INTEGER)
+            } else {
+                statement.setLong(12, requestTimestamp)
+            }
+            statement.setLong(13, turn.timestampMillis)
             statement.addBatch()
         }
         statement.executeBatch()

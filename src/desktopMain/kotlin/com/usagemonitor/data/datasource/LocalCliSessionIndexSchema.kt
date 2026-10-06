@@ -39,6 +39,12 @@ internal fun initializeCliIndexSchema(connection: Connection, hostName: () -> St
         backfillHostName(connection, hostName())
     }
 
+    // Vazão de saída (#381). Quem preenche as linhas antigas é a releitura
+    // forçada pela versão 3 do índice: o conflito do `message_id` grava as
+    // duas colunas nos turnos que já existiam.
+    addColumnIfMissing(connection, "cli_turns", "request_ts", type = "INTEGER")
+    addColumnIfMissing(connection, "cli_turns", "last_line_ts", type = "INTEGER")
+
     connection.createStatement().use { statement ->
         statement.execute(CREATE_SESSIONS_INDEX_SQL)
         statement.execute(CREATE_TURNS_INDEX_SQL)
@@ -123,7 +129,12 @@ internal fun backfillHostName(connection: Connection, hostName: String?) {
 }
 
 /** Devolve `true` quando a coluna acabou de ser criada. */
-internal fun addColumnIfMissing(connection: Connection, table: String, column: String): Boolean {
+internal fun addColumnIfMissing(
+    connection: Connection,
+    table: String,
+    column: String,
+    type: String = "TEXT"
+): Boolean {
     val existing = connection.prepareStatement("PRAGMA table_info($table);").use { statement ->
         statement.executeQuery().use { rows ->
             buildSet {
@@ -138,7 +149,7 @@ internal fun addColumnIfMissing(connection: Connection, table: String, column: S
     }
 
     connection.createStatement().use { statement ->
-        statement.execute("ALTER TABLE $table ADD COLUMN $column TEXT;")
+        statement.execute("ALTER TABLE $table ADD COLUMN $column $type;")
     }
     return true
 }

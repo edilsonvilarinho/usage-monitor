@@ -9,10 +9,10 @@
 **Branch:** `feat/issues-381-388`
 
 ### ▶ Atividade corrente
-A06 — timing de turno do Claude e MAX de tokens no conflito do `message_id`.
+A07 — versão de schema e timing de turno no índice do Codex.
 
 ### ⏭ Próxima atividade
-A07 — versão de schema e timing de turno no índice do Codex.
+A08 — vazão exposta para Codex e agregação; A09 — atividade por delta de cota.
 
 - A #383 está fechada (entregue em `e2e4ac88`, #390) e fica fora.
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
@@ -25,7 +25,8 @@ A07 — versão de schema e timing de turno no índice do Codex.
 | 2 | `70ea48df` | A02 | Medição de timing Claude/Codex e do modal Codex | Scripts read-only em scratchpad sobre transcripts e índice reais; números na seção "Medições" |
 | 3 | `70ea48df` | A03 | Viabilidade Telegram; firewall adiado para A21 | Bot API e FAQ oficiais consultados; ver "Medições" |
 | 4 | `953db4c1` | A04 | Galeria única em `docs/planos/issues-381-388-visual/` (rodadas N–R, 10 opções por issue) | `node docs/planos/issues-381-388-visual/build-gallery.cjs` → 87,4 KB; aberta no browser pane: console sem erro, nenhum palco com transbordo horizontal nas 5 abas |
-| 5 | (este) | A05 | Escrita de turnos extraída para `LocalCliSessionTurnWriter.kt` (678 + 99 linhas), sem mudança de comportamento | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.architecture.*"` → 57 + 8 testes, 0 falhas |
+| 5 | `6a2abef7` | A05 | Escrita de turnos extraída para `LocalCliSessionTurnWriter.kt` (678 + 99 linhas), sem mudança de comportamento | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.architecture.*"` → 57 + 8 testes, 0 falhas |
+| 6 | (este) | A06 | `cli_turns` ganha `request_ts`/`last_line_ts`; conflito do `message_id` funde por `MAX` (corrige subcontagem de saída de 5,64%); `INDEX_SCHEMA_VERSION` 3; `OutputThroughput` no domain e `CliSessionSummary.throughput` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.domain.OutputThroughputTest" --tests "com.usagemonitor.architecture.*"` → 62 + 4 + 8 testes, 0 falhas (5 testes novos de índice, 4 de domínio) |
 
 ## Medições (Fase 0)
 

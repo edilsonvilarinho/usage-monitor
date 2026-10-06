@@ -24,6 +24,9 @@ internal const val SUBAGENTS_DIRECTORY_NAME = "subagents"
 
 internal const val USAGE_MARKER = "\"usage\""
 
+/** Filtro barato antes de decodificar: só linha com este trecho pode ser pedido. */
+internal const val USER_TYPE_MARKER = "\"type\":\"user\""
+
 internal const val READ_BUFFER_BYTES = 64 * 1024
 
 internal val NEW_LINE_BYTE = '\n'.code.toByte()
@@ -77,6 +80,8 @@ internal val CREATE_TURNS_TABLE_SQL = """
       cache_read_tokens INTEGER NOT NULL DEFAULT 0,
       cache_write_5m_tokens INTEGER NOT NULL DEFAULT 0,
       cache_write_1h_tokens INTEGER NOT NULL DEFAULT 0,
+      request_ts INTEGER,
+      last_line_ts INTEGER,
       PRIMARY KEY (session_id, message_id)
     );
 """
@@ -93,7 +98,7 @@ internal val CREATE_TURNS_TABLE_SQL = """
  *     reset que a varredura respeita. É a passada que finalmente preenche
  *     `cli_turn_tools` do histórico já indexado.
  */
-internal const val INDEX_SCHEMA_VERSION = 2
+internal const val INDEX_SCHEMA_VERSION = 3
 
 /**
  * Metadados do índice CLI, hoje só a versão do schema.
@@ -225,12 +230,29 @@ internal val UPSERT_FILE_SQL = """
       last_offset = excluded.last_offset;
 """
 
+/**
+ * Uma resposta do modelo chega em várias linhas com o mesmo `message.id`, e o
+ * `output_tokens` cresce entre elas (medido em 2026-10-06: guardar só a
+ * primeira linha subcontava a saída em 5,64%). Por isso o conflito não é
+ * ignorado: cada contador fica com o maior valor visto, `last_line_ts` com o
+ * instante da última linha e `request_ts` com o primeiro pedido conhecido. O
+ * `seq` e o `ts` da primeira linha não mudam — continuam sendo a ordem e o
+ * instante da atividade.
+ */
 internal val INSERT_TURN_SQL = """
-    INSERT OR IGNORE INTO cli_turns (
+    INSERT INTO cli_turns (
       session_id, seq, message_id, ts, model, is_sidechain,
       input_tokens, output_tokens, cache_read_tokens,
-      cache_write_5m_tokens, cache_write_1h_tokens
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      cache_write_5m_tokens, cache_write_1h_tokens, request_ts, last_line_ts
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(session_id, message_id) DO UPDATE SET
+      input_tokens = MAX(cli_turns.input_tokens, excluded.input_tokens),
+      output_tokens = MAX(cli_turns.output_tokens, excluded.output_tokens),
+      cache_read_tokens = MAX(cli_turns.cache_read_tokens, excluded.cache_read_tokens),
+      cache_write_5m_tokens = MAX(cli_turns.cache_write_5m_tokens, excluded.cache_write_5m_tokens),
+      cache_write_1h_tokens = MAX(cli_turns.cache_write_1h_tokens, excluded.cache_write_1h_tokens),
+      request_ts = COALESCE(cli_turns.request_ts, excluded.request_ts),
+      last_line_ts = MAX(COALESCE(cli_turns.last_line_ts, cli_turns.ts), excluded.last_line_ts);
 """
 
 internal val INSERT_SESSION_SHELL_SQL = """
@@ -372,6 +394,27 @@ internal val SELECT_USAGE_GROUPS_SQL = """
  * O primeiro turno da janela não tem antecessor, `LAG` devolve `NULL` e ele
  * fica de fora — que é o que a função do domain faz sobre a lista recortada.
  */
+/**
+ * Vazão de saída por sessão: tokens de saída sobre o tempo entre o pedido
+ * (linha `user`/`tool_result` anterior) e a última linha da resposta. É vazão
+ * ponta a ponta — inclui a espera pelo primeiro token. Turno sem pedido
+ * conhecido, sem duração ou acima do corte entre turnos fica de fora: não foi
+ * medido, e somá-lo como zero inventaria velocidade.
+ */
+internal val SELECT_SESSION_THROUGHPUT_SQL = """
+    SELECT t.session_id AS session_id,
+           SUM(t.output_tokens) AS output_tokens,
+           SUM(t.last_line_ts - t.request_ts) AS generation_millis
+    FROM cli_turns t
+    JOIN cli_sessions s ON s.session_id = t.session_id
+    WHERE t.ts >= ?
+      AND (? = 1 OR s.profile_id = ?)
+      AND t.request_ts IS NOT NULL
+      AND t.last_line_ts > t.request_ts
+      AND t.last_line_ts - t.request_ts < ?
+    GROUP BY t.session_id;
+"""
+
 internal val SELECT_SESSION_ACTIVE_TIME_SQL = """
     SELECT session_id, SUM(gap) AS active_millis
     FROM (

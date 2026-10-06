@@ -173,6 +173,91 @@ class LocalCliSessionDataSourceTest {
     }
 
     @Test
+    fun `growing output of the same message keeps the largest value`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:02Z", outputTokens = 100L),
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:10Z", outputTokens = 300L)
+            )
+
+            dataSource.syncIndex()
+
+            val session = dataSource.readSessions().single()
+            assertEquals(1, session.turnCount)
+            assertEquals(300L, session.outputTokens)
+        }
+    }
+
+    @Test
+    fun `growing output split across incremental reads keeps the largest value`() = runTest {
+        withFixture { root, dataSource ->
+            val first = assistantLine("session-a", "msg-1", "2026-08-01T10:00:02Z", outputTokens = 100L)
+            val file = writeTranscript(root, "session-a", first)
+            dataSource.syncIndex()
+
+            file.appendText(assistantLine("session-a", "msg-1", "2026-08-01T10:00:10Z", outputTokens = 300L) + "\n")
+            dataSource.syncIndex()
+
+            val session = dataSource.readSessions().single()
+            assertEquals(1, session.turnCount)
+            assertEquals(300L, session.outputTokens)
+        }
+    }
+
+    @Test
+    fun `throughput runs from the request to the last line of the response`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                userLine("session-a", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:02Z", outputTokens = 50L),
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:10Z", outputTokens = 400L)
+            )
+
+            dataSource.syncIndex()
+
+            val throughput = assertNotNull(dataSource.readSessions().single().throughput)
+            assertEquals(400L, throughput.outputTokens)
+            assertEquals(10_000L, throughput.generationMillis)
+            assertEquals(40.0, throughput.tokensPerSecond)
+        }
+    }
+
+    @Test
+    fun `turn without a known request has no throughput`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:02Z", outputTokens = 400L)
+            )
+
+            dataSource.syncIndex()
+
+            assertNull(dataSource.readSessions().single().throughput)
+        }
+    }
+
+    @Test
+    fun `response longer than the turn gap cutoff is not measured`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                userLine("session-a", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-1", "2026-08-01T11:00:00Z", outputTokens = 400L)
+            )
+
+            dataSource.syncIndex()
+
+            assertNull(dataSource.readSessions().single().throughput)
+        }
+    }
+
+    @Test
     fun `cost uses the model of each turn`() = runTest {
         withFixture { root, dataSource ->
             writeTranscript(

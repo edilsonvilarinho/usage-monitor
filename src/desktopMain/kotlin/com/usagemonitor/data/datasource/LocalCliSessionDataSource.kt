@@ -12,6 +12,7 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
 import kotlinx.coroutines.Dispatchers
@@ -132,6 +133,7 @@ class LocalCliSessionDataSource(
                 // desenho do contexto vivo: o tempo ativo não é agregado de
                 // `cli_sessions`, sai da distância entre turnos.
                 val activeTimes = readActiveTimes(connection, profileId, sinceEpochMillis ?: 0L)
+                val throughputs = readThroughputs(connection, profileId, sinceEpochMillis ?: 0L)
                 val sessions = if (sinceEpochMillis == null) {
                     readStoredSessions(connection, profileId, liveContexts)
                 } else {
@@ -140,7 +142,14 @@ class LocalCliSessionDataSource(
                 // Sessão fora do mapa recebe zero, e não nulo: a consulta rodou, e
                 // ausência ali significa "nenhum intervalo medido" — o caso da
                 // sessão de um turno só.
-                sessions.map { session -> session.copy(activeMillis = activeTimes[session.sessionId] ?: 0L) }
+                // Vazão ausente fica nula: diferente do tempo ativo, aqui ausência é
+                // "nenhum turno com pedido conhecido", e zero inventaria lentidão.
+                sessions.map { session ->
+                    session.copy(
+                        activeMillis = activeTimes[session.sessionId] ?: 0L,
+                        throughput = throughputs[session.sessionId]
+                    )
+                }
             }
         }
     }
@@ -405,6 +414,33 @@ class LocalCliSessionDataSource(
                 buildMap {
                     while (rows.next()) {
                         put(rows.getString("session_id"), rows.getLong("active_millis"))
+                    }
+                }
+            }
+        }
+    }
+
+    /** Vazão de saída por sessão na janela ([SELECT_SESSION_THROUGHPUT_SQL]). */
+    private fun readThroughputs(
+        connection: Connection,
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Map<String, OutputThroughput> {
+        return connection.prepareStatement(SELECT_SESSION_THROUGHPUT_SQL).use { statement ->
+            statement.setLong(1, sinceEpochMillis)
+            statement.setInt(2, if (profileId == null) 1 else 0)
+            statement.setString(3, profileId)
+            statement.setLong(4, TURN_GAP_CUTOFF_MILLIS)
+            statement.executeQuery().use { rows ->
+                buildMap {
+                    while (rows.next()) {
+                        put(
+                            rows.getString("session_id"),
+                            OutputThroughput(
+                                outputTokens = rows.getLong("output_tokens"),
+                                generationMillis = rows.getLong("generation_millis")
+                            )
+                        )
                     }
                 }
             }

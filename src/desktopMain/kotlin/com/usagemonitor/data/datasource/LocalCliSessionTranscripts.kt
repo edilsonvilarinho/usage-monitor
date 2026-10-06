@@ -121,8 +121,22 @@ internal fun parseTranscript(file: File, startOffset: Long, json: Json): ParsedT
     val turns = mutableListOf<ParsedTurn>()
     val metadata = mutableMapOf<String, SessionMetadata>()
     var skippedLines = 0
+    // Instante do último pedido (`user`, que inclui `tool_result`) visto nesta
+    // leitura: é o começo da resposta seguinte. Um pedido que ficou na leitura
+    // anterior não é conhecido — o turno fica sem vazão, não com vazão chutada.
+    var lastRequestMillis: Long? = null
 
     val endOffset = forEachCompleteLine(file, startOffset) { rawLine ->
+        if (rawLine.contains(USER_TYPE_MARKER)) {
+            val requestLine = runCatching { json.decodeFromString<ClaudeTranscriptTailLineDto>(rawLine) }.getOrNull()
+            if (requestLine?.type == USER_LINE_TYPE) {
+                lastRequestMillis = requestLine.timestamp
+                    ?.let { value -> runCatching { Instant.parse(value) }.getOrNull() }
+                    ?.toEpochMilliseconds()
+                return@forEachCompleteLine
+            }
+        }
+
         // Rejeição barata: linhas sem `usage` nunca são turnos com consumo.
         if (!rawLine.contains(USAGE_MARKER)) {
             return@forEachCompleteLine
@@ -139,7 +153,7 @@ internal fun parseTranscript(file: File, startOffset: Long, json: Json): ParsedT
             return@forEachCompleteLine
         }
 
-        turns.add(parsedTurn)
+        turns.add(parsedTurn.copy(requestTimestampMillis = lastRequestMillis))
         metadata[parsedTurn.sessionId] = SessionMetadata(cwd = line.cwd, gitBranch = line.gitBranch)
     }
 
@@ -242,7 +256,9 @@ internal data class ParsedTurn(
     val cacheWrite5mTokens: Long,
     val cacheWrite1hTokens: Long,
     /** Nome da ferramenta → número de chamadas neste turno. */
-    val toolCalls: Map<String, Int> = emptyMap()
+    val toolCalls: Map<String, Int> = emptyMap(),
+    /** Pedido que antecedeu a resposta; `null` quando não estava nesta leitura. */
+    val requestTimestampMillis: Long? = null
 )
 
 internal data class ParsedTranscript(
