@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageGroupRow
@@ -411,7 +412,9 @@ internal object ScreenshotFixtures {
         costMicros = costMicros,
         liveContextTokens = liveContextTokens,
         liveContextModel = model,
-        activeMillis = activeMillis
+        activeMillis = activeMillis,
+        // Vazão sintética entre 80 e 119 tok/s, perto da mediana medida (95, #381).
+        throughput = OutputThroughput(outputTokens, outputTokens * 1_000L / (80L + turnCount % 40))
     )
 
     /**

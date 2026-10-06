@@ -10,7 +10,9 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.presentation.ui.BreakdownAxis
 import com.usagemonitor.presentation.ui.BreakdownLabels
 import com.usagemonitor.presentation.ui.CliSessionsLabels
+import com.usagemonitor.domain.entity.combinedThroughput
 import com.usagemonitor.presentation.ui.formatActiveTime
+import com.usagemonitor.presentation.ui.formatThroughput
 import com.usagemonitor.presentation.ui.formatInstant
 import com.usagemonitor.presentation.ui.formatMicrosUsd
 import com.usagemonitor.presentation.ui.formatPercent
@@ -54,6 +56,10 @@ fun reportForCliSessions(
             val activeMillis = state.totalActiveMillis
             if (activeMillis != null && activeMillis > 0L) {
                 add(UsageReportEntry(CliSessionsLabels.activeTime(language), formatActiveTime(activeMillis)))
+            }
+            val throughput = state.sessions.map { session -> session.throughput }.combinedThroughput()
+            if (throughput?.tokensPerSecond != null) {
+                add(UsageReportEntry(CliSessionsLabels.throughput(language), formatThroughput(throughput)))
             }
             if (breakdown != null) {
                 add(
@@ -478,7 +484,7 @@ private fun periodOf(
 }
 
 /** `2026-08-17 15:42 BRT` — data absoluta, que é o que um relatório arquivado exige. */
-private fun formatTimestamp(instant: Instant, timeZone: TimeZone, includeZone: Boolean = true): String {
+internal fun formatTimestamp(instant: Instant, timeZone: TimeZone, includeZone: Boolean = true): String {
     val local = instant.toLocalDateTime(timeZone)
     val month = local.monthNumber.toString().padStart(2, '0')
     val day = local.dayOfMonth.toString().padStart(2, '0')

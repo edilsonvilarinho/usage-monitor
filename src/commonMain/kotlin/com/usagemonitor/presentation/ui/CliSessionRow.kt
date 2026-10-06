@@ -58,6 +58,10 @@ private val SESSION_COLUMN_COST = 96.dp
 
 private val SESSION_COLUMN_ACTIVE_TIME = 84.dp
 
+// Vazão (#381): "118 tok/s" cabe em 76dp. Com ela as sete colunas somam 854dp,
+// ainda abaixo do que sobra da janela de 960dp (866) — a linha não quebra.
+private val SESSION_COLUMN_THROUGHPUT = 76.dp
+
 /** Mesma pegada do `AppIconButton`, para o cabeçalho reservar a casa certa. */
 private val SESSION_ACTION_SLOT = 26.dp
 
@@ -130,6 +134,10 @@ internal fun CliSessionColumnHeader(
         AppColumnHeaderLabel(
             label = CliSessionsLabels.activeTime(language),
             modifier = Modifier.width(SESSION_COLUMN_ACTIVE_TIME)
+        )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.throughput(language),
+            modifier = Modifier.width(SESSION_COLUMN_THROUGHPUT)
         )
         if (hasActionColumn) {
             Spacer(modifier = Modifier.weight(1f))
@@ -265,6 +273,11 @@ internal fun CliSessionRow(
                         ?.let { millis -> formatActiveTime(millis) }
                         ?: "—",
                     modifier = Modifier.width(SESSION_COLUMN_ACTIVE_TIME)
+                )
+
+                AppCellValue(
+                    value = formatThroughput(session.throughput),
+                    modifier = Modifier.width(SESSION_COLUMN_THROUGHPUT)
                 )
             }
 

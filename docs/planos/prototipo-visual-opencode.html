@@ -1550,12 +1550,13 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
       <div class="metric"><span class="k">Tokens (com cache)</span><span class="v big">6,53 M</span></div>
       <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 9,5012</span></div>
       <div class="metric"><span class="k">Tempo ativo</span><span class="v big">4h 3min</span></div>
+      <div class="metric"><span class="k">Vazão</span><span class="v big">95 tok/s</span><span class="k">saída · ponta a ponta</span></div>
     </div>
 
     <div class="colhead">
       <span style="width:170px">Sessão</span><span style="width:130px">Projeto</span>
       <span style="width:136px">Tokens (com cache)</span><span style="width:90px">Cache</span>
-      <span style="width:96px">Custo</span><span style="width:84px">Tempo ativo</span>
+      <span style="width:96px">Custo</span><span style="width:84px">Tempo ativo</span><span style="width:76px">Vazão</span>
     </div>
     <div class="panel"><div class="pbody flush">
       <div class="row"><div class="stack" style="gap:var(--s1);flex:1">
@@ -1567,6 +1568,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
           <div class="stack" style="gap:0;width:90px"><span class="v sm">96%</span><div class="track ok"><i style="width:96%"></i></div></div>
           <span class="v sm" style="width:96px">US$ 5,4792</span>
           <span class="v sm" style="width:84px">2h 14min</span>
+          <span class="v sm" style="width:76px">94 tok/s</span>
         </div>
         <div class="hstack" style="gap:var(--s2)"><span class="st warn">Sem resposta há 3h00</span><span class="st crit">Saturada</span><span class="k">72% da janela · US$ 0,3600 por mensagem</span></div>
       </div></div>
@@ -1579,6 +1581,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
           <div class="stack" style="gap:0;width:90px"><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></div>
           <span class="v sm" style="width:96px">US$ 3,6100</span>
           <span class="v sm" style="width:84px">1h 5min</span>
+          <span class="v sm" style="width:76px">118 tok/s</span>
         </div>
         <div class="hstack" style="gap:var(--s2)"><span class="st warn">Atenção</span><span class="k">46% da janela · US$ 0,2300 por mensagem</span></div>
       </div></div>
@@ -1589,6 +1592,14 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
     desfez a concessão foi o <b>veredito sair do fluxo de colunas</b>: ele media 210dp e desceu para a segunda linha da
     própria linha, junto da razão que o gerou. Com ele fora as seis colunas somam 766dp com o vão, a linha não quebra, e a
     janela ganha piso de 960dp para que ela continue não quebrando quando o usuário arrasta a borda.</p>
+    <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>Vazão e paridade com o Codex (#381, #384, direção O1).</b>
+    Sétima coluna <b>Vazão</b> (76dp; as sete somam 854dp e ainda cabem nos 866 que a janela de 960 deixa) e bloco de
+    métrica com o total sobre o total do recorte. É vazão <b>ponta a ponta</b> — tokens de saída do pedido à última linha
+    da resposta, inclui a espera pelo primeiro token —, escrita assim no rodapé do bloco. Sessão sem turno medido mostra
+    "—", nunca zero. O modal do Codex passa a ter o mesmo padrão: abas Sessões/Resumo (Resumo por projeto e por
+    <b>modelo principal da sessão</b>, porque o índice agrega por sessão), bloco de métricas, coluna Vazão, Relatório PDF
+    e <b>nenhum botão de atualizar</b>: o laço de 5 s já relê, e a passada do laço não pisca mais "Atualizando…". O PDF
+    de CLI, Codex e time sai no idioma do app, rodapé inclusive.</p>
     <p class="note" style="margin:var(--s2) 0 var(--s4)"><b>A marca de sessão sem resposta fica na segunda linha, ao
     lado do veredito</b> (issue #177). Não é uma sétima coluna pelo motivo do parágrafo acima: as seis já somam 766dp,
     e a faixa de legendas não admite linha quebrada. Ela é <b>ponto e palavra</b>, como todo estado deste sistema — cor

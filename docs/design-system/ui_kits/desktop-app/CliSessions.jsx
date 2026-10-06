@@ -1,11 +1,11 @@
 const { AppWindowFrame, AppToolbar, AppTabs, AppSegmentedControl, AppTextField, AppButton, AppPanel, AppPanelHeader, AppPanelBody, AppDataRow, AppKey, AppValue, AppStatusIndicator, AppColumnHeader, AppDataTable, AppMetric, AppEmptyState, AppSourceMark } = DS;
 
 const SESSIONS = [
-  { id: '7c4a1f92', projeto: 'api-gateway', branch: 'feat/rate-limit', modelo: 'sonnet-4-5', turnos: 48, tokens: '1 284 000', custo: 'US$ 3,1841', ativo: '2h 41m', saude: 'crit', veredito: 'Saturada' },
-  { id: 'b81e35c0', projeto: 'checkout-web', branch: 'main', modelo: 'sonnet-4-5', turnos: 26, tokens: '612 400', custo: 'US$ 1,6279', ativo: '1h 08m', saude: 'warn', veredito: 'Atenção' },
-  { id: '3fd90a17', projeto: 'infra-terraform', branch: 'chore/tfsec', modelo: 'haiku-4-5', turnos: 12, tokens: '208 100', custo: 'US$ 0,1904', ativo: '0h 22m', saude: 'ok', veredito: 'Saudável' },
-  { id: 'e02b7c44', projeto: 'api-gateway', branch: 'fix/timeout', modelo: 'opus-4-1', turnos: 9, tokens: '164 900', custo: 'US$ 2,4730', ativo: '0h 31m', saude: 'ok', veredito: 'Saudável' },
-  { id: 'a5518d6b', projeto: 'docs-portal', branch: 'main', modelo: 'sonnet-4-5-legacy', turnos: 5, tokens: '61 200', custo: 'US$ 0,1620', ativo: '0h 14m', saude: null, veredito: '—' }
+  { id: '7c4a1f92', projeto: 'api-gateway', branch: 'feat/rate-limit', modelo: 'sonnet-4-5', turnos: 48, tokens: '1 284 000', custo: 'US$ 3,1841', ativo: '2h 41m', vazao: '94 tok/s', saude: 'crit', veredito: 'Saturada' },
+  { id: 'b81e35c0', projeto: 'checkout-web', branch: 'main', modelo: 'sonnet-4-5', turnos: 26, tokens: '612 400', custo: 'US$ 1,6279', ativo: '1h 08m', vazao: '118 tok/s', saude: 'warn', veredito: 'Atenção' },
+  { id: '3fd90a17', projeto: 'infra-terraform', branch: 'chore/tfsec', modelo: 'haiku-4-5', turnos: 12, tokens: '208 100', custo: 'US$ 0,1904', ativo: '0h 22m', vazao: '87 tok/s', saude: 'ok', veredito: 'Saudável' },
+  { id: 'e02b7c44', projeto: 'api-gateway', branch: 'fix/timeout', modelo: 'opus-4-1', turnos: 9, tokens: '164 900', custo: 'US$ 2,4730', ativo: '0h 31m', vazao: '101 tok/s', saude: 'ok', veredito: 'Saudável' },
+  { id: 'a5518d6b', projeto: 'docs-portal', branch: 'main', modelo: 'sonnet-4-5-legacy', turnos: 5, tokens: '61 200', custo: 'US$ 0,1620', ativo: '0h 14m', vazao: '—', saude: null, veredito: '—' }
 ];
 
 const COLS = [{ label: 'Sessão', flex: 2, width: 150 }, { label: 'Modelo', width: 112 }, { label: 'Turnos', width: 54, align: 'right' }, { label: 'Tokens', width: 84, align: 'right' }, { label: 'Custo', width: 84, align: 'right' }, { label: 'Ativo', width: 54, align: 'right' }, { label: 'Saúde', width: 88, align: 'right' }];
@@ -22,6 +22,7 @@ function SessionRow({ s, last, onOpen }) {
       <AppValue size="sm" style={{ width: 84, flex: 'none', textAlign: 'right' }}>{s.tokens}</AppValue>
       <AppValue size="sm" style={{ width: 84, flex: 'none', textAlign: 'right' }}>{s.custo}</AppValue>
       <AppValue size="sm" style={{ width: 54, flex: 'none', textAlign: 'right' }}>{s.ativo}</AppValue>
+      <AppValue size="sm" style={{ width: 70, flex: 'none', textAlign: 'right' }}>{s.vazao}</AppValue>
       <span style={{ width: 88, flex: 'none', display: 'flex', justifyContent: 'flex-end' }}>
         {s.saude ? (
           <AppStatusIndicator level={s.saude} title={'Contexto vivo contra a janela do modelo ' + s.modelo}>{s.veredito}</AppStatusIndicator>
@@ -36,11 +37,12 @@ function SessionRow({ s, last, onOpen }) {
 function Resumo() {
   return (
     <React.Fragment>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 'var(--s3)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 'var(--s3)' }}>
         <AppMetric label="Ritmo" value="US$ 1,84/h" hint="projeção US$ 9,20 no fechamento" />
         <AppMetric label="Tokens/h" value="412 900" />
         <AppMetric label="Economia do cache" value="US$ 12,40" hint="72% dos tokens vieram do cache" />
         <AppMetric label="Tempo ativo" value="5h 26m" hint="pausas > 5 min descartadas" />
+        <AppMetric label="Vazão" value="95 tok/s" hint="saída · ponta a ponta" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s3)' }}>
         <AppPanel>

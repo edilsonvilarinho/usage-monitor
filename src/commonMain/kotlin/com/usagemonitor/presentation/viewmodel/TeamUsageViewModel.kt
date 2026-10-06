@@ -230,7 +230,8 @@ class TeamUsageViewModel(
         val request = reportRequest(
             document = reportForTeam(state = current, language = language, now = now),
             range = current.range,
-            now = now
+            now = now,
+            language = language
         )
 
         exportJob?.cancel()
