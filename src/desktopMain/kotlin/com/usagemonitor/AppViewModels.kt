@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
+import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
 import com.usagemonitor.domain.usecase.CheckForAppUpdateUseCase
 import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.CreateTeamKeyUseCase
@@ -47,6 +48,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
+import com.usagemonitor.presentation.viewmodel.ComparisonViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.QuotaActivityTracker
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
@@ -224,6 +226,14 @@ internal class AppViewModels(
         }
     }
 
+    // Comparação entre modelos e APIs (#386): lê sob demanda, ao abrir a janela.
+    val comparison = ComparisonViewModel(
+        buildComparison = BuildModelComparisonUseCase(graph.cliSessionRepository, graph.codexCliSessionRepository),
+        dashboardState = dashboard.uiState,
+        exportWriter = graph.usageExportWriter,
+        breadcrumbs = breadcrumbs
+    )
+
     // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
     // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.
     val quotaActivity = QuotaActivityTracker(dashboardState = dashboard.uiState)
@@ -293,6 +303,7 @@ internal class AppViewModels(
         teamPresence.onDestroy()
         sessionPulse.onDestroy()
         quotaActivity.onDestroy()
+        comparison.onDestroy()
         usageAlert.onDestroy()
         teamKeys.onDestroy()
         teamSync.onDestroy()

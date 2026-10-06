@@ -8,7 +8,10 @@ import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.CodexCliSessionTurn
+import com.usagemonitor.domain.entity.CodexCliModelUsage
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
+import com.usagemonitor.domain.entity.OutputThroughput
+import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.combinedThroughput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -125,6 +128,60 @@ class LocalCodexCliSessionDataSource(
                     summary = buildSummary(connection, sessionId, turns),
                     turns = turns
                 )
+            }
+        }
+    }
+
+    /**
+     * Uso por modelo (#386), somado no SQL. A vazão usa o mesmo corte do índice
+     * do Claude: resposta sem pedido, sem duração ou acima do corte não entra.
+     */
+    override suspend fun readModelUsage(sinceEpochMillis: Long?): List<CodexCliModelUsage> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(
+                    """
+                    SELECT model,
+                           COUNT(*) AS responses,
+                           SUM(input_tokens) AS input_tokens,
+                           SUM(cached_input_tokens) AS cached_input_tokens,
+                           SUM(output_tokens) AS output_tokens,
+                           SUM(total_tokens) AS total_tokens,
+                           SUM(CASE WHEN request_ts IS NOT NULL AND ts > request_ts AND ts - request_ts < ?
+                                    THEN output_tokens ELSE 0 END) AS measured_output,
+                           SUM(CASE WHEN request_ts IS NOT NULL AND ts > request_ts AND ts - request_ts < ?
+                                    THEN ts - request_ts ELSE 0 END) AS measured_millis
+                    FROM codex_cli_turns
+                    WHERE model IS NOT NULL AND ts >= ?
+                    GROUP BY model
+                    """.trimIndent()
+                ).use { statement ->
+                    statement.setLong(1, TURN_GAP_CUTOFF_MILLIS)
+                    statement.setLong(2, TURN_GAP_CUTOFF_MILLIS)
+                    statement.setLong(3, sinceEpochMillis ?: 0L)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) {
+                                val measuredMillis = rows.getLong("measured_millis")
+                                add(
+                                    CodexCliModelUsage(
+                                        model = rows.getString("model"),
+                                        responseCount = rows.getInt("responses"),
+                                        inputTokens = rows.getLong("input_tokens"),
+                                        cachedInputTokens = rows.getLong("cached_input_tokens"),
+                                        outputTokens = rows.getLong("output_tokens"),
+                                        totalTokens = rows.getLong("total_tokens"),
+                                        throughput = if (measuredMillis > 0L) {
+                                            OutputThroughput(rows.getLong("measured_output"), measuredMillis)
+                                        } else {
+                                            null
+                                        }
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

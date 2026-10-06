@@ -115,6 +115,23 @@ fun reportRequest(
     )
 }
 
+/** PDF da comparação: `usage-monitor-comparison-7d-2026-10-06.pdf` (#386). */
+fun comparisonReportRequest(
+    document: UsageReportDocument,
+    range: CliSessionRange,
+    now: Instant,
+    language: AppLanguage,
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+): UsageExportRequest {
+    val local = now.toLocalDateTime(timeZone).date
+    val month = local.monthNumber.toString().padStart(2, '0')
+    val day = local.dayOfMonth.toString().padStart(2, '0')
+    return UsageExportRequest(
+        suggestedFileName = "usage-monitor-comparison-${rangeSlug(range)}-${local.year}-$month-$day.pdf",
+        payload = UsageExportPayload.Report(document, language)
+    )
+}
+
 /** PDF do modal do Codex: `usage-monitor-codex-report-5h-2026-10-06.pdf`. */
 fun codexReportRequest(
     document: UsageReportDocument,

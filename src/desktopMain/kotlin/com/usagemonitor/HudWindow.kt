@@ -467,6 +467,7 @@ private fun HudWindowAppBalloon(
                 onOpenAdminOverview = actions.openAdminOverview,
                 onOpenTeamPresence = actions.openTeamPresenceOverview,
                 onOpenHelp = actions.openHelp,
+                onOpenComparison = actions.openComparison,
                 onExportSnapshot = {
                     val stats = currentStats()
                     if (stats != null) {

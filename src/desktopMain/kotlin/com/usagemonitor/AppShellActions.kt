@@ -26,6 +26,8 @@ internal class AppShellActions(
     val onExportFailure: (Throwable) -> Unit,
     val openAdminOverview: (() -> Unit)?,
     val openTeamPresenceOverview: (() -> Unit)?,
+    /** Comparação entre modelos e APIs (#386), no balão da engrenagem. */
+    val openComparison: () -> Unit,
     // As janelas que o card de uma conta abre — também do balão da conta na HUD.
     val openHistory: (ApiSource, UsageAccountKey?) -> Unit,
     val openCliSessions: (UsageTargetKey) -> Unit,

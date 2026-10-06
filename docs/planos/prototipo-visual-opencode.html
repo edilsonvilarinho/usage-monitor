@@ -604,6 +604,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#resumo">Resumo por eixo</a>
   <a href="#time">Uso do time</a>
   <a href="#tendencia">Tendência do time</a>
+  <a href="#comparacao">Comparar modelos</a>
   <a href="#presenca">Presença</a>
   <a href="#presenca-contas">Presença · todas as contas</a>
   <a href="#chaves">Administração de chaves</a>
@@ -1879,6 +1880,23 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 </div>
 
 <!-- ═══════════════════════════════ PRESENÇA ══════════════════════════ -->
+<h2 id="comparacao">9c · Comparar modelos e APIs</h2>
+<p class="note"><b>Direção P7 — mapa de calor (#386).</b> Janela própria, aberta pelo balão da engrenagem
+(ícone de setas, "Comparar modelos e APIs"). Uma linha por modelo do Claude CLI e do Codex e uma por fonte sem CLI; colunas
+Tokens, Custo, Cache, Vazão e Cota da fonte. A cor da célula é o valor sobre o maior da coluna, na cor de identidade da
+fonte da linha, com opacidade máxima de 45%: <b>o número está sempre escrito</b>, a cor é apoio. Métrica que a fonte não
+mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca zero. Recorte 5h/7 dias/30 dias/Total, padrão
+7 dias; lê sob demanda, ao abrir e ao trocar o recorte. Relatório PDF com a mesma tabela, sem a cor.</p>
+<div class="win" style="max-width:1000px">
+  <div class="titlebar"><span class="ttl">Comparar modelos e APIs</span></div>
+  <div class="toolbar"><span class="sp"></span><div class="seg"><button>5h</button><button class="on">7 dias</button><button>30 dias</button><button>Total</button></div><button class="btn">Relatório PDF</button></div>
+  <div class="panel"><div class="scroller"><table class="dt">
+    <tr><td class="k">Modelo / fonte</td><td class="k">Tokens</td><td class="k">Custo</td><td class="k">Cache</td><td class="k">Vazão</td><td class="k">Cota da fonte</td></tr>
+    <tr><td>claude-opus-5-5<br><span class="k" style="color:var(--anthropic)">anthropic</span></td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">6,3M</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">US$ 9,1000</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">96%</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 36%,transparent)">94 tok/s</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">68%</td></tr><tr><td>claude-sonnet-5<br><span class="k" style="color:var(--anthropic)">anthropic</span></td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 18%,transparent)">2,5M</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 11%,transparent)">US$ 2,3100</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 44%,transparent)">95%</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">118 tok/s</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">68%</td></tr><tr><td>MiniMax<br><span class="k" style="color:var(--minimax)">minimax</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num" style="background:color-mix(in srgb,var(--minimax) 14%,transparent)">22%</td></tr><tr><td>gpt-5.6-luna<br><span class="k" style="color:var(--codex)">codex</span></td><td class="num" style="background:color-mix(in srgb,var(--codex) 22%,transparent)">3,1M</td><td class="num">sem tarifa</td><td class="num" style="background:color-mix(in srgb,var(--codex) 41%,transparent)">88%</td><td class="num" style="background:color-mix(in srgb,var(--codex) 12%,transparent)">33 tok/s</td><td class="num" style="background:color-mix(in srgb,var(--codex) 27%,transparent)">41%</td></tr>
+  </table></div></div>
+  <div class="statusbar"><span>Lido 06/10 11:42 BRT</span></div>
+</div>
+
 <h2 id="presenca">10 · Presença</h2>
 <div class="win">
   <div class="titlebar"><span class="t">Conectados agora</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>

@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliSessionTail
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
+import com.usagemonitor.domain.entity.OutputThroughput
 
 /**
  * Contrato de acesso às sessões do Claude Code.
@@ -77,4 +78,8 @@ interface CliSessionRepository {
      * de [getSessions] porque a resposta não está no índice — está no `.jsonl`.
      */
     suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>>
+
+    /** Vazão de saída por modelo (#386); vazio quando a fonte não mede. */
+    suspend fun getModelThroughputs(profileId: String? = null, sinceEpochMillis: Long = 0L): Result<Map<String, OutputThroughput>> =
+        Result.success(emptyMap())
 }

@@ -279,6 +279,29 @@ class LocalCliSessionDataSource(
         }
     }
 
+    override suspend fun readModelThroughputs(profileId: String?, sinceEpochMillis: Long): Map<String, OutputThroughput> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(SELECT_MODEL_THROUGHPUT_SQL).use { statement ->
+                    statement.setLong(1, sinceEpochMillis)
+                    statement.setInt(2, if (profileId == null) 1 else 0)
+                    statement.setString(3, profileId)
+                    statement.setLong(4, TURN_GAP_CUTOFF_MILLIS)
+                    statement.executeQuery().use { rows ->
+                        buildMap {
+                            while (rows.next()) {
+                                put(
+                                    rows.getString("model"),
+                                    OutputThroughput(rows.getLong("output_tokens"), rows.getLong("generation_millis"))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override suspend fun readSessionTails(sessionIds: Collection<String>): List<CliSessionTail> {
         if (sessionIds.isEmpty()) {
             return emptyList()

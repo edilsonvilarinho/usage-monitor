@@ -1,5 +1,7 @@
 package com.usagemonitor.data.repository
 
+import com.usagemonitor.domain.entity.CodexCliModelUsage
+
 import com.usagemonitor.data.datasource.CodexCliSessionDataSource
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
@@ -19,5 +21,9 @@ class CodexCliSessionRepositoryImpl(
 
     override suspend fun getSessionDetail(sessionId: String): Result<CodexCliSessionDetail?> = runCatching {
         dataSource.readSession(sessionId)
+    }
+
+    override suspend fun getModelUsage(sinceEpochMillis: Long?): Result<List<CodexCliModelUsage>> = runCatching {
+        dataSource.readModelUsage(sinceEpochMillis)
     }
 }

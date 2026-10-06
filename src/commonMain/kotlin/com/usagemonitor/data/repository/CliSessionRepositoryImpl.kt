@@ -1,5 +1,7 @@
 package com.usagemonitor.data.repository
 
+import com.usagemonitor.domain.entity.OutputThroughput
+
 import com.usagemonitor.data.datasource.CliSessionDataSource
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
@@ -47,6 +49,13 @@ class CliSessionRepositoryImpl(
 
             rows.toUsageBreakdown(activeTimes)
         }
+    }
+
+    override suspend fun getModelThroughputs(
+        profileId: String?,
+        sinceEpochMillis: Long
+    ): Result<Map<String, OutputThroughput>> {
+        return runCatching { dataSource.readModelThroughputs(profileId, sinceEpochMillis) }
     }
 
     override suspend fun getHourlyUsage(
