@@ -49,8 +49,18 @@ data class CodexCliSessionTurn(
     val source: CodexCliRolloutSource = CodexCliRolloutSource.UNKNOWN,
     val rawSource: String? = null,
     val threadSource: String? = null,
-    val usage: CodexCliUsageDelta = CodexCliUsageDelta()
-)
+    val usage: CodexCliUsageDelta = CodexCliUsageDelta(),
+    /** Entrada que originou esta resposta (contexto do turno, saída de ferramenta ou mensagem); `null` = não lida (#381). */
+    val requestTs: Instant? = null
+) {
+    /** Vazão desta resposta, de [requestTs] até o registro de uso; `null` quando não medida. */
+    val throughput: OutputThroughput?
+        get() = measuredThroughput(
+            outputTokens = usage.outputTokens,
+            requestMillis = requestTs?.toEpochMilliseconds(),
+            endMillis = ts.toEpochMilliseconds()
+        )
+}
 
 /** Agregado de uma sessão local, sem prompt, resposta ou conteúdo de ferramenta. */
 data class CodexCliSessionSummary(
@@ -74,7 +84,9 @@ data class CodexCliSessionSummary(
     val outputTokens: Long = 0L,
     val reasoningOutputTokens: Long = 0L,
     val totalTokens: Long = 0L,
-    val skippedLines: Int = 0
+    val skippedLines: Int = 0,
+    /** Vazão de saída das respostas medidas; `null` = nenhuma medida (#381). */
+    val throughput: OutputThroughput? = null
 ) {
     val projectName: String?
         get() = cwd

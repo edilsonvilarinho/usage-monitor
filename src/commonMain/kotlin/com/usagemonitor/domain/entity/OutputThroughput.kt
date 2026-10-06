@@ -32,6 +32,22 @@ data class OutputThroughput(
     }
 }
 
+/**
+ * Amostra de uma resposta: [outputTokens] entre o pedido ([requestMillis]) e o
+ * fim ([endMillis]). Sem pedido, sem duração ou com duração a partir de
+ * [TURN_GAP_CUTOFF_MILLIS] não é medida — o mesmo corte do índice do Claude.
+ */
+fun measuredThroughput(outputTokens: Long, requestMillis: Long?, endMillis: Long): OutputThroughput? {
+    if (requestMillis == null) {
+        return null
+    }
+    val duration = endMillis - requestMillis
+    if (duration <= 0L || duration >= TURN_GAP_CUTOFF_MILLIS) {
+        return null
+    }
+    return OutputThroughput(outputTokens = outputTokens, generationMillis = duration)
+}
+
 /** Vazão do conjunto (total sobre total); `null` quando nenhum item foi medido. */
 fun Iterable<OutputThroughput?>.combinedThroughput(): OutputThroughput? {
     var total: OutputThroughput? = null

@@ -9,10 +9,10 @@
 **Branch:** `feat/issues-381-388`
 
 ### ▶ Atividade corrente
-A07 — versão de schema e timing de turno no índice do Codex.
+A09 — uso detectado por variação de cota (#385). A08 foi absorvida pela A06/A07: a vazão já sai pronta no domain.
 
 ### ⏭ Próxima atividade
-A08 — vazão exposta para Codex e agregação; A09 — atividade por delta de cota.
+A10 — faixa ativa por janela no histórico (#382).
 
 - A #383 está fechada (entregue em `e2e4ac88`, #390) e fica fora.
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
@@ -26,7 +26,8 @@ A08 — vazão exposta para Codex e agregação; A09 — atividade por delta de 
 | 3 | `70ea48df` | A03 | Viabilidade Telegram; firewall adiado para A21 | Bot API e FAQ oficiais consultados; ver "Medições" |
 | 4 | `953db4c1` | A04 | Galeria única em `docs/planos/issues-381-388-visual/` (rodadas N–R, 10 opções por issue) | `node docs/planos/issues-381-388-visual/build-gallery.cjs` → 87,4 KB; aberta no browser pane: console sem erro, nenhum palco com transbordo horizontal nas 5 abas |
 | 5 | `6a2abef7` | A05 | Escrita de turnos extraída para `LocalCliSessionTurnWriter.kt` (678 + 99 linhas), sem mudança de comportamento | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.architecture.*"` → 57 + 8 testes, 0 falhas |
-| 6 | (este) | A06 | `cli_turns` ganha `request_ts`/`last_line_ts`; conflito do `message_id` funde por `MAX` (corrige subcontagem de saída de 5,64%); `INDEX_SCHEMA_VERSION` 3; `OutputThroughput` no domain e `CliSessionSummary.throughput` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.domain.OutputThroughputTest" --tests "com.usagemonitor.architecture.*"` → 62 + 4 + 8 testes, 0 falhas (5 testes novos de índice, 4 de domínio) |
+| 6 | `aa04c4c3` | A06 | `cli_turns` ganha `request_ts`/`last_line_ts`; conflito do `message_id` funde por `MAX` (corrige subcontagem de saída de 5,64%); `INDEX_SCHEMA_VERSION` 3; `OutputThroughput` no domain e `CliSessionSummary.throughput` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCliSessionDataSourceTest" --tests "com.usagemonitor.domain.OutputThroughputTest" --tests "com.usagemonitor.architecture.*"` → 62 + 4 + 8 testes, 0 falhas (5 testes novos de índice, 4 de domínio) |
+| 7 | (este) | A07 | Parser do Codex lê o envelope de `turn_context`/saída de ferramenta/mensagem do usuário como início do pedido; `codex_cli_turns.request_ts`; `codex_cli_index_meta` versão 1 relê os rollouts; `CodexCliSessionSummary.throughput`; `measuredThroughput` no domain | `gradlew.bat desktopTest --tests "com.usagemonitor.data.CodexCliRolloutParserTest" --tests "com.usagemonitor.data.LocalCodexCliSessionDataSourceTest" --tests "com.usagemonitor.domain.*"` → 5 + 4 + domínio, 0 falhas (3 testes novos) |
 
 ## Medições (Fase 0)
 
