@@ -23,6 +23,8 @@ main { padding:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax
 .name { font-size:12px; border-left:2px solid var(--c); padding-left:6px; align-self:stretch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .state { font-family:var(--mono); font-size:10px; color:var(--muted); align-self:stretch; }
 .state.on::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--ok); margin-right:5px; }
+.risk { font-family:var(--mono); font-size:11px; align-self:stretch; color:var(--c); }
+.risk::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--c); margin-right:5px; }
 .q { font-family:var(--mono); font-size:11px; color:var(--muted); align-self:stretch; display:flex; gap:6px; }
 .q b { color:var(--fg); font-weight:500; }
 .q span:last-child { margin-left:auto; }
@@ -35,7 +37,7 @@ footer { padding:8px 16px 16px; color:var(--muted); font-size:11px; max-width:12
 <body>
 <header><h1>Usage Monitor</h1><span class="read" id="read">lendo…</span></header>
 <main id="grid"><p class="msg">Lendo o retrato do app…</p></main>
-<footer>Só metadados de uso. Nunca conteúdo de prompt ou resposta. Atualiza a cada 30 s. Cor do arco: até 74% normal, 75–89% atenção, 90% ou mais crítico — o percentual está sempre escrito.</footer>
+<footer>Só metadados de uso. Nunca conteúdo de prompt ou resposta. A página relê a cada 30 s; o app coleta a cada 60 s com sessão CLI ativa e 5 min sem. A cor do arco e a palavra são o risco da projeção, as mesmas da HUD; cinza é cota sem projeção.</footer>
 <script>
 /*
  * Biblioteca do anel Gargantua para protótipos HTML (skill usage-monitor-visual-options).
@@ -112,7 +114,11 @@ const ACCENT = { ANTHROPIC:'anthropic', CODEX:'codex', DEEPSEEK:'deepseek', MINI
   KILO:'kilo', OPENROUTER:'openrouter', GEMINI:'gemini', ANTIGRAVITY:'gemini', CURSOR:'cursor' };
 const token = new URLSearchParams(location.search).get('t') || '';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const tone = p => p >= 90 ? 'crit' : p >= 75 ? 'warn' : 'ok';
+// O tom vem do risco da projeção, o mesmo da HUD; sem projeção, neutro — nunca limiar próprio.
+TONE.neutral = '#B8B2B2';
+const tone = risk => ({ ON_TRACK:'ok', AT_RISK:'warn', WILL_EXCEED:'crit' })[risk] || 'neutral';
+const RISK_WORD = { ON_TRACK:['Normal','ok'], AT_RISK:['Atenção','warn'], WILL_EXCEED:['Crítico','crit'] };
+const hhmm = iso => new Date(iso).toLocaleTimeString('pt-BR', { timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit' });
 const fmtReset = iso => { if (!iso) return ''; const d = new Date(iso);
   return d.toLocaleString('pt-BR', { timeZone:'America/Sao_Paulo', weekday:'short', hour:'2-digit', minute:'2-digit' }) + ' BRT'; };
 const money = (cents, cur) => (cents / 100).toLocaleString('pt-BR', { style:'currency', currency: cur || 'USD' });
@@ -130,19 +136,24 @@ function render(data) {
       + (q.percent !== null ? q.percent + '%' : q.unit === 'CURRENCY_USD' ? esc(money(q.total - q.used, q.currency)) : esc(q.used + (q.total ? ' / ' + q.total : '')))
       + '</span><span>' + esc(fmtReset(q.resets_at)) + '</span></div>').join('');
     return '<section class="acc"><div class="name" style="--c:var(--' + (ACCENT[a.source] || 'muted') + ')">' + esc(a.label) + '</div>'
-      + visual + '<div class="state ' + (a.active ? 'on' : '') + '">' + (a.active ? 'Em uso agora' : 'Sem uso detectado') + '</div>' + lines + '</section>';
+      + visual
+      + (RISK_WORD[a.worst_risk] ? '<div class="risk" style="--c:var(--' + RISK_WORD[a.worst_risk][1] + ')">' + RISK_WORD[a.worst_risk][0] + '</div>' : '')
+      + '<div class="state ' + (a.active ? 'on' : '') + '">' + (a.active ? 'Em uso agora' : 'Sem uso detectado') + '</div>' + lines + '</section>';
   }).join('');
   grid.querySelectorAll('canvas').forEach(cv => {
     const a = data.accounts[Number(cv.dataset.i)];
     const arcs = a.quotas.filter(q => q.percent !== null).slice(0, 3)
       .sort((x, y) => ['MONTHLY','WEEKLY','INTERVAL','REPORTED'].indexOf(x.period) - ['MONTHLY','WEEKLY','INTERVAL','REPORTED'].indexOf(y.period))
-      .map(q => ({ f: Math.min(q.percent, 100) / 100, t: tone(q.percent) }));
+      .map(q => ({ f: Math.min(q.percent, 100) / 100, t: tone(q.risk) }));
     const ctx = cv.getContext('2d');
     // Canvas de 240 px: o anel de 64 px a 2× (128 px) centrado, com folga para o disco.
     ctx.translate(PAD * 2, PAD * 2); ctx.scale(2, 2);
     drawRing(ctx, { arcs, mark: a.source === 'ANTHROPIC' ? 'claude' : 'openai' }, .3, { markAlpha: (a.source === 'ANTHROPIC' || a.source === 'CODEX') ? 1 : 0 });
   });
-  document.getElementById('read').textContent = 'lido ' + new Date(data.generated_at).toLocaleTimeString('pt-BR', { timeZone:'America/Sao_Paulo' }) + ' BRT';
+  // Hora da coleta do app, não do pedido da página: o número pode ter até 5 min.
+  document.getElementById('read').textContent = data.last_collected_at
+    ? 'coleta ' + hhmm(data.last_collected_at) + ' BRT · página ' + hhmm(data.generated_at)
+    : 'sem coleta ainda';
 }
 
 async function load() {

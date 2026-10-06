@@ -17,11 +17,14 @@ object JsonUsageSnapshotEncoder : UsageSnapshotEncoder {
     override fun encode(snapshot: UsageSnapshot): String {
         val dto = SnapshotDto(
             generatedAt = snapshot.generatedAt.toString(),
+            lastCollectedAt = snapshot.lastCollectedAt?.toString(),
             accounts = snapshot.accounts.map { account ->
                 AccountDto(
                     source = account.source.name,
                     label = account.label,
                     active = account.active,
+                    fetchedAt = account.fetchedAt?.toString(),
+                    worstRisk = account.worstRisk?.name,
                     quotas = account.quotas.map { quota ->
                         QuotaDto(
                             label = quota.label,
@@ -31,7 +34,8 @@ object JsonUsageSnapshotEncoder : UsageSnapshotEncoder {
                             total = quota.total,
                             percent = quota.percent,
                             resetsAt = quota.resetsAt?.toString(),
-                            currency = quota.currencyCode
+                            currency = quota.currencyCode,
+                            risk = quota.risk?.name
                         )
                     }
                 )
@@ -43,6 +47,7 @@ object JsonUsageSnapshotEncoder : UsageSnapshotEncoder {
     @Serializable
     private data class SnapshotDto(
         @SerialName("generated_at") val generatedAt: String,
+        @SerialName("last_collected_at") val lastCollectedAt: String?,
         @SerialName("accounts") val accounts: List<AccountDto>
     )
 
@@ -51,6 +56,8 @@ object JsonUsageSnapshotEncoder : UsageSnapshotEncoder {
         @SerialName("source") val source: String,
         @SerialName("label") val label: String,
         @SerialName("active") val active: Boolean,
+        @SerialName("fetched_at") val fetchedAt: String?,
+        @SerialName("worst_risk") val worstRisk: String?,
         @SerialName("quotas") val quotas: List<QuotaDto>
     )
 
@@ -63,6 +70,7 @@ object JsonUsageSnapshotEncoder : UsageSnapshotEncoder {
         @SerialName("total") val total: Long,
         @SerialName("percent") val percent: Int?,
         @SerialName("resets_at") val resetsAt: String?,
-        @SerialName("currency") val currency: String
+        @SerialName("currency") val currency: String,
+        @SerialName("risk") val risk: String?
     )
 }

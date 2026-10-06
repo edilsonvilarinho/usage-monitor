@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAlert
+import com.usagemonitor.presentation.ui.components.riskLevelLabel
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
@@ -32,9 +33,12 @@ internal object TelegramBotMessages {
                 "${quota.label} $value$reset"
             }
             val active = if (account.active) (if (pt) " · em uso" else " · in use") else ""
-            "${account.label}$active\n  $quotas"
+            val risk = account.worstRisk?.let { level -> " · ${riskLevelLabel(level, language)}" }.orEmpty()
+            "${account.label}$risk$active\n  $quotas"
         }
-        val header = if (pt) "Usage Monitor · ${clock(snapshot.generatedAt)} BRT" else "Usage Monitor · ${clock(snapshot.generatedAt)} BRT"
+        // A hora é a da coleta, não a do pedido: o número pode ter minutos.
+        val collected = snapshot.lastCollectedAt?.let { at -> "${clock(at)} BRT" } ?: "—"
+        val header = if (pt) "Usage Monitor · coleta $collected" else "Usage Monitor · collected $collected"
         return (listOf(header) + lines).joinToString("\n")
     }
 

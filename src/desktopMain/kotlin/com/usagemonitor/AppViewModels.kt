@@ -272,10 +272,10 @@ internal class AppViewModels(
     )
 
     /** O retrato que a HUD mostra, para a web local (#388) e o `/status` do bot (#387). */
-    fun currentSnapshot(): UsageSnapshot? =
-        (dashboard.uiState.value as? UiState.Success)?.data?.let { stats ->
-            buildUsageSnapshot(stats, hudActiveTargets.value, Clock.System.now())
-        }
+    fun currentSnapshot(): UsageSnapshot? {
+        val success = dashboard.uiState.value as? UiState.Success ?: return null
+        return buildUsageSnapshot(success.data, hudActiveTargets.value, Clock.System.now(), success.riskSummaries)
+    }
 
     /**
      * Bot do Telegram (#387): repassa os alertas da bandeja e atende comandos das

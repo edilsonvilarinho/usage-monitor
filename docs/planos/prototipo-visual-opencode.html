@@ -2283,8 +2283,9 @@ exigiria biblioteca nova para um atalho do "Copiar".</p>
 <p class="note"><b>A página</b> (<code>src/desktopMain/resources/web/hud.html</code>): grade responsiva de cartões, um por
 conta, com o anel Gargantua a 2× (mesmo desenho do app), as linhas de cota com percentual e reinício em BRT, "Em uso
 agora" (sessão CLI ou uso detectado pela cota) e saldo em moeda para pré-pago. Atualiza a cada 30 s e, se o app cair,
-mantém a última leitura e diz isso. A cor do arco segue os limiares dos alertas (75/90) e o percentual está sempre
-escrito. A CSP não deixa carregar nada de fora; a fonte cai para a mono do sistema.</p>
+mantém a última leitura e diz isso. A cor do arco e a palavra do pior risco são o risco da projeção — os mesmos da HUD (<code>toneFor</code>); cota sem
+projeção fica cinza, nunca pintada por limiar próprio. O cabeçalho diz a hora da <b>coleta</b> do app e, ao lado, a da
+página: a página relê a cada 30 s, mas o número só muda quando o app coleta (60 s com sessão CLI, 5 min sem). A CSP não deixa carregar nada de fora; a fonte cai para a mono do sistema.</p>
 
 <h2 id="cfg-bug">12f · Relatório de bug</h2>
 <p class="lede">Aberto pelo botão <b>Reportar um bug</b> da aba Geral, e sozinho no arranque seguinte a uma queda. Ele tem <b>janela própria</b> (desde que a HUD virou o único modo, setembro de 2026): a HUD tem o tamanho do notch e não comporta o formulário. A captura enquadra a HUD, e o clique nas Configurações fecha aquela janela antes de abrir esta.</p>
