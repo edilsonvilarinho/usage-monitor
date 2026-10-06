@@ -41,6 +41,11 @@ export interface AppMenuProps {
   onDismiss?: () => void;
   /** Which side it opens to when there is room; it flips when there is not. */
   placement?: 'top' | 'bottom';
+  /** Bounds supplied by the host; overflow scrolls vertically. */
+  maxWidth?: CSSProperties['maxWidth'];
+  maxHeight?: CSSProperties['maxHeight'];
+  /** Long account names wrap in full inside the menu. */
+  wrapLabels?: boolean;
   /** The anchor control — usually an `AppIconButton`. */
   children?: ReactNode;
   style?: CSSProperties;

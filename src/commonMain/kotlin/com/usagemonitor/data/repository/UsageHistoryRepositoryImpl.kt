@@ -99,7 +99,9 @@ class UsageHistoryRepositoryImpl(
             // sempre mais velho que o corte e faria a tela dizer que está parada.
             lastUpdatedAt = records.filter { it.capturedAt >= currentWindowStart }.maxOfOrNull { it.capturedAt },
             series = groupedSeries,
-            accountContext = accountContext
+            accountContext = accountContext,
+            rangeStartsAt = if (range == HistoryRange.TOTAL) null else range.windowStart(now),
+            rangeEndsAt = now
         )
     }
 

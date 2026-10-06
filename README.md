@@ -30,12 +30,13 @@ response content anywhere.
   edge of any monitor. Hover a ring for its details balloon; click it to refresh that account.
 - **Claude Code session cost** — local transcripts broken down by session, project, branch and model,
   with estimated cost and a context-health verdict. Codex CLI sessions too, token counts only.
-- **History and forecast** — trend, projected exhaustion, previous-period comparison and a monthly
-  USD budget.
+- **History and forecast** — summary before the chart, expandable quota and window details,
+  projected exhaustion, previous-period comparison and a monthly USD budget.
 - **Alerts** — tray notifications when a quota crosses 75/90/100% or a session saturates, with quiet
   hours.
 - **Keeps working** — each source fails on its own and keeps its last reading; rate limits back off.
-- **Export** — CSV and JSON of sessions and summaries, and a PDF report.
+- **Export** — CSV and JSON of sessions and summaries, and PDF reports. History PDF follows the
+  selected source, account, range and quota and includes all available windows, even when collapsed.
 - **Team view (optional)** — a server you host aggregates one account across machines, with a 30-day
   trend and live presence. See [`server/README.md`](server/README.md).
 - **Desktop** — auto-start, light and dark themes, English and Portuguese, UI scale, in-app help

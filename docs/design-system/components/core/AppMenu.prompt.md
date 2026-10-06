@@ -1,5 +1,11 @@
 Dropdown menu anchored to a control: one choice from a short list, the current one marked.
 
+**Long account labels (#383).** A consumer may bound the popup with `maxWidth` and `maxHeight`
+and enable `wrapLabels`. Labels then wrap completely, including long e-mail addresses, and the
+menu scrolls vertically within the available window. The collapsed control shows one selection;
+opening the menu exposes the complete account/workspace labels and the selection mark. Do not
+duplicate the account list or the full selected label as permanent rows above the report.
+
 ```jsx
 <AppMenu
   open={open}
@@ -19,7 +25,7 @@ width of all of them; the menu shows the current one and the rest on demand. Use
 control on a toolbar with room, the menu on a status bar that has none — three window-mode labels
 side by side did not fit on a 30dp bar that already carries five actions. (Its first consumer, the
 window-mode menu, was removed with the cards-only mode in September 2026; the primitive stays
-published without a consumer in the app.)
+published; history now consumes it for account selection and the narrow range selector.)
 
 **Not the platform's own menu.** That one brings its own surface, radius, entry animation and item
 height, and none of the four belong to this system. Dressing it from the outside would leave two

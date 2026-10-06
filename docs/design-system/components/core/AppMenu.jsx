@@ -9,12 +9,15 @@ export function AppMenu({
   onSelect,
   onDismiss,
   placement = 'top',
+  maxWidth,
+  maxHeight,
+  wrapLabels = false,
   children,
   style
 }) {
   const anchored = placement === 'top'
     ? { bottom: 'calc(100% + var(--s1))', right: 0 }
-    : { top: 'calc(100% + var(--s1))', right: 0 };
+    : { top: 'calc(100% + var(--s1))', left: 0 };
 
   return (
     <div style={{ position: 'relative', display: 'inline-flex', ...style }}>
@@ -28,12 +31,14 @@ export function AppMenu({
             style={{
               position: 'absolute',
               ...anchored,
-              minWidth: 'max-content',
+              width: 'max-content',
+              maxWidth,
+              maxHeight,
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--r2)',
               boxShadow: 'var(--shadow-overlay)',
-              overflow: 'hidden',
+              overflowY: 'auto',
               zIndex: 2
             }}
           >
@@ -60,14 +65,15 @@ export function AppMenu({
                     color: on ? 'var(--fg)' : 'var(--muted)',
                     fontFamily: 'var(--mono)',
                     fontSize: 'var(--t12)',
-                    whiteSpace: 'nowrap',
+                    whiteSpace: wrapLabels ? 'normal' : 'nowrap',
+                    textAlign: 'left',
                     cursor: 'default'
                   }}
                 >
                   {/* A marca ocupa lugar em toda linha: sem isso o rótulo da
                       selecionada andaria para o lado a cada troca de opção. */}
-                  <span style={{ width: 12, textAlign: 'center' }}>{on ? '✓' : ''}</span>
-                  <span>{label}</span>
+                  <span style={{ width: 12, flexShrink: 0, textAlign: 'center' }}>{on ? '✓' : ''}</span>
+                  <span style={{ minWidth: 0, overflowWrap: wrapLabels ? 'anywhere' : undefined }}>{label}</span>
                 </button>
               );
             })}

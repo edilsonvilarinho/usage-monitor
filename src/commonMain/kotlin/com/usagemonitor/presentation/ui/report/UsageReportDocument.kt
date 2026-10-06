@@ -54,6 +54,11 @@ sealed interface UsageReportSection {
 
     fun sanitized(): UsageReportSection
 
+    /** Texto com quebra de linha, para explicações e previsões que não cabem em uma célula. */
+    data class Paragraphs(override val heading: String, val paragraphs: List<String>) : UsageReportSection {
+        override fun sanitized(): UsageReportSection = Paragraphs(heading.toReportText(), paragraphs.map { it.toReportText() })
+    }
+
     /** Bloco rótulo/valor: os totais da janela. */
     data class KeyValues(
         override val heading: String,

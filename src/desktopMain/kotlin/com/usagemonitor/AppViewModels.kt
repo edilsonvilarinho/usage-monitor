@@ -128,7 +128,8 @@ internal class AppViewModels(
     val history = HistoryViewModel(
         getUsageHistory = graph.getUsageHistory,
         enabledApis = graph.enabledApis,
-        breadcrumbs = breadcrumbs
+        breadcrumbs = breadcrumbs,
+        exportWriter = graph.usageExportWriter
     )
 
     // A indexação corre em background desde o arranque, em `Dispatchers.IO`: o

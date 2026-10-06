@@ -109,6 +109,15 @@ fun main(args: Array<String>) {
     outputDir.mkdirs()
 
     val generator = ScreenshotGenerator(outputDir)
+    if ("--history-regression" in args) {
+        generator.historyRegression()
+        return
+    }
+    if ("--history-baseline" in args) {
+        generator.historyBaseline()
+        println("Base visual do histórico gerada em ${outputDir.absolutePath}")
+        return
+    }
     if ("--observed" in args) {
         generator.observedHud()
         println("Capturas de atividade observada geradas em ${outputDir.absolutePath}")
@@ -145,6 +154,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
         heightDp: Int,
         /** O tema claro tem paleta de acentos própria; capturá-lo é como se confere. */
         isDark: Boolean = true,
+        uiScalePercent: Int = 100,
         content: @Composable () -> Unit
     ) {
         val scene = ImageComposeScene(
@@ -155,7 +165,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
 
         try {
             scene.setContent {
-                AppTheme(isDark = isDark) {
+                AppTheme(isDark = isDark, uiScalePercent = uiScalePercent) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -295,6 +305,60 @@ private class ScreenshotGenerator(private val outputDir: File) {
             onBack = {},
             focusedSource = ApiSource.ANTHROPIC
         )
+    }
+
+    fun historyBaseline() {
+        for (report in issue383HistoryReports()) {
+            for (isDark in listOf(true, false)) {
+                for ((width, scale) in listOf(320 to 100, 680 to 100, 1030 to 100, 320 to 125, 1030 to 125)) {
+                    val viewModel = fixedHistoryViewModel(report)
+                    try {
+                        val theme = if (isDark) "dark" else "light"
+                        val suffix = if (scale == 100) "" else "-scale$scale"
+                        capture("history-${report.source.name.lowercase()}-$theme-$width$suffix", width, 840, isDark, scale) {
+                            HistoryScreen(
+                                viewModel = viewModel,
+                                language = AppLanguage.PT,
+                                onBack = {},
+                                focusedSource = report.source,
+                                showSourceSelector = false
+                            )
+                        }
+                    } finally {
+                        viewModel.onDestroy()
+                    }
+                }
+            }
+        }
+        generateIssue383Reports(outputDir)
+    }
+
+    fun historyRegression() {
+        val base = issue383HistoryReports().first()
+        for (source in listOf(ApiSource.ANTHROPIC, ApiSource.CODEX)) {
+            val accounts = issue383LongHistoryAccounts(source)
+            val report = base.copy(source = source, accountContext = accounts.first(),
+                series = base.series.map { it.copy(quotaLabel = if (source == ApiSource.CODEX) it.quotaLabel.replace("Claude", "Codex") else it.quotaLabel) })
+            for (dark in listOf(true, false)) {
+                for ((width, height, scale) in listOf(Triple(1030, 560, 100), Triple(860, 600, 100),
+                    Triple(1030, 640, 125), Triple(320, 560, 100), Triple(320, 700, 125))) {
+                    val vm = fixedHistoryViewModel(report, accounts)
+                    try {
+                        capture("history-regression-${source.name.lowercase()}-${if (dark) "dark" else "light"}-$width-$height-$scale", width, height, dark, scale) {
+                            HistoryScreen(vm, AppLanguage.PT, {}, focusedSource = source, showSourceSelector = false)
+                        }
+                    } finally { vm.onDestroy() }
+                }
+            }
+        }
+        for (dark in listOf(true, false)) {
+            for (scale in listOf(100, 125)) {
+                capture("history-windows-${if (dark) "dark" else "light"}-$scale", 1030, 640, dark, scale) {
+                    com.usagemonitor.presentation.ui.HistoryWindowAnalysisPanel(issue383ManyWindowsSeries(),
+                        com.usagemonitor.presentation.ui.theme.AppAccents.current.anthropic, AppLanguage.PT)
+                }
+            }
+        }
     }
 
     // O diálogo é dividido em abas e a grade de temas é rolável, então a captura
@@ -522,36 +586,47 @@ internal const val APP_VERSION = "27.0.0"
  * sem esperar o `Success`, a captura pegaria o spinner. Daí o bloqueio até o
  * estado chegar, com prazo para não travar o build se algo mudar.
  */
-internal fun fixedHistoryViewModel(): HistoryViewModel {
+internal fun fixedHistoryViewModel(report: ApiUsageHistoryReport = ScreenshotFixtures.historyReport, accounts: List<UsageAccountContext>? = null): HistoryViewModel {
     val repository = object : UsageHistoryRepository {
         override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
 
         override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> {
-            return ScreenshotFixtures.historyAccounts
+            if (accounts != null) return accounts.filter { it.key.source == source }
+            val context = report.accountContext
+            if (context != null && context.key.source == source && source != ApiSource.ANTHROPIC) {
+                return listOf(context)
+            }
+            return ScreenshotFixtures.historyAccounts.filter { it.key.source == source }
         }
 
         override suspend fun getHistoryReport(
             source: ApiSource,
             range: HistoryRange,
             now: Instant
-        ): ApiUsageHistoryReport = ScreenshotFixtures.historyReport
+        ): ApiUsageHistoryReport = report.copy(range = range)
 
         override suspend fun getHistoryReport(
             source: ApiSource,
             accountKey: UsageAccountKey?,
             range: HistoryRange,
             now: Instant
-        ): ApiUsageHistoryReport = ScreenshotFixtures.historyReport
+        ): ApiUsageHistoryReport = report.copy(
+            range = range,
+            accountContext = accounts?.firstOrNull { it.key == accountKey } ?: report.accountContext
+        )
     }
 
     val viewModel = HistoryViewModel(
         getUsageHistory = GetUsageHistoryUseCase(repository),
-        enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC, ApiSource.CODEX, ApiSource.DEEPSEEK))
+        enabledApis = MutableStateFlow(setOf(report.source, ApiSource.ANTHROPIC, ApiSource.CODEX, ApiSource.DEEPSEEK)),
+        exportWriter = com.usagemonitor.presentation.viewmodel.UsageExportWriter { null }
     )
+
+    viewModel.openForSource(report.source)
 
     runBlocking {
         withTimeout(10.seconds) {
-            viewModel.uiState.first { state -> state is HistoryUiState.Success }
+            viewModel.uiState.first { state -> state is HistoryUiState.Success && state.selectedSource == report.source }
         }
     }
 

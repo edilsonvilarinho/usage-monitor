@@ -268,6 +268,16 @@ kover {
 // distribuido e ainda enxergar os composables `internal`.
 val desktopTestCompilation = kotlin.jvm("desktop").compilations.getByName("test")
 
+tasks.register<JavaExec>("probeHistoryWindow") {
+    group = "verification"
+    description = "Abre e reabre uma janela real de histórico com dados sintéticos para reproduzir a issue #389."
+    mainClass.set("com.usagemonitor.HistoryOpenProbe")
+    systemProperty("skiko.renderApi", providers.gradleProperty("historyProbeRenderApi").orElse("SOFTWARE").get())
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(providers.gradleProperty("historyProbeOutputDir").orElse("build/issue389-probe").get())
+    args(providers.gradleProperty("historyProbePrewarm").orElse("false").get())
+}
+
 tasks.register<JavaExec>("generateScreenshots") {
     group = "documentation"
     description = "Renderiza offscreen os prints do README com dados sinteticos."
@@ -276,6 +286,8 @@ tasks.register<JavaExec>("generateScreenshots") {
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(providers.gradleProperty("screenshotOutputDir").orElse(layout.projectDirectory.dir("img").asFile.absolutePath).get())
     if (providers.gradleProperty("screenshotScenario").orNull == "observed") args("--observed")
+    if (providers.gradleProperty("screenshotScenario").orNull == "history-baseline") args("--history-baseline")
+    if (providers.gradleProperty("screenshotScenario").orNull == "history-regression") args("--history-regression")
 }
 
 tasks.register<JavaExec>("generateGargantuaPreview") {
@@ -304,6 +316,7 @@ tasks.register<JavaExec>("generateHelpMedia") {
     mainClass.set("com.usagemonitor.screenshots.HelpMediaGeneratorKt")
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(layout.projectDirectory.dir("src/desktopMain/resources/help").asFile.absolutePath)
+    if (providers.gradleProperty("helpMediaTopic").orNull == "history") args("--history")
 }
 
 // Pre-extracao da nativa do Skiko antes dos forks paralelos -- ver o comentario

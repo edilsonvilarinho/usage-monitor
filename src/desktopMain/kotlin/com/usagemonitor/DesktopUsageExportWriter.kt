@@ -42,7 +42,7 @@ class DesktopUsageExportWriter(
             when (val payload = request.payload) {
                 is UsageExportPayload.Text -> target.writeText(payload.content)
                 is UsageExportPayload.Report ->
-                    target.writeBytes(PdfUsageReportRenderer(language()).render(payload.document))
+                    target.writeBytes(PdfUsageReportRenderer(payload.language ?: language()).render(payload.document))
             }
         }
         return target.absolutePath

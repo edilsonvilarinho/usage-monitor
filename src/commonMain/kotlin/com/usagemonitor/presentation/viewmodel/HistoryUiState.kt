@@ -38,6 +38,8 @@ sealed interface HistoryUiState {
          * intervalo ou a conta mantém o relatório anterior na tela até o novo
          * chegar, em vez de trocar a tela inteira por "Carregando".
          */
-        val isRefreshing: Boolean = false
+        val isRefreshing: Boolean = false,
+        val isExporting: Boolean = false,
+        val exportOutcome: CliExportOutcome? = null
     ) : HistoryUiState
 }

@@ -1426,23 +1426,22 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
 <!-- ═══════════════════════════════ HISTÓRICO ═════════════════════════ -->
 <h2 id="historico">5 · Histórico</h2>
-<p class="lede">Fonte, conta e intervalo se juntam numa <b>toolbar única de 34dp</b>. O gráfico ganha um painel neutro e as métricas viram tabela.</p>
-<p class="note"><b>Linha de referência do período anterior, tracejada (issue #215).</b> A leitura já ia até o início da janela anterior para calcular "vs. período anterior" na tabela; esses pontos existiam e eram descartados depois de virar um número só. Sobrepor a série anterior — tracejada, em tom neutro, nunca a cor de acento — dá o contexto visual sem exigir ler a tabela abaixo. Some sob zoom: o recorte é por fração de índice da série corrente, e as duas janelas não têm garantia de mesma densidade de amostragem — comparar um trecho ampliado contra o período inteiro anterior seria comparar tempos diferentes. Uma legenda em texto acompanha, porque a cor sozinha não diz o que o traçado significa.</p>
-
+<p class="lede"><b>Direção 01 aprovada — resumo, gráfico e detalhes (issue #383).</b> Três métricas primárias antes do gráfico; resumo das cotas aberto e análises recolhidas. Cabeçalho, filtros e última coleta ficam fora da rolagem.</p>
 <div class="win">
-  <div class="titlebar"><span class="t">Histórico de uso — Anthropic · Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="titlebar"><span class="t">Histórico — Anthropic</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
   <div class="body">
-    <div class="panel"><div class="phead" style="gap:var(--s3)">
-      <span class="k">API</span>
-      <div class="seg"><button class="on" type="button">Anthropic</button><button type="button">Codex</button><button type="button">DeepSeek</button></div>
-      <span class="k">Conta</span>
-      <div class="seg"><button class="on" type="button">dev@example.com</button><button type="button">qa@example.com</button></div>
-      <span class="sp"></span>
-      <div class="seg"><button class="on" type="button">24h</button><button type="button">7 dias</button><button type="button">30 dias</button><button type="button">Total</button></div>
-      <span class="k">Cota</span>
-      <div class="seg"><button type="button">5h</button><button type="button">7d</button><button class="on" type="button">Ambas</button></div>
+    <div class="panel"><div class="pbody" style="flex-direction:row;flex-wrap:wrap;align-items:center">
+      <button class="btn" type="button" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Conta: dev@example.com · Padrão ▾</button>
+      <div role="group" aria-label="Intervalo" style="display:flex;gap:var(--s1)"><button class="btn on" type="button">24h</button><button class="btn" type="button">7 dias</button><button class="btn" type="button">30 dias</button><button class="btn" type="button">Total</button></div>
+      <div role="group" aria-label="Cota" style="display:flex;gap:var(--s1)"><button class="btn" type="button">5h</button><button class="btn" type="button">7d</button><button class="btn on" type="button">Ambas</button></div>
+      <button class="btn" type="button">PDF</button>
     </div></div>
-
+    <div style="max-height:680px;overflow-y:auto;display:flex;flex-direction:column;gap:var(--s3)">
+      <div style="display:flex;flex-wrap:wrap;gap:var(--s3)">
+        <div class="metric"><span class="k">Uso atual</span><span>68% / 100%</span></div>
+        <div class="metric"><span class="k">Janelas no intervalo</span><span>5 · 1 esgotou</span></div>
+        <div class="metric"><span class="k">Pico médio por janela</span><span>74%</span></div>
+      </div>
     <div class="chart">
       <div class="hstack" style="margin-bottom:var(--s2)">
         <span class="k">Consumo ao longo do intervalo selecionado</span>
@@ -1465,6 +1464,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       </svg>
     </div>
 
+      <details open><summary class="k">Resumo das cotas</summary>
     <div class="panel">
       <div class="phead"><span class="ptitle">Sessão 5h</span><span class="sp"></span><span class="st warn">Atenção</span></div>
       <div class="scroller"><table class="dt">
@@ -1485,6 +1485,8 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
       </table></div>
     </div>
 
+      </details>
+      <details><summary class="k">Janelas e distribuição horária</summary>
     <div class="panel">
       <div class="phead"><span class="ptitle">Janelas 5h</span><span class="sp"></span><span class="k">5 janelas no intervalo</span></div>
       <div class="scroller"><table class="dt">
@@ -1499,9 +1501,12 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
         <span class="k">Pico às 14h BRT · 15% do consumo</span>
       </div>
     </div>
+      </details>
+    </div>
     <div class="statusbar"><span>Última coleta: Qua 12/08 11h00 BRT</span></div>
   </div>
 </div>
+<p class="note"><b>Adaptação e exportação (#383).</b> Conta usa menu sob demanda com nomes completos e rolagem, sem lista permanente nem rótulo duplicado. A partir de 720dp, conta, intervalo, cota e PDF ocupam uma linha. Entre 600 e 719dp são duas; abaixo de 600dp, intervalo vira menu e as cotas ficam em linha própria. A tabela de métricas usa uma coluna abaixo de 600dp e valores completos com quebra de texto. Saldo e atividade local mantêm sua semântica própria, com resumo antes do gráfico e detalhes expansíveis. PDF usa a fonte, conta, intervalo absoluto e cota carregados, incluindo todas as janelas e leituras disponíveis. Zoom e expansão não retiram dados. Total identifica a amostragem de até 720 pontos por série. Sem dados, durante releitura ou escrita, a ação é desabilitada com motivo; cancelar o destino é silencioso.</p>
 <p class="note">Preservados: seleção por fonte e por conta, as quatro janelas, reinícios, média por hora, forecast, comparação com o período anterior e as regras próprias de saldo e de créditos. Os pontos da janela anterior entram no delta e, com uma série só, na linha tracejada descrita acima.</p>
 <p class="note"><b>Seletor de cota <code>5h | 7d | Ambas</code> (issue #320)</b>, só quando a fonte tem as duas janelas; os nomes saem das séries — a intervalar do MiniMax não é de 5 horas. Trocar não relê o banco. "Ambas" é o padrão; "5h" ou "7d" mostram um gráfico e uma tabela, e com série única volta a linha tracejada do período anterior. O Codex passa a ter um card só para 5h e 7d; a série reportada e a mensal continuam em cards próprios. <b>"Consumido no período" sai</b> quando a série tem janelas: somava as subidas de todas as janelas sobre o total de uma (173% numa semana de 5h). No lugar: janelas no intervalo e quantas esgotaram, pico médio e consumo médio por janela fechada.</p>
 <p class="note"><b>Trocar intervalo ou conta não troca a tela por «Carregando» (issue #320)</b>: o conteúdo anterior fica, esmaecido, com o intervalo novo já marcado, até a leitura chegar. Trocar de fonte ainda passa pelo estado de carga. Toda a movimentação da janela obedece a «Reduzir animações».</p>

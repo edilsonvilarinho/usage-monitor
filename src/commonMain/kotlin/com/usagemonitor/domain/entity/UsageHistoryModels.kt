@@ -280,7 +280,10 @@ data class ApiUsageHistoryReport(
     val range: HistoryRange,
     val lastUpdatedAt: Instant?,
     val series: List<UsageHistorySeries>,
-    val accountContext: UsageAccountContext? = null
+    val accountContext: UsageAccountContext? = null,
+    /** Recorte absoluto da consulta; Total não possui início nominal. */
+    val rangeStartsAt: Instant? = null,
+    val rangeEndsAt: Instant? = null
 ) {
     val isEmpty: Boolean
         get() = series.isEmpty()

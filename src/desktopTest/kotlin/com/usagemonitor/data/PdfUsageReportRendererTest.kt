@@ -19,6 +19,17 @@ import kotlin.test.assertTrue
 
 class PdfUsageReportRendererTest {
 
+    @Test
+    fun `long history explanations wrap without losing the end of the text`() {
+        val paragraph = "Previsão: " + "dados observados no intervalo ".repeat(20) + "FIM DA PREVISAO"
+        val document = UsageReportDocument("Histórico", "teste", listOf(UsageReportSection.Paragraphs("Detalhes", listOf(paragraph))))
+        Loader.loadPDF(PdfUsageReportRenderer(AppLanguage.PT).render(document)).use { pdf ->
+            val text = PDFTextStripper().getText(pdf)
+            assertTrue(text.contains("FIM DA PREVISAO"), text)
+            assertTrue(text.contains("Detalhes"), text)
+        }
+    }
+
     /**
      * O PDF gerado é relido com o próprio PDFBox: afirmar que os bytes existem não
      * diria nada sobre o arquivo abrir num leitor.

@@ -176,6 +176,7 @@ internal fun ApplyWindowMinimumSize(
 ) {
     val scale = uiScaleFactor(uiScalePercent)
     LaunchedEffect(window, scale, workArea, widthDp, heightDp) {
+        awaitAwtEventTurn()
         val minimum = fitWindowSize(
             DpSize(width = widthDp.dp * scale, height = heightDp.dp * scale),
             workArea

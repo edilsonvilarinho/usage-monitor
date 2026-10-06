@@ -28,6 +28,8 @@ import com.usagemonitor.ApplyWindowMinimumSize
 import com.usagemonitor.AutoStartManager
 import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.activateWindow
+import com.usagemonitor.awaitAwtEventTurn
+import com.usagemonitor.postAwtWindowOperation
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.isWindowOpacitySupported
@@ -46,6 +48,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * O que toda janela modal recebe igual: ícone, tema, escala, movimento e a área
@@ -285,6 +289,7 @@ private fun WindowScope.ModalWindowBody(
         // reabrir no meio da saída. Um pedido que chegou durante o pré-aquecimento
         // espera no fluxo e é atendido aqui.
         host.requests.collectLatest { request ->
+            awaitAwtEventTurn()
             val motion = currentEnvironment.motion
             val animated = shouldAnimateModalWindow(motion, opacitySupported, platform)
             // Aba, faixa e dado novo só repetem o E9 numa janela que abriu com ele.
@@ -300,6 +305,7 @@ private fun WindowScope.ModalWindowBody(
                     } else {
                         setWindowOpacity(window, 1f)
                     }
+                    awaitAwtEventTurn()
                     activateWindow(window)
                     return@collectLatest
                 }
@@ -321,6 +327,7 @@ private fun WindowScope.ModalWindowBody(
                     withFrameNanos { }
                     withFrameNanos { }
                 }
+                awaitAwtEventTurn()
                 host.contentOnScreen = true
                 host.opens += 1
                 currentEnvironment.breadcrumbs.record(
@@ -437,6 +444,7 @@ private suspend fun prewarmWindow(
     diagnosticName: String
 ) {
     modalPrewarmLock.withLock {
+        awaitAwtEventTurn()
         // Pedida enquanto esperava a vez: a abertura normal cobre tudo.
         if (host.requests.value.visible) {
             return
@@ -452,8 +460,11 @@ private suspend fun prewarmWindow(
                 withFrameNanos { }
             }
         } finally {
-            host.onScreen = false
-            window.focusableWindowState = wasFocusable
+            withContext(NonCancellable) {
+                awaitAwtEventTurn()
+                host.onScreen = false
+                window.focusableWindowState = wasFocusable
+            }
         }
         breadcrumbs.record(
             BreadcrumbCategory.NAVIGATION,
@@ -495,7 +506,7 @@ private suspend fun fadeWindow(
         targetValue = target,
         animationSpec = appTweenSpec(durationMillis, motion, easing)
     ) { value, _ ->
-        setWindowOpacity(window, value)
+        postAwtWindowOperation { if (window.isDisplayable) setWindowOpacity(window, value) }
     }
 }
 
@@ -520,7 +531,8 @@ private suspend fun playFilaments(
             animationSpec = appTweenSpec(durationMillis, motion, LinearEasing)
         ) { value, _ ->
             reveal.progress = value
-            setWindowOpacity(window, modalFilamentWindowAlpha(phase, value))
+            val alpha = modalFilamentWindowAlpha(phase, value)
+            postAwtWindowOperation { if (window.isDisplayable) setWindowOpacity(window, alpha) }
         }
     } finally {
         if (phase == ModalRevealPhase.OPENING) {
