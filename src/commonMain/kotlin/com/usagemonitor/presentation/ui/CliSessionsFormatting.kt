@@ -309,6 +309,15 @@ internal object CliSessionsLabels {
         return if (language == AppLanguage.PT) "Taxa de acerto de cache" else "Cache hit rate"
     }
 
+    /** Rótulo do bloco de 168dp: "Taxa de acerto de cache" com o `?` cortava (#393). */
+    fun cacheHitRateShort(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Acerto do cache" else "Cache hit rate"
+    }
+
+    fun outputPerTurnChart(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Saída por turno" else "Output per turn"
+    }
+
     /**
      * Não é a duração da sessão: intervalos acima de cinco minutos entre turnos
      * são descartados por serem o usuário parado, não tempo de trabalho.

@@ -273,6 +273,14 @@ data class CliSessionAnalytics(
     val cacheWrite1hPerTurn: List<Long> = emptyList(),
     val cumulativeCostMicros: List<Long> = emptyList(),
     val cumulativeSavingsMicros: List<Long> = emptyList(),
+    /** Saída de cada turno da thread principal (#393, grade de gráficos). */
+    val outputPerTurn: List<Long> = emptyList(),
+    /**
+     * `cacheRead / (cacheRead + cacheWrite)` de cada turno da thread principal —
+     * a mesma conta de [CliSessionSummary.cacheHitRate]; `null` sem atividade de
+     * cache no turno, que não é acerto zero.
+     */
+    val cacheHitPerTurn: List<Double?> = emptyList(),
     /**
      * Tempo de trabalho da sessão, somando só os intervalos entre turnos
      * consecutivos menores que [TURN_GAP_CUTOFF_MILLIS].

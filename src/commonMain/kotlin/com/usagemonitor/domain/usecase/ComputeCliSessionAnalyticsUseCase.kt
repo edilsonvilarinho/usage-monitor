@@ -53,6 +53,11 @@ class ComputeCliSessionAnalyticsUseCase {
             cacheWrite1hPerTurn = mainTurns.map { turn -> turn.cacheWrite1hTokens },
             cumulativeCostMicros = accumulate(turns) { turn -> turn.costMicros ?: 0L },
             cumulativeSavingsMicros = accumulate(turns) { turn -> turn.cacheSavingsMicros ?: 0L },
+            outputPerTurn = mainTurns.map { turn -> turn.outputTokens },
+            cacheHitPerTurn = mainTurns.map { turn ->
+                val denominator = turn.cacheReadTokens + turn.cacheWriteTokens
+                if (denominator > 0L) turn.cacheReadTokens.toDouble() / denominator.toDouble() else null
+            },
             // Só a thread principal: o subagente roda em paralelo, e somar os
             // intervalos dele contaria o mesmo tempo duas vezes.
             activeTimeMillis = activeTimeMillisOf(mainTurns)

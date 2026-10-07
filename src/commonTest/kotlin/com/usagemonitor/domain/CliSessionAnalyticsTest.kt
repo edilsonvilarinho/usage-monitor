@@ -303,6 +303,22 @@ class CliSessionAnalyticsTest {
         )
     }
 
+    @Test
+    fun `per turn output and cache hit follow the main thread`() {
+        val detail = detail(
+            turn(seq = 1, outputTokens = 120L, cacheReadTokens = 800L, cacheWrite5mTokens = 200L),
+            turn(seq = 2, outputTokens = 999L, cacheReadTokens = 50L, isSidechain = true),
+            turn(seq = 3, outputTokens = 40L)
+        )
+
+        val analytics = computeAnalytics(detail)
+
+        assertEquals(listOf(120L, 40L), analytics.outputPerTurn)
+        assertEquals(0.8, analytics.cacheHitPerTurn[0]!!, 1e-9)
+        // Turno sem leitura nem escrita de cache: não medido, não acerto zero.
+        assertNull(analytics.cacheHitPerTurn[1])
+    }
+
     private fun detail(vararg turns: CliSessionTurn): CliSessionDetail {
         return CliSessionDetail(summary = summary(), turns = turns.toList())
     }

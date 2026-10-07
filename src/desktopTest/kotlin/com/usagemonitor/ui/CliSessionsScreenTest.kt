@@ -1,5 +1,7 @@
 package com.usagemonitor.ui
 
+import com.usagemonitor.presentation.ui.CLI_TURN_CHART_GRID_TAG
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -690,17 +693,20 @@ class CliSessionsScreenTest {
             }
         }
 
-        // O essencial: veredito, resumo e o único gráfico do primeiro nível.
+        // O essencial: veredito, resumo e a grade de gráficos por turno (#393, T3).
         onNodeWithText("Sessão saudável").assertIsDisplayed()
-        onNodeWithText("Custo").assertExists()
+        // "Custo" é o bloco do resumo e também a legenda do gráfico de custo da grade.
+        onAllNodesWithText("Custo").assertCountEquals(2)
         onNodeWithText("Tokens (com cache)").assertExists()
+        onNodeWithTag(CLI_TURN_CHART_GRID_TAG).assertExists()
         onNodeWithText("Contexto por turno").assertExists()
+        onNodeWithText("Saída por turno").assertExists()
+        onNodeWithText("Custo x economia acumulados").assertExists()
         onNodeWithText("Avançado").assertExists()
 
         // Fechado, o bloco avançado nem entra na árvore.
         onNodeWithText("Distribuição de custo").assertDoesNotExist()
         onNodeWithText("Cache gravado por turno").assertDoesNotExist()
-        onNodeWithText("Custo x economia acumulados").assertDoesNotExist()
     }
 
     @Test
@@ -1047,7 +1053,8 @@ class CliSessionsScreenTest {
             }
         }
 
-        onNodeWithText("Como ler esta tela").performClick()
+        // A grade de gráficos (#393) empurra o glossário para baixo da dobra.
+        onNodeWithText("Como ler esta tela").performScrollTo().performClick()
 
         assertEquals(true, toggled)
     }

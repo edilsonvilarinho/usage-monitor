@@ -1656,25 +1656,15 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
       <div class="metric"><span class="k">Tempo ativo</span><span class="v big">2h 14min</span></div>
     </div>
 
-    <div class="chart">
-      <div class="hstack" style="margin-bottom:var(--s2)">
-        <span class="k">Contexto por turno</span><span class="sp"></span>
-        <span class="legend"><span><i style="background:var(--cread)"></i>Cache lido</span><span><i style="background:var(--cwrite)"></i>Cache gravado</span><span><i style="background:var(--input)"></i>Input</span><span><i style="background:var(--output)"></i>Output</span></span>
-      </div>
-      <svg class="spark" viewBox="0 0 700 160" role="img" aria-label="Crescimento do contexto ao longo de 18 turnos">
-        <g stroke="var(--border)" stroke-width="1"><line x1="0" y1="40" x2="700" y2="40"/><line x1="0" y1="80" x2="700" y2="80"/><line x1="0" y1="120" x2="700" y2="120"/></g>
-        <g fill="var(--cread)">
-          <rect x="6" y="147" width="26" height="9" rx="1"/><rect x="45" y="139" width="26" height="17" rx="1"/>
-          <rect x="84" y="130" width="26" height="26" rx="1"/><rect x="123" y="123" width="26" height="33" rx="1"/>
-          <rect x="162" y="113" width="26" height="43" rx="1"/><rect x="201" y="101" width="26" height="55" rx="1"/>
-          <rect x="240" y="89" width="26" height="67" rx="1"/><rect x="279" y="76" width="26" height="80" rx="1"/>
-          <rect x="318" y="65" width="26" height="91" rx="1"/><rect x="357" y="50" width="26" height="106" rx="1"/>
-          <rect x="396" y="40" width="26" height="116" rx="1"/><rect x="435" y="25" width="26" height="131" rx="1"/>
-          <rect x="474" y="12" width="26" height="144" rx="1"/><rect x="513" y="1" width="26" height="155" rx="1"/>
-          <rect x="552" y="-13" width="26" height="169" rx="1"/><rect x="591" y="-27" width="26" height="183" rx="1"/>
-          <rect x="630" y="-36" width="26" height="192" rx="1"/><rect x="669" y="-45" width="26" height="201" rx="1"/>
-        </g>
-      </svg>
+    <div class="g2">
+      <div class="chart"><div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Contexto por turno</span><span class="sp"></span><span class="legend"><span><i style="background:var(--cread)"></i>Contexto</span><span style="color:var(--crit)">▼ compactação</span></span></div>
+        <svg class="spark" viewBox="0 0 340 96" role="img" aria-label="Contexto por turno"><path d="M0,92 L60,80 L120,64 L180,46 L240,30 L300,16 L340,8 L340,96 L0,96 Z" fill="var(--cread)" opacity=".14"/><path d="M0,92 L60,80 L120,64 L180,46 L240,30 L300,16 L340,8" fill="none" stroke="var(--cread)" stroke-width="2"/></svg></div>
+      <div class="chart"><div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Taxa de acerto de cache</span></div>
+        <svg class="spark" viewBox="0 0 340 96" role="img" aria-label="Acerto do cache por turno"><path d="M0,50 L30,14 L60,8 L340,6" fill="none" stroke="var(--cread)" stroke-width="2"/></svg></div>
+      <div class="chart"><div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Saída por turno</span></div>
+        <svg class="spark" viewBox="0 0 340 96" role="img" aria-label="Saída por turno"><g fill="var(--output)"><rect x="4" y="60" width="14" height="36"/><rect x="24" y="52" width="14" height="44"/><rect x="44" y="70" width="14" height="26"/><rect x="64" y="40" width="14" height="56"/><rect x="84" y="58" width="14" height="38"/><rect x="104" y="30" width="14" height="66"/><rect x="124" y="64" width="14" height="32"/><rect x="144" y="48" width="14" height="48"/></g></svg></div>
+      <div class="chart"><div class="hstack" style="margin-bottom:var(--s2)"><span class="k">Custo x economia acumulados</span><span class="sp"></span><span class="legend"><span><i style="background:var(--input)"></i>Custo</span><span><i style="background:var(--savings)"></i>Economia</span></span></div>
+        <svg class="spark" viewBox="0 0 340 96" role="img" aria-label="Custo e economia acumulados"><path d="M0,94 C120,90 240,70 340,60" fill="none" stroke="var(--input)" stroke-width="2"/><path d="M0,94 C120,84 240,40 340,8" fill="none" stroke="var(--savings)" stroke-width="2"/></svg></div>
     </div>
 
     <div class="g2">
@@ -1694,6 +1684,33 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
     <span class="k">Estimado a preço de tabela. Não é uma fatura.</span>
   </div>
 </div>
+
+<p class="note"><b>Grade 2×2 de gráficos por turno (#393, direção T3).</b> O detalhe deixa de ter um gráfico só no primeiro nível: contexto, acerto do cache, saída e custo × economia acumulados ficam lado a lado (uma coluna abaixo de 600dp). "Avançado" fica com a composição, a distribuição do custo, a economia e o cache gravado 5m/1h. O bloco "Taxa de acerto de cache" do resumo virou "Acerto do cache": com o <code>?</code> o rótulo longo cortava em 168dp.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões Codex CLI</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack"><button class="btn ghost" type="button">← Voltar</button><span class="v sm">01a111fa…</span></div>
+    <div class="g4">
+      <div class="metric"><span class="k">Respostas</span><span class="v big">220</span></div>
+      <div class="metric"><span class="k">Tokens (com cache)</span><span class="v big">38,1M</span></div>
+      <div class="metric"><span class="k">Cache</span><span class="v big">96 %</span></div>
+      <div class="metric"><span class="k">Saída</span><span class="v big">197,7K</span><span class="k">Raciocínio 72,4K</span></div>
+    </div>
+    <div class="g2">
+      <div class="chart"><span class="k">Contexto por resposta</span><svg class="spark" viewBox="0 0 340 80" role="img" aria-label="Contexto por resposta, com compactação"><path d="M0,74 L220,8 L222,60 L340,14" fill="none" stroke="var(--cread)" stroke-width="2"/><circle cx="222" cy="60" r="3" fill="var(--crit)"/></svg></div>
+      <div class="chart"><span class="k">Cache por resposta</span><svg class="spark" viewBox="0 0 340 80" role="img" aria-label="Cache por resposta"><path d="M0,40 L10,8 L220,6 L222,60 L232,8 L340,6" fill="none" stroke="var(--cread)" stroke-width="2"/></svg></div>
+      <div class="chart"><span class="k">Saída por resposta</span><span class="legend"><span><i style="background:var(--output)"></i>Visível</span><span><i style="background:var(--input)"></i>Raciocínio</span></span><svg class="spark" viewBox="0 0 340 80" role="img" aria-label="Saída por resposta"><g fill="var(--output)"><rect x="4" y="50" width="12" height="30"/><rect x="22" y="40" width="12" height="40"/><rect x="40" y="56" width="12" height="24"/><rect x="58" y="30" width="12" height="50"/></g></svg></div>
+      <div class="chart"><span class="k">Vazão (tok/s)</span><svg class="spark" viewBox="0 0 340 80" role="img" aria-label="Vazão por resposta, com lacunas não medidas"><path d="M0,30 L60,28 L90,32" fill="none" stroke="var(--savings)" stroke-width="2"/><path d="M110,30 L340,29" fill="none" stroke="var(--savings)" stroke-width="2"/></svg></div>
+    </div>
+    <table class="dt">
+      <tr><td class="k">#</td><td class="k">Modelo</td><td class="k">Contexto</td><td class="k">Cache</td><td class="k">Saída</td><td class="k">Vazão</td></tr>
+      <tr><td>#1</td><td>gpt-6.1-sol</td><td class="num">35,8K</td><td class="num">62 %</td><td class="num">194</td><td class="num">—</td></tr>
+      <tr><td>#2</td><td>gpt-6.1-sol</td><td class="num">40,5K</td><td class="num">88 %</td><td class="num">259</td><td class="num">32 tok/s</td></tr>
+    </table>
+  </div>
+</div>
+<p class="note"><b>Detalhe do Codex com a mesma grade (#393, T3).</b> Contexto = entrada de cada resposta (prompt inteiro com cache; medido no rollout real), ▼ na queda; cache = parte da entrada servida do cache; saída empilha visível e raciocínio (o raciocínio é parte da saída); vazão quebra a linha onde a resposta não foi medida — nunca desce a zero. Sem custo (o app não tem tarifa do Codex) e sem percentual da janela (o índice não lê <code>model_context_window</code>). A tabela troca o id truncado da resposta por Contexto, Cache, Saída e Vazão, com números formatados.</p>
 
 <!-- ═══════════════════════════════ RESUMO ════════════════════════════ -->
 <h2 id="resumo">8 · Resumo por eixo</h2>

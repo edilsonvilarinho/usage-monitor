@@ -35,19 +35,25 @@ export function SessionDetail() {
         <AppMetric label="Saúde" value="Saturada" size="sm" hint="contexto 92% da janela" />
       </div>
 
-      <AppPanel>
-        <AppPanelHeader
-          title="Crescimento do contexto"
-          subtitle="linha tracejada: limite da janela do modelo"
-          status={<AppStatusIndicator level="crit">92%</AppStatusIndicator>}
-        />
-        <AppPanelBody>
-          <ContextChart />
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <AppKey>turno 1</AppKey><AppKey>turno 24</AppKey><AppKey>turno 48</AppKey>
-          </div>
-        </AppPanelBody>
-      </AppPanel>
+      {/* #393 (T3): grade 2×2 de gráficos por turno, a mesma no Claude e no Codex.
+          Claude: contexto, cache, saída, custo acumulado. Codex: contexto, cache, saída
+          (visível + raciocínio), vazão — sem custo, o app não tem tarifa do Codex. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 'var(--s2)' }}>
+        <AppPanel>
+          <AppPanelHeader title="Contexto por turno" status={<AppStatusIndicator level="crit">92%</AppStatusIndicator>} />
+          <AppPanelBody><ContextChart /></AppPanelBody>
+        </AppPanel>
+        {[['Taxa de acerto de cache', '--cread'], ['Saída por turno', '--output'], ['Custo x economia acumulados', '--savings']].map(([title, color]) => (
+          <AppPanel key={title}>
+            <AppPanelHeader title={title} />
+            <AppPanelBody>
+              <svg viewBox="0 0 440 96" style={{ display: 'block', width: '100%', height: 'auto' }} role="img" aria-label={title}>
+                <polyline points={TURNS.map((v, i) => (i / (TURNS.length - 1)) * 440 + ',' + (96 - (title.startsWith('Taxa') ? 90 : v * 0.9))).join(' ')} fill="none" stroke={'var(' + color + ')'} strokeWidth="2" />
+              </svg>
+            </AppPanelBody>
+          </AppPanel>
+        ))}
+      </div>
 
       <AppPanel>
         <AppPanelHeader

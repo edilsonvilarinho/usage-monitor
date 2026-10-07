@@ -97,4 +97,23 @@ class TurnSeriesBinningTest {
         assertEquals(emptyList(), dropIndices(listOf(5L)))
         assertEquals(emptyList(), dropIndices(emptyList()))
     }
+
+    @Test
+    fun `unmeasured turns stay null through binning`() {
+        val values = listOf(10L, null, null, null, 30L, 40L)
+
+        assertEquals(listOf(10L, null, 40L), binSeries(values, targetBins = 3, mode = BinMode.MAX))
+        assertEquals(values, binSeries(values, targetBins = 10, mode = BinMode.MAX))
+    }
+
+    @Test
+    fun `a gap is not a drop`() {
+        assertEquals(listOf(4), dropIndices(listOf(100L, null, 120L, 200L, 50L)))
+    }
+
+    @Test
+    fun `basis points keep null and round the fraction`() {
+        assertEquals(listOf(9_650L, null, 0L, 10_000L), com.usagemonitor.presentation.ui.fractionsAsBasisPoints(listOf(0.965, null, -0.1, 1.2)))
+        assertEquals("97 %", com.usagemonitor.presentation.ui.formatBasisPointsPercent(9_650L))
+    }
 }
