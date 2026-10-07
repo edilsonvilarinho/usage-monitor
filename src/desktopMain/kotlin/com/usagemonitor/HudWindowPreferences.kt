@@ -116,6 +116,19 @@ internal fun persistHudPlacement(settings: PreferencesSettings, placement: HudPl
     settings.putString(HUD_EDGE_OFFSET_KEY, placement.offsetFraction.coerceIn(0f, 1f).toString())
 }
 
+private const val HUD_AUTO_RETRACT_KEY = "hudAutoRetract"
+
+/**
+ * Modo "recolher quando parada" (issue #400), ligado pelo alfinete ao lado da
+ * mão. Nasce **desligado**: quem atualiza o app não vê a HUD mudar sozinha.
+ */
+internal fun readHudAutoRetract(settings: PreferencesSettings): Boolean =
+    settings.getBoolean(HUD_AUTO_RETRACT_KEY, false)
+
+internal fun persistHudAutoRetract(settings: PreferencesSettings, enabled: Boolean) {
+    settings.putBoolean(HUD_AUTO_RETRACT_KEY, enabled)
+}
+
 private const val HUD_SCREEN_ID_KEY = "hudScreenId"
 private const val HUD_SCREEN_BOUNDS_KEY = "hudScreenBounds"
 

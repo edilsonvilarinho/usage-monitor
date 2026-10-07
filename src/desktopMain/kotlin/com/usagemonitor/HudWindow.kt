@@ -189,16 +189,16 @@ internal fun HudWindowHost(
     // **antes** do conteúdo ao abrir e volta **depois** dele ao fechar — ver o KDoc.
     var windowOpen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
+    val retract = remember { HudAutoRetractState(settings) }
     // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
     // janela (dp de janela). Nulo fora de arrasto.
     var dragWindowPosition by remember { mutableStateOf<DpOffset?>(null) }
     var dragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
 
     LaunchedEffect(hovered, dragging) {
-        if (dragging) {
-            return@LaunchedEffect
-        }
+        if (dragging) return@LaunchedEffect
         if (hovered) {
+            delay(hudOpenDelayMillis(retract.enabled, alreadyOpen = windowOpen))
             screenArea = resolveHudScreenArea(settings, hudScreenArea)
             windowOpen = true
             // Um quadro para o recorte sair antes de o conteúdo começar a se
@@ -241,7 +241,7 @@ internal fun HudWindowHost(
         hudDockedWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
     val hitRegionSupported = remember { hudUsesHitRegion(AutoStartManager.currentPlatform()) }
-    val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes)
+    val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
 
@@ -395,6 +395,8 @@ internal fun HudWindowHost(
                         hasUpdateAction = updateAction != null
                     ),
                     gearDescription = hudGearDescription(language),
+                    autoRetract = retract.enabled,
+                    onToggleAutoRetract = retract::toggle,
                     modifier = Modifier.fillMaxSize()
                 )
             }

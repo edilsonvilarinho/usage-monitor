@@ -51,7 +51,7 @@ const clockIcon = (fraction) => (
 
 export function AppHudBar({
   accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, refreshFraction, version = '38.2.0', update, updateHeadline, updateDetail, updateAction,
-  actions = ['⟲', '▣'], continuous = false, reduced = false, style
+  actions = ['⟲', '▣'], continuous = false, reduced = false, autoRetract = false, style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
   const open = balloon !== undefined && balloon !== null;
@@ -188,9 +188,30 @@ export function AppHudBar({
     </div>
   );
 
+  // Modo recolher (#400): parado, só a faixa de 10dp com um ponto por conta; a
+  // forma diz o pior risco junto com a cor. Aberto, a íris (Z2) revela o notch.
+  const dotShape = {
+    warn: { width: 6, height: 6, background: 'var(--warn)', transform: 'rotate(45deg)' },
+    crit: { width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '7px solid var(--crit)' },
+    ok: { width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)' },
+    off: { width: 7, height: 7, borderRadius: '50%', border: '1.5px solid var(--muted)', boxSizing: 'border-box' }
+  };
+  const retracted = autoRetract && !open ? (
+    <div role="img" aria-label={['Barra HUD recolhida', ...accounts.map((a) => `${a.label}: ${a.statusLabel}`)].join(' · ')} style={{
+      display: 'flex', flexDirection: horizontal ? 'row' : 'column', alignItems: 'center', justifyContent: 'space-around',
+      [horizontal ? 'width' : 'height']: Math.max(120, accounts.length * 140), [horizontal ? 'height' : 'width']: 10,
+      background: 'var(--hud-body), var(--hud-rim)', backgroundClip: 'padding-box, padding-box, border-box',
+      border: '1px solid transparent', ...flat, borderRadius: { top: '0 0 5px 5px', bottom: '5px 5px 0 0', left: '0 5px 5px 0', right: '5px 0 0 5px' }[edge],
+      boxShadow: 'var(--hud-inner-glow), var(--shadow-dialog)'
+    }}>
+      {accounts.map((a) => <span key={a.label} aria-hidden="true" style={{ flex: 'none', ...(dotShape[a.level] || dotShape.off) }} />)}
+    </div>
+  ) : null;
+
   const row = horizontal ? 'row' : 'column';
-  const strip = (
+  const strip = retracted || (
     <div style={{ display: 'flex', flexDirection: row, alignItems: 'center', gap: 6 }}>
+      {open ? handle('📌', autoRetract ? 'Manter a barra HUD aberta' : 'Recolher a barra HUD quando parada') : null}
       {open ? handle('✋', 'Mover a barra HUD') : null}
       {notch}
       {open ? handle('⚙', update ? `Ações do Usage Monitor · ${update}` : 'Ações do Usage Monitor', Boolean(update)) : null}

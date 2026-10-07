@@ -192,6 +192,56 @@ class HudNotchGeometryTest {
     }
 
     /**
+     * Issue #400: no modo recolher, parada, só a faixa fina recebe o ponteiro. O
+     * comprimento ao longo da borda é o mesmo do notch — o alvo do hover não
+     * encolhe —, e a espessura cai para a faixa mais a margem da sombra.
+     */
+    @Test
+    fun `recolhida so a faixa com a margem aceita clique em todas as bordas`() {
+        val accounts = listOf(account("Padrão", "Crítico", listOf("5h" to "88%", "7d" to "9%")))
+        for (edge in HudEdge.entries) {
+            for (fraction in listOf(0f, 0.5f, 1f)) {
+                val sizes = hudNotchSizes(accounts, edge, "", false)
+                val window = hudDockedWindowBounds(edge, fraction, sizes, screen)
+                val full = hudRestHitRegion(edge, window, sizes)
+                val retracted = hudRestHitRegion(edge, window, sizes, retracted = true)
+                val label = "$edge em $fraction"
+                val reach = HUD_RETRACTED_STRIP + HUD_SHADOW_MARGIN
+                if (edge.isHorizontal) {
+                    assertEquals(full.left to full.right, retracted.left to retracted.right, "$label: ao longo")
+                    assertEquals(reach, retracted.bottom - retracted.top, "$label: espessura")
+                } else {
+                    assertEquals(full.top to full.bottom, retracted.top to retracted.bottom, "$label: ao longo")
+                    assertEquals(reach, retracted.right - retracted.left, "$label: espessura")
+                }
+                // Rente à mesma borda da tela que o recorte do notch inteiro.
+                when (edge) {
+                    HudEdge.TOP -> assertEquals(full.top, retracted.top, label)
+                    HudEdge.BOTTOM -> assertEquals(full.bottom, retracted.bottom, label)
+                    HudEdge.LEFT -> assertEquals(full.left, retracted.left, label)
+                    HudEdge.RIGHT -> assertEquals(full.right, retracted.right, label)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `so o modo recolher espera a intencao antes de abrir`() {
+        assertEquals(0L, hudOpenDelayMillis(autoRetract = false, alreadyOpen = false))
+        assertEquals(HUD_RETRACT_INTENT_MILLIS, hudOpenDelayMillis(autoRetract = true, alreadyOpen = false))
+        // Já aberta (o ponteiro passou da faixa para o balão): nada de nova espera.
+        assertEquals(0L, hudOpenDelayMillis(autoRetract = true, alreadyOpen = true))
+    }
+
+    @Test
+    fun `o notch so recolhe com o modo ligado, parado e fora do arrasto`() {
+        assertTrue(hudNotchRevealed(autoRetract = false, expanded = false, dragging = false))
+        assertFalse(hudNotchRevealed(autoRetract = true, expanded = false, dragging = false))
+        assertTrue(hudNotchRevealed(autoRetract = true, expanded = true, dragging = false))
+        assertTrue(hudNotchRevealed(autoRetract = true, expanded = false, dragging = true))
+    }
+
+    /**
      * Issue #288: o arrasto começava da origem da janela aberta com o tamanho da
      * de arrasto, e embaixo e à direita o notch saltava o tamanho do balão para
      * longe do ponteiro. O notch tem de estar no mesmo ponto nos três estados.
@@ -336,7 +386,7 @@ class HudNotchGeometryTest {
         assertEquals(hudAppBalloonHeight(hasUpdateIndicator = false), sizes.balloon.height)
         assertEquals(sizes.collapsed.height + HUD_BALLOON_GAP + sizes.balloon.height, sizes.expanded.height)
         assertEquals(sizes.collapsed.height, sizes.withHandles.height)
-        assertEquals(sizes.collapsed.width + (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2, sizes.withHandles.width)
+        assertEquals(sizes.collapsed.width + (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * HUD_HANDLES_PER_SIDE * 2, sizes.withHandles.width)
     }
 
     /** A ação da atualização é uma linha a mais no balão da engrenagem, e a janela aberta a reserva. */

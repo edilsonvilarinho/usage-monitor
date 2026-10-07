@@ -51,6 +51,10 @@
   /* Finite: account/gear balloon opens and closes (B3, relativistic jet). */
   --dur-gargantua-jet-open: 520ms;
   --dur-gargantua-jet-close: 240ms;
+  /* Finite: retract mode (#400), the eclipse iris opens the notch from the
+     strip and closes back into its middle (Z2). */
+  --dur-gargantua-iris-open: 420ms;
+  --dur-gargantua-iris-close: 240ms;
   /* Finite: a changed digit rolls through the event horizon (D5), 50ms cascade. */
   --dur-gargantua-roll: 480ms;
   --dur-gargantua-roll-stagger: 50ms;
