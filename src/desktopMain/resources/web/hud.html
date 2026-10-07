@@ -9,15 +9,19 @@
 /* Página da HUD na rede local (#388, direção R3 — grade de anéis). Tokens do
    design system copiados à mão: a CSP não deixa carregar fonte nem CSS de fora. */
 :root { --bg:#131010; --surface:#1B1818; --raised:#211E1E; --border:#3D3838; --fg:#F2EDED; --muted:#B8B2B2;
-  --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --night:#080B12;
+  --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --night:#080B12; --gold:#E8AE63;
   --anthropic:#4F8CFF; --codex:#27BFA3; --deepseek:#C084FC; --minimax:#FF8A3D; --oc:#7BD389; --kilo:#E6D84E;
   --openrouter:#FF6FA8; --gemini:#E2A5E9; --cursor:#C7E9A5;
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace; --sans: "IBM Plex Sans", system-ui, sans-serif; }
 * { box-sizing: border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:14px; }
-header { display:flex; align-items:baseline; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); }
+header { display:flex; align-items:baseline; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:1; }
 h1 { font-family:var(--mono); font-size:16px; font-weight:600; margin:0; }
-.read { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); }
+.read { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.dot { width:6px; height:6px; border-radius:50%; background:var(--ok); display:inline-block; }
+.dot.off { background:var(--border); }
+.bar { position:absolute; left:0; bottom:-1px; height:1px; width:0; background:linear-gradient(90deg, rgba(232,174,99,.1), var(--gold)); }
+.v { display:inline-block; }
 main { padding:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; max-width:1200px; margin:0 auto; }
 .acc { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
 .name { font-size:12px; border-left:2px solid var(--c); padding-left:6px; align-self:stretch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -35,9 +39,9 @@ footer { padding:8px 16px 16px; color:var(--muted); font-size:11px; max-width:12
 </style>
 </head>
 <body>
-<header><h1>Usage Monitor</h1><span class="read" id="read">lendo…</span></header>
+<header><h1>Usage Monitor</h1><span class="read"><i class="dot off" id="dot"></i><span id="read">lendo…</span></span><span class="bar" id="bar"></span></header>
 <main id="grid"><p class="msg">Lendo o retrato do app…</p></main>
-<footer>Só metadados de uso. Nunca conteúdo de prompt ou resposta. A página relê a cada 30 s; o app coleta a cada 60 s com sessão CLI ativa e 5 min sem. A cor do arco e a palavra são o risco da projeção, as mesmas da HUD; cinza é cota sem projeção.</footer>
+<footer>Só metadados de uso. Nunca conteúdo de prompt ou resposta. A página relê a cada 30 s; o app coleta a cada 60 s com sessão CLI ativa e 5 min sem. A cor do arco e a palavra são o risco da projeção, as mesmas da HUD; cinza é cota sem projeção. Com "reduzir movimento" no sistema, nada anima.</footer>
 <script>
 /*
  * Biblioteca do anel Gargantua para protótipos HTML (skill usage-monitor-visual-options).
@@ -110,6 +114,8 @@ function drawRing(ctx,acc,ph,o){
   ctx.restore();ctx.globalAlpha=1;
 }
 
+function ringAt(x,cx,cy,r,color,alpha,width){if(alpha<=0||r<=0)return;x.strokeStyle=rgba(color,alpha);x.lineWidth=width;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();}
+
 const ACCENT = { ANTHROPIC:'anthropic', CODEX:'codex', DEEPSEEK:'deepseek', MINIMAX:'minimax', OPENCODE:'oc', OPENCODE_GO:'oc',
   KILO:'kilo', OPENROUTER:'openrouter', GEMINI:'gemini', ANTIGRAVITY:'gemini', CURSOR:'cursor' };
 const token = new URLSearchParams(location.search).get('t') || '';
@@ -122,52 +128,168 @@ const hhmm = iso => new Date(iso).toLocaleTimeString('pt-BR', { timeZone:'Americ
 const fmtReset = iso => { if (!iso) return ''; const d = new Date(iso);
   return d.toLocaleString('pt-BR', { timeZone:'America/Sao_Paulo', weekday:'short', hour:'2-digit', minute:'2-digit' }) + ' BRT'; };
 const money = (cents, cur) => (cents / 100).toLocaleString('pt-BR', { style:'currency', currency: cur || 'USD' });
+const PERIOD_ORDER = ['MONTHLY','WEEKLY','INTERVAL','REPORTED'];
+const quotaText = q => q.percent !== null ? q.percent + '%'
+  : q.unit === 'CURRENCY_USD' ? money(q.total - q.used, q.currency) : q.used + (q.total ? ' / ' + q.total : '');
+
+/*
+ * Movimento da HUD na página (#394, direção U5). Mesmos gestos e tempos do app:
+ * disco e plasma girando, cometa de sessão na conta em uso, ondas gravitacionais
+ * quando a conta tem coleta nova (R1, 1300/800 ms), horizonte de eventos no número
+ * que mudou (D5, 480 ms, cascata 50 ms) e o filete até a próxima releitura.
+ * Comprimento do arco nunca anima: troca seco para o valor novo.
+ * "Reduzir movimento" do sistema = corte seco; aba escondida não desenha.
+ */
+const RELOAD_MS = 30000, WAVES_MS = 1300, WAVE_MS = 800, WAVE_STEP_MS = 250, HORIZON_MS = 480, HORIZON_STEP_MS = 50, GLOW_MS = 600;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let snapshot = null, lastLoadAt = 0, collectedChangedAt = -Infinity;
+let rings = [], values = [], waveStarts = new Map(), horizon = new Map();
+const previousFetch = new Map(), previousValue = new Map();
 
 function render(data) {
+  const now = performance.now();
   const grid = document.getElementById('grid');
-  if (!data.accounts.length) { grid.innerHTML = '<p class="msg">Nenhuma API habilitada no app.</p>'; return; }
+  // A primeira leitura não anima: só mudança entre duas leituras é evento.
+  const first = snapshot === null;
+  if (!first && data.last_collected_at && snapshot.last_collected_at !== data.last_collected_at) collectedChangedAt = now;
+  snapshot = data;
+  if (!data.accounts.length) { grid.innerHTML = '<p class="msg">Nenhuma API habilitada no app.</p>'; rings = []; values = []; return; }
+  waveStarts = new Map(); horizon = new Map();
+  let cascade = 0;
+  data.accounts.forEach((a, i) => {
+    const key = a.source + '|' + a.label;
+    if (!first && a.fetched_at && previousFetch.get(key) !== a.fetched_at) waveStarts.set(i, now);
+    previousFetch.set(key, a.fetched_at);
+    a.quotas.forEach((q, k) => {
+      const qKey = key + '|' + q.label, text = quotaText(q), before = previousValue.get(qKey);
+      if (!first && before !== undefined && before !== text) horizon.set(i + ':' + k, { from: before, at: now + cascade++ * HORIZON_STEP_MS });
+      previousValue.set(qKey, text);
+    });
+  });
   grid.innerHTML = data.accounts.map((a, i) => {
     const windowed = a.quotas.filter(q => q.percent !== null).slice(0, 3);
     const balance = a.quotas.find(q => q.percent === null && q.unit === 'CURRENCY_USD');
     const visual = windowed.length ? '<canvas width="240" height="240" data-i="' + i + '"></canvas>'
       : balance ? '<div class="big">' + esc(money(balance.total - balance.used, balance.currency)) + '</div>'
       : '<div class="big">—</div>';
-    const lines = a.quotas.map(q => '<div class="q"><b>' + esc(q.label) + '</b><span>'
-      + (q.percent !== null ? q.percent + '%' : q.unit === 'CURRENCY_USD' ? esc(money(q.total - q.used, q.currency)) : esc(q.used + (q.total ? ' / ' + q.total : '')))
-      + '</span><span>' + esc(fmtReset(q.resets_at)) + '</span></div>').join('');
+    const lines = a.quotas.map((q, k) => '<div class="q"><b>' + esc(q.label) + '</b><span class="v" data-h="' + i + ':' + k + '" data-now="'
+      + esc(quotaText(q)) + '">' + esc(quotaText(q)) + '</span><span>' + esc(fmtReset(q.resets_at)) + '</span></div>').join('');
     return '<section class="acc"><div class="name" style="--c:var(--' + (ACCENT[a.source] || 'muted') + ')">' + esc(a.label) + '</div>'
       + visual
       + (RISK_WORD[a.worst_risk] ? '<div class="risk" style="--c:var(--' + RISK_WORD[a.worst_risk][1] + ')">' + RISK_WORD[a.worst_risk][0] + '</div>' : '')
       + '<div class="state ' + (a.active ? 'on' : '') + '">' + (a.active ? 'Em uso agora' : 'Sem uso detectado') + '</div>' + lines + '</section>';
   }).join('');
-  grid.querySelectorAll('canvas').forEach(cv => {
+  rings = [...grid.querySelectorAll('canvas')].map(cv => {
     const a = data.accounts[Number(cv.dataset.i)];
     const arcs = a.quotas.filter(q => q.percent !== null).slice(0, 3)
-      .sort((x, y) => ['MONTHLY','WEEKLY','INTERVAL','REPORTED'].indexOf(x.period) - ['MONTHLY','WEEKLY','INTERVAL','REPORTED'].indexOf(y.period))
+      .sort((x, y) => PERIOD_ORDER.indexOf(x.period) - PERIOD_ORDER.indexOf(y.period))
       .map(q => ({ f: Math.min(q.percent, 100) / 100, t: tone(q.risk) }));
-    const ctx = cv.getContext('2d');
-    // Canvas de 240 px: o anel de 64 px a 2× (128 px) centrado, com folga para o disco.
-    ctx.translate(PAD * 2, PAD * 2); ctx.scale(2, 2);
-    drawRing(ctx, { arcs, mark: a.source === 'ANTHROPIC' ? 'claude' : 'openai' }, .3, { markAlpha: (a.source === 'ANTHROPIC' || a.source === 'CODEX') ? 1 : 0 });
+    return { ctx: cv.getContext('2d'), i: Number(cv.dataset.i), active: a.active, arcs,
+      mark: a.source === 'ANTHROPIC' ? 'claude' : 'openai', markAlpha: (a.source === 'ANTHROPIC' || a.source === 'CODEX') ? 1 : 0 };
   });
-  // Hora da coleta do app, não do pedido da página: o número pode ter até 5 min.
-  document.getElementById('read').textContent = data.last_collected_at
-    ? 'coleta ' + hhmm(data.last_collected_at) + ' BRT · página ' + hhmm(data.generated_at)
-    : 'sem coleta ainda';
+  values = [...grid.querySelectorAll('.v')].filter(el => horizon.has(el.dataset.h));
+  draw(now, true);
 }
 
+function comet(ctx, angle) {
+  const c = S / 2, r = S / 2 + 2.2;
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 16; k++) { const b = angle - k * .06; ctx.strokeStyle = rgba(INFO, (1 - k / 16) * .55); ctx.lineWidth = 1.4 * (1 - k / 20);
+    ctx.beginPath(); ctx.arc(c, c, r, b - .07, b); ctx.stroke(); }
+  const x = c + r * Math.cos(angle), y = c + r * Math.sin(angle), g = ctx.createRadialGradient(x, y, 0, x, y, 3);
+  g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.4, rgba(INFO, .8)); g.addColorStop(1, rgba(INFO, 0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+}
+
+function drawRings(now, still) {
+  rings.forEach(r => {
+    const ctx = r.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 240, 240);
+    // Canvas de 240 px: o anel de 64 px a 2× (128 px) centrado, com folga para o disco e as ondas.
+    ctx.translate(PAD * 2, PAD * 2); ctx.scale(2, 2);
+    drawRing(ctx, { arcs: r.arcs, mark: r.mark }, still ? .3 : now / 4000, { markAlpha: r.markAlpha });
+    if (still) return;
+    if (r.active) comet(ctx, now / 3000 * Math.PI * 2 - Math.PI / 2);
+    const start = waveStarts.get(r.i);
+    if (start !== undefined && now - start < WAVES_MS) {
+      for (let k = 0; k < 3; k++) { const p = seg(now - start, k * WAVE_STEP_MS, k * WAVE_STEP_MS + WAVE_MS);
+        if (p > 0 && p < 1) ringAt(ctx, S / 2, S / 2, S / 2 - 1 + easeOut(p) * 12, '#E8AE63', .6 * (1 - p), .8 - .4 * p); }
+    }
+  });
+}
+
+function clearValue(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+  el.style.transform = ''; el.style.filter = ''; el.style.opacity = ''; el.style.textShadow = '';
+}
+
+function drawValues(now, still) {
+  values.forEach(el => {
+    const h = horizon.get(el.dataset.h);
+    const p = still ? 1 : seg(now - h.at, 0, HORIZON_MS);
+    if (p >= 1) { clearValue(el, el.dataset.now); return; }
+    if (p <= 0) { clearValue(el, h.from); return; }
+    // Horizonte de eventos: o valor antigo some num ponto e o novo nasce dele, sem passar do tamanho.
+    const old = p < .5, k = old ? easeIn(p * 2) : easeOut((p - .5) * 2);
+    const text = old ? h.from : el.dataset.now;
+    if (el.textContent !== text) el.textContent = text;
+    el.style.transform = 'scale(' + (old ? 1 - k * .9 : .1 + .9 * k) + ')';
+    el.style.filter = 'blur(' + ((old ? k : 1 - k) * 1.6) + 'px)';
+    el.style.opacity = old ? 1 - k * .5 : .5 + .5 * k;
+    el.style.textShadow = '0 0 ' + (6 * (1 - Math.abs(p - .5) * 2)) + 'px rgba(232,174,99,.9)';
+  });
+}
+
+function ago(iso) {
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  return s < 5 ? 'agora' : s < 60 ? 'há ' + s + ' s' : 'há ' + Math.floor(s / 60) + ' min';
+}
+
+function drawHeader(now, still) {
+  if (!snapshot) return;
+  const read = document.getElementById('read'), dot = document.getElementById('dot'), bar = document.getElementById('bar');
+  const text = snapshot.last_collected_at ? 'coleta ' + hhmm(snapshot.last_collected_at) + ' BRT · ' + ago(snapshot.last_collected_at) : 'sem coleta ainda';
+  if (read.textContent !== text) read.textContent = text;
+  dot.className = snapshot.last_collected_at ? 'dot' : 'dot off';
+  const glow = still ? 0 : 1 - clamp((now - collectedChangedAt) / GLOW_MS);
+  dot.style.background = glow > 0 ? mix('#4CAF50', '#E8AE63', glow) : '';
+  dot.style.boxShadow = glow > 0 ? '0 0 ' + (6 * glow) + 'px #E8AE63' : '';
+  // Filete até a próxima releitura da página: tempo, não dado de cota.
+  bar.style.width = still ? '0' : (clamp((now - lastLoadAt) / RELOAD_MS) * 100) + '%';
+}
+
+function draw(now, force) {
+  const still = reduceMotion.matches;
+  if (!still || force) { drawRings(now, still); drawValues(now, still); }
+  drawHeader(now, still);
+}
+
+let frameRequested = false;
+function requestFrame() { if (!frameRequested) { frameRequested = true; requestAnimationFrame(loop); } }
+function loop(now) {
+  frameRequested = false;
+  if (document.hidden) return;
+  draw(now, false);
+  // Com movimento reduzido nada é contínuo: só o "há N s" do cabeçalho, uma vez por segundo.
+  if (reduceMotion.matches) setTimeout(requestFrame, 1000); else requestFrame();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) requestFrame(); });
+reduceMotion.addEventListener('change', () => draw(performance.now(), true));
+
 async function load() {
+  lastLoadAt = performance.now();
   try {
     const res = await fetch('/api/snapshot?t=' + encodeURIComponent(token), { cache:'no-store' });
     if (res.status === 401) { document.getElementById('grid').innerHTML = '<p class="msg">Token inválido. Copie o endereço de novo nas Configurações › Rede do app.</p>'; return; }
-    if (!res.ok) { document.getElementById('read').textContent = 'sem leitura ainda'; return; }
+    if (!res.ok) { if (!snapshot) document.getElementById('read').textContent = 'sem leitura ainda'; return; }
     render(await res.json());
   } catch (e) {
     document.getElementById('read').textContent = 'app fora do ar — mantendo a última leitura';
   }
 }
 load();
-setInterval(load, 30000);
+setInterval(load, RELOAD_MS);
+requestFrame();
 </script>
 </body>
 </html>
