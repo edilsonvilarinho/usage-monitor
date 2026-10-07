@@ -58,10 +58,13 @@ internal fun telegramBotSectionModel(
     val (label, tone) = when (status) {
         TelegramBotStatus.Off -> (if (pt) "Desligado" else "Off") to AppTone.NEUTRAL
         TelegramBotStatus.Connecting -> (if (pt) "Conectando" else "Connecting") to AppTone.INFO
-        is TelegramBotStatus.Connected -> if (status.chatCount == 0) {
-            (if (pt) "Conectado · sem conversa pareada" else "Connected · no paired chat") to AppTone.WARNING
-        } else {
-            (if (pt) "Conectado · ${status.chatCount} conversa(s)" else "Connected · ${status.chatCount} chat(s)") to AppTone.OK
+        is TelegramBotStatus.Connected -> {
+            val who = status.botUsername?.let { name -> (if (pt) "Conectado como @" else "Connected as @") + name } ?: if (pt) "Conectado" else "Connected"
+            if (status.chatCount == 0) {
+                (if (pt) "$who · sem conversa pareada" else "$who · no paired chat") to AppTone.WARNING
+            } else {
+                (if (pt) "$who · ${status.chatCount} conversa(s)" else "$who · ${status.chatCount} chat(s)") to AppTone.OK
+            }
         }
         is TelegramBotStatus.Failed -> ((if (pt) "Falha: " else "Failed: ") + status.message) to AppTone.CRITICAL
     }
@@ -81,7 +84,9 @@ internal fun telegramBotSectionModel(
         onTokenChange = actions::changeToken,
         onStartPairing = actions::startPairing,
         onRemoveChat = actions::removeChat,
-        onSendTest = actions::sendTest
+        onSendTest = actions::sendTest,
+        connected = status is TelegramBotStatus.Connected,
+        botUsername = (status as? TelegramBotStatus.Connected)?.botUsername
     )
 }
 

@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução na branch.`
+**Estado atual:** `Concluída na branch (A01–A06). Falta push e PR (aguardando autorização).`
 
 **Direções escolhidas (2026-10-06):** #394 → **U5 · Paridade + próxima leitura** · #396 → **V2 · Três passos
 numerados** (card nas Configurações) + **W5 · W1 + botões na mensagem** (respostas do bot).
@@ -49,6 +49,7 @@ Galeria das 18 opções em [`issues-394-396-visual/options.html`](issues-394-396
 | A03 | `feat(web): animate the local web HUD like the desktop HUD` | navegador do app contra `/api/snapshot` simulado (`stub_server.py`, rótulo com `<b>` para conferir o escape): ondas, cometa, horizonte no número e ponto dourado visíveis em captura, console sem erro; `gradlew.bat desktopTest --tests "com.usagemonitor.LocalWebAccessServiceTest"` verde | concluída |
 | A04 | `feat(telegram): format bot replies as HTML cards with a command menu` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.TelegramBotApiTest" --tests "com.usagemonitor.presentation.TelegramBotMessagesTest" --tests "com.usagemonitor.TelegramBotServiceTest" --tests "com.usagemonitor.ui.TelegramBotSectionTest"` verde; testes novos de formato, escape, barra, `parse_mode` e `setMyCommands` | concluída |
 | A05 | `feat(telegram): add refresh, mute and thresholds buttons to /status` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.TelegramBotApiTest" --tests "com.usagemonitor.presentation.TelegramBotMessagesTest" --tests "com.usagemonitor.TelegramBotServiceTest" --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.ui.TelegramBotSectionTest"` verde; testes novos: callback, teclado, `editMessageText`, silêncio de 1 h no `evaluateUsageAlerts`, `/alertas on` encerra o silêncio, toque de estranho ignorado | concluída |
+| A06 | `feat(settings): telegram bot card in three numbered steps` | `gradlew.bat allTests` verde (273 classes, 2566 testes, 0 falhas); `TelegramBotSectionTest` com Copiar → "Copiado ✓", "Abrir no Telegram" e exemplo recolhido; captura em `build/issue396-screenshots/telegram-section.png` conferida | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -62,4 +63,13 @@ Galeria das 18 opções em [`issues-394-396-visual/options.html`](issues-394-396
 
 ## Desvios do plano e achados da execução
 
-—
+- **A02:** dois testes do `DashboardViewModelTest` comparavam a leitura publicada por igualdade com a buscada; com o carimbo
+  eles passaram a ignorar `fetchedAt`. O comentário da correção ficou fora do `DashboardViewModel` (751 linhas, faixa de
+  750–800 em que mudança começa extraindo): a razão está no teste e no `presentation.md`.
+- **A05:** "Silenciar 1h" entrou como campo novo `snoozedUntilEpochMillis`; `/alertas on` também o encerra. O botão
+  Atualizar usa `DashboardViewModel.refresh()`, que também checa atualização do app — aceito, é o mesmo caminho do botão do
+  app. As Configurações › Alertas **não mostram** o silêncio temporário (R1).
+- **A06:** a direção V2 pediu "Abrir no Telegram"; o `@` do bot não era lido — entrou `getMe` ao conectar. Nenhuma primitiva
+  nova: passo = texto + `AppStatusIndicator`; caixa do comando = `AppDataSurface`; exemplo = `AppExpandable`.
+- O JS da página web (A03) não roda na suíte (R4); `prefers-reduced-motion` foi conferido só por leitura do código.
+- Plataformas: suíte só no Windows (#342). O card V2 não mexe em host de janela; a página web roda em qualquer navegador.

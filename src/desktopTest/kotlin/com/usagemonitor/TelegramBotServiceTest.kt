@@ -36,6 +36,8 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
 
     override suspend fun deleteWebhook(token: String) = Unit
 
+    override suspend fun getMe(token: String): String = "usage_monitor_bot"
+
     override suspend fun getUpdates(token: String, offset: Long?, timeoutSeconds: Int): List<TelegramIncomingMessage> {
         if (offset == -1L) return emptyList()
         delay(20)
@@ -174,5 +176,12 @@ class TelegramBotServiceTest {
         waitUntil { settings.value.isAuthorized(51L) }
         assertTrue(api.answered.isEmpty())
         assertEquals(null, alertSettings.value.snoozedUntilEpochMillis)
+    }
+
+    @Test
+    fun `connected status carries the bot username for the deep link`() {
+        service.start()
+
+        waitUntil { (service.status.value as? TelegramBotStatus.Connected)?.botUsername == "usage_monitor_bot" }
     }
 }

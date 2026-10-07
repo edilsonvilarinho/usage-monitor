@@ -35,7 +35,8 @@ import kotlin.time.Clock
 internal sealed interface TelegramBotStatus {
     data object Off : TelegramBotStatus
     data object Connecting : TelegramBotStatus
-    data class Connected(val chatCount: Int) : TelegramBotStatus
+    /** [botUsername] sem `@`; `null` quando o `getMe` falhou — o link "Abrir no Telegram" some. */
+    data class Connected(val chatCount: Int, val botUsername: String? = null) : TelegramBotStatus
     data class Failed(val message: String) : TelegramBotStatus
 }
 
@@ -97,6 +98,7 @@ internal class TelegramBotService(
 
     private suspend fun pollLoop() {
         var activeToken: String? = null
+        var botUsername: String? = null
         var offset: Long? = null
         var failures = 0
         while (true) {
@@ -115,8 +117,9 @@ internal class TelegramBotService(
                     offset = api.getUpdates(settings.botToken, offset = -1, timeoutSeconds = 0).lastOrNull()?.updateId?.plus(1)
                     activeToken = settings.botToken
                     registerMenu(settings.botToken)
+                    botUsername = fetchUsername(settings.botToken)
                 }
-                _status.value = TelegramBotStatus.Connected(settings.authorizedChats.size)
+                _status.value = TelegramBotStatus.Connected(settings.authorizedChats.size, botUsername)
                 val updates = api.getUpdates(settings.botToken, offset, LONG_POLL_SECONDS)
                 failures = 0
                 for (update in updates) {
@@ -215,6 +218,9 @@ internal class TelegramBotService(
     private suspend fun runTelegram(block: suspend () -> Unit) {
         runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
     }
+
+    private suspend fun fetchUsername(token: String): String? =
+        runCatching { api.getMe(token) }.onFailure { error -> if (error is CancellationException) throw error }.getOrNull()
 
     /** Menu de comandos do Telegram (#396). Falhar aqui não derruba a conexão: o bot responde sem o menu. */
     private suspend fun registerMenu(token: String) {

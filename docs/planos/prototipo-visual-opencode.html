@@ -2148,27 +2148,32 @@ três a seis amostras, um único incidente anterior levantaria a média e escond
 caso que a detecção existe para pegar. <b>Desligado o interruptor, o segmentado sai da tela.</b></p>
 
 <h2 id="cfg-telegram">12b-2 · Configurações — Alertas › Bot do Telegram</h2>
-<p class="note"><b>#387, direção Q10 — configuração e conversa.</b> Seção abaixo dos alertas, na mesma aba (sem aba nova).
-À esquerda: interruptor no cabeçalho, token mascarado, estado (ponto e palavra), conversas autorizadas com
-<b>Remover</b>, <b>Parear conversa</b> (código de 6 caracteres válido por 10 min, mostrado como o comando a enviar) e
-<b>Enviar teste</b>. À direita: conversa de exemplo com a resposta <b>real</b> do <code>/status</code> com os números de agora,
-mais dois comandos que mudam os alertas — a mão dupla fica visível antes de parear. Abaixo de 560dp as colunas empilham.
-Discord aparece como segunda fase, com o motivo.</p>
+<p class="note"><b>#387, direção Q10; refeito na #396, direção V2 — três passos.</b> Seção abaixo dos alertas, na mesma
+aba (sem aba nova). Interruptor no cabeçalho; desligado mostra só o texto e o passo 1. Ligado, três passos numerados, cada
+um com o estado em ponto e palavra (<b>Feito</b>, <b>Agora</b>, <b>Depois</b>): <b>1 · Token do bot</b> (campo mascarado e
+"Conectado como @bot", do <code>getMe</code>); <b>2 · Parear uma conversa</b> (conversas pareadas com <b>Remover</b> colado ao
+nome; com código aberto, a caixa do comando <code>/start CÓDIGO</code> com <b>Copiar</b> — vira "Copiado ✓" por 1,6 s —,
+o prazo, <b>Abrir no Telegram</b> pelo link <code>t.me/&lt;bot&gt;?start=&lt;código&gt;</code>, que já manda o comando, e
+<b>Gerar novo código</b>; sem código, <b>Parear conversa</b>/<b>Parear outra conversa</b>); <b>3 · Testar</b> (<b>Enviar
+teste</b>, só depois do pareamento). A conversa de exemplo saiu do card: <b>▸ Ver como o bot responde</b> abre, recolhida
+por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord aparece como segunda fase, com o motivo.</p>
 <div class="win" style="max-width:660px">
   <div class="titlebar"><span class="t">Configurações › Alertas</span></div>
   <div class="body"><div class="panel">
-    <div class="phead"><span class="ptitle">Bot do Telegram</span><span class="sp"></span><span class="st ok">Conectado · 1 conversa(s)</span></div>
-    <div class="pbody"><div class="hstack" style="align-items:flex-start;gap:var(--s4)">
-      <div class="stack" style="flex:1">
-        <span class="k">Conversas autorizadas</span>
-        <div class="hstack"><span class="v sm">@edilson</span><span class="sp"></span><button class="btn">Remover</button></div>
-        <span class="v sm">No Telegram, envie ao bot: /start AB12CD</span><span class="k">Vale por mais 10 min.</span>
-        <div class="hstack"><button class="btn">Parear conversa</button><button class="btn">Enviar teste</button></div>
-      </div>
-      <div class="stack" style="flex:1">
-        <span class="k">você › /status</span><span class="v sm">bot › Anthropic · Padrão · em uso — Claude 5h 68% (13:05)</span>
-        <span class="k">você › /silencio 12-13</span><span class="v sm">bot › Silêncio 12:00 → 13:00 aplicado.</span>
-      </div>
+    <div class="phead"><span class="ptitle">Bot do Telegram</span><span class="sp"></span><span class="st ok">ligado</span></div>
+    <div class="pbody"><div class="stack">
+      <span class="dim" style="font-size:var(--t12)">Recebe os alertas no Telegram e responde a comandos. Só metadados de uso — nunca prompt ou resposta.</span>
+      <div class="hstack"><span class="v">1 · Token do bot</span><span class="st ok">Feito</span></div>
+      <span class="v sm">••••••••••••••••••••</span><span class="st ok">Conectado como @usage_monitor_bot · 1 conversa(s)</span>
+      <div class="hstack"><span class="v">2 · Parear uma conversa</span><span class="st" style="color:var(--info)">Agora</span></div>
+      <div class="hstack"><span class="v sm">@edilson</span><button class="btn">Remover</button></div>
+      <span class="k">Envie ao bot no Telegram</span>
+      <div class="hstack panel" style="padding:var(--s2)"><span class="v">/start AB12CD</span><span class="sp"></span><button class="btn primary">Copiar</button></div>
+      <span class="k">Vale por mais 10 min.</span>
+      <div class="hstack"><button class="btn">Abrir no Telegram</button><button class="btn">Gerar novo código</button></div>
+      <div class="hstack"><span class="v">3 · Testar</span><span class="st" style="color:var(--info)">Agora</span></div>
+      <div class="hstack"><button class="btn">Enviar teste</button></div>
+      <span class="k">▸ Ver como o bot responde</span>
     </div></div>
   </div></div>
 </div>

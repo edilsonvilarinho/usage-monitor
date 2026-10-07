@@ -40,7 +40,7 @@ class TelegramUnauthorizedException : RuntimeException("Token do bot recusado pe
 
 /**
  * Cliente mínimo da Bot API do Telegram (#387): `getUpdates` em long polling,
- * `sendMessage`, `editMessageText`, `answerCallbackQuery`, `deleteWebhook` e `setMyCommands`.
+ * `sendMessage`, `editMessageText`, `answerCallbackQuery`, `deleteWebhook`, `setMyCommands` e `getMe`.
  * Só HTTPS de saída — nenhuma porta aberta.
  *
  * O token vai no caminho da URL, como a API exige; por isso nenhuma mensagem de
@@ -128,6 +128,10 @@ open class TelegramBotApi(
         decode(response, SimpleResponseDto.serializer())
     }
 
+    /** `@` do bot, para o link `t.me/<bot>?start=<código>` das Configurações (#396); `null` se o Telegram não informar. */
+    open suspend fun getMe(token: String): String? =
+        decode(httpClient.get("$baseUrl/bot$token/getMe"), MeResponseDto.serializer()).result?.username
+
     /** `getUpdates` não funciona com webhook configurado: o pareamento remove antes de começar. */
     open suspend fun deleteWebhook(token: String) {
         decode(httpClient.post("$baseUrl/bot$token/deleteWebhook"), SimpleResponseDto.serializer())
@@ -161,6 +165,17 @@ open class TelegramBotApi(
         override val parameters: ResponseParametersDto? = null,
         val result: List<UpdateDto>? = null
     ) : OkResponse
+
+    @Serializable
+    private data class MeResponseDto(
+        override val ok: Boolean = false,
+        override val description: String? = null,
+        override val parameters: ResponseParametersDto? = null,
+        val result: MeDto? = null
+    ) : OkResponse
+
+    @Serializable
+    private data class MeDto(val username: String? = null)
 
     @Serializable
     private data class SimpleResponseDto(

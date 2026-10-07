@@ -299,6 +299,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   inteira com 400. A prévia das Configurações mostra o mesmo texto sem as marcas (`TelegramBotMessages.plain`).
 - **Menu**: ao conectar um token o serviço chama `setMyCommands` com os comandos no idioma do app — o botão "Menu" do
   Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão.
+- **`getMe`** ao conectar dá o `@` do bot: as Configurações dizem "Conectado como @bot" e oferecem "Abrir no Telegram" pelo
+  link `https://t.me/<bot>?start=<código>`, que abre a conversa e manda o `/start <código>` sozinho. Sem resposta do
+  `getMe`, o link some e o resto segue.
 - **Botões do `/status` (#396, direção W5)**: teclado inline de uma linha — 🔄 Atualizar, 🔕 Silenciar 1h, ⚙ Limiares
   (`BotButton`, `callback_data` `refresh`/`snooze`/`thresholds`). O `getUpdates` passa a pedir `callback_query`; toque de
   conversa não pareada não recebe nem o `answerCallbackQuery`, e `callback_data` desconhecido só fecha o "carregando".
