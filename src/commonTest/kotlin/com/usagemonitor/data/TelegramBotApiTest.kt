@@ -1,6 +1,7 @@
 package com.usagemonitor.data
 
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import io.ktor.client.HttpClient
@@ -54,6 +55,43 @@ class TelegramBotApiTest {
         api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }.sendMessage("123:abc", 51L, "<b>Olá</b>", html = true)
 
         assertEquals("""{"chat_id":51,"text":"<b>Olá</b>","parse_mode":"HTML"}""", sent)
+    }
+
+    @Test
+    fun `button tap arrives with its data and the message that carries it`() = runTest {
+        val body = """{"ok":true,"result":[
+            {"update_id":20,"callback_query":{"id":"cb1","data":"refresh","message":{"message_id":700,"chat":{"id":51,"username":"ed"},"text":"x"}}}]}"""
+        var url = ""
+        val update = api(HttpStatusCode.OK, body) { u, _ -> url = u }.getUpdates("123:abc", offset = 20, timeoutSeconds = 25).single()
+
+        assertEquals("cb1", update.callbackId)
+        assertEquals("refresh", update.callbackData)
+        assertEquals(700L, update.messageId)
+        assertEquals(51L, update.chatId)
+        assertEquals(null, update.text)
+        assertTrue(url.contains("callback_query"))
+    }
+
+    @Test
+    fun `buttons go as one inline keyboard row`() = runTest {
+        var sent: String? = null
+        api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }
+            .sendMessage("123:abc", 51L, "x", html = true, buttons = listOf(TelegramButton("A", "refresh"), TelegramButton("B", "snooze")))
+
+        assertEquals(
+            """{"chat_id":51,"text":"x","parse_mode":"HTML","reply_markup":{"inline_keyboard":[[{"text":"A","callback_data":"refresh"},{"text":"B","callback_data":"snooze"}]]}}""",
+            sent
+        )
+    }
+
+    @Test
+    fun `edit message targets chat and message id`() = runTest {
+        var url = ""
+        var sent: String? = null
+        api(HttpStatusCode.OK, """{"ok":true}""") { u, body -> url = u; sent = body }.editMessageText("123:abc", 51L, 700L, "y")
+
+        assertTrue(url.endsWith("/editMessageText"))
+        assertEquals("""{"chat_id":51,"message_id":700,"text":"y","parse_mode":"HTML"}""", sent)
     }
 
     @Test

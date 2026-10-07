@@ -19,7 +19,12 @@ data class UsageAlertSettings(
     /** Aviso de consumo acima do hábito do próprio usuário; ver [UsageSpike]. */
     val spikeAlertsEnabled: Boolean = true,
     val spikeFactor: Double = DEFAULT_SPIKE_FACTOR,
-    val quietHours: QuietHours? = null
+    val quietHours: QuietHours? = null,
+    /**
+     * Silêncio temporário até este instante (botão "Silenciar 1h" do bot, #396).
+     * Mesmo efeito do [quietHours]: adia, não consome. `null` = sem silêncio temporário.
+     */
+    val snoozedUntilEpochMillis: Long? = null
 ) {
     /**
      * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
@@ -213,7 +218,8 @@ fun evaluateUsageAlerts(
     stalledSessions: List<StalledCliSession> = emptyList(),
     spikes: List<UsageSpike> = emptyList()
 ): UsageAlertEvaluation {
-    val silenced = currentLocalHour != null && settings.quietHours?.contains(currentLocalHour) == true
+    val snoozed = settings.snoozedUntilEpochMillis?.let { until -> now.toEpochMilliseconds() < until } == true
+    val silenced = snoozed || (currentLocalHour != null && settings.quietHours?.contains(currentLocalHour) == true)
 
     val quotaResult = evaluateQuotaAlerts(
         stats = stats,

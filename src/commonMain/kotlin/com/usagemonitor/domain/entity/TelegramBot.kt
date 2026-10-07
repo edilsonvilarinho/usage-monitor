@@ -120,10 +120,35 @@ fun applyBotCommand(settings: UsageAlertSettings, command: BotCommand): UsageAle
             quotaAlertsEnabled = command.enabled,
             sessionAlertsEnabled = command.enabled,
             stalledSessionAlertsEnabled = command.enabled,
-            spikeAlertsEnabled = command.enabled
+            spikeAlertsEnabled = command.enabled,
+            // Ligar de volta encerra o "Silenciar 1h" do botão; desligar não precisa dele.
+            snoozedUntilEpochMillis = null
         )
         is BotCommand.Quiet -> settings.copy(quietHours = command.hours)
         is BotCommand.Threshold -> settings.copy(quotaPercents = command.percents)
         else -> null
     }
 }
+
+/** Duração do botão "Silenciar 1h" da mensagem do `/status` (#396). */
+const val TELEGRAM_SNOOZE_MILLIS = 60 * 60 * 1_000L
+
+/**
+ * Botão do teclado inline que acompanha o `/status` (#396, direção W5). O
+ * [data] é o `callback_data` que o Telegram devolve — até 64 bytes, nunca dado
+ * de uso.
+ */
+enum class BotButton(val data: String) {
+    REFRESH("refresh"),
+    SNOOZE("snooze"),
+    THRESHOLDS("thresholds");
+
+    companion object {
+        /** `null` para `callback_data` desconhecido: o bot só responde ao que ele mesmo mandou. */
+        fun fromData(data: String?): BotButton? = entries.firstOrNull { button -> button.data == data }
+    }
+}
+
+/** Silêncio temporário de [TELEGRAM_SNOOZE_MILLIS] a partir de [nowMillis]; função pura, como [applyBotCommand]. */
+fun snoozeAlerts(settings: UsageAlertSettings, nowMillis: Long): UsageAlertSettings =
+    settings.copy(snoozedUntilEpochMillis = nowMillis + TELEGRAM_SNOOZE_MILLIS)

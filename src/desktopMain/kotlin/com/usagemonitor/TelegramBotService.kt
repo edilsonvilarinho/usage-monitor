@@ -1,10 +1,12 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
@@ -13,6 +15,7 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.parseBotCommand
+import com.usagemonitor.domain.entity.snoozeAlerts
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +51,11 @@ internal sealed interface TelegramBotStatus {
  * o acumulado um `/alertas off` antigo seria reaplicado a cada reinício do app.
  * Mesmo ciclo de vida do `TeamSyncService`: escopo próprio, `onDestroy` no
  * encerramento único de `AppViewModels`.
+ *
+ * O `/status` vem com teclado inline (#396, W5): Atualizar pede coleta ao app por
+ * [requestRefresh] e edita a mesma mensagem; Silenciar 1h grava o silêncio
+ * temporário; Limiares mostra os atuais. O toque roda fora do laço de polling — a
+ * coleta pode levar segundos e não pode atrasar os outros updates.
  */
 internal class TelegramBotService(
     private val api: TelegramBotApi,
@@ -58,6 +66,8 @@ internal class TelegramBotService(
     private val alerts: Flow<UsageAlert>,
     private val snapshotProvider: () -> UsageSnapshot?,
     private val languageProvider: () -> AppLanguage,
+    /** Pede coleta ao app e volta quando ela termina (ou desiste); respeita o backoff de 429 do painel. */
+    private val requestRefresh: suspend () -> Unit = {},
     private val clock: Clock = Clock.System
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -130,6 +140,12 @@ internal class TelegramBotService(
     }
 
     private suspend fun handle(token: String, message: TelegramIncomingMessage) {
+        val callbackId = message.callbackId
+        if (callbackId != null) {
+            // Toque de quem não está pareado não recebe nem o "fechar carregando".
+            if (settingsFlow.value.isAuthorized(message.chatId)) scope.launch { handleButton(token, message, callbackId) }
+            return
+        }
         val command = message.text?.let(::parseBotCommand) ?: return
         val language = languageProvider()
         val settings = settingsFlow.value
@@ -148,8 +164,11 @@ internal class TelegramBotService(
         }
         // Conversa não pareada não recebe resposta: o bot não confirma que existe.
         if (!settings.isAuthorized(message.chatId)) return
+        if (command == BotCommand.Status) {
+            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshotProvider(), language), html = true, buttons = statusButtons(language))
+            return
+        }
         val reply = when (command) {
-            BotCommand.Status -> TelegramBotMessages.status(snapshotProvider(), language)
             BotCommand.Help -> TelegramBotMessages.help(language)
             is BotCommand.Invalid -> TelegramBotMessages.invalid(command.usage, language)
             else -> {
@@ -159,6 +178,42 @@ internal class TelegramBotService(
             }
         }
         api.sendMessage(token, message.chatId, reply, html = true)
+    }
+
+    private suspend fun handleButton(token: String, message: TelegramIncomingMessage, callbackId: String) {
+        val language = languageProvider()
+        val button = BotButton.fromData(message.callbackData)
+        runTelegram {
+            when (button) {
+                BotButton.REFRESH -> {
+                    api.answerCallbackQuery(token, callbackId, TelegramBotMessages.refreshing(language))
+                    requestRefresh()
+                    val messageId = message.messageId
+                    val text = TelegramBotMessages.status(snapshotProvider(), language)
+                    // Sem mudança o Telegram responde 400 "message is not modified": o `runTelegram` o engole.
+                    if (messageId != null) api.editMessageText(token, message.chatId, messageId, text, statusButtons(language))
+                }
+                BotButton.SNOOZE -> {
+                    val snoozed = snoozeAlerts(alertSettingsFlow.value, clock.now().toEpochMilliseconds())
+                    saveAlertSettings(snoozed)
+                    api.answerCallbackQuery(token, callbackId)
+                    api.sendMessage(token, message.chatId, TelegramBotMessages.snoozed(snoozed.snoozedUntilEpochMillis ?: 0L, language), html = true)
+                }
+                BotButton.THRESHOLDS -> {
+                    api.answerCallbackQuery(token, callbackId)
+                    api.sendMessage(token, message.chatId, TelegramBotMessages.thresholds(alertSettingsFlow.value, language), html = true)
+                }
+                null -> api.answerCallbackQuery(token, callbackId)
+            }
+        }
+    }
+
+    private fun statusButtons(language: AppLanguage): List<TelegramButton> =
+        TelegramBotMessages.statusButtons(language).map { (label, button) -> TelegramButton(label, button.data) }
+
+    /** Falha de um toque fica no toque: o polling segue. Cancelamento continua subindo. */
+    private suspend fun runTelegram(block: suspend () -> Unit) {
+        runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
     }
 
     /** Menu de comandos do Telegram (#396). Falhar aqui não derruba a conexão: o bot responde sem o menu. */

@@ -299,6 +299,15 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   inteira com 400. A prévia das Configurações mostra o mesmo texto sem as marcas (`TelegramBotMessages.plain`).
 - **Menu**: ao conectar um token o serviço chama `setMyCommands` com os comandos no idioma do app — o botão "Menu" do
   Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão.
+- **Botões do `/status` (#396, direção W5)**: teclado inline de uma linha — 🔄 Atualizar, 🔕 Silenciar 1h, ⚙ Limiares
+  (`BotButton`, `callback_data` `refresh`/`snooze`/`thresholds`). O `getUpdates` passa a pedir `callback_query`; toque de
+  conversa não pareada não recebe nem o `answerCallbackQuery`, e `callback_data` desconhecido só fecha o "carregando".
+  **Atualizar** responde "Coletando…", chama `refreshForBot` (o mesmo `DashboardViewModel.refresh()` do botão do app:
+  alvo em backoff de 429 não vai à rede; espera a coleta começar por até 2 s e terminar por até 30 s) e edita a mesma
+  mensagem com `editMessageText`; o 400 "message is not modified" é engolido. **Silenciar 1h** grava
+  `UsageAlertSettings.snoozedUntilEpochMillis` (campo novo com default, chave `alertsSnoozedUntilMillis`), que silencia
+  como o horário de silêncio — adia, não consome —; `/alertas on` o encerra. **Limiares** responde os percentuais atuais
+  e o comando para mudar. O toque roda fora do laço de polling: a coleta não atrasa os outros updates.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

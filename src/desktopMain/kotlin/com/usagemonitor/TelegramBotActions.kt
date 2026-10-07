@@ -8,7 +8,10 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.TelegramBotSectionModel
+import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
 
 /** Ações da seção do bot (#387); arquivo próprio para o `SettingsActions` não crescer. */
@@ -81,3 +84,17 @@ internal fun telegramBotSectionModel(
         onSendTest = actions::sendTest
     )
 }
+
+/**
+ * "Atualizar" do bot (#396): a mesma coleta do botão do app — alvo em backoff de 429
+ * não vai à rede —, esperando ela terminar. Se nada começar (tudo em backoff), volta
+ * logo e o bot mostra a leitura que já tem.
+ */
+internal suspend fun refreshForBot(dashboard: DashboardViewModel) {
+    dashboard.refresh()
+    withTimeoutOrNull(BOT_REFRESH_START_MILLIS) { dashboard.refreshingTargets.first { targets -> targets.isNotEmpty() } } ?: return
+    withTimeoutOrNull(BOT_REFRESH_FINISH_MILLIS) { dashboard.refreshingTargets.first { targets -> targets.isEmpty() } }
+}
+
+private const val BOT_REFRESH_START_MILLIS = 2_000L
+private const val BOT_REFRESH_FINISH_MILLIS = 30_000L

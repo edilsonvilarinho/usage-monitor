@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
@@ -88,6 +90,36 @@ internal object TelegramBotMessages {
     internal fun bar(percent: Int): String {
         val filled = (percent.coerceIn(0, 100) / 10)
         return "▰".repeat(filled) + "▱".repeat(10 - filled)
+    }
+
+    /** Teclado do `/status` (#396, W5): uma linha, nesta ordem. */
+    fun statusButtons(language: AppLanguage): List<Pair<String, BotButton>> = if (language == AppLanguage.PT) {
+        listOf("🔄 Atualizar" to BotButton.REFRESH, "🔕 Silenciar 1h" to BotButton.SNOOZE, "⚙ Limiares" to BotButton.THRESHOLDS)
+    } else {
+        listOf("🔄 Refresh" to BotButton.REFRESH, "🔕 Mute 1h" to BotButton.SNOOZE, "⚙ Thresholds" to BotButton.THRESHOLDS)
+    }
+
+    /** Aviso curto do Telegram enquanto o app coleta. */
+    fun refreshing(language: AppLanguage): String = if (language == AppLanguage.PT) "Coletando…" else "Collecting…"
+
+    fun snoozed(untilMillis: Long, language: AppLanguage): String {
+        val until = clock(Instant.fromEpochMilliseconds(untilMillis))
+        return if (language == AppLanguage.PT) {
+            "🔕 Alertas silenciados até <b>$until</b>.\nPara voltar antes: <code>/alertas on</code>"
+        } else {
+            "🔕 Alerts muted until <b>$until</b>.\nTo resume earlier: <code>/alerts on</code>"
+        }
+    }
+
+    fun thresholds(settings: UsageAlertSettings, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val percents = settings.quotaPercents.joinToString(", ") { percent -> "<b>$percent%</b>" }.ifEmpty { if (pt) "nenhum" else "none" }
+        val off = if (settings.quotaAlertsEnabled) "" else if (pt) " (alertas de cota desligados)" else " (quota alerts off)"
+        return if (pt) {
+            "⚙ Limiares de cota: $percents$off\nMude com <code>/limiar 75,90</code>"
+        } else {
+            "⚙ Quota thresholds: $percents$off\nChange with <code>/threshold 75,90</code>"
+        }
     }
 
     private fun riskEmoji(level: UsageRiskLevel): String = when (level) {
