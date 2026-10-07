@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
@@ -69,12 +70,18 @@ internal class TelegramBotService(
     private val enabledSources: () -> Set<ApiSource> = { emptySet() },
     private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> },
     /** Gasto do Claude Code nas últimas 24 h (#398, Y1); `null` é "não medido". */
-    private val spendProvider: suspend () -> TelegramDailySpend? = { null }
+    private val spendProvider: suspend () -> TelegramDailySpend? = { null },
+    /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
+    private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
     private var alertJob: Job? = null
     private var summaryJob: Job? = null
+    private var panelJob: Job? = null
+
+    /** Último texto do painel por conversa, para editar só o que mudou. Só neste laço. */
+    private val panelTexts = mutableMapOf<Long, String>()
 
     private val handlers = TelegramBotHandlers(
         api = api,
@@ -103,6 +110,12 @@ internal class TelegramBotService(
             alerts.collect { alert -> broadcast(TelegramBotMessages.alert(alert, languageProvider())) }
         }
         summaryJob = scope.launch { summaryLoop() }
+        panelJob = scope.launch {
+            while (true) {
+                runCatching { syncPanels() }.onFailure { error -> if (error is CancellationException) throw error }
+                delay(panelIntervalMillis)
+            }
+        }
     }
 
     fun onDestroy() {
@@ -192,6 +205,63 @@ internal class TelegramBotService(
         }
     }
 
+    /**
+     * Painel fixado (#398, Y5). Ligado: envia em silêncio e fixa onde ainda não há
+     * painel, e edita só quando o texto mudou — a hora no texto é a da coleta, então
+     * a edição segue o ritmo da coleta e nunca passa de uma por intervalo. Mensagem
+     * apagada pelo usuário (400 "not found") é recriada. Desligado: desafixa e
+     * esquece. Conversa removida sai do mapa.
+     */
+    private suspend fun syncPanels() {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank()) return
+        val token = settings.botToken
+        val chats = settings.authorizedChats.map { chat -> chat.id }.toSet()
+        if (!settings.livePanelEnabled) {
+            if (settings.panelMessages.isEmpty()) return
+            for ((chatId, messageId) in settings.panelMessages) {
+                runTelegramCall { api.unpinChatMessage(token, chatId, messageId) }
+            }
+            panelTexts.clear()
+            savePanels(emptyMap())
+            return
+        }
+        val text = TelegramBotSummaryMessages.panel(snapshotProvider(), languageProvider())
+        val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
+        for (chatId in chats) {
+            val messageId = panels[chatId]
+            if (messageId != null && panelTexts[chatId] == text) continue
+            val kept = messageId != null && editPanel(token, chatId, messageId, text)
+            if (!kept) {
+                val created = api.sendMessage(token, chatId, text, html = true, silent = true) ?: continue
+                runTelegramCall { api.pinChatMessage(token, chatId, created) }
+                panels[chatId] = created
+            }
+            panelTexts[chatId] = text
+            delay(SEND_SPACING_MILLIS)
+        }
+        if (panels != settings.panelMessages) savePanels(panels)
+    }
+
+    /** `false` quando a mensagem sumiu e tem de ser recriada; "not modified" conta como mantida. */
+    private suspend fun editPanel(token: String, chatId: Long, messageId: Long, text: String): Boolean =
+        try {
+            api.editMessageText(token, chatId, messageId, text)
+            true
+        } catch (bad: TelegramBadRequestException) {
+            if (bad.isMessageGone) false else bad.isNotModified || throw bad
+        }
+
+    private fun savePanels(panels: Map<Long, Long>) {
+        val next = settingsFlow.value.copy(panelMessages = panels)
+        runCatching { saveSettings(next) }
+        settingsFlow.value = next
+    }
+
+    private suspend fun runTelegramCall(block: suspend () -> Unit) {
+        runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
+    }
+
     /** Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa. */
     private suspend fun broadcast(text: String) {
         val settings = settingsFlow.value
@@ -211,5 +281,6 @@ internal class TelegramBotService(
         const val BACKOFF_MAX_MILLIS = 60_000L
         const val SEND_SPACING_MILLIS = 1_100L
         const val SUMMARY_CHECK_MILLIS = 60_000L
+        const val PANEL_INTERVAL_MILLIS = 60_000L
     }
 }

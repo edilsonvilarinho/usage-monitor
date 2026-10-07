@@ -57,7 +57,10 @@ class TelegramBotSectionModel(
     val onAllowSourceControlChange: (Boolean) -> Unit = {},
     /** Hora do resumo diário (#398, Y1); `null` desligado. */
     val dailySummaryHour: Int? = null,
-    val onDailySummaryHourChange: (Int?) -> Unit = {}
+    val onDailySummaryHourChange: (Int?) -> Unit = {},
+    /** Painel fixado que se atualiza sozinho (#398, Y5). */
+    val livePanelEnabled: Boolean = false,
+    val onLivePanelChange: (Boolean) -> Unit = {}
 )
 
 /**

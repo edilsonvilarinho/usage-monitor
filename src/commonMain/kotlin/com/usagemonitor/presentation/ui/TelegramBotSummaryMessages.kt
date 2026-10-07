@@ -44,6 +44,29 @@ internal object TelegramBotSummaryMessages {
         ).joinToString("\n\n")
     }
 
+    /**
+     * Painel fixado (#398, Y5): uma linha por conta com a cota mais cheia e a barra.
+     * A hora é a da **coleta**, nunca a do envio — o texto só muda quando há leitura
+     * nova, e é isso que segura as edições no ritmo da coleta.
+     */
+    fun panel(snapshot: UsageSnapshot?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (snapshot == null || snapshot.accounts.isEmpty()) return TelegramBotMessages.noReading(pt)
+        val updated = snapshot.lastCollectedAt?.let { at -> (if (pt) "atualizado " else "updated ") + "${TelegramBotMessages.clock(at)} BRT" }
+            ?: if (pt) "sem coleta ainda" else "not collected yet"
+        val lines = snapshot.accounts.map { account ->
+            val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
+            val quota = account.quotas.filter { item -> item.percent != null }.maxByOrNull { item -> item.percent ?: 0 }
+                ?: account.quotas.firstOrNull()
+            val value = quota?.let { item ->
+                " · ${TelegramBotMessages.escape(item.label)}\n<code>${TelegramBotMessages.escape(TelegramBotMessages.quotaValue(item, pt))}</code>"
+            }.orEmpty()
+            "$mark<b>${TelegramBotMessages.escape(account.label)}</b>$value"
+        }
+        val title = if (pt) "<b>📌 Painel ao vivo</b>" else "<b>📌 Live panel</b>"
+        return "$title\n<i>$updated</i>\n\n" + lines.joinToString("\n")
+    }
+
     /** A cota mais cheia da conta; sem percentual (saldo), a primeira, com o valor que o `/status` mostra. */
     private fun accountLine(account: UsageSnapshotAccount, now: Instant, pt: Boolean): String {
         val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()

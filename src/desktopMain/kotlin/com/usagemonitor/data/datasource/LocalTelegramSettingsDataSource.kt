@@ -12,6 +12,9 @@ import java.security.SecureRandom
 private data class TelegramChatDto(val id: Long, val name: String = "")
 
 @Serializable
+private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
+
+@Serializable
 private data class TelegramSettingsDto(
     val enabled: Boolean = false,
     val botToken: String = "",
@@ -20,7 +23,9 @@ private data class TelegramSettingsDto(
     val pairingExpiresAtMillis: Long? = null,
     val allowSourceControl: Boolean = false,
     val dailySummaryHour: Int? = null,
-    val lastSummaryDate: String? = null
+    val lastSummaryDate: String? = null,
+    val livePanelEnabled: Boolean = false,
+    val panelMessages: List<TelegramPanelMessageDto> = emptyList()
 )
 
 /**
@@ -46,7 +51,9 @@ internal class LocalTelegramSettingsDataSource(
             // Hora fora das oferecidas é arquivo editado à mão: vale como desligado,
             // e o seletor das Configurações mostra isso em vez de uma hora falsa.
             dailySummaryHour = dto.dailySummaryHour?.takeIf { hour -> hour in TELEGRAM_SUMMARY_HOURS },
-            lastSummaryDate = dto.lastSummaryDate
+            lastSummaryDate = dto.lastSummaryDate,
+            livePanelEnabled = dto.livePanelEnabled,
+            panelMessages = dto.panelMessages.associate { panel -> panel.chatId to panel.messageId }
         )
     }
 
@@ -59,7 +66,9 @@ internal class LocalTelegramSettingsDataSource(
             pairingExpiresAtMillis = settings.pairingExpiresAtMillis,
             allowSourceControl = settings.allowSourceControl,
             dailySummaryHour = settings.dailySummaryHour,
-            lastSummaryDate = settings.lastSummaryDate
+            lastSummaryDate = settings.lastSummaryDate,
+            livePanelEnabled = settings.livePanelEnabled,
+            panelMessages = settings.panelMessages.map { (chatId, messageId) -> TelegramPanelMessageDto(chatId, messageId) }
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))
     }

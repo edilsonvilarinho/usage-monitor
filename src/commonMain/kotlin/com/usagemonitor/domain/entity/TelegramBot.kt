@@ -28,7 +28,11 @@ class TelegramBotSettings(
     /** Hora (BRT) do resumo diário (#398, Y1); `null` desliga. */
     val dailySummaryHour: Int? = null,
     /** Dia local (ISO) do último resumo enviado: um por dia. */
-    val lastSummaryDate: String? = null
+    val lastSummaryDate: String? = null,
+    /** Painel fixado que se atualiza sozinho (#398, Y5). */
+    val livePanelEnabled: Boolean = false,
+    /** A mensagem do painel em cada conversa (`chatId` → `message_id`), para editar e desafixar. */
+    val panelMessages: Map<Long, Long> = emptyMap()
 ) {
     fun copy(
         enabled: Boolean = this.enabled,
@@ -38,9 +42,12 @@ class TelegramBotSettings(
         pairingExpiresAtMillis: Long? = this.pairingExpiresAtMillis,
         allowSourceControl: Boolean = this.allowSourceControl,
         dailySummaryHour: Int? = this.dailySummaryHour,
-        lastSummaryDate: String? = this.lastSummaryDate
+        lastSummaryDate: String? = this.lastSummaryDate,
+        livePanelEnabled: Boolean = this.livePanelEnabled,
+        panelMessages: Map<Long, Long> = this.panelMessages
     ): TelegramBotSettings = TelegramBotSettings(
-        enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate
+        enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate,
+        livePanelEnabled, panelMessages
     )
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
@@ -56,10 +63,13 @@ class TelegramBotSettings(
         other.enabled == enabled && other.botToken == botToken && other.authorizedChats == authorizedChats &&
         other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis &&
         other.allowSourceControl == allowSourceControl && other.dailySummaryHour == dailySummaryHour &&
-        other.lastSummaryDate == lastSummaryDate
+        other.lastSummaryDate == lastSummaryDate && other.livePanelEnabled == livePanelEnabled &&
+        other.panelMessages == panelMessages
 
-    override fun hashCode(): Int =
-        listOf(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate).hashCode()
+    override fun hashCode(): Int = listOf(
+        enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate,
+        livePanelEnabled, panelMessages
+    ).hashCode()
 
     override fun toString(): String =
         "TelegramBotSettings(enabled=$enabled, botToken=${if (botToken.isEmpty()) "" else "***"}, chats=${authorizedChats.size})"

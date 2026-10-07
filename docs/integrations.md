@@ -339,6 +339,13 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   `sinceEpochMillis` = agora − 24 h (o repositório não tem fim de janela, e "ontem" exigiria valor novo em
   `CliSessionRange`), `+` com turno sem tarifa, linha omitida quando o índice falha ("não medido"). `/resumo` (`/summary`)
   manda na hora.
+- **Painel fixado ao vivo (#398, Y5)**: interruptor no card (`livePanelEnabled`, nasce desligado). A cada 60 s o serviço
+  monta o painel (por conta a cota mais cheia com a barra) e, por conversa pareada: sem painel, envia **em silêncio**
+  (`disable_notification`) e fixa (`pinChatMessage`, sem notificar); com painel, edita **só se o texto mudou**. A hora no
+  texto é a da **coleta** (`lastCollectedAt`), não a do envio, então a edição acompanha a coleta e nunca passa de uma por
+  minuto por conversa — dentro do limite de edição do Telegram. 400 "not modified" conta como mantido; 400 "not found"
+  (mensagem apagada) recria. `chatId → message_id` em `telegram.json` (`panelMessages`); conversa removida sai do mapa.
+  Desligar desafixa e esquece na passada seguinte (até 1 min).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

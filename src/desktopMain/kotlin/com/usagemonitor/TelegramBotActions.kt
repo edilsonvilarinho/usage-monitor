@@ -47,6 +47,9 @@ internal class TelegramBotActions(
      */
     fun setDailySummaryHour(hour: Int?) = update { current -> current.copy(dailySummaryHour = hour, lastSummaryDate = null) }
 
+    /** O serviço envia e fixa, ou desafixa, na próxima passada do painel (até 1 min). */
+    fun setLivePanel(enabled: Boolean) = update { current -> current.copy(livePanelEnabled = enabled) }
+
     private fun update(transform: (TelegramBotSettings) -> TelegramBotSettings) {
         val next = transform(settingsFlow.value)
         runCatching { dataSource.save(next) }
@@ -98,7 +101,9 @@ internal fun telegramBotSectionModel(
         allowSourceControl = settings.allowSourceControl,
         onAllowSourceControlChange = actions::setAllowSourceControl,
         dailySummaryHour = settings.dailySummaryHour,
-        onDailySummaryHourChange = actions::setDailySummaryHour
+        onDailySummaryHourChange = actions::setDailySummaryHour,
+        livePanelEnabled = settings.livePanelEnabled,
+        onLivePanelChange = actions::setLivePanel
     )
 }
 

@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A07 concluída.`
+**Estado atual:** `Em execução — A08 concluída.`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -60,6 +60,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | A05 | `feat(telegram): remote control with /atualizar, /api and quiet durations` | `gradlew.bat desktopTest --tests *Telegram*`: 44 testes, 0 falhas (novos: parse dos comandos, ida e volta dos toques e dado forjado, próxima 08:00 BRT, `/api` sem permissão não muda nada, com permissão liga a fonte, menu do `/silencio` e 4 h, `/atualizar`, interruptor do card). Primeira rodada: 2 falhas nos testes novos (lista do menu e `performScrollTo` fora de rolagem), corrigidas no teste | concluída |
 | A06 | `feat(alerts): warn when a quota that alerted resets` | `gradlew.bat desktopTest --tests com.usagemonitor.domain.* com.usagemonitor.presentation.* *AlertSettings* *Telegram* *UsageAlert*`: 1134 testes, 0 falhas (novos: reinício anunciado uma vez, janela sem alerta reinicia calada, leitura vencida no meio mantém a memória, silêncio adia, interruptor desligado, mensagem PT/EN) | concluída |
 | A07 | `feat(telegram): daily summary at a chosen hour and /resumo` | `gradlew.bat desktopTest --tests *Telegram*`: 52 testes, 0 falhas (novos: hora/uma vez por dia/silêncio adia, texto com cota mais cheia e gasto `+`, sem gasto medido, envio agendado único com data gravada, `/resumo`, seletor do card) | concluída |
+| A08 | `feat(telegram): live pinned panel edited on each collection` | `gradlew.bat desktopTest --tests *Telegram*`: 54 testes, 0 falhas (novos: painel enviado em silêncio e fixado, editado com leitura nova sem novo pin, desafixado ao desligar; texto com hora da coleta estável entre envios) | concluída |
 | A02 | X10: prévia do notch na Aparência | `SettingsWindowHost.kt`, `SettingsHudPreview.kt`, teste, protótipo, `presentation.md` |
 | A03 | Infra do bot: id da mensagem, fixar/desafixar, foto, campos novos de `telegram.json`, tratadores fora do serviço | `TelegramBotApi.kt`, `TelegramBot.kt`, `LocalTelegramSettingsDataSource.kt`, `TelegramBotService.kt` |
 | A04 | Y4: `/conta` | domain, `TelegramBotMessages.kt`, tratadores |
@@ -82,7 +83,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | # | Risco | Estado |
 | --- | --- | --- |
 | R1 | Janela de Configurações muda (host em `desktopMain`); a suíte só roda no Windows e nada exercita o sistema de janelas. O PR declara que X11 não foi aberto | aberto |
-| R2 | Limites do Telegram: edição frequente (Y5) e `sendPhoto` multipart sem teste contra o Telegram real; conferência com bot real é do usuário | aberto |
+| R2 | Limites do Telegram: edição frequente (Y5) e `sendPhoto` multipart sem teste contra o Telegram real; conferência com bot real é do usuário. Y5: edição limitada a uma por minuto por conversa e só com texto novo (hora da coleta) | aberto |
 | R3 | `AppViewModels.kt` (408 linhas) cresce com a fiação do bot; acima de ~700, extrair a fiação | aberto |
 
 ## Desvios do plano e achados da execução

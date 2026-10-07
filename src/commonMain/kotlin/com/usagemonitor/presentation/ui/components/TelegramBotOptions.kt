@@ -16,6 +16,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 /** O rótulo é traduzido; buscar por texto amarraria o teste ao idioma. */
 const val TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG = "telegramSourceControlSwitch"
 const val TELEGRAM_DAILY_SUMMARY_TEST_TAG = "telegramDailySummary"
+const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
 
 /**
  * Opções do que o bot faz além de responder (#398): permissões e envios por conta
@@ -45,6 +46,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
             onSelect = { index -> model.onDailySummaryHourChange(hours[index]) },
             modifier = Modifier.testTag(TELEGRAM_DAILY_SUMMARY_TEST_TAG)
         )
+        TelegramOptionRow(
+            label = if (pt) "Painel fixado ao vivo" else "Live pinned panel",
+            description = if (pt) {
+                "Fixa uma mensagem no topo da conversa e a edita a cada coleta, sem notificar. Desligar desafixa."
+            } else {
+                "Pins a message at the top of the chat and edits it on every collection, silently. Turning it off unpins it."
+            }
+        ) {
+            AppSwitch(
+                checked = model.livePanelEnabled,
+                onCheckedChange = model.onLivePanelChange,
+                modifier = Modifier.testTag(TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG)
+            )
+        }
         TelegramOptionRow(
             label = if (pt) "Permitir mudar fontes pelo bot" else "Allow changing sources from the bot",
             description = if (pt) {

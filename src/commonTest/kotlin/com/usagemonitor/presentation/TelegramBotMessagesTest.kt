@@ -117,4 +117,14 @@ class TelegramBotMessagesTest {
         assertTrue(text.startsWith("<b>☀ Summary for Tue 06/10</b>"), text)
         assertFalse("last 24 h" in text, text)
     }
+
+    /** #398, Y5: o painel traz a hora da coleta, não a do envio — só muda com leitura nova. */
+    @Test
+    fun `live panel shows the collection time and one line per account`() {
+        val text = TelegramBotSummaryMessages.panel(snapshot, AppLanguage.PT)
+
+        assertTrue(text.startsWith("<b>📌 Painel ao vivo</b>\n<i>atualizado 22:28 BRT</i>"), text)
+        assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>" in text, text)
+        assertEquals(text, TelegramBotSummaryMessages.panel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
+    }
 }

@@ -6,6 +6,9 @@ import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.UsageSnapshotQuota
+import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -52,14 +55,29 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
 
     val menus = Collections.synchronizedList(mutableListOf<List<Pair<String, String>>>())
 
+    val silentSends = Collections.synchronizedList(mutableListOf<String>())
+    val pins = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
+    val unpins = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
+    val editedTexts = Collections.synchronizedList(mutableListOf<String>())
+
     override suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean, buttons: List<List<TelegramButton>>, silent: Boolean): Long {
         sent += chatId to text
         keyboards += buttons.flatten()
+        if (silent) silentSends += text
         return nextMessageId.incrementAndGet().toLong()
+    }
+
+    override suspend fun pinChatMessage(token: String, chatId: Long, messageId: Long) {
+        pins += chatId to messageId
+    }
+
+    override suspend fun unpinChatMessage(token: String, chatId: Long, messageId: Long) {
+        unpins += chatId to messageId
     }
 
     override suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<List<TelegramButton>>) {
         edits += chatId to messageId
+        editedTexts += text
     }
 
     override suspend fun answerCallbackQuery(token: String, callbackId: String, text: String?) {
@@ -94,7 +112,8 @@ class TelegramBotServiceTest {
         requestRefresh = { refreshes.incrementAndGet() },
         clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") },
         enabledSources = { enabledSources.value },
-        toggleSource = { source, on -> enabledSources.value = if (on) enabledSources.value + source else enabledSources.value - source }
+        toggleSource = { source, on -> enabledSources.value = if (on) enabledSources.value + source else enabledSources.value - source },
+        panelIntervalMillis = 50L
     )
 
     @AfterTest
@@ -283,5 +302,41 @@ class TelegramBotServiceTest {
         api.pending += message(1, chat = 51, text = "/resumo")
 
         waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("Sem leitura ainda") } }
+    }
+
+    /**
+     * #398, Y5: ligado, o painel sai em silêncio e é fixado; com leitura nova é
+     * editado; desligado, é desafixado e esquecido.
+     */
+    @Test
+    fun `live panel is pinned, edited on a new reading and unpinned when turned off`() {
+        fun reading(collectedAt: String, percent: Int) = UsageSnapshot(
+            generatedAt = Instant.parse("2026-10-06T12:00:00Z"),
+            accounts = listOf(
+                UsageSnapshotAccount(
+                    ApiSource.ANTHROPIC, "Claude — Edi", active = false,
+                    fetchedAt = Instant.parse(collectedAt),
+                    quotas = listOf(
+                        UsageSnapshotQuota("Sessão 5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, percent.toLong(), 100L, percent, null, "USD")
+                    )
+                )
+            )
+        )
+        snapshot = reading("2026-10-06T11:58:00Z", 42)
+        settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed")), livePanelEnabled = true)
+        service.start()
+
+        waitUntil { api.pins.isNotEmpty() && settings.value.panelMessages.isNotEmpty() }
+        val messageId = settings.value.panelMessages.getValue(51L)
+        assertEquals(51L to messageId, api.pins.single())
+        assertTrue(api.silentSends.single().contains("42%"))
+
+        snapshot = reading("2026-10-06T11:59:00Z", 57)
+        waitUntil { api.editedTexts.any { it.contains("57%") } }
+        assertEquals(1, api.pins.size)
+
+        settings.value = settings.value.copy(livePanelEnabled = false)
+        waitUntil { api.unpins.isNotEmpty() && settings.value.panelMessages.isEmpty() }
+        assertEquals(51L to messageId, api.unpins.single())
     }
 }
