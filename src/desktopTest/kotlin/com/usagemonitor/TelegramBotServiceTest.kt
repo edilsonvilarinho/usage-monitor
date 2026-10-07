@@ -81,6 +81,7 @@ class TelegramBotServiceTest {
     private val alerts = MutableSharedFlow<UsageAlert>(extraBufferCapacity = 4)
     private val refreshes = AtomicInteger()
     @Volatile private var snapshot: UsageSnapshot? = null
+    private val enabledSources = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
     private val service = TelegramBotService(
         api = api,
         settingsFlow = settings,
@@ -91,7 +92,9 @@ class TelegramBotServiceTest {
         snapshotProvider = { snapshot },
         languageProvider = { AppLanguage.PT },
         requestRefresh = { refreshes.incrementAndGet() },
-        clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") }
+        clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") },
+        enabledSources = { enabledSources.value },
+        toggleSource = { source, on -> enabledSources.value = if (on) enabledSources.value + source else enabledSources.value - source }
     )
 
     @AfterTest
@@ -139,7 +142,7 @@ class TelegramBotServiceTest {
         service.start()
 
         waitUntil { api.menus.isNotEmpty() }
-        assertEquals(listOf("status", "conta", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
+        assertEquals(listOf("status", "conta", "atualizar", "api", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
     }
 
     @Test
@@ -214,5 +217,50 @@ class TelegramBotServiceTest {
         service.start()
 
         waitUntil { (service.status.value as? TelegramBotStatus.Connected)?.botUsername == "usage_monitor_bot" }
+    }
+
+    /** #398, Y8: sem a permissão o `/api` só lista, e um toque antigo não muda nada. */
+    @Test
+    fun `api lists without buttons and refuses taps while source control is off`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/api")
+        api.pending += tap(2, chat = 51, data = "api:DEEPSEEK")
+
+        waitUntil { api.sent.any { it.second.startsWith("<b>Fontes monitoradas</b>") } && "cb2" in api.answered }
+        assertTrue(api.keyboards.last().isEmpty())
+        assertEquals(setOf(ApiSource.ANTHROPIC), enabledSources.value)
+    }
+
+    @Test
+    fun `api tap toggles the source when the user allowed it`() {
+        settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed")), allowSourceControl = true)
+        service.start()
+        api.pending += tap(1, chat = 51, data = "api:DEEPSEEK")
+
+        waitUntil { ApiSource.DEEPSEEK in enabledSources.value }
+        waitUntil { api.edits.isNotEmpty() && api.sent.any { it.second.contains("DeepSeek</b> ligada") } }
+    }
+
+    /** `/silencio` sem argumento oferece durações; "4 h" grava o silêncio a partir do toque. */
+    @Test
+    fun `quiet menu offers durations and a tap mutes for that long`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/silencio")
+        waitUntil { api.keyboards.any { row -> row.map { it.data } == listOf("snz:60", "snz:240", "snz:am") } }
+
+        api.pending += tap(2, chat = 51, data = "snz:240")
+        waitUntil { alertSettings.value.snoozedUntilEpochMillis != null }
+        assertEquals(Instant.parse("2026-10-06T16:00:00Z").toEpochMilliseconds(), alertSettings.value.snoozedUntilEpochMillis)
+    }
+
+    @Test
+    fun `refresh command collects and answers with the status`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/atualizar")
+
+        waitUntil { refreshes.get() == 1 && api.sent.any { it.second.startsWith("Sem leitura ainda") } }
     }
 }

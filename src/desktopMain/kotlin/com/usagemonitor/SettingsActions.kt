@@ -340,10 +340,7 @@ internal class SettingsActions(
         updateProxy(resetConnection = false) { current -> current.copy(password = password) }
     }
 
-    private fun setEnabledApis(updated: Set<ApiSource>) {
-        graph.enabledApis.value = updated
-        writeApiSourceCollection(settings, ENABLED_APIS_KEY, updated)
-    }
+    private fun setEnabledApis(updated: Set<ApiSource>) = persistEnabledApis(graph, updated)
 
     private fun refreshEnabledProfiles() {
         graph.enabledAnthropicProfiles.value = resolveAnthropicProfiles(
@@ -397,4 +394,13 @@ internal fun updateProxySettings(
     val updated = transform(settingsFlow.value)
     settingsFlow.value = updated
     return runCatching { dataSource.save(updated) }.isSuccess
+}
+
+/**
+ * Fontes ligadas: publica e grava. Um caminho só para a aba APIs e o `/api` do bot
+ * (#398) — duas cópias divergiriam na chave ou na ordem das gravações.
+ */
+internal fun persistEnabledApis(graph: AppGraph, updated: Set<ApiSource>) {
+    graph.enabledApis.value = updated
+    writeApiSourceCollection(graph.settings, ENABLED_APIS_KEY, updated)
 }

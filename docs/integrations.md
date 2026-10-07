@@ -287,7 +287,8 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   seguinte. O Telegram guarda updates por 24 h, e sem isso um `/alertas off` antigo seria reaplicado a cada arranque.
 - **Pareamento**: "Parear conversa" gera um código de 6 caracteres (sem 0/O/1/I) válido por 10 min; a conversa que mandar
   `/start <código>` entra na lista. Conversa não pareada não recebe resposta nenhuma.
-- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/conta`, `/alertas on|off`, `/silencio 22-07|off`, `/limiar 75,90`, `/ajuda`.
+- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/conta`, `/atualizar`, `/api`, `/alertas on|off`, `/silencio`
+  (sem argumento abre o menu de durações) `22-07|off`, `/limiar 75,90`, `/ajuda`.
   Os que mudam algo passam por `applyBotCommand` e gravam nas mesmas preferências de alerta das Configurações.
 - **Alertas**: o serviço coleta o mesmo `UsageAlertViewModel.alerts` da bandeja — já deduplicado e respeitando o silêncio —
   e manda o mesmo título e corpo (`usageAlertMessage`) a cada conversa pareada, com 1,1 s entre envios (limite do Telegram
@@ -322,6 +323,12 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   `botAccountKey`): estável entre o envio do teclado e o toque — índice não serve, a ordem pode mudar — e sem rótulo nem
   e-mail. Conta que saiu da leitura responde pedindo `/conta` de novo. `BotButton` (enum) não ganhou valor: toque com
   parâmetro é `BotTap` (sealed).
+- **Controle remoto (#398, Y8)**: `/atualizar` (`/refresh`) chama o mesmo `refreshForBot` do botão Atualizar e responde o
+  `/status`. `/api` lista as fontes com ✅/⬜; com **"Permitir mudar fontes pelo bot"** (`allowSourceControl` em
+  `telegram.json`, **nasce desligado**) vem um botão por fonte (`api:<ApiSource>`), que grava por `persistEnabledApis` — o
+  mesmo caminho do interruptor da aba APIs — e recoleta a fonte; a permissão é relida no toque, então um teclado antigo
+  deixa de valer quando ela é desligada. `/silencio` sem argumento oferece 1 h, 4 h e "até 08:00" (`snz:60`, `snz:240`,
+  `snz:am`; `nextMorningMillis` em BRT, teto de um dia contra dado forjado), gravando o mesmo `snoozedUntilEpochMillis`.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

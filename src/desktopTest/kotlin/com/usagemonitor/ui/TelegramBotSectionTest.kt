@@ -8,6 +8,9 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -16,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TelegramBotSection
 import com.usagemonitor.presentation.ui.components.TelegramBotSectionModel
 import java.io.File
@@ -84,4 +88,32 @@ class TelegramBotSectionTest {
         assertEquals(0, onAllNodesWithText("/start AB12CD").fetchSemanticsNodes().size)
         onNodeWithText("1 · Token do bot").assertIsDisplayed()
     }
+
+    /** #398, Y8: a permissão de mudar fontes é um interruptor do card, nascido desligado. */
+    @Test
+    fun `source control switch reports the change`() = runDesktopComposeUiTest {
+        var allowed: Boolean? = null
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.width(640.dp)) {
+                    TelegramBotSection(
+                        model(enabled = true, code = null).copyWith(onAllowSourceControlChange = { value -> allowed = value }),
+                        AppLanguage.PT
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Permitir mudar fontes pelo bot").assertIsDisplayed()
+        onNodeWithTag(TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG).assertIsOff().performClick()
+        assertEquals(true, allowed)
+    }
+
+    private fun TelegramBotSectionModel.copyWith(onAllowSourceControlChange: (Boolean) -> Unit) = TelegramBotSectionModel(
+        enabled = enabled, token = token, statusLabel = statusLabel, statusTone = statusTone, chats = chats,
+        pairingCode = pairingCode, pairingHint = pairingHint, statusPreview = statusPreview,
+        onEnabledChange = onEnabledChange, onTokenChange = onTokenChange, onStartPairing = onStartPairing,
+        onRemoveChat = onRemoveChat, onSendTest = onSendTest, connected = connected, botUsername = botUsername,
+        allowSourceControl = allowSourceControl, onAllowSourceControlChange = onAllowSourceControlChange
+    )
 }

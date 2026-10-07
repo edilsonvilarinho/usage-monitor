@@ -39,6 +39,8 @@ internal class TelegramBotActions(
 
     fun sendTest() = service.sendTest()
 
+    fun setAllowSourceControl(allowed: Boolean) = update { current -> current.copy(allowSourceControl = allowed) }
+
     private fun update(transform: (TelegramBotSettings) -> TelegramBotSettings) {
         val next = transform(settingsFlow.value)
         runCatching { dataSource.save(next) }
@@ -86,7 +88,9 @@ internal fun telegramBotSectionModel(
         onRemoveChat = actions::removeChat,
         onSendTest = actions::sendTest,
         connected = status is TelegramBotStatus.Connected,
-        botUsername = (status as? TelegramBotStatus.Connected)?.botUsername
+        botUsername = (status as? TelegramBotStatus.Connected)?.botUsername,
+        allowSourceControl = settings.allowSourceControl,
+        onAllowSourceControlChange = actions::setAllowSourceControl
     )
 }
 

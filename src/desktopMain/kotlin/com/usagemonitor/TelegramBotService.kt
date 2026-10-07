@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
@@ -59,7 +60,10 @@ internal class TelegramBotService(
     private val languageProvider: () -> AppLanguage,
     /** Pede coleta ao app e volta quando ela termina (ou desiste); respeita o backoff de 429 do painel. */
     private val requestRefresh: suspend () -> Unit = {},
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    /** Fontes ligadas e como ligar/desligar uma (#398, Y8); o `/api` usa os dois. */
+    private val enabledSources: () -> Set<ApiSource> = { emptySet() },
+    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> }
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
@@ -75,7 +79,9 @@ internal class TelegramBotService(
         snapshotProvider = snapshotProvider,
         languageProvider = languageProvider,
         requestRefresh = requestRefresh,
-        clock = clock
+        clock = clock,
+        enabledSources = enabledSources,
+        toggleSource = toggleSource
     )
 
     private val _status = MutableStateFlow<TelegramBotStatus>(TelegramBotStatus.Off)

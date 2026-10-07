@@ -2186,7 +2186,9 @@ nome; com código aberto, a caixa do comando <code>/start CÓDIGO</code> com <b>
 o prazo, <b>Abrir no Telegram</b> pelo link <code>t.me/&lt;bot&gt;?start=&lt;código&gt;</code>, que já manda o comando, e
 <b>Gerar novo código</b>; sem código, <b>Parear conversa</b>/<b>Parear outra conversa</b>); <b>3 · Testar</b> (<b>Enviar
 teste</b>, só depois do pareamento). A conversa de exemplo saiu do card: <b>▸ Ver como o bot responde</b> abre, recolhida
-por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord aparece como segunda fase, com o motivo.</p>
+por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord aparece como segunda fase, com o motivo.
+<b>#398:</b> bloco <b>Opções do bot</b> abaixo dos passos — "Permitir mudar fontes pelo bot" (Y8, nasce desligado: com ele,
+quem está numa conversa pareada muda o que o app monitora; desligado, o <code>/api</code> só lista).</p>
 <div class="win" style="max-width:660px">
   <div class="titlebar"><span class="t">Configurações › Alertas</span></div>
   <div class="body"><div class="panel">
@@ -2203,6 +2205,9 @@ por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord
       <div class="hstack"><button class="btn">Abrir no Telegram</button><button class="btn">Gerar novo código</button></div>
       <div class="hstack"><span class="v">3 · Testar</span><span class="st" style="color:var(--info)">Agora</span></div>
       <div class="hstack"><button class="btn">Enviar teste</button></div>
+      <!-- #398: opções do bot, abaixo dos três passos. -->
+      <span class="v">Opções do bot</span>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Permitir mudar fontes pelo bot</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Com ele, o /api liga e desliga as APIs monitoradas. Desligado, o /api só lista.</span></div><span class="sw"></span></div>
       <span class="k">▸ Ver como o bot responde</span>
     </div></div>
   </div></div>

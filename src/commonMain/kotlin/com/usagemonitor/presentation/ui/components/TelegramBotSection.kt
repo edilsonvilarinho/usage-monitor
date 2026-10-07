@@ -51,7 +51,10 @@ class TelegramBotSectionModel(
     /** O polling está de pé com este token: o passo do token está feito. */
     val connected: Boolean = false,
     /** `@` do bot sem a arroba, do `getMe`; `null` esconde "Abrir no Telegram". */
-    val botUsername: String? = null
+    val botUsername: String? = null,
+    /** `/api` pode ligar e desligar fontes (#398, Y8). */
+    val allowSourceControl: Boolean = false,
+    val onAllowSourceControlChange: (Boolean) -> Unit = {}
 )
 
 /**
@@ -116,6 +119,7 @@ fun TelegramBotSection(model: TelegramBotSectionModel, language: AppLanguage, mo
                 }
                 AppButton(label = if (pt) "Enviar teste" else "Send test", onClick = model.onSendTest, enabled = model.chats.isNotEmpty())
             }
+            TelegramBotOptions(model, pt)
             TelegramPreview(model.statusPreview, pt)
             BodyText(
                 if (pt) "Discord fica para uma segunda fase: exige conexão permanente (Gateway)."

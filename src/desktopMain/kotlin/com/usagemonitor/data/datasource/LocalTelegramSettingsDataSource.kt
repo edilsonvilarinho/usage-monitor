@@ -16,7 +16,8 @@ private data class TelegramSettingsDto(
     val botToken: String = "",
     val authorizedChats: List<TelegramChatDto> = emptyList(),
     val pairingCode: String? = null,
-    val pairingExpiresAtMillis: Long? = null
+    val pairingExpiresAtMillis: Long? = null,
+    val allowSourceControl: Boolean = false
 )
 
 /**
@@ -37,7 +38,8 @@ internal class LocalTelegramSettingsDataSource(
             botToken = dto.botToken,
             authorizedChats = dto.authorizedChats.map { chat -> TelegramChat(chat.id, chat.name) },
             pairingCode = dto.pairingCode,
-            pairingExpiresAtMillis = dto.pairingExpiresAtMillis
+            pairingExpiresAtMillis = dto.pairingExpiresAtMillis,
+            allowSourceControl = dto.allowSourceControl
         )
     }
 
@@ -47,7 +49,8 @@ internal class LocalTelegramSettingsDataSource(
             botToken = settings.botToken.trim(),
             authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name) },
             pairingCode = settings.pairingCode,
-            pairingExpiresAtMillis = settings.pairingExpiresAtMillis
+            pairingExpiresAtMillis = settings.pairingExpiresAtMillis,
+            allowSourceControl = settings.allowSourceControl
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))
     }

@@ -35,6 +35,8 @@ internal object TelegramBotMessages {
         listOf(
             "status" to "Cotas de todas as contas",
             "conta" to "Uma conta por vez",
+            "atualizar" to "Coleta agora e mostra as cotas",
+            "api" to "Fontes monitoradas",
             "alertas" to "Liga ou desliga os alertas (on ou off)",
             "silencio" to "Horário de silêncio (22-07 ou off)",
             "limiar" to "Limiares de alerta de cota (75,90)",
@@ -44,6 +46,8 @@ internal object TelegramBotMessages {
         listOf(
             "status" to "Quotas of every account",
             "account" to "One account at a time",
+            "refresh" to "Collect now and show the quotas",
+            "api" to "Monitored sources",
             "alerts" to "Turn alerts on or off",
             "quiet" to "Quiet hours (22-07 or off)",
             "threshold" to "Quota alert thresholds (75,90)",
@@ -169,16 +173,20 @@ internal object TelegramBotMessages {
         "<b>Comandos</b>\n" +
             "<code>/status</code> — cotas de todas as contas\n" +
             "<code>/conta</code> — escolha uma conta e veja só ela\n" +
+            "<code>/atualizar</code> — coleta agora e mostra as cotas\n" +
+            "<code>/api</code> — fontes monitoradas\n" +
             "<code>/alertas on</code> · <code>/alertas off</code> — liga ou desliga os alertas\n" +
-            "<code>/silencio 22-07</code> — silêncio das 22h às 7h · <code>/silencio off</code>\n" +
+            "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
             "<i>Toque num comando para copiar.</i>"
     } else {
         "<b>Commands</b>\n" +
             "<code>/status</code> — quotas of every account\n" +
             "<code>/account</code> — pick one account and see only it\n" +
+            "<code>/refresh</code> — collect now and show the quotas\n" +
+            "<code>/api</code> — monitored sources\n" +
             "<code>/alerts on</code> · <code>/alerts off</code> — turn alerts on or off\n" +
-            "<code>/quiet 22-07</code> — quiet from 22h to 7h · <code>/quiet off</code>\n" +
+            "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
             "<i>Tap a command to copy it.</i>"
     }

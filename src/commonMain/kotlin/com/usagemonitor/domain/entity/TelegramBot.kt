@@ -19,15 +19,21 @@ class TelegramBotSettings(
     val authorizedChats: List<TelegramChat> = emptyList(),
     /** Código que a próxima conversa manda em `/start <código>`; `null` sem pareamento aberto. */
     val pairingCode: String? = null,
-    val pairingExpiresAtMillis: Long? = null
+    val pairingExpiresAtMillis: Long? = null,
+    /**
+     * `/api` pode ligar e desligar fontes (#398, Y8). Nasce desligado: com ele, quem
+     * está numa conversa pareada muda o que o app monitora.
+     */
+    val allowSourceControl: Boolean = false
 ) {
     fun copy(
         enabled: Boolean = this.enabled,
         botToken: String = this.botToken,
         authorizedChats: List<TelegramChat> = this.authorizedChats,
         pairingCode: String? = this.pairingCode,
-        pairingExpiresAtMillis: Long? = this.pairingExpiresAtMillis
-    ): TelegramBotSettings = TelegramBotSettings(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis)
+        pairingExpiresAtMillis: Long? = this.pairingExpiresAtMillis,
+        allowSourceControl: Boolean = this.allowSourceControl
+    ): TelegramBotSettings = TelegramBotSettings(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl)
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
 
@@ -40,10 +46,11 @@ class TelegramBotSettings(
 
     override fun equals(other: Any?): Boolean = other is TelegramBotSettings &&
         other.enabled == enabled && other.botToken == botToken && other.authorizedChats == authorizedChats &&
-        other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis
+        other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis &&
+        other.allowSourceControl == allowSourceControl
 
     override fun hashCode(): Int =
-        listOf(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis).hashCode()
+        listOf(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl).hashCode()
 
     override fun toString(): String =
         "TelegramBotSettings(enabled=$enabled, botToken=${if (botToken.isEmpty()) "" else "***"}, chats=${authorizedChats.size})"
@@ -59,6 +66,12 @@ sealed interface BotCommand {
     data class Threshold(val percents: List<Int>) : BotCommand
     /** `/conta` (#398, Y4): escolher uma conta num teclado e ver só ela. */
     data object Accounts : BotCommand
+    /** `/atualizar` (#398, Y8): coleta agora e responde o `/status`. */
+    data object Refresh : BotCommand
+    /** `/api` (#398, Y8): lista as fontes e, se permitido, liga e desliga. */
+    data object Sources : BotCommand
+    /** `/silencio` sem argumento (#398, Y8): oferece 1 h, 4 h e até 08:00. */
+    data object QuietMenu : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -87,6 +100,8 @@ fun parseBotCommand(text: String): BotCommand? {
         "silencio", "silêncio", "quiet" -> parseQuiet(args.firstOrNull())
         "limiar", "threshold" -> parseThreshold(args.joinToString(","))
         "conta", "contas", "account", "accounts" -> BotCommand.Accounts
+        "atualizar", "refresh" -> BotCommand.Refresh
+        "api", "apis", "fontes", "sources" -> BotCommand.Sources
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }
@@ -94,7 +109,7 @@ fun parseBotCommand(text: String): BotCommand? {
 
 private fun parseQuiet(argument: String?): BotCommand {
     val usage = "/silencio 22-07 | /silencio off"
-    val value = argument?.lowercase() ?: return BotCommand.Invalid(usage)
+    val value = argument?.lowercase() ?: return BotCommand.QuietMenu
     if (value == "off" || value == "desligar") {
         return BotCommand.Quiet(null)
     }

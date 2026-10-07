@@ -293,7 +293,14 @@ internal class AppViewModels(
         alerts = usageAlert.alerts,
         snapshotProvider = ::currentSnapshot,
         requestRefresh = { refreshForBot(dashboard) },
-        languageProvider = { storedLanguage(graph.settings) }
+        languageProvider = { storedLanguage(graph.settings) },
+        enabledSources = { graph.enabledApis.value },
+        // O mesmo caminho do interruptor da aba APIs: grava e recoleta a fonte.
+        toggleSource = { source, on ->
+            val current = graph.enabledApis.value
+            persistEnabledApis(graph, if (on) current + source else current - source)
+            dashboard.refresh(source)
+        }
     ).also { service -> service.start() }
 
     val teamKeys = TeamKeysAdminViewModel(

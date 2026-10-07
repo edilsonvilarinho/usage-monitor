@@ -3,7 +3,11 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.nextMorningMillis
+import com.usagemonitor.domain.entity.snoozeAlertsUntil
+import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.BotTap
@@ -42,7 +46,11 @@ internal class TelegramBotHandlers(
     private val snapshotProvider: () -> UsageSnapshot?,
     private val languageProvider: () -> AppLanguage,
     private val requestRefresh: suspend () -> Unit,
-    private val clock: Clock
+    private val clock: Clock,
+    /** Fontes ligadas agora (#398, Y8). */
+    private val enabledSources: () -> Set<ApiSource> = { emptySet() },
+    /** Liga ou desliga uma fonte pelo mesmo caminho das Configurações. */
+    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> }
 ) {
 
     suspend fun handle(token: String, message: TelegramIncomingMessage) {
@@ -73,6 +81,23 @@ internal class TelegramBotHandlers(
         if (command == BotCommand.Status) {
             val snapshot = snapshotProvider()
             api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+            return
+        }
+        if (command == BotCommand.Refresh) {
+            requestRefresh()
+            val snapshot = snapshotProvider()
+            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+            return
+        }
+        if (command == BotCommand.Sources) {
+            val allowed = settings.allowSourceControl
+            val enabled = enabledSources()
+            val buttons = if (allowed) rows(TelegramBotRemoteMessages.sourceButtons(enabled, language)) else emptyList()
+            api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.sources(enabled, allowed, language), html = true, buttons = buttons)
+            return
+        }
+        if (command == BotCommand.QuietMenu) {
+            api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.quietMenu(language), html = true, buttons = rows(TelegramBotRemoteMessages.quietButtons(language)))
             return
         }
         if (command == BotCommand.Accounts) {
@@ -132,16 +157,51 @@ internal class TelegramBotHandlers(
                 api.answerCallbackQuery(token, callbackId)
                 api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true)
             }
+            is BotTap.Source -> toggleFromTap(token, message, callbackId, tap.source, language)
+            is BotTap.SnoozeFor -> snoozeFromTap(token, message.chatId, callbackId, clock.now().toEpochMilliseconds() + tap.minutes * 60_000L, language)
+            BotTap.SnoozeUntilMorning -> snoozeFromTap(token, message.chatId, callbackId, nextMorningMillis(clock.now().toEpochMilliseconds()), language)
         }
     }
+
+    /**
+     * A permissão é relida no toque, e não só no envio do teclado: desligada
+     * depois, o teclado antigo não pode continuar mudando fontes.
+     */
+    private suspend fun toggleFromTap(token: String, message: TelegramIncomingMessage, callbackId: String, source: ApiSource, language: AppLanguage) {
+        if (!settingsFlow.value.allowSourceControl) {
+            api.answerCallbackQuery(token, callbackId, TelegramBotRemoteMessages.sourceControlOff(language))
+            return
+        }
+        val turnOn = source !in enabledSources()
+        toggleSource(source, turnOn)
+        api.answerCallbackQuery(token, callbackId)
+        val messageId = message.messageId
+        val enabled = enabledSources()
+        if (messageId != null) {
+            api.editMessageText(
+                token, message.chatId, messageId,
+                TelegramBotRemoteMessages.sources(enabled, allowed = true, language),
+                rows(TelegramBotRemoteMessages.sourceButtons(enabled, language))
+            )
+        }
+        api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.sourceToggled(source, turnOn, language), html = true)
+    }
+
+    private suspend fun snoozeFromTap(token: String, chatId: Long, callbackId: String, untilMillis: Long, language: AppLanguage) {
+        saveAlertSettings(snoozeAlertsUntil(alertSettingsFlow.value, untilMillis))
+        api.answerCallbackQuery(token, callbackId)
+        api.sendMessage(token, chatId, TelegramBotRemoteMessages.snoozedUntil(untilMillis, clock.now().toEpochMilliseconds(), language), html = true)
+    }
+
+    private fun rows(labelled: List<List<Pair<String, String>>>): List<List<TelegramButton>> =
+        labelled.map { row -> row.map { (label, data) -> TelegramButton(label, data) } }
 
     /** Ações do `/status` numa linha e, embaixo, um botão por conta (#398, Y4). */
     private fun statusButtons(language: AppLanguage, snapshot: UsageSnapshot?): List<List<TelegramButton>> =
         listOf(TelegramBotMessages.statusButtons(language).map { (label, button) -> TelegramButton(label, button.data) }) +
             accountRows(snapshot)
 
-    private fun accountRows(snapshot: UsageSnapshot?): List<List<TelegramButton>> =
-        TelegramBotMessages.accountButtons(snapshot).map { row -> row.map { (label, data) -> TelegramButton(label, data) } }
+    private fun accountRows(snapshot: UsageSnapshot?): List<List<TelegramButton>> = rows(TelegramBotMessages.accountButtons(snapshot))
 
     /** Falha de um toque fica no toque: o polling segue. Cancelamento continua subindo. */
     private suspend fun runTelegram(block: suspend () -> Unit) {
