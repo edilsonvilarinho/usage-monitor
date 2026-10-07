@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui.components
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageHistoryPoint
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,6 +26,23 @@ class UsageHistoryLineChartTest {
         assertEquals(0f, fractions[0])
         assertEquals(0.25f, fractions[1])
         assertEquals(1f, fractions[2])
+    }
+
+    @Test
+    fun `buildTimeReferenceLabels labels the middle instant, not the middle point`() {
+        // 5 min de polling até 13:00 BRT e 60 s depois: o ponto do meio da lista
+        // cai perto do fim do intervalo, mas o centro do eixo é 08:55 BRT.
+        val sparse = (0 until 12).map { index ->
+            historyPoint(Instant.parse("2026-10-05T23:57:00Z").plus((index * 5).minutes).toString(), 10)
+        }
+        val dense = (0 until 60).map { index ->
+            historyPoint(Instant.parse("2026-10-06T16:00:00Z").plus(index.minutes).toString(), 10)
+        }
+        val points = sparse + dense + historyPoint("2026-10-06T23:53:00Z", 10)
+
+        val labels = buildTimeReferenceLabels(points)
+
+        assertEquals(listOf("20:57", "08:55", "20:53"), labels)
     }
 
     @Test

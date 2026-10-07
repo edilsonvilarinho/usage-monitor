@@ -16,10 +16,10 @@ Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`
 | Autor dos commits | skill `usage-monitor-commit-push`, trailer `Co-Authored-By: Claude Opus 5.5` |
 
 ### ▶ Atividade corrente
-A02 — rótulo do meio do eixo de tempo.
+A03 — distribuição horária por janela na camada data.
 
 ### ⏭ Próxima atividade
-A03 — distribuição horária por janela na camada data.
+A04 — lista de janelas e detalhe (S9).
 
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
 
@@ -106,6 +106,7 @@ Commit e push só com autorização.
 | Atividade | Commit (assunto) | Evidência |
 | --- | --- | --- |
 | A01 | `docs: plan issues #392 and #393 with visual gallery` | `node docs/planos/issues-392-393-visual/build-gallery.cjs` → 65,0 KB; aberta no browser pane: console sem erro, 22 cards, nenhum palco com transbordo horizontal |
+| A02 | `fix(history): label the axis middle by time, not by point index` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest"` → 32 testes, 0 falhas (1 novo: polling 5 min + 60 s, centro 08:55 BRT); `--tests "com.usagemonitor.ui.History*"` → 20 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
