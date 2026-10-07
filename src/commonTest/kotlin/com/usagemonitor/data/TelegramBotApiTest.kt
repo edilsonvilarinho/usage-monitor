@@ -1,5 +1,6 @@
 package com.usagemonitor.data
 
+import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
@@ -73,15 +74,72 @@ class TelegramBotApiTest {
     }
 
     @Test
-    fun `buttons go as one inline keyboard row`() = runTest {
+    fun `buttons go as inline keyboard rows and empty rows are dropped`() = runTest {
         var sent: String? = null
         api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }
-            .sendMessage("123:abc", 51L, "x", html = true, buttons = listOf(TelegramButton("A", "refresh"), TelegramButton("B", "snooze")))
+            .sendMessage(
+                "123:abc", 51L, "x", html = true,
+                buttons = listOf(listOf(TelegramButton("A", "refresh"), TelegramButton("B", "snooze")), emptyList(), listOf(TelegramButton("C", "acc:0")))
+            )
 
         assertEquals(
-            """{"chat_id":51,"text":"x","parse_mode":"HTML","reply_markup":{"inline_keyboard":[[{"text":"A","callback_data":"refresh"},{"text":"B","callback_data":"snooze"}]]}}""",
+            """{"chat_id":51,"text":"x","parse_mode":"HTML","reply_markup":{"inline_keyboard":[[{"text":"A","callback_data":"refresh"},{"text":"B","callback_data":"snooze"}],[{"text":"C","callback_data":"acc:0"}]]}}""",
             sent
         )
+    }
+
+    /** #398: o painel fixado edita a mesma mensagem, então o envio devolve o id dela. */
+    @Test
+    fun `send message returns the message id and silent skips the sound`() = runTest {
+        var sent: String? = null
+        val id = api(HttpStatusCode.OK, """{"ok":true,"result":{"message_id":812,"chat":{"id":51}}}""") { _, body -> sent = body }
+            .sendMessage("123:abc", 51L, "x", silent = true)
+
+        assertEquals(812L, id)
+        assertEquals("""{"chat_id":51,"text":"x","disable_notification":true}""", sent)
+    }
+
+    @Test
+    fun `pin and unpin target chat and message without notifying`() = runTest {
+        val calls = mutableListOf<Pair<String, String?>>()
+        val client = api(HttpStatusCode.OK, """{"ok":true,"result":true}""") { u, body -> calls += u to body }
+        client.pinChatMessage("123:abc", 51L, 812L)
+        client.unpinChatMessage("123:abc", 51L, 812L)
+
+        assertTrue(calls[0].first.endsWith("/pinChatMessage"))
+        assertEquals("""{"chat_id":51,"message_id":812,"disable_notification":true}""", calls[0].second)
+        assertTrue(calls[1].first.endsWith("/unpinChatMessage"))
+        assertEquals("""{"chat_id":51,"message_id":812}""", calls[1].second)
+    }
+
+    /** O 400 é tipado: "not modified" não é erro do painel, "not found" pede mensagem nova. */
+    @Test
+    fun `bad request carries the telegram description`() = runTest {
+        val notModified = assertFailsWith<TelegramBadRequestException> {
+            api(HttpStatusCode.BadRequest, """{"ok":false,"error_code":400,"description":"Bad Request: message is not modified"}""")
+                .editMessageText("123:abc", 51L, 700L, "y")
+        }
+        assertTrue(notModified.isNotModified)
+        val gone = assertFailsWith<TelegramBadRequestException> {
+            api(HttpStatusCode.BadRequest, """{"ok":false,"error_code":400,"description":"Bad Request: message to edit not found"}""")
+                .editMessageText("123:abc", 51L, 700L, "y")
+        }
+        assertTrue(gone.isMessageGone)
+    }
+
+    @Test
+    fun `photo goes as multipart with the png and an html caption`() = runTest {
+        var url = ""
+        var contentType: String? = null
+        val engine = MockEngine { request ->
+            url = request.url.toString()
+            contentType = request.body.contentType?.toString()
+            respond("""{"ok":true}""", HttpStatusCode.OK)
+        }
+        TelegramBotApi(HttpClient(engine)).sendPhoto("123:abc", 51L, byteArrayOf(1, 2, 3), "<b>24 h</b>")
+
+        assertTrue(url.endsWith("/bot123:abc/sendPhoto"))
+        assertTrue(contentType.orEmpty().startsWith("multipart/form-data"))
     }
 
     @Test

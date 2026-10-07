@@ -31,6 +31,7 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
     val pending = Collections.synchronizedList(mutableListOf<TelegramIncomingMessage>())
     val sent = Collections.synchronizedList(mutableListOf<Pair<Long, String>>())
     val keyboards = Collections.synchronizedList(mutableListOf<List<TelegramButton>>())
+    private val nextMessageId = AtomicInteger(800)
     val edits = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
     val answered = Collections.synchronizedList(mutableListOf<String>())
 
@@ -47,12 +48,13 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
 
     val menus = Collections.synchronizedList(mutableListOf<List<Pair<String, String>>>())
 
-    override suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean, buttons: List<TelegramButton>) {
+    override suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean, buttons: List<List<TelegramButton>>, silent: Boolean): Long {
         sent += chatId to text
-        keyboards += buttons
+        keyboards += buttons.flatten()
+        return nextMessageId.incrementAndGet().toLong()
     }
 
-    override suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<TelegramButton>) {
+    override suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<List<TelegramButton>>) {
         edits += chatId to messageId
     }
 

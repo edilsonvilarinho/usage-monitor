@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A02 concluída.`
+**Estado atual:** `Em execução — A03 concluída.`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -55,6 +55,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | A00 | Plano, galeria e rodadas X/Y no histórico da skill de opções visuais | este arquivo, `issues-398-399-visual/`, `.claude/skills/usage-monitor-visual-options/SKILL.md` |
 | A01 | X1: abas Aparência e Sistema | `SettingsDialogContent.kt`, `SettingsAppearanceTab.kt`, `SettingsSystemTab.kt`, testes, protótipo, `presentation.md` |
 | A02 | `feat(settings): live HUD preview on the appearance tab` | `gradlew.bat desktopTest --tests SettingsDialogContentTest` 18/0 falhas (novo: prévia só na Aparência, hover não abre balão); `*Help*` + `ArchitectureRulesTest` 32/0; captura temporária da aba conferida a olho (notch com 3 contas, opacidade 80%) e descartada | concluída |
+| A03 | `refactor(telegram): message ids, keyboard rows, pin and photo calls` | `gradlew.bat desktopTest --tests *Telegram*`: 34 testes, 0 falhas (novos: id devolvido e `silent`, linhas do teclado, fixar/desafixar, 400 tipado, `sendPhoto` multipart) | concluída |
 | A02 | X10: prévia do notch na Aparência | `SettingsWindowHost.kt`, `SettingsHudPreview.kt`, teste, protótipo, `presentation.md` |
 | A03 | Infra do bot: id da mensagem, fixar/desafixar, foto, campos novos de `telegram.json`, tratadores fora do serviço | `TelegramBotApi.kt`, `TelegramBot.kt`, `LocalTelegramSettingsDataSource.kt`, `TelegramBotService.kt` |
 | A04 | Y4: `/conta` | domain, `TelegramBotMessages.kt`, tratadores |
@@ -82,4 +83,5 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 
 ## Desvios do plano e achados da execução
 
+- A03: o plano previa regravar `telegram.json` por patch de `JsonObject`. Não se aplica: o arquivo é inteiro do app (sem campos de terceiros, ao contrário do `credentials.json` da Anthropic) e o DTO com defaults já é retrocompatível. Os campos novos entram cada um na atividade que os usa, e não todos na A03.
 - A01: a ajuda (`HelpCatalog.kt`, PT e EN) ainda citava "Manter sempre visível", removido com o modo HUD único; saiu junto com a troca de "Geral" por "Aparência"/"Sistema".

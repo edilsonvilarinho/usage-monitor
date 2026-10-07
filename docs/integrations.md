@@ -311,6 +311,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   `UsageAlertSettings.snoozedUntilEpochMillis` (campo novo com default, chave `alertsSnoozedUntilMillis`), que silencia
   como o horário de silêncio — adia, não consome —; `/alertas on` o encerra. **Limiares** responde os percentuais atuais
   e o comando para mudar. O toque roda fora do laço de polling: a coleta não atrasa os outros updates.
+- **Infra da #398**: `sendMessage` devolve o `message_id` (o painel fixado edita a mesma mensagem) e aceita `silent`
+  (`disable_notification`); o teclado inline é uma lista **por linha** (linha vazia é descartada). `pinChatMessage` fixa
+  sem notificar, `unpinChatMessage` desafixa; `sendPhoto` manda PNG em multipart com legenda HTML. O 400 é
+  `TelegramBadRequestException` com a `description` do Telegram (`isNotModified`, `isMessageGone`). O tratamento de
+  comandos e toques saiu do `TelegramBotService` para `TelegramBotHandlers`; o serviço ficou com o polling e o repasse.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
