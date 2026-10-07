@@ -45,6 +45,11 @@ export function Settings() {
               e Sistema (o que o app faz fora dela). */}
           {sec === 'Aparência' ? (
             <React.Fragment>
+              {/* Issue #399 (X10): prévia da barra HUD — o próprio notch, fechado e sem gesto. */}
+              <AppKey>Prévia da barra HUD</AppKey>
+              <div style={{ alignSelf: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 'var(--s2) var(--s4)', fontFamily: 'var(--mono)', fontSize: 'var(--t12)', opacity: opacity / 100 }}>
+                Claude 7d 41% · 5h 68% · Atenção
+              </div>
               <AppSwitch checked={dark} onChange={setDark} label="Tema escuro" />
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', width: 190 }}>Idioma</span>

@@ -18,6 +18,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.performMouseInput
+import com.usagemonitor.SETTINGS_HUD_PREVIEW_TEST_TAG
+import com.usagemonitor.SettingsHudPreview
+import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.screenshots.ScreenshotFixtures
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
@@ -551,6 +556,45 @@ class SettingsDialogContentTest {
         onNodeWithText("personal@example.com").assertIsDisplayed()
 
         onAllNodesWithText("Close").assertCountEquals(0)
+    }
+
+    /**
+     * Prévia da barra HUD (#399, X10): o próprio notch, só na aba Aparência, e
+     * sem gesto — o ponteiro sobre ela não abre balão.
+     */
+    @Test
+    fun `appearance tab shows a static HUD preview`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    appearancePreview = {
+                        SettingsHudPreview(
+                            accounts = ScreenshotFixtures.hudAccounts,
+                            fallbackLabel = "Carregando",
+                            windowOpacityPercent = 80,
+                            windowOpacitySupported = true,
+                            language = AppLanguage.PT
+                        )
+                    }
+                )
+            }
+        }
+
+        onNodeWithText("Prévia da barra HUD").assertIsDisplayed()
+        onNodeWithTag(SETTINGS_HUD_PREVIEW_TEST_TAG).assertIsDisplayed().performMouseInput { moveTo(center) }
+        waitForIdle()
+        onAllNodesWithTag(HUD_BALLOON_TEST_TAG).assertCountEquals(0)
+
+        onNodeWithTag(settingsTabTestTag(SettingsTab.SYSTEM)).performClick()
+        onAllNodesWithTag(SETTINGS_HUD_PREVIEW_TEST_TAG).assertCountEquals(0)
     }
 
     @Test

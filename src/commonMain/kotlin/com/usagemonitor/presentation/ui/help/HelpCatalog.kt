@@ -313,7 +313,8 @@ object HelpCatalog {
                 "janela principal guarda tamanho e posição entre execuções.",
             steps = listOf(
                 "Abra Configurações → \"Aparência\".",
-                "Escolha o tema e o \"Idioma\".",
+                "Escolha o tema e o \"Idioma\". A \"Prévia da barra HUD\", no topo da aba, mostra a " +
+                    "barra com o tema, o tamanho e a opacidade escolhidos.",
                 "\"Tamanho da interface\" vai de 80% a 150%; a janela é reajustada junto. " +
                     "\"Opacidade da janela\" fica na mesma aba.",
                 "\"Inicialização com Sistema\" fica em Configurações → \"Sistema\"."
@@ -566,7 +567,8 @@ object HelpCatalog {
                 "main window remembers its size and position between runs.",
             steps = listOf(
                 "Open Settings → \"Appearance\".",
-                "Pick the theme and the \"Language\".",
+                "Pick the theme and the \"Language\". The \"HUD bar preview\" at the top of the tab " +
+                    "shows the bar with the chosen theme, size and opacity.",
                 "\"Interface size\" ranges from 80% to 150%; the window is resized along with it. " +
                     "\"Window opacity\" is on the same tab.",
                 "\"System Startup\" lives under Settings → \"System\"."

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,9 +29,26 @@ internal fun AppearanceSettingsTab(
     onLanguageChange: (AppLanguage) -> Unit,
     onWindowOpacityChange: (Int) -> Unit,
     onUiScaleChange: (Int) -> Unit,
-    onReducedMotionChange: (Boolean) -> Unit
+    onReducedMotionChange: (Boolean) -> Unit,
+    /**
+     * A prévia da barra HUD (#399, direção X10). Slot porque o notch mora em
+     * `desktopMain`; `null` (testes, geradores de captura) não desenha o painel.
+     */
+    preview: (@Composable () -> Unit)? = null
 ) {
     val isPt = currentLanguage == AppLanguage.PT
+
+    // No topo, antes dos controles: o que muda embaixo se vê aqui sem fechar as
+    // Configurações para olhar a HUD.
+    if (preview != null) {
+        AppDataSurfaceFlush(
+            header = { AppSectionHeader(title = if (isPt) "Prévia da barra HUD" else "HUD bar preview") }
+        ) {
+            AppDataRow(showDivider = false) {
+                Box(modifier = Modifier.weight(1f)) { preview() }
+            }
+        }
+    }
 
     AppDataSurfaceFlush(
         header = { AppSectionHeader(title = if (isPt) "Tema e idioma" else "Theme and language") }

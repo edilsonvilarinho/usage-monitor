@@ -2067,6 +2067,9 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
       <button class="btn ghost" type="button" style="justify-content:flex-start">Rede</button>
     </div>
     <div class="body">
+      <div class="panel"><div class="phead"><span class="ptitle">Prévia da barra HUD</span></div><div class="pbody" style="display:flex;justify-content:center">
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;padding:var(--s2) var(--s4);display:flex;gap:var(--s4);opacity:.92"><span class="v sm">Claude 7d 41% · 5h 68% · Atenção</span><span class="v sm">Codex 7d 7% · Normal</span></div>
+      </div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Tema e idioma</span></div><div class="pbody flush">
         <div class="row" style="display:block"><div class="stack" style="gap:var(--s2)"><span class="v sm">Tema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Escolha uma das treze paletas claras ou treze escuras.</span><div class="theme-board" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s2)"><span class="theme-card selected" style="--preview-bg:#131010;--preview-surface:#1B1818;--preview-primary:#4C8DFF"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Obsidiana</span><span>escuro</span></span></span><span class="theme-card" style="--preview-bg:#F1F8F9;--preview-surface:#FBFFFF;--preview-primary:#006B73"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Gelo</span><span>claro</span></span></span></div></div></div>
         <div class="row"><span class="v sm">Idioma</span><span class="sp"></span><div class="seg"><button class="on" type="button">PT</button><button type="button">EN</button></div></div>
@@ -2080,7 +2083,7 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
   </div>
 </div>
 
-<p class="note"><b>Aparência e Sistema no lugar de Geral (issue #399, direção X1).</b> A aba Geral juntava dez controles, e as 26 paletas empurravam Sistema e Diagnóstico para fora da primeira tela. Aparência é o que a janela mostra (tema, idioma, opacidade, tamanho, animações); Sistema é o que o app faz fora dela (inicialização, bandeja, atualizações, diagnóstico). Os dois valores entraram em <code>SettingsTab</code> por exceção aprovada à regra do enum: ele não é persistido.</p>
+<p class="note"><b>Aparência e Sistema no lugar de Geral (issue #399, direção X1).</b> A aba Geral juntava dez controles, e as 26 paletas empurravam Sistema e Diagnóstico para fora da primeira tela. Aparência é o que a janela mostra (tema, idioma, opacidade, tamanho, animações); Sistema é o que o app faz fora dela (inicialização, bandeja, atualizações, diagnóstico). Os dois valores entraram em <code>SettingsTab</code> por exceção aprovada à regra do enum: ele não é persistido. A aba abre com a <b>prévia da barra HUD</b> (X10): o próprio notch, fechado e sem gesto, com as contas da última leitura; tema e tamanho vêm da janela, a opacidade é aplicada na prévia.</p>
 
 <div class="win">
   <div class="titlebar"><span class="t">Configurações › Sistema</span><span class="wbtn">×</span></div>

@@ -221,6 +221,8 @@ fun SettingsDialogContent(
     /** Bot do Telegram (#387); `null` esconde a seção. */
     telegramBot: TelegramBotSectionModel? = null,
     toastEvent: SettingsToastEvent? = null,
+    /** Prévia da barra HUD na aba Aparência (#399, X10); `null` esconde o painel. */
+    appearancePreview: (@Composable () -> Unit)? = null,
     /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
     initialTab: SettingsTab = SettingsTab.APPEARANCE,
     modifier: Modifier = Modifier
@@ -291,7 +293,8 @@ fun SettingsDialogContent(
                                 onLanguageChange = onLanguageChange,
                                 onWindowOpacityChange = onWindowOpacityChange,
                                 onUiScaleChange = onUiScaleChange,
-                                onReducedMotionChange = onReducedMotionChange
+                                onReducedMotionChange = onReducedMotionChange,
+                                preview = appearancePreview
                             )
 
                             SettingsTab.SYSTEM -> SystemSettingsTab(
