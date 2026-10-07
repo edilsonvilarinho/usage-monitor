@@ -103,6 +103,20 @@ none while downloading) — offered here, where the label says what the click do
 notch. At rest each handle is a quarter arc in `outline` inside the shadow margin the resting window
 already has.
 
+
+**Retract when idle (#400).** Optional, toggled by a third handle — a **pin** past the hand (filled:
+pinned open, the usual HUD; outlined: retracts) — and stored as `hudAutoRetract`, off by default. At
+rest the notch becomes a **10dp strip** as long as the notch, under it, with **one dot per account** at
+its ring: the dot's shape carries the worst risk with its colour (diamond attention, triangle critical,
+hollow ring no forecast, disc on track) and the strip's label lists every account's word. After 200ms
+of hover (the pointer crosses screen edges all the time) the **eclipse iris (Z2)** opens: a disc
+centred on the middle of the strip, flush with the screen edge, reveals the notch as it is today
+(`--dur-gargantua-iris-open` 420ms, ease-out) with a 1.5dp gold rim that lights and fades; leaving
+closes it into the middle (`--dur-gargantua-iris-close` 240ms, ease-in). It is a layer clip, so the
+part outside the disc also takes no pointer. The window keeps its size and origin; on Windows the
+resting hit region shrinks to the strip plus the 16dp margin. A critical quota does not open the bar
+by itself. Reduced motion: instant cut. Chosen among 15 HTML options (round Z).
+
 **Update pending is the gear's dot** (#225, #291). It takes no room in the strip — the old icon was a
 phone with an arrow and nobody read it as "new version" at 12dp. At rest the gear's quarter arc takes
 the state's tone with a dot on it; open, the gear disc carries an 8dp dot in its corner. The whole

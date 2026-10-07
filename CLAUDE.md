@@ -326,6 +326,8 @@ seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes d
   ponto da engrenagem; reiniciar só pelo botão do balão.
 - Movimento contínuo (órbita de sessão, pulso de atenção) só atrás de `AppMotionPolicy.continuous`.
 - Balão é conteúdo da janela, nunca `Popup`; nenhum formato novo de percentual/reset/rótulo.
+- Modo recolher (#400): opt-in pelo alfinete (`hudAutoRetract`, nasce desligado); a íris (Z2) é recorte de
+  camada dentro da janela fixa, e a faixa parada é a área de clique. Crítico não abre a barra sozinho.
 
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.

@@ -72,6 +72,11 @@ export interface AppHudBarProps {
   actions?: string[];
   continuous?: boolean;
   reduced?: boolean;
+  /**
+   * "Recolher quando parada" (#400). Resting (`balloon` unset), the notch is a 10dp strip with one
+   * dot per account whose shape and colour give the worst risk; open, the pin handle sits past the hand.
+   */
+  autoRetract?: boolean;
   style?: CSSProperties;
 }
 

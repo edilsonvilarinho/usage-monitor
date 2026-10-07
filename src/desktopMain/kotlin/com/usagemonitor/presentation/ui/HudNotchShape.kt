@@ -20,13 +20,16 @@ import com.usagemonitor.HudEdge
  */
 internal class HudNotchShape(private val edge: HudEdge) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val s = with(density) { HUD_NOTCH_SHOULDER.toPx() }
         val r = with(density) { HUD_NOTCH_RADIUS.toPx() }
         // Desenhado para a borda de cima em (along, across) e levado às outras
         // bordas por reflexão/rotação dos pontos — de controle inclusive, que é
         // afim e portanto preserva as curvas.
         val along = if (edge.isHorizontal) size.width else size.height
         val across = if (edge.isHorizontal) size.height else size.width
+        // A faixa recolhida (#400) tem 10dp: com o ombro inteiro de 8dp o corpo
+        // voltaria para trás dele. Abaixo de 16dp o ombro encolhe junto; o notch,
+        // de 44dp para cima, não muda.
+        val s = minOf(with(density) { HUD_NOTCH_SHOULDER.toPx() }, across / 2)
         val radius = minOf(r, (along - 2 * s) / 2, across / 2).coerceAtLeast(0f)
         val map: (Float, Float) -> Offset = when (edge) {
             HudEdge.TOP -> { a, c -> Offset(a, c) }

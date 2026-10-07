@@ -41,6 +41,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.test.assertIsSelected
 import com.usagemonitor.presentation.ui.HUD_GEAR_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_MOVE_HANDLE_TAG
+import com.usagemonitor.presentation.ui.HUD_RETRACT_HANDLE_TAG
+import com.usagemonitor.presentation.ui.HUD_RETRACTED_STRIP_TAG
+import androidx.compose.ui.test.onRoot
 import com.usagemonitor.presentation.ui.hudBalloonBoxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
@@ -182,7 +185,9 @@ class HudNotchTest {
         accountActions: (@Composable (HudAccount) -> Unit)? = null,
         dragging: Boolean = false,
         onGearClick: () -> Unit = {},
-        motion: AppMotionPolicy = AppMotionPolicy.Static
+        motion: AppMotionPolicy = AppMotionPolicy.Static,
+        autoRetract: Boolean = false,
+        onToggleAutoRetract: (() -> Unit)? = null
     ) {
         AppTheme(isDark = true, motion = motion) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
@@ -201,7 +206,9 @@ class HudNotchTest {
                     accountActions = accountActions,
                     dragging = dragging,
                     onGearClick = onGearClick,
-                    gearDescription = GEAR
+                    gearDescription = GEAR,
+                    autoRetract = autoRetract,
+                    onToggleAutoRetract = onToggleAutoRetract
                 )
             }
         }
@@ -682,6 +689,113 @@ class HudNotchTest {
         onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(true, reported.last())
+    }
+
+    // ------------------------------------------------------------ modo recolher (#400)
+
+    /**
+     * Opacidade do pixel no meio do notch, perto da borda de dentro: fora da
+     * faixa recolhida, então só o notch revelado pela íris o pinta.
+     */
+    private fun ComposeUiTest.notchInnerAlpha(edge: HudEdge = HudEdge.TOP, atCorner: Boolean = false): Float {
+        val bounds = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+        val pixels = onRoot().captureToImage().toPixelMap()
+        val x = when {
+            edge == HudEdge.LEFT -> bounds.right - 12.dp
+            edge == HudEdge.RIGHT -> bounds.left + 12.dp
+            // O canto de dentro, o último ponto que o disco alcança.
+            atCorner -> bounds.left + 20.dp
+            else -> (bounds.left + bounds.right) / 2
+        }
+        val y = when (edge) {
+            HudEdge.TOP -> bounds.bottom - 12.dp
+            HudEdge.BOTTOM -> bounds.top + 12.dp
+            else -> (bounds.top + bounds.bottom) / 2
+        }
+        return pixels[x.value.toInt(), y.value.toInt()].alpha
+    }
+
+    @Test
+    fun `sem o modo recolher a hud nao tem faixa nem alfinete`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true) }
+
+        onNodeWithTag(HUD_RETRACTED_STRIP_TAG).assertDoesNotExist()
+        onNodeWithTag(HUD_RETRACT_HANDLE_TAG).assertDoesNotExist()
+        assertTrue(notchInnerAlpha() > 0.9f)
+    }
+
+    /** Recolhida, só a faixa: o notch some e cada conta vira um ponto com a palavra na descrição. */
+    @Test
+    fun `recolhida so a faixa fica a vista em toda borda`() {
+        for (edge in HudEdge.entries) {
+            runDesktopComposeUiTest {
+                setContent { notch(edge = edge, autoRetract = true) }
+
+                onNodeWithContentDescription(
+                    "Barra HUD recolhida · INFORMATA2: Crítico · DeepSeek: Sem projeção"
+                ).assertIsDisplayed()
+                assertTrue(notchInnerAlpha(edge) < 0.05f, "$edge: o notch devia estar recolhido")
+            }
+        }
+    }
+
+    /** O ponteiro na faixa conta como sobre a HUD: é por ela que a íris abre. */
+    @Test
+    fun `o ponteiro sobre a faixa conta como sobre o notch`() = runDesktopComposeUiTest {
+        val reported = mutableListOf<Boolean>()
+        setContent { notch(autoRetract = true, onHoverChange = { hovered -> reported += hovered }) }
+
+        onNodeWithTag(HUD_RETRACTED_STRIP_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(true, reported.last())
+    }
+
+    /** Aberta, a íris revela o notch inteiro e o alfinete aparece ao lado da mão. */
+    @Test
+    fun `aberta a iris revela o notch e o alfinete`() = runDesktopComposeUiTest {
+        var open by mutableStateOf(false)
+        setContent { notch(expanded = open, autoRetract = true, onToggleAutoRetract = {}) }
+
+        assertTrue(notchInnerAlpha() < 0.05f)
+        onNodeWithTag(HUD_RETRACT_HANDLE_TAG).assertDoesNotExist()
+        open = true
+        waitForIdle()
+        assertTrue(notchInnerAlpha() > 0.9f)
+        onNodeWithContentDescription("Manter a barra HUD aberta").assertIsDisplayed()
+        open = false
+        waitForIdle()
+        assertTrue(notchInnerAlpha() < 0.05f)
+    }
+
+    /** No meio da íris o notch está só em parte: a revelação é um quadro, não um salto. */
+    @Test
+    fun `a iris abre por quadros e com animacao reduzida abre de uma vez`() {
+        fun midway(motion: AppMotionPolicy): Float {
+            var alpha = 0f
+            runDesktopComposeUiTest {
+                var open by mutableStateOf(false)
+                setContent { notch(expanded = open, autoRetract = true, motion = motion) }
+                mainClock.autoAdvance = false
+                open = true
+                mainClock.advanceTimeByFrame()
+                mainClock.advanceTimeBy(AppGargantuaTokens.irisOpenMillis * 15L / 100)
+                alpha = notchInnerAlpha(atCorner = true)
+            }
+            return alpha
+        }
+        // Aos 15% o disco ainda não chegou ao canto de dentro do notch.
+        assertTrue(midway(AppMotionPolicy.Static) < 0.05f, "com animação o notch não pode surgir inteiro")
+        assertTrue(midway(AppMotionPolicy.Reduced) > 0.9f, "com animação reduzida é corte seco")
+    }
+
+    /** O alfinete alterna o modo e diz a ação, não só o estado. */
+    @Test
+    fun `o alfinete alterna o modo recolher`() = runDesktopComposeUiTest {
+        var toggles = 0
+        setContent { notch(expanded = true, onToggleAutoRetract = { toggles += 1 }) }
+
+        onNodeWithContentDescription("Recolher a barra HUD quando parada").performClick()
+        assertEquals(1, toggles)
     }
 
     // ------------------------------------------------------------ balão da engrenagem (rodada 3)

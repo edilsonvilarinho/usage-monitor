@@ -412,6 +412,39 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     é o mesmo nó nos dois modos: um anel novo reanimaria os arcos do zero. Com vários desligamentos
     juntos, o notch segue o passo mais lento. `HudNotchTest` mede o notch parado no colapso, no meio
     da vaga e assentado. Recusadas: K2 tudo junto, K3 onda que fecha, K4 as vizinhas ocupam a vaga.
+- **Recolher quando parada** (issue #400; `HudRetract.kt`, `HudRetractedStrip.kt`,
+  `GargantuaEclipseIris.kt`; 2026-10-07). Pedido: a HUD sempre visível, mas nem sempre aberta. Modo
+  **opcional**, ligado pelo **alfinete** ao lado da mão (`HudRetractHandle`, terceira alça) e gravado em
+  `hudAutoRetract`, que nasce **desligado** — quem atualiza não vê a HUD mudar sozinha. Alfinete cheio é
+  a barra presa aberta; vazado, solta. A descrição diz a ação e o `stateDescription` o estado.
+  - **Parado, a faixa** (`HudRetractedStrip`): o corpo do notch com 10dp de espessura
+    (`HUD_RETRACTED_STRIP`) e o comprimento dele, por baixo do notch, com **um ponto por conta** na altura
+    do anel. A forma diz o pior risco junto com a cor — losango em atenção, triângulo crítico, anel vazio
+    sem projeção, círculo em dia —, e a descrição traz a palavra de cada conta. O comprimento é o do
+    notch: o alvo do hover não encolhe. `HudNotchShape` encolhe o ombro abaixo de 16dp de espessura, senão
+    o corpo da faixa voltaria para trás dele; o notch, de 44dp para cima, não muda.
+  - **Expandir: Z2 · íris do eclipse** (escolhida entre 15 protótipos HTML, Z1–Z15). Um disco centrado no
+    meio do notch, rente à borda da tela, revela o notch de hoje (`irisOpenMillis` 420ms, `easeOut`) com
+    um fio dourado de 1,5dp na borda do disco que acende e apaga por um seno; recolher fecha o disco no
+    meio (`irisCloseMillis` 240ms, `easeIn`). Inverter no meio parte do raio em que o disco está
+    (`gargantuaIrisOpenProgressFor`/`CloseProgressFor`). O recorte é **de camada** (`graphicsLayer`
+    com `clip`): também tira o ponteiro do que ficou de fora, e por isso a faixa recebe o hover com a íris
+    fechada. Aberto e parado, sem recorte — a sombra do notch passa da caixa. O fio é desenhado fora do
+    recorte. Nenhum arco cresce: o disco recorta o notch já no valor.
+  - **Intenção de 200ms** (`HUD_RETRACT_INTENT_MILLIS`, `hudOpenDelayMillis`) antes de abrir, só neste
+    modo: o ponteiro cruza a borda da tela o tempo todo (abas, botão de fechar, a barra de tarefas). Sair
+    recolhe pelo mesmo `HUD_COLLAPSE_DELAY_MILLIS` de sempre, e o recorte da janela volta depois da íris
+    fechar (300ms > 240ms).
+  - **A janela não muda**: o tamanho e a origem são os de sempre; no Windows a área de clique parada vira
+    a faixa mais a margem de 16dp (`hudRestHitRegion(retracted = true)`). A reserva de alças passou a
+    duas por ponta (`HUD_HANDLES_PER_SIDE`), simétrica, para o alfinete caber e o centro da janela de
+    arrasto continuar sendo o do notch.
+  - **Crítico com a barra recolhida não a abre sozinho**: a faixa avisa pelo triângulo. Arrastando, o notch
+    nunca recolhe (`hudNotchRevealed`). "Reduzir animações" = corte seco.
+  - Recusadas: Z1 ejeção coronal, Z3 aglomerado que acende, Z4 terminador, Z5 foco do telescópio, Z6
+    precessão do eixo, Z7 migração planetária, Z8 aurora, Z9 nebulosa bipolar, Z10 clarão de raio gama,
+    Z11 mosaico do interferômetro, Z12 camadas da atmosfera, Z13 rolamento na órbita, Z14 vela solar, Z15
+    telescópio que estende.
 
 ## Fora do alcance dos testes
 
@@ -429,6 +462,8 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
 | Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
 | Escalas diferentes por monitor | só em máquina real | | |
+| Faixa recolhida de 10dp recebe o ponteiro (modo recolher, #400), com opacidade 55% e 100% | | | |
+| Área vazia da janela sem recorte abre a barra recolhida sem querer (#400) | não se aplica (recorte) | | |
 | Maximizar zera o recorte dos cantos (`DesktopWindowFrame`, `shape = null`) | em uso desde maio | risco da #340, sem relato | |
 
 Ao medir um item, preencha a célula com a data, a máquina e a issue, no mesmo commit da mudança.

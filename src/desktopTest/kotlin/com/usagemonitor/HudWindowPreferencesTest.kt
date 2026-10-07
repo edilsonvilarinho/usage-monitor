@@ -138,6 +138,18 @@ class HudWindowPreferencesTest {
         }
     }
 
+    /** Issue #400: quem atualiza não vê a HUD recolher sozinha; o alfinete grava a escolha. */
+    @Test
+    fun `auto retract starts off and round trips the toggle`() {
+        withTestSettings { settings ->
+            assertEquals(false, readHudAutoRetract(settings))
+            persistHudAutoRetract(settings, true)
+            assertEquals(true, readHudAutoRetract(settings))
+            persistHudAutoRetract(settings, false)
+            assertEquals(false, readHudAutoRetract(settings))
+        }
+    }
+
     private fun withTestSettings(block: (PreferencesSettings) -> Unit) {
         val nodeName = "com.usagemonitor.tests.${UUID.randomUUID()}"
         val preferencesNode = Preferences.userRoot().node(nodeName)

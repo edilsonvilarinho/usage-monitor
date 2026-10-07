@@ -27,7 +27,8 @@ response content anywhere.
 ## Features
 
 - **HUD notch** — one ring per account, one arc per quota (weekly outside, 5h inside), docked to any
-  edge of any monitor. Hover a ring for its details balloon; click it to refresh that account.
+  edge of any monitor. Hover a ring for its details balloon; click it to refresh that account. The
+  pin next to the move hand makes it retract to a thin strip with one risk dot per account when idle.
 - **Claude Code session cost** — local transcripts broken down by session, project, branch and model,
   with estimated cost and a context-health verdict. Codex CLI sessions too, token counts only.
 - **History and forecast** — summary before the chart, expandable quota and window details,

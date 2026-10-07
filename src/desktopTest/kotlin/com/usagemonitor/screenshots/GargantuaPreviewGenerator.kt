@@ -89,6 +89,7 @@ fun main(args: Array<String>) {
     recordPresence(output)
     recordRefresh(output)
     recordBalloon(output)
+    recordRetract(output)
     recordModal(output)
     println("Prévia Gargantua: ${output.absolutePath}")
 }
@@ -204,6 +205,41 @@ private fun recordBalloon(output: File) {
         expanded = false
         recorder.animate(600) { }
         GifEncoder.write(File(output, "hud-gargantua-balloon.gif"), recorder.frames)
+    } finally {
+        recorder.close()
+    }
+}
+
+/**
+ * Z2 · íris do eclipse (#400): no modo recolher, a faixa parada abre no notch
+ * de hoje e fecha de volta, na borda esquerda do print da issue.
+ */
+private fun recordRetract(output: File) {
+    val accounts = GargantuaPreviewFixtures.showcase.take(2)
+    var expanded by mutableStateOf(false)
+    val recorder = SceneRecorder(widthDp = 200, heightDp = 340, frameMillis = 20L)
+    try {
+        recorder.setContent {
+            CompositionLocalProvider(LocalAppMotionPolicy provides AppMotionPolicy.Live) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                    HudNotch(
+                        accounts = accounts,
+                        edge = HudEdge.LEFT,
+                        sizes = hudNotchSizes(accounts, HudEdge.LEFT, "Carregando", hasUpdateIndicator = false),
+                        fallbackLabel = "Carregando",
+                        expanded = expanded,
+                        autoRetract = true,
+                        onToggleAutoRetract = {}
+                    )
+                }
+            }
+        }
+        recorder.animate(600) { }
+        expanded = true
+        recorder.animate(1_200) { }
+        expanded = false
+        recorder.animate(800) { }
+        GifEncoder.write(File(output, "hud-gargantua-retract.gif"), recorder.frames)
     } finally {
         recorder.close()
     }

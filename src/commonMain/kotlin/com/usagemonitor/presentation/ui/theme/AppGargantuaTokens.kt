@@ -42,6 +42,10 @@ object AppGargantuaTokens {
     const val jetOpenMillis = 520
     /** Fechamento do balão: dobra de volta e o feixe recolhe (B3). */
     const val jetCloseMillis = 240
+    /** Modo recolher (#400): a íris do eclipse abre o notch a partir da faixa (Z2). */
+    const val irisOpenMillis = 420
+    /** Modo recolher (#400): a íris fecha de volta no meio da faixa (Z2). */
+    const val irisCloseMillis = 240
     /** Dado novo: cada caractere que mudou rola pelo horizonte (D5). */
     const val rollMillis = 480
     /** Cascata entre os caracteres que rolam, da esquerda para a direita (D5). */

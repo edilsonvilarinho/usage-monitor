@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import com.usagemonitor.HUD_HANDLE_GAP
+import com.usagemonitor.HUD_HANDLE_SIZE
 import com.usagemonitor.HUD_SHADOW_MARGIN
 import com.usagemonitor.HudEdge
 import com.usagemonitor.HudNotchSizes
@@ -168,28 +169,21 @@ internal fun HudNotch(
     /** O clique na engrenagem quando não há [appBalloon]. */
     onGearClick: () -> Unit = {},
     gearDescription: String = "",
+    /** Modo "recolher quando parada" (#400): parado, só a faixa fica à vista. */
+    autoRetract: Boolean = false,
+    /** O alfinete ao lado da mão, que alterna [autoRetract]; `null` não o mostra. */
+    onToggleAutoRetract: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // O ponteiro "está no notch" enquanto estiver no corpo, no balão ou numa
-    // alça: sair do anel para o balão atravessa a cauda, que é do balão, e
-    // chegar a uma alça passa rente à ponta do notch.
-    val notchHover = remember { MutableInteractionSource() }
-    val balloonHover = remember { MutableInteractionSource() }
-    val moveHover = remember { MutableInteractionSource() }
-    val gearHover = remember { MutableInteractionSource() }
-    val notchHovered by notchHover.collectIsHoveredAsState()
-    val balloonHovered by balloonHover.collectIsHoveredAsState()
-    val moveHovered by moveHover.collectIsHoveredAsState()
-    val gearHovered by gearHover.collectIsHoveredAsState()
-    val hovered = notchHovered || balloonHovered || moveHovered || gearHovered
-    LaunchedEffect(hovered) {
-        onHoverChange(hovered)
-    }
+    val hover = rememberHudHover(onHoverChange)
+    val gearHovered by hover.gear.collectIsHoveredAsState()
 
     val open = expanded && !dragging
     // As alças ficam durante o arrasto: é a mão que está sendo carregada, e
     // tirá-la da composição cancelaria o gesto no meio.
     val showHandles = open || dragging
+    // Z2 · íris do eclipse: recolhido, o notch some para dentro da faixa.
+    val iris = rememberHudIrisFrame(revealed = !autoRetract || showHandles)
     // O balão é da conta do último anel sob o ponteiro, ou da engrenagem
     // ([APP_BALLOON]). Fechado, ele é esquecido: a próxima abertura começa pelo
     // anel em que o ponteiro entrar.
@@ -251,11 +245,12 @@ internal fun HudNotch(
                     .layoutId(HudNotchPart.NOTCH)
                     .requiredSize(notchSize)
                     .testTag(HUD_CONTENT_TEST_TAG)
+                    .hudEclipseIris(edge, iris)
                     .appDepth(AppDepth.DIALOG, shape)
                     // O corpo é o horizonte de eventos (M1): núcleo escuro e
                     // anel de fótons com Doppler na borda.
                     .gargantuaHorizonBody(shape)
-                    .hoverable(notchHover)
+                    .hoverable(hover.notch)
                     .onPlaced { coordinates -> ringItemBounds.body = coordinates }
                     // Só a mão move. Arrastando pelo corpo o notch saía do lugar
                     // quando a intenção era clicar num anel, e o cursor de mover
@@ -308,6 +303,7 @@ internal fun HudNotch(
                     }
                 )
             }
+            HudRetractParts(autoRetract, onToggleAutoRetract, showHandles, accounts, edge, notchSize, ringCenters, { rootCoordinates }, language, hover)
             for ((part, atStart) in listOf(HudNotchPart.HINT_START to true, HudNotchPart.HINT_END to false)) {
                 AnimatedVisibility(
                     visible = !showHandles,
@@ -336,7 +332,7 @@ internal fun HudNotch(
                     onDragStart = onDragStart,
                     onDragMove = onDragMove,
                     onDragEnd = onDragEnd,
-                    interaction = moveHover
+                    interaction = hover.move
                 )
             }
             AnimatedVisibility(
@@ -360,7 +356,7 @@ internal fun HudNotch(
                             balloonIndex = APP_BALLOON
                         }
                     },
-                    interaction = gearHover,
+                    interaction = hover.gear,
                     // A cauda do balão da engrenagem aponta para ela, como a do
                     // de conta aponta para o anel.
                     modifier = Modifier.onGloballyPositioned { coordinates ->
@@ -395,7 +391,7 @@ internal fun HudNotch(
                         reveal = jet,
                         beamOrigin = { balloonBox.depthTo(edge, ringDepths[index]) },
                         modifier = Modifier
-                            .hoverable(balloonHover)
+                            .hoverable(hover.balloon)
                             .onPlaced { coordinates ->
                                 val root = rootCoordinates
                                 if (root != null && root.isAttached && coordinates.isAttached) {
@@ -449,7 +445,7 @@ private fun hudNotchMeasurePolicy(
         .measure(Constraints())
     val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
         ?.measure(Constraints())
-    val extras = listOf(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR)
+    val extras = listOf<Any>(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR, HudRetractPart.HANDLE, HudRetractPart.STRIP)
         .associateWith { part ->
             measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
         }
@@ -499,6 +495,8 @@ private fun hudNotchMeasurePolicy(
                 HudEdge.RIGHT -> place(width - across - acrossSize, along, zIndex)
             }
         }
+        // A faixa do modo recolher (#400) por baixo do notch: aberto, ele a cobre.
+        extras[HudRetractPart.STRIP]?.placeAt(notchStart, 0, STRIP_Z_INDEX)
         notch.placeAt(notchStart, 0)
         val notchEnd = notchStart + notchAlong
         extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
@@ -508,6 +506,15 @@ private fun hudNotchMeasurePolicy(
         extras[HudNotchPart.MOVE]?.let { handle ->
             handle.placeAt(
                 notchStart - handleGap - handle.alongSize(edge),
+                (notchAcross - handle.acrossSize(edge)) / 2,
+                HANDLE_Z_INDEX
+            )
+        }
+        // O alfinete do modo recolher, além da mão (#400); a geometria reserva
+        // duas alças em cada ponta.
+        extras[HudRetractPart.HANDLE]?.let { handle ->
+            handle.placeAt(
+                notchStart - (handleGap + HUD_HANDLE_SIZE.roundToPx()) - handleGap - handle.alongSize(edge),
                 (notchAcross - handle.acrossSize(edge)) / 2,
                 HANDLE_Z_INDEX
             )
@@ -527,6 +534,36 @@ private fun hudNotchMeasurePolicy(
 }
 
 private enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
+
+/**
+ * As fontes de hover do notch. O ponteiro "está no notch" enquanto estiver no
+ * corpo, no balão, numa alça ou na faixa recolhida: sair do anel para o balão
+ * atravessa a cauda, que é do balão, e chegar a uma alça passa rente à ponta.
+ */
+internal class HudHoverSources {
+    val notch = MutableInteractionSource()
+    val balloon = MutableInteractionSource()
+    val move = MutableInteractionSource()
+    val gear = MutableInteractionSource()
+    val retract = MutableInteractionSource()
+    val strip = MutableInteractionSource()
+    val all: List<MutableInteractionSource> get() = listOf(notch, balloon, move, gear, retract, strip)
+}
+
+/** As fontes, e [onHoverChange] a cada troca da união delas. */
+@Composable
+private fun rememberHudHover(onHoverChange: (Boolean) -> Unit): HudHoverSources {
+    val sources = remember { HudHoverSources() }
+    val states = sources.all.map { source -> source.collectIsHoveredAsState() }
+    val hovered = states.any { state -> state.value }
+    LaunchedEffect(hovered) {
+        onHoverChange(hovered)
+    }
+    return sources
+}
+
+/** A faixa recolhida fica por baixo do corpo, acima das alças que saem de trás dele. */
+private const val STRIP_Z_INDEX = -0.5f
 
 /** A caixa de cada conta no corpo do notch; o gesto do corpo acha o anel clicado por ela. */
 private class HudRingHitBoxes {
@@ -549,7 +586,7 @@ private fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) he
  * aparecendo já no lugar, a entrada lia como tremor ao passar o ponteiro.
  */
 @Composable
-private fun handleEnter(edge: HudEdge, atStart: Boolean): EnterTransition {
+internal fun handleEnter(edge: HudEdge, atStart: Boolean): EnterTransition {
     val slide = with(LocalDensity.current) { HANDLE_SLIDE.roundToPx() }
     return fadeIn(appTween(AppMotion.slow, AppMotion.emphasizedEasing)) +
         scaleIn(
@@ -564,7 +601,7 @@ private fun handleEnter(edge: HudEdge, atStart: Boolean): EnterTransition {
 
 /** A saída volta para dentro do notch, curta: o que sai já não interessa. */
 @Composable
-private fun handleExit(edge: HudEdge, atStart: Boolean): ExitTransition {
+internal fun handleExit(edge: HudEdge, atStart: Boolean): ExitTransition {
     val slide = with(LocalDensity.current) { HANDLE_SLIDE.roundToPx() }
     return fadeOut(appTween(AppMotion.fast, AppMotion.exitEasing)) +
         scaleOut(

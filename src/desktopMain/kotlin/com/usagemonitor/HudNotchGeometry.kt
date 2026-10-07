@@ -183,7 +183,10 @@ internal fun hudNotchSizes(
         edge.isHorizontal -> horizontalCollapsed(accounts, fallbackLabel, compact = true)
         else -> verticalCollapsed(accounts, fallbackLabel, compact = true)
     }
-    val handlesReach = (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * 2
+    // A ponta de perto leva duas alças (a mão e o alfinete do modo recolher,
+    // #400) e a de longe uma; a reserva é simétrica, duas de cada lado, para o
+    // centro da janela de arrasto continuar sendo o centro do notch.
+    val handlesReach = (HUD_HANDLE_GAP + HUD_HANDLE_SIZE) * HUD_HANDLES_PER_SIDE * 2
     val withHandles = if (edge.isHorizontal) {
         DpSize(collapsed.width + handlesReach, collapsed.height)
     } else {
@@ -236,6 +239,16 @@ internal fun hudNotchSizesWithDeparture(
  */
 internal val HUD_HANDLE_SIZE = 32.dp
 internal val HUD_HANDLE_GAP = 6.dp
+
+/** Alças reservadas em cada ponta: a de perto tem a mão e o alfinete (#400). */
+internal const val HUD_HANDLES_PER_SIDE = 2
+
+/**
+ * A faixa do notch recolhido no modo "recolher quando parada" (#400): rente à
+ * borda, do comprimento do notch, com um ponto de risco por conta. A janela não
+ * muda; só o desenho e a área de clique parada encolhem para ela.
+ */
+internal val HUD_RETRACTED_STRIP = 10.dp
 
 /**
  * A fração da borda que a faixa completa pode ocupar antes de virar compacta.
@@ -599,11 +612,21 @@ internal fun hudDockedWindowBounds(
  * O notch é posicionado pela mesma conta do layout de `HudNotch`: centrado em
  * [HudWindowBounds.notchCenterInWindow] e preso dentro da janela.
  */
-internal fun hudRestHitRegion(edge: HudEdge, window: HudWindowBounds, sizes: HudNotchSizes): DpRect {
+internal fun hudRestHitRegion(
+    edge: HudEdge,
+    window: HudWindowBounds,
+    sizes: HudNotchSizes,
+    /** Modo recolher (#400): parado, só a faixa de [HUD_RETRACTED_STRIP] recebe o ponteiro. */
+    retracted: Boolean = false
+): DpRect {
     val alongLength = if (edge.isHorizontal) window.size.width else window.size.height
     val acrossLength = if (edge.isHorizontal) window.size.height else window.size.width
     val notchAlong = if (edge.isHorizontal) sizes.collapsed.width else sizes.collapsed.height
-    val notchAcross = if (edge.isHorizontal) sizes.collapsed.height else sizes.collapsed.width
+    val notchAcross = when {
+        retracted -> HUD_RETRACTED_STRIP
+        edge.isHorizontal -> sizes.collapsed.height
+        else -> sizes.collapsed.width
+    }
     val notchStart = (window.notchCenterInWindow - notchAlong / 2)
         .coerceIn(0.dp, (alongLength - notchAlong).coerceAtLeast(0.dp))
     val alongStart = (notchStart - HUD_SHADOW_MARGIN).coerceAtLeast(0.dp)

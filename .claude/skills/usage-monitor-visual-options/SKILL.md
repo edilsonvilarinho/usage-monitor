@@ -115,7 +115,8 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 
 | Configurações — organizar a aba Geral (#399; estática, galeria única `docs/planos/issues-398-399-visual/`) | X1 · Aparência e Sistema viram abas (exceção à regra do enum, aprovada) + X10 · prévia ao vivo do notch na Aparência | X2 sub-abas na Geral, X3 painéis recolhíveis com resumo, X4 árvore com âncoras, X5 tema numa janela própria, X6 duas colunas, X7 busca nas Configurações, X8 aba "Sobre", X9 navegação por assunto em grupos |
 | Bot do Telegram — funções novas (#398; estática, galeria única `docs/planos/issues-398-399-visual/`) | Y1 resumo diário, Y2 aviso de reinício de cota, Y4 uma conta por vez, Y5 painel fixado ao vivo, Y6 gráfico das últimas 24 h, Y8 controle remoto | Y3 `/custo` e orçamento do mês, Y7 sessões CLI ativas e travadas, Y9 alerta com ação na mensagem, Y10 relatório semanal em PDF |
+| HUD — recolher e expandir a barra (#400; modo opcional pelo alfinete, parada vira faixa de 10dp com um ponto de risco por conta) | Z2 · íris do eclipse (disco do meio da faixa revela o notch, fio dourado na borda; 420/240 ms, intenção de 200 ms) | Z1 ejeção coronal, Z3 aglomerado que acende, Z4 terminador, Z5 foco do telescópio, Z6 precessão do eixo, Z7 migração planetária, Z8 aurora, Z9 nebulosa bipolar, Z10 clarão de raio gama, Z11 mosaico do interferômetro, Z12 camadas da atmosfera, Z13 rolamento na órbita, Z14 vela solar, Z15 telescópio que estende |
 
-Próxima rodada usa a próxima letra livre (Z, depois letras duplas; U, V, W, X e Y já usadas). Trilha, fundo ou estado contínuo: as opções
+Próxima rodada usa a próxima letra livre (letras duplas: AA, AB…; U a Z já usadas). Trilha, fundo ou estado contínuo: as opções
 já nascem animadas (laço atrás da política), nunca só o quadro parado. Ícone de sistema não anima: nessa rodada o
 card mostra os tamanhos reais (lupa ×4 no 16 px) sobre barra clara e escura, e não um laço.

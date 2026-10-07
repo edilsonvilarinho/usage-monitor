@@ -31,7 +31,8 @@ de resposta para lugar nenhum.
 
 - **Notch da HUD** — um anel por conta, um arco por cota (semanal por fora, 5h por dentro), colado
   em qualquer borda de qualquer monitor. Passe o ponteiro num anel para abrir o balão; clique para
-  recoletar aquela conta.
+  recoletar aquela conta. O alfinete ao lado da mão faz ele recolher, parado, a uma faixa fina com
+  um ponto de risco por conta.
 - **Custo das sessões do Claude Code** — transcripts locais abertos por sessão, projeto, branch e
   modelo, com custo estimado e um veredito de saúde do contexto. Sessões do Codex CLI também, só
   com tokens.

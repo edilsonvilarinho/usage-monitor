@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PushPin as PushPinOutlined
 import androidx.compose.material.icons.rounded.PanTool
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_HANDLE_SIZE
 import com.usagemonitor.HudEdge
@@ -55,6 +58,7 @@ import kotlin.math.atan2
 
 internal const val HUD_MOVE_HANDLE_TAG = "hudMoveHandle"
 internal const val HUD_GEAR_HANDLE_TAG = "hudGearHandle"
+internal const val HUD_RETRACT_HANDLE_TAG = "hudRetractHandle"
 
 /** O ponto da atualização pendente na engrenagem aberta (issue #291). */
 internal const val HUD_GEAR_UPDATE_DOT_TAG = "hudGearUpdateDot"
@@ -102,6 +106,65 @@ internal fun HudMoveHandle(
             .semantics { contentDescription = description }
     ) { tint ->
         Icon(Icons.Rounded.PanTool, contentDescription = null, tint = tint, modifier = Modifier.size(HANDLE_ICON_SIZE))
+    }
+}
+
+/** O que o clique no alfinete faz: a ação, não o estado (#400). */
+internal fun hudRetractHandleDescription(autoRetract: Boolean, language: AppLanguage): String = when {
+    language == AppLanguage.PT && autoRetract -> "Manter a barra HUD aberta"
+    language == AppLanguage.PT -> "Recolher a barra HUD quando parada"
+    autoRetract -> "Keep the HUD bar open"
+    else -> "Retract the HUD bar when idle"
+}
+
+/** O estado do modo, para o leitor de tela: o ícone cheio ou vazado não diz sozinho. */
+internal fun hudRetractHandleState(autoRetract: Boolean, language: AppLanguage): String = when {
+    language == AppLanguage.PT && autoRetract -> "Recolhe quando parada"
+    language == AppLanguage.PT -> "Sempre aberta"
+    autoRetract -> "Retracts when idle"
+    else -> "Always open"
+}
+
+/**
+ * O alfinete ao lado da mão (issue #400): liga e desliga o modo "recolher quando
+ * parada". Alfinete cheio é a barra **presa aberta** (o modo de sempre);
+ * vazado, solta — recolhe à faixa quando o ponteiro sai. A descrição diz a
+ * ação, e o estado vai à parte.
+ */
+@Composable
+internal fun HudRetractHandle(
+    autoRetract: Boolean,
+    language: AppLanguage,
+    onClick: () -> Unit,
+    interaction: MutableInteractionSource,
+    modifier: Modifier = Modifier
+) {
+    val description = hudRetractHandleDescription(autoRetract, language)
+    val state = hudRetractHandleState(autoRetract, language)
+    HudHandleDisc(
+        carrying = false,
+        interaction = interaction,
+        modifier = modifier
+            .testTag(HUD_RETRACT_HANDLE_TAG)
+            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClickLabel = description,
+                onClick = onClick
+            )
+            .semantics {
+                contentDescription = description
+                stateDescription = state
+            }
+    ) { tint ->
+        Icon(
+            if (autoRetract) Icons.Outlined.PushPinOutlined else Icons.Rounded.PushPin,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(HANDLE_ICON_SIZE)
+        )
     }
 }
 
