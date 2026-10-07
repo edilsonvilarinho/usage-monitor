@@ -16,10 +16,10 @@ Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`
 | Autor dos commits | skill `usage-monitor-commit-push`, trailer `Co-Authored-By: Claude Opus 5.5` |
 
 ### ▶ Atividade corrente
-A06 — analytics por turno do Codex.
+A07 — grade 2×2 nas duas fontes.
 
 ### ⏭ Próxima atividade
-A07 — grade 2×2 nas duas fontes.
+A08/A09 — fechamento, `allTests` e capturas.
 
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
 
@@ -110,6 +110,7 @@ Commit e push só com autorização.
 | A03 | `feat(history): compute the hourly distribution per quota window` | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaWindowAnalysisTest" --tests "com.usagemonitor.data.*History*" --tests "com.usagemonitor.architecture.*"` → 17 + 39 + 8 testes, 0 falhas (2 novos: soma das janelas = distribuição do intervalo, hora a hora; janela sem subida → `null`) |
 | A04 | `feat(history): list quota windows with a per-window detail` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.HistoryWindowAnalysisTest" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.architecture.*"` → 62 testes, 0 falhas (novos: seleção padrão, recorte de pontos, segunda linha da lista, "usada antes da 1ª leitura", itens sem sobreposição, troca do detalhe no clique, menu abaixo de 600dp); `gradlew.bat generateScreenshots -PscreenshotScenario=history-regression -PscreenshotOutputDir=build/issue392-screenshots` → lista e detalhe conferidos em `history-windows-dark-100.png` |
 | A05 | `feat(history): hint hourly bars and key the active band to the view` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.HistoryWindowAnalysisTest" --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.architecture.*"` → 98 testes, 0 falhas (novos: texto da bolha, hora sob o ponteiro, chave dentro/fora do trecho, hover real na barra 17h); captura `history-regression-anthropic-dark-1030-640-125.png`: chave com amostra e eixo 12:00 · 23:30 · 11:00 |
+| A06 | `feat(codex): per-response analytics for the session detail` | rollout real `2026/10/06/rollout-…-01a111fa….jsonl` lido: `usage` é por resposta, `input_tokens` 35.789 → 40.463 → 48.627 (contexto com cache), `total = input + output` (raciocínio dentro da saída); `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CodexCliSessionAnalyticsTest" --tests "com.usagemonitor.architecture.*"` → 4 + 8 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
@@ -118,7 +119,7 @@ Commit e push só com autorização.
 | Curva da janela no Total herda a reamostragem do gráfico principal | aceito | só desenho; números do detalhe vêm de `QuotaWindowSummary`, calculados dos pontos crus |
 | Janela que começou antes do início do intervalo aparece parcial (curva e barras) | aberto | rotular "parcial" no item da lista; medir em A04 |
 | `TurnSeriesChart` aceita só `List<Long>` (sem lacuna) | aberto | decisão 8; medir em A07 |
-| Entrada por resposta do Codex = tamanho do contexto | aberto | coerente com o print (35.983 → 91.754 crescendo); confirmar contra um rollout real em A06 antes de rotular "Contexto" |
+| Entrada por resposta do Codex = tamanho do contexto | fechado | medido em A06 no rollout real: `usage` por resposta, `input_tokens` inclui o cache e cresce até a compactação |
 | `CodexCliSessionsScreen.kt` (588) e `CliSessionDetail.kt` (556) perto do teto de 800 | aberto | A07 começa extraindo |
 | Suíte só roda no Windows; nenhum host de janela muda | aceito | PR declara a plataforma testada |
 
@@ -129,3 +130,4 @@ Commit e push só com autorização.
 - **A04:** sem divisória vertical entre lista e detalhe — `IntrinsicSize.Min` falha com o `BoxWithConstraints` de `HistoryMetricTable`.
 - **A04:** "usada antes da 1ª leitura" vale também no PDF (`activeSpanLabel` ganhou o idioma).
 - **A05:** a primeira versão da bolha abria por cima das barras e travou o teste de hover por mais de 10 min (laço `Enter`/`Exit` com o `Surface`; pilha do worker parada em `HistoryLayoutRegressionTest.kt:68`). Corrigido com a bolha acima das barras.
+- **A06 (achado):** o rollout traz `model_context_window` (354.350 no rollout medido). O índice do Codex não lê esse campo; o percentual da janela de contexto no Codex fica **possível**, mas exige coluna nova no índice e versão em `codex_cli_index_meta`. Fora do escopo desta entrega — candidato a issue própria.
