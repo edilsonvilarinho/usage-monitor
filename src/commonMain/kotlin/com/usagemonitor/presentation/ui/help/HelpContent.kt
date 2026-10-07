@@ -299,7 +299,7 @@ fun helpWindowTitle(language: AppLanguage): String {
  * Largura do trilho de tópicos.
  *
  * Maior que o default de 150dp das Configurações: ali os rótulos são de uma
- * palavra ("Geral", "Rede"), e aqui são nomes de funcionalidade — o item mais
+ * palavra ("Sistema", "Rede"), e aqui são nomes de funcionalidade — o item mais
  * largo é "Dashboard e integrações", que não cabe em 150dp sem cortar.
  */
 private val HELP_NAV_WIDTH = 200.dp

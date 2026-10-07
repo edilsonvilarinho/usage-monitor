@@ -174,7 +174,7 @@ Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `St
 **Atualização automática** (`desktopMain/update/`; planos
 [`atualizacao-automatica-windows-execucao.md`](planos/atualizacao-automatica-windows-execucao.md)
 e [`atualizacao-automatica-linux-execucao.md`](planos/atualizacao-automatica-linux-execucao.md)):
-interruptor "Atualização automática" nas Configurações → Geral, desmarcado por padrão
+interruptor "Atualização automática" nas Configurações → Sistema, desmarcado por padrão
 (`autoUpdateEnabled` em `PreferencesSettings`). Ligado, baixa a release em segundo plano, valida o
 SHA-256 contra o `digest` da API do GitHub (não o hash publicado no workflow, que serve só ao
 instalador inicial) e troca ao fechar o app — ou pelo botão "Reiniciar o app e atualizar".
@@ -240,7 +240,7 @@ marca `releaseNotesSeenVersion`, nunca o recibo do instalador.**
   poda do artefato aplicado (`shouldDiscardUpdateArtifacts`).
 
 **Canal beta** (issue #355; plano [`releases-beta-355-execucao.md`](planos/releases-beta-355-execucao.md)):
-interruptor "Receber versões beta" em Configurações → Geral, logo abaixo da atualização automática,
+interruptor "Receber versões beta" em Configurações → Sistema, logo abaixo da atualização automática,
 desmarcado por padrão (`receiveBetaUpdates` em `PreferencesSettings`). Independe da atualização
 automática: sem ela a beta só é anunciada.
 - **Quem não optou está protegido pelo GitHub, não pelo app.** A beta é a tag `vX.Y.Z-beta.N`,

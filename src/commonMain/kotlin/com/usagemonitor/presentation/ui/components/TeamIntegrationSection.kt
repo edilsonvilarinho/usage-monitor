@@ -92,7 +92,7 @@ fun TeamIntegrationSection(
 ) {
     val isPt = language == AppLanguage.PT
 
-    // Painel com cabeçalho e divisória, como as duas seções da aba Geral: o
+    // Painel com cabeçalho e divisória, como os painéis da aba Sistema: o
     // interruptor da integração inteira mora no cabeçalho, que é onde ele
     // pertence — ele liga e desliga tudo o que está abaixo dele.
     AppDataSurfaceFlush(
@@ -375,7 +375,7 @@ private fun TeamProfileCheckboxRow(
     rejection: String? = null,
     showDivider: Boolean = true
 ) {
-    // Linha de dados como as opções da aba Geral: rótulo em mono à esquerda,
+    // Linha de dados como as opções da aba Sistema: rótulo em mono à esquerda,
     // controle à direita. O interruptor abria a linha, e a coluna de identidade
     // começava depois dele — desalinhada de tudo o que vem acima.
     AppDataRow(showDivider = showDivider, horizontalPadding = 0.dp) {

@@ -26,7 +26,7 @@ const APIS = [
 ];
 
 export function Settings() {
-  const [sec, setSec] = React.useState('Geral');
+  const [sec, setSec] = React.useState('Aparência');
   const [opacity, setOpacity] = React.useState(100);
   const [scale, setScale] = React.useState(115);
   const [autoStart, setAutoStart] = React.useState(true);
@@ -39,17 +39,13 @@ export function Settings() {
   return (
     <AppWindowFrame title="Configurações" style={{ width: 900 }}>
       <AppPanel style={{ flexDirection: 'row', overflow: 'hidden', minHeight: 420 }}>
-        <AppSettingsNav items={['Geral', 'Alertas', 'APIs', 'Contas', 'Time']} value={sec} onChange={setSec} />
+        <AppSettingsNav items={['Aparência', 'Sistema', 'Alertas', 'APIs', 'Contas', 'Time']} value={sec} onChange={setSec} />
         <div style={{ flex: 1, padding: 'var(--s4)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)', minWidth: 0 }}>
-          {sec === 'Geral' ? (
+          {/* Issue #399 (X1): a antiga aba Geral virou Aparência (o que a janela mostra)
+              e Sistema (o que o app faz fora dela). */}
+          {sec === 'Aparência' ? (
             <React.Fragment>
-              <AppSwitch checked={autoStart} onChange={setAutoStart} label="Iniciar com o sistema" hint="Registro Run no Windows, .desktop no Linux, LaunchAgent no macOS." />
               <AppSwitch checked={dark} onChange={setDark} label="Tema escuro" />
-              <AppSwitch checked={false} disabled label="Atualização automática"
-                reason="Instalação .deb: aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma árvore que o próximo apt upgrade desfaz." />
-              {/* Issue #355: canal beta, desligado por padrão; desligar não faz downgrade. */}
-              <AppSwitch checked={false} label="Receber versões beta"
-                hint="Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova." />
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)', width: 190 }}>Idioma</span>
                 <AppSegmentedControl items={['PT', 'EN']} value={lang} onChange={setLang} />
@@ -61,9 +57,24 @@ export function Settings() {
               </span>
               <AppSwitch checked={false} label="Reduzir animações"
                 hint="Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa." />
+            </React.Fragment>
+          ) : null}
+
+          {sec === 'Sistema' ? (
+            <React.Fragment>
+              <AppKey>Inicialização e bandeja</AppKey>
+              <AppSwitch checked={autoStart} onChange={setAutoStart} label="Iniciar com o sistema" hint="Registro Run no Windows, .desktop no Linux, LaunchAgent no macOS." />
               {/* Issue #328: desligado por padrão; o anel mostra o maior percentual vigente. */}
               <AppSwitch checked={false} label="Anel de uso na bandeja"
                 hint="Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta." />
+              <AppKey>Atualizações</AppKey>
+              <AppSwitch checked={false} disabled label="Atualização automática"
+                reason="Instalação .deb: aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma árvore que o próximo apt upgrade desfaz." />
+              {/* Issue #355: canal beta, desligado por padrão; desligar não faz downgrade. */}
+              <AppSwitch checked={false} label="Receber versões beta"
+                hint="Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova." />
+              <AppKey>Diagnóstico</AppKey>
+              <AppButton variant="primary">Reportar um bug</AppButton>
             </React.Fragment>
           ) : null}
 

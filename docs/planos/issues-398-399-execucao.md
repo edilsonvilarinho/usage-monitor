@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A00 concluída.`
+**Estado atual:** `Em execução — A01 concluída.`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -69,6 +69,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | Atividade | Commit | Evidência | Estado |
 | --- | --- | --- | --- |
 | A00 | `docs: plan issues 398 and 399` | `git diff --cached --stat`: plano, galeria e skill; revisão do diff | concluída |
+| A01 | `feat(settings): split the general tab into appearance and system` | `gradlew.bat desktopTest --tests SettingsDialogContentTest DiagnosticsSettingsSectionTest BetaUpdatesToggleTest NetworkSettingsSectionTest ApiKeyDialogTest *Help*`: 55 testes, 0 falhas | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -80,4 +81,4 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 
 ## Desvios do plano e achados da execução
 
-—
+- A01: a ajuda (`HelpCatalog.kt`, PT e EN) ainda citava "Manter sempre visível", removido com o modo HUD único; saiu junto com a troca de "Geral" por "Aparência"/"Sistema".

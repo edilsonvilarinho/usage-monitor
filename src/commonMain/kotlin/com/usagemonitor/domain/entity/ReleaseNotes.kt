@@ -8,7 +8,7 @@ import kotlin.time.Instant
  * Existe porque a atualização automática é **silenciosa por construção**: o app
  * fecha, o instalador roda sem tela e o app volta com outro número no rodapé.
  * Sem esta janela, a única pista de que algo mudou é uma linha em
- * Configurações → Geral, que ninguém abre. Vale igualmente para a instalação
+ * Configurações → Sistema, que ninguém abre. Vale igualmente para a instalação
  * manual, que também troca o binário sem dizer o que mudou.
  *
  * [items] pode ser vazio — release só de `chore`/`docs` não tem nada a dizer ao

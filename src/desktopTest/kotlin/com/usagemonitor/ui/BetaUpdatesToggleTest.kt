@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.BETA_UPDATES_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.BetaUpdatesToggle
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.SettingsTab
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -55,9 +56,9 @@ class BetaUpdatesToggleTest {
         assertEquals(true, lastValue)
     }
 
-    /** A aba Geral traz o interruptor e repassa o clique a quem é dono da preferência. */
+    /** A aba Sistema traz o interruptor e repassa o clique a quem é dono da preferência. */
     @Test
-    fun `the general settings tab shows the beta switch`() = runDesktopComposeUiTest {
+    fun `the system settings tab shows the beta switch`() = runDesktopComposeUiTest {
         var lastValue: Boolean? = null
         setContent {
             ScreenTestTheme(isDark = true) {
@@ -71,12 +72,13 @@ class BetaUpdatesToggleTest {
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
                     receiveBetaUpdates = false,
-                    onReceiveBetaUpdatesChange = { value -> lastValue = value }
+                    onReceiveBetaUpdatesChange = { value -> lastValue = value },
+                    initialTab = SettingsTab.SYSTEM
                 )
             }
         }
 
-        // A aba Geral rola; o interruptor pode nascer fora da vista.
+        // A aba Sistema rola; o interruptor pode nascer fora da vista.
         onNodeWithTag(BETA_UPDATES_SWITCH_TEST_TAG).performScrollTo().assertIsOff().performClick()
 
         assertEquals(true, lastValue)

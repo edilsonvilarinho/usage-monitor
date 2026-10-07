@@ -360,7 +360,7 @@ private fun AlertToggleRow(
     testTag: String,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    // Rótulo em mono e linha de dados, como as opções da aba Geral: o texto
+    // Rótulo em mono e linha de dados, como as opções da aba Sistema: o texto
     // estava em `bodySmall`, que é sans, e lia como frase e não como rótulo.
     AppDataRow(showDivider = false, horizontalPadding = 0.dp) {
         Text(
