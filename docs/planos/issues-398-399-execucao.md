@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A09 concluída.`
+**Estado atual:** `Concluída na branch (A00–A10).`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -62,6 +62,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | A07 | `feat(telegram): daily summary at a chosen hour and /resumo` | `gradlew.bat desktopTest --tests *Telegram*`: 52 testes, 0 falhas (novos: hora/uma vez por dia/silêncio adia, texto com cota mais cheia e gasto `+`, sem gasto medido, envio agendado único com data gravada, `/resumo`, seletor do card) | concluída |
 | A08 | `feat(telegram): live pinned panel edited on each collection` | `gradlew.bat desktopTest --tests *Telegram*`: 54 testes, 0 falhas (novos: painel enviado em silêncio e fixado, editado com leitura nova sem novo pin, desafixado ao desligar; texto com hora da coleta estável entre envios) | concluída |
 | A09 | `feat(telegram): usage chart as a png with /grafico` | `gradlew.bat desktopTest --tests *Telegram*`: 58 testes, 0 falhas (novos: parse de `/grafico`, linha por cota com reinício e recorte do intervalo, saldo e série vazia fora, PNG 960×540 com fundo e cor da linha por pixel, foto ou texto no serviço). Primeira compilação: `Path.moveTo` inexistente no Skiko do projeto, trocado por `drawLine`; PNG conferido a olho numa captura temporária descartada | concluída |
+| A10 | `docs: close the plan for issues 398 and 399` | `gradlew.bat allTests`: 276 classes, 2601 testes, 0 falhas, 0 puladas (exit 0) | concluída |
 | A02 | X10: prévia do notch na Aparência | `SettingsWindowHost.kt`, `SettingsHudPreview.kt`, teste, protótipo, `presentation.md` |
 | A03 | Infra do bot: id da mensagem, fixar/desafixar, foto, campos novos de `telegram.json`, tratadores fora do serviço | `TelegramBotApi.kt`, `TelegramBot.kt`, `LocalTelegramSettingsDataSource.kt`, `TelegramBotService.kt` |
 | A04 | Y4: `/conta` | domain, `TelegramBotMessages.kt`, tratadores |
@@ -83,9 +84,9 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 
 | # | Risco | Estado |
 | --- | --- | --- |
-| R1 | Janela de Configurações muda (host em `desktopMain`); a suíte só roda no Windows e nada exercita o sistema de janelas. O PR declara que X11 não foi aberto | aberto |
+| R1 | Janela de Configurações muda (host em `desktopMain`); a suíte só roda no Windows e nada exercita o sistema de janelas. O PR declara que X11 não foi aberto | aceito: só Windows (testes); a prévia não usa API de janela, é composição dentro da janela existente |
 | R2 | Limites do Telegram: edição frequente (Y5) e `sendPhoto` multipart sem teste contra o Telegram real; conferência com bot real é do usuário. Y5: edição limitada a uma por minuto por conversa e só com texto novo (hora da coleta) | aberto |
-| R3 | `AppViewModels.kt` (408 linhas) cresce com a fiação do bot; acima de ~700, extrair a fiação | aberto |
+| R3 | `AppViewModels.kt` (408 linhas) cresce com a fiação do bot; acima de ~700, extrair a fiação | medido: 454 linhas após A09, abaixo do teto de 800 e do gatilho de 700 |
 
 ## Desvios do plano e achados da execução
 
