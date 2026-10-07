@@ -292,7 +292,8 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   Os que mudam algo passam por `applyBotCommand` e gravam nas mesmas preferências de alerta das Configurações.
 - **Alertas**: o serviço coleta o mesmo `UsageAlertViewModel.alerts` da bandeja — já deduplicado e respeitando o silêncio —
   e manda o mesmo título e corpo (`usageAlertMessage`) a cada conversa pareada, com 1,1 s entre envios (limite do Telegram
-  ~1 mensagem/s por conversa). 429 espera o `retry_after`; 401/404 é token recusado e para até o usuário trocá-lo.
+  ~1 mensagem/s por conversa). 429 espera o `retry_after`; 401/404 é token recusado e para até o usuário trocá-lo. O
+  aviso de reinício de cota (#398, Y2, `UsageAlert.QuotaReset`) chega por este mesmo caminho.
 - **Formato (#396, direção W1)**: toda mensagem sai com `parse_mode: HTML` (`<b>`, `<i>`, `<code>`). O `/status` é um
   cartão por conta — risco com emoji **e** palavra, "⚡ em uso", e por cota o reinício (só a hora em menos de 24 h; com o dia
   da semana depois) e uma barra de 10 células em `<code>` cheia pelo piso do percentual. Todo texto variável passa por

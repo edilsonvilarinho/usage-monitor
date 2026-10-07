@@ -90,6 +90,24 @@ class UsageAlertMessagesTest {
         assertTrue(usageAlertMessage(spike(), AppLanguage.PT).title != threshold.title)
     }
 
+    /** #398, Y2: o reinício responde ao limiar — mesmo título, e diz quando é o próximo. */
+    @Test
+    fun `the reset message keeps the threshold title and names the next reset`() {
+        val reset = UsageAlert.QuotaReset(
+            target = UsageTargetKey(ApiSource.ANTHROPIC, DEFAULT_ANTHROPIC_PROFILE_ID),
+            targetLabel = "Anthropic — Padrão",
+            quotaLabel = "Sessão 5h",
+            nextResetAt = NOW
+        )
+        val pt = usageAlertMessage(reset, AppLanguage.PT)
+        val en = usageAlertMessage(reset, AppLanguage.EN)
+
+        assertEquals("Anthropic — Padrão · Sessão 5h", pt.title)
+        assertTrue(pt.body.startsWith("A cota reiniciou"), pt.body)
+        assertTrue(pt.body.contains("Próximo reinício:") && pt.body.endsWith("BRT."), pt.body)
+        assertTrue(en.body.startsWith("The quota reset"), en.body)
+    }
+
     /** O separador decimal vem do idioma, não do `Locale` da máquina que roda. */
     @Test
     fun `the factor is formatted without depending on the jvm locale`() {

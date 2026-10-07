@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A05 concluída.`
+**Estado atual:** `Em execução — A06 concluída.`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -58,6 +58,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | A03 | `refactor(telegram): message ids, keyboard rows, pin and photo calls` | `gradlew.bat desktopTest --tests *Telegram*`: 34 testes, 0 falhas (novos: id devolvido e `silent`, linhas do teclado, fixar/desafixar, 400 tipado, `sendPhoto` multipart) | concluída |
 | A04 | `feat(telegram): one account at a time with /conta` | `gradlew.bat desktopTest --tests *Telegram*`: 37 testes, 0 falhas (novos: parse `/conta`, `callback_data` curto e sem rótulo, botões e cartão de uma conta, fluxo `/conta` → toque no serviço) | concluída |
 | A05 | `feat(telegram): remote control with /atualizar, /api and quiet durations` | `gradlew.bat desktopTest --tests *Telegram*`: 44 testes, 0 falhas (novos: parse dos comandos, ida e volta dos toques e dado forjado, próxima 08:00 BRT, `/api` sem permissão não muda nada, com permissão liga a fonte, menu do `/silencio` e 4 h, `/atualizar`, interruptor do card). Primeira rodada: 2 falhas nos testes novos (lista do menu e `performScrollTo` fora de rolagem), corrigidas no teste | concluída |
+| A06 | `feat(alerts): warn when a quota that alerted resets` | `gradlew.bat desktopTest --tests com.usagemonitor.domain.* com.usagemonitor.presentation.* *AlertSettings* *Telegram* *UsageAlert*`: 1134 testes, 0 falhas (novos: reinício anunciado uma vez, janela sem alerta reinicia calada, leitura vencida no meio mantém a memória, silêncio adia, interruptor desligado, mensagem PT/EN) | concluída |
 | A02 | X10: prévia do notch na Aparência | `SettingsWindowHost.kt`, `SettingsHudPreview.kt`, teste, protótipo, `presentation.md` |
 | A03 | Infra do bot: id da mensagem, fixar/desafixar, foto, campos novos de `telegram.json`, tratadores fora do serviço | `TelegramBotApi.kt`, `TelegramBot.kt`, `LocalTelegramSettingsDataSource.kt`, `TelegramBotService.kt` |
 | A04 | Y4: `/conta` | domain, `TelegramBotMessages.kt`, tratadores |
@@ -85,5 +86,6 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 
 ## Desvios do plano e achados da execução
 
+- A06 (achado): a leitura **vencida** era descartada da memória de alertas (`continue` sem gravar a janela). Para a Y2 isso perderia o aviso de reinício sempre que uma avaliação caísse entre o fim da janela e a coleta seguinte; a memória passou a ser carregada adiante. Os limiares não mudam: a janela nova continua rearmando por `isSamePeriod`.
 - A03: o plano previa regravar `telegram.json` por patch de `JsonObject`. Não se aplica: o arquivo é inteiro do app (sem campos de terceiros, ao contrário do `credentials.json` da Anthropic) e o DTO com defaults já é retrocompatível. Os campos novos entram cada um na atividade que os usa, e não todos na A03.
 - A01: a ajuda (`HelpCatalog.kt`, PT e EN) ainda citava "Manter sempre visível", removido com o modo HUD único; saiu junto com a troca de "Geral" por "Aparência"/"Sistema".
