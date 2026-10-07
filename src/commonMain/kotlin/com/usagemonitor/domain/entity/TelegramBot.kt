@@ -19,15 +19,36 @@ class TelegramBotSettings(
     val authorizedChats: List<TelegramChat> = emptyList(),
     /** Código que a próxima conversa manda em `/start <código>`; `null` sem pareamento aberto. */
     val pairingCode: String? = null,
-    val pairingExpiresAtMillis: Long? = null
+    val pairingExpiresAtMillis: Long? = null,
+    /**
+     * `/api` pode ligar e desligar fontes (#398, Y8). Nasce desligado: com ele, quem
+     * está numa conversa pareada muda o que o app monitora.
+     */
+    val allowSourceControl: Boolean = false,
+    /** Hora (BRT) do resumo diário (#398, Y1); `null` desliga. */
+    val dailySummaryHour: Int? = null,
+    /** Dia local (ISO) do último resumo enviado: um por dia. */
+    val lastSummaryDate: String? = null,
+    /** Painel fixado que se atualiza sozinho (#398, Y5). */
+    val livePanelEnabled: Boolean = false,
+    /** A mensagem do painel em cada conversa (`chatId` → `message_id`), para editar e desafixar. */
+    val panelMessages: Map<Long, Long> = emptyMap()
 ) {
     fun copy(
         enabled: Boolean = this.enabled,
         botToken: String = this.botToken,
         authorizedChats: List<TelegramChat> = this.authorizedChats,
         pairingCode: String? = this.pairingCode,
-        pairingExpiresAtMillis: Long? = this.pairingExpiresAtMillis
-    ): TelegramBotSettings = TelegramBotSettings(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis)
+        pairingExpiresAtMillis: Long? = this.pairingExpiresAtMillis,
+        allowSourceControl: Boolean = this.allowSourceControl,
+        dailySummaryHour: Int? = this.dailySummaryHour,
+        lastSummaryDate: String? = this.lastSummaryDate,
+        livePanelEnabled: Boolean = this.livePanelEnabled,
+        panelMessages: Map<Long, Long> = this.panelMessages
+    ): TelegramBotSettings = TelegramBotSettings(
+        enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate,
+        livePanelEnabled, panelMessages
+    )
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
 
@@ -40,10 +61,15 @@ class TelegramBotSettings(
 
     override fun equals(other: Any?): Boolean = other is TelegramBotSettings &&
         other.enabled == enabled && other.botToken == botToken && other.authorizedChats == authorizedChats &&
-        other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis
+        other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis &&
+        other.allowSourceControl == allowSourceControl && other.dailySummaryHour == dailySummaryHour &&
+        other.lastSummaryDate == lastSummaryDate && other.livePanelEnabled == livePanelEnabled &&
+        other.panelMessages == panelMessages
 
-    override fun hashCode(): Int =
-        listOf(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis).hashCode()
+    override fun hashCode(): Int = listOf(
+        enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate,
+        livePanelEnabled, panelMessages
+    ).hashCode()
 
     override fun toString(): String =
         "TelegramBotSettings(enabled=$enabled, botToken=${if (botToken.isEmpty()) "" else "***"}, chats=${authorizedChats.size})"
@@ -57,6 +83,18 @@ sealed interface BotCommand {
     /** `null` desliga o silêncio. */
     data class Quiet(val hours: QuietHours?) : BotCommand
     data class Threshold(val percents: List<Int>) : BotCommand
+    /** `/conta` (#398, Y4): escolher uma conta num teclado e ver só ela. */
+    data object Accounts : BotCommand
+    /** `/atualizar` (#398, Y8): coleta agora e responde o `/status`. */
+    data object Refresh : BotCommand
+    /** `/api` (#398, Y8): lista as fontes e, se permitido, liga e desliga. */
+    data object Sources : BotCommand
+    /** `/silencio` sem argumento (#398, Y8): oferece 1 h, 4 h e até 08:00. */
+    data object QuietMenu : BotCommand
+    /** `/resumo` (#398, Y1): o resumo diário na hora. */
+    data object Summary : BotCommand
+    /** `/grafico [24h|7d]` (#398, Y6): imagem do uso no intervalo. */
+    data class Chart(val range: HistoryRange) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -84,6 +122,15 @@ fun parseBotCommand(text: String): BotCommand? {
         }
         "silencio", "silêncio", "quiet" -> parseQuiet(args.firstOrNull())
         "limiar", "threshold" -> parseThreshold(args.joinToString(","))
+        "conta", "contas", "account", "accounts" -> BotCommand.Accounts
+        "atualizar", "refresh" -> BotCommand.Refresh
+        "api", "apis", "fontes", "sources" -> BotCommand.Sources
+        "resumo", "summary" -> BotCommand.Summary
+        "grafico", "gráfico", "chart" -> when (args.firstOrNull()?.lowercase()) {
+            null, "24h", "24" -> BotCommand.Chart(HistoryRange.LAST_24_HOURS)
+            "7d", "7" -> BotCommand.Chart(HistoryRange.LAST_7_DAYS)
+            else -> BotCommand.Invalid("/grafico 24h | /grafico 7d")
+        }
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }
@@ -91,7 +138,7 @@ fun parseBotCommand(text: String): BotCommand? {
 
 private fun parseQuiet(argument: String?): BotCommand {
     val usage = "/silencio 22-07 | /silencio off"
-    val value = argument?.lowercase() ?: return BotCommand.Invalid(usage)
+    val value = argument?.lowercase() ?: return BotCommand.QuietMenu
     if (value == "off" || value == "desligar") {
         return BotCommand.Quiet(null)
     }

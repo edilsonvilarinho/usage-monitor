@@ -26,6 +26,7 @@ import com.usagemonitor.domain.entity.sourcesWithQuotaThresholdGap
 const val ALERT_SETTINGS_QUOTA_SWITCH_TEST_TAG = "alertSettingsQuotaSwitch"
 const val ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG = "alertSettingsQuotaCoverage"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
+const val ALERT_SETTINGS_QUOTA_RESET_SWITCH_TEST_TAG = "alertSettingsQuotaResetSwitch"
 const val ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG = "alertSettingsStalledSwitch"
 const val ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG = "alertSettingsStallThreshold"
 const val ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG = "alertSettingsSpikeSwitch"
@@ -184,6 +185,24 @@ fun AlertSettingsSection(
                 color = MaterialTheme.colorScheme.error
             )
         }
+
+        // Logo abaixo dos limiares: responde a eles. Sem alerta de cota não há
+        // janela que tenha alertado, e o reinício não teria o que avisar.
+        AlertToggleRow(
+            label = if (isPt) "Avisar quando a cota reiniciar" else "Warn when a quota resets",
+            checked = settings.quotaAlertsEnabled && settings.quotaResetAlertsEnabled,
+            testTag = ALERT_SETTINGS_QUOTA_RESET_SWITCH_TEST_TAG,
+            onCheckedChange = { checked -> onSettingsChange(settings.copy(quotaResetAlertsEnabled = checked)) }
+        )
+        Text(
+            text = if (isPt) {
+                "Só das cotas que passaram de um limiar na janela anterior."
+            } else {
+                "Only for quotas that crossed a threshold in the previous window."
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         AlertToggleRow(
             label = if (isPt) "Avisar quando uma sessão CLI saturar" else "Warn when a CLI session saturates",
@@ -360,7 +379,7 @@ private fun AlertToggleRow(
     testTag: String,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    // Rótulo em mono e linha de dados, como as opções da aba Geral: o texto
+    // Rótulo em mono e linha de dados, como as opções da aba Sistema: o texto
     // estava em `bodySmall`, que é sans, e lia como frase e não como rótulo.
     AppDataRow(showDivider = false, horizontalPadding = 0.dp) {
         Text(

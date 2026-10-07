@@ -287,11 +287,13 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   seguinte. O Telegram guarda updates por 24 h, e sem isso um `/alertas off` antigo seria reaplicado a cada arranque.
 - **Pareamento**: "Parear conversa" gera um código de 6 caracteres (sem 0/O/1/I) válido por 10 min; a conversa que mandar
   `/start <código>` entra na lista. Conversa não pareada não recebe resposta nenhuma.
-- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/alertas on|off`, `/silencio 22-07|off`, `/limiar 75,90`, `/ajuda`.
+- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/conta`, `/atualizar`, `/api`, `/alertas on|off`, `/silencio`
+  (sem argumento abre o menu de durações) `22-07|off`, `/limiar 75,90`, `/ajuda`.
   Os que mudam algo passam por `applyBotCommand` e gravam nas mesmas preferências de alerta das Configurações.
 - **Alertas**: o serviço coleta o mesmo `UsageAlertViewModel.alerts` da bandeja — já deduplicado e respeitando o silêncio —
   e manda o mesmo título e corpo (`usageAlertMessage`) a cada conversa pareada, com 1,1 s entre envios (limite do Telegram
-  ~1 mensagem/s por conversa). 429 espera o `retry_after`; 401/404 é token recusado e para até o usuário trocá-lo.
+  ~1 mensagem/s por conversa). 429 espera o `retry_after`; 401/404 é token recusado e para até o usuário trocá-lo. O
+  aviso de reinício de cota (#398, Y2, `UsageAlert.QuotaReset`) chega por este mesmo caminho.
 - **Formato (#396, direção W1)**: toda mensagem sai com `parse_mode: HTML` (`<b>`, `<i>`, `<code>`). O `/status` é um
   cartão por conta — risco com emoji **e** palavra, "⚡ em uso", e por cota o reinício (só a hora em menos de 24 h; com o dia
   da semana depois) e uma barra de 10 células em `<code>` cheia pelo piso do percentual. Todo texto variável passa por
@@ -311,6 +313,47 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   `UsageAlertSettings.snoozedUntilEpochMillis` (campo novo com default, chave `alertsSnoozedUntilMillis`), que silencia
   como o horário de silêncio — adia, não consome —; `/alertas on` o encerra. **Limiares** responde os percentuais atuais
   e o comando para mudar. O toque roda fora do laço de polling: a coleta não atrasa os outros updates.
+- **Infra da #398**: `sendMessage` devolve o `message_id` (o painel fixado edita a mesma mensagem) e aceita `silent`
+  (`disable_notification`); o teclado inline é uma lista **por linha** (linha vazia é descartada). `pinChatMessage` fixa
+  sem notificar, `unpinChatMessage` desafixa; `sendPhoto` manda PNG em multipart com legenda HTML. O 400 é
+  `TelegramBadRequestException` com a `description` do Telegram (`isNotModified`, `isMessageGone`). O tratamento de
+  comandos e toques saiu do `TelegramBotService` para `TelegramBotHandlers`; o serviço ficou com o polling e o repasse.
+- **Uma conta por vez (#398, Y4)**: `/conta` (`/account`) responde "Qual conta?" com um botão por conta, duas por linha,
+  emoji do pior risco antes do rótulo; o `/status` ganha as mesmas linhas embaixo das três ações. O toque manda só o
+  cartão daquela conta, com a hora da coleta dela. `callback_data` `acc:<ApiSource>:<FNV-1a do rótulo>` (`BotTap`,
+  `botAccountKey`): estável entre o envio do teclado e o toque — índice não serve, a ordem pode mudar — e sem rótulo nem
+  e-mail. Conta que saiu da leitura responde pedindo `/conta` de novo. `BotButton` (enum) não ganhou valor: toque com
+  parâmetro é `BotTap` (sealed).
+- **Controle remoto (#398, Y8)**: `/atualizar` (`/refresh`) chama o mesmo `refreshForBot` do botão Atualizar e responde o
+  `/status`. `/api` lista as fontes com ✅/⬜; com **"Permitir mudar fontes pelo bot"** (`allowSourceControl` em
+  `telegram.json`, **nasce desligado**) vem um botão por fonte (`api:<ApiSource>`), que grava por `persistEnabledApis` — o
+  mesmo caminho do interruptor da aba APIs — e recoleta a fonte; a permissão é relida no toque, então um teclado antigo
+  deixa de valer quando ela é desligada. `/silencio` sem argumento oferece 1 h, 4 h e "até 08:00" (`snz:60`, `snz:240`,
+  `snz:am`; `nextMorningMillis` em BRT, teto de um dia contra dado forjado), gravando o mesmo `snoozedUntilEpochMillis`.
+- **Resumo diário (#398, Y1)**: hora escolhida no card (Desligado, 07, 08, 09, 12 ou 18 h BRT; `dailySummaryHour` em
+  `telegram.json`, hora fora da lista vale como desligado). O serviço checa a cada minuto (`isDailySummaryDue`, pura):
+  sai a partir da hora, uma vez por dia local (`lastSummaryDate`), e com o app fechado na hora sai quando ele abrir naquele
+  dia; horário de silêncio e "Silenciar" **adiam**. A data é gravada **antes** do envio — falha no meio perde o dia em vez
+  de repetir a cada minuto. Trocar a hora zera a data. Texto: por conta a cota mais cheia (saldo pelo valor), "Reinicia
+  hoje" com as cotas do dia local e "Claude Code, últimas 24 h" — custo de `CliSessionRepository.getUsageBreakdown` com
+  `sinceEpochMillis` = agora − 24 h (o repositório não tem fim de janela, e "ontem" exigiria valor novo em
+  `CliSessionRange`), `+` com turno sem tarifa, linha omitida quando o índice falha ("não medido"). `/resumo` (`/summary`)
+  manda na hora.
+- **Painel fixado ao vivo (#398, Y5)**: interruptor no card (`livePanelEnabled`, nasce desligado). A cada 60 s o serviço
+  monta o painel (por conta a cota mais cheia com a barra) e, por conversa pareada: sem painel, envia **em silêncio**
+  (`disable_notification`) e fixa (`pinChatMessage`, sem notificar); com painel, edita **só se o texto mudou**. A hora no
+  texto é a da **coleta** (`lastCollectedAt`), não a do envio, então a edição acompanha a coleta e nunca passa de uma por
+  minuto por conversa — dentro do limite de edição do Telegram. 400 "not modified" conta como mantido; 400 "not found"
+  (mensagem apagada) recria. `chatId → message_id` em `telegram.json` (`panelMessages`); conversa removida sai do mapa.
+  Desligar desafixa e esquece na passada seguinte (até 1 min).
+- **Gráfico (#398, Y6)**: `/grafico` (24 h) e `/grafico 7d` (`/chart`) mandam um PNG 960×540 por `sendPhoto`. Dados de
+  `GetUsageHistoryUseCase` das fontes ligadas, uma série por conta (`listAccounts`; sem contas, a fonte vai sem chave),
+  nomeada pela fonte e numerada quando há mais de uma conta — **nunca o e-mail**. `buildTelegramChart` (pura): só cota com
+  reinício conhecido e total > 0 (saldo em dinheiro fica de fora), só pontos dentro do intervalo, reinício onde
+  `periodEndAt` muda (`isSamePeriod`), teto de 8 linhas. `TelegramChartRenderer` desenha com o Skia do Compose Desktop
+  (sem dependência nova; Plex Mono do classpath): eixo 0–100%, tracejado dourado no reinício e **o segmento que atravessa
+  o reinício não é ligado** — a queda não foi consumo. A legenda escreve rótulo e último percentual. Sem histórico, a
+  resposta é texto.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

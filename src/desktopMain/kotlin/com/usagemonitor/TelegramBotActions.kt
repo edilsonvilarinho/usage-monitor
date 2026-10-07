@@ -39,6 +39,17 @@ internal class TelegramBotActions(
 
     fun sendTest() = service.sendTest()
 
+    fun setAllowSourceControl(allowed: Boolean) = update { current -> current.copy(allowSourceControl = allowed) }
+
+    /**
+     * Trocar a hora religa o resumo de hoje: escolher 18:00 às 10:00 não pode ficar
+     * sem resumo porque o das 08:00 já saiu.
+     */
+    fun setDailySummaryHour(hour: Int?) = update { current -> current.copy(dailySummaryHour = hour, lastSummaryDate = null) }
+
+    /** O serviço envia e fixa, ou desafixa, na próxima passada do painel (até 1 min). */
+    fun setLivePanel(enabled: Boolean) = update { current -> current.copy(livePanelEnabled = enabled) }
+
     private fun update(transform: (TelegramBotSettings) -> TelegramBotSettings) {
         val next = transform(settingsFlow.value)
         runCatching { dataSource.save(next) }
@@ -86,7 +97,13 @@ internal fun telegramBotSectionModel(
         onRemoveChat = actions::removeChat,
         onSendTest = actions::sendTest,
         connected = status is TelegramBotStatus.Connected,
-        botUsername = (status as? TelegramBotStatus.Connected)?.botUsername
+        botUsername = (status as? TelegramBotStatus.Connected)?.botUsername,
+        allowSourceControl = settings.allowSourceControl,
+        onAllowSourceControlChange = actions::setAllowSourceControl,
+        dailySummaryHour = settings.dailySummaryHour,
+        onDailySummaryHourChange = actions::setDailySummaryHour,
+        livePanelEnabled = settings.livePanelEnabled,
+        onLivePanelChange = actions::setLivePanel
     )
 }
 

@@ -709,6 +709,80 @@ class UsageAlertTest {
         assertEquals(5.0, UsageAlertSettings.DEFAULT.copy(spikeFactor = 5.0).effectiveSpikeFactor)
         assertEquals(DEFAULT_SPIKE_FACTOR, UsageAlertSettings.DEFAULT.effectiveSpikeFactor)
     }
+
+    // ---------------------------------------------------------------- #398, Y2
+
+    /** A janela que alertou vira: sai um aviso de reinício com o fim da janela nova. */
+    @Test
+    fun `a window that alerted announces its reset once`() {
+        val alerted = evaluate(stats(usedPercent = 92), UsageAlertState.EMPTY, NOW)
+        val nextReset = RESET_AT + 5.hours
+
+        val reset = evaluate(stats(usedPercent = 3, resetAt = nextReset), alerted.state, RESET_AT + 1.minutes)
+        val again = evaluate(stats(usedPercent = 4, resetAt = nextReset), reset.state, RESET_AT + 11.minutes)
+
+        val announced = reset.alerts.filterIsInstance<UsageAlert.QuotaReset>().single()
+        assertEquals("Sessão 5h", announced.quotaLabel)
+        assertEquals(nextReset, announced.nextResetAt)
+        assertTrue(again.alerts.isEmpty())
+    }
+
+    @Test
+    fun `a window that never alerted resets in silence`() {
+        val quiet = evaluate(stats(usedPercent = 40), UsageAlertState.EMPTY, NOW)
+
+        val next = evaluate(stats(usedPercent = 2, resetAt = RESET_AT + 5.hours), quiet.state, RESET_AT + 1.minutes)
+
+        assertTrue(next.alerts.isEmpty())
+    }
+
+    /** A leitura vencida entre as duas janelas não apaga a memória de que a anterior alertou. */
+    @Test
+    fun `an expired reading in between keeps the reset`() {
+        val alerted = evaluate(stats(usedPercent = 92), UsageAlertState.EMPTY, NOW)
+        val expired = evaluate(stats(usedPercent = 92), alerted.state, RESET_AT + 1.minutes)
+
+        val next = evaluate(stats(usedPercent = 1, resetAt = RESET_AT + 5.hours), expired.state, RESET_AT + 2.minutes)
+
+        assertEquals(1, next.alerts.filterIsInstance<UsageAlert.QuotaReset>().size)
+    }
+
+    /** No silêncio o aviso fica pendente e sai quando ele acaba — adia, não consome. */
+    @Test
+    fun `the reset waits for the end of the snooze`() {
+        val alerted = evaluate(stats(usedPercent = 92), UsageAlertState.EMPTY, NOW)
+        val snoozed = UsageAlertSettings.DEFAULT.copy(snoozedUntilEpochMillis = (RESET_AT + 30.minutes).toEpochMilliseconds())
+        val nextReset = RESET_AT + 5.hours
+
+        val during = evaluate(stats(usedPercent = 1, resetAt = nextReset), alerted.state, RESET_AT + 1.minutes, snoozed)
+        val after = evaluate(stats(usedPercent = 2, resetAt = nextReset), during.state, RESET_AT + 31.minutes, snoozed)
+
+        assertTrue(during.alerts.isEmpty())
+        assertEquals(1, after.alerts.filterIsInstance<UsageAlert.QuotaReset>().size)
+    }
+
+    @Test
+    fun `turning the reset warning off keeps only the thresholds`() {
+        val settings = UsageAlertSettings.DEFAULT.copy(quotaResetAlertsEnabled = false)
+        val alerted = evaluate(stats(usedPercent = 92), UsageAlertState.EMPTY, NOW, settings)
+
+        val next = evaluate(stats(usedPercent = 1, resetAt = RESET_AT + 5.hours), alerted.state, RESET_AT + 1.minutes, settings)
+
+        assertTrue(next.alerts.isEmpty())
+    }
+
+    private fun evaluate(
+        stat: ApiUsageStats,
+        previous: UsageAlertState,
+        now: Instant,
+        settings: UsageAlertSettings = UsageAlertSettings.DEFAULT
+    ) = evaluateUsageAlerts(
+        stats = listOf(stat),
+        sessionPulse = SessionPulse.EMPTY,
+        previous = previous,
+        settings = settings,
+        now = now
+    )
 }
 
 /** A forma exata de `DeepSeekMapper`/`OpenRouterMapper`: `used = 0`, sem reset. */

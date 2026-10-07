@@ -18,6 +18,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.test.performMouseInput
+import com.usagemonitor.SETTINGS_HUD_PREVIEW_TEST_TAG
+import com.usagemonitor.SettingsHudPreview
+import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.screenshots.ScreenshotFixtures
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
@@ -461,7 +466,7 @@ class SettingsDialogContentTest {
         assertEquals(true, added)
     }
 
-    /** Anel de uso da bandeja (issue #328): fecha a seção Sistema da aba Geral. */
+    /** Anel de uso da bandeja (issue #328): na aba Sistema (#399). */
     @Test
     fun `SettingsDialogContent emits the tray usage ring change`() = runDesktopComposeUiTest {
         var enabled: Boolean? = null
@@ -478,7 +483,8 @@ class SettingsDialogContentTest {
                     onThemeChange = {},
                     onLanguageChange = {},
                     onAutoStartChange = {},
-                    onApiToggle = { _, _ -> }
+                    onApiToggle = { _, _ -> },
+                    initialTab = SettingsTab.SYSTEM
                 )
             }
         }
@@ -519,9 +525,9 @@ class SettingsDialogContentTest {
             }
         }
 
-        // A aba Geral é a que abre; o resto do diálogo só existe depois do clique
-        // na aba correspondente.
-        onNodeWithText("System Startup").assertIsDisplayed()
+        // A aba Aparência é a que abre (#399, X1); o resto do diálogo só existe
+        // depois do clique na aba correspondente.
+        onAllNodesWithText("System Startup").assertCountEquals(0)
         onNodeWithText("Window opacity").assertIsDisplayed()
         // Por tag: "75%" também é rótulo de limiar no cartão de alertas.
         onNodeWithTag(WINDOW_OPACITY_VALUE_TEST_TAG).assertTextEquals("75%")
@@ -529,6 +535,12 @@ class SettingsDialogContentTest {
         // Mesma razão da tag de opacidade: "115%" também aparece como limiar.
         onNodeWithTag(UI_SCALE_VALUE_TEST_TAG).assertTextEquals("115%")
         onNodeWithText("Language").assertIsDisplayed()
+
+        onNodeWithTag(settingsTabTestTag(SettingsTab.SYSTEM)).performClick()
+        onNodeWithText("System Startup").assertIsDisplayed()
+        onNodeWithText("Updates").assertIsDisplayed()
+        onNodeWithText("Diagnostics").assertIsDisplayed()
+        onAllNodesWithText("Window opacity").assertCountEquals(0)
 
         onNodeWithTag(settingsTabTestTag(SettingsTab.APIS)).performClick()
         onNodeWithText("Monitored APIs").assertIsDisplayed()
@@ -544,6 +556,45 @@ class SettingsDialogContentTest {
         onNodeWithText("personal@example.com").assertIsDisplayed()
 
         onAllNodesWithText("Close").assertCountEquals(0)
+    }
+
+    /**
+     * Prévia da barra HUD (#399, X10): o próprio notch, só na aba Aparência, e
+     * sem gesto — o ponteiro sobre ela não abre balão.
+     */
+    @Test
+    fun `appearance tab shows a static HUD preview`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    appearancePreview = {
+                        SettingsHudPreview(
+                            accounts = ScreenshotFixtures.hudAccounts,
+                            fallbackLabel = "Carregando",
+                            windowOpacityPercent = 80,
+                            windowOpacitySupported = true,
+                            language = AppLanguage.PT
+                        )
+                    }
+                )
+            }
+        }
+
+        onNodeWithText("Prévia da barra HUD").assertIsDisplayed()
+        onNodeWithTag(SETTINGS_HUD_PREVIEW_TEST_TAG).assertIsDisplayed().performMouseInput { moveTo(center) }
+        waitForIdle()
+        onAllNodesWithTag(HUD_BALLOON_TEST_TAG).assertCountEquals(0)
+
+        onNodeWithTag(settingsTabTestTag(SettingsTab.SYSTEM)).performClick()
+        onAllNodesWithTag(SETTINGS_HUD_PREVIEW_TEST_TAG).assertCountEquals(0)
     }
 
     @Test
@@ -565,12 +616,13 @@ class SettingsDialogContentTest {
 
         // O conteúdo das outras abas não está apenas fora da vista: ele não está
         // na composição. Sem isso as abas seriam decoração sobre a mesma coluna.
-        onNodeWithText("System Startup").assertIsDisplayed()
+        onNodeWithText("Window opacity").assertIsDisplayed()
+        onAllNodesWithText("System Startup").assertCountEquals(0)
         onAllNodesWithText("Monitored APIs").assertCountEquals(0)
         onAllNodesWithText("Anthropic accounts").assertCountEquals(0)
 
         onNodeWithTag(settingsTabTestTag(SettingsTab.TEAM)).performClick()
-        onAllNodesWithText("System Startup").assertCountEquals(0)
+        onAllNodesWithText("Window opacity").assertCountEquals(0)
     }
 
     @Test

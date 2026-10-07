@@ -291,6 +291,8 @@ internal fun runUsageMonitor(
         actions = settingsActions,
         autoUpdate = autoUpdate,
         profileUiModels = profileUiModels,
+        accountColors = accountColors,
+        accountEmojis = accountEmojis,
         state = windows.settings,
         environment = modalEnvironment.copy(prewarmReady = settingsPrewarmReady)
     )

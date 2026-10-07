@@ -1,6 +1,14 @@
 package com.usagemonitor.domain
 
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.BotButton
+import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.UsageSnapshotAccount
+import com.usagemonitor.domain.entity.botAccountTapData
+import com.usagemonitor.domain.entity.data
+import com.usagemonitor.domain.entity.nextMorningMillis
+import com.usagemonitor.domain.entity.parseBotTap
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.TELEGRAM_SNOOZE_MILLIS
 import com.usagemonitor.domain.entity.snoozeAlerts
@@ -10,6 +18,7 @@ import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.parseBotCommand
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,6 +37,14 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Quiet(null), parseBotCommand("/quiet off"))
         assertEquals(BotCommand.Threshold(listOf(75, 90)), parseBotCommand("/limiar 90,75"))
         assertEquals(BotCommand.Start("AB12CD"), parseBotCommand("/start AB12CD"))
+        assertEquals(BotCommand.Accounts, parseBotCommand("/conta"))
+        assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
+        assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
+        assertEquals(BotCommand.Sources, parseBotCommand("/api"))
+        assertEquals(BotCommand.QuietMenu, parseBotCommand("/silencio"))
+        assertEquals(BotCommand.Chart(HistoryRange.LAST_24_HOURS), parseBotCommand("/grafico"))
+        assertEquals(BotCommand.Chart(HistoryRange.LAST_7_DAYS), parseBotCommand("/chart 7d"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/grafico 30d"))
     }
 
     @Test
@@ -75,5 +92,43 @@ class TelegramBotCommandTest {
         val settings = TelegramBotSettings(botToken = "123:secret", authorizedChats = listOf(TelegramChat(1L, "@ed")))
 
         assertFalse(settings.toString().contains("secret"))
+    }
+
+    /** #398, Y4: o toque da conta volta com fonte e resumo do rótulo, nunca o rótulo. */
+    @Test
+    fun `account tap data is short, stable and never carries the label`() {
+        val account = UsageSnapshotAccount(ApiSource.ANTHROPIC, "edi@example.com", active = false, quotas = emptyList())
+        val data = botAccountTapData(account)
+
+        assertTrue(data.startsWith("acc:ANTHROPIC:"))
+        assertFalse("edi@example.com" in data)
+        assertTrue(data.encodeToByteArray().size <= 64)
+        assertEquals(data, botAccountTapData(account.copy(active = true)))
+        assertEquals(BotTap.Account(data.removePrefix("acc:")), parseBotTap(data))
+        assertNull(parseBotTap("refresh"))
+        assertNull(parseBotTap("acc:"))
+    }
+
+    /** #398, Y8: os toques com parâmetro vão e voltam iguais, e dado forjado é recusado. */
+    @Test
+    fun `remote control taps round trip and reject forged data`() {
+        val taps = listOf(BotTap.Source(ApiSource.DEEPSEEK), BotTap.SnoozeFor(240), BotTap.SnoozeUntilMorning)
+        taps.forEach { tap -> assertEquals(tap, parseBotTap(tap.data())) }
+        assertNull(parseBotTap("api:NOPE"))
+        assertNull(parseBotTap("snz:0"))
+        assertNull(parseBotTap("snz:99999"))
+    }
+
+    /** "Até 08:00" é a próxima 08:00 em BRT: hoje antes dela, amanhã depois. */
+    @Test
+    fun `next morning is the next 08h in Sao Paulo`() {
+        // 22:30 BRT de terça → 08:00 BRT de quarta (11:00 UTC).
+        val night = Instant.parse("2026-10-07T01:30:00Z").toEpochMilliseconds()
+        assertEquals(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(night))
+        // 06:00 BRT → 08:00 BRT do mesmo dia.
+        val dawn = Instant.parse("2026-10-07T09:00:00Z").toEpochMilliseconds()
+        assertEquals(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(dawn))
+        // Exatamente 08:00 já passou: vai para o dia seguinte.
+        assertEquals(Instant.parse("2026-10-08T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds()))
     }
 }

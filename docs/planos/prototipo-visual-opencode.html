@@ -609,7 +609,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#presenca-contas">Presença · todas as contas</a>
   <a href="#chaves">Administração de chaves</a>
   <div class="grp">Configurações</div>
-  <a href="#cfg-geral">Geral</a>
+  <a href="#cfg-geral">Aparência e Sistema</a>
   <a href="#cfg-alertas">Alertas</a>
   <a href="#cfg-telegram">Bot do Telegram</a>
   <a href="#cfg-apis">APIs</a>
@@ -678,7 +678,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
 <p class="note">Os acentos são os que já passam no <code>AppAccentsContrastTest</code> (AA 4,5:1 nas duas superfícies, matiz preservada entre temas, 20° de separação entre si). <b>Não mudam sem decisão registrada</b> no <code>readme.md</code> do design system — foi assim que <code>--gemini</code> (~294°) e <code>--cursor</code> (~90°) entraram na issue #267. Nove acentos cobrem onze fontes: <code>--oc</code> é do OpenCode (Zen Free e Go) e <code>--gemini</code> é do Google (Gemini CLI e Antigravity). O que muda é a área: de fundo de card inteiro para um marcador de 2px, linha de gráfico e texto de valor. E a cor <code>opencode</code> continua sendo a da <b>integração</b> monitorada — não vira a cor da marca do app.</p>
 
 <h3 id="temas">Presets configuráveis — 8 claros e 8 escuros</h3>
-<p class="lede">O seletor da aplicação apresenta a mesma grade abaixo em Configurações → Geral. Cada cartão expõe a família de superfícies e seu acento estrutural; a seleção persistida vale para todas as janelas. Os marcadores de sucesso, atenção, erro e as cores das integrações permanecem semânticos.</p>
+<p class="lede">O seletor da aplicação apresenta a mesma grade abaixo em Configurações → Aparência. Cada cartão expõe a família de superfícies e seu acento estrutural; a seleção persistida vale para todas as janelas. Os marcadores de sucesso, atenção, erro e as cores das integrações permanecem semânticos.</p>
 <div class="theme-board">
   <div class="theme-card selected" style="--preview-bg:#131010;--preview-surface:#1B1818;--preview-primary:#4C8DFF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Obsidiana</span><span>escuro</span></div></div>
   <div class="theme-card" style="--preview-bg:#111315;--preview-surface:#1A1D20;--preview-primary:#7DB3FF"><div class="preview"><i></i><i></i><i></i></div><div class="name"><span>Grafite</span><span>escuro</span></div></div>
@@ -856,7 +856,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <span style="font-family:var(--mono);font-size:var(--t20);font-weight:500;letter-spacing:-.01em">usage monitor</span>
 </div>
 <p class="note"><b>Verificação pendente:</b> o <code>.icns</code> do macOS não é validável na máquina Windows onde a implementação roda. Ele é montado por script determinístico e a checagem real acontece no job <code>build-macos</code> do release. O <code>.ico</code> sai do mesmo script, com uma entrada PNG por tamanho. O ícone da bandeja recebe o ponto de risco por cima — <code>ON_TRACK</code> não acende nada, porque ponto verde permanente vira decoração.</p>
-<p class="note"><b>Anel de uso (issue #328), desligado por padrão</b> — "Anel de uso na bandeja", última linha de Configurações › Geral › Sistema. Arco do topo no sentido horário com o <b>maior</b> percentual entre as cotas vigentes de todas as contas; saldo em dinheiro e janela vencida ficam de fora, e sem cota elegível não há anel (anel vazio diria 0% sem ninguém ter medido). Trilho escuro na volta inteira para o arco ler sobre bandeja clara ou escura. Cor pelos cortes de 75 e 90 dos alertas; abaixo deles cinza claro, não verde, pelo mesmo motivo do ponto. O anel não diz de qual conta é o número: o tooltip do ícone continua listando cada uma. O ponto de risco continua por cima.</p>
+<p class="note"><b>Anel de uso (issue #328), desligado por padrão</b> — "Anel de uso na bandeja", última linha do painel "Inicialização e bandeja" em Configurações › Sistema. Arco do topo no sentido horário com o <b>maior</b> percentual entre as cotas vigentes de todas as contas; saldo em dinheiro e janela vencida ficam de fora, e sem cota elegível não há anel (anel vazio diria 0% sem ninguém ter medido). Trilho escuro na volta inteira para o arco ler sobre bandeja clara ou escura. Cor pelos cortes de 75 e 90 dos alertas; abaixo deles cinza claro, não verde, pelo mesmo motivo do ponto. O anel não diz de qual conta é o número: o tooltip do ícone continua listando cada uma. O ponto de risco continua por cima.</p>
 
 <!-- ═══════════════════════════════ DASHBOARD ═════════════════════════ -->
 <h2 id="dashboard">4 · Dashboard</h2>
@@ -1327,7 +1327,7 @@ semântica que este protótipo não define. Falha de fonte já tem o banner por 
 
 <!-- ═══════════════════════════════ NOVIDADES ════════════════════════ -->
 <h2 id="novidades">4d · Novidades da versão</h2>
-<p class="lede">Diálogo da <b>primeira abertura depois de uma mudança de versão</b> — automática ou manual, nas três plataformas (issues #74 e #127). A atualização automática é silenciosa por construção: o app fecha, o instalador roda sem tela e o app volta com outro número no rodapé. A instalação manual também troca o binário sem dizer o que mudou. Sem esta janela, a única pista é uma linha em Configurações → Geral, que ninguém abre.</p>
+<p class="lede">Diálogo da <b>primeira abertura depois de uma mudança de versão</b> — automática ou manual, nas três plataformas (issues #74 e #127). A atualização automática é silenciosa por construção: o app fecha, o instalador roda sem tela e o app volta com outro número no rodapé. A instalação manual também troca o binário sem dizer o que mudou. Sem esta janela, a única pista é uma linha em Configurações → Sistema, que ninguém abre.</p>
 
 <div class="panel"><div class="pbody">
   <div class="cap">560 × 520dp, <code>undecorated</code> com a moldura de diálogo do §14</div>
@@ -2058,25 +2058,55 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
   <div style="display:grid;grid-template-columns:180px 1fr;min-height:420px">
     <div style="border-right:1px solid var(--border);background:var(--surface);padding:var(--s3);display:flex;flex-direction:column;gap:2px">
       <span class="k" style="margin-bottom:var(--s2)">Seções</span>
-      <button class="btn ghost" type="button" style="justify-content:flex-start;color:var(--fg);background:var(--raised)">Geral</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start;color:var(--fg);background:var(--raised)">Aparência</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Sistema</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Alertas</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">APIs</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Contas</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Time</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Rede</button>
     </div>
     <div class="body">
-      <div class="panel"><div class="phead"><span class="ptitle">Aparência</span></div><div class="pbody flush">
-        <div class="row" style="display:block"><div class="stack" style="gap:var(--s2)"><span class="v sm">Tema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Escolha uma das oito paletas claras ou oito escuras.</span><div class="theme-board" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s2)"><span class="theme-card selected" style="--preview-bg:#131010;--preview-surface:#1B1818;--preview-primary:#4C8DFF"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Obsidiana</span><span>escuro</span></span></span><span class="theme-card" style="--preview-bg:#F1F8F9;--preview-surface:#FBFFFF;--preview-primary:#006B73"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Gelo</span><span>claro</span></span></span></div></div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Prévia da barra HUD</span></div><div class="pbody" style="display:flex;justify-content:center">
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;padding:var(--s2) var(--s4);display:flex;gap:var(--s4);opacity:.92"><span class="v sm">Claude 7d 41% · 5h 68% · Atenção</span><span class="v sm">Codex 7d 7% · Normal</span></div>
+      </div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Tema e idioma</span></div><div class="pbody flush">
+        <div class="row" style="display:block"><div class="stack" style="gap:var(--s2)"><span class="v sm">Tema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Escolha uma das treze paletas claras ou treze escuras.</span><div class="theme-board" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s2)"><span class="theme-card selected" style="--preview-bg:#131010;--preview-surface:#1B1818;--preview-primary:#4C8DFF"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Obsidiana</span><span>escuro</span></span></span><span class="theme-card" style="--preview-bg:#F1F8F9;--preview-surface:#FBFFFF;--preview-primary:#006B73"><span class="preview"><i></i><i></i><i></i></span><span class="name"><span>Gelo</span><span>claro</span></span></span></div></div></div>
         <div class="row"><span class="v sm">Idioma</span><span class="sp"></span><div class="seg"><button class="on" type="button">PT</button><button type="button">EN</button></div></div>
+      </div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Janela</span></div><div class="pbody flush">
         <div class="row"><span class="v sm">Opacidade da janela</span><span class="sp"></span><span class="v sm">92%</span><div class="track" style="width:150px"><i style="width:92%"></i></div></div>
+        <div class="row"><span class="v sm">Tamanho da interface</span><span class="sp"></span><span class="v sm">115%</span><div class="track" style="width:150px"><i style="width:50%"></i></div></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Reduzir animações</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Troca telas, barras e menus de uma vez, sem transição, e desliga o que gira ou pulsa para indicar sessão ativa.</span></div><span class="sw"></span></div>
       </div></div>
-      <div class="panel"><div class="phead"><span class="ptitle">Sistema</span></div><div class="pbody flush">
-        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Iniciar com o sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Aparência e Sistema no lugar de Geral (issue #399, direção X1).</b> A aba Geral juntava dez controles, e as 26 paletas empurravam Sistema e Diagnóstico para fora da primeira tela. Aparência é o que a janela mostra (tema, idioma, opacidade, tamanho, animações); Sistema é o que o app faz fora dela (inicialização, bandeja, atualizações, diagnóstico). Os dois valores entraram em <code>SettingsTab</code> por exceção aprovada à regra do enum: ele não é persistido. A aba abre com a <b>prévia da barra HUD</b> (X10): o próprio notch, fechado e sem gesto, com as contas da última leitura; tema e tamanho vêm da janela, a opacidade é aplicada na prévia.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Configurações › Sistema</span><span class="wbtn">×</span></div>
+  <div style="display:grid;grid-template-columns:180px 1fr;min-height:420px">
+    <div style="border-right:1px solid var(--border);background:var(--surface);padding:var(--s3);display:flex;flex-direction:column;gap:2px">
+      <span class="k" style="margin-bottom:var(--s2)">Seções</span>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Aparência</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start;color:var(--fg);background:var(--raised)">Sistema</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Alertas</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">APIs</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Contas</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Time</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Rede</button>
+    </div>
+    <div class="body">
+      <div class="panel"><div class="phead"><span class="ptitle">Inicialização e bandeja</span></div><div class="pbody flush">
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Inicialização com Sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Anel de uso na bandeja</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta.</span></div><span class="sw"></span></div>
+      </div></div>
+      <div class="panel"><div class="phead"><span class="ptitle">Atualizações</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
         <!-- Issue #355: canal beta, logo abaixo da atualização automática; desligado por padrão. -->
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Receber versões beta</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Oferece também as versões beta, que chegam antes da estável e podem ter defeitos. Desligar não volta para a versão anterior: o app fica na beta até sair uma estável mais nova.</span></div><span class="sw"></span></div>
-        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Anel de uso na bandeja</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta.</span></div><span class="sw"></span></div>
       </div></div>
 
       <div class="panel"><div class="phead"><span class="ptitle">Diagnóstico</span><span class="sp"></span><button class="btn primary" type="button">Reportar um bug</button></div><div class="pbody flush">
@@ -2109,6 +2139,8 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
   <div class="body">
     <div class="panel"><div class="phead"><span class="ptitle">Alertas na bandeja</span><span class="sp"></span><span class="sw on"></span></div><div class="pbody flush">
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Limiares de cota</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto (DeepSeek, OpenRouter) e atividade observada não informa limite (OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado.</span></div><div class="hstack"><input class="field" value="75" style="width:56px"><input class="field" value="90" style="width:56px"><input class="field" value="100" style="width:56px"><span class="k">%</span></div></div>
+      <!-- #398, Y2: aviso de reinício, logo abaixo dos limiares que ele responde. -->
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Avisar quando a cota reiniciar</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só das cotas que passaram de um limiar na janela anterior.</span></div><span class="sw on"></span></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI saturada</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só o veredito saturado vira notificação. Atenção apareceu em 7 de 70 sessões medidas — notificar nesse patamar tornaria o alerta rotina.</span></div><span class="sw on"></span></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI sem resposta</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Houve pedido e não houve resposta no transcript acima do limiar. O app não verifica o processo do Claude Code, e o texto do aviso não afirma que ele travou.</span></div><span class="sw on"></span></div>
       <div class="row"><span class="v sm" style="flex:1">Limiar sem resposta</span><div class="seg"><button type="button">30min</button><button type="button">1h</button><button class="on" type="button">2h</button><button type="button">4h</button></div></div>
@@ -2156,7 +2188,9 @@ nome; com código aberto, a caixa do comando <code>/start CÓDIGO</code> com <b>
 o prazo, <b>Abrir no Telegram</b> pelo link <code>t.me/&lt;bot&gt;?start=&lt;código&gt;</code>, que já manda o comando, e
 <b>Gerar novo código</b>; sem código, <b>Parear conversa</b>/<b>Parear outra conversa</b>); <b>3 · Testar</b> (<b>Enviar
 teste</b>, só depois do pareamento). A conversa de exemplo saiu do card: <b>▸ Ver como o bot responde</b> abre, recolhida
-por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord aparece como segunda fase, com o motivo.</p>
+por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord aparece como segunda fase, com o motivo.
+<b>#398:</b> bloco <b>Opções do bot</b> abaixo dos passos — "Resumo diário" (Y1, segmentado Desligado/07/08/09/12/18 h BRT), "Painel fixado ao vivo" (Y5), "Permitir mudar fontes pelo bot" (Y8, nasce desligado: com ele,
+quem está numa conversa pareada muda o que o app monitora; desligado, o <code>/api</code> só lista).</p>
 <div class="win" style="max-width:660px">
   <div class="titlebar"><span class="t">Configurações › Alertas</span></div>
   <div class="body"><div class="panel">
@@ -2173,6 +2207,12 @@ por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord
       <div class="hstack"><button class="btn">Abrir no Telegram</button><button class="btn">Gerar novo código</button></div>
       <div class="hstack"><span class="v">3 · Testar</span><span class="st" style="color:var(--info)">Agora</span></div>
       <div class="hstack"><button class="btn">Enviar teste</button></div>
+      <!-- #398: opções do bot, abaixo dos três passos. -->
+      <span class="v">Opções do bot</span>
+      <div class="stack" style="gap:0"><span class="v sm">Resumo diário</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Uma mensagem por dia com a cota mais cheia de cada conta, o que reinicia hoje e o gasto das últimas 24 h. Horário em BRT; o silêncio adia.</span></div>
+      <div class="seg"><button type="button">Desligado</button><button type="button">07:00</button><button class="on" type="button">08:00</button><button type="button">09:00</button><button type="button">12:00</button><button type="button">18:00</button></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Painel fixado ao vivo</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Fixa uma mensagem no topo da conversa e a edita a cada coleta, sem notificar. Desligar desafixa.</span></div><span class="sw"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Permitir mudar fontes pelo bot</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Com ele, o /api liga e desliga as APIs monitoradas. Desligado, o /api só lista.</span></div><span class="sw"></span></div>
       <span class="k">▸ Ver como o bot responde</span>
     </div></div>
   </div></div>
@@ -2323,7 +2363,7 @@ a coleta muda e filete dourado sob o cabeçalho até a próxima releitura. O com
 leitura não anima; aba escondida não desenha; "reduzir movimento" do sistema é corte seco. A CSP não deixa carregar nada de fora; a fonte cai para a mono do sistema.</p>
 
 <h2 id="cfg-bug">12f · Relatório de bug</h2>
-<p class="lede">Aberto pelo botão <b>Reportar um bug</b> da aba Geral, e sozinho no arranque seguinte a uma queda. Ele tem <b>janela própria</b> (desde que a HUD virou o único modo, setembro de 2026): a HUD tem o tamanho do notch e não comporta o formulário. A captura enquadra a HUD, e o clique nas Configurações fecha aquela janela antes de abrir esta.</p>
+<p class="lede">Aberto pelo botão <b>Reportar um bug</b> da aba Sistema, e sozinho no arranque seguinte a uma queda. Ele tem <b>janela própria</b> (desde que a HUD virou o único modo, setembro de 2026): a HUD tem o tamanho do notch e não comporta o formulário. A captura enquadra a HUD, e o clique nas Configurações fecha aquela janela antes de abrir esta.</p>
 
 <div class="g2">
   <div>
@@ -2496,7 +2536,7 @@ O app fechou inesperadamente.
 
 <p class="note"><b>A faixa da demo tem altura fixa, não a proporção da gravação.</b> Com <code>aspectRatio</code> ela media ~410dp numa janela de 900dp e empurrava a seção "Como ativar" inteira para fora da vista — três asserts de componente falharam com <em>not displayed</em> antes da troca. Altura fixa também é o que mantém a página parada ao trocar de tópico, e a gravação entra com <code>Fit</code>: o que sobra é margem, nunca corte.</p>
 
-<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Geral", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola, pela mesma razão de sempre: ele é o controle.</p>
+<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Sistema", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola, pela mesma razão de sempre: ele é o controle.</p>
 
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>
@@ -2509,7 +2549,7 @@ O app fechou inesperadamente.
   <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Fonte embutida no PDFBox recalcula largura de todas as colunas</span><span class="k">commit K1</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhum texto de interface muda — ~390 asserts observam essas strings</span><span class="k">todas as fases</span></div>
   <div class="row"><span class="st ok">Regra fixa</span><span class="v sm" style="flex:1">Nenhuma ação, filtro, gráfico, exportação ou mensagem é removida</span><span class="k">todas as fases</span></div>
-  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Com <code>USAGE_MONITOR_UPDATE_FEED_URL</code> definida, o feed de releases é outro — e o SHA-256 que barra artefato adulterado vem de lá. A aba Geral mostra um aviso em tom âmbar enquanto ela estiver ativa</span><span class="k">issue #75</span></div>
+  <div class="row"><span class="st warn">Risco conhecido</span><span class="v sm" style="flex:1">Com <code>USAGE_MONITOR_UPDATE_FEED_URL</code> definida, o feed de releases é outro — e o SHA-256 que barra artefato adulterado vem de lá. A aba Sistema mostra um aviso em tom âmbar enquanto ela estiver ativa</span><span class="k">issue #75</span></div>
   <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">O <code>Setup.exe</code> não é assinado: SmartScreen ou antivírus podem barrar a atualização silenciosa, que então cai na faixa "Baixar manualmente"</span><span class="k">issue #75</span></div>
   <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">A atualização automática do Linux sai <b>desligada por build</b> (<code>LINUX_AUTO_UPDATE_SHIPPED = false</code>): CI e containers cobrem script e extração, mas ninguém a exercitou numa sessão gráfica real. A máquina de desenvolvimento é Windows</span><span class="k">issue #100</span></div>
   <div class="row"><span class="st warn">Risco aceito</span><span class="v sm" style="flex:1">~125 MB por versão no Linux, e ~600 MB em disco com as duas versões retidas em <code>~/.local/share</code> — a atual e uma anterior, para o rollback do ciclo seguinte</span><span class="k">issue #100</span></div>

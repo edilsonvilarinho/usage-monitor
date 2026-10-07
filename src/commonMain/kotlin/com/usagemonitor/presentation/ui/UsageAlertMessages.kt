@@ -19,6 +19,7 @@ data class UsageAlertMessage(
 fun usageAlertMessage(alert: UsageAlert, language: AppLanguage): UsageAlertMessage {
     return when (alert) {
         is UsageAlert.QuotaThreshold -> quotaThresholdMessage(alert, language)
+        is UsageAlert.QuotaReset -> quotaResetMessage(alert, language)
         is UsageAlert.SessionSaturated -> sessionSaturatedMessage(alert, language)
         is UsageAlert.SessionStalled -> sessionStalledMessage(alert, language)
         is UsageAlert.SpendSpike -> spendSpikeMessage(alert, language)
@@ -92,6 +93,21 @@ private fun quotaThresholdMessage(
     }
 
     return UsageAlertMessage(title = title, body = head + resetSuffix)
+}
+
+/** Mesmo título `alvo · cota` do limiar: o reinício responde àquele aviso. */
+private fun quotaResetMessage(
+    alert: UsageAlert.QuotaReset,
+    language: AppLanguage
+): UsageAlertMessage {
+    val title = "${alert.targetLabel} · ${alert.quotaLabel}"
+    val next = formatBrtDateTime(alert.nextResetAt, language)
+    val body = if (language == AppLanguage.PT) {
+        "A cota reiniciou: dá para voltar a usar. Próximo reinício: $next BRT."
+    } else {
+        "The quota reset: you can use it again. Next reset: $next BRT."
+    }
+    return UsageAlertMessage(title = title, body = body)
 }
 
 private fun sessionSaturatedMessage(

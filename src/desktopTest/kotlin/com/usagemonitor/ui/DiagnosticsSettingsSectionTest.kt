@@ -15,7 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * A aba Geral cresceu com a seção nova, e a cena do teste tem de crescer junto:
+ * A aba Sistema cresceu com a seção nova, e a cena do teste tem de crescer junto:
  * `assertIsDisplayed` mede contra os limites da janela, não os do `Box` interno.
  */
 private const val SCENE_HEIGHT = 2200
@@ -70,7 +70,7 @@ class DiagnosticsSettingsSectionTest {
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
                     onReportBug = onReportBug,
-                    initialTab = SettingsTab.GENERAL
+                    initialTab = SettingsTab.SYSTEM
                 )
             }
         }

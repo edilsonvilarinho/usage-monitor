@@ -1,0 +1,222 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#398 #399 opções</title><style>body{margin:0;background:#101010}</style></head><body>
+<style>
+.ux{--bg:#131010;--surface:#1B1818;--raised:#211E1E;--border:#3D3838;--fg:#F2EDED;--muted:#B8B2B2;--ok:#4CAF50;--warn:#FFA726;--crit:#E86A6A;--info:#4C8DFF;--gold:#E8AE63;--hot:#FFF0CB;--dust:#8C643F;
+  background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux h2{font-size:14px;color:#fff;margin:26px 0 4px;font-weight:500;border-top:1px solid #2c2c2c;padding-top:16px}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 12px;color:#e9d6b8;font-size:11.5px}
+.ux .fix b{color:var(--gold)}
+.ux .fix ul{margin:4px 0 0;padding-left:16px}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:12px}
+.ux .opt.ref{border-style:dashed;border-color:#4a4a4a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt p{margin:0 0 8px;color:#8f8f8f;font-size:11px}
+.ux .tags{font-size:10.5px;color:#7a7a7a;margin-top:8px}
+.ux .tags b{color:#c9a46e;font-weight:500}
+.ux .tags .no{color:var(--crit)}
+.ux .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.ux .grid2 .opt{margin-bottom:0}
+/* ---------- janela de Configurações ---------- */
+.ux .win{display:flex;background:var(--bg);border:1px solid #2a2626;border-radius:8px;overflow:hidden;height:300px;font-size:10.5px}
+.ux .win.tall{height:340px}
+.ux .nav{width:118px;flex:none;border-right:1px solid var(--border);padding:8px 6px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.ux .nav .hd{font-size:9px;color:#7d7676;text-transform:uppercase;letter-spacing:.06em;padding:2px 6px 4px}
+.ux .nav .it{padding:4px 7px;border-radius:6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .nav .it.sel{background:var(--raised);color:var(--fg);box-shadow:inset 2px 0 0 var(--gold)}
+.ux .nav .it.subi{padding-left:18px;font-size:10px}
+.ux .nav .it.subi.sel{box-shadow:inset 2px 0 0 var(--dust);background:transparent;color:var(--hot)}
+.ux .nav .grp{font-size:9px;color:#7d7676;padding:6px 7px 1px;text-transform:uppercase;letter-spacing:.05em}
+.ux .nav .srch{border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:#8a8282;margin-bottom:6px;font-size:10px}
+.ux .nav .new{color:var(--gold)}
+.ux .main{flex:1;min-width:0;padding:10px 12px;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+.ux .sec{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:none}
+.ux .sec .sh{display:flex;align-items:center;gap:6px;padding:6px 9px;border-bottom:1px solid var(--border);font-size:10px;color:var(--fg);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.ux .sec .sh .tr{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)}
+.ux .sec.closed .sh{border-bottom:none}
+.ux .row{display:flex;align-items:center;gap:8px;padding:5px 9px;border-top:1px solid #2a2626}
+.ux .sh+.row{border-top:none}
+.ux .row .l{flex:1;min-width:0}
+.ux .row .l b{display:block;color:var(--fg);font-weight:500;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .row .l i{display:block;font-style:normal;font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--muted);font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .sw{width:24px;height:13px;border-radius:7px;background:#3a3535;position:relative;flex:none}
+.ux .sw::after{content:"";position:absolute;left:2px;top:2px;width:9px;height:9px;border-radius:50%;background:#bbb}
+.ux .sw.on{background:#2e7d32}.ux .sw.on::after{left:auto;right:2px;background:#fff}
+.ux .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex:none}
+.ux .seg span{padding:2px 7px;color:var(--muted);font-size:9.5px}
+.ux .seg span.on{background:var(--raised);color:var(--fg)}
+.ux .sl{width:90px;height:4px;border-radius:2px;background:#3a3535;position:relative;flex:none}
+.ux .sl i{position:absolute;left:0;top:0;bottom:0;background:var(--gold);border-radius:2px}
+.ux .sl i::after{content:"";position:absolute;right:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--hot)}
+.ux .val{color:var(--fg);width:34px;text-align:right;flex:none}
+.ux .sws{display:grid;grid-template-columns:repeat(13,1fr);gap:3px;padding:4px 9px 7px}
+.ux .sws span{height:13px;border-radius:3px;border:1px solid #00000055}
+.ux .sws span.sel{outline:1.5px solid var(--gold);outline-offset:1px}
+.ux .chev{color:var(--muted);flex:none;width:10px}
+.ux .sum{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:9.5px;margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .btn{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--raised);color:var(--fg);border-radius:6px;padding:2px 8px;font-size:9.5px;white-space:nowrap;flex:none}
+.ux .btn.pri{background:#2a3b5c;border-color:#3f5f99;color:#dbe7ff}
+.ux .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);flex:none}
+.ux .tabs span{padding:4px 9px;color:var(--muted);border-bottom:2px solid transparent}
+.ux .tabs span.on{color:var(--fg);border-bottom-color:var(--gold)}
+.ux .cols2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ux .pv{background:#0b0909;border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;flex:none}
+.ux .notch{background:#1B1818;border:1px solid #2e2a2a;border-radius:0 0 12px 12px;padding:6px 10px;display:flex;gap:8px;align-items:center}
+.ux .ring{width:28px;height:28px;border-radius:50%;background:conic-gradient(var(--ok) 0 42%,#2a2626 42% 100%);position:relative}
+.ux .ring::after{content:"";position:absolute;inset:4px;border-radius:50%;background:#030508;box-shadow:0 0 6px #E8AE6344 inset}
+.ux .ring.w{background:conic-gradient(var(--warn) 0 78%,#2a2626 78% 100%)}
+.ux .tiny{font-size:9.5px;color:var(--muted)}
+.ux .card2{background:var(--raised);border:1px solid var(--border);border-radius:8px;padding:7px 9px}
+.ux .card2 b{color:var(--fg);font-weight:500}
+.ux .badge{font-size:9px;border-radius:4px;padding:0 5px;background:#33260f;color:var(--warn);flex:none}
+.ux .badge.ok{background:#1a2e1c;color:#66BB6A}
+.ux .hl{background:#3a2a14;color:var(--hot);border-radius:2px;padding:0 2px}
+.ux .modal{position:absolute;inset:18px 26px;background:var(--surface);border:1px solid #4a3a20;border-radius:10px;box-shadow:0 10px 40px #000a;padding:10px;display:flex;flex-direction:column;gap:6px}
+.ux .dim{position:relative}
+.ux .dim::before{content:"";position:absolute;inset:0;background:#000a;z-index:0}
+.ux .dim>*{position:relative;z-index:1}
+/* ---------- Telegram ---------- */
+.ux .tg{background:#0e1621 radial-gradient(circle at 20% 20%,#17202c,#0e1621);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:12px;line-height:1.38;color:#f5f5f5;min-height:250px}
+.ux .tg .in,.ux .tg .out{max-width:94%;padding:6px 9px 5px;border-radius:10px;white-space:pre-wrap;word-break:break-word}
+.ux .tg .in{background:#212d3b;align-self:flex-start;border-bottom-left-radius:3px}
+.ux .tg .out{background:#766ac8;align-self:flex-end;border-bottom-right-radius:3px}
+.ux .tg .tm{float:right;font-size:10px;color:rgba(255,255,255,.45);margin:6px 0 -3px 8px}
+.ux .tg code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:11px;color:#9fd0ff}
+.ux .tg pre{font-family:"IBM Plex Mono",Consolas,monospace;font-size:10.5px;background:rgba(0,0,0,.28);border-radius:6px;padding:5px 7px;margin:3px 0;white-space:pre;overflow-x:auto;color:#e8e8e8;line-height:1.4}
+.ux .tg i{color:#a9b4c0}
+.ux .tg .kb{display:grid;gap:4px;align-self:flex-start;width:94%}
+.ux .tg .kb span{background:rgba(33,45,59,.85);border-radius:6px;text-align:center;padding:4px 2px;font-size:11px}
+.ux .tg .pin{align-self:stretch;background:#17212b;border-left:3px solid #6ab3f3;border-radius:4px;padding:4px 8px;font-size:11px;color:#cfd8e3}
+.ux .tg .pin b{color:#6ab3f3;font-weight:500}
+.ux .tg .img{border-radius:8px;background:#0b0f15;border:1px solid #233;height:86px;position:relative;overflow:hidden;margin:2px 0}
+.ux .tg .file{display:flex;gap:8px;align-items:center}
+.ux .tg .file .ic{width:34px;height:34px;border-radius:50%;background:#6ab3f3;color:#0e1621;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex:none}
+.ux .cfg{margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px 8px;font-size:10.5px}
+.ux .cfg .row{padding:3px 0;border-top:none}
+.ux .cfg .t{font-size:9.5px;color:#7d7676;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+</style>
+<div class="ux" id="ux">
+<h1>#399 + #398 — Configurações reorganizadas e bot do Telegram com mais funções</h1>
+<p class="sub">Duas rodadas, estáticas: <b>X</b> (#399, como organizar a aba Geral e a navegação das Configurações) e <b>Y</b> (#398, que funções novas o bot ganha). Escolha uma X e uma ou mais Y; dá para combinar. Cada Y mostra também a linha que ela acrescenta nas Configurações — é aí que as duas issues se encontram.</p>
+<div class="fix"><b>Restrições levantadas antes de desenhar (código lido):</b>
+<ul>
+<li><b>Hoje a Geral tem 10 controles em 3 painéis</b> (<code>SettingsGeneralTab.kt</code>): Aparência (tema com 26 paletas, idioma, opacidade, tamanho da interface, reduzir animações), Sistema (inicialização, atualização automática com recibo, beta, anel na bandeja) e Diagnóstico (Reportar um bug). O seletor de 26 paletas sozinho ocupa a maior parte da altura.</li>
+<li><b>CLAUDE.md: "nenhum valor novo em enum existente"</b>. Opções que criam abas novas (<b>X1, X8, X9</b>) mexem em <code>SettingsTab</code> e exigem exceção explícita sua. As outras não tocam o enum.</li>
+<li><b>#398 não tem corpo</b> — só o título. As Y são proposta minha, todas montadas sobre dado que o app já calcula (cotas, risco, <code>GetMonthlyBudgetStatusUseCase</code>, <code>ModelPricingTable</code>, índice CLI, histórico, relatório PDF). Nenhuma trafega prompt, resposta ou caminho de projeto.</li>
+<li><b>O card do Telegram mora na aba Alertas</b> (<code>SettingsDialogContent.kt:492</code>). Cada Y acrescenta 1–3 controles a ele: o crescimento de #398 pesa na escolha de #399.</li>
+</ul></div>
+
+<h2>X · Organização das Configurações (#399)</h2>
+<p class="sub">Mesmos 10 controles da Geral de hoje, com os rótulos reais do app. Tema escuro padrão, tamanho reduzido.</p>
+<div id="xopts"></div>
+
+<h2>Y · Funções novas do bot (#398)</h2>
+<p class="sub">Conversa real no formato W5 já em produção (HTML do Telegram, cartão por conta, risco em emoji <b>e</b> palavra). Embaixo de cada uma: o que entra nas Configurações e o que custa no código.</p>
+<div class="grid2" id="yopts"></div>
+</div>
+<script>
+(function(){
+const SW=['#1B1818','#16161E','#0F1A14','#1A1420','#101826','#201612','#14181C','#1E1B10','#0E0E0E','#181020','#121C1C','#1C1414','#141414','#F4F1EC','#F2F4F8','#EEF4EE','#F6F0F4','#EEF2F8','#F8F2EC','#EEF0F2','#F6F4E8','#FFFFFF','#F4EEF8','#EEF6F6','#F8EEEE','#F0F0F0'];
+const sw=on=>`<span class="sw${on?' on':''}"></span>`;
+const seg=(a,i)=>`<span class="seg">${a.map((t,k)=>`<span class="${k===i?'on':''}">${t}</span>`).join('')}</span>`;
+const sl=(p,v)=>`<span class="sl"><i style="width:${p}%"></i></span><span class="val">${v}</span>`;
+const row=(l,d,c)=>`<div class="row"><div class="l"><b>${l}</b>${d?`<i>${d}</i>`:''}</div>${c||''}</div>`;
+const sec=(t,body,tr)=>`<div class="sec"><div class="sh">${t}${tr?`<span class="tr">${tr}</span>`:''}</div>${body}</div>`;
+const swatches=(n=26)=>`<div class="sws">${SW.slice(0,n).map((c,i)=>`<span class="${i===0?'sel':''}" style="background:${c}"></span>`).join('')}</div>`;
+const R={
+ theme:row('Tema','Escolha uma das treze paletas claras ou treze escuras.')+swatches(),
+ themeRow:row('Tema','Gargantua escuro',`<span class="btn">Trocar…</span>`),
+ lang:row('Idioma','',seg(['PT','EN'],0)),
+ op:row('Opacidade da janela','',sl(92,'92%')),
+ sc:row('Tamanho da interface','',sl(60,'115%')),
+ rm:row('Reduzir animações','Corte seco em toda transição',sw(false)),
+ as:row('Inicialização com Sistema','Abre com o Windows',sw(true)),
+ au:row('Atualização automática','Última: v41.8.0 instalada ontem',sw(true)),
+ bt:row('Receber versões beta','Prévias antes da estável',sw(false)),
+ tr:row('Anel de uso na bandeja','O ícone mostra a pior cota',sw(true)),
+ bug:row('Reportar um bug','Trilha em ~/.usage-monitor/diagnostics',`<span class="btn pri">Reportar</span>`)
+};
+const NAV=['Geral','Alertas','APIs','Contas','Time','Rede'];
+const nav=(items,sel,extra='')=>`<div class="nav">${extra}<div class="hd">Seções</div>${items.map(x=>typeof x==='string'?`<div class="it${x===sel?' sel':''}">${x}</div>`:x).join('')}</div>`;
+const win=(n,m,cls='')=>`<div class="win ${cls}">${n}<div class="main">${m}</div></div>`;
+const X=[
+ {id:'ref',n:'Hoje (referência)',d:'Três painéis empilhados na Geral. As 26 paletas empurram Sistema e Diagnóstico para fora da primeira tela; quem procura "atualização" rola sem pista.',
+  h:win(nav(NAV,'Geral'),sec('Aparência',R.theme+R.lang+R.op+R.sc+R.rm)+sec('Sistema',R.as+R.au)),t:''},
+ {id:'X1',n:'X1 · Aparência e Sistema viram abas',d:'A Geral some: "Aparência" (tema, idioma, opacidade, tamanho, animações) e "Sistema" (inicialização, atualização, beta, bandeja, bug) entram na navegação. Sete itens na lateral.',
+  h:win(nav(['Aparência','Sistema','Alertas','APIs','Contas','Time','Rede'],'Sistema'),sec('Inicialização',R.as+R.tr)+sec('Atualizações',R.au+R.bt)+sec('Diagnóstico',R.bug)),
+  t:'<span class="no">Novo valor em SettingsTab</span> — exige exceção à regra do CLAUDE.md.'},
+ {id:'X2',n:'X2 · Sub-abas dentro da Geral',d:'Segmentado no topo da Geral: Aparência · Sistema · Sobre. Só a sub-aba escolhida é composta (mesmo critério das abas). A navegação lateral não muda.',
+  h:win(nav(NAV,'Geral'),`<div class="tabs"><span>Aparência</span><span class="on">Sistema</span><span>Sobre</span></div>`+sec('Comportamento',R.as+R.tr)+sec('Atualizações',R.au+R.bt)),
+  t:'<b>Sem enum novo</b> no SettingsTab (enum próprio da sub-aba). Aba × segmentado têm papéis distintos no design system: usar AppSegmented, não AppTabs.'},
+ {id:'X3',n:'X3 · Painéis recolhíveis com resumo',d:'Cada painel fechado mostra o valor atual na própria linha ("Gargantua escuro · PT · 115%"). Abre só o que vai mudar; o último aberto é lembrado na sessão do diálogo.',
+  h:win(nav(NAV,'Geral'),`<div class="sec closed"><div class="sh"><span class="chev">▸</span>Aparência<span class="sum">Gargantua escuro · PT · 92% · 115%</span></div></div>`+`<div class="sec"><div class="sh"><span class="chev">▾</span>Sistema<span class="sum">inicia com o Windows · atualiza sozinho</span></div>${R.as+R.au+R.bt+R.tr}</div>`+`<div class="sec closed"><div class="sh"><span class="chev">▸</span>Diagnóstico<span class="sum">trilha local ativa</span></div></div>`),
+  t:'<b>Sem enum novo.</b> Primitiva nova (painel recolhível) — nasce no mesmo commit que a usa.'},
+ {id:'X4',n:'X4 · Navegação em árvore com âncoras',d:'"Geral" abre sub-itens na lateral (Aparência, Sistema, Atualizações, Diagnóstico). Clicar rola até o painel; rolar acende o sub-item visível. A página continua uma só.',
+  h:win(nav(['Geral',`<div class="it subi">Aparência</div>`,`<div class="it subi sel">Sistema</div>`,`<div class="it subi">Atualizações</div>`,`<div class="it subi">Diagnóstico</div>`,'Alertas','APIs','Contas','Time','Rede'],'Geral'),sec('Sistema',R.as+R.tr)+sec('Atualizações',R.au+R.bt)+sec('Diagnóstico',R.bug)),
+  t:'<b>Sem enum novo.</b> Custo: scroll-spy no Compose (posição de cada painel medida) e teste de rolagem.'},
+ {id:'X5',n:'X5 · Tema numa janela própria',d:'O seletor de 26 paletas sai da aba e vira uma linha "Tema · Gargantua escuro [Trocar…]" que abre um AppDialog com a galeria grande e prévia. A Geral inteira cabe numa tela sem rolar.',
+  h:`<div class="win dim">${nav(NAV,'Geral')}<div class="main">${sec('Aparência',R.themeRow+R.lang+R.op+R.sc+R.rm)+sec('Sistema',R.as+R.au)}</div><div class="modal"><div class="sh" style="font-size:10px;color:var(--fg);font-weight:600">TEMA</div><div class="tiny">Escuras</div>${`<div class="sws" style="padding:0">${SW.slice(0,13).map((c,i)=>`<span class="${i===0?'sel':''}" style="background:${c};height:22px"></span>`).join('')}</div>`}<div class="tiny">Claras</div><div class="sws" style="padding:0">${SW.slice(13).map(c=>`<span style="background:${c};height:22px"></span>`).join('')}</div><div style="display:flex;gap:6px;margin-top:auto;justify-content:flex-end"><span class="btn">Cancelar</span><span class="btn pri">Aplicar</span></div></div></div>`,
+  t:'<b>Sem enum novo.</b> Diálogo interno por AppDialog (regra). Muda o fluxo: tema deixa de aplicar no clique.'},
+ {id:'X6',n:'X6 · Duas colunas na Geral',d:'Aparência à esquerda, Sistema e Diagnóstico à direita, lado a lado. Abaixo de ~620dp volta a uma coluna. Nada muda de lugar, só de arranjo.',
+  h:win(nav(NAV,'Geral'),`<div class="cols2">${sec('Aparência',row('Tema','')+swatches(13)+R.lang+R.op+R.sc+R.rm)}<div style="display:flex;flex-direction:column;gap:8px">${sec('Sistema',R.as+R.au+R.bt+R.tr)+sec('Diagnóstico',R.bug)}</div></div>`),
+  t:'<b>Sem enum novo.</b> Menor mudança de código. Risco: linhas com descrição truncam na coluna estreita (precedente Q10 quebrou por isso).'},
+ {id:'X7',n:'X7 · Busca nas Configurações',d:'Campo "Buscar" no topo da navegação procura em todas as abas pelo rótulo real; o resultado lista "Aba › Painel › Controle" e o clique leva até ele, com o termo destacado.',
+  h:win(nav(NAV,'',`<div class="srch">⌕ atualiz▏</div>`),`<div class="tiny">3 resultados</div><div class="card2"><span class="tiny">Geral › Sistema</span><br><b><span class="hl">Atualiz</span>ação automática</b></div><div class="card2"><span class="tiny">Geral › Sistema</span><br><b>Receber versões beta</b> <span class="tiny">· "…antes da <span class="hl">atualiz</span>ação estável"</span></div><div class="card2"><span class="tiny">Alertas › Bot do Telegram</span><br><b>Botão <span class="hl">Atualiz</span>ar do /status</b></div>`),
+  t:'<b>Sem enum novo.</b> Combina com qualquer outra X. Custo: índice de rótulos PT/EN mantido em um lugar só, com teste que falha se um controle ficar fora.'},
+ {id:'X8',n:'X8 · Atualizações e Diagnóstico viram "Sobre"',d:'Geral fica só Aparência + Sistema. Nova seção "Sobre" no fim da lateral: versão, novidades, atualização automática, beta, recibo e Reportar um bug — tudo que fala do app e não do uso.',
+  h:win(nav([...NAV,'<div class="it new sel">Sobre</div>'],''),`<div class="card2" style="display:flex;align-items:center;gap:8px"><b>Usage Monitor 41.8.0</b><span class="badge ok">estável</span><span class="btn" style="margin-left:auto">Ver novidades</span></div>`+sec('Atualizações',R.au+R.bt)+sec('Diagnóstico',R.bug)),
+  t:'<span class="no">Novo valor em SettingsTab</span> ("Sobre") — exige exceção.'},
+ {id:'X9',n:'X9 · Navegação por assunto, em grupos',d:'Lateral reagrupada: <i>App</i> (Aparência, Sistema, Sobre), <i>Dados</i> (APIs, Contas), <i>Avisos</i> (Alertas, Telegram) e <i>Conexões</i> (Rede, Acesso web, Time). Telegram e acesso web saem de dentro de outras abas.',
+  h:win(`<div class="nav"><div class="grp">App</div><div class="it">Aparência</div><div class="it">Sistema</div><div class="it">Sobre</div><div class="grp">Dados</div><div class="it">APIs</div><div class="it">Contas</div><div class="grp">Avisos</div><div class="it">Alertas</div><div class="it sel">Telegram</div><div class="grp">Conexões</div><div class="it">Rede</div><div class="it">Acesso web</div><div class="it">Time</div></div>`,sec('Bot do Telegram',row('1 · Token','Conectado como @usage_edi_bot','<span class="badge ok">Feito</span>')+row('2 · Pareamento','Edi','<span class="badge ok">Feito</span>')+row('3 · Teste','','<span class="btn">Enviar teste</span>'),sw(true))+sec('Envios',row('Resumo diário','08:00 BRT',sw(true))+row('Aviso de reinício de cota','',sw(false))),'tall'),
+  t:'<span class="no">Vários valores novos em SettingsTab</span> — exige exceção. É a única que abre espaço para o crescimento de #398 sem lotar Alertas.'},
+ {id:'X10',n:'X10 · Aparência com prévia ao vivo',d:'Painel de Aparência ganha uma prévia fixa do notch da HUD no topo: trocar tema, opacidade ou tamanho redesenha a prévia na hora, antes de olhar a HUD real. Sistema segue abaixo.',
+  h:win(nav(NAV,'Geral'),`<div class="pv"><div class="notch"><span class="ring"></span><span class="tiny">Claude 5h <b style="color:var(--fg)">42%</b></span><span class="ring w"></span><span class="tiny">Codex 7d <b style="color:var(--fg)">78%</b></span></div><span class="tiny">prévia · 115% · opacidade 92%</span></div>`+sec('Aparência',row('Tema','')+swatches()+R.op+R.sc)),
+  t:'<b>Sem enum novo.</b> A prévia reaproveita o desenho do notch; geometria vem de <code>hudNotchSizes</code>, nunca medida.'}
+];
+document.getElementById('xopts').innerHTML=X.map(o=>`<div class="opt${o.id==='ref'?' ref':''}"><h3>${o.n}</h3><p>${o.d}</p>${o.h}${o.t?`<div class="tags">${o.t}</div>`:''}</div>`).join('');
+
+/* ---------- Y ---------- */
+const tm=t=>`<span class="tm">${t}</span>`;
+const out=(t,h)=>`<div class="out">${t}${tm(h)}</div>`;
+const inn=(t,h)=>`<div class="in">${t}${tm(h)}</div>`;
+const kb=(cols,b)=>`<div class="kb" style="grid-template-columns:repeat(${cols},1fr)">${b.map(x=>`<span>${x}</span>`).join('')}</div>`;
+const cfg=rows=>`<div class="cfg"><div class="t">Configurações › Bot do Telegram</div>${rows}</div>`;
+const Y=[
+ {id:'ref',n:'Hoje (referência)',d:'/status com cartão por conta e três botões; /alertas, /silencio, /limiar, /ajuda; alertas da bandeja repassados. Só responde quando perguntado ou quando um alerta dispara.',
+  h:`<div class="tg">${out('/status','09:12')}${inn('<b>📊 Usage Monitor</b>\n<i>coleta 09:11 BRT · há menos de 1 min</i>\n\n<b>Claude — Edi</b> — 🟡 Atenção · ⚡ em uso\nSessão 5h · reinicia 11:00\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>\nSemanal · reinicia sex 19:44\n<code>▰▰▱▱▱▱▱▱▱▱  21%</code>','09:12')}${kb(3,['🔄 Atualizar','🔕 Silenciar 1h','⚙ Limiares'])}</div>`,c:''},
+ {id:'Y1',n:'Y1 · Resumo diário agendado',d:'Uma mensagem por dia na hora escolhida: pior cota de cada conta, reinícios do dia e custo de ontem. Respeita o horário de silêncio (adia, não pula). Comando /resumo manda na hora.',
+  h:`<div class="tg">${inn('<b>☀ Bom dia — resumo de qui 08/10</b>\n\n🟡 <b>Claude — Edi</b> semanal 61% · reinicia sex 19:44\n🟢 <b>Codex</b> 7d 22% · reinicia ter 03:28\n🟢 <b>MiniMax</b> 9% das requisições\n\n<b>Ontem</b> US$ 14,20 · 6 sessões CLI\n<b>Reinicia hoje</b> Claude 5h às 11:00, 16:00\n<i>/resumo a qualquer hora</i>','08:00')}</div>`,
+  c:cfg(row('Resumo diário','Hora do envio',`${seg(['off','08:00','18:00'],1)}`)),t:'Dado existente: <code>UsageSnapshot</code> + custo do índice CLI (<code>ModelPricingTable</code>). Novo: agendador no <code>TelegramBotService</code> e hora persistida em <code>telegram.json</code>.'},
+ {id:'Y2',n:'Y2 · Aviso quando a cota reinicia',d:'Quando uma janela que passou de um limiar volta a zero, o bot avisa: "pode voltar a usar". Só para janelas que tinham disparado alerta, para não virar ruído a cada 5 h.',
+  h:`<div class="tg">${inn('🔴 <b>Claude — Edi · Sessão 5h em 90%</b>\nNo ritmo atual estoura antes do reinício (11:00).','10:21')}${inn('🟢 <b>Claude — Edi · Sessão 5h reiniciou</b>\nCota em 0%. Próximo reinício 16:00.','11:00')}</div>`,
+  c:cfg(row('Avisar reinício de cota','Só das janelas que tinham alertado',sw(true))),t:'Dado existente: <code>FiredQuotaWindow</code> já guarda quais janelas dispararam. Novo: tipo de alerta em <code>UsageAlert</code> (sealed — confere os <code>when</code>), também na bandeja.'},
+ {id:'Y3',n:'Y3 · /custo e orçamento do mês',d:'/custo hoje|semana|mes: custo recalculado dos tokens por modelo, com o teto mensal configurado nas Alertas e a projeção do mês. Modelo sem tarifa aparece com "+", nunca como zero.',
+  h:`<div class="tg">${out('/custo mes','18:40')}${inn('<b>💰 Outubro até agora</b> (1–8)\n<pre>Opus 5.5     US$ 96,10\nSonnet 5.5   US$ 31,45\nGPT-5 Codex  US$ 18,02\n───────────────────────\nTotal        US$ 145,57+</pre>Teto US$ 300 · <b>49%</b> · projeção 🟡 US$ 564\n<i>+ 3 turnos de modelo sem tarifa</i>','18:40')}${kb(3,['Hoje','Semana','Mês'])}</div>`,
+  c:cfg(row('/custo','Usa o teto mensal das Alertas','<span class="tiny">sem controle novo</span>')),t:'Dado existente: <code>GetMonthlyBudgetStatusUseCase</code>, <code>GetCliUsageBreakdownUseCase</code>. Novo: comando e mensagem. Só metadado de uso.'},
+ {id:'Y4',n:'Y4 · Uma conta por vez',d:'/conta lista as contas em botões; tocar mostra só aquela, com todas as janelas, sessão em uso e o pior risco. O /status geral ganha uma linha de botões por conta embaixo.',
+  h:`<div class="tg">${out('/conta','14:02')}${inn('Qual conta?','14:02')}${kb(2,['Claude — Edi','Claude — Trabalho','Codex','MiniMax'])}${inn('<b>Claude — Trabalho</b> — 🔴 Vai estourar\nSessão 5h · reinicia 16:00\n<code>▰▰▰▰▰▰▰▰▱▱  86%</code>\nSemanal · reinicia sáb 09:10\n<code>▰▰▰▰▰▰▱▱▱▱  64%</code>\nOpus semanal\n<code>▰▰▰▰▰▰▰▱▱▱  71%</code>','14:02')}</div>`,
+  c:cfg(row('/conta','Sem controle novo','')),t:'Dado existente: <code>UsageSnapshot.accounts</code>. Novo: <code>callback_data</code> com índice da conta (≤ 64 bytes; nunca e-mail).'},
+ {id:'Y5',n:'Y5 · Painel fixado ao vivo',d:'Uma mensagem fixada no topo da conversa, editada a cada coleta só quando algum número mudou. Abrir o Telegram já mostra o estado sem pedir nada; alertas continuam chegando como mensagem.',
+  h:`<div class="tg"><div class="pin"><b>📌 Mensagem fixada</b> · atualizada 14:31\n🟡 Edi 5h 42% · 🔴 Trabalho 5h 86% · 🟢 Codex 7d 22%</div>${inn('<b>📊 Painel ao vivo</b>\n<i>atualizado 14:31 BRT</i>\n\n🟡 <b>Edi</b>  5h <code>▰▰▰▰▱▱▱▱▱▱ 42%</code>\n🔴 <b>Trabalho</b> 5h <code>▰▰▰▰▰▰▰▰▱▱ 86%</code>\n🟢 <b>Codex</b> 7d <code>▰▰▱▱▱▱▱▱▱▱ 22%</code>','09:00 ✎')}</div>`,
+  c:cfg(row('Painel fixado ao vivo','Edita uma mensagem; não notifica',sw(true))),t:'Novo: <code>pinChatMessage</code> e id da mensagem persistido. Risco: limite de edição do Telegram — editar só com mudança e no máximo 1×/min.'},
+ {id:'Y6',n:'Y6 · Gráfico das últimas 24 h',d:'/grafico manda uma imagem com a curva de cada cota nas últimas 24 h (ou 7 d), marcando reinícios. Mesmo desenho do Histórico do app, renderizado em PNG.',
+  h:`<div class="tg">${out('/grafico 24h','16:10')}<div class="in" style="width:94%"><div class="img"><svg viewBox="0 0 280 86" width="100%" height="86"><g stroke="#2a3644" stroke-width="1"><line x1="0" y1="20" x2="280" y2="20"/><line x1="0" y1="50" x2="280" y2="50"/></g><line x1="96" y1="4" x2="96" y2="82" stroke="#E8AE63" stroke-dasharray="3 3"/><line x1="200" y1="4" x2="200" y2="82" stroke="#E8AE63" stroke-dasharray="3 3"/><polyline fill="none" stroke="#4F8CFF" stroke-width="2" points="0,80 30,64 60,40 90,22 96,80 130,70 170,46 200,30 200,80 240,66 280,58"/><polyline fill="none" stroke="#27BFA3" stroke-width="2" points="0,72 70,68 140,62 210,60 280,55"/><text x="4" y="12" fill="#a9b4c0" font-size="9" font-family="monospace">Claude 5h · Codex 7d — reinícios em dourado</text></svg></div><i>24 h até 16:10 BRT</i>${tm('16:10')}</div></div>`,
+  c:cfg(row('/grafico','Sem controle novo','')),t:'Dado existente: <code>GetUsageHistoryUseCase</code>. Novo: <code>sendPhoto</code> multipart e render PNG em <code>desktopMain</code> (Skia), com teste de pixel.'},
+ {id:'Y7',n:'Y7 · Sessões CLI ativas e travadas',d:'/sessoes lista as sessões em andamento: ferramenta, modelo, duração, tokens, custo e % do contexto. Sessão travada vem marcada. Sem prompt, sem resposta, sem caminho do projeto.',
+  h:`<div class="tg">${out('/sessoes','15:47')}${inn('<b>⚡ 2 sessões em andamento</b>\n\n<b>Claude Code</b> · Opus 5.5 · 42 min\n<code>contexto ▰▰▰▰▰▰▱▱▱▱ 63%</code>\n1,8 M tokens · US$ 6,10\n\n<b>Codex</b> · gpt-5-codex · 1 h 05\n⚠ <b>sem atividade há 22 min</b>\n<code>contexto ▰▰▰▰▰▰▰▰▰▱ 91%</code>','15:47')}</div>`,
+  c:cfg(row('/sessoes','Sem controle novo','')),t:'Dado existente: índice CLI e <code>GetStalledCliSessionsUseCase</code>. Regra: nunca <code>cwd</code>/<code>session_id</code> cru na mensagem.'},
+ {id:'Y8',n:'Y8 · Controle remoto do app',d:'/atualizar pede coleta e responde quando termina; /api lista as fontes com botão liga/desliga; o silenciar ganha durações (1 h, 4 h, até amanhã 08:00). Tudo grava pelo mesmo caminho das Configurações.',
+  h:`<div class="tg">${out('/api','20:05')}${inn('<b>Fontes monitoradas</b>\nToque para ligar ou desligar.','20:05')}${kb(2,['✅ Claude','✅ Codex','✅ MiniMax','⬜ DeepSeek'])}${out('/silencio','20:06')}${inn('Silenciar alertas por quanto tempo?','20:06')}${kb(3,['1 h','4 h','até 08:00'])}</div>`,
+  c:cfg(row('Permitir mudar fontes pelo bot','Desligado: /api só lista',sw(false))),t:'Dado existente: <code>enabledApis</code>, <code>snoozedUntilEpochMillis</code>. Risco: conversa pareada passa a desligar fonte — por isso o interruptor nasce desligado.'},
+ {id:'Y9',n:'Y9 · Alerta com ação na própria mensagem',d:'Todo alerta repassado chega com botões: "Calar esta cota até reiniciar", "Ver conta" e "Silenciar 1h". Calar uma cota não cala as outras.',
+  h:`<div class="tg">${inn('🟡 <b>Claude — Edi · Semanal em 75%</b>\nNo ritmo atual chega a 100% na sexta 14:00, antes do reinício (sex 19:44).','13:12')}${kb(1,['🔕 Calar esta cota até reiniciar'])}${kb(2,['📊 Ver conta','🔕 Silenciar 1h'])}${inn('🔕 Semanal de Claude — Edi calada até sex 19:44.','13:13')}</div>`,
+  c:cfg(row('Cotas caladas','Semanal — Edi até sex 19:44',`<span class="btn">Reativar</span>`)),t:'Novo: lista de janelas caladas em <code>UsageAlertSettings</code> (campo com default, retrocompatível) e decisão pura testada. Vale também para a bandeja.'},
+ {id:'Y10',n:'Y10 · Relatório semanal em PDF',d:'Toda segunda (ou /relatorio) o bot manda o mesmo PDF do app com a semana anterior: cotas, custo por modelo, sessões. Mensagem curta com os três números principais.',
+  h:`<div class="tg">${inn('<b>📄 Semana 29/09 – 05/10</b>\nCusto US$ 182,40 · 31 sessões CLI\nPior cota: Claude — Trabalho semanal 97%','seg 08:00')}<div class="in"><div class="file"><span class="ic">PDF</span><div><b>usage-monitor-2026-w40.pdf</b><br><i>184 KB</i></div></div>${tm('08:00')}</div></div>`,
+  c:cfg(row('Relatório semanal','Segunda 08:00 BRT',sw(true))),t:'Dado existente: <code>UsageReportDocument</code> (PDF com Plex embutida). Novo: <code>sendDocument</code> multipart e agendador (o mesmo da Y1).'}
+];
+document.getElementById('yopts').innerHTML=Y.map(o=>`<div class="opt${o.id==='ref'?' ref':''}"><h3>${o.n}</h3><p>${o.d}</p>${o.h}${o.c||''}${o.t?`<div class="tags">${o.t}</div>`:''}</div>`).join('');
+})();
+</script>
+</body></html>

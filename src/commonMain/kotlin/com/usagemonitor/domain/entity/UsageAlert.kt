@@ -24,7 +24,12 @@ data class UsageAlertSettings(
      * Silêncio temporário até este instante (botão "Silenciar 1h" do bot, #396).
      * Mesmo efeito do [quietHours]: adia, não consome. `null` = sem silêncio temporário.
      */
-    val snoozedUntilEpochMillis: Long? = null
+    val snoozedUntilEpochMillis: Long? = null,
+    /**
+     * Aviso de que uma cota reiniciou (#398, Y2) — só das que tinham alertado na
+     * janela anterior, para não virar ruído a cada 5 h. Vale para bandeja e bot.
+     */
+    val quotaResetAlertsEnabled: Boolean = true
 ) {
     /**
      * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
@@ -116,6 +121,17 @@ sealed interface UsageAlert {
         val hasKnownResetAt: Boolean
     ) : UsageAlert
 
+    /**
+     * Uma cota que tinha cruzado limiar na janela anterior reiniciou (#398, Y2):
+     * dá para voltar a usar. [nextResetAt] é o fim da janela nova.
+     */
+    data class QuotaReset(
+        val target: UsageTargetKey,
+        val targetLabel: String,
+        val quotaLabel: String,
+        val nextResetAt: Instant
+    ) : UsageAlert
+
     /** Uma sessão CLI com interação recente saturou a janela de contexto. */
     data class SessionSaturated(
         val sessionId: String,
@@ -189,7 +205,12 @@ data class QuotaAlertScope(
 /** Limiares já disparados dentro de uma janela específica. */
 data class FiredQuotaWindow(
     val periodEndAt: Instant,
-    val firedPercents: Set<Int> = emptySet()
+    val firedPercents: Set<Int> = emptySet(),
+    /**
+     * A janela anterior alertou e o aviso de reinício ainda não saiu (#398, Y2) —
+     * caiu no silêncio. Fica pendente até sair, como os limiares: adia, não consome.
+     */
+    val resetPending: Boolean = false
 )
 
 /** Alertas a emitir agora e o estado a guardar para a próxima passada. */
@@ -284,21 +305,41 @@ private fun evaluateQuotaAlerts(
 
     for (stat in stats) {
         for (quota in stat.quotas) {
-            if (quota.total <= 0L || quota.isExpiredAt(now)) {
-                // Janela vencida descreve um período que não existe mais: alertar
-                // sobre ela seria alertar sobre o passado. O valor novo só vem da
-                // próxima coleta.
-                continue
-            }
-
             val scope = QuotaAlertScope(
                 target = stat.targetKey,
                 quotaLabel = quota.label,
                 periodType = quota.periodType
             )
+            if (quota.total <= 0L || quota.isExpiredAt(now)) {
+                // Janela vencida descreve um período que não existe mais: alertar
+                // sobre ela seria alertar sobre o passado. O valor novo só vem da
+                // próxima coleta. A memória da janela segue adiante (#398, Y2): sem
+                // ela, a leitura nova não saberia que a anterior tinha alertado.
+                previous[scope]?.let { stored -> windows[scope] = stored }
+                continue
+            }
+
             val storedWindow = previous[scope]
             val isSameWindow = storedWindow != null && isSamePeriod(storedWindow.periodEndAt, quota.periodEndAt)
             val alreadyFired = if (isSameWindow) storedWindow.firedPercents else emptySet()
+            val targetLabel = stat.profileLabel?.takeIf { label -> label.isNotBlank() } ?: stat.apiName
+            // Reinício: a janela virou e a anterior tinha alertado — ou o aviso
+            // ficou pendente no silêncio. Só com reinício conhecido: saldo
+            // pré-pago não "reinicia".
+            val resetDue = settings.quotaResetAlertsEnabled && quota.hasKnownResetAt && when {
+                storedWindow == null -> false
+                isSameWindow -> storedWindow.resetPending
+                else -> storedWindow.firedPercents.isNotEmpty()
+            }
+            if (resetDue && !silenced) {
+                alerts += UsageAlert.QuotaReset(
+                    target = stat.targetKey,
+                    targetLabel = targetLabel,
+                    quotaLabel = quota.label,
+                    nextResetAt = quota.periodEndAt
+                )
+            }
+            val resetPending = resetDue && silenced
 
             val actualPercent = quotaPercentUsed(quota)
             val crossed = thresholds.filter { threshold -> actualPercent >= threshold }
@@ -309,7 +350,7 @@ private fun evaluateQuotaAlerts(
                 // consumo só cresce dentro de uma janela, então o alerta volta a
                 // ser avaliado — e emitido — quando o silêncio terminar. Marcá-lo
                 // aqui perderia o aviso para sempre.
-                windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired)
+                windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired, resetPending)
                 continue
             }
 
@@ -318,7 +359,7 @@ private fun evaluateQuotaAlerts(
             for (threshold in pending) {
                 alerts += UsageAlert.QuotaThreshold(
                     target = stat.targetKey,
-                    targetLabel = stat.profileLabel?.takeIf { label -> label.isNotBlank() } ?: stat.apiName,
+                    targetLabel = targetLabel,
                     quotaLabel = quota.label,
                     thresholdPercent = threshold,
                     actualPercent = actualPercent,
@@ -326,7 +367,7 @@ private fun evaluateQuotaAlerts(
                     hasKnownResetAt = quota.hasKnownResetAt
                 )
             }
-            windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired + pending)
+            windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired + pending, resetPending)
         }
     }
 

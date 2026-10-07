@@ -8,6 +8,8 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -79,5 +81,50 @@ class TelegramBotMessagesTest {
     @Test
     fun `invalid usage is escaped inside code`() {
         assertEquals("Não entendi. Uso: <code>/limiar 75,90 &amp; &lt;x&gt;</code>", TelegramBotMessages.invalid("/limiar 75,90 & <x>", AppLanguage.PT))
+    }
+
+    /** #398, Y4: duas contas por linha, risco em emoji antes do rótulo, e o cartão de uma só. */
+    @Test
+    fun `account picker buttons and single account card`() {
+        val rows = TelegramBotMessages.accountButtons(snapshot)
+
+        assertEquals(1, rows.size)
+        assertEquals(listOf("🔴 Anthropic · <Padrão>", "DeepSeek"), rows.single().map { it.first })
+        val key = rows.single()[1].second.removePrefix("acc:")
+        val card = TelegramBotMessages.account(snapshot, key, AppLanguage.PT)
+        assertTrue(card.startsWith("<b>DeepSeek</b>\nSaldo"), card)
+        assertFalse("Anthropic" in card)
+        assertTrue("saiu" !in card && "não está mais" in TelegramBotMessages.account(snapshot, "ANTHROPIC:0", AppLanguage.PT))
+    }
+
+    /** #398, Y1: cota mais cheia por conta, o que reinicia hoje e o gasto de 24 h com `+` quando parcial. */
+    @Test
+    fun `daily summary lists the fullest quota, resets today and the spend`() {
+        val text = TelegramBotSummaryMessages.summary(snapshot, TelegramDailySpend(14_200_000L, 6, unpricedTurns = 2), AppLanguage.PT)
+
+        assertTrue(text.startsWith("<b>☀ Resumo de ter 06/10</b>"), text)
+        assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h <b>42%</b> · reinicia 02:10" in text, text)
+        assertTrue("<b>DeepSeek</b> · Saldo saldo US$ 37,66" in text, text)
+        assertTrue("<b>Claude Code, últimas 24 h</b>: US$ 14,20+ · 6 sessões" in text, text)
+        // 02:10 já é amanhã (dia local 07/10): não entra em "Reinicia hoje".
+        assertFalse("Reinicia hoje" in text, text)
+    }
+
+    @Test
+    fun `daily summary without a measured spend drops the spend line`() {
+        val text = TelegramBotSummaryMessages.summary(snapshot, spend = null, AppLanguage.EN)
+
+        assertTrue(text.startsWith("<b>☀ Summary for Tue 06/10</b>"), text)
+        assertFalse("last 24 h" in text, text)
+    }
+
+    /** #398, Y5: o painel traz a hora da coleta, não a do envio — só muda com leitura nova. */
+    @Test
+    fun `live panel shows the collection time and one line per account`() {
+        val text = TelegramBotSummaryMessages.panel(snapshot, AppLanguage.PT)
+
+        assertTrue(text.startsWith("<b>📌 Painel ao vivo</b>\n<i>atualizado 22:28 BRT</i>"), text)
+        assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>" in text, text)
+        assertEquals(text, TelegramBotSummaryMessages.panel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
     }
 }

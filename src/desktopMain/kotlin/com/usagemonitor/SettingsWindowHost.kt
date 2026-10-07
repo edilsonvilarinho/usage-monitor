@@ -11,7 +11,13 @@ import com.usagemonitor.presentation.ui.ModalWindowEnvironment
 import com.usagemonitor.presentation.ui.components.CodexAccountsSettings
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.hudFallbackLabel
+import com.usagemonitor.presentation.ui.theme.AccountAccent
+import com.usagemonitor.presentation.ui.theme.AccountEmoji
+import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.update.AutoUpdateController
+import kotlin.time.Clock
 import com.usagemonitor.update.isEnabled
 import com.usagemonitor.update.receivesBetaUpdates
 
@@ -30,6 +36,9 @@ internal fun SettingsWindowHost(
     actions: SettingsActions,
     autoUpdate: AutoUpdateController,
     profileUiModels: List<AnthropicProfileUiModel>,
+    /** Cor e emoji por conta Claude, para a prévia da HUD igualar a barra real. */
+    accountColors: Map<String, AccountAccent>,
+    accountEmojis: Map<String, AccountEmoji>,
     state: DialogState,
     environment: ModalWindowEnvironment
 ) {
@@ -49,6 +58,8 @@ internal fun SettingsWindowHost(
         TelegramBotActions(graph.telegramSettingsDataSource, graph.telegramSettingsFlow, viewModels.telegramBot)
     }
     val language = shell.language
+    val quotaRisks by viewModels.usageAlert.quotaRisks.collectAsState()
+    val dashboardState by viewModels.dashboard.uiState.collectAsState()
 
     AppDialogWindow(
         visible = modal.isSettingsOpen,
@@ -141,7 +152,25 @@ internal fun SettingsWindowHost(
             onProxyTestConnection = feedback::checkProxyConnection,
             webAccess = webAccessSectionModel(webAccessSettings, webAccessStatus, webAccessActions),
             telegramBot = telegramBotSectionModel(telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions),
-            toastEvent = feedback.toastEvent
+            toastEvent = feedback.toastEvent,
+            appearancePreview = {
+                // Parada: sem pulso de sessão nem coleta em curso — a prévia é do
+                // desenho (tema, escala, opacidade), não do estado ao vivo.
+                SettingsHudPreview(
+                    accounts = buildHudAccounts(
+                        quotaRisks = quotaRisks,
+                        cardOrder = shell.cardOrder,
+                        language = language,
+                        now = Clock.System.now(),
+                        accountColors = accountColors,
+                        accountEmojis = accountEmojis
+                    ),
+                    fallbackLabel = hudFallbackLabel(dashboardState is UiState.NoApisEnabled, language),
+                    windowOpacityPercent = shell.windowOpacityPercent,
+                    windowOpacitySupported = shell.windowOpacitySupported,
+                    language = language
+                )
+            }
         )
     }
 }

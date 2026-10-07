@@ -312,11 +312,12 @@ object HelpCatalog {
                 "espaçamento e alvo de clique crescem junto, e as proporções da tela permanecem. A " +
                 "janela principal guarda tamanho e posição entre execuções.",
             steps = listOf(
-                "Abra Configurações → \"Geral\".",
-                "Escolha o tema e o \"Idioma\" na seção Aparência.",
-                "\"Tamanho da interface\" vai de 80% a 150%; a janela é reajustada junto.",
-                "\"Opacidade da janela\", \"Manter sempre visível\" e \"Inicialização com Sistema\" " +
-                    "ficam na seção Sistema."
+                "Abra Configurações → \"Aparência\".",
+                "Escolha o tema e o \"Idioma\". A \"Prévia da barra HUD\", no topo da aba, mostra a " +
+                    "barra com o tema, o tamanho e a opacidade escolhidos.",
+                "\"Tamanho da interface\" vai de 80% a 150%; a janela é reajustada junto. " +
+                    "\"Opacidade da janela\" fica na mesma aba.",
+                "\"Inicialização com Sistema\" fica em Configurações → \"Sistema\"."
             ),
             mediaId = "appearance"
         )
@@ -331,7 +332,7 @@ object HelpCatalog {
                 "interruptor explica o motivo. Depois de uma troca de versão, a janela de novidades " +
                 "lista o que mudou.",
             steps = listOf(
-                "Abra Configurações → \"Geral\" e ligue \"Atualização automática\".",
+                "Abra Configurações → \"Sistema\" e ligue \"Atualização automática\".",
                 "Se a instalação não suportar a troca, o interruptor aparece desabilitado com o " +
                     "motivo escrito ao lado.",
                 "Com a versão baixada, a faixa no topo do dashboard — ou, na barra HUD, o balão da " +
@@ -565,10 +566,12 @@ object HelpCatalog {
                 "click targets grow along with it, and the proportions of the screen stay put. The " +
                 "main window remembers its size and position between runs.",
             steps = listOf(
-                "Open Settings → \"General\".",
-                "Pick the theme and the \"Language\" under Appearance.",
-                "\"Interface size\" ranges from 80% to 150%; the window is resized along with it.",
-                "\"Window opacity\", \"Always on top\" and \"System Startup\" live under System."
+                "Open Settings → \"Appearance\".",
+                "Pick the theme and the \"Language\". The \"HUD bar preview\" at the top of the tab " +
+                    "shows the bar with the chosen theme, size and opacity.",
+                "\"Interface size\" ranges from 80% to 150%; the window is resized along with it. " +
+                    "\"Window opacity\" is on the same tab.",
+                "\"System Startup\" lives under Settings → \"System\"."
             ),
             mediaId = "appearance"
         )
@@ -582,7 +585,7 @@ object HelpCatalog {
                 "script install in a managed tree; on macOS the mechanism does not exist and the " +
                 "switch says why. After a version change, the what's new window lists what changed.",
             steps = listOf(
-                "Open Settings → \"General\" and turn on \"Automatic updates\".",
+                "Open Settings → \"System\" and turn on \"Automatic updates\".",
                 "If your install cannot be swapped, the switch shows up disabled with the reason " +
                     "written next to it.",
                 "Once the version is downloaded, the strip at the top of the dashboard — or, in the HUD " +

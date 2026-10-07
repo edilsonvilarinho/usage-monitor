@@ -74,8 +74,12 @@ const val REPORT_BUG_BUTTON_TEST_TAG = "reportBugButton"
  * Enum próprio, e não um valor a mais em algum enum existente: os `when`
  * exaustivos de `AppLanguage` e companhia não têm nada a ver com esta escolha.
  * A ordem de declaração é a ordem das abas na tela.
+ *
+ * `APPEARANCE` e `SYSTEM` substituíram `GENERAL` (issue #399, direção X1) — exceção
+ * aprovada à regra de não criar valor em enum existente: o enum não é persistido
+ * nem serializado, e os dois `when` que o percorrem são deste arquivo.
  */
-enum class SettingsTab { GENERAL, ALERTS, APIS, ACCOUNTS, TEAM, NETWORK }
+enum class SettingsTab { APPEARANCE, SYSTEM, ALERTS, APIS, ACCOUNTS, TEAM, NETWORK }
 
 /** Marcado por aba: o rótulo é traduzido e buscar por texto amarraria o teste ao idioma. */
 fun settingsTabTestTag(tab: SettingsTab): String = "settingsTab_${tab.name}"
@@ -83,7 +87,8 @@ fun settingsTabTestTag(tab: SettingsTab): String = "settingsTab_${tab.name}"
 internal fun settingsTabLabel(tab: SettingsTab, language: AppLanguage): String {
     val isPt = language == AppLanguage.PT
     return when (tab) {
-        SettingsTab.GENERAL -> if (isPt) "Geral" else "General"
+        SettingsTab.APPEARANCE -> if (isPt) "Aparência" else "Appearance"
+        SettingsTab.SYSTEM -> if (isPt) "Sistema" else "System"
         SettingsTab.ALERTS -> if (isPt) "Alertas" else "Alerts"
         SettingsTab.APIS -> if (isPt) "APIs" else "APIs"
         SettingsTab.ACCOUNTS -> if (isPt) "Contas" else "Accounts"
@@ -216,8 +221,10 @@ fun SettingsDialogContent(
     /** Bot do Telegram (#387); `null` esconde a seção. */
     telegramBot: TelegramBotSectionModel? = null,
     toastEvent: SettingsToastEvent? = null,
+    /** Prévia da barra HUD na aba Aparência (#399, X10); `null` esconde o painel. */
+    appearancePreview: (@Composable () -> Unit)? = null,
     /** Aba aberta ao entrar; existe para os geradores de captura escolherem a seção. */
-    initialTab: SettingsTab = SettingsTab.GENERAL,
+    initialTab: SettingsTab = SettingsTab.APPEARANCE,
     modifier: Modifier = Modifier
 ) {
     // A aba mora num `remember` do próprio diálogo: ele é uma janela separada e
@@ -275,31 +282,36 @@ fun SettingsDialogContent(
                 ) { tab ->
                     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                         when (tab) {
-                            SettingsTab.GENERAL -> GeneralSettingsTab(
+                            SettingsTab.APPEARANCE -> AppearanceSettingsTab(
                                 currentTheme = currentTheme,
                                 currentLanguage = currentLanguage,
-                                autoStartEnabled = autoStartEnabled,
                                 windowOpacityPercent = windowOpacityPercent,
                                 windowOpacityEnabled = windowOpacityEnabled,
                                 uiScalePercent = uiScalePercent,
                                 reducedMotion = reducedMotion,
+                                onThemeChange = onThemeChange,
+                                onLanguageChange = onLanguageChange,
+                                onWindowOpacityChange = onWindowOpacityChange,
+                                onUiScaleChange = onUiScaleChange,
+                                onReducedMotionChange = onReducedMotionChange,
+                                preview = appearancePreview
+                            )
+
+                            SettingsTab.SYSTEM -> SystemSettingsTab(
+                                currentLanguage = currentLanguage,
+                                autoStartEnabled = autoStartEnabled,
                                 autoUpdateEnabled = autoUpdateEnabled,
                                 autoUpdateSupport = autoUpdateSupport,
                                 autoUpdatePlatform = autoUpdatePlatform,
                                 lastUpdateReceipt = lastUpdateReceipt,
                                 autoUpdateFeedOverride = autoUpdateFeedOverride,
-                                onThemeChange = onThemeChange,
-                                onLanguageChange = onLanguageChange,
                                 onAutoStartChange = onAutoStartChange,
                                 onAutoUpdateChange = onAutoUpdateChange,
-                                receiveBetaUpdates = receiveBetaUpdates,
-                                onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange,
-                                onWindowOpacityChange = onWindowOpacityChange,
-                                onUiScaleChange = onUiScaleChange,
-                                onReducedMotionChange = onReducedMotionChange,
+                                onReportBug = onReportBug,
                                 trayUsageRing = trayUsageRing,
                                 onTrayUsageRingChange = onTrayUsageRingChange,
-                                onReportBug = onReportBug
+                                receiveBetaUpdates = receiveBetaUpdates,
+                                onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange
                             )
 
                             SettingsTab.ALERTS -> {

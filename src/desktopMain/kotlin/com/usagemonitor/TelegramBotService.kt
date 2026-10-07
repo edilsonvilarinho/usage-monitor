@@ -1,21 +1,21 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
-import com.usagemonitor.data.datasource.TelegramButton
-import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.BotButton
-import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.presentation.ui.TelegramChart
+import com.usagemonitor.domain.entity.dailySummaryDate
+import com.usagemonitor.domain.entity.isDailySummaryDue
+import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
-import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
-import com.usagemonitor.domain.entity.applyBotCommand
-import com.usagemonitor.domain.entity.parseBotCommand
-import com.usagemonitor.domain.entity.snoozeAlerts
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -53,10 +53,8 @@ internal sealed interface TelegramBotStatus {
  * Mesmo ciclo de vida do `TeamSyncService`: escopo próprio, `onDestroy` no
  * encerramento único de `AppViewModels`.
  *
- * O `/status` vem com teclado inline (#396, W5): Atualizar pede coleta ao app por
- * [requestRefresh] e edita a mesma mensagem; Silenciar 1h grava o silêncio
- * temporário; Limiares mostra os atuais. O toque roda fora do laço de polling — a
- * coleta pode levar segundos e não pode atrasar os outros updates.
+ * O que cada comando e cada botão faz mora em [TelegramBotHandlers]; aqui ficam o
+ * laço de polling, o repasse dos alertas e o envio em lote.
  */
 internal class TelegramBotService(
     private val api: TelegramBotApi,
@@ -69,11 +67,42 @@ internal class TelegramBotService(
     private val languageProvider: () -> AppLanguage,
     /** Pede coleta ao app e volta quando ela termina (ou desiste); respeita o backoff de 429 do painel. */
     private val requestRefresh: suspend () -> Unit = {},
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    /** Fontes ligadas e como ligar/desligar uma (#398, Y8); o `/api` usa os dois. */
+    private val enabledSources: () -> Set<ApiSource> = { emptySet() },
+    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> },
+    /** Gasto do Claude Code nas últimas 24 h (#398, Y1); `null` é "não medido". */
+    private val spendProvider: suspend () -> TelegramDailySpend? = { null },
+    /** Gráfico do `/grafico` (#398, Y6), montado de quem tem o histórico. */
+    private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null },
+    /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
+    private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
     private var alertJob: Job? = null
+    private var summaryJob: Job? = null
+    private var panelJob: Job? = null
+
+    /** Último texto do painel por conversa, para editar só o que mudou. Só neste laço. */
+    private val panelTexts = mutableMapOf<Long, String>()
+
+    private val handlers = TelegramBotHandlers(
+        api = api,
+        scope = scope,
+        settingsFlow = settingsFlow,
+        saveSettings = saveSettings,
+        alertSettingsFlow = alertSettingsFlow,
+        saveAlertSettings = saveAlertSettings,
+        snapshotProvider = snapshotProvider,
+        languageProvider = languageProvider,
+        requestRefresh = requestRefresh,
+        clock = clock,
+        enabledSources = enabledSources,
+        toggleSource = toggleSource,
+        summaryText = { language -> TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language) },
+        chartProvider = chartProvider
+    )
 
     private val _status = MutableStateFlow<TelegramBotStatus>(TelegramBotStatus.Off)
     val status: StateFlow<TelegramBotStatus> = _status.asStateFlow()
@@ -84,6 +113,13 @@ internal class TelegramBotService(
         pollJob = scope.launch { pollLoop() }
         alertJob = scope.launch {
             alerts.collect { alert -> broadcast(TelegramBotMessages.alert(alert, languageProvider())) }
+        }
+        summaryJob = scope.launch { summaryLoop() }
+        panelJob = scope.launch {
+            while (true) {
+                runCatching { syncPanels() }.onFailure { error -> if (error is CancellationException) throw error }
+                delay(panelIntervalMillis)
+            }
         }
     }
 
@@ -124,7 +160,7 @@ internal class TelegramBotService(
                 failures = 0
                 for (update in updates) {
                     offset = update.updateId + 1
-                    handle(settings.botToken, update)
+                    handlers.handle(settings.botToken, update)
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -142,83 +178,6 @@ internal class TelegramBotService(
         }
     }
 
-    private suspend fun handle(token: String, message: TelegramIncomingMessage) {
-        val callbackId = message.callbackId
-        if (callbackId != null) {
-            // Toque de quem não está pareado não recebe nem o "fechar carregando".
-            if (settingsFlow.value.isAuthorized(message.chatId)) scope.launch { handleButton(token, message, callbackId) }
-            return
-        }
-        val command = message.text?.let(::parseBotCommand) ?: return
-        val language = languageProvider()
-        val settings = settingsFlow.value
-        if (command is BotCommand.Start) {
-            if (!settings.isAuthorized(message.chatId) && settings.acceptsPairing(command.code, clock.now().toEpochMilliseconds())) {
-                val paired = settings.copy(
-                    authorizedChats = settings.authorizedChats + TelegramChat(message.chatId, message.chatName),
-                    pairingCode = null,
-                    pairingExpiresAtMillis = null
-                )
-                runCatching { saveSettings(paired) }
-                settingsFlow.value = paired
-                api.sendMessage(token, message.chatId, TelegramBotMessages.paired(language), html = true)
-            }
-            return
-        }
-        // Conversa não pareada não recebe resposta: o bot não confirma que existe.
-        if (!settings.isAuthorized(message.chatId)) return
-        if (command == BotCommand.Status) {
-            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshotProvider(), language), html = true, buttons = statusButtons(language))
-            return
-        }
-        val reply = when (command) {
-            BotCommand.Help -> TelegramBotMessages.help(language)
-            is BotCommand.Invalid -> TelegramBotMessages.invalid(command.usage, language)
-            else -> {
-                val updated = applyBotCommand(alertSettingsFlow.value, command)
-                if (updated != null) saveAlertSettings(updated)
-                TelegramBotMessages.applied(command, language)
-            }
-        }
-        api.sendMessage(token, message.chatId, reply, html = true)
-    }
-
-    private suspend fun handleButton(token: String, message: TelegramIncomingMessage, callbackId: String) {
-        val language = languageProvider()
-        val button = BotButton.fromData(message.callbackData)
-        runTelegram {
-            when (button) {
-                BotButton.REFRESH -> {
-                    api.answerCallbackQuery(token, callbackId, TelegramBotMessages.refreshing(language))
-                    requestRefresh()
-                    val messageId = message.messageId
-                    val text = TelegramBotMessages.status(snapshotProvider(), language)
-                    // Sem mudança o Telegram responde 400 "message is not modified": o `runTelegram` o engole.
-                    if (messageId != null) api.editMessageText(token, message.chatId, messageId, text, statusButtons(language))
-                }
-                BotButton.SNOOZE -> {
-                    val snoozed = snoozeAlerts(alertSettingsFlow.value, clock.now().toEpochMilliseconds())
-                    saveAlertSettings(snoozed)
-                    api.answerCallbackQuery(token, callbackId)
-                    api.sendMessage(token, message.chatId, TelegramBotMessages.snoozed(snoozed.snoozedUntilEpochMillis ?: 0L, language), html = true)
-                }
-                BotButton.THRESHOLDS -> {
-                    api.answerCallbackQuery(token, callbackId)
-                    api.sendMessage(token, message.chatId, TelegramBotMessages.thresholds(alertSettingsFlow.value, language), html = true)
-                }
-                null -> api.answerCallbackQuery(token, callbackId)
-            }
-        }
-    }
-
-    private fun statusButtons(language: AppLanguage): List<TelegramButton> =
-        TelegramBotMessages.statusButtons(language).map { (label, button) -> TelegramButton(label, button.data) }
-
-    /** Falha de um toque fica no toque: o polling segue. Cancelamento continua subindo. */
-    private suspend fun runTelegram(block: suspend () -> Unit) {
-        runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
-    }
-
     private suspend fun fetchUsername(token: String): String? =
         runCatching { api.getMe(token) }.onFailure { error -> if (error is CancellationException) throw error }.getOrNull()
 
@@ -226,6 +185,86 @@ internal class TelegramBotService(
     private suspend fun registerMenu(token: String) {
         runCatching { api.setMyCommands(token, TelegramBotMessages.menu(languageProvider())) }
             .onFailure { error -> if (error is CancellationException) throw error }
+    }
+
+    /**
+     * Resumo diário (#398, Y1): checa uma vez por minuto se já é hora. A data vai
+     * para o `telegram.json` **antes** do envio: falhar no meio não repete o
+     * resumo a cada minuto — perde-se um dia, não se inunda a conversa.
+     */
+    private suspend fun summaryLoop() {
+        while (true) {
+            val settings = settingsFlow.value
+            val now = clock.now()
+            val ready = settings.enabled && settings.botToken.isNotBlank() && settings.authorizedChats.isNotEmpty()
+            if (ready && isDailySummaryDue(settings.dailySummaryHour, settings.lastSummaryDate, now, alertSettingsFlow.value)) {
+                val marked = settings.copy(lastSummaryDate = dailySummaryDate(now))
+                runCatching { saveSettings(marked) }
+                settingsFlow.value = marked
+                runCatching {
+                    val language = languageProvider()
+                    broadcast(TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language))
+                }.onFailure { error -> if (error is CancellationException) throw error }
+            }
+            delay(SUMMARY_CHECK_MILLIS)
+        }
+    }
+
+    /**
+     * Painel fixado (#398, Y5). Ligado: envia em silêncio e fixa onde ainda não há
+     * painel, e edita só quando o texto mudou — a hora no texto é a da coleta, então
+     * a edição segue o ritmo da coleta e nunca passa de uma por intervalo. Mensagem
+     * apagada pelo usuário (400 "not found") é recriada. Desligado: desafixa e
+     * esquece. Conversa removida sai do mapa.
+     */
+    private suspend fun syncPanels() {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank()) return
+        val token = settings.botToken
+        val chats = settings.authorizedChats.map { chat -> chat.id }.toSet()
+        if (!settings.livePanelEnabled) {
+            if (settings.panelMessages.isEmpty()) return
+            for ((chatId, messageId) in settings.panelMessages) {
+                runTelegramCall { api.unpinChatMessage(token, chatId, messageId) }
+            }
+            panelTexts.clear()
+            savePanels(emptyMap())
+            return
+        }
+        val text = TelegramBotSummaryMessages.panel(snapshotProvider(), languageProvider())
+        val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
+        for (chatId in chats) {
+            val messageId = panels[chatId]
+            if (messageId != null && panelTexts[chatId] == text) continue
+            val kept = messageId != null && editPanel(token, chatId, messageId, text)
+            if (!kept) {
+                val created = api.sendMessage(token, chatId, text, html = true, silent = true) ?: continue
+                runTelegramCall { api.pinChatMessage(token, chatId, created) }
+                panels[chatId] = created
+            }
+            panelTexts[chatId] = text
+            delay(SEND_SPACING_MILLIS)
+        }
+        if (panels != settings.panelMessages) savePanels(panels)
+    }
+
+    /** `false` quando a mensagem sumiu e tem de ser recriada; "not modified" conta como mantida. */
+    private suspend fun editPanel(token: String, chatId: Long, messageId: Long, text: String): Boolean =
+        try {
+            api.editMessageText(token, chatId, messageId, text)
+            true
+        } catch (bad: TelegramBadRequestException) {
+            if (bad.isMessageGone) false else bad.isNotModified || throw bad
+        }
+
+    private fun savePanels(panels: Map<Long, Long>) {
+        val next = settingsFlow.value.copy(panelMessages = panels)
+        runCatching { saveSettings(next) }
+        settingsFlow.value = next
+    }
+
+    private suspend fun runTelegramCall(block: suspend () -> Unit) {
+        runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
     }
 
     /** Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa. */
@@ -246,5 +285,7 @@ internal class TelegramBotService(
         const val BACKOFF_BASE_MILLIS = 2_000L
         const val BACKOFF_MAX_MILLIS = 60_000L
         const val SEND_SPACING_MILLIS = 1_100L
+        const val SUMMARY_CHECK_MILLIS = 60_000L
+        const val PANEL_INTERVAL_MILLIS = 60_000L
     }
 }

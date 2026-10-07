@@ -2,6 +2,8 @@ package com.usagemonitor.data.datasource
 
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.timeout
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
@@ -9,6 +11,8 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -39,8 +43,20 @@ class TelegramRateLimitedException(val retryAfterSeconds: Long) : RuntimeExcepti
 class TelegramUnauthorizedException : RuntimeException("Token do bot recusado pelo Telegram.")
 
 /**
+ * 400 da Bot API, com a [description] do Telegram (#398). Tipado porque o painel
+ * fixado (Y5) precisa separar "message is not modified" (nada a fazer) de
+ * "message to edit not found" (a mensagem sumiu e tem de ser recriada).
+ */
+class TelegramBadRequestException(val description: String) : IllegalStateException("Telegram respondeu HTTP 400: $description") {
+    val isNotModified: Boolean get() = description.contains("not modified", ignoreCase = true)
+    val isMessageGone: Boolean get() = description.contains("not found", ignoreCase = true) ||
+        description.contains("can't be edited", ignoreCase = true)
+}
+
+/**
  * Cliente mínimo da Bot API do Telegram (#387): `getUpdates` em long polling,
- * `sendMessage`, `editMessageText`, `answerCallbackQuery`, `deleteWebhook`, `setMyCommands` e `getMe`.
+ * `sendMessage`, `editMessageText`, `answerCallbackQuery`, `deleteWebhook`, `setMyCommands`, `getMe`
+ * e, desde a #398, `pinChatMessage`, `unpinChatMessage` e `sendPhoto`.
  * Só HTTPS de saída — nenhuma porta aberta.
  *
  * O token vai no caminho da URL, como a API exige; por isso nenhuma mensagem de
@@ -85,19 +101,28 @@ open class TelegramBotApi(
 
     /**
      * [html] liga `parse_mode: HTML`: quem chama já escapou o texto variável.
-     * [buttons] viram uma linha de teclado inline embaixo da mensagem.
+     * [buttons] é o teclado inline, uma lista por linha, embaixo da mensagem.
+     * [silent] entrega sem som. Devolve o `message_id` (#398: o painel fixado
+     * edita a mesma mensagem), `null` se o Telegram não o informar.
      */
-    open suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean = false, buttons: List<TelegramButton> = emptyList()) {
-        val body = SendMessageDto(chatId, text, if (html) PARSE_MODE_HTML else null, keyboard(buttons))
+    open suspend fun sendMessage(
+        token: String,
+        chatId: Long,
+        text: String,
+        html: Boolean = false,
+        buttons: List<List<TelegramButton>> = emptyList(),
+        silent: Boolean = false
+    ): Long? {
+        val body = SendMessageDto(chatId, text, if (html) PARSE_MODE_HTML else null, keyboard(buttons), silent.takeIf { it })
         val response = httpClient.post("$baseUrl/bot$token/sendMessage") {
             contentType(ContentType.Application.Json)
             setBody(json.encodeToString(SendMessageDto.serializer(), body))
         }
-        decode(response, SimpleResponseDto.serializer())
+        return decode(response, SentResponseDto.serializer()).result?.messageId
     }
 
     /** Troca o texto de uma mensagem já enviada, mantendo [buttons] embaixo dela. */
-    open suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<TelegramButton> = emptyList()) {
+    open suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<List<TelegramButton>> = emptyList()) {
         val body = EditMessageDto(chatId, messageId, text, PARSE_MODE_HTML, keyboard(buttons))
         val response = httpClient.post("$baseUrl/bot$token/editMessageText") {
             contentType(ContentType.Application.Json)
@@ -115,8 +140,52 @@ open class TelegramBotApi(
         decode(response, SimpleResponseDto.serializer())
     }
 
-    private fun keyboard(buttons: List<TelegramButton>): KeyboardDto? =
-        if (buttons.isEmpty()) null else KeyboardDto(listOf(buttons.map { button -> ButtonDto(button.text, button.data) }))
+    private fun keyboard(rows: List<List<TelegramButton>>): KeyboardDto? {
+        val filled = rows.filter { row -> row.isNotEmpty() }
+        if (filled.isEmpty()) return null
+        return KeyboardDto(filled.map { row -> row.map { button -> ButtonDto(button.text, button.data) } })
+    }
+
+    /** Fixa a mensagem no topo da conversa sem notificar (#398, painel ao vivo). */
+    open suspend fun pinChatMessage(token: String, chatId: Long, messageId: Long) {
+        val response = httpClient.post("$baseUrl/bot$token/pinChatMessage") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(PinDto.serializer(), PinDto(chatId, messageId, disableNotification = true)))
+        }
+        decode(response, SimpleResponseDto.serializer())
+    }
+
+    open suspend fun unpinChatMessage(token: String, chatId: Long, messageId: Long) {
+        val response = httpClient.post("$baseUrl/bot$token/unpinChatMessage") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(PinDto.serializer(), PinDto(chatId, messageId)))
+        }
+        decode(response, SimpleResponseDto.serializer())
+    }
+
+    /**
+     * Imagem PNG com legenda em HTML (#398, `/grafico`). Multipart, como a Bot API
+     * exige para arquivo enviado do disco; [caption] já vem escapada.
+     */
+    open suspend fun sendPhoto(token: String, chatId: Long, png: ByteArray, caption: String) {
+        val response = httpClient.submitFormWithBinaryData(
+            url = "$baseUrl/bot$token/sendPhoto",
+            formData = formData {
+                append("chat_id", chatId.toString())
+                append("caption", caption)
+                append("parse_mode", PARSE_MODE_HTML)
+                append(
+                    "photo",
+                    png,
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "image/png")
+                        append(HttpHeaders.ContentDisposition, "filename=\"usage.png\"")
+                    }
+                )
+            }
+        )
+        decode(response, SimpleResponseDto.serializer())
+    }
 
     /** Lista do botão "Menu" do Telegram: os comandos aparecem sem digitar `/ajuda`. */
     open suspend fun setMyCommands(token: String, commands: List<Pair<String, String>>) {
@@ -143,6 +212,7 @@ open class TelegramBotApi(
         val code = response.status.value
         if (code == 401 || code == 404) throw TelegramUnauthorizedException()
         if (code == 429) throw TelegramRateLimitedException(parsed?.parameters?.retryAfter ?: DEFAULT_RETRY_SECONDS)
+        if (code == 400) throw TelegramBadRequestException(parsed?.description ?: "resposta ilegível")
         if (parsed == null || !parsed.ok) {
             throw IllegalStateException("Telegram respondeu HTTP $code: ${parsed?.description ?: "resposta ilegível"}")
         }
@@ -178,6 +248,21 @@ open class TelegramBotApi(
     private data class MeDto(val username: String? = null)
 
     @Serializable
+    private data class SentResponseDto(
+        override val ok: Boolean = false,
+        override val description: String? = null,
+        override val parameters: ResponseParametersDto? = null,
+        val result: MessageDto? = null
+    ) : OkResponse
+
+    @Serializable
+    private data class PinDto(
+        @SerialName("chat_id") val chatId: Long,
+        @SerialName("message_id") val messageId: Long,
+        @SerialName("disable_notification") val disableNotification: Boolean? = null
+    )
+
+    @Serializable
     private data class SimpleResponseDto(
         override val ok: Boolean = false,
         override val description: String? = null,
@@ -193,7 +278,7 @@ open class TelegramBotApi(
 
     @Serializable
     private data class MessageDto(
-        val chat: ChatDto,
+        val chat: ChatDto = ChatDto(0L),
         val text: String? = null,
         @SerialName("message_id") val messageId: Long? = null
     )
@@ -214,7 +299,8 @@ open class TelegramBotApi(
         @SerialName("chat_id") val chatId: Long,
         val text: String,
         @SerialName("parse_mode") val parseMode: String? = null,
-        @SerialName("reply_markup") val replyMarkup: KeyboardDto? = null
+        @SerialName("reply_markup") val replyMarkup: KeyboardDto? = null,
+        @SerialName("disable_notification") val disableNotification: Boolean? = null
     )
 
     @Serializable

@@ -113,6 +113,9 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Respostas do bot do Telegram (#396; galeria única `docs/planos/issues-394-396-visual/`) | W5 · W1 + botões na mensagem (cartão por conta com barra de 10 células, risco em emoji e palavra; teclado Atualizar, Silenciar 1h, Limiares; menu por `setMyCommands`) | W1 cartão por conta (virou a base da W5), W2 tabela monoespaçada, W3 bloco por conta com tempo até o reinício, W4 pior primeiro com o resto recolhido |
 | Card "Bot do Telegram" nas Configurações (#396; estática, galeria única `docs/planos/issues-394-396-visual/`) | V2 · três passos numerados (token, pareamento com Copiar e Abrir no Telegram, teste; exemplo recolhido) | V1 comando com Copiar e prévia real, V3 pareamento em foco, V4 guia de comandos no lugar da conversa, V5 faixa de status e prévia larga |
 
-Próxima rodada usa a próxima letra livre (X, Y, …; U, V e W já usadas). Trilha, fundo ou estado contínuo: as opções
+| Configurações — organizar a aba Geral (#399; estática, galeria única `docs/planos/issues-398-399-visual/`) | X1 · Aparência e Sistema viram abas (exceção à regra do enum, aprovada) + X10 · prévia ao vivo do notch na Aparência | X2 sub-abas na Geral, X3 painéis recolhíveis com resumo, X4 árvore com âncoras, X5 tema numa janela própria, X6 duas colunas, X7 busca nas Configurações, X8 aba "Sobre", X9 navegação por assunto em grupos |
+| Bot do Telegram — funções novas (#398; estática, galeria única `docs/planos/issues-398-399-visual/`) | Y1 resumo diário, Y2 aviso de reinício de cota, Y4 uma conta por vez, Y5 painel fixado ao vivo, Y6 gráfico das últimas 24 h, Y8 controle remoto | Y3 `/custo` e orçamento do mês, Y7 sessões CLI ativas e travadas, Y9 alerta com ação na mensagem, Y10 relatório semanal em PDF |
+
+Próxima rodada usa a próxima letra livre (Z, depois letras duplas; U, V, W, X e Y já usadas). Trilha, fundo ou estado contínuo: as opções
 já nascem animadas (laço atrás da política), nunca só o quadro parado. Ícone de sistema não anima: nessa rodada o
 card mostra os tamanhos reais (lupa ×4 no 16 px) sobre barra clara e escura, e não um laço.
