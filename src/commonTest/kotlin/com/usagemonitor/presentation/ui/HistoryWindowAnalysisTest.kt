@@ -67,4 +67,48 @@ class HistoryWindowAnalysisTest {
             hourlyPeakLabel(QuotaHourlyDistribution(byHour), AppLanguage.PT)
         )
     }
+
+    @Test
+    fun `detail opens the open window, else the newest`() {
+        val old = window("2026-09-27T01:00:00Z")
+        val open = window("2026-09-27T06:00:00Z", open = true)
+        val closedNewest = window("2026-09-27T11:00:00Z")
+
+        assertEquals(open, defaultSelectedWindow(listOf(old, open)))
+        assertEquals(closedNewest, defaultSelectedWindow(listOf(old, closedNewest)))
+        assertEquals(null, defaultSelectedWindow(emptyList()))
+    }
+
+    @Test
+    fun `window curve keeps only the readings inside the window`() {
+        fun point(at: String) = com.usagemonitor.domain.entity.UsageHistoryPoint(
+            capturedAt = Instant.parse(at), used = 1, total = 100, rawUsed = 0, rawTotal = 0,
+            periodEndAt = Instant.parse("2026-09-27T12:00:00Z")
+        )
+        val target = window("2026-09-27T06:00:00Z").copy(lastObservedAt = Instant.parse("2026-09-27T08:00:00Z"))
+        val points = listOf(point("2026-09-27T05:59:00Z"), point("2026-09-27T06:00:00Z"), point("2026-09-27T07:00:00Z"),
+            point("2026-09-27T08:00:00Z"), point("2026-09-27T08:01:00Z"))
+
+        assertEquals(
+            listOf("2026-09-27T06:00:00Z", "2026-09-27T07:00:00Z", "2026-09-27T08:00:00Z").map(Instant::parse),
+            pointsOfWindow(points, target).map { it.capturedAt }
+        )
+    }
+
+    @Test
+    fun `window list detail names the peak and the exhaustion only when it happened`() {
+        assertEquals("pico 80 %", windowListDetail(window("2026-09-27T10:00:00Z"), AppLanguage.PT))
+        assertEquals("pico 80 % · esgotou em 2h", windowListDetail(window("2026-09-27T10:00:00Z", "2026-09-27T12:00:00Z"), AppLanguage.PT))
+    }
+
+    @Test
+    fun `window used before the first reading does not read as zero minutes active`() {
+        val at = Instant.parse("2026-10-06T00:02:00Z")
+        val usedBefore = window("2026-10-06T00:02:00Z").copy(activeFrom = at, activeUntil = at)
+        val active = window("2026-10-06T00:02:00Z").copy(activeFrom = at, activeUntil = Instant.parse("2026-10-06T01:00:00Z"))
+
+        assertEquals("usada antes da 1ª leitura", activeSpanLabel(usedBefore, AppLanguage.PT))
+        assertEquals("21:02 → 22:00 · 58min", activeSpanLabel(active, AppLanguage.PT))
+        assertEquals("—", activeSpanLabel(window("2026-10-06T00:02:00Z"), AppLanguage.PT))
+    }
 }

@@ -10,21 +10,47 @@ import com.usagemonitor.presentation.ui.*
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.screenshots.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class HistoryLayoutRegressionTest {
     @Test
-    fun `eight wide table rows occupy distinct vertical positions`() = runDesktopComposeUiTest(width = 1030, height = 640) {
+    fun `eight window list items occupy distinct vertical positions`() = runDesktopComposeUiTest(width = 1030, height = 900) {
         val series = issue383ManyWindowsSeries()
         setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
-        val header = onNodeWithText("Início observado").fetchSemanticsNode().boundsInRoot
         val rows = windowRowsNewestFirst(series.windows).map { window ->
-            onNodeWithText(windowStartLabel(window, AppLanguage.PT)).fetchSemanticsNode().boundsInRoot
+            onNodeWithTag(historyWindowItemTag(window)).fetchSemanticsNode().boundsInRoot
         }
-        assertTrue(header.bottom <= rows.first().top, "Cabeçalho sobreposto à primeira linha")
+        assertEquals(HISTORY_WINDOW_ROW_LIMIT, rows.size)
         rows.zipWithNext().forEach { (previous, next) -> assertTrue(previous.bottom <= next.top, "Linhas sobrepostas: $previous e $next") }
+    }
+
+    @Test
+    fun `window list opens the current window and switches the detail on click`() = runDesktopComposeUiTest(width = 1030, height = 900) {
+        val series = issue383ManyWindowsSeries()
+        val newestFirst = windowRowsNewestFirst(series.windows)
+        setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(historyWindowItemTag(newestFirst.first())).assertIsSelected()
+        onNodeWithTag(HISTORY_WINDOW_DETAIL_TAG).onChildren().filterToOne(hasText(windowStartLabel(newestFirst.first(), AppLanguage.PT))).assertExists()
+
+        onNodeWithTag(historyWindowItemTag(newestFirst[2])).performClick()
+
+        onNodeWithTag(historyWindowItemTag(newestFirst[2])).assertIsSelected()
+        onNodeWithTag(historyWindowItemTag(newestFirst.first())).assertIsNotSelected()
+        onNodeWithTag(HISTORY_WINDOW_DETAIL_TAG).onChildren().filterToOne(hasText(windowStartLabel(newestFirst[2], AppLanguage.PT))).assertExists()
+    }
+
+    @Test
+    fun `narrow window panel turns the list into a menu`() = runDesktopComposeUiTest(width = 360, height = 900) {
+        val series = issue383ManyWindowsSeries()
+        val newestFirst = windowRowsNewestFirst(series.windows)
+        setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(historyWindowItemTag(newestFirst[1])).assertDoesNotExist()
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).performClick()
+        onNodeWithTag(historyWindowItemTag(newestFirst[1])).performClick()
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).assertContentDescriptionEquals("Janela: ${windowStartLabel(newestFirst[1], AppLanguage.PT)}")
     }
 
     @Test

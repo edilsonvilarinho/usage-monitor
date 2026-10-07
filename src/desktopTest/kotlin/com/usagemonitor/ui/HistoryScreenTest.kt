@@ -1078,7 +1078,10 @@ class HistoryScreenTest {
                     exhaustedAt = Instant.parse("2026-05-07T11:30:00Z"),
                     consumedPercent = 95.0,
                     averagePercentPerHour = 24.0,
-                    isOpen = false
+                    isOpen = false,
+                    hourlyDistribution = com.usagemonitor.domain.entity.QuotaHourlyDistribution(
+                        List(24) { hour -> if (hour == 8) 95.0 else 0.0 }
+                    )
                 )
             ),
             hourlyDistribution = com.usagemonitor.domain.entity.QuotaHourlyDistribution(
@@ -1098,11 +1101,10 @@ class HistoryScreenTest {
             }
         }
         waitUntil(timeoutMillis = 5_000) {
-            runCatching { onNodeWithText("▸ Janelas e distribuição horária").fetchSemanticsNode(); true }.getOrDefault(false)
+            runCatching { onNodeWithText("▾ Janelas e distribuição horária").fetchSemanticsNode(); true }.getOrDefault(false)
         }
 
-        // A análise é secundária na direção 01 e precisa ser aberta explicitamente.
-        onNodeWithText("▸ Janelas e distribuição horária").performClick()
+        // #392 (S9): a análise nasce aberta, com a janela escolhida no detalhe.
 
         onNodeWithText("Janelas 5h").assertIsDisplayed()
         onNodeWithText("3h 30min").assertIsDisplayed()

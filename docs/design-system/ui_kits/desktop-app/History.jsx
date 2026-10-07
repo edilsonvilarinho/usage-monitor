@@ -97,12 +97,22 @@ export function History() {
             {quota !== '5h' && <AppPanel><AppPanelHeader title="Resumo semanal" /><AppDataTable columns={metricColumns} rows={rows(true)} /></AppPanel>}
           </div>
         </details>
-        <details>
+        <details open>
           <summary style={{ fontFamily: 'var(--mono)', cursor: 'pointer' }}>Janelas e distribuição horária</summary>
           <AppPanel style={{ marginTop: 'var(--s2)' }}>
             <AppPanelHeader title={weeklyOnly ? 'Janelas 7d' : 'Janelas 5h'} subtitle="Até oito janelas recentes na tela; todas no PDF" />
-            <AppDataTable columns={[{ key: 'inicio', label: 'Início observado' }, { key: 'ativa', label: 'Ativa', numeric: true }, { key: 'pico', label: 'Pico', numeric: true }, { key: 'esgotou', label: 'Esgotou em', numeric: true }, { key: 'ritmo', label: 'Ritmo', numeric: true }]} rows={weeklyOnly ? [{ id: 1, inicio: '03/10 21:05 BRT · atual', ativa: '21:05 → 11:40 · 2d 14h', pico: '43 %', esgotou: '—', ritmo: '1 %/h' }] : [{ id: 1, inicio: '06/10 12:05 BRT · atual', ativa: '12:12 → 15:40 · 3h 28min', pico: '68 %', esgotou: '—', ritmo: '5,6 %/h' }, { id: 2, inicio: '06/10 07:02 BRT', ativa: '07:02 → 10:14 · 3h 12min', pico: '100 %', esgotou: '3h 12min', ritmo: '31 %/h' }]} />
-            <AppPanelBody><AppKey>Consumo por hora do dia (BRT)</AppKey><svg viewBox="0 0 700 58" style={{ display: 'block', width: '100%', height: 56 }} role="img" aria-label="Pico às 14h BRT">{[2,0,0,0,0,0,0,0,6,18,30,34,22,28,48,40,30,20,12,8,6,4,2,2].map((h,i) => <rect key={i} x={i*29+4} y={56-h} width="20" height={h} rx="2" fill="var(--anthropic)" />)}</svg><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)' }}>Pico às 14h BRT · 15% do consumo</span></AppPanelBody>
+            {/* #392 (S9): lista de janelas à esquerda, detalhe da escolhida à direita. */}
+            <div style={{ display: 'flex', gap: 'var(--s2)' }}>
+              <div style={{ width: 200, flex: 'none', fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>
+                {(weeklyOnly ? [['03/10 21:05 BRT · atual', 'pico 43 %']] : [['06/10 12:05 BRT · atual', 'pico 68 %'], ['06/10 07:02 BRT', 'pico 100 % · esgotou em 3h 12min']]).map(([start, detail], i) => (
+                  <div key={start} style={{ padding: 'var(--s2) var(--s3)', background: i === 0 ? 'var(--raised)' : 'transparent', borderTop: i ? '1px solid var(--border)' : 'none' }}>{start}<br /><span style={{ color: 'var(--muted)', fontSize: 'var(--t10)' }}>{detail}</span></div>
+                ))}
+              </div>
+              <AppPanelBody style={{ flex: 1, minWidth: 0 }}>
+                <AppDataTable columns={[{ key: 'k', label: 'Métrica' }, { key: 'v', label: 'Valor', numeric: true }]} rows={weeklyOnly ? [{ id: 1, k: 'Ativa', v: '21:05 → 11:40 · 2d 14h' }, { id: 2, k: 'Pico', v: '43 %' }, { id: 3, k: 'Esgotou em', v: '—' }, { id: 4, k: 'Ritmo', v: '1 %/h' }] : [{ id: 1, k: 'Ativa', v: '12:12 → 15:40 · 3h 28min' }, { id: 2, k: 'Pico', v: '68 %' }, { id: 3, k: 'Esgotou em', v: '—' }, { id: 4, k: 'Ritmo', v: '5,6 %/h' }]} />
+                <AppKey>Consumo por hora do dia (BRT) · só desta janela</AppKey><svg viewBox="0 0 700 58" style={{ display: 'block', width: '100%', height: 56 }} role="img" aria-label="Pico às 14h BRT">{[2,0,0,0,0,0,0,0,6,18,30,34,22,28,48,40,30,20,12,8,6,4,2,2].map((h,i) => <rect key={i} x={i*29+4} y={56-h} width="20" height={h} rx="2" fill="var(--anthropic)" />)}</svg><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)' }}>Pico às 14h BRT · 15% do consumo</span>
+              </AppPanelBody>
+            </div>
           </AppPanel>
         </details>
       </div>

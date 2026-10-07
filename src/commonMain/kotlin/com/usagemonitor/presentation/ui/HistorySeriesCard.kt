@@ -29,7 +29,8 @@ internal fun HistorySeriesCard(
     monthlySummary: UsageHistorySeries? = null
 ) {
     var metricsExpanded by remember(chartSelectionKey) { mutableStateOf(true) }
-    var analysisExpanded by remember(chartSelectionKey) { mutableStateOf(false) }
+    // Nasce aberta (#392): a lista de janelas e o detalhe são a resposta da issue.
+    var analysisExpanded by remember(chartSelectionKey) { mutableStateOf(true) }
     val title = titleOverride ?: historySeriesDisplayTitle(source, series, language)
     val subtitle = subtitleOverride ?: historySeriesDisplaySubtitle(source, series, language)
     val chartSeries = if (quotaView == HistoryQuotaView.WEEKLY && weeklySummary != null) weeklySummary else series

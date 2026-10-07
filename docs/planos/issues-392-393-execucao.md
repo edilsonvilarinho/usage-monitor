@@ -16,10 +16,10 @@ Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`
 | Autor dos commits | skill `usage-monitor-commit-push`, trailer `Co-Authored-By: Claude Opus 5.5` |
 
 ### ▶ Atividade corrente
-A04 — lista de janelas e detalhe (S9).
+A05 — dica nas barras horárias e legenda com amostras.
 
 ### ⏭ Próxima atividade
-A05 — dica nas barras horárias e legenda com amostras.
+A06 — analytics por turno do Codex.
 
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
 
@@ -108,6 +108,7 @@ Commit e push só com autorização.
 | A01 | `docs: plan issues #392 and #393 with visual gallery` | `node docs/planos/issues-392-393-visual/build-gallery.cjs` → 65,0 KB; aberta no browser pane: console sem erro, 22 cards, nenhum palco com transbordo horizontal |
 | A02 | `fix(history): label the axis middle by time, not by point index` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest"` → 32 testes, 0 falhas (1 novo: polling 5 min + 60 s, centro 08:55 BRT); `--tests "com.usagemonitor.ui.History*"` → 20 testes, 0 falhas |
 | A03 | `feat(history): compute the hourly distribution per quota window` | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaWindowAnalysisTest" --tests "com.usagemonitor.data.*History*" --tests "com.usagemonitor.architecture.*"` → 17 + 39 + 8 testes, 0 falhas (2 novos: soma das janelas = distribuição do intervalo, hora a hora; janela sem subida → `null`) |
+| A04 | `feat(history): list quota windows with a per-window detail` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.HistoryWindowAnalysisTest" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.architecture.*"` → 62 testes, 0 falhas (novos: seleção padrão, recorte de pontos, segunda linha da lista, "usada antes da 1ª leitura", itens sem sobreposição, troca do detalhe no clique, menu abaixo de 600dp); `gradlew.bat generateScreenshots -PscreenshotScenario=history-regression -PscreenshotOutputDir=build/issue392-screenshots` → lista e detalhe conferidos em `history-windows-dark-100.png` |
 
 ## Problemas em aberto e riscos
 
@@ -123,3 +124,6 @@ Commit e push só com autorização.
 ## Desvios do plano e achados da execução
 
 - **A03:** `UsageHistoryRepositoryImpl` não mudou. Ele já chama `quotaWindowsOf(points, …)` com os pontos crus, antes de `downsamplePoints`; o campo novo nasce dentro de `quotaWindowsOf` e herda isso.
+- **A04:** documentação de tela (protótipo, kit `History.jsx`, `presentation.md`, tabela de rodadas da skill) sai da A08 e entra no commit de cada atividade de tela, como manda o `CLAUDE.md` ("no mesmo commit da mudança"). A08 fica só com o que sobrar.
+- **A04:** sem divisória vertical entre lista e detalhe — `IntrinsicSize.Min` falha com o `BoxWithConstraints` de `HistoryMetricTable`.
+- **A04:** "usada antes da 1ª leitura" vale também no PDF (`activeSpanLabel` ganhou o idioma).
