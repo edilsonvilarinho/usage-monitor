@@ -1,6 +1,9 @@
 package com.usagemonitor.domain
 
+import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.TELEGRAM_SNOOZE_MILLIS
+import com.usagemonitor.domain.entity.snoozeAlerts
 import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
@@ -46,6 +49,16 @@ class TelegramBotCommandTest {
         assertEquals(QuietHours(12, 13), applyBotCommand(base, BotCommand.Quiet(QuietHours(12, 13)))!!.quietHours)
         assertEquals(listOf(80), applyBotCommand(base, BotCommand.Threshold(listOf(80)))!!.quotaPercents)
         assertNull(applyBotCommand(base, BotCommand.Status))
+    }
+
+    @Test
+    fun `snooze lasts one hour and turning alerts on ends it`() {
+        val snoozed = snoozeAlerts(UsageAlertSettings(), nowMillis = 1_000L)
+
+        assertEquals(1_000L + TELEGRAM_SNOOZE_MILLIS, snoozed.snoozedUntilEpochMillis)
+        assertNull(applyBotCommand(snoozed, BotCommand.Alerts(true))!!.snoozedUntilEpochMillis)
+        assertEquals(BotButton.SNOOZE, BotButton.fromData("snooze"))
+        assertNull(BotButton.fromData("forged"))
     }
 
     @Test

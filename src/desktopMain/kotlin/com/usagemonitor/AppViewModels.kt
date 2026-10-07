@@ -292,6 +292,7 @@ internal class AppViewModels(
         },
         alerts = usageAlert.alerts,
         snapshotProvider = ::currentSnapshot,
+        requestRefresh = { refreshForBot(dashboard) },
         languageProvider = { storedLanguage(graph.settings) }
     ).also { service -> service.start() }
 

@@ -1,0 +1,434 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#394 #396 opções</title><style>body{margin:0;background:#101010}</style></head><body>
+<style>
+.ux{--bg:#131010;--surface:#1B1818;--raised:#211E1E;--border:#3D3838;--fg:#F2EDED;--muted:#B8B2B2;--ok:#4CAF50;--warn:#FFA726;--crit:#E86A6A;--info:#4C8DFF;--gold:#E8AE63;--hot:#FFF0CB;--dust:#8C643F;--anthropic:#4F8CFF;--codex:#27BFA3;
+  background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux h2{font-size:14px;color:#fff;margin:26px 0 4px;font-weight:500;border-top:1px solid #2c2c2c;padding-top:16px}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 12px;color:#e9d6b8;font-size:11.5px}
+.ux .fix b{color:var(--gold)}
+.ux .bar-top{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.ux button.ctl{background:#252525;color:#eee;border:1px solid #444;border-radius:6px;padding:5px 9px;font:inherit;cursor:pointer}
+.ux button.ctl.on{background:#3a2a14;border-color:#8C643F;color:#FFE0B0}
+.ux .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:12px}
+.ux .grid2 .opt{margin-bottom:0}
+.ux .opt.ref{border-style:dashed;border-color:#4a4a4a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt p{margin:0 0 8px;color:#8f8f8f;font-size:11px}
+.ux .tags{font-size:10.5px;color:#7a7a7a;margin-bottom:8px}
+/* ---------- U: página web mini ---------- */
+.ux .stage{position:relative;width:100%;max-width:300px;height:292px;background:var(--bg);border:1px solid #262222;border-radius:8px;overflow:hidden;margin:0 auto}
+.ux .stage .ph{position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--dust)}
+.ux .whd{display:flex;align-items:baseline;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);position:relative}
+.ux .whd b{font-size:12px;color:var(--fg);font-weight:600}
+.ux .rd{margin-left:auto;font-size:9.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.ux .rd i{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block}
+.ux .rd i.off{background:#666}
+.ux .rbar{position:absolute;left:0;bottom:-1px;height:1px;background:linear-gradient(90deg,rgba(232,174,99,.1),var(--gold));}
+.ux .wgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+.ux .acc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;will-change:transform,opacity}
+.ux .nm{font-size:10px;border-left:2px solid var(--c);padding-left:5px;align-self:stretch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--fg);font-family:"IBM Plex Sans",system-ui,sans-serif}
+.ux .acc canvas{width:110px;height:110px;display:block}
+.ux .st{font-size:9px;color:var(--muted);align-self:stretch}
+.ux .st.on::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ok);margin-right:4px}
+.ux .rk{font-size:9.5px;align-self:stretch;color:var(--c)}
+.ux .rk::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--c);margin-right:4px}
+.ux .q{font-size:9px;color:var(--muted);align-self:stretch;display:flex;gap:4px;white-space:nowrap}
+.ux .q b{color:var(--fg);font-weight:500}
+.ux .q .v{margin-left:auto;display:inline-block;min-width:26px;text-align:right}
+/* ---------- V: Configurações ---------- */
+.ux .set{background:#141012;border-radius:8px;padding:10px;border:1px solid #262222}
+.ux .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px}
+.ux .card h4{margin:0;font-size:12px;color:var(--fg);font-weight:600;display:flex;align-items:center;gap:8px}
+.ux .sw{margin-left:auto;width:28px;height:16px;border-radius:8px;background:#2e7d32;position:relative;flex:none}
+.ux .sw::after{content:"";position:absolute;right:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+.ux .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.ux .body{font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:11px;color:var(--muted);margin:0 0 8px}
+.ux .fld{border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:6px 8px;color:var(--fg);font-size:11px;display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.ux .fld .dots{flex:1;overflow:hidden;white-space:nowrap;letter-spacing:1px}
+.ux .lnk{color:var(--info);font-size:10.5px;cursor:pointer;white-space:nowrap}
+.ux .pill{display:inline-flex;gap:5px;align-items:center;font-size:10px;padding:1px 7px;border-radius:5px;margin-bottom:8px}
+.ux .pill i{width:6px;height:6px;border-radius:50%}
+.ux .pill.ok{background:#1a2e1c;color:#66BB6A}.ux .pill.ok i{background:#66BB6A}
+.ux .pill.warn{background:#33260f;color:var(--warn)}.ux .pill.warn i{background:var(--warn)}
+.ux .lbl{font-size:10.5px;color:var(--fg);margin:6px 0 4px;font-weight:600}
+.ux .chat{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--fg);padding:4px 0}
+.ux .av{width:20px;height:20px;border-radius:50%;background:#3a2f5c;color:#cfc5ff;font-size:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.ux .ghost{margin-left:auto;color:var(--muted);font-size:10.5px;border:1px solid transparent;border-radius:6px;padding:2px 6px}
+.ux .ghost.danger{color:var(--crit)}
+.ux .btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--raised);color:var(--fg);border-radius:6px;padding:5px 9px;font-size:10.5px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.ux .btn.pri{background:#2a3b5c;border-color:#3f5f99;color:#dbe7ff}
+.ux .btn.ok{background:#1a2e1c;border-color:#2e7d32;color:#a5d6a7}
+.ux .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ux .cmd{display:flex;align-items:center;gap:6px;border:1px solid #4a3a20;background:#100c0a;border-radius:6px;padding:6px 6px 6px 9px;margin:4px 0}
+.ux .cmd code{flex:1;color:var(--hot);font-size:12px;font-family:inherit}
+.ux .tiny{font-size:10px;color:var(--muted)}
+.ux .step{display:grid;grid-template-columns:20px 1fr;gap:8px;padding:8px 0;border-top:1px solid #2a2626}
+.ux .step:first-of-type{border-top:none}
+.ux .num{width:20px;height:20px;border-radius:50%;border:1px solid var(--border);font-size:10px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.ux .num.done{background:#1a2e1c;border-color:#2e7d32;color:#a5d6a7}
+.ux .num.cur{border-color:var(--gold);color:var(--gold)}
+.ux .big{font-size:24px;letter-spacing:4px;color:var(--hot);text-align:center;padding:10px 0 4px}
+.ux .focus{border:1px solid #4a3a20;background:radial-gradient(circle at 50% 0,rgba(232,174,99,.12),transparent 70%),var(--raised);border-radius:8px;padding:12px;text-align:center}
+.ux .cmdtab{width:100%;border-collapse:collapse;font-size:10.5px}
+.ux .cmdtab td{padding:5px 4px;border-top:1px solid #2a2626;vertical-align:top;color:var(--muted)}
+.ux .cmdtab td:first-child{color:var(--hot);white-space:nowrap}
+.ux .cp{cursor:pointer;color:var(--muted);font-size:10px;border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:4px}
+.ux .ex{border:1px solid var(--border);border-radius:8px;background:var(--raised);padding:8px;font-size:10px}
+.ux .ex .t{color:var(--fg);font-weight:600;font-size:11px}
+.ux .ex .s{color:var(--muted);margin-bottom:6px}
+/* ---------- W: Telegram ---------- */
+.ux .tg{background:#0e1621 radial-gradient(circle at 20% 20%,#17202c,#0e1621);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:12.5px;line-height:1.38;color:#f5f5f5}
+.ux .tg .in,.ux .tg .out{max-width:92%;padding:6px 9px 5px;border-radius:10px;position:relative;white-space:pre-wrap;word-break:break-word}
+.ux .tg .in{background:#212d3b;align-self:flex-start;border-bottom-left-radius:3px}
+.ux .tg .out{background:#766ac8;align-self:flex-end;border-bottom-right-radius:3px}
+.ux .tg .tm{float:right;font-size:10px;color:rgba(255,255,255,.45);margin:6px 0 -3px 8px}
+.ux .tg code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:11.5px;color:#9fd0ff}
+.ux .tg pre{font-family:"IBM Plex Mono",Consolas,monospace;font-size:11px;background:rgba(0,0,0,.28);border-radius:6px;padding:6px 8px;margin:4px 0;white-space:pre;overflow-x:auto;color:#e8e8e8;line-height:1.4}
+.ux .tg blockquote{margin:4px 0;padding:3px 8px;border-left:3px solid #6ab3f3;background:rgba(106,179,243,.1);border-radius:4px;white-space:pre-wrap}
+.ux .tg blockquote.r{border-left-color:#ef5350;background:rgba(239,83,80,.1)}
+.ux .tg blockquote.g{border-left-color:#66bb6a;background:rgba(102,187,106,.08)}
+.ux .tg .cmdl{color:#6ab3f3}
+.ux .tg i{color:#a9b4c0}
+.ux .tg .kb{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;align-self:flex-start;width:92%}
+.ux .tg .kb span{background:rgba(33,45,59,.85);border-radius:6px;text-align:center;padding:5px 2px;font-size:11.5px}
+.ux .tg .menu{align-self:stretch;background:#17212b;border-radius:6px;padding:6px 8px;font-size:11.5px;color:#aaa}
+.ux .tg .menu div{padding:2px 0}.ux .tg .menu b{color:#6ab3f3;font-weight:500}
+@media (max-width:560px){.ux .cols{grid-template-columns:1fr}}
+</style>
+<div class="ux" id="ux">
+<h1>#394 + #396 — web local animada, card do Telegram e mensagens do bot</h1>
+<p class="sub">Três rodadas independentes: <b>U</b> (#394, animações da HUD na página web), <b>V</b> (#396, card "Bot do Telegram" nas Configurações, com cópia do <code>/start</code>), <b>W</b> (#396, formato das respostas do bot). Escolha uma letra de cada; dá para combinar.</p>
+<div class="fix"><b>#394 "sem coleta ainda" não é visual — é defeito confirmado.</b> A página e o bot leem <code>lastCollectedAt</code> = maior <code>ApiUsageStats.fetchedAt</code>. Na coleta ao vivo ninguém carimba <code>fetchedAt</code>: só a restauração do cache (<code>DashboardCacheMapper</code>) e a retenção após falha (<code>statsRetainedAfterFailure</code>) o preenchem. Depois da primeira coleta bem-sucedida o campo volta a <code>null</code> → "sem coleta ainda" na web e "coleta —" no <code>/status</code>. A correção entra em qualquer opção abaixo.</div>
+<div class="bar-top"><button class="ctl" id="slow">Câmera lenta ×3</button><button class="ctl" id="red">Reduzir animações</button><span class="tiny" id="slowtag"></span></div>
+
+<h2>U · Página web (#394) — quais animações da HUD entram</h2>
+<p class="sub">Laço de 7 s: aguardando → coleta nova chega (Claude 5h 13% → 14%) → assenta. Comprimento do arco troca seco, nunca cresce por efeito. Contínuo só com a aba visível (<code>document.hidden</code> pausa) e com <code>prefers-reduced-motion</code> tudo vira corte seco — o botão acima simula.</p>
+<div class="grid2" id="uopts"></div>
+
+<h2>V · Card "Bot do Telegram" (#396)</h2>
+<p class="sub">Estático. O botão de copiar funciona no mockup. Mesmo conteúdo do print (Edi pareado, código QX424Z). A conversa de exemplo à direita usa o formato W1; troca para a W escolhida.</p>
+<div id="vopts"></div>
+
+<h2>W · Respostas do bot (#396)</h2>
+<p class="sub">Telegram com <code>parse_mode: HTML</code> (<code>&lt;b&gt;</code>, <code>&lt;code&gt;</code>, <code>&lt;pre&gt;</code>, <code>&lt;blockquote&gt;</code>). Risco sempre com emoji <b>e</b> palavra (cor nunca informa sozinha). Em todas: <code>setMyCommands</code> no arranque do bot, para o botão "Menu" do Telegram listar os comandos sem digitar <code>/ajuda</code>.</p>
+<div class="grid2" id="wopts"></div>
+</div>
+<script>
+/*
+ * Biblioteca do anel Gargantua para protótipos HTML (skill usage-monitor-visual-options).
+ * Mesmo desenho do app (AppGargantuaRing / GargantuaDrawing.kt), em Canvas 2D:
+ *   drawRing(ctx, {arcs:[{f:0..1, t:'ok'|'warn'|'crit'}], mark:'claude'|'openai'}, phase, overrides)
+ *   ctx já transladado por PAD; o anel ocupa S×S (64 px = anel do app a 100%).
+ * Efeitos: flashAt, ringAt (onda), rrPath (contorno do balão), perimeter (pontos do contorno).
+ * Easing: seg(t,a,b), easeOut, easeIn, easeInOut. Nada aqui tem rebote: dado não passa do lugar.
+ */
+const TONE={ok:'#4CAF50',warn:'#FFA726',crit:'#EF5350'}, INFO='#42A5F5';
+const S=64, STROKE=2.5, GAP=1.5, PAD=28, W=S+PAD*2;
+const LIGHT=-135*Math.PI/180;
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const easeOut=t=>1-Math.pow(1-t,3), easeIn=t=>t*t*t, easeInOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+function hex(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16))}
+function rgba(c,a){const [r,g,b]=hex(c);return `rgba(${r},${g},${b},${a})`}
+function mix(c,w,k){const a=hex(c),b=hex(w);return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*k).toString(16).padStart(2,'0')).join('')}
+function drawCore(ctx,room,ph,o){
+  const c=S/2,h=room*.62*o.core;
+  ctx.globalAlpha=o.disk;
+  let g=ctx.createRadialGradient(c,c,Math.max(0,h*.9),c,c,room);
+  g.addColorStop(0,'rgba(232,174,99,.16)');g.addColorStop(1,'rgba(232,174,99,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(c,c,room,0,7);ctx.fill();
+  ctx.lineWidth=room*.05;ctx.strokeStyle='rgba(255,230,190,.35)';ctx.beginPath();ctx.arc(c,c,h+room*.1,Math.PI*1.08,Math.PI*1.92);ctx.stroke();
+  ctx.lineWidth=room*.025;ctx.strokeStyle='rgba(255,230,190,.18)';ctx.beginPath();ctx.arc(c,c,h+room*.08,Math.PI*.15,Math.PI*.85);ctx.stroke();
+  const disk=front=>{ctx.save();ctx.translate(c,c+room*.08);ctx.rotate(-12*Math.PI/180);
+    const rx=room*.95*o.diskScale,ry=rx*.16;const lg=ctx.createLinearGradient(-rx,0,rx,0);
+    lg.addColorStop(0,'rgba(180,80,30,.25)');lg.addColorStop(.5,'rgba(232,174,99,.55)');lg.addColorStop(1,'rgba(255,240,203,.8)');
+    ctx.strokeStyle=lg;ctx.lineWidth=room*.07;ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:Math.PI*2);ctx.stroke();
+    for(let k=0;k<3;k++){const a=((ph*360*(1+k%2))+k*120)%360;if(front!==(a<180))continue;const r=a*Math.PI/180,e=Math.abs(Math.sin(r));
+      ctx.strokeStyle=`rgba(255,248,230,${.45*e})`;ctx.lineWidth=room*.035;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,r,r+Math.min(.35,(front?Math.PI:Math.PI*2)-r));ctx.stroke();}
+    ctx.restore();};
+  disk(false);ctx.globalAlpha=1;
+  ctx.fillStyle='#030508';ctx.beginPath();ctx.arc(c,c,h,0,7);ctx.fill();
+  ctx.globalAlpha=o.disk;ctx.strokeStyle='rgba(255,240,203,.8)';ctx.lineWidth=room*.022;ctx.beginPath();ctx.arc(c,c,h+room*.01,0,7);ctx.stroke();
+  disk(true);ctx.globalAlpha=1;
+}
+function glassArc(ctx,r,tone,f,ph,o){
+  const c=S/2,a0=-Math.PI/2,end=a0+f*Math.PI*2,step=Math.PI/60;
+  ctx.globalAlpha=o.glass;ctx.lineCap='butt';
+  ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=STROKE*1.4;ctx.beginPath();ctx.arc(c,c,r,0,7);ctx.stroke();
+  for(let a=0;a<Math.PI*2;a+=step){const lit=.5+.5*Math.cos(a-LIGHT);
+    ctx.strokeStyle=`rgba(255,255,255,${.28*lit*lit*lit})`;ctx.lineWidth=.45;ctx.beginPath();ctx.arc(c,c,r-STROKE*.5,a,a+step+.01);ctx.stroke();
+    ctx.strokeStyle=`rgba(255,255,255,${.12*lit})`;ctx.lineWidth=.35;ctx.beginPath();ctx.arc(c,c,r+STROKE*.5,a,a+step+.01);ctx.stroke();}
+  ctx.globalAlpha=1;
+  if(f<=.001)return;
+  ctx.lineCap='round';
+  ctx.strokeStyle=rgba(tone,.25);ctx.lineWidth=STROKE*2.4;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  ctx.strokeStyle=tone;ctx.lineWidth=STROKE*.9;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  ctx.strokeStyle=mix(tone,'#ffffff',.6);ctx.lineWidth=STROKE*.35;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  for(let k=0;k<3;k++){const p=(ph+k/3)%1,fade=Math.sin(p*Math.PI);if(fade<.02)continue;
+    const x=c+r*Math.cos(a0+p*f*Math.PI*2),y=c+r*Math.sin(a0+p*f*Math.PI*2);const g=ctx.createRadialGradient(x,y,0,x,y,2.4);
+    g.addColorStop(0,`rgba(255,255,255,${.9*fade})`);g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,2.4,0,7);ctx.fill();}
+}
+function mark(ctx,kind,alpha,scale){
+  const c=S/2;ctx.save();ctx.globalAlpha=alpha;ctx.translate(c,c);ctx.scale(scale,scale);ctx.strokeStyle='#F2EDED';ctx.fillStyle='#F2EDED';
+  if(kind==='claude'){ctx.lineWidth=1.6;ctx.lineCap='round';for(let i=0;i<12;i++){const a=i*Math.PI/6+.13;const l=i%2?6.5:8.5;ctx.beginPath();ctx.moveTo(Math.cos(a)*1.5,Math.sin(a)*1.5);ctx.lineTo(Math.cos(a)*l,Math.sin(a)*l);ctx.stroke();}}
+  else{ctx.lineWidth=1.3;for(let i=0;i<6;i++){ctx.save();ctx.rotate(i*Math.PI/3);ctx.beginPath();ctx.ellipse(0,-3.2,2.6,5.4,0,0,Math.PI*2);ctx.stroke();ctx.restore();}}
+  ctx.restore();
+}
+const BASE={scale:1,core:1,disk:1,diskScale:1,glass:1,arcs:1,markAlpha:1,markScale:1,rot:0,stretch:1,alpha:1};
+function drawRing(ctx,acc,ph,o){
+  o={...BASE,...o};
+  const room=S/2-acc.arcs.length*(STROKE+GAP);
+  ctx.save();ctx.globalAlpha=o.alpha;
+  drawCore(ctx,room,ph/5,o);
+  acc.arcs.forEach((a,i)=>glassArc(ctx,S/2-STROKE/2-i*(STROKE+GAP),TONE[a.t],a.f*o.arcs,ph,o));
+  mark(ctx,acc.mark,o.markAlpha,o.markScale);
+  ctx.restore();ctx.globalAlpha=1;
+}
+const ACC=[{arcs:[{f:.06,t:'ok'},{f:.44,t:'crit'}],mark:'claude'},{arcs:[{f:.25,t:'ok'},{f:0,t:'ok'}],mark:'openai'}];
+
+/* ---------- efeitos de cena (coordenadas do palco) ---------- */
+function flashAt(x,cx,cy,a,r){if(a<=0)return;const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,`rgba(255,255,255,${a})`);g.addColorStop(.3,`rgba(255,240,203,${a*.7})`);g.addColorStop(1,'rgba(232,174,99,0)');x.fillStyle=g;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();}
+function ringAt(x,cx,cy,r,color,alpha,width){if(alpha<=0||r<=0)return;x.strokeStyle=rgba(color,alpha);x.lineWidth=width;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();}
+function rrPath(x,r){const k=10;x.beginPath();x.roundRect(r.x,r.y,r.w,r.h,k);}
+function perimeter(r,N){ // contorno arredondado em sentido horário, começando no ponto da cauda (borda direita)
+  const k=10,pts=[];const L=2*(r.w+r.h-4*k)+2*Math.PI*k;
+  const segs=[[r.x+k,r.y,r.x+r.w-k,r.y],['c',r.x+r.w-k,r.y+k,-Math.PI/2,0],[r.x+r.w,r.y+k,r.x+r.w,r.y+r.h-k],['c',r.x+r.w-k,r.y+r.h-k,0,Math.PI/2],
+    [r.x+r.w-k,r.y+r.h,r.x+k,r.y+r.h],['c',r.x+k,r.y+r.h-k,Math.PI/2,Math.PI],[r.x,r.y+r.h-k,r.x,r.y+k],['c',r.x+k,r.y+k,Math.PI,Math.PI*1.5]];
+  for(let i=0;i<N;i++){let d=i/N*L;for(const s of segs){const len=s[0]==='c'?Math.PI/2*k:Math.hypot(s[2]-s[0],s[3]-s[1]);
+      if(d<=len){if(s[0]==='c'){const a=s[3]+(d/len)*(s[4]-s[3]);pts.push([s[1]+Math.cos(a)*k,s[2]+Math.sin(a)*k]);}else{const u=d/len;pts.push([s[0]+(s[2]-s[0])*u,s[1]+(s[3]-s[1])*u]);}break;}d-=len;}}
+  return pts;
+}
+
+
+/* ================= U · página web ================= */
+const CYCLE=7000, COLLECT=2000;
+const ACCS=[
+  {name:'Anthropic · Padrão',c:'--anthropic',mark:'claude',active:true,risk:['Atenção','--warn'],
+   q:[{l:'Claude 7d',o:17,n:17,t:'ok',r:'ter 01:00'},{l:'Claude 5h',o:13,n:14,t:'warn',r:'qua 02:10'}]},
+  {name:'Codex',c:'--codex',mark:'openai',active:false,risk:['Normal','--ok'],
+   q:[{l:'Codex 7d',o:56,n:56,t:'ok',r:'sex 19:44'},{l:'Codex 5h',o:0,n:0,t:'ok',r:'qua 02:44'}]}];
+const U=[
+ {id:'U0',ref:1,name:'Hoje (referência)',desc:'Anel desenhado uma vez (fase fixa), número troca seco a cada releitura de 30 s, cabeçalho preso em "sem coleta ainda" pelo defeito do <code>fetchedAt</code>.',f:{}},
+ {id:'U1',name:'U1 · Paridade com a HUD',desc:'O que a HUD desktop faz: disco e plasma girando, cometa azul de sessão em volta da conta em uso, ondas gravitacionais na coleta (R1, 1300/800 ms) e horizonte de eventos no número que mudou (D5, 480 ms, cascata 50 ms).',tags:'contínuo + eventos · mesmas funções de quadro portadas para JS',f:{cont:1,comet:1,waves:1,horizon:1}},
+ {id:'U2',name:'U2 · Só eventos (poupa bateria)',desc:'Anel parado; só anima quando chega coleta nova: ondas R1 em volta do anel + horizonte D5 no número. Nada contínuo — celular com a aba aberta não gasta bateria.',tags:'finito · 1300 ms por coleta',f:{waves:1,horizon:1}},
+ {id:'U3',name:'U3 · Só estado contínuo',desc:'Disco, plasma e cometa de sessão girando o tempo todo; a coleta troca o número seco, sem ondas nem horizonte.',tags:'contínuo · zero evento',f:{cont:1,comet:1}},
+ {id:'U4',name:'U4 · Paridade + entrada',desc:'U1 + abertura da página: onda de choque em cada anel (S1, 1100 ms) e cards entrando em cascata de 120 ms (opacidade e 6 px, sem rebote).',tags:'U1 + 1100 ms ao abrir',f:{cont:1,comet:1,waves:1,horizon:1,open:1}},
+ {id:'U5',name:'U5 · Paridade + próxima leitura',desc:'U1 + filete dourado sob o cabeçalho que enche até a próxima releitura (30 s). O indicador diz "há 12 s" e o ponto acende dourado 600 ms quando a coleta muda.',tags:'U1 + filete de tempo (não é dado de cota)',f:{cont:1,comet:1,waves:1,horizon:1,bar:1}},
+];
+let speed=1, reduced=false, T=0, last=performance.now();
+const stages=[];
+function accHtml(a,i){
+  return `<section class="acc" data-a="${i}"><div class="nm" style="--c:var(${a.c})">${a.name}</div><canvas width="220" height="220"></canvas>`
+   +`<div class="rk" style="--c:var(${a.risk[1]})">${a.risk[0]}</div><div class="st ${a.active?'on':''}">${a.active?'Em uso agora':'Sem uso detectado'}</div>`
+   +a.q.slice().reverse().map((q,k)=>`<div class="q"><b>${q.l}</b><span class="v" data-q="${a.q.length-1-k}">${q.o}%</span><span>${q.r}</span></div>`).join('')+`</section>`;
+}
+function buildU(){
+  const host=document.getElementById('uopts');
+  U.forEach(o=>{
+    const d=document.createElement('div');d.className='opt'+(o.ref?' ref':'');
+    d.innerHTML=`<h3>${o.name}</h3><p>${o.desc}</p>${o.tags?`<div class="tags">${o.tags}</div>`:''}
+      <div class="stage"><div class="whd"><b>Usage Monitor</b><span class="rd"><i></i><span class="rt"></span></span>${o.f.bar?'<span class="rbar"></span>':''}</div>
+      <div class="wgrid">${ACCS.map(accHtml).join('')}</div><span class="ph"></span></div>`;
+    host.appendChild(d);
+    stages.push({o,el:d,cv:[...d.querySelectorAll('canvas')].map(c=>c.getContext('2d')),acc:[...d.querySelectorAll('.acc')],
+      vals:[...d.querySelectorAll('.acc')].map(s=>[...s.querySelectorAll('.v')]),rt:d.querySelector('.rt'),dot:d.querySelector('.rd i'),
+      bar:d.querySelector('.rbar'),ph:d.querySelector('.ph')});
+  });
+}
+function comet(ctx,a){
+  const c=S/2,r=S/2+2.2;
+  for(let k=0;k<16;k++){const b=a-k*.06,al=(1-k/16)*.55;ctx.strokeStyle=rgba(INFO,al);ctx.lineWidth=1.4*(1-k/20);ctx.lineCap='round';
+    ctx.beginPath();ctx.arc(c,c,r,b-.07,b);ctx.stroke();}
+  const x=c+r*Math.cos(a),y=c+r*Math.sin(a),g=ctx.createRadialGradient(x,y,0,x,y,3);
+  g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(.4,rgba(INFO,.8));g.addColorStop(1,rgba(INFO,0));ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,3,0,7);ctx.fill();
+}
+function frame(st,tc,now){
+  const f=reduced?{}:st.o.f, collected=tc>=COLLECT, dtc=tc-COLLECT;
+  // entrada (U4)
+  st.acc.forEach((el,i)=>{ if(f.open&&tc<1100){const p=easeOut(seg(tc,i*120,i*120+400));el.style.opacity=p;el.style.transform=`translateY(${(1-p)*6}px)`;}
+    else{el.style.opacity=1;el.style.transform='none';} });
+  st.cv.forEach((ctx,i)=>{
+    const a=ACCS[i];ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,220,220);ctx.translate(30,30);ctx.scale(2.5,2.5);
+    const arcs=a.q.map(q=>({f:(collected?q.n:q.o)/100,t:q.t}));
+    const ph=f.cont?now/4000:.3;
+    const op=f.open?easeOut(seg(tc,100+i*120,700+i*120)):1;
+    drawRing(ctx,{arcs,mark:a.mark},ph,{alpha:op});
+    if(f.open&&tc<1100){const p=seg(tc,i*120,i*120+1000);if(p>0&&p<1){flashAt(ctx,32,32,.5*(1-p)*(p<.15?p/.15:1),14+p*10);ringAt(ctx,32,32,18+easeOut(p)*24,'#E8AE63',.6*(1-p),.9);}}
+    if(f.comet&&a.active)comet(ctx,now/3000*Math.PI*2-Math.PI/2);
+    if(f.waves&&collected&&dtc<1300){for(let k=0;k<3;k++){const p=seg(dtc,k*250,k*250+800);if(p>0&&p<1)ringAt(ctx,32,32,31+easeOut(p)*12,'#E8AE63',.6*(1-p),.8-.4*p);}}
+  });
+  // números: D5 horizonte de eventos no que mudou
+  let idx=0;
+  st.vals.forEach((list,i)=>list.forEach(el=>{
+    const q=ACCS[i].q[+el.dataset.q];
+    if(q.o===q.n){el.textContent=q.n+'%';return;}
+    const k0=idx++;const p=f.horizon&&collected?seg(dtc-k0*50,0,480):(collected?1:0);
+    if(!f.horizon||p<=0||p>=1){el.textContent=(collected?q.n:q.o)+'%';el.style.transform='none';el.style.filter='none';el.style.opacity=1;el.style.textShadow='none';return;}
+    if(p<.5){const k=easeIn(p*2);el.textContent=q.o+'%';el.style.transform=`scale(${1-k*.9})`;el.style.filter=`blur(${k*1.6}px)`;el.style.opacity=1-k*.5;}
+    else{const k=easeOut((p-.5)*2);el.textContent=q.n+'%';el.style.transform=`scale(${.1+.9*k})`;el.style.filter=`blur(${(1-k)*1.6}px)`;el.style.opacity=.5+.5*k;}
+    el.style.textShadow=`0 0 ${6*(1-Math.abs(p-.5)*2)}px rgba(232,174,99,.9)`;
+  }));
+  // indicador
+  if(st.o.ref){st.rt.textContent='sem coleta ainda';st.dot.className='off';}
+  else{const s=collected?Math.floor(dtc/1000):40+Math.floor(tc/1000);
+    st.rt.textContent=collected?(s===0?'coleta 21:45 BRT · agora':`coleta 21:45 BRT · há ${s} s`):`coleta 21:44 BRT · há ${s} s`;
+    st.dot.className='';const glow=!reduced&&collected&&dtc<600?1-dtc/600:0;
+    st.dot.style.background=glow?mix('#4CAF50','#E8AE63',glow):'';st.dot.style.boxShadow=glow?`0 0 ${6*glow}px #E8AE63`:'none';}
+  if(st.bar)st.bar.style.width=(((tc-COLLECT+CYCLE)%CYCLE)/CYCLE*100)+'%';
+  // fase
+  let ph;
+  if(f.open&&tc<1100)ph='abrindo a página · 1100 ms';
+  else if(!collected)ph='aguardando coleta';
+  else if(dtc<1300)ph='coleta nova · '+(f.waves?'ondas 1300 ms + horizonte 480 ms':'troca seca');
+  else ph='assentado'+(f.cont?' · contínuo':'');
+  st.ph.textContent=(reduced?'[reduzir] ':'')+ph;
+}
+function loop(now){
+  T+=(now-last)/speed;last=now;
+  const t=window.FREEZE!=null?window.FREEZE:T;
+  const tc=t%CYCLE;
+  stages.forEach(st=>frame(st,tc,t));
+  requestAnimationFrame(loop);
+}
+
+/* ================= W · mensagens do bot ================= */
+const out=(t,tm)=>`<div class="out">${t}<span class="tm">${tm}</span></div>`;
+const inn=(t,tm)=>`<div class="in">${t}<span class="tm">${tm}</span></div>`;
+const bar10=p=>'▰'.repeat(Math.floor(p/10))+'▱'.repeat(10-Math.floor(p/10));
+const W1_STATUS=`<b>📊 Usage Monitor</b>
+<i>coleta 22:29 BRT · há 1 min</i>
+
+<b>Anthropic · Padrão</b> — 🔴 Crítico · ⚡ em uso
+Claude 5h · reinicia 02:10
+<code>${bar10(42)} 42%</code>
+Claude 7d · reinicia ter 01:00
+<code>${bar10(21)} 21%</code>
+
+<b>Codex</b> — 🟢 Normal
+Codex 5h · reinicia 03:28
+<code>${bar10(0)}  0%</code>
+Codex 7d · reinicia sex 19:44
+<code>${bar10(56)} 56%</code>`;
+const W1_HELP=`<b>Comandos</b>
+<code>/status</code> — cotas de todas as contas
+<code>/alertas on</code> · <code>/alertas off</code> — liga ou desliga os alertas
+<code>/silencio 22-07</code> — silêncio das 22h às 7h · <code>/silencio off</code>
+<code>/limiar 75,90</code> — avisa em 75% e 90%
+<i>Toque num comando para copiar.</i>`;
+const WOPTS=[
+ {id:'W0',ref:1,name:'Hoje (referência)',desc:'Texto puro, sem <code>parse_mode</code>; "coleta —" pelo defeito do <code>fetchedAt</code>.',
+  chat:out('/status','22:29')+inn(`Usage Monitor · coleta —
+Anthropic · Padrão · Crítico · em uso
+  Claude 5h 42% (02:10) · Claude 7d 21% (01:00)
+Codex · Normal
+  Codex 5h 0% (03:28) · Codex 7d 56% (19:44)`,'22:29')+out('/ajuda','22:31')+inn(`Comandos:
+<span class="cmdl">/status</span> — cotas de todas as contas
+<span class="cmdl">/alertas</span> on|off — liga ou desliga os alertas
+<span class="cmdl">/silencio</span> 22-07 — horário de silêncio (off desliga)
+<span class="cmdl">/limiar</span> 75,90 — limiares de alerta de cota`,'22:31')},
+ {id:'W1',name:'W1 · Cartão por conta com barra',desc:'Conta em negrito, risco com emoji + palavra, uma linha por cota com barra de 10 células, percentual e reinício. Comandos em <code>&lt;code&gt;</code>: um toque copia no Telegram. Pareamento confirma com ✅.',tags:'HTML simples · barra em monoespaçada',
+  chat:out('/start QX424Z','22:31')+inn(`✅ <b>Conversa pareada.</b>
+Toque em <code>/status</code> ou abra o <b>Menu</b> para ver os comandos.`,'22:31')+out('/status','22:32')+inn(W1_STATUS,'22:32')+out('/ajuda','22:33')+inn(W1_HELP,'22:33')},
+ {id:'W2',name:'W2 · Tabela monoespaçada',desc:'Tudo num bloco <code>&lt;pre&gt;</code> alinhado em colunas (cota, %, reinício). Mais denso; no celular estreito a linha pode rolar na horizontal.',tags:'<pre> · colunas fixas',
+  chat:out('/status','22:32')+inn(`<b>Usage Monitor</b> · <i>coleta 22:29 BRT</i>
+<pre>Anthropic · Padrão   CRÍTICO 🔴
+  Claude 5h   42%  02:10
+  Claude 7d   21%  ter 01:00
+Codex                NORMAL  🟢
+  Codex 5h     0%  03:28
+  Codex 7d    56%  sex 19:44</pre>⚡ em uso: Anthropic · Padrão`,'22:32')+out('/ajuda','22:33')+inn(`<b>Comandos</b>
+<pre>/status            cotas agora
+/alertas on|off    liga/desliga
+/silencio 22-07    silêncio (off)
+/limiar 75,90      limiares</pre>`,'22:33')},
+ {id:'W3',name:'W3 · Bloco por conta + tempo até reiniciar',desc:'Cada conta num <code>&lt;blockquote&gt;</code> com o percentual em negrito e "em 3h41" ao lado do reinício. A cor da barra do bloco é do tema do Telegram, não nossa — o risco fica no emoji e na palavra.',tags:'blockquote · contagem até o reinício',
+  chat:out('/status','22:32')+inn(`<b>Usage Monitor</b> · <i>coleta 22:29 BRT</i>
+<blockquote><b>🔴 Anthropic · Padrão — Crítico</b> · ⚡ em uso
+Claude 5h  <b>42%</b> · reinicia 02:10 (em 3h41)
+Claude 7d  <b>21%</b> · reinicia ter 01:00</blockquote><blockquote><b>🟢 Codex — Normal</b>
+Codex 5h  <b>0%</b> · reinicia 03:28 (em 4h59)
+Codex 7d  <b>56%</b> · reinicia sex 19:44</blockquote>`,'22:32')+out('/ajuda','22:33')+inn(`<b>Comandos</b>
+<blockquote><code>/status</code>  cotas agora
+<code>/alertas on|off</code>  alertas
+<code>/silencio 22-07</code>  silêncio · <code>off</code> desliga
+<code>/limiar 75,90</code>  limiares</blockquote>`,'22:33')},
+ {id:'W4',name:'W4 · Pior primeiro, resto recolhido',desc:'A primeira linha é a cota de pior risco (é o que aparece na notificação do celular); as demais contas vão num <code>&lt;blockquote expandable&gt;</code> que abre com um toque.',tags:'manchete + bloco expansível',
+  chat:out('/status','22:32')+inn(`🔴 <b>Claude 5h em 42% — Crítico</b>
+Reinicia 02:10 (em 3h41) · Anthropic · Padrão, em uso
+<blockquote>Claude 7d 21% · ter 01:00
+🟢 Codex — Normal
+Codex 5h 0% · 03:28 …  <i>▾ mostrar</i></blockquote><i>coleta 22:29 BRT · 2 contas</i>`,'22:32')+out('/ajuda','22:33')+inn(W1_HELP,'22:33')},
+ {id:'W5',name:'W5 · W1 + botões na mensagem',desc:'O cartão W1 com teclado inline: Atualizar (edita a mesma mensagem com a leitura nova), Silenciar 1h, Limiares. Custa tratar <code>callback_query</code>, <code>answerCallbackQuery</code> e <code>editMessageText</code>; "Atualizar" pede coleta ao app e respeita o backoff de 429.',tags:'mais escopo · menos digitação',
+  chat:out('/status','22:32')+inn(W1_STATUS,'22:32')+`<div class="kb"><span>🔄 Atualizar</span><span>🔕 Silenciar 1h</span><span>⚙ Limiares</span></div>`
+   +`<div class="menu"><div>Menu (setMyCommands)</div><div><b>/status</b> cotas de todas as contas</div><div><b>/alertas</b> liga ou desliga os alertas</div><div><b>/silencio</b> horário de silêncio</div><div><b>/limiar</b> limiares de alerta</div></div>`},
+];
+function buildW(){
+  const host=document.getElementById('wopts');
+  WOPTS.forEach(o=>{const d=document.createElement('div');d.className='opt'+(o.ref?' ref':'');
+    d.innerHTML=`<h3>${o.name}</h3><p>${o.desc}</p>${o.tags?`<div class="tags">${o.tags.replace(/</g,'&lt;')}</div>`:''}<div class="tg">${o.chat}</div>`;host.appendChild(d);});
+}
+
+/* ================= V · card nas Configurações ================= */
+const TOKEN=`<div class="fld"><span class="dots">••••••••••••••••••••••••••••</span><span class="lnk">Trocar</span></div>`;
+const INTRO=`<p class="body">Recebe os alertas no Telegram e responde a comandos. Só metadados de uso — nunca prompt ou resposta.</p>`;
+const CMD=(sub)=>`<div class="cmd"><code>/start QX424Z</code><button class="btn pri copy" data-copy="/start QX424Z">⧉ Copiar</button></div>${sub?`<div class="tiny">${sub}</div>`:''}`;
+const PREVIEW=`<div class="tg" style="font-size:11px">${out('/status','22:32')}${inn(W1_STATUS,'22:32')}</div>`;
+const V=[
+ {id:'V0',ref:1,name:'Hoje (referência)',desc:'Comando em texto corrido (copiar exige selecionar à mão), status em linha solta, "Remover" longe do nome, conversa de exemplo em texto cru que quebra no meio da cota.',
+  html:`<div class="card"><h4>Bot do Telegram<span class="sw"></span></h4><div class="cols"><div>${INTRO.replace('</p>',' Crie o bot com o @BotFather e cole o token aqui.</p>')}${TOKEN}
+   <div class="tiny" style="color:var(--warn)">● Conectado · sem conversa pareada</div><div class="lbl">Conversas autorizadas</div><div class="body">Nenhuma. Pareie uma conversa para receber os alertas.</div>
+   <div class="body" style="color:var(--fg)">No Telegram, envie ao bot: <span style="font-family:inherit">/start QX424Z</span></div><div class="tiny">Vale por mais 10 min.</div>
+   <div class="btns"><span class="btn">Parear conversa</span><span class="btn" style="opacity:.4">Enviar teste</span></div><div class="tiny" style="margin-top:8px">Discord fica para uma segunda fase: exige conexão permanente (Gateway).</div></div>
+   <div class="ex"><div class="t">Conversa de exemplo</div><div class="s">/status com os números de agora</div><div class="s">você › /status</div><div>bot › Usage Monitor · coleta — Anthropic · Padrão · Crítico · em uso Claude 5h 42% (02:10) · Claude 7d 21% (01:00) Codex · Normal Codex 5h 0% (03:28) · Codex 7d 56% (19:44)</div>
+   <div class="s" style="margin-top:6px">você › /silencio 12-13</div><div>bot › Silêncio 12:00 → 13:00 aplicado.</div><div class="s" style="margin-top:6px">você › /limiar 75,90</div><div>bot › Limiares de cota: 75%, 90%</div></div></div></div>`},
+ {id:'V1',name:'V1 · Comando com Copiar + prévia real',desc:'O <code>/start QX424Z</code> vira caixa de comando com botão Copiar (vira "Copiado ✓" por 1,6 s) e o prazo em contagem. Status vira pílula. À direita, a prévia no visual do Telegram com uma só troca — o /status no formato W escolhido; /silencio e /limiar saem do exemplo.',tags:'mudança mínima de layout',
+  html:`<div class="card"><h4>Bot do Telegram<span class="sw"></span></h4><div class="cols"><div>${INTRO}${TOKEN}
+   <span class="pill warn"><i></i>Conectado · aguardando pareamento</span><div class="lbl">Envie ao bot no Telegram</div>${CMD('Vale por 9:41 · some daqui assim que a conversa parear')}
+   <div class="lbl" style="margin-top:10px">Conversas autorizadas</div><div class="body">Nenhuma ainda.</div><div class="btns"><span class="btn">Gerar novo código</span><span class="btn" style="opacity:.4">Enviar teste</span></div></div>
+   <div><div class="lbl" style="margin-top:0">Como o bot responde</div>${PREVIEW}</div></div></div>`},
+ {id:'V2',name:'V2 · Três passos numerados',desc:'Coluna única em passos: 1 token (feito ✓), 2 parear (caixa com Copiar e "Abrir no Telegram"), 3 testar. O exemplo de conversa sai do card e vira "Ver como o bot responde", recolhido.',tags:'guia de primeiro uso · "Abrir no Telegram" exige o @ do bot (getMe)',
+  html:`<div class="card"><h4>Bot do Telegram<span class="sw"></span></h4>${INTRO.replace('class="body"','class="body" style="margin-top:8px"')}
+   <div class="step"><span class="num done">✓</span><div><div class="lbl" style="margin-top:0">Token do bot</div>${TOKEN}<span class="pill ok"><i></i>Conectado como @usage_monitor_bot</span></div></div>
+   <div class="step"><span class="num cur">2</span><div><div class="lbl" style="margin-top:0">Parear esta conversa</div>${CMD('Vale por 9:41')}<div class="btns"><span class="btn">↗ Abrir no Telegram</span><span class="btn">Gerar novo código</span></div></div></div>
+   <div class="step"><span class="num">3</span><div><div class="lbl" style="margin-top:0">Testar</div><div class="body">Disponível depois do pareamento.</div><span class="btn" style="opacity:.4">Enviar teste</span></div></div>
+   <div class="tiny" style="border-top:1px solid #2a2626;padding-top:8px">▸ Ver como o bot responde</div></div>`},
+ {id:'V3',name:'V3 · Pareamento em foco',desc:'Enquanto falta parear, a coluna direita inteira é o pareamento: código grande, botão principal "Copiar /start QX424Z" e "Abrir @usage_monitor_bot" (link <code>t.me/…?start=QX424Z</code> manda o comando sozinho). Pareado, a coluna volta a mostrar a prévia.',tags:'estado guia o layout · deep link exige getMe',
+  html:`<div class="card"><h4>Bot do Telegram<span class="sw"></span></h4><div class="cols"><div>${INTRO}${TOKEN}<span class="pill warn"><i></i>Conectado · aguardando pareamento</span>
+   <div class="lbl">Conversas autorizadas</div><div class="body">Nenhuma ainda.</div><div class="tiny" style="margin-top:8px">Discord fica para uma segunda fase.</div></div>
+   <div class="focus"><div class="tiny">Envie ao bot no Telegram</div><div class="big">QX424Z</div><div class="tiny" style="margin-bottom:10px">/start QX424Z · vale por 9:41</div>
+   <div class="btns" style="justify-content:center"><button class="btn pri copy" data-copy="/start QX424Z">⧉ Copiar /start QX424Z</button><span class="btn">↗ Abrir @usage_monitor_bot</span></div></div></div></div>`},
+ {id:'V4',name:'V4 · Guia de comandos no lugar da conversa',desc:'Pareado (estado do print 1): conversa como linha com avatar e "Remover" colado. A direita troca a conversa fictícia por uma tabela de comandos, cada um com ⧉ para copiar; o /status de exemplo vira link "ver prévia".',tags:'referência > encenação',
+  html:`<div class="card"><h4>Bot do Telegram<span class="sw"></span></h4><div class="cols"><div>${INTRO}${TOKEN}<span class="pill ok"><i></i>Conectado · 1 conversa</span>
+   <div class="lbl">Conversas autorizadas</div><div class="chat"><span class="av">E</span>Edi<span class="ghost danger">Remover</span></div>
+   <div class="btns"><span class="btn">Parear outra conversa</span><span class="btn ok">Enviar teste</span></div></div>
+   <div class="ex"><div class="t">Comandos do bot</div><div class="s">também no botão Menu do Telegram</div><table class="cmdtab">
+   <tr><td>/status<span class="cp copy" data-copy="/status">⧉</span></td><td>cotas de todas as contas · <span class="lnk">ver prévia</span></td></tr>
+   <tr><td>/alertas on|off<span class="cp copy" data-copy="/alertas off">⧉</span></td><td>liga ou desliga os alertas</td></tr>
+   <tr><td>/silencio 22-07<span class="cp copy" data-copy="/silencio 22-07">⧉</span></td><td>silêncio das 22h às 7h; <code>off</code> desliga</td></tr>
+   <tr><td>/limiar 75,90<span class="cp copy" data-copy="/limiar 75,90">⧉</span></td><td>avisa em 75% e 90%</td></tr></table></div></div></div>`},
+ {id:'V5',name:'V5 · Faixa de status + prévia larga',desc:'Topo do card vira uma faixa: pílula, conversas como chips removíveis (Edi ✕) e o código clicável em linha (clicar no próprio código copia). Abaixo, a prévia do Telegram em largura total, com espaço para a mensagem não quebrar.',tags:'horizontal · prévia sem quebra',
+  html:`<div class="card"><h4>Bot do Telegram<span class="sw"></span></h4>
+   <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0 8px"><span class="pill ok" style="margin:0"><i></i>Conectado</span><span class="btn">E · Edi ✕</span>
+   <button class="btn copy" data-copy="/start QX424Z" style="border-color:#4a3a20;color:var(--hot)">+ parear: /start QX424Z ⧉</button><span class="tiny">9:41</span><span class="btn ok" style="margin-left:auto">Enviar teste</span></div>
+   ${INTRO}${TOKEN}<div class="lbl">Prévia no Telegram</div>${PREVIEW}</div>`},
+];
+function buildV(){
+  const host=document.getElementById('vopts');
+  V.forEach(o=>{const d=document.createElement('div');d.className='opt'+(o.ref?' ref':'');
+    d.innerHTML=`<h3>${o.name}</h3><p>${o.desc}</p>${o.tags?`<div class="tags">${o.tags}</div>`:''}<div class="set">${o.html}</div>`;host.appendChild(d);});
+}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.copy');if(!b)return;
+  try{navigator.clipboard&&navigator.clipboard.writeText(b.dataset.copy).catch(()=>{});}catch(_){}
+  if(b.dataset.label==null)b.dataset.label=b.innerHTML;
+  b.innerHTML='✓ Copiado';b.classList.add('ok');clearTimeout(b._t);b._t=setTimeout(()=>{b.innerHTML=b.dataset.label;b.classList.remove('ok');},1600);
+});
+document.getElementById('slow').onclick=e=>{speed=speed===1?3:1;e.target.classList.toggle('on',speed===3);document.getElementById('slowtag').textContent=speed===3?'tempos ×3':'';};
+document.getElementById('red').onclick=e=>{reduced=!reduced;e.target.classList.toggle('on',reduced);};
+buildU();buildV();buildW();requestAnimationFrame(loop);
+</script>
+</body></html>

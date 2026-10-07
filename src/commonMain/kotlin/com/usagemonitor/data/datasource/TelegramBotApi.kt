@@ -14,13 +14,23 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Mensagem de texto recebida (#387). Só o que o bot usa: conversa, nome e texto. */
+/**
+ * Update recebido (#387): mensagem de texto ou toque num botão inline (#396).
+ * Só o que o bot usa: conversa, nome, texto e, no botão, o `callback_data`, o id do
+ * toque (para o `answerCallbackQuery`) e a mensagem que o carrega (para editá-la).
+ */
 data class TelegramIncomingMessage(
     val updateId: Long,
     val chatId: Long,
     val chatName: String,
-    val text: String?
+    val text: String?,
+    val callbackId: String? = null,
+    val callbackData: String? = null,
+    val messageId: Long? = null
 )
+
+/** Botão de teclado inline: [data] volta no `callback_query`. */
+data class TelegramButton(val text: String, val data: String)
 
 /** 429 da Bot API: [retryAfterSeconds] é o que o Telegram mandou esperar. */
 class TelegramRateLimitedException(val retryAfterSeconds: Long) : RuntimeException("Telegram: limite de envio, aguarde $retryAfterSeconds s")
@@ -30,7 +40,8 @@ class TelegramUnauthorizedException : RuntimeException("Token do bot recusado pe
 
 /**
  * Cliente mínimo da Bot API do Telegram (#387): `getUpdates` em long polling,
- * `sendMessage` e `deleteWebhook`. Só HTTPS de saída — nenhuma porta aberta.
+ * `sendMessage`, `editMessageText`, `answerCallbackQuery`, `deleteWebhook`, `setMyCommands` e `getMe`.
+ * Só HTTPS de saída — nenhuma porta aberta.
  *
  * O token vai no caminho da URL, como a API exige; por isso nenhuma mensagem de
  * erro daqui repete a URL ou o corpo bruto.
@@ -50,7 +61,7 @@ open class TelegramBotApi(
         val response = httpClient.get("$baseUrl/bot$token/getUpdates") {
             if (offset != null) parameter("offset", offset)
             parameter("timeout", timeoutSeconds)
-            parameter("allowed_updates", "[\"message\"]")
+            parameter("allowed_updates", "[\"message\",\"callback_query\"]")
             timeout {
                 requestTimeoutMillis = (timeoutSeconds + LONG_POLL_MARGIN_SECONDS) * 1_000L
                 socketTimeoutMillis = (timeoutSeconds + LONG_POLL_MARGIN_SECONDS) * 1_000L
@@ -58,23 +69,68 @@ open class TelegramBotApi(
         }
         val body = decode(response, UpdatesResponseDto.serializer())
         return body.result.orEmpty().mapNotNull { update ->
-            val message = update.message ?: return@mapNotNull null
+            val callback = update.callbackQuery
+            val message = update.message ?: callback?.message ?: return@mapNotNull null
             TelegramIncomingMessage(
                 updateId = update.updateId,
                 chatId = message.chat.id,
                 chatName = message.chat.username?.let { name -> "@$name" } ?: message.chat.firstName ?: message.chat.title ?: message.chat.id.toString(),
-                text = message.text
+                text = if (callback == null) message.text else null,
+                callbackId = callback?.id,
+                callbackData = callback?.data,
+                messageId = message.messageId
             )
         }
     }
 
-    open suspend fun sendMessage(token: String, chatId: Long, text: String) {
+    /**
+     * [html] liga `parse_mode: HTML`: quem chama já escapou o texto variável.
+     * [buttons] viram uma linha de teclado inline embaixo da mensagem.
+     */
+    open suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean = false, buttons: List<TelegramButton> = emptyList()) {
+        val body = SendMessageDto(chatId, text, if (html) PARSE_MODE_HTML else null, keyboard(buttons))
         val response = httpClient.post("$baseUrl/bot$token/sendMessage") {
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(SendMessageDto.serializer(), SendMessageDto(chatId, text)))
+            setBody(json.encodeToString(SendMessageDto.serializer(), body))
         }
         decode(response, SimpleResponseDto.serializer())
     }
+
+    /** Troca o texto de uma mensagem já enviada, mantendo [buttons] embaixo dela. */
+    open suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<TelegramButton> = emptyList()) {
+        val body = EditMessageDto(chatId, messageId, text, PARSE_MODE_HTML, keyboard(buttons))
+        val response = httpClient.post("$baseUrl/bot$token/editMessageText") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(EditMessageDto.serializer(), body))
+        }
+        decode(response, SimpleResponseDto.serializer())
+    }
+
+    /** Fecha o "carregando" do botão no Telegram; [text] aparece como aviso curto. */
+    open suspend fun answerCallbackQuery(token: String, callbackId: String, text: String? = null) {
+        val response = httpClient.post("$baseUrl/bot$token/answerCallbackQuery") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(AnswerCallbackDto.serializer(), AnswerCallbackDto(callbackId, text)))
+        }
+        decode(response, SimpleResponseDto.serializer())
+    }
+
+    private fun keyboard(buttons: List<TelegramButton>): KeyboardDto? =
+        if (buttons.isEmpty()) null else KeyboardDto(listOf(buttons.map { button -> ButtonDto(button.text, button.data) }))
+
+    /** Lista do botão "Menu" do Telegram: os comandos aparecem sem digitar `/ajuda`. */
+    open suspend fun setMyCommands(token: String, commands: List<Pair<String, String>>) {
+        val body = SetCommandsDto(commands.map { (command, description) -> CommandDto(command, description) })
+        val response = httpClient.post("$baseUrl/bot$token/setMyCommands") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SetCommandsDto.serializer(), body))
+        }
+        decode(response, SimpleResponseDto.serializer())
+    }
+
+    /** `@` do bot, para o link `t.me/<bot>?start=<código>` das Configurações (#396); `null` se o Telegram não informar. */
+    open suspend fun getMe(token: String): String? =
+        decode(httpClient.get("$baseUrl/bot$token/getMe"), MeResponseDto.serializer()).result?.username
 
     /** `getUpdates` não funciona com webhook configurado: o pareamento remove antes de começar. */
     open suspend fun deleteWebhook(token: String) {
@@ -111,6 +167,17 @@ open class TelegramBotApi(
     ) : OkResponse
 
     @Serializable
+    private data class MeResponseDto(
+        override val ok: Boolean = false,
+        override val description: String? = null,
+        override val parameters: ResponseParametersDto? = null,
+        val result: MeDto? = null
+    ) : OkResponse
+
+    @Serializable
+    private data class MeDto(val username: String? = null)
+
+    @Serializable
     private data class SimpleResponseDto(
         override val ok: Boolean = false,
         override val description: String? = null,
@@ -120,11 +187,19 @@ open class TelegramBotApi(
     @Serializable
     private data class UpdateDto(
         @SerialName("update_id") val updateId: Long,
-        val message: MessageDto? = null
+        val message: MessageDto? = null,
+        @SerialName("callback_query") val callbackQuery: CallbackQueryDto? = null
     )
 
     @Serializable
-    private data class MessageDto(val chat: ChatDto, val text: String? = null)
+    private data class MessageDto(
+        val chat: ChatDto,
+        val text: String? = null,
+        @SerialName("message_id") val messageId: Long? = null
+    )
+
+    @Serializable
+    private data class CallbackQueryDto(val id: String, val data: String? = null, val message: MessageDto? = null)
 
     @Serializable
     private data class ChatDto(
@@ -135,10 +210,40 @@ open class TelegramBotApi(
     )
 
     @Serializable
-    private data class SendMessageDto(@SerialName("chat_id") val chatId: Long, val text: String)
+    private data class SendMessageDto(
+        @SerialName("chat_id") val chatId: Long,
+        val text: String,
+        @SerialName("parse_mode") val parseMode: String? = null,
+        @SerialName("reply_markup") val replyMarkup: KeyboardDto? = null
+    )
+
+    @Serializable
+    private data class EditMessageDto(
+        @SerialName("chat_id") val chatId: Long,
+        @SerialName("message_id") val messageId: Long,
+        val text: String,
+        @SerialName("parse_mode") val parseMode: String,
+        @SerialName("reply_markup") val replyMarkup: KeyboardDto? = null
+    )
+
+    @Serializable
+    private data class AnswerCallbackDto(@SerialName("callback_query_id") val callbackQueryId: String, val text: String? = null)
+
+    @Serializable
+    private data class KeyboardDto(@SerialName("inline_keyboard") val inlineKeyboard: List<List<ButtonDto>>)
+
+    @Serializable
+    private data class ButtonDto(val text: String, @SerialName("callback_data") val callbackData: String)
+
+    @Serializable
+    private data class CommandDto(val command: String, val description: String)
+
+    @Serializable
+    private data class SetCommandsDto(val commands: List<CommandDto>)
 
     private companion object {
         const val LONG_POLL_MARGIN_SECONDS = 10
         const val DEFAULT_RETRY_SECONDS = 5L
+        const val PARSE_MODE_HTML = "HTML"
     }
 }

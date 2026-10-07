@@ -149,6 +149,19 @@ class DashboardViewModelRateLimitTest : DashboardViewModelTestSupport() {
     }
 
     @Test
+    fun `a live reading carries the collection instant`() = runTest {
+        // #394: sem o carimbo, a web dizia "sem coleta ainda" e o bot "coleta —".
+        val viewModel = anthropicOnlyViewModel(clock = MutableClock(fixedInstant)) { Result.success(sampleAnthropicStats) }
+
+        viewModel.refresh()
+        awaitConditionRealTime { (viewModel.uiState.value as? UiState.Success)?.data?.isNotEmpty() == true }
+
+        val state = assertIs<UiState.Success>(viewModel.uiState.value)
+        assertEquals(fixedInstant, state.data.single().fetchedAt)
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `a reading older than seven days is dropped instead of kept`() = runTest {
         val clock = MutableClock(fixedInstant)
         val responses = ArrayDeque(

@@ -8,7 +8,10 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.TelegramBotSectionModel
+import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
 
 /** Ações da seção do bot (#387); arquivo próprio para o `SettingsActions` não crescer. */
@@ -55,10 +58,13 @@ internal fun telegramBotSectionModel(
     val (label, tone) = when (status) {
         TelegramBotStatus.Off -> (if (pt) "Desligado" else "Off") to AppTone.NEUTRAL
         TelegramBotStatus.Connecting -> (if (pt) "Conectando" else "Connecting") to AppTone.INFO
-        is TelegramBotStatus.Connected -> if (status.chatCount == 0) {
-            (if (pt) "Conectado · sem conversa pareada" else "Connected · no paired chat") to AppTone.WARNING
-        } else {
-            (if (pt) "Conectado · ${status.chatCount} conversa(s)" else "Connected · ${status.chatCount} chat(s)") to AppTone.OK
+        is TelegramBotStatus.Connected -> {
+            val who = status.botUsername?.let { name -> (if (pt) "Conectado como @" else "Connected as @") + name } ?: if (pt) "Conectado" else "Connected"
+            if (status.chatCount == 0) {
+                (if (pt) "$who · sem conversa pareada" else "$who · no paired chat") to AppTone.WARNING
+            } else {
+                (if (pt) "$who · ${status.chatCount} conversa(s)" else "$who · ${status.chatCount} chat(s)") to AppTone.OK
+            }
         }
         is TelegramBotStatus.Failed -> ((if (pt) "Falha: " else "Failed: ") + status.message) to AppTone.CRITICAL
     }
@@ -73,11 +79,27 @@ internal fun telegramBotSectionModel(
         chats = settings.authorizedChats,
         pairingCode = openCode,
         pairingHint = openCode?.let { if (pt) "Vale por mais $minutesLeft min." else "Valid for $minutesLeft more min." },
-        statusPreview = TelegramBotMessages.status(snapshot, language),
+        statusPreview = TelegramBotMessages.plain(TelegramBotMessages.status(snapshot, language)),
         onEnabledChange = actions::setEnabled,
         onTokenChange = actions::changeToken,
         onStartPairing = actions::startPairing,
         onRemoveChat = actions::removeChat,
-        onSendTest = actions::sendTest
+        onSendTest = actions::sendTest,
+        connected = status is TelegramBotStatus.Connected,
+        botUsername = (status as? TelegramBotStatus.Connected)?.botUsername
     )
 }
+
+/**
+ * "Atualizar" do bot (#396): a mesma coleta do botão do app — alvo em backoff de 429
+ * não vai à rede —, esperando ela terminar. Se nada começar (tudo em backoff), volta
+ * logo e o bot mostra a leitura que já tem.
+ */
+internal suspend fun refreshForBot(dashboard: DashboardViewModel) {
+    dashboard.refresh()
+    withTimeoutOrNull(BOT_REFRESH_START_MILLIS) { dashboard.refreshingTargets.first { targets -> targets.isNotEmpty() } } ?: return
+    withTimeoutOrNull(BOT_REFRESH_FINISH_MILLIS) { dashboard.refreshingTargets.first { targets -> targets.isEmpty() } }
+}
+
+private const val BOT_REFRESH_START_MILLIS = 2_000L
+private const val BOT_REFRESH_FINISH_MILLIS = 30_000L

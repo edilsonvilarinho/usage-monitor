@@ -200,6 +200,32 @@ class UsageAlertTest {
     }
 
     @Test
+    fun `a snooze postpones the alert until it ends`() {
+        // "Silenciar 1h" do bot (#396): mesmo efeito do silêncio por horário.
+        val settings = UsageAlertSettings.DEFAULT.copy(snoozedUntilEpochMillis = (NOW + 1.hours).toEpochMilliseconds())
+
+        val snoozed = evaluateUsageAlerts(
+            stats = listOf(stats(usedPercent = 92)),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = UsageAlertState.EMPTY,
+            settings = settings,
+            now = NOW,
+            currentLocalHour = 12
+        )
+        assertTrue(snoozed.alerts.isEmpty())
+
+        val after = evaluateUsageAlerts(
+            stats = listOf(stats(usedPercent = 92)),
+            sessionPulse = SessionPulse.EMPTY,
+            previous = snoozed.state,
+            settings = settings,
+            now = NOW + 1.hours,
+            currentLocalHour = 13
+        )
+        assertEquals(listOf(75, 90), after.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().map { alert -> alert.thresholdPercent })
+    }
+
+    @Test
     fun `disabling quota alerts clears the fired state`() {
         val fired = evaluateUsageAlerts(
             stats = listOf(stats(usedPercent = 92)),

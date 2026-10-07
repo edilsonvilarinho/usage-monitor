@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,8 +30,13 @@ import kotlin.time.Instant
 private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("") })) {
     val pending = Collections.synchronizedList(mutableListOf<TelegramIncomingMessage>())
     val sent = Collections.synchronizedList(mutableListOf<Pair<Long, String>>())
+    val keyboards = Collections.synchronizedList(mutableListOf<List<TelegramButton>>())
+    val edits = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
+    val answered = Collections.synchronizedList(mutableListOf<String>())
 
     override suspend fun deleteWebhook(token: String) = Unit
+
+    override suspend fun getMe(token: String): String = "usage_monitor_bot"
 
     override suspend fun getUpdates(token: String, offset: Long?, timeoutSeconds: Int): List<TelegramIncomingMessage> {
         if (offset == -1L) return emptyList()
@@ -38,8 +45,23 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
         return batch
     }
 
-    override suspend fun sendMessage(token: String, chatId: Long, text: String) {
+    val menus = Collections.synchronizedList(mutableListOf<List<Pair<String, String>>>())
+
+    override suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean, buttons: List<TelegramButton>) {
         sent += chatId to text
+        keyboards += buttons
+    }
+
+    override suspend fun editMessageText(token: String, chatId: Long, messageId: Long, text: String, buttons: List<TelegramButton>) {
+        edits += chatId to messageId
+    }
+
+    override suspend fun answerCallbackQuery(token: String, callbackId: String, text: String?) {
+        answered += callbackId
+    }
+
+    override suspend fun setMyCommands(token: String, commands: List<Pair<String, String>>) {
+        menus += commands
     }
 }
 
@@ -51,6 +73,7 @@ class TelegramBotServiceTest {
     )
     private val alertSettings = MutableStateFlow(UsageAlertSettings())
     private val alerts = MutableSharedFlow<UsageAlert>(extraBufferCapacity = 4)
+    private val refreshes = AtomicInteger()
     private val service = TelegramBotService(
         api = api,
         settingsFlow = settings,
@@ -60,6 +83,7 @@ class TelegramBotServiceTest {
         alerts = alerts,
         snapshotProvider = { null },
         languageProvider = { AppLanguage.PT },
+        requestRefresh = { refreshes.incrementAndGet() },
         clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") }
     )
 
@@ -67,6 +91,13 @@ class TelegramBotServiceTest {
     fun tearDown() = service.onDestroy()
 
     private fun message(id: Long, chat: Long, text: String) = TelegramIncomingMessage(id, chat, "@chat$chat", text)
+
+    private fun tap(id: Long, chat: Long, data: String) =
+        TelegramIncomingMessage(id, chat, "@chat$chat", text = null, callbackId = "cb$id", callbackData = data, messageId = 700L)
+
+    private fun paired() {
+        settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed")))
+    }
 
     private fun waitUntil(condition: () -> Boolean) = runBlocking {
         withTimeout(5_000) { while (!condition()) delay(20) }
@@ -93,6 +124,64 @@ class TelegramBotServiceTest {
         api.pending += message(1, chat = 51, text = "/alertas off")
 
         waitUntil { !alertSettings.value.quotaAlertsEnabled }
-        waitUntil { api.sent.any { it.second == "Alertas desligados." } }
+        waitUntil { api.sent.any { it.second == "🔕 Alertas desligados." } }
+    }
+
+    @Test
+    fun `connecting registers the command menu in the app language`() {
+        service.start()
+
+        waitUntil { api.menus.isNotEmpty() }
+        assertEquals(listOf("status", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
+    }
+
+    @Test
+    fun `status reply carries the refresh, mute and thresholds buttons`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/status")
+
+        waitUntil { api.keyboards.any { it.isNotEmpty() } }
+        assertEquals(listOf("refresh", "snooze", "thresholds"), api.keyboards.first { it.isNotEmpty() }.map { it.data })
+    }
+
+    @Test
+    fun `mute button silences alerts for one hour`() {
+        paired()
+        service.start()
+        api.pending += tap(1, chat = 51, data = "snooze")
+
+        waitUntil { alertSettings.value.snoozedUntilEpochMillis != null }
+        assertEquals(Instant.parse("2026-10-06T13:00:00Z").toEpochMilliseconds(), alertSettings.value.snoozedUntilEpochMillis)
+        waitUntil { "cb1" in api.answered && api.sent.any { it.second.startsWith("🔕 Alertas silenciados até") } }
+    }
+
+    @Test
+    fun `refresh button collects and edits the same message`() {
+        paired()
+        service.start()
+        api.pending += tap(1, chat = 51, data = "refresh")
+
+        waitUntil { api.edits.isNotEmpty() }
+        assertEquals(1, refreshes.get())
+        assertEquals(51L to 700L, api.edits.single())
+    }
+
+    @Test
+    fun `a stranger tapping a button gets nothing`() {
+        service.start()
+        api.pending += tap(1, chat = 99, data = "snooze")
+        api.pending += message(2, chat = 51, text = "/start ab12cd")
+
+        waitUntil { settings.value.isAuthorized(51L) }
+        assertTrue(api.answered.isEmpty())
+        assertEquals(null, alertSettings.value.snoozedUntilEpochMillis)
+    }
+
+    @Test
+    fun `connected status carries the bot username for the deep link`() {
+        service.start()
+
+        waitUntil { (service.status.value as? TelegramBotStatus.Connected)?.botUsername == "usage_monitor_bot" }
     }
 }

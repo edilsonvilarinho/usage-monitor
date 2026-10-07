@@ -18,6 +18,7 @@ private const val STALL_THRESHOLD_MINUTES_KEY = "alertsStallThresholdMinutes"
 private const val SPIKE_ALERTS_ENABLED_KEY = "alertsSpikeEnabled"
 private const val SPIKE_FACTOR_TENTHS_KEY = "alertsSpikeFactorTenths"
 private const val QUIET_HOURS_KEY = "alertsQuietHours"
+private const val SNOOZED_UNTIL_KEY = "alertsSnoozedUntilMillis"
 
 /**
  * Preferências de alerta no mesmo armazenamento das demais (registro/plist via
@@ -36,7 +37,8 @@ internal fun readPersistedAlertSettings(settings: PreferencesSettings): UsageAle
         stallThresholdMillis = decodeStallThresholdMillis(settings.getIntOrNull(STALL_THRESHOLD_MINUTES_KEY)),
         spikeAlertsEnabled = settings.getBoolean(SPIKE_ALERTS_ENABLED_KEY, true),
         spikeFactor = decodeSpikeFactor(settings.getIntOrNull(SPIKE_FACTOR_TENTHS_KEY)),
-        quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY))
+        quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY)),
+        snoozedUntilEpochMillis = settings.getLongOrNull(SNOOZED_UNTIL_KEY)
     )
 }
 
@@ -49,6 +51,8 @@ internal fun persistAlertSettings(settings: PreferencesSettings, value: UsageAle
     settings.putBoolean(SPIKE_ALERTS_ENABLED_KEY, value.spikeAlertsEnabled)
     settings.putInt(SPIKE_FACTOR_TENTHS_KEY, (value.effectiveSpikeFactor * 10.0).roundToInt())
     settings.putString(QUIET_HOURS_KEY, encodeQuietHours(value.quietHours))
+    val snoozedUntil = value.snoozedUntilEpochMillis
+    if (snoozedUntil == null) settings.remove(SNOOZED_UNTIL_KEY) else settings.putLong(SNOOZED_UNTIL_KEY, snoozedUntil)
 }
 
 /**
