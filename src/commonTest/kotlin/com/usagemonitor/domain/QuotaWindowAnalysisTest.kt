@@ -222,4 +222,31 @@ class QuotaWindowAnalysisTest {
 
         assertNull(quotaHourlyDistributionOf(flat, UsageUnit.PERCENTAGE, PeriodType.INTERVAL))
     }
+    @Test
+    fun `each window carries its own hourly distribution and they add up to the range`() {
+        val windows = quotaWindowsOf(twoWindows, UsageUnit.PERCENTAGE, PeriodType.INTERVAL, TimeZone.of("America/Sao_Paulo"))
+        val range = quotaHourlyDistributionOf(twoWindows, UsageUnit.PERCENTAGE, PeriodType.INTERVAL, TimeZone.of("America/Sao_Paulo"))!!
+
+        // Primeira janela: +50 às 23h BRT e +40 à 0h BRT; segunda: +30 às 4h BRT.
+        val firstHours = windows[0].hourlyDistribution!!.percentByHour
+        val secondHours = windows[1].hourlyDistribution!!.percentByHour
+        assertEquals(50.0, firstHours[23], 0.001)
+        assertEquals(40.0, firstHours[0], 0.001)
+        assertEquals(0.0, firstHours[4], 0.001)
+        assertEquals(30.0, secondHours[4], 0.001)
+        assertEquals(0.0, secondHours[23], 0.001)
+        (0 until 24).forEach { hour ->
+            assertEquals(range.percentByHour[hour], firstHours[hour] + secondHours[hour], 0.001)
+        }
+    }
+
+    @Test
+    fun `a window that never grew has no hourly distribution`() {
+        val flat = listOf(
+            point("2026-09-27T01:00:00Z", 10, first),
+            point("2026-09-27T02:00:00Z", 10, first)
+        )
+
+        assertNull(quotaWindowsOf(flat, UsageUnit.PERCENTAGE, PeriodType.INTERVAL).single().hourlyDistribution)
+    }
 }

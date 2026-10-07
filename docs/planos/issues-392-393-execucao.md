@@ -16,10 +16,10 @@ Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`
 | Autor dos commits | skill `usage-monitor-commit-push`, trailer `Co-Authored-By: Claude Opus 5.5` |
 
 ### ▶ Atividade corrente
-A03 — distribuição horária por janela na camada data.
+A04 — lista de janelas e detalhe (S9).
 
 ### ⏭ Próxima atividade
-A04 — lista de janelas e detalhe (S9).
+A05 — dica nas barras horárias e legenda com amostras.
 
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
 
@@ -107,6 +107,7 @@ Commit e push só com autorização.
 | --- | --- | --- |
 | A01 | `docs: plan issues #392 and #393 with visual gallery` | `node docs/planos/issues-392-393-visual/build-gallery.cjs` → 65,0 KB; aberta no browser pane: console sem erro, 22 cards, nenhum palco com transbordo horizontal |
 | A02 | `fix(history): label the axis middle by time, not by point index` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest"` → 32 testes, 0 falhas (1 novo: polling 5 min + 60 s, centro 08:55 BRT); `--tests "com.usagemonitor.ui.History*"` → 20 testes, 0 falhas |
+| A03 | `feat(history): compute the hourly distribution per quota window` | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaWindowAnalysisTest" --tests "com.usagemonitor.data.*History*" --tests "com.usagemonitor.architecture.*"` → 17 + 39 + 8 testes, 0 falhas (2 novos: soma das janelas = distribuição do intervalo, hora a hora; janela sem subida → `null`) |
 
 ## Problemas em aberto e riscos
 
@@ -121,4 +122,4 @@ Commit e push só com autorização.
 
 ## Desvios do plano e achados da execução
 
-(preenchido durante a execução)
+- **A03:** `UsageHistoryRepositoryImpl` não mudou. Ele já chama `quotaWindowsOf(points, …)` com os pontos crus, antes de `downsamplePoints`; o campo novo nasce dentro de `quotaWindowsOf` e herda isso.
