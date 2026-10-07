@@ -346,6 +346,14 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   minuto por conversa — dentro do limite de edição do Telegram. 400 "not modified" conta como mantido; 400 "not found"
   (mensagem apagada) recria. `chatId → message_id` em `telegram.json` (`panelMessages`); conversa removida sai do mapa.
   Desligar desafixa e esquece na passada seguinte (até 1 min).
+- **Gráfico (#398, Y6)**: `/grafico` (24 h) e `/grafico 7d` (`/chart`) mandam um PNG 960×540 por `sendPhoto`. Dados de
+  `GetUsageHistoryUseCase` das fontes ligadas, uma série por conta (`listAccounts`; sem contas, a fonte vai sem chave),
+  nomeada pela fonte e numerada quando há mais de uma conta — **nunca o e-mail**. `buildTelegramChart` (pura): só cota com
+  reinício conhecido e total > 0 (saldo em dinheiro fica de fora), só pontos dentro do intervalo, reinício onde
+  `periodEndAt` muda (`isSamePeriod`), teto de 8 linhas. `TelegramChartRenderer` desenha com o Skia do Compose Desktop
+  (sem dependência nova; Plex Mono do classpath): eixo 0–100%, tracejado dourado no reinício e **o segmento que atravessa
+  o reinício não é ligado** — a queda não foi consumo. A legenda escreve rótulo e último percentual. Sem histórico, a
+  resposta é texto.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

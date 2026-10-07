@@ -11,6 +11,9 @@ import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.presentation.ui.TelegramChart
+import com.usagemonitor.presentation.ui.TelegramChartMessages
 import com.usagemonitor.domain.entity.parseBotTap
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
@@ -52,7 +55,9 @@ internal class TelegramBotHandlers(
     /** Liga ou desliga uma fonte pelo mesmo caminho das Configurações. */
     private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> },
     /** O texto do resumo diário (#398, Y1), montado por quem tem o gasto. */
-    private val summaryText: suspend (AppLanguage) -> String = { language -> TelegramBotMessages.noReading(language == AppLanguage.PT) }
+    private val summaryText: suspend (AppLanguage) -> String = { language -> TelegramBotMessages.noReading(language == AppLanguage.PT) },
+    /** O gráfico do intervalo (#398, Y6); `null` sem histórico — a resposta vira texto. */
+    private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null }
 ) {
 
     suspend fun handle(token: String, message: TelegramIncomingMessage) {
@@ -96,6 +101,15 @@ internal class TelegramBotHandlers(
             val enabled = enabledSources()
             val buttons = if (allowed) rows(TelegramBotRemoteMessages.sourceButtons(enabled, language)) else emptyList()
             api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.sources(enabled, allowed, language), html = true, buttons = buttons)
+            return
+        }
+        if (command is BotCommand.Chart) {
+            val chart = chartProvider(command.range)
+            if (chart == null || chart.isEmpty) {
+                api.sendMessage(token, message.chatId, TelegramChartMessages.empty(language), html = true)
+                return
+            }
+            api.sendPhoto(token, message.chatId, TelegramChartRenderer.render(chart), TelegramChartMessages.caption(command.range, chart, language))
             return
         }
         if (command == BotCommand.Summary) {

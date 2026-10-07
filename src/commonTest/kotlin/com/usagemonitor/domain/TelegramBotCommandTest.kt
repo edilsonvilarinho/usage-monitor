@@ -3,6 +3,7 @@ package com.usagemonitor.domain
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.data
@@ -41,6 +42,9 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
         assertEquals(BotCommand.Sources, parseBotCommand("/api"))
         assertEquals(BotCommand.QuietMenu, parseBotCommand("/silencio"))
+        assertEquals(BotCommand.Chart(HistoryRange.LAST_24_HOURS), parseBotCommand("/grafico"))
+        assertEquals(BotCommand.Chart(HistoryRange.LAST_7_DAYS), parseBotCommand("/chart 7d"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/grafico 30d"))
     }
 
     @Test

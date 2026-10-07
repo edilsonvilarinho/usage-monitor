@@ -93,6 +93,8 @@ sealed interface BotCommand {
     data object QuietMenu : BotCommand
     /** `/resumo` (#398, Y1): o resumo diário na hora. */
     data object Summary : BotCommand
+    /** `/grafico [24h|7d]` (#398, Y6): imagem do uso no intervalo. */
+    data class Chart(val range: HistoryRange) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -124,6 +126,11 @@ fun parseBotCommand(text: String): BotCommand? {
         "atualizar", "refresh" -> BotCommand.Refresh
         "api", "apis", "fontes", "sources" -> BotCommand.Sources
         "resumo", "summary" -> BotCommand.Summary
+        "grafico", "gráfico", "chart" -> when (args.firstOrNull()?.lowercase()) {
+            null, "24h", "24" -> BotCommand.Chart(HistoryRange.LAST_24_HOURS)
+            "7d", "7" -> BotCommand.Chart(HistoryRange.LAST_7_DAYS)
+            else -> BotCommand.Invalid("/grafico 24h | /grafico 7d")
+        }
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

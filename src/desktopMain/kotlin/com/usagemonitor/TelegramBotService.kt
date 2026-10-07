@@ -6,7 +6,9 @@ import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.domain.entity.dailySummaryDate
 import com.usagemonitor.domain.entity.isDailySummaryDue
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
@@ -71,6 +73,8 @@ internal class TelegramBotService(
     private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> },
     /** Gasto do Claude Code nas últimas 24 h (#398, Y1); `null` é "não medido". */
     private val spendProvider: suspend () -> TelegramDailySpend? = { null },
+    /** Gráfico do `/grafico` (#398, Y6), montado de quem tem o histórico. */
+    private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null },
     /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
     private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS
 ) {
@@ -96,7 +100,8 @@ internal class TelegramBotService(
         clock = clock,
         enabledSources = enabledSources,
         toggleSource = toggleSource,
-        summaryText = { language -> TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language) }
+        summaryText = { language -> TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language) },
+        chartProvider = chartProvider
     )
 
     private val _status = MutableStateFlow<TelegramBotStatus>(TelegramBotStatus.Off)

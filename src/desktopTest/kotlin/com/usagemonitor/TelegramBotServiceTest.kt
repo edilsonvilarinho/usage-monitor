@@ -6,6 +6,9 @@ import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.presentation.ui.TelegramChart
+import com.usagemonitor.presentation.ui.TelegramChartLine
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
@@ -67,6 +70,12 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
         return nextMessageId.incrementAndGet().toLong()
     }
 
+    val photos = Collections.synchronizedList(mutableListOf<Pair<Long, Int>>())
+
+    override suspend fun sendPhoto(token: String, chatId: Long, png: ByteArray, caption: String) {
+        photos += chatId to png.size
+    }
+
     override suspend fun pinChatMessage(token: String, chatId: Long, messageId: Long) {
         pins += chatId to messageId
     }
@@ -113,6 +122,13 @@ class TelegramBotServiceTest {
         clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") },
         enabledSources = { enabledSources.value },
         toggleSource = { source, on -> enabledSources.value = if (on) enabledSources.value + source else enabledSources.value - source },
+        chartProvider = { range ->
+            if (range != HistoryRange.LAST_24_HOURS) {
+                null
+            } else {
+                TelegramChart(0L, 3_600_000L, listOf(TelegramChartLine("Anthropic · Sessão 5h", listOf(0L to 10f, 3_600_000L to 20f), emptyList(), 20)))
+            }
+        },
         panelIntervalMillis = 50L
     )
 
@@ -161,7 +177,7 @@ class TelegramBotServiceTest {
         service.start()
 
         waitUntil { api.menus.isNotEmpty() }
-        assertEquals(listOf("status", "conta", "atualizar", "api", "resumo", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
+        assertEquals(listOf("status", "conta", "atualizar", "api", "resumo", "grafico", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
     }
 
     @Test
@@ -338,5 +354,17 @@ class TelegramBotServiceTest {
         settings.value = settings.value.copy(livePanelEnabled = false)
         waitUntil { api.unpins.isNotEmpty() && settings.value.panelMessages.isEmpty() }
         assertEquals(51L to messageId, api.unpins.single())
+    }
+
+    /** #398, Y6: com histórico sai uma foto; sem histórico, a resposta é texto. */
+    @Test
+    fun `chart command sends a photo or says there is no history`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/grafico")
+        api.pending += message(2, chat = 51, text = "/grafico 7d")
+
+        waitUntil { api.photos.isNotEmpty() && api.sent.any { it.second.startsWith("Sem histórico no intervalo") } }
+        assertTrue(api.photos.single().second > 0)
     }
 }
