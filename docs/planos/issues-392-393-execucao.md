@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Plano aprovado (2026-10-06). Em execução.`
+**Estado atual:** `Concluída na branch (A01–A09). Falta push e PR (aguardando autorização).`
 
 **Direções escolhidas (2026-10-06):** #392 → **S9 · Lista de janelas e detalhe** · #393 → **T3 · Grade de gráficos 2×2**.
 Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`node docs/planos/issues-392-393-visual/build-gallery.cjs`).
@@ -12,11 +12,11 @@ Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`
 | Modelo | Claude Opus 5.5 (`claude-opus-5-5`) |
 | Ferramenta | Claude Code (desktop, aba Code) |
 | Data | 2026-10-06 |
-| Branch | `feat/issues-392-393` (a criar a partir de `main` em `066d2ecd`) |
+| Branch | `feat/issues-392-393` (criada a partir de `main` em `066d2ecd`) |
 | Autor dos commits | skill `usage-monitor-commit-push`, trailer `Co-Authored-By: Claude Opus 5.5` |
 
 ### ▶ Atividade corrente
-A09 — `allTests` e fechamento.
+Concluída na branch — falta push e PR (aguardando autorização).
 
 ### ⏭ Próxima atividade
 —
@@ -112,13 +112,15 @@ Commit e push só com autorização.
 | A05 | `feat(history): hint hourly bars and key the active band to the view` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.HistoryWindowAnalysisTest" --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.architecture.*"` → 98 testes, 0 falhas (novos: texto da bolha, hora sob o ponteiro, chave dentro/fora do trecho, hover real na barra 17h); captura `history-regression-anthropic-dark-1030-640-125.png`: chave com amostra e eixo 12:00 · 23:30 · 11:00 |
 | A06 | `feat(codex): per-response analytics for the session detail` | rollout real `2026/10/06/rollout-…-01a111fa….jsonl` lido: `usage` é por resposta, `input_tokens` 35.789 → 40.463 → 48.627 (contexto com cache), `total = input + output` (raciocínio dentro da saída); `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CodexCliSessionAnalyticsTest" --tests "com.usagemonitor.architecture.*"` → 4 + 8 testes, 0 falhas |
 | A07 | `feat(cli-sessions): turn chart grid for Claude and Codex details` | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CodexCliSessionDetailTest" --tests "com.usagemonitor.domain.CliSessionAnalyticsTest" --tests "com.usagemonitor.domain.CodexCliSessionAnalyticsTest" --tests "com.usagemonitor.presentation.TurnSeriesBinningTest" --tests "com.usagemonitor.ui.*Cli*" --tests "com.usagemonitor.presentation.*Cli*" --tests "com.usagemonitor.ui.*Team*" --tests "com.usagemonitor.architecture.*"` → 282 testes, 0 falhas (novos: grade em 2 colunas e em 1 abaixo de 600dp, tabela formatada sem id de resposta, "—" na vazão não medida, binning com lacuna, queda só entre medidos, séries do Claude); `gradlew.bat generateScreenshots -PscreenshotOutputDir=build/issue393-screenshots` → `codex-session-detail.png` e `cli-session-detail.png` conferidos; eixo da vazão cortado ("33 tok/") corrigido com a unidade no título e reconferido na A09 |
+| A08 | (sem commit próprio) | Documentação de tela entrou no commit de cada atividade (A04, A05, A07), como manda o `CLAUDE.md`; não sobrou nada para a A08 |
+| A09 | `docs(plan): close issues #392 and #393 execution` | `gradlew.bat allTests` → 2.546 testes, 0 falhas, 0 ignorados (272 arquivos de resultado, todos desta execução). **Não feito:** app empacotado não gerado; nenhuma plataforma além do Windows testada; nenhum host de janela mudou |
 
 ## Problemas em aberto e riscos
 
 | Risco | Estado | Mitigação |
 | --- | --- | --- |
 | Curva da janela no Total herda a reamostragem do gráfico principal | aceito | só desenho; números do detalhe vêm de `QuotaWindowSummary`, calculados dos pontos crus |
-| Janela que começou antes do início do intervalo aparece parcial (curva e barras) | aberto | rotular "parcial" no item da lista; medir em A04 |
+| Janela que começou antes do início do intervalo aparece parcial (curva e barras) | aceito | o item diz "Início observado", a primeira leitura do app — mesma regra da tabela anterior; rótulo "parcial" não entrou (a API não informa o início nominal, e marcar exigiria derivá-lo) |
 | `TurnSeriesChart` aceita só `List<Long>` (sem lacuna) | fechado | A07: `TurnSeries.values` virou `List<Long?>`; lacuna quebra a linha, bin de nulos fica nulo |
 | Entrada por resposta do Codex = tamanho do contexto | fechado | medido em A06 no rollout real: `usage` por resposta, `input_tokens` inclui o cache e cresce até a compactação |
 | `CodexCliSessionsScreen.kt` (588) e `CliSessionDetail.kt` (556) perto do teto de 800 | fechado | A07: detalhe do Codex extraído para arquivo próprio; nenhum arquivo passa de 800 (`ArchitectureRulesTest` verde) |
@@ -134,3 +136,5 @@ Commit e push só com autorização.
 - **A06 (achado):** o rollout traz `model_context_window` (354.350 no rollout medido). O índice do Codex não lê esse campo; o percentual da janela de contexto no Codex fica **possível**, mas exige coluna nova no índice e versão em `codex_cli_index_meta`. Fora do escopo desta entrega — candidato a issue própria.
 - **A07:** "Custo x economia acumulados" saiu do Avançado do Claude e entrou na grade — é o quarto gráfico da T3. "Custo" passa a aparecer duas vezes no detalhe (bloco do resumo e legenda); o teste foi ajustado, e o glossário passou a precisar de rolagem no teste de 700dp.
 - **A07:** a legenda da saída no Claude usa "Saída", e não `CliSessionsLabels.output` ("Output" fixo, nome do componente de token no Avançado).
+- **A09:** a issue de rastreio não foi criada: o trabalho começou e terminou na mesma sessão.
+- **Pendências declaradas:** percentual da janela de contexto no Codex (`model_context_window` no rollout, fora do índice) e eixo do gráfico de cache, que usa o percentil 99 como teto (94 % no topo em vez de 100 %) — os dois ficam como candidatos a issue própria.
