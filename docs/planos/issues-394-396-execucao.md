@@ -45,6 +45,7 @@ Galeria das 18 opções em [`issues-394-396-visual/options.html`](issues-394-396
 | Atividade | Commit | Evidência | Estado |
 | --- | --- | --- | --- |
 | A01 | `docs: plan issues 394 and 396` | plano e galeria gravados | concluída |
+| A02 | `fix(dashboard): stamp fetchedAt on live readings` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.data.*"` verde; teste novo `a live reading carries the collection instant`; dois testes que comparavam a leitura por igualdade passaram a ignorar `fetchedAt` | concluída |
 
 ## Problemas em aberto e riscos
 

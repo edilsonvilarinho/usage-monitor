@@ -515,7 +515,7 @@ class DashboardViewModel(
             .onSuccess { fetched ->
                 if (isPersistableDashboardStats(fetched)) {
                     scheduler.recordSuccess(target, capturedAt)
-                    stats = fetched
+                    stats = fetched.copy(fetchedAt = capturedAt)
                     // Sequencial, como era no laço único: a conexão do SQLite é
                     // serializada e disputada pelo indexador de sessões CLI.
                     historyMutex.withLock {

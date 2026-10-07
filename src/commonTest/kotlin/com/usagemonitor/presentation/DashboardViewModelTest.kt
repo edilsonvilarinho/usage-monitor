@@ -86,7 +86,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
 
         awaitCondition {
             val state = viewModel.uiState.value as? UiState.Success ?: return@awaitCondition false
-            state.data.singleOrNull() == emptyKiloStats
+            state.data.singleOrNull()?.copy(fetchedAt = null) == emptyKiloStats
         }
 
         viewModel.onDestroy()
@@ -130,7 +130,7 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         enabledApis.value = setOf(ApiSource.KILO)
         viewModel.refresh(ApiSource.DEEPSEEK)
 
-        awaitCondition { (viewModel.uiState.value as? UiState.Success)?.data == listOf(kiloStats) }
+        awaitCondition { (viewModel.uiState.value as? UiState.Success)?.data?.map { it.copy(fetchedAt = null) } == listOf(kiloStats) }
         assertEquals(callsBeforeDisable, deepSeekCalls)
 
         enabledApis.value = emptySet()
