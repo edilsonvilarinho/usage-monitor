@@ -54,6 +54,22 @@ class HistoryLayoutRegressionTest {
     }
 
     @Test
+    fun `hovering an hourly bar names the hour and its share`() = runDesktopComposeUiTest(width = 1030, height = 900) {
+        val hours = com.usagemonitor.domain.entity.QuotaHourlyDistribution(List(24) { hour -> when (hour) { 16 -> 31.0; 17 -> 53.0; 19 -> 16.0; else -> 0.0 } })
+        val base = issue383ManyWindowsSeries()
+        val series = base.copy(windows = base.windows.map { it.copy(hourlyDistribution = hours) })
+        setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(HISTORY_HOURLY_TOOLTIP_TAG).assertDoesNotExist()
+
+        val chart = onNodeWithTag(HISTORY_HOURLY_CHART_TAG)
+        val width = chart.fetchSemanticsNode().size.width.toFloat()
+        chart.performMouseInput { moveTo(androidx.compose.ui.geometry.Offset(width * 17.5f / 24f, 20f)) }
+
+        onNodeWithTag(HISTORY_HOURLY_TOOLTIP_TAG).assertExists()
+        onNodeWithText("17h–18h BRT · 53% do consumo").assertExists()
+    }
+
+    @Test
     fun `long account list does not consume report area in short window`() = runDesktopComposeUiTest(width = 1030, height = 560) {
         val accounts = issue383LongHistoryAccounts(ApiSource.ANTHROPIC)
         val report = issue383HistoryReports().first().copy(accountContext = accounts.first())

@@ -110,7 +110,7 @@ export function History() {
               </div>
               <AppPanelBody style={{ flex: 1, minWidth: 0 }}>
                 <AppDataTable columns={[{ key: 'k', label: 'Métrica' }, { key: 'v', label: 'Valor', numeric: true }]} rows={weeklyOnly ? [{ id: 1, k: 'Ativa', v: '21:05 → 11:40 · 2d 14h' }, { id: 2, k: 'Pico', v: '43 %' }, { id: 3, k: 'Esgotou em', v: '—' }, { id: 4, k: 'Ritmo', v: '1 %/h' }] : [{ id: 1, k: 'Ativa', v: '12:12 → 15:40 · 3h 28min' }, { id: 2, k: 'Pico', v: '68 %' }, { id: 3, k: 'Esgotou em', v: '—' }, { id: 4, k: 'Ritmo', v: '5,6 %/h' }]} />
-                <AppKey>Consumo por hora do dia (BRT) · só desta janela</AppKey><svg viewBox="0 0 700 58" style={{ display: 'block', width: '100%', height: 56 }} role="img" aria-label="Pico às 14h BRT">{[2,0,0,0,0,0,0,0,6,18,30,34,22,28,48,40,30,20,12,8,6,4,2,2].map((h,i) => <rect key={i} x={i*29+4} y={56-h} width="20" height={h} rx="2" fill="var(--anthropic)" />)}</svg><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)' }}>Pico às 14h BRT · 15% do consumo</span>
+                <AppKey>Consumo por hora do dia (BRT) · só desta janela</AppKey>{/* #392: hover na barra → bolha «14h–15h BRT · 15% do consumo», acima das barras. */}<svg viewBox="0 0 700 58" style={{ display: 'block', width: '100%', height: 56 }} role="img" aria-label="Pico às 14h BRT">{[2,0,0,0,0,0,0,0,6,18,30,34,22,28,48,40,30,20,12,8,6,4,2,2].map((h,i) => <rect key={i} x={i*29+4} y={56-h} width="20" height={h} rx="2" fill="var(--anthropic)" />)}</svg><span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t10)' }}>Pico às 14h BRT · 15% do consumo</span>
               </AppPanelBody>
             </div>
           </AppPanel>

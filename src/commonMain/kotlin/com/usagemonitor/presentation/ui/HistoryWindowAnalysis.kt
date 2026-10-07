@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import kotlin.math.roundToLong
 import kotlin.time.Instant
+import com.usagemonitor.presentation.ui.components.HistoryActiveSpanKey
 
 /** Janelas listadas por painel; as mais antigas ficam só no resumo agregado. */
 internal const val HISTORY_WINDOW_ROW_LIMIT = 8
@@ -127,18 +128,24 @@ private fun formatElapsed(from: Instant, to: Instant): String {
 }
 
 /**
- * Legenda sob o gráfico (#382, direção N6): a faixa ativa da janela corrente e
- * o que a faixa clara significa. `null` sem janela aberta com uso.
+ * Chave da faixa ativa sob o gráfico (#382, direção N6; #392). A frase escolhida
+ * depende do trecho visível: com zoom fora da janela aberta, ela diz isso em vez
+ * de descrever uma faixa que não está na tela.
  */
-internal fun currentActiveSpanCaption(series: UsageHistorySeries, language: AppLanguage): String? {
-    val window = series.windows.lastOrNull { candidate -> candidate.isOpen } ?: return null
-    if (window.activeFrom == null) {
-        return null
+internal fun historyActiveSpanKey(series: UsageHistorySeries, language: AppLanguage): HistoryActiveSpanKey {
+    val pt = language == AppLanguage.PT
+    val band = if (pt) "Faixa clara: trecho em que o uso subiu; o resto ficou ocioso." else "Light band: where usage rose; the rest was idle."
+    val window = series.windows.lastOrNull { candidate -> candidate.isOpen }
+    val from = window?.activeFrom
+    val until = window?.activeUntil
+    if (window == null || from == null || until == null) {
+        return HistoryActiveSpanKey(currentSpan = null, insideText = band, outsideText = band, genericText = band)
     }
     val span = activeSpanLabel(window, language)
-    return if (language == AppLanguage.PT) {
-        "Janela atual ativa $span. A faixa clara marca o trecho em que o uso subiu; o resto ficou ocioso."
-    } else {
-        "Current window active $span. The light band marks where usage rose; the rest was idle."
-    }
+    return HistoryActiveSpanKey(
+        currentSpan = from..until,
+        insideText = if (pt) "$band Janela atual ativa $span." else "$band Current window active $span.",
+        outsideText = if (pt) "$band A janela atual ($span) está fora do trecho ampliado; \"Ver tudo\" volta a mostrá-la." else "$band The current window ($span) is outside the zoomed range; \"View all\" shows it again.",
+        genericText = band
+    )
 }

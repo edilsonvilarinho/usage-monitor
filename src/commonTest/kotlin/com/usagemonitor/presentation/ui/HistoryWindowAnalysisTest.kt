@@ -111,4 +111,46 @@ class HistoryWindowAnalysisTest {
         assertEquals("21:02 → 22:00 · 58min", activeSpanLabel(active, AppLanguage.PT))
         assertEquals("—", activeSpanLabel(window("2026-10-06T00:02:00Z"), AppLanguage.PT))
     }
+
+    @Test
+    fun `hourly tooltip names the hour and its share, or says there was no usage`() {
+        val hours = QuotaHourlyDistribution(List(24) { hour -> when (hour) { 16 -> 31.0; 17 -> 53.0; 19 -> 16.0; else -> 0.0 } })
+
+        assertEquals("17h–18h BRT · 53% do consumo", hourlyTooltipLabel(hours, 17, AppLanguage.PT))
+        assertEquals("3h–4h BRT · sem consumo", hourlyTooltipLabel(hours, 3, AppLanguage.PT))
+        assertEquals("17h–18h BRT · 53% of usage", hourlyTooltipLabel(hours, 17, AppLanguage.EN))
+    }
+
+    @Test
+    fun `pointer position maps to the hour slot`() {
+        assertEquals(0, hourAt(0f, 240f))
+        assertEquals(17, hourAt(175f, 240f))
+        assertEquals(23, hourAt(240f, 240f))
+        assertEquals(null, hourAt(-1f, 240f))
+        assertEquals(null, hourAt(10f, 0f))
+    }
+
+    @Test
+    fun `active span key follows the visible range`() {
+        val from = Instant.parse("2026-10-06T19:06:00Z")
+        val until = Instant.parse("2026-10-06T22:29:00Z")
+        val open = window("2026-10-06T19:06:00Z", open = true).copy(activeFrom = from, activeUntil = until)
+        val series = com.usagemonitor.domain.entity.UsageHistorySeries(
+            quotaLabel = "5h", periodType = com.usagemonitor.domain.entity.PeriodType.INTERVAL,
+            unit = com.usagemonitor.domain.entity.UsageUnit.PERCENTAGE, points = emptyList(),
+            currentDisplayUsed = 0, currentDisplayTotal = 100, deltaDisplayUsed = 0,
+            averageDisplayConsumptionPerHour = 0.0, currentPeriodEndAt = until,
+            forecast = com.usagemonitor.domain.entity.UsageForecast.InsufficientData, riskSummary = null,
+            windows = listOf(open)
+        )
+        val key = historyActiveSpanKey(series, AppLanguage.PT)
+
+        val inside = com.usagemonitor.presentation.ui.components.activeSpanKeyText(key, Instant.parse("2026-10-05T23:57:00Z"), Instant.parse("2026-10-06T23:54:00Z"))
+        val outside = com.usagemonitor.presentation.ui.components.activeSpanKeyText(key, Instant.parse("2026-10-02T00:00:00Z"), Instant.parse("2026-10-05T00:00:00Z"))
+
+        assertEquals("Faixa clara: trecho em que o uso subiu; o resto ficou ocioso. Janela atual ativa 16:06 → 19:29 · 3h 23min.", inside)
+        assertEquals("Faixa clara: trecho em que o uso subiu; o resto ficou ocioso. A janela atual (16:06 → 19:29 · 3h 23min) está fora do trecho ampliado; \"Ver tudo\" volta a mostrá-la.", outside)
+        val noOpen = historyActiveSpanKey(series.copy(windows = emptyList()), AppLanguage.PT)
+        assertEquals("Faixa clara: trecho em que o uso subiu; o resto ficou ocioso.", com.usagemonitor.presentation.ui.components.activeSpanKeyText(noOpen, from, until))
+    }
 }

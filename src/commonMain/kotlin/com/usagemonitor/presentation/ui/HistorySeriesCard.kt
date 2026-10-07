@@ -54,16 +54,9 @@ internal fun HistorySeriesCard(
                         monthlySummary = monthlySummary.takeIf { quotaView == HistoryQuotaView.BOTH && weeklySummary != null },
                         monthlyColor = AppAccents.current.savings
                     ),
-                    showActiveSpans = chartSeries.windows.isNotEmpty()
+                    showActiveSpans = chartSeries.windows.isNotEmpty(),
+                    activeSpanKey = historyActiveSpanKey(chartSeries, language)
                 )
-                currentActiveSpanCaption(chartSeries, language)?.let { caption ->
-                    Text(
-                        text = caption,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = AppSpacing.xs)
-                    )
-                }
             }
         }
         HistoryDetailsSection(

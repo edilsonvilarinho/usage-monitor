@@ -16,10 +16,10 @@ Galeria das 20 opções em [`issues-392-393-visual/`](issues-392-393-visual/) (`
 | Autor dos commits | skill `usage-monitor-commit-push`, trailer `Co-Authored-By: Claude Opus 5.5` |
 
 ### ▶ Atividade corrente
-A05 — dica nas barras horárias e legenda com amostras.
+A06 — analytics por turno do Codex.
 
 ### ⏭ Próxima atividade
-A06 — analytics por turno do Codex.
+A07 — grade 2×2 nas duas fontes.
 
 - A alteração pré-existente em `server/package-lock.json` fica fora desta entrega.
 
@@ -109,6 +109,7 @@ Commit e push só com autorização.
 | A02 | `fix(history): label the axis middle by time, not by point index` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest"` → 32 testes, 0 falhas (1 novo: polling 5 min + 60 s, centro 08:55 BRT); `--tests "com.usagemonitor.ui.History*"` → 20 testes, 0 falhas |
 | A03 | `feat(history): compute the hourly distribution per quota window` | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.QuotaWindowAnalysisTest" --tests "com.usagemonitor.data.*History*" --tests "com.usagemonitor.architecture.*"` → 17 + 39 + 8 testes, 0 falhas (2 novos: soma das janelas = distribuição do intervalo, hora a hora; janela sem subida → `null`) |
 | A04 | `feat(history): list quota windows with a per-window detail` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.HistoryWindowAnalysisTest" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.architecture.*"` → 62 testes, 0 falhas (novos: seleção padrão, recorte de pontos, segunda linha da lista, "usada antes da 1ª leitura", itens sem sobreposição, troca do detalhe no clique, menu abaixo de 600dp); `gradlew.bat generateScreenshots -PscreenshotScenario=history-regression -PscreenshotOutputDir=build/issue392-screenshots` → lista e detalhe conferidos em `history-windows-dark-100.png` |
+| A05 | `feat(history): hint hourly bars and key the active band to the view` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.HistoryWindowAnalysisTest" --tests "com.usagemonitor.presentation.ui.components.UsageHistoryLineChartTest" --tests "com.usagemonitor.ui.History*" --tests "com.usagemonitor.presentation.History*" --tests "com.usagemonitor.architecture.*"` → 98 testes, 0 falhas (novos: texto da bolha, hora sob o ponteiro, chave dentro/fora do trecho, hover real na barra 17h); captura `history-regression-anthropic-dark-1030-640-125.png`: chave com amostra e eixo 12:00 · 23:30 · 11:00 |
 
 ## Problemas em aberto e riscos
 
@@ -127,3 +128,4 @@ Commit e push só com autorização.
 - **A04:** documentação de tela (protótipo, kit `History.jsx`, `presentation.md`, tabela de rodadas da skill) sai da A08 e entra no commit de cada atividade de tela, como manda o `CLAUDE.md` ("no mesmo commit da mudança"). A08 fica só com o que sobrar.
 - **A04:** sem divisória vertical entre lista e detalhe — `IntrinsicSize.Min` falha com o `BoxWithConstraints` de `HistoryMetricTable`.
 - **A04:** "usada antes da 1ª leitura" vale também no PDF (`activeSpanLabel` ganhou o idioma).
+- **A05:** a primeira versão da bolha abria por cima das barras e travou o teste de hover por mais de 10 min (laço `Enter`/`Exit` com o `Surface`; pilha do worker parada em `HistoryLayoutRegressionTest.kt:68`). Corrigido com a bolha acima das barras.
