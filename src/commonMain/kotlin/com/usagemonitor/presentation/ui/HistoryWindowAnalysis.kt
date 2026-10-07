@@ -1,209 +1,44 @@
 package com.usagemonitor.presentation.ui
 
 import kotlinx.datetime.toLocalDateTime
-
 import kotlinx.datetime.TimeZone
-
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaHourlyDistribution
 import com.usagemonitor.domain.entity.QuotaWindowSummary
+import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
-import com.usagemonitor.presentation.ui.components.AppCellValue
-import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
-import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
-import com.usagemonitor.presentation.ui.components.AppDataRow
-import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
-import com.usagemonitor.presentation.ui.components.AppSectionHeader
-import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlin.math.roundToLong
 import kotlin.time.Instant
+import com.usagemonitor.presentation.ui.components.HistoryActiveSpanKey
 
 /** Janelas listadas por painel; as mais antigas ficam só no resumo agregado. */
 internal const val HISTORY_WINDOW_ROW_LIMIT = 8
 
-private val HOURLY_CHART_HEIGHT = 56.dp
+/**
+ * A janela que o detalhe abre (#392, direção S9): a aberta, e sem ela a mais
+ * nova. `null` sem janela no intervalo.
+ */
+internal fun defaultSelectedWindow(windows: List<QuotaWindowSummary>): QuotaWindowSummary? {
+    return windows.lastOrNull { window -> window.isOpen } ?: windows.lastOrNull()
+}
 
 /**
- * A análise por janela de uma série (issue #320): a tabela das janelas do
- * intervalo e o consumo por hora do dia.
- *
- * Nada aparece quando a série não tem janela — saldo, cota reportada, cota sem
- * reinício conhecido. Um painel vazio dizendo "sem janelas" seria cromo.
+ * Os pontos da série que caem dentro de [window], para a curva do detalhe. Só
+ * desenho: no intervalo "Total" eles herdam a reamostragem do gráfico principal,
+ * e por isso nenhum número do detalhe sai daqui — sai de [QuotaWindowSummary].
  */
-@Composable
-internal fun HistoryWindowAnalysisPanel(
-    series: UsageHistorySeries,
-    accentColor: Color,
-    language: AppLanguage
-) {
-    val distribution = series.hourlyDistribution
-    if (series.windows.isEmpty() && distribution == null) {
-        return
-    }
-
-    val window = quotaWindowLabel(series, language)
-    AppDataSurfaceFlush(
-        header = {
-            AppSectionHeader(
-                title = if (language == AppLanguage.PT) "Janelas $window" else "$window windows",
-                subtitle = windowCountSubtitle(series.windows.size, language)
-            )
-        }
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = AppSpacing.sm),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-        ) {
-            if (series.windows.isNotEmpty()) {
-                HistoryWindowTable(windows = series.windows, language = language)
-            }
-            if (distribution != null) {
-                HistoryHourlyDistribution(
-                    distribution = distribution,
-                    color = accentColor,
-                    language = language
-                )
-            }
-        }
-    }
+internal fun pointsOfWindow(points: List<UsageHistoryPoint>, window: QuotaWindowSummary): List<UsageHistoryPoint> {
+    return points.filter { point -> point.capturedAt >= window.firstObservedAt && point.capturedAt <= window.lastObservedAt }
 }
 
-@Composable
-private fun HistoryWindowTable(windows: List<QuotaWindowSummary>, language: AppLanguage) {
-    val pt = language == AppLanguage.PT
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth < 600.dp) {
-            val newestFirst = windowRowsNewestFirst(windows)
-            Column {
-                newestFirst.forEachIndexed { index, window ->
-                    AppDataRow(showDivider = index != newestFirst.lastIndex) {
-                        Column(Modifier.fillMaxWidth()) {
-                            HistoryMetricTable(listOf(
-                                HistoryMetricEntry(if (pt) "Início observado" else "First reading", windowStartLabel(window, language)),
-                                HistoryMetricEntry(if (pt) "Ativa" else "Active", activeSpanLabel(window)),
-                                HistoryMetricEntry(if (pt) "Pico" else "Peak", "${window.peakPercent} %"),
-                                HistoryMetricEntry(if (pt) "Esgotou em" else "Exhausted after", exhaustionLabel(window)),
-                                HistoryMetricEntry(if (pt) "Ritmo" else "Pace", paceLabel(window.averagePercentPerHour))
-                            ))
-                        }
-                    }
-                }
-            }
-        } else Column { HistoryWideWindowTable(windows, language) }
+/** Segunda linha do item da lista: pico e, quando esgotou, em quanto tempo. */
+internal fun windowListDetail(window: QuotaWindowSummary, language: AppLanguage): String {
+    val peak = if (language == AppLanguage.PT) "pico ${window.peakPercent} %" else "peak ${window.peakPercent} %"
+    if (window.exhaustedAt == null) {
+        return peak
     }
-}
-
-@Composable
-private fun HistoryWideWindowTable(windows: List<QuotaWindowSummary>, language: AppLanguage) {
-    val pt = language == AppLanguage.PT
-    AppColumnHeaderRow(startGutter = 0.dp) {
-        AppColumnHeaderLabel(if (pt) "Início observado" else "First reading", Modifier.weight(1.4f))
-        AppColumnHeaderLabel(if (pt) "Ativa" else "Active", Modifier.weight(1.5f))
-        AppColumnHeaderLabel(if (pt) "Pico" else "Peak", Modifier.weight(0.7f))
-        AppColumnHeaderLabel(if (pt) "Esgotou em" else "Exhausted after", Modifier.weight(1f))
-        AppColumnHeaderLabel(if (pt) "Ritmo" else "Pace", Modifier.weight(0.8f))
-    }
-    val newestFirst = windowRowsNewestFirst(windows)
-    newestFirst.forEachIndexed { index, window ->
-        AppDataRow(showDivider = index != newestFirst.lastIndex) {
-            AppCellValue(windowStartLabel(window, language), Modifier.weight(1.4f))
-            AppCellValue(activeSpanLabel(window), Modifier.weight(1.5f))
-            AppCellValue("${window.peakPercent} %", Modifier.weight(0.7f))
-            AppCellValue(exhaustionLabel(window), Modifier.weight(1f))
-            AppCellValue(paceLabel(window.averagePercentPerHour), Modifier.weight(0.8f))
-        }
-    }
-}
-
-@Composable
-private fun HistoryHourlyDistribution(
-    distribution: QuotaHourlyDistribution,
-    color: Color,
-    language: AppLanguage
-) {
-    val summary = hourlyPeakLabel(distribution, language)
-    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val trackColor = MaterialTheme.colorScheme.outlineVariant
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = AppSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
-    ) {
-        Text(
-            text = if (language == AppLanguage.PT) "Consumo por hora do dia (BRT)" else "Usage by hour of day (BRT)",
-            style = MaterialTheme.typography.labelSmall,
-            color = axisColor
-        )
-        // As barras não carregam número: a frase abaixo delas é o que diz a hora
-        // de pico, e é ela que o leitor de tela recebe.
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(HOURLY_CHART_HEIGHT)
-                .semantics { contentDescription = summary }
-        ) {
-            val values = distribution.percentByHour
-            val max = values.maxOrNull()?.takeIf { it > 0.0 } ?: 1.0
-            val slot = size.width / values.size
-            val barWidth = slot * 0.7f
-            values.forEachIndexed { hour, value ->
-                val left = hour * slot + (slot - barWidth) / 2f
-                drawRoundRect(
-                    color = trackColor,
-                    topLeft = Offset(left, size.height - 1.dp.toPx()),
-                    size = Size(barWidth, 1.dp.toPx())
-                )
-                val barHeight = (value / max).toFloat() * size.height
-                if (barHeight > 0f) {
-                    drawRoundRect(
-                        color = color,
-                        topLeft = Offset(left, size.height - barHeight),
-                        size = Size(barWidth, barHeight),
-                        cornerRadius = CornerRadius(2.dp.toPx())
-                    )
-                }
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("0h", "6h", "12h", "18h", "23h").forEachIndexed { index, label ->
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = axisColor,
-                    modifier = Modifier.weight(1f),
-                    textAlign = when (index) {
-                        0 -> TextAlign.Start
-                        4 -> TextAlign.End
-                        else -> TextAlign.Center
-                    }
-                )
-            }
-        }
-        Text(
-            text = summary,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
+    val exhausted = exhaustionLabel(window)
+    return if (language == AppLanguage.PT) "$peak · esgotou em $exhausted" else "$peak · exhausted after $exhausted"
 }
 
 /** As janelas mais recentes primeiro, até [HISTORY_WINDOW_ROW_LIMIT]. */
@@ -229,9 +64,14 @@ internal fun windowCountSubtitle(count: Int, language: AppLanguage): String {
  * Faixa ativa da janela (#382): "08:12 → 11:40 · 3h 28min". Os horários são do
  * dia da própria janela; a data já está na coluna de início. "—" sem subida.
  */
-internal fun activeSpanLabel(window: QuotaWindowSummary): String {
+internal fun activeSpanLabel(window: QuotaWindowSummary, language: AppLanguage): String {
     val from = window.activeFrom ?: return "—"
     val until = window.activeUntil ?: return "—"
+    // Faixa de um ponto só: a janela chegou usada e não subiu depois (#392). Um
+    // "21:02 → 21:02 · 0min" se lia como janela ativa por zero minutos.
+    if (from == until) {
+        return if (language == AppLanguage.PT) "usada antes da 1ª leitura" else "used before the first reading"
+    }
     return "${formatClock(from)} → ${formatClock(until)} · ${formatElapsed(from, until)}"
 }
 
@@ -288,18 +128,24 @@ private fun formatElapsed(from: Instant, to: Instant): String {
 }
 
 /**
- * Legenda sob o gráfico (#382, direção N6): a faixa ativa da janela corrente e
- * o que a faixa clara significa. `null` sem janela aberta com uso.
+ * Chave da faixa ativa sob o gráfico (#382, direção N6; #392). A frase escolhida
+ * depende do trecho visível: com zoom fora da janela aberta, ela diz isso em vez
+ * de descrever uma faixa que não está na tela.
  */
-internal fun currentActiveSpanCaption(series: UsageHistorySeries, language: AppLanguage): String? {
-    val window = series.windows.lastOrNull { candidate -> candidate.isOpen } ?: return null
-    if (window.activeFrom == null) {
-        return null
+internal fun historyActiveSpanKey(series: UsageHistorySeries, language: AppLanguage): HistoryActiveSpanKey {
+    val pt = language == AppLanguage.PT
+    val band = if (pt) "Faixa clara: trecho em que o uso subiu; o resto ficou ocioso." else "Light band: where usage rose; the rest was idle."
+    val window = series.windows.lastOrNull { candidate -> candidate.isOpen }
+    val from = window?.activeFrom
+    val until = window?.activeUntil
+    if (window == null || from == null || until == null) {
+        return HistoryActiveSpanKey(currentSpan = null, insideText = band, outsideText = band, genericText = band)
     }
-    val span = activeSpanLabel(window)
-    return if (language == AppLanguage.PT) {
-        "Janela atual ativa $span. A faixa clara marca o trecho em que o uso subiu; o resto ficou ocioso."
-    } else {
-        "Current window active $span. The light band marks where usage rose; the rest was idle."
-    }
+    val span = activeSpanLabel(window, language)
+    return HistoryActiveSpanKey(
+        currentSpan = from..until,
+        insideText = if (pt) "$band Janela atual ativa $span." else "$band Current window active $span.",
+        outsideText = if (pt) "$band A janela atual ($span) está fora do trecho ampliado; \"Ver tudo\" volta a mostrá-la." else "$band The current window ($span) is outside the zoomed range; \"View all\" shows it again.",
+        genericText = band
+    )
 }

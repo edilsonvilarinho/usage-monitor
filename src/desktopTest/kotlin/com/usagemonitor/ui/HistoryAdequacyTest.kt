@@ -22,7 +22,7 @@ class HistoryAdequacyTest {
         try {
             setContent { ScreenTestTheme(isDark = true) { HistoryScreen(vm, AppLanguage.PT, {}, showSourceSelector = false) } }
             waitUntil(timeoutMillis = 5000) { vm.uiState.value is HistoryUiState.Success }
-            onNodeWithText("▸ Janelas e distribuição horária").performScrollTo().performClick()
+            onNodeWithText("▾ Janelas e distribuição horária").performScrollTo()
             val window = (vm.uiState.value as HistoryUiState.Success).report.series.first().windows.last()
             val value = onNodeWithText(windowStartLabel(window, AppLanguage.PT)).performScrollTo().assertIsDisplayed()
             val layouts = mutableListOf<TextLayoutResult>()

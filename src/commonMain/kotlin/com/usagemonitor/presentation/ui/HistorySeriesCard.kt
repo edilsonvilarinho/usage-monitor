@@ -29,7 +29,8 @@ internal fun HistorySeriesCard(
     monthlySummary: UsageHistorySeries? = null
 ) {
     var metricsExpanded by remember(chartSelectionKey) { mutableStateOf(true) }
-    var analysisExpanded by remember(chartSelectionKey) { mutableStateOf(false) }
+    // Nasce aberta (#392): a lista de janelas e o detalhe são a resposta da issue.
+    var analysisExpanded by remember(chartSelectionKey) { mutableStateOf(true) }
     val title = titleOverride ?: historySeriesDisplayTitle(source, series, language)
     val subtitle = subtitleOverride ?: historySeriesDisplaySubtitle(source, series, language)
     val chartSeries = if (quotaView == HistoryQuotaView.WEEKLY && weeklySummary != null) weeklySummary else series
@@ -53,16 +54,9 @@ internal fun HistorySeriesCard(
                         monthlySummary = monthlySummary.takeIf { quotaView == HistoryQuotaView.BOTH && weeklySummary != null },
                         monthlyColor = AppAccents.current.savings
                     ),
-                    showActiveSpans = chartSeries.windows.isNotEmpty()
+                    showActiveSpans = chartSeries.windows.isNotEmpty(),
+                    activeSpanKey = historyActiveSpanKey(chartSeries, language)
                 )
-                currentActiveSpanCaption(chartSeries, language)?.let { caption ->
-                    Text(
-                        text = caption,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = AppSpacing.xs)
-                    )
-                }
             }
         }
         HistoryDetailsSection(

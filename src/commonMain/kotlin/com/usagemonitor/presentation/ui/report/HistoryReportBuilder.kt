@@ -81,7 +81,7 @@ private fun addWindowSections(sections: MutableList<UsageReportSection>, series:
     if (series.windows.isNotEmpty()) sections += UsageReportSection.Table(
         heading = "${if (pt) "Janelas" else "Windows"} · ${series.quotaLabel}",
         columns = listOf(UsageReportColumn(if (pt) "Início observado" else "First observed", 2f), UsageReportColumn(if (pt) "Ativa" else "Active", 2f), UsageReportColumn(if (pt) "Pico" else "Peak", alignEnd = true), UsageReportColumn(if (pt) "Esgotou em" else "Exhausted after", alignEnd = true), UsageReportColumn(if (pt) "Ritmo" else "Pace", alignEnd = true)),
-        rows = series.windows.asReversed().map { listOf(windowStartLabel(it, language), activeSpanLabel(it), "${it.peakPercent} %", exhaustionLabel(it), paceLabel(it.averagePercentPerHour)) }
+        rows = series.windows.asReversed().map { listOf(windowStartLabel(it, language), activeSpanLabel(it, language), "${it.peakPercent} %", exhaustionLabel(it), paceLabel(it.averagePercentPerHour)) }
     )
     val distribution = series.hourlyDistribution ?: return
     sections += UsageReportSection.Table(

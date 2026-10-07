@@ -275,11 +275,16 @@ internal fun buildTimeReferenceLabels(points: List<UsageHistoryPoint>): List<Str
         return emptyList()
     }
 
-    val middlePoint = points[points.lastIndex / 2]
+    // O eixo X é por tempo (buildTimelineFractions): o rótulo do centro é o
+    // instante do meio, não o ponto do meio da lista. Com polling de 60 s numa
+    // parte do intervalo e de 5 min na outra, o ponto do meio cai longe do centro.
+    val start = points.first().capturedAt
+    val end = points.last().capturedAt
+    val middle = Instant.fromEpochMilliseconds((start.toEpochMilliseconds() + end.toEpochMilliseconds()) / 2)
     return listOf(
-        formatTimeReference(points.first().capturedAt, points.first().capturedAt, points.last().capturedAt),
-        formatTimeReference(middlePoint.capturedAt, points.first().capturedAt, points.last().capturedAt),
-        formatTimeReference(points.last().capturedAt, points.first().capturedAt, points.last().capturedAt)
+        formatTimeReference(start, start, end),
+        formatTimeReference(middle, start, end),
+        formatTimeReference(end, start, end)
     )
 }
 

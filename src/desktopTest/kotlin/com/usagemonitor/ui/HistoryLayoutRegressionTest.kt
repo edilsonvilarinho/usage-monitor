@@ -10,21 +10,63 @@ import com.usagemonitor.presentation.ui.*
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.screenshots.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class HistoryLayoutRegressionTest {
     @Test
-    fun `eight wide table rows occupy distinct vertical positions`() = runDesktopComposeUiTest(width = 1030, height = 640) {
+    fun `eight window list items occupy distinct vertical positions`() = runDesktopComposeUiTest(width = 1030, height = 900) {
         val series = issue383ManyWindowsSeries()
         setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
-        val header = onNodeWithText("Início observado").fetchSemanticsNode().boundsInRoot
         val rows = windowRowsNewestFirst(series.windows).map { window ->
-            onNodeWithText(windowStartLabel(window, AppLanguage.PT)).fetchSemanticsNode().boundsInRoot
+            onNodeWithTag(historyWindowItemTag(window)).fetchSemanticsNode().boundsInRoot
         }
-        assertTrue(header.bottom <= rows.first().top, "Cabeçalho sobreposto à primeira linha")
+        assertEquals(HISTORY_WINDOW_ROW_LIMIT, rows.size)
         rows.zipWithNext().forEach { (previous, next) -> assertTrue(previous.bottom <= next.top, "Linhas sobrepostas: $previous e $next") }
+    }
+
+    @Test
+    fun `window list opens the current window and switches the detail on click`() = runDesktopComposeUiTest(width = 1030, height = 900) {
+        val series = issue383ManyWindowsSeries()
+        val newestFirst = windowRowsNewestFirst(series.windows)
+        setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(historyWindowItemTag(newestFirst.first())).assertIsSelected()
+        onNodeWithTag(HISTORY_WINDOW_DETAIL_TAG).onChildren().filterToOne(hasText(windowStartLabel(newestFirst.first(), AppLanguage.PT))).assertExists()
+
+        onNodeWithTag(historyWindowItemTag(newestFirst[2])).performClick()
+
+        onNodeWithTag(historyWindowItemTag(newestFirst[2])).assertIsSelected()
+        onNodeWithTag(historyWindowItemTag(newestFirst.first())).assertIsNotSelected()
+        onNodeWithTag(HISTORY_WINDOW_DETAIL_TAG).onChildren().filterToOne(hasText(windowStartLabel(newestFirst[2], AppLanguage.PT))).assertExists()
+    }
+
+    @Test
+    fun `narrow window panel turns the list into a menu`() = runDesktopComposeUiTest(width = 360, height = 900) {
+        val series = issue383ManyWindowsSeries()
+        val newestFirst = windowRowsNewestFirst(series.windows)
+        setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(historyWindowItemTag(newestFirst[1])).assertDoesNotExist()
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).performClick()
+        onNodeWithTag(historyWindowItemTag(newestFirst[1])).performClick()
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).assertContentDescriptionEquals("Janela: ${windowStartLabel(newestFirst[1], AppLanguage.PT)}")
+    }
+
+    @Test
+    fun `hovering an hourly bar names the hour and its share`() = runDesktopComposeUiTest(width = 1030, height = 900) {
+        val hours = com.usagemonitor.domain.entity.QuotaHourlyDistribution(List(24) { hour -> when (hour) { 16 -> 31.0; 17 -> 53.0; 19 -> 16.0; else -> 0.0 } })
+        val base = issue383ManyWindowsSeries()
+        val series = base.copy(windows = base.windows.map { it.copy(hourlyDistribution = hours) })
+        setContent { ScreenTestTheme(isDark = true) { HistoryWindowAnalysisPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(HISTORY_HOURLY_TOOLTIP_TAG).assertDoesNotExist()
+
+        val chart = onNodeWithTag(HISTORY_HOURLY_CHART_TAG)
+        val width = chart.fetchSemanticsNode().size.width.toFloat()
+        chart.performMouseInput { moveTo(androidx.compose.ui.geometry.Offset(width * 17.5f / 24f, 20f)) }
+
+        onNodeWithTag(HISTORY_HOURLY_TOOLTIP_TAG).assertExists()
+        onNodeWithText("17h–18h BRT · 53% do consumo").assertExists()
     }
 
     @Test

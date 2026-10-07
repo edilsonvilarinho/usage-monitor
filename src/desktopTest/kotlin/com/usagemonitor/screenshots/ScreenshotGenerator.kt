@@ -135,6 +135,7 @@ fun main(args: Array<String>) {
     generator.cliSessions()
     generator.cliBreakdown()
     generator.cliSessionDetail()
+    generator.codexSessionDetail()
     generator.teamUsage()
     generator.teamTrend()
     generator.presence(isDark = true)
@@ -486,6 +487,11 @@ private class ScreenshotGenerator(private val outputDir: File) {
             onOpenSession = {},
             onCloseDetail = {}
         )
+    }
+
+    // #393 (T3): grade 2×2 e tabela de respostas do Codex.
+    fun codexSessionDetail() = capture("codex-session-detail", widthDp = 1_060, heightDp = 980) {
+        com.usagemonitor.presentation.ui.CodexCliSessionDetailPane(codexDetailFixture(), AppLanguage.PT, {})
     }
 
     fun teamTrend() = capture("team-trend", widthDp = 960, heightDp = 560) {

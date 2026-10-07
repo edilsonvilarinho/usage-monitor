@@ -37,7 +37,13 @@ data class QuotaWindowSummary(
      * com sessão CLI, 5 min sem. `null` nos dois quando o uso não subiu na janela.
      */
     val activeFrom: Instant? = null,
-    val activeUntil: Instant? = null
+    val activeUntil: Instant? = null,
+    /**
+     * Consumo por hora do dia **só desta janela** (#392), dos pontos crus — no
+     * intervalo "Total" os pontos que o gráfico recebe são reamostrados e a soma
+     * por hora sairia errada se viesse deles. `null` quando o uso não subiu.
+     */
+    val hourlyDistribution: QuotaHourlyDistribution? = null
 )
 
 /**
@@ -116,7 +122,8 @@ fun splitIntoQuotaWindows(points: List<UsageHistoryPoint>, unit: UsageUnit): Lis
 fun quotaWindowsOf(
     points: List<UsageHistoryPoint>,
     unit: UsageUnit,
-    periodType: PeriodType
+    periodType: PeriodType,
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
 ): List<QuotaWindowSummary> {
     if (!hasQuotaWindows(points, unit, periodType)) {
         return emptyList()
@@ -142,7 +149,8 @@ fun quotaWindowsOf(
             averagePercentPerHour = if (hours > 0.0) consumed / hours else null,
             isOpen = index == windows.lastIndex && last.periodEndAt > lastCapturedAt,
             activeFrom = activeSpan?.let { span -> window[span.first].capturedAt },
-            activeUntil = activeSpan?.let { span -> window[span.last].capturedAt }
+            activeUntil = activeSpan?.let { span -> window[span.last].capturedAt },
+            hourlyDistribution = hourlyConsumptionOf(window, timeZone).toDistributionOrNull()
         )
     }
 }
@@ -219,18 +227,32 @@ fun quotaHourlyDistributionOf(
 
     val byHour = DoubleArray(HOURS_PER_DAY)
     splitIntoQuotaWindows(windowedPoints(points), unit).forEach { window ->
-        for (index in 1 until window.size) {
-            val diff = window[index].displayUsed - window[index - 1].displayUsed
-            if (diff > 0L) {
-                val hour = window[index].capturedAt.toLocalDateTime(timeZone).hour
-                byHour[hour] += diff.toDouble() / percentBase(window[index])
-            }
+        val windowHours = hourlyConsumptionOf(window, timeZone)
+        for (hour in 0 until HOURS_PER_DAY) {
+            byHour[hour] += windowHours[hour]
         }
     }
-    if (byHour.all { value -> value <= 0.0 }) {
+    return byHour.toDistributionOrNull()
+}
+
+/** Subidas de uma janela somadas na hora local da leitura mais nova; o reinício não entra. */
+private fun hourlyConsumptionOf(window: List<UsageHistoryPoint>, timeZone: TimeZone): DoubleArray {
+    val byHour = DoubleArray(HOURS_PER_DAY)
+    for (index in 1 until window.size) {
+        val diff = window[index].displayUsed - window[index - 1].displayUsed
+        if (diff > 0L) {
+            val hour = window[index].capturedAt.toLocalDateTime(timeZone).hour
+            byHour[hour] += diff.toDouble() / percentBase(window[index])
+        }
+    }
+    return byHour
+}
+
+private fun DoubleArray.toDistributionOrNull(): QuotaHourlyDistribution? {
+    if (all { value -> value <= 0.0 }) {
         return null
     }
-    return QuotaHourlyDistribution(byHour.toList())
+    return QuotaHourlyDistribution(toList())
 }
 
 private fun hasQuotaWindows(points: List<UsageHistoryPoint>, unit: UsageUnit, periodType: PeriodType): Boolean {

@@ -21,7 +21,7 @@ enum class BinMode {
  * Sem isso, 251 turnos em ~900 px viram barras de 1 px — ilegíveis. Séries
  * menores que o alvo passam intactas: nunca se interpola nem se inventa ponto.
  */
-fun binSeries(values: List<Long>, targetBins: Int, mode: BinMode): List<Long> {
+fun binSeries(values: List<Long?>, targetBins: Int, mode: BinMode): List<Long?> {
     if (targetBins <= 0) {
         return emptyList()
     }
@@ -31,11 +31,18 @@ fun binSeries(values: List<Long>, targetBins: Int, mode: BinMode): List<Long> {
 
     val binSize = ceil(values.size.toDouble() / targetBins.toDouble()).toInt().coerceAtLeast(1)
 
+    // `null` é "não medido": um bin só de nulos continua nulo, e um bin misto
+    // condensa só o que foi medido — nunca vira zero.
     return values.chunked(binSize) { chunk ->
-        when (mode) {
-            BinMode.SUM -> chunk.sum()
-            BinMode.LAST -> chunk.last()
-            BinMode.MAX -> chunk.max()
+        val measured = chunk.filterNotNull()
+        if (measured.isEmpty()) {
+            null
+        } else {
+            when (mode) {
+                BinMode.SUM -> measured.sum()
+                BinMode.LAST -> measured.last()
+                BinMode.MAX -> measured.max()
+            }
         }
     }
 }
@@ -69,9 +76,13 @@ fun scaleCeiling(values: List<Long>, percentile: Double = 0.99): Long {
  * transcript inteiro a cada turno, então a curva dele era monotônica e essas
  * quedas eram invisíveis — é a informação mais útil do gráfico.
  */
-fun dropIndices(values: List<Long>): List<Int> {
+fun dropIndices(values: List<Long?>): List<Int> {
     if (values.size < 2) {
         return emptyList()
     }
-    return (1 until values.size).filter { index -> values[index] < values[index - 1] }
+    return (1 until values.size).filter { index ->
+        val current = values[index]
+        val previous = values[index - 1]
+        current != null && previous != null && current < previous
+    }
 }

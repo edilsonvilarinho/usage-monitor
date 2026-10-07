@@ -101,7 +101,9 @@ internal fun UsageHistoryLineChart(
      */
     overlays: List<HistoryChartOverlay> = emptyList(),
     /** Faixa ativa de cada janela (#382); só cota com janela — saldo não tem. */
-    showActiveSpans: Boolean = false
+    showActiveSpans: Boolean = false,
+    /** Chave da faixa ativa sob o gráfico (#392); `null` não desenha chave. */
+    activeSpanKey: HistoryActiveSpanKey? = null
 ) {
     val lineColor = accentColor
     val fillColor = accentColor.copy(alpha = 0.12f)
@@ -341,20 +343,15 @@ internal fun UsageHistoryLineChart(
             )
         }
 
-        // A cor não basta para dizer "isto é o período anterior" — o
-        // traçado sozinho não carrega a legenda, e por escrito é a mesma
-        // regra que já vale para todo estado deste sistema.
-        if (previousPlotPoints.size > 1) {
-            Text(
-                text = if (language == AppLanguage.PT) {
-                    "Tracejado: mesmo ponto do período anterior"
-                } else {
-                    "Dashed: same point last period"
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = axisTextColor
-            )
-        }
+        HistoryChartFooter(
+            showPreviousNote = previousPlotPoints.size > 1,
+            activeSpanKeyText = activeSpanKey
+                ?.takeIf { showActiveSpans && windowedPoints.isNotEmpty() }
+                ?.let { key -> activeSpanKeyText(key, windowedPoints.first().capturedAt, windowedPoints.last().capturedAt) },
+            lineColor = lineColor,
+            textColor = axisTextColor,
+            language = language
+        )
     }
 }
 

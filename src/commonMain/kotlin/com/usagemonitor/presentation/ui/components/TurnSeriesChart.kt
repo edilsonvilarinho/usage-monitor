@@ -60,10 +60,13 @@ private const val BAR_GAP_FRACTION = 0.28f
 private const val PIXELS_PER_POINT = 6f
 private const val MARKER_RADIUS_PX = 3.5f
 
-/** Uma série de valores por turno. Genérica: o gráfico não conhece o domínio. */
+/**
+ * Uma série de valores por turno. Genérica: o gráfico não conhece o domínio.
+ * `null` é turno não medido: a linha quebra ali e a bolha mostra "—".
+ */
 data class TurnSeries(
     val label: String,
-    val values: List<Long>,
+    val values: List<Long?>,
     val color: Color,
     val binMode: BinMode = BinMode.LAST
 )
@@ -254,7 +257,7 @@ private fun ChartTooltip(
                             color = entry.color
                         )
                         Text(
-                            text = valueFormatter(entry.values.getOrElse(index) { 0L }),
+                            text = entry.values.getOrNull(index)?.let(valueFormatter) ?: "—",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium
                         )
@@ -303,12 +306,12 @@ private fun TurnSeriesLegend(series: List<TurnSeries>, showDropHint: Boolean) {
 
 private fun ceilingFor(series: List<TurnSeries>, stacked: Boolean): Long {
     if (!stacked) {
-        return scaleCeiling(series.flatMap { entry -> entry.values })
+        return scaleCeiling(series.flatMap { entry -> entry.values.filterNotNull() })
     }
 
     val length = series.maxOf { entry -> entry.values.size }
     val totals = (0 until length).map { index ->
-        series.sumOf { entry -> entry.values.getOrElse(index) { 0L } }
+        series.sumOf { entry -> entry.values.getOrNull(index) ?: 0L }
     }
     return scaleCeiling(totals)
 }
@@ -341,50 +344,57 @@ private fun DrawScope.drawGrid(color: Color) {
     )
 }
 
-private fun DrawScope.seriesPath(values: List<Long>, ceiling: Long, closeToBaseline: Boolean): Path? {
+/**
+ * Um traçado por trecho contínuo de valores medidos: o `null` interrompe a
+ * linha em vez de levá-la ao chão, que se leria como zero.
+ */
+private fun DrawScope.seriesPaths(values: List<Long?>, ceiling: Long, closeToBaseline: Boolean): List<Path> {
     if (values.isEmpty()) {
-        return null
+        return emptyList()
     }
-
-    val path = Path()
     val stepX = if (values.size == 1) 0f else size.width / (values.size - 1).toFloat()
+    fun xAt(index: Int) = if (values.size == 1) size.width / 2f else stepX * index
+
+    val runs = mutableListOf<List<Int>>()
+    var current = mutableListOf<Int>()
     values.forEachIndexed { index, value ->
-        val x = if (values.size == 1) size.width / 2f else stepX * index
-        val y = size.height - heightFor(value, ceiling)
-        if (index == 0) {
-            path.moveTo(x, y)
+        if (value == null) {
+            if (current.isNotEmpty()) runs += current
+            current = mutableListOf()
         } else {
-            path.lineTo(x, y)
+            current += index
         }
     }
+    if (current.isNotEmpty()) runs += current
 
-    if (closeToBaseline) {
-        val lastX = if (values.size == 1) size.width / 2f else size.width
-        path.lineTo(lastX, size.height)
-        path.lineTo(if (values.size == 1) size.width / 2f else 0f, size.height)
-        path.close()
+    return runs.map { run ->
+        val path = Path()
+        run.forEachIndexed { position, index ->
+            val y = size.height - heightFor(values[index] ?: 0L, ceiling)
+            if (position == 0) path.moveTo(xAt(index), y) else path.lineTo(xAt(index), y)
+        }
+        if (closeToBaseline) {
+            path.lineTo(xAt(run.last()), size.height)
+            path.lineTo(xAt(run.first()), size.height)
+            path.close()
+        }
+        path
     }
-    return path
 }
 
 private fun DrawScope.drawSeriesArea(series: TurnSeries, ceiling: Long) {
-    val path = seriesPath(series.values, ceiling, closeToBaseline = true) ?: return
     // Preenchimento chapado, não gradiente: o sistema visual não tem degradê em
     // lugar nenhum, e o fade fazia a mesma série parecer mais fraca embaixo — onde
     // o valor é maior, porque a área cresce da linha até a base.
-    drawPath(
-        path = path,
-        color = series.color.copy(alpha = AREA_TOP_ALPHA)
-    )
+    for (path in seriesPaths(series.values, ceiling, closeToBaseline = true)) {
+        drawPath(path = path, color = series.color.copy(alpha = AREA_TOP_ALPHA))
+    }
 }
 
 private fun DrawScope.drawSeriesLine(series: TurnSeries, ceiling: Long) {
-    val path = seriesPath(series.values, ceiling, closeToBaseline = false) ?: return
-    drawPath(
-        path = path,
-        color = series.color,
-        style = Stroke(width = LINE_STROKE_PX, cap = StrokeCap.Round)
-    )
+    for (path in seriesPaths(series.values, ceiling, closeToBaseline = false)) {
+        drawPath(path = path, color = series.color, style = Stroke(width = LINE_STROKE_PX, cap = StrokeCap.Round))
+    }
 }
 
 private fun DrawScope.drawStackedBars(series: List<TurnSeries>, ceiling: Long) {
@@ -403,7 +413,7 @@ private fun DrawScope.drawStackedBars(series: List<TurnSeries>, ceiling: Long) {
     for (index in 0 until length) {
         var bottom = size.height
         for (entry in series) {
-            val value = entry.values.getOrElse(index) { 0L }
+            val value = entry.values.getOrNull(index) ?: 0L
             if (value <= 0L) {
                 continue
             }
@@ -421,7 +431,7 @@ private fun DrawScope.drawStackedBars(series: List<TurnSeries>, ceiling: Long) {
 /** Marca as quedas da série — cada uma é uma compactação do contexto. */
 private fun DrawScope.drawDropMarkers(
     drops: List<Int>,
-    values: List<Long>,
+    values: List<Long?>,
     ceiling: Long,
     color: Color
 ) {
@@ -432,7 +442,7 @@ private fun DrawScope.drawDropMarkers(
     val stepX = size.width / (values.size - 1).toFloat()
     for (index in drops) {
         val x = stepX * index
-        val y = size.height - heightFor(values[index], ceiling)
+        val y = size.height - heightFor(values[index] ?: continue, ceiling)
         drawCircle(color = color, radius = MARKER_RADIUS_PX, center = Offset(x, y))
     }
 }

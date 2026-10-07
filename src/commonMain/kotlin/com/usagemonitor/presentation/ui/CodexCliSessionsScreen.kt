@@ -66,9 +66,7 @@ private val CODEX_SESSION_MODEL_COLUMN = 130.dp
 private val CODEX_SESSION_RESPONSES_COLUMN = 84.dp
 private val CODEX_SESSION_TOKENS_COLUMN = 130.dp
 private val CODEX_SESSION_CACHE_COLUMN = 90.dp
-private val CODEX_TURN_NUMBER_COLUMN = 44.dp
-private val CODEX_TURN_TOKENS_COLUMN = 110.dp
-private val CODEX_METRIC_BLOCK_WIDTH = 168.dp
+internal val CODEX_METRIC_BLOCK_WIDTH = 168.dp
 
 @Composable
 fun CodexCliSessionsScreen(
@@ -233,8 +231,8 @@ private fun CodexCliSessionContent(
         )
     }
     if (state.detail != null) {
-        CodexCliSessionDetailContent(
-            state = state,
+        CodexCliSessionDetailPane(
+            detail = state.detail,
             language = language,
             onCloseDetail = onCloseDetail,
             modifier = modifier
@@ -398,176 +396,11 @@ private fun CodexCliSessionRow(
 }
 
 @OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun CodexCliSessionDetailContent(
-    state: CodexCliSessionsUiState.Success,
-    language: AppLanguage,
-    onCloseDetail: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val detail = state.detail ?: return
-    val summary = detail.summary
-
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
-    ) {
-        AppToolbar(spacing = AppSpacing.sm) {
-            AppButton(
-                label = if (language == AppLanguage.PT) "Voltar" else "Back",
-                onClick = onCloseDetail,
-                tone = AppButtonTone.GHOST
-            )
-            Text(shortCodexId(summary.sessionId), style = MaterialTheme.typography.titleMedium)
-        }
-
-        AppDataSurface(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = 0.dp,
-            verticalArrangement = Arrangement.Top
-        ) {
-            AppSectionHeader(
-                title = summary.projectName ?: if (language == AppLanguage.PT) "Projeto desconhecido" else "Unknown project",
-                subtitle = "${codexApplicationLabel(summary)} · ${summary.source.name.lowercase()}"
-            )
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
-            ) {
-                CodexMetadataValue(
-                    label = if (language == AppLanguage.PT) "Diretório" else "Directory",
-                    value = summary.cwd ?: "—"
-                )
-                CodexMetadataValue(
-                    label = if (language == AppLanguage.PT) "Branch" else "Branch",
-                    value = summary.gitBranch ?: "—"
-                )
-                CodexMetadataValue(
-                    label = if (language == AppLanguage.PT) "Versão CLI" else "CLI version",
-                    value = summary.cliVersion ?: "—"
-                )
-                CodexMetadataValue(
-                    label = if (language == AppLanguage.PT) "Período" else "Period",
-                    value = "${formatInstant(summary.firstTs)} → ${formatInstant(summary.lastTs)}"
-                )
-            }
-        }
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-        ) {
-            AppMetricBlock(
-                label = if (language == AppLanguage.PT) "Respostas" else "Responses",
-                value = summary.responseCount.toString(),
-                modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH)
-            )
-            AppMetricBlock(
-                label = if (language == AppLanguage.PT) "Tokens (com cache)" else "Tokens (cached)",
-                value = formatQuantity(summary.totalTokens),
-                modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH)
-            )
-            AppMetricBlock(
-                label = "Cache",
-                value = codexCachePercent(summary),
-                modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH)
-            )
-            AppMetricBlock(
-                label = if (language == AppLanguage.PT) "Entrada" else "Input",
-                value = formatQuantity(summary.inputTokens),
-                modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH)
-            )
-            AppMetricBlock(
-                label = if (language == AppLanguage.PT) "Saída" else "Output",
-                value = formatQuantity(summary.outputTokens),
-                footer = if (language == AppLanguage.PT) {
-                    "Raciocínio ${formatQuantity(summary.reasoningOutputTokens)}"
-                } else {
-                    "Reasoning ${formatQuantity(summary.reasoningOutputTokens)}"
-                },
-                modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH)
-            )
-        }
-
-        AppDataSurfaceFlush(
-            modifier = Modifier.fillMaxWidth(),
-            header = {
-                Column {
-                    AppSectionHeader(
-                        title = if (language == AppLanguage.PT) "Uso por turno" else "Usage by turn",
-                        subtitle = if (language == AppLanguage.PT) {
-                            "${summary.responseCount} resposta(s) · ${formatQuantity(summary.totalTokens)} tokens"
-                        } else {
-                            "${summary.responseCount} response(s) · ${formatQuantity(summary.totalTokens)} tokens"
-                        },
-                        markerColor = AppAccents.current.codex
-                    )
-                    CodexTurnColumnHeader(language = language)
-                }
-            }
-        ) {
-            detail.turns.forEachIndexed { index, turn ->
-                AppDataRow(showDivider = index != detail.turns.lastIndex) {
-                    AppCellValue(
-                        value = "#${turn.seq + 1}",
-                        modifier = Modifier.width(CODEX_TURN_NUMBER_COLUMN)
-                    )
-                    AppCellValue(
-                        value = turn.model ?: "—",
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    AppCellValue(
-                        value = shortCodexId(turn.responseId, 18),
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    AppCellValue(
-                        value = turn.usage.totalTokens.toString(),
-                        modifier = Modifier.width(CODEX_TURN_TOKENS_COLUMN)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CodexTurnColumnHeader(language: AppLanguage) {
-    AppColumnHeaderRow(
-        startGutter = 0.dp,
-        modifier = Modifier.padding(vertical = AppSpacing.sm)
-    ) {
-        AppColumnHeaderLabel(label = "#", modifier = Modifier.width(CODEX_TURN_NUMBER_COLUMN))
-        AppColumnHeaderLabel(
-            label = if (language == AppLanguage.PT) "Modelo" else "Model",
-            modifier = Modifier.weight(1f)
-        )
-        AppColumnHeaderLabel(
-            label = if (language == AppLanguage.PT) "Resposta" else "Response",
-            modifier = Modifier.weight(1f)
-        )
-        AppColumnHeaderLabel(label = "Tokens", modifier = Modifier.width(CODEX_TURN_TOKENS_COLUMN))
-    }
-}
-
-@Composable
-private fun CodexMetadataValue(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.labelMedium)
-    }
-}
-
-private fun shortCodexId(value: String, maxLength: Int = 8): String {
+internal fun shortCodexId(value: String, maxLength: Int = 8): String {
     return if (value.length <= maxLength) value else "${value.take(maxLength)}…"
 }
 
-private fun codexApplicationLabel(session: CodexCliSessionSummary): String {
+internal fun codexApplicationLabel(session: CodexCliSessionSummary): String {
     return when (session.originator?.trim()?.lowercase()) {
         "codex desktop" -> "Codex Desktop"
         "codex-tui", "codex tui" -> "Codex CLI"
@@ -583,6 +416,6 @@ private fun codexCacheFraction(session: CodexCliSessionSummary): Float {
         .toFloat()
 }
 
-private fun codexCachePercent(session: CodexCliSessionSummary): String {
+internal fun codexCachePercent(session: CodexCliSessionSummary): String {
     return formatPercentageOfTotal(session.cachedInputTokens.toDouble(), session.inputTokens)
 }

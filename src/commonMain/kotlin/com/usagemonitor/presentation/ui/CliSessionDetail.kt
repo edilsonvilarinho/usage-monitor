@@ -200,28 +200,7 @@ internal fun CliSessionDetailSections(
     SessionSummaryRow(summary = summary, analytics = analytics, language = language)
 
     if (missingTurnsNotice == null) {
-        val accents = AppAccents.current
-        DetailSection(
-            title = CliSessionsLabels.contextPerTurnChart(language),
-            accent = accents.cacheRead,
-            // Duas dúvidas de uma vez: o que a curva mede e o que o ▼ marca.
-            help = listOf(GlossaryTerm.CONTEXT_PER_TURN, GlossaryTerm.COMPACTION),
-            language = language
-        ) {
-            TurnSeriesChart(
-                series = listOf(
-                    TurnSeries(
-                        label = CliSessionsLabels.chartContextLegend(language),
-                        values = analytics.contextPerTurn,
-                        color = accents.cacheRead,
-                        binMode = BinMode.LAST
-                    )
-                ),
-                height = DETAIL_CHART_HEIGHT,
-                valueFormatter = { value -> formatQuantity(value) },
-                highlightDrops = true
-            )
-        }
+        ClaudeTurnChartGrid(analytics = analytics, language = language)
 
         AdvancedDisclosure(
             expanded = advancedExpanded,
@@ -280,7 +259,7 @@ internal fun SessionSummaryRow(
             language = language
         )
         MetricCard(
-            label = CliSessionsLabels.cacheHitRate(language),
+            label = CliSessionsLabels.cacheHitRateShort(language),
             value = formatPercent(analytics.cacheHitRate),
             accent = accents.cacheRead,
             help = GlossaryTerm.CACHE_HIT_RATE,
@@ -425,31 +404,6 @@ internal fun SessionAdvancedSections(
         )
     }
 
-    DetailSection(
-        title = CliSessionsLabels.costVersusSavingsChart(language),
-        accent = accents.savings,
-        help = listOf(GlossaryTerm.COST_VERSUS_SAVINGS),
-        language = language
-    ) {
-        TurnSeriesChart(
-            series = listOf(
-                TurnSeries(
-                    label = CliSessionsLabels.chartCostLegend(language),
-                    values = analytics.cumulativeCostMicros,
-                    color = accents.input,
-                    binMode = BinMode.MAX
-                ),
-                TurnSeries(
-                    label = CliSessionsLabels.chartSavingsLegend(language),
-                    values = analytics.cumulativeSavingsMicros,
-                    color = accents.savings,
-                    binMode = BinMode.MAX
-                )
-            ),
-            height = DETAIL_CHART_HEIGHT,
-            valueFormatter = { value -> formatMicrosUsdShort(value) }
-        )
-    }
 }
 
 /**
@@ -553,4 +507,75 @@ internal fun SessionMetadataCard(summary: CliSessionSummary, language: AppLangua
             )
         }
     }
+}
+
+/**
+ * Os quatro gráficos por turno do Claude (#393, direção T3): contexto, cache,
+ * saída e custo acumulado com a economia. Mesma grade do Codex; o quarto
+ * gráfico aqui é custo porque o Claude tem tarifa.
+ */
+@Composable
+private fun ClaudeTurnChartGrid(analytics: CliSessionAnalytics, language: AppLanguage) {
+    val accents = AppAccents.current
+    CliTurnChartGrid(
+        cells = listOf(
+            {
+                DetailSection(
+                    title = CliSessionsLabels.contextPerTurnChart(language),
+                    accent = accents.cacheRead,
+                    // Duas dúvidas de uma vez: o que a curva mede e o que o ▼ marca.
+                    help = listOf(GlossaryTerm.CONTEXT_PER_TURN, GlossaryTerm.COMPACTION),
+                    language = language
+                ) {
+                    TurnSeriesChart(
+                        series = listOf(TurnSeries(CliSessionsLabels.chartContextLegend(language), analytics.contextPerTurn, accents.cacheRead, BinMode.LAST)),
+                        height = TURN_CHART_GRID_HEIGHT,
+                        valueFormatter = { value -> formatQuantity(value) },
+                        highlightDrops = true
+                    )
+                }
+            },
+            {
+                DetailSection(
+                    title = CliSessionsLabels.cacheHitRate(language),
+                    accent = accents.cacheRead,
+                    help = listOf(GlossaryTerm.CACHE_HIT_RATE),
+                    language = language
+                ) {
+                    TurnSeriesChart(
+                        series = listOf(TurnSeries("Cache", fractionsAsBasisPoints(analytics.cacheHitPerTurn), accents.cacheRead, BinMode.LAST)),
+                        height = TURN_CHART_GRID_HEIGHT,
+                        valueFormatter = ::formatBasisPointsPercent
+                    )
+                }
+            },
+            {
+                DetailSection(title = CliSessionsLabels.outputPerTurnChart(language), accent = accents.output, language = language) {
+                    TurnSeriesChart(
+                        series = listOf(TurnSeries(if (language == AppLanguage.PT) "Saída" else "Output", analytics.outputPerTurn, accents.output, BinMode.SUM)),
+                        stacked = true,
+                        height = TURN_CHART_GRID_HEIGHT,
+                        valueFormatter = { value -> formatQuantity(value) }
+                    )
+                }
+            },
+            {
+                DetailSection(
+                    title = CliSessionsLabels.costVersusSavingsChart(language),
+                    accent = accents.savings,
+                    help = listOf(GlossaryTerm.COST_VERSUS_SAVINGS),
+                    language = language
+                ) {
+                    TurnSeriesChart(
+                        series = listOf(
+                            TurnSeries(CliSessionsLabels.chartCostLegend(language), analytics.cumulativeCostMicros, accents.input, BinMode.MAX),
+                            TurnSeries(CliSessionsLabels.chartSavingsLegend(language), analytics.cumulativeSavingsMicros, accents.savings, BinMode.MAX)
+                        ),
+                        height = TURN_CHART_GRID_HEIGHT,
+                        valueFormatter = { value -> formatMicrosUsdShort(value) }
+                    )
+                }
+            }
+        )
+    )
 }

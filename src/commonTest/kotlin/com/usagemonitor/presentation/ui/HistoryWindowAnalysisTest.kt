@@ -67,4 +67,90 @@ class HistoryWindowAnalysisTest {
             hourlyPeakLabel(QuotaHourlyDistribution(byHour), AppLanguage.PT)
         )
     }
+
+    @Test
+    fun `detail opens the open window, else the newest`() {
+        val old = window("2026-09-27T01:00:00Z")
+        val open = window("2026-09-27T06:00:00Z", open = true)
+        val closedNewest = window("2026-09-27T11:00:00Z")
+
+        assertEquals(open, defaultSelectedWindow(listOf(old, open)))
+        assertEquals(closedNewest, defaultSelectedWindow(listOf(old, closedNewest)))
+        assertEquals(null, defaultSelectedWindow(emptyList()))
+    }
+
+    @Test
+    fun `window curve keeps only the readings inside the window`() {
+        fun point(at: String) = com.usagemonitor.domain.entity.UsageHistoryPoint(
+            capturedAt = Instant.parse(at), used = 1, total = 100, rawUsed = 0, rawTotal = 0,
+            periodEndAt = Instant.parse("2026-09-27T12:00:00Z")
+        )
+        val target = window("2026-09-27T06:00:00Z").copy(lastObservedAt = Instant.parse("2026-09-27T08:00:00Z"))
+        val points = listOf(point("2026-09-27T05:59:00Z"), point("2026-09-27T06:00:00Z"), point("2026-09-27T07:00:00Z"),
+            point("2026-09-27T08:00:00Z"), point("2026-09-27T08:01:00Z"))
+
+        assertEquals(
+            listOf("2026-09-27T06:00:00Z", "2026-09-27T07:00:00Z", "2026-09-27T08:00:00Z").map(Instant::parse),
+            pointsOfWindow(points, target).map { it.capturedAt }
+        )
+    }
+
+    @Test
+    fun `window list detail names the peak and the exhaustion only when it happened`() {
+        assertEquals("pico 80 %", windowListDetail(window("2026-09-27T10:00:00Z"), AppLanguage.PT))
+        assertEquals("pico 80 % · esgotou em 2h", windowListDetail(window("2026-09-27T10:00:00Z", "2026-09-27T12:00:00Z"), AppLanguage.PT))
+    }
+
+    @Test
+    fun `window used before the first reading does not read as zero minutes active`() {
+        val at = Instant.parse("2026-10-06T00:02:00Z")
+        val usedBefore = window("2026-10-06T00:02:00Z").copy(activeFrom = at, activeUntil = at)
+        val active = window("2026-10-06T00:02:00Z").copy(activeFrom = at, activeUntil = Instant.parse("2026-10-06T01:00:00Z"))
+
+        assertEquals("usada antes da 1ª leitura", activeSpanLabel(usedBefore, AppLanguage.PT))
+        assertEquals("21:02 → 22:00 · 58min", activeSpanLabel(active, AppLanguage.PT))
+        assertEquals("—", activeSpanLabel(window("2026-10-06T00:02:00Z"), AppLanguage.PT))
+    }
+
+    @Test
+    fun `hourly tooltip names the hour and its share, or says there was no usage`() {
+        val hours = QuotaHourlyDistribution(List(24) { hour -> when (hour) { 16 -> 31.0; 17 -> 53.0; 19 -> 16.0; else -> 0.0 } })
+
+        assertEquals("17h–18h BRT · 53% do consumo", hourlyTooltipLabel(hours, 17, AppLanguage.PT))
+        assertEquals("3h–4h BRT · sem consumo", hourlyTooltipLabel(hours, 3, AppLanguage.PT))
+        assertEquals("17h–18h BRT · 53% of usage", hourlyTooltipLabel(hours, 17, AppLanguage.EN))
+    }
+
+    @Test
+    fun `pointer position maps to the hour slot`() {
+        assertEquals(0, hourAt(0f, 240f))
+        assertEquals(17, hourAt(175f, 240f))
+        assertEquals(23, hourAt(240f, 240f))
+        assertEquals(null, hourAt(-1f, 240f))
+        assertEquals(null, hourAt(10f, 0f))
+    }
+
+    @Test
+    fun `active span key follows the visible range`() {
+        val from = Instant.parse("2026-10-06T19:06:00Z")
+        val until = Instant.parse("2026-10-06T22:29:00Z")
+        val open = window("2026-10-06T19:06:00Z", open = true).copy(activeFrom = from, activeUntil = until)
+        val series = com.usagemonitor.domain.entity.UsageHistorySeries(
+            quotaLabel = "5h", periodType = com.usagemonitor.domain.entity.PeriodType.INTERVAL,
+            unit = com.usagemonitor.domain.entity.UsageUnit.PERCENTAGE, points = emptyList(),
+            currentDisplayUsed = 0, currentDisplayTotal = 100, deltaDisplayUsed = 0,
+            averageDisplayConsumptionPerHour = 0.0, currentPeriodEndAt = until,
+            forecast = com.usagemonitor.domain.entity.UsageForecast.InsufficientData, riskSummary = null,
+            windows = listOf(open)
+        )
+        val key = historyActiveSpanKey(series, AppLanguage.PT)
+
+        val inside = com.usagemonitor.presentation.ui.components.activeSpanKeyText(key, Instant.parse("2026-10-05T23:57:00Z"), Instant.parse("2026-10-06T23:54:00Z"))
+        val outside = com.usagemonitor.presentation.ui.components.activeSpanKeyText(key, Instant.parse("2026-10-02T00:00:00Z"), Instant.parse("2026-10-05T00:00:00Z"))
+
+        assertEquals("Faixa clara: trecho em que o uso subiu; o resto ficou ocioso. Janela atual ativa 16:06 → 19:29 · 3h 23min.", inside)
+        assertEquals("Faixa clara: trecho em que o uso subiu; o resto ficou ocioso. A janela atual (16:06 → 19:29 · 3h 23min) está fora do trecho ampliado; \"Ver tudo\" volta a mostrá-la.", outside)
+        val noOpen = historyActiveSpanKey(series.copy(windows = emptyList()), AppLanguage.PT)
+        assertEquals("Faixa clara: trecho em que o uso subiu; o resto ficou ocioso.", com.usagemonitor.presentation.ui.components.activeSpanKeyText(noOpen, from, until))
+    }
 }
