@@ -30,7 +30,7 @@ class TelegramUnauthorizedException : RuntimeException("Token do bot recusado pe
 
 /**
  * Cliente mínimo da Bot API do Telegram (#387): `getUpdates` em long polling,
- * `sendMessage` e `deleteWebhook`. Só HTTPS de saída — nenhuma porta aberta.
+ * `sendMessage`, `deleteWebhook` e `setMyCommands`. Só HTTPS de saída — nenhuma porta aberta.
  *
  * O token vai no caminho da URL, como a API exige; por isso nenhuma mensagem de
  * erro daqui repete a URL ou o corpo bruto.
@@ -68,10 +68,21 @@ open class TelegramBotApi(
         }
     }
 
-    open suspend fun sendMessage(token: String, chatId: Long, text: String) {
+    /** [html] liga `parse_mode: HTML`: quem chama já escapou o texto variável. */
+    open suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean = false) {
         val response = httpClient.post("$baseUrl/bot$token/sendMessage") {
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(SendMessageDto.serializer(), SendMessageDto(chatId, text)))
+            setBody(json.encodeToString(SendMessageDto.serializer(), SendMessageDto(chatId, text, if (html) PARSE_MODE_HTML else null)))
+        }
+        decode(response, SimpleResponseDto.serializer())
+    }
+
+    /** Lista do botão "Menu" do Telegram: os comandos aparecem sem digitar `/ajuda`. */
+    open suspend fun setMyCommands(token: String, commands: List<Pair<String, String>>) {
+        val body = SetCommandsDto(commands.map { (command, description) -> CommandDto(command, description) })
+        val response = httpClient.post("$baseUrl/bot$token/setMyCommands") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SetCommandsDto.serializer(), body))
         }
         decode(response, SimpleResponseDto.serializer())
     }
@@ -135,10 +146,21 @@ open class TelegramBotApi(
     )
 
     @Serializable
-    private data class SendMessageDto(@SerialName("chat_id") val chatId: Long, val text: String)
+    private data class SendMessageDto(
+        @SerialName("chat_id") val chatId: Long,
+        val text: String,
+        @SerialName("parse_mode") val parseMode: String? = null
+    )
+
+    @Serializable
+    private data class CommandDto(val command: String, val description: String)
+
+    @Serializable
+    private data class SetCommandsDto(val commands: List<CommandDto>)
 
     private companion object {
         const val LONG_POLL_MARGIN_SECONDS = 10
         const val DEFAULT_RETRY_SECONDS = 5L
+        const val PARSE_MODE_HTML = "HTML"
     }
 }

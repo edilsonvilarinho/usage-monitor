@@ -38,8 +38,14 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
         return batch
     }
 
-    override suspend fun sendMessage(token: String, chatId: Long, text: String) {
+    val menus = Collections.synchronizedList(mutableListOf<List<Pair<String, String>>>())
+
+    override suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean) {
         sent += chatId to text
+    }
+
+    override suspend fun setMyCommands(token: String, commands: List<Pair<String, String>>) {
+        menus += commands
     }
 }
 
@@ -93,6 +99,14 @@ class TelegramBotServiceTest {
         api.pending += message(1, chat = 51, text = "/alertas off")
 
         waitUntil { !alertSettings.value.quotaAlertsEnabled }
-        waitUntil { api.sent.any { it.second == "Alertas desligados." } }
+        waitUntil { api.sent.any { it.second == "🔕 Alertas desligados." } }
+    }
+
+    @Test
+    fun `connecting registers the command menu in the app language`() {
+        service.start()
+
+        waitUntil { api.menus.isNotEmpty() }
+        assertEquals(listOf("status", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
     }
 }

@@ -49,6 +49,25 @@ class TelegramBotApiTest {
     }
 
     @Test
+    fun `html message declares the parse mode`() = runTest {
+        var sent: String? = null
+        api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }.sendMessage("123:abc", 51L, "<b>Olá</b>", html = true)
+
+        assertEquals("""{"chat_id":51,"text":"<b>Olá</b>","parse_mode":"HTML"}""", sent)
+    }
+
+    @Test
+    fun `command menu posts every command with its description`() = runTest {
+        var url = ""
+        var sent: String? = null
+        api(HttpStatusCode.OK, """{"ok":true,"result":true}""") { u, body -> url = u; sent = body }
+            .setMyCommands("123:abc", listOf("status" to "Cotas"))
+
+        assertTrue(url.endsWith("/bot123:abc/setMyCommands"))
+        assertEquals("""{"commands":[{"command":"status","description":"Cotas"}]}""", sent)
+    }
+
+    @Test
     fun `rate limit carries retry after and bad token is typed`() = runTest {
         val limited = assertFailsWith<TelegramRateLimitedException> {
             api(HttpStatusCode.TooManyRequests, """{"ok":false,"error_code":429,"parameters":{"retry_after":7}}""")

@@ -104,6 +104,7 @@ internal class TelegramBotService(
                     // Pula o acumulado: o último update vira o ponto de partida.
                     offset = api.getUpdates(settings.botToken, offset = -1, timeoutSeconds = 0).lastOrNull()?.updateId?.plus(1)
                     activeToken = settings.botToken
+                    registerMenu(settings.botToken)
                 }
                 _status.value = TelegramBotStatus.Connected(settings.authorizedChats.size)
                 val updates = api.getUpdates(settings.botToken, offset, LONG_POLL_SECONDS)
@@ -141,7 +142,7 @@ internal class TelegramBotService(
                 )
                 runCatching { saveSettings(paired) }
                 settingsFlow.value = paired
-                api.sendMessage(token, message.chatId, TelegramBotMessages.paired(language))
+                api.sendMessage(token, message.chatId, TelegramBotMessages.paired(language), html = true)
             }
             return
         }
@@ -157,7 +158,13 @@ internal class TelegramBotService(
                 TelegramBotMessages.applied(command, language)
             }
         }
-        api.sendMessage(token, message.chatId, reply)
+        api.sendMessage(token, message.chatId, reply, html = true)
+    }
+
+    /** Menu de comandos do Telegram (#396). Falhar aqui não derruba a conexão: o bot responde sem o menu. */
+    private suspend fun registerMenu(token: String) {
+        runCatching { api.setMyCommands(token, TelegramBotMessages.menu(languageProvider())) }
+            .onFailure { error -> if (error is CancellationException) throw error }
     }
 
     /** Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa. */
@@ -165,7 +172,7 @@ internal class TelegramBotService(
         val settings = settingsFlow.value
         if (!settings.enabled || settings.botToken.isBlank()) return
         for (chat in settings.authorizedChats) {
-            runCatching { api.sendMessage(settings.botToken, chat.id, text) }
+            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)
         }

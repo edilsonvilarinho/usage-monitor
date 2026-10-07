@@ -73,7 +73,7 @@ internal fun telegramBotSectionModel(
         chats = settings.authorizedChats,
         pairingCode = openCode,
         pairingHint = openCode?.let { if (pt) "Vale por mais $minutesLeft min." else "Valid for $minutesLeft more min." },
-        statusPreview = TelegramBotMessages.status(snapshot, language),
+        statusPreview = TelegramBotMessages.plain(TelegramBotMessages.status(snapshot, language)),
         onEnabledChange = actions::setEnabled,
         onTokenChange = actions::changeToken,
         onStartPairing = actions::startPairing,

@@ -292,6 +292,13 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
 - **Alertas**: o serviço coleta o mesmo `UsageAlertViewModel.alerts` da bandeja — já deduplicado e respeitando o silêncio —
   e manda o mesmo título e corpo (`usageAlertMessage`) a cada conversa pareada, com 1,1 s entre envios (limite do Telegram
   ~1 mensagem/s por conversa). 429 espera o `retry_after`; 401/404 é token recusado e para até o usuário trocá-lo.
+- **Formato (#396, direção W1)**: toda mensagem sai com `parse_mode: HTML` (`<b>`, `<i>`, `<code>`). O `/status` é um
+  cartão por conta — risco com emoji **e** palavra, "⚡ em uso", e por cota o reinício (só a hora em menos de 24 h; com o dia
+  da semana depois) e uma barra de 10 células em `<code>` cheia pelo piso do percentual. Todo texto variável passa por
+  `TelegramBotMessages.escape` (`&`, `<`, `>`): sem ele um rótulo de conta com `<` faria o Telegram recusar a mensagem
+  inteira com 400. A prévia das Configurações mostra o mesmo texto sem as marcas (`TelegramBotMessages.plain`).
+- **Menu**: ao conectar um token o serviço chama `setMyCommands` com os comandos no idioma do app — o botão "Menu" do
+  Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

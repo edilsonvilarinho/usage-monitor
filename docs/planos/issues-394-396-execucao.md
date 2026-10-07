@@ -47,6 +47,7 @@ Galeria das 18 opções em [`issues-394-396-visual/options.html`](issues-394-396
 | A01 | `docs: plan issues 394 and 396` | plano e galeria gravados | concluída |
 | A02 | `fix(dashboard): stamp fetchedAt on live readings` | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.data.*"` verde; teste novo `a live reading carries the collection instant`; dois testes que comparavam a leitura por igualdade passaram a ignorar `fetchedAt` | concluída |
 | A03 | `feat(web): animate the local web HUD like the desktop HUD` | navegador do app contra `/api/snapshot` simulado (`stub_server.py`, rótulo com `<b>` para conferir o escape): ondas, cometa, horizonte no número e ponto dourado visíveis em captura, console sem erro; `gradlew.bat desktopTest --tests "com.usagemonitor.LocalWebAccessServiceTest"` verde | concluída |
+| A04 | `feat(telegram): format bot replies as HTML cards with a command menu` | `gradlew.bat desktopTest --tests "com.usagemonitor.data.TelegramBotApiTest" --tests "com.usagemonitor.presentation.TelegramBotMessagesTest" --tests "com.usagemonitor.TelegramBotServiceTest" --tests "com.usagemonitor.ui.TelegramBotSectionTest"` verde; testes novos de formato, escape, barra, `parse_mode` e `setMyCommands` | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -54,7 +55,7 @@ Galeria das 18 opções em [`issues-394-396-visual/options.html`](issues-394-396
 | --- | --- | --- |
 | R1 | "Silenciar 1h" exige estado novo (silêncio até um instante); campo novo com default em `UsageAlertSettings`, nunca valor novo em enum | aberto |
 | R2 | "Atualizar" pede coleta ao app: precisa respeitar o backoff de 429 do `DashboardViewModel` e não pode prender o long polling | aberto |
-| R3 | `parse_mode: HTML` exige escapar `<`, `>` e `&` de todo texto variável (rótulo de conta é do usuário) — senão o Telegram recusa a mensagem com 400 | aberto |
+| R3 | `parse_mode: HTML` exige escapar `<`, `>` e `&` de todo texto variável (rótulo de conta é do usuário) — senão o Telegram recusa a mensagem com 400 | fechado em A04 — `TelegramBotMessages.escape`, coberto por teste com rótulo `<Padrão>` |
 | R4 | JS da página web não roda na suíte; conferência só por navegador com `/api/snapshot` simulado | aceito — conferido em A03; `prefers-reduced-motion` só lido no código, sem emulação no navegador do app |
 | R5 | Nenhum teste exercita sistema de janelas (#342): o card V2 só é verificado por teste de componente | aceito |
 
