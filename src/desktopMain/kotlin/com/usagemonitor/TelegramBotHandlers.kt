@@ -6,6 +6,8 @@ import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.parseBotTap
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
@@ -69,7 +71,13 @@ internal class TelegramBotHandlers(
         // Conversa não pareada não recebe resposta: o bot não confirma que existe.
         if (!settings.isAuthorized(message.chatId)) return
         if (command == BotCommand.Status) {
-            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshotProvider(), language), html = true, buttons = statusButtons(language))
+            val snapshot = snapshotProvider()
+            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+            return
+        }
+        if (command == BotCommand.Accounts) {
+            val snapshot = snapshotProvider()
+            api.sendMessage(token, message.chatId, TelegramBotMessages.accountPicker(snapshot, language), html = true, buttons = accountRows(snapshot))
             return
         }
         val reply = when (command) {
@@ -86,6 +94,11 @@ internal class TelegramBotHandlers(
 
     private suspend fun handleButton(token: String, message: TelegramIncomingMessage, callbackId: String) {
         val language = languageProvider()
+        val tap = parseBotTap(message.callbackData)
+        if (tap != null) {
+            runTelegram { handleTap(token, message, callbackId, tap, language) }
+            return
+        }
         val button = BotButton.fromData(message.callbackData)
         runTelegram {
             when (button) {
@@ -93,9 +106,10 @@ internal class TelegramBotHandlers(
                     api.answerCallbackQuery(token, callbackId, TelegramBotMessages.refreshing(language))
                     requestRefresh()
                     val messageId = message.messageId
-                    val text = TelegramBotMessages.status(snapshotProvider(), language)
+                    val snapshot = snapshotProvider()
+                    val text = TelegramBotMessages.status(snapshot, language)
                     // Sem mudança o Telegram responde 400 "message is not modified": o `runTelegram` o engole.
-                    if (messageId != null) api.editMessageText(token, message.chatId, messageId, text, statusButtons(language))
+                    if (messageId != null) api.editMessageText(token, message.chatId, messageId, text, statusButtons(language, snapshot))
                 }
                 BotButton.SNOOZE -> {
                     val snoozed = snoozeAlerts(alertSettingsFlow.value, clock.now().toEpochMilliseconds())
@@ -112,8 +126,22 @@ internal class TelegramBotHandlers(
         }
     }
 
-    private fun statusButtons(language: AppLanguage): List<List<TelegramButton>> =
-        listOf(TelegramBotMessages.statusButtons(language).map { (label, button) -> TelegramButton(label, button.data) })
+    private suspend fun handleTap(token: String, message: TelegramIncomingMessage, callbackId: String, tap: BotTap, language: AppLanguage) {
+        when (tap) {
+            is BotTap.Account -> {
+                api.answerCallbackQuery(token, callbackId)
+                api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true)
+            }
+        }
+    }
+
+    /** Ações do `/status` numa linha e, embaixo, um botão por conta (#398, Y4). */
+    private fun statusButtons(language: AppLanguage, snapshot: UsageSnapshot?): List<List<TelegramButton>> =
+        listOf(TelegramBotMessages.statusButtons(language).map { (label, button) -> TelegramButton(label, button.data) }) +
+            accountRows(snapshot)
+
+    private fun accountRows(snapshot: UsageSnapshot?): List<List<TelegramButton>> =
+        TelegramBotMessages.accountButtons(snapshot).map { row -> row.map { (label, data) -> TelegramButton(label, data) } }
 
     /** Falha de um toque fica no toque: o polling segue. Cancelamento continua subindo. */
     private suspend fun runTelegram(block: suspend () -> Unit) {

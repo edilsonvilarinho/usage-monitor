@@ -80,4 +80,18 @@ class TelegramBotMessagesTest {
     fun `invalid usage is escaped inside code`() {
         assertEquals("Não entendi. Uso: <code>/limiar 75,90 &amp; &lt;x&gt;</code>", TelegramBotMessages.invalid("/limiar 75,90 & <x>", AppLanguage.PT))
     }
+
+    /** #398, Y4: duas contas por linha, risco em emoji antes do rótulo, e o cartão de uma só. */
+    @Test
+    fun `account picker buttons and single account card`() {
+        val rows = TelegramBotMessages.accountButtons(snapshot)
+
+        assertEquals(1, rows.size)
+        assertEquals(listOf("🔴 Anthropic · <Padrão>", "DeepSeek"), rows.single().map { it.first })
+        val key = rows.single()[1].second.removePrefix("acc:")
+        val card = TelegramBotMessages.account(snapshot, key, AppLanguage.PT)
+        assertTrue(card.startsWith("<b>DeepSeek</b>\nSaldo"), card)
+        assertFalse("Anthropic" in card)
+        assertTrue("saiu" !in card && "não está mais" in TelegramBotMessages.account(snapshot, "ANTHROPIC:0", AppLanguage.PT))
+    }
 }

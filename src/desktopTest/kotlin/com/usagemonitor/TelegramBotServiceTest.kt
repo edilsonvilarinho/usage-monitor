@@ -3,7 +3,11 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.domain.entity.UsageSnapshotAccount
+import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
@@ -76,6 +80,7 @@ class TelegramBotServiceTest {
     private val alertSettings = MutableStateFlow(UsageAlertSettings())
     private val alerts = MutableSharedFlow<UsageAlert>(extraBufferCapacity = 4)
     private val refreshes = AtomicInteger()
+    @Volatile private var snapshot: UsageSnapshot? = null
     private val service = TelegramBotService(
         api = api,
         settingsFlow = settings,
@@ -83,7 +88,7 @@ class TelegramBotServiceTest {
         alertSettingsFlow = alertSettings,
         saveAlertSettings = { updated -> alertSettings.value = updated },
         alerts = alerts,
-        snapshotProvider = { null },
+        snapshotProvider = { snapshot },
         languageProvider = { AppLanguage.PT },
         requestRefresh = { refreshes.incrementAndGet() },
         clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") }
@@ -134,7 +139,7 @@ class TelegramBotServiceTest {
         service.start()
 
         waitUntil { api.menus.isNotEmpty() }
-        assertEquals(listOf("status", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
+        assertEquals(listOf("status", "conta", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
     }
 
     @Test
@@ -145,6 +150,30 @@ class TelegramBotServiceTest {
 
         waitUntil { api.keyboards.any { it.isNotEmpty() } }
         assertEquals(listOf("refresh", "snooze", "thresholds"), api.keyboards.first { it.isNotEmpty() }.map { it.data })
+    }
+
+    /** #398, Y4: o `/conta` oferece uma conta por botão, e o toque manda só ela. */
+    @Test
+    fun `account command lists the accounts and a tap shows only that one`() {
+        val reading = UsageSnapshot(
+            generatedAt = Instant.parse("2026-10-06T12:00:00Z"),
+            accounts = listOf(
+                UsageSnapshotAccount(ApiSource.ANTHROPIC, "Claude — Edi", active = false, quotas = emptyList()),
+                UsageSnapshotAccount(ApiSource.CODEX, "Codex", active = false, quotas = emptyList())
+            )
+        )
+        snapshot = reading
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/conta")
+
+        waitUntil { api.sent.any { it.second == "Qual conta?" } }
+        val codexTap = botAccountTapData(reading.accounts[1])
+        assertEquals(listOf(botAccountTapData(reading.accounts[0]), codexTap), api.keyboards.last().map { it.data })
+
+        api.pending += tap(2, chat = 51, data = codexTap)
+        waitUntil { api.sent.any { it.second.startsWith("<b>Codex</b>") } }
+        assertTrue(api.sent.none { it.second.startsWith("<b>Claude — Edi</b>") })
     }
 
     @Test

@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A03 concluída.`
+**Estado atual:** `Em execução — A04 concluída.`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -56,6 +56,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | A01 | X1: abas Aparência e Sistema | `SettingsDialogContent.kt`, `SettingsAppearanceTab.kt`, `SettingsSystemTab.kt`, testes, protótipo, `presentation.md` |
 | A02 | `feat(settings): live HUD preview on the appearance tab` | `gradlew.bat desktopTest --tests SettingsDialogContentTest` 18/0 falhas (novo: prévia só na Aparência, hover não abre balão); `*Help*` + `ArchitectureRulesTest` 32/0; captura temporária da aba conferida a olho (notch com 3 contas, opacidade 80%) e descartada | concluída |
 | A03 | `refactor(telegram): message ids, keyboard rows, pin and photo calls` | `gradlew.bat desktopTest --tests *Telegram*`: 34 testes, 0 falhas (novos: id devolvido e `silent`, linhas do teclado, fixar/desafixar, 400 tipado, `sendPhoto` multipart) | concluída |
+| A04 | `feat(telegram): one account at a time with /conta` | `gradlew.bat desktopTest --tests *Telegram*`: 37 testes, 0 falhas (novos: parse `/conta`, `callback_data` curto e sem rótulo, botões e cartão de uma conta, fluxo `/conta` → toque no serviço) | concluída |
 | A02 | X10: prévia do notch na Aparência | `SettingsWindowHost.kt`, `SettingsHudPreview.kt`, teste, protótipo, `presentation.md` |
 | A03 | Infra do bot: id da mensagem, fixar/desafixar, foto, campos novos de `telegram.json`, tratadores fora do serviço | `TelegramBotApi.kt`, `TelegramBot.kt`, `LocalTelegramSettingsDataSource.kt`, `TelegramBotService.kt` |
 | A04 | Y4: `/conta` | domain, `TelegramBotMessages.kt`, tratadores |

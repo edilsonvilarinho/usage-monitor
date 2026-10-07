@@ -287,7 +287,7 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   seguinte. O Telegram guarda updates por 24 h, e sem isso um `/alertas off` antigo seria reaplicado a cada arranque.
 - **Pareamento**: "Parear conversa" gera um código de 6 caracteres (sem 0/O/1/I) válido por 10 min; a conversa que mandar
   `/start <código>` entra na lista. Conversa não pareada não recebe resposta nenhuma.
-- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/alertas on|off`, `/silencio 22-07|off`, `/limiar 75,90`, `/ajuda`.
+- **Comandos** (`parseBotCommand`, PT e EN): `/status`, `/conta`, `/alertas on|off`, `/silencio 22-07|off`, `/limiar 75,90`, `/ajuda`.
   Os que mudam algo passam por `applyBotCommand` e gravam nas mesmas preferências de alerta das Configurações.
 - **Alertas**: o serviço coleta o mesmo `UsageAlertViewModel.alerts` da bandeja — já deduplicado e respeitando o silêncio —
   e manda o mesmo título e corpo (`usageAlertMessage`) a cada conversa pareada, com 1,1 s entre envios (limite do Telegram
@@ -316,6 +316,12 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   sem notificar, `unpinChatMessage` desafixa; `sendPhoto` manda PNG em multipart com legenda HTML. O 400 é
   `TelegramBadRequestException` com a `description` do Telegram (`isNotModified`, `isMessageGone`). O tratamento de
   comandos e toques saiu do `TelegramBotService` para `TelegramBotHandlers`; o serviço ficou com o polling e o repasse.
+- **Uma conta por vez (#398, Y4)**: `/conta` (`/account`) responde "Qual conta?" com um botão por conta, duas por linha,
+  emoji do pior risco antes do rótulo; o `/status` ganha as mesmas linhas embaixo das três ações. O toque manda só o
+  cartão daquela conta, com a hora da coleta dela. `callback_data` `acc:<ApiSource>:<FNV-1a do rótulo>` (`BotTap`,
+  `botAccountKey`): estável entre o envio do teclado e o toque — índice não serve, a ordem pode mudar — e sem rótulo nem
+  e-mail. Conta que saiu da leitura responde pedindo `/conta` de novo. `BotButton` (enum) não ganhou valor: toque com
+  parâmetro é `BotTap` (sealed).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

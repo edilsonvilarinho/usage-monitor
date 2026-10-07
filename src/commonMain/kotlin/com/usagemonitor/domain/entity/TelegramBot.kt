@@ -57,6 +57,8 @@ sealed interface BotCommand {
     /** `null` desliga o silêncio. */
     data class Quiet(val hours: QuietHours?) : BotCommand
     data class Threshold(val percents: List<Int>) : BotCommand
+    /** `/conta` (#398, Y4): escolher uma conta num teclado e ver só ela. */
+    data object Accounts : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -84,6 +86,7 @@ fun parseBotCommand(text: String): BotCommand? {
         }
         "silencio", "silêncio", "quiet" -> parseQuiet(args.firstOrNull())
         "limiar", "threshold" -> parseThreshold(args.joinToString(","))
+        "conta", "contas", "account", "accounts" -> BotCommand.Accounts
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

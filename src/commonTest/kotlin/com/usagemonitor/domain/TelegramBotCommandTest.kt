@@ -1,6 +1,11 @@
 package com.usagemonitor.domain
 
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.BotButton
+import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.UsageSnapshotAccount
+import com.usagemonitor.domain.entity.botAccountTapData
+import com.usagemonitor.domain.entity.parseBotTap
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.TELEGRAM_SNOOZE_MILLIS
 import com.usagemonitor.domain.entity.snoozeAlerts
@@ -28,6 +33,8 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Quiet(null), parseBotCommand("/quiet off"))
         assertEquals(BotCommand.Threshold(listOf(75, 90)), parseBotCommand("/limiar 90,75"))
         assertEquals(BotCommand.Start("AB12CD"), parseBotCommand("/start AB12CD"))
+        assertEquals(BotCommand.Accounts, parseBotCommand("/conta"))
+        assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
     }
 
     @Test
@@ -75,5 +82,20 @@ class TelegramBotCommandTest {
         val settings = TelegramBotSettings(botToken = "123:secret", authorizedChats = listOf(TelegramChat(1L, "@ed")))
 
         assertFalse(settings.toString().contains("secret"))
+    }
+
+    /** #398, Y4: o toque da conta volta com fonte e resumo do rótulo, nunca o rótulo. */
+    @Test
+    fun `account tap data is short, stable and never carries the label`() {
+        val account = UsageSnapshotAccount(ApiSource.ANTHROPIC, "edi@example.com", active = false, quotas = emptyList())
+        val data = botAccountTapData(account)
+
+        assertTrue(data.startsWith("acc:ANTHROPIC:"))
+        assertFalse("edi@example.com" in data)
+        assertTrue(data.encodeToByteArray().size <= 64)
+        assertEquals(data, botAccountTapData(account.copy(active = true)))
+        assertEquals(BotTap.Account(data.removePrefix("acc:")), parseBotTap(data))
+        assertNull(parseBotTap("refresh"))
+        assertNull(parseBotTap("acc:"))
     }
 }
