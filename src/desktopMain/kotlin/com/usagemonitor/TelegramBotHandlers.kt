@@ -50,7 +50,9 @@ internal class TelegramBotHandlers(
     /** Fontes ligadas agora (#398, Y8). */
     private val enabledSources: () -> Set<ApiSource> = { emptySet() },
     /** Liga ou desliga uma fonte pelo mesmo caminho das Configurações. */
-    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> }
+    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> },
+    /** O texto do resumo diário (#398, Y1), montado por quem tem o gasto. */
+    private val summaryText: suspend (AppLanguage) -> String = { language -> TelegramBotMessages.noReading(language == AppLanguage.PT) }
 ) {
 
     suspend fun handle(token: String, message: TelegramIncomingMessage) {
@@ -94,6 +96,10 @@ internal class TelegramBotHandlers(
             val enabled = enabledSources()
             val buttons = if (allowed) rows(TelegramBotRemoteMessages.sourceButtons(enabled, language)) else emptyList()
             api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.sources(enabled, allowed, language), html = true, buttons = buttons)
+            return
+        }
+        if (command == BotCommand.Summary) {
+            api.sendMessage(token, message.chatId, summaryText(language), html = true)
             return
         }
         if (command == BotCommand.QuietMenu) {

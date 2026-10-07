@@ -8,6 +8,8 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,5 +95,26 @@ class TelegramBotMessagesTest {
         assertTrue(card.startsWith("<b>DeepSeek</b>\nSaldo"), card)
         assertFalse("Anthropic" in card)
         assertTrue("saiu" !in card && "não está mais" in TelegramBotMessages.account(snapshot, "ANTHROPIC:0", AppLanguage.PT))
+    }
+
+    /** #398, Y1: cota mais cheia por conta, o que reinicia hoje e o gasto de 24 h com `+` quando parcial. */
+    @Test
+    fun `daily summary lists the fullest quota, resets today and the spend`() {
+        val text = TelegramBotSummaryMessages.summary(snapshot, TelegramDailySpend(14_200_000L, 6, unpricedTurns = 2), AppLanguage.PT)
+
+        assertTrue(text.startsWith("<b>☀ Resumo de ter 06/10</b>"), text)
+        assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h <b>42%</b> · reinicia 02:10" in text, text)
+        assertTrue("<b>DeepSeek</b> · Saldo saldo US$ 37,66" in text, text)
+        assertTrue("<b>Claude Code, últimas 24 h</b>: US$ 14,20+ · 6 sessões" in text, text)
+        // 02:10 já é amanhã (dia local 07/10): não entra em "Reinicia hoje".
+        assertFalse("Reinicia hoje" in text, text)
+    }
+
+    @Test
+    fun `daily summary without a measured spend drops the spend line`() {
+        val text = TelegramBotSummaryMessages.summary(snapshot, spend = null, AppLanguage.EN)
+
+        assertTrue(text.startsWith("<b>☀ Summary for Tue 06/10</b>"), text)
+        assertFalse("last 24 h" in text, text)
     }
 }

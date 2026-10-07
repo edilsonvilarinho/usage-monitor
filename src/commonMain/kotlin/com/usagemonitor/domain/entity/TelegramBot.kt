@@ -24,7 +24,11 @@ class TelegramBotSettings(
      * `/api` pode ligar e desligar fontes (#398, Y8). Nasce desligado: com ele, quem
      * está numa conversa pareada muda o que o app monitora.
      */
-    val allowSourceControl: Boolean = false
+    val allowSourceControl: Boolean = false,
+    /** Hora (BRT) do resumo diário (#398, Y1); `null` desliga. */
+    val dailySummaryHour: Int? = null,
+    /** Dia local (ISO) do último resumo enviado: um por dia. */
+    val lastSummaryDate: String? = null
 ) {
     fun copy(
         enabled: Boolean = this.enabled,
@@ -32,8 +36,12 @@ class TelegramBotSettings(
         authorizedChats: List<TelegramChat> = this.authorizedChats,
         pairingCode: String? = this.pairingCode,
         pairingExpiresAtMillis: Long? = this.pairingExpiresAtMillis,
-        allowSourceControl: Boolean = this.allowSourceControl
-    ): TelegramBotSettings = TelegramBotSettings(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl)
+        allowSourceControl: Boolean = this.allowSourceControl,
+        dailySummaryHour: Int? = this.dailySummaryHour,
+        lastSummaryDate: String? = this.lastSummaryDate
+    ): TelegramBotSettings = TelegramBotSettings(
+        enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate
+    )
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
 
@@ -47,10 +55,11 @@ class TelegramBotSettings(
     override fun equals(other: Any?): Boolean = other is TelegramBotSettings &&
         other.enabled == enabled && other.botToken == botToken && other.authorizedChats == authorizedChats &&
         other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis &&
-        other.allowSourceControl == allowSourceControl
+        other.allowSourceControl == allowSourceControl && other.dailySummaryHour == dailySummaryHour &&
+        other.lastSummaryDate == lastSummaryDate
 
     override fun hashCode(): Int =
-        listOf(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl).hashCode()
+        listOf(enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate).hashCode()
 
     override fun toString(): String =
         "TelegramBotSettings(enabled=$enabled, botToken=${if (botToken.isEmpty()) "" else "***"}, chats=${authorizedChats.size})"
@@ -72,6 +81,8 @@ sealed interface BotCommand {
     data object Sources : BotCommand
     /** `/silencio` sem argumento (#398, Y8): oferece 1 h, 4 h e até 08:00. */
     data object QuietMenu : BotCommand
+    /** `/resumo` (#398, Y1): o resumo diário na hora. */
+    data object Summary : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -102,6 +113,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "conta", "contas", "account", "accounts" -> BotCommand.Accounts
         "atualizar", "refresh" -> BotCommand.Refresh
         "api", "apis", "fontes", "sources" -> BotCommand.Sources
+        "resumo", "summary" -> BotCommand.Summary
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

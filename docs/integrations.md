@@ -330,6 +330,15 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   mesmo caminho do interruptor da aba APIs — e recoleta a fonte; a permissão é relida no toque, então um teclado antigo
   deixa de valer quando ela é desligada. `/silencio` sem argumento oferece 1 h, 4 h e "até 08:00" (`snz:60`, `snz:240`,
   `snz:am`; `nextMorningMillis` em BRT, teto de um dia contra dado forjado), gravando o mesmo `snoozedUntilEpochMillis`.
+- **Resumo diário (#398, Y1)**: hora escolhida no card (Desligado, 07, 08, 09, 12 ou 18 h BRT; `dailySummaryHour` em
+  `telegram.json`, hora fora da lista vale como desligado). O serviço checa a cada minuto (`isDailySummaryDue`, pura):
+  sai a partir da hora, uma vez por dia local (`lastSummaryDate`), e com o app fechado na hora sai quando ele abrir naquele
+  dia; horário de silêncio e "Silenciar" **adiam**. A data é gravada **antes** do envio — falha no meio perde o dia em vez
+  de repetir a cada minuto. Trocar a hora zera a data. Texto: por conta a cota mais cheia (saldo pelo valor), "Reinicia
+  hoje" com as cotas do dia local e "Claude Code, últimas 24 h" — custo de `CliSessionRepository.getUsageBreakdown` com
+  `sinceEpochMillis` = agora − 24 h (o repositório não tem fim de janela, e "ontem" exigiria valor novo em
+  `CliSessionRange`), `+` com turno sem tarifa, linha omitida quando o índice falha ("não medido"). `/resumo` (`/summary`)
+  manda na hora.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

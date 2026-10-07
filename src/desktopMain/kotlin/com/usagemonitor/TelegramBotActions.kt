@@ -41,6 +41,12 @@ internal class TelegramBotActions(
 
     fun setAllowSourceControl(allowed: Boolean) = update { current -> current.copy(allowSourceControl = allowed) }
 
+    /**
+     * Trocar a hora religa o resumo de hoje: escolher 18:00 às 10:00 não pode ficar
+     * sem resumo porque o das 08:00 já saiu.
+     */
+    fun setDailySummaryHour(hour: Int?) = update { current -> current.copy(dailySummaryHour = hour, lastSummaryDate = null) }
+
     private fun update(transform: (TelegramBotSettings) -> TelegramBotSettings) {
         val next = transform(settingsFlow.value)
         runCatching { dataSource.save(next) }
@@ -90,7 +96,9 @@ internal fun telegramBotSectionModel(
         connected = status is TelegramBotStatus.Connected,
         botUsername = (status as? TelegramBotStatus.Connected)?.botUsername,
         allowSourceControl = settings.allowSourceControl,
-        onAllowSourceControlChange = actions::setAllowSourceControl
+        onAllowSourceControlChange = actions::setAllowSourceControl,
+        dailySummaryHour = settings.dailySummaryHour,
+        onDailySummaryHourChange = actions::setDailySummaryHour
     )
 }
 

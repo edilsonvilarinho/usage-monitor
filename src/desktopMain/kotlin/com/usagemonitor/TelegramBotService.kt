@@ -5,6 +5,10 @@ import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.domain.entity.dailySummaryDate
+import com.usagemonitor.domain.entity.isDailySummaryDue
+import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
@@ -63,11 +67,14 @@ internal class TelegramBotService(
     private val clock: Clock = Clock.System,
     /** Fontes ligadas e como ligar/desligar uma (#398, Y8); o `/api` usa os dois. */
     private val enabledSources: () -> Set<ApiSource> = { emptySet() },
-    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> }
+    private val toggleSource: (ApiSource, Boolean) -> Unit = { _, _ -> },
+    /** Gasto do Claude Code nas últimas 24 h (#398, Y1); `null` é "não medido". */
+    private val spendProvider: suspend () -> TelegramDailySpend? = { null }
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
     private var alertJob: Job? = null
+    private var summaryJob: Job? = null
 
     private val handlers = TelegramBotHandlers(
         api = api,
@@ -81,7 +88,8 @@ internal class TelegramBotService(
         requestRefresh = requestRefresh,
         clock = clock,
         enabledSources = enabledSources,
-        toggleSource = toggleSource
+        toggleSource = toggleSource,
+        summaryText = { language -> TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language) }
     )
 
     private val _status = MutableStateFlow<TelegramBotStatus>(TelegramBotStatus.Off)
@@ -94,6 +102,7 @@ internal class TelegramBotService(
         alertJob = scope.launch {
             alerts.collect { alert -> broadcast(TelegramBotMessages.alert(alert, languageProvider())) }
         }
+        summaryJob = scope.launch { summaryLoop() }
     }
 
     fun onDestroy() {
@@ -160,6 +169,29 @@ internal class TelegramBotService(
             .onFailure { error -> if (error is CancellationException) throw error }
     }
 
+    /**
+     * Resumo diário (#398, Y1): checa uma vez por minuto se já é hora. A data vai
+     * para o `telegram.json` **antes** do envio: falhar no meio não repete o
+     * resumo a cada minuto — perde-se um dia, não se inunda a conversa.
+     */
+    private suspend fun summaryLoop() {
+        while (true) {
+            val settings = settingsFlow.value
+            val now = clock.now()
+            val ready = settings.enabled && settings.botToken.isNotBlank() && settings.authorizedChats.isNotEmpty()
+            if (ready && isDailySummaryDue(settings.dailySummaryHour, settings.lastSummaryDate, now, alertSettingsFlow.value)) {
+                val marked = settings.copy(lastSummaryDate = dailySummaryDate(now))
+                runCatching { saveSettings(marked) }
+                settingsFlow.value = marked
+                runCatching {
+                    val language = languageProvider()
+                    broadcast(TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language))
+                }.onFailure { error -> if (error is CancellationException) throw error }
+            }
+            delay(SUMMARY_CHECK_MILLIS)
+        }
+    }
+
     /** Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa. */
     private suspend fun broadcast(text: String) {
         val settings = settingsFlow.value
@@ -178,5 +210,6 @@ internal class TelegramBotService(
         const val BACKOFF_BASE_MILLIS = 2_000L
         const val BACKOFF_MAX_MILLIS = 60_000L
         const val SEND_SPACING_MILLIS = 1_100L
+        const val SUMMARY_CHECK_MILLIS = 60_000L
     }
 }

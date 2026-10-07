@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import kotlinx.serialization.Serializable
@@ -17,7 +18,9 @@ private data class TelegramSettingsDto(
     val authorizedChats: List<TelegramChatDto> = emptyList(),
     val pairingCode: String? = null,
     val pairingExpiresAtMillis: Long? = null,
-    val allowSourceControl: Boolean = false
+    val allowSourceControl: Boolean = false,
+    val dailySummaryHour: Int? = null,
+    val lastSummaryDate: String? = null
 )
 
 /**
@@ -39,7 +42,11 @@ internal class LocalTelegramSettingsDataSource(
             authorizedChats = dto.authorizedChats.map { chat -> TelegramChat(chat.id, chat.name) },
             pairingCode = dto.pairingCode,
             pairingExpiresAtMillis = dto.pairingExpiresAtMillis,
-            allowSourceControl = dto.allowSourceControl
+            allowSourceControl = dto.allowSourceControl,
+            // Hora fora das oferecidas é arquivo editado à mão: vale como desligado,
+            // e o seletor das Configurações mostra isso em vez de uma hora falsa.
+            dailySummaryHour = dto.dailySummaryHour?.takeIf { hour -> hour in TELEGRAM_SUMMARY_HOURS },
+            lastSummaryDate = dto.lastSummaryDate
         )
     }
 
@@ -50,7 +57,9 @@ internal class LocalTelegramSettingsDataSource(
             authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name) },
             pairingCode = settings.pairingCode,
             pairingExpiresAtMillis = settings.pairingExpiresAtMillis,
-            allowSourceControl = settings.allowSourceControl
+            allowSourceControl = settings.allowSourceControl,
+            dailySummaryHour = settings.dailySummaryHour,
+            lastSummaryDate = settings.lastSummaryDate
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))
     }

@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A06 concluída.`
+**Estado atual:** `Em execução — A07 concluída.`
 
 **Direções escolhidas (2026-10-07):** #399 → **X1 · Aparência e Sistema viram abas** + **X10 · Aparência com prévia
 ao vivo** · #398 → **Y1 · resumo diário**, **Y2 · aviso de reinício de cota**, **Y4 · uma conta por vez**,
@@ -59,6 +59,7 @@ Galeria das 20 opções em [`issues-398-399-visual/options.html`](issues-398-399
 | A04 | `feat(telegram): one account at a time with /conta` | `gradlew.bat desktopTest --tests *Telegram*`: 37 testes, 0 falhas (novos: parse `/conta`, `callback_data` curto e sem rótulo, botões e cartão de uma conta, fluxo `/conta` → toque no serviço) | concluída |
 | A05 | `feat(telegram): remote control with /atualizar, /api and quiet durations` | `gradlew.bat desktopTest --tests *Telegram*`: 44 testes, 0 falhas (novos: parse dos comandos, ida e volta dos toques e dado forjado, próxima 08:00 BRT, `/api` sem permissão não muda nada, com permissão liga a fonte, menu do `/silencio` e 4 h, `/atualizar`, interruptor do card). Primeira rodada: 2 falhas nos testes novos (lista do menu e `performScrollTo` fora de rolagem), corrigidas no teste | concluída |
 | A06 | `feat(alerts): warn when a quota that alerted resets` | `gradlew.bat desktopTest --tests com.usagemonitor.domain.* com.usagemonitor.presentation.* *AlertSettings* *Telegram* *UsageAlert*`: 1134 testes, 0 falhas (novos: reinício anunciado uma vez, janela sem alerta reinicia calada, leitura vencida no meio mantém a memória, silêncio adia, interruptor desligado, mensagem PT/EN) | concluída |
+| A07 | `feat(telegram): daily summary at a chosen hour and /resumo` | `gradlew.bat desktopTest --tests *Telegram*`: 52 testes, 0 falhas (novos: hora/uma vez por dia/silêncio adia, texto com cota mais cheia e gasto `+`, sem gasto medido, envio agendado único com data gravada, `/resumo`, seletor do card) | concluída |
 | A02 | X10: prévia do notch na Aparência | `SettingsWindowHost.kt`, `SettingsHudPreview.kt`, teste, protótipo, `presentation.md` |
 | A03 | Infra do bot: id da mensagem, fixar/desafixar, foto, campos novos de `telegram.json`, tratadores fora do serviço | `TelegramBotApi.kt`, `TelegramBot.kt`, `LocalTelegramSettingsDataSource.kt`, `TelegramBotService.kt` |
 | A04 | Y4: `/conta` | domain, `TelegramBotMessages.kt`, tratadores |

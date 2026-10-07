@@ -37,6 +37,7 @@ internal object TelegramBotMessages {
             "conta" to "Uma conta por vez",
             "atualizar" to "Coleta agora e mostra as cotas",
             "api" to "Fontes monitoradas",
+            "resumo" to "Resumo do dia",
             "alertas" to "Liga ou desliga os alertas (on ou off)",
             "silencio" to "Horário de silêncio (22-07 ou off)",
             "limiar" to "Limiares de alerta de cota (75,90)",
@@ -48,6 +49,7 @@ internal object TelegramBotMessages {
             "account" to "One account at a time",
             "refresh" to "Collect now and show the quotas",
             "api" to "Monitored sources",
+            "summary" to "Summary of the day",
             "alerts" to "Turn alerts on or off",
             "quiet" to "Quiet hours (22-07 or off)",
             "threshold" to "Quota alert thresholds (75,90)",
@@ -100,7 +102,7 @@ internal object TelegramBotMessages {
         return accountCard(account, snapshot.generatedAt, language) + "\n" + collected
     }
 
-    private fun noReading(pt: Boolean): String =
+    internal fun noReading(pt: Boolean): String =
         if (pt) "Sem leitura ainda. Abra o Usage Monitor e habilite ao menos uma API." else "No reading yet. Open Usage Monitor and enable at least one API."
 
     private fun accountCard(account: UsageSnapshotAccount, now: Instant, language: AppLanguage): String {
@@ -117,7 +119,7 @@ internal object TelegramBotMessages {
         return (listOf(title) + quotas).joinToString("\n")
     }
 
-    private fun quotaValue(quota: UsageSnapshotQuota, pt: Boolean): String {
+    internal fun quotaValue(quota: UsageSnapshotQuota, pt: Boolean): String {
         val percent = quota.percent
         return when {
             percent != null -> "${bar(percent)} ${percent.toString().padStart(3)}%"
@@ -163,7 +165,7 @@ internal object TelegramBotMessages {
         }
     }
 
-    private fun riskEmoji(level: UsageRiskLevel): String = when (level) {
+    internal fun riskEmoji(level: UsageRiskLevel): String = when (level) {
         UsageRiskLevel.ON_TRACK -> "🟢"
         UsageRiskLevel.AT_RISK -> "🟡"
         UsageRiskLevel.WILL_EXCEED -> "🔴"
@@ -175,6 +177,7 @@ internal object TelegramBotMessages {
             "<code>/conta</code> — escolha uma conta e veja só ela\n" +
             "<code>/atualizar</code> — coleta agora e mostra as cotas\n" +
             "<code>/api</code> — fontes monitoradas\n" +
+            "<code>/resumo</code> — resumo do dia\n" +
             "<code>/alertas on</code> · <code>/alertas off</code> — liga ou desliga os alertas\n" +
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
@@ -185,6 +188,7 @@ internal object TelegramBotMessages {
             "<code>/account</code> — pick one account and see only it\n" +
             "<code>/refresh</code> — collect now and show the quotas\n" +
             "<code>/api</code> — monitored sources\n" +
+            "<code>/summary</code> — summary of the day\n" +
             "<code>/alerts on</code> · <code>/alerts off</code> — turn alerts on or off\n" +
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
@@ -230,7 +234,7 @@ internal object TelegramBotMessages {
     internal fun escape(text: String): String =
         text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    private fun elapsed(duration: kotlin.time.Duration, pt: Boolean): String {
+    internal fun elapsed(duration: kotlin.time.Duration, pt: Boolean): String {
         val minutes = duration.inWholeMinutes.coerceAtLeast(0L)
         return when {
             minutes < 1L -> if (pt) "há menos de 1 min" else "less than 1 min ago"
@@ -240,13 +244,13 @@ internal object TelegramBotMessages {
     }
 
     /** Reinício em menos de 24 h só com a hora; mais longe, com o dia da semana. */
-    private fun resetLabel(at: Instant, now: Instant, pt: Boolean): String {
+    internal fun resetLabel(at: Instant, now: Instant, pt: Boolean): String {
         if (at - now < 24.hours) return clock(at)
         val day = at.toLocalDateTime(SAO_PAULO).dayOfWeek
         return "${weekday(day, pt)} ${clock(at)}"
     }
 
-    private fun weekday(day: DayOfWeek, pt: Boolean): String = when (day) {
+    internal fun weekday(day: DayOfWeek, pt: Boolean): String = when (day) {
         DayOfWeek.MONDAY -> if (pt) "seg" else "Mon"
         DayOfWeek.TUESDAY -> if (pt) "ter" else "Tue"
         DayOfWeek.WEDNESDAY -> if (pt) "qua" else "Wed"
@@ -256,7 +260,7 @@ internal object TelegramBotMessages {
         DayOfWeek.SUNDAY -> if (pt) "dom" else "Sun"
     }
 
-    private fun clock(instant: Instant): String {
+    internal fun clock(instant: Instant): String {
         val local = instant.toLocalDateTime(SAO_PAULO)
         return "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
     }

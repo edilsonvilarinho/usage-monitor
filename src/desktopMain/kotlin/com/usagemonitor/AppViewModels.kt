@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.data.datasource.TelegramBotApi
 import kotlin.time.Clock
@@ -300,6 +301,14 @@ internal class AppViewModels(
             val current = graph.enabledApis.value
             persistEnabledApis(graph, if (on) current + source else current - source)
             dashboard.refresh(source)
+        },
+        // Corte de 24 h por `sinceEpochMillis`: o repositório não tem fim de
+        // janela, e "ontem" exigiria um `CliSessionRange` novo (proibido).
+        spendProvider = {
+            val since = Clock.System.now().toEpochMilliseconds() - DAILY_SPEND_WINDOW_MILLIS
+            graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.totals?.let { totals ->
+                TelegramDailySpend(totals.costMicros, totals.sessionCount, totals.unpricedTurnCount)
+            }
         }
     ).also { service -> service.start() }
 
@@ -413,3 +422,6 @@ internal const val TEAM_PRESENCE_LIVE_INTERVAL_MILLIS = 5_000L
  * de 30 em 30 segundos.
  */
 internal const val SESSION_PULSE_INTERVAL_MILLIS = 30_000L
+
+/** Janela do gasto no resumo diário do bot (#398, Y1). */
+private const val DAILY_SPEND_WINDOW_MILLIS = 24 * 60 * 60 * 1_000L

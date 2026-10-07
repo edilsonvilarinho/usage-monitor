@@ -142,7 +142,7 @@ class TelegramBotServiceTest {
         service.start()
 
         waitUntil { api.menus.isNotEmpty() }
-        assertEquals(listOf("status", "conta", "atualizar", "api", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
+        assertEquals(listOf("status", "conta", "atualizar", "api", "resumo", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
     }
 
     @Test
@@ -262,5 +262,26 @@ class TelegramBotServiceTest {
         api.pending += message(1, chat = 51, text = "/atualizar")
 
         waitUntil { refreshes.get() == 1 && api.sent.any { it.second.startsWith("Sem leitura ainda") } }
+    }
+
+    /** #398, Y1: com a hora já passada, o resumo sai uma vez e a data fica gravada. */
+    @Test
+    fun `daily summary goes out once when its hour has passed`() {
+        // O relógio do serviço marca 09:00 BRT (12:00 UTC); resumo às 08:00.
+        settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed")), dailySummaryHour = 8)
+        service.start()
+
+        waitUntil { settings.value.lastSummaryDate == "2026-10-06" }
+        waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("Sem leitura ainda") } }
+        assertEquals(1, api.sent.count { it.second.startsWith("Sem leitura ainda") })
+    }
+
+    @Test
+    fun `summary command answers on demand`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/resumo")
+
+        waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("Sem leitura ainda") } }
     }
 }

@@ -54,7 +54,10 @@ class TelegramBotSectionModel(
     val botUsername: String? = null,
     /** `/api` pode ligar e desligar fontes (#398, Y8). */
     val allowSourceControl: Boolean = false,
-    val onAllowSourceControlChange: (Boolean) -> Unit = {}
+    val onAllowSourceControlChange: (Boolean) -> Unit = {},
+    /** Hora do resumo diário (#398, Y1); `null` desligado. */
+    val dailySummaryHour: Int? = null,
+    val onDailySummaryHourChange: (Int?) -> Unit = {}
 )
 
 /**

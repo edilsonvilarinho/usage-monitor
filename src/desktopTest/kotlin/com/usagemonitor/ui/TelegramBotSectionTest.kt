@@ -114,6 +114,33 @@ class TelegramBotSectionTest {
         pairingCode = pairingCode, pairingHint = pairingHint, statusPreview = statusPreview,
         onEnabledChange = onEnabledChange, onTokenChange = onTokenChange, onStartPairing = onStartPairing,
         onRemoveChat = onRemoveChat, onSendTest = onSendTest, connected = connected, botUsername = botUsername,
-        allowSourceControl = allowSourceControl, onAllowSourceControlChange = onAllowSourceControlChange
+        allowSourceControl = allowSourceControl, onAllowSourceControlChange = onAllowSourceControlChange,
+        dailySummaryHour = dailySummaryHour, onDailySummaryHourChange = onDailySummaryHourChange
     )
+
+    /** #398, Y1: o seletor do resumo vai de "Desligado" às horas oferecidas. */
+    @Test
+    fun `daily summary selector reports the chosen hour`() = runDesktopComposeUiTest {
+        var hour: Int? = -1
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.width(720.dp)) {
+                    TelegramBotSection(
+                        TelegramBotSectionModel(
+                            enabled = true, token = "123:abc", statusLabel = "Conectado", statusTone = AppTone.OK,
+                            chats = listOf(TelegramChat(51L, "@edilson")), pairingCode = null, pairingHint = null,
+                            statusPreview = "", onEnabledChange = {}, onTokenChange = {}, onStartPairing = {},
+                            onRemoveChat = {}, onSendTest = {}, connected = true,
+                            dailySummaryHour = null, onDailySummaryHourChange = { value -> hour = value }
+                        ),
+                        AppLanguage.PT
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Resumo diário").assertIsDisplayed()
+        onNodeWithText("08:00").performClick()
+        assertEquals(8, hour)
+    }
 }
