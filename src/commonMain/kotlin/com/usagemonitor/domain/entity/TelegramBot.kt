@@ -166,6 +166,8 @@ sealed interface BotCommand {
     data class Keyboard(val on: Boolean) : BotCommand
     /** `/hud` (#408, AA29): traz a HUD à frente no PC — só com "Permitir ações no PC". */
     data object FocusHud : BotCommand
+    /** `/exportar [24h|7d|30d] [csv|json]` (#408, AA23): o consumo do Claude CLI como arquivo. */
+    data class Export(val days: Int, val format: UsageExportFormat) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -177,7 +179,7 @@ sealed interface BotCommand {
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
     is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud -> true
-    is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, BotCommand.Accounts, BotCommand.Refresh,
+    is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
@@ -241,6 +243,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "conversas", "chats" -> BotCommand.Chats
         "sair", "leave", "unpair" -> BotCommand.Leave
         "hud" -> BotCommand.FocusHud
+        "exportar", "export" -> parseExport(args)
         "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {
             null, "on", "ligar" -> BotCommand.Keyboard(true)
             "off", "desligar" -> BotCommand.Keyboard(false)
@@ -276,6 +279,23 @@ private val TELEGRAM_KEYBOARD = listOf(
     listOf(KeyboardKey("📊 Status", "📊 Status", BotCommand.Status), KeyboardKey("👤 Conta", "👤 Account", BotCommand.Accounts)),
     listOf(KeyboardKey("📈 Gráfico", "📈 Chart", BotCommand.Chart(HistoryRange.LAST_24_HOURS)), KeyboardKey("⏳ Quando", "⏳ When", BotCommand.Exhaustion))
 )
+
+/** Período e formato em qualquer ordem; sem eles, 7 dias em CSV. */
+private fun parseExport(args: List<String>): BotCommand {
+    var days = 7
+    var format = UsageExportFormat.CSV
+    for (arg in args.map { value -> value.lowercase() }) {
+        when (arg) {
+            "24h", "1d", "1" -> days = 1
+            "7d", "7" -> days = 7
+            "30d", "30" -> days = 30
+            "csv" -> format = UsageExportFormat.CSV
+            "json" -> format = UsageExportFormat.JSON
+            else -> return BotCommand.Invalid("/exportar 7d csv | /exportar 30d json")
+        }
+    }
+    return BotCommand.Export(days, format)
+}
 
 private fun parseQuiet(argument: String?): BotCommand {
     val usage = "/silencio 22-07 | /silencio off"

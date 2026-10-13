@@ -160,6 +160,7 @@ Molde por tipo de opção:
 | A17 | `feat(telegram): offer a persistent shortcut keyboard with /teclado` | `gradlew.bat desktopTest --tests "*Telegram*"`: 82 testes, 0 falhas (novos: JSON do teclado persistente e do `remove_keyboard`; `/teclado on` manda as duas linhas, o rótulo tocado roda o comando e `/teclado off` tira) | concluída |
 | A18 | `feat(telegram): bring the HUD to the front with /hud behind a PC actions switch` | `gradlew.bat desktopTest --tests "*Telegram*"`: 84 testes, 0 falhas (novos: `/hud` recusado sem a permissão e pedido com ela; interruptor nasce desligado e manda o conjunto de opções). Primeira rodada: 1 falha no teste de tela (`performScrollTo` fora de rolagem, armadilha conhecida), corrigida no teste | concluída |
 | A19 | `feat(telegram): sign messages with this PC's name when asked` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CliSession*"`: 86 + 236 testes, 0 falhas (novos: assinatura só com nome conhecido e escapada; desligada nada muda, ligada alerta e resposta terminam com o nome). `resolveLocalHostName` saiu do `LocalCliSessionDataSource` (que estava na faixa 750–800 e encolheu) | concluída |
+| A20 | `feat(telegram): send the CLI usage as a csv or json file with /exportar` | `gradlew.bat desktopTest --tests "*Telegram*"`: 88 testes, 0 falhas (novos: `sendDocument` multipart; `/exportar json 30d` manda o arquivo com nome de data e recorte; parse em qualquer ordem e formato inválido) | concluída |
 
 ## Problemas em aberto e riscos
 

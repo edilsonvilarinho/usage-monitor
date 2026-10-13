@@ -57,6 +57,7 @@ internal object TelegramBotMessages {
             "idioma" to "Idioma desta conversa (pt, en ou app)",
             "teclado" to "Atalhos no lugar do teclado (on ou off)",
             "hud" to "Traz a HUD à frente no PC",
+            "exportar" to "Uso do Claude CLI em arquivo (7d csv)",
             "ajuda" to "Lista de comandos"
         )
     } else {
@@ -85,6 +86,7 @@ internal object TelegramBotMessages {
             "language" to "Language of this chat (pt, en or app)",
             "keyboard" to "Shortcuts in place of the keyboard (on or off)",
             "hud" to "Bring the HUD to the front on the PC",
+            "export" to "Claude CLI usage as a file (7d csv)",
             "help" to "List of commands"
         )
     }
@@ -233,6 +235,7 @@ internal object TelegramBotMessages {
             "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
             "<code>/teclado on</code> · <code>/teclado off</code> — atalhos no lugar do teclado\n" +
             "<code>/hud</code> — traz a HUD à frente no PC\n" +
+            "<code>/exportar</code> · <code>/exportar 30d json</code> — uso do Claude CLI em arquivo\n" +
             "<i>Toque num comando para copiar.</i>"
     } else {
         "<b>Commands</b>\n" +
@@ -259,6 +262,7 @@ internal object TelegramBotMessages {
             "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +
             "<code>/keyboard on</code> · <code>/keyboard off</code> — shortcuts in place of the keyboard\n" +
             "<code>/hud</code> — bring the HUD to the front on the PC\n" +
+            "<code>/export</code> · <code>/export 30d json</code> — Claude CLI usage as a file\n" +
             "<i>Tap a command to copy it.</i>"
     }
 

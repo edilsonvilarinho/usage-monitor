@@ -145,6 +145,19 @@ internal object TelegramBotUsageMessages {
             "<b>Comparison · last $days ${if (days == 1) "day" else "days"}</b>\n<i>color: value over the column maximum; the number is always written</i>"
         }
 
+    /** Legenda do arquivo do `/exportar` (AA23): o recorte e o que está dentro. */
+    fun exportCaption(days: Int, language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "<b>Uso do Claude CLI · últimos $days ${if (days == 1) "dia" else "dias"}</b>\n<i>por modelo e ferramenta, com os totais; sem projeto, branch ou conteúdo</i>"
+    } else {
+        "<b>Claude CLI usage · last $days ${if (days == 1) "day" else "days"}</b>\n<i>by model and tool, with totals; no project, branch or content</i>"
+    }
+
+    /** Nome do arquivo do `/exportar`: data local do envio e o recorte. */
+    fun exportFileName(now: Instant, days: Int, extension: String): String {
+        val date = now.toLocalDateTime(SAO_PAULO).date
+        return "usage-monitor-$date-${days}d.$extension"
+    }
+
     /** Legenda do `/status img` (AA14): a hora da coleta, como o `/status`. */
     fun ringsCaption(collectedAt: Instant?, language: AppLanguage): String {
         val pt = language == AppLanguage.PT

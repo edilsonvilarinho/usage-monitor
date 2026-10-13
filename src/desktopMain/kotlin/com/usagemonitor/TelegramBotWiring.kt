@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.resolveLocalHostName
+import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.domain.entity.TelegramAccountHistory
@@ -83,7 +84,16 @@ private fun createTelegramBotService(
         accountHistory = accountHistoryReader(graph, dashboard),
         // O mesmo pedido da segunda instância: um arquivo que o laço do `Main` atende.
         focusHud = { FocusRequestChannel().request() },
-        machineName = machineName
+        machineName = machineName,
+        exportUsage = { since, format ->
+            graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
+                // Projeto, branch e integrante ficam fora: o arquivo sai do PC para o Telegram.
+                DefaultUsageExportEncoder.encodeBreakdown(
+                    breakdown.copy(byProject = emptyList(), byBranch = emptyList(), byMember = emptyList()),
+                    format
+                )
+            }
+        }
     )
 )
 

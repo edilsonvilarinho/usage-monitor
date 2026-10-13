@@ -66,6 +66,18 @@ class TelegramBotApiTest {
     }
 
     @Test
+    fun `document goes as multipart to sendDocument`() = runTest {
+        var url = ""
+        val engine = MockEngine { request ->
+            url = request.url.toString()
+            respond("""{"ok":true}""", HttpStatusCode.OK)
+        }
+        TelegramBotApi(HttpClient(engine)).sendDocument("123:abc", 51L, "a,b\n1,2".encodeToByteArray(), "uso.csv", "text/csv", "<b>Uso</b>")
+
+        assertTrue(url.endsWith("/bot123:abc/sendDocument"), url)
+    }
+
+    @Test
     fun `html message declares the parse mode`() = runTest {
         var sent: String? = null
         api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }.sendMessage("123:abc", 51L, "<b>Olá</b>", html = true)

@@ -26,6 +26,7 @@ import com.usagemonitor.domain.entity.parseBotTap
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.changesApp
@@ -149,6 +150,20 @@ internal class TelegramBotHandlers(
             is BotCommand.Compare -> sendHeatmap(token, chatId, command.days, language)
             BotCommand.Chats -> send(token, chatId, TelegramBotChatMessages.chats(settingsFlow.value.authorizedChats, chatId, language))
             BotCommand.Leave -> leave(token, chatId, language)
+            is BotCommand.Export -> {
+                val now = clock.now()
+                val content = readings.exportUsage(now.toEpochMilliseconds() - command.days * DAY_MILLIS, command.format)
+                if (content == null) {
+                    send(token, chatId, TelegramBotUsageMessages.throughput(null, language))
+                } else {
+                    val contentType = if (command.format == UsageExportFormat.JSON) "application/json" else "text/csv"
+                    api.sendDocument(
+                        token, chatId, content.encodeToByteArray(),
+                        TelegramBotUsageMessages.exportFileName(now, command.days, command.format.extension), contentType,
+                        TelegramBotUsageMessages.exportCaption(command.days, language)
+                    )
+                }
+            }
             BotCommand.FocusHud -> {
                 // A permissão é relida aqui: desligada depois do pedido, ele não sai.
                 val allowed = settingsFlow.value.preferences.allowPcActions

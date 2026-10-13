@@ -1,6 +1,7 @@
 package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotTap
@@ -58,6 +59,9 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.ChatLanguage(AppLanguage.EN), parseBotCommand("/idioma en"))
         assertEquals(BotCommand.Keyboard(true), parseBotCommand("/teclado"))
         assertEquals(BotCommand.FocusHud, parseBotCommand("/hud"))
+        assertEquals(BotCommand.Export(7, UsageExportFormat.CSV), parseBotCommand("/exportar"))
+        assertEquals(BotCommand.Export(30, UsageExportFormat.JSON), parseBotCommand("/export json 30d"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/exportar pdf"))
         assertTrue(BotCommand.FocusHud.changesApp())
         assertEquals(BotCommand.Keyboard(false), parseBotCommand("/keyboard off"))
         assertEquals(BotCommand.Accounts, parseKeyboardLabel("👤 Account"))

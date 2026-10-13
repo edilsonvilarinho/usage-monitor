@@ -86,6 +86,11 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
     }
 
     val photos = Collections.synchronizedList(mutableListOf<Pair<Long, Int>>())
+    val documents = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
+
+    override suspend fun sendDocument(token: String, chatId: Long, bytes: ByteArray, fileName: String, contentType: String, caption: String) {
+        documents += fileName to bytes.decodeToString()
+    }
 
     override suspend fun sendPhoto(token: String, chatId: Long, png: ByteArray, caption: String) {
         photos += chatId to png.size
@@ -146,7 +151,11 @@ class TelegramBotServiceTest {
             }
         },
         panelIntervalMillis = 50L,
-        readings = TelegramBotReadings(focusHud = { focusRequests.incrementAndGet(); true }, machineName = { "NOTE-EDI" })
+        readings = TelegramBotReadings(
+            focusHud = { focusRequests.incrementAndGet(); true },
+            machineName = { "NOTE-EDI" },
+            exportUsage = { since, format -> "$format desde $since" }
+        )
     )
 
     @AfterTest
@@ -330,6 +339,20 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("<b>Sessão CLI saturada</b>") && it.second.endsWith("<i>💻 NOTE-EDI</i>") } }
         api.pending += message(2, chat = 51, text = "/reinicios")
         waitUntil { api.sent.count { it.second.endsWith("<i>💻 NOTE-EDI</i>") } >= 2 }
+    }
+
+    /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */
+    @Test
+    fun `export sends the usage file with the period and format`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/exportar json 30d")
+
+        waitUntil { api.documents.isNotEmpty() }
+        val (name, content) = api.documents.single()
+        assertEquals("usage-monitor-2026-10-06-30d.json", name)
+        // 2026-10-06T12:00Z menos 30 dias.
+        assertEquals("JSON desde ${Instant.parse("2026-09-06T12:00:00Z").toEpochMilliseconds()}", content)
     }
 
     @Test

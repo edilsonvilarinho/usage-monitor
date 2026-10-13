@@ -210,6 +210,30 @@ open class TelegramBotApi(
         decode(response, SimpleResponseDto.serializer())
     }
 
+    /**
+     * Arquivo com legenda em HTML (#408, `/exportar`). Multipart, como o [sendPhoto];
+     * [fileName] é o nome que o Telegram mostra e com que o arquivo é salvo.
+     */
+    open suspend fun sendDocument(token: String, chatId: Long, bytes: ByteArray, fileName: String, contentType: String, caption: String) {
+        val response = httpClient.submitFormWithBinaryData(
+            url = "$baseUrl/bot$token/sendDocument",
+            formData = formData {
+                append("chat_id", chatId.toString())
+                append("caption", caption)
+                append("parse_mode", PARSE_MODE_HTML)
+                append(
+                    "document",
+                    bytes,
+                    Headers.build {
+                        append(HttpHeaders.ContentType, contentType)
+                        append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                    }
+                )
+            }
+        )
+        decode(response, SimpleResponseDto.serializer())
+    }
+
     /** Lista do botão "Menu" do Telegram: os comandos aparecem sem digitar `/ajuda`. */
     open suspend fun setMyCommands(token: String, commands: List<Pair<String, String>>) {
         val body = SetCommandsDto(commands.map { (command, description) -> CommandDto(command, description) })

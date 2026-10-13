@@ -416,6 +416,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     `InetAddress`; saiu do `LocalCliSessionDataSource` para um dono só). Sem nome, a mensagem segue sem assinatura. Dois PCs
     com o **mesmo** token disputam o `getUpdates` (o Telegram responde 409 a um deles): o nome resolve "de onde veio o
     alerta", não a disputa — para comandos, um token por PC.
+  - `/exportar [24h|7d|30d] [csv|json]` (`/export`, AA23; padrão 7 d CSV): o consumo do Claude CLI do recorte
+    (`getUsageBreakdown` com `sinceEpochMillis`) no mesmo formato da exportação do app (`DefaultUsageExportEncoder`), enviado
+    por `sendDocument` (multipart novo, como o `sendPhoto`). Projeto, branch e integrante são **zerados antes de codificar** —
+    o arquivo sai do PC; ficam modelo, ferramenta e totais. Índice ilegível responde em texto.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
