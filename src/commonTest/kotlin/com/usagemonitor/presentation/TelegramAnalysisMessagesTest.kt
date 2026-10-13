@@ -42,4 +42,13 @@ class TelegramAnalysisMessagesTest {
         assertEquals("▁▅█ ", com.usagemonitor.presentation.ui.TelegramAnalysisTexts.spark(listOf(0.0, 5.0, 10.0, null)))
         assertTrue("weekly" in TelegramAnalysisMessages.text(AnalysisView.TREND, AnalysisFixture.analysis, AppLanguage.EN)!!)
     }
+
+    /** AB3: cada intervalo com ritmo, vazão e a razão contra 7 dias; 7 dias não se compara consigo. */
+    @Test
+    fun `intervals compare each span with the week`() {
+        val text = TelegramAnalysisMessages.text(AnalysisView.INTERVALS, AnalysisFixture.analysis, AppLanguage.PT)!!
+        assertTrue("1 h         14,0      48   ↑ 1,9×" in text, text)
+        assertTrue("7 d          7,4      47        —" in text, text)
+        assertTrue("pace by interval" in TelegramAnalysisMessages.text(AnalysisView.INTERVALS, AnalysisFixture.analysis, AppLanguage.EN)!!)
+    }
 }
