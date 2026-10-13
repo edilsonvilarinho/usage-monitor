@@ -13,6 +13,7 @@ import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.accountByKey
 import com.usagemonitor.domain.entity.botAccountKey
 import com.usagemonitor.domain.entity.data
+import com.usagemonitor.presentation.ui.TelegramAnalysisImageLabels
 import com.usagemonitor.presentation.ui.TelegramAnalysisMessages
 import com.usagemonitor.presentation.ui.TelegramAnalysisTexts
 
@@ -84,7 +85,16 @@ internal class TelegramAnalysisHandler(
                     api.sendMessage(token, chatId, text, html = true, buttons = buttons)
                 }
             }
-            AnalysisViewKind.IMAGE, AnalysisViewKind.FILE -> send(token, chatId, TelegramAnalysisMessages.panel(analysis, language))
+            AnalysisViewKind.IMAGE -> {
+                // A imagem sai como mensagem nova: o Telegram não troca texto por foto na edição.
+                val png = TelegramAnalysisRenderer.render(shown, analysis, language)
+                if (png == null) {
+                    send(token, chatId, TelegramAnalysisMessages.panel(analysis, language))
+                } else {
+                    api.sendPhoto(token, chatId, png, signed(TelegramAnalysisImageLabels.caption(shown, analysis, language)))
+                }
+            }
+            AnalysisViewKind.FILE -> send(token, chatId, TelegramAnalysisMessages.panel(analysis, language))
         }
     }
 
