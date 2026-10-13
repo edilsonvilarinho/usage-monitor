@@ -141,6 +141,7 @@ Molde por tipo de opção:
 | Atividade | Commit | Evidência | Estado |
 | --- | --- | --- | --- |
 | A00 | `docs: plan issue 408 telegram bot features` | galeria aberta no painel do navegador: 30 cards + referência, console sem erro, sem rolagem horizontal a 375 px; publicada para o usuário, que escolheu AA1–AA30 | concluída |
+| A01 | `refactor(telegram): dispatch commands and move the bot wiring out of AppViewModels` | `gradlew.bat desktopTest --tests "*Telegram*"`: 58 testes, 0 falhas (comportamento igual; `handle` virou `when` exaustivo e a fiação foi para `TelegramBotWiring.kt`, `AppViewModels` 454 → 394 linhas) | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -148,7 +149,7 @@ Molde por tipo de opção:
 | --- | --- | --- |
 | R1 | Nada é conferido contra o Telegram real pelo agente (limites de edição, `sendDocument`, `ReplyKeyboardMarkup`) | aberto |
 | R2 | AA20: dois PCs com o mesmo token fazendo `getUpdates` recebem 409 do Telegram — exige decisão de quem faz polling | aberto, só se AA20 for escolhida |
-| R3 | `AppViewModels.kt` (454 linhas) cresce com a fiação; acima de ~700, extrair | medido |
+| R3 | `AppViewModels.kt` (454 linhas) cresce com a fiação; acima de ~700, extrair | fechado na A01: fiação em `TelegramBotWiring.kt`, `AppViewModels` com 394 linhas |
 
 ## Desvios do plano e achados da execução
 

@@ -85,56 +85,61 @@ internal class TelegramBotHandlers(
         }
         // Conversa não pareada não recebe resposta: o bot não confirma que existe.
         if (!settings.isAuthorized(message.chatId)) return
-        if (command == BotCommand.Status) {
-            val snapshot = snapshotProvider()
-            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
-            return
-        }
-        if (command == BotCommand.Refresh) {
-            requestRefresh()
-            val snapshot = snapshotProvider()
-            api.sendMessage(token, message.chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
-            return
-        }
-        if (command == BotCommand.Sources) {
-            val allowed = settings.allowSourceControl
-            val enabled = enabledSources()
-            val buttons = if (allowed) rows(TelegramBotRemoteMessages.sourceButtons(enabled, language)) else emptyList()
-            api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.sources(enabled, allowed, language), html = true, buttons = buttons)
-            return
-        }
-        if (command is BotCommand.Chart) {
-            val chart = chartProvider(command.range)
-            if (chart == null || chart.isEmpty) {
-                api.sendMessage(token, message.chatId, TelegramChartMessages.empty(language), html = true)
-                return
+        reply(token, message.chatId, command, language)
+    }
+
+    /**
+     * Um comando já autorizado. `when` exaustivo de propósito: comando novo em
+     * [BotCommand] não compila sem dizer o que o bot responde.
+     */
+    private suspend fun reply(token: String, chatId: Long, command: BotCommand, language: AppLanguage) {
+        when (command) {
+            is BotCommand.Start -> Unit
+            BotCommand.Status -> sendStatus(token, chatId, language)
+            BotCommand.Refresh -> {
+                requestRefresh()
+                sendStatus(token, chatId, language)
             }
-            api.sendPhoto(token, message.chatId, TelegramChartRenderer.render(chart), TelegramChartMessages.caption(command.range, chart, language))
-            return
-        }
-        if (command == BotCommand.Summary) {
-            api.sendMessage(token, message.chatId, summaryText(language), html = true)
-            return
-        }
-        if (command == BotCommand.QuietMenu) {
-            api.sendMessage(token, message.chatId, TelegramBotRemoteMessages.quietMenu(language), html = true, buttons = rows(TelegramBotRemoteMessages.quietButtons(language)))
-            return
-        }
-        if (command == BotCommand.Accounts) {
-            val snapshot = snapshotProvider()
-            api.sendMessage(token, message.chatId, TelegramBotMessages.accountPicker(snapshot, language), html = true, buttons = accountRows(snapshot))
-            return
-        }
-        val reply = when (command) {
-            BotCommand.Help -> TelegramBotMessages.help(language)
-            is BotCommand.Invalid -> TelegramBotMessages.invalid(command.usage, language)
-            else -> {
+            BotCommand.Sources -> sendSources(token, chatId, language)
+            is BotCommand.Chart -> sendChart(token, chatId, command.range, language)
+            BotCommand.Summary -> api.sendMessage(token, chatId, summaryText(language), html = true)
+            BotCommand.QuietMenu -> api.sendMessage(
+                token, chatId, TelegramBotRemoteMessages.quietMenu(language), html = true,
+                buttons = rows(TelegramBotRemoteMessages.quietButtons(language))
+            )
+            BotCommand.Accounts -> {
+                val snapshot = snapshotProvider()
+                api.sendMessage(token, chatId, TelegramBotMessages.accountPicker(snapshot, language), html = true, buttons = accountRows(snapshot))
+            }
+            BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
+            is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
+            is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {
                 val updated = applyBotCommand(alertSettingsFlow.value, command)
                 if (updated != null) saveAlertSettings(updated)
-                TelegramBotMessages.applied(command, language)
+                api.sendMessage(token, chatId, TelegramBotMessages.applied(command, language), html = true)
             }
         }
-        api.sendMessage(token, message.chatId, reply, html = true)
+    }
+
+    private suspend fun sendStatus(token: String, chatId: Long, language: AppLanguage) {
+        val snapshot = snapshotProvider()
+        api.sendMessage(token, chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+    }
+
+    private suspend fun sendSources(token: String, chatId: Long, language: AppLanguage) {
+        val allowed = settingsFlow.value.allowSourceControl
+        val enabled = enabledSources()
+        val buttons = if (allowed) rows(TelegramBotRemoteMessages.sourceButtons(enabled, language)) else emptyList()
+        api.sendMessage(token, chatId, TelegramBotRemoteMessages.sources(enabled, allowed, language), html = true, buttons = buttons)
+    }
+
+    private suspend fun sendChart(token: String, chatId: Long, range: HistoryRange, language: AppLanguage) {
+        val chart = chartProvider(range)
+        if (chart == null || chart.isEmpty) {
+            api.sendMessage(token, chatId, TelegramChartMessages.empty(language), html = true)
+            return
+        }
+        api.sendPhoto(token, chatId, TelegramChartRenderer.render(chart), TelegramChartMessages.caption(range, chart, language))
     }
 
     private suspend fun handleButton(token: String, message: TelegramIncomingMessage, callbackId: String) {
