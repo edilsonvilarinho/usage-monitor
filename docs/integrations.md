@@ -365,6 +365,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     total); as outras da fonte vêm embaixo com o emoji do pior risco. Conta só com saldo fica fora: não se compara com janela.
   - `/ritmo` (`/pace`, AA27): para cota em percentual com mais de 24 h até o reinício, (100 − uso) dividido pelos dias que
     faltam, em pp por dia. Rotulado **estimativa** — a API não informa ritmo; é cálculo de apresentação, não da camada data.
+  - `/ping` (AA19): versão (`CURRENT_APP_VERSION`), tempo aberto (instante da montagem do bot), próxima coleta
+    (`DashboardViewModel.nextRefreshAt`) e a hora da última leitura de cada conta. As leituras que não vêm do retrato
+    entram por `TelegramBotReadings` (um parâmetro só no serviço, default vazio por leitura).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

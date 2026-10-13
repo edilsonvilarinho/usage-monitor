@@ -3,6 +3,8 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.domain.entity.TelegramPing
+import kotlin.time.Instant
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.displayName
@@ -24,7 +26,9 @@ internal fun createTelegramBot(
     graph: AppGraph,
     dashboard: DashboardViewModel,
     alerts: Flow<UsageAlert>,
-    snapshot: () -> UsageSnapshot?
+    snapshot: () -> UsageSnapshot?,
+    /** Quando o app abriu, para o `/ping` dizer há quanto tempo está de pé. */
+    startedAt: Instant = Clock.System.now()
 ): TelegramBotService = TelegramBotService(
     api = TelegramBotApi(graph.httpClient),
     settingsFlow = graph.telegramSettingsFlow,
@@ -53,7 +57,10 @@ internal fun createTelegramBot(
             TelegramDailySpend(totals.costMicros, totals.sessionCount, totals.unpricedTurnCount)
         }
     },
-    chartProvider = { range -> telegramChartOf(graph, range) }
+    chartProvider = { range -> telegramChartOf(graph, range) },
+    readings = TelegramBotReadings(
+        ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) }
+    )
 )
 
 /** Janela do gasto no resumo diário do bot (#398, Y1). */

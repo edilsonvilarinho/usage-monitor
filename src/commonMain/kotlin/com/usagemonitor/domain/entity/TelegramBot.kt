@@ -103,6 +103,8 @@ sealed interface BotCommand {
     data object BestAccount : BotCommand
     /** `/ritmo` (#408, AA27): quanto das janelas longas cabe por dia até o reinício (estimativa). */
     data object Pace : BotCommand
+    /** `/ping` (#408, AA19): o app está aberto e coletando? */
+    data object Ping : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -143,6 +145,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "quando", "when" -> BotCommand.Exhaustion
         "qual", "which" -> BotCommand.BestAccount
         "ritmo", "pace" -> BotCommand.Pace
+        "ping" -> BotCommand.Ping
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

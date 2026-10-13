@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.nextMorningMillis
 import com.usagemonitor.domain.entity.snoozeAlertsUntil
+import com.usagemonitor.presentation.ui.TelegramBotChatMessages
 import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
 import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.domain.entity.BotButton
@@ -58,7 +59,9 @@ internal class TelegramBotHandlers(
     /** O texto do resumo diário (#398, Y1), montado por quem tem o gasto. */
     private val summaryText: suspend (AppLanguage) -> String = { language -> TelegramBotMessages.noReading(language == AppLanguage.PT) },
     /** O gráfico do intervalo (#398, Y6); `null` sem histórico — a resposta vira texto. */
-    private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null }
+    private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null },
+    /** Leituras das funções da #408. */
+    private val readings: TelegramBotReadings = TelegramBotReadings()
 ) {
 
     suspend fun handle(token: String, message: TelegramIncomingMessage) {
@@ -116,6 +119,7 @@ internal class TelegramBotHandlers(
             BotCommand.Exhaustion -> send(token, chatId, TelegramBotInsightMessages.exhaustion(snapshotProvider(), language))
             BotCommand.BestAccount -> send(token, chatId, TelegramBotInsightMessages.bestAccount(snapshotProvider(), language))
             BotCommand.Pace -> send(token, chatId, TelegramBotInsightMessages.pace(snapshotProvider(), language))
+            BotCommand.Ping -> send(token, chatId, TelegramBotChatMessages.ping(readings.ping(), snapshotProvider(), clock.now(), language))
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {

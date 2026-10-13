@@ -75,6 +75,8 @@ internal class TelegramBotService(
     private val spendProvider: suspend () -> TelegramDailySpend? = { null },
     /** Gráfico do `/grafico` (#398, Y6), montado de quem tem o histórico. */
     private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null },
+    /** Leituras das funções da #408 (`/ping` e as seguintes). */
+    private val readings: TelegramBotReadings = TelegramBotReadings(),
     /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
     private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS
 ) {
@@ -101,7 +103,8 @@ internal class TelegramBotService(
         enabledSources = enabledSources,
         toggleSource = toggleSource,
         summaryText = { language -> TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language) },
-        chartProvider = chartProvider
+        chartProvider = chartProvider,
+        readings = readings
     )
 
     private val _status = MutableStateFlow<TelegramBotStatus>(TelegramBotStatus.Off)
