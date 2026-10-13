@@ -126,6 +126,7 @@ internal class TelegramBotHandlers(
                 val since = clock.now().toEpochMilliseconds() - DAY_MILLIS
                 send(token, chatId, TelegramBotUsageMessages.throughput(readings.comparison(since), language))
             }
+            BotCommand.Week -> send(token, chatId, TelegramBotUsageMessages.week(readings.accountHistory(HistoryRange.LAST_7_DAYS), language))
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {

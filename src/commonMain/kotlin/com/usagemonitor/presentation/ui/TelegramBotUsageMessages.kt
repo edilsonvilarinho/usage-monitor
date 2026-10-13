@@ -2,6 +2,8 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ComparisonRow
+import com.usagemonitor.domain.entity.TelegramAccountHistory
+import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import kotlin.math.roundToInt
 
@@ -34,6 +36,38 @@ internal object TelegramBotUsageMessages {
         }
         val header = if (pt) "<b>⚡ Vazão de saída — 24 h</b>" else "<b>⚡ Output throughput — 24 h</b>"
         val footer = if (pt) "<i>ponta a ponta: do pedido à última linha</i>" else "<i>end to end: from the request to the last line</i>"
+        return (listOf(header) + lines + footer).joinToString("\n")
+    }
+
+    /**
+     * `/semana` (AA7): o consumo dos últimos 7 dias contra os 7 anteriores, por cota,
+     * em pontos somados (o `UsagePeriodComparison` do histórico: reinício conta zero,
+     * nunca delta negativo). Seta **e** número; saldo em dinheiro fica fora.
+     */
+    fun week(histories: List<TelegramAccountHistory>, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val lines = histories.flatMap { history ->
+            history.report.series.mapNotNull { series ->
+                val comparison = series.comparison ?: return@mapNotNull null
+                val total = series.currentDisplayTotal
+                if (total <= 0L || series.unit == UsageUnit.CURRENCY_USD) return@mapNotNull null
+                val current = comparison.currentDelta * 100 / total
+                val previous = comparison.previousDelta * 100 / total
+                val diff = current - previous
+                val trend = when {
+                    diff > 0 -> "▲ +$diff pp"
+                    diff < 0 -> "▼ −${-diff} pp"
+                    else -> "="
+                }
+                val name = "<b>${TelegramBotMessages.escape(history.label)} · ${TelegramBotMessages.escape(series.quotaLabel)}</b>"
+                if (pt) "$name +$current pp (antes +$previous pp) $trend" else "$name +$current pp (before +$previous pp) $trend"
+            }
+        }
+        if (lines.isEmpty()) {
+            return if (pt) "📅 Ainda não há duas semanas de histórico para comparar." else "📅 There are not two weeks of history to compare yet."
+        }
+        val header = if (pt) "<b>📅 Últimos 7 dias × 7 anteriores</b>" else "<b>📅 Last 7 days × the 7 before</b>"
+        val footer = if (pt) "<i>pontos da cota somados; reinício conta zero</i>" else "<i>quota points added up; a reset counts zero</i>"
         return (listOf(header) + lines + footer).joinToString("\n")
     }
 }

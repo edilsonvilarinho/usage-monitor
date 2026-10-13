@@ -60,6 +60,13 @@ data class UsageSnapshotQuota(
     val exhaustsAt: Instant? = null
 )
 
+/**
+ * Rótulo da conta no retrato: a fonte e, com mais de uma conta, o apelido. Um dono
+ * só — o bot casa o histórico de cada conta com o cartão do `/status` por ele (#408).
+ */
+val ApiUsageStats.snapshotLabel: String
+    get() = profileLabel?.let { label -> "$apiName · $label" } ?: apiName
+
 /** Monta o retrato na ordem em que o dashboard publica as fontes. */
 fun buildUsageSnapshot(
     stats: List<ApiUsageStats>,
@@ -72,7 +79,7 @@ fun buildUsageSnapshot(
         accounts = stats.map { item ->
             UsageSnapshotAccount(
                 source = item.source,
-                label = item.profileLabel?.let { label -> "${item.apiName} · $label" } ?: item.apiName,
+                label = item.snapshotLabel,
                 active = item.targetKey in activeTargets,
                 fetchedAt = item.fetchedAt,
                 quotas = item.quotas.map { quota ->

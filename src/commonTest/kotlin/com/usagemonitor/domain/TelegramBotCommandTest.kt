@@ -46,6 +46,7 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Ping, parseBotCommand("/ping"))
         assertEquals(BotCommand.Spike, parseBotCommand("/pico"))
         assertEquals(BotCommand.Throughput, parseBotCommand("/vazão"))
+        assertEquals(BotCommand.Week, parseBotCommand("/semana"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
         assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
         assertEquals(BotCommand.Sources, parseBotCommand("/api"))

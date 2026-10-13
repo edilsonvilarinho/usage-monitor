@@ -109,6 +109,8 @@ sealed interface BotCommand {
     data object Spike : BotCommand
     /** `/vazao` (#408, AA5): tokens/s de saída por modelo nas últimas 24 h. */
     data object Throughput : BotCommand
+    /** `/semana` (#408, AA7): últimos 7 dias contra os 7 anteriores. */
+    data object Week : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -152,6 +154,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "ping" -> BotCommand.Ping
         "pico", "spike" -> BotCommand.Spike
         "vazao", "vazão", "throughput", "speed" -> BotCommand.Throughput
+        "semana", "week" -> BotCommand.Week
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

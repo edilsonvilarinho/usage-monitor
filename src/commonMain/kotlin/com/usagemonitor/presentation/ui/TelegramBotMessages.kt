@@ -46,6 +46,7 @@ internal object TelegramBotMessages {
             "ping" to "O app está aberto? Versão e última coleta",
             "pico" to "Consumo de hoje acima do seu hábito",
             "vazao" to "Tokens por segundo por modelo (24h)",
+            "semana" to "Esta semana contra a anterior",
             "alertas" to "Liga ou desliga os alertas (on ou off)",
             "silencio" to "Horário de silêncio (22-07 ou off)",
             "limiar" to "Limiares de alerta de cota (75,90)",
@@ -66,6 +67,7 @@ internal object TelegramBotMessages {
             "ping" to "Is the app running? Version and last collection",
             "spike" to "Today's usage above your habit",
             "throughput" to "Tokens per second per model (24h)",
+            "week" to "This week against the previous one",
             "alerts" to "Turn alerts on or off",
             "quiet" to "Quiet hours (22-07 or off)",
             "threshold" to "Quota alert thresholds (75,90)",
@@ -202,6 +204,7 @@ internal object TelegramBotMessages {
             "<code>/ping</code> — versão, tempo aberto e última coleta\n" +
             "<code>/pico</code> — o que está acima do seu hábito hoje\n" +
             "<code>/vazao</code> — tokens por segundo por modelo, 24 h\n" +
+            "<code>/semana</code> — últimos 7 dias contra os 7 anteriores\n" +
             "<code>/alertas on</code> · <code>/alertas off</code> — liga ou desliga os alertas\n" +
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
@@ -221,6 +224,7 @@ internal object TelegramBotMessages {
             "<code>/ping</code> — version, uptime and last collection\n" +
             "<code>/spike</code> — what is above your habit today\n" +
             "<code>/throughput</code> — tokens per second per model, 24 h\n" +
+            "<code>/week</code> — last 7 days against the 7 before\n" +
             "<code>/alerts on</code> · <code>/alerts off</code> — turn alerts on or off\n" +
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +

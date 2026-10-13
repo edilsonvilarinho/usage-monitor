@@ -3,7 +3,9 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.TelegramPing
+import com.usagemonitor.domain.entity.snapshotLabel
 import kotlin.time.Instant
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageSnapshot
@@ -64,7 +66,8 @@ internal fun createTelegramBot(
     readings = TelegramBotReadings(
         ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) },
         spikes = { dashboard.spikes.value },
-        comparison = comparisonReader(graph, dashboard)
+        comparison = comparisonReader(graph, dashboard),
+        accountHistory = accountHistoryReader(graph, dashboard)
     )
 )
 
@@ -74,6 +77,18 @@ private fun comparisonReader(graph: AppGraph, dashboard: DashboardViewModel): su
     return { since ->
         val stats = (dashboard.uiState.value as? UiState.Success)?.data.orEmpty()
         buildComparison(since, stats).getOrNull()
+    }
+}
+
+/**
+ * O histórico de cada conta da última coleta, pela mesma chave que o painel usa
+ * para a projeção (`accountContext.key`). Conta cujo SQLite falha fica fora.
+ */
+private fun accountHistoryReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (HistoryRange) -> List<TelegramAccountHistory> = { range ->
+    val now = Clock.System.now()
+    val stats = (dashboard.uiState.value as? UiState.Success)?.data.orEmpty()
+    stats.mapNotNull { item ->
+        runCatching { TelegramAccountHistory(item.snapshotLabel, graph.getUsageHistory(item.source, range, item.accountContext?.key, now)) }.getOrNull()
     }
 }
 

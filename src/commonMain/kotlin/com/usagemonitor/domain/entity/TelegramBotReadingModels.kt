@@ -13,3 +13,13 @@ data class TelegramPing(
     /** `null` quando o painel ainda não agendou a primeira coleta. */
     val nextRefreshAt: Instant?
 )
+
+/**
+ * O histórico de uma conta do retrato (#408: `/semana`, `/janelas`, sparkline do
+ * `/status`). [label] é o mesmo `snapshotLabel` do cartão — é por ele que o bot
+ * casa o histórico com a conta, nunca pelo e-mail.
+ */
+data class TelegramAccountHistory(
+    val label: String,
+    val report: ApiUsageHistoryReport
+)

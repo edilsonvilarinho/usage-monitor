@@ -1,6 +1,8 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.ComparisonRow
+import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageSpike
 
@@ -18,5 +20,7 @@ internal class TelegramBotReadings(
      * Linhas da comparação entre modelos (#386) desde o instante dado (`/vazao`,
      * `/comparar`); `null` quando o índice CLI falha — "não medido", não lista vazia.
      */
-    val comparison: suspend (sinceEpochMillis: Long) -> List<ComparisonRow>? = { null }
+    val comparison: suspend (sinceEpochMillis: Long) -> List<ComparisonRow>? = { null },
+    /** Histórico de cada conta da última coleta no intervalo, na ordem do retrato. */
+    val accountHistory: suspend (HistoryRange) -> List<TelegramAccountHistory> = { emptyList() }
 )

@@ -374,6 +374,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/vazao` (`/throughput`, AA5): tokens de saída por segundo por modelo nas últimas 24 h, das linhas da comparação entre
     modelos (`BuildModelComparisonUseCase`, #386) — ponta a ponta e total sobre total, nunca média de razões. Modelo sem vazão
     medida fica fora; índice ilegível responde que não deu para ler, em vez de lista vazia.
+  - `/semana` (`/week`, AA7): por cota, os pontos consumidos nos últimos 7 dias contra os 7 anteriores
+    (`UsageHistorySeries.comparison`, o mesmo do Histórico: reinício conta zero), com seta e número. O histórico de cada
+    conta é lido com a mesma chave da projeção do painel (`accountContext.key`) e casado com o cartão pelo `snapshotLabel`
+    (`TelegramAccountHistory`) — nunca pelo e-mail. Saldo em dinheiro fica fora.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
