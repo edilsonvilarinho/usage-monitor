@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TelegramBotSection
 import com.usagemonitor.presentation.ui.components.TelegramBotSectionModel
@@ -29,6 +30,26 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class TelegramBotSectionTest {
+
+    @Test
+    fun `each chat has a control switch that turns it read only`() = runDesktopComposeUiTest {
+        var change: Pair<Long, Boolean>? = null
+        val base = model(enabled = true, code = null)
+        val withRoles = TelegramBotSectionModel(
+            enabled = base.enabled, token = base.token, statusLabel = base.statusLabel, statusTone = base.statusTone,
+            chats = listOf(TelegramChat(51L, "@edilson"), TelegramChat(52L, "Time Infra", readOnly = true)),
+            pairingCode = null, pairingHint = null, statusPreview = base.statusPreview,
+            onEnabledChange = {}, onTokenChange = {}, onStartPairing = {}, onRemoveChat = {}, onSendTest = {},
+            connected = true, onChatControlChange = { id, control -> change = id to control }
+        )
+        setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(withRoles, AppLanguage.PT) } } }
+
+        onNodeWithText("Controle").assertIsDisplayed()
+        onNodeWithText("Só leitura").assertIsDisplayed()
+        onNodeWithTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + 52L).assertIsOff()
+        onNodeWithTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + 51L).performClick()
+        assertEquals(51L to false, change)
+    }
 
     private fun model(enabled: Boolean, code: String? = "AB12CD", onPair: () -> Unit = {}) = TelegramBotSectionModel(
         enabled = enabled,

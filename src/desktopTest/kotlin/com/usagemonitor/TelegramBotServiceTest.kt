@@ -238,6 +238,22 @@ class TelegramBotServiceTest {
         assertTrue(51L to 900L in api.unpins)
     }
 
+    /** #408, AA21: conversa só de leitura lê, mas não muda alertas nem silencia pelo botão. */
+    @Test
+    fun `read only chat reads but cannot change alerts`() {
+        settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "Time", readOnly = true)))
+        service.start()
+        api.pending += message(1, chat = 51, text = "/alertas off")
+        api.pending += tap(2, chat = 51, data = "snooze")
+        api.pending += message(3, chat = 51, text = "/reinicios")
+
+        waitUntil { api.sent.any { it.second.startsWith("🔒 Esta conversa é <b>só leitura</b>") } }
+        waitUntil { "cb2" in api.answered }
+        waitUntil { api.sent.size >= 2 }
+        assertTrue(alertSettings.value.quotaAlertsEnabled)
+        assertEquals(null, alertSettings.value.snoozedUntilEpochMillis)
+    }
+
     @Test
     fun `mute button silences alerts for one hour`() {
         paired()

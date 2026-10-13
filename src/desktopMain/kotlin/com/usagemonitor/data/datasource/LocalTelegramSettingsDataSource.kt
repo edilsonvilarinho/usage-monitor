@@ -9,7 +9,7 @@ import java.io.File
 import java.security.SecureRandom
 
 @Serializable
-private data class TelegramChatDto(val id: Long, val name: String = "")
+private data class TelegramChatDto(val id: Long, val name: String = "", val readOnly: Boolean = false)
 
 @Serializable
 private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
@@ -44,7 +44,7 @@ internal class LocalTelegramSettingsDataSource(
         return TelegramBotSettings(
             enabled = dto.enabled,
             botToken = dto.botToken,
-            authorizedChats = dto.authorizedChats.map { chat -> TelegramChat(chat.id, chat.name) },
+            authorizedChats = dto.authorizedChats.map { chat -> TelegramChat(chat.id, chat.name, chat.readOnly) },
             pairingCode = dto.pairingCode,
             pairingExpiresAtMillis = dto.pairingExpiresAtMillis,
             allowSourceControl = dto.allowSourceControl,
@@ -61,7 +61,7 @@ internal class LocalTelegramSettingsDataSource(
         val dto = TelegramSettingsDto(
             enabled = settings.enabled,
             botToken = settings.botToken.trim(),
-            authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name) },
+            authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name, chat.readOnly) },
             pairingCode = settings.pairingCode,
             pairingExpiresAtMillis = settings.pairingExpiresAtMillis,
             allowSourceControl = settings.allowSourceControl,

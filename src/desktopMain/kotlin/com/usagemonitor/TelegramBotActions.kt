@@ -39,6 +39,11 @@ internal class TelegramBotActions(
 
     fun sendTest() = service.sendTest()
 
+    /** Controle (`true`) ou só leitura da conversa (#408, AA21); vale no próximo comando ou toque. */
+    fun setChatControl(chatId: Long, control: Boolean) = update { current ->
+        current.copy(authorizedChats = current.authorizedChats.map { chat -> if (chat.id == chatId) chat.copy(readOnly = !control) else chat })
+    }
+
     fun setAllowSourceControl(allowed: Boolean) = update { current -> current.copy(allowSourceControl = allowed) }
 
     /**
@@ -103,7 +108,8 @@ internal fun telegramBotSectionModel(
         dailySummaryHour = settings.dailySummaryHour,
         onDailySummaryHourChange = actions::setDailySummaryHour,
         livePanelEnabled = settings.livePanelEnabled,
-        onLivePanelChange = actions::setLivePanel
+        onLivePanelChange = actions::setLivePanel,
+        onChatControlChange = actions::setChatControl
     )
 }
 

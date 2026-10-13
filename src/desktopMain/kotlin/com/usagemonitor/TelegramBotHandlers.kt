@@ -25,6 +25,7 @@ import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.applyBotCommand
+import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.parseBotCommand
 import com.usagemonitor.domain.entity.snoozeAlerts
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -92,6 +93,10 @@ internal class TelegramBotHandlers(
         }
         // Conversa não pareada não recebe resposta: o bot não confirma que existe.
         if (!settings.isAuthorized(message.chatId)) return
+        if (settings.isReadOnly(message.chatId) && command.changesApp()) {
+            send(token, message.chatId, TelegramBotChatMessages.readOnly(language))
+            return
+        }
         reply(token, message.chatId, command, language)
     }
 
@@ -221,6 +226,11 @@ internal class TelegramBotHandlers(
     private suspend fun handleButton(token: String, message: TelegramIncomingMessage, callbackId: String) {
         val language = languageProvider()
         val tap = parseBotTap(message.callbackData)
+        // O papel é relido no toque: um teclado enviado antes de a conversa virar só leitura não vale mais.
+        if (settingsFlow.value.isReadOnly(message.chatId) && tapChangesApp(tap, BotButton.fromData(message.callbackData))) {
+            runTelegram { api.answerCallbackQuery(token, callbackId, TelegramBotChatMessages.readOnlyTap(language)) }
+            return
+        }
         if (tap != null) {
             runTelegram { handleTap(token, message, callbackId, tap, language) }
             return
@@ -262,6 +272,13 @@ internal class TelegramBotHandlers(
             is BotTap.SnoozeFor -> snoozeFromTap(token, message.chatId, callbackId, clock.now().toEpochMilliseconds() + tap.minutes * 60_000L, language)
             BotTap.SnoozeUntilMorning -> snoozeFromTap(token, message.chatId, callbackId, nextMorningMillis(clock.now().toEpochMilliseconds()), language)
         }
+    }
+
+    /** Toques que mudam o app (#408, AA21): ligar fonte e silenciar. Ver conta e atualizar só leem. */
+    private fun tapChangesApp(tap: BotTap?, button: BotButton?): Boolean = when (tap) {
+        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning -> true
+        is BotTap.Account -> false
+        null -> button == BotButton.SNOOZE
     }
 
     /**

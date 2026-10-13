@@ -25,6 +25,17 @@ internal object TelegramBotChatMessages {
         return (listOf(header) + lines + footer).joinToString("\n")
     }
 
+    /** Recusa de conversa só de leitura (AA21): diz o papel e onde mudá-lo. */
+    fun readOnly(language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "🔒 Esta conversa é <b>só leitura</b>: ela vê as cotas, mas não muda alertas, fontes nem silêncio. Quem pareou dá controle em Configurações › Alertas › Bot do Telegram."
+    } else {
+        "🔒 This chat is <b>read only</b>: it sees the quotas but does not change alerts, sources or quiet hours. Whoever paired it can grant control in Settings › Alerts › Telegram bot."
+    }
+
+    /** Aviso curto do toque numa conversa só de leitura (AA21). */
+    fun readOnlyTap(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Conversa só de leitura." else "Read-only chat."
+
     /** Resposta do `/sair` (AA22): a última mensagem que esta conversa recebe. */
     fun left(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "👋 Pareamento desfeito. Esta conversa não recebe mais nada. Para voltar, gere um código novo nas Configurações."

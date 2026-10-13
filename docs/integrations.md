@@ -395,6 +395,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/conversas` (`/chats`) e `/sair` (`/leave`, AA22): a lista das conversas pareadas com a atual marcada, e o pareamento
     desfeito pelo próprio Telegram. Sair grava a lista antes de responder (a confirmação é a última mensagem da conversa),
     desafixa o painel dela e não pede permissão — é a conversa decidindo por si.
+  - **Papéis por conversa** (AA21): `TelegramChat.readOnly` (em `telegram.json`, nasce `false` = comportamento de antes).
+    Conversa só de leitura recebe tudo, mas comando que muda o app (`BotCommand.changesApp`, `when` exaustivo — comando
+    novo não compila sem decidir) responde com a recusa, e toque de fonte ou silêncio só fecha o "carregando" com o aviso.
+    O papel é relido a cada comando e toque. Interruptor **Controle** por conversa no card.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

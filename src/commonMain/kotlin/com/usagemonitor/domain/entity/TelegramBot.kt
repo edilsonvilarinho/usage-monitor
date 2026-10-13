@@ -3,8 +3,13 @@ package com.usagemonitor.domain.entity
 /** Validade do código de pareamento: o tempo de abrir o Telegram e mandar a mensagem. */
 const val TELEGRAM_PAIRING_TTL_MILLIS = 10 * 60 * 1_000L
 
-/** Conversa autorizada a falar com o bot (#387). Nome é só rótulo; a identidade é o [id]. */
-data class TelegramChat(val id: Long, val name: String)
+/**
+ * Conversa autorizada a falar com o bot (#387). Nome é só rótulo; a identidade é o [id].
+ * [readOnly] (#408, AA21): a conversa lê tudo mas não muda nada — um grupo da equipe
+ * vê o `/status`, só quem tem controle mexe em alertas, fontes e silêncio. Nasce
+ * `false`, o comportamento de antes do papel existir.
+ */
+data class TelegramChat(val id: Long, val name: String, val readOnly: Boolean = false)
 
 /**
  * Configuração do bot do Telegram (#387).
@@ -51,6 +56,9 @@ class TelegramBotSettings(
     )
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
+
+    /** Conversa pareada só de leitura (#408, AA21); conversa fora da lista não é "só leitura", é estranha. */
+    fun isReadOnly(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId && chat.readOnly }
 
     /** Sem [chatId] na lista nem painel guardado dela (#408, `/sair`). */
     fun withoutChat(chatId: Long): TelegramBotSettings =
@@ -127,6 +135,20 @@ sealed interface BotCommand {
     data object Leave : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
+}
+
+/**
+ * O comando muda o app — alertas, silêncio, limiares (#408, AA21)? Conversa só de
+ * leitura não pode. `when` exaustivo de propósito: comando novo não compila sem
+ * dizer se muda alguma coisa. Sair (`/sair`) não conta: é a conversa decidindo por si.
+ */
+fun BotCommand.changesApp(): Boolean = when (this) {
+    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> true
+    is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, BotCommand.Accounts, BotCommand.Refresh,
+    BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
+    BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
+    BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
+    BotCommand.Leave, BotCommand.Help, is BotCommand.Invalid -> false
 }
 
 /**

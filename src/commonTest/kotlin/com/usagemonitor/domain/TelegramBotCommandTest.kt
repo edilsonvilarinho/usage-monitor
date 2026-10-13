@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.applyBotCommand
+import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.parseBotCommand
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -51,6 +52,10 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Compare(7), parseBotCommand("/comparar"))
         assertEquals(BotCommand.StatusImage, parseBotCommand("/status img"))
         assertEquals(BotCommand.Chats, parseBotCommand("/conversas"))
+        assertTrue(BotCommand.Alerts(false).changesApp())
+        assertFalse(BotCommand.Leave.changesApp())
+        assertTrue(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(1))
+        assertFalse(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(2))
         assertEquals(BotCommand.Leave, parseBotCommand("/sair"))
         assertEquals(BotCommand.Status, parseBotCommand("/status qualquer"))
         assertEquals(BotCommand.Compare(30), parseBotCommand("/compare 30d"))
