@@ -120,6 +120,7 @@ internal class TelegramBotHandlers(
             BotCommand.BestAccount -> send(token, chatId, TelegramBotInsightMessages.bestAccount(snapshotProvider(), language))
             BotCommand.Pace -> send(token, chatId, TelegramBotInsightMessages.pace(snapshotProvider(), language))
             BotCommand.Ping -> send(token, chatId, TelegramBotChatMessages.ping(readings.ping(), snapshotProvider(), clock.now(), language))
+            BotCommand.Spike -> send(token, chatId, TelegramBotInsightMessages.spikes(readings.spikes(), alertSettingsFlow.value.effectiveSpikeFactor, language))
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {

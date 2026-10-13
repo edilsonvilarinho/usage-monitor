@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.TelegramPing
+import com.usagemonitor.domain.entity.UsageSpike
 
 /**
  * O que o bot lê do app além do retrato (#408). Um tipo só, em vez de um
@@ -9,5 +10,7 @@ import com.usagemonitor.domain.entity.TelegramPing
  */
 internal class TelegramBotReadings(
     /** `/ping` (AA19): versão, quando o app abriu e a próxima coleta. */
-    val ping: () -> TelegramPing? = { null }
+    val ping: () -> TelegramPing? = { null },
+    /** `/pico` (AA11): as anomalias de gasto que o painel já calcula para o alerta. */
+    val spikes: () -> List<UsageSpike> = { emptyList() }
 )

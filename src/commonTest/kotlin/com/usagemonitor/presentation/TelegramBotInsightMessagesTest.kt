@@ -8,6 +8,10 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageDailyBaseline
+import com.usagemonitor.domain.entity.UsageSpike
+import com.usagemonitor.domain.entity.UsageTargetKey
+import kotlinx.datetime.LocalDate
 import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -149,5 +153,28 @@ class TelegramBotInsightMessagesTest {
         )
         val short = UsageSnapshot(now, listOf(account("Padrão", quota("5h", 86, Instant.parse("2026-10-13T19:00:00Z")))))
         assertTrue(TelegramBotInsightMessages.pace(short, AppLanguage.PT).startsWith("Nenhuma janela com mais de um dia"))
+    }
+
+    @Test
+    fun `spike lists the strongest first in quota points and says the bar when there is none`() {
+        fun spike(label: String, factor: Double, today: Long, usual: Long) = UsageSpike(
+            target = UsageTargetKey.forSource(ApiSource.ANTHROPIC), targetLabel = "Padrão", quotaLabel = label,
+            periodType = PeriodType.WEEKLY, unit = UsageUnit.PERCENTAGE,
+            baseline = UsageDailyBaseline(todayDelta = today, baselineDelta = usual, completeDays = 14),
+            factor = factor, quotaTotal = 100, localDate = LocalDate(2026, 10, 13)
+        )
+
+        val text = TelegramBotInsightMessages.spikes(listOf(spike("5h", 3.0, 30, 10), spike("Semanal", 3.1, 19, 6)), 3.0, AppLanguage.PT)
+
+        assertEquals(
+            "<b>📈 Hoje × seu hábito</b>\n\n" +
+                "<b>Padrão · Semanal</b> — <b>3,1×</b> o normal\nhoje +19 pp · mediana +6 pp (14 dias, mesma hora)\n\n" +
+                "<b>Padrão · 5h</b> — <b>3,0×</b> o normal\nhoje +30 pp · mediana +10 pp (14 dias, mesma hora)",
+            text
+        )
+        assertEquals(
+            "📈 Nada acima do seu hábito hoje. O aviso sai a partir de 3,0× a mediana.",
+            TelegramBotInsightMessages.spikes(emptyList(), 3.0, AppLanguage.PT)
+        )
     }
 }

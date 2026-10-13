@@ -105,6 +105,8 @@ sealed interface BotCommand {
     data object Pace : BotCommand
     /** `/ping` (#408, AA19): o app está aberto e coletando? */
     data object Ping : BotCommand
+    /** `/pico` (#408, AA11): o consumo de hoje contra o hábito, sob demanda. */
+    data object Spike : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -146,6 +148,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "qual", "which" -> BotCommand.BestAccount
         "ritmo", "pace" -> BotCommand.Pace
         "ping" -> BotCommand.Ping
+        "pico", "spike" -> BotCommand.Spike
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

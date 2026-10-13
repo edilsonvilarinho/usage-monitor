@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
+import com.usagemonitor.domain.entity.UsageSpike
 import kotlin.math.roundToInt
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -170,6 +171,45 @@ internal object TelegramBotInsightMessages {
         val header = if (pt) "<b>🧭 Ritmo sugerido</b> <i>(estimativa)</i>" else "<b>🧭 Suggested pace</b> <i>(estimate)</i>"
         return header + "\n\n" + lines.joinToString("\n\n")
     }
+
+    /**
+     * `/pico` (AA11): as mesmas anomalias do alerta de consumo acima do hábito
+     * (`UsageSpike`), mais forte primeiro. Sem nenhuma, diz a partir de quanto o
+     * aviso sai — a régua é o fator das Configurações.
+     */
+    fun spikes(spikes: List<UsageSpike>, minFactor: Double, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val factor = formatSpikeFactor(minFactor, language)
+        if (spikes.isEmpty()) {
+            return if (pt) {
+                "📈 Nada acima do seu hábito hoje. O aviso sai a partir de ${factor}× a mediana."
+            } else {
+                "📈 Nothing above your habit today. The alert fires from ${factor}× the median."
+            }
+        }
+        val ordered = spikes.sortedWith(
+            compareByDescending<UsageSpike> { spike -> spike.factor }
+                .thenBy { spike -> spike.targetLabel }
+                .thenBy { spike -> spike.quotaLabel }
+        )
+        val lines = ordered.map { spike ->
+            val name = "<b>${TelegramBotMessages.escape(spike.targetLabel)} · ${TelegramBotMessages.escape(spike.quotaLabel)}</b>"
+            val today = amount(spike.baseline.todayDelta, spike.quotaTotal)
+            val usual = amount(spike.baseline.baselineDelta, spike.quotaTotal)
+            val days = spike.baseline.completeDays
+            if (pt) {
+                "$name — <b>${formatSpikeFactor(spike.factor, language)}×</b> o normal\nhoje $today · mediana $usual ($days dias, mesma hora)"
+            } else {
+                "$name — <b>${formatSpikeFactor(spike.factor, language)}×</b> the usual\ntoday $today · median $usual ($days days, same hour)"
+            }
+        }
+        val header = if (pt) "<b>📈 Hoje × seu hábito</b>" else "<b>📈 Today × your habit</b>"
+        return header + "\n\n" + lines.joinToString("\n\n")
+    }
+
+    /** Em pontos percentuais da cota quando há total; sem total, a unidade crua. */
+    private fun amount(delta: Long, total: Long): String =
+        if (total > 0L) "+${delta * 100 / total} pp" else "+$delta"
 
     private fun oneDecimal(value: Double, pt: Boolean): String {
         val tenths = (value * 10).roundToInt()

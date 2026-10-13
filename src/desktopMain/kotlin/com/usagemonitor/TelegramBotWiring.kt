@@ -59,7 +59,8 @@ internal fun createTelegramBot(
     },
     chartProvider = { range -> telegramChartOf(graph, range) },
     readings = TelegramBotReadings(
-        ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) }
+        ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) },
+        spikes = { dashboard.spikes.value }
     )
 )
 

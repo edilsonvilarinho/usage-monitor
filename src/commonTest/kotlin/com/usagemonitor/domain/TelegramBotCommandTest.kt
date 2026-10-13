@@ -44,6 +44,7 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.BestAccount, parseBotCommand("/qual"))
         assertEquals(BotCommand.Pace, parseBotCommand("/ritmo"))
         assertEquals(BotCommand.Ping, parseBotCommand("/ping"))
+        assertEquals(BotCommand.Spike, parseBotCommand("/pico"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
         assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
         assertEquals(BotCommand.Sources, parseBotCommand("/api"))

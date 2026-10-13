@@ -368,6 +368,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/ping` (AA19): versão (`CURRENT_APP_VERSION`), tempo aberto (instante da montagem do bot), próxima coleta
     (`DashboardViewModel.nextRefreshAt`) e a hora da última leitura de cada conta. As leituras que não vêm do retrato
     entram por `TelegramBotReadings` (um parâmetro só no serviço, default vazio por leitura).
+  - `/pico` (`/spike`, AA11): as mesmas anomalias do alerta "consumo acima do habitual" (`DashboardViewModel.spikes`), mais
+    forte primeiro, em pontos da cota (hoje × mediana dos dias completos até a mesma hora). Sem nenhuma, diz o fator a partir
+    do qual o aviso sai (`effectiveSpikeFactor`).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
