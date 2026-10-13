@@ -115,7 +115,7 @@ internal class TelegramBotService(
         if (pollJob?.isActive == true) return
         pollJob = scope.launch { pollLoop() }
         alertJob = scope.launch {
-            alerts.collect { alert -> broadcast(TelegramBotMessages.alert(alert, languageProvider())) }
+            alerts.collect { alert -> broadcast { language -> TelegramBotMessages.alert(alert, language) } }
         }
         summaryJob = scope.launch { summaryLoop() }
         panelJob = scope.launch {
@@ -132,7 +132,7 @@ internal class TelegramBotService(
 
     /** Botão "Enviar teste" das Configurações. */
     fun sendTest() {
-        scope.launch { broadcast(TelegramBotMessages.test(languageProvider())) }
+        scope.launch { broadcast { language -> TelegramBotMessages.test(language) } }
     }
 
     private suspend fun pollLoop() {
@@ -205,8 +205,9 @@ internal class TelegramBotService(
                 runCatching { saveSettings(marked) }
                 settingsFlow.value = marked
                 runCatching {
-                    val language = languageProvider()
-                    broadcast(TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language))
+                    val snapshot = snapshotProvider()
+                    val spend = spendProvider()
+                    broadcast { language -> TelegramBotSummaryMessages.summary(snapshot, spend, language) }
                 }.onFailure { error -> if (error is CancellationException) throw error }
             }
             delay(SUMMARY_CHECK_MILLIS)
@@ -234,9 +235,10 @@ internal class TelegramBotService(
             savePanels(emptyMap())
             return
         }
-        val text = TelegramBotSummaryMessages.panel(snapshotProvider(), languageProvider())
+        val snapshot = snapshotProvider()
         val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
         for (chatId in chats) {
+            val text = TelegramBotSummaryMessages.panel(snapshot, settings.languageOf(chatId, languageProvider()))
             val messageId = panels[chatId]
             if (messageId != null && panelTexts[chatId] == text) continue
             val kept = messageId != null && editPanel(token, chatId, messageId, text)
@@ -270,11 +272,17 @@ internal class TelegramBotService(
         runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
     }
 
-    /** Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa. */
-    private suspend fun broadcast(text: String) {
+    /**
+     * Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa.
+     * O texto sai no idioma de cada conversa (#408, AA24), montado uma vez por idioma.
+     */
+    private suspend fun broadcast(textFor: suspend (AppLanguage) -> String) {
         val settings = settingsFlow.value
         if (!settings.enabled || settings.botToken.isBlank()) return
+        val texts = mutableMapOf<AppLanguage, String>()
         for (chat in settings.authorizedChats) {
+            val language = settings.languageOf(chat.id, languageProvider())
+            val text = texts[language] ?: textFor(language).also { built -> texts[language] = built }
             runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)

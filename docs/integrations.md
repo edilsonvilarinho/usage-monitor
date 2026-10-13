@@ -399,6 +399,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     Conversa só de leitura recebe tudo, mas comando que muda o app (`BotCommand.changesApp`, `when` exaustivo — comando
     novo não compila sem decidir) responde com a recusa, e toque de fonte ou silêncio só fecha o "carregando" com o aviso.
     O papel é relido a cada comando e toque. Interruptor **Controle** por conversa no card.
+  - `/idioma pt|en|app` (`/language`, AA24): idioma por conversa (`TelegramChat.language`, `null` = o do app; valor
+    desconhecido no arquivo vale como `null`). Respostas, toques, alertas, resumo diário e painel saem no idioma de cada
+    conversa — o repasse monta o texto uma vez por idioma. O menu do Telegram (`setMyCommands`) continua no idioma do app.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

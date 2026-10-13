@@ -9,7 +9,13 @@ const val TELEGRAM_PAIRING_TTL_MILLIS = 10 * 60 * 1_000L
  * vê o `/status`, só quem tem controle mexe em alertas, fontes e silêncio. Nasce
  * `false`, o comportamento de antes do papel existir.
  */
-data class TelegramChat(val id: Long, val name: String, val readOnly: Boolean = false)
+data class TelegramChat(
+    val id: Long,
+    val name: String,
+    val readOnly: Boolean = false,
+    /** Idioma desta conversa (#408, AA24); `null` segue o idioma do app. */
+    val language: AppLanguage? = null
+)
 
 /**
  * Configuração do bot do Telegram (#387).
@@ -56,6 +62,10 @@ class TelegramBotSettings(
     )
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
+
+    /** O idioma das respostas e alertas desta conversa (#408, AA24): o dela ou, sem escolha, o do app. */
+    fun languageOf(chatId: Long, appLanguage: AppLanguage): AppLanguage =
+        authorizedChats.firstOrNull { chat -> chat.id == chatId }?.language ?: appLanguage
 
     /** Conversa pareada só de leitura (#408, AA21); conversa fora da lista não é "só leitura", é estranha. */
     fun isReadOnly(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId && chat.readOnly }
@@ -133,6 +143,8 @@ sealed interface BotCommand {
     data object Chats : BotCommand
     /** `/sair` (#408, AA22): desfaz o pareamento desta conversa. */
     data object Leave : BotCommand
+    /** `/idioma pt|en|app` (#408, AA24): o idioma desta conversa; `null` volta ao do app. */
+    data class ChatLanguage(val language: AppLanguage?) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -148,7 +160,7 @@ fun BotCommand.changesApp(): Boolean = when (this) {
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
-    BotCommand.Leave, BotCommand.Help, is BotCommand.Invalid -> false
+    BotCommand.Leave, is BotCommand.ChatLanguage, BotCommand.Help, is BotCommand.Invalid -> false
 }
 
 /**
@@ -207,6 +219,12 @@ fun parseBotCommand(text: String): BotCommand? {
         }
         "conversas", "chats" -> BotCommand.Chats
         "sair", "leave", "unpair" -> BotCommand.Leave
+        "idioma", "language", "lang" -> when (args.firstOrNull()?.lowercase()) {
+            "pt", "português", "portugues" -> BotCommand.ChatLanguage(AppLanguage.PT)
+            "en", "english", "inglês", "ingles" -> BotCommand.ChatLanguage(AppLanguage.EN)
+            "app", "padrão", "padrao", "default" -> BotCommand.ChatLanguage(null)
+            else -> BotCommand.Invalid("/idioma pt | /idioma en | /idioma app")
+        }
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

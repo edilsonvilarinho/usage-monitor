@@ -1,6 +1,7 @@
 package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotTap
 import com.usagemonitor.domain.entity.HistoryRange
@@ -53,6 +54,11 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.StatusImage, parseBotCommand("/status img"))
         assertEquals(BotCommand.Chats, parseBotCommand("/conversas"))
         assertTrue(BotCommand.Alerts(false).changesApp())
+        assertEquals(BotCommand.ChatLanguage(AppLanguage.EN), parseBotCommand("/idioma en"))
+        assertEquals(BotCommand.ChatLanguage(null), parseBotCommand("/language app"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/idioma"))
+        assertEquals(AppLanguage.EN, TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", language = AppLanguage.EN))).languageOf(1, AppLanguage.PT))
+        assertEquals(AppLanguage.PT, TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a"))).languageOf(1, AppLanguage.PT))
         assertFalse(BotCommand.Leave.changesApp())
         assertTrue(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(1))
         assertFalse(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(2))

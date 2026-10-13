@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
@@ -9,7 +10,7 @@ import java.io.File
 import java.security.SecureRandom
 
 @Serializable
-private data class TelegramChatDto(val id: Long, val name: String = "", val readOnly: Boolean = false)
+private data class TelegramChatDto(val id: Long, val name: String = "", val readOnly: Boolean = false, val language: String? = null)
 
 @Serializable
 private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
@@ -44,7 +45,10 @@ internal class LocalTelegramSettingsDataSource(
         return TelegramBotSettings(
             enabled = dto.enabled,
             botToken = dto.botToken,
-            authorizedChats = dto.authorizedChats.map { chat -> TelegramChat(chat.id, chat.name, chat.readOnly) },
+            // Idioma fora do enum é arquivo editado à mão: vale como "o do app".
+            authorizedChats = dto.authorizedChats.map { chat ->
+                TelegramChat(chat.id, chat.name, chat.readOnly, AppLanguage.entries.firstOrNull { language -> language.name == chat.language })
+            },
             pairingCode = dto.pairingCode,
             pairingExpiresAtMillis = dto.pairingExpiresAtMillis,
             allowSourceControl = dto.allowSourceControl,
@@ -61,7 +65,7 @@ internal class LocalTelegramSettingsDataSource(
         val dto = TelegramSettingsDto(
             enabled = settings.enabled,
             botToken = settings.botToken.trim(),
-            authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name, chat.readOnly) },
+            authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name, chat.readOnly, chat.language?.name) },
             pairingCode = settings.pairingCode,
             pairingExpiresAtMillis = settings.pairingExpiresAtMillis,
             allowSourceControl = settings.allowSourceControl,

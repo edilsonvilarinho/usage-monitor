@@ -254,6 +254,21 @@ class TelegramBotServiceTest {
         assertEquals(null, alertSettings.value.snoozedUntilEpochMillis)
     }
 
+    /** #408, AA24: `/idioma en` vale só para esta conversa — o alerta sai em inglês nela e em português na outra. */
+    @Test
+    fun `chat language changes replies and alerts of that chat only`() {
+        settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed"), TelegramChat(52L, "@outra")))
+        service.start()
+        api.pending += message(1, chat = 51, text = "/idioma en")
+
+        waitUntil { api.sent.any { it.first == 51L && it.second == "🌐 This chat now speaks English." } }
+        assertEquals(AppLanguage.EN, settings.value.authorizedChats.first { it.id == 51L }.language)
+        runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
+
+        waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("<b>CLI session saturated</b>") } }
+        waitUntil { api.sent.any { it.first == 52L && it.second.startsWith("<b>Sessão CLI saturada</b>") } }
+    }
+
     @Test
     fun `mute button silences alerts for one hour`() {
         paired()

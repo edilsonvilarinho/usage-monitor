@@ -54,6 +54,7 @@ internal object TelegramBotMessages {
             "limiar" to "Limiares de alerta de cota (75,90)",
             "conversas" to "Conversas pareadas",
             "sair" to "Desfaz o pareamento desta conversa",
+            "idioma" to "Idioma desta conversa (pt, en ou app)",
             "ajuda" to "Lista de comandos"
         )
     } else {
@@ -79,6 +80,7 @@ internal object TelegramBotMessages {
             "threshold" to "Quota alert thresholds (75,90)",
             "chats" to "Paired chats",
             "leave" to "Unpair this chat",
+            "language" to "Language of this chat (pt, en or app)",
             "help" to "List of commands"
         )
     }
@@ -224,6 +226,7 @@ internal object TelegramBotMessages {
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
             "<code>/conversas</code> — conversas pareadas · <code>/sair</code> — desfaz o pareamento desta\n" +
+            "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
             "<i>Toque num comando para copiar.</i>"
     } else {
         "<b>Commands</b>\n" +
@@ -247,6 +250,7 @@ internal object TelegramBotMessages {
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
             "<code>/chats</code> — paired chats · <code>/leave</code> — unpair this one\n" +
+            "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +
             "<i>Tap a command to copy it.</i>"
     }
 
