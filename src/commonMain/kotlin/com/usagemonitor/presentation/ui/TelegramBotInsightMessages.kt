@@ -5,7 +5,9 @@ import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
+import kotlin.math.roundToInt
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
@@ -130,6 +132,48 @@ internal object TelegramBotInsightMessages {
         }
         val header = if (pt) "<b>🎯 Melhor conta agora</b>" else "<b>🎯 Best account now</b>"
         return header + "\n\n" + blocks.joinToString("\n\n")
+    }
+
+    /**
+     * `/ritmo` (AA27): para janela com mais de um dia até o reinício, o que resta
+     * dividido pelos dias que faltam. É **estimativa** e diz isso: a API não
+     * informa ritmo, e o número só serve de régua para o dia.
+     */
+    fun pace(snapshot: UsageSnapshot?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (snapshot == null || snapshot.accounts.isEmpty()) return TelegramBotMessages.noReading(pt)
+        val now = snapshot.generatedAt
+        val lines = snapshot.accounts.flatMap { account ->
+            account.quotas.mapNotNull { quota ->
+                val percent = quota.percent ?: return@mapNotNull null
+                val resetsAt = quota.resetsAt?.takeIf { at -> at - now > 24.hours } ?: return@mapNotNull null
+                val days = (resetsAt - now).inWholeMinutes / MINUTES_PER_DAY.toDouble()
+                val remaining = (100 - percent).coerceAtLeast(0)
+                val perDay = (remaining / days).roundToInt()
+                val name = "<b>${TelegramBotMessages.escape(account.label)} · ${TelegramBotMessages.escape(quota.label)}</b>"
+                val reset = TelegramBotMessages.resetLabel(resetsAt, now, pt)
+                val daysText = oneDecimal(days, pt)
+                if (pt) {
+                    "$name $percent% · reinicia $reset\nrestam $remaining pp em $daysText dias → <b>~$perDay pp por dia</b>"
+                } else {
+                    "$name $percent% · resets $reset\n$remaining pp left in $daysText days → <b>~$perDay pp a day</b>"
+                }
+            }
+        }
+        if (lines.isEmpty()) {
+            return if (pt) {
+                "Nenhuma janela com mais de um dia até o reinício. O ritmo vale para cotas semanais e mensais."
+            } else {
+                "No window with more than a day until its reset. The pace applies to weekly and monthly quotas."
+            }
+        }
+        val header = if (pt) "<b>🧭 Ritmo sugerido</b> <i>(estimativa)</i>" else "<b>🧭 Suggested pace</b> <i>(estimate)</i>"
+        return header + "\n\n" + lines.joinToString("\n\n")
+    }
+
+    private fun oneDecimal(value: Double, pt: Boolean): String {
+        val tenths = (value * 10).roundToInt()
+        return "${tenths / 10}${if (pt) "," else "."}${tenths % 10}"
     }
 
     private fun maxPercent(account: UsageSnapshotAccount): Int =

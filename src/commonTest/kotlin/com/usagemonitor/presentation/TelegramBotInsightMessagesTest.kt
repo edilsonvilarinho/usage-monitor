@@ -126,4 +126,28 @@ class TelegramBotInsightMessagesTest {
             text
         )
     }
+
+    @Test
+    fun `pace divides what is left of long windows by the days until the reset`() {
+        val snapshot = UsageSnapshot(
+            generatedAt = now,
+            accounts = listOf(
+                account(
+                    "Padrão",
+                    // Reinicia em menos de um dia: fora, não há o que dividir.
+                    quota("5h", 86, Instant.parse("2026-10-13T19:00:00Z")),
+                    // Sex 19:44 BRT: 3 d 5 h 44 min = 3,2 dias.
+                    quota("Semanal", 61, Instant.parse("2026-10-16T22:44:00Z"), PeriodType.WEEKLY)
+                )
+            )
+        )
+
+        assertEquals(
+            "<b>🧭 Ritmo sugerido</b> <i>(estimativa)</i>\n\n" +
+                "<b>Padrão · Semanal</b> 61% · reinicia sex 19:44\nrestam 39 pp em 3,2 dias → <b>~12 pp por dia</b>",
+            TelegramBotInsightMessages.pace(snapshot, AppLanguage.PT)
+        )
+        val short = UsageSnapshot(now, listOf(account("Padrão", quota("5h", 86, Instant.parse("2026-10-13T19:00:00Z")))))
+        assertTrue(TelegramBotInsightMessages.pace(short, AppLanguage.PT).startsWith("Nenhuma janela com mais de um dia"))
+    }
 }

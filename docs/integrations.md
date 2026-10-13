@@ -363,6 +363,8 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     ou "não estoura antes de reiniciar"; saldo diz quando acaba; sem projeção, a linha diz "sem projeção".
   - `/qual` (`/which`, AA28): por fonte, a conta com mais folga — menor risco, depois menor percentual, depois rótulo (ordem
     total); as outras da fonte vêm embaixo com o emoji do pior risco. Conta só com saldo fica fora: não se compara com janela.
+  - `/ritmo` (`/pace`, AA27): para cota em percentual com mais de 24 h até o reinício, (100 − uso) dividido pelos dias que
+    faltam, em pp por dia. Rotulado **estimativa** — a API não informa ritmo; é cálculo de apresentação, não da camada data.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

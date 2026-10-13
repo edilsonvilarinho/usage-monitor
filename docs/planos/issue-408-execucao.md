@@ -145,6 +145,7 @@ Molde por tipo de opção:
 | A02 | `feat(telegram): list the next quota resets with /reinicios` | `gradlew.bat desktopTest --tests "*Telegram*"`: 60 testes, 0 falhas (novos: ordem do relógio com empate por conta e cota, reinício vencido fora, sem reinício conhecido; o teste do menu passou a exigir que todo item seja comando conhecido, em vez da lista fixa) | concluída |
 | A03 | `feat(telegram): show when each quota runs out with /quando` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*UsageSnapshotTest*"`: 61 + 3 testes, 0 falhas (novos: estoura antes do reinício com a antecedência, não estoura, sem projeção, saldo sem reinício; `exhaustsAt` no retrato com o filtro de cota vencida) | concluída |
 | A04 | `feat(telegram): pick the account with the most room with /qual` | `gradlew.bat desktopTest --tests "*Telegram*"`: 62 testes, 0 falhas (novo: menor risco, depois menor percentual, por fonte; saldo fora; única conta) | concluída |
+| A05 | `feat(telegram): suggest a daily pace for long windows with /ritmo` | `gradlew.bat desktopTest --tests "*Telegram*"`: 63 testes, 0 falhas (novo: 39 pp em 3,2 dias → ~12 pp por dia; janela de menos de um dia fora) | concluída |
 
 ## Problemas em aberto e riscos
 
