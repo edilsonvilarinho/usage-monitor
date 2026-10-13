@@ -2202,7 +2202,8 @@ assina alertas e respostas com o nome da máquina, mostrado na própria descriç
 nasce desligado) libera o <code>/time</code>. <b>Permitir atualizar pelo bot</b> (AA17, nasce desligado) avisa a versão
 pronta uma vez e oferece o reinício. <b>Só alerta crítico toca</b> (AA26, nasce ligado): cota em 90% ou mais toca; os
 outros alertas chegam sem som. <b>Agrupar alertas repetidos</b> (AA1, nasce ligado): o mesmo alerta no mesmo dia edita a
-mensagem anterior com o contador.</p>
+mensagem anterior com o contador. <b>Juntar alertas</b> (AA25, nasce ligado): os não críticos de 15 min chegam numa
+mensagem só; o crítico sai na hora.</p>
 <div class="win" style="max-width:660px">
   <div class="titlebar"><span class="t">Configurações › Alertas</span></div>
   <div class="body"><div class="panel">
@@ -2233,6 +2234,7 @@ mensagem anterior com o contador.</p>
       <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Permitir atualizar pelo bot</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Avisa quando uma versão nova já foi baixada e oferece "Atualizar e reiniciar o app": o app fecha e reabre neste PC.</span></div><span class="sw"></span></div>
       <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Só alerta crítico toca</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Cota em 90% ou mais toca no celular; os outros alertas chegam em silêncio, sem vibrar.</span></div><span class="sw on"></span></div>
       <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Agrupar alertas repetidos</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O mesmo alerta no mesmo dia edita a mensagem anterior com um contador, sem vibrar de novo. Crítico sempre abre outra.</span></div><span class="sw on"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Juntar alertas</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Os alertas de 15 min chegam numa mensagem só, um tópico por alerta. Crítico sai na hora.</span></div><span class="sw on"></span></div>
       <span class="k">▸ Ver como o bot responde</span>
     </div></div>
   </div></div>

@@ -54,3 +54,27 @@ data class TelegramAlertGroup(
     val firstAtMillis: Long,
     val day: String
 )
+
+/** Um item do lote (#408, AA25): o alerta mais recente de um grupo e quantas vezes ele veio. */
+data class TelegramBatchItem(val alert: UsageAlert, val count: Int)
+
+/**
+ * Os alertas retidos no lote, um item por [alertGroupKey] na ordem da primeira chegada,
+ * com o alerta mais recente do grupo (o percentual que vale é o de agora). Sem chave,
+ * cada alerta é um item.
+ */
+fun batchAlertItems(alerts: List<UsageAlert>): List<TelegramBatchItem> {
+    val items = mutableListOf<TelegramBatchItem>()
+    val indexByKey = mutableMapOf<String, Int>()
+    for (alert in alerts) {
+        val key = alertGroupKey(alert)
+        val index = key?.let { groupKey -> indexByKey[groupKey] }
+        if (index == null) {
+            if (key != null) indexByKey[key] = items.size
+            items += TelegramBatchItem(alert, 1)
+        } else {
+            items[index] = TelegramBatchItem(alert, items[index].count + 1)
+        }
+    }
+    return items
+}

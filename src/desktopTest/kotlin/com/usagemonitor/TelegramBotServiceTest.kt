@@ -161,7 +161,8 @@ class TelegramBotServiceTest {
             readyUpdate = { readyVersion },
             applyUpdate = { applied.incrementAndGet() }
         ),
-        updateCheckMillis = 50L
+        updateCheckMillis = 50L,
+        alertBatchMillis = 300L
     )
 
     @AfterTest
@@ -393,6 +394,28 @@ class TelegramBotServiceTest {
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s3", "alem-das-sombras")) }
         waitUntil { api.sent.size == 2 }
         assertEquals(1, api.edits.size)
+    }
+
+    /** #408, AA25: com o lote (padrão), os não críticos saem juntos numa mensagem; o crítico sai na hora. */
+    @Test
+    fun `non critical alerts arrive in one batch and critical goes out at once`() {
+        paired()
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(batchAlerts = true))
+        service.start()
+        runBlocking {
+            alerts.emit(quotaAlert(75))
+            alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras"))
+            alerts.emit(UsageAlert.SessionSaturated("s2", "alem-das-sombras"))
+            alerts.emit(quotaAlert(92))
+        }
+
+        waitUntil { api.sent.size == 2 }
+        assertTrue(api.sent.first().second.contains("92%"))
+        val batch = api.sent.last().second
+        assertTrue(batch.startsWith("<b>🔔 3 alertas · 09:00–09:00</b>\n"))
+        assertTrue("<b>Sessão CLI saturada</b> (2×)" in batch)
+        assertEquals(1, batch.lines().count { it.startsWith("• <b>Padrão · Sessão 5h</b>:") })
+        assertTrue(batch in api.silentSends)
     }
 
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */

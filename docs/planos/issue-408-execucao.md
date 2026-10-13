@@ -166,6 +166,7 @@ Molde por tipo de opção:
 | A23 | `feat(telegram): turn each alert kind on or off from /alertas` | `gradlew.bat desktopTest --tests "*Telegram*"`: 91 testes, 0 falhas (novos: `/alertas` sem argumento abre um botão por tipo, o toque inverte só aquele campo e redesenha o teclado; ida e volta do `alt:<tipo>` e da inversão para todos os tipos) | concluída |
 | A24 | `feat(telegram): ring only for critical alerts` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*" --tests "*UsageAlert*"`: 93 + 2 + 64 testes, 0 falhas (novos: `isCriticalAlert` — 89% não, 90% e 100% sim, sessão e reinício nunca; com a opção padrão a cota em 75% sai sem som e a de 92% com som, desligada tudo toca; interruptor do card nasce ligado). Primeira rodada: 3 falhas por fixture — `UsageTargetKey(ANTHROPIC)` exige perfil; os testes passaram a usar Codex | concluída |
 | A25 | `feat(telegram): edit a repeated alert into a counter instead of a new message` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*"`: 97 + 2 testes, 0 falhas (novos: `alertGroupKey` junta sessões do mesmo projeto e separa projeto, limiar e sessão sem projeto, crítico nunca agrupa; texto `2×`/`3× desde` com `última:` em BRT; a segunda saturada do mesmo projeto edita a mensagem 801 em vez de enviar, desligado abre outra; interruptor nasce ligado) | concluída |
+| A26 | `feat(telegram): batch non critical alerts every 15 minutes` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*"`: 99 + 2 testes, 0 falhas (novos: `batchAlertItems` um item por grupo na ordem da chegada com o alerta mais recente; 75% + duas saturadas do mesmo projeto + 92% → o crítico sai na hora e o lote sai depois como `🔔 3 alertas`, com `(2×)` e sem som; interruptor nasce ligado). Os testes da A24/A25 seguiram verdes com o lote ligado (lote de um alerta sai como avulso) | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -183,4 +184,6 @@ Molde por tipo de opção:
   dado). Quem já tinha o bot passa a receber os alertas não críticos sem som. Teste e respostas a comandos seguem com som.
 - A25: o agrupamento é só em memória (reiniciar o app abre mensagem nova) e o crítico nunca agrupa, para não perder o som
   da A24. A causa das repetições (D4) continua sem diagnóstico, como decidido.
+- A24–A26: as três opções de entrega nascem **ligadas**, como os interruptores do mockup aprovado. Efeito para quem já
+  usa o bot: alerta não crítico chega sem som, até 15 min depois e, repetido no dia, como contador. Cada uma desliga no card.
 - A21: o `/time` mostra presença (online, trabalhando, sessões ativas) e não o consumo em dinheiro por pessoa do mockup AA16 — a presença não traz custo, e somar sessões do time num recorte pediria um `CliSessionRange` novo (proibido).

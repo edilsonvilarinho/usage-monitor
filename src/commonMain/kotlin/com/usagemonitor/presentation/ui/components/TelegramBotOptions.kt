@@ -21,6 +21,7 @@ const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
 const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
 const val TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG = "telegramCriticalSoundSwitch"
 const val TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG = "telegramGroupAlertsSwitch"
+const val TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG = "telegramBatchAlertsSwitch"
 const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
 const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
@@ -164,6 +165,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.groupRepeatedAlerts,
                 onCheckedChange = { group -> model.onPreferencesChange(model.preferences.copy(groupRepeatedAlerts = group)) },
                 modifier = Modifier.testTag(TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Juntar alertas" else "Batch alerts",
+            description = if (pt) {
+                "Os alertas de 15 min chegam numa mensagem só, um tópico por alerta. Crítico sai na hora."
+            } else {
+                "Alerts from 15 min arrive in a single message, one bullet per alert. Critical goes out right away."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.batchAlerts,
+                onCheckedChange = { batch -> model.onPreferencesChange(model.preferences.copy(batchAlerts = batch)) },
+                modifier = Modifier.testTag(TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG)
             )
         }
     }

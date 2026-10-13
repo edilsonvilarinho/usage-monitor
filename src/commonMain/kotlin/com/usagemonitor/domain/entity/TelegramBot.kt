@@ -46,6 +46,11 @@ data class TelegramBotPreferences(
      * de abrir outra (#408, AA1). Nasce ligado, como no mockup: só muda a forma da entrega.
      */
     val groupRepeatedAlerts: Boolean = true,
+    /**
+     * Junta os alertas de 15 min numa mensagem só (#408, AA25); o crítico sai na hora, fora
+     * do lote. Nasce ligado, como no mockup: atrasa o aviso não crítico, nunca o descarta.
+     */
+    val batchAlerts: Boolean = true,
     /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
     val announcedUpdateVersion: String? = null
 )

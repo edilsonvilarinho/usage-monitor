@@ -25,7 +25,8 @@ private data class TelegramPreferencesDto(
     val allowRemoteUpdate: Boolean = false,
     val announcedUpdateVersion: String? = null,
     val soundOnlyOnCritical: Boolean = true,
-    val groupRepeatedAlerts: Boolean = true
+    val groupRepeatedAlerts: Boolean = true,
+    val batchAlerts: Boolean = true
 )
 
 @Serializable
@@ -79,7 +80,8 @@ internal class LocalTelegramSettingsDataSource(
                 allowRemoteUpdate = dto.preferences.allowRemoteUpdate,
                 announcedUpdateVersion = dto.preferences.announcedUpdateVersion,
                 soundOnlyOnCritical = dto.preferences.soundOnlyOnCritical,
-                groupRepeatedAlerts = dto.preferences.groupRepeatedAlerts
+                groupRepeatedAlerts = dto.preferences.groupRepeatedAlerts,
+                batchAlerts = dto.preferences.batchAlerts
             )
         )
     }
@@ -103,7 +105,8 @@ internal class LocalTelegramSettingsDataSource(
                 allowRemoteUpdate = settings.preferences.allowRemoteUpdate,
                 announcedUpdateVersion = settings.preferences.announcedUpdateVersion,
                 soundOnlyOnCritical = settings.preferences.soundOnlyOnCritical,
-                groupRepeatedAlerts = settings.preferences.groupRepeatedAlerts
+                groupRepeatedAlerts = settings.preferences.groupRepeatedAlerts,
+                batchAlerts = settings.preferences.batchAlerts
             )
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))

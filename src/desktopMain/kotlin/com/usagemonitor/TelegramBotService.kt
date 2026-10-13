@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.isDailySummaryDue
 import com.usagemonitor.domain.entity.isCriticalAlert
 import com.usagemonitor.domain.entity.TelegramAlertGroup
 import com.usagemonitor.domain.entity.alertGroupKey
+import com.usagemonitor.domain.entity.batchAlertItems
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
@@ -36,6 +37,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -88,7 +91,9 @@ internal class TelegramBotService(
     /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
     private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS,
     /** Intervalo da checagem de versão pronta (#408, AA17); parâmetro pelo mesmo motivo. */
-    private val updateCheckMillis: Long = UPDATE_CHECK_MILLIS
+    private val updateCheckMillis: Long = UPDATE_CHECK_MILLIS,
+    /** Janela do lote de alertas (#408, AA25); parâmetro para o teste não esperar 15 minutos. */
+    private val alertBatchMillis: Long = ALERT_BATCH_MILLIS
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
@@ -102,6 +107,14 @@ internal class TelegramBotService(
      * grupo. Só em memória e só no coletor de alertas: reiniciar o app abre mensagem nova.
      */
     private val alertGroups = mutableMapOf<Pair<Long, String>, TelegramAlertGroup>()
+
+    /**
+     * Alertas retidos no lote (#408, AA25) e o instante do primeiro. O coletor e o
+     * esvaziamento atrasado disputam o lote e os grupos: tudo sob [alertMutex].
+     */
+    private val alertBatch = mutableListOf<UsageAlert>()
+    private var alertBatchStartedAt: Instant? = null
+    private val alertMutex = Mutex()
 
     /** Último texto do painel por conversa, para editar só o que mudou. Só neste laço. */
     private val panelTexts = mutableMapOf<Long, String>()
@@ -132,7 +145,7 @@ internal class TelegramBotService(
         if (pollJob?.isActive == true) return
         pollJob = scope.launch { pollLoop() }
         alertJob = scope.launch {
-            alerts.collect { alert -> deliverAlert(alert) }
+            alerts.collect { alert -> receiveAlert(alert) }
         }
         summaryJob = scope.launch { summaryLoop() }
         updateJob = scope.launch {
@@ -296,6 +309,45 @@ internal class TelegramBotService(
     }
 
     /**
+     * Porta de entrada dos alertas. Com o lote ligado (#408, AA25), o não crítico espera
+     * até [alertBatchMillis] contados do primeiro retido; o crítico sai na hora, fora do
+     * lote. Encerrar o app com alerta retido o perde — o mesmo de um envio que falha.
+     */
+    private suspend fun receiveAlert(alert: UsageAlert) {
+        alertMutex.withLock {
+            val batching = settingsFlow.value.preferences.batchAlerts && !isCriticalAlert(alert)
+            if (!batching) {
+                deliverAlert(alert)
+                return
+            }
+            alertBatch += alert
+            if (alertBatchStartedAt != null) return
+            alertBatchStartedAt = clock.now()
+        }
+        scope.launch {
+            delay(alertBatchMillis)
+            alertMutex.withLock { flushAlertBatch() }
+        }
+    }
+
+    /** Lote de um alerta só sai como alerta avulso (com o agrupamento da AA1); dois ou mais, numa mensagem. */
+    private suspend fun flushAlertBatch() {
+        val retained = alertBatch.toList()
+        val startedAt = alertBatchStartedAt ?: clock.now()
+        alertBatch.clear()
+        alertBatchStartedAt = null
+        if (retained.isEmpty()) return
+        if (retained.size == 1) {
+            deliverAlert(retained.single())
+            return
+        }
+        val items = batchAlertItems(retained)
+        val now = clock.now()
+        val silent = settingsFlow.value.preferences.soundOnlyOnCritical
+        broadcast(silent = silent) { language -> TelegramBotMessages.alertBatch(items, startedAt, now, language) }
+    }
+
+    /**
      * Entrega de um alerta. Som por gravidade (#408, AA26): sem som não some — chega e não
      * vibra. Repetição no mesmo dia (AA1) edita a mensagem da conversa com o contador; a
      * edição não toca, então o aparelho vibra só na primeira. Edição que falha (mensagem
@@ -368,9 +420,11 @@ internal class TelegramBotService(
     /**
      * Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa.
      * O texto sai no idioma de cada conversa (#408, AA24), montado uma vez por idioma.
+     * [silent] entrega sem som (`disable_notification`).
      */
     private suspend fun broadcast(
         buttons: (AppLanguage) -> List<List<TelegramButton>> = { emptyList() },
+        silent: Boolean = false,
         textFor: suspend (AppLanguage) -> String
     ) {
         val settings = settingsFlow.value
@@ -380,7 +434,7 @@ internal class TelegramBotService(
         for (chat in settings.authorizedChats) {
             val language = settings.languageOf(chat.id, languageProvider())
             val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
-            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language)) }
+            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language), silent = silent) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)
         }
@@ -396,5 +450,6 @@ internal class TelegramBotService(
         const val SUMMARY_CHECK_MILLIS = 60_000L
         const val PANEL_INTERVAL_MILLIS = 60_000L
         const val UPDATE_CHECK_MILLIS = 60_000L
+        const val ALERT_BATCH_MILLIS = 15 * 60_000L
     }
 }

@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAlert
+import com.usagemonitor.domain.entity.TelegramBatchItem
 import com.usagemonitor.domain.entity.accountByKey
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
@@ -296,6 +297,22 @@ internal object TelegramBotMessages {
     fun alert(alert: UsageAlert, language: AppLanguage): String {
         val message = usageAlertMessage(alert, language)
         return "<b>${escape(message.title)}</b>\n${escape(message.body)}"
+    }
+
+    /**
+     * Lote de alertas (#408, AA25): cabeçalho com a quantidade e a faixa de horário (BRT),
+     * um tópico por item com título, repetições e corpo — o mesmo texto do alerta avulso.
+     */
+    fun alertBatch(items: List<TelegramBatchItem>, from: Instant, to: Instant, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val total = items.sumOf { item -> item.count }
+        val header = "<b>🔔 $total " + (if (pt) "alertas" else "alerts") + " · ${clock(from)}–${clock(to)}</b>"
+        val lines = items.map { item ->
+            val message = usageAlertMessage(item.alert, language)
+            val repeated = if (item.count > 1) " (${item.count}×)" else ""
+            "• <b>${escape(message.title)}</b>$repeated: ${escape(message.body)}"
+        }
+        return (listOf(header) + lines).joinToString("\n")
     }
 
     /**

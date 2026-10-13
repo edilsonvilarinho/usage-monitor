@@ -446,6 +446,12 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     nunca agrupa: precisa tocar. O mapa (conversa, chave) → mensagem vive só em memória no coletor de alertas: reiniciar o
     app abre mensagem nova, e edição que falha (mensagem apagada, rede) cai numa mensagem nova. Não mexe na dedup da
     bandeja (`UsageAlertState`): a causa das repetições (D4 do plano) segue sem diagnóstico.
+  - **Alertas em lote** (AA25): com **"Juntar alertas"** (nasce ligado), o alerta não crítico fica retido até 15 min
+    contados do primeiro do lote; ao fim, um lote de um alerta sai como alerta avulso (com o agrupamento da AA1) e dois ou
+    mais saem numa mensagem — `🔔 N alertas · HH:MM–HH:MM` e um tópico por grupo (`batchAlertItems`: mesmo `alertGroupKey`
+    vira `(k×)`, com o alerta mais recente), sem som quando "Só alerta crítico toca" está ligado. O crítico sai na hora,
+    fora do lote. Só no Telegram: a bandeja segue imediata. Lote e grupos ficam sob um `Mutex` (coletor × esvaziamento
+    atrasado); fechar o app com alerta retido o perde, como um envio que falha.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
