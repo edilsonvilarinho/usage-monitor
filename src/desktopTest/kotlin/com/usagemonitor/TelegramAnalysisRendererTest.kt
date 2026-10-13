@@ -71,4 +71,16 @@ class TelegramAnalysisRendererTest {
         assertTrue(hasColor(image, TelegramAnalysisRenderer.EMBER and 0xFFFFFF))
         assertEquals("--- average 5.9 pp", TelegramAnalysisImageLabels.average(5.857, AppLanguage.EN))
     }
+
+    /** AB11: seis blocos; ritmo abaixo da janela anterior sai verde, a vazão azul. */
+    @Test
+    fun `card shows six tiles and colors the pace drop in green`() {
+        val tiles = TelegramAnalysisImageLabels.cardTiles(AnalysisFixture.analysis, AppLanguage.PT)
+        assertEquals(listOf("62%", "14,0 pp/h", "41%", "48 tok/s", "↓ 13%", "15h"), tiles.map { tile -> tile.big })
+        assertEquals("→ ≈83% no reinício", tiles.first().detail)
+        val image = image(AnalysisView.CARD)
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.OK and 0xFFFFFF))
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.INFO and 0xFFFFFF))
+        assertEquals("ter 06/10 · 12:30", TelegramAnalysisImageLabels.cardHeader(AnalysisFixture.analysis, AppLanguage.PT).second)
+    }
 }

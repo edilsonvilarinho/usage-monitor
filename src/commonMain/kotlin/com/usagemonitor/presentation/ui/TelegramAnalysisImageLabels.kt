@@ -3,6 +3,9 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.AnalysisView
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.SessionAnalysis
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
 
 /**
@@ -48,6 +51,80 @@ internal object TelegramAnalysisImageLabels {
             atReset = projected?.let { value -> if (pt) "≈$value% no reinício" else "≈$value% at reset" }.orEmpty()
         )
     }
+
+    enum class TileTone { PLAIN, SPEED, GOOD, WARNING }
+
+    /** Um bloco do cartão (AB11): o número grande, o que ele é e o contexto embaixo. */
+    class CardTile(val big: String, val label: String, val detail: String, val tone: TileTone)
+
+    /**
+     * Os seis números do cartão de resultado (AB11): 5h, ritmo, semanal, vazão, contra a janela
+     * anterior e a hora mais pesada. Número não medido vira "—", nunca zero.
+     */
+    fun cardTiles(analysis: SessionAnalysis, language: AppLanguage): List<CardTile> {
+        val pt = language == AppLanguage.PT
+        fun pace(value: Double?) = TelegramAnalysisMessages.pace(value, pt).trim()
+        val five = analysis.fiveHour
+        val weekly = analysis.weekly
+        val speed = analysis.intervals.firstOrNull()?.tokensPerSecond
+        val previous = analysis.previous
+        val change = previous?.let { item ->
+            val now = item.currentPace
+            val before = item.previousPace
+            if (now == null || before == null || before <= 0.0) null else ((now - before) / before * 100).roundToInt()
+        }
+        val peak = analysis.hours.filter { bucket -> (bucket.percentPoints ?: 0.0) > 0.0 }.maxByOrNull { bucket -> bucket.percentPoints ?: 0.0 }
+        return listOf(
+            CardTile(
+                five?.let { window -> "${window.percent}%" } ?: "—",
+                "5h" + (five?.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + TelegramBotMessages.clock(at) }.orEmpty()),
+                five?.projectedAtReset?.let { value -> if (pt) "→ ≈$value% no reinício" else "→ ≈$value% at reset" }.orEmpty(),
+                TileTone.PLAIN
+            ),
+            CardTile(
+                "${pace(five?.paceNow)} pp/h",
+                if (pt) "ritmo 5h agora" else "5h pace now",
+                (if (pt) "média da janela " else "window average ") + pace(five?.paceAverage),
+                TileTone.PLAIN
+            ),
+            CardTile(
+                weekly?.let { window -> "${window.percent}%" } ?: "—",
+                if (pt) "semanal" else "weekly",
+                "${pace(weekly?.paceNow)} pp/h · " + (if (pt) "seguro " else "safe ") + pace(weekly?.safePace),
+                TileTone.PLAIN
+            ),
+            CardTile(
+                (speed?.roundToInt()?.toString() ?: "—") + " tok/s",
+                if (pt) "última 1 h" else "last 1 h",
+                analysis.modelSpeeds.firstOrNull()?.let { item -> "${item.model} ${item.tokensPerSecond.roundToInt()}" }.orEmpty(),
+                TileTone.SPEED
+            ),
+            CardTile(
+                change?.let { value -> (if (value <= 0) "↓ " else "↑ ") + "${kotlin.math.abs(value)}%" } ?: "—",
+                if (pt) "ritmo vs janela anterior" else "pace vs previous window",
+                previous?.let { item -> (if (pt) "agora " else "now ") + pace(item.currentPace) + (if (pt) " · antes " else " · before ") + pace(item.previousPace) }.orEmpty(),
+                if (change == null) TileTone.PLAIN else if (change <= 0) TileTone.GOOD else TileTone.WARNING
+            ),
+            CardTile(
+                peak?.let { bucket -> TelegramBotMessages.clock(bucket.start).substring(0, 2) + "h" } ?: "—",
+                if (pt) "hora mais pesada (24 h)" else "heaviest hour (24 h)",
+                peak?.percentPoints?.let { value -> "${value.roundToInt()} pp" + if (pt) " em 1 h" else " in 1 h" }.orEmpty(),
+                TileTone.WARNING.takeIf { peak != null } ?: TileTone.PLAIN
+            )
+        )
+    }
+
+    /** O cabeçalho do cartão: a marca e a data/hora local da análise. */
+    fun cardHeader(analysis: SessionAnalysis, language: AppLanguage): Pair<String, String> {
+        val pt = language == AppLanguage.PT
+        val local = analysis.generatedAt.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
+        val date = TelegramBotMessages.weekday(local.dayOfWeek, pt) + " " +
+            local.date.day.toString().padStart(2, '0') + "/" + local.date.month.number.toString().padStart(2, '0')
+        return (if (pt) "USAGE MONITOR · ANÁLISE" else "USAGE MONITOR · ANALYSIS") to "$date · ${TelegramBotMessages.clock(analysis.generatedAt)}"
+    }
+
+    fun cardFooter(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "só metadados de uso: nenhum prompt ou resposta sai do PC" else "usage metadata only: no prompt or answer leaves the PC"
 
     /** A legenda da média tracejada dos dias (AB10). */
     fun average(value: Double, language: AppLanguage): String {

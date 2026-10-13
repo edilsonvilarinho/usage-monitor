@@ -37,7 +37,32 @@ internal object TelegramAnalysisRenderer {
         AnalysisView.HEATMAP -> draw(WIDTH, HEAT_HEIGHT) { canvas -> heatmap(canvas, analysis, language) }
         AnalysisView.CURVE -> draw(WIDTH, CHART_HEIGHT) { canvas -> curve(canvas, analysis, language) }
         AnalysisView.DAYS -> draw(WIDTH, CHART_HEIGHT) { canvas -> days(canvas, analysis, language) }
+        AnalysisView.CARD -> draw(WIDTH, CARD_HEIGHT) { canvas -> card(canvas, analysis, language) }
         else -> null
+    }
+
+    /** AB11 · cartão de resultado: seis números em duas linhas de três, pronto para mostrar. */
+    private fun card(canvas: Canvas, analysis: SessionAnalysis, language: AppLanguage) {
+        val (brand, date) = TelegramAnalysisImageLabels.cardHeader(analysis, language)
+        canvas.drawString(brand, PAD, PAD + 18f, font(16f), Paint().apply { color = GOLD })
+        canvas.drawString(date, WIDTH - PAD - font(16f).measureTextWidth(date), PAD + 18f, font(16f), Paint().apply { color = MUTED })
+        canvas.drawString(analysis.accountLabel, PAD, PAD + 56f, font(28f), Paint().apply { color = HOT })
+        val tiles = TelegramAnalysisImageLabels.cardTiles(analysis, language)
+        val columnWidth = (WIDTH - PAD * 2) / 3f
+        tiles.forEachIndexed { index, tile ->
+            val x = PAD + (index % 3) * columnWidth
+            val y = 170f + (index / 3) * 170f
+            val color = when (tile.tone) {
+                TelegramAnalysisImageLabels.TileTone.PLAIN -> HOT
+                TelegramAnalysisImageLabels.TileTone.SPEED -> INFO
+                TelegramAnalysisImageLabels.TileTone.GOOD -> OK
+                TelegramAnalysisImageLabels.TileTone.WARNING -> WARNING
+            }
+            canvas.drawString(tile.big, x, y, font(44f), Paint().apply { this.color = color })
+            canvas.drawString(tile.label, x, y + 32f, font(17f), Paint().apply { this.color = FOREGROUND })
+            canvas.drawString(tile.detail, x, y + 58f, font(15f), Paint().apply { this.color = MUTED })
+        }
+        footer(canvas, CARD_HEIGHT, TelegramAnalysisImageLabels.cardFooter(language), MUTED)
     }
 
     /**
@@ -302,6 +327,7 @@ internal object TelegramAnalysisRenderer {
     private const val CHART_HEIGHT = 420
     private const val PAD = 24f
     private const val RECENT_HOURS = 4
+    private const val CARD_HEIGHT = 520
     private const val HEAT_ROW = 44f
     private const val HEAT_HEIGHT = 64 + 7 * 44 + 40
 
@@ -319,5 +345,7 @@ internal object TelegramAnalysisRenderer {
     const val EMBER = 0xFF8C643F.toInt()
     private const val GRID = 0xFF2A2626.toInt()
     const val EMPTY_CELL = 0xFF141B24.toInt()
+    const val OK = 0xFF4CAF50.toInt()
+    const val WARNING = 0xFFFFA726.toInt()
     private const val CORE = 0xFF030508.toInt()
 }
