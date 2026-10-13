@@ -50,6 +50,8 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Windows(weekly = false), parseBotCommand("/janelas"))
         assertEquals(BotCommand.Compare(7), parseBotCommand("/comparar"))
         assertEquals(BotCommand.StatusImage, parseBotCommand("/status img"))
+        assertEquals(BotCommand.Chats, parseBotCommand("/conversas"))
+        assertEquals(BotCommand.Leave, parseBotCommand("/sair"))
         assertEquals(BotCommand.Status, parseBotCommand("/status qualquer"))
         assertEquals(BotCommand.Compare(30), parseBotCommand("/compare 30d"))
         assertEquals(BotCommand.Windows(weekly = true), parseBotCommand("/windows 7d"))

@@ -52,6 +52,10 @@ class TelegramBotSettings(
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
 
+    /** Sem [chatId] na lista nem painel guardado dela (#408, `/sair`). */
+    fun withoutChat(chatId: Long): TelegramBotSettings =
+        copy(authorizedChats = authorizedChats.filterNot { chat -> chat.id == chatId }, panelMessages = panelMessages - chatId)
+
     /** O código vale para [code] dentro do prazo — comparação sem diferenciar caixa. */
     fun acceptsPairing(code: String, nowMillis: Long): Boolean {
         val expected = pairingCode ?: return false
@@ -117,6 +121,10 @@ sealed interface BotCommand {
     data class Windows(val weekly: Boolean) : BotCommand
     /** `/comparar [24h|7d|30d]` (#408, AA6): o mapa de calor da comparação entre modelos, em PNG. */
     data class Compare(val days: Int) : BotCommand
+    /** `/conversas` (#408, AA22): quem está pareado. */
+    data object Chats : BotCommand
+    /** `/sair` (#408, AA22): desfaz o pareamento desta conversa. */
+    data object Leave : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -175,6 +183,8 @@ fun parseBotCommand(text: String): BotCommand? {
             "7d", "7", "semana", "week" -> BotCommand.Windows(weekly = true)
             else -> BotCommand.Invalid("/janelas 5h | /janelas 7d")
         }
+        "conversas", "chats" -> BotCommand.Chats
+        "sair", "leave", "unpair" -> BotCommand.Leave
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

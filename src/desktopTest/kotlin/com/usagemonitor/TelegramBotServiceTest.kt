@@ -221,6 +221,23 @@ class TelegramBotServiceTest {
         assertTrue(api.sent.none { it.second.startsWith("<b>Claude — Edi</b>") })
     }
 
+    /** #408, AA22: `/sair` tira a conversa da lista, desafixa o painel dela e responde por último. */
+    @Test
+    fun `leave unpairs the chat, unpins its panel and answers once more`() {
+        settings.value = settings.value.copy(
+            authorizedChats = listOf(TelegramChat(51L, "@ed"), TelegramChat(52L, "@outra")),
+            panelMessages = mapOf(51L to 900L)
+        )
+        service.start()
+        api.pending += message(1, chat = 51, text = "/sair")
+
+        waitUntil { !settings.value.isAuthorized(51L) }
+        assertTrue(settings.value.isAuthorized(52L))
+        assertEquals(emptyMap(), settings.value.panelMessages)
+        waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("👋 Pareamento desfeito.") } }
+        assertTrue(51L to 900L in api.unpins)
+    }
+
     @Test
     fun `mute button silences alerts for one hour`() {
         paired()

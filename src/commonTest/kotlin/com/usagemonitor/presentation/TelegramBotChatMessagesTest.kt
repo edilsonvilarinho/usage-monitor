@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
@@ -15,6 +16,16 @@ class TelegramBotChatMessagesTest {
 
     // 22:10 BRT de terça (13/10/2026).
     private val now = Instant.parse("2026-10-14T01:10:00Z")
+
+    @Test
+    fun `chats lists the paired chats and marks the current one`() {
+        val text = TelegramBotChatMessages.chats(listOf(TelegramChat(1, "@edi"), TelegramChat(2, "Time <Infra>")), 2, AppLanguage.PT)
+
+        assertEquals(
+            "<b>Conversas pareadas</b>\n• @edi\n• Time &lt;Infra&gt; — esta\n<i>/sair desfaz o pareamento desta conversa.</i>",
+            text
+        )
+    }
 
     @Test
     fun `ping says version, uptime, next collection and each account's last reading`() {

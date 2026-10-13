@@ -154,6 +154,7 @@ Molde por tipo de opção:
 | A11 | `feat(telegram): add a 6 hour sparkline under each quota in /status` | `gradlew.bat desktopTest --tests "*Telegram*"`: 70 testes, 0 falhas (novos: blocos de 30 min com a última leitura levada adiante, menos de duas leituras sem linha, cartão com a linha só na cota com histórico) | concluída |
 | A12 | `feat(telegram): send the model comparison heat map as an image with /comparar` | `gradlew.bat desktopTest --tests "*Telegram*"`: 73 testes, 0 falhas (novos: células da comparação com intensidade sobre o maior da coluna, teto de 12 linhas sem mudar a escala, PNG com altura por linha e fundo; parse 24h/7d/30d) | concluída |
 | A13 | `feat(telegram): draw the account rings as an image with /status img` | `gradlew.bat desktopTest --tests "*Telegram*"`: 76 testes, 0 falhas (novos: janela mais longa por fora com teto de três arcos, maior percentual no centro, conta só com saldo fora, PNG de quatro anéis por linha com a cor do arco crítico). PNG do anel e do mapa de calor (A12) conferidos a olho numa captura temporária descartada; o núcleo cresceu (raio 64) para o percentual não cobrir o arco interno | concluída |
+| A14 | `feat(telegram): list paired chats with /conversas and unpair with /sair` | `gradlew.bat desktopTest --tests "*Telegram*"`: 77 testes, 0 falhas (novos: lista com a conversa atual marcada e escape; `/sair` tira só esta conversa, esquece e desafixa o painel dela e responde por último) | concluída |
 
 ## Problemas em aberto e riscos
 

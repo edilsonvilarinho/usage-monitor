@@ -392,6 +392,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     de reinício mais distante por fora, o maior percentual no centro e a palavra do pior risco embaixo (`buildTelegramRings`,
     pura; `TelegramRingsRenderer`, Skia). Conta só com saldo fica fora da imagem; sem nenhuma, a resposta manda para o
     `/status` em texto. Desenho estático: o arco nunca passa do número do centro.
+  - `/conversas` (`/chats`) e `/sair` (`/leave`, AA22): a lista das conversas pareadas com a atual marcada, e o pareamento
+    desfeito pelo próprio Telegram. Sair grava a lista antes de responder (a confirmação é a última mensagem da conversa),
+    desafixa o painel dela e não pede permissão — é a conversa decidindo por si.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

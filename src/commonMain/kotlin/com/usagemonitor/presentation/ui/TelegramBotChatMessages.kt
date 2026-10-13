@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageSnapshot
 import kotlin.time.Instant
@@ -11,6 +12,25 @@ import kotlin.time.Instant
  * de [TelegramBotMessages].
  */
 internal object TelegramBotChatMessages {
+
+    /** `/conversas` (AA22): as conversas pareadas, com esta marcada. */
+    fun chats(chats: List<TelegramChat>, currentChatId: Long, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val lines = chats.map { chat ->
+            val current = if (chat.id == currentChatId) (if (pt) " — esta" else " — this one") else ""
+            "• ${TelegramBotMessages.escape(chat.name)}$current"
+        }
+        val header = if (pt) "<b>Conversas pareadas</b>" else "<b>Paired chats</b>"
+        val footer = if (pt) "<i>/sair desfaz o pareamento desta conversa.</i>" else "<i>/leave unpairs this chat.</i>"
+        return (listOf(header) + lines + footer).joinToString("\n")
+    }
+
+    /** Resposta do `/sair` (AA22): a última mensagem que esta conversa recebe. */
+    fun left(language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "👋 Pareamento desfeito. Esta conversa não recebe mais nada. Para voltar, gere um código novo nas Configurações."
+    } else {
+        "👋 Unpaired. This chat will not receive anything else. To come back, create a new code in Settings."
+    }
 
     /**
      * `/ping` (AA19): versão, tempo aberto, próxima coleta e, por conta, a hora da

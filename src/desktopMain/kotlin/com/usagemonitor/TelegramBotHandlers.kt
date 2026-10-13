@@ -138,6 +138,8 @@ internal class TelegramBotHandlers(
             }
             BotCommand.Week -> send(token, chatId, TelegramBotUsageMessages.week(readings.accountHistory(HistoryRange.LAST_7_DAYS), language))
             is BotCommand.Compare -> sendHeatmap(token, chatId, command.days, language)
+            BotCommand.Chats -> send(token, chatId, TelegramBotChatMessages.chats(settingsFlow.value.authorizedChats, chatId, language))
+            BotCommand.Leave -> leave(token, chatId, language)
             is BotCommand.Windows -> {
                 // Semanais pedem o mês: em 7 dias cabem uma ou duas janelas de 7 d.
                 val range = if (command.weekly) HistoryRange.LAST_30_DAYS else HistoryRange.LAST_7_DAYS
@@ -160,6 +162,22 @@ internal class TelegramBotHandlers(
     private suspend fun sendStatus(token: String, chatId: Long, language: AppLanguage) {
         val snapshot = snapshotProvider()
         api.sendMessage(token, chatId, statusText(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+    }
+
+    /**
+     * `/sair` (#408, AA22): a conversa sai da lista antes da resposta — a confirmação
+     * é a última mensagem dela. Sair não pede permissão: é a conversa decidindo por si.
+     * O painel fixado dela é desafixado aqui, porque o laço do painel só cuida de
+     * conversas que ainda estão na lista.
+     */
+    private suspend fun leave(token: String, chatId: Long, language: AppLanguage) {
+        val current = settingsFlow.value
+        val panel = current.panelMessages[chatId]
+        val next = current.withoutChat(chatId)
+        runCatching { saveSettings(next) }
+        settingsFlow.value = next
+        if (panel != null) runTelegram { api.unpinChatMessage(token, chatId, panel) }
+        send(token, chatId, TelegramBotChatMessages.left(language))
     }
 
     /** `/comparar` (#408, AA6): índice ilegível ou recorte vazio respondem em texto. */
