@@ -18,7 +18,7 @@ internal object TelegramAnalysisMessages {
     /** As vistas que já têm texto, imagem ou arquivo; só elas viram aba. */
     val availableViews: List<AnalysisView> = listOf(
         AnalysisView.PANEL, AnalysisView.TREND, AnalysisView.INTERVALS, AnalysisView.SENTENCES, AnalysisView.TIMELINE, AnalysisView.VERSUS,
-        AnalysisView.GAUGES, AnalysisView.HOURS
+        AnalysisView.GAUGES, AnalysisView.HOURS, AnalysisView.HEATMAP
     )
 
     fun pickAccount(language: AppLanguage): String =

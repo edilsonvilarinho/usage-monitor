@@ -43,4 +43,13 @@ class TelegramAnalysisRendererTest {
         assertTrue(hasColor(image, TelegramAnalysisRenderer.EMBER and 0xFFFFFF))
         assertTrue(hasColor(image, TelegramAnalysisRenderer.INFO and 0xFFFFFF, 70 until 360))
     }
+
+    /** AB8: 7 linhas × 24 colunas; hora parada fica na cor vazia, a mais forte em ouro cheio. */
+    @Test
+    fun `heatmap leaves idle hours empty and paints the strongest in full gold`() {
+        val image = image(AnalysisView.HEATMAP)
+        assertEquals(64 + 7 * 44 + 40, image.height)
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.EMPTY_CELL and 0xFFFFFF))
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
+    }
 }

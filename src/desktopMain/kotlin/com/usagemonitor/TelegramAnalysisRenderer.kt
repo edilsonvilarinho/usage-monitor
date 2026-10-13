@@ -32,7 +32,46 @@ internal object TelegramAnalysisRenderer {
     fun render(view: AnalysisView, analysis: SessionAnalysis, language: AppLanguage): ByteArray? = when (view) {
         AnalysisView.GAUGES -> draw(WIDTH, 480) { canvas -> gauges(canvas, analysis, language) }
         AnalysisView.HOURS -> draw(WIDTH, CHART_HEIGHT) { canvas -> hours(canvas, analysis, language) }
+        AnalysisView.HEATMAP -> draw(WIDTH, HEAT_HEIGHT) { canvas -> heatmap(canvas, analysis, language) }
         else -> null
+    }
+
+    /**
+     * AB8 · mapa de calor: 7 dias × 24 horas (BRT), o dourado na proporção do maior valor da
+     * semana; a célula forte tem o número escrito, para a cor não informar sozinha.
+     */
+    private fun heatmap(canvas: Canvas, analysis: SessionAnalysis, language: AppLanguage) {
+        title(canvas, TelegramAnalysisImageLabels.title(AnalysisView.HEATMAP, analysis, language))
+        val left = PAD + 52f
+        val top = 64f
+        val cellWidth = (WIDTH - left - PAD) / 24f
+        val max = analysis.heat.flatten().maxOrNull()?.takeIf { value -> value > 0.0 } ?: 1.0
+        val pt = language == AppLanguage.PT
+        analysis.heat.forEachIndexed { row, values ->
+            val y = top + row * HEAT_ROW
+            val day = analysis.heatDays.getOrNull(row)?.let { date -> TelegramBotMessages.weekday(date.dayOfWeek, pt) }.orEmpty()
+            canvas.drawString(day, left - 10f - font(15f).measureTextWidth(day), y + HEAT_ROW / 2f + 5f, font(15f), Paint().apply { color = MUTED })
+            values.forEachIndexed { hour, value ->
+                val x = left + hour * cellWidth
+                val box = Rect.makeLTRB(x + 1.5f, y + 1.5f, x + cellWidth - 1.5f, y + HEAT_ROW - 1.5f)
+                val color = if (value <= 0.0) EMPTY_CELL else blend(EMPTY_CELL, GOLD, 0.25 + 0.75 * value / max)
+                canvas.drawRect(box, Paint().apply { this.color = color })
+                if (value >= max * STRONG_CELL) centered(canvas, value.toInt().toString(), box.left + box.width / 2f, box.bottom - 13f, font(13f), CORE)
+            }
+        }
+        listOf(0, 6, 12, 18, 23).forEach { hour ->
+            centered(canvas, hour.toString().padStart(2, '0'), left + hour * cellWidth + cellWidth / 2f, top + 7 * HEAT_ROW + 22f, font(13f), MUTED)
+        }
+    }
+
+    private fun blend(from: Int, to: Int, amount: Double): Int {
+        val t = amount.coerceIn(0.0, 1.0)
+        fun channel(shift: Int): Int {
+            val a = (from shr shift) and 0xFF
+            val b = (to shr shift) and 0xFF
+            return (a + (b - a) * t).toInt() and 0xFF
+        }
+        return (0xFF shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
 
     /**
@@ -176,6 +215,11 @@ internal object TelegramAnalysisRenderer {
     private const val CHART_HEIGHT = 420
     private const val PAD = 24f
     private const val RECENT_HOURS = 4
+    private const val HEAT_ROW = 44f
+    private const val HEAT_HEIGHT = 64 + 7 * 44 + 40
+
+    /** A partir desta fração do maior valor a célula ganha o número escrito. */
+    private const val STRONG_CELL = 0.7
 
     const val BACKGROUND = 0xFF131010.toInt()
     private const val TRACK = 0xFF2A2626.toInt()
@@ -187,4 +231,6 @@ internal object TelegramAnalysisRenderer {
     const val INFO = 0xFF4C8DFF.toInt()
     const val EMBER = 0xFF8C643F.toInt()
     private const val GRID = 0xFF2A2626.toInt()
+    const val EMPTY_CELL = 0xFF141B24.toInt()
+    private const val CORE = 0xFF030508.toInt()
 }
