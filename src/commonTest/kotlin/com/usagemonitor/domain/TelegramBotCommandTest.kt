@@ -1,6 +1,9 @@
 package com.usagemonitor.domain
 
+import com.usagemonitor.domain.entity.AlertKind
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.isOn
+import com.usagemonitor.domain.entity.toggled
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BotButton
@@ -60,6 +63,11 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Keyboard(true), parseBotCommand("/teclado"))
         assertEquals(BotCommand.FocusHud, parseBotCommand("/hud"))
         assertEquals(BotCommand.Team, parseBotCommand("/time"))
+        assertEquals(BotCommand.AlertMenu, parseBotCommand("/alertas"))
+        AlertKind.entries.forEach { kind ->
+            assertEquals(BotTap.ToggleAlert(kind), parseBotTap(BotTap.ToggleAlert(kind).data()))
+            assertEquals(!UsageAlertSettings().isOn(kind), UsageAlertSettings().toggled(kind).isOn(kind))
+        }
         assertEquals(BotTap.UpdateNow("42.1.0"), parseBotTap(BotTap.UpdateNow("42.1.0").data()))
         assertEquals(null, parseBotTap("upd:"))
         assertEquals(BotCommand.Export(7, UsageExportFormat.CSV), parseBotCommand("/exportar"))

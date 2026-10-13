@@ -383,6 +383,22 @@ class TelegramBotServiceTest {
         waitUntil { applied.get() == 1 }
     }
 
+    /** #408, AA9: `/alertas` sem argumento abre um interruptor por tipo; o toque muda só aquele e redesenha o teclado. */
+    @Test
+    fun `alert menu toggles one kind and redraws its keyboard`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/alertas")
+
+        waitUntil { api.keyboards.any { row -> row.any { it.data == "alt:session" } } }
+        assertTrue(api.keyboards.last { it.isNotEmpty() }.any { it.text == "✅ Sessão saturada" })
+        api.pending += tap(2, chat = 51, data = "alt:session")
+
+        waitUntil { !alertSettings.value.sessionAlertsEnabled }
+        assertTrue(alertSettings.value.quotaAlertsEnabled)
+        waitUntil { api.edits.isNotEmpty() }
+    }
+
     @Test
     fun `mute button silences alerts for one hour`() {
         paired()

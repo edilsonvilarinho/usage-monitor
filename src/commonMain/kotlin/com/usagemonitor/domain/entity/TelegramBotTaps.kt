@@ -32,6 +32,9 @@ sealed interface BotTap {
 
     /** "Atualizar e reiniciar" da versão [version] (#408, AA17); versão diferente da pronta não reinicia nada. */
     data class UpdateNow(val version: String) : BotTap
+
+    /** Liga ou desliga um tipo de alerta (#408, AA9). */
+    data class ToggleAlert(val kind: AlertKind) : BotTap
 }
 
 private const val ACCOUNT_PREFIX = "acc:"
@@ -39,6 +42,7 @@ private const val SOURCE_PREFIX = "api:"
 private const val SNOOZE_PREFIX = "snz:"
 private const val SNOOZE_MORNING = "am"
 private const val UPDATE_PREFIX = "upd:"
+private const val ALERT_PREFIX = "alt:"
 
 /** `null` para dado que não é deste formato — inclusive os de [BotButton]. */
 fun parseBotTap(data: String?): BotTap? {
@@ -49,6 +53,7 @@ fun parseBotTap(data: String?): BotTap? {
         value == SNOOZE_PREFIX + SNOOZE_MORNING -> BotTap.SnoozeUntilMorning
         value.startsWith(SNOOZE_PREFIX) -> value.removePrefix(SNOOZE_PREFIX).toIntOrNull()?.takeIf { minutes -> minutes in 1..MAX_SNOOZE_MINUTES }?.let(BotTap::SnoozeFor)
         value.startsWith(UPDATE_PREFIX) -> value.removePrefix(UPDATE_PREFIX).takeIf { version -> version.isNotEmpty() }?.let(BotTap::UpdateNow)
+        value.startsWith(ALERT_PREFIX) -> AlertKind.entries.firstOrNull { kind -> kind.data == value.removePrefix(ALERT_PREFIX) }?.let(BotTap::ToggleAlert)
         else -> null
     }
 }
@@ -60,6 +65,7 @@ fun BotTap.data(): String = when (this) {
     is BotTap.SnoozeFor -> SNOOZE_PREFIX + minutes
     BotTap.SnoozeUntilMorning -> SNOOZE_PREFIX + SNOOZE_MORNING
     is BotTap.UpdateNow -> UPDATE_PREFIX + version
+    is BotTap.ToggleAlert -> ALERT_PREFIX + kind.data
 }
 
 /** Teto do silêncio por toque: um dia. Dado maior é forjado, não do teclado do bot. */

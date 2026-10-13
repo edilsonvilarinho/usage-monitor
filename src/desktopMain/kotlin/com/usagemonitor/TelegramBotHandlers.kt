@@ -30,6 +30,7 @@ import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.changesApp
+import com.usagemonitor.domain.entity.toggled
 import com.usagemonitor.domain.entity.parseBotCommand
 import com.usagemonitor.domain.entity.snoozeAlerts
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -112,6 +113,10 @@ internal class TelegramBotHandlers(
     private suspend fun reply(token: String, chatId: Long, command: BotCommand, language: AppLanguage) {
         when (command) {
             is BotCommand.Start -> Unit
+            BotCommand.AlertMenu -> api.sendMessage(
+                token, chatId, TelegramBotRemoteMessages.alertMenu(language), html = true,
+                buttons = rows(TelegramBotRemoteMessages.alertButtons(alertSettingsFlow.value, language))
+            )
             BotCommand.Status -> sendStatus(token, chatId, language)
             BotCommand.StatusImage -> {
                 val rings = buildTelegramRings(snapshotProvider(), language)
@@ -317,6 +322,18 @@ internal class TelegramBotHandlers(
             is BotTap.Source -> toggleFromTap(token, message, callbackId, tap.source, language)
             is BotTap.SnoozeFor -> snoozeFromTap(token, message.chatId, callbackId, clock.now().toEpochMilliseconds() + tap.minutes * 60_000L, language)
             BotTap.SnoozeUntilMorning -> snoozeFromTap(token, message.chatId, callbackId, nextMorningMillis(clock.now().toEpochMilliseconds()), language)
+            is BotTap.ToggleAlert -> {
+                val updated = alertSettingsFlow.value.toggled(tap.kind)
+                saveAlertSettings(updated)
+                api.answerCallbackQuery(token, callbackId)
+                val messageId = message.messageId
+                if (messageId != null) {
+                    api.editMessageText(
+                        token, message.chatId, messageId, TelegramBotRemoteMessages.alertMenu(language),
+                        rows(TelegramBotRemoteMessages.alertButtons(updated, language))
+                    )
+                }
+            }
             is BotTap.UpdateNow -> {
                 // Permissão e versão relidas no toque: aviso antigo não reinicia o app.
                 val result = when {
@@ -332,7 +349,7 @@ internal class TelegramBotHandlers(
 
     /** Toques que mudam o app (#408, AA21): ligar fonte e silenciar. Ver conta e atualizar só leem. */
     private fun tapChangesApp(tap: BotTap?, button: BotButton?): Boolean = when (tap) {
-        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow -> true
+        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow, is BotTap.ToggleAlert -> true
         is BotTap.Account -> false
         null -> button == BotButton.SNOOZE
     }

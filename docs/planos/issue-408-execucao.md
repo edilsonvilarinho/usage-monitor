@@ -163,6 +163,7 @@ Molde por tipo de opção:
 | A20 | `feat(telegram): send the CLI usage as a csv or json file with /exportar` | `gradlew.bat desktopTest --tests "*Telegram*"`: 88 testes, 0 falhas (novos: `sendDocument` multipart; `/exportar json 30d` manda o arquivo com nome de data e recorte; parse em qualquer ordem e formato inválido) | concluída |
 | A21 | `feat(telegram): show who from the team is online with /time behind a switch` | `gradlew.bat desktopTest --tests "*Telegram*"`: 89 testes, 0 falhas (novo: trabalhando, online e fora em ordem total, só apelido — nome da máquina não aparece; desligado, sem time e servidor fora do ar) | concluída |
 | A22 | `feat(telegram): announce a ready update once and restart it from the bot` | `gradlew.bat desktopTest --tests "*Telegram*"`: 90 testes, 0 falhas (novo: sem permissão nada sai; com ela, um aviso por versão com o botão `upd:<versão>`, toque de versão antiga não reinicia, o da pronta chama `applyUpdate`). Primeira rodada: 1 falha no teste "sample reply" — o exemplo expandido saiu da altura padrão da cena com a opção nova (armadilha "altura da cena"); a cena do teste passou a 2000 px | concluída |
+| A23 | `feat(telegram): turn each alert kind on or off from /alertas` | `gradlew.bat desktopTest --tests "*Telegram*"`: 91 testes, 0 falhas (novos: `/alertas` sem argumento abre um botão por tipo, o toque inverte só aquele campo e redesenha o teclado; ida e volta do `alt:<tipo>` e da inversão para todos os tipos) | concluída |
 
 ## Problemas em aberto e riscos
 

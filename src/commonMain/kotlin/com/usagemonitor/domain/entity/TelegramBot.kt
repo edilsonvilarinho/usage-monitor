@@ -130,6 +130,8 @@ sealed interface BotCommand {
     /** `/status img` (#408, AA14): os anéis das contas como imagem. */
     data object StatusImage : BotCommand
     data class Alerts(val enabled: Boolean) : BotCommand
+    /** `/alertas` sem argumento (#408, AA9): um interruptor por tipo de alerta. */
+    data object AlertMenu : BotCommand
     /** `null` desliga o silêncio. */
     data class Quiet(val hours: QuietHours?) : BotCommand
     data class Threshold(val percents: List<Int>) : BotCommand
@@ -190,7 +192,7 @@ sealed interface BotCommand {
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
     is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud -> true
-    is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Team, BotCommand.Accounts, BotCommand.Refresh,
+    is BotCommand.Start, BotCommand.AlertMenu, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Team, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
@@ -219,7 +221,8 @@ fun parseBotCommand(text: String): BotCommand? {
         "alertas", "alerts" -> when (args.firstOrNull()?.lowercase()) {
             "on", "ligar", "ligado" -> BotCommand.Alerts(true)
             "off", "desligar", "desligado" -> BotCommand.Alerts(false)
-            else -> BotCommand.Invalid("/alertas on|off")
+            null -> BotCommand.AlertMenu
+            else -> BotCommand.Invalid("/alertas | /alertas on | /alertas off")
         }
         "silencio", "silêncio", "quiet" -> parseQuiet(args.firstOrNull())
         "limiar", "threshold" -> parseThreshold(args.joinToString(","))

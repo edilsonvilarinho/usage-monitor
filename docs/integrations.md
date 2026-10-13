@@ -431,6 +431,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     envio — com o botão "⬆ Atualizar e reiniciar o app" (`upd:<versão>`). O toque relê permissão e versão: aviso antigo
     responde "não está mais pronta", e só a versão pronta chama `restartAndUpdateNow`, o mesmo botão da faixa do app. O texto
     diz o que reinicia. Conversa só de leitura não reinicia (`tapChangesApp`).
+  - **Tipos de alerta** (AA9): `/alertas` sem argumento (antes "uso inválido") manda um botão por tipo — Cota, Reinício,
+    Sessão saturada, Sem resposta, Pico — com ✅/⬜ e o nome (`alt:<tipo>`). O toque inverte **o mesmo campo** das
+    Configurações (`AlertKind`, enum novo que aponta para os interruptores de `UsageAlertSettings`) e redesenha o teclado da
+    mensagem. `/alertas on|off` continua mudando todos.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

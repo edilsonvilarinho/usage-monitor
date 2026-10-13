@@ -1,6 +1,9 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.domain.entity.AlertKind
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.domain.entity.isOn
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BotTap
 import com.usagemonitor.domain.entity.TELEGRAM_MORNING_HOUR
@@ -89,6 +92,30 @@ internal object TelegramBotRemoteMessages {
             "🔕 Alertas silenciados até <b>$clock</b>$day.\nPara voltar antes: <code>/alertas on</code>"
         } else {
             "🔕 Alerts muted until <b>$clock</b>$day.\nTo resume earlier: <code>/alerts on</code>"
+        }
+    }
+
+    /** `/alertas` sem argumento (#408, AA9). */
+    fun alertMenu(language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "<b>Alertas</b> — toque para ligar ou desligar cada tipo.\nTodos de uma vez: <code>/alertas on</code> · <code>/alertas off</code>"
+    } else {
+        "<b>Alerts</b> — tap to turn each kind on or off.\nAll at once: <code>/alerts on</code> · <code>/alerts off</code>"
+    }
+
+    /** Um botão por tipo, dois por linha; o rótulo diz o estado atual com ✅/⬜ **e** o nome. */
+    fun alertButtons(settings: UsageAlertSettings, language: AppLanguage): List<List<Pair<String, String>>> =
+        AlertKind.entries
+            .map { kind -> (mark(settings.isOn(kind)) + " " + alertKindName(kind, language)) to BotTap.ToggleAlert(kind).data() }
+            .chunked(SOURCE_BUTTONS_PER_ROW)
+
+    fun alertKindName(kind: AlertKind, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        return when (kind) {
+            AlertKind.QUOTA -> if (pt) "Cota" else "Quota"
+            AlertKind.RESET -> if (pt) "Reinício" else "Reset"
+            AlertKind.SESSION -> if (pt) "Sessão saturada" else "Saturated session"
+            AlertKind.STALLED -> if (pt) "Sem resposta" else "No reply"
+            AlertKind.SPIKE -> if (pt) "Pico" else "Spike"
         }
     }
 
