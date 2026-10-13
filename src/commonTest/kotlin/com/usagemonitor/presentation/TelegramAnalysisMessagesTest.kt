@@ -75,4 +75,22 @@ class TelegramAnalysisMessagesTest {
         val closed = AnalysisFixture.analysis.copy(slices = emptyList())
         assertTrue("No 5h window open" in TelegramAnalysisMessages.text(AnalysisView.TIMELINE, closed, AppLanguage.EN)!!)
     }
+
+    /** AB13: contas lado a lado; ✓ na de mais folga ou mais rápida, só com duas medidas na linha. */
+    @Test
+    fun `scoreboard marks the account with the most room`() {
+        val base = AnalysisFixture.analysis
+        val codex = base.copy(
+            accountLabel = "Codex",
+            fiveHour = base.fiveHour!!.copy(percent = 23, paceNow = 6.1, safePace = 31.0),
+            weekly = base.weekly!!.copy(percent = 18),
+            intervals = base.intervals.mapIndexed { index, row -> if (index == 0) row.copy(tokensPerSecond = 63.0) else row }
+        )
+        val text = com.usagemonitor.presentation.ui.TelegramAnalysisTexts.scoreboard(listOf(base, codex), AppLanguage.PT)
+        assertTrue("5h         62%       23% ✓" in text, text)
+        assertTrue("seguro 5h  25,3      31,0 ✓" in text, text)
+        assertTrue("tok/s      48        63 ✓" in text, text)
+        val single = com.usagemonitor.presentation.ui.TelegramAnalysisTexts.scoreboard(listOf(base), AppLanguage.EN)
+        assertTrue("Scoreboard now" in single && "✓ " !in single.substringBefore("</pre>"), single)
+    }
 }

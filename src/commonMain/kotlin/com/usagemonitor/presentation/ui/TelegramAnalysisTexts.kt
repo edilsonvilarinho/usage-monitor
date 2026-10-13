@@ -133,6 +133,41 @@ internal object TelegramAnalysisTexts {
         return "$title\n<pre>${TelegramBotMessages.escape(lines.joinToString("\n"))}</pre>\n$footer"
     }
 
+    /**
+     * AB13 · placar: as contas lado a lado, uma linha por métrica, com ✓ na que tem mais folga
+     * (ou é mais rápida). ✓ só com duas ou mais contas medidas naquela linha; até [SCOREBOARD_COLUMNS]
+     * colunas, o resto é contado no rodapé.
+     */
+    fun scoreboard(analyses: List<SessionAnalysis>, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val shown = analyses.take(SCOREBOARD_COLUMNS)
+        val names = shown.map { analysis -> analysis.accountLabel.substringAfterLast(" · ").take(COLUMN - 1) }
+        val rows = listOf(
+            metricRow("5h", shown.map { item -> item.fiveHour?.percent?.toDouble() }, lowerIsBetter = true) { value -> "${value.roundToInt()}%" },
+            metricRow(if (pt) "ritmo 5h" else "5h pace", shown.map { item -> item.fiveHour?.paceNow }, lowerIsBetter = true) { value -> TelegramAnalysisMessages.pace(value, pt).trim() },
+            metricRow(if (pt) "semanal" else "weekly", shown.map { item -> item.weekly?.percent?.toDouble() }, lowerIsBetter = true) { value -> "${value.roundToInt()}%" },
+            metricRow(if (pt) "seguro 5h" else "safe 5h", shown.map { item -> item.fiveHour?.safePace }, lowerIsBetter = false) { value -> TelegramAnalysisMessages.pace(value, pt).trim() },
+            metricRow("tok/s", shown.map { item -> item.intervals.firstOrNull()?.tokensPerSecond }, lowerIsBetter = false) { value -> value.roundToInt().toString() },
+            (if (pt) "reinicia" else "resets").padEnd(LABEL) + shown.joinToString("") { item ->
+                (item.fiveHour?.resetsAt?.let { at -> TelegramBotMessages.clock(at) } ?: "—").padEnd(COLUMN)
+            }
+        )
+        val head = "".padEnd(LABEL) + names.joinToString("") { name -> name.padEnd(COLUMN) }
+        val title = if (pt) "<b>📐 Placar agora</b>" else "<b>📐 Scoreboard now</b>"
+        val more = (analyses.size - shown.size).takeIf { count -> count > 0 }?.let { count -> if (pt) " · +$count conta(s) fora" else " · +$count more account(s)" }.orEmpty()
+        val footer = "<i>" + (if (pt) "✓ = mais folga ou mais rápida · tok/s da última hora" else "✓ = most room or fastest · tok/s of the last hour") + "$more</i>"
+        return "$title\n<pre>${TelegramBotMessages.escape((listOf(head) + rows).joinToString("\n").trimEnd())}</pre>\n$footer"
+    }
+
+    private fun metricRow(label: String, values: List<Double?>, lowerIsBetter: Boolean, format: (Double) -> String): String {
+        val measured = values.filterNotNull()
+        val best = if (measured.size < 2) null else if (lowerIsBetter) measured.min() else measured.max()
+        return label.padEnd(LABEL) + values.joinToString("") { value ->
+            val text = value?.let(format) ?: "—"
+            (if (value != null && value == best) "$text ✓" else text).padEnd(COLUMN)
+        }
+    }
+
     /** Mesmo rótulo nos dois idiomas: "h" e "d" são unidades, não palavras. */
     fun spanLabel(span: AnalysisSpan): String = when (span) {
         AnalysisSpan.HOUR_1 -> "1 h"
@@ -168,6 +203,9 @@ internal object TelegramAnalysisTexts {
 
     private const val BLOCKS = "▁▂▃▄▅▆▇█"
     private const val BAR_CELLS = 5
+    private const val SCOREBOARD_COLUMNS = 3
+    private const val LABEL = 11
+    private const val COLUMN = 10
     private const val MILLIS_PER_HOUR = 3_600_000.0
     private val SLICE = 30.minutes
     private const val TREND_POINTS = 7

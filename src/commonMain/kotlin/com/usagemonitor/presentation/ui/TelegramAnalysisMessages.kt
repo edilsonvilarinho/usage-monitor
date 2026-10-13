@@ -21,6 +21,9 @@ internal object TelegramAnalysisMessages {
     fun pickAccount(language: AppLanguage): String =
         if (language == AppLanguage.PT) "<b>📐 Análise de qual conta?</b>" else "<b>📐 Analysis of which account?</b>"
 
+    /** Botão "Todas" da escolha de conta: abre o placar (AB13). */
+    fun scoreboardButton(language: AppLanguage): String = if (language == AppLanguage.PT) "📊 Todas (placar)" else "📊 All (scoreboard)"
+
     fun noAccount(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "📐 A análise cobre contas Anthropic e Codex, e nenhuma está com leitura agora."
     } else {

@@ -14,6 +14,7 @@ import com.usagemonitor.domain.entity.accountByKey
 import com.usagemonitor.domain.entity.botAccountKey
 import com.usagemonitor.domain.entity.data
 import com.usagemonitor.presentation.ui.TelegramAnalysisMessages
+import com.usagemonitor.presentation.ui.TelegramAnalysisTexts
 
 /**
  * O `/analise` e as abas dele (rodada AB). Mora fora do [TelegramBotHandlers] pelo tamanho:
@@ -32,12 +33,23 @@ internal class TelegramAnalysisHandler(
         val accounts = analyzableAccounts().filter { account -> command.source == null || account.source == command.source }
         when {
             accounts.isEmpty() -> send(token, chatId, TelegramAnalysisMessages.noAccount(language))
+            command.all -> scoreboard(token, chatId, accounts, language)
             accounts.size == 1 -> show(token, chatId, accounts.single(), command.view ?: AnalysisView.PANEL, editMessageId = null, language)
             else -> api.sendMessage(
                 token, chatId, TelegramAnalysisMessages.pickAccount(language), html = true,
-                buttons = accounts.map { account -> TelegramButton(account.label, BotTap.AnalysisAccount(botAccountKey(account)).data()) }.chunked(2)
+                buttons = (
+                    accounts.map { account -> TelegramButton(account.label, BotTap.AnalysisAccount(botAccountKey(account)).data()) } +
+                        TelegramButton(TelegramAnalysisMessages.scoreboardButton(language), BotTap.AnalysisAccount(null).data())
+                    ).chunked(2)
             )
         }
+    }
+
+    /** AB13 · placar: a análise de cada conta, lado a lado; conta sem histórico fica fora. */
+    private suspend fun scoreboard(token: String, chatId: Long, accounts: List<UsageSnapshotAccount>, language: AppLanguage) {
+        val analyses = accounts.mapNotNull { account -> account.targetKey?.let { key -> readings.sessionAnalysis(key) } }
+        if (analyses.isEmpty()) return send(token, chatId, TelegramAnalysisMessages.notReady(language))
+        send(token, chatId, TelegramAnalysisTexts.scoreboard(analyses, language))
     }
 
     /** Toque na escolha da conta ou numa aba; a conta é relida do retrato de agora. */
@@ -48,7 +60,8 @@ internal class TelegramAnalysisHandler(
             is BotTap.AnalysisShow -> Triple(tap.key, tap.view, messageId)
             else -> return
         }
-        val account = key?.let { value -> snapshotProvider()?.accountByKey(value) }?.takeIf { item -> item in analyzableAccounts() }
+        if (key == null) return scoreboard(token, chatId, analyzableAccounts(), language)
+        val account = snapshotProvider()?.accountByKey(key)?.takeIf { item -> item in analyzableAccounts() }
         if (account == null) {
             send(token, chatId, TelegramAnalysisMessages.noAccount(language))
             return
