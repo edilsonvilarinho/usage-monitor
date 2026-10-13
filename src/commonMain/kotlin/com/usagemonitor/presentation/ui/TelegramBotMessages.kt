@@ -96,7 +96,7 @@ internal object TelegramBotMessages {
         val quotas = account.quotas.map { quota ->
             val reset = quota.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + resetLabel(at, now, pt) }.orEmpty()
             val spark = sparklines[quota.label]?.let { line -> "\n<code>$line</code> <i>6 h</i>" }.orEmpty()
-            "${escape(quota.label)}$reset\n<code>${escape(quotaValue(quota, pt))}</code>$spark"
+            "${escape(displayQuotaLabel(quota.label, pt))}$reset\n<code>${escape(quotaValue(quota, pt))}</code>$spark"
         }
         return (listOf(title) + quotas).joinToString("\n")
     }

@@ -58,7 +58,7 @@ internal object TelegramBotUsageMessages {
         val blocks = histories.flatMap { history ->
             history.report.series.filter { series -> series.periodType == period && series.windows.isNotEmpty() }.map { series ->
                 val recent = series.windows.sortedByDescending { window -> window.resetsAt }.take(MAX_WINDOWS)
-                val title = "<b>${TelegramBotMessages.escape(history.label)} · ${TelegramBotMessages.escape(series.quotaLabel)}</b>"
+                val title = "<b>${TelegramBotMessages.escape(history.label)} · ${TelegramBotMessages.escape(displayQuotaLabel(series.quotaLabel, language))}</b>"
                 title + "\n" + recent.joinToString("\n") { window -> windowLine(window, pt) }
             }
         }
@@ -195,7 +195,7 @@ internal object TelegramBotUsageMessages {
                     diff < 0 -> "▼ −${-diff} pp"
                     else -> "="
                 }
-                val name = "<b>${TelegramBotMessages.escape(history.label)} · ${TelegramBotMessages.escape(series.quotaLabel)}</b>"
+                val name = "<b>${TelegramBotMessages.escape(history.label)} · ${TelegramBotMessages.escape(displayQuotaLabel(series.quotaLabel, language))}</b>"
                 if (pt) "$name +$current pp (antes +$previous pp) $trend" else "$name +$current pp (before +$previous pp) $trend"
             }
         }

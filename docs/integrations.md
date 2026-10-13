@@ -406,6 +406,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     toques, alertas, resumo diário e painel saem sempre no idioma do app; o `pollLoop` guarda o idioma em que registrou o
     menu e chama `setMyCommands` de novo quando o do app muda (dentro de um ciclo de long polling, até 25 s). O campo
     `language` das conversas no `telegram.json` antigo é ignorado (`ignoreUnknownKeys`).
+  - **Auditoria de idioma** (B03): todo texto das mensagens já tinha os dois idiomas; o que vazava em português no bot em
+    inglês eram as chaves de série nascidas em português ("Créditos", "Saldo", "Gratuito", "Go semanal", "Go mensal").
+    `displayQuotaLabel` (presentation) traduz **só na exibição** — a chave do histórico não muda — no bot, no gráfico e nos
+    títulos dos alertas (bandeja inclusive). O estado "token recusado" das Configurações deixou de ser texto fixo em
+    português (`TelegramBotStatus.TokenRejected`).
   - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado (📊 Status,
     👤 Conta, 📈 Gráfico, ⏳ Quando, no idioma da conversa); `off` manda `remove_keyboard`. O toque chega como **texto** com o
     rótulo e `parseKeyboardLabel` o traduz no comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos

@@ -203,5 +203,5 @@ private suspend fun telegramChartOf(graph: AppGraph, range: HistoryRange): Teleg
             }
         }
     }
-    return buildTelegramChart(reports, range, now).takeUnless { chart -> chart.isEmpty }
+    return buildTelegramChart(reports, range, now, language).takeUnless { chart -> chart.isEmpty }
 }

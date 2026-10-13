@@ -41,7 +41,7 @@ internal object TelegramBotInsightMessages {
         val lines = entries.take(MAX_RESET_LINES).map { entry ->
             val value = entry.quota.percent?.let { percent -> " — <b>$percent%</b>" }.orEmpty()
             "<code>${TelegramBotMessages.resetLabel(entry.at, now, pt)}</code> " +
-                "<b>${TelegramBotMessages.escape(entry.account)}</b> · ${TelegramBotMessages.escape(entry.quota.label)}$value"
+                "<b>${TelegramBotMessages.escape(entry.account)}</b> · ${TelegramBotMessages.escape(displayQuotaLabel(entry.quota.label, pt))}$value"
         }
         val more = (entries.size - MAX_RESET_LINES).takeIf { count -> count > 0 }?.let { count ->
             "<i>" + (if (pt) "+$count mais" else "+$count more") + "</i>"
@@ -66,7 +66,7 @@ internal object TelegramBotInsightMessages {
     }
 
     private fun exhaustionLine(account: String, quota: UsageSnapshotQuota, now: Instant, pt: Boolean): String {
-        val name = "<b>${TelegramBotMessages.escape(account)} · ${TelegramBotMessages.escape(quota.label)}</b>"
+        val name = "<b>${TelegramBotMessages.escape(account)} · ${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))}</b>"
         val value = quota.percent?.let { percent -> " $percent%" }.orEmpty()
         val risk = quota.risk ?: return "⚪ $name$value — " + (if (pt) "sem projeção" else "no projection")
         val mark = TelegramBotMessages.riskEmoji(risk)
@@ -118,7 +118,7 @@ internal object TelegramBotInsightMessages {
                     .thenBy { account -> account.label }
             )
             val best = ranked.first()
-            val quotas = best.quotas.mapNotNull { quota -> quota.percent?.let { percent -> "${TelegramBotMessages.escape(quota.label)} $percent%" } }
+            val quotas = best.quotas.mapNotNull { quota -> quota.percent?.let { percent -> "${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))} $percent%" } }
             val head = "<b>${TelegramBotMessages.escape(best.label)}</b> — " + quotas.joinToString(" · ")
             val others = ranked.drop(1).map { account ->
                 val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
@@ -151,7 +151,7 @@ internal object TelegramBotInsightMessages {
                 val days = (resetsAt - now).inWholeMinutes / MINUTES_PER_DAY.toDouble()
                 val remaining = (100 - percent).coerceAtLeast(0)
                 val perDay = (remaining / days).roundToInt()
-                val name = "<b>${TelegramBotMessages.escape(account.label)} · ${TelegramBotMessages.escape(quota.label)}</b>"
+                val name = "<b>${TelegramBotMessages.escape(account.label)} · ${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))}</b>"
                 val reset = TelegramBotMessages.resetLabel(resetsAt, now, pt)
                 val daysText = oneDecimal(days, pt)
                 if (pt) {
@@ -193,7 +193,7 @@ internal object TelegramBotInsightMessages {
                 .thenBy { spike -> spike.quotaLabel }
         )
         val lines = ordered.map { spike ->
-            val name = "<b>${TelegramBotMessages.escape(spike.targetLabel)} · ${TelegramBotMessages.escape(spike.quotaLabel)}</b>"
+            val name = "<b>${TelegramBotMessages.escape(spike.targetLabel)} · ${TelegramBotMessages.escape(displayQuotaLabel(spike.quotaLabel, pt))}</b>"
             val today = amount(spike.baseline.todayDelta, spike.quotaTotal)
             val usual = amount(spike.baseline.baselineDelta, spike.quotaTotal)
             val days = spike.baseline.completeDays

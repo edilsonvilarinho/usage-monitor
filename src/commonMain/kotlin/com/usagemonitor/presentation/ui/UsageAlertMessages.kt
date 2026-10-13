@@ -45,7 +45,7 @@ private fun spendSpikeMessage(
 ): UsageAlertMessage {
     val isPt = language == AppLanguage.PT
     val factor = formatSpikeFactor(alert.factor, language)
-    val subject = "${alert.targetLabel} · ${alert.quotaLabel}"
+    val subject = "${alert.targetLabel} · ${displayQuotaLabel(alert.quotaLabel, language)}"
 
     if (isPt) {
         return UsageAlertMessage(
@@ -68,7 +68,7 @@ private fun quotaThresholdMessage(
     alert: UsageAlert.QuotaThreshold,
     language: AppLanguage
 ): UsageAlertMessage {
-    val title = "${alert.targetLabel} · ${alert.quotaLabel}"
+    val title = "${alert.targetLabel} · ${displayQuotaLabel(alert.quotaLabel, language)}"
 
     // Sem `resets_at` conhecido a frase termina no consumo: inventar um horário
     // de reinício seria pior que omiti-lo.
@@ -104,12 +104,12 @@ private fun resetSoonMessage(
     val at = formatBrtDateTime(alert.resetAt, language)
     return if (language == AppLanguage.PT) {
         UsageAlertMessage(
-            title = "${alert.targetLabel} · ${alert.quotaLabel} reinicia em ${alert.minutesLeft} min",
+            title = "${alert.targetLabel} · ${displayQuotaLabel(alert.quotaLabel, language)} reinicia em ${alert.minutesLeft} min",
             body = "Está em ${alert.actualPercent}%. Dá para retomar em $at BRT."
         )
     } else {
         UsageAlertMessage(
-            title = "${alert.targetLabel} · ${alert.quotaLabel} resets in ${alert.minutesLeft} min",
+            title = "${alert.targetLabel} · ${displayQuotaLabel(alert.quotaLabel, language)} resets in ${alert.minutesLeft} min",
             body = "At ${alert.actualPercent}%. You can resume at $at BRT."
         )
     }
@@ -120,7 +120,7 @@ private fun quotaResetMessage(
     alert: UsageAlert.QuotaReset,
     language: AppLanguage
 ): UsageAlertMessage {
-    val title = "${alert.targetLabel} · ${alert.quotaLabel}"
+    val title = "${alert.targetLabel} · ${displayQuotaLabel(alert.quotaLabel, language)}"
     val next = formatBrtDateTime(alert.nextResetAt, language)
     val body = if (language == AppLanguage.PT) {
         "A cota reiniciou: dá para voltar a usar. Próximo reinício: $next BRT."

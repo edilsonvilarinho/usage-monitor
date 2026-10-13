@@ -89,6 +89,7 @@ internal fun telegramBotSectionModel(
             }
         }
         is TelegramBotStatus.Failed -> ((if (pt) "Falha: " else "Failed: ") + status.message) to AppTone.CRITICAL
+        TelegramBotStatus.TokenRejected -> (if (pt) "Falha: token do bot recusado pelo Telegram." else "Failed: the Telegram bot token was rejected.") to AppTone.CRITICAL
     }
     val expiresAt = settings.pairingExpiresAtMillis
     val openCode = settings.pairingCode?.takeIf { expiresAt != null && nowMillis < expiresAt }

@@ -156,4 +156,15 @@ class TelegramBotMessagesTest {
         assertTrue(text.endsWith("\n<i>última: 11:43</i>"))
         assertTrue("alem-das-sombras" in text)
     }
+
+    /** B03: chave de série em português sai traduzida no inglês; rótulo neutro sai como veio; no português, nada muda. */
+    @Test
+    fun `quota labels follow the app language without renaming the series key`() {
+        assertEquals("Balance", com.usagemonitor.presentation.ui.displayQuotaLabel("Saldo", AppLanguage.EN))
+        assertEquals("Go weekly", com.usagemonitor.presentation.ui.displayQuotaLabel("Go semanal", AppLanguage.EN))
+        assertEquals("Claude 5h", com.usagemonitor.presentation.ui.displayQuotaLabel("Claude 5h", AppLanguage.EN))
+        assertEquals("Saldo", com.usagemonitor.presentation.ui.displayQuotaLabel("Saldo", AppLanguage.PT))
+        val status = TelegramBotMessages.status(snapshot, AppLanguage.EN)
+        assertTrue("Balance" in status && "Saldo" !in status, status)
+    }
 }

@@ -54,6 +54,8 @@ internal sealed interface TelegramBotStatus {
     /** [botUsername] sem `@`; `null` quando o `getMe` falhou — o link "Abrir no Telegram" some. */
     data class Connected(val chatCount: Int, val botUsername: String? = null) : TelegramBotStatus
     data class Failed(val message: String) : TelegramBotStatus
+    /** 401 do Telegram: o texto sai no idioma do app em quem mostra o estado (B03), não aqui. */
+    data object TokenRejected : TelegramBotStatus
 }
 
 /**
@@ -233,7 +235,7 @@ internal class TelegramBotService(
             } catch (limited: TelegramRateLimitedException) {
                 delay(limited.retryAfterSeconds * 1_000L)
             } catch (_: TelegramUnauthorizedException) {
-                _status.value = TelegramBotStatus.Failed("Token do bot recusado pelo Telegram.")
+                _status.value = TelegramBotStatus.TokenRejected
                 activeToken = null
                 delay(UNAUTHORIZED_RETRY_MILLIS)
             } catch (error: Exception) {

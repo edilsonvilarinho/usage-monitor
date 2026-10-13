@@ -58,7 +58,7 @@ internal object TelegramBotSummaryMessages {
             val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
             val quota = fullestQuota(account)
             val value = quota?.let { item ->
-                " · ${TelegramBotMessages.escape(item.label)}\n<code>${TelegramBotMessages.escape(TelegramBotMessages.quotaValue(item, pt))}</code>"
+                " · ${TelegramBotMessages.escape(displayQuotaLabel(item.label, pt))}\n<code>${TelegramBotMessages.escape(TelegramBotMessages.quotaValue(item, pt))}</code>"
             }.orEmpty()
             "$mark<b>${TelegramBotMessages.escape(account.label)}</b>$value"
         }
@@ -95,7 +95,7 @@ internal object TelegramBotSummaryMessages {
         val name = "<b>${TelegramBotMessages.escape(account.label)}</b>"
         val quota = fullestQuota(account) ?: return mark + name
         val reset = quota.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + TelegramBotMessages.resetLabel(at, now, pt) }.orEmpty()
-        return "$mark$name · ${TelegramBotMessages.escape(quota.label)} ${valueOf(quota, pt)}$reset"
+        return "$mark$name · ${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))} ${valueOf(quota, pt)}$reset"
     }
 
     private fun valueOf(quota: UsageSnapshotQuota, pt: Boolean): String {
@@ -109,7 +109,7 @@ internal object TelegramBotSummaryMessages {
         val entries = snapshot.accounts.flatMap { account ->
             account.quotas.mapNotNull { quota ->
                 val at = quota.resetsAt?.takeIf { instant -> instant > now && instant.toLocalDateTime(SAO_PAULO).date == today }
-                at?.let { instant -> instant to "${TelegramBotMessages.escape(account.label)} ${TelegramBotMessages.escape(quota.label)} " + (if (pt) "às " else "at ") + TelegramBotMessages.clock(instant) }
+                at?.let { instant -> instant to "${TelegramBotMessages.escape(account.label)} ${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))} " + (if (pt) "às " else "at ") + TelegramBotMessages.clock(instant) }
             }
         }.sortedBy { (instant, _) -> instant }
         if (entries.isEmpty()) return null

@@ -94,6 +94,7 @@ Regras que valem para todas:
 | B00 | `docs: plan the session analysis round` | galeria aberta no painel do navegador: 15 opções + referência + entrada, console sem erro, sem rolagem horizontal a 375 px; publicada para o usuário, que escolheu AB1–AB15 e respondeu U1–U3 | concluída |
 | B01 | `refactor(telegram): build the command menu and help from one catalog by category` | `gradlew.bat desktopTest --tests "*Telegram*"`: 111 testes, 0 falhas (novos: todo nome do catálogo, PT e EN, é comando que o bot entende; categorias contíguas no menu com o emoji da categoria abrindo a descrição; nomes só `a-z0-9_`; um cabeçalho por categoria no `/ajuda` de cada idioma). `TelegramBotMessages` caiu de 353 para 277 linhas | concluída |
 | B02 | `feat(telegram): follow the app language everywhere and drop /idioma` | `gradlew.bat desktopTest --tests "*Telegram*"`: 111 testes, 0 falhas (novo: trocar o idioma do app registra o menu de novo — `conta` → `account` — e o alerta seguinte sai em inglês nas duas conversas; `/idioma en` passou a ser comando desconhecido). `TelegramChat.language`, `languageOf`, `BotCommand.ChatLanguage` e `languageSet` removidos | concluída |
+| B03 | `fix(telegram): show Portuguese series labels in the app language` | varredura de literais acentuados fora de ramo de idioma nos `Telegram*Messages`, renderizadores, serviço e `UsageAlertMessages`: todas as mensagens já tinham EN; vazavam as chaves de série PT e o "Token do bot recusado" das Configurações. `gradlew.bat desktopTest --tests "*Telegram*" --tests "*UsageAlert*"`: 181 testes, 0 falhas (novo: `Saldo` → `Balance`, `Go semanal` → `Go weekly`, rótulo neutro igual, PT intacto, `/status` em inglês sem "Saldo") | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -104,3 +105,5 @@ Regras que valem para todas:
 | R3 | O PR #409 cresce com esta entrega (decisão U3) | aceito |
 
 ## Desvios do plano e achados da execução
+- B03: o **app** em inglês também mostra "Saldo"/"Go semanal" (`expandedQuotaTitle` devolve o rótulo cru em cota de moeda) —
+  fora do escopo do bot; virou tarefa separada (reaproveitar `displayQuotaLabel` nas telas).
