@@ -33,4 +33,14 @@ class TelegramAnalysisRendererTest {
         val (label, safe) = TelegramAnalysisImageLabels.gaugeLabel("5h", 62, 25.3, AppLanguage.EN)
         assertEquals("5h · 62%" to "safe up to 25.3", label to safe)
     }
+
+    /** AB7: barras das horas recentes em ouro, as antigas em brasa, e a linha azul da vazão. */
+    @Test
+    fun `hours draw recent bars in gold, older ones in ember and the throughput line in blue`() {
+        val image = image(AnalysisView.HOURS)
+        assertEquals(420, image.height)
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.EMBER and 0xFFFFFF))
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.INFO and 0xFFFFFF, 70 until 360))
+    }
 }

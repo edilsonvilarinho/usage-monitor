@@ -37,6 +37,10 @@ internal object TelegramAnalysisImageLabels {
 
     fun windowWeekly(language: AppLanguage): String = if (language == AppLanguage.PT) "semanal" else "weekly"
 
+    /** A legenda da linha azul de vazão, que tem eixo próprio à direita. */
+    fun speedLegend(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "— tok/s (eixo à direita)" else "— tok/s (right axis)"
+
     fun notMeasured(language: AppLanguage): String = if (language == AppLanguage.PT) "sem leitura" else "no reading"
 
     /** Vazão por modelo, a linha de rodapé das imagens. */
