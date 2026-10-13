@@ -466,6 +466,15 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - **Lembrete antes do reinício** (AA4): `/avise 15` (5 a 120 min; `/remind`) e `/avise off` gravam
     `resetReminderMinutes` pelo mesmo caminho do `/limiar` (`applyBotCommand`). O alerta é `UsageAlert.ResetSoon`, decidido
     na função pura e entregue pela bandeja e pelo bot (decisão em `docs/presentation.md`).
+  - **Fonte quebrada** (AA18): com **"Avisar fonte com falha"** (nasce ligado), o serviço lê a cada minuto os erros que o
+    `UiState` já publica (`sourceHealthOf` na fiação: mensagem **saneada** da tela, nunca token; hora dos números mantidos
+    por `statsRetainedAfterFailure`) e `evaluateSourceHealth` (domain, pura) decide: conta falhando há
+    `SOURCE_BROKEN_AFTER_MILLIS` (15 min — três coletas no ritmo sem sessão) avisa **uma vez** "⚠ X parou de atualizar /
+    Falhando desde HH:MM: motivo / Os números mostrados são de HH:MM"; quando volta a ler, "✅ X voltou" — só se tinha
+    avisado. Fonte desligada sai calada; silêncio adia. O 429 conta como falha (a fonte de fato parou, e a mensagem diz que é
+    limite). **Desvio do mockup**: "3 coletas seguidas" virou 15 min seguidos — o `UiState` é `StateFlow` e não emite duas
+    falhas iguais, então contar coletas exigiria um evento novo no `DashboardViewModel` (751 linhas, faixa que não cresce).
+    O estado vive em memória: reiniciar o app recomeça a contagem.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

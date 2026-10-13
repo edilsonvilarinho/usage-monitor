@@ -25,6 +25,7 @@ import com.usagemonitor.presentation.ui.components.TELEGRAM_CRITICAL_SOUND_SWITC
 import com.usagemonitor.presentation.ui.components.TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG
@@ -97,6 +98,8 @@ class TelegramBotSectionTest {
         onNodeWithTag(TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG).assertIsOn()
         // #408, AA15: "Painel em uma linha" também.
         onNodeWithTag(TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG).assertIsOn()
+        // #408, AA18: "Avisar fonte com falha" também.
+        onNodeWithTag(TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG).assertIsOn()
     }
 
     private fun model(enabled: Boolean, code: String? = "AB12CD", onPair: () -> Unit = {}) = TelegramBotSectionModel(

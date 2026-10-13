@@ -23,6 +23,7 @@ const val TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG = "telegramCriticalSoundSwitch
 const val TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG = "telegramGroupAlertsSwitch"
 const val TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG = "telegramBatchAlertsSwitch"
 const val TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG = "telegramCompactPanelSwitch"
+const val TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG = "telegramSourceHealthSwitch"
 const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
 const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
@@ -194,6 +195,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.compactPanel,
                 onCheckedChange = { compact -> model.onPreferencesChange(model.preferences.copy(compactPanel = compact)) },
                 modifier = Modifier.testTag(TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Avisar fonte com falha" else "Warn about a failing source",
+            description = if (pt) {
+                "Depois de 15 min falhando, o bot diz o motivo e de quando são os números. Avisa de novo quando ela voltar."
+            } else {
+                "After 15 min failing, the bot says why and how old the numbers are. It tells you again when it is back."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.sourceHealthAlerts,
+                onCheckedChange = { warn -> model.onPreferencesChange(model.preferences.copy(sourceHealthAlerts = warn)) },
+                modifier = Modifier.testTag(TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG)
             )
         }
     }

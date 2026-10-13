@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.isOn
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.SourceHealthEvent
 import com.usagemonitor.domain.entity.BotTap
 import com.usagemonitor.domain.entity.TELEGRAM_MORNING_HOUR
 import com.usagemonitor.domain.entity.data
@@ -135,6 +136,34 @@ internal object TelegramBotRemoteMessages {
             "🎧 <b>Foco até $until</b>\nSó chegam alertas críticos (≥ 90%). <code>/foco off</code> encerra."
         } else {
             "🎧 <b>Focus until $until</b>\nOnly critical alerts (≥ 90%) come through. <code>/focus off</code> ends it."
+        }
+    }
+
+    /**
+     * Fonte quebrada e de volta (#408, AA18). O motivo é a mensagem que a tela já mostra
+     * (saneada), escapada; a hora dos números mantidos diz o quanto eles envelheceram.
+     */
+    fun sourceHealth(event: SourceHealthEvent, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        return when (event) {
+            is SourceHealthEvent.Broken -> {
+                val label = TelegramBotMessages.escape(event.label)
+                val since = TelegramBotMessages.clock(event.failingSince)
+                val reason = TelegramBotMessages.escape(event.reason)
+                val kept = event.lastReadingAt?.let { at ->
+                    if (pt) "Os números mostrados são de ${TelegramBotMessages.clock(at)}." else "The numbers shown are from ${TelegramBotMessages.clock(at)}."
+                } ?: if (pt) "Não há leitura guardada desta conta." else "There is no stored reading for this account."
+                if (pt) {
+                    "⚠ <b>$label parou de atualizar</b>\nFalhando desde $since: $reason\n$kept"
+                } else {
+                    "⚠ <b>$label stopped updating</b>\nFailing since $since: $reason\n$kept"
+                }
+            }
+            is SourceHealthEvent.Recovered -> {
+                val label = TelegramBotMessages.escape(event.label)
+                val at = TelegramBotMessages.clock(event.at)
+                if (pt) "✅ <b>$label voltou</b> — coleta $at." else "✅ <b>$label is back</b> — collected $at."
+            }
         }
     }
 }

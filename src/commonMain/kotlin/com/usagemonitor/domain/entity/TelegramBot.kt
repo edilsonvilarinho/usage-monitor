@@ -56,6 +56,11 @@ data class TelegramBotPreferences(
      * Nasce ligado, como no mockup; o painel em si continua nascendo desligado.
      */
     val compactPanel: Boolean = true,
+    /**
+     * Avisa a fonte que falha há 15 min e de novo quando ela volta (#408, AA18). Nasce
+     * ligado, como no mockup: o texto é a mensagem saneada da tela, nunca o token.
+     */
+    val sourceHealthAlerts: Boolean = true,
     /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
     val announcedUpdateVersion: String? = null
 )

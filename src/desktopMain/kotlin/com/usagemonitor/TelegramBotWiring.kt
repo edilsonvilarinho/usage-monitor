@@ -7,6 +7,10 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.TelegramPing
+import com.usagemonitor.domain.entity.SourceHealthObservation
+import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.viewmodel.UiApiError
 import com.usagemonitor.domain.entity.snapshotLabel
 import kotlin.time.Instant
 import com.usagemonitor.domain.entity.UsageAlert
@@ -92,6 +96,7 @@ private fun createTelegramBotService(
         // Só a pronta (baixada e com SHA-256 conferido): a só "disponível" não tem o que instalar.
         readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Ready)?.update?.version },
         applyUpdate = { dashboard.restartAndUpdateNow() },
+        sourceHealth = { sourceHealthOf(dashboard.uiState.value, storedLanguage(graph.settings)) },
         exportUsage = { since, format ->
             graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
                 // Projeto, branch e integrante ficam fora: o arquivo sai do PC para o Telegram.
@@ -119,6 +124,40 @@ private fun teamPresenceReader(graph: AppGraph): suspend () -> Result<List<TeamM
         if (failure != null && results.all { result -> result.isFailure }) return@reader Result.failure(failure)
         Result.success(results.flatMap { result -> result.getOrNull()?.entries.orEmpty() }.distinctBy { entry -> entry.memberKey })
     }
+}
+
+/**
+ * Fonte quebrada (#408, AA18): uma observação por conta da última coleta. A falha leva a
+ * mensagem que a tela mostra (já saneada) e a hora dos números mantidos na tela; o 429 entra
+ * como falha — a fonte de fato parou de atualizar, e a mensagem diz que é limite.
+ */
+private fun sourceHealthOf(state: UiState, language: AppLanguage): List<SourceHealthObservation>? {
+    val data: List<ApiUsageStats>
+    val errors: List<UiApiError>
+    when (state) {
+        is UiState.Success -> {
+            data = state.data
+            errors = state.errors
+        }
+        is UiState.Error -> {
+            data = emptyList()
+            errors = state.errors
+        }
+        UiState.NoApisEnabled -> return emptyList()
+        UiState.Loading -> return null
+    }
+    val failingKeys = errors.map { error -> error.target.storageKey }.toSet()
+    val failing = errors.map { error ->
+        SourceHealthObservation(
+            key = error.target.storageKey,
+            label = error.targetLabel?.takeIf { label -> label.isNotBlank() } ?: error.source.displayName(language),
+            failure = error.message,
+            lastReadingAt = data.firstOrNull { stats -> stats.targetKey == error.target }?.fetchedAt
+        )
+    }
+    val healthy = data.filter { stats -> stats.targetKey.storageKey !in failingKeys }
+        .map { stats -> SourceHealthObservation(stats.targetKey.storageKey, stats.snapshotLabel, failure = null) }
+    return failing + healthy
 }
 
 /** A comparação entre modelos (#386) desde um instante, com as cotas da última coleta. */

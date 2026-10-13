@@ -18,6 +18,11 @@ import com.usagemonitor.domain.entity.isCriticalAlert
 import com.usagemonitor.domain.entity.TelegramAlertGroup
 import com.usagemonitor.domain.entity.alertGroupKey
 import com.usagemonitor.domain.entity.batchAlertItems
+import com.usagemonitor.domain.entity.SOURCE_BROKEN_AFTER_MILLIS
+import com.usagemonitor.domain.entity.SourceHealthEntry
+import com.usagemonitor.domain.entity.evaluateSourceHealth
+import com.usagemonitor.domain.entity.isAlertSilenced
+import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
@@ -93,7 +98,11 @@ internal class TelegramBotService(
     /** Intervalo da checagem de versão pronta (#408, AA17); parâmetro pelo mesmo motivo. */
     private val updateCheckMillis: Long = UPDATE_CHECK_MILLIS,
     /** Janela do lote de alertas (#408, AA25); parâmetro para o teste não esperar 15 minutos. */
-    private val alertBatchMillis: Long = ALERT_BATCH_MILLIS
+    private val alertBatchMillis: Long = ALERT_BATCH_MILLIS,
+    /** Intervalo da checagem de fonte quebrada (#408, AA18). */
+    private val sourceHealthCheckMillis: Long = SOURCE_HEALTH_CHECK_MILLIS,
+    /** Quanto a fonte falha antes do aviso (#408, AA18); parâmetro para o teste não esperar 15 minutos. */
+    private val sourceBrokenAfterMillis: Long = SOURCE_BROKEN_AFTER_MILLIS
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
@@ -101,6 +110,10 @@ internal class TelegramBotService(
     private var summaryJob: Job? = null
     private var panelJob: Job? = null
     private var updateJob: Job? = null
+    private var sourceHealthJob: Job? = null
+
+    /** Contas falhando e se já avisaram (#408, AA18). Só no laço da checagem; reiniciar o app recomeça a contagem. */
+    private var sourceHealth: Map<String, SourceHealthEntry> = emptyMap()
 
     /**
      * Mensagem de cada alerta agrupável por conversa (#408, AA1), `(chatId, chave)` →
@@ -152,6 +165,12 @@ internal class TelegramBotService(
             while (true) {
                 runCatching { announceReadyUpdate() }.onFailure { error -> if (error is CancellationException) throw error }
                 delay(updateCheckMillis)
+            }
+        }
+        sourceHealthJob = scope.launch {
+            while (true) {
+                runCatching { checkSourceHealth() }.onFailure { error -> if (error is CancellationException) throw error }
+                delay(sourceHealthCheckMillis)
             }
         }
         panelJob = scope.launch {
@@ -404,6 +423,25 @@ internal class TelegramBotService(
             false
         }
 
+    /**
+     * Fonte quebrada (#408, AA18): a decisão é de [evaluateSourceHealth]; aqui só a leitura,
+     * o silêncio e o envio. Desligado, a contagem é esquecida — religar recomeça do zero.
+     */
+    private suspend fun checkSourceHealth() {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank() || !settings.preferences.sourceHealthAlerts) {
+            sourceHealth = emptyMap()
+            return
+        }
+        val observations = readings.sourceHealth() ?: return
+        val now = clock.now()
+        val evaluation = evaluateSourceHealth(observations, sourceHealth, now, isAlertSilenced(alertSettingsFlow.value, now), sourceBrokenAfterMillis)
+        sourceHealth = evaluation.state
+        for (event in evaluation.events) {
+            broadcast(silent = settings.preferences.soundOnlyOnCritical) { language -> TelegramBotRemoteMessages.sourceHealth(event, language) }
+        }
+    }
+
     /** `false` quando a mensagem sumiu e tem de ser recriada; "not modified" conta como mantida. */
     private suspend fun editPanel(token: String, chatId: Long, messageId: Long, text: String): Boolean =
         try {
@@ -457,5 +495,6 @@ internal class TelegramBotService(
         const val PANEL_INTERVAL_MILLIS = 60_000L
         const val UPDATE_CHECK_MILLIS = 60_000L
         const val ALERT_BATCH_MILLIS = 15 * 60_000L
+        const val SOURCE_HEALTH_CHECK_MILLIS = 60_000L
     }
 }

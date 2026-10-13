@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.SourceHealthObservation
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -132,6 +133,7 @@ class TelegramBotServiceTest {
     private val applied = AtomicInteger()
     @Volatile private var readyVersion: String? = null
     @Volatile private var snapshot: UsageSnapshot? = null
+    @Volatile private var sourceHealth: List<SourceHealthObservation>? = null
     private val enabledSources = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
     private val service = TelegramBotService(
         api = api,
@@ -159,10 +161,13 @@ class TelegramBotServiceTest {
             machineName = { "NOTE-EDI" },
             exportUsage = { since, format -> "$format desde $since" },
             readyUpdate = { readyVersion },
-            applyUpdate = { applied.incrementAndGet() }
+            applyUpdate = { applied.incrementAndGet() },
+            sourceHealth = { sourceHealth }
         ),
         updateCheckMillis = 50L,
-        alertBatchMillis = 300L
+        alertBatchMillis = 300L,
+        sourceHealthCheckMillis = 50L,
+        sourceBrokenAfterMillis = 0L
     )
 
     @AfterTest
@@ -430,6 +435,24 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("🎧 <b>Foco até 11:00</b>") } }
         api.pending += message(2, chat = 51, text = "/foco off")
         waitUntil { alertSettings.value.focusUntilEpochMillis == null }
+    }
+
+    /** #408, AA18: a fonte quebrada avisa uma vez com o motivo escapado; ao voltar, avisa que voltou. */
+    @Test
+    fun `broken source warns once and again when it is back`() {
+        paired()
+        service.start()
+        sourceHealth = listOf(SourceHealthObservation("cursor", "Cursor", failure = "HTTP 401 <recusado>", lastReadingAt = Instant.parse("2026-10-06T11:50:00Z")))
+
+        waitUntil { api.sent.any { it.second.startsWith("⚠ <b>Cursor parou de atualizar</b>") } }
+        val broken = api.sent.single { it.second.startsWith("⚠") }.second
+        assertTrue("HTTP 401 &lt;recusado&gt;" in broken)
+        assertTrue(broken.endsWith("Os números mostrados são de 08:50."))
+        Thread.sleep(200)
+        assertEquals(1, api.sent.count { it.second.startsWith("⚠") })
+
+        sourceHealth = listOf(SourceHealthObservation("cursor", "Cursor", failure = null))
+        waitUntil { api.sent.any { it.second == "✅ <b>Cursor voltou</b> — coleta 09:00." } }
     }
 
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */
