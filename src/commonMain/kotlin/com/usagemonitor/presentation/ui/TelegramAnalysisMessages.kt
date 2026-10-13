@@ -25,6 +25,12 @@ internal object TelegramAnalysisMessages {
     fun pickAccount(language: AppLanguage): String =
         if (language == AppLanguage.PT) "<b>📐 Análise de qual conta?</b>" else "<b>📐 Analysis of which account?</b>"
 
+    /** Botão do `/status` que abre a análise (B19). */
+    fun openButton(language: AppLanguage): String = if (language == AppLanguage.PT) "📐 Análise" else "📐 Analysis"
+
+    /** Botão da resposta do `/conta` que abre a análise daquela conta (B19). */
+    fun accountButton(language: AppLanguage): String = if (language == AppLanguage.PT) "📐 Analisar esta conta" else "📐 Analyze this account"
+
     /** Botão "Todas" da escolha de conta: abre o placar (AB13). */
     fun scoreboardButton(language: AppLanguage): String = if (language == AppLanguage.PT) "📊 Todas (placar)" else "📊 All (scoreboard)"
 

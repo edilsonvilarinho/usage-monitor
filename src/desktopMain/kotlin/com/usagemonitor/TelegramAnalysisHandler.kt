@@ -53,9 +53,16 @@ internal class TelegramAnalysisHandler(
         send(token, chatId, TelegramAnalysisTexts.scoreboard(analyses, language))
     }
 
+    /** Há conta analisável agora? Decide se o `/status` e o `/conta` oferecem o botão. */
+    fun hasAccounts(): Boolean = analyzableAccounts().isNotEmpty()
+
+    /** A conta de [key] é analisável? (Anthropic ou Codex, com chave de alvo.) */
+    fun canAnalyze(key: String): Boolean = snapshotProvider()?.accountByKey(key)?.let { account -> account in analyzableAccounts() } == true
+
     /** Toque na escolha da conta ou numa aba; a conta é relida do retrato de agora. */
     suspend fun tap(token: String, chatId: Long, messageId: Long?, callbackId: String, tap: BotTap, language: AppLanguage) {
         api.answerCallbackQuery(token, callbackId)
+        if (tap == BotTap.AnalysisPick) return command(token, chatId, BotCommand.Analysis(null, null, false), language)
         val (key, view, editId) = when (tap) {
             is BotTap.AnalysisAccount -> Triple(tap.key, AnalysisView.PANEL, null)
             is BotTap.AnalysisShow -> Triple(tap.key, tap.view, messageId)

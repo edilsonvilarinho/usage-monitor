@@ -19,6 +19,7 @@ import com.usagemonitor.presentation.ui.buildTelegramRings
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.data
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.presentation.ui.TelegramChartMessages
@@ -38,6 +39,7 @@ import com.usagemonitor.domain.entity.toggled
 import com.usagemonitor.domain.entity.parseBotCommand
 import com.usagemonitor.domain.entity.snoozeAlerts
 import com.usagemonitor.presentation.ui.TelegramBotMessages
+import com.usagemonitor.presentation.ui.TelegramAnalysisMessages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -372,7 +374,13 @@ internal class TelegramBotHandlers(
         when (tap) {
             is BotTap.Account -> {
                 api.answerCallbackQuery(token, callbackId)
-                api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true)
+                // B19: a conta Anthropic ou Codex ganha o atalho para a análise dela.
+                val buttons = if (analysis.canAnalyze(tap.key)) {
+                    listOf(listOf(TelegramButton(TelegramAnalysisMessages.accountButton(language), BotTap.AnalysisAccount(tap.key).data())))
+                } else {
+                    emptyList()
+                }
+                api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true, buttons = buttons)
             }
             is BotTap.Source -> toggleFromTap(token, message, callbackId, tap.source, language)
             is BotTap.SnoozeFor -> snoozeFromTap(token, message.chatId, callbackId, clock.now().toEpochMilliseconds() + tap.minutes * 60_000L, language)
@@ -389,7 +397,7 @@ internal class TelegramBotHandlers(
                     )
                 }
             }
-            is BotTap.AnalysisAccount, is BotTap.AnalysisShow -> analysis.tap(token, message.chatId, message.messageId, callbackId, tap, language)
+            is BotTap.AnalysisAccount, is BotTap.AnalysisShow, BotTap.AnalysisPick -> analysis.tap(token, message.chatId, message.messageId, callbackId, tap, language)
             is BotTap.ThresholdAccount -> {
                 api.answerCallbackQuery(token, callbackId)
                 val account = tap.key?.let { key -> snapshotProvider()?.accountByKey(key) }
@@ -419,7 +427,7 @@ internal class TelegramBotHandlers(
     private fun tapChangesApp(tap: BotTap?, button: BotButton?): Boolean = when (tap) {
         is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow, is BotTap.ToggleAlert,
         is BotTap.ThresholdAccount -> true
-        is BotTap.Account, is BotTap.AnalysisAccount, is BotTap.AnalysisShow -> false
+        is BotTap.Account, is BotTap.AnalysisAccount, is BotTap.AnalysisShow, BotTap.AnalysisPick -> false
         null -> button == BotButton.SNOOZE
     }
 
@@ -459,7 +467,9 @@ internal class TelegramBotHandlers(
     /** Ações do `/status` numa linha e, embaixo, um botão por conta (#398, Y4). */
     private fun statusButtons(language: AppLanguage, snapshot: UsageSnapshot?): List<List<TelegramButton>> =
         listOf(TelegramBotMessages.statusButtons(language).map { (label, button) -> TelegramButton(label, button.data) }) +
-            accountRows(snapshot)
+            accountRows(snapshot) +
+            // B19: o atalho para a análise, quando há conta Anthropic ou Codex.
+            (if (analysis.hasAccounts()) listOf(listOf(TelegramButton(TelegramAnalysisMessages.openButton(language), BotTap.AnalysisPick.data()))) else emptyList())
 
     private fun accountRows(snapshot: UsageSnapshot?): List<List<TelegramButton>> = rows(TelegramBotMessages.accountButtons(snapshot))
 

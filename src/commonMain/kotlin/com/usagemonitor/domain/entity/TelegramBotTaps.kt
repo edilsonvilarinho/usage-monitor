@@ -44,6 +44,9 @@ sealed interface BotTap {
 
     /** Aba da análise (AB12): a vista [view] da conta [key]. */
     data class AnalysisShow(val key: String, val view: AnalysisView) : BotTap
+
+    /** "📐 Análise" do `/status` (rodada AB, B19): o mesmo que mandar `/analise`. */
+    data object AnalysisPick : BotTap
 }
 
 private const val ACCOUNT_PREFIX = "acc:"
@@ -56,6 +59,7 @@ private const val THRESHOLD_PREFIX = "thr:"
 private const val THRESHOLD_ALL = "*"
 private const val ANALYSIS_PREFIX = "ana:"
 private const val ANALYSIS_VIEW_PREFIX = "anv:"
+private const val ANALYSIS_PICK = "anp"
 
 /** `null` para dado que não é deste formato — inclusive os de [BotButton]. */
 fun parseBotTap(data: String?): BotTap? {
@@ -69,6 +73,7 @@ fun parseBotTap(data: String?): BotTap? {
         value.startsWith(ALERT_PREFIX) -> AlertKind.entries.firstOrNull { kind -> kind.data == value.removePrefix(ALERT_PREFIX) }?.let(BotTap::ToggleAlert)
         value == THRESHOLD_PREFIX + THRESHOLD_ALL -> BotTap.ThresholdAccount(null)
         value.startsWith(THRESHOLD_PREFIX) -> value.removePrefix(THRESHOLD_PREFIX).takeIf { key -> key.isNotEmpty() }?.let(BotTap::ThresholdAccount)
+        value == ANALYSIS_PICK -> BotTap.AnalysisPick
         value == ANALYSIS_PREFIX + THRESHOLD_ALL -> BotTap.AnalysisAccount(null)
         value.startsWith(ANALYSIS_PREFIX) -> value.removePrefix(ANALYSIS_PREFIX).takeIf { key -> key.isNotEmpty() }?.let(BotTap::AnalysisAccount)
         value.startsWith(ANALYSIS_VIEW_PREFIX) -> parseAnalysisShow(value.removePrefix(ANALYSIS_VIEW_PREFIX))
@@ -87,6 +92,7 @@ fun BotTap.data(): String = when (this) {
     is BotTap.ThresholdAccount -> THRESHOLD_PREFIX + (key ?: THRESHOLD_ALL)
     is BotTap.AnalysisAccount -> ANALYSIS_PREFIX + (key ?: THRESHOLD_ALL)
     is BotTap.AnalysisShow -> ANALYSIS_VIEW_PREFIX + key + ":" + view.code
+    BotTap.AnalysisPick -> ANALYSIS_PICK
 }
 
 /** `<chave da conta>:<código da vista>`; a chave já tem `:` (fonte:resumo), então o código é o último trecho. */

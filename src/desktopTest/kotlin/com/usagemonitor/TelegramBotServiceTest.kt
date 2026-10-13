@@ -515,6 +515,13 @@ class TelegramBotServiceTest {
         assertEquals("• Painel •", tab.text)
         api.pending += tap(2, chat = 51, data = tab.data)
         waitUntil { api.editedTexts.any { it.startsWith("<b>📐") } }
+
+        // B19: o `/status` traz o atalho "📐 Análise", e ele abre a mesma análise.
+        api.pending += message(3, chat = 51, text = "/status")
+        waitUntil { api.keyboards.any { row -> row.any { it.data == "anp" } } }
+        val before = api.sent.count { it.second.startsWith("<b>📐 Anthropic") }
+        api.pending += tap(4, chat = 51, data = "anp")
+        waitUntil { api.sent.count { it.second.startsWith("<b>📐 Anthropic") } == before + 1 }
     }
 
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */
