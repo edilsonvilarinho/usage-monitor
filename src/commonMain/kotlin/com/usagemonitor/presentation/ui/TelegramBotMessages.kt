@@ -298,6 +298,17 @@ internal object TelegramBotMessages {
         return "<b>${escape(message.title)}</b>\n${escape(message.body)}"
     }
 
+    /**
+     * O mesmo alerta repetido no dia (#408, AA1): a mensagem anterior editada com o
+     * contador, a hora da primeira e a da última.
+     */
+    fun repeatedAlert(alert: UsageAlert, count: Int, firstAt: Instant, lastAt: Instant, language: AppLanguage): String {
+        val message = usageAlertMessage(alert, language)
+        val pt = language == AppLanguage.PT
+        return "<b>${escape(message.title)}</b> · <b>$count×</b> " + (if (pt) "desde " else "since ") + clock(firstAt) +
+            "\n${escape(message.body)}\n<i>" + (if (pt) "última: " else "last: ") + clock(lastAt) + "</i>"
+    }
+
     fun test(language: AppLanguage): String =
         if (language == AppLanguage.PT) "✅ Mensagem de teste do Usage Monitor. Os alertas chegam aqui." else "✅ Usage Monitor test message. Alerts arrive here."
 

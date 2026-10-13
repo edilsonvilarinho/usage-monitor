@@ -29,3 +29,28 @@ fun UsageAlertSettings.toggled(kind: AlertKind): UsageAlertSettings = when (kind
     AlertKind.STALLED -> copy(stalledSessionAlertsEnabled = !stalledSessionAlertsEnabled)
     AlertKind.SPIKE -> copy(spikeAlertsEnabled = !spikeAlertsEnabled)
 }
+
+/**
+ * O que faz dois alertas serem "o mesmo" para o bot agrupar (#408, AA1): tipo e assunto —
+ * projeto da sessão, cota da conta (e o limiar, que é outro aviso). A sessão sem projeto
+ * cai no próprio id, que nunca sai do processo. `null` não agrupa: o crítico
+ * ([isCriticalAlert]) sempre abre mensagem nova, porque edição não toca no celular.
+ */
+fun alertGroupKey(alert: UsageAlert): String? {
+    if (isCriticalAlert(alert)) return null
+    return when (alert) {
+        is UsageAlert.QuotaThreshold -> "quota|${alert.target.storageKey}|${alert.quotaLabel}|${alert.thresholdPercent}"
+        is UsageAlert.QuotaReset -> "reset|${alert.target.storageKey}|${alert.quotaLabel}"
+        is UsageAlert.SessionSaturated -> "session|${alert.projectName ?: alert.sessionId}"
+        is UsageAlert.SessionStalled -> "stalled|${alert.projectName ?: alert.sessionId}"
+        is UsageAlert.SpendSpike -> "spike|${alert.target.storageKey}|${alert.quotaLabel}"
+    }
+}
+
+/** Mensagem que agrupa as repetições de um alerta numa conversa, no dia local [day] (ISO). */
+data class TelegramAlertGroup(
+    val messageId: Long,
+    val count: Int,
+    val firstAtMillis: Long,
+    val day: String
+)

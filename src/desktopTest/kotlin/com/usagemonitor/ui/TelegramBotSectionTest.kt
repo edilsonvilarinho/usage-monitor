@@ -22,6 +22,7 @@ import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG
@@ -88,6 +89,8 @@ class TelegramBotSectionTest {
         onNodeWithTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG).assertIsOn()
         onNodeWithTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG).performClick()
         assertEquals(TelegramBotPreferences(soundOnlyOnCritical = false), sent)
+        // #408, AA1: "Agrupar alertas repetidos" também nasce ligado.
+        onNodeWithTag(TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG).assertIsOn()
     }
 
     private fun model(enabled: Boolean, code: String? = "AB12CD", onPair: () -> Unit = {}) = TelegramBotSectionModel(

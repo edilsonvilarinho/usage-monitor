@@ -20,6 +20,7 @@ const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
 const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
 const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
 const val TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG = "telegramCriticalSoundSwitch"
+const val TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG = "telegramGroupAlertsSwitch"
 const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
 const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
@@ -149,6 +150,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.soundOnlyOnCritical,
                 onCheckedChange = { only -> model.onPreferencesChange(model.preferences.copy(soundOnlyOnCritical = only)) },
                 modifier = Modifier.testTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Agrupar alertas repetidos" else "Group repeated alerts",
+            description = if (pt) {
+                "O mesmo alerta no mesmo dia edita a mensagem anterior com um contador, sem vibrar de novo. Crítico sempre abre outra."
+            } else {
+                "The same alert on the same day edits the previous message with a counter, without vibrating again. Critical always opens a new one."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.groupRepeatedAlerts,
+                onCheckedChange = { group -> model.onPreferencesChange(model.preferences.copy(groupRepeatedAlerts = group)) },
+                modifier = Modifier.testTag(TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG)
             )
         }
     }

@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -126,5 +127,20 @@ class TelegramBotMessagesTest {
         assertTrue(text.startsWith("<b>📌 Painel ao vivo</b>\n<i>atualizado 22:28 BRT</i>"), text)
         assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>" in text, text)
         assertEquals(text, TelegramBotSummaryMessages.panel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
+    }
+
+    /** #408, AA1: a repetição edita a mensagem com o contador, a hora da primeira e a da última (BRT). */
+    @Test
+    fun `repeated alert carries the count and both times`() {
+        val text = TelegramBotMessages.repeatedAlert(
+            UsageAlert.SessionSaturated("s2", "alem-das-sombras"),
+            count = 3,
+            firstAt = Instant.parse("2026-10-06T09:55:00Z"),
+            lastAt = Instant.parse("2026-10-06T14:43:00Z"),
+            language = AppLanguage.PT
+        )
+        assertTrue(text.startsWith("<b>Sessão CLI saturada</b> · <b>3×</b> desde 06:55\n"))
+        assertTrue(text.endsWith("\n<i>última: 11:43</i>"))
+        assertTrue("alem-das-sombras" in text)
     }
 }

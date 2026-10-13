@@ -41,6 +41,11 @@ data class TelegramBotPreferences(
      * Nasce ligado, como no mockup aprovado: não age no PC nem expõe dado — só tira o som.
      */
     val soundOnlyOnCritical: Boolean = true,
+    /**
+     * Repetição do mesmo alerta no mesmo dia edita a mensagem anterior com o contador em vez
+     * de abrir outra (#408, AA1). Nasce ligado, como no mockup: só muda a forma da entrega.
+     */
+    val groupRepeatedAlerts: Boolean = true,
     /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
     val announcedUpdateVersion: String? = null
 )

@@ -439,6 +439,13 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     nem expõe dado, só tira o som), o alerta sai com `disable_notification` salvo se for crítico. Crítico tem dono único no
     domain, `isCriticalAlert`: `QuotaThreshold` com percentual real ≥ `CRITICAL_ALERT_PERCENT` (90), o que inclui a esgotada.
     Sessão, reinício, sem resposta e pico nunca são críticos. A mensagem de teste e as respostas a comandos seguem com som.
+  - **Alerta repetido vira contador** (AA1): com **"Agrupar alertas repetidos"** (nasce ligado), a repetição do mesmo alerta
+    no mesmo dia local (BRT) **edita** a mensagem anterior daquela conversa — `<b>N×</b> desde HH:MM` no título e
+    `última: HH:MM` no fim —, e a edição não toca. "O mesmo" é `alertGroupKey` (domain): tipo e assunto — projeto da sessão
+    (sessões diferentes do mesmo projeto contam juntas, que é o caso do print da issue), cota da conta com o limiar. Crítico
+    nunca agrupa: precisa tocar. O mapa (conversa, chave) → mensagem vive só em memória no coletor de alertas: reiniciar o
+    app abre mensagem nova, e edição que falha (mensagem apagada, rede) cai numa mensagem nova. Não mexe na dedup da
+    bandeja (`UsageAlertState`): a causa das repetições (D4 do plano) segue sem diagnóstico.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

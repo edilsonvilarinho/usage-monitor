@@ -376,6 +376,25 @@ class TelegramBotServiceTest {
         assertEquals(1, api.silentSends.size)
     }
 
+    /** #408, AA1: a repetição do mesmo projeto no dia edita a primeira mensagem; desligado, abre outra. */
+    @Test
+    fun `repeated alert edits the first message with a counter`() {
+        paired()
+        service.start()
+        runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
+        waitUntil { api.sent.size == 1 }
+        runBlocking { alerts.emit(UsageAlert.SessionSaturated("s2", "alem-das-sombras")) }
+
+        waitUntil { api.editedTexts.any { "<b>2×</b> desde 09:00" in it } }
+        assertEquals(1, api.sent.size)
+        assertEquals(51L to 801L, api.edits.single())
+
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(groupRepeatedAlerts = false))
+        runBlocking { alerts.emit(UsageAlert.SessionSaturated("s3", "alem-das-sombras")) }
+        waitUntil { api.sent.size == 2 }
+        assertEquals(1, api.edits.size)
+    }
+
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */
     @Test
     fun `export sends the usage file with the period and format`() {

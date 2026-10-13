@@ -15,6 +15,8 @@ import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.domain.entity.dailySummaryDate
 import com.usagemonitor.domain.entity.isDailySummaryDue
 import com.usagemonitor.domain.entity.isCriticalAlert
+import com.usagemonitor.domain.entity.TelegramAlertGroup
+import com.usagemonitor.domain.entity.alertGroupKey
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 /** Estado do bot para a seção das Configurações. */
 internal sealed interface TelegramBotStatus {
@@ -94,6 +97,12 @@ internal class TelegramBotService(
     private var panelJob: Job? = null
     private var updateJob: Job? = null
 
+    /**
+     * Mensagem de cada alerta agrupável por conversa (#408, AA1), `(chatId, chave)` →
+     * grupo. Só em memória e só no coletor de alertas: reiniciar o app abre mensagem nova.
+     */
+    private val alertGroups = mutableMapOf<Pair<Long, String>, TelegramAlertGroup>()
+
     /** Último texto do painel por conversa, para editar só o que mudou. Só neste laço. */
     private val panelTexts = mutableMapOf<Long, String>()
 
@@ -123,11 +132,7 @@ internal class TelegramBotService(
         if (pollJob?.isActive == true) return
         pollJob = scope.launch { pollLoop() }
         alertJob = scope.launch {
-            alerts.collect { alert ->
-                // Som por gravidade (#408, AA26): sem som não some — chega e não vibra.
-                val silent = settingsFlow.value.preferences.soundOnlyOnCritical && !isCriticalAlert(alert)
-                broadcast(silent = silent) { language -> TelegramBotMessages.alert(alert, language) }
-            }
+            alerts.collect { alert -> deliverAlert(alert) }
         }
         summaryJob = scope.launch { summaryLoop() }
         updateJob = scope.launch {
@@ -290,6 +295,57 @@ internal class TelegramBotService(
         }
     }
 
+    /**
+     * Entrega de um alerta. Som por gravidade (#408, AA26): sem som não some — chega e não
+     * vibra. Repetição no mesmo dia (AA1) edita a mensagem da conversa com o contador; a
+     * edição não toca, então o aparelho vibra só na primeira. Edição que falha (mensagem
+     * apagada, rede) cai numa mensagem nova, que passa a ser o grupo.
+     */
+    private suspend fun deliverAlert(alert: UsageAlert) {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank()) return
+        val preferences = settings.preferences
+        val silent = preferences.soundOnlyOnCritical && !isCriticalAlert(alert)
+        val key = if (preferences.groupRepeatedAlerts) alertGroupKey(alert) else null
+        val now = clock.now()
+        val day = dailySummaryDate(now)
+        alertGroups.entries.removeAll { entry -> entry.value.day != day }
+        val machine = if (preferences.showMachineName) readings.machineName() else null
+        for (chat in settings.authorizedChats) {
+            val language = settings.languageOf(chat.id, languageProvider())
+            val group = key?.let { groupKey -> alertGroups[chat.id to groupKey] }
+            if (key != null && group != null) {
+                val next = group.copy(count = group.count + 1)
+                val firstAt = Instant.fromEpochMilliseconds(group.firstAtMillis)
+                val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.repeatedAlert(alert, next.count, firstAt, now, language), machine)
+                if (editAlert(settings.botToken, chat.id, group.messageId, text)) {
+                    alertGroups[chat.id to key] = next
+                    delay(SEND_SPACING_MILLIS)
+                    continue
+                }
+            }
+            val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.alert(alert, language), machine)
+            val sentId = runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, silent = silent) }
+                .onFailure { error -> if (error is CancellationException) throw error }
+                .getOrNull()
+            if (key != null && sentId != null) alertGroups[chat.id to key] = TelegramAlertGroup(sentId, 1, now.toEpochMilliseconds(), day)
+            delay(SEND_SPACING_MILLIS)
+        }
+    }
+
+    /** `true` quando a mensagem agrupada foi editada (ou já estava igual). */
+    private suspend fun editAlert(token: String, chatId: Long, messageId: Long, text: String): Boolean =
+        try {
+            api.editMessageText(token, chatId, messageId, text)
+            true
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (bad: TelegramBadRequestException) {
+            bad.isNotModified
+        } catch (_: Exception) {
+            false
+        }
+
     /** `false` quando a mensagem sumiu e tem de ser recriada; "not modified" conta como mantida. */
     private suspend fun editPanel(token: String, chatId: Long, messageId: Long, text: String): Boolean =
         try {
@@ -312,11 +368,9 @@ internal class TelegramBotService(
     /**
      * Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa.
      * O texto sai no idioma de cada conversa (#408, AA24), montado uma vez por idioma.
-     * [silent] entrega sem som (`disable_notification`).
      */
     private suspend fun broadcast(
         buttons: (AppLanguage) -> List<List<TelegramButton>> = { emptyList() },
-        silent: Boolean = false,
         textFor: suspend (AppLanguage) -> String
     ) {
         val settings = settingsFlow.value
@@ -326,7 +380,7 @@ internal class TelegramBotService(
         for (chat in settings.authorizedChats) {
             val language = settings.languageOf(chat.id, languageProvider())
             val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
-            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language), silent = silent) }
+            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language)) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)
         }
