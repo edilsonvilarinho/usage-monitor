@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Execução das 30 opções (A00–A32).`
+**Estado atual:** `Concluído — A00–A32 executadas; PR aberto para revisão.`
 
 **Direção escolhida (2026-10-13):** o usuário aprovou **todas** as opções, AA1 a AA30 ("pode fazer todos").
 
@@ -172,6 +172,7 @@ Molde por tipo de opção:
 | A29 | `feat(alerts): remind before a high quota resets, with /avise in the bot` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*" --tests "*UsageAlert*" --tests "*AlertSettings*"`: 185 testes, 0 falhas (novos: 80% a 20 min não lembra, a 14 min lembra uma vez com 14 min, de novo na mesma janela não, 40% nunca, desligado nunca; `/avise 30`, `/remind 15min`, `off`, 2 e sem argumento inválidos; persistência ausente = 15, `0` = desligado, 999 → 120). `UsageAlert.ResetSoon` é subtipo do `sealed`, não valor de enum; o kit `Settings.jsx` não desenha a seção de alertas, nada a atualizar ali | concluída |
 | A30 | `feat(telegram): warn when a source keeps failing and when it is back` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*" --tests "*UsageAlert*" --tests "*AlertSettings*"`: 188 testes, 0 falhas (novos: `evaluateSourceHealth` — aviso uma vez aos 15 min com a hora da falha e dos números, nada aos 20, "voltou" só depois de avisar, silêncio adia, falha curta calada, fonte desligada sai; serviço manda o motivo escapado e "Cursor voltou — coleta 09:00"; interruptor nasce ligado) | concluída |
 | A31 | `feat(alerts): set quota thresholds per account from /limiar` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*" --tests "*UsageAlert*" --tests "*AlertSettings*" --tests "*UsageSnapshot*"`: 195 testes, 0 falhas (novos: conta com 50,80 avisa em 60% e as outras não; `quotaPercentsFor` volta ao geral sem limiar próprio; `/limiar` sem números vira o menu e o toque `thr:` vai e volta; persistência com tabulação no rótulo e linha ilegível descartada; no serviço, `/limiar` → toque → `50,80` grava só a conta, `geral` sem pedido aberto não muda nada e com pedido devolve ao geral). Primeira rodada: compilação falhou — os botões do menu eram uma lista plana e o teclado pede linhas | concluída |
+| A32 | `docs: close the issue 408 plan` | `gradlew.bat allTests`: 2673 testes, 0 falhas, 0 ignorados (inclui `ArchitectureRulesTest`: nenhum arquivo de produção acima de 800 linhas — o maior tocado, `UsageAlert.kt`, com 637). Branch publicada e PR aberto contra `main` | concluída |
 
 ## Problemas em aberto e riscos
 
