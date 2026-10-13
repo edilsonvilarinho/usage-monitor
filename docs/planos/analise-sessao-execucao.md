@@ -92,6 +92,7 @@ Regras que valem para todas:
 | Atividade | Commit | Evidência | Estado |
 | --- | --- | --- | --- |
 | B00 | `docs: plan the session analysis round` | galeria aberta no painel do navegador: 15 opções + referência + entrada, console sem erro, sem rolagem horizontal a 375 px; publicada para o usuário, que escolheu AB1–AB15 e respondeu U1–U3 | concluída |
+| B01 | `refactor(telegram): build the command menu and help from one catalog by category` | `gradlew.bat desktopTest --tests "*Telegram*"`: 111 testes, 0 falhas (novos: todo nome do catálogo, PT e EN, é comando que o bot entende; categorias contíguas no menu com o emoji da categoria abrindo a descrição; nomes só `a-z0-9_`; um cabeçalho por categoria no `/ajuda` de cada idioma). `TelegramBotMessages` caiu de 353 para 277 linhas | concluída |
 
 ## Problemas em aberto e riscos
 

@@ -31,72 +31,8 @@ import kotlin.time.Instant
  */
 internal object TelegramBotMessages {
 
-    /** Comandos do botão "Menu" do Telegram (`setMyCommands`), no idioma do app. */
-    fun menu(language: AppLanguage): List<Pair<String, String>> = if (language == AppLanguage.PT) {
-        listOf(
-            "status" to "Cotas de todas as contas",
-            "conta" to "Uma conta por vez",
-            "atualizar" to "Coleta agora e mostra as cotas",
-            "api" to "Fontes monitoradas",
-            "resumo" to "Resumo do dia",
-            "grafico" to "Gráfico do uso (24h ou 7d)",
-            "reinicios" to "Próximos reinícios das cotas",
-            "quando" to "Quando cada cota estoura no ritmo atual",
-            "qual" to "Que conta tem mais folga agora",
-            "ritmo" to "Quanto da cota semanal cabe por dia",
-            "ping" to "O app está aberto? Versão e última coleta",
-            "pico" to "Consumo de hoje acima do seu hábito",
-            "vazao" to "Tokens por segundo por modelo (24h)",
-            "semana" to "Esta semana contra a anterior",
-            "janelas" to "Últimas janelas com pico (5h ou 7d)",
-            "comparar" to "Mapa de calor dos modelos (7d)",
-            "alertas" to "Alertas por tipo, ou todos (on ou off)",
-            "silencio" to "Horário de silêncio (22-07 ou off)",
-            "foco" to "Só alertas críticos por um tempo (2h ou off)",
-            "avise" to "Lembrete antes do reinício (15 ou off)",
-            "limiar" to "Limiares de cota (75,90), ou por conta",
-            "conversas" to "Conversas pareadas",
-            "sair" to "Desfaz o pareamento desta conversa",
-            "idioma" to "Idioma desta conversa (pt, en ou app)",
-            "teclado" to "Atalhos no lugar do teclado (on ou off)",
-            "hud" to "Traz a HUD à frente no PC",
-            "exportar" to "Uso do Claude CLI em arquivo (7d csv)",
-            "time" to "Quem do time está online",
-            "ajuda" to "Lista de comandos"
-        )
-    } else {
-        listOf(
-            "status" to "Quotas of every account",
-            "account" to "One account at a time",
-            "refresh" to "Collect now and show the quotas",
-            "api" to "Monitored sources",
-            "summary" to "Summary of the day",
-            "chart" to "Usage chart (24h or 7d)",
-            "resets" to "Next quota resets",
-            "when" to "When each quota runs out at the current pace",
-            "which" to "Which account has the most room now",
-            "pace" to "How much of the weekly quota fits per day",
-            "ping" to "Is the app running? Version and last collection",
-            "spike" to "Today's usage above your habit",
-            "throughput" to "Tokens per second per model (24h)",
-            "week" to "This week against the previous one",
-            "windows" to "Latest windows with their peak (5h or 7d)",
-            "compare" to "Model heat map (7d)",
-            "alerts" to "Alerts by kind, or all (on or off)",
-            "quiet" to "Quiet hours (22-07 or off)",
-            "focus" to "Only critical alerts for a while (2h or off)",
-            "remind" to "Reminder before resets (15 or off)",
-            "threshold" to "Quota thresholds (75,90), or per account",
-            "chats" to "Paired chats",
-            "leave" to "Unpair this chat",
-            "language" to "Language of this chat (pt, en or app)",
-            "keyboard" to "Shortcuts in place of the keyboard (on or off)",
-            "hud" to "Bring the HUD to the front on the PC",
-            "export" to "Claude CLI usage as a file (7d csv)",
-            "team" to "Who from the team is online",
-            "help" to "List of commands"
-        )
-    }
+    /** Comandos do botão "Menu" do Telegram (`setMyCommands`), no idioma do app, por categoria. */
+    fun menu(language: AppLanguage): List<Pair<String, String>> = TelegramCommandCatalog.menu(language)
 
     /**
      * `/status`: um cartão por conta — risco, uso e, por cota, reinício e barra de 10 células.
@@ -221,67 +157,8 @@ internal object TelegramBotMessages {
         UsageRiskLevel.WILL_EXCEED -> "🔴"
     }
 
-    fun help(language: AppLanguage): String = if (language == AppLanguage.PT) {
-        "<b>Comandos</b>\n" +
-            "<code>/status</code> — cotas de todas as contas · <code>/status img</code> — os anéis em imagem\n" +
-            "<code>/conta</code> — escolha uma conta e veja só ela\n" +
-            "<code>/atualizar</code> — coleta agora e mostra as cotas\n" +
-            "<code>/api</code> — fontes monitoradas\n" +
-            "<code>/resumo</code> — resumo do dia\n" +
-            "<code>/grafico</code> · <code>/grafico 7d</code> — gráfico do uso\n" +
-            "<code>/reinicios</code> — próximos reinícios, em ordem\n" +
-            "<code>/quando</code> — quando cada cota estoura no ritmo atual\n" +
-            "<code>/qual</code> — que conta de cada fonte tem mais folga\n" +
-            "<code>/ritmo</code> — quanto das janelas longas cabe por dia\n" +
-            "<code>/ping</code> — versão, tempo aberto e última coleta\n" +
-            "<code>/pico</code> — o que está acima do seu hábito hoje\n" +
-            "<code>/vazao</code> — tokens por segundo por modelo, 24 h\n" +
-            "<code>/semana</code> — últimos 7 dias contra os 7 anteriores\n" +
-            "<code>/janelas</code> · <code>/janelas 7d</code> — últimas janelas, pico e tempo ativo\n" +
-            "<code>/comparar</code> · <code>/comparar 30d</code> — mapa de calor dos modelos\n" +
-            "<code>/alertas</code> — liga e desliga cada tipo · <code>/alertas on</code> · <code>/alertas off</code> — todos\n" +
-            "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
-            "<code>/foco 2h</code> · <code>/foco off</code> — só alertas críticos por um tempo\n" +
-            "<code>/avise 15</code> · <code>/avise off</code> — lembrete antes de reiniciar uma cota alta\n" +
-            "<code>/limiar 75,90</code> — avisa em 75% e 90% · <code>/limiar</code> — limiar de uma conta\n" +
-            "<code>/conversas</code> — conversas pareadas · <code>/sair</code> — desfaz o pareamento desta\n" +
-            "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
-            "<code>/teclado on</code> · <code>/teclado off</code> — atalhos no lugar do teclado\n" +
-            "<code>/hud</code> — traz a HUD à frente no PC\n" +
-            "<code>/exportar</code> · <code>/exportar 30d json</code> — uso do Claude CLI em arquivo\n" +
-            "<code>/time</code> — quem do time está online\n" +
-            "<i>Toque num comando para copiar.</i>"
-    } else {
-        "<b>Commands</b>\n" +
-            "<code>/status</code> — quotas of every account · <code>/status img</code> — the rings as an image\n" +
-            "<code>/account</code> — pick one account and see only it\n" +
-            "<code>/refresh</code> — collect now and show the quotas\n" +
-            "<code>/api</code> — monitored sources\n" +
-            "<code>/summary</code> — summary of the day\n" +
-            "<code>/chart</code> · <code>/chart 7d</code> — usage chart\n" +
-            "<code>/resets</code> — next resets, in order\n" +
-            "<code>/when</code> — when each quota runs out at the current pace\n" +
-            "<code>/which</code> — which account of each source has the most room\n" +
-            "<code>/pace</code> — how much of the long windows fits per day\n" +
-            "<code>/ping</code> — version, uptime and last collection\n" +
-            "<code>/spike</code> — what is above your habit today\n" +
-            "<code>/throughput</code> — tokens per second per model, 24 h\n" +
-            "<code>/week</code> — last 7 days against the 7 before\n" +
-            "<code>/windows</code> · <code>/windows 7d</code> — latest windows, peak and active time\n" +
-            "<code>/compare</code> · <code>/compare 30d</code> — model heat map\n" +
-            "<code>/alerts</code> — turn each kind on or off · <code>/alerts on</code> · <code>/alerts off</code> — all\n" +
-            "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
-            "<code>/focus 2h</code> · <code>/focus off</code> — only critical alerts for a while\n" +
-            "<code>/remind 15</code> · <code>/remind off</code> — reminder before a high quota resets\n" +
-            "<code>/threshold 75,90</code> — alert at 75% and 90% · <code>/threshold</code> — one account's threshold\n" +
-            "<code>/chats</code> — paired chats · <code>/leave</code> — unpair this one\n" +
-            "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +
-            "<code>/keyboard on</code> · <code>/keyboard off</code> — shortcuts in place of the keyboard\n" +
-            "<code>/hud</code> — bring the HUD to the front on the PC\n" +
-            "<code>/export</code> · <code>/export 30d json</code> — Claude CLI usage as a file\n" +
-            "<code>/team</code> — who from the team is online\n" +
-            "<i>Tap a command to copy it.</i>"
-    }
+    /** O `/ajuda`, por categoria ([TelegramCommandCatalog]). */
+    fun help(language: AppLanguage): String = TelegramCommandCatalog.help(language)
 
     fun paired(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "✅ <b>Conversa pareada.</b>\nToque em /status ou abra o <b>Menu</b> para ver os comandos."
