@@ -100,6 +100,7 @@ Regras que valem para todas:
 | B06 | `feat(telegram): add the trend view to the session analysis` | `gradlew.bat desktopTest --tests "*TelegramAnalysis*"`: 3 testes, 0 falhas (novo: uma linha por métrica — 5h % das fatias da janela, pp/h e tok/s por hora, semanal por dia —, valor de agora e seta; não medido vira espaço na linha; PT e EN) | concluída |
 | B07 | `feat(telegram): add the pace by interval view to the session analysis` | `gradlew.bat desktopTest --tests "*TelegramAnalysis*"`: 4 testes, 0 falhas (novo: 1 h a 7 d com pp/h da 5h, tok/s e razão contra 7 d — `1 h 14,0 48 ↑ 1,9×`; 7 d sem razão consigo; PT e EN) | concluída |
 | B08 | `feat(telegram): add the plain reading view to the session analysis` | `gradlew.bat desktopTest --tests "*TelegramAnalysis*"`: 5 testes, 0 falhas (novo: "A 5h está em 62% e chega a ~83% no reinício das 14:00 — não estoura", "13% abaixo da janela anterior no mesmo ponto", hora mais pesada 15h (17 pp), semanal com o ritmo que cabe, vazão por modelo; sem janela anterior nem vazão, as frases somem em vez de virar zero) | concluída |
+| B09 | `feat(telegram): add the 5h window timeline to the session analysis` | `gradlew.bat desktopTest --tests "*TelegramAnalysis*"`: 6 testes, 0 falhas (novo: fatias de 30 min desde 09:00 com barra sobre a maior fatia, pontos, ritmo da fatia e vazão — `09:00 ▰▰▰▱▱ 6 pp 12/h 50 t/s`; rodapé com total e reinício; sem janela aberta, a frase diz isso) | concluída |
 
 ## Problemas em aberto e riscos
 

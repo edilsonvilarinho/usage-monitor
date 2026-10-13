@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.AnalysisSpan
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.SessionAnalysis
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * As vistas de texto da análise além do painel (rodada AB). Monoespaçadas dentro de `<pre>`,
@@ -105,6 +106,33 @@ internal object TelegramAnalysisTexts {
         return title + "\n" + lines.joinToString("\n") { line -> "• $line" }
     }
 
+    /**
+     * AB5 · linha do tempo da janela 5h: uma fatia de 30 min por linha com a barra do que ela
+     * consumiu (sobre a maior fatia), os pontos, o ritmo da fatia e a vazão. A última fatia é
+     * parcial: o ritmo divide pelo tempo que ela já durou.
+     */
+    fun timeline(analysis: SessionAnalysis, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val title = "<b>📐 ${TelegramBotMessages.escape(analysis.accountLabel)} · " + (if (pt) "janela 5h" else "5h window") + "</b>"
+        val window = analysis.fiveHour
+        if (analysis.slices.isEmpty() || window == null) {
+            return title + "\n" + (if (pt) "Nenhuma janela 5h aberta agora." else "No 5h window open right now.")
+        }
+        val max = analysis.slices.mapNotNull { slice -> slice.percentPoints }.maxOrNull()?.takeIf { value -> value > 0.0 }
+        val lines = analysis.slices.map { slice ->
+            val points = slice.percentPoints
+            val cells = if (points == null || max == null) 0 else ((points / max) * BAR_CELLS).roundToInt().coerceIn(0, BAR_CELLS)
+            val hours = (minOf(slice.start + SLICE, analysis.generatedAt) - slice.start).inWholeMilliseconds / MILLIS_PER_HOUR
+            val rate = if (points == null || hours <= 0.0) "—" else "${(points / hours).roundToInt()}/h"
+            TelegramBotMessages.clock(slice.start) + " " + "▰".repeat(cells) + "▱".repeat(BAR_CELLS - cells) +
+                (points?.roundToInt()?.let { value -> "$value pp" } ?: "—").padStart(7) + rate.padStart(6) +
+                (slice.tokensPerSecond?.roundToInt()?.let { value -> "$value t/s" } ?: "—").padStart(8)
+        }
+        val reset = window.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + TelegramBotMessages.clock(at) }.orEmpty()
+        val footer = "<i>" + (if (pt) "total " else "total ") + "${window.percent}%$reset</i>"
+        return "$title\n<pre>${TelegramBotMessages.escape(lines.joinToString("\n"))}</pre>\n$footer"
+    }
+
     /** Mesmo rótulo nos dois idiomas: "h" e "d" são unidades, não palavras. */
     fun spanLabel(span: AnalysisSpan): String = when (span) {
         AnalysisSpan.HOUR_1 -> "1 h"
@@ -139,5 +167,8 @@ internal object TelegramAnalysisTexts {
     }
 
     private const val BLOCKS = "▁▂▃▄▅▆▇█"
+    private const val BAR_CELLS = 5
+    private const val MILLIS_PER_HOUR = 3_600_000.0
+    private val SLICE = 30.minutes
     private const val TREND_POINTS = 7
 }

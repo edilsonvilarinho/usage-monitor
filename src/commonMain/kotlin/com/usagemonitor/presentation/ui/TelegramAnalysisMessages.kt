@@ -16,7 +16,7 @@ import kotlin.math.roundToInt
 internal object TelegramAnalysisMessages {
 
     /** As vistas que já têm texto, imagem ou arquivo; só elas viram aba. */
-    val availableViews: List<AnalysisView> = listOf(AnalysisView.PANEL, AnalysisView.TREND, AnalysisView.INTERVALS, AnalysisView.SENTENCES)
+    val availableViews: List<AnalysisView> = listOf(AnalysisView.PANEL, AnalysisView.TREND, AnalysisView.INTERVALS, AnalysisView.SENTENCES, AnalysisView.TIMELINE)
 
     fun pickAccount(language: AppLanguage): String =
         if (language == AppLanguage.PT) "<b>📐 Análise de qual conta?</b>" else "<b>📐 Analysis of which account?</b>"
@@ -67,6 +67,7 @@ internal object TelegramAnalysisMessages {
             AnalysisView.TREND -> TelegramAnalysisTexts.trend(analysis, language)
             AnalysisView.INTERVALS -> TelegramAnalysisTexts.intervals(analysis, language)
             AnalysisView.SENTENCES -> TelegramAnalysisTexts.sentences(analysis, language)
+            AnalysisView.TIMELINE -> TelegramAnalysisTexts.timeline(analysis, language)
             else -> null
         }
     }

@@ -64,4 +64,15 @@ class TelegramAnalysisMessagesTest {
         val en = TelegramAnalysisMessages.text(AnalysisView.SENTENCES, bare, AppLanguage.EN)!!
         assertTrue("previous window" !in en && "In the last hour" !in en && "does not run out" in en, en)
     }
+
+    /** AB5: uma fatia de 30 min por linha, barra sobre a maior fatia, ritmo da fatia e vazão. */
+    @Test
+    fun `timeline lists the open window in half hours`() {
+        val text = TelegramAnalysisMessages.text(AnalysisView.TIMELINE, AnalysisFixture.analysis, AppLanguage.PT)!!
+        assertTrue("09:00 ▰▰▰▱▱   6 pp  12/h  50 t/s" in text, text)
+        assertTrue("11:30 ▰▰▰▰▰  11 pp  22/h  50 t/s" in text, text)
+        assertTrue(text.endsWith("<i>total 62% · reinicia 14:00</i>"), text)
+        val closed = AnalysisFixture.analysis.copy(slices = emptyList())
+        assertTrue("No 5h window open" in TelegramAnalysisMessages.text(AnalysisView.TIMELINE, closed, AppLanguage.EN)!!)
+    }
 }
