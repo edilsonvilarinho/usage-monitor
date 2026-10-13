@@ -2,10 +2,15 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ComparisonRow
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaWindowSummary
 import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import kotlin.math.roundToInt
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 /**
  * Leituras do índice CLI e do histórico no bot (#408): vazão, semana, janelas e
@@ -38,6 +43,60 @@ internal object TelegramBotUsageMessages {
         val footer = if (pt) "<i>ponta a ponta: do pedido à última linha</i>" else "<i>end to end: from the request to the last line</i>"
         return (listOf(header) + lines + footer).joinToString("\n")
     }
+
+    /**
+     * `/janelas` (AA12): as últimas janelas de cada conta — pico, se esgotou e quanto
+     * tempo o uso ficou subindo (faixa ativa, #382). [weekly] escolhe as janelas
+     * semanais; sem ele, as curtas (5 h). Mesmas `QuotaWindowSummary` do Histórico.
+     */
+    fun windows(histories: List<TelegramAccountHistory>, weekly: Boolean, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val period = if (weekly) PeriodType.WEEKLY else PeriodType.INTERVAL
+        val blocks = histories.flatMap { history ->
+            history.report.series.filter { series -> series.periodType == period && series.windows.isNotEmpty() }.map { series ->
+                val recent = series.windows.sortedByDescending { window -> window.resetsAt }.take(MAX_WINDOWS)
+                val title = "<b>${TelegramBotMessages.escape(history.label)} · ${TelegramBotMessages.escape(series.quotaLabel)}</b>"
+                title + "\n" + recent.joinToString("\n") { window -> windowLine(window, pt) }
+            }
+        }
+        if (blocks.isEmpty()) {
+            val which = if (weekly) (if (pt) "semanais" else "weekly") else (if (pt) "de 5 h" else "5 h")
+            return if (pt) "🪟 Sem janelas $which no histórico ainda." else "🪟 No $which windows in the history yet."
+        }
+        val header = if (weekly) {
+            if (pt) "<b>🪟 Janelas semanais</b>" else "<b>🪟 Weekly windows</b>"
+        } else {
+            if (pt) "<b>🪟 Janelas de 5 h</b>" else "<b>🪟 5 h windows</b>"
+        }
+        return header + "\n\n" + blocks.joinToString("\n\n")
+    }
+
+    private fun windowLine(window: QuotaWindowSummary, pt: Boolean): String {
+        val range = "<code>${dayClock(window.firstObservedAt, pt)}–${TelegramBotMessages.clock(window.resetsAt)}</code>"
+        val peak = (if (pt) " pico " else " peak ") + "${window.peakPercent}%"
+        val exhausted = window.exhaustedAt?.let { at -> (if (pt) " · esgotou " else " · ran out ") + TelegramBotMessages.clock(at) }.orEmpty()
+        val from = window.activeFrom
+        val until = window.activeUntil
+        val active = if (from != null && until != null && until > from) {
+            (if (pt) " · ativa " else " · active ") + TelegramBotInsightMessages.span(until - from)
+        } else {
+            ""
+        }
+        val open = if (window.isOpen) (if (pt) " · aberta" else " · open") else ""
+        return "$range$peak$exhausted$active$open"
+    }
+
+    /** "13/10 11:00": o dia ajuda a separar janelas de dias diferentes com a mesma hora. */
+    private fun dayClock(at: Instant, pt: Boolean): String {
+        val local = at.toLocalDateTime(SAO_PAULO)
+        val day = local.date.dayOfMonth.toString().padStart(2, '0')
+        val month = local.date.monthNumber.toString().padStart(2, '0')
+        val date = if (pt) "$day/$month" else "$month/$day"
+        return "$date ${TelegramBotMessages.clock(at)}"
+    }
+
+    private const val MAX_WINDOWS = 4
+    private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
 
     /**
      * `/semana` (AA7): o consumo dos últimos 7 dias contra os 7 anteriores, por cota,

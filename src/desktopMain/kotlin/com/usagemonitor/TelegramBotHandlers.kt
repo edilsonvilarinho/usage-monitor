@@ -127,6 +127,11 @@ internal class TelegramBotHandlers(
                 send(token, chatId, TelegramBotUsageMessages.throughput(readings.comparison(since), language))
             }
             BotCommand.Week -> send(token, chatId, TelegramBotUsageMessages.week(readings.accountHistory(HistoryRange.LAST_7_DAYS), language))
+            is BotCommand.Windows -> {
+                // Semanais pedem o mês: em 7 dias cabem uma ou duas janelas de 7 d.
+                val range = if (command.weekly) HistoryRange.LAST_30_DAYS else HistoryRange.LAST_7_DAYS
+                send(token, chatId, TelegramBotUsageMessages.windows(readings.accountHistory(range), command.weekly, language))
+            }
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {

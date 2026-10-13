@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaWindowSummary
 import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistorySeries
@@ -65,6 +66,31 @@ class TelegramBotUsageMessagesTest {
             TelegramBotUsageMessages.week(histories, AppLanguage.PT)
         )
         assertEquals("📅 Ainda não há duas semanas de histórico para comparar.", TelegramBotUsageMessages.week(emptyList(), AppLanguage.PT))
+    }
+
+    @Test
+    fun `windows lists the latest short windows newest first with peak, exhaustion and active span`() {
+        fun window(first: String, reset: String, peak: Int, exhausted: String? = null, from: String? = null, until: String? = null, open: Boolean = false) =
+            QuotaWindowSummary(
+                firstObservedAt = Instant.parse(first), lastObservedAt = Instant.parse(first), resetsAt = Instant.parse(reset),
+                peakPercent = peak, exhaustedAt = exhausted?.let(Instant::parse), consumedPercent = peak.toDouble(),
+                averagePercentPerHour = null, isOpen = open, activeFrom = from?.let(Instant::parse), activeUntil = until?.let(Instant::parse)
+            )
+        val short = series("5h", PeriodType.INTERVAL, null).copy(
+            windows = listOf(
+                window("2026-10-13T09:00:00Z", "2026-10-13T14:00:00Z", 50, from = "2026-10-13T09:05:00Z", until = "2026-10-13T10:10:00Z"),
+                window("2026-10-13T14:00:00Z", "2026-10-13T19:00:00Z", 97, exhausted = "2026-10-13T18:30:00Z", open = true)
+            )
+        )
+
+        assertEquals(
+            "<b>🪟 Janelas de 5 h</b>\n\n" +
+                "<b>Anthropic · Padrão · 5h</b>\n" +
+                "<code>13/10 11:00–16:00</code> pico 97% · esgotou 15:30 · aberta\n" +
+                "<code>13/10 06:00–11:00</code> pico 50% · ativa 1 h 5 min",
+            TelegramBotUsageMessages.windows(listOf(history("Anthropic · Padrão", short)), weekly = false, language = AppLanguage.PT)
+        )
+        assertEquals("🪟 Sem janelas semanais no histórico ainda.", TelegramBotUsageMessages.windows(listOf(history("Anthropic · Padrão", short)), weekly = true, language = AppLanguage.PT))
     }
 
     private val now = Instant.parse("2026-10-13T17:00:00Z")

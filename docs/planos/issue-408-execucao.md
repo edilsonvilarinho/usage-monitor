@@ -150,6 +150,7 @@ Molde por tipo de opção:
 | A07 | `feat(telegram): explain today's usage against your habit with /pico` | `gradlew.bat desktopTest --tests "*Telegram*"`: 65 testes, 0 falhas (novo: mais forte primeiro em pontos da cota; sem anomalia, o fator das Configurações) | concluída |
 | A08 | `feat(telegram): report output throughput per model with /vazao` | `gradlew.bat desktopTest --tests "*Telegram*"`: 66 testes, 0 falhas (novo: mais rápido primeiro, modelo sem vazão fora, índice ilegível) | concluída |
 | A09 | `feat(telegram): compare this week with the previous one with /semana` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*UsageSnapshotTest*"`: 67 + 3 testes, 0 falhas (novo: pontos somados com seta, sem semana anterior fora; `snapshotLabel` passou a ser o dono do rótulo da conta) | concluída |
+| A10 | `feat(telegram): list the latest quota windows with /janelas` | `gradlew.bat desktopTest --tests "*Telegram*"`: 68 testes, 0 falhas (novos: mais nova primeiro com pico, esgotou e faixa ativa; sem janelas semanais; argumento inválido) | concluída |
 
 ## Problemas em aberto e riscos
 

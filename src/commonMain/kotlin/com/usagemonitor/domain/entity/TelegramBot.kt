@@ -111,6 +111,8 @@ sealed interface BotCommand {
     data object Throughput : BotCommand
     /** `/semana` (#408, AA7): últimos 7 dias contra os 7 anteriores. */
     data object Week : BotCommand
+    /** `/janelas [5h|7d]` (#408, AA12): as últimas janelas com pico e faixa ativa. */
+    data class Windows(val weekly: Boolean) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -155,6 +157,11 @@ fun parseBotCommand(text: String): BotCommand? {
         "pico", "spike" -> BotCommand.Spike
         "vazao", "vazão", "throughput", "speed" -> BotCommand.Throughput
         "semana", "week" -> BotCommand.Week
+        "janelas", "windows" -> when (args.firstOrNull()?.lowercase()) {
+            null, "5h", "5" -> BotCommand.Windows(weekly = false)
+            "7d", "7", "semana", "week" -> BotCommand.Windows(weekly = true)
+            else -> BotCommand.Invalid("/janelas 5h | /janelas 7d")
+        }
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

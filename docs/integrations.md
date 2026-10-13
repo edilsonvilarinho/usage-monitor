@@ -378,6 +378,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     (`UsageHistorySeries.comparison`, o mesmo do Histórico: reinício conta zero), com seta e número. O histórico de cada
     conta é lido com a mesma chave da projeção do painel (`accountContext.key`) e casado com o cartão pelo `snapshotLabel`
     (`TelegramAccountHistory`) — nunca pelo e-mail. Saldo em dinheiro fica fora.
+  - `/janelas` (`/windows`, AA12): as 4 últimas janelas curtas (`/janelas 7d`: semanais, lidas de 30 dias) de cada conta,
+    mais nova primeiro — início observado e reinício, pico, hora em que esgotou e a faixa ativa (#382). Mesmas
+    `QuotaWindowSummary` do Histórico.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
