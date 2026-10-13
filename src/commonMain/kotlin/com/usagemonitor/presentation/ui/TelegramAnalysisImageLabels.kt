@@ -126,6 +126,28 @@ internal object TelegramAnalysisImageLabels {
     fun cardFooter(language: AppLanguage): String =
         if (language == AppLanguage.PT) "só metadados de uso: nenhum prompt ou resposta sai do PC" else "usage metadata only: no prompt or answer leaves the PC"
 
+    /**
+     * AB15: o nome do arquivo (fonte, data e hora locais, sem rótulo nem e-mail da conta) e a
+     * legenda com o resumo em uma linha.
+     */
+    fun reportFileName(analysis: SessionAnalysis, language: AppLanguage): String {
+        val local = analysis.generatedAt.toLocalDateTime(TimeZone.of("America/Sao_Paulo"))
+        val stamp = local.date.toString() + "-" + local.hour.toString().padStart(2, '0') + local.minute.toString().padStart(2, '0')
+        val prefix = if (language == AppLanguage.PT) "analise" else "analysis"
+        return "$prefix-${analysis.source.name.lowercase()}-$stamp.pdf"
+    }
+
+    fun reportCaption(analysis: SessionAnalysis, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val parts = listOfNotNull(
+            analysis.fiveHour?.let { window -> "5h ${window.percent}%" + (window.projectedAtReset?.let { value -> if (pt) " (≈$value% no reinício)" else " (≈$value% at reset)" } ?: "") },
+            analysis.fiveHour?.paceNow?.let { value -> "${TelegramAnalysisMessages.pace(value, pt).trim()} pp/h" },
+            analysis.weekly?.let { window -> (if (pt) "semanal " else "weekly ") + "${window.percent}%" },
+            analysis.modelSpeeds.takeIf { speeds -> speeds.isNotEmpty() }?.joinToString("/") { speed -> speed.tokensPerSecond.roundToInt().toString() }?.let { value -> "$value tok/s" }
+        )
+        return "<b>📐 ${TelegramBotMessages.escape(analysis.accountLabel)}</b> · " + parts.joinToString(" · ")
+    }
+
     /** A legenda da média tracejada dos dias (AB10). */
     fun average(value: Double, language: AppLanguage): String {
         val pt = language == AppLanguage.PT

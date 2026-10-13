@@ -94,7 +94,11 @@ internal class TelegramAnalysisHandler(
                     api.sendPhoto(token, chatId, png, signed(TelegramAnalysisImageLabels.caption(shown, analysis, language)))
                 }
             }
-            AnalysisViewKind.FILE -> send(token, chatId, TelegramAnalysisMessages.panel(analysis, language))
+            AnalysisViewKind.FILE -> api.sendDocument(
+                token, chatId, TelegramAnalysisPdf.render(analysis, language),
+                TelegramAnalysisImageLabels.reportFileName(analysis, language), "application/pdf",
+                signed(TelegramAnalysisImageLabels.reportCaption(analysis, language))
+            )
         }
     }
 

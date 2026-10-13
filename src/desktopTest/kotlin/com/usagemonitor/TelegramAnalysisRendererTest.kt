@@ -83,4 +83,17 @@ class TelegramAnalysisRendererTest {
         assertTrue(hasColor(image, TelegramAnalysisRenderer.INFO and 0xFFFFFF))
         assertEquals("ter 06/10 · 12:30", TelegramAnalysisImageLabels.cardHeader(AnalysisFixture.analysis, AppLanguage.PT).second)
     }
+
+    /** AB15: PDF de uma página com as quatro imagens; nome sem rótulo da conta, legenda com o resumo. */
+    @Test
+    fun `report is a one page pdf named by source and local time`() {
+        val pdf = TelegramAnalysisPdf.render(AnalysisFixture.analysis, AppLanguage.PT)
+        assertTrue(pdf.decodeToString(0, 5) == "%PDF-")
+        org.apache.pdfbox.Loader.loadPDF(pdf).use { document -> assertEquals(1, document.numberOfPages) }
+        assertEquals("analise-anthropic-2026-10-06-1230.pdf", TelegramAnalysisImageLabels.reportFileName(AnalysisFixture.analysis, AppLanguage.PT))
+        assertEquals(
+            "<b>📐 Anthropic · &lt;Padrão&gt;</b> · 5h 62% (≈83% at reset) · 14.0 pp/h · weekly 41% · 71/48 tok/s",
+            TelegramAnalysisImageLabels.reportCaption(AnalysisFixture.analysis, AppLanguage.EN)
+        )
+    }
 }
