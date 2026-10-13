@@ -19,6 +19,7 @@ const val TELEGRAM_DAILY_SUMMARY_TEST_TAG = "telegramDailySummary"
 const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
 const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
 const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
+const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
 
 /**
  * Opções do que o bot faz além de responder (#398): permissões e envios por conta
@@ -104,6 +105,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.showMachineName,
                 onCheckedChange = { show -> model.onPreferencesChange(model.preferences.copy(showMachineName = show)) },
                 modifier = Modifier.testTag(TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Mostrar o time no bot" else "Show the team in the bot",
+            description = if (pt) {
+                "Com ele, o /time lista quem do time está online pelo apelido. Expõe dado de outras pessoas na conversa."
+            } else {
+                "With it, /team lists who from the team is online by nickname. It shows other people's data in the chat."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.showTeam,
+                onCheckedChange = { show -> model.onPreferencesChange(model.preferences.copy(showTeam = show)) },
+                modifier = Modifier.testTag(TELEGRAM_TEAM_SWITCH_TEST_TAG)
             )
         }
     }

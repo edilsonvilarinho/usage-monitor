@@ -28,7 +28,9 @@ data class TelegramBotPreferences(
     /** `/hud` traz a HUD à frente no PC (#408, AA29). */
     val allowPcActions: Boolean = false,
     /** Mensagens dizem de que PC saíram (#408, AA20): útil com o bot em mais de uma máquina. */
-    val showMachineName: Boolean = false
+    val showMachineName: Boolean = false,
+    /** `/time` mostra quem do time está online (#408, AA16): dado de outras pessoas, nasce desligado. */
+    val showTeam: Boolean = false
 )
 
 /**
@@ -168,6 +170,8 @@ sealed interface BotCommand {
     data object FocusHud : BotCommand
     /** `/exportar [24h|7d|30d] [csv|json]` (#408, AA23): o consumo do Claude CLI como arquivo. */
     data class Export(val days: Int, val format: UsageExportFormat) : BotCommand
+    /** `/time` (#408, AA16): quem do time está online e trabalhando — só com "Mostrar o time no bot". */
+    data object Team : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -179,7 +183,7 @@ sealed interface BotCommand {
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
     is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud -> true
-    is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Accounts, BotCommand.Refresh,
+    is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Team, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
@@ -244,6 +248,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "sair", "leave", "unpair" -> BotCommand.Leave
         "hud" -> BotCommand.FocusHud
         "exportar", "export" -> parseExport(args)
+        "time", "team", "equipe" -> BotCommand.Team
         "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {
             null, "on", "ligar" -> BotCommand.Keyboard(true)
             "off", "desligar" -> BotCommand.Keyboard(false)

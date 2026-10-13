@@ -2,7 +2,10 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamMemberPresence
+import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TelegramChat
+import kotlin.test.assertTrue
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
@@ -16,6 +19,30 @@ class TelegramBotChatMessagesTest {
 
     // 22:10 BRT de terça (13/10/2026).
     private val now = Instant.parse("2026-10-14T01:10:00Z")
+
+    @Test
+    fun `team lists working, online and away members by nickname only`() {
+        fun member(alias: String, device: String, online: Boolean, working: Boolean, sessions: Int = 0, lastSeen: String? = null) = TeamMemberPresence(
+            member = TeamMemberUsage(deviceId = device, alias = alias, hostName = "PC-SECRETO", lastSeenAt = lastSeen?.let(Instant::parse)),
+            isOnline = online, isWorkingNow = working, activeSessionCount = sessions
+        )
+        val members = listOf(
+            member("joão", "d3", online = false, working = false, lastSeen = "2026-10-13T23:10:00Z"),
+            member("marina", "d2", online = true, working = false),
+            member("edi", "d1", online = true, working = true, sessions = 2)
+        )
+
+        val text = TelegramBotChatMessages.team(true, Result.success(members), now, AppLanguage.PT)
+
+        assertEquals(
+            "<b>👥 Time agora</b>\n⚡ <b>edi</b> — trabalhando · 2 sessão(ões)\n🟢 <b>marina</b> — online, parado\n⚪ <b>joão</b> — visto há 2 h",
+            text
+        )
+        assertTrue("PC-SECRETO" !in text)
+        assertTrue(TelegramBotChatMessages.team(false, null, now, AppLanguage.PT).startsWith("🔒"))
+        assertEquals("👥 Nenhuma conta participa de um time neste app.", TelegramBotChatMessages.team(true, null, now, AppLanguage.PT))
+        assertEquals("👥 O servidor do time não respondeu agora.", TelegramBotChatMessages.team(true, Result.failure(IllegalStateException()), now, AppLanguage.PT))
+    }
 
     @Test
     fun `machine signature goes at the end only with a known name`() {

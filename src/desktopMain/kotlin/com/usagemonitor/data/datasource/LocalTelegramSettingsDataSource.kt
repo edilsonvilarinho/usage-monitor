@@ -20,7 +20,8 @@ private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long
 @Serializable
 private data class TelegramPreferencesDto(
     val allowPcActions: Boolean = false,
-    val showMachineName: Boolean = false
+    val showMachineName: Boolean = false,
+    val showTeam: Boolean = false
 )
 
 @Serializable
@@ -69,7 +70,8 @@ internal class LocalTelegramSettingsDataSource(
             panelMessages = dto.panelMessages.associate { panel -> panel.chatId to panel.messageId },
             preferences = TelegramBotPreferences(
                 allowPcActions = dto.preferences.allowPcActions,
-                showMachineName = dto.preferences.showMachineName
+                showMachineName = dto.preferences.showMachineName,
+                showTeam = dto.preferences.showTeam
             )
         )
     }
@@ -88,7 +90,8 @@ internal class LocalTelegramSettingsDataSource(
             panelMessages = settings.panelMessages.map { (chatId, messageId) -> TelegramPanelMessageDto(chatId, messageId) },
             preferences = TelegramPreferencesDto(
                 allowPcActions = settings.preferences.allowPcActions,
-                showMachineName = settings.preferences.showMachineName
+                showMachineName = settings.preferences.showMachineName,
+                showTeam = settings.preferences.showTeam
             )
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))

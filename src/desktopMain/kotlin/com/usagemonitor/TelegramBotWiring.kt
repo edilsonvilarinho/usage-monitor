@@ -13,7 +13,9 @@ import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
+import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.presentation.ui.buildTelegramChart
@@ -85,6 +87,7 @@ private fun createTelegramBotService(
         // O mesmo pedido da segunda instância: um arquivo que o laço do `Main` atende.
         focusHud = { FocusRequestChannel().request() },
         machineName = machineName,
+        teamPresence = teamPresenceReader(graph),
         exportUsage = { since, format ->
             graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
                 // Projeto, branch e integrante ficam fora: o arquivo sai do PC para o Telegram.
@@ -96,6 +99,23 @@ private fun createTelegramBotService(
         }
     )
 )
+
+/**
+ * A presença do time (#408, `/time`) nas mesmas contas do semáforo dos cards
+ * (`buildSessionPulseTargets`: integração ligada e perfil participando). Uma pessoa em
+ * duas contas aparece uma vez. Todas as leituras falhando é falha; algumas, não.
+ */
+private fun teamPresenceReader(graph: AppGraph): suspend () -> Result<List<TeamMemberPresence>>? {
+    val presence = GetTeamPresenceUseCase(graph.teamUsageRepository, graph.teamServerClockOffset)
+    return reader@{
+        val keys = buildSessionPulseTargets(graph.profileRegistry, graph.teamSettingsFlow.value).map { target -> target.accountKey }.distinct()
+        if (keys.isEmpty()) return@reader null
+        val results = keys.map { key -> presence(key) }
+        val failure = results.firstOrNull { result -> result.isFailure }?.exceptionOrNull()
+        if (failure != null && results.all { result -> result.isFailure }) return@reader Result.failure(failure)
+        Result.success(results.flatMap { result -> result.getOrNull()?.entries.orEmpty() }.distinctBy { entry -> entry.memberKey })
+    }
+}
 
 /** A comparação entre modelos (#386) desde um instante, com as cotas da última coleta. */
 private fun comparisonReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (Long) -> List<ComparisonRow>? {

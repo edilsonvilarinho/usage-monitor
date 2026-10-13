@@ -161,6 +161,7 @@ Molde por tipo de opção:
 | A18 | `feat(telegram): bring the HUD to the front with /hud behind a PC actions switch` | `gradlew.bat desktopTest --tests "*Telegram*"`: 84 testes, 0 falhas (novos: `/hud` recusado sem a permissão e pedido com ela; interruptor nasce desligado e manda o conjunto de opções). Primeira rodada: 1 falha no teste de tela (`performScrollTo` fora de rolagem, armadilha conhecida), corrigida no teste | concluída |
 | A19 | `feat(telegram): sign messages with this PC's name when asked` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CliSession*"`: 86 + 236 testes, 0 falhas (novos: assinatura só com nome conhecido e escapada; desligada nada muda, ligada alerta e resposta terminam com o nome). `resolveLocalHostName` saiu do `LocalCliSessionDataSource` (que estava na faixa 750–800 e encolheu) | concluída |
 | A20 | `feat(telegram): send the CLI usage as a csv or json file with /exportar` | `gradlew.bat desktopTest --tests "*Telegram*"`: 88 testes, 0 falhas (novos: `sendDocument` multipart; `/exportar json 30d` manda o arquivo com nome de data e recorte; parse em qualquer ordem e formato inválido) | concluída |
+| A21 | `feat(telegram): show who from the team is online with /time behind a switch` | `gradlew.bat desktopTest --tests "*Telegram*"`: 89 testes, 0 falhas (novo: trabalhando, online e fora em ordem total, só apelido — nome da máquina não aparece; desligado, sem time e servidor fora do ar) | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -174,3 +175,4 @@ Molde por tipo de opção:
 - A03: a linha do `/reinicios` no `/ajuda` não tinha entrado na A02 (a substituição não casou e passou calada); entrou aqui junto com a do `/quando`. Daqui em diante as edições falham quando o trecho não existe.
 - A12/A13: na conferência a olho, com três arcos o percentual do centro cobria o arco interno; raio e passo do anel foram ajustados antes do commit. O custo do mapa de calor sai no formato da janela de comparação (`formatMicrosUsd`, quatro casas), reaproveitado sem mudança.
 - A18: as opções novas da #408 passaram a morar em `TelegramBotPreferences` (data class sem segredo) em vez de campos soltos no `TelegramBotSettings`, para não reescrever o `copy`/`equals`/`hashCode` à mão a cada função.
+- A21: o `/time` mostra presença (online, trabalhando, sessões ativas) e não o consumo em dinheiro por pessoa do mockup AA16 — a presença não traz custo, e somar sessões do time num recorte pediria um `CliSessionRange` novo (proibido).

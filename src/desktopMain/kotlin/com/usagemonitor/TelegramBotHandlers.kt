@@ -164,6 +164,12 @@ internal class TelegramBotHandlers(
                     )
                 }
             }
+            BotCommand.Team -> {
+                // A permissão é relida a cada pedido; desligada, o servidor nem é consultado.
+                val allowed = settingsFlow.value.preferences.showTeam
+                val presence = if (allowed) readings.teamPresence() else null
+                send(token, chatId, TelegramBotChatMessages.team(allowed, presence, clock.now(), language))
+            }
             BotCommand.FocusHud -> {
                 // A permissão é relida aqui: desligada depois do pedido, ele não sai.
                 val allowed = settingsFlow.value.preferences.allowPcActions

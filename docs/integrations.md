@@ -420,6 +420,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     (`getUsageBreakdown` com `sinceEpochMillis`) no mesmo formato da exportação do app (`DefaultUsageExportEncoder`), enviado
     por `sendDocument` (multipart novo, como o `sendPhoto`). Projeto, branch e integrante são **zerados antes de codificar** —
     o arquivo sai do PC; ficam modelo, ferramenta e totais. Índice ilegível responde em texto.
+  - `/time` (`/team`, AA16): presença do time (`GetTeamPresenceUseCase`, com o desvio de relógio medido) nas mesmas contas
+    do semáforo dos cards (`buildSessionPulseTargets`), uma linha por pessoa — trabalhando agora com o número de sessões,
+    online parado, ou fora com a última batida —, **só pelo apelido**: nunca e-mail nem nome da máquina. Só com **"Mostrar o
+    time no bot"** (nasce desligado: expõe dado de outras pessoas); desligado, o servidor nem é consultado. O consumo em
+    dinheiro por pessoa do mockup ficou fora (desvio registrado no plano).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

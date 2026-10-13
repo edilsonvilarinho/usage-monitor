@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageSnapshot
@@ -31,6 +32,45 @@ internal object TelegramBotChatMessages {
      */
     fun withMachine(text: String, machine: String?): String =
         machine?.takeIf { name -> name.isNotBlank() }?.let { name -> "$text\n<i>💻 ${TelegramBotMessages.escape(name)}</i>" } ?: text
+
+    /**
+     * `/time` (AA16): por apelido — nunca e-mail nem máquina —, trabalhando agora,
+     * online parado ou fora (com a última batida). Ordem total: trabalhando, online,
+     * fora; depois apelido e dispositivo.
+     */
+    fun team(allowed: Boolean, presence: Result<List<TeamMemberPresence>>?, now: Instant, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (!allowed) {
+            return if (pt) {
+                "🔒 Mostrar o time no bot está desligado. Ligue em Configurações › Alertas › Bot do Telegram."
+            } else {
+                "🔒 Showing the team in the bot is off. Turn it on in Settings › Alerts › Telegram bot."
+            }
+        }
+        if (presence == null) {
+            return if (pt) "👥 Nenhuma conta participa de um time neste app." else "👥 No account takes part in a team in this app."
+        }
+        val members = presence.getOrNull()
+            ?: return if (pt) "👥 O servidor do time não respondeu agora." else "👥 The team server did not answer right now."
+        if (members.isEmpty()) {
+            return if (pt) "👥 Ninguém do time apareceu nos últimos 30 min." else "👥 Nobody from the team showed up in the last 30 min."
+        }
+        val ordered = members.sortedWith(
+            compareBy<TeamMemberPresence> { entry -> if (entry.isWorkingNow) 0 else if (entry.isOnline) 1 else 2 }
+                .thenBy { entry -> entry.alias }
+                .thenBy { entry -> entry.deviceId }
+        )
+        val lines = ordered.map { entry ->
+            val name = "<b>${TelegramBotMessages.escape(entry.alias)}</b>"
+            when {
+                entry.isWorkingNow -> "⚡ $name — " + (if (pt) "trabalhando · ${entry.activeSessionCount} sessão(ões)" else "working · ${entry.activeSessionCount} session(s)")
+                entry.isOnline -> "🟢 $name — " + (if (pt) "online, parado" else "online, idle")
+                else -> "⚪ $name — " + (entry.lastSeenAt?.let { at -> (if (pt) "visto " else "seen ") + TelegramBotMessages.elapsed(now - at, pt) } ?: if (pt) "fora" else "away")
+            }
+        }
+        val header = if (pt) "<b>👥 Time agora</b>" else "<b>👥 Team now</b>"
+        return (listOf(header) + lines).joinToString("\n")
+    }
 
     /** `/hud` (AA29): o pedido saiu, ou a permissão está desligada. */
     fun focusHud(allowed: Boolean, requested: Boolean, language: AppLanguage): String {

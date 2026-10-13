@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramAccountHistory
+import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.UsageSpike
@@ -32,5 +33,10 @@ internal class TelegramBotReadings(
      * `/exportar` (AA23): o consumo do Claude CLI desde o instante, no formato pedido —
      * só modelo, ferramenta e totais; `null` quando o índice falha.
      */
-    val exportUsage: suspend (sinceEpochMillis: Long, format: UsageExportFormat) -> String? = { _, _ -> null }
+    val exportUsage: suspend (sinceEpochMillis: Long, format: UsageExportFormat) -> String? = { _, _ -> null },
+    /**
+     * `/time` (AA16): a presença do time das contas que participam. `null` sem
+     * integração de time; falha é o servidor que não respondeu.
+     */
+    val teamPresence: suspend () -> Result<List<TeamMemberPresence>>? = { null }
 )
