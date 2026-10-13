@@ -32,4 +32,14 @@ class TelegramAnalysisMessagesTest {
         assertEquals(BotTap.AnalysisShow("ANTHROPIC:1a2b3c", AnalysisView.PANEL), parseBotTap(first.second))
         assertTrue(rows.flatten().all { (_, data) -> data.length <= 64 })
     }
+
+    /** AB2: uma linha por métrica com a tendência, o valor de agora e a seta contra o trecho anterior. */
+    @Test
+    fun `trend draws one sparkline per metric`() {
+        val text = TelegramAnalysisMessages.text(AnalysisView.TREND, AnalysisFixture.analysis, AppLanguage.PT)!!
+        assertTrue("5h %" in text && "62%" in text && "+10,0 pp" in text, text)
+        assertTrue("semanal" in text && "41%" in text, text)
+        assertEquals("▁▅█ ", com.usagemonitor.presentation.ui.TelegramAnalysisTexts.spark(listOf(0.0, 5.0, 10.0, null)))
+        assertTrue("weekly" in TelegramAnalysisMessages.text(AnalysisView.TREND, AnalysisFixture.analysis, AppLanguage.EN)!!)
+    }
 }
