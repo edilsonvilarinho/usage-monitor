@@ -354,6 +354,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   (sem dependência nova; Plex Mono do classpath): eixo 0–100%, tracejado dourado no reinício e **o segmento que atravessa
   o reinício não é ligado** — a queda não foi consumo. A legenda escreve rótulo e último percentual. Sem histórico, a
   resposta é texto.
+- **Funções da #408** (galeria AA, `docs/planos/issue-408-execucao.md`). Toda resposta sai do `UsageSnapshot` ou de
+  leitura que o app já faz; nenhuma leva prompt, resposta, `cwd` ou `session_id`.
+  - `/reinicios` (`/resets`, AA3): toda cota com reinício conhecido ainda por vir, na ordem do relógio (empate por conta e
+    cota), com o percentual; teto de 12 linhas e "+N mais".
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

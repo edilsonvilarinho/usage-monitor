@@ -142,6 +142,7 @@ Molde por tipo de opção:
 | --- | --- | --- | --- |
 | A00 | `docs: plan issue 408 telegram bot features` | galeria aberta no painel do navegador: 30 cards + referência, console sem erro, sem rolagem horizontal a 375 px; publicada para o usuário, que escolheu AA1–AA30 | concluída |
 | A01 | `refactor(telegram): dispatch commands and move the bot wiring out of AppViewModels` | `gradlew.bat desktopTest --tests "*Telegram*"`: 58 testes, 0 falhas (comportamento igual; `handle` virou `when` exaustivo e a fiação foi para `TelegramBotWiring.kt`, `AppViewModels` 454 → 394 linhas) | concluída |
+| A02 | `feat(telegram): list the next quota resets with /reinicios` | `gradlew.bat desktopTest --tests "*Telegram*"`: 60 testes, 0 falhas (novos: ordem do relógio com empate por conta e cota, reinício vencido fora, sem reinício conhecido; o teste do menu passou a exigir que todo item seja comando conhecido, em vez da lista fixa) | concluída |
 
 ## Problemas em aberto e riscos
 

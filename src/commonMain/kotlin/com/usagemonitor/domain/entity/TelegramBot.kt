@@ -95,6 +95,8 @@ sealed interface BotCommand {
     data object Summary : BotCommand
     /** `/grafico [24h|7d]` (#398, Y6): imagem do uso no intervalo. */
     data class Chart(val range: HistoryRange) : BotCommand
+    /** `/reinicios` (#408, AA3): os próximos reinícios de todas as contas, em ordem. */
+    data object Resets : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -131,6 +133,7 @@ fun parseBotCommand(text: String): BotCommand? {
             "7d", "7" -> BotCommand.Chart(HistoryRange.LAST_7_DAYS)
             else -> BotCommand.Invalid("/grafico 24h | /grafico 7d")
         }
+        "reinicios", "reinícios", "resets" -> BotCommand.Resets
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

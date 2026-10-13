@@ -38,6 +38,8 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Threshold(listOf(75, 90)), parseBotCommand("/limiar 90,75"))
         assertEquals(BotCommand.Start("AB12CD"), parseBotCommand("/start AB12CD"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/conta"))
+        assertEquals(BotCommand.Resets, parseBotCommand("/reinícios"))
+        assertEquals(BotCommand.Resets, parseBotCommand("/resets"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
         assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
         assertEquals(BotCommand.Sources, parseBotCommand("/api"))

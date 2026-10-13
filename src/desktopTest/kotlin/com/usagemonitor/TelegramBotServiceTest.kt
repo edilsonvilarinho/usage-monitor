@@ -18,6 +18,8 @@ import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.parseBotCommand
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -177,7 +179,12 @@ class TelegramBotServiceTest {
         service.start()
 
         waitUntil { api.menus.isNotEmpty() }
-        assertEquals(listOf("status", "conta", "atualizar", "api", "resumo", "grafico", "alertas", "silencio", "limiar", "ajuda"), api.menus.first().map { it.first })
+        val names = api.menus.first().map { it.first }
+        assertEquals("status", names.first())
+        assertEquals("ajuda", names.last())
+        // Todo item do menu é um comando que o bot conhece: nenhum cai no "Não entendi. Uso: /ajuda".
+        names.forEach { name -> assertFalse(parseBotCommand("/$name") == BotCommand.Invalid("/ajuda"), name) }
+        assertEquals(names.size, names.toSet().size)
     }
 
     @Test

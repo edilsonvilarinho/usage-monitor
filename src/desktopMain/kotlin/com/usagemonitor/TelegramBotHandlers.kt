@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.nextMorningMillis
 import com.usagemonitor.domain.entity.snoozeAlertsUntil
+import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
 import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
@@ -111,6 +112,7 @@ internal class TelegramBotHandlers(
                 val snapshot = snapshotProvider()
                 api.sendMessage(token, chatId, TelegramBotMessages.accountPicker(snapshot, language), html = true, buttons = accountRows(snapshot))
             }
+            BotCommand.Resets -> send(token, chatId, TelegramBotInsightMessages.resets(snapshotProvider(), language))
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {
@@ -119,6 +121,10 @@ internal class TelegramBotHandlers(
                 api.sendMessage(token, chatId, TelegramBotMessages.applied(command, language), html = true)
             }
         }
+    }
+
+    private suspend fun send(token: String, chatId: Long, text: String) {
+        api.sendMessage(token, chatId, text, html = true)
     }
 
     private suspend fun sendStatus(token: String, chatId: Long, language: AppLanguage) {
