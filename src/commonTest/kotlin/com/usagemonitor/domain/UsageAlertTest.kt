@@ -783,6 +783,24 @@ class UsageAlertTest {
         settings = settings,
         now = now
     )
+
+    /** #408, AA8: no foco, a cota abaixo de 90% espera e a crítica sai; a sessão saturada espera o fim do foco. */
+    @Test
+    fun `focus lets only critical quota alerts through and postpones the rest`() {
+        val settings = UsageAlertSettings.DEFAULT.copy(focusUntilEpochMillis = (NOW + 1.hours).toEpochMilliseconds())
+        val pulse = SessionPulse(listOf(sessionAlert("s1", CliSessionHealth.SATURATED)))
+
+        val calm = evaluateUsageAlerts(listOf(stats(usedPercent = 80)), pulse, UsageAlertState.EMPTY, settings, NOW)
+        assertTrue(calm.alerts.isEmpty())
+
+        val critical = evaluateUsageAlerts(listOf(stats(usedPercent = 92)), pulse, calm.state, settings, NOW + 10.minutes)
+        assertEquals(listOf(75, 90), critical.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().map { alert -> alert.thresholdPercent })
+        assertTrue(critical.alerts.none { alert -> alert is UsageAlert.SessionSaturated })
+
+        val after = evaluateUsageAlerts(listOf(stats(usedPercent = 92)), pulse, critical.state, settings, NOW + 1.hours)
+        assertEquals(listOf("s1"), after.alerts.filterIsInstance<UsageAlert.SessionSaturated>().map { alert -> alert.sessionId })
+        assertTrue(after.alerts.none { alert -> alert is UsageAlert.QuotaThreshold })
+    }
 }
 
 /** A forma exata de `DeepSeekMapper`/`OpenRouterMapper`: `used = 0`, sem reset. */
@@ -883,3 +901,4 @@ private fun sessionAlert(sessionId: String, health: CliSessionHealth): ActiveSes
         projectName = "usage-monitor"
     )
 }
+

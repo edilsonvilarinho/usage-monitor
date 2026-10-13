@@ -29,7 +29,13 @@ data class UsageAlertSettings(
      * Aviso de que uma cota reiniciou (#398, Y2) — só das que tinham alertado na
      * janela anterior, para não virar ruído a cada 5 h. Vale para bandeja e bot.
      */
-    val quotaResetAlertsEnabled: Boolean = true
+    val quotaResetAlertsEnabled: Boolean = true,
+    /**
+     * Modo foco até este instante (`/foco`, #408, AA8): só o alerta crítico
+     * ([isCriticalAlert]) sai; o resto é adiado como no silêncio — adia, não consome.
+     * Diferente do silêncio, que cala tudo. `null` = sem foco.
+     */
+    val focusUntilEpochMillis: Long? = null
 ) {
     /**
      * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
@@ -253,32 +259,37 @@ fun evaluateUsageAlerts(
 ): UsageAlertEvaluation {
     val snoozed = settings.snoozedUntilEpochMillis?.let { until -> now.toEpochMilliseconds() < until } == true
     val silenced = snoozed || (currentLocalHour != null && settings.quietHours?.contains(currentLocalHour) == true)
+    val focused = settings.focusUntilEpochMillis?.let { until -> now.toEpochMilliseconds() < until } == true
+    // No foco, o que não é crítico é adiado pelo mesmo caminho do silêncio; a cota
+    // decide por leitura, porque a mesma janela pode virar crítica antes do fim do foco.
+    val deferred = silenced || focused
 
     val quotaResult = evaluateQuotaAlerts(
         stats = stats,
         previous = previous.quotaWindows,
         settings = settings,
         now = now,
-        silenced = silenced
+        silenced = silenced,
+        focused = focused
     )
     val sessionResult = evaluateSessionAlerts(
         pulse = sessionPulse,
         previous = previous.firedSessionIds,
         settings = settings,
-        silenced = silenced
+        silenced = deferred
     )
     val stalledResult = evaluateStalledSessionAlerts(
         stalledSessions = stalledSessions,
         previous = previous.firedStalledSessionIds,
         settings = settings,
-        silenced = silenced
+        silenced = deferred
     )
 
     val spikeResult = evaluateSpikeAlerts(
         spikes = spikes,
         previous = previous.firedSpikeDays,
         settings = settings,
-        silenced = silenced
+        silenced = deferred
     )
 
     return UsageAlertEvaluation(
@@ -302,7 +313,8 @@ private fun evaluateQuotaAlerts(
     previous: Map<QuotaAlertScope, FiredQuotaWindow>,
     settings: UsageAlertSettings,
     now: Instant,
-    silenced: Boolean
+    silenced: Boolean,
+    focused: Boolean = false
 ): QuotaAlertResult {
     val thresholds = settings.effectiveQuotaPercents
     if (!settings.quotaAlertsEnabled || thresholds.isEmpty()) {
@@ -343,7 +355,9 @@ private fun evaluateQuotaAlerts(
                 isSameWindow -> storedWindow.resetPending
                 else -> storedWindow.firedPercents.isNotEmpty()
             }
-            if (resetDue && !silenced) {
+            // Reinício não é crítico: no foco, fica pendente como no silêncio.
+            val resetDeferred = silenced || focused
+            if (resetDue && !resetDeferred) {
                 alerts += UsageAlert.QuotaReset(
                     target = stat.targetKey,
                     targetLabel = targetLabel,
@@ -351,13 +365,15 @@ private fun evaluateQuotaAlerts(
                     nextResetAt = quota.periodEndAt
                 )
             }
-            val resetPending = resetDue && silenced
+            val resetPending = resetDue && resetDeferred
 
             val actualPercent = quotaPercentUsed(quota)
             val crossed = thresholds.filter { threshold -> actualPercent >= threshold }
             val pending = crossed.filter { threshold -> threshold !in alreadyFired }
 
-            if (silenced || pending.isEmpty()) {
+            // Foco (#408, AA8): abaixo do crítico, o limiar espera como no silêncio.
+            val focusDeferred = focused && actualPercent < CRITICAL_ALERT_PERCENT
+            if (silenced || focusDeferred || pending.isEmpty()) {
                 // No silêncio o limiar cruzado não é marcado como disparado: o
                 // consumo só cresce dentro de uma janela, então o alerta volta a
                 // ser avaliado — e emitido — quando o silêncio terminar. Marcá-lo

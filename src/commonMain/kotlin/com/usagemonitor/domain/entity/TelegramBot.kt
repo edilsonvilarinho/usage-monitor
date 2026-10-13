@@ -201,6 +201,8 @@ sealed interface BotCommand {
     data class Export(val days: Int, val format: UsageExportFormat) : BotCommand
     /** `/time` (#408, AA16): quem do time está online e trabalhando — só com "Mostrar o time no bot". */
     data object Team : BotCommand
+    /** `/foco 2h|off` (#408, AA8): por [hours] horas só passa alerta crítico; `null` encerra. */
+    data class Focus(val hours: Int?) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -211,7 +213,7 @@ sealed interface BotCommand {
  * dizer se muda alguma coisa. Sair (`/sair`) não conta: é a conversa decidindo por si.
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
-    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud -> true
+    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud, is BotCommand.Focus -> true
     is BotCommand.Start, BotCommand.AlertMenu, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Team, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
@@ -279,6 +281,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "hud" -> BotCommand.FocusHud
         "exportar", "export" -> parseExport(args)
         "time", "team", "equipe" -> BotCommand.Team
+        "foco", "focus" -> parseFocus(args.firstOrNull())
         "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {
             null, "on", "ligar" -> BotCommand.Keyboard(true)
             "off", "desligar" -> BotCommand.Keyboard(false)
@@ -331,6 +334,22 @@ private fun parseExport(args: List<String>): BotCommand {
     }
     return BotCommand.Export(days, format)
 }
+
+/** `2h` ou `2` (até [MAX_FOCUS_HOURS]) liga; `off` encerra. Sem argumento, o uso. */
+private fun parseFocus(argument: String?): BotCommand {
+    val value = argument?.lowercase() ?: return BotCommand.Invalid("/foco 2h | /foco off")
+    if (value == "off" || value == "desligar") return BotCommand.Focus(null)
+    val hours = value.removeSuffix("h").toIntOrNull()?.takeIf { count -> count in 1..MAX_FOCUS_HOURS }
+        ?: return BotCommand.Invalid("/foco 2h | /foco off")
+    return BotCommand.Focus(hours)
+}
+
+/** Teto do `/foco`: mais que meio dia de foco é silêncio com outro nome. */
+const val MAX_FOCUS_HOURS = 12
+
+/** Preferências com o foco do `/foco` aplicado a partir de [nowMillis]. Função pura. */
+fun focusAlerts(settings: UsageAlertSettings, command: BotCommand.Focus, nowMillis: Long): UsageAlertSettings =
+    settings.copy(focusUntilEpochMillis = command.hours?.let { hours -> nowMillis + hours * 60 * 60 * 1_000L })
 
 private fun parseQuiet(argument: String?): BotCommand {
     val usage = "/silencio 22-07 | /silencio off"

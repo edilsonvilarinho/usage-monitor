@@ -123,4 +123,18 @@ internal object TelegramBotRemoteMessages {
 
     private const val SOURCE_BUTTONS_PER_ROW = 2
     private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
+
+    /** `/foco` (#408, AA8): até quando, ou encerrado — o que ficou retido sai na próxima coleta. */
+    fun focus(untilMillis: Long?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (untilMillis == null) {
+            return if (pt) "🔔 Foco encerrado. O que ficou retido chega na próxima coleta." else "🔔 Focus ended. What was held back arrives with the next collection."
+        }
+        val until = TelegramBotMessages.clock(kotlin.time.Instant.fromEpochMilliseconds(untilMillis))
+        return if (pt) {
+            "🎧 <b>Foco até $until</b>\nSó chegam alertas críticos (≥ 90%). <code>/foco off</code> encerra."
+        } else {
+            "🎧 <b>Focus until $until</b>\nOnly critical alerts (≥ 90%) come through. <code>/focus off</code> ends it."
+        }
+    }
 }

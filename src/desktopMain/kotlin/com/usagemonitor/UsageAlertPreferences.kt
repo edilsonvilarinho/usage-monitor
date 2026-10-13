@@ -20,6 +20,7 @@ private const val SPIKE_FACTOR_TENTHS_KEY = "alertsSpikeFactorTenths"
 private const val QUIET_HOURS_KEY = "alertsQuietHours"
 private const val SNOOZED_UNTIL_KEY = "alertsSnoozedUntilMillis"
 private const val QUOTA_RESET_ALERTS_ENABLED_KEY = "alertsQuotaResetEnabled"
+private const val FOCUS_UNTIL_KEY = "alertsFocusUntilMillis"
 
 /**
  * Preferências de alerta no mesmo armazenamento das demais (registro/plist via
@@ -40,7 +41,8 @@ internal fun readPersistedAlertSettings(settings: PreferencesSettings): UsageAle
         spikeFactor = decodeSpikeFactor(settings.getIntOrNull(SPIKE_FACTOR_TENTHS_KEY)),
         quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY)),
         snoozedUntilEpochMillis = settings.getLongOrNull(SNOOZED_UNTIL_KEY),
-        quotaResetAlertsEnabled = settings.getBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, true)
+        quotaResetAlertsEnabled = settings.getBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, true),
+        focusUntilEpochMillis = settings.getLongOrNull(FOCUS_UNTIL_KEY)
     )
 }
 
@@ -56,6 +58,8 @@ internal fun persistAlertSettings(settings: PreferencesSettings, value: UsageAle
     settings.putBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, value.quotaResetAlertsEnabled)
     val snoozedUntil = value.snoozedUntilEpochMillis
     if (snoozedUntil == null) settings.remove(SNOOZED_UNTIL_KEY) else settings.putLong(SNOOZED_UNTIL_KEY, snoozedUntil)
+    val focusUntil = value.focusUntilEpochMillis
+    if (focusUntil == null) settings.remove(FOCUS_UNTIL_KEY) else settings.putLong(FOCUS_UNTIL_KEY, focusUntil)
 }
 
 /**

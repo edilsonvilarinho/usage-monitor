@@ -418,6 +418,20 @@ class TelegramBotServiceTest {
         assertTrue(batch in api.silentSends)
     }
 
+    /** #408, AA8: `/foco 2h` grava o prazo nas preferências de alerta e responde até quando; só leitura não pode. */
+    @Test
+    fun `focus command sets the deadline and answers until when`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/foco 2h")
+
+        waitUntil { alertSettings.value.focusUntilEpochMillis != null }
+        assertEquals(Instant.parse("2026-10-06T14:00:00Z").toEpochMilliseconds(), alertSettings.value.focusUntilEpochMillis)
+        waitUntil { api.sent.any { it.second.startsWith("🎧 <b>Foco até 11:00</b>") } }
+        api.pending += message(2, chat = 51, text = "/foco off")
+        waitUntil { alertSettings.value.focusUntilEpochMillis == null }
+    }
+
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */
     @Test
     fun `export sends the usage file with the period and format`() {

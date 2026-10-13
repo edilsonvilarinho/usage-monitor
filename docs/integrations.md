@@ -456,6 +456,13 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     painel vira `🔴 Padrão 86% · 🟢 Codex 22% · DeepSeek US$ 37,66` — ponto de risco, conta e a cota mais cheia (saldo com o
     valor) — e a hora da coleta na segunda linha (`compactPanel`). O banner de mensagem fixada do Telegram mostra só a
     primeira linha, sem marcas. Desligado, volta o formato de #398 com a barra por conta.
+  - **Modo foco** (AA8): `/foco 2h` (1 a 12 h; `/focus` em inglês) grava `focusUntilEpochMillis` em `UsageAlertSettings`
+    (registro, `alertsFocusUntilMillis`) e `/foco off` apaga. A decisão pura (`evaluateUsageAlerts`) trata o foco como o
+    silêncio para tudo que não é crítico — **adia, não consome**: limiar abaixo de `CRITICAL_ALERT_PERCENT`, reinício,
+    sessão, sem resposta e pico ficam pendentes e saem na primeira coleta depois do fim. A cota decide por leitura: a mesma
+    janela que passa de 90% durante o foco sai na hora, com todos os limiares cruzados (todos levam o percentual crítico).
+    Vale para a bandeja também, porque mora na decisão. Diferente do silêncio, que cala tudo. Conversa só de leitura não
+    liga foco (`changesApp`).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

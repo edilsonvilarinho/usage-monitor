@@ -52,6 +52,7 @@ internal object TelegramBotMessages {
             "comparar" to "Mapa de calor dos modelos (7d)",
             "alertas" to "Alertas por tipo, ou todos (on ou off)",
             "silencio" to "Horário de silêncio (22-07 ou off)",
+            "foco" to "Só alertas críticos por um tempo (2h ou off)",
             "limiar" to "Limiares de alerta de cota (75,90)",
             "conversas" to "Conversas pareadas",
             "sair" to "Desfaz o pareamento desta conversa",
@@ -82,6 +83,7 @@ internal object TelegramBotMessages {
             "compare" to "Model heat map (7d)",
             "alerts" to "Alerts by kind, or all (on or off)",
             "quiet" to "Quiet hours (22-07 or off)",
+            "focus" to "Only critical alerts for a while (2h or off)",
             "threshold" to "Quota alert thresholds (75,90)",
             "chats" to "Paired chats",
             "leave" to "Unpair this chat",
@@ -233,6 +235,7 @@ internal object TelegramBotMessages {
             "<code>/comparar</code> · <code>/comparar 30d</code> — mapa de calor dos modelos\n" +
             "<code>/alertas</code> — liga e desliga cada tipo · <code>/alertas on</code> · <code>/alertas off</code> — todos\n" +
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
+            "<code>/foco 2h</code> · <code>/foco off</code> — só alertas críticos por um tempo\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
             "<code>/conversas</code> — conversas pareadas · <code>/sair</code> — desfaz o pareamento desta\n" +
             "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
@@ -261,6 +264,7 @@ internal object TelegramBotMessages {
             "<code>/compare</code> · <code>/compare 30d</code> — model heat map\n" +
             "<code>/alerts</code> — turn each kind on or off · <code>/alerts on</code> · <code>/alerts off</code> — all\n" +
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
+            "<code>/focus 2h</code> · <code>/focus off</code> — only critical alerts for a while\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
             "<code>/chats</code> — paired chats · <code>/leave</code> — unpair this one\n" +
             "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +

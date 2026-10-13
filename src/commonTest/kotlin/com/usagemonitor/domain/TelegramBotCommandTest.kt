@@ -22,6 +22,7 @@ import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.applyBotCommand
+import com.usagemonitor.domain.entity.focusAlerts
 import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.parseKeyboardLabel
 import com.usagemonitor.domain.entity.parseBotCommand
@@ -181,5 +182,20 @@ class TelegramBotCommandTest {
         assertEquals(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(dawn))
         // Exatamente 08:00 já passou: vai para o dia seguinte.
         assertEquals(Instant.parse("2026-10-08T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds()))
+    }
+
+    /** #408, AA8: `/foco 2h` liga por duas horas, `/foco off` encerra; fora do teto, o uso. */
+    @Test
+    fun `focus command parses hours and off and sets the deadline`() {
+        assertEquals(BotCommand.Focus(2), parseBotCommand("/foco 2h"))
+        assertEquals(BotCommand.Focus(3), parseBotCommand("/focus 3"))
+        assertEquals(BotCommand.Focus(null), parseBotCommand("/foco off"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/foco 13h"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/foco"))
+        assertTrue(BotCommand.Focus(2).changesApp())
+
+        val focused = focusAlerts(UsageAlertSettings(), BotCommand.Focus(2), nowMillis = 1_000L)
+        assertEquals(1_000L + 2 * 3_600_000L, focused.focusUntilEpochMillis)
+        assertEquals(null, focusAlerts(focused, BotCommand.Focus(null), nowMillis = 5_000L).focusUntilEpochMillis)
     }
 }

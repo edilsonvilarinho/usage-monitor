@@ -29,6 +29,7 @@ import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.applyBotCommand
+import com.usagemonitor.domain.entity.focusAlerts
 import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.toggled
 import com.usagemonitor.domain.entity.parseBotCommand
@@ -196,6 +197,11 @@ internal class TelegramBotHandlers(
                 // Semanais pedem o mês: em 7 dias cabem uma ou duas janelas de 7 d.
                 val range = if (command.weekly) HistoryRange.LAST_30_DAYS else HistoryRange.LAST_7_DAYS
                 send(token, chatId, TelegramBotUsageMessages.windows(readings.accountHistory(range), command.weekly, language))
+            }
+            is BotCommand.Focus -> {
+                val updated = focusAlerts(alertSettingsFlow.value, command, clock.now().toEpochMilliseconds())
+                saveAlertSettings(updated)
+                send(token, chatId, TelegramBotRemoteMessages.focus(updated.focusUntilEpochMillis, language))
             }
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
