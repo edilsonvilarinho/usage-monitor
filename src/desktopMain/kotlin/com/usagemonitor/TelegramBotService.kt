@@ -14,6 +14,7 @@ import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.domain.entity.dailySummaryDate
 import com.usagemonitor.domain.entity.isDailySummaryDue
+import com.usagemonitor.domain.entity.isCriticalAlert
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
@@ -122,7 +123,11 @@ internal class TelegramBotService(
         if (pollJob?.isActive == true) return
         pollJob = scope.launch { pollLoop() }
         alertJob = scope.launch {
-            alerts.collect { alert -> broadcast { language -> TelegramBotMessages.alert(alert, language) } }
+            alerts.collect { alert ->
+                // Som por gravidade (#408, AA26): sem som não some — chega e não vibra.
+                val silent = settingsFlow.value.preferences.soundOnlyOnCritical && !isCriticalAlert(alert)
+                broadcast(silent = silent) { language -> TelegramBotMessages.alert(alert, language) }
+            }
         }
         summaryJob = scope.launch { summaryLoop() }
         updateJob = scope.launch {
@@ -307,9 +312,11 @@ internal class TelegramBotService(
     /**
      * Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa.
      * O texto sai no idioma de cada conversa (#408, AA24), montado uma vez por idioma.
+     * [silent] entrega sem som (`disable_notification`).
      */
     private suspend fun broadcast(
         buttons: (AppLanguage) -> List<List<TelegramButton>> = { emptyList() },
+        silent: Boolean = false,
         textFor: suspend (AppLanguage) -> String
     ) {
         val settings = settingsFlow.value
@@ -319,7 +326,7 @@ internal class TelegramBotService(
         for (chat in settings.authorizedChats) {
             val language = settings.languageOf(chat.id, languageProvider())
             val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
-            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language)) }
+            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language), silent = silent) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)
         }

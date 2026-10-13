@@ -435,6 +435,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     Sessão saturada, Sem resposta, Pico — com ✅/⬜ e o nome (`alt:<tipo>`). O toque inverte **o mesmo campo** das
     Configurações (`AlertKind`, enum novo que aponta para os interruptores de `UsageAlertSettings`) e redesenha o teclado da
     mensagem. `/alertas on|off` continua mudando todos.
+  - **Som por gravidade** (AA26): com **"Só alerta crítico toca"** (nasce **ligado**, como no mockup aprovado — não age no PC
+    nem expõe dado, só tira o som), o alerta sai com `disable_notification` salvo se for crítico. Crítico tem dono único no
+    domain, `isCriticalAlert`: `QuotaThreshold` com percentual real ≥ `CRITICAL_ALERT_PERCENT` (90), o que inclui a esgotada.
+    Sessão, reinício, sem resposta e pico nunca são críticos. A mensagem de teste e as respostas a comandos seguem com som.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

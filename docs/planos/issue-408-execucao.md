@@ -164,6 +164,7 @@ Molde por tipo de opção:
 | A21 | `feat(telegram): show who from the team is online with /time behind a switch` | `gradlew.bat desktopTest --tests "*Telegram*"`: 89 testes, 0 falhas (novo: trabalhando, online e fora em ordem total, só apelido — nome da máquina não aparece; desligado, sem time e servidor fora do ar) | concluída |
 | A22 | `feat(telegram): announce a ready update once and restart it from the bot` | `gradlew.bat desktopTest --tests "*Telegram*"`: 90 testes, 0 falhas (novo: sem permissão nada sai; com ela, um aviso por versão com o botão `upd:<versão>`, toque de versão antiga não reinicia, o da pronta chama `applyUpdate`). Primeira rodada: 1 falha no teste "sample reply" — o exemplo expandido saiu da altura padrão da cena com a opção nova (armadilha "altura da cena"); a cena do teste passou a 2000 px | concluída |
 | A23 | `feat(telegram): turn each alert kind on or off from /alertas` | `gradlew.bat desktopTest --tests "*Telegram*"`: 91 testes, 0 falhas (novos: `/alertas` sem argumento abre um botão por tipo, o toque inverte só aquele campo e redesenha o teclado; ida e volta do `alt:<tipo>` e da inversão para todos os tipos) | concluída |
+| A24 | `feat(telegram): ring only for critical alerts` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CriticalAlert*" --tests "*UsageAlert*"`: 93 + 2 + 64 testes, 0 falhas (novos: `isCriticalAlert` — 89% não, 90% e 100% sim, sessão e reinício nunca; com a opção padrão a cota em 75% sai sem som e a de 92% com som, desligada tudo toca; interruptor do card nasce ligado). Primeira rodada: 3 falhas por fixture — `UsageTargetKey(ANTHROPIC)` exige perfil; os testes passaram a usar Codex | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -177,4 +178,6 @@ Molde por tipo de opção:
 - A03: a linha do `/reinicios` no `/ajuda` não tinha entrado na A02 (a substituição não casou e passou calada); entrou aqui junto com a do `/quando`. Daqui em diante as edições falham quando o trecho não existe.
 - A12/A13: na conferência a olho, com três arcos o percentual do centro cobria o arco interno; raio e passo do anel foram ajustados antes do commit. O custo do mapa de calor sai no formato da janela de comparação (`formatMicrosUsd`, quatro casas), reaproveitado sem mudança.
 - A18: as opções novas da #408 passaram a morar em `TelegramBotPreferences` (data class sem segredo) em vez de campos soltos no `TelegramBotSettings`, para não reescrever o `copy`/`equals`/`hashCode` à mão a cada função.
+- A24: "Só alerta crítico toca" nasce **ligado** (o mockup AA26 aprovado mostra o interruptor ligado; não age no PC nem expõe
+  dado). Quem já tinha o bot passa a receber os alertas não críticos sem som. Teste e respostas a comandos seguem com som.
 - A21: o `/time` mostra presença (online, trabalhando, sessões ativas) e não o consumo em dinheiro por pessoa do mockup AA16 — a presença não traz custo, e somar sessões do time num recorte pediria um `CliSessionRange` novo (proibido).

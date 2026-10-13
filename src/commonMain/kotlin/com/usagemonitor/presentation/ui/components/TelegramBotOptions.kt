@@ -19,6 +19,7 @@ const val TELEGRAM_DAILY_SUMMARY_TEST_TAG = "telegramDailySummary"
 const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
 const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
 const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
+const val TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG = "telegramCriticalSoundSwitch"
 const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
 const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
@@ -134,6 +135,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.allowRemoteUpdate,
                 onCheckedChange = { allowed -> model.onPreferencesChange(model.preferences.copy(allowRemoteUpdate = allowed)) },
                 modifier = Modifier.testTag(TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Só alerta crítico toca" else "Only critical alerts ring",
+            description = if (pt) {
+                "Cota em 90% ou mais toca no celular; os outros alertas chegam em silêncio, sem vibrar."
+            } else {
+                "A quota at 90% or more rings the phone; the other alerts arrive silently, without vibrating."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.soundOnlyOnCritical,
+                onCheckedChange = { only -> model.onPreferencesChange(model.preferences.copy(soundOnlyOnCritical = only)) },
+                modifier = Modifier.testTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG)
             )
         }
     }

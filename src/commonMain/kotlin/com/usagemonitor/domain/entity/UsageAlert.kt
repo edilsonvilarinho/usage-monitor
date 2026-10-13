@@ -172,6 +172,18 @@ sealed interface UsageAlert {
     ) : UsageAlert
 }
 
+/** Piso do alerta crítico (#408): a partir daqui o limiar é o urgente dos padrões, não o aviso antecipado. */
+const val CRITICAL_ALERT_PERCENT = 90
+
+/**
+ * Alerta crítico (#408): uma cota em [CRITICAL_ALERT_PERCENT]% ou mais, o que inclui a
+ * esgotada. Dono único da gravidade — o som do bot (AA26), o modo foco (AA8) e o lote
+ * (AA25) perguntam aqui, para "crítico" nunca ter duas definições. Sessão, reinício e
+ * anomalia não são críticos: nenhum deles diz que o uso vai parar.
+ */
+fun isCriticalAlert(alert: UsageAlert): Boolean =
+    alert is UsageAlert.QuotaThreshold && alert.actualPercent >= CRITICAL_ALERT_PERCENT
+
 /**
  * Memória de disparo entre passadas do polling.
  *

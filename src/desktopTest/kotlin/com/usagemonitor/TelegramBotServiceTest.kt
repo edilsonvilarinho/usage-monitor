@@ -14,6 +14,7 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -344,6 +345,35 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("<b>Sessão CLI saturada</b>") && it.second.endsWith("<i>💻 NOTE-EDI</i>") } }
         api.pending += message(2, chat = 51, text = "/reinicios")
         waitUntil { api.sent.count { it.second.endsWith("<i>💻 NOTE-EDI</i>") } >= 2 }
+    }
+
+    private fun quotaAlert(percent: Int) = UsageAlert.QuotaThreshold(
+        target = UsageTargetKey(ApiSource.CODEX),
+        targetLabel = "Padrão",
+        quotaLabel = "Sessão 5h",
+        thresholdPercent = percent,
+        actualPercent = percent,
+        periodEndAt = Instant.parse("2026-10-06T15:00:00Z"),
+        hasKnownResetAt = true
+    )
+
+    /** #408, AA26: com "Só alerta crítico toca" (padrão), só a cota em 90% ou mais sai com som; desligado, todos tocam. */
+    @Test
+    fun `only critical alerts ring by default`() {
+        paired()
+        service.start()
+        runBlocking { alerts.emit(quotaAlert(75)) }
+        waitUntil { api.sent.size == 1 }
+        assertEquals(1, api.silentSends.size)
+
+        runBlocking { alerts.emit(quotaAlert(92)) }
+        waitUntil { api.sent.size == 2 }
+        assertEquals(1, api.silentSends.size)
+
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(soundOnlyOnCritical = false))
+        runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
+        waitUntil { api.sent.size == 3 }
+        assertEquals(1, api.silentSends.size)
     }
 
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */

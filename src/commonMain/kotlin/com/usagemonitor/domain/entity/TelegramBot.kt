@@ -36,6 +36,11 @@ data class TelegramBotPreferences(
      * o app no PC a pedido de uma conversa, por isso nasce desligado.
      */
     val allowRemoteUpdate: Boolean = false,
+    /**
+     * Só o alerta crítico ([isCriticalAlert]) toca; os outros chegam sem som (#408, AA26).
+     * Nasce ligado, como no mockup aprovado: não age no PC nem expõe dado — só tira o som.
+     */
+    val soundOnlyOnCritical: Boolean = true,
     /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
     val announcedUpdateVersion: String? = null
 )
