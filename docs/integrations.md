@@ -452,6 +452,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     vira `(k×)`, com o alerta mais recente), sem som quando "Só alerta crítico toca" está ligado. O crítico sai na hora,
     fora do lote. Só no Telegram: a bandeja segue imediata. Lote e grupos ficam sob um `Mutex` (coletor × esvaziamento
     atrasado); fechar o app com alerta retido o perde, como um envio que falha.
+  - **Painel em uma linha** (AA15): com **"Painel em uma linha"** (nasce ligado; o painel fixado em si continua opt-in), o
+    painel vira `🔴 Padrão 86% · 🟢 Codex 22% · DeepSeek US$ 37,66` — ponto de risco, conta e a cota mais cheia (saldo com o
+    valor) — e a hora da coleta na segunda linha (`compactPanel`). O banner de mensagem fixada do Telegram mostra só a
+    primeira linha, sem marcas. Desligado, volta o formato de #398 com a barra por conta.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

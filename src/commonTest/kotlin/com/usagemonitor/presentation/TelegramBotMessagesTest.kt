@@ -129,6 +129,19 @@ class TelegramBotMessagesTest {
         assertEquals(text, TelegramBotSummaryMessages.panel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
     }
 
+    /** #408, AA15: uma linha com risco, conta e pior percentual (saldo com o valor); a hora da coleta na segunda. */
+    @Test
+    fun `compact panel fits one line per chat`() {
+        val text = TelegramBotSummaryMessages.compactPanel(snapshot, AppLanguage.PT)
+        val lines = text.lines()
+
+        assertEquals(2, lines.size, text)
+        assertTrue(lines[0].startsWith("🔴 Anthropic · &lt;Padrão&gt; 42% · "), text)
+        assertTrue("DeepSeek saldo US$ 37,66" in lines[0], text)
+        assertEquals("<i>coleta 22:28 BRT</i>", lines[1])
+        assertEquals(text, TelegramBotSummaryMessages.compactPanel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
+    }
+
     /** #408, AA1: a repetição edita a mensagem com o contador, a hora da primeira e a da última (BRT). */
     @Test
     fun `repeated alert carries the count and both times`() {

@@ -51,6 +51,11 @@ data class TelegramBotPreferences(
      * do lote. Nasce ligado, como no mockup: atrasa o aviso não crítico, nunca o descarta.
      */
     val batchAlerts: Boolean = true,
+    /**
+     * Painel fixado em uma linha (#408, AA15): cabe no banner do topo da conversa sem abrir.
+     * Nasce ligado, como no mockup; o painel em si continua nascendo desligado.
+     */
+    val compactPanel: Boolean = true,
     /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
     val announcedUpdateVersion: String? = null
 )

@@ -275,7 +275,13 @@ internal class TelegramBotService(
         val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
         for (chatId in chats) {
             val machine = if (settings.preferences.showMachineName) readings.machineName() else null
-            val text = TelegramBotChatMessages.withMachine(TelegramBotSummaryMessages.panel(snapshot, settings.languageOf(chatId, languageProvider())), machine)
+            val language = settings.languageOf(chatId, languageProvider())
+            val body = if (settings.preferences.compactPanel) {
+                TelegramBotSummaryMessages.compactPanel(snapshot, language)
+            } else {
+                TelegramBotSummaryMessages.panel(snapshot, language)
+            }
+            val text = TelegramBotChatMessages.withMachine(body, machine)
             val messageId = panels[chatId]
             if (messageId != null && panelTexts[chatId] == text) continue
             val kept = messageId != null && editPanel(token, chatId, messageId, text)

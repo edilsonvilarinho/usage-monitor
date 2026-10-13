@@ -603,6 +603,8 @@ class TelegramBotServiceTest {
         val messageId = settings.value.panelMessages.getValue(51L)
         assertEquals(51L to messageId, api.pins.single())
         assertTrue(api.silentSends.single().contains("42%"))
+        // #408, AA15: o painel nasce em uma linha.
+        assertTrue(api.silentSends.single().lines().size <= 2)
 
         snapshot = reading("2026-10-06T11:59:00Z", 57)
         waitUntil { api.editedTexts.any { it.contains("57%") } }

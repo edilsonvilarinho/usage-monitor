@@ -22,6 +22,7 @@ const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
 const val TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG = "telegramCriticalSoundSwitch"
 const val TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG = "telegramGroupAlertsSwitch"
 const val TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG = "telegramBatchAlertsSwitch"
+const val TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG = "telegramCompactPanelSwitch"
 const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
 const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
@@ -179,6 +180,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.batchAlerts,
                 onCheckedChange = { batch -> model.onPreferencesChange(model.preferences.copy(batchAlerts = batch)) },
                 modifier = Modifier.testTag(TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Painel em uma linha" else "One-line panel",
+            description = if (pt) {
+                "O painel fixado vira uma linha com o risco e o pior percentual de cada conta, que cabe no topo da conversa."
+            } else {
+                "The pinned panel becomes one line with each account's risk and worst percentage, which fits the top of the chat."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.compactPanel,
+                onCheckedChange = { compact -> model.onPreferencesChange(model.preferences.copy(compactPanel = compact)) },
+                modifier = Modifier.testTag(TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG)
             )
         }
     }
