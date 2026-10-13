@@ -145,6 +145,17 @@ internal object TelegramBotUsageMessages {
             "<b>Comparison · last $days ${if (days == 1) "day" else "days"}</b>\n<i>color: value over the column maximum; the number is always written</i>"
         }
 
+    /** Legenda do `/status img` (AA14): a hora da coleta, como o `/status`. */
+    fun ringsCaption(collectedAt: Instant?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val collected = collectedAt?.let { at -> (if (pt) "coleta " else "collected ") + TelegramBotMessages.clock(at) + " BRT" }
+            ?: if (pt) "sem coleta ainda" else "not collected yet"
+        return "<b>📊 Usage Monitor</b>\n<i>$collected</i>"
+    }
+
+    fun ringsEmpty(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Nenhuma conta com cota em percentual para desenhar. Use /status." else "No account with a percentage quota to draw. Use /status."
+
     fun compareEmpty(language: AppLanguage): String =
         if (language == AppLanguage.PT) "Nenhum uso no recorte para comparar." else "No usage in range to compare."
 

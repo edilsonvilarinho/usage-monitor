@@ -388,6 +388,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     mesmas células (`comparisonCell`) e intensidade (`heatIntensity`, contra todas as linhas mesmo com o teto de 12),
     desenhado por `TelegramHeatmapRenderer` no Skia do `/grafico`; o dourado da célula tem teto para o número claro manter
     contraste. Índice ilegível ou recorte vazio respondem em texto.
+  - `/status img` (AA14): PNG com um anel por conta (quatro por linha) no vocabulário da HUD — até três arcos com a janela
+    de reinício mais distante por fora, o maior percentual no centro e a palavra do pior risco embaixo (`buildTelegramRings`,
+    pura; `TelegramRingsRenderer`, Skia). Conta só com saldo fica fora da imagem; sem nenhuma, a resposta manda para o
+    `/status` em texto. Desenho estático: o arco nunca passa do número do centro.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

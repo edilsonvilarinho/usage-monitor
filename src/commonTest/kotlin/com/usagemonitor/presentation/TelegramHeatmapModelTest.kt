@@ -5,6 +5,14 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.presentation.ui.TELEGRAM_HEATMAP_MAX_ROWS
 import com.usagemonitor.presentation.ui.buildTelegramHeatmap
+import com.usagemonitor.presentation.ui.buildTelegramRings
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.UsageRiskLevel
+import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.domain.entity.UsageSnapshotAccount
+import com.usagemonitor.domain.entity.UsageSnapshotQuota
+import com.usagemonitor.domain.entity.UsageUnit
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -34,6 +42,38 @@ class TelegramHeatmapModelTest {
         assertEquals("sem tarifa", heatmap.rows[1].cells[1].text)
         assertEquals("—", heatmap.rows[2].cells[0].text)
         assertNull(heatmap.rows[2].cells[0].intensity)
+    }
+
+    @Test
+    fun `rings put the longest window outside, the highest percent in the center and skip balance only accounts`() {
+        val now = Instant.parse("2026-10-13T17:00:00Z")
+        fun quota(label: String, percent: Int?, resetsAt: String?, risk: UsageRiskLevel? = null) = UsageSnapshotQuota(
+            label, PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 0, 100, percent, resetsAt?.let(Instant::parse), "USD", risk
+        )
+        val snapshot = UsageSnapshot(
+            generatedAt = now,
+            accounts = listOf(
+                UsageSnapshotAccount(
+                    ApiSource.ANTHROPIC, "Anthropic · Padrão", false,
+                    listOf(
+                        quota("5h", 86, "2026-10-13T19:00:00Z", UsageRiskLevel.WILL_EXCEED),
+                        quota("Semanal", 61, "2026-10-16T22:44:00Z", UsageRiskLevel.ON_TRACK),
+                        quota("Opus", 40, "2026-10-16T22:44:00Z"),
+                        quota("Sonnet", 10, "2026-10-14T22:44:00Z")
+                    )
+                ),
+                UsageSnapshotAccount(ApiSource.DEEPSEEK, "DeepSeek", false, listOf(quota("Saldo", null, null)))
+            )
+        )
+
+        val rings = buildTelegramRings(snapshot, AppLanguage.PT)
+
+        assertEquals(1, rings.rings.size)
+        val ring = rings.rings.single()
+        assertEquals(86, ring.centerPercent)
+        assertEquals("Crítico", ring.riskWord)
+        // Reinício mais distante por fora (empate pelo rótulo), teto de três arcos.
+        assertEquals(listOf(40, 61, 10), ring.arcs.map { it.percent })
     }
 
     @Test

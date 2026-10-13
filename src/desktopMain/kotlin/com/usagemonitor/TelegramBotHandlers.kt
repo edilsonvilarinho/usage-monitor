@@ -12,6 +12,7 @@ import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
 import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.presentation.ui.TelegramBotUsageMessages
 import com.usagemonitor.presentation.ui.buildTelegramHeatmap
+import com.usagemonitor.presentation.ui.buildTelegramRings
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.BotTap
@@ -102,6 +103,14 @@ internal class TelegramBotHandlers(
         when (command) {
             is BotCommand.Start -> Unit
             BotCommand.Status -> sendStatus(token, chatId, language)
+            BotCommand.StatusImage -> {
+                val rings = buildTelegramRings(snapshotProvider(), language)
+                if (rings.rings.isEmpty()) {
+                    send(token, chatId, TelegramBotUsageMessages.ringsEmpty(language))
+                } else {
+                    api.sendPhoto(token, chatId, TelegramRingsRenderer.render(rings), TelegramBotUsageMessages.ringsCaption(rings.collectedAt, language))
+                }
+            }
             BotCommand.Refresh -> {
                 requestRefresh()
                 sendStatus(token, chatId, language)

@@ -153,6 +153,7 @@ Molde por tipo de opção:
 | A10 | `feat(telegram): list the latest quota windows with /janelas` | `gradlew.bat desktopTest --tests "*Telegram*"`: 68 testes, 0 falhas (novos: mais nova primeiro com pico, esgotou e faixa ativa; sem janelas semanais; argumento inválido) | concluída |
 | A11 | `feat(telegram): add a 6 hour sparkline under each quota in /status` | `gradlew.bat desktopTest --tests "*Telegram*"`: 70 testes, 0 falhas (novos: blocos de 30 min com a última leitura levada adiante, menos de duas leituras sem linha, cartão com a linha só na cota com histórico) | concluída |
 | A12 | `feat(telegram): send the model comparison heat map as an image with /comparar` | `gradlew.bat desktopTest --tests "*Telegram*"`: 73 testes, 0 falhas (novos: células da comparação com intensidade sobre o maior da coluna, teto de 12 linhas sem mudar a escala, PNG com altura por linha e fundo; parse 24h/7d/30d) | concluída |
+| A13 | `feat(telegram): draw the account rings as an image with /status img` | `gradlew.bat desktopTest --tests "*Telegram*"`: 76 testes, 0 falhas (novos: janela mais longa por fora com teto de três arcos, maior percentual no centro, conta só com saldo fora, PNG de quatro anéis por linha com a cor do arco crítico). PNG do anel e do mapa de calor (A12) conferidos a olho numa captura temporária descartada; o núcleo cresceu (raio 64) para o percentual não cobrir o arco interno | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -164,3 +165,4 @@ Molde por tipo de opção:
 
 ## Desvios do plano e achados da execução
 - A03: a linha do `/reinicios` no `/ajuda` não tinha entrado na A02 (a substituição não casou e passou calada); entrou aqui junto com a do `/quando`. Daqui em diante as edições falham quando o trecho não existe.
+- A12/A13: na conferência a olho, com três arcos o percentual do centro cobria o arco interno; raio e passo do anel foram ajustados antes do commit. O custo do mapa de calor sai no formato da janela de comparação (`formatMicrosUsd`, quatro casas), reaproveitado sem mudança.

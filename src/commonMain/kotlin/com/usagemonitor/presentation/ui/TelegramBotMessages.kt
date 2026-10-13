@@ -200,7 +200,7 @@ internal object TelegramBotMessages {
 
     fun help(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "<b>Comandos</b>\n" +
-            "<code>/status</code> — cotas de todas as contas\n" +
+            "<code>/status</code> — cotas de todas as contas · <code>/status img</code> — os anéis em imagem\n" +
             "<code>/conta</code> — escolha uma conta e veja só ela\n" +
             "<code>/atualizar</code> — coleta agora e mostra as cotas\n" +
             "<code>/api</code> — fontes monitoradas\n" +
@@ -222,7 +222,7 @@ internal object TelegramBotMessages {
             "<i>Toque num comando para copiar.</i>"
     } else {
         "<b>Commands</b>\n" +
-            "<code>/status</code> — quotas of every account\n" +
+            "<code>/status</code> — quotas of every account · <code>/status img</code> — the rings as an image\n" +
             "<code>/account</code> — pick one account and see only it\n" +
             "<code>/refresh</code> — collect now and show the quotas\n" +
             "<code>/api</code> — monitored sources\n" +

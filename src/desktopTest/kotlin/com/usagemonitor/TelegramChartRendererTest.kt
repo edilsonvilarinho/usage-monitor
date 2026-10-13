@@ -5,6 +5,10 @@ import com.usagemonitor.presentation.ui.TelegramChartLine
 import com.usagemonitor.presentation.ui.TelegramHeatmap
 import com.usagemonitor.presentation.ui.TelegramHeatmapCell
 import com.usagemonitor.presentation.ui.TelegramHeatmapRow
+import com.usagemonitor.presentation.ui.TelegramRing
+import com.usagemonitor.presentation.ui.TelegramRingArc
+import com.usagemonitor.presentation.ui.TelegramRings
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlin.test.Test
@@ -37,6 +41,23 @@ class TelegramChartRendererTest {
         val blue = 0x4F8CFF
         val hasLine = (0 until image.height).any { y -> (100 until 800 step 50).any { x -> (image.getRGB(x, y) and 0xFFFFFF) == blue } }
         assertTrue(hasLine)
+    }
+
+    @Test
+    fun `rings render four per row with the critical arc color`() {
+        val rings = TelegramRings(
+            rings = (1..5).map { index -> TelegramRing("Conta $index", 86, "Crítico", listOf(TelegramRingArc(86, UsageRiskLevel.WILL_EXCEED))) },
+            collectedAt = null
+        )
+
+        val image = ImageIO.read(ByteArrayInputStream(TelegramRingsRenderer.render(rings)))
+
+        assertEquals(960, image.width)
+        // Cinco anéis em linhas de quatro: duas linhas de 200 px mais as margens.
+        assertEquals(24 * 2 + 2 * 200, image.height)
+        val red = 0xE86A6A
+        val hasArc = (0 until 240).any { y -> (0 until 240).any { x -> (image.getRGB(x, y) and 0xFFFFFF) == red } }
+        assertTrue(hasArc)
     }
 
     @Test

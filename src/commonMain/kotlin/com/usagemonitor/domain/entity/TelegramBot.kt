@@ -79,6 +79,8 @@ class TelegramBotSettings(
 sealed interface BotCommand {
     data class Start(val code: String) : BotCommand
     data object Status : BotCommand
+    /** `/status img` (#408, AA14): os anéis das contas como imagem. */
+    data object StatusImage : BotCommand
     data class Alerts(val enabled: Boolean) : BotCommand
     /** `null` desliga o silêncio. */
     data class Quiet(val hours: QuietHours?) : BotCommand
@@ -134,7 +136,10 @@ fun parseBotCommand(text: String): BotCommand? {
     val args = parts.drop(1)
     return when (name) {
         "start" -> args.firstOrNull()?.let { code -> BotCommand.Start(code) } ?: BotCommand.Help
-        "status" -> BotCommand.Status
+        "status" -> when (args.firstOrNull()?.lowercase()) {
+            "img", "imagem", "image", "foto", "photo" -> BotCommand.StatusImage
+            else -> BotCommand.Status
+        }
         "alertas", "alerts" -> when (args.firstOrNull()?.lowercase()) {
             "on", "ligar", "ligado" -> BotCommand.Alerts(true)
             "off", "desligar", "desligado" -> BotCommand.Alerts(false)
