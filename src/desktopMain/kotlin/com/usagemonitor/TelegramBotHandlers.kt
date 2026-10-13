@@ -182,12 +182,16 @@ internal class TelegramBotHandlers(
     }
 
     private suspend fun send(token: String, chatId: Long, text: String) {
-        api.sendMessage(token, chatId, text, html = true)
+        api.sendMessage(token, chatId, signed(text), html = true)
     }
+
+    /** A assinatura do PC (#408, AA20) quando a opção está ligada. */
+    private fun signed(text: String): String =
+        if (settingsFlow.value.preferences.showMachineName) TelegramBotChatMessages.withMachine(text, readings.machineName()) else text
 
     private suspend fun sendStatus(token: String, chatId: Long, language: AppLanguage) {
         val snapshot = snapshotProvider()
-        api.sendMessage(token, chatId, statusText(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+        api.sendMessage(token, chatId, signed(statusText(snapshot, language)), html = true, buttons = statusButtons(language, snapshot))
     }
 
     /**
@@ -264,7 +268,7 @@ internal class TelegramBotHandlers(
                     requestRefresh()
                     val messageId = message.messageId
                     val snapshot = snapshotProvider()
-                    val text = statusText(snapshot, language)
+                    val text = signed(statusText(snapshot, language))
                     // Sem mudança o Telegram responde 400 "message is not modified": o `runTelegram` o engole.
                     if (messageId != null) api.editMessageText(token, message.chatId, messageId, text, statusButtons(language, snapshot))
                 }

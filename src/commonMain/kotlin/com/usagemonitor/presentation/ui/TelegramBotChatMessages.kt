@@ -25,6 +25,13 @@ internal object TelegramBotChatMessages {
         return (listOf(header) + lines + footer).joinToString("\n")
     }
 
+    /**
+     * A assinatura do PC no fim da mensagem (AA20), quando ligada e o nome é
+     * conhecido. Sem nome, a mensagem segue sem ela — nunca um nome inventado.
+     */
+    fun withMachine(text: String, machine: String?): String =
+        machine?.takeIf { name -> name.isNotBlank() }?.let { name -> "$text\n<i>💻 ${TelegramBotMessages.escape(name)}</i>" } ?: text
+
     /** `/hud` (AA29): o pedido saiu, ou a permissão está desligada. */
     fun focusHud(allowed: Boolean, requested: Boolean, language: AppLanguage): String {
         val pt = language == AppLanguage.PT

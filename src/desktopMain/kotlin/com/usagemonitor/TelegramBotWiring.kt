@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.resolveLocalHostName
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.domain.entity.TelegramAccountHistory
@@ -34,6 +35,18 @@ internal fun createTelegramBot(
     snapshot: () -> UsageSnapshot?,
     /** Quando o app abriu, para o `/ping` dizer há quanto tempo está de pé. */
     startedAt: Instant = Clock.System.now()
+): TelegramBotService {
+    val machine by lazy { resolveLocalHostName() }
+    return createTelegramBotService(graph, dashboard, alerts, snapshot, startedAt) { machine }
+}
+
+private fun createTelegramBotService(
+    graph: AppGraph,
+    dashboard: DashboardViewModel,
+    alerts: Flow<UsageAlert>,
+    snapshot: () -> UsageSnapshot?,
+    startedAt: Instant,
+    machineName: () -> String?
 ): TelegramBotService = TelegramBotService(
     api = TelegramBotApi(graph.httpClient),
     settingsFlow = graph.telegramSettingsFlow,
@@ -69,7 +82,8 @@ internal fun createTelegramBot(
         comparison = comparisonReader(graph, dashboard),
         accountHistory = accountHistoryReader(graph, dashboard),
         // O mesmo pedido da segunda instância: um arquivo que o laço do `Main` atende.
-        focusHud = { FocusRequestChannel().request() }
+        focusHud = { FocusRequestChannel().request() },
+        machineName = machineName
     )
 )
 

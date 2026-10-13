@@ -18,6 +18,13 @@ class TelegramBotChatMessagesTest {
     private val now = Instant.parse("2026-10-14T01:10:00Z")
 
     @Test
+    fun `machine signature goes at the end only with a known name`() {
+        assertEquals("<b>Alerta</b>\n<i>💻 NOTE-&lt;EDI&gt;</i>", TelegramBotChatMessages.withMachine("<b>Alerta</b>", "NOTE-<EDI>"))
+        assertEquals("<b>Alerta</b>", TelegramBotChatMessages.withMachine("<b>Alerta</b>", null))
+        assertEquals("<b>Alerta</b>", TelegramBotChatMessages.withMachine("<b>Alerta</b>", " "))
+    }
+
+    @Test
     fun `chats lists the paired chats and marks the current one`() {
         val text = TelegramBotChatMessages.chats(listOf(TelegramChat(1, "@edi"), TelegramChat(2, "Time <Infra>")), 2, AppLanguage.PT)
 

@@ -24,5 +24,7 @@ internal class TelegramBotReadings(
     /** Histórico de cada conta da última coleta no intervalo, na ordem do retrato. */
     val accountHistory: suspend (HistoryRange) -> List<TelegramAccountHistory> = { emptyList() },
     /** `/hud` (AA29): pede à HUD que venha à frente; `false` quando o pedido não foi gravado. */
-    val focusHud: () -> Boolean = { false }
+    val focusHud: () -> Boolean = { false },
+    /** Nome deste PC (AA20); `null` quando o sistema não o informa. */
+    val machineName: () -> String? = { null }
 )

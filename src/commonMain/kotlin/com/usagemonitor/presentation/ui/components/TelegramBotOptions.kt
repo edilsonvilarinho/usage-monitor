@@ -18,6 +18,7 @@ const val TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG = "telegramSourceControlSwitch
 const val TELEGRAM_DAILY_SUMMARY_TEST_TAG = "telegramDailySummary"
 const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
 const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
+const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
 
 /**
  * Opções do que o bot faz além de responder (#398): permissões e envios por conta
@@ -87,6 +88,22 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.allowPcActions,
                 onCheckedChange = { allowed -> model.onPreferencesChange(model.preferences.copy(allowPcActions = allowed)) },
                 modifier = Modifier.testTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG)
+            )
+        }
+        val machine = model.machineName
+        TelegramOptionRow(
+            label = if (pt) "Nome deste PC nas mensagens" else "This PC's name in messages",
+            description = when {
+                machine == null && pt -> "Útil com o bot em mais de um computador. O sistema não informou o nome deste."
+                machine == null -> "Useful with the bot on more than one computer. The system did not report this one's name."
+                pt -> "Útil com o bot em mais de um computador. Este assina como $machine."
+                else -> "Useful with the bot on more than one computer. This one signs as $machine."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.showMachineName,
+                onCheckedChange = { show -> model.onPreferencesChange(model.preferences.copy(showMachineName = show)) },
+                modifier = Modifier.testTag(TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG)
             )
         }
     }

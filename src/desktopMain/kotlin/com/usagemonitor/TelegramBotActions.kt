@@ -72,7 +72,9 @@ internal fun telegramBotSectionModel(
     snapshot: UsageSnapshot?,
     language: AppLanguage,
     actions: TelegramBotActions,
-    nowMillis: Long = Clock.System.now().toEpochMilliseconds()
+    nowMillis: Long = Clock.System.now().toEpochMilliseconds(),
+    /** Nome deste PC para o card mostrar o que a opção AA20 vai escrever. */
+    machineName: String? = null
 ): TelegramBotSectionModel {
     val pt = language == AppLanguage.PT
     val (label, tone) = when (status) {
@@ -115,7 +117,8 @@ internal fun telegramBotSectionModel(
         onLivePanelChange = actions::setLivePanel,
         onChatControlChange = actions::setChatControl,
         preferences = settings.preferences,
-        onPreferencesChange = actions::setPreferences
+        onPreferencesChange = actions::setPreferences,
+        machineName = machineName
     )
 }
 

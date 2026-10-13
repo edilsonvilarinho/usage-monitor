@@ -411,6 +411,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     é recusada (`changesApp`). As opções novas da #408 moram em `TelegramBotPreferences` (`data class` sem segredo, objeto
     `preferences` no `telegram.json` com default por campo), e não como campos soltos do `TelegramBotSettings`, cujo
     `copy`/`equals`/`hashCode` é escrito à mão por causa do token.
+  - **Nome do PC** (AA20): com "Nome deste PC nas mensagens" ligado, alertas, resumo, painel, `/status` e respostas de
+    texto terminam com `💻 <nome>` — o mesmo nome do índice CLI (`resolveLocalHostName`, `COMPUTERNAME`/`HOSTNAME`, depois
+    `InetAddress`; saiu do `LocalCliSessionDataSource` para um dono só). Sem nome, a mensagem segue sem assinatura. Dois PCs
+    com o **mesmo** token disputam o `getUpdates` (o Telegram responde 409 a um deles): o nome resolve "de onde veio o
+    alerta", não a disputa — para comandos, um token por PC.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

@@ -146,7 +146,7 @@ class TelegramBotServiceTest {
             }
         },
         panelIntervalMillis = 50L,
-        readings = TelegramBotReadings(focusHud = { focusRequests.incrementAndGet(); true })
+        readings = TelegramBotReadings(focusHud = { focusRequests.incrementAndGet(); true }, machineName = { "NOTE-EDI" })
     )
 
     @AfterTest
@@ -314,6 +314,22 @@ class TelegramBotServiceTest {
         api.pending += message(2, chat = 51, text = "/hud")
         waitUntil { api.sent.any { it.second == "🖥 HUD trazida para a frente no PC." } }
         assertEquals(1, focusRequests.get())
+    }
+
+    /** #408, AA20: com a opção ligada, alerta e resposta dizem de que PC saíram; desligada, não. */
+    @Test
+    fun `machine name signs alerts and replies only when turned on`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/ping")
+        waitUntil { api.sent.any { it.second.startsWith("🏓") } }
+        assertTrue(api.sent.none { "💻" in it.second })
+
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(showMachineName = true))
+        runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
+        waitUntil { api.sent.any { it.second.startsWith("<b>Sessão CLI saturada</b>") && it.second.endsWith("<i>💻 NOTE-EDI</i>") } }
+        api.pending += message(2, chat = 51, text = "/reinicios")
+        waitUntil { api.sent.count { it.second.endsWith("<i>💻 NOTE-EDI</i>") } >= 2 }
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.presentation.ui.TelegramBotChatMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -238,7 +239,8 @@ internal class TelegramBotService(
         val snapshot = snapshotProvider()
         val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
         for (chatId in chats) {
-            val text = TelegramBotSummaryMessages.panel(snapshot, settings.languageOf(chatId, languageProvider()))
+            val machine = if (settings.preferences.showMachineName) readings.machineName() else null
+            val text = TelegramBotChatMessages.withMachine(TelegramBotSummaryMessages.panel(snapshot, settings.languageOf(chatId, languageProvider())), machine)
             val messageId = panels[chatId]
             if (messageId != null && panelTexts[chatId] == text) continue
             val kept = messageId != null && editPanel(token, chatId, messageId, text)
@@ -280,9 +282,10 @@ internal class TelegramBotService(
         val settings = settingsFlow.value
         if (!settings.enabled || settings.botToken.isBlank()) return
         val texts = mutableMapOf<AppLanguage, String>()
+        val machine = if (settings.preferences.showMachineName) readings.machineName() else null
         for (chat in settings.authorizedChats) {
             val language = settings.languageOf(chat.id, languageProvider())
-            val text = texts[language] ?: textFor(language).also { built -> texts[language] = built }
+            val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
             runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)

@@ -69,7 +69,9 @@ class TelegramBotSectionModel(
     val onChatControlChange: (Long, Boolean) -> Unit = { _, _ -> },
     /** Opções da #408; o card muda uma e devolve o conjunto. */
     val preferences: TelegramBotPreferences = TelegramBotPreferences(),
-    val onPreferencesChange: (TelegramBotPreferences) -> Unit = {}
+    val onPreferencesChange: (TelegramBotPreferences) -> Unit = {},
+    /** Nome deste PC (#408, AA20); `null` quando o sistema não informa. */
+    val machineName: String? = null
 )
 
 /**

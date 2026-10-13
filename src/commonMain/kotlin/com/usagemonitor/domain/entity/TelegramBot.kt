@@ -26,7 +26,9 @@ data class TelegramChat(
  */
 data class TelegramBotPreferences(
     /** `/hud` traz a HUD à frente no PC (#408, AA29). */
-    val allowPcActions: Boolean = false
+    val allowPcActions: Boolean = false,
+    /** Mensagens dizem de que PC saíram (#408, AA20): útil com o bot em mais de uma máquina. */
+    val showMachineName: Boolean = false
 )
 
 /**
