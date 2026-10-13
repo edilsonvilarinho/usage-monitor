@@ -35,7 +35,13 @@ data class UsageAlertSettings(
      * ([isCriticalAlert]) sai; o resto é adiado como no silêncio — adia, não consome.
      * Diferente do silêncio, que cala tudo. `null` = sem foco.
      */
-    val focusUntilEpochMillis: Long? = null
+    val focusUntilEpochMillis: Long? = null,
+    /**
+     * Lembrete N minutos antes do reinício de uma cota acima do primeiro limiar (#408,
+     * AA4; `/avise`). `null` desliga. Nasce em [DEFAULT_RESET_REMINDER_MINUTES], como o
+     * interruptor ligado do mockup aprovado; vale para a bandeja e o bot.
+     */
+    val resetReminderMinutes: Int? = DEFAULT_RESET_REMINDER_MINUTES
 ) {
     /**
      * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
@@ -75,6 +81,12 @@ data class UsageAlertSettings(
         val DEFAULT = UsageAlertSettings()
     }
 }
+
+/** Antecedência padrão do lembrete de reinício (#408, AA4). */
+const val DEFAULT_RESET_REMINDER_MINUTES = 15
+
+/** Faixa aceita no `/avise`: menos que 5 min não dá tempo de ler; mais que 2 h já é o `/reinicios`. */
+val RESET_REMINDER_MINUTES_RANGE = 5..120
 
 /** Limiares padrão: um aviso antecipado, um urgente e o estouro. */
 val DEFAULT_QUOTA_ALERT_PERCENTS: List<Int> = listOf(75, 90, 100)
@@ -136,6 +148,19 @@ sealed interface UsageAlert {
         val targetLabel: String,
         val quotaLabel: String,
         val nextResetAt: Instant
+    ) : UsageAlert
+
+    /**
+     * Uma cota acima do limiar reinicia em [minutesLeft] minutos (#408, AA4): dá para
+     * planejar a volta. Um por janela; não é crítico — não diz que o uso vai parar.
+     */
+    data class ResetSoon(
+        val target: UsageTargetKey,
+        val targetLabel: String,
+        val quotaLabel: String,
+        val actualPercent: Int,
+        val resetAt: Instant,
+        val minutesLeft: Int
     ) : UsageAlert
 
     /** Uma sessão CLI com interação recente saturou a janela de contexto. */
@@ -228,7 +253,9 @@ data class FiredQuotaWindow(
      * A janela anterior alertou e o aviso de reinício ainda não saiu (#398, Y2) —
      * caiu no silêncio. Fica pendente até sair, como os limiares: adia, não consome.
      */
-    val resetPending: Boolean = false
+    val resetPending: Boolean = false,
+    /** O lembrete antes do reinício (#408, AA4) já saiu nesta janela. */
+    val reminded: Boolean = false
 )
 
 /** Alertas a emitir agora e o estado a guardar para a próxima passada. */
@@ -371,6 +398,26 @@ private fun evaluateQuotaAlerts(
             val crossed = thresholds.filter { threshold -> actualPercent >= threshold }
             val pending = crossed.filter { threshold -> threshold !in alreadyFired }
 
+            // Lembrete antes do reinício (#408, AA4): só cota acima do primeiro limiar e
+            // com reinício conhecido, um por janela. No silêncio e no foco fica para a
+            // próxima leitura — se o reinício chegar antes, não há mais o que lembrar.
+            val alreadyReminded = isSameWindow && storedWindow.reminded
+            val minutesLeft = (quota.periodEndAt - now).inWholeMinutes
+            val reminderWindow = settings.resetReminderMinutes
+            val reminderDue = reminderWindow != null && quota.hasKnownResetAt && crossed.isNotEmpty() && !alreadyReminded &&
+                quota.periodEndAt > now && minutesLeft < reminderWindow
+            if (reminderDue && !resetDeferred) {
+                alerts += UsageAlert.ResetSoon(
+                    target = stat.targetKey,
+                    targetLabel = targetLabel,
+                    quotaLabel = quota.label,
+                    actualPercent = actualPercent,
+                    resetAt = quota.periodEndAt,
+                    minutesLeft = minutesLeft.toInt().coerceAtLeast(1)
+                )
+            }
+            val reminded = alreadyReminded || (reminderDue && !resetDeferred)
+
             // Foco (#408, AA8): abaixo do crítico, o limiar espera como no silêncio.
             val focusDeferred = focused && actualPercent < CRITICAL_ALERT_PERCENT
             if (silenced || focusDeferred || pending.isEmpty()) {
@@ -378,7 +425,7 @@ private fun evaluateQuotaAlerts(
                 // consumo só cresce dentro de uma janela, então o alerta volta a
                 // ser avaliado — e emitido — quando o silêncio terminar. Marcá-lo
                 // aqui perderia o aviso para sempre.
-                windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired, resetPending)
+                windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired, resetPending, reminded)
                 continue
             }
 
@@ -395,7 +442,7 @@ private fun evaluateQuotaAlerts(
                     hasKnownResetAt = quota.hasKnownResetAt
                 )
             }
-            windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired + pending, resetPending)
+            windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired + pending, resetPending, reminded)
         }
     }
 

@@ -203,6 +203,8 @@ sealed interface BotCommand {
     data object Team : BotCommand
     /** `/foco 2h|off` (#408, AA8): por [hours] horas só passa alerta crítico; `null` encerra. */
     data class Focus(val hours: Int?) : BotCommand
+    /** `/avise 15|off` (#408, AA4): minutos de antecedência do lembrete de reinício; `null` desliga. */
+    data class Remind(val minutes: Int?) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -213,7 +215,8 @@ sealed interface BotCommand {
  * dizer se muda alguma coisa. Sair (`/sair`) não conta: é a conversa decidindo por si.
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
-    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud, is BotCommand.Focus -> true
+    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud, is BotCommand.Focus,
+    is BotCommand.Remind -> true
     is BotCommand.Start, BotCommand.AlertMenu, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Team, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
@@ -282,6 +285,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "exportar", "export" -> parseExport(args)
         "time", "team", "equipe" -> BotCommand.Team
         "foco", "focus" -> parseFocus(args.firstOrNull())
+        "avise", "aviso", "lembrete", "remind" -> parseRemind(args.firstOrNull())
         "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {
             null, "on", "ligar" -> BotCommand.Keyboard(true)
             "off", "desligar" -> BotCommand.Keyboard(false)
@@ -333,6 +337,16 @@ private fun parseExport(args: List<String>): BotCommand {
         }
     }
     return BotCommand.Export(days, format)
+}
+
+/** Minutos dentro de [RESET_REMINDER_MINUTES_RANGE] (com ou sem `min`); `off` desliga. Sem argumento, o uso. */
+private fun parseRemind(argument: String?): BotCommand {
+    val usage = "/avise 15 | /avise off"
+    val value = argument?.lowercase() ?: return BotCommand.Invalid(usage)
+    if (value == "off" || value == "desligar") return BotCommand.Remind(null)
+    val minutes = value.removeSuffix("min").removeSuffix("m").toIntOrNull()?.takeIf { count -> count in RESET_REMINDER_MINUTES_RANGE }
+        ?: return BotCommand.Invalid(usage)
+    return BotCommand.Remind(minutes)
 }
 
 /** `2h` ou `2` (até [MAX_FOCUS_HOURS]) liga; `off` encerra. Sem argumento, o uso. */
@@ -388,6 +402,7 @@ fun applyBotCommand(settings: UsageAlertSettings, command: BotCommand): UsageAle
         )
         is BotCommand.Quiet -> settings.copy(quietHours = command.hours)
         is BotCommand.Threshold -> settings.copy(quotaPercents = command.percents)
+        is BotCommand.Remind -> settings.copy(resetReminderMinutes = command.minutes)
         else -> null
     }
 }

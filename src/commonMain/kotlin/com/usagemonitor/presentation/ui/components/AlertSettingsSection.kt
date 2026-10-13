@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.domain.entity.DEFAULT_RESET_REMINDER_MINUTES
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
@@ -27,6 +28,7 @@ const val ALERT_SETTINGS_QUOTA_SWITCH_TEST_TAG = "alertSettingsQuotaSwitch"
 const val ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG = "alertSettingsQuotaCoverage"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
 const val ALERT_SETTINGS_QUOTA_RESET_SWITCH_TEST_TAG = "alertSettingsQuotaResetSwitch"
+const val ALERT_SETTINGS_RESET_REMINDER_SWITCH_TEST_TAG = "alertSettingsResetReminderSwitch"
 const val ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG = "alertSettingsStalledSwitch"
 const val ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG = "alertSettingsStallThreshold"
 const val ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG = "alertSettingsSpikeSwitch"
@@ -199,6 +201,25 @@ fun AlertSettingsSection(
                 "Só das cotas que passaram de um limiar na janela anterior."
             } else {
                 "Only for quotas that crossed a threshold in the previous window."
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // #408, AA4: o outro lado do reinício — avisa antes, para planejar a volta.
+        val reminderMinutes = settings.resetReminderMinutes
+        AlertToggleRow(
+            label = if (isPt) "Lembrar antes de a cota reiniciar" else "Remind before a quota resets",
+            checked = settings.quotaAlertsEnabled && reminderMinutes != null,
+            testTag = ALERT_SETTINGS_RESET_REMINDER_SWITCH_TEST_TAG,
+            onCheckedChange = { checked ->
+                onSettingsChange(settings.copy(resetReminderMinutes = if (checked) DEFAULT_RESET_REMINDER_MINUTES else null))
+            }
+        )
+        Text(
+            text = when {
+                isPt -> "${reminderMinutes ?: DEFAULT_RESET_REMINDER_MINUTES} min antes, só de cota acima de um limiar. No bot, /avise 30 muda os minutos."
+                else -> "${reminderMinutes ?: DEFAULT_RESET_REMINDER_MINUTES} min before, only for a quota above a threshold. In the bot, /remind 30 changes the minutes."
             },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant

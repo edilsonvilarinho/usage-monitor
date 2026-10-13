@@ -94,4 +94,13 @@ class UsageAlertPreferencesTest {
         assertEquals(0, wrapHour(24))
         assertEquals(13, wrapHour(13))
     }
+
+    /** #408, AA4: ausente é o padrão (15 min), `0` é desligado e fora da faixa cai para dentro dela. */
+    @Test
+    fun `reset reminder minutes decode absent, off and out of range`() {
+        assertEquals(15, decodeResetReminderMinutes(null))
+        assertEquals(null, decodeResetReminderMinutes(0))
+        assertEquals(30, decodeResetReminderMinutes(30))
+        assertEquals(120, decodeResetReminderMinutes(999))
+    }
 }

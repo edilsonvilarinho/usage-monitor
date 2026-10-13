@@ -41,6 +41,7 @@ fun alertGroupKey(alert: UsageAlert): String? {
     return when (alert) {
         is UsageAlert.QuotaThreshold -> "quota|${alert.target.storageKey}|${alert.quotaLabel}|${alert.thresholdPercent}"
         is UsageAlert.QuotaReset -> "reset|${alert.target.storageKey}|${alert.quotaLabel}"
+        is UsageAlert.ResetSoon -> "remind|${alert.target.storageKey}|${alert.quotaLabel}"
         is UsageAlert.SessionSaturated -> "session|${alert.projectName ?: alert.sessionId}"
         is UsageAlert.SessionStalled -> "stalled|${alert.projectName ?: alert.sessionId}"
         is UsageAlert.SpendSpike -> "spike|${alert.target.storageKey}|${alert.quotaLabel}"

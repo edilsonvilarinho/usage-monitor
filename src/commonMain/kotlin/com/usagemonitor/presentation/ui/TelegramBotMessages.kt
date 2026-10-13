@@ -53,6 +53,7 @@ internal object TelegramBotMessages {
             "alertas" to "Alertas por tipo, ou todos (on ou off)",
             "silencio" to "Horário de silêncio (22-07 ou off)",
             "foco" to "Só alertas críticos por um tempo (2h ou off)",
+            "avise" to "Lembrete antes do reinício (15 ou off)",
             "limiar" to "Limiares de alerta de cota (75,90)",
             "conversas" to "Conversas pareadas",
             "sair" to "Desfaz o pareamento desta conversa",
@@ -84,6 +85,7 @@ internal object TelegramBotMessages {
             "alerts" to "Alerts by kind, or all (on or off)",
             "quiet" to "Quiet hours (22-07 or off)",
             "focus" to "Only critical alerts for a while (2h or off)",
+            "remind" to "Reminder before resets (15 or off)",
             "threshold" to "Quota alert thresholds (75,90)",
             "chats" to "Paired chats",
             "leave" to "Unpair this chat",
@@ -236,6 +238,7 @@ internal object TelegramBotMessages {
             "<code>/alertas</code> — liga e desliga cada tipo · <code>/alertas on</code> · <code>/alertas off</code> — todos\n" +
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/foco 2h</code> · <code>/foco off</code> — só alertas críticos por um tempo\n" +
+            "<code>/avise 15</code> · <code>/avise off</code> — lembrete antes de reiniciar uma cota alta\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
             "<code>/conversas</code> — conversas pareadas · <code>/sair</code> — desfaz o pareamento desta\n" +
             "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
@@ -265,6 +268,7 @@ internal object TelegramBotMessages {
             "<code>/alerts</code> — turn each kind on or off · <code>/alerts on</code> · <code>/alerts off</code> — all\n" +
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/focus 2h</code> · <code>/focus off</code> — only critical alerts for a while\n" +
+            "<code>/remind 15</code> · <code>/remind off</code> — reminder before a high quota resets\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
             "<code>/chats</code> — paired chats · <code>/leave</code> — unpair this one\n" +
             "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +
@@ -290,6 +294,13 @@ internal object TelegramBotMessages {
                 if (pt) "🔕 Silêncio $range aplicado." else "🔕 Quiet hours $range set."
             } ?: if (pt) "🔔 Silêncio desligado." else "🔔 Quiet hours off."
             is BotCommand.Threshold -> (if (pt) "Limiares de cota: " else "Quota thresholds: ") + command.percents.joinToString(", ") { "<b>$it%</b>" }
+            is BotCommand.Remind -> command.minutes?.let { minutes ->
+                if (pt) {
+                    "⏰ Combinado: aviso <b>$minutes min</b> antes de reiniciar qualquer cota acima de um limiar."
+                } else {
+                    "⏰ Done: I'll warn <b>$minutes min</b> before any quota above a threshold resets."
+                }
+            } ?: if (pt) "⏰ Lembrete antes do reinício desligado." else "⏰ Reminder before resets off."
             else -> help(language)
         }
     }

@@ -2,6 +2,8 @@ package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
+import com.usagemonitor.domain.entity.DEFAULT_RESET_REMINDER_MINUTES
+import com.usagemonitor.domain.entity.RESET_REMINDER_MINUTES_RANGE
 import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.MIN_SPIKE_FACTOR
@@ -21,6 +23,7 @@ private const val QUIET_HOURS_KEY = "alertsQuietHours"
 private const val SNOOZED_UNTIL_KEY = "alertsSnoozedUntilMillis"
 private const val QUOTA_RESET_ALERTS_ENABLED_KEY = "alertsQuotaResetEnabled"
 private const val FOCUS_UNTIL_KEY = "alertsFocusUntilMillis"
+private const val RESET_REMINDER_MINUTES_KEY = "alertsResetReminderMinutes"
 
 /**
  * Preferências de alerta no mesmo armazenamento das demais (registro/plist via
@@ -42,7 +45,8 @@ internal fun readPersistedAlertSettings(settings: PreferencesSettings): UsageAle
         quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY)),
         snoozedUntilEpochMillis = settings.getLongOrNull(SNOOZED_UNTIL_KEY),
         quotaResetAlertsEnabled = settings.getBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, true),
-        focusUntilEpochMillis = settings.getLongOrNull(FOCUS_UNTIL_KEY)
+        focusUntilEpochMillis = settings.getLongOrNull(FOCUS_UNTIL_KEY),
+        resetReminderMinutes = decodeResetReminderMinutes(settings.getIntOrNull(RESET_REMINDER_MINUTES_KEY))
     )
 }
 
@@ -60,6 +64,18 @@ internal fun persistAlertSettings(settings: PreferencesSettings, value: UsageAle
     if (snoozedUntil == null) settings.remove(SNOOZED_UNTIL_KEY) else settings.putLong(SNOOZED_UNTIL_KEY, snoozedUntil)
     val focusUntil = value.focusUntilEpochMillis
     if (focusUntil == null) settings.remove(FOCUS_UNTIL_KEY) else settings.putLong(FOCUS_UNTIL_KEY, focusUntil)
+    settings.putInt(RESET_REMINDER_MINUTES_KEY, value.resetReminderMinutes ?: 0)
+}
+
+/**
+ * Lembrete de reinício (#408, AA4) gravado em minutos, com `0` para desligado: ausente é
+ * o padrão, e não "desligado", senão quem já tinha o app nunca receberia o lembrete.
+ * Fora da faixa do `/avise` (registro editado à mão) cai para dentro dela.
+ */
+internal fun decodeResetReminderMinutes(stored: Int?): Int? = when (stored) {
+    null -> DEFAULT_RESET_REMINDER_MINUTES
+    0 -> null
+    else -> stored.coerceIn(RESET_REMINDER_MINUTES_RANGE)
 }
 
 /**

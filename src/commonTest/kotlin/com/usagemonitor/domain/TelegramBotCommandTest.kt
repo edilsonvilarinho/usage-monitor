@@ -198,4 +198,16 @@ class TelegramBotCommandTest {
         assertEquals(1_000L + 2 * 3_600_000L, focused.focusUntilEpochMillis)
         assertEquals(null, focusAlerts(focused, BotCommand.Focus(null), nowMillis = 5_000L).focusUntilEpochMillis)
     }
+
+    /** #408, AA4: `/avise 30` muda a antecedência, `/avise off` desliga; fora da faixa, o uso. */
+    @Test
+    fun `remind command parses minutes and off`() {
+        assertEquals(BotCommand.Remind(30), parseBotCommand("/avise 30"))
+        assertEquals(BotCommand.Remind(15), parseBotCommand("/remind 15min"))
+        assertEquals(BotCommand.Remind(null), parseBotCommand("/avise off"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/avise 2"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/avise"))
+        assertEquals(30, applyBotCommand(UsageAlertSettings(), BotCommand.Remind(30))?.resetReminderMinutes)
+        assertTrue(BotCommand.Remind(null).changesApp())
+    }
 }

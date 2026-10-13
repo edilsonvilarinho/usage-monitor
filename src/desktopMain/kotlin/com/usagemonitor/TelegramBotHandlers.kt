@@ -205,7 +205,7 @@ internal class TelegramBotHandlers(
             }
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
-            is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {
+            is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, is BotCommand.Remind -> {
                 val updated = applyBotCommand(alertSettingsFlow.value, command)
                 if (updated != null) saveAlertSettings(updated)
                 api.sendMessage(token, chatId, TelegramBotMessages.applied(command, language), html = true)

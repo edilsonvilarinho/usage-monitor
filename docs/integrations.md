@@ -463,6 +463,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     janela que passa de 90% durante o foco sai na hora, com todos os limiares cruzados (todos levam o percentual crítico).
     Vale para a bandeja também, porque mora na decisão. Diferente do silêncio, que cala tudo. Conversa só de leitura não
     liga foco (`changesApp`).
+  - **Lembrete antes do reinício** (AA4): `/avise 15` (5 a 120 min; `/remind`) e `/avise off` gravam
+    `resetReminderMinutes` pelo mesmo caminho do `/limiar` (`applyBotCommand`). O alerta é `UsageAlert.ResetSoon`, decidido
+    na função pura e entregue pela bandeja e pelo bot (decisão em `docs/presentation.md`).
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

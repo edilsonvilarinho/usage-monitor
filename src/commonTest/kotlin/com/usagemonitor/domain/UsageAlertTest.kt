@@ -801,6 +801,26 @@ class UsageAlertTest {
         assertEquals(listOf("s1"), after.alerts.filterIsInstance<UsageAlert.SessionSaturated>().map { alert -> alert.sessionId })
         assertTrue(after.alerts.none { alert -> alert is UsageAlert.QuotaThreshold })
     }
+
+    /** #408, AA4: cota acima do limiar avisa uma vez dentro dos 15 min antes do reinício; abaixo, nunca. */
+    @Test
+    fun `a high quota reminds once before it resets`() {
+        val early = evaluate(stats(usedPercent = 80), UsageAlertState.EMPTY, RESET_AT - 20.minutes, UsageAlertSettings.DEFAULT)
+        assertTrue(early.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+
+        val due = evaluate(stats(usedPercent = 80), early.state, RESET_AT - 14.minutes, UsageAlertSettings.DEFAULT)
+        val reminder = due.alerts.filterIsInstance<UsageAlert.ResetSoon>().single()
+        assertEquals(14, reminder.minutesLeft)
+        assertEquals(80, reminder.actualPercent)
+
+        val again = evaluate(stats(usedPercent = 81), due.state, RESET_AT - 5.minutes, UsageAlertSettings.DEFAULT)
+        assertTrue(again.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+
+        val low = evaluate(stats(usedPercent = 40), UsageAlertState.EMPTY, RESET_AT - 10.minutes, UsageAlertSettings.DEFAULT)
+        assertTrue(low.alerts.isEmpty())
+        val off = evaluate(stats(usedPercent = 80), early.state, RESET_AT - 10.minutes, UsageAlertSettings.DEFAULT.copy(resetReminderMinutes = null))
+        assertTrue(off.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+    }
 }
 
 /** A forma exata de `DeepSeekMapper`/`OpenRouterMapper`: `used = 0`, sem reset. */

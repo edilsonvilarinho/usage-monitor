@@ -20,6 +20,7 @@ fun usageAlertMessage(alert: UsageAlert, language: AppLanguage): UsageAlertMessa
     return when (alert) {
         is UsageAlert.QuotaThreshold -> quotaThresholdMessage(alert, language)
         is UsageAlert.QuotaReset -> quotaResetMessage(alert, language)
+        is UsageAlert.ResetSoon -> resetSoonMessage(alert, language)
         is UsageAlert.SessionSaturated -> sessionSaturatedMessage(alert, language)
         is UsageAlert.SessionStalled -> sessionStalledMessage(alert, language)
         is UsageAlert.SpendSpike -> spendSpikeMessage(alert, language)
@@ -93,6 +94,25 @@ private fun quotaThresholdMessage(
     }
 
     return UsageAlertMessage(title = title, body = head + resetSuffix)
+}
+
+/** Lembrete antes do reinício (#408, AA4): quanto falta, onde a cota está e a hora da volta. */
+private fun resetSoonMessage(
+    alert: UsageAlert.ResetSoon,
+    language: AppLanguage
+): UsageAlertMessage {
+    val at = formatBrtDateTime(alert.resetAt, language)
+    return if (language == AppLanguage.PT) {
+        UsageAlertMessage(
+            title = "${alert.targetLabel} · ${alert.quotaLabel} reinicia em ${alert.minutesLeft} min",
+            body = "Está em ${alert.actualPercent}%. Dá para retomar em $at BRT."
+        )
+    } else {
+        UsageAlertMessage(
+            title = "${alert.targetLabel} · ${alert.quotaLabel} resets in ${alert.minutesLeft} min",
+            body = "At ${alert.actualPercent}%. You can resume at $at BRT."
+        )
+    }
 }
 
 /** Mesmo título `alvo · cota` do limiar: o reinício responde àquele aviso. */
