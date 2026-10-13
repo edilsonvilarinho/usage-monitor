@@ -93,4 +93,15 @@ class TelegramAnalysisMessagesTest {
         val single = com.usagemonitor.presentation.ui.TelegramAnalysisTexts.scoreboard(listOf(base), AppLanguage.EN)
         assertTrue("Scoreboard now" in single && "✓ " !in single.substringBefore("</pre>"), single)
     }
+
+    /** AB14: a janela corrente contra a anterior no mesmo ponto; sem anterior, a frase diz isso. */
+    @Test
+    fun `versus compares this window with the previous one at the same point`() {
+        val text = TelegramAnalysisMessages.text(AnalysisView.VERSUS, AnalysisFixture.analysis, AppLanguage.PT)!!
+        assertTrue("5h aos 3h30       62%     71%   ↓ 13%" in text, text)
+        assertTrue("tok/s              50      44   ↑ 14%" in text, text)
+        assertTrue("semanal/dia       5,8     7,9   ↓ 27%" in text, text)
+        val none = AnalysisFixture.analysis.copy(previous = null)
+        assertTrue("No previous 5h window" in TelegramAnalysisMessages.text(AnalysisView.VERSUS, none, AppLanguage.EN)!!)
+    }
 }

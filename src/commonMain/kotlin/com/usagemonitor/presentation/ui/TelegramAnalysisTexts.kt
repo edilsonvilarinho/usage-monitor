@@ -168,6 +168,46 @@ internal object TelegramAnalysisTexts {
         }
     }
 
+    /**
+     * AB14 · antes × agora: a janela 5h corrente contra a anterior **no mesmo ponto** (mesmo
+     * tempo desde o início), métrica por métrica, e a semanal de hoje contra ontem. Δ é a
+     * variação percentual sobre o "antes"; sem "antes" medido, "—".
+     */
+    fun versus(analysis: SessionAnalysis, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val title = "<b>📐 ${TelegramBotMessages.escape(analysis.accountLabel)} · " + (if (pt) "esta janela × anterior" else "this window × previous") + "</b>"
+        val previous = analysis.previous ?: return title + "\n" + (if (pt) "Sem janela 5h anterior no histórico." else "No previous 5h window in the history.")
+        val elapsed = elapsedLabel(previous.elapsedMillis)
+        val today = analysis.days.lastOrNull()?.percentPoints
+        val yesterday = analysis.days.getOrNull(analysis.days.size - 2)?.percentPoints
+        val rows = listOf(
+            versusRow((if (pt) "5h aos " else "5h at ") + elapsed, previous.currentPercent.toDouble(), previous.previousPercent?.toDouble()) { value -> "${value.roundToInt()}%" },
+            versusRow(if (pt) "ritmo médio" else "avg pace", previous.currentPace, previous.previousPace) { value -> TelegramAnalysisMessages.pace(value, pt).trim() },
+            versusRow(if (pt) "hora pesada" else "peak hour", previous.currentPeakHour, previous.previousPeakHour) { value -> "${value.roundToInt()} pp" },
+            versusRow("tok/s", previous.currentTokensPerSecond, previous.previousTokensPerSecond) { value -> value.roundToInt().toString() },
+            versusRow(if (pt) "semanal/dia" else "weekly/day", today, yesterday) { value -> TelegramAnalysisMessages.pace(value, pt).trim() }
+        )
+        val head = "".padEnd(VERSUS_LABEL) + (if (pt) "agora" else "now").padStart(8) + (if (pt) "antes" else "before").padStart(8) + "Δ".padStart(8)
+        val footer = "<i>" + (if (pt) "mesmo ponto da janela: $elapsed desde o início · semanal: hoje × ontem" else "same point of the window: $elapsed since the start · weekly: today × yesterday") + "</i>"
+        return "$title\n<pre>${TelegramBotMessages.escape((listOf(head) + rows).joinToString("\n"))}</pre>\n$footer"
+    }
+
+    private fun versusRow(label: String, now: Double?, before: Double?, format: (Double) -> String): String {
+        val change = if (now == null || before == null || before <= 0.0) {
+            "—"
+        } else {
+            val percent = ((now - before) / before * 100).roundToInt()
+            (if (percent > 0) "↑ " else if (percent < 0) "↓ " else "= ") + "${kotlin.math.abs(percent)}%"
+        }
+        return label.padEnd(VERSUS_LABEL) + (now?.let(format) ?: "—").padStart(8) + (before?.let(format) ?: "—").padStart(8) + change.padStart(8)
+    }
+
+    /** "3h30", "45min": o tempo desde o início da janela. */
+    private fun elapsedLabel(millis: Long): String {
+        val minutes = millis / 60_000L
+        return if (minutes < 60) "${minutes}min" else "${minutes / 60}h${(minutes % 60).toString().padStart(2, '0')}"
+    }
+
     /** Mesmo rótulo nos dois idiomas: "h" e "d" são unidades, não palavras. */
     fun spanLabel(span: AnalysisSpan): String = when (span) {
         AnalysisSpan.HOUR_1 -> "1 h"
@@ -204,6 +244,7 @@ internal object TelegramAnalysisTexts {
     private const val BLOCKS = "▁▂▃▄▅▆▇█"
     private const val BAR_CELLS = 5
     private const val SCOREBOARD_COLUMNS = 3
+    private const val VERSUS_LABEL = 13
     private const val LABEL = 11
     private const val COLUMN = 10
     private const val MILLIS_PER_HOUR = 3_600_000.0
