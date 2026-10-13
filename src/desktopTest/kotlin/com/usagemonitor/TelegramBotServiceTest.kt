@@ -163,7 +163,8 @@ class TelegramBotServiceTest {
             exportUsage = { since, format -> "$format desde $since" },
             readyUpdate = { readyVersion },
             applyUpdate = { applied.incrementAndGet() },
-            sourceHealth = { sourceHealth }
+            sourceHealth = { sourceHealth },
+            sessionAnalysis = { key -> if (key == "ANTHROPIC:work") com.usagemonitor.presentation.AnalysisFixture.analysis else null }
         ),
         updateCheckMillis = 50L,
         alertBatchMillis = 300L,
@@ -489,6 +490,31 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.count { it.second.startsWith("Limiar de <b>Anthropic · Trabalho</b>") } == 2 }
         api.pending += message(6, chat = 51, text = "geral")
         waitUntil { alertSettings.value.quotaPercentsByTarget.isEmpty() }
+    }
+
+    /** Rodada AB: com uma conta analisável, `/analise` abre o painel com as abas; a aba edita a mesma mensagem. */
+    @Test
+    fun `analysis opens the panel with tabs and a tab edits the message`() {
+        paired()
+        snapshot = UsageSnapshot(
+            generatedAt = Instant.parse("2026-10-06T12:00:00Z"),
+            accounts = listOf(
+                UsageSnapshotAccount(
+                    ApiSource.ANTHROPIC, "Anthropic · Trabalho", active = false,
+                    quotas = listOf(UsageSnapshotQuota("Claude 5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 62, 100, 62, null, "USD")),
+                    targetKey = "ANTHROPIC:work"
+                ),
+                UsageSnapshotAccount(ApiSource.DEEPSEEK, "DeepSeek", active = false, quotas = emptyList())
+            )
+        )
+        service.start()
+        api.pending += message(1, chat = 51, text = "/analise")
+
+        waitUntil { api.sent.any { it.second.startsWith("<b>📐 Anthropic · &lt;Padrão&gt;</b>") } }
+        val tab = api.keyboards.last { it.isNotEmpty() }.first()
+        assertEquals("• Painel •", tab.text)
+        api.pending += tap(2, chat = 51, data = tab.data)
+        waitUntil { api.editedTexts.any { it.startsWith("<b>📐") } }
     }
 
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */

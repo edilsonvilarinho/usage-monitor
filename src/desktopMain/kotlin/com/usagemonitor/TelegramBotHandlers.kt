@@ -84,6 +84,9 @@ internal class TelegramBotHandlers(
      */
     private val pendingThresholds = java.util.concurrent.ConcurrentHashMap<Long, PendingThreshold>()
 
+    /** O `/analise` e as abas dele (rodada AB). */
+    private val analysis = TelegramAnalysisHandler(api, snapshotProvider, readings, ::signed)
+
     private class PendingThreshold(val targetKey: String?, val label: String?, val expiresAtMillis: Long)
 
     suspend fun handle(token: String, message: TelegramIncomingMessage) {
@@ -212,6 +215,7 @@ internal class TelegramBotHandlers(
                 saveAlertSettings(updated)
                 send(token, chatId, TelegramBotRemoteMessages.focus(updated.focusUntilEpochMillis, language))
             }
+            is BotCommand.Analysis -> analysis.command(token, chatId, command, language)
             BotCommand.ThresholdMenu -> api.sendMessage(
                 token, chatId, TelegramBotRemoteMessages.thresholdMenu(language), html = true,
                 buttons = rows(TelegramBotRemoteMessages.thresholdButtons(snapshotProvider(), language))
@@ -385,6 +389,7 @@ internal class TelegramBotHandlers(
                     )
                 }
             }
+            is BotTap.AnalysisAccount, is BotTap.AnalysisShow -> analysis.tap(token, message.chatId, message.messageId, callbackId, tap, language)
             is BotTap.ThresholdAccount -> {
                 api.answerCallbackQuery(token, callbackId)
                 val account = tap.key?.let { key -> snapshotProvider()?.accountByKey(key) }
@@ -414,7 +419,7 @@ internal class TelegramBotHandlers(
     private fun tapChangesApp(tap: BotTap?, button: BotButton?): Boolean = when (tap) {
         is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow, is BotTap.ToggleAlert,
         is BotTap.ThresholdAccount -> true
-        is BotTap.Account -> false
+        is BotTap.Account, is BotTap.AnalysisAccount, is BotTap.AnalysisShow -> false
         null -> button == BotButton.SNOOZE
     }
 

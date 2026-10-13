@@ -1,6 +1,7 @@
 package com.usagemonitor.domain
 
 import com.usagemonitor.domain.entity.AlertKind
+import com.usagemonitor.domain.entity.AnalysisView
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.isOn
 import com.usagemonitor.domain.entity.toggled
@@ -220,5 +221,19 @@ class TelegramBotCommandTest {
         }
         assertEquals(listOf(50, 80), parseThresholdPercents("80, 50"))
         assertEquals(null, parseThresholdPercents("geral"))
+    }
+
+    /** Rodada AB: `/analise` com fonte, placar e vista em qualquer ordem; os toques vão e voltam. */
+    @Test
+    fun `analysis command reads source, scoreboard and view`() {
+        assertEquals(BotCommand.Analysis(null, null, false), parseBotCommand("/analise"))
+        assertEquals(BotCommand.Analysis(AnalysisView.HOURS, ApiSource.CODEX, false), parseBotCommand("/analise horas codex"))
+        assertEquals(BotCommand.Analysis(null, null, true), parseBotCommand("/analysis all"))
+        assertEquals(BotCommand.Analysis(AnalysisView.CURVE, null, false), parseBotCommand("/analise 5h img"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/analise xyz"))
+        assertFalse(BotCommand.Analysis(null, null, false).changesApp())
+        for (tap in listOf(BotTap.AnalysisAccount(null), BotTap.AnalysisAccount("CODEX:9f"), BotTap.AnalysisShow("ANTHROPIC:1a2b", AnalysisView.REPORT))) {
+            assertEquals(tap, parseBotTap(tap.data()))
+        }
     }
 }

@@ -200,6 +200,11 @@ sealed interface BotCommand {
     data class Export(val days: Int, val format: UsageExportFormat) : BotCommand
     /** `/time` (#408, AA16): quem do time está online e trabalhando — só com "Mostrar o time no bot". */
     data object Team : BotCommand
+    /**
+     * `/analise` (rodada AB): a análise da sessão de uma conta. [view] `null` abre o painel
+     * com as abas; [source] filtra a escolha da conta; [all] é o placar das contas.
+     */
+    data class Analysis(val view: AnalysisView?, val source: ApiSource?, val all: Boolean) : BotCommand
     /** `/foco 2h|off` (#408, AA8): por [hours] horas só passa alerta crítico; `null` encerra. */
     data class Focus(val hours: Int?) : BotCommand
     /** `/avise 15|off` (#408, AA4): minutos de antecedência do lembrete de reinício; `null` desliga. */
@@ -220,7 +225,7 @@ fun BotCommand.changesApp(): Boolean = when (this) {
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
-    BotCommand.Leave, is BotCommand.Keyboard, BotCommand.Help, is BotCommand.Invalid -> false
+    BotCommand.Leave, is BotCommand.Keyboard, is BotCommand.Analysis, BotCommand.Help, is BotCommand.Invalid -> false
 }
 
 /**
@@ -283,6 +288,7 @@ fun parseBotCommand(text: String): BotCommand? {
         "hud" -> BotCommand.FocusHud
         "exportar", "export" -> parseExport(args)
         "time", "team", "equipe" -> BotCommand.Team
+        "analise", "análise", "analises", "análises", "analysis", "analyze" -> parseAnalysis(args)
         "foco", "focus" -> parseFocus(args.firstOrNull())
         "avise", "aviso", "lembrete", "remind" -> parseRemind(args.firstOrNull())
         "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {

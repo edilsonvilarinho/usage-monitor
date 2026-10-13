@@ -489,6 +489,13 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     min**; o texto solto seguinte (`50,80` ou `geral`) grava o limiar daquela conta (`withAccountThreshold`) ou, em "Todas",
     o geral. Sem pedido aberto, texto solto continua sem resposta. Conversa só de leitura é recusada no comando, no toque e
     na resposta. `/limiar 75,90` segue mudando o geral. Decisão e persistência em `docs/presentation.md`.
+- **Análise da sessão** (rodada AB, `docs/planos/analise-sessao-execucao.md`): `/analise` (`/analysis`), categoria 📐 Análises.
+  Cobre contas Anthropic e Codex (`ANALYSIS_SOURCES`); com uma só, abre direto, com mais, pergunta a conta
+  (`ana:<botAccountKey>`). A resposta é o painel de bordo (AB1) com **abas** (AB12): cada aba é `anv:<conta>:<código>` e as
+  vistas de texto **editam a mesma mensagem**; imagem e PDF saem como mensagem nova. Argumentos em qualquer ordem: fonte
+  (`claude`, `codex`), `todas` (placar) e a vista (`horas`, `img`, `pdf`…). Dados: `buildSessionAnalysis` (domain) —
+  ritmo em pp/h pela subida entre leituras do histórico de 7 dias, vazão por diferença de dois recortes "desde" do índice
+  CLI (Anthropic pelo perfil da conta, Codex pela máquina). Só leitura (`changesApp` falso); nada de prompt ou projeto.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

@@ -58,6 +58,9 @@ internal object TelegramCommandCatalog {
         entry(TelegramCommandCategory.NOW, "ping", "ping", "O app está aberto? Versão e última coleta", "Is the app running? Version and last collection",
             "<code>/ping</code> — versão, tempo aberto e última coleta", "<code>/ping</code> — version, uptime and last collection"),
         // 📐 Análises: ritmo, vazão e histórico para entender o consumo.
+        entry(TelegramCommandCategory.ANALYSIS, "analise", "analysis", "Análise da sessão: ritmo, vazão e janelas", "Session analysis: pace, throughput and windows",
+            "<code>/analise</code> — análise da sessão por conta, com abas · <code>/analise codex</code> · <code>/analise horas</code> · <code>/analise todas</code>",
+            "<code>/analysis</code> — session analysis per account, with tabs · <code>/analysis codex</code> · <code>/analysis hours</code> · <code>/analysis all</code>"),
         entry(TelegramCommandCategory.ANALYSIS, "ritmo", "pace", "Quanto da cota semanal cabe por dia", "How much of the weekly quota fits per day",
             "<code>/ritmo</code> — quanto das janelas longas cabe por dia", "<code>/pace</code> — how much of the long windows fits per day"),
         entry(TelegramCommandCategory.ANALYSIS, "vazao", "throughput", "Tokens por segundo por modelo (24h)", "Tokens per second per model (24h)",
