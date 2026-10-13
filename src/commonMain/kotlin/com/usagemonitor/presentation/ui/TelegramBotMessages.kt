@@ -77,8 +77,12 @@ internal object TelegramBotMessages {
         )
     }
 
-    /** `/status`: um cartão por conta — risco, uso e, por cota, reinício e barra de 10 células. */
-    fun status(snapshot: UsageSnapshot?, language: AppLanguage): String {
+    /**
+     * `/status`: um cartão por conta — risco, uso e, por cota, reinício e barra de 10 células.
+     * [sparklines] (#408, AA13) é rótulo da conta → rótulo da cota → a linha das últimas
+     * 6 h; cota sem histórico fica só com a barra.
+     */
+    fun status(snapshot: UsageSnapshot?, language: AppLanguage, sparklines: Map<String, Map<String, String>> = emptyMap()): String {
         val pt = language == AppLanguage.PT
         if (snapshot == null || snapshot.accounts.isEmpty()) {
             return noReading(pt)
@@ -88,7 +92,7 @@ internal object TelegramBotMessages {
             (if (pt) "coleta " else "collected ") + "${clock(at)} BRT · " + elapsed(snapshot.generatedAt - at, pt)
         } ?: if (pt) "sem coleta ainda" else "not collected yet"
         val header = "<b>📊 Usage Monitor</b>\n<i>$collected</i>"
-        val cards = snapshot.accounts.map { account -> accountCard(account, snapshot.generatedAt, language) }
+        val cards = snapshot.accounts.map { account -> accountCard(account, snapshot.generatedAt, language, sparklines[account.label].orEmpty()) }
         return (listOf(header) + cards).joinToString("\n\n")
     }
 
@@ -125,7 +129,7 @@ internal object TelegramBotMessages {
     internal fun noReading(pt: Boolean): String =
         if (pt) "Sem leitura ainda. Abra o Usage Monitor e habilite ao menos uma API." else "No reading yet. Open Usage Monitor and enable at least one API."
 
-    private fun accountCard(account: UsageSnapshotAccount, now: Instant, language: AppLanguage): String {
+    private fun accountCard(account: UsageSnapshotAccount, now: Instant, language: AppLanguage, sparklines: Map<String, String> = emptyMap()): String {
         val pt = language == AppLanguage.PT
         val tags = listOfNotNull(
             account.worstRisk?.let { level -> "${riskEmoji(level)} ${riskLevelLabel(level, language)}" },
@@ -134,7 +138,8 @@ internal object TelegramBotMessages {
         val title = "<b>${escape(account.label)}</b>" + if (tags.isEmpty()) "" else " — " + tags.joinToString(" · ")
         val quotas = account.quotas.map { quota ->
             val reset = quota.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + resetLabel(at, now, pt) }.orEmpty()
-            "${escape(quota.label)}$reset\n<code>${escape(quotaValue(quota, pt))}</code>"
+            val spark = sparklines[quota.label]?.let { line -> "\n<code>$line</code> <i>6 h</i>" }.orEmpty()
+            "${escape(quota.label)}$reset\n<code>${escape(quotaValue(quota, pt))}</code>$spark"
         }
         return (listOf(title) + quotas).joinToString("\n")
     }

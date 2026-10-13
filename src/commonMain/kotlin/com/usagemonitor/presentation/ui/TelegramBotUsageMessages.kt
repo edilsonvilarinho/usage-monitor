@@ -5,11 +5,14 @@ import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaWindowSummary
 import com.usagemonitor.domain.entity.TelegramAccountHistory
+import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.displayName
 import kotlin.math.roundToInt
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
@@ -94,6 +97,45 @@ internal object TelegramBotUsageMessages {
         val date = if (pt) "$day/$month" else "$month/$day"
         return "$date ${TelegramBotMessages.clock(at)}"
     }
+
+    /**
+     * Sparkline do `/status` (AA13) de cada conta e cota com histórico nas últimas 6 h:
+     * rótulo da conta → rótulo da cota → linha. Saldo em dinheiro fica fora.
+     */
+    fun sparklines(histories: List<TelegramAccountHistory>, now: Instant): Map<String, Map<String, String>> =
+        histories.associate { history ->
+            history.label to history.report.series
+                .filter { series -> series.unit != UsageUnit.CURRENCY_USD }
+                .mapNotNull { series -> sparkline(series.points, now)?.let { line -> series.quotaLabel to line } }
+                .toMap()
+        }.filterValues { lines -> lines.isNotEmpty() }
+
+    /**
+     * Doze blocos de 30 min nas últimas 6 h, cada um com o uso da última leitura até o
+     * fim dele (a linha não inventa ponto entre leituras). Antes da primeira leitura, um
+     * espaço. `null` com menos de duas leituras na janela: não há tendência a mostrar.
+     * O número continua escrito ao lado; a linha só dá a forma.
+     */
+    fun sparkline(points: List<UsageHistoryPoint>, now: Instant): String? {
+        val start = now - SPARK_SPAN
+        val ordered = points.sortedBy { point -> point.capturedAt }
+        if (ordered.count { point -> point.capturedAt > start && point.capturedAt <= now } < 2) return null
+        return (1..SPARK_BUCKETS).joinToString("") { index ->
+            val end = start + SPARK_BUCKET * index
+            val last = ordered.lastOrNull { point -> point.capturedAt <= end }
+            if (last == null) {
+                " "
+            } else {
+                val percent = (last.normalizedUsage * 100f).toInt()
+                SPARK_BLOCKS[(percent * (SPARK_BLOCKS.length - 1) / 100).coerceIn(0, SPARK_BLOCKS.length - 1)].toString()
+            }
+        }
+    }
+
+    private const val SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
+    private const val SPARK_BUCKETS = 12
+    private val SPARK_BUCKET = 30.minutes
+    private val SPARK_SPAN = 6.hours
 
     private const val MAX_WINDOWS = 4
     private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")

@@ -381,6 +381,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/janelas` (`/windows`, AA12): as 4 últimas janelas curtas (`/janelas 7d`: semanais, lidas de 30 dias) de cada conta,
     mais nova primeiro — início observado e reinício, pico, hora em que esgotou e a faixa ativa (#382). Mesmas
     `QuotaWindowSummary` do Histórico.
+  - **Sparkline no `/status`** (AA13): embaixo da barra de cada cota com pelo menos duas leituras nas últimas 6 h, doze blocos
+    `▁…█` de 30 min — cada bloco com o uso da última leitura até o fim dele (não inventa ponto entre leituras), espaço antes
+    da primeira. O número continua escrito na barra; a linha só dá a forma. Vale também para a edição do botão Atualizar.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

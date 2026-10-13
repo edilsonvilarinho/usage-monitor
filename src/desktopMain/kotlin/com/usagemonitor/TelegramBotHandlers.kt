@@ -148,7 +148,14 @@ internal class TelegramBotHandlers(
 
     private suspend fun sendStatus(token: String, chatId: Long, language: AppLanguage) {
         val snapshot = snapshotProvider()
-        api.sendMessage(token, chatId, TelegramBotMessages.status(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+        api.sendMessage(token, chatId, statusText(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+    }
+
+    /** O `/status` com a sparkline das últimas 6 h de cada cota (#408, AA13). */
+    private suspend fun statusText(snapshot: UsageSnapshot?, language: AppLanguage): String {
+        val now = snapshot?.generatedAt ?: return TelegramBotMessages.status(null, language)
+        val sparklines = TelegramBotUsageMessages.sparklines(readings.accountHistory(HistoryRange.LAST_24_HOURS), now)
+        return TelegramBotMessages.status(snapshot, language, sparklines)
     }
 
     private suspend fun sendSources(token: String, chatId: Long, language: AppLanguage) {
@@ -182,7 +189,7 @@ internal class TelegramBotHandlers(
                     requestRefresh()
                     val messageId = message.messageId
                     val snapshot = snapshotProvider()
-                    val text = TelegramBotMessages.status(snapshot, language)
+                    val text = statusText(snapshot, language)
                     // Sem mudança o Telegram responde 400 "message is not modified": o `runTelegram` o engole.
                     if (messageId != null) api.editMessageText(token, message.chatId, messageId, text, statusButtons(language, snapshot))
                 }

@@ -151,6 +151,7 @@ Molde por tipo de opção:
 | A08 | `feat(telegram): report output throughput per model with /vazao` | `gradlew.bat desktopTest --tests "*Telegram*"`: 66 testes, 0 falhas (novo: mais rápido primeiro, modelo sem vazão fora, índice ilegível) | concluída |
 | A09 | `feat(telegram): compare this week with the previous one with /semana` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*UsageSnapshotTest*"`: 67 + 3 testes, 0 falhas (novo: pontos somados com seta, sem semana anterior fora; `snapshotLabel` passou a ser o dono do rótulo da conta) | concluída |
 | A10 | `feat(telegram): list the latest quota windows with /janelas` | `gradlew.bat desktopTest --tests "*Telegram*"`: 68 testes, 0 falhas (novos: mais nova primeiro com pico, esgotou e faixa ativa; sem janelas semanais; argumento inválido) | concluída |
+| A11 | `feat(telegram): add a 6 hour sparkline under each quota in /status` | `gradlew.bat desktopTest --tests "*Telegram*"`: 70 testes, 0 falhas (novos: blocos de 30 min com a última leitura levada adiante, menos de duas leituras sem linha, cartão com a linha só na cota com histórico) | concluída |
 
 ## Problemas em aberto e riscos
 
