@@ -20,6 +20,8 @@ import org.jetbrains.skia.Surface
 import org.jetbrains.skia.Typeface
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
@@ -33,7 +35,57 @@ internal object TelegramAnalysisRenderer {
         AnalysisView.GAUGES -> draw(WIDTH, 480) { canvas -> gauges(canvas, analysis, language) }
         AnalysisView.HOURS -> draw(WIDTH, CHART_HEIGHT) { canvas -> hours(canvas, analysis, language) }
         AnalysisView.HEATMAP -> draw(WIDTH, HEAT_HEIGHT) { canvas -> heatmap(canvas, analysis, language) }
+        AnalysisView.CURVE -> draw(WIDTH, CHART_HEIGHT) { canvas -> curve(canvas, analysis, language) }
         else -> null
+    }
+
+    /**
+     * AB9 · curva da janela 5h: o acumulado pelas fatias de 30 min (a janela começa em zero), a
+     * reta tracejada do ritmo uniforme (0 no início, 100% no reinício) e a projeção tracejada
+     * de agora até o reinício. Abaixo da reta, sobra cota no reinício.
+     */
+    private fun curve(canvas: Canvas, analysis: SessionAnalysis, language: AppLanguage) {
+        title(canvas, TelegramAnalysisImageLabels.title(AnalysisView.CURVE, analysis, language))
+        val window = analysis.fiveHour
+        val start = window?.startsAt
+        val end = window?.resetsAt
+        if (window == null || start == null || end == null) {
+            centered(canvas, TelegramAnalysisImageLabels.notMeasured(language), WIDTH / 2f, CHART_HEIGHT / 2f, font(22f), MUTED)
+            return
+        }
+        val area = Rect.makeLTRB(PAD + 46f, 64f, WIDTH - PAD - 20f, CHART_HEIGHT - 60f)
+        val span = (end - start).inWholeMilliseconds.toFloat()
+        fun x(at: Instant) = area.left + ((at - start).inWholeMilliseconds / span).coerceIn(0f, 1f) * area.width
+        fun y(percent: Double) = area.bottom - (percent / 100.0).toFloat().coerceIn(0f, 1f) * area.height
+        grid(canvas, area, 100.0, MUTED)
+        val dashed = { color: Int -> stroke(color, 2f).apply { pathEffect = org.jetbrains.skia.PathEffect.makeDash(floatArrayOf(8f, 6f), 0f) } }
+        canvas.drawLine(x(start), y(0.0), x(end), y(100.0), dashed(MUTED))
+        val labels = TelegramAnalysisImageLabels.curveLabels(window.percent, window.projectedAtReset, language)
+        // Acima e à esquerda, onde nem a reta nem a curva passam.
+        canvas.drawString(labels.even, x(start) + 0.04f * area.width, y(72.0), font(14f), Paint().apply { color = MUTED })
+        var accumulated = 0.0
+        var previous = x(start) to y(0.0)
+        analysis.slices.forEach { slice ->
+            accumulated += slice.percentPoints ?: 0.0
+            val sliceEnd = minOf(slice.start + 30.minutes, analysis.generatedAt)
+            val point = x(sliceEnd) to y(accumulated)
+            canvas.drawLine(previous.first, previous.second, point.first, point.second, stroke(GOLD, 4f))
+            previous = point
+        }
+        val now = x(analysis.generatedAt) to y(window.percent.toDouble())
+        window.projectedAtReset?.let { projected ->
+            canvas.drawLine(now.first, now.second, x(end), y(projected.toDouble()), dashed(GOLD))
+            val text = labels.atReset
+            // Abaixo da ponta: acima dela passa a reta uniforme, que chega a 100% no mesmo x.
+            canvas.drawString(text, x(end) - font(15f).measureTextWidth(text), y(projected.toDouble()) + 48f, font(15f), Paint().apply { color = GOLD })
+        }
+        canvas.drawCircle(now.first, now.second, 6f, Paint().apply { color = HOT; isAntiAlias = true })
+        canvas.drawString(labels.now, now.first + 10f, now.second + 22f, font(15f), Paint().apply { color = HOT })
+        var tick = start
+        while (tick <= end) {
+            centered(canvas, hourOf(tick), x(tick), area.bottom + 22f, font(13f), MUTED)
+            tick += 1.hours
+        }
     }
 
     /**

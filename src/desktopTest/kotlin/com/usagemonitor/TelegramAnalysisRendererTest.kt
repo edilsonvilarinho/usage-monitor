@@ -52,4 +52,14 @@ class TelegramAnalysisRendererTest {
         assertTrue(hasColor(image, TelegramAnalysisRenderer.EMPTY_CELL and 0xFFFFFF))
         assertTrue(hasColor(image, TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
     }
+
+    /** AB9: curva e projeção em ouro; sem janela aberta, a imagem diz "sem leitura" em vez de inventar curva. */
+    @Test
+    fun `curve draws the window in gold and nothing without an open window`() {
+        assertTrue(hasColor(image(AnalysisView.CURVE), TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
+        val closed = AnalysisFixture.analysis.copy(fiveHour = null)
+        val png = TelegramAnalysisRenderer.render(AnalysisView.CURVE, closed, AppLanguage.PT)!!
+        assertTrue(!hasColor(ImageIO.read(ByteArrayInputStream(png)), TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
+        assertEquals("≈83% at reset", TelegramAnalysisImageLabels.curveLabels(62, 83, AppLanguage.EN).atReset)
+    }
 }
