@@ -358,6 +358,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   leitura que o app já faz; nenhuma leva prompt, resposta, `cwd` ou `session_id`.
   - `/reinicios` (`/resets`, AA3): toda cota com reinício conhecido ainda por vir, na ordem do relógio (empate por conta e
     cota), com o percentual; teto de 12 linhas e "+N mais".
+  - `/quando` (`/when`, AA2): a data de esgotamento da mesma projeção do arco da HUD (`QuotaRiskSummary.estimatedExhaustionAt`,
+    agora também em `UsageSnapshotQuota.exhaustsAt`, com o mesmo filtro de cota vencida) contra o reinício: "estoura N antes"
+    ou "não estoura antes de reiniciar"; saldo diz quando acaba; sem projeção, a linha diz "sem projeção".
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

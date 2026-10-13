@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.ui
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
@@ -43,8 +44,69 @@ internal object TelegramBotInsightMessages {
         return (listOf(header) + lines + listOfNotNull(more)).joinToString("\n")
     }
 
+    /**
+     * `/quando` (AA2): a data de esgotamento da mesma projeção que pinta o arco da
+     * HUD, contra o reinício. Sem projeção, a linha diz isso — nunca um palpite.
+     */
+    fun exhaustion(snapshot: UsageSnapshot?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (snapshot == null || snapshot.accounts.isEmpty()) return TelegramBotMessages.noReading(pt)
+        val now = snapshot.generatedAt
+        val lines = snapshot.accounts.flatMap { account ->
+            account.quotas.map { quota -> exhaustionLine(account.label, quota, now, pt) }
+        }
+        val header = if (pt) "<b>⏳ No ritmo atual</b>" else "<b>⏳ At the current pace</b>"
+        val footer = if (pt) "<i>estimativa pelo ritmo das últimas leituras</i>" else "<i>estimate from the pace of recent readings</i>"
+        return (listOf(header) + lines + footer).joinToString("\n")
+    }
+
+    private fun exhaustionLine(account: String, quota: UsageSnapshotQuota, now: Instant, pt: Boolean): String {
+        val name = "<b>${TelegramBotMessages.escape(account)} · ${TelegramBotMessages.escape(quota.label)}</b>"
+        val value = quota.percent?.let { percent -> " $percent%" }.orEmpty()
+        val risk = quota.risk ?: return "⚪ $name$value — " + (if (pt) "sem projeção" else "no projection")
+        val mark = TelegramBotMessages.riskEmoji(risk)
+        val exhaustsAt = quota.exhaustsAt
+        val resetsAt = quota.resetsAt
+        if (resetsAt == null) {
+            // Saldo pré-pago: não reinicia, a resposta é só quando acaba.
+            val end = if (exhaustsAt == null) {
+                if (pt) "sem data de fim" else "no end date"
+            } else {
+                (if (pt) "acaba por volta de " else "runs out around ") + TelegramBotMessages.resetLabel(exhaustsAt, now, pt)
+            }
+            return "$mark $name$value — $end"
+        }
+        val reset = TelegramBotMessages.resetLabel(resetsAt, now, pt)
+        if (exhaustsAt == null || exhaustsAt >= resetsAt) {
+            return "$mark $name$value — " + (if (pt) "não estoura antes de reiniciar ($reset)" else "does not run out before the reset ($reset)")
+        }
+        val early = span(resetsAt - exhaustsAt)
+        val at = TelegramBotMessages.resetLabel(exhaustsAt, now, pt)
+        val verdict = if (pt) {
+            "chega a 100% às $at, reinicia $reset: <b>estoura $early antes</b>"
+        } else {
+            "hits 100% at $at, resets $reset: <b>runs out $early early</b>"
+        }
+        return "$mark $name$value — $verdict"
+    }
+
+    /** "20 min", "3 h 10 min", "2 d 4 h": a antecedência em palavras curtas. */
+    internal fun span(duration: Duration): String {
+        val minutes = duration.inWholeMinutes.coerceAtLeast(1L)
+        val days = minutes / MINUTES_PER_DAY
+        val hours = (minutes % MINUTES_PER_DAY) / 60
+        val rest = minutes % 60
+        return when {
+            days > 0 -> "$days d" + if (hours > 0) " $hours h" else ""
+            hours > 0 -> "$hours h" + if (rest > 0) " $rest min" else ""
+            else -> "$rest min"
+        }
+    }
+
     private class ResetEntry(val at: Instant, val account: String, val quota: UsageSnapshotQuota)
 
     /** Teto da lista: com muitas contas, as primeiras linhas são as que importam. */
     private const val MAX_RESET_LINES = 12
+
+    private const val MINUTES_PER_DAY = 24 * 60L
 }

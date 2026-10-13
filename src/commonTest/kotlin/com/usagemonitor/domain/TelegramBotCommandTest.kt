@@ -40,6 +40,7 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Accounts, parseBotCommand("/conta"))
         assertEquals(BotCommand.Resets, parseBotCommand("/reinícios"))
         assertEquals(BotCommand.Resets, parseBotCommand("/resets"))
+        assertEquals(BotCommand.Exhaustion, parseBotCommand("/quando"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
         assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
         assertEquals(BotCommand.Sources, parseBotCommand("/api"))

@@ -113,6 +113,7 @@ internal class TelegramBotHandlers(
                 api.sendMessage(token, chatId, TelegramBotMessages.accountPicker(snapshot, language), html = true, buttons = accountRows(snapshot))
             }
             BotCommand.Resets -> send(token, chatId, TelegramBotInsightMessages.resets(snapshotProvider(), language))
+            BotCommand.Exhaustion -> send(token, chatId, TelegramBotInsightMessages.exhaustion(snapshotProvider(), language))
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {

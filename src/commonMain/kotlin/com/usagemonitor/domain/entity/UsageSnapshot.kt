@@ -51,7 +51,13 @@ data class UsageSnapshotQuota(
      * "sem projeção" — cota vencida, saldo sem histórico, fonte observada — e a
      * HUD o mostra neutro; a página faz o mesmo em vez de inventar limiar próprio.
      */
-    val risk: UsageRiskLevel? = null
+    val risk: UsageRiskLevel? = null,
+    /**
+     * Quando a cota esgota no ritmo observado — o `estimatedExhaustionAt` da mesma
+     * projeção de [risk] (#408, `/quando`). `null` é "sem data": com reinício
+     * conhecido e risco [UsageRiskLevel.ON_TRACK], o reinício chega antes.
+     */
+    val exhaustsAt: Instant? = null
 )
 
 /** Monta o retrato na ordem em que o dashboard publica as fontes. */
@@ -71,6 +77,8 @@ fun buildUsageSnapshot(
                 fetchedAt = item.fetchedAt,
                 quotas = item.quotas.map { quota ->
                     val hasWindow = quota.hasKnownResetAt && quota.unit != UsageUnit.CURRENCY_USD && quota.total > 0L
+                    // Mesmo filtro do `worstQuotaRisk`: cota vencida não tem projeção válida.
+                    val summary = riskSummaries[item.targetKey]?.get(quota.seriesKey)?.takeUnless { quota.isExpiredAt(now) }
                     UsageSnapshotQuota(
                         label = quota.label,
                         periodType = quota.periodType,
@@ -80,10 +88,8 @@ fun buildUsageSnapshot(
                         percent = if (hasWindow) (quota.percentageUsed * 100f).toInt() else null,
                         resetsAt = if (quota.hasKnownResetAt) quota.periodEndAt else null,
                         currencyCode = quota.currencyCode,
-                        // Mesmo filtro do `worstQuotaRisk`: cota vencida não tem projeção válida.
-                        risk = riskSummaries[item.targetKey]?.get(quota.seriesKey)
-                            ?.takeUnless { quota.isExpiredAt(now) }
-                            ?.level
+                        risk = summary?.level,
+                        exhaustsAt = summary?.estimatedExhaustionAt
                     )
                 }
             )

@@ -25,10 +25,11 @@ class TelegramBotInsightMessagesTest {
         percent: Int?,
         resetsAt: Instant?,
         periodType: PeriodType = PeriodType.INTERVAL,
-        risk: UsageRiskLevel? = null
+        risk: UsageRiskLevel? = null,
+        exhaustsAt: Instant? = null
     ) = UsageSnapshotQuota(
         label = label, periodType = periodType, unit = UsageUnit.PERCENTAGE, used = percent?.toLong() ?: 0L, total = 100,
-        percent = percent, resetsAt = resetsAt, currencyCode = "USD", risk = risk
+        percent = percent, resetsAt = resetsAt, currencyCode = "USD", risk = risk, exhaustsAt = exhaustsAt
     )
 
     private fun account(label: String, vararg quotas: UsageSnapshotQuota, source: ApiSource = ApiSource.ANTHROPIC) =
@@ -69,5 +70,35 @@ class TelegramBotInsightMessagesTest {
 
         assertEquals("No quota with a known reset.", TelegramBotInsightMessages.resets(snapshot, AppLanguage.EN))
         assertTrue(TelegramBotInsightMessages.resets(null, AppLanguage.PT).startsWith("Sem leitura ainda."))
+    }
+
+    @Test
+    fun `when compares the projected exhaustion with the reset and never guesses`() {
+        val snapshot = UsageSnapshot(
+            generatedAt = now,
+            accounts = listOf(
+                account(
+                    "Padrão",
+                    quota("5h", 86, Instant.parse("2026-10-13T19:00:00Z"), risk = UsageRiskLevel.WILL_EXCEED, exhaustsAt = Instant.parse("2026-10-13T18:40:00Z")),
+                    quota("Semanal", 61, Instant.parse("2026-10-16T22:44:00Z"), PeriodType.WEEKLY, risk = UsageRiskLevel.ON_TRACK)
+                ),
+                account("MiniMax", quota("Requisições", 9, Instant.parse("2026-10-13T20:00:00Z")), source = ApiSource.MINIMAX),
+                account(
+                    "DeepSeek",
+                    UsageSnapshotQuota(
+                        "Saldo", PeriodType.REPORTED, UsageUnit.CURRENCY_USD, 100, 500, null, null, "USD",
+                        UsageRiskLevel.AT_RISK, Instant.parse("2026-10-20T12:00:00Z")
+                    ),
+                    source = ApiSource.DEEPSEEK
+                )
+            )
+        )
+
+        val text = TelegramBotInsightMessages.exhaustion(snapshot, AppLanguage.PT)
+
+        assertTrue("🔴 <b>Padrão · 5h</b> 86% — chega a 100% às 15:40, reinicia 16:00: <b>estoura 20 min antes</b>" in text, text)
+        assertTrue("🟢 <b>Padrão · Semanal</b> 61% — não estoura antes de reiniciar (sex 19:44)" in text, text)
+        assertTrue("⚪ <b>MiniMax · Requisições</b> 9% — sem projeção" in text, text)
+        assertTrue("🟡 <b>DeepSeek · Saldo</b> — acaba por volta de ter 09:00" in text, text)
     }
 }

@@ -72,8 +72,8 @@ class UsageSnapshotTest {
         )
         val risks = mapOf(
             anthropicKey to mapOf(
-                QuotaSeriesKey("Claude 5h", PeriodType.INTERVAL) to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, null),
-                QuotaSeriesKey("Claude 7d", PeriodType.WEEKLY) to QuotaRiskSummary(UsageRiskLevel.AT_RISK, null)
+                QuotaSeriesKey("Claude 5h", PeriodType.INTERVAL) to QuotaRiskSummary(UsageRiskLevel.WILL_EXCEED, Instant.parse("2026-10-06T16:00:00Z")),
+                QuotaSeriesKey("Claude 7d", PeriodType.WEEKLY) to QuotaRiskSummary(UsageRiskLevel.AT_RISK, Instant.parse("2026-10-06T18:00:00Z"))
             )
         )
 
@@ -81,7 +81,10 @@ class UsageSnapshotTest {
 
         val anthropic = snapshot.accounts[0]
         assertEquals(UsageRiskLevel.WILL_EXCEED, anthropic.quotas[0].risk)
+        // A data de esgotamento vem da mesma projeção, com o mesmo filtro da cota vencida (#408, `/quando`).
+        assertEquals(Instant.parse("2026-10-06T16:00:00Z"), anthropic.quotas[0].exhaustsAt)
         assertNull(anthropic.quotas[1].risk)
+        assertNull(anthropic.quotas[1].exhaustsAt)
         assertEquals(UsageRiskLevel.WILL_EXCEED, anthropic.worstRisk)
         assertNull(snapshot.accounts[1].worstRisk)
         assertEquals(Instant.parse("2026-10-06T14:40:00Z"), snapshot.lastCollectedAt)
