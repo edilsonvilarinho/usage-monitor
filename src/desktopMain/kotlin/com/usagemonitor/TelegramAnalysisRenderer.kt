@@ -36,7 +36,42 @@ internal object TelegramAnalysisRenderer {
         AnalysisView.HOURS -> draw(WIDTH, CHART_HEIGHT) { canvas -> hours(canvas, analysis, language) }
         AnalysisView.HEATMAP -> draw(WIDTH, HEAT_HEIGHT) { canvas -> heatmap(canvas, analysis, language) }
         AnalysisView.CURVE -> draw(WIDTH, CHART_HEIGHT) { canvas -> curve(canvas, analysis, language) }
+        AnalysisView.DAYS -> draw(WIDTH, CHART_HEIGHT) { canvas -> days(canvas, analysis, language) }
         else -> null
+    }
+
+    /**
+     * AB10 · dias da semana: os pontos da semanal gastos em cada um dos 7 dias, o valor escrito
+     * sobre a barra, a média tracejada e hoje em ouro. Dia não medido fica sem barra e com "—".
+     */
+    private fun days(canvas: Canvas, analysis: SessionAnalysis, language: AppLanguage) {
+        title(canvas, TelegramAnalysisImageLabels.title(AnalysisView.DAYS, analysis, language))
+        val pt = language == AppLanguage.PT
+        val area = Rect.makeLTRB(PAD + 40f, 80f, WIDTH - PAD - 20f, CHART_HEIGHT - 60f)
+        val measured = analysis.days.mapNotNull { day -> day.percentPoints }
+        val max = niceCeiling((measured.maxOrNull() ?: 0.0) * 1.15)
+        grid(canvas, area, max, MUTED)
+        val step = area.width / analysis.days.size.coerceAtLeast(1)
+        analysis.days.forEachIndexed { index, day ->
+            val left = area.left + index * step
+            val today = index == analysis.days.lastIndex
+            val points = day.percentPoints
+            if (points != null) {
+                val top = area.bottom - (points / max).toFloat() * area.height
+                canvas.drawRect(Rect.makeLTRB(left + 14f, top, left + step - 14f, area.bottom), Paint().apply { color = if (today) GOLD else EMBER })
+                centered(canvas, TelegramAnalysisMessages.pace(points, pt).trim(), left + step / 2f, top - 8f, font(15f), if (today) HOT else FOREGROUND)
+            } else {
+                centered(canvas, "—", left + step / 2f, area.bottom - 8f, font(15f), MUTED)
+            }
+            centered(canvas, TelegramBotMessages.weekday(day.date.dayOfWeek, pt), left + step / 2f, area.bottom + 22f, font(14f), if (today) GOLD else MUTED)
+        }
+        if (measured.isNotEmpty()) {
+            val average = measured.average()
+            val y = area.bottom - (average / max).toFloat() * area.height
+            canvas.drawLine(area.left, y, area.right, y, stroke(MUTED, 2f).apply { pathEffect = org.jetbrains.skia.PathEffect.makeDash(floatArrayOf(8f, 6f), 0f) })
+            val text = TelegramAnalysisImageLabels.average(average, language)
+            canvas.drawString(text, area.right - font(14f).measureTextWidth(text), 64f, font(14f), Paint().apply { color = MUTED })
+        }
     }
 
     /**

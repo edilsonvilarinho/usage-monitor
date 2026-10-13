@@ -49,6 +49,12 @@ internal object TelegramAnalysisImageLabels {
         )
     }
 
+    /** A legenda da média tracejada dos dias (AB10). */
+    fun average(value: Double, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        return (if (pt) "--- média " else "--- average ") + TelegramAnalysisMessages.pace(value, pt).trim() + " pp"
+    }
+
     /** A legenda da linha azul de vazão, que tem eixo próprio à direita. */
     fun speedLegend(language: AppLanguage): String =
         if (language == AppLanguage.PT) "— tok/s (eixo à direita)" else "— tok/s (right axis)"

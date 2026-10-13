@@ -62,4 +62,13 @@ class TelegramAnalysisRendererTest {
         assertTrue(!hasColor(ImageIO.read(ByteArrayInputStream(png)), TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
         assertEquals("≈83% at reset", TelegramAnalysisImageLabels.curveLabels(62, 83, AppLanguage.EN).atReset)
     }
+
+    /** AB10: hoje em ouro, os outros dias em brasa; a média sai no idioma do app. */
+    @Test
+    fun `days paint today in gold and the other days in ember`() {
+        val image = image(AnalysisView.DAYS)
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.GOLD and 0xFFFFFF))
+        assertTrue(hasColor(image, TelegramAnalysisRenderer.EMBER and 0xFFFFFF))
+        assertEquals("--- average 5.9 pp", TelegramAnalysisImageLabels.average(5.857, AppLanguage.EN))
+    }
 }
