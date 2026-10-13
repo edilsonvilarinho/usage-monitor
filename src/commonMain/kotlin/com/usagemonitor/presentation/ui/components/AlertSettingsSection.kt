@@ -29,6 +29,7 @@ const val ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG = "alertSettingsQuotaCoverage"
 const val ALERT_SETTINGS_SESSION_SWITCH_TEST_TAG = "alertSettingsSessionSwitch"
 const val ALERT_SETTINGS_QUOTA_RESET_SWITCH_TEST_TAG = "alertSettingsQuotaResetSwitch"
 const val ALERT_SETTINGS_RESET_REMINDER_SWITCH_TEST_TAG = "alertSettingsResetReminderSwitch"
+const val ALERT_SETTINGS_ACCOUNT_THRESHOLDS_TEST_TAG = "alertSettingsAccountThresholds"
 const val ALERT_SETTINGS_STALLED_SWITCH_TEST_TAG = "alertSettingsStalledSwitch"
 const val ALERT_SETTINGS_STALL_THRESHOLD_TEST_TAG = "alertSettingsStallThreshold"
 const val ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG = "alertSettingsSpikeSwitch"
@@ -175,6 +176,23 @@ fun AlertSettingsSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(ALERT_SETTINGS_QUOTA_COVERAGE_TEST_TAG)
         )
+
+        // #408, AA10: limiar por conta, gravado pelo `/limiar` do bot. Aqui só aparece e se desfaz.
+        if (settings.quotaPercentsByTarget.isNotEmpty()) {
+            val own = settings.quotaPercentsByTarget.values.sortedBy { override -> override.label }
+                .joinToString(" · ") { override -> override.label + " " + override.percents.joinToString(", ") { percent -> "$percent%" } }
+            Text(
+                text = (if (isPt) "Limiar próprio: " else "Own threshold: ") + own,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(ALERT_SETTINGS_ACCOUNT_THRESHOLDS_TEST_TAG)
+            )
+            AppButton(
+                label = if (isPt) "Usar o geral em todas" else "Use the general one everywhere",
+                onClick = { onSettingsChange(settings.copy(quotaPercentsByTarget = emptyMap())) },
+                tone = AppButtonTone.GHOST
+            )
+        }
 
         if (settings.quotaAlertsEnabled && selected.isEmpty()) {
             Text(

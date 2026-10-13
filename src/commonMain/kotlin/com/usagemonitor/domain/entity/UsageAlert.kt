@@ -41,7 +41,12 @@ data class UsageAlertSettings(
      * AA4; `/avise`). `null` desliga. Nasce em [DEFAULT_RESET_REMINDER_MINUTES], como o
      * interruptor ligado do mockup aprovado; vale para a bandeja e o bot.
      */
-    val resetReminderMinutes: Int? = DEFAULT_RESET_REMINDER_MINUTES
+    val resetReminderMinutes: Int? = DEFAULT_RESET_REMINDER_MINUTES,
+    /**
+     * Limiar próprio por conta (#408, AA10), por `UsageTargetKey.storageKey`. Conta fora do
+     * mapa segue [quotaPercents]. Vale para a bandeja e o bot: mora na decisão.
+     */
+    val quotaPercentsByTarget: Map<String, QuotaThresholdOverride> = emptyMap()
 ) {
     /**
      * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
@@ -72,10 +77,11 @@ data class UsageAlertSettings(
      * própria acabariam divergindo.
      */
     val effectiveQuotaPercents: List<Int>
-        get() = quotaPercents
-            .filter { percent -> percent in 1..100 }
-            .distinct()
-            .sorted()
+        get() = normalizeQuotaPercents(quotaPercents)
+
+    /** Os limiares que valem para [target]: os dela, se tiver, ou os gerais — já normalizados. */
+    fun quotaPercentsFor(target: UsageTargetKey): List<Int> =
+        quotaPercentsByTarget[target.storageKey]?.let { override -> normalizeQuotaPercents(override.percents) } ?: effectiveQuotaPercents
 
     companion object {
         val DEFAULT = UsageAlertSettings()
@@ -87,6 +93,29 @@ const val DEFAULT_RESET_REMINDER_MINUTES = 15
 
 /** Faixa aceita no `/avise`: menos que 5 min não dá tempo de ler; mais que 2 h já é o `/reinicios`. */
 val RESET_REMINDER_MINUTES_RANGE = 5..120
+
+/** Dentro de 1..100, sem repetidos e em ordem — o dono único da normalização dos limiares. */
+fun normalizeQuotaPercents(percents: List<Int>): List<Int> =
+    percents.filter { percent -> percent in 1..100 }.distinct().sorted()
+
+/**
+ * Limiar próprio de uma conta (#408, AA10). [label] é o rótulo de quando foi gravado, só para
+ * mostrar nas Configurações sem consultar o painel; a identidade é a chave do mapa.
+ */
+data class QuotaThresholdOverride(
+    val label: String,
+    val percents: List<Int>
+)
+
+/** Grava ([percents]) ou tira (`null`) o limiar próprio da conta [targetKey]. Função pura. */
+fun UsageAlertSettings.withAccountThreshold(targetKey: String, label: String, percents: List<Int>?): UsageAlertSettings =
+    copy(
+        quotaPercentsByTarget = if (percents == null) {
+            quotaPercentsByTarget - targetKey
+        } else {
+            quotaPercentsByTarget + (targetKey to QuotaThresholdOverride(label, normalizeQuotaPercents(percents)))
+        }
+    )
 
 /** Limiares padrão: um aviso antecipado, um urgente e o estouro. */
 val DEFAULT_QUOTA_ALERT_PERCENTS: List<Int> = listOf(75, 90, 100)
@@ -343,8 +372,7 @@ private fun evaluateQuotaAlerts(
     silenced: Boolean,
     focused: Boolean = false
 ): QuotaAlertResult {
-    val thresholds = settings.effectiveQuotaPercents
-    if (!settings.quotaAlertsEnabled || thresholds.isEmpty()) {
+    if (!settings.quotaAlertsEnabled) {
         // Alerta desligado não pode deixar rastro: religá-lo tem de voltar a
         // avisar sobre a janela corrente, não herdar disparos de quando estava
         // ligado.
@@ -355,6 +383,10 @@ private fun evaluateQuotaAlerts(
     val windows = mutableMapOf<QuotaAlertScope, FiredQuotaWindow>()
 
     for (stat in stats) {
+        // Por conta (#408, AA10): sem limiar nenhum, a conta não deixa rastro, como o
+        // alerta de cota desligado.
+        val thresholds = settings.quotaPercentsFor(stat.targetKey)
+        if (thresholds.isEmpty()) continue
         for (quota in stat.quotas) {
             val scope = QuotaAlertScope(
                 target = stat.targetKey,

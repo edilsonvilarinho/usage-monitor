@@ -30,6 +30,9 @@ import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.focusAlerts
+import com.usagemonitor.domain.entity.accountByKey
+import com.usagemonitor.domain.entity.parseThresholdPercents
+import com.usagemonitor.domain.entity.withAccountThreshold
 import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.toggled
 import com.usagemonitor.domain.entity.parseBotCommand
@@ -74,6 +77,15 @@ internal class TelegramBotHandlers(
     private val readings: TelegramBotReadings = TelegramBotReadings()
 ) {
 
+    /**
+     * Conta escolhida no `/limiar` esperando os números, por conversa (#408, AA10). Só em
+     * memória e por [THRESHOLD_REPLY_MILLIS]: a resposta tem de vir logo depois do toque.
+     * Toques rodam em paralelo ao polling, por isso o mapa concorrente.
+     */
+    private val pendingThresholds = java.util.concurrent.ConcurrentHashMap<Long, PendingThreshold>()
+
+    private class PendingThreshold(val targetKey: String?, val label: String?, val expiresAtMillis: Long)
+
     suspend fun handle(token: String, message: TelegramIncomingMessage) {
         val callbackId = message.callbackId
         if (callbackId != null) {
@@ -82,7 +94,11 @@ internal class TelegramBotHandlers(
             return
         }
         val text = message.text ?: return
-        val command = parseBotCommand(text) ?: parseKeyboardLabel(text) ?: return
+        val command = parseBotCommand(text) ?: parseKeyboardLabel(text)
+        if (command == null) {
+            answerPendingThreshold(token, message.chatId, text)
+            return
+        }
         val settings = settingsFlow.value
         val language = settings.languageOf(message.chatId, languageProvider())
         if (command is BotCommand.Start) {
@@ -203,6 +219,10 @@ internal class TelegramBotHandlers(
                 saveAlertSettings(updated)
                 send(token, chatId, TelegramBotRemoteMessages.focus(updated.focusUntilEpochMillis, language))
             }
+            BotCommand.ThresholdMenu -> api.sendMessage(
+                token, chatId, TelegramBotRemoteMessages.thresholdMenu(language), html = true,
+                buttons = rows(TelegramBotRemoteMessages.thresholdButtons(snapshotProvider(), language))
+            )
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, is BotCommand.Remind -> {
@@ -211,6 +231,38 @@ internal class TelegramBotHandlers(
                 api.sendMessage(token, chatId, TelegramBotMessages.applied(command, language), html = true)
             }
         }
+    }
+
+    /**
+     * Texto solto depois do toque numa conta do `/limiar` (#408, AA10): números gravam o
+     * limiar dela (ou o geral, em "Todas"); `geral` a devolve ao geral. Sem pedido aberto,
+     * texto solto segue sem resposta. Papel relido aqui: o toque pode ter vindo antes.
+     */
+    private suspend fun answerPendingThreshold(token: String, chatId: Long, text: String) {
+        val pending = pendingThresholds[chatId] ?: return
+        val settings = settingsFlow.value
+        if (!settings.isAuthorized(chatId) || settings.isReadOnly(chatId)) return
+        if (clock.now().toEpochMilliseconds() > pending.expiresAtMillis) {
+            pendingThresholds.remove(chatId)
+            return
+        }
+        val language = settings.languageOf(chatId, languageProvider())
+        val answer = text.trim().lowercase()
+        val backToGeneral = answer == "geral" || answer == "general"
+        val percents = if (backToGeneral) null else parseThresholdPercents(answer)
+        if (!backToGeneral && percents == null) {
+            send(token, chatId, TelegramBotMessages.invalid("50,80", language))
+            return
+        }
+        pendingThresholds.remove(chatId)
+        val current = alertSettingsFlow.value
+        val targetKey = pending.targetKey
+        val updated = when {
+            targetKey == null -> current.copy(quotaPercents = percents ?: current.quotaPercents)
+            else -> current.withAccountThreshold(targetKey, pending.label.orEmpty(), percents)
+        }
+        saveAlertSettings(updated)
+        send(token, chatId, TelegramBotRemoteMessages.thresholdSet(pending.label, percents, updated.effectiveQuotaPercents, language))
     }
 
     private suspend fun send(token: String, chatId: Long, text: String) {
@@ -340,6 +392,18 @@ internal class TelegramBotHandlers(
                     )
                 }
             }
+            is BotTap.ThresholdAccount -> {
+                api.answerCallbackQuery(token, callbackId)
+                val account = tap.key?.let { key -> snapshotProvider()?.accountByKey(key) }
+                val targetKey = account?.targetKey
+                if (tap.key != null && targetKey == null) {
+                    // A conta saiu do retrato entre o teclado e o toque.
+                    api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true)
+                    return
+                }
+                pendingThresholds[message.chatId] = PendingThreshold(targetKey, account?.label, clock.now().toEpochMilliseconds() + THRESHOLD_REPLY_MILLIS)
+                send(token, message.chatId, TelegramBotRemoteMessages.thresholdAsk(account?.label, alertSettingsFlow.value.effectiveQuotaPercents, language))
+            }
             is BotTap.UpdateNow -> {
                 // Permissão e versão relidas no toque: aviso antigo não reinicia o app.
                 val result = when {
@@ -355,7 +419,8 @@ internal class TelegramBotHandlers(
 
     /** Toques que mudam o app (#408, AA21): ligar fonte e silenciar. Ver conta e atualizar só leem. */
     private fun tapChangesApp(tap: BotTap?, button: BotButton?): Boolean = when (tap) {
-        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow, is BotTap.ToggleAlert -> true
+        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow, is BotTap.ToggleAlert,
+        is BotTap.ThresholdAccount -> true
         is BotTap.Account -> false
         null -> button == BotButton.SNOOZE
     }
@@ -409,3 +474,6 @@ internal class TelegramBotHandlers(
         runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
     }
 }
+
+/** Prazo para responder os números depois do toque numa conta do `/limiar` (#408, AA10). */
+private const val THRESHOLD_REPLY_MILLIS = 10 * 60 * 1_000L

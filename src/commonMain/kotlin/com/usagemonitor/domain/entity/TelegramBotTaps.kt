@@ -35,6 +35,9 @@ sealed interface BotTap {
 
     /** Liga ou desliga um tipo de alerta (#408, AA9). */
     data class ToggleAlert(val kind: AlertKind) : BotTap
+
+    /** Conta escolhida no `/limiar` (#408, AA10): [key] de [botAccountKey], ou `null` para todas. */
+    data class ThresholdAccount(val key: String?) : BotTap
 }
 
 private const val ACCOUNT_PREFIX = "acc:"
@@ -43,6 +46,8 @@ private const val SNOOZE_PREFIX = "snz:"
 private const val SNOOZE_MORNING = "am"
 private const val UPDATE_PREFIX = "upd:"
 private const val ALERT_PREFIX = "alt:"
+private const val THRESHOLD_PREFIX = "thr:"
+private const val THRESHOLD_ALL = "*"
 
 /** `null` para dado que não é deste formato — inclusive os de [BotButton]. */
 fun parseBotTap(data: String?): BotTap? {
@@ -54,6 +59,8 @@ fun parseBotTap(data: String?): BotTap? {
         value.startsWith(SNOOZE_PREFIX) -> value.removePrefix(SNOOZE_PREFIX).toIntOrNull()?.takeIf { minutes -> minutes in 1..MAX_SNOOZE_MINUTES }?.let(BotTap::SnoozeFor)
         value.startsWith(UPDATE_PREFIX) -> value.removePrefix(UPDATE_PREFIX).takeIf { version -> version.isNotEmpty() }?.let(BotTap::UpdateNow)
         value.startsWith(ALERT_PREFIX) -> AlertKind.entries.firstOrNull { kind -> kind.data == value.removePrefix(ALERT_PREFIX) }?.let(BotTap::ToggleAlert)
+        value == THRESHOLD_PREFIX + THRESHOLD_ALL -> BotTap.ThresholdAccount(null)
+        value.startsWith(THRESHOLD_PREFIX) -> value.removePrefix(THRESHOLD_PREFIX).takeIf { key -> key.isNotEmpty() }?.let(BotTap::ThresholdAccount)
         else -> null
     }
 }
@@ -66,6 +73,7 @@ fun BotTap.data(): String = when (this) {
     BotTap.SnoozeUntilMorning -> SNOOZE_PREFIX + SNOOZE_MORNING
     is BotTap.UpdateNow -> UPDATE_PREFIX + version
     is BotTap.ToggleAlert -> ALERT_PREFIX + kind.data
+    is BotTap.ThresholdAccount -> THRESHOLD_PREFIX + (key ?: THRESHOLD_ALL)
 }
 
 /** Teto do silêncio por toque: um dia. Dado maior é forjado, não do teclado do bot. */

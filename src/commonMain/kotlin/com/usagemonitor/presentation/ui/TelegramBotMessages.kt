@@ -54,7 +54,7 @@ internal object TelegramBotMessages {
             "silencio" to "Horário de silêncio (22-07 ou off)",
             "foco" to "Só alertas críticos por um tempo (2h ou off)",
             "avise" to "Lembrete antes do reinício (15 ou off)",
-            "limiar" to "Limiares de alerta de cota (75,90)",
+            "limiar" to "Limiares de cota (75,90), ou por conta",
             "conversas" to "Conversas pareadas",
             "sair" to "Desfaz o pareamento desta conversa",
             "idioma" to "Idioma desta conversa (pt, en ou app)",
@@ -86,7 +86,7 @@ internal object TelegramBotMessages {
             "quiet" to "Quiet hours (22-07 or off)",
             "focus" to "Only critical alerts for a while (2h or off)",
             "remind" to "Reminder before resets (15 or off)",
-            "threshold" to "Quota alert thresholds (75,90)",
+            "threshold" to "Quota thresholds (75,90), or per account",
             "chats" to "Paired chats",
             "leave" to "Unpair this chat",
             "language" to "Language of this chat (pt, en or app)",
@@ -204,10 +204,14 @@ internal object TelegramBotMessages {
         val pt = language == AppLanguage.PT
         val percents = settings.quotaPercents.joinToString(", ") { percent -> "<b>$percent%</b>" }.ifEmpty { if (pt) "nenhum" else "none" }
         val off = if (settings.quotaAlertsEnabled) "" else if (pt) " (alertas de cota desligados)" else " (quota alerts off)"
+        // Limiar por conta (#408, AA10): uma linha por conta com limiar próprio, por rótulo.
+        val own = settings.quotaPercentsByTarget.values.sortedBy { override -> override.label }.joinToString("") { override ->
+            "\n• ${escape(override.label)}: " + override.percents.joinToString(", ") { percent -> "<b>$percent%</b>" }
+        }
         return if (pt) {
-            "⚙ Limiares de cota: $percents$off\nMude com <code>/limiar 75,90</code>"
+            "⚙ Limiares de cota: $percents$off$own\nMude com <code>/limiar 75,90</code> ou, por conta, <code>/limiar</code>"
         } else {
-            "⚙ Quota thresholds: $percents$off\nChange with <code>/threshold 75,90</code>"
+            "⚙ Quota thresholds: $percents$off$own\nChange with <code>/threshold 75,90</code> or, per account, <code>/threshold</code>"
         }
     }
 
@@ -239,7 +243,7 @@ internal object TelegramBotMessages {
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/foco 2h</code> · <code>/foco off</code> — só alertas críticos por um tempo\n" +
             "<code>/avise 15</code> · <code>/avise off</code> — lembrete antes de reiniciar uma cota alta\n" +
-            "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
+            "<code>/limiar 75,90</code> — avisa em 75% e 90% · <code>/limiar</code> — limiar de uma conta\n" +
             "<code>/conversas</code> — conversas pareadas · <code>/sair</code> — desfaz o pareamento desta\n" +
             "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
             "<code>/teclado on</code> · <code>/teclado off</code> — atalhos no lugar do teclado\n" +
@@ -269,7 +273,7 @@ internal object TelegramBotMessages {
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/focus 2h</code> · <code>/focus off</code> — only critical alerts for a while\n" +
             "<code>/remind 15</code> · <code>/remind off</code> — reminder before a high quota resets\n" +
-            "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
+            "<code>/threshold 75,90</code> — alert at 75% and 90% · <code>/threshold</code> — one account's threshold\n" +
             "<code>/chats</code> — paired chats · <code>/leave</code> — unpair this one\n" +
             "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +
             "<code>/keyboard on</code> · <code>/keyboard off</code> — shortcuts in place of the keyboard\n" +

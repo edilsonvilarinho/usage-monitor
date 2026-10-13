@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
 import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.QuietHours
+import com.usagemonitor.domain.entity.QuotaThresholdOverride
 import com.usagemonitor.presentation.ui.components.wrapHour
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -102,5 +103,19 @@ class UsageAlertPreferencesTest {
         assertEquals(null, decodeResetReminderMinutes(0))
         assertEquals(30, decodeResetReminderMinutes(30))
         assertEquals(120, decodeResetReminderMinutes(999))
+    }
+
+    /** #408, AA10: ida e volta do limiar por conta; linha ilegível sai sem levar as outras. */
+    @Test
+    fun `account thresholds round trip and drop unreadable lines`() {
+        val overrides = mapOf(
+            "ANTHROPIC:work" to QuotaThresholdOverride("Anthropic · Trabalho\tx", listOf(50, 80)),
+            "CODEX" to QuotaThresholdOverride("Codex", listOf(90))
+        )
+        val decoded = decodeQuotaPercentsByTarget(encodeQuotaPercentsByTarget(overrides))
+        assertEquals(listOf(50, 80), decoded.getValue("ANTHROPIC:work").percents)
+        assertEquals("Anthropic · Trabalho x", decoded.getValue("ANTHROPIC:work").label)
+        assertEquals(setOf("ANTHROPIC:work"), decodeQuotaPercentsByTarget("ANTHROPIC:work\t50,80\tA\nlixo\nCODEX\t\tCodex").keys)
+        assertEquals(emptyMap(), decodeQuotaPercentsByTarget(null))
     }
 }

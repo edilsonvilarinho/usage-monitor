@@ -23,6 +23,7 @@ import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.focusAlerts
+import com.usagemonitor.domain.entity.parseThresholdPercents
 import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.parseKeyboardLabel
 import com.usagemonitor.domain.entity.parseBotCommand
@@ -209,5 +210,18 @@ class TelegramBotCommandTest {
         assertIs<BotCommand.Invalid>(parseBotCommand("/avise"))
         assertEquals(30, applyBotCommand(UsageAlertSettings(), BotCommand.Remind(30))?.resetReminderMinutes)
         assertTrue(BotCommand.Remind(null).changesApp())
+    }
+
+    /** #408, AA10: `/limiar` sem números pergunta a conta; o toque vai e volta com a chave ou "todas". */
+    @Test
+    fun `threshold without numbers asks for the account`() {
+        assertEquals(BotCommand.ThresholdMenu, parseBotCommand("/limiar"))
+        assertEquals(BotCommand.Threshold(listOf(75, 90)), parseBotCommand("/limiar 90,75"))
+        assertTrue(BotCommand.ThresholdMenu.changesApp())
+        for (tap in listOf(BotTap.ThresholdAccount("ANTHROPIC:1a2b3c"), BotTap.ThresholdAccount(null))) {
+            assertEquals(tap, parseBotTap(tap.data()))
+        }
+        assertEquals(listOf(50, 80), parseThresholdPercents("80, 50"))
+        assertEquals(null, parseThresholdPercents("geral"))
     }
 }

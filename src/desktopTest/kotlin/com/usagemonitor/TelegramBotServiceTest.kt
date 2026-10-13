@@ -455,6 +455,41 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second == "✅ <b>Cursor voltou</b> — coleta 09:00." } }
     }
 
+    /** #408, AA10: `/limiar` → toque na conta → "50,80" grava o limiar só dela; "geral" a devolve. */
+    @Test
+    fun `threshold per account asks the account and takes the numbers`() {
+        paired()
+        snapshot = UsageSnapshot(
+            generatedAt = Instant.parse("2026-10-06T12:00:00Z"),
+            accounts = listOf(
+                UsageSnapshotAccount(
+                    ApiSource.ANTHROPIC, "Anthropic · Trabalho", active = false,
+                    quotas = listOf(UsageSnapshotQuota("Sessão 5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 40, 100, 40, null, "USD")),
+                    targetKey = "ANTHROPIC:work"
+                )
+            )
+        )
+        service.start()
+        api.pending += message(1, chat = 51, text = "/limiar")
+        waitUntil { api.keyboards.any { row -> row.any { it.text == "Anthropic · Trabalho" } } }
+        val data = api.keyboards.last { it.isNotEmpty() }.first().data
+
+        api.pending += tap(2, chat = 51, data = data)
+        waitUntil { api.sent.any { it.second.startsWith("Limiar de <b>Anthropic · Trabalho</b>") } }
+        api.pending += message(3, chat = 51, text = "50,80")
+        waitUntil { alertSettings.value.quotaPercentsByTarget.isNotEmpty() }
+        assertEquals(listOf(50, 80), alertSettings.value.quotaPercentsByTarget.getValue("ANTHROPIC:work").percents)
+        assertEquals(UsageAlertSettings().quotaPercents, alertSettings.value.quotaPercents)
+
+        api.pending += message(4, chat = 51, text = "geral")
+        Thread.sleep(200)
+        assertEquals(1, alertSettings.value.quotaPercentsByTarget.size)
+        api.pending += tap(5, chat = 51, data = data)
+        waitUntil { api.sent.count { it.second.startsWith("Limiar de <b>Anthropic · Trabalho</b>") } == 2 }
+        api.pending += message(6, chat = 51, text = "geral")
+        waitUntil { alertSettings.value.quotaPercentsByTarget.isEmpty() }
+    }
+
     /** #408, AA23: `/exportar 30d json` manda o arquivo com nome de data e recorte. */
     @Test
     fun `export sends the usage file with the period and format`() {

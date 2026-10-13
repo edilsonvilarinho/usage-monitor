@@ -160,6 +160,8 @@ sealed interface BotCommand {
     /** `null` desliga o silêncio. */
     data class Quiet(val hours: QuietHours?) : BotCommand
     data class Threshold(val percents: List<Int>) : BotCommand
+    /** `/limiar` sem números (#408, AA10): pergunta a conta antes. */
+    data object ThresholdMenu : BotCommand
     /** `/conta` (#398, Y4): escolher uma conta num teclado e ver só ela. */
     data object Accounts : BotCommand
     /** `/atualizar` (#398, Y8): coleta agora e responde o `/status`. */
@@ -221,7 +223,7 @@ sealed interface BotCommand {
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
     is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud, is BotCommand.Focus,
-    is BotCommand.Remind -> true
+    is BotCommand.Remind, BotCommand.ThresholdMenu -> true
     is BotCommand.Start, BotCommand.AlertMenu, BotCommand.Status, BotCommand.StatusImage, is BotCommand.Export, BotCommand.Team, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
@@ -255,7 +257,7 @@ fun parseBotCommand(text: String): BotCommand? {
             else -> BotCommand.Invalid("/alertas | /alertas on | /alertas off")
         }
         "silencio", "silêncio", "quiet" -> parseQuiet(args.firstOrNull())
-        "limiar", "threshold" -> parseThreshold(args.joinToString(","))
+        "limiar", "threshold" -> if (args.isEmpty()) BotCommand.ThresholdMenu else parseThreshold(args.joinToString(","))
         "conta", "contas", "account", "accounts" -> BotCommand.Accounts
         "atualizar", "refresh" -> BotCommand.Refresh
         "api", "apis", "fontes", "sources" -> BotCommand.Sources
@@ -384,12 +386,13 @@ private fun parseQuiet(argument: String?): BotCommand {
 }
 
 private fun parseThreshold(argument: String): BotCommand {
-    val percents = argument.split(',').mapNotNull { part -> part.trim().toIntOrNull() }.filter { percent -> percent in 1..100 }
-    if (percents.isEmpty()) {
-        return BotCommand.Invalid("/limiar 75,90")
-    }
-    return BotCommand.Threshold(percents.distinct().sorted())
+    val percents = parseThresholdPercents(argument) ?: return BotCommand.Invalid("/limiar 75,90")
+    return BotCommand.Threshold(percents)
 }
+
+/** `75,90` (ou com espaços) em limiares normalizados; `null` quando não sobra nenhum. */
+fun parseThresholdPercents(text: String): List<Int>? =
+    normalizeQuotaPercents(text.split(',', ' ').mapNotNull { part -> part.trim().toIntOrNull() }).ifEmpty { null }
 
 /**
  * Preferências de alerta depois do comando, ou `null` quando o comando não as

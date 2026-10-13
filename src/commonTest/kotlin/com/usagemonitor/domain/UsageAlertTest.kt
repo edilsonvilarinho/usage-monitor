@@ -24,6 +24,7 @@ import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.evaluateUsageAlerts
+import com.usagemonitor.domain.entity.withAccountThreshold
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
@@ -820,6 +821,19 @@ class UsageAlertTest {
         assertTrue(low.alerts.isEmpty())
         val off = evaluate(stats(usedPercent = 80), early.state, RESET_AT - 10.minutes, UsageAlertSettings.DEFAULT.copy(resetReminderMinutes = null))
         assertTrue(off.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+    }
+
+    /** #408, AA10: a conta com limiar próprio avisa nos dela; sem ele, nos gerais. */
+    @Test
+    fun `an account threshold replaces the general one only for that account`() {
+        val own = UsageAlertSettings.DEFAULT.withAccountThreshold(TARGET.storageKey, "Anthropic · Trabalho", listOf(80, 50))
+        val result = evaluate(stats(usedPercent = 60), UsageAlertState.EMPTY, NOW, own)
+        assertEquals(listOf(50), result.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().map { alert -> alert.thresholdPercent })
+        assertEquals(listOf(50, 80), own.quotaPercentsFor(TARGET))
+
+        val general = evaluate(stats(usedPercent = 60), UsageAlertState.EMPTY, NOW)
+        assertTrue(general.alerts.isEmpty())
+        assertEquals(UsageAlertSettings.DEFAULT.effectiveQuotaPercents, own.withAccountThreshold(TARGET.storageKey, "x", null).quotaPercentsFor(TARGET))
     }
 }
 

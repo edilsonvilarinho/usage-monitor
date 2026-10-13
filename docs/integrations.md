@@ -475,6 +475,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     limite). **Desvio do mockup**: "3 coletas seguidas" virou 15 min seguidos — o `UiState` é `StateFlow` e não emite duas
     falhas iguais, então contar coletas exigiria um evento novo no `DashboardViewModel` (751 linhas, faixa que não cresce).
     O estado vive em memória: reiniciar o app recomeça a contagem.
+  - **Limiar por conta** (AA10): `/limiar` sem números (antes "uso inválido") pergunta a conta — um botão por conta com cota em
+    percentual (`thr:<botAccountKey>`) e "Todas" (`thr:*`). O toque abre um pedido por conversa, **só em memória e por 10
+    min**; o texto solto seguinte (`50,80` ou `geral`) grava o limiar daquela conta (`withAccountThreshold`) ou, em "Todas",
+    o geral. Sem pedido aberto, texto solto continua sem resposta. Conversa só de leitura é recusada no comando, no toque e
+    na resposta. `/limiar 75,90` segue mudando o geral. Decisão e persistência em `docs/presentation.md`.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

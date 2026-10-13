@@ -28,7 +28,12 @@ data class UsageSnapshotAccount(
     val active: Boolean,
     val quotas: List<UsageSnapshotQuota>,
     /** Quando a leitura desta conta foi coletada; `null` antes da primeira coleta. */
-    val fetchedAt: Instant? = null
+    val fetchedAt: Instant? = null,
+    /**
+     * `UsageTargetKey.storageKey` da conta (#408, AA10): o limiar por conta é gravado por
+     * ela, que não muda com o apelido. Id interno do app — não identifica ninguém.
+     */
+    val targetKey: String? = null
 ) {
     /** O pior risco entre as cotas, pela ordem do enum — a palavra da HUD. `null` sem projeção. */
     val worstRisk: UsageRiskLevel?
@@ -82,6 +87,7 @@ fun buildUsageSnapshot(
                 label = item.snapshotLabel,
                 active = item.targetKey in activeTargets,
                 fetchedAt = item.fetchedAt,
+                targetKey = item.targetKey.storageKey,
                 quotas = item.quotas.map { quota ->
                     val hasWindow = quota.hasKnownResetAt && quota.unit != UsageUnit.CURRENCY_USD && quota.total > 0L
                     // Mesmo filtro do `worstQuotaRisk`: cota vencida não tem projeção válida.

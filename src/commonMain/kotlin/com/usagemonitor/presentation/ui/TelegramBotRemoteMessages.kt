@@ -5,6 +5,8 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.isOn
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.botAccountKey
+import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.SourceHealthEvent
 import com.usagemonitor.domain.entity.BotTap
 import com.usagemonitor.domain.entity.TELEGRAM_MORNING_HOUR
@@ -164,6 +166,51 @@ internal object TelegramBotRemoteMessages {
                 val at = TelegramBotMessages.clock(event.at)
                 if (pt) "✅ <b>$label voltou</b> — coleta $at." else "✅ <b>$label is back</b> — collected $at."
             }
+        }
+    }
+
+    /** `/limiar` sem números (#408, AA10): a pergunta e um botão por conta com cota em percentual, mais "Todas". */
+    fun thresholdMenu(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "<b>Limiar de qual conta?</b>" else "<b>Threshold for which account?</b>"
+
+    fun thresholdButtons(snapshot: UsageSnapshot?, language: AppLanguage): List<List<Pair<String, String>>> {
+        val accounts = snapshot?.accounts.orEmpty().filter { account -> account.targetKey != null && account.quotas.any { quota -> quota.percent != null } }
+        val buttons = accounts.map { account -> account.label to BotTap.ThresholdAccount(botAccountKey(account)).data() } +
+            ((if (language == AppLanguage.PT) "Todas" else "All") to BotTap.ThresholdAccount(null).data())
+        return buttons.chunked(SOURCE_BUTTONS_PER_ROW)
+    }
+
+    /** Depois do toque: o que responder. [label] `null` é "todas as contas" — o limiar geral. */
+    fun thresholdAsk(label: String?, general: List<Int>, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val current = general.joinToString(", ") { percent -> "$percent%" }.ifEmpty { if (pt) "nenhum" else "none" }
+        if (label == null) {
+            return if (pt) {
+                "Limiar <b>geral</b> (hoje $current): responda com os números, ex.: <code>75,90</code>."
+            } else {
+                "<b>General</b> threshold (now $current): reply with the numbers, e.g. <code>75,90</code>."
+            }
+        }
+        val name = TelegramBotMessages.escape(label)
+        return if (pt) {
+            "Limiar de <b>$name</b>: responda com os números, ex.: <code>50,80</code> — ou <code>geral</code> para seguir o geral ($current)."
+        } else {
+            "Threshold for <b>$name</b>: reply with the numbers, e.g. <code>50,80</code> — or <code>general</code> to follow the general one ($current)."
+        }
+    }
+
+    /** O limiar gravado; [percents] `null` é a conta que voltou ao geral. */
+    fun thresholdSet(label: String?, percents: List<Int>?, general: List<Int>, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val generalText = general.joinToString(", ") { percent -> "$percent%" }.ifEmpty { if (pt) "nenhum" else "none" }
+        val name = label?.let(TelegramBotMessages::escape)
+        return when {
+            name == null && pt -> "Limiar geral: <b>$generalText</b>."
+            name == null -> "General threshold: <b>$generalText</b>."
+            percents == null && pt -> "<b>$name</b> volta a seguir o limiar geral ($generalText)."
+            percents == null -> "<b>$name</b> follows the general threshold again ($generalText)."
+            pt -> "<b>$name</b>: alertas em ${percents.joinToString(" e ") { percent -> "$percent%" }}.\nAs outras seguem $generalText."
+            else -> "<b>$name</b>: alerts at ${percents.joinToString(" and ") { percent -> "$percent%" }}.\nThe others follow $generalText."
         }
     }
 }
