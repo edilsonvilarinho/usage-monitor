@@ -79,6 +79,7 @@ internal fun ResponsiveDashboardCardGrid(
     onOpenCodexCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamPresenceCard: (UsageTargetKey) -> Unit = {},
+    onOpenAnalysisCard: (UsageTargetKey) -> Unit = {},
     /**
      * Perfis Anthropic marcados como parte do time nas Configurações.
      *
@@ -177,6 +178,11 @@ internal fun ResponsiveDashboardCardGrid(
                             },
                             onOpenTeamPresence = if (CardAction.TEAM_PRESENCE in actions) {
                                 { onOpenTeamPresenceCard(stats.targetKey) }
+                            } else {
+                                null
+                            },
+                            onOpenAnalysis = if (CardAction.ANALYSIS in actions) {
+                                { onOpenAnalysisCard(stats.targetKey) }
                             } else {
                                 null
                             },

@@ -54,6 +54,7 @@ import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.ComparisonViewModel
+import com.usagemonitor.presentation.viewmodel.AnalysisViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.QuotaActivityTracker
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
@@ -239,6 +240,9 @@ internal class AppViewModels(
         breadcrumbs = breadcrumbs
     )
 
+    // Análise da sessão (rodada AB): a mesma leitura do `/analise` do bot, sob demanda.
+    val analysis = AnalysisViewModel(load = sessionAnalysisReader(graph, dashboard))
+
     // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
     // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.
     val quotaActivity = QuotaActivityTracker(dashboardState = dashboard.uiState)
@@ -335,6 +339,7 @@ internal class AppViewModels(
         sessionPulse.onDestroy()
         quotaActivity.onDestroy()
         comparison.onDestroy()
+        analysis.onDestroy()
         webAccess.stop()
         telegramBot.onDestroy()
         usageAlert.onDestroy()

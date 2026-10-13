@@ -605,6 +605,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#time">Uso do time</a>
   <a href="#tendencia">Tendência do time</a>
   <a href="#comparacao">Comparar modelos</a>
+  <a href="#analise">Análise da sessão</a>
   <a href="#presenca">Presença</a>
   <a href="#presenca-contas">Presença · todas as contas</a>
   <a href="#chaves">Administração de chaves</a>
@@ -1927,6 +1928,31 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
     <tr><td>claude-opus-5-5<br><span class="k" style="color:var(--anthropic)">anthropic</span></td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">6,3M</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">US$ 9,1000</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">96%</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 36%,transparent)">94 tok/s</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">68%</td></tr><tr><td>claude-sonnet-5<br><span class="k" style="color:var(--anthropic)">anthropic</span></td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 18%,transparent)">2,5M</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 11%,transparent)">US$ 2,3100</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 44%,transparent)">95%</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">118 tok/s</td><td class="num" style="background:color-mix(in srgb,var(--anthropic) 45%,transparent)">68%</td></tr><tr><td>MiniMax<br><span class="k" style="color:var(--minimax)">minimax</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num" style="background:color-mix(in srgb,var(--minimax) 14%,transparent)">22%</td></tr><tr><td>gpt-5.6-luna<br><span class="k" style="color:var(--codex)">codex</span></td><td class="num" style="background:color-mix(in srgb,var(--codex) 22%,transparent)">3,1M</td><td class="num">sem tarifa</td><td class="num" style="background:color-mix(in srgb,var(--codex) 41%,transparent)">88%</td><td class="num" style="background:color-mix(in srgb,var(--codex) 12%,transparent)">33 tok/s</td><td class="num" style="background:color-mix(in srgb,var(--codex) 27%,transparent)">41%</td></tr>
   </table></div></div>
   <div class="statusbar"><span>Lido 06/10 11:42 BRT</span></div>
+</div>
+
+<h2 id="analise">9d · Análise da sessão</h2>
+<p class="note"><b>Rodada AB (todas as opções AB1–AB15).</b> Janela própria, aberta pelo botão <b>Análise</b> (ícone
+<i>insights</i>) da barra do card e do balão da conta na HUD, só em contas Anthropic e Codex — <code>CardAction.ANALYSIS</code>,
+exceção aprovada ao enum. As abas são as vistas de texto do <code>/analise</code> do bot (Painel, Tendência, Intervalos,
+Frases, Janela 5h, Antes × agora), com o mesmo texto sem as marcas do Telegram, em Plex Mono. Ritmo em pp/h pela subida
+entre leituras do histórico; vazão (tok/s) pela soma de tokens sobre a soma do tempo do índice CLI. Não medido é "—".
+Lê sob demanda, ao abrir e no <b>Atualizar</b>; sem histórico, o estado vazio explica.</p>
+<div class="win" style="max-width:820px">
+  <div class="titlebar"><span class="ttl">Análise · Anthropic · Padrão</span></div>
+  <div class="toolbar"><span class="v">Análise · Anthropic · Padrão</span><span class="sp"></span><button class="btn">Atualizar</button></div>
+  <div class="tabs"><button class="on" type="button">Painel</button><button type="button">Tendência</button><button type="button">Intervalos</button><button type="button">Frases</button><button type="button">Janela 5h</button><button type="button">Antes × agora</button></div>
+  <div class="panel"><div class="pbody"><pre style="margin:0;font-family:var(--mono);font-size:var(--t12)">📐 Anthropic · Padrão · análise 12:30 BRT
+JANELA 5h    62%   reinicia 14:00
+  agora    14,0 pp/h  (última 1 h)
+  média    17,7 pp/h  (desde 09:00)
+  seguro   25,3 pp/h  → folga
+  no reset ≈ 83%
+
+SEMANAL      41%   reinicia sex 19:44
+  agora     0,9 pp/h  (última 1 h)
+  seguro    1,5 pp/h  → folga
+
+TOKENS/s (1 h)  claude-sonnet 71 · claude-opus 48</pre></div></div>
 </div>
 
 <h2 id="presenca">10 · Presença</h2>

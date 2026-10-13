@@ -512,6 +512,7 @@ private fun HudAccountActions(
             onClick = {
                 when (action) {
                     CardAction.HISTORY -> actions.openHistory(target.source, account.accountKey)
+                    CardAction.ANALYSIS -> actions.openAnalysis(target)
                     CardAction.CODEX_CLI_SESSIONS -> actions.openCodexCliSessions(target)
                     CardAction.CLI_SESSIONS -> actions.openCliSessions(target)
                     CardAction.TEAM_USAGE -> actions.openTeamUsage(target)

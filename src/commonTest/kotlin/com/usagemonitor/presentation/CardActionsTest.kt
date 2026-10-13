@@ -20,9 +20,9 @@ class CardActionsTest {
 
     @Test
     fun `sessoes cli sao da anthropic e do codex, cada uma com a sua`() {
-        assertEquals(listOf(CardAction.HISTORY, CardAction.CLI_SESSIONS), cardActionsFor(padrao, emptySet()))
+        assertEquals(listOf(CardAction.HISTORY, CardAction.ANALYSIS, CardAction.CLI_SESSIONS), cardActionsFor(padrao, emptySet()))
         assertEquals(
-            listOf(CardAction.HISTORY, CardAction.CODEX_CLI_SESSIONS),
+            listOf(CardAction.HISTORY, CardAction.ANALYSIS, CardAction.CODEX_CLI_SESSIONS),
             cardActionsFor(UsageTargetKey.forSource(ApiSource.CODEX), emptySet())
         )
     }
@@ -31,11 +31,11 @@ class CardActionsTest {
     @Test
     fun `time so na conta anthropic marcada`() {
         assertEquals(
-            listOf(CardAction.HISTORY, CardAction.CLI_SESSIONS, CardAction.TEAM_USAGE, CardAction.TEAM_PRESENCE),
+            listOf(CardAction.HISTORY, CardAction.ANALYSIS, CardAction.CLI_SESSIONS, CardAction.TEAM_USAGE, CardAction.TEAM_PRESENCE),
             cardActionsFor(padrao, setOf("padrao"))
         )
         assertEquals(
-            listOf(CardAction.HISTORY, CardAction.CLI_SESSIONS),
+            listOf(CardAction.HISTORY, CardAction.ANALYSIS, CardAction.CLI_SESSIONS),
             cardActionsFor(UsageTargetKey(ApiSource.ANTHROPIC, "sandbox"), setOf("padrao"))
         )
     }

@@ -27,6 +27,7 @@ internal class AppWindowStates(
     val cliSessions: WindowState,
     val codexCliSessions: WindowState,
     val comparison: WindowState,
+    val analysis: WindowState,
     val teamUsage: WindowState,
     val teamPresence: WindowState,
     val teamKeys: DialogState,
@@ -61,6 +62,9 @@ internal fun rememberAppWindowStates(
         ),
         comparison = rememberWindowState(
             size = fitWindowSize(DpSize(1000.dp * scale, 620.dp * scale), workArea)
+        ),
+        analysis = rememberWindowState(
+            size = fitWindowSize(DpSize(820.dp * scale, 620.dp * scale), workArea)
         ),
         teamUsage = rememberPersistedTeamUsageWindowState(persistedTeamUsage, uiScalePercent, workArea),
         teamPresence = rememberPersistedTeamPresenceWindowState(persistedTeamPresence, uiScalePercent, workArea),

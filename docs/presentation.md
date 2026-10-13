@@ -150,6 +150,21 @@
   - **O texto diz "sem resposta desde o último pedido", nunca "travou"**, e há teste afirmando isso nos dois
     idiomas: a evidência é o transcript, e o app não olha o sistema operacional.
 
+## Análise da sessão (rodada AB)
+
+Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeria em `docs/planos/analise-sessao-visual/`.
+
+- **Dados** (`SessionAnalysis`, domain, `buildSessionAnalysis` pura): janela 5h e semanal (percentual, ritmo agora na
+  última hora, ritmo médio desde o início nominal, ritmo seguro até o reinício e onde chega no reinício), intervalos de 1 h
+  a 7 d, 24 horas, mapa 7 × 24, dias, fatias de 30 min da janela aberta, a janela anterior no mesmo ponto e a vazão por
+  modelo. Ritmo é a subida entre leituras do histórico (a regra de `positiveDeltaOf`); vazão é a diferença de dois recortes
+  "desde" do índice CLI, somas e nunca média de razões. `null` é não medido. Leitura em `SessionAnalysisReader.kt`
+  (desktopMain), compartilhada pelo bot e pela janela.
+- **Janela "Análise"** (`AnalysisScreen`, `AnalysisViewModel`): aberta pelo `CardAction.ANALYSIS` — valor novo no enum,
+  **exceção aprovada** pelo usuário (U2), em `cardActionsFor` para Anthropic e Codex, depois de Histórico; ícone
+  `Icons.Rounded.Insights`. Abas = vistas de texto do `/analise`, mesmo texto sem as marcas do Telegram, em `labelMedium`
+  (Plex Mono). Sob demanda, "Atualizar" relê; sem histórico, `AppEmptyState`.
+
 ## Sistema visual — janelas, cards e tooltips
 
 Movido do `CLAUDE.md`, que guarda só as regras.
