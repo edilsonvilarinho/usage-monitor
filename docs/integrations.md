@@ -402,9 +402,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     Conversa só de leitura recebe tudo, mas comando que muda o app (`BotCommand.changesApp`, `when` exaustivo — comando
     novo não compila sem decidir) responde com a recusa, e toque de fonte ou silêncio só fecha o "carregando" com o aviso.
     O papel é relido a cada comando e toque. Interruptor **Controle** por conversa no card.
-  - `/idioma pt|en|app` (`/language`, AA24): idioma por conversa (`TelegramChat.language`, `null` = o do app; valor
-    desconhecido no arquivo vale como `null`). Respostas, toques, alertas, resumo diário e painel saem no idioma de cada
-    conversa — o repasse monta o texto uma vez por idioma. O menu do Telegram (`setMyCommands`) continua no idioma do app.
+  - ~~`/idioma`~~ (AA24) **saiu** na análise da sessão (B02, decisão do usuário: o idioma do app manda). Menu, respostas,
+    toques, alertas, resumo diário e painel saem sempre no idioma do app; o `pollLoop` guarda o idioma em que registrou o
+    menu e chama `setMyCommands` de novo quando o do app muda (dentro de um ciclo de long polling, até 25 s). O campo
+    `language` das conversas no `telegram.json` antigo é ignorado (`ignoreUnknownKeys`).
   - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado (📊 Status,
     👤 Conta, 📈 Gráfico, ⏳ Quando, no idioma da conversa); `off` manda `remove_keyboard`. O toque chega como **texto** com o
     rótulo e `parseKeyboardLabel` o traduz no comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos

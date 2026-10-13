@@ -100,7 +100,7 @@ internal class TelegramBotHandlers(
             return
         }
         val settings = settingsFlow.value
-        val language = settings.languageOf(message.chatId, languageProvider())
+        val language = languageProvider()
         if (command is BotCommand.Start) {
             if (!settings.isAuthorized(message.chatId) && settings.acceptsPairing(command.code, clock.now().toEpochMilliseconds())) {
                 val paired = settings.copy(
@@ -202,13 +202,6 @@ internal class TelegramBotHandlers(
                 token, chatId, TelegramBotChatMessages.keyboard(command.on, language), html = true,
                 replyKeyboard = if (command.on) TelegramReplyKeyboard.Show(telegramKeyboardRows(language)) else TelegramReplyKeyboard.Remove
             )
-            is BotCommand.ChatLanguage -> {
-                val current = settingsFlow.value
-                val next = current.copy(authorizedChats = current.authorizedChats.map { chat -> if (chat.id == chatId) chat.copy(language = command.language) else chat })
-                runCatching { saveSettings(next) }
-                settingsFlow.value = next
-                send(token, chatId, TelegramBotChatMessages.languageSet(command.language, next.languageOf(chatId, languageProvider())))
-            }
             is BotCommand.Windows -> {
                 // Semanais pedem o mês: em 7 dias cabem uma ou duas janelas de 7 d.
                 val range = if (command.weekly) HistoryRange.LAST_30_DAYS else HistoryRange.LAST_7_DAYS
@@ -246,7 +239,7 @@ internal class TelegramBotHandlers(
             pendingThresholds.remove(chatId)
             return
         }
-        val language = settings.languageOf(chatId, languageProvider())
+        val language = languageProvider()
         val answer = text.trim().lowercase()
         val backToGeneral = answer == "geral" || answer == "general"
         val percents = if (backToGeneral) null else parseThresholdPercents(answer)
@@ -333,7 +326,7 @@ internal class TelegramBotHandlers(
     }
 
     private suspend fun handleButton(token: String, message: TelegramIncomingMessage, callbackId: String) {
-        val language = settingsFlow.value.languageOf(message.chatId, languageProvider())
+        val language = languageProvider()
         val tap = parseBotTap(message.callbackData)
         // O papel é relido no toque: um teclado enviado antes de a conversa virar só leitura não vale mais.
         if (settingsFlow.value.isReadOnly(message.chatId) && tapChangesApp(tap, BotButton.fromData(message.callbackData))) {

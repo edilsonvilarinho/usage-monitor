@@ -133,6 +133,7 @@ class TelegramBotServiceTest {
     private val applied = AtomicInteger()
     @Volatile private var readyVersion: String? = null
     @Volatile private var snapshot: UsageSnapshot? = null
+    @Volatile private var appLanguage = AppLanguage.PT
     @Volatile private var sourceHealth: List<SourceHealthObservation>? = null
     private val enabledSources = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
     private val service = TelegramBotService(
@@ -143,7 +144,7 @@ class TelegramBotServiceTest {
         saveAlertSettings = { updated -> alertSettings.value = updated },
         alerts = alerts,
         snapshotProvider = { snapshot },
-        languageProvider = { AppLanguage.PT },
+        languageProvider = { appLanguage },
         requestRefresh = { refreshes.incrementAndGet() },
         clock = object : Clock { override fun now() = Instant.parse("2026-10-06T12:00:00Z") },
         enabledSources = { enabledSources.value },
@@ -290,19 +291,19 @@ class TelegramBotServiceTest {
         assertEquals(null, alertSettings.value.snoozedUntilEpochMillis)
     }
 
-    /** #408, AA24: `/idioma en` vale só para esta conversa — o alerta sai em inglês nela e em português na outra. */
+    /** B02: o idioma do app manda — trocá-lo registra o menu de novo, e os alertas seguem o idioma novo. */
     @Test
-    fun `chat language changes replies and alerts of that chat only`() {
+    fun `menu and alerts follow the app language when it changes`() {
         settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed"), TelegramChat(52L, "@outra")))
         service.start()
-        api.pending += message(1, chat = 51, text = "/idioma en")
+        waitUntil { api.menus.isNotEmpty() }
+        assertEquals("conta", api.menus.first()[1].first)
 
-        waitUntil { api.sent.any { it.first == 51L && it.second == "🌐 This chat now speaks English." } }
-        assertEquals(AppLanguage.EN, settings.value.authorizedChats.first { it.id == 51L }.language)
+        appLanguage = AppLanguage.EN
+        waitUntil { api.menus.size >= 2 }
+        assertEquals("account", api.menus.last()[1].first)
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
-
-        waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("<b>CLI session saturated</b>") } }
-        waitUntil { api.sent.any { it.first == 52L && it.second.startsWith("<b>Sessão CLI saturada</b>") } }
+        waitUntil { api.sent.count { it.second.startsWith("<b>CLI session saturated</b>") } == 2 }
     }
 
     /** #408, AA30: `/teclado on` manda o teclado fixo, e tocar um botão dele é o comando. */

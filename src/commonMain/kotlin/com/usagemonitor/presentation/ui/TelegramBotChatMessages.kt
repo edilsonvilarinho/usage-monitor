@@ -118,14 +118,6 @@ internal object TelegramBotChatMessages {
         else -> "⌨ Shortcuts removed."
     }
 
-    /** Confirmação do `/idioma` (AA24), já no idioma novo. */
-    fun languageSet(language: AppLanguage?, effective: AppLanguage): String = when {
-        language == null && effective == AppLanguage.PT -> "🌐 Esta conversa segue o idioma do app (português)."
-        language == null -> "🌐 This chat follows the app language (English)."
-        effective == AppLanguage.PT -> "🌐 Esta conversa agora fala português."
-        else -> "🌐 This chat now speaks English."
-    }
-
     /** Recusa de conversa só de leitura (AA21): diz o papel e onde mudá-lo. */
     fun readOnly(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "🔒 Esta conversa é <b>só leitura</b>: ela vê as cotas, mas não muda alertas, fontes nem silêncio. Quem pareou dá controle em Configurações › Alertas › Bot do Telegram."

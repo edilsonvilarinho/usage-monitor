@@ -1,6 +1,5 @@
 package com.usagemonitor.data.datasource
 
-import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -11,7 +10,7 @@ import java.io.File
 import java.security.SecureRandom
 
 @Serializable
-private data class TelegramChatDto(val id: Long, val name: String = "", val readOnly: Boolean = false, val language: String? = null)
+private data class TelegramChatDto(val id: Long, val name: String = "", val readOnly: Boolean = false)
 
 @Serializable
 private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
@@ -64,7 +63,7 @@ internal class LocalTelegramSettingsDataSource(
             botToken = dto.botToken,
             // Idioma fora do enum é arquivo editado à mão: vale como "o do app".
             authorizedChats = dto.authorizedChats.map { chat ->
-                TelegramChat(chat.id, chat.name, chat.readOnly, AppLanguage.entries.firstOrNull { language -> language.name == chat.language })
+                TelegramChat(chat.id, chat.name, chat.readOnly)
             },
             pairingCode = dto.pairingCode,
             pairingExpiresAtMillis = dto.pairingExpiresAtMillis,
@@ -94,7 +93,7 @@ internal class LocalTelegramSettingsDataSource(
         val dto = TelegramSettingsDto(
             enabled = settings.enabled,
             botToken = settings.botToken.trim(),
-            authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name, chat.readOnly, chat.language?.name) },
+            authorizedChats = settings.authorizedChats.map { chat -> TelegramChatDto(chat.id, chat.name, chat.readOnly) },
             pairingCode = settings.pairingCode,
             pairingExpiresAtMillis = settings.pairingExpiresAtMillis,
             allowSourceControl = settings.allowSourceControl,

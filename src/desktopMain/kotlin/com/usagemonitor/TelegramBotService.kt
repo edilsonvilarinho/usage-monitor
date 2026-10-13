@@ -192,6 +192,9 @@ internal class TelegramBotService(
 
     private suspend fun pollLoop() {
         var activeToken: String? = null
+        // Idioma em que o menu foi registrado: trocar o idioma do app registra de novo
+        // (análise da sessão, B02) — antes o menu ficava no idioma da conexão.
+        var menuLanguage: AppLanguage? = null
         var botUsername: String? = null
         var offset: Long? = null
         var failures = 0
@@ -210,8 +213,13 @@ internal class TelegramBotService(
                     // Pula o acumulado: o último update vira o ponto de partida.
                     offset = api.getUpdates(settings.botToken, offset = -1, timeoutSeconds = 0).lastOrNull()?.updateId?.plus(1)
                     activeToken = settings.botToken
-                    registerMenu(settings.botToken)
+                    menuLanguage = null
                     botUsername = fetchUsername(settings.botToken)
+                }
+                val appLanguage = languageProvider()
+                if (appLanguage != menuLanguage) {
+                    registerMenu(settings.botToken, appLanguage)
+                    menuLanguage = appLanguage
                 }
                 _status.value = TelegramBotStatus.Connected(settings.authorizedChats.size, botUsername)
                 val updates = api.getUpdates(settings.botToken, offset, LONG_POLL_SECONDS)
@@ -240,8 +248,8 @@ internal class TelegramBotService(
         runCatching { api.getMe(token) }.onFailure { error -> if (error is CancellationException) throw error }.getOrNull()
 
     /** Menu de comandos do Telegram (#396). Falhar aqui não derruba a conexão: o bot responde sem o menu. */
-    private suspend fun registerMenu(token: String) {
-        runCatching { api.setMyCommands(token, TelegramBotMessages.menu(languageProvider())) }
+    private suspend fun registerMenu(token: String, language: AppLanguage) {
+        runCatching { api.setMyCommands(token, TelegramBotMessages.menu(language)) }
             .onFailure { error -> if (error is CancellationException) throw error }
     }
 
@@ -294,7 +302,7 @@ internal class TelegramBotService(
         val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
         for (chatId in chats) {
             val machine = if (settings.preferences.showMachineName) readings.machineName() else null
-            val language = settings.languageOf(chatId, languageProvider())
+            val language = languageProvider()
             val body = if (settings.preferences.compactPanel) {
                 TelegramBotSummaryMessages.compactPanel(snapshot, language)
             } else {
@@ -389,7 +397,7 @@ internal class TelegramBotService(
         alertGroups.entries.removeAll { entry -> entry.value.day != day }
         val machine = if (preferences.showMachineName) readings.machineName() else null
         for (chat in settings.authorizedChats) {
-            val language = settings.languageOf(chat.id, languageProvider())
+            val language = languageProvider()
             val group = key?.let { groupKey -> alertGroups[chat.id to groupKey] }
             if (key != null && group != null) {
                 val next = group.copy(count = group.count + 1)
@@ -476,7 +484,7 @@ internal class TelegramBotService(
         val texts = mutableMapOf<AppLanguage, String>()
         val machine = if (settings.preferences.showMachineName) readings.machineName() else null
         for (chat in settings.authorizedChats) {
-            val language = settings.languageOf(chat.id, languageProvider())
+            val language = languageProvider()
             val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
             runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language), silent = silent) }
                 .onFailure { error -> if (error is CancellationException) throw error }
