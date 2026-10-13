@@ -113,6 +113,8 @@ sealed interface BotCommand {
     data object Week : BotCommand
     /** `/janelas [5h|7d]` (#408, AA12): as últimas janelas com pico e faixa ativa. */
     data class Windows(val weekly: Boolean) : BotCommand
+    /** `/comparar [24h|7d|30d]` (#408, AA6): o mapa de calor da comparação entre modelos, em PNG. */
+    data class Compare(val days: Int) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -157,6 +159,12 @@ fun parseBotCommand(text: String): BotCommand? {
         "pico", "spike" -> BotCommand.Spike
         "vazao", "vazão", "throughput", "speed" -> BotCommand.Throughput
         "semana", "week" -> BotCommand.Week
+        "comparar", "compare" -> when (args.firstOrNull()?.lowercase()) {
+            "24h", "1d", "1" -> BotCommand.Compare(1)
+            null, "7d", "7" -> BotCommand.Compare(7)
+            "30d", "30" -> BotCommand.Compare(30)
+            else -> BotCommand.Invalid("/comparar 24h | /comparar 7d | /comparar 30d")
+        }
         "janelas", "windows" -> when (args.firstOrNull()?.lowercase()) {
             null, "5h", "5" -> BotCommand.Windows(weekly = false)
             "7d", "7", "semana", "week" -> BotCommand.Windows(weekly = true)

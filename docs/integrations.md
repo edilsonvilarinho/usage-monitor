@@ -384,6 +384,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - **Sparkline no `/status`** (AA13): embaixo da barra de cada cota com pelo menos duas leituras nas últimas 6 h, doze blocos
     `▁…█` de 30 min — cada bloco com o uso da última leitura até o fim dele (não inventa ponto entre leituras), espaço antes
     da primeira. O número continua escrito na barra; a linha só dá a forma. Vale também para a edição do botão Atualizar.
+  - `/comparar [24h|7d|30d]` (`/compare`, AA6; padrão 7 d): PNG com o mapa de calor da comparação entre modelos (#386, P7) —
+    mesmas células (`comparisonCell`) e intensidade (`heatIntensity`, contra todas as linhas mesmo com o teto de 12),
+    desenhado por `TelegramHeatmapRenderer` no Skia do `/grafico`; o dourado da célula tem teto para o número claro manter
+    contraste. Índice ilegível ou recorte vazio respondem em texto.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

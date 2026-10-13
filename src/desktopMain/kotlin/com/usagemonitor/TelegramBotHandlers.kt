@@ -11,6 +11,7 @@ import com.usagemonitor.presentation.ui.TelegramBotChatMessages
 import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
 import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.presentation.ui.TelegramBotUsageMessages
+import com.usagemonitor.presentation.ui.buildTelegramHeatmap
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.BotTap
@@ -127,6 +128,7 @@ internal class TelegramBotHandlers(
                 send(token, chatId, TelegramBotUsageMessages.throughput(readings.comparison(since), language))
             }
             BotCommand.Week -> send(token, chatId, TelegramBotUsageMessages.week(readings.accountHistory(HistoryRange.LAST_7_DAYS), language))
+            is BotCommand.Compare -> sendHeatmap(token, chatId, command.days, language)
             is BotCommand.Windows -> {
                 // Semanais pedem o mês: em 7 dias cabem uma ou duas janelas de 7 d.
                 val range = if (command.weekly) HistoryRange.LAST_30_DAYS else HistoryRange.LAST_7_DAYS
@@ -149,6 +151,21 @@ internal class TelegramBotHandlers(
     private suspend fun sendStatus(token: String, chatId: Long, language: AppLanguage) {
         val snapshot = snapshotProvider()
         api.sendMessage(token, chatId, statusText(snapshot, language), html = true, buttons = statusButtons(language, snapshot))
+    }
+
+    /** `/comparar` (#408, AA6): índice ilegível ou recorte vazio respondem em texto. */
+    private suspend fun sendHeatmap(token: String, chatId: Long, days: Int, language: AppLanguage) {
+        val rows = readings.comparison(clock.now().toEpochMilliseconds() - days * DAY_MILLIS)
+        if (rows == null) {
+            send(token, chatId, TelegramBotUsageMessages.throughput(null, language))
+            return
+        }
+        val heatmap = buildTelegramHeatmap(rows, language)
+        if (heatmap.isEmpty) {
+            send(token, chatId, TelegramBotUsageMessages.compareEmpty(language))
+            return
+        }
+        api.sendPhoto(token, chatId, TelegramHeatmapRenderer.render(heatmap), TelegramBotUsageMessages.compareCaption(days, language))
     }
 
     /** O `/status` com a sparkline das últimas 6 h de cada cota (#408, AA13). */

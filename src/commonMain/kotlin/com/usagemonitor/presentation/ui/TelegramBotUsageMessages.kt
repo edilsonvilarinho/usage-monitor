@@ -137,6 +137,17 @@ internal object TelegramBotUsageMessages {
     private val SPARK_BUCKET = 30.minutes
     private val SPARK_SPAN = 6.hours
 
+    /** Legenda da imagem do `/comparar` (AA6): o recorte e a regra da cor. */
+    fun compareCaption(days: Int, language: AppLanguage): String =
+        if (language == AppLanguage.PT) {
+            "<b>Comparação · últimos $days ${if (days == 1) "dia" else "dias"}</b>\n<i>cor: valor sobre o maior da coluna; o número está sempre escrito</i>"
+        } else {
+            "<b>Comparison · last $days ${if (days == 1) "day" else "days"}</b>\n<i>color: value over the column maximum; the number is always written</i>"
+        }
+
+    fun compareEmpty(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "Nenhum uso no recorte para comparar." else "No usage in range to compare."
+
     private const val MAX_WINDOWS = 4
     private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
 

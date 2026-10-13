@@ -48,6 +48,7 @@ internal object TelegramBotMessages {
             "vazao" to "Tokens por segundo por modelo (24h)",
             "semana" to "Esta semana contra a anterior",
             "janelas" to "Últimas janelas com pico (5h ou 7d)",
+            "comparar" to "Mapa de calor dos modelos (7d)",
             "alertas" to "Liga ou desliga os alertas (on ou off)",
             "silencio" to "Horário de silêncio (22-07 ou off)",
             "limiar" to "Limiares de alerta de cota (75,90)",
@@ -70,6 +71,7 @@ internal object TelegramBotMessages {
             "throughput" to "Tokens per second per model (24h)",
             "week" to "This week against the previous one",
             "windows" to "Latest windows with their peak (5h or 7d)",
+            "compare" to "Model heat map (7d)",
             "alerts" to "Turn alerts on or off",
             "quiet" to "Quiet hours (22-07 or off)",
             "threshold" to "Quota alert thresholds (75,90)",
@@ -213,6 +215,7 @@ internal object TelegramBotMessages {
             "<code>/vazao</code> — tokens por segundo por modelo, 24 h\n" +
             "<code>/semana</code> — últimos 7 dias contra os 7 anteriores\n" +
             "<code>/janelas</code> · <code>/janelas 7d</code> — últimas janelas, pico e tempo ativo\n" +
+            "<code>/comparar</code> · <code>/comparar 30d</code> — mapa de calor dos modelos\n" +
             "<code>/alertas on</code> · <code>/alertas off</code> — liga ou desliga os alertas\n" +
             "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
             "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
@@ -234,6 +237,7 @@ internal object TelegramBotMessages {
             "<code>/throughput</code> — tokens per second per model, 24 h\n" +
             "<code>/week</code> — last 7 days against the 7 before\n" +
             "<code>/windows</code> · <code>/windows 7d</code> — latest windows, peak and active time\n" +
+            "<code>/compare</code> · <code>/compare 30d</code> — model heat map\n" +
             "<code>/alerts on</code> · <code>/alerts off</code> — turn alerts on or off\n" +
             "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
             "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
