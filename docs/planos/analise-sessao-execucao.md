@@ -37,7 +37,7 @@
 | D2 | O menu é uma lista plana de 30 comandos, na ordem de chegada | `TelegramBotMessages.menu` e `help` são listas literais, PT e EN escritas à mão em duas cópias | confirmado |
 | D3 | O Telegram não tem seção no menu de comandos | `setMyCommands` aceita só pares nome/descrição | confirmado (API) — a categoria vai na ordem e no prefixo da descrição |
 | D4 | Ritmo em pp/h tem fonte | histórico de cotas (`GetUsageHistoryUseCase`, `UsageHistoryPoint.capturedAt/used/total`) | confirmado |
-| D5 | Tokens/s por intervalo | `OutputThroughput` é soma de tokens e de tempo (`outputTokens`, `generationMillis`); por diferença de dois recortes `since` dá o intervalo sem média de razões. `getHourlyUsage` não traz tempo de geração | Claude **a verificar na B04**; Codex **a verificar na B04** (`getModelUsage(since)`) |
+| D5 | Tokens/s por intervalo | `OutputThroughput` é soma de tokens e de tempo (`outputTokens`, `generationMillis`); por diferença de dois recortes `since` dá o intervalo sem média de razões. `getHourlyUsage` não traz tempo de geração | **confirmado na B04**: os dois devolvem somas por modelo "desde" um instante |
 | D6 | `CardAction` é o dono das ações do card e do balão | `CardActions.kt`, `cardActionsFor` | confirmado |
 
 ## Organização do menu (B01)
@@ -95,13 +95,14 @@ Regras que valem para todas:
 | B01 | `refactor(telegram): build the command menu and help from one catalog by category` | `gradlew.bat desktopTest --tests "*Telegram*"`: 111 testes, 0 falhas (novos: todo nome do catálogo, PT e EN, é comando que o bot entende; categorias contíguas no menu com o emoji da categoria abrindo a descrição; nomes só `a-z0-9_`; um cabeçalho por categoria no `/ajuda` de cada idioma). `TelegramBotMessages` caiu de 353 para 277 linhas | concluída |
 | B02 | `feat(telegram): follow the app language everywhere and drop /idioma` | `gradlew.bat desktopTest --tests "*Telegram*"`: 111 testes, 0 falhas (novo: trocar o idioma do app registra o menu de novo — `conta` → `account` — e o alerta seguinte sai em inglês nas duas conversas; `/idioma en` passou a ser comando desconhecido). `TelegramChat.language`, `languageOf`, `BotCommand.ChatLanguage` e `languageSet` removidos | concluída |
 | B03 | `fix(telegram): show Portuguese series labels in the app language` | varredura de literais acentuados fora de ramo de idioma nos `Telegram*Messages`, renderizadores, serviço e `UsageAlertMessages`: todas as mensagens já tinham EN; vazavam as chaves de série PT e o "Token do bot recusado" das Configurações. `gradlew.bat desktopTest --tests "*Telegram*" --tests "*UsageAlert*"`: 181 testes, 0 falhas (novo: `Saldo` → `Balance`, `Go semanal` → `Go weekly`, rótulo neutro igual, PT intacto, `/status` em inglês sem "Saldo") | concluída |
+| B04 | `feat(analysis): build the session analysis from quota history and CLI throughput` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*SessionAnalysis*"`: 112 + 4 testes, 0 falhas (novos, cenário 12:30 BRT com a 5h em 62%: ritmo agora 21 pp/h, médio 17,7, seguro 25,3, ≈93% no reset; intervalos e fatias com 50 tok/s exatos por diferença de recortes; anterior no mesmo ponto 71%; dias locais e mapa 7×24; sem índice a vazão fica nula). D5 confirmado: Claude `getModelThroughputs(perfil, since)` e Codex `getModelUsage(since)` devolvem somas | concluída |
 
 ## Problemas em aberto e riscos
 
 | # | Risco | Estado |
 | --- | --- | --- |
 | R1 | Nada é conferido contra o Telegram real (edição com teclado, `sendPhoto`, `sendDocument`) | aberto |
-| R2 | Tokens/s por intervalo pode não existir para o Codex (D5) | aberto — B04 confirma ou a linha diz "sem leitura" |
+| R2 | Tokens/s por intervalo pode não existir para o Codex (D5) | fechado na B04: `CodexCliModelUsage.throughput`. O Codex mede a máquina toda, não a conta |
 | R3 | O PR #409 cresce com esta entrega (decisão U3) | aceito |
 
 ## Desvios do plano e achados da execução

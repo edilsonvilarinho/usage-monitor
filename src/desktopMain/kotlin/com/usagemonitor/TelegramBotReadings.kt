@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.SourceHealthObservation
+import com.usagemonitor.domain.entity.SessionAnalysis
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.UsageSpike
 
@@ -45,5 +46,7 @@ internal class TelegramBotReadings(
     /** AA17: fecha o app e instala a versão pronta — o mesmo botão da faixa do app. */
     val applyUpdate: () -> Unit = {},
     /** AA18: como cada conta saiu da última coleta; `null` antes da primeira. */
-    val sourceHealth: () -> List<SourceHealthObservation>? = { null }
+    val sourceHealth: () -> List<SourceHealthObservation>? = { null },
+    /** Análise da sessão (rodada AB) da conta de `storageKey`; `null` fora de Anthropic e Codex ou sem leitura. */
+    val sessionAnalysis: suspend (targetKey: String) -> SessionAnalysis? = { null }
 )
