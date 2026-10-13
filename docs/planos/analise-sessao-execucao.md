@@ -112,6 +112,7 @@ Regras que valem para todas:
 | B18 | `feat(telegram): send the session analysis as a one page pdf` | `gradlew.bat desktopTest --tests "*TelegramAnalysis*"`: 0 falhas (novo: `%PDF-` de uma página; nome `analise-anthropic-2026-10-06-1230.pdf` sem rótulo nem e-mail da conta; legenda com o resumo em uma linha no idioma do app). Página renderizada a olho (PDFBox → PNG temporário): cartão, curva, horas e dias em A4 paisagem, fundo escuro do relatório. Todo texto está nas imagens: o PDF não tem contrato de caracteres próprio | concluída |
 | B19 | `feat(telegram): reach the session analysis from /status and /conta` | `gradlew.bat desktopTest --tests "*Telegram*"`: 129 testes, 0 falhas (novo: `/status` com conta Anthropic ou Codex ganha a linha "📐 Análise" (`anp`, toque novo `BotTap.AnalysisPick` — `BotButton` é enum e não cresce), e o toque abre a mesma análise do `/analise`; a conta analisável do `/conta` ganha "📐 Analisar esta conta" (`ana:<conta>`)). Primeira rodada: compilação falhou por falta do import da extensão `data` | concluída |
 | B20 | `feat(analysis): open the session analysis window from the card and the HUD` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CardAction*" --tests "*Analysis*"`: 0 falhas (novos: `AnalysisScreenTest` — título com a conta, aba Painel com o texto sem marcas, clique em Intervalos pede a vista; estado vazio em inglês). `CardActionsTest` atualizado: Anthropic e Codex ganham `ANALYSIS` depois de Histórico (exceção U2). Primeira rodada: 2 falhas esperadas no `CardActionsTest` (lista fixada antes da regra nova) e 1 erro de compilação (`weight` fora de `ColumnScope`). Leitura extraída para `SessionAnalysisReader.kt`, usada pelo bot e pela janela | concluída |
+| B21 | `feat(analysis): show the analysis charts in the app window` | `gradlew.bat desktopTest --tests "*Analysis*"`: 0 falhas (`AnalysisScreenTest` com 3: aba de imagem mostra o desenho, "Horas" pede a vista, "Texto" volta ao painel). Os mesmos PNGs do bot, por `AnalysisImageProvider` de `desktopMain`; segmentado Texto · Gráficos para as 12 abas caberem em 640 dp. Não conferido na janela real (risco R4) | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -122,5 +123,7 @@ Regras que valem para todas:
 | R3 | O PR #409 cresce com esta entrega (decisão U3) | aceito |
 
 ## Desvios do plano e achados da execução
+- B21: os gráficos da janela são os mesmos PNGs escuros do bot (não Canvas por vista, como dizia a galeria) e não seguem o
+  tema claro. Doze abas não cabiam na janela mínima: entrou o segmentado Texto | Gráficos.
 - B03: o **app** em inglês também mostra "Saldo"/"Go semanal" (`expandedQuotaTitle` devolve o rótulo cru em cota de moeda) —
   fora do escopo do bot; virou tarefa separada (reaproveitar `displayQuotaLabel` nas telas).

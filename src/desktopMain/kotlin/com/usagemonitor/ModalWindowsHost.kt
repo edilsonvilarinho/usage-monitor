@@ -3,6 +3,8 @@ package com.usagemonitor
 import com.usagemonitor.presentation.ui.ComparisonScreen
 import com.usagemonitor.presentation.ui.AnalysisLabels
 import com.usagemonitor.presentation.ui.AnalysisScreen
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import org.jetbrains.skia.Image
 
 import com.usagemonitor.presentation.ui.ComparisonLabels
 
@@ -126,7 +128,14 @@ internal fun ModalWindowsHost(
         onCloseRequest = { modal.isAnalysisOpen = false },
         openGeneration = modal.analysisOpenGeneration
     ) {
-        AnalysisScreen(viewModel = viewModels.analysis, language = language)
+        AnalysisScreen(
+            viewModel = viewModels.analysis,
+            language = language,
+            // Os PNGs do `/analise` do bot (Skia), decodificados para a tela.
+            imageFor = { view, analysis, imageLanguage ->
+                TelegramAnalysisRenderer.render(view, analysis, imageLanguage)?.let { png -> Image.makeFromEncoded(png).toComposeImageBitmap() }
+            }
+        )
     }
 
     AppDialogWindow(

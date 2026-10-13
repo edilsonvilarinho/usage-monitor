@@ -164,6 +164,11 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   **exceção aprovada** pelo usuário (U2), em `cardActionsFor` para Anthropic e Codex, depois de Histórico; ícone
   `Icons.Rounded.Insights`. Abas = vistas de texto do `/analise`, mesmo texto sem as marcas do Telegram, em `labelMedium`
   (Plex Mono). Sob demanda, "Atualizar" relê; sem histórico, `AppEmptyState`.
+- **Gráficos na janela** (B21): as vistas de imagem são **os mesmos PNGs do bot** (`TelegramAnalysisRenderer`, Skia,
+  fundo escuro), decodificados por `AnalysisImageProvider` vindo de `desktopMain` — um desenho só para as duas portas.
+  Doze abas não cabem na janela mínima (640 dp): `AppSegmentedControl` **Texto | Gráficos** escolhe o grupo e `AppTabs`
+  a vista dentro dele (papéis distintos). Nome da aba sem o emoji do Telegram (a Plex não tem o glifo). **Desvio**: o
+  mockup falava em Canvas por vista; a imagem não segue o tema claro (fica escura nos dois temas).
 
 ## Sistema visual — janelas, cards e tooltips
 
