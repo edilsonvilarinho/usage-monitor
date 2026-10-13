@@ -51,4 +51,17 @@ class TelegramAnalysisMessagesTest {
         assertTrue("7 d          7,4      47        —" in text, text)
         assertTrue("pace by interval" in TelegramAnalysisMessages.text(AnalysisView.INTERVALS, AnalysisFixture.analysis, AppLanguage.EN)!!)
     }
+
+    /** AB4: frases só com dado medido — reinício, comparação no mesmo ponto, hora pesada, semanal e vazão. */
+    @Test
+    fun `sentences read the numbers in plain words`() {
+        val text = TelegramAnalysisMessages.text(AnalysisView.SENTENCES, AnalysisFixture.analysis, AppLanguage.PT)!!
+        assertTrue("• A 5h está em <b>62%</b> e chega a <b>~83%</b> no reinício das 14:00 — <b>não estoura</b>." in text, text)
+        assertTrue("<b>13% abaixo</b> da janela anterior no mesmo ponto" in text, text)
+        assertTrue("Hora mais pesada nas últimas 24 h: <b>15h</b> (17 pp)." in text, text)
+        assertTrue("cabem <b>1,5 pp/h</b>" in text && "claude-sonnet 71 tok/s" in text, text)
+        val bare = AnalysisFixture.analysis.copy(previous = null, modelSpeeds = emptyList())
+        val en = TelegramAnalysisMessages.text(AnalysisView.SENTENCES, bare, AppLanguage.EN)!!
+        assertTrue("previous window" !in en && "In the last hour" !in en && "does not run out" in en, en)
+    }
 }

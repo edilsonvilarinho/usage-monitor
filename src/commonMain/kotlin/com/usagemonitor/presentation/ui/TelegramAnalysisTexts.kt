@@ -54,6 +54,57 @@ internal object TelegramAnalysisTexts {
         return "$title\n<pre>${TelegramBotMessages.escape((listOf(head) + rows).joinToString("\n"))}</pre>\n$footer"
     }
 
+    /**
+     * AB4 · leitura em frases: o que os números dizem, frase por frase. Frase sem dado medido
+     * não sai — sem janela anterior, a comparação some em vez de virar "0% abaixo".
+     */
+    fun sentences(analysis: SessionAnalysis, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val lines = mutableListOf<String>()
+        analysis.fiveHour?.let { window ->
+            val reset = window.resetsAt?.let { at -> TelegramBotMessages.clock(at) }
+            val ending = window.projectedAtReset?.let { value ->
+                val verdict = if (value >= 100) (if (pt) "<b>estoura antes</b>" else "<b>runs out before</b>") else (if (pt) "<b>não estoura</b>" else "<b>does not run out</b>")
+                if (pt) " e chega a <b>~$value%</b>" + (reset?.let { at -> " no reinício das $at" } ?: "") + " — $verdict"
+                else " and reaches <b>~$value%</b>" + (reset?.let { at -> " at the $at reset" } ?: "") + " — $verdict"
+            }.orEmpty()
+            lines += (if (pt) "A 5h está em <b>${window.percent}%</b>" else "The 5h window is at <b>${window.percent}%</b>") + "$ending."
+        }
+        analysis.previous?.let { previous ->
+            val current = previous.currentPace
+            val before = previous.previousPace
+            if (current != null && before != null && before > 0.0) {
+                val change = ((current - before) / before * 100).roundToInt()
+                val direction = if (change <= 0) (if (pt) "abaixo" else "below") else (if (pt) "acima" else "above")
+                lines += if (pt) {
+                    "Ritmo médio da janela <b>${TelegramAnalysisMessages.pace(current, true).trim()} pp/h</b>, <b>${kotlin.math.abs(change)}% $direction</b> da janela anterior no mesmo ponto."
+                } else {
+                    "Window average pace <b>${TelegramAnalysisMessages.pace(current, false).trim()} pp/h</b>, <b>${kotlin.math.abs(change)}% $direction</b> the previous window at the same point."
+                }
+            }
+        }
+        analysis.hours.filter { bucket -> (bucket.percentPoints ?: 0.0) > 0.0 }.maxByOrNull { bucket -> bucket.percentPoints ?: 0.0 }?.let { peak ->
+            val from = TelegramBotMessages.clock(peak.start).substring(0, 2)
+            val points = (peak.percentPoints ?: 0.0).roundToInt()
+            lines += if (pt) "Hora mais pesada nas últimas 24 h: <b>${from}h</b> ($points pp)." else "Heaviest hour in the last 24 h: <b>${from}h</b> ($points pp)."
+        }
+        analysis.weekly?.let { window ->
+            val room = window.safePace?.let { value -> TelegramAnalysisMessages.pace(value, pt).trim() }
+            lines += if (pt) {
+                "Semanal em <b>${window.percent}%</b>" + (room?.let { value -> "; até o reinício cabem <b>$value pp/h</b>." } ?: ".")
+            } else {
+                "Weekly at <b>${window.percent}%</b>" + (room?.let { value -> "; until the reset there is room for <b>$value pp/h</b>." } ?: ".")
+            }
+        }
+        if (analysis.modelSpeeds.isNotEmpty()) {
+            val speeds = analysis.modelSpeeds.joinToString(", ") { speed -> "<b>${TelegramBotMessages.escape(speed.model)} ${speed.tokensPerSecond.roundToInt()} tok/s</b>" }
+            lines += (if (pt) "Na última hora: " else "In the last hour: ") + "$speeds."
+        }
+        val title = "<b>📐 ${TelegramBotMessages.escape(analysis.accountLabel)} · " + (if (pt) "leitura" else "reading") + "</b>"
+        if (lines.isEmpty()) return title + "\n" + (if (pt) "Sem leitura suficiente para comentar ainda." else "Not enough readings to comment on yet.")
+        return title + "\n" + lines.joinToString("\n") { line -> "• $line" }
+    }
+
     /** Mesmo rótulo nos dois idiomas: "h" e "d" são unidades, não palavras. */
     fun spanLabel(span: AnalysisSpan): String = when (span) {
         AnalysisSpan.HOUR_1 -> "1 h"
