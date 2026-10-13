@@ -371,6 +371,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/pico` (`/spike`, AA11): as mesmas anomalias do alerta "consumo acima do habitual" (`DashboardViewModel.spikes`), mais
     forte primeiro, em pontos da cota (hoje × mediana dos dias completos até a mesma hora). Sem nenhuma, diz o fator a partir
     do qual o aviso sai (`effectiveSpikeFactor`).
+  - `/vazao` (`/throughput`, AA5): tokens de saída por segundo por modelo nas últimas 24 h, das linhas da comparação entre
+    modelos (`BuildModelComparisonUseCase`, #386) — ponta a ponta e total sobre total, nunca média de razões. Modelo sem vazão
+    medida fica fora; índice ilegível responde que não deu para ler, em vez de lista vazia.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

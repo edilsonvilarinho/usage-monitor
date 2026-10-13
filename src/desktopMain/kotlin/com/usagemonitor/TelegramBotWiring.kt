@@ -7,7 +7,10 @@ import com.usagemonitor.domain.entity.TelegramPing
 import kotlin.time.Instant
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
+import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.presentation.ui.buildTelegramChart
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
@@ -60,9 +63,19 @@ internal fun createTelegramBot(
     chartProvider = { range -> telegramChartOf(graph, range) },
     readings = TelegramBotReadings(
         ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) },
-        spikes = { dashboard.spikes.value }
+        spikes = { dashboard.spikes.value },
+        comparison = comparisonReader(graph, dashboard)
     )
 )
+
+/** A comparação entre modelos (#386) desde um instante, com as cotas da última coleta. */
+private fun comparisonReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (Long) -> List<ComparisonRow>? {
+    val buildComparison = BuildModelComparisonUseCase(graph.cliSessionRepository, graph.codexCliSessionRepository)
+    return { since ->
+        val stats = (dashboard.uiState.value as? UiState.Success)?.data.orEmpty()
+        buildComparison(since, stats).getOrNull()
+    }
+}
 
 /** Janela do gasto no resumo diário do bot (#398, Y1). */
 private const val DAILY_SPEND_WINDOW_MILLIS = 24 * 60 * 60 * 1_000L

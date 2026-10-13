@@ -148,6 +148,7 @@ Molde por tipo de opção:
 | A05 | `feat(telegram): suggest a daily pace for long windows with /ritmo` | `gradlew.bat desktopTest --tests "*Telegram*"`: 63 testes, 0 falhas (novo: 39 pp em 3,2 dias → ~12 pp por dia; janela de menos de um dia fora) | concluída |
 | A06 | `feat(telegram): answer /ping with version, uptime and last collection` | `gradlew.bat desktopTest --tests "*Telegram*"`: 64 testes, 0 falhas (novo: versão, 6 h 12 min aberto, próxima coleta e hora por conta; `TelegramBotReadings` criado para as leituras da #408) | concluída |
 | A07 | `feat(telegram): explain today's usage against your habit with /pico` | `gradlew.bat desktopTest --tests "*Telegram*"`: 65 testes, 0 falhas (novo: mais forte primeiro em pontos da cota; sem anomalia, o fator das Configurações) | concluída |
+| A08 | `feat(telegram): report output throughput per model with /vazao` | `gradlew.bat desktopTest --tests "*Telegram*"`: 66 testes, 0 falhas (novo: mais rápido primeiro, modelo sem vazão fora, índice ilegível) | concluída |
 
 ## Problemas em aberto e riscos
 

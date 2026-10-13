@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.snoozeAlertsUntil
 import com.usagemonitor.presentation.ui.TelegramBotChatMessages
 import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
 import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
+import com.usagemonitor.presentation.ui.TelegramBotUsageMessages
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotCommand
 import com.usagemonitor.domain.entity.BotTap
@@ -121,6 +122,10 @@ internal class TelegramBotHandlers(
             BotCommand.Pace -> send(token, chatId, TelegramBotInsightMessages.pace(snapshotProvider(), language))
             BotCommand.Ping -> send(token, chatId, TelegramBotChatMessages.ping(readings.ping(), snapshotProvider(), clock.now(), language))
             BotCommand.Spike -> send(token, chatId, TelegramBotInsightMessages.spikes(readings.spikes(), alertSettingsFlow.value.effectiveSpikeFactor, language))
+            BotCommand.Throughput -> {
+                val since = clock.now().toEpochMilliseconds() - DAY_MILLIS
+                send(token, chatId, TelegramBotUsageMessages.throughput(readings.comparison(since), language))
+            }
             BotCommand.Help -> api.sendMessage(token, chatId, TelegramBotMessages.help(language), html = true)
             is BotCommand.Invalid -> api.sendMessage(token, chatId, TelegramBotMessages.invalid(command.usage, language), html = true)
             is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> {
@@ -241,6 +246,10 @@ internal class TelegramBotHandlers(
             accountRows(snapshot)
 
     private fun accountRows(snapshot: UsageSnapshot?): List<List<TelegramButton>> = rows(TelegramBotMessages.accountButtons(snapshot))
+
+    private companion object {
+        const val DAY_MILLIS = 24 * 60 * 60 * 1_000L
+    }
 
     /** Falha de um toque fica no toque: o polling segue. Cancelamento continua subindo. */
     private suspend fun runTelegram(block: suspend () -> Unit) {

@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.TelegramPing
 import com.usagemonitor.domain.entity.UsageSpike
 
@@ -12,5 +13,10 @@ internal class TelegramBotReadings(
     /** `/ping` (AA19): versão, quando o app abriu e a próxima coleta. */
     val ping: () -> TelegramPing? = { null },
     /** `/pico` (AA11): as anomalias de gasto que o painel já calcula para o alerta. */
-    val spikes: () -> List<UsageSpike> = { emptyList() }
+    val spikes: () -> List<UsageSpike> = { emptyList() },
+    /**
+     * Linhas da comparação entre modelos (#386) desde o instante dado (`/vazao`,
+     * `/comparar`); `null` quando o índice CLI falha — "não medido", não lista vazia.
+     */
+    val comparison: suspend (sinceEpochMillis: Long) -> List<ComparisonRow>? = { null }
 )
