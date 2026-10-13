@@ -1,0 +1,233 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AB análise da sessão</title><style>body{margin:0;background:#101010}</style></head><body>
+<style>
+.ux{--bg:#131010;--surface:#1B1818;--raised:#211E1E;--border:#3D3838;--fg:#F2EDED;--muted:#B8B2B2;--ok:#4CAF50;--warn:#FFA726;--crit:#E86A6A;--info:#4C8DFF;--gold:#E8AE63;--hot:#FFF0CB;--dust:#8C643F;
+  background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux h2{font-size:14px;color:#fff;margin:26px 0 4px;font-weight:500;border-top:1px solid #2c2c2c;padding-top:16px}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 12px;color:#e9d6b8;font-size:11.5px}
+.ux .fix b{color:var(--gold)}
+.ux .fix ul{margin:4px 0 0;padding-left:16px}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:12px}
+.ux .opt.ref{border-style:dashed;border-color:#4a4a4a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt p{margin:0 0 8px;color:#8f8f8f;font-size:11px}
+.ux .tags{font-size:10.5px;color:#7a7a7a;margin-top:8px}
+.ux .tags b{color:#c9a46e;font-weight:500}
+.ux .tags .no{color:var(--crit)}
+.ux .tags .lo{color:#66BB6A}
+.ux .tags .md{color:var(--warn)}
+.ux .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.ux .grid2 .opt{margin-bottom:0}
+.ux .row{display:flex;align-items:center;gap:8px;padding:3px 0}
+.ux .row .l{flex:1;min-width:0}
+.ux .row .l b{display:block;color:var(--fg);font-weight:500;font-size:10.5px}
+.ux .row .l i{display:block;font-style:normal;font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--muted);font-size:9.5px}
+.ux .sw{width:24px;height:13px;border-radius:7px;background:#3a3535;position:relative;flex:none}
+.ux .sw::after{content:"";position:absolute;left:2px;top:2px;width:9px;height:9px;border-radius:50%;background:#bbb}
+.ux .sw.on{background:#2e7d32}.ux .sw.on::after{left:auto;right:2px;background:#fff}
+.ux .cfg{margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px 8px;font-size:10.5px}
+.ux .cfg .t{font-size:9.5px;color:#7d7676;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+/* ---------- Telegram ---------- */
+.ux .tg{background:#0e1621 radial-gradient(circle at 20% 20%,#17202c,#0e1621);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:12px;line-height:1.38;color:#f5f5f5;min-height:200px}
+.ux .tg .in,.ux .tg .out{max-width:94%;padding:6px 9px 5px;border-radius:10px;white-space:pre-wrap;word-break:break-word}
+.ux .tg .in{background:#212d3b;align-self:flex-start;border-bottom-left-radius:3px}
+.ux .tg .out{background:#766ac8;align-self:flex-end;border-bottom-right-radius:3px}
+.ux .tg .in.ghost{opacity:.45;text-decoration:line-through}
+.ux .tg .tm{float:right;font-size:10px;color:rgba(255,255,255,.45);margin:6px 0 -3px 8px}
+.ux .tg code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:11px;color:#9fd0ff}
+.ux .tg pre{font-family:"IBM Plex Mono",Consolas,monospace;font-size:10.5px;background:rgba(0,0,0,.28);border-radius:6px;padding:5px 7px;margin:3px 0;white-space:pre;overflow-x:auto;color:#e8e8e8;line-height:1.4}
+.ux .tg i{color:#a9b4c0}
+.ux .tg a{color:#6ab3f3;text-decoration:none}
+.ux .tg .kb{display:grid;gap:4px;align-self:flex-start;width:94%}
+.ux .tg .kb span{background:rgba(33,45,59,.85);border-radius:6px;text-align:center;padding:4px 2px;font-size:11px}
+.ux .tg .rk{display:grid;gap:4px;align-self:stretch;background:#17212b;border-top:1px solid #233;padding:6px;border-radius:0 0 6px 6px;margin:4px -10px -10px}
+.ux .tg .rk span{background:#2b3a4b;border-radius:6px;text-align:center;padding:6px 2px;font-size:11.5px}
+.ux .tg .pin{align-self:stretch;background:#17212b;border-left:3px solid #6ab3f3;border-radius:4px;padding:4px 8px;font-size:11px;color:#cfd8e3}
+.ux .tg .pin b{color:#6ab3f3;font-weight:500}
+.ux .tg .img{border-radius:8px;background:#0b0f15;border:1px solid #233;position:relative;overflow:hidden;margin:2px 0}
+.ux .tg .file{display:flex;gap:8px;align-items:center}
+.ux .tg .file .ic{width:34px;height:34px;border-radius:50%;background:#6ab3f3;color:#0e1621;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex:none}
+.ux .tg .note{align-self:center;font-size:10.5px;color:#8fa1b3;background:rgba(0,0,0,.25);border-radius:10px;padding:1px 8px}
+.ux .tg .bell{font-size:10px;color:#8fa1b3}
+.ux .heat{display:grid;grid-template-columns:78px repeat(3,1fr);gap:2px;font-family:"IBM Plex Mono",Consolas,monospace;font-size:9.5px;padding:6px}
+.ux .heat span{padding:3px 4px;border-radius:3px;text-align:right;color:#f5f5f5}
+.ux .heat span.h{background:none;color:#a9b4c0;text-align:left}
+.ux .rings{display:flex;gap:14px;justify-content:center;padding:10px 6px 8px}
+.ux .rg{display:flex;flex-direction:column;align-items:center;gap:4px;font-family:"IBM Plex Mono",Consolas,monospace;font-size:9.5px;color:#cfd8e3}
+.ux .rg .r{width:52px;height:52px;border-radius:50%;position:relative;box-shadow:0 0 10px #E8AE6333}
+.ux .rg .r::after{content:"";position:absolute;inset:6px;border-radius:50%;background:#030508;box-shadow:0 0 6px #E8AE6355 inset}
+.ux .rg .r b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;color:#FFF0CB;font-weight:500;font-size:11px}
+.ux .svg{display:block;width:100%;height:auto;border-radius:8px;background:#0b0f15;border:1px solid #233;margin:2px 0}
+.ux .app{margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px;font-size:10.5px;color:var(--fg)}
+.ux .app .t{font-size:9.5px;color:#7d7676;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.ux .bal{display:flex;flex-direction:column;gap:6px}
+.ux .bal .acts{display:flex;gap:6px;flex-wrap:wrap}
+.ux .bal .acts span{border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--muted)}
+.ux .bal .acts span.new{border-color:var(--gold);color:var(--hot);box-shadow:0 0 8px #E8AE6344}
+.ux .hl{color:var(--gold)}
+.ux .entry{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+</style>
+<div class="ux" id="ux">
+<h1>Análise da sessão — comando do bot e ação no detalhamento da API</h1>
+<p class="sub">Rodada <b>AB</b>, estática, 15 opções. Escolha uma ou combine (ex.: o texto de uma + a imagem de outra). Números fictícios e coerentes entre as opções: <b>Anthropic · Padrão</b> com a 5h em 62% (reinicia 14:00) e a semanal em 41%; <b>Codex</b> com a 5h em 23%.</p>
+<div class="fix"><b>Restrições levantadas antes de desenhar (código lido):</b>
+<ul>
+<li><b>Ritmo em pp/h</b> sai do histórico de cotas que o app já grava (o mesmo do <code>/janelas</code> e do <code>/ritmo</code>): diferença de percentual entre leituras ÷ tempo. Só Anthropic e Codex têm janela 5h/7d em percentual.</li>
+<li><b>Tokens/s</b> sai do índice CLI (<code>OutputThroughput</code>, ponta a ponta, soma de tokens ÷ soma de tempo — nunca média de razões). Claude Code e Codex CLI têm; a API de cota não informa tokens.</li>
+<li>Número que a fonte não informa <b>não é derivado</b>: sem histórico suficiente, a linha diz "sem leitura" em vez de zero (<code>null</code> ≠ 0).</li>
+<li>Botão novo usa <code>BotTap</code> com prefixo (≤ 64 bytes, sem rótulo nem e-mail); <code>BotButton</code> é enum e não cresce. Ação no card entra em <code>cardActionsFor</code> (dono único do card e do balão da HUD) — <code>CardAction</code> é enum: <b>valor novo exige a sua aprovação</b>, como foi com as abas da #399.</li>
+<li>Hoje a mesma informação está espalhada em 5 comandos (<code>/ritmo</code>, <code>/vazao</code>, <code>/janelas</code>, <code>/semana</code>, <code>/quando</code>) e nenhum junta 5h, 7d e tokens/s da mesma conta.</li>
+</ul></div>
+
+<h2>Onde a ação mora (vale para qualquer opção)</h2>
+<p class="sub">O comando e o botão abrem o mesmo conteúdo. No app, o resultado abre numa janela <code>AppDialogWindow</code> "Análise · &lt;conta&gt;"; as opções de imagem viram o mesmo gráfico em Compose.</p>
+<div class="entry" id="entry"></div>
+
+<h2>Referência</h2>
+<div id="ref"></div>
+
+<h2>AB · Texto na conversa</h2>
+<p class="sub">Cabe numa mensagem, copia e cola, lê no relógio.</p>
+<div class="grid2" id="g1"></div>
+
+<h2>AB · Imagem (PNG pelo <code>sendPhoto</code>)</h2>
+<p class="sub">Para mostrar como resultado: um quadro que se lê sem explicação.</p>
+<div class="grid2" id="g2"></div>
+
+<h2>AB · Formatos de navegação</h2>
+<p class="sub">Muito dado numa mensagem só: botões, comparação ou arquivo.</p>
+<div class="grid2" id="g3"></div>
+</div>
+<script>
+(function(){
+const tm=t=>`<span class="tm">${t}</span>`;
+const out=(t,h)=>`<div class="out">${t}${tm(h)}</div>`;
+const inn=(t,h,c='')=>`<div class="in ${c}">${t}${tm(h)}</div>`;
+const kb=(cols,b)=>`<div class="kb" style="grid-template-columns:repeat(${cols},1fr)">${b.map(x=>`<span>${x}</span>`).join('')}</div>`;
+const tg=b=>`<div class="tg">${b}</div>`;
+const pic=(svg,cap,h)=>`<div class="in" style="padding:4px;max-width:100%">${svg}${cap?`<div style="padding:3px 4px 0">${cap}</div>`:''}${tm(h)}</div>`;
+const app=(t,b)=>`<div class="app"><div class="t">${t}</div>${b}</div>`;
+const LO='<span class="lo">custo baixo</span>',MD='<span class="md">custo médio</span>',HI='<span class="no">custo alto</span>';
+const card=o=>`<div class="opt${o.id==='ref'?' ref':''}"><h3>${o.n}</h3><p>${o.d}</p>${o.h}${o.c||''}${o.t?`<div class="tags">${o.t}</div>`:''}</div>`;
+const G='#E8AE63',HOT='#FFF0CB',EMB='#B4501E',OK='#4CAF50',WARN='#FFA726',CRIT='#E86A6A',INFO='#4C8DFF',MUT='#8fa1b3',FG='#cfd8e3';
+const T=(x,y,s,o={})=>`<text x="${x}" y="${y}" fill="${o.c||FG}" font-size="${o.s||10}" font-family="IBM Plex Mono,Consolas,monospace" text-anchor="${o.a||'start'}" ${o.w?`font-weight="${o.w}"`:''}>${s}</text>`;
+// dados fictícios coerentes
+const hourly=[1,0,0,0,0,0,0,2,9,14,17,11,6,13,18,15,8,4,3,6,10,12,9,14]; // pp por hora, 24h até agora (12:30)
+const hours=['13','14','15','16','17','18','19','20','21','22','23','00','01','02','03','04','05','06','07','08','09','10','11','12'];
+const days=[['qua',8.2],['qui',11.4],['sex',6.1],['sáb',1.2],['dom',0.4],['seg',7.9],['ter',5.8]]; // pp da semanal por dia
+const heat=[[0,0,0,0,0,0,0,1,6,9,11,8,3,7,10,9,5,2,1,2,4,3,1,0],[0,0,0,0,0,0,0,3,10,14,15,12,5,9,13,12,8,3,2,3,5,4,2,1],[0,0,0,0,0,0,0,1,5,7,8,6,2,4,6,5,3,1,0,1,2,1,0,0],[0,0,0,0,0,0,0,0,0,2,3,2,0,0,1,1,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,2,7,10,12,9,4,8,11,10,6,2,1,2,3,2,1,0],[0,0,0,0,0,0,0,2,9,14,17,11,6,13,0,0,0,0,0,0,0,0,0,0]];
+const hc=v=>v<=0?'#141b24':`rgba(232,174,99,${Math.min(1,.18+v/17*.82)})`;
+
+function bars(){const w=320,h=150,x0=26,bw=(w-x0-6)/24,mx=18;let s=`<svg class="svg" viewBox="0 0 ${w} ${h}">`;
+ s+=T(8,14,'pp da 5h por hora · últimas 24 h',{c:MUT,s:9});
+ [0,9,18].forEach(v=>{const y=128-v/mx*100;s+=`<line x1="${x0}" x2="${w-4}" y1="${y}" y2="${y}" stroke="#223" />`+T(x0-4,y+3,v,{a:'end',c:MUT,s:8})});
+ hourly.forEach((v,i)=>{const bh=v/mx*100,x=x0+i*bw;s+=`<rect x="${x+1}" y="${128-bh}" width="${bw-2}" height="${bh}" rx="1.5" fill="${i>=20?G:'#8C643F'}"/>`;if(i%3===0)s+=T(x+bw/2,142,hours[i],{a:'middle',c:MUT,s:7.5})});
+ const tps=[0,0,0,0,0,0,0,40,52,49,47,55,0,61,48,51,44,0,0,58,49,46,50,48];
+ let p='';tps.forEach((v,i)=>{if(!v)return;const x=x0+i*bw+bw/2,y=128-v/80*100;p+=(p?'L':'M')+x+' '+y});
+ s+=`<path d="${p}" fill="none" stroke="${INFO}" stroke-width="1.3" stroke-dasharray="0" opacity=".9"/>`+T(w-6,26,'— tok/s (eixo 0–80)',{a:'end',c:INFO,s:8});
+ return s+'</svg>'}
+function gauge(cx,cy,r,val,mx,safe,lab,sub){const a=v=>Math.PI*(1-v/mx),P=v=>[cx+r*Math.cos(a(v)),cy-r*Math.sin(a(v))];
+ let s=`<path d="M${cx-r} ${cy} A${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="#223" stroke-width="9" stroke-linecap="round"/>`;
+ const [sx,sy]=P(Math.min(val,mx));s+=`<path d="M${cx-r} ${cy} A${r} ${r} 0 0 1 ${sx} ${sy}" fill="none" stroke="${val>safe?CRIT:G}" stroke-width="9" stroke-linecap="round"/>`;
+ const [kx,ky]=P(safe),[kx2,ky2]=[cx+(r+8)*Math.cos(a(safe)),cy-(r+8)*Math.sin(a(safe))];s+=`<line x1="${kx}" y1="${ky}" x2="${kx2}" y2="${ky2}" stroke="${HOT}" stroke-width="2"/>`;
+ s+=T(cx,cy-6,val.toString().replace('.',','),{a:'middle',s:17,c:HOT,w:500})+T(cx,cy+8,'pp/h',{a:'middle',c:MUT,s:8})+T(cx,cy+24,lab,{a:'middle',s:9.5})+T(cx,cy+36,sub,{a:'middle',c:MUT,s:8});return s}
+function gauges(){return `<svg class="svg" viewBox="0 0 320 170">${T(8,14,'Anthropic · Padrão — ritmo agora (última 1 h)',{c:MUT,s:9})}${gauge(85,95,52,14,40,25.3,'5h · 62%','seguro até 25,3')}${gauge(235,95,52,0.9,2,1.5,'7d · 41%','seguro até 1,5')}${T(160,160,'⚡ 48 tok/s Opus · 71 tok/s Sonnet (1 h)',{a:'middle',c:INFO,s:9})}</svg>`}
+function heatmap(){const x0=30,y0=22,cw=11.5,ch=15;let s=`<svg class="svg" viewBox="0 0 320 ${y0+7*ch+22}">`+T(8,13,'pp da 5h por hora · 7 dias (BRT)',{c:MUT,s:9});
+ days.forEach(([d],r)=>{s+=T(x0-4,y0+r*ch+11,d,{a:'end',c:MUT,s:8});heat[r].forEach((v,c)=>{s+=`<rect x="${x0+c*cw}" y="${y0+r*ch}" width="${cw-1.5}" height="${ch-1.5}" rx="2" fill="${hc(v)}"/>`;if(v>=12)s+=T(x0+c*cw+cw/2-.7,y0+r*ch+10.5,v,{a:'middle',s:7,c:'#030508',w:600})})});
+ [0,6,12,18,23].forEach(c=>s+=T(x0+c*cw+cw/2,y0+7*ch+10,String(c).padStart(2,'0'),{a:'middle',c:MUT,s:7.5}));
+ return s+'</svg>'}
+function windowCurve(){const w=320,h=160,x0=28,x1=w-10,y=v=>132-v*1.1,X=t=>x0+(x1-x0)*t/5;let s=`<svg class="svg" viewBox="0 0 ${w} ${h}">`+T(8,14,'Padrão · janela 5h (09:00 → 14:00)',{c:MUT,s:9});
+ [0,50,100].forEach(v=>s+=`<line x1="${x0}" x2="${x1}" y1="${y(v)}" y2="${y(v)}" stroke="#223"/>`+T(x0-4,y(v)+3,v+'%',{a:'end',c:MUT,s:7.5}));
+ s+=`<line x1="${X(0)}" y1="${y(0)}" x2="${X(5)}" y2="${y(100)}" stroke="${MUT}" stroke-dasharray="3 3"/>`+T(X(1.3),y(33),'ritmo seguro 20 pp/h',{c:MUT,s:7.5});
+ const pts=[[0,0],[.5,6],[1,15],[1.5,24],[2,33],[2.5,41],[3,52],[3.5,62]];s+=`<path d="${pts.map((p,i)=>(i?'L':'M')+X(p[0])+' '+y(p[1])).join('')}" fill="none" stroke="${G}" stroke-width="2"/>`;
+ s+=`<path d="M${X(3.5)} ${y(62)} L${X(5)} ${y(83)}" stroke="${G}" stroke-dasharray="4 3" fill="none" opacity=".7"/>`+T(X(5)-2,y(83)-5,'83% no reset',{a:'end',c:G,s:8});
+ s+=`<circle cx="${X(3.5)}" cy="${y(62)}" r="3" fill="${HOT}"/>`+T(X(3.5)+5,y(62)+12,'agora 62%',{s:8,c:HOT});
+ ['09','10','11','12','13','14'].forEach((l,i)=>s+=T(X(i),146,l,{a:'middle',c:MUT,s:7.5}));
+ return s+'</svg>'}
+function weekBars(){const w=320,h=150,x0=26,bw=(w-x0-10)/7,mx=12;let s=`<svg class="svg" viewBox="0 0 ${w} ${h}">`+T(8,14,'pp da semanal por dia · média 5,9',{c:MUT,s:9});
+ const avg=5.9,ya=124-avg/mx*96;s+=`<line x1="${x0}" x2="${w-6}" y1="${ya}" y2="${ya}" stroke="${MUT}" stroke-dasharray="3 3"/>`;
+ days.forEach(([d,v],i)=>{const bh=v/mx*96,x=x0+i*bw;s+=`<rect x="${x+4}" y="${124-bh}" width="${bw-8}" height="${bh}" rx="2" fill="${i===6?G:'#8C643F'}"/>`+T(x+bw/2,120-bh,v.toString().replace('.',','),{a:'middle',s:8,c:i===6?HOT:FG})+T(x+bw/2,138,d,{a:'middle',c:MUT,s:8})});
+ s+=T(w-8,26,'hoje até 12:30',{a:'end',c:G,s:8});return s+'</svg>'}
+function shareCard(){let s=`<svg class="svg" viewBox="0 0 320 190"><defs><radialGradient id="gl" cx=".15" cy=".2" r=".9"><stop offset="0" stop-color="#2a1d10"/><stop offset="1" stop-color="#0b0f15"/></radialGradient></defs><rect width="320" height="190" fill="url(#gl)"/>`;
+ s+=T(14,22,'USAGE MONITOR · ANÁLISE',{c:G,s:9,w:600})+T(306,22,'ter 06/10 · 12:30',{a:'end',c:MUT,s:8.5})+T(14,40,'Anthropic · Padrão',{s:12,c:HOT,w:500});
+ const box=(x,y,big,lab,sub,col)=>T(x,y,big,{s:20,c:col||HOT,w:500})+T(x,y+13,lab,{s:8.5,c:FG})+T(x,y+24,sub,{s:7.5,c:MUT});
+ s+=box(14,72,'62%','5h · reinicia 14:00','→ 83% no reset')+box(116,72,'14 pp/h','ritmo 5h agora','média da janela 17,7')+box(226,72,'41%','semanal · 3,2 dias','0,9 pp/h · seguro 1,5');
+ s+=box(14,132,'48 tok/s','Opus · última 1 h','71 tok/s Sonnet',INFO)+box(116,132,'↓ 21%','ritmo vs ontem 12h','hoje 14 · ontem 17,7',OK)+box(226,132,'10–11h','hora mais pesada','17 pp em 1 h',WARN);
+ return s+T(14,182,'risco 🟢 em dia · nenhum dado de prompt sai do PC',{s:7.5,c:MUT})+'</svg>'}
+function scoreboard(){return ''}
+
+const ENTRY=[
+ {id:'e1',n:'Bot · comando',d:'<code>/analise</code> pergunta a conta (botões); <code>/analise codex</code> e <code>/analise 7d</code> pulam a pergunta.',h:tg(out('/analise','12:30')+inn('<b>Análise de qual conta?</b>','12:30')+kb(2,['Anthropic · Padrão','Anthropic · Trabalho','Codex','Todas']))},
+ {id:'e2',n:'Bot · botão no /status e /conta',d:'Abaixo de cada conta, ao lado das que já existem, um botão "📐 Análise" (<code>ana:&lt;chave&gt;</code>).',h:tg(inn('🟢 <b>Anthropic · Padrão</b> — Em dia\nSessão 5h · reinicia 14:00\n<code>▰▰▰▰▰▰▱▱▱▱  62%</code>','12:30')+kb(3,['🔄 Atualizar','🔕 Silenciar 1h','📐 Análise']))},
+ {id:'e3',n:'App · detalhamento da conta',d:'Botão "Análise" no balão da conta na HUD e na barra do card, ao lado de Histórico e Sessões CLI (Anthropic e Codex).',h:app('Balão da conta · HUD',`<div class="bal"><b>Anthropic · Padrão</b><span style="color:var(--muted)">5h 62% · semanal 41% · 🟢 em dia</span><div class="acts"><span>Histórico</span><span>Sessões CLI</span><span class="new">📐 Análise</span></div></div>`)}
+];
+
+const REF={id:'ref',n:'Hoje (referência)',d:'A informação existe, mas espalhada: cada comando responde uma pergunta e nenhum junta 5h, 7d e tokens/s da mesma conta. No app, ritmo e vazão estão em janelas diferentes (Histórico, Sessões CLI, Comparação).',
+ h:tg(out('/ritmo','12:30')+inn('<b>Ritmo</b> · Padrão semanal: ~12 pp por dia até sex 19:44','12:30')+out('/vazao','12:31')+inn('<b>⚡ Vazão 24 h</b>\nSonnet 71 tok/s · Opus 48 tok/s · gpt-5-codex 63 tok/s','12:31')+out('/janelas','12:31')+inn('<b>Últimas janelas 5h</b>\n09:00 → 62% (ativa) · ontem 18:00 → 100% esgotou…','12:31'))};
+
+const G1=[
+ {n:'AB1 · Painel de bordo',d:'Um bloco por janela com consumo, ritmo agora e ritmo médio, mais o ritmo seguro (o que levaria a 100% exatamente no reinício). Tokens/s no fim. Monoespaçado, alinhado em colunas.',
+  h:tg(out('/analise','12:30')+inn('<b>📐 Anthropic · Padrão</b> · <i>coleta 12:30</i>\n<pre>JANELA 5h   62%   reinicia 14:00\n  agora    14,0 pp/h  (última 1 h)\n  média    17,7 pp/h  (desde 09:00)\n  seguro   25,3 pp/h  → folga\n  no reset ≈ 83%\n\nSEMANAL     41%   reinicia sex 19:44\n  agora     0,9 pp/h\n  média     0,8 pp/h\n  seguro    1,5 pp/h  → folga\n\nTOKENS/s (1 h)  Opus 48 · Sonnet 71</pre>','12:30')),
+  a:'No app: a mesma grade em duas colunas (5h | semanal) com os números em <code>label*</code>.',t:LO+' · Dado: histórico de cotas + <code>OutputThroughput</code>. Só texto.'},
+ {n:'AB2 · Sparkline por métrica',d:'Uma linha por métrica com a tendência das últimas 6 h em blocos ▁▂▃, o valor atual e a variação contra a hora anterior. Lê de relance qual número está subindo.',
+  h:tg(out('/analise','12:30')+inn('<b>📐 Padrão · últimas 6 h</b>\n<pre>5h %      ▁▂▃▄▅▆▇  62%   +10 pp\npp/h 5h   ▃▅▇▆▃▅▄  14,0  ↓ 4,0\ntok/s     ▅▆▄▅▇▆▅  48    ↑ 3\nsemanal   ▁▁▂▂▂▃▃  41%   +0,9\n</pre><i>blocos de 1 h · seta contra a hora anterior</i>','12:30')),
+  a:'No app: sparklines reais (Canvas) na mesma ordem.',t:LO+' · Reaproveita o sparkline do <code>/status</code> (AA13).'},
+ {n:'AB3 · Intervalos lado a lado',d:'Tabela de intervalos — 1 h, 3 h, 5 h, 24 h, 7 d — com pp/h e tokens/s em cada um, e a diferença para o intervalo mais longo. Responde "estou mais rápido que o normal?".',
+  h:tg(out('/analise intervalos','12:30')+inn('<b>📐 Padrão · ritmo por intervalo</b>\n<pre>          pp/h 5h   tok/s   vs 7 d\n1 h        14,0      48     ↑ 1,9×\n3 h        16,3      51     ↑ 2,2×\n5 h        17,7      50     ↑ 2,4×\n24 h        8,1      49     ↑ 1,1×\n7 d         7,4      47       —\n</pre><i>pp/h da 5h: diferença entre leituras ÷ tempo</i>','12:30')),
+  a:'No app: tabela com a coluna "vs 7 d" em chip (ok/atenção).',t:LO+' · Dado: histórico por intervalo + índice CLI com <code>sinceEpochMillis</code> (sem <code>CliSessionRange</code> novo).'},
+ {n:'AB4 · Leitura em frases',d:'Três a cinco frases que interpretam os números: comparação com o hábito, hora mais pesada e o que acontece no reinício. Bom para colar num relatório.',
+  h:tg(out('/analise','12:30')+inn('<b>📐 Padrão hoje</b>\n• A 5h está em <b>62%</b> e chega a <b>~83%</b> no reinício das 14:00 — <b>não estoura</b>.\n• Ritmo agora <b>14 pp/h</b>, <b>21% abaixo</b> de ontem no mesmo horário.\n• Hora mais pesada: <b>10–11h</b> (17 pp).\n• Semanal em <b>41%</b> com 3,2 dias pela frente: sobra ~<b>1,5 pp/h</b>.\n• Opus gerou <b>48 tok/s</b>, Sonnet <b>71 tok/s</b>.','12:30')),
+  a:'No app: o mesmo texto como cabeçalho da janela, acima dos gráficos.',t:MD+' · Frase só sai com dado medido; sem ontem, a frase de comparação some.'},
+ {n:'AB5 · Linha do tempo da janela',d:'A janela 5h em fatias de 30 min, cada uma com a barra de quanto consumiu, o ritmo e a vazão daquele trecho. Mostra onde a janela foi gasta.',
+  h:tg(out('/analise 5h','12:30')+inn('<b>📐 Padrão · janela 5h (09:00 →)</b>\n<pre>09:00 ▰▰▱▱▱  6 pp  12/h  52 t/s\n09:30 ▰▰▰▱▱  9 pp  18/h  49 t/s\n10:00 ▰▰▰▱▱  9 pp  18/h  47 t/s\n10:30 ▰▰▰▱▱  9 pp  18/h  55 t/s\n11:00 ▰▰▱▱▱  8 pp  16/h  61 t/s\n11:30 ▰▰▰▱▱ 11 pp  22/h  48 t/s\n12:00 ▰▰▰▱▱ 10 pp  20/h  48 t/s\n</pre><i>total 62% · reinicia 14:00</i>','12:30')),
+  a:'No app: a faixa ativa da janela (N6) com a vazão por fatia embaixo.',t:LO+' · Dado: histórico da janela corrente (#392) + índice CLI por fatia.'}
+];
+
+const G2=[
+ {n:'AB6 · Velocímetros',d:'Dois mostradores, 5h e semanal: o ponteiro é o ritmo agora, a marca clara é o ritmo seguro. Acima da marca, o arco fica crítico. Tokens/s no rodapé.',
+  h:tg(out('/analise img','12:30')+pic(gauges(),'<i>marca clara = ritmo que leva a 100% exatamente no reinício</i>','12:30')),
+  a:'No app: os dois mostradores em Canvas, no tamanho do anel ×2.',t:MD+' · Render Skia em <code>desktopMain</code> (padrão do <code>/comparar</code>).'},
+ {n:'AB7 · Ritmo por hora (24 h)',d:'Barras de pp da 5h consumidos em cada hora das últimas 24 h, com a linha de tokens/s por cima. A hora corrente e as 3 anteriores em ouro.',
+  h:tg(out('/analise horas','12:30')+pic(bars(),'<b>Padrão</b> · pico 10–11h (17 pp) · madrugada parada','12:30')),
+  a:'No app: o mesmo gráfico com tooltip por hora.',t:MD+' · Dado: histórico 24 h agrupado por hora (SQL em UTC, traduzido no domain).'},
+ {n:'AB8 · Mapa de calor dia × hora',d:'7 dias × 24 horas, intensidade = pp/h da 5h; número escrito nas células fortes. Mostra o padrão da semana: quando você consome mais.',
+  h:tg(out('/analise semana','12:30')+pic(heatmap(),'<b>Padrão</b> · dias úteis 09–16h · fim de semana quase parado','12:30')),
+  a:'No app: o mapa com tooltip por célula (pp, tok/s).',t:MD+' · Mesma linguagem do P7 (valor sobre o máximo, número escrito).'},
+ {n:'AB9 · Curva da janela e ritmo seguro',d:'A janela 5h corrente: curva real do percentual, a reta tracejada do ritmo seguro (0 → 100% no reinício) e a projeção até o reset.',
+  h:tg(out('/analise 5h img','12:30')+pic(windowCurve(),'abaixo da reta = sobra cota no reinício','12:30')),
+  a:'No app: o gráfico do Histórico com a reta de ritmo seguro.',t:MD+' · Projeção já existe (<code>QuotaRiskSummary</code>); a reta é geometria.'},
+ {n:'AB10 · Dias da semana',d:'Barras de pp da semanal gastos em cada um dos últimos 7 dias, a média tracejada e hoje em ouro. Diferença de velocidade entre dias à vista.',
+  h:tg(out('/analise dias','12:30')+pic(weekBars(),'hoje <b>5,8 pp</b> até 12:30 · quinta foi o dia mais pesado','12:30')),
+  a:'No app: barras por dia com a média.',t:LO+' · Dado: histórico 7 d da semanal, diferença por dia local (BRT).'},
+ {n:'AB11 · Cartão de resultado',d:'Uma imagem pronta para mostrar: os 6 números que importam em destaque (5h, ritmo, semanal, tokens/s, variação contra ontem, hora mais pesada), com data e conta.',
+  h:tg(out('/analise cartao','12:30')+pic(shareCard(),'','12:30')),
+  a:'No app: botão "Copiar imagem" na janela de análise.',t:MD+' · Render Skia; só metadados de uso (nada de prompt, projeto ou caminho).'}
+];
+
+const G3=[
+ {n:'AB12 · Abas por botão',d:'Uma mensagem só, editada pelos botões: Resumo, 5h, Semanal, Tokens, Horas, Dias. O conteúdo muda no lugar; a conversa não enche.',
+  h:tg(out('/analise','12:30')+inn('<b>📐 Padrão · 5h</b>\n<pre>62%   reinicia 14:00\nagora 14,0 pp/h · média 17,7\nseguro 25,3 pp/h · ≈83% no reset</pre>','12:30')+kb(3,['Resumo','• 5h •','Semanal','Tokens','Horas','Dias'])),
+  a:'No app: as mesmas seis abas (<code>AppTabs</code>) na janela de análise.',t:MD+' · <code>editMessageText</code> com teclado; toque <code>ana:&lt;chave&gt;:&lt;aba&gt;</code> ≤ 64 bytes.'},
+ {n:'AB13 · Placar Anthropic × Codex',d:'As contas lado a lado, mesma linha para cada métrica, e a vencedora (mais folga, mais rápida) marcada. Responde "onde vale mais a pena trabalhar agora".',
+  h:tg(out('/analise todas','12:30')+inn('<b>📐 Placar agora</b>\n<pre>              Padrão   Codex\n5h            62%      23% ✓\nritmo 5h      14,0     6,1 ✓\nsemanal       41%      18% ✓\nseguro 5h     25,3     31,0\ntok/s         48/71    63\nreinicia      14:00    15:10\n</pre><i>✓ = mais folga · tok/s Claude: Opus/Sonnet</i>','12:30')),
+  a:'No app: a janela de análise com a coluna da outra conta ao lado.',t:LO+' · Junta o que <code>/qual</code> e <code>/vazao</code> já calculam.'},
+ {n:'AB14 · Antes × agora',d:'Compara a janela atual com a anterior equivalente (5h com a 5h anterior; semana com a semana passada), métrica por métrica, com seta e percentual de diferença.',
+  h:tg(out('/analise comparar','12:30')+inn('<b>📐 Padrão · esta janela × anterior</b>\n<pre>                agora   antes   Δ\n5h aos 3h30     62%     71%   ↓ 13%\nritmo médio     17,7    20,3  ↓ 13%\nhora pesada     17 pp   22 pp ↓ 23%\ntok/s           50      44    ↑ 14%\nsemanal (dia)   5,8     7,9   ↓ 27%\n</pre><i>mesmo ponto da janela: 3 h 30 min desde o início</i>','12:30')),
+  a:'No app: duas curvas sobrepostas no gráfico da janela.',t:MD+' · Dado: duas janelas do histórico (#392) alinhadas pelo início.'},
+ {n:'AB15 · Relatório completo em arquivo',d:'Um resumo curto na conversa e o relatório inteiro anexo (PDF de uma página: cartão, curva da janela, horas e dias). Para guardar ou mandar para alguém.',
+  h:tg(out('/analise pdf','12:30')+inn('<b>📐 Padrão</b> · 5h 62% (≈83% no reset) · 14 pp/h · semanal 41% · 48/71 tok/s','12:30')+`<div class="in"><div class="file"><span class="ic">PDF</span><div><b>analise-padrao-2026-10-06-1230.pdf</b><br><i>1 página · 84 KB</i></div></div>${tm('12:30')}</div>`),
+  a:'No app: botão "Exportar PDF" na janela (mesmo gerador do relatório do Histórico).',t:HI+' · Reaproveita o PDF do Histórico (Plex Mono embutida); <code>sendDocument</code> já existe (AA23).'}
+];
+
+let n=0;const tag=o=>{o.id='AB'+(++n);o.c=o.a?`<div class="tags" style="color:#b9a07a">${o.a}</div>`:'';return o};
+document.getElementById('entry').innerHTML=ENTRY.map(card).join('');
+document.getElementById('ref').innerHTML=card(REF);
+document.getElementById('g1').innerHTML=G1.map(tag).map(card).join('');
+document.getElementById('g2').innerHTML=G2.map(tag).map(card).join('');
+document.getElementById('g3').innerHTML=G3.map(tag).map(card).join('');
+window.AB_COUNT=n;
+})();
+</script>
+</body></html>
