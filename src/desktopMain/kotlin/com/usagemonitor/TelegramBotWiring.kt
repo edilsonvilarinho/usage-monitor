@@ -67,7 +67,9 @@ internal fun createTelegramBot(
         ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) },
         spikes = { dashboard.spikes.value },
         comparison = comparisonReader(graph, dashboard),
-        accountHistory = accountHistoryReader(graph, dashboard)
+        accountHistory = accountHistoryReader(graph, dashboard),
+        // O mesmo pedido da segunda instância: um arquivo que o laço do `Main` atende.
+        focusHud = { FocusRequestChannel().request() }
     )
 )
 

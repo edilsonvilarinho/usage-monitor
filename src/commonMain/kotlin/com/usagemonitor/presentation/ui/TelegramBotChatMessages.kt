@@ -25,6 +25,19 @@ internal object TelegramBotChatMessages {
         return (listOf(header) + lines + footer).joinToString("\n")
     }
 
+    /** `/hud` (AA29): o pedido saiu, ou a permissão está desligada. */
+    fun focusHud(allowed: Boolean, requested: Boolean, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        return when {
+            !allowed && pt -> "🔒 Ações no PC pelo bot estão desligadas. Ligue em Configurações › Alertas › Bot do Telegram › Permitir ações no PC."
+            !allowed -> "🔒 PC actions from the bot are off. Turn them on in Settings › Alerts › Telegram bot › Allow PC actions."
+            !requested && pt -> "Não deu para pedir a HUD agora."
+            !requested -> "Could not ask for the HUD right now."
+            pt -> "🖥 HUD trazida para a frente no PC."
+            else -> "🖥 HUD brought to the front on the PC."
+        }
+    }
+
     /** Confirmação do `/teclado` (AA30). */
     fun keyboard(on: Boolean, language: AppLanguage): String = when {
         on && language == AppLanguage.PT -> "⌨ Atalhos no lugar do teclado. <code>/teclado off</code> tira."

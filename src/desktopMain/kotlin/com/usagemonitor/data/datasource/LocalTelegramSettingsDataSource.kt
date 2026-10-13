@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import kotlinx.serialization.Serializable
@@ -15,6 +16,12 @@ private data class TelegramChatDto(val id: Long, val name: String = "", val read
 @Serializable
 private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
 
+/** Opções da #408; cada campo com default, para o arquivo antigo continuar valendo. */
+@Serializable
+private data class TelegramPreferencesDto(
+    val allowPcActions: Boolean = false
+)
+
 @Serializable
 private data class TelegramSettingsDto(
     val enabled: Boolean = false,
@@ -26,7 +33,8 @@ private data class TelegramSettingsDto(
     val dailySummaryHour: Int? = null,
     val lastSummaryDate: String? = null,
     val livePanelEnabled: Boolean = false,
-    val panelMessages: List<TelegramPanelMessageDto> = emptyList()
+    val panelMessages: List<TelegramPanelMessageDto> = emptyList(),
+    val preferences: TelegramPreferencesDto = TelegramPreferencesDto()
 )
 
 /**
@@ -57,7 +65,10 @@ internal class LocalTelegramSettingsDataSource(
             dailySummaryHour = dto.dailySummaryHour?.takeIf { hour -> hour in TELEGRAM_SUMMARY_HOURS },
             lastSummaryDate = dto.lastSummaryDate,
             livePanelEnabled = dto.livePanelEnabled,
-            panelMessages = dto.panelMessages.associate { panel -> panel.chatId to panel.messageId }
+            panelMessages = dto.panelMessages.associate { panel -> panel.chatId to panel.messageId },
+            preferences = TelegramBotPreferences(
+                allowPcActions = dto.preferences.allowPcActions
+            )
         )
     }
 
@@ -72,7 +83,10 @@ internal class LocalTelegramSettingsDataSource(
             dailySummaryHour = settings.dailySummaryHour,
             lastSummaryDate = settings.lastSummaryDate,
             livePanelEnabled = settings.livePanelEnabled,
-            panelMessages = settings.panelMessages.map { (chatId, messageId) -> TelegramPanelMessageDto(chatId, messageId) }
+            panelMessages = settings.panelMessages.map { (chatId, messageId) -> TelegramPanelMessageDto(chatId, messageId) },
+            preferences = TelegramPreferencesDto(
+                allowPcActions = settings.preferences.allowPcActions
+            )
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))
     }

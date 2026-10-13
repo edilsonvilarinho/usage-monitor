@@ -57,6 +57,8 @@ class TelegramBotCommandTest {
         assertTrue(BotCommand.Alerts(false).changesApp())
         assertEquals(BotCommand.ChatLanguage(AppLanguage.EN), parseBotCommand("/idioma en"))
         assertEquals(BotCommand.Keyboard(true), parseBotCommand("/teclado"))
+        assertEquals(BotCommand.FocusHud, parseBotCommand("/hud"))
+        assertTrue(BotCommand.FocusHud.changesApp())
         assertEquals(BotCommand.Keyboard(false), parseBotCommand("/keyboard off"))
         assertEquals(BotCommand.Accounts, parseKeyboardLabel("👤 Account"))
         assertEquals(null, parseKeyboardLabel("oi"))

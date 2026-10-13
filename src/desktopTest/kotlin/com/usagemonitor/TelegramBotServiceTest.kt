@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.botAccountTapData
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
@@ -121,6 +122,7 @@ class TelegramBotServiceTest {
     private val alertSettings = MutableStateFlow(UsageAlertSettings())
     private val alerts = MutableSharedFlow<UsageAlert>(extraBufferCapacity = 4)
     private val refreshes = AtomicInteger()
+    private val focusRequests = AtomicInteger()
     @Volatile private var snapshot: UsageSnapshot? = null
     private val enabledSources = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
     private val service = TelegramBotService(
@@ -143,7 +145,8 @@ class TelegramBotServiceTest {
                 TelegramChart(0L, 3_600_000L, listOf(TelegramChartLine("Anthropic · Sessão 5h", listOf(0L to 10f, 3_600_000L to 20f), emptyList(), 20)))
             }
         },
-        panelIntervalMillis = 50L
+        panelIntervalMillis = 50L,
+        readings = TelegramBotReadings(focusHud = { focusRequests.incrementAndGet(); true })
     )
 
     @AfterTest
@@ -296,6 +299,21 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("Sem leitura ainda.") } }
         api.pending += message(3, chat = 51, text = "/teclado off")
         waitUntil { TelegramReplyKeyboard.Remove in api.replyKeyboards }
+    }
+
+    /** #408, AA29: `/hud` só pede a HUD com "Permitir ações no PC" ligado. */
+    @Test
+    fun `hud command needs the pc actions permission`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/hud")
+        waitUntil { api.sent.any { it.second.startsWith("🔒 Ações no PC pelo bot estão desligadas.") } }
+        assertEquals(0, focusRequests.get())
+
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(allowPcActions = true))
+        api.pending += message(2, chat = 51, text = "/hud")
+        waitUntil { api.sent.any { it.second == "🖥 HUD trazida para a frente no PC." } }
+        assertEquals(1, focusRequests.get())
     }
 
     @Test

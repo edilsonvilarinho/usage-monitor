@@ -18,6 +18,18 @@ data class TelegramChat(
 )
 
 /**
+ * Opções do bot sem segredo (#408): cada função nova com interruptor entra aqui, e
+ * não como mais um campo do [TelegramBotSettings] — aquele tem `copy`, `equals` e
+ * `hashCode` escritos à mão por causa do token, e crescer um a um os três a cada
+ * função seria a falha esperando para acontecer. Toda opção que age no PC ou expõe
+ * dado de terceiros nasce desligada.
+ */
+data class TelegramBotPreferences(
+    /** `/hud` traz a HUD à frente no PC (#408, AA29). */
+    val allowPcActions: Boolean = false
+)
+
+/**
  * Configuração do bot do Telegram (#387).
  *
  * **Não é `data class`**: carrega o token do bot, e o `toString` gerado o vazaria
@@ -43,7 +55,9 @@ class TelegramBotSettings(
     /** Painel fixado que se atualiza sozinho (#398, Y5). */
     val livePanelEnabled: Boolean = false,
     /** A mensagem do painel em cada conversa (`chatId` → `message_id`), para editar e desafixar. */
-    val panelMessages: Map<Long, Long> = emptyMap()
+    val panelMessages: Map<Long, Long> = emptyMap(),
+    /** As opções da #408 ([TelegramBotPreferences]). */
+    val preferences: TelegramBotPreferences = TelegramBotPreferences()
 ) {
     fun copy(
         enabled: Boolean = this.enabled,
@@ -55,10 +69,11 @@ class TelegramBotSettings(
         dailySummaryHour: Int? = this.dailySummaryHour,
         lastSummaryDate: String? = this.lastSummaryDate,
         livePanelEnabled: Boolean = this.livePanelEnabled,
-        panelMessages: Map<Long, Long> = this.panelMessages
+        panelMessages: Map<Long, Long> = this.panelMessages,
+        preferences: TelegramBotPreferences = this.preferences
     ): TelegramBotSettings = TelegramBotSettings(
         enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate,
-        livePanelEnabled, panelMessages
+        livePanelEnabled, panelMessages, preferences
     )
 
     fun isAuthorized(chatId: Long): Boolean = authorizedChats.any { chat -> chat.id == chatId }
@@ -86,11 +101,11 @@ class TelegramBotSettings(
         other.pairingCode == pairingCode && other.pairingExpiresAtMillis == pairingExpiresAtMillis &&
         other.allowSourceControl == allowSourceControl && other.dailySummaryHour == dailySummaryHour &&
         other.lastSummaryDate == lastSummaryDate && other.livePanelEnabled == livePanelEnabled &&
-        other.panelMessages == panelMessages
+        other.panelMessages == panelMessages && other.preferences == preferences
 
     override fun hashCode(): Int = listOf(
         enabled, botToken, authorizedChats, pairingCode, pairingExpiresAtMillis, allowSourceControl, dailySummaryHour, lastSummaryDate,
-        livePanelEnabled, panelMessages
+        livePanelEnabled, panelMessages, preferences
     ).hashCode()
 
     override fun toString(): String =
@@ -147,6 +162,8 @@ sealed interface BotCommand {
     data class ChatLanguage(val language: AppLanguage?) : BotCommand
     /** `/teclado on|off` (#408, AA30): o teclado fixo de atalhos desta conversa. */
     data class Keyboard(val on: Boolean) : BotCommand
+    /** `/hud` (#408, AA29): traz a HUD à frente no PC — só com "Permitir ações no PC". */
+    data object FocusHud : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -157,7 +174,7 @@ sealed interface BotCommand {
  * dizer se muda alguma coisa. Sair (`/sair`) não conta: é a conversa decidindo por si.
  */
 fun BotCommand.changesApp(): Boolean = when (this) {
-    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold -> true
+    is BotCommand.Alerts, is BotCommand.Quiet, is BotCommand.Threshold, BotCommand.FocusHud -> true
     is BotCommand.Start, BotCommand.Status, BotCommand.StatusImage, BotCommand.Accounts, BotCommand.Refresh,
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
@@ -221,6 +238,7 @@ fun parseBotCommand(text: String): BotCommand? {
         }
         "conversas", "chats" -> BotCommand.Chats
         "sair", "leave", "unpair" -> BotCommand.Leave
+        "hud" -> BotCommand.FocusHud
         "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {
             null, "on", "ligar" -> BotCommand.Keyboard(true)
             "off", "desligar" -> BotCommand.Keyboard(false)

@@ -149,6 +149,12 @@ internal class TelegramBotHandlers(
             is BotCommand.Compare -> sendHeatmap(token, chatId, command.days, language)
             BotCommand.Chats -> send(token, chatId, TelegramBotChatMessages.chats(settingsFlow.value.authorizedChats, chatId, language))
             BotCommand.Leave -> leave(token, chatId, language)
+            BotCommand.FocusHud -> {
+                // A permissão é relida aqui: desligada depois do pedido, ele não sai.
+                val allowed = settingsFlow.value.preferences.allowPcActions
+                val requested = allowed && readings.focusHud()
+                send(token, chatId, TelegramBotChatMessages.focusHud(allowed, requested, language))
+            }
             is BotCommand.Keyboard -> api.sendMessage(
                 token, chatId, TelegramBotChatMessages.keyboard(command.on, language), html = true,
                 replyKeyboard = if (command.on) TelegramReplyKeyboard.Show(telegramKeyboardRows(language)) else TelegramReplyKeyboard.Remove

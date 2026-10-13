@@ -406,6 +406,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     👤 Conta, 📈 Gráfico, ⏳ Quando, no idioma da conversa); `off` manda `remove_keyboard`. O toque chega como **texto** com o
     rótulo e `parseKeyboardLabel` o traduz no comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos
     `resize_keyboard`/`is_persistent` não têm default no DTO porque o `Json` do cliente não grava valor padrão.
+  - `/hud` (AA29): grava o mesmo `focus.request` da segunda instância (`FocusRequestChannel`), que o laço do `Main` atende
+    trazendo a HUD à frente. Só com **"Permitir ações no PC"** (nasce desligado), relido a cada pedido; conversa só de leitura
+    é recusada (`changesApp`). As opções novas da #408 moram em `TelegramBotPreferences` (`data class` sem segredo, objeto
+    `preferences` no `telegram.json` com default por campo), e não como campos soltos do `TelegramBotSettings`, cujo
+    `copy`/`equals`/`hashCode` é escrito à mão por causa do token.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

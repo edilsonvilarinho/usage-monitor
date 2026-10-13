@@ -17,6 +17,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 const val TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG = "telegramSourceControlSwitch"
 const val TELEGRAM_DAILY_SUMMARY_TEST_TAG = "telegramDailySummary"
 const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
+const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
 
 /**
  * Opções do que o bot faz além de responder (#398): permissões e envios por conta
@@ -72,6 +73,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.allowSourceControl,
                 onCheckedChange = model.onAllowSourceControlChange,
                 modifier = Modifier.testTag(TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Permitir ações no PC" else "Allow PC actions",
+            description = if (pt) {
+                "Com ele, o /hud traz a HUD para a frente neste computador. Desligado, o bot só lê."
+            } else {
+                "With it, /hud brings the HUD to the front on this computer. Off, the bot only reads."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.allowPcActions,
+                onCheckedChange = { allowed -> model.onPreferencesChange(model.preferences.copy(allowPcActions = allowed)) },
+                modifier = Modifier.testTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG)
             )
         }
     }

@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TELEGRAM_PAIRING_TTL_MILLIS
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -38,6 +39,9 @@ internal class TelegramBotActions(
     }
 
     fun sendTest() = service.sendTest()
+
+    /** As opções da #408 de uma vez: o card muda uma e manda o conjunto. */
+    fun setPreferences(preferences: TelegramBotPreferences) = update { current -> current.copy(preferences = preferences) }
 
     /** Controle (`true`) ou só leitura da conversa (#408, AA21); vale no próximo comando ou toque. */
     fun setChatControl(chatId: Long, control: Boolean) = update { current ->
@@ -109,7 +113,9 @@ internal fun telegramBotSectionModel(
         onDailySummaryHourChange = actions::setDailySummaryHour,
         livePanelEnabled = settings.livePanelEnabled,
         onLivePanelChange = actions::setLivePanel,
-        onChatControlChange = actions::setChatControl
+        onChatControlChange = actions::setChatControl,
+        preferences = settings.preferences,
+        onPreferencesChange = actions::setPreferences
     )
 }
 

@@ -22,5 +22,7 @@ internal class TelegramBotReadings(
      */
     val comparison: suspend (sinceEpochMillis: Long) -> List<ComparisonRow>? = { null },
     /** Histórico de cada conta da última coleta no intervalo, na ordem do retrato. */
-    val accountHistory: suspend (HistoryRange) -> List<TelegramAccountHistory> = { emptyList() }
+    val accountHistory: suspend (HistoryRange) -> List<TelegramAccountHistory> = { emptyList() },
+    /** `/hud` (AA29): pede à HUD que venha à frente; `false` quando o pedido não foi gravado. */
+    val focusHud: () -> Boolean = { false }
 )

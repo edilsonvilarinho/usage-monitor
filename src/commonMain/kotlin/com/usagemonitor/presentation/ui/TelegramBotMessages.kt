@@ -56,6 +56,7 @@ internal object TelegramBotMessages {
             "sair" to "Desfaz o pareamento desta conversa",
             "idioma" to "Idioma desta conversa (pt, en ou app)",
             "teclado" to "Atalhos no lugar do teclado (on ou off)",
+            "hud" to "Traz a HUD à frente no PC",
             "ajuda" to "Lista de comandos"
         )
     } else {
@@ -83,6 +84,7 @@ internal object TelegramBotMessages {
             "leave" to "Unpair this chat",
             "language" to "Language of this chat (pt, en or app)",
             "keyboard" to "Shortcuts in place of the keyboard (on or off)",
+            "hud" to "Bring the HUD to the front on the PC",
             "help" to "List of commands"
         )
     }
@@ -230,6 +232,7 @@ internal object TelegramBotMessages {
             "<code>/conversas</code> — conversas pareadas · <code>/sair</code> — desfaz o pareamento desta\n" +
             "<code>/idioma en</code> · <code>/idioma app</code> — idioma desta conversa\n" +
             "<code>/teclado on</code> · <code>/teclado off</code> — atalhos no lugar do teclado\n" +
+            "<code>/hud</code> — traz a HUD à frente no PC\n" +
             "<i>Toque num comando para copiar.</i>"
     } else {
         "<b>Commands</b>\n" +
@@ -255,6 +258,7 @@ internal object TelegramBotMessages {
             "<code>/chats</code> — paired chats · <code>/leave</code> — unpair this one\n" +
             "<code>/language pt</code> · <code>/language app</code> — language of this chat\n" +
             "<code>/keyboard on</code> · <code>/keyboard off</code> — shortcuts in place of the keyboard\n" +
+            "<code>/hud</code> — bring the HUD to the front on the PC\n" +
             "<i>Tap a command to copy it.</i>"
     }
 

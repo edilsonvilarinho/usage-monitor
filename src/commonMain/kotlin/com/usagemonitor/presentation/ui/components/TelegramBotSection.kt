@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlinx.coroutines.delay
@@ -65,7 +66,10 @@ class TelegramBotSectionModel(
     val livePanelEnabled: Boolean = false,
     val onLivePanelChange: (Boolean) -> Unit = {},
     /** Papel de cada conversa (#408, AA21): `true` dá controle, `false` deixa só leitura. */
-    val onChatControlChange: (Long, Boolean) -> Unit = { _, _ -> }
+    val onChatControlChange: (Long, Boolean) -> Unit = { _, _ -> },
+    /** Opções da #408; o card muda uma e devolve o conjunto. */
+    val preferences: TelegramBotPreferences = TelegramBotPreferences(),
+    val onPreferencesChange: (TelegramBotPreferences) -> Unit = {}
 )
 
 /**

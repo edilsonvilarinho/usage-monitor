@@ -20,6 +20,8 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX
+import com.usagemonitor.presentation.ui.components.TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TelegramBotSection
 import com.usagemonitor.presentation.ui.components.TelegramBotSectionModel
@@ -49,6 +51,23 @@ class TelegramBotSectionTest {
         onNodeWithTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + 52L).assertIsOff()
         onNodeWithTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + 51L).performClick()
         assertEquals(51L to false, change)
+    }
+
+    @Test
+    fun `pc actions switch starts off and sends the preference`() = runDesktopComposeUiTest {
+        var sent: TelegramBotPreferences? = null
+        val base = model(enabled = true, code = null)
+        val withCallback = TelegramBotSectionModel(
+            enabled = base.enabled, token = base.token, statusLabel = base.statusLabel, statusTone = base.statusTone,
+            chats = base.chats, pairingCode = null, pairingHint = null, statusPreview = base.statusPreview,
+            onEnabledChange = {}, onTokenChange = {}, onStartPairing = {}, onRemoveChat = {}, onSendTest = {},
+            connected = true, onPreferencesChange = { preferences -> sent = preferences }
+        )
+        setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(withCallback, AppLanguage.PT) } } }
+
+        onNodeWithTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG).assertIsOff()
+        onNodeWithTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG).performClick()
+        assertEquals(TelegramBotPreferences(allowPcActions = true), sent)
     }
 
     private fun model(enabled: Boolean, code: String? = "AB12CD", onPair: () -> Unit = {}) = TelegramBotSectionModel(

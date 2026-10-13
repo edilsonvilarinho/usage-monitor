@@ -158,6 +158,7 @@ Molde por tipo de opção:
 | A15 | `feat(telegram): give each paired chat a control or read-only role` | `gradlew.bat desktopTest --tests "*Telegram*"`: 79 testes, 0 falhas (novos: conversa só de leitura recebe a recusa no `/alertas off` e no toque de silenciar e continua lendo; interruptor Controle por conversa; `changesApp` exaustivo). Captura `build/issue396-screenshots/telegram-section.png` conferida: Controle e o interruptor ao lado do nome | concluída |
 | A16 | `feat(telegram): choose the language of each chat with /idioma` | `gradlew.bat desktopTest --tests "*Telegram*"`: 80 testes, 0 falhas (novo: `/idioma en` numa conversa faz o alerta sair em inglês nela e em português na outra; parse pt/en/app e sem argumento) | concluída |
 | A17 | `feat(telegram): offer a persistent shortcut keyboard with /teclado` | `gradlew.bat desktopTest --tests "*Telegram*"`: 82 testes, 0 falhas (novos: JSON do teclado persistente e do `remove_keyboard`; `/teclado on` manda as duas linhas, o rótulo tocado roda o comando e `/teclado off` tira) | concluída |
+| A18 | `feat(telegram): bring the HUD to the front with /hud behind a PC actions switch` | `gradlew.bat desktopTest --tests "*Telegram*"`: 84 testes, 0 falhas (novos: `/hud` recusado sem a permissão e pedido com ela; interruptor nasce desligado e manda o conjunto de opções). Primeira rodada: 1 falha no teste de tela (`performScrollTo` fora de rolagem, armadilha conhecida), corrigida no teste | concluída |
 
 ## Problemas em aberto e riscos
 
@@ -170,3 +171,4 @@ Molde por tipo de opção:
 ## Desvios do plano e achados da execução
 - A03: a linha do `/reinicios` no `/ajuda` não tinha entrado na A02 (a substituição não casou e passou calada); entrou aqui junto com a do `/quando`. Daqui em diante as edições falham quando o trecho não existe.
 - A12/A13: na conferência a olho, com três arcos o percentual do centro cobria o arco interno; raio e passo do anel foram ajustados antes do commit. O custo do mapa de calor sai no formato da janela de comparação (`formatMicrosUsd`, quatro casas), reaproveitado sem mudança.
+- A18: as opções novas da #408 passaram a morar em `TelegramBotPreferences` (data class sem segredo) em vez de campos soltos no `TelegramBotSettings`, para não reescrever o `copy`/`equals`/`hashCode` à mão a cada função.
