@@ -145,6 +145,8 @@ sealed interface BotCommand {
     data object Leave : BotCommand
     /** `/idioma pt|en|app` (#408, AA24): o idioma desta conversa; `null` volta ao do app. */
     data class ChatLanguage(val language: AppLanguage?) : BotCommand
+    /** `/teclado on|off` (#408, AA30): o teclado fixo de atalhos desta conversa. */
+    data class Keyboard(val on: Boolean) : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -160,7 +162,7 @@ fun BotCommand.changesApp(): Boolean = when (this) {
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
-    BotCommand.Leave, is BotCommand.ChatLanguage, BotCommand.Help, is BotCommand.Invalid -> false
+    BotCommand.Leave, is BotCommand.ChatLanguage, is BotCommand.Keyboard, BotCommand.Help, is BotCommand.Invalid -> false
 }
 
 /**
@@ -219,6 +221,11 @@ fun parseBotCommand(text: String): BotCommand? {
         }
         "conversas", "chats" -> BotCommand.Chats
         "sair", "leave", "unpair" -> BotCommand.Leave
+        "teclado", "keyboard" -> when (args.firstOrNull()?.lowercase()) {
+            null, "on", "ligar" -> BotCommand.Keyboard(true)
+            "off", "desligar" -> BotCommand.Keyboard(false)
+            else -> BotCommand.Invalid("/teclado on | /teclado off")
+        }
         "idioma", "language", "lang" -> when (args.firstOrNull()?.lowercase()) {
             "pt", "português", "portugues" -> BotCommand.ChatLanguage(AppLanguage.PT)
             "en", "english", "inglês", "ingles" -> BotCommand.ChatLanguage(AppLanguage.EN)
@@ -229,6 +236,26 @@ fun parseBotCommand(text: String): BotCommand? {
         else -> BotCommand.Invalid("/ajuda")
     }
 }
+
+/**
+ * Os botões do teclado fixo (#408, AA30), duas linhas de dois, no idioma da conversa.
+ * O toque chega como texto com o rótulo; [parseKeyboardLabel] o traduz no comando.
+ */
+fun telegramKeyboardRows(language: AppLanguage): List<List<String>> =
+    TELEGRAM_KEYBOARD.map { row -> row.map { key -> if (language == AppLanguage.PT) key.pt else key.en } }
+
+/** O comando de um rótulo do teclado fixo, nos dois idiomas; outro texto é `null`, como conversa solta. */
+fun parseKeyboardLabel(text: String): BotCommand? {
+    val trimmed = text.trim()
+    return TELEGRAM_KEYBOARD.flatten().firstOrNull { key -> key.pt == trimmed || key.en == trimmed }?.command
+}
+
+private class KeyboardKey(val pt: String, val en: String, val command: BotCommand)
+
+private val TELEGRAM_KEYBOARD = listOf(
+    listOf(KeyboardKey("📊 Status", "📊 Status", BotCommand.Status), KeyboardKey("👤 Conta", "👤 Account", BotCommand.Accounts)),
+    listOf(KeyboardKey("📈 Gráfico", "📈 Chart", BotCommand.Chart(HistoryRange.LAST_24_HOURS)), KeyboardKey("⏳ Quando", "⏳ When", BotCommand.Exhaustion))
+)
 
 private fun parseQuiet(argument: String?): BotCommand {
     val usage = "/silencio 22-07 | /silencio off"

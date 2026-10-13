@@ -19,6 +19,7 @@ import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.applyBotCommand
 import com.usagemonitor.domain.entity.changesApp
+import com.usagemonitor.domain.entity.parseKeyboardLabel
 import com.usagemonitor.domain.entity.parseBotCommand
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -55,6 +56,10 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Chats, parseBotCommand("/conversas"))
         assertTrue(BotCommand.Alerts(false).changesApp())
         assertEquals(BotCommand.ChatLanguage(AppLanguage.EN), parseBotCommand("/idioma en"))
+        assertEquals(BotCommand.Keyboard(true), parseBotCommand("/teclado"))
+        assertEquals(BotCommand.Keyboard(false), parseBotCommand("/keyboard off"))
+        assertEquals(BotCommand.Accounts, parseKeyboardLabel("👤 Account"))
+        assertEquals(null, parseKeyboardLabel("oi"))
         assertEquals(BotCommand.ChatLanguage(null), parseBotCommand("/language app"))
         assertIs<BotCommand.Invalid>(parseBotCommand("/idioma"))
         assertEquals(AppLanguage.EN, TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", language = AppLanguage.EN))).languageOf(1, AppLanguage.PT))

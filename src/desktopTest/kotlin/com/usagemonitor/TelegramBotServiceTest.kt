@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
+import com.usagemonitor.data.datasource.TelegramReplyKeyboard
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -65,8 +66,19 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
     val unpins = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
     val editedTexts = Collections.synchronizedList(mutableListOf<String>())
 
-    override suspend fun sendMessage(token: String, chatId: Long, text: String, html: Boolean, buttons: List<List<TelegramButton>>, silent: Boolean): Long {
+    val replyKeyboards = Collections.synchronizedList(mutableListOf<TelegramReplyKeyboard>())
+
+    override suspend fun sendMessage(
+        token: String,
+        chatId: Long,
+        text: String,
+        html: Boolean,
+        buttons: List<List<TelegramButton>>,
+        silent: Boolean,
+        replyKeyboard: TelegramReplyKeyboard?
+    ): Long {
         sent += chatId to text
+        if (replyKeyboard != null) replyKeyboards += replyKeyboard
         keyboards += buttons.flatten()
         if (silent) silentSends += text
         return nextMessageId.incrementAndGet().toLong()
@@ -267,6 +279,23 @@ class TelegramBotServiceTest {
 
         waitUntil { api.sent.any { it.first == 51L && it.second.startsWith("<b>CLI session saturated</b>") } }
         waitUntil { api.sent.any { it.first == 52L && it.second.startsWith("<b>Sessão CLI saturada</b>") } }
+    }
+
+    /** #408, AA30: `/teclado on` manda o teclado fixo, e tocar um botão dele é o comando. */
+    @Test
+    fun `keyboard command shows the persistent keyboard and its labels run commands`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/teclado on")
+
+        waitUntil { api.replyKeyboards.isNotEmpty() }
+        val shown = api.replyKeyboards.first() as TelegramReplyKeyboard.Show
+        assertEquals(listOf(listOf("📊 Status", "👤 Conta"), listOf("📈 Gráfico", "⏳ Quando")), shown.rows)
+
+        api.pending += message(2, chat = 51, text = "⏳ Quando")
+        waitUntil { api.sent.any { it.second.startsWith("Sem leitura ainda.") } }
+        api.pending += message(3, chat = 51, text = "/teclado off")
+        waitUntil { TelegramReplyKeyboard.Remove in api.replyKeyboards }
     }
 
     @Test

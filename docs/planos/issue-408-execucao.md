@@ -157,6 +157,7 @@ Molde por tipo de opção:
 | A14 | `feat(telegram): list paired chats with /conversas and unpair with /sair` | `gradlew.bat desktopTest --tests "*Telegram*"`: 77 testes, 0 falhas (novos: lista com a conversa atual marcada e escape; `/sair` tira só esta conversa, esquece e desafixa o painel dela e responde por último) | concluída |
 | A15 | `feat(telegram): give each paired chat a control or read-only role` | `gradlew.bat desktopTest --tests "*Telegram*"`: 79 testes, 0 falhas (novos: conversa só de leitura recebe a recusa no `/alertas off` e no toque de silenciar e continua lendo; interruptor Controle por conversa; `changesApp` exaustivo). Captura `build/issue396-screenshots/telegram-section.png` conferida: Controle e o interruptor ao lado do nome | concluída |
 | A16 | `feat(telegram): choose the language of each chat with /idioma` | `gradlew.bat desktopTest --tests "*Telegram*"`: 80 testes, 0 falhas (novo: `/idioma en` numa conversa faz o alerta sair em inglês nela e em português na outra; parse pt/en/app e sem argumento) | concluída |
+| A17 | `feat(telegram): offer a persistent shortcut keyboard with /teclado` | `gradlew.bat desktopTest --tests "*Telegram*"`: 82 testes, 0 falhas (novos: JSON do teclado persistente e do `remove_keyboard`; `/teclado on` manda as duas linhas, o rótulo tocado roda o comando e `/teclado off` tira) | concluída |
 
 ## Problemas em aberto e riscos
 

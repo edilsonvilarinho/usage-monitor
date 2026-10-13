@@ -3,6 +3,9 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
+import com.usagemonitor.data.datasource.TelegramReplyKeyboard
+import com.usagemonitor.domain.entity.parseKeyboardLabel
+import com.usagemonitor.domain.entity.telegramKeyboardRows
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.nextMorningMillis
@@ -75,7 +78,8 @@ internal class TelegramBotHandlers(
             if (settingsFlow.value.isAuthorized(message.chatId)) scope.launch { handleButton(token, message, callbackId) }
             return
         }
-        val command = message.text?.let(::parseBotCommand) ?: return
+        val text = message.text ?: return
+        val command = parseBotCommand(text) ?: parseKeyboardLabel(text) ?: return
         val settings = settingsFlow.value
         val language = settings.languageOf(message.chatId, languageProvider())
         if (command is BotCommand.Start) {
@@ -145,6 +149,10 @@ internal class TelegramBotHandlers(
             is BotCommand.Compare -> sendHeatmap(token, chatId, command.days, language)
             BotCommand.Chats -> send(token, chatId, TelegramBotChatMessages.chats(settingsFlow.value.authorizedChats, chatId, language))
             BotCommand.Leave -> leave(token, chatId, language)
+            is BotCommand.Keyboard -> api.sendMessage(
+                token, chatId, TelegramBotChatMessages.keyboard(command.on, language), html = true,
+                replyKeyboard = if (command.on) TelegramReplyKeyboard.Show(telegramKeyboardRows(language)) else TelegramReplyKeyboard.Remove
+            )
             is BotCommand.ChatLanguage -> {
                 val current = settingsFlow.value
                 val next = current.copy(authorizedChats = current.authorizedChats.map { chat -> if (chat.id == chatId) chat.copy(language = command.language) else chat })

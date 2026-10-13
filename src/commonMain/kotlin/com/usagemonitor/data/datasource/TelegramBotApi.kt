@@ -17,6 +17,7 @@ import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Update recebido (#387): mensagem de texto ou toque num botão inline (#396).
@@ -35,6 +36,15 @@ data class TelegramIncomingMessage(
 
 /** Botão de teclado inline: [data] volta no `callback_query`. */
 data class TelegramButton(val text: String, val data: String)
+
+/**
+ * Teclado fixo no lugar do teclado do celular (#408, AA30): o toque chega como
+ * mensagem de texto com o rótulo. [Remove] o tira.
+ */
+sealed interface TelegramReplyKeyboard {
+    data class Show(val rows: List<List<String>>) : TelegramReplyKeyboard
+    data object Remove : TelegramReplyKeyboard
+}
 
 /** 429 da Bot API: [retryAfterSeconds] é o que o Telegram mandou esperar. */
 class TelegramRateLimitedException(val retryAfterSeconds: Long) : RuntimeException("Telegram: limite de envio, aguarde $retryAfterSeconds s")
@@ -104,6 +114,8 @@ open class TelegramBotApi(
      * [buttons] é o teclado inline, uma lista por linha, embaixo da mensagem.
      * [silent] entrega sem som. Devolve o `message_id` (#398: o painel fixado
      * edita a mesma mensagem), `null` se o Telegram não o informar.
+     * [replyKeyboard] (#408) liga ou tira o teclado fixo; com [buttons], o inline vence —
+     * a Bot API aceita um `reply_markup` só.
      */
     open suspend fun sendMessage(
         token: String,
@@ -111,9 +123,12 @@ open class TelegramBotApi(
         text: String,
         html: Boolean = false,
         buttons: List<List<TelegramButton>> = emptyList(),
-        silent: Boolean = false
+        silent: Boolean = false,
+        replyKeyboard: TelegramReplyKeyboard? = null
     ): Long? {
-        val body = SendMessageDto(chatId, text, if (html) PARSE_MODE_HTML else null, keyboard(buttons), silent.takeIf { it })
+        val markup = keyboard(buttons)?.let { inline -> json.encodeToJsonElement(KeyboardDto.serializer(), inline) }
+            ?: replyKeyboard?.let(::replyMarkup)
+        val body = SendMessageDto(chatId, text, if (html) PARSE_MODE_HTML else null, markup, silent.takeIf { it })
         val response = httpClient.post("$baseUrl/bot$token/sendMessage") {
             contentType(ContentType.Application.Json)
             setBody(json.encodeToString(SendMessageDto.serializer(), body))
@@ -138,6 +153,14 @@ open class TelegramBotApi(
             setBody(json.encodeToString(AnswerCallbackDto.serializer(), AnswerCallbackDto(callbackId, text)))
         }
         decode(response, SimpleResponseDto.serializer())
+    }
+
+    private fun replyMarkup(keyboard: TelegramReplyKeyboard): JsonElement = when (keyboard) {
+        is TelegramReplyKeyboard.Show -> json.encodeToJsonElement(
+            ReplyKeyboardDto.serializer(),
+            ReplyKeyboardDto(keyboard.rows.map { row -> row.map(::ReplyButtonDto) }, resizeKeyboard = true, isPersistent = true)
+        )
+        TelegramReplyKeyboard.Remove -> json.encodeToJsonElement(RemoveKeyboardDto.serializer(), RemoveKeyboardDto(removeKeyboard = true))
     }
 
     private fun keyboard(rows: List<List<TelegramButton>>): KeyboardDto? {
@@ -299,9 +322,23 @@ open class TelegramBotApi(
         @SerialName("chat_id") val chatId: Long,
         val text: String,
         @SerialName("parse_mode") val parseMode: String? = null,
-        @SerialName("reply_markup") val replyMarkup: KeyboardDto? = null,
+        @SerialName("reply_markup") val replyMarkup: JsonElement? = null,
         @SerialName("disable_notification") val disableNotification: Boolean? = null
     )
+
+    /** Sem default de propósito: o `Json` do cliente não grava valor padrão, e estes têm de ir. */
+    @Serializable
+    private data class ReplyKeyboardDto(
+        val keyboard: List<List<ReplyButtonDto>>,
+        @SerialName("resize_keyboard") val resizeKeyboard: Boolean,
+        @SerialName("is_persistent") val isPersistent: Boolean
+    )
+
+    @Serializable
+    private data class ReplyButtonDto(val text: String)
+
+    @Serializable
+    private data class RemoveKeyboardDto(@SerialName("remove_keyboard") val removeKeyboard: Boolean)
 
     @Serializable
     private data class EditMessageDto(

@@ -25,6 +25,14 @@ internal object TelegramBotChatMessages {
         return (listOf(header) + lines + footer).joinToString("\n")
     }
 
+    /** Confirmação do `/teclado` (AA30). */
+    fun keyboard(on: Boolean, language: AppLanguage): String = when {
+        on && language == AppLanguage.PT -> "⌨ Atalhos no lugar do teclado. <code>/teclado off</code> tira."
+        on -> "⌨ Shortcuts in place of the keyboard. <code>/keyboard off</code> removes them."
+        language == AppLanguage.PT -> "⌨ Atalhos removidos."
+        else -> "⌨ Shortcuts removed."
+    }
+
     /** Confirmação do `/idioma` (AA24), já no idioma novo. */
     fun languageSet(language: AppLanguage?, effective: AppLanguage): String = when {
         language == null && effective == AppLanguage.PT -> "🌐 Esta conversa segue o idioma do app (português)."

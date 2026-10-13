@@ -402,6 +402,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/idioma pt|en|app` (`/language`, AA24): idioma por conversa (`TelegramChat.language`, `null` = o do app; valor
     desconhecido no arquivo vale como `null`). Respostas, toques, alertas, resumo diário e painel saem no idioma de cada
     conversa — o repasse monta o texto uma vez por idioma. O menu do Telegram (`setMyCommands`) continua no idioma do app.
+  - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado (📊 Status,
+    👤 Conta, 📈 Gráfico, ⏳ Quando, no idioma da conversa); `off` manda `remove_keyboard`. O toque chega como **texto** com o
+    rótulo e `parseKeyboardLabel` o traduz no comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos
+    `resize_keyboard`/`is_persistent` não têm default no DTO porque o `Json` do cliente não grava valor padrão.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 
