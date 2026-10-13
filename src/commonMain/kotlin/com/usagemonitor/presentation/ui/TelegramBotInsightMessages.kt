@@ -1,7 +1,9 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -89,6 +91,49 @@ internal object TelegramBotInsightMessages {
         }
         return "$mark $name$value — $verdict"
     }
+
+    /**
+     * `/qual` (AA28): por fonte, a conta com mais folga — menor risco, depois menor
+     * percentual, depois rótulo. Só entra conta com cota em percentual: saldo não
+     * se compara com janela. As outras da mesma fonte vêm embaixo, com o pior risco.
+     */
+    fun bestAccount(snapshot: UsageSnapshot?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (snapshot == null || snapshot.accounts.isEmpty()) return TelegramBotMessages.noReading(pt)
+        val groups = snapshot.accounts
+            .filter { account -> account.quotas.any { quota -> quota.percent != null } }
+            .groupBy { account -> account.source }
+            .toList()
+            .sortedBy { (source, _) -> source.ordinal }
+        if (groups.isEmpty()) {
+            return if (pt) "Nenhuma conta com cota em percentual para comparar." else "No account with a percentage quota to compare."
+        }
+        val blocks = groups.map { (_, accounts) ->
+            val ranked = accounts.sortedWith(
+                compareBy<UsageSnapshotAccount> { account -> account.worstRisk?.ordinal ?: UsageRiskLevel.ON_TRACK.ordinal }
+                    .thenBy { account -> maxPercent(account) }
+                    .thenBy { account -> account.label }
+            )
+            val best = ranked.first()
+            val quotas = best.quotas.mapNotNull { quota -> quota.percent?.let { percent -> "${TelegramBotMessages.escape(quota.label)} $percent%" } }
+            val head = "<b>${TelegramBotMessages.escape(best.label)}</b> — " + quotas.joinToString(" · ")
+            val others = ranked.drop(1).map { account ->
+                val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
+                "$mark${TelegramBotMessages.escape(account.label)} ${maxPercent(account)}%"
+            }
+            val tail = if (others.isEmpty()) {
+                if (pt) "<i>única conta desta fonte</i>" else "<i>only account of this source</i>"
+            } else {
+                "<i>" + (if (pt) "depois: " else "then: ") + others.joinToString(" · ") + "</i>"
+            }
+            "$head\n$tail"
+        }
+        val header = if (pt) "<b>🎯 Melhor conta agora</b>" else "<b>🎯 Best account now</b>"
+        return header + "\n\n" + blocks.joinToString("\n\n")
+    }
+
+    private fun maxPercent(account: UsageSnapshotAccount): Int =
+        account.quotas.mapNotNull { quota -> quota.percent }.maxOrNull() ?: 0
 
     /** "20 min", "3 h 10 min", "2 d 4 h": a antecedência em palavras curtas. */
     internal fun span(duration: Duration): String {

@@ -99,6 +99,8 @@ sealed interface BotCommand {
     data object Resets : BotCommand
     /** `/quando` (#408, AA2): quando cada cota esgota no ritmo atual, contra o reinício. */
     data object Exhaustion : BotCommand
+    /** `/qual` (#408, AA28): a conta com mais folga de cada fonte, agora. */
+    data object BestAccount : BotCommand
     data object Help : BotCommand
     data class Invalid(val usage: String) : BotCommand
 }
@@ -137,6 +139,7 @@ fun parseBotCommand(text: String): BotCommand? {
         }
         "reinicios", "reinícios", "resets" -> BotCommand.Resets
         "quando", "when" -> BotCommand.Exhaustion
+        "qual", "which" -> BotCommand.BestAccount
         "ajuda", "help" -> BotCommand.Help
         else -> BotCommand.Invalid("/ajuda")
     }

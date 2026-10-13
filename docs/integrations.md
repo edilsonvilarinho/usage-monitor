@@ -361,6 +361,8 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/quando` (`/when`, AA2): a data de esgotamento da mesma projeção do arco da HUD (`QuotaRiskSummary.estimatedExhaustionAt`,
     agora também em `UsageSnapshotQuota.exhaustsAt`, com o mesmo filtro de cota vencida) contra o reinício: "estoura N antes"
     ou "não estoura antes de reiniciar"; saldo diz quando acaba; sem projeção, a linha diz "sem projeção".
+  - `/qual` (`/which`, AA28): por fonte, a conta com mais folga — menor risco, depois menor percentual, depois rótulo (ordem
+    total); as outras da fonte vêm embaixo com o emoji do pior risco. Conta só com saldo fica fora: não se compara com janela.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

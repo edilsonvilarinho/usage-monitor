@@ -144,6 +144,7 @@ Molde por tipo de opção:
 | A01 | `refactor(telegram): dispatch commands and move the bot wiring out of AppViewModels` | `gradlew.bat desktopTest --tests "*Telegram*"`: 58 testes, 0 falhas (comportamento igual; `handle` virou `when` exaustivo e a fiação foi para `TelegramBotWiring.kt`, `AppViewModels` 454 → 394 linhas) | concluída |
 | A02 | `feat(telegram): list the next quota resets with /reinicios` | `gradlew.bat desktopTest --tests "*Telegram*"`: 60 testes, 0 falhas (novos: ordem do relógio com empate por conta e cota, reinício vencido fora, sem reinício conhecido; o teste do menu passou a exigir que todo item seja comando conhecido, em vez da lista fixa) | concluída |
 | A03 | `feat(telegram): show when each quota runs out with /quando` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*UsageSnapshotTest*"`: 61 + 3 testes, 0 falhas (novos: estoura antes do reinício com a antecedência, não estoura, sem projeção, saldo sem reinício; `exhaustsAt` no retrato com o filtro de cota vencida) | concluída |
+| A04 | `feat(telegram): pick the account with the most room with /qual` | `gradlew.bat desktopTest --tests "*Telegram*"`: 62 testes, 0 falhas (novo: menor risco, depois menor percentual, por fonte; saldo fora; única conta) | concluída |
 
 ## Problemas em aberto e riscos
 

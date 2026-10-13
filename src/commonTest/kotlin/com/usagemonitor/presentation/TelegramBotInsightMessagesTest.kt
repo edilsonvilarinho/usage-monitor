@@ -101,4 +101,29 @@ class TelegramBotInsightMessagesTest {
         assertTrue("⚪ <b>MiniMax · Requisições</b> 9% — sem projeção" in text, text)
         assertTrue("🟡 <b>DeepSeek · Saldo</b> — acaba por volta de ter 09:00" in text, text)
     }
+
+    @Test
+    fun `which picks the account with the lowest risk then the lowest percent per source`() {
+        val snapshot = UsageSnapshot(
+            generatedAt = now,
+            accounts = listOf(
+                account("Anthropic · Padrão", quota("5h", 86, null, risk = UsageRiskLevel.WILL_EXCEED), quota("Semanal", 61, null)),
+                account("Anthropic · Trabalho", quota("5h", 12, null, risk = UsageRiskLevel.ON_TRACK), quota("Semanal", 30, null)),
+                account("Anthropic · Pessoal", quota("5h", 5, null, risk = UsageRiskLevel.AT_RISK)),
+                account("Codex", quota("7d", 22, null), source = ApiSource.CODEX),
+                account("DeepSeek", UsageSnapshotQuota("Saldo", PeriodType.REPORTED, UsageUnit.CURRENCY_USD, 1, 5, null, null, "USD"), source = ApiSource.DEEPSEEK)
+            )
+        )
+
+        val text = TelegramBotInsightMessages.bestAccount(snapshot, AppLanguage.PT)
+
+        assertEquals(
+            "<b>🎯 Melhor conta agora</b>\n\n" +
+                "<b>Anthropic · Trabalho</b> — 5h 12% · Semanal 30%\n" +
+                "<i>depois: 🟡 Anthropic · Pessoal 5% · 🔴 Anthropic · Padrão 86%</i>\n\n" +
+                "<b>Codex</b> — 7d 22%\n" +
+                "<i>única conta desta fonte</i>",
+            text
+        )
+    }
 }
