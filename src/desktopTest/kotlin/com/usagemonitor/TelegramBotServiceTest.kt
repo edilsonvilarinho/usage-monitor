@@ -128,6 +128,8 @@ class TelegramBotServiceTest {
     private val alerts = MutableSharedFlow<UsageAlert>(extraBufferCapacity = 4)
     private val refreshes = AtomicInteger()
     private val focusRequests = AtomicInteger()
+    private val applied = AtomicInteger()
+    @Volatile private var readyVersion: String? = null
     @Volatile private var snapshot: UsageSnapshot? = null
     private val enabledSources = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
     private val service = TelegramBotService(
@@ -154,8 +156,11 @@ class TelegramBotServiceTest {
         readings = TelegramBotReadings(
             focusHud = { focusRequests.incrementAndGet(); true },
             machineName = { "NOTE-EDI" },
-            exportUsage = { since, format -> "$format desde $since" }
-        )
+            exportUsage = { since, format -> "$format desde $since" },
+            readyUpdate = { readyVersion },
+            applyUpdate = { applied.incrementAndGet() }
+        ),
+        updateCheckMillis = 50L
     )
 
     @AfterTest
@@ -353,6 +358,29 @@ class TelegramBotServiceTest {
         assertEquals("usage-monitor-2026-10-06-30d.json", name)
         // 2026-10-06T12:00Z menos 30 dias.
         assertEquals("JSON desde ${Instant.parse("2026-09-06T12:00:00Z").toEpochMilliseconds()}", content)
+    }
+
+    /** #408, AA17: versão pronta é avisada uma vez com o botão; o toque reinicia só a versão avisada. */
+    @Test
+    fun `ready update is announced once and the tap restarts only with the permission`() {
+        paired()
+        readyVersion = "42.1.0"
+        service.start()
+        Thread.sleep(200)
+        assertTrue(api.sent.none { it.second.startsWith("⬆") })
+
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(allowRemoteUpdate = true))
+        waitUntil { api.sent.any { it.second.startsWith("⬆ <b>Usage Monitor 42.1.0 pronto para instalar</b>") } }
+        assertEquals("upd:42.1.0", api.keyboards.last { it.isNotEmpty() }.single().data)
+        assertEquals("42.1.0", settings.value.preferences.announcedUpdateVersion)
+        Thread.sleep(200)
+        assertEquals(1, api.sent.count { it.second.startsWith("⬆") })
+
+        api.pending += tap(1, chat = 51, data = "upd:41.0.0")
+        waitUntil { "cb1" in api.answered }
+        assertEquals(0, applied.get())
+        api.pending += tap(2, chat = 51, data = "upd:42.1.0")
+        waitUntil { applied.get() == 1 }
     }
 
     @Test

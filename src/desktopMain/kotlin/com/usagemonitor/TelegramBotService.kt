@@ -2,6 +2,9 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.TelegramButton
+import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.data
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import com.usagemonitor.domain.entity.ApiSource
@@ -79,13 +82,16 @@ internal class TelegramBotService(
     /** Leituras das funções da #408 (`/ping` e as seguintes). */
     private val readings: TelegramBotReadings = TelegramBotReadings(),
     /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
-    private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS
+    private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS,
+    /** Intervalo da checagem de versão pronta (#408, AA17); parâmetro pelo mesmo motivo. */
+    private val updateCheckMillis: Long = UPDATE_CHECK_MILLIS
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
     private var alertJob: Job? = null
     private var summaryJob: Job? = null
     private var panelJob: Job? = null
+    private var updateJob: Job? = null
 
     /** Último texto do painel por conversa, para editar só o que mudou. Só neste laço. */
     private val panelTexts = mutableMapOf<Long, String>()
@@ -119,6 +125,12 @@ internal class TelegramBotService(
             alerts.collect { alert -> broadcast { language -> TelegramBotMessages.alert(alert, language) } }
         }
         summaryJob = scope.launch { summaryLoop() }
+        updateJob = scope.launch {
+            while (true) {
+                runCatching { announceReadyUpdate() }.onFailure { error -> if (error is CancellationException) throw error }
+                delay(updateCheckMillis)
+            }
+        }
         panelJob = scope.launch {
             while (true) {
                 runCatching { syncPanels() }.onFailure { error -> if (error is CancellationException) throw error }
@@ -255,6 +267,24 @@ internal class TelegramBotService(
         if (panels != settings.panelMessages) savePanels(panels)
     }
 
+    /**
+     * Versão pronta para instalar (#408, AA17): avisa uma vez por versão, com o botão
+     * "Atualizar e reiniciar". A versão é gravada **antes** do envio, como o resumo
+     * diário: falhar no meio perde o aviso em vez de repeti-lo a cada minuto.
+     */
+    private suspend fun announceReadyUpdate() {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank() || !settings.preferences.allowRemoteUpdate) return
+        val version = readings.readyUpdate() ?: return
+        if (version == settings.preferences.announcedUpdateVersion) return
+        val marked = settings.copy(preferences = settings.preferences.copy(announcedUpdateVersion = version))
+        runCatching { saveSettings(marked) }
+        settingsFlow.value = marked
+        broadcast(buttons = { language -> listOf(listOf(TelegramButton(TelegramBotChatMessages.updateButton(language), BotTap.UpdateNow(version).data()))) }) { language ->
+            TelegramBotChatMessages.updateReady(version, language)
+        }
+    }
+
     /** `false` quando a mensagem sumiu e tem de ser recriada; "not modified" conta como mantida. */
     private suspend fun editPanel(token: String, chatId: Long, messageId: Long, text: String): Boolean =
         try {
@@ -278,7 +308,10 @@ internal class TelegramBotService(
      * Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa.
      * O texto sai no idioma de cada conversa (#408, AA24), montado uma vez por idioma.
      */
-    private suspend fun broadcast(textFor: suspend (AppLanguage) -> String) {
+    private suspend fun broadcast(
+        buttons: (AppLanguage) -> List<List<TelegramButton>> = { emptyList() },
+        textFor: suspend (AppLanguage) -> String
+    ) {
         val settings = settingsFlow.value
         if (!settings.enabled || settings.botToken.isBlank()) return
         val texts = mutableMapOf<AppLanguage, String>()
@@ -286,7 +319,7 @@ internal class TelegramBotService(
         for (chat in settings.authorizedChats) {
             val language = settings.languageOf(chat.id, languageProvider())
             val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
-            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true) }
+            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language)) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)
         }
@@ -301,5 +334,6 @@ internal class TelegramBotService(
         const val SEND_SPACING_MILLIS = 1_100L
         const val SUMMARY_CHECK_MILLIS = 60_000L
         const val PANEL_INTERVAL_MILLIS = 60_000L
+        const val UPDATE_CHECK_MILLIS = 60_000L
     }
 }

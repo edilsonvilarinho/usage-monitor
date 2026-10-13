@@ -21,7 +21,9 @@ private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long
 private data class TelegramPreferencesDto(
     val allowPcActions: Boolean = false,
     val showMachineName: Boolean = false,
-    val showTeam: Boolean = false
+    val showTeam: Boolean = false,
+    val allowRemoteUpdate: Boolean = false,
+    val announcedUpdateVersion: String? = null
 )
 
 @Serializable
@@ -71,7 +73,9 @@ internal class LocalTelegramSettingsDataSource(
             preferences = TelegramBotPreferences(
                 allowPcActions = dto.preferences.allowPcActions,
                 showMachineName = dto.preferences.showMachineName,
-                showTeam = dto.preferences.showTeam
+                showTeam = dto.preferences.showTeam,
+                allowRemoteUpdate = dto.preferences.allowRemoteUpdate,
+                announcedUpdateVersion = dto.preferences.announcedUpdateVersion
             )
         )
     }
@@ -91,7 +95,9 @@ internal class LocalTelegramSettingsDataSource(
             preferences = TelegramPreferencesDto(
                 allowPcActions = settings.preferences.allowPcActions,
                 showMachineName = settings.preferences.showMachineName,
-                showTeam = settings.preferences.showTeam
+                showTeam = settings.preferences.showTeam,
+                allowRemoteUpdate = settings.preferences.allowRemoteUpdate,
+                announcedUpdateVersion = settings.preferences.announcedUpdateVersion
             )
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))

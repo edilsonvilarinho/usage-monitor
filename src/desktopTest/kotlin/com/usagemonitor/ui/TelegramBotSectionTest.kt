@@ -110,7 +110,8 @@ class TelegramBotSectionTest {
     }
 
     @Test
-    fun `the sample reply opens on demand`() = runDesktopComposeUiTest {
+    // Cena alta: as opções da #408 empurram o exemplo para baixo da altura padrão (768).
+    fun `the sample reply opens on demand`() = runDesktopComposeUiTest(width = 1024, height = 2000) {
         setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(model(enabled = true, code = null), AppLanguage.PT) } } }
 
         assertEquals(0, onAllNodesWithText("Claude 5h", substring = true).fetchSemanticsNodes().size)

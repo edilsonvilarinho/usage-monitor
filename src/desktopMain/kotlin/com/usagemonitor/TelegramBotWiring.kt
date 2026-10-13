@@ -19,6 +19,7 @@ import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.presentation.ui.buildTelegramChart
+import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Clock
@@ -88,6 +89,9 @@ private fun createTelegramBotService(
         focusHud = { FocusRequestChannel().request() },
         machineName = machineName,
         teamPresence = teamPresenceReader(graph),
+        // Só a pronta (baixada e com SHA-256 conferido): a só "disponível" não tem o que instalar.
+        readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Ready)?.update?.version },
+        applyUpdate = { dashboard.restartAndUpdateNow() },
         exportUsage = { since, format ->
             graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
                 // Projeto, branch e integrante ficam fora: o arquivo sai do PC para o Telegram.

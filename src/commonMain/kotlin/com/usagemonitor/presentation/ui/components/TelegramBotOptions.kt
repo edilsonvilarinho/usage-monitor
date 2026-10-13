@@ -20,6 +20,7 @@ const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
 const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
 const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
 const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
+const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
 /**
  * Opções do que o bot faz além de responder (#398): permissões e envios por conta
@@ -119,6 +120,20 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.preferences.showTeam,
                 onCheckedChange = { show -> model.onPreferencesChange(model.preferences.copy(showTeam = show)) },
                 modifier = Modifier.testTag(TELEGRAM_TEAM_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Permitir atualizar pelo bot" else "Allow updating from the bot",
+            description = if (pt) {
+                "Avisa quando uma versão nova já foi baixada e oferece \"Atualizar e reiniciar o app\": o app fecha e reabre neste PC."
+            } else {
+                "Says when a new version is downloaded and offers \"Update and restart the app\": the app closes and reopens on this PC."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.allowRemoteUpdate,
+                onCheckedChange = { allowed -> model.onPreferencesChange(model.preferences.copy(allowRemoteUpdate = allowed)) },
+                modifier = Modifier.testTag(TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG)
             )
         }
     }

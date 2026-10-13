@@ -30,7 +30,14 @@ data class TelegramBotPreferences(
     /** Mensagens dizem de que PC saíram (#408, AA20): útil com o bot em mais de uma máquina. */
     val showMachineName: Boolean = false,
     /** `/time` mostra quem do time está online (#408, AA16): dado de outras pessoas, nasce desligado. */
-    val showTeam: Boolean = false
+    val showTeam: Boolean = false,
+    /**
+     * Avisa a versão nova já baixada e oferece "Atualizar e reiniciar" (#408, AA17): reinicia
+     * o app no PC a pedido de uma conversa, por isso nasce desligado.
+     */
+    val allowRemoteUpdate: Boolean = false,
+    /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
+    val announcedUpdateVersion: String? = null
 )
 
 /**

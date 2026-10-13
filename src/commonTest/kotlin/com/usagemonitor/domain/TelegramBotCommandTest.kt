@@ -60,6 +60,8 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Keyboard(true), parseBotCommand("/teclado"))
         assertEquals(BotCommand.FocusHud, parseBotCommand("/hud"))
         assertEquals(BotCommand.Team, parseBotCommand("/time"))
+        assertEquals(BotTap.UpdateNow("42.1.0"), parseBotTap(BotTap.UpdateNow("42.1.0").data()))
+        assertEquals(null, parseBotTap("upd:"))
         assertEquals(BotCommand.Export(7, UsageExportFormat.CSV), parseBotCommand("/exportar"))
         assertEquals(BotCommand.Export(30, UsageExportFormat.JSON), parseBotCommand("/export json 30d"))
         assertIs<BotCommand.Invalid>(parseBotCommand("/exportar pdf"))

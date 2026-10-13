@@ -38,5 +38,9 @@ internal class TelegramBotReadings(
      * `/time` (AA16): a presença do time das contas que participam. `null` sem
      * integração de time; falha é o servidor que não respondeu.
      */
-    val teamPresence: suspend () -> Result<List<TeamMemberPresence>>? = { null }
+    val teamPresence: suspend () -> Result<List<TeamMemberPresence>>? = { null },
+    /** AA17: a versão baixada e conferida, pronta para instalar; `null` sem nenhuma. */
+    val readyUpdate: () -> String? = { null },
+    /** AA17: fecha o app e instala a versão pronta — o mesmo botão da faixa do app. */
+    val applyUpdate: () -> Unit = {}
 )

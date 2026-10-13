@@ -317,12 +317,22 @@ internal class TelegramBotHandlers(
             is BotTap.Source -> toggleFromTap(token, message, callbackId, tap.source, language)
             is BotTap.SnoozeFor -> snoozeFromTap(token, message.chatId, callbackId, clock.now().toEpochMilliseconds() + tap.minutes * 60_000L, language)
             BotTap.SnoozeUntilMorning -> snoozeFromTap(token, message.chatId, callbackId, nextMorningMillis(clock.now().toEpochMilliseconds()), language)
+            is BotTap.UpdateNow -> {
+                // Permissão e versão relidas no toque: aviso antigo não reinicia o app.
+                val result = when {
+                    !settingsFlow.value.preferences.allowRemoteUpdate -> TelegramBotChatMessages.UpdateTapResult.NOT_ALLOWED
+                    readings.readyUpdate() != tap.version -> TelegramBotChatMessages.UpdateTapResult.STALE
+                    else -> TelegramBotChatMessages.UpdateTapResult.STARTED
+                }
+                api.answerCallbackQuery(token, callbackId, TelegramBotChatMessages.updateTap(result, language))
+                if (result == TelegramBotChatMessages.UpdateTapResult.STARTED) readings.applyUpdate()
+            }
         }
     }
 
     /** Toques que mudam o app (#408, AA21): ligar fonte e silenciar. Ver conta e atualizar só leem. */
     private fun tapChangesApp(tap: BotTap?, button: BotButton?): Boolean = when (tap) {
-        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning -> true
+        is BotTap.Source, is BotTap.SnoozeFor, BotTap.SnoozeUntilMorning, is BotTap.UpdateNow -> true
         is BotTap.Account -> false
         null -> button == BotButton.SNOOZE
     }

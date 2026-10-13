@@ -29,12 +29,16 @@ sealed interface BotTap {
 
     /** Silencia até a próxima 08:00 em BRT (#398, Y8). */
     data object SnoozeUntilMorning : BotTap
+
+    /** "Atualizar e reiniciar" da versão [version] (#408, AA17); versão diferente da pronta não reinicia nada. */
+    data class UpdateNow(val version: String) : BotTap
 }
 
 private const val ACCOUNT_PREFIX = "acc:"
 private const val SOURCE_PREFIX = "api:"
 private const val SNOOZE_PREFIX = "snz:"
 private const val SNOOZE_MORNING = "am"
+private const val UPDATE_PREFIX = "upd:"
 
 /** `null` para dado que não é deste formato — inclusive os de [BotButton]. */
 fun parseBotTap(data: String?): BotTap? {
@@ -44,6 +48,7 @@ fun parseBotTap(data: String?): BotTap? {
         value.startsWith(SOURCE_PREFIX) -> ApiSource.entries.firstOrNull { source -> source.name == value.removePrefix(SOURCE_PREFIX) }?.let(BotTap::Source)
         value == SNOOZE_PREFIX + SNOOZE_MORNING -> BotTap.SnoozeUntilMorning
         value.startsWith(SNOOZE_PREFIX) -> value.removePrefix(SNOOZE_PREFIX).toIntOrNull()?.takeIf { minutes -> minutes in 1..MAX_SNOOZE_MINUTES }?.let(BotTap::SnoozeFor)
+        value.startsWith(UPDATE_PREFIX) -> value.removePrefix(UPDATE_PREFIX).takeIf { version -> version.isNotEmpty() }?.let(BotTap::UpdateNow)
         else -> null
     }
 }
@@ -54,6 +59,7 @@ fun BotTap.data(): String = when (this) {
     is BotTap.Source -> SOURCE_PREFIX + source.name
     is BotTap.SnoozeFor -> SNOOZE_PREFIX + minutes
     BotTap.SnoozeUntilMorning -> SNOOZE_PREFIX + SNOOZE_MORNING
+    is BotTap.UpdateNow -> UPDATE_PREFIX + version
 }
 
 /** Teto do silêncio por toque: um dia. Dado maior é forjado, não do teclado do bot. */

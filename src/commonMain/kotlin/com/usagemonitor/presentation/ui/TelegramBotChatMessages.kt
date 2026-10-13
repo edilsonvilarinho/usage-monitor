@@ -72,6 +72,31 @@ internal object TelegramBotChatMessages {
         return (listOf(header) + lines).joinToString("\n")
     }
 
+    /**
+     * Aviso da versão pronta (AA17). O texto diz **o que** reinicia — o app neste PC —,
+     * como a faixa de atualização do app.
+     */
+    fun updateReady(version: String, language: AppLanguage): String = if (language == AppLanguage.PT) {
+        "⬆ <b>Usage Monitor ${TelegramBotMessages.escape(version)} pronto para instalar</b>\nO app fecha e reabre neste PC para instalar. Novidades na janela do app depois do reinício."
+    } else {
+        "⬆ <b>Usage Monitor ${TelegramBotMessages.escape(version)} ready to install</b>\nThe app closes and reopens on this PC to install. What's new shows in the app after the restart."
+    }
+
+    fun updateButton(language: AppLanguage): String =
+        if (language == AppLanguage.PT) "⬆ Atualizar e reiniciar o app" else "⬆ Update and restart the app"
+
+    /** Resposta do toque (AA17): reiniciando, ou por que não. */
+    fun updateTap(result: UpdateTapResult, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        return when (result) {
+            UpdateTapResult.STARTED -> if (pt) "Reiniciando o app para instalar…" else "Restarting the app to install…"
+            UpdateTapResult.NOT_ALLOWED -> if (pt) "Atualizar pelo bot está desligado." else "Updating from the bot is off."
+            UpdateTapResult.STALE -> if (pt) "Essa versão não está mais pronta." else "That version is no longer ready."
+        }
+    }
+
+    enum class UpdateTapResult { STARTED, NOT_ALLOWED, STALE }
+
     /** `/hud` (AA29): o pedido saiu, ou a permissão está desligada. */
     fun focusHud(allowed: Boolean, requested: Boolean, language: AppLanguage): String {
         val pt = language == AppLanguage.PT
