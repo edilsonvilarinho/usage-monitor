@@ -23,7 +23,10 @@ import com.usagemonitor.domain.entity.AnalysisView
 import com.usagemonitor.domain.entity.AnalysisViewKind
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.SessionAnalysis
+import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.ui.components.AppDataSurface
 import com.usagemonitor.presentation.ui.components.AppEmptyState
 import com.usagemonitor.presentation.ui.components.AppLoadingState
@@ -86,7 +89,10 @@ typealias AnalysisImageProvider = (AnalysisView, SessionAnalysis, AppLanguage) -
 fun AnalysisScreen(viewModel: AnalysisViewModel, language: AppLanguage, imageFor: AnalysisImageProvider? = null) {
     val state by viewModel.uiState.collectAsState()
     val label by viewModel.accountLabel.collectAsState()
-    AnalysisContent(state, label, language, onSelect = viewModel::selectView, onRefresh = viewModel::refresh, imageFor = imageFor)
+    AnalysisContent(
+        state, label, language, onSelect = viewModel::selectView, onRefresh = viewModel::refresh, imageFor = imageFor,
+        onExportPdf = if (viewModel.canExport) ({ viewModel.exportPdf(language) }) else null
+    )
 }
 
 @Composable
@@ -96,13 +102,32 @@ internal fun AnalysisContent(
     language: AppLanguage,
     onSelect: (AnalysisView) -> Unit,
     onRefresh: () -> Unit,
-    imageFor: AnalysisImageProvider? = null
+    imageFor: AnalysisImageProvider? = null,
+    /** "Relatório PDF" (B21b); `null` esconde o botão. */
+    onExportPdf: (() -> Unit)? = null
 ) {
     AppWindowScaffold(modifier = Modifier.fillMaxSize()) {
         AppToolbar(spacing = AppSpacing.sm) {
             Text(AnalysisLabels.title(accountLabel, language), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.weight(1f))
+            if (onExportPdf != null && state is AnalysisUiState.Success) {
+                AppButton(label = ExportLabels.exportPdf(language), onClick = onExportPdf)
+            }
             AppButton(label = AnalysisLabels.refresh(language), onClick = onRefresh)
+        }
+        val outcome = (state as? AnalysisUiState.Success)?.exportOutcome
+        if (outcome != null) {
+            AppBanner(
+                title = when (outcome) {
+                    is CliExportOutcome.Saved -> if (language == AppLanguage.PT) "Exportação concluída" else "Export complete"
+                    is CliExportOutcome.Failed -> if (language == AppLanguage.PT) "Falha na exportação" else "Export failed"
+                },
+                description = when (outcome) {
+                    is CliExportOutcome.Saved -> outcome.path
+                    is CliExportOutcome.Failed -> outcome.message
+                },
+                tone = if (outcome is CliExportOutcome.Saved) AppTone.OK else AppTone.CRITICAL
+            )
         }
         when (state) {
             AnalysisUiState.Loading -> AppLoadingState(message = AnalysisLabels.loading(language), modifier = Modifier.fillMaxSize())

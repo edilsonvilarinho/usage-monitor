@@ -169,6 +169,9 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   Doze abas não cabem na janela mínima (640 dp): `AppSegmentedControl` **Texto | Gráficos** escolhe o grupo e `AppTabs`
   a vista dentro dele (papéis distintos). Nome da aba sem o emoji do Telegram (a Plex não tem o glifo). **Desvio**: o
   mockup falava em Canvas por vista; a imagem não segue o tema claro (fica escura nos dois temas).
+- **Relatório PDF** (B21b): botão na barra da janela, o mesmo PDF de uma página do `/analise pdf` e o mesmo nome de
+  arquivo, gravado pelo `UsageExportWriter` com o payload novo `UsageExportPayload.Binary` (bytes prontos; não é `data
+  class`). Cancelar o diálogo não publica nada; salvo ou falha vira `AppBanner`, como na Comparação.
 
 ## Sistema visual — janelas, cards e tooltips
 

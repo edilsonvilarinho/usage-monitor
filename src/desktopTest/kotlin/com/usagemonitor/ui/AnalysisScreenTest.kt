@@ -19,6 +19,7 @@ import com.usagemonitor.presentation.ui.ANALYSIS_IMAGE_TAG
 import androidx.compose.ui.graphics.ImageBitmap
 import com.usagemonitor.presentation.ui.AnalysisContent
 import com.usagemonitor.presentation.viewmodel.AnalysisUiState
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -74,6 +75,29 @@ class AnalysisScreenTest {
         // O segmentado troca de grupo: "Texto" volta ao painel.
         onNodeWithText("Texto").performClick()
         assertEquals(AnalysisView.PANEL, selected)
+    }
+
+    /** B21b: com exportação, o botão "Relatório PDF" aparece e o resultado vira faixa com o caminho. */
+    @Test
+    fun `pdf button exports and the saved path shows in a banner`() = runDesktopComposeUiTest(width = 1100, height = 800) {
+        var exported = 0
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.size(1000.dp, 700.dp)) {
+                    AnalysisContent(
+                        state = AnalysisUiState.Success(AnalysisFixture.analysis, AnalysisView.PANEL, exportOutcome = CliExportOutcome.Saved("C:/tmp/analise.pdf")),
+                        accountLabel = "Codex",
+                        language = AppLanguage.PT,
+                        onSelect = {},
+                        onRefresh = {},
+                        onExportPdf = { exported++ }
+                    )
+                }
+            }
+        }
+        onNodeWithText("Relatório PDF").performClick()
+        assertEquals(1, exported)
+        onNodeWithText("C:/tmp/analise.pdf").assertIsDisplayed()
     }
 
     @Test

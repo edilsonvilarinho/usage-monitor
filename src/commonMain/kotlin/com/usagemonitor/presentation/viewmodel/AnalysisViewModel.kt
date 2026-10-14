@@ -1,6 +1,10 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.AnalysisView
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.TelegramAnalysisImageLabels
+import com.usagemonitor.presentation.ui.UsageExportPayload
+import com.usagemonitor.presentation.ui.UsageExportRequest
 import com.usagemonitor.domain.entity.SessionAnalysis
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,7 +22,13 @@ sealed interface AnalysisUiState {
     data object Loading : AnalysisUiState
     /** A conta ainda não tem histórico, ou saiu do painel desde o clique. */
     data object Empty : AnalysisUiState
-    data class Success(val analysis: SessionAnalysis, val view: AnalysisView, val isRefreshing: Boolean = false) : AnalysisUiState
+    data class Success(
+        val analysis: SessionAnalysis,
+        val view: AnalysisView,
+        val isRefreshing: Boolean = false,
+        /** Resultado do "Relatório PDF" (B21b); `null` sem exportação ou com o diálogo cancelado. */
+        val exportOutcome: CliExportOutcome? = null
+    ) : AnalysisUiState
 }
 
 /**
@@ -30,8 +40,16 @@ sealed interface AnalysisUiState {
  */
 class AnalysisViewModel(
     private val load: suspend (targetKey: String) -> SessionAnalysis?,
-    dispatcher: CoroutineDispatcher = Dispatchers.Default
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** Grava o PDF (B21b); `null` esconde o botão. */
+    private val exportWriter: UsageExportWriter? = null,
+    /** O PDF de uma página do `/analise pdf`, montado em `desktopMain` (PDFBox é JVM). */
+    private val pdfOf: (suspend (SessionAnalysis, AppLanguage) -> ByteArray)? = null
 ) {
+    /** Há como exportar? Decide se a janela mostra "Relatório PDF". */
+    val canExport: Boolean
+        get() = exportWriter != null && pdfOf != null
+
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private var loadJob: Job? = null
     private var targetKey: String? = null
@@ -71,6 +89,29 @@ class AnalysisViewModel(
                 null
             }
             _uiState.value = if (analysis == null) AnalysisUiState.Empty else AnalysisUiState.Success(analysis, view)
+        }
+    }
+
+    /**
+     * "Relatório PDF" (AB15 no app): o mesmo arquivo do bot, com o mesmo nome. Cancelar o
+     * diálogo não é falha — nada é publicado.
+     */
+    fun exportPdf(language: AppLanguage) {
+        val writer = exportWriter ?: return
+        val build = pdfOf ?: return
+        val current = _uiState.value as? AnalysisUiState.Success ?: return
+        scope.launch {
+            val outcome = try {
+                val bytes = build(current.analysis, language)
+                val name = TelegramAnalysisImageLabels.reportFileName(current.analysis, language)
+                writer.write(UsageExportRequest(name, UsageExportPayload.Binary(bytes)))?.let { path -> CliExportOutcome.Saved(path) }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                CliExportOutcome.Failed(error.message ?: error::class.simpleName.orEmpty())
+            } ?: return@launch
+            val latest = _uiState.value as? AnalysisUiState.Success ?: return@launch
+            _uiState.value = latest.copy(exportOutcome = outcome)
         }
     }
 

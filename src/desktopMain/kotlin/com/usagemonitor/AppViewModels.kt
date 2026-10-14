@@ -241,7 +241,11 @@ internal class AppViewModels(
     )
 
     // Análise da sessão (rodada AB): a mesma leitura do `/analise` do bot, sob demanda.
-    val analysis = AnalysisViewModel(load = sessionAnalysisReader(graph, dashboard))
+    val analysis = AnalysisViewModel(
+        load = sessionAnalysisReader(graph, dashboard),
+        exportWriter = graph.usageExportWriter,
+        pdfOf = { result, language -> TelegramAnalysisPdf.render(result, language) }
+    )
 
     // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
     // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.

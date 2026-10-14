@@ -41,6 +41,7 @@ class DesktopUsageExportWriter(
         withContext(Dispatchers.IO) {
             when (val payload = request.payload) {
                 is UsageExportPayload.Text -> target.writeText(payload.content)
+                is UsageExportPayload.Binary -> target.writeBytes(payload.content)
                 is UsageExportPayload.Report ->
                     target.writeBytes(PdfUsageReportRenderer(payload.language ?: language()).render(payload.document))
             }
