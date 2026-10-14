@@ -97,6 +97,7 @@ private fun createTelegramBotService(
         focusHud = { FocusRequestChannel().request() },
         machineName = machineName,
         teamPresence = teamPresenceReader(graph),
+        teamClockOffsetMillis = { graph.teamServerClockOffset.offsetMillis },
         // Só a pronta (baixada e com SHA-256 conferido): a só "disponível" não tem o que instalar.
         readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Ready)?.update?.version },
         applyUpdate = { dashboard.restartAndUpdateNow() },

@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.telegramKeyboardRows
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.nextMorningMillis
+import com.usagemonitor.domain.entity.serverReferenceNow
 import com.usagemonitor.domain.entity.snoozeAlertsUntil
 import com.usagemonitor.presentation.ui.TelegramBotChatMessages
 import com.usagemonitor.presentation.ui.TelegramBotInsightMessages
@@ -195,7 +196,8 @@ internal class TelegramBotHandlers(
                 // A permissão é relida a cada pedido; desligada, o servidor nem é consultado.
                 val allowed = settingsFlow.value.preferences.showTeam
                 val presence = if (allowed) readings.teamPresence() else null
-                send(token, chatId, TelegramBotChatMessages.team(allowed, presence, clock.now(), language))
+                val serverNow = serverReferenceNow(clock.now(), readings.teamClockOffsetMillis())
+                send(token, chatId, TelegramBotChatMessages.team(allowed, presence, serverNow, language))
             }
             BotCommand.FocusHud -> {
                 // A permissão é relida aqui: desligada depois do pedido, ele não sai.

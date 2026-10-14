@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.PRESENCE_LOOKBACK_MILLIS
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.hasSuspectClockSkew
+import com.usagemonitor.domain.entity.serverReferenceNow
 import com.usagemonitor.domain.entity.toTeamPresence
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamServerClockOffset
@@ -82,7 +83,7 @@ data class TeamPresenceResult(
 
 /** Agora do servidor, estimado a partir do relógio local mais o desvio medido. */
 private fun referenceNow(clock: Clock, offset: TeamServerClockOffset): Instant {
-    return Instant.fromEpochMilliseconds(clock.now().toEpochMilliseconds() + offset.offsetMillis)
+    return serverReferenceNow(clock.now(), offset.offsetMillis)
 }
 
 private fun List<TeamMemberUsage>.toPresenceResult(

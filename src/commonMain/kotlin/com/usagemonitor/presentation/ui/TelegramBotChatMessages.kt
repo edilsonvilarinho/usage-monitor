@@ -36,9 +36,10 @@ internal object TelegramBotChatMessages {
     /**
      * `/time` (AA16): por apelido — nunca e-mail nem máquina —, trabalhando agora,
      * online parado ou fora (com a última batida). Ordem total: trabalhando, online,
-     * fora; depois apelido e dispositivo.
+     * fora; depois apelido e dispositivo. [serverNow] é o agora do servidor
+     * (`serverReferenceNow`), o mesmo relógio de `lastSeenAt`.
      */
-    fun team(allowed: Boolean, presence: Result<List<TeamMemberPresence>>?, now: Instant, language: AppLanguage): String {
+    fun team(allowed: Boolean, presence: Result<List<TeamMemberPresence>>?, serverNow: Instant, language: AppLanguage): String {
         val pt = language == AppLanguage.PT
         if (!allowed) {
             return if (pt) {
@@ -65,7 +66,7 @@ internal object TelegramBotChatMessages {
             when {
                 entry.isWorkingNow -> "⚡ $name — " + (if (pt) "trabalhando · ${entry.activeSessionCount} sessão(ões)" else "working · ${entry.activeSessionCount} session(s)")
                 entry.isOnline -> "🟢 $name — " + (if (pt) "online, parado" else "online, idle")
-                else -> "⚪ $name — " + (entry.lastSeenAt?.let { at -> (if (pt) "visto " else "seen ") + TelegramBotMessages.elapsed(now - at, pt) } ?: if (pt) "fora" else "away")
+                else -> "⚪ $name — " + (entry.lastSeenAt?.let { at -> (if (pt) "visto " else "seen ") + TelegramBotMessages.elapsed(serverNow - at, pt) } ?: if (pt) "fora" else "away")
             }
         }
         val header = if (pt) "<b>👥 Time agora</b>" else "<b>👥 Team now</b>"

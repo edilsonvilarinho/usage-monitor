@@ -18,6 +18,8 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.SourceHealthObservation
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.TelegramBotPreferences
+import com.usagemonitor.domain.entity.TeamMemberUsage
+import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
@@ -174,6 +176,20 @@ class TelegramBotServiceTest {
             readyUpdate = { readyVersion },
             applyUpdate = { applied.incrementAndGet() },
             sourceHealth = { sourceHealth },
+            teamPresence = {
+                Result.success(
+                    listOf(
+                        TeamMemberPresence(
+                            member = TeamMemberUsage(deviceId = "d1", alias = "joão", lastSeenAt = Instant.parse("2026-10-06T10:00:00Z")),
+                            isOnline = false,
+                            isWorkingNow = false,
+                            activeSessionCount = 0
+                        )
+                    )
+                )
+            },
+            // O servidor está 1 h atrás deste PC.
+            teamClockOffsetMillis = { -3_600_000L },
             sessionAnalysis = { key -> if (key == "ANTHROPIC:work") com.usagemonitor.presentation.AnalysisFixture.analysis else null }
         ),
         updateCheckMillis = 50L,
@@ -345,6 +361,20 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("Sem leitura ainda.") } }
         api.pending += message(3, chat = 51, text = "/teclado off")
         waitUntil { TelegramReplyKeyboard.Remove in api.replyKeyboards }
+    }
+
+    /**
+     * `lastSeenAt` é carimbo do servidor: o "visto há" conta do agora do servidor
+     * (relógio local 12:00 menos 1 h de desvio = 11:00), não do relógio local.
+     */
+    @Test
+    fun `team command measures last seen against the server clock`() {
+        paired()
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(showTeam = true))
+        service.start()
+        api.pending += message(1, chat = 51, text = "/time")
+        waitUntil { api.sent.any { it.second.startsWith("<b>👥 Time agora</b>") } }
+        assertTrue(api.sent.any { it.second.endsWith("⚪ <b>joão</b> — visto há 1 h") })
     }
 
     /** #408, AA29: `/hud` só pede a HUD com "Permitir ações no PC" ligado. */

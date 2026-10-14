@@ -97,6 +97,15 @@ data class TeamMemberPresence(
 }
 
 /**
+ * O agora **do servidor do time**: relógio local mais o desvio medido
+ * (`TeamServerClockOffset.offsetMillis`). Todo cálculo contra `lastSeenAt`, que é
+ * carimbo do servidor, parte daqui — a tela de presença e o `/time` do bot.
+ */
+fun serverReferenceNow(localNow: Instant, offsetMillis: Long): Instant {
+    return Instant.fromEpochMilliseconds(localNow.toEpochMilliseconds() + offsetMillis)
+}
+
+/**
  * Classifica os integrantes contra [referenceNow].
  *
  * [referenceNow] é o agora **do servidor**, já corrigido pelo desvio medido —
