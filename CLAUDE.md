@@ -191,8 +191,9 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
   `CliSessionsLabels`…); migrar um arquivo baixa o teto. Classificação de fonte é predicado do domain
   com `when` exaustivo (`ApiSourceClassification.kt`), nunca conjunto literal repetido.
 - **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
-  divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas (`DashboardViewModel`, `LocalCliSessionDataSource`,
-  `ApiUsageCardFormatting`, `AutoStartManager`), a próxima mudança começa extraindo, não crescendo.
+  divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas
+  (`TeamUsageViewModel`, `DashboardViewModel`; logo abaixo, `TeamUsageScreen` com 749), a próxima mudança começa
+  extraindo, não crescendo. Medido em 2026-10-14 (`boas-praticas-377`).
 
 ## Integração com time (`server/`)
 
