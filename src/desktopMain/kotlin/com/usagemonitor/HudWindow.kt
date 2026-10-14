@@ -217,29 +217,17 @@ internal fun HudWindowHost(
     }
 
     val scale = uiScaleFactor(uiScalePercent)
-    // A janela mede a lista com quem está saindo, até a vaga fechar; o notch
-    // recolhe até a lista sem ela por dentro da janela (K1).
-    val (sizes, settledSizes) = hudNotchSizesWithDeparture(
+    val (sizes, settledSizes) = hudWindowSizes(
         accounts = accounts,
-        edge = placement.edge,
+        placement = placement,
+        screenArea = screenArea,
+        scale = scale,
         fallbackLabel = fallbackLabel,
         hasUpdateIndicator = updateIndicator != null,
-        // Mais que isso da borda e a faixa fica compacta (anel + percentual).
-        maxAlong = (if (placement.edge.isHorizontal) screenArea.size.width else screenArea.size.height) /
-            uiScaleFactor(uiScalePercent) * hudMaxAlongFraction(placement.edge),
-        hasUpdateAction = updateAction != null,
-        maxWindowHeight = screenArea.size.height / scale
+        hasUpdateAction = updateAction != null
     )
     val composedArea = screenArea.inCompositionDp(scale)
-    // Parada e aberta a janela é a mesma, com o notch no mesmo ponto da tela; quem
-    // se ajusta a um canto é o balão. Parada, só o notch aceita clique.
-    // Carregando, a janela é o notch com as alças — simétrico ao longo da borda,
-    // então o centro dela continua sendo o do notch, que é o que o encaixe lê.
-    val bounds = if (dragging) {
-        hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
-    } else {
-        hudDockedWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
-    }
+    val bounds = hudHostWindowBounds(dragging, placement, sizes, composedArea)
     val hitRegionSupported = remember { hudUsesHitRegion(AutoStartManager.currentPlatform()) }
     val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
