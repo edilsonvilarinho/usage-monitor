@@ -22,8 +22,6 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.requiresLocalApiKey
-import com.usagemonitor.domain.entity.statusBadgeLabel
-import com.usagemonitor.domain.entity.statusSupportingText
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -169,7 +167,7 @@ fun ApiCheckboxRow(
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
             ) {
                 Text(
-                    text = apiLabel(api, language),
+                    text = api.displayName(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -201,9 +199,9 @@ fun ApiCheckboxRow(
                 // muda com o nome da fonte ("da MiniMax", "do DeepSeek") e uma
                 // frase montada erraria a concordância em parte delas.
                 contentDescription = if (language == AppLanguage.PT) {
-                    "Gerenciar chave — ${apiLabel(api, language)}"
+                    "Gerenciar chave — ${api.displayName()}"
                 } else {
-                    "Manage ${apiLabel(api, language)} key"
+                    "Manage ${api.displayName()} key"
                 },
                 onClick = onEditApiKey,
                 modifier = Modifier.testTag(apiSelectorEditKeyTestTag(api))
@@ -246,8 +244,4 @@ private fun SourceStatusBadge(
             .border(AppBorderWidth, MaterialTheme.colorScheme.outlineVariant, AppShapes.small)
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
-}
-
-private fun apiLabel(api: ApiSource, language: AppLanguage): String {
-    return api.displayName(language)
 }

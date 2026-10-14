@@ -156,7 +156,7 @@ private fun ApiKeyDialog(
     var apiKey by remember(source) { mutableStateOf("") }
     var revealed by remember(source) { mutableStateOf(false) }
     var showError by remember(source) { mutableStateOf(false) }
-    val sourceName = source.displayName(language)
+    val sourceName = source.displayName()
     val isChecking = checkState.status == ApiKeyCheckStatus.CHECKING
     val hasCandidateKey = apiKey.isNotBlank() || hasStoredKey
 

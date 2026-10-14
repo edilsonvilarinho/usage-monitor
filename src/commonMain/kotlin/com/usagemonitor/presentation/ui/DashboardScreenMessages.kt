@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.presentation.viewmodel.DashboardToast
@@ -52,21 +53,7 @@ internal fun decodeToastMessage(toast: DashboardToast, language: AppLanguage): S
     }
 }
 
-internal fun sourceLabelFromKey(source: ApiSource): String {
-    return when (source) {
-        ApiSource.ANTHROPIC -> "Anthropic"
-        ApiSource.MINIMAX -> "MiniMax"
-        ApiSource.CODEX -> "Codex"
-        ApiSource.DEEPSEEK -> "DeepSeek"
-        ApiSource.OPENCODE -> "OpenCode Zen Free"
-        ApiSource.OPENCODE_GO -> "OpenCode Go"
-        ApiSource.KILO -> "Kilo Free"
-        ApiSource.OPENROUTER -> "OpenRouter"
-        ApiSource.GEMINI -> "Gemini CLI"
-        ApiSource.CURSOR -> "Cursor"
-        ApiSource.ANTIGRAVITY -> "Antigravity CLI"
-    }
-}
+internal fun sourceLabelFromKey(source: ApiSource): String = source.displayName()
 
 /** A hora de [instant] em BRT, `HH:mm` — o prazo do backoff no toast e no banner (issue #269). */
 internal fun formatRetryClock(instant: Instant): String {

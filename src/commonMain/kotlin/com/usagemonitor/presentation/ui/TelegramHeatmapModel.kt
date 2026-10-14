@@ -43,4 +43,4 @@ fun buildTelegramHeatmap(rows: List<ComparisonRow>, language: AppLanguage): Tele
 
 /** Modelo do Claude CLI e do Codex com a fonte na frente; linha de fonte já é o nome dela. */
 private fun heatmapLabel(row: ComparisonRow, language: AppLanguage): String =
-    if (row.source.hasCliSessionIndex()) "${row.source.displayName(language)} · ${row.label}" else row.label
+    if (row.source.hasCliSessionIndex()) "${row.source.displayName()} · ${row.label}" else row.label

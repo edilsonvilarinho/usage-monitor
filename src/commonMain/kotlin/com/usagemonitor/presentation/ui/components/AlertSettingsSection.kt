@@ -88,9 +88,9 @@ private val DEFAULT_QUIET_HOURS = QuietHours(22, 8)
  */
 internal fun quotaThresholdCoverageNote(language: AppLanguage): String {
     val balance = sourcesWithQuotaThresholdGap(QuotaThresholdGap.PREPAID_BALANCE)
-        .joinToString { source -> source.displayName(language) }
+        .joinToString { source -> source.displayName() }
     val observed = sourcesWithQuotaThresholdGap(QuotaThresholdGap.OBSERVED_ACTIVITY)
-        .joinToString { source -> source.displayName(language) }
+        .joinToString { source -> source.displayName() }
 
     return if (language == AppLanguage.PT) {
         "O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto ($balance) e " +

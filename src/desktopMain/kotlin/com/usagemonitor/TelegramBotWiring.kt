@@ -155,7 +155,7 @@ private fun sourceHealthOf(state: UiState, language: AppLanguage): List<SourceHe
     val failing = errors.map { error ->
         SourceHealthObservation(
             key = error.target.storageKey,
-            label = error.targetLabel?.takeIf { label -> label.isNotBlank() } ?: error.source.displayName(language),
+            label = error.targetLabel?.takeIf { label -> label.isNotBlank() } ?: error.source.displayName(),
             failure = error.message,
             lastReadingAt = data.firstOrNull { stats -> stats.targetKey == error.target }?.fetchedAt
         )
@@ -200,10 +200,10 @@ private suspend fun telegramChartOf(graph: AppGraph, range: HistoryRange): Teleg
     val reports = graph.enabledApis.value.sortedBy { source -> source.ordinal }.flatMap { source ->
         val accounts = runCatching { graph.getUsageHistory.listAccounts(source) }.getOrDefault(emptyList())
         if (accounts.isEmpty()) {
-            listOfNotNull(runCatching { source.displayName(language) to graph.getUsageHistory(source, range, null, now) }.getOrNull())
+            listOfNotNull(runCatching { source.displayName() to graph.getUsageHistory(source, range, null, now) }.getOrNull())
         } else {
             accounts.mapIndexedNotNull { index, account ->
-                val name = if (accounts.size > 1) "${source.displayName(language)} ${index + 1}" else source.displayName(language)
+                val name = if (accounts.size > 1) "${source.displayName()} ${index + 1}" else source.displayName()
                 runCatching { name to graph.getUsageHistory(source, range, account.key, now) }.getOrNull()
             }
         }

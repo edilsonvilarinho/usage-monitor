@@ -358,7 +358,7 @@ internal fun ApiUsageStats.quotaEndAt(periodType: PeriodType): Instant? {
 }
 
 internal fun historyWindowTitle(source: ApiSource, language: AppLanguage): String {
-    val sourceName = source.displayName(language)
+    val sourceName = source.displayName()
 
     return if (language == AppLanguage.PT) {
         "Histórico - $sourceName"
