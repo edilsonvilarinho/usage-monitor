@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — #412 concluída (A1, A2); #411 aguardando a escolha da rodada visual AC.`
+**Estado atual:** `Em execução — #412 concluída (A1, A2); #411 com a direção AC4 escolhida, implementação em andamento.`
 
 | Campo | Valor |
 | --- | --- |
@@ -38,6 +38,8 @@
 4. Precedência por abertura, nunca dois modais juntos: Novidades > Guia de introdução > Dica do dia.
 5. Guia automático só em instalação nova: `releaseNotesSeenVersion == null && onboardingCompletedVersion == null`, lido antes do efeito que grava a marca das Novidades; o recibo do instalador é só guarda, nunca condição — ele não existe no macOS e no Linux é escrito depois de o app subir (#127).
 6. Preferências em `PreferencesSettings` (não é segredo). Janelas novas por `AppDialogWindow`, sem pré-aquecimento, abertas depois de a HUD estar na tela.
+7. **Direção escolhida (usuário, 2026-10-13): AC4 · carrossel ilustrado**, com a ressalva de que o visual do mockup ficou diferente do app. Consequência: a ilustração de cada cartão é a **demo real da ajuda** (`help/<mediaId>.gif`, gravada das telas do app por `HelpMediaGenerator`) mostrada pelo mesmo quadro da Ajuda; moldura, botões e interruptor são as primitivas do app (`AppDialogWindow`, `AppSectionHeader`, `AppButton`, `AppSwitch`). Sem emoji (o mockup usou) e sem pontos de progresso — o passo é escrito ("Passo 2 de 6"), porque pontos seriam primitiva nova e cor/forma sem palavra.
+8. Os cartões do guia e as dicas apontam para tópicos da Ajuda (`HelpTopic`): o texto curto é do guia, a demo e o "como ativar" completo continuam na Ajuda.
 
 ### Inicialização por plataforma
 
@@ -47,6 +49,41 @@
 | Recibo do instalador | antes de o app subir | depois (#127) | não existe |
 | Preferência | registro `HKCU\Software\JavaSoft\Prefs\com\usagemonitor` | `~/.java/.userPrefs/com/usagemonitor/prefs.xml` | `~/Library/Preferences/com.apple.java.util.prefs.plist` |
 | Verificação | testado | X11 antes do merge ou risco no PR (#342) | nunca verificado em Mac real |
+
+## B1 — Inventário de funções (rótulo real, onde mora)
+
+Fonte: código desta branch (`AppTrayHost.kt`, `CardActions.kt`, `FooterBar.kt`, `Settings*Tab.kt`,
+`TelegramCommandCatalog.kt`) e `README.md › Features`. Coluna "Ajuda hoje" diz se algum tópico de
+`HelpCatalog` cobre a função. Cada dica do B7 cita o rótulo desta tabela; rótulo que mudar no código
+muda aqui e no catálogo.
+
+| Grupo | Função | Onde / rótulo real | Ajuda hoje |
+| --- | --- | --- | --- |
+| Ver | Anéis por conta, arco por cota (fora 7d, dentro 5h) | notch da HUD; balão ao passar o ponteiro | `WINDOW_MODES` |
+| Ver | Mover a HUD para qualquer borda | mão na ponta do notch ("Mover a barra HUD") | `WINDOW_MODES` |
+| Ver | Recolher a HUD numa faixa de risco quando parada (#400) | alfinete da HUD | não |
+| Ver | Atualizar uma conta / todas | clique no anel; bandeja "Atualizar agora" | parcial |
+| Entender | Histórico e previsão | ação do card/balão (`CardAction.HISTORY`) | `HISTORY` |
+| Entender | Análise da sessão: ritmo, vazão e janelas | ação "Análise da sessão: ritmo, vazão e janelas" | não |
+| Entender | Sessões CLI (Claude) e Sessões CLI do Codex | ações "Sessões CLI desta conta" | `CLI_SESSIONS` |
+| Entender | Comparar modelos e APIs | rodapé "Comparar modelos e APIs" | não |
+| Entender | Custo por sessão, projeto, branch e modelo | janela de Sessões CLI | `BREAKDOWN` |
+| Ser avisado | Limiar de cota, sessão saturada, reinício, lembrete antes do reinício | Configurações › Alertas: "Avisar quando a quota cruzar um limiar", "Avisar quando uma sessão CLI saturar", "Avisar quando a cota reiniciar", "Lembrar antes de a cota reiniciar" | `ALERTS` (parcial) |
+| Ser avisado | Silêncio num horário | "Silenciar num período do dia" | `ALERTS` |
+| Ser avisado | Teto de gasto mensal | "Teto mensal em USD (vazio desliga)" | `BUDGET` |
+| Ser avisado | Anel de uso na bandeja | Sistema › "Anel de uso na bandeja" | não |
+| Remoto | Bot do Telegram (status, alertas, gráficos, análise, controle remoto) | Configurações › Alertas › bot do Telegram | não |
+| Remoto | HUD no navegador da rede local | Configurações › Rede | não |
+| Exportar | CSV, JSON e Relatório PDF | rodapé "Exportar cotas atuais (CSV)"; "Exportar CSV", "Exportar JSON", "Relatório PDF" | `EXPORT` |
+| Time | Integração com time, presença | Configurações › Time ("Integração com time") | `TEAM`, `PRESENCE` |
+| Contas | Várias contas Claude (cor e emoji) e contas Codex extras | Configurações › Contas; "Contas Codex extras" | parcial em `WINDOW_MODES` |
+| Personalizar | Tema, idioma, tamanho da interface, opacidade, reduzir animações | Aparência: "Tema e idioma", "Tamanho da interface", "Opacidade da janela", "Reduzir animações" | `APPEARANCE` |
+| Sistema | Iniciar com o sistema, atualização automática, canal beta, reportar bug | Sistema: "Inicialização com Sistema", "Atualização automática", "Reportar um bug" | `UPDATES` |
+| Integrações | Chaves de MiniMax, DeepSeek, OpenCode Go, OpenRouter; "Testar chave"; proxy | Configurações › APIs; Rede › "Proxy" | `DASHBOARD` (texto desatualizado, E7) |
+
+Candidatos a tópico novo da ajuda (B4, exceção do enum): bot do Telegram, HUD no navegador,
+comparação de modelos, análise da sessão, contas (Claude e Codex). "Recolher a HUD" entra como passo
+do tópico da HUD, não como tópico.
 
 ## Execução — uma atividade, um commit
 
@@ -68,6 +105,7 @@
 | --- | --- | --- | --- |
 | A1 | `test(telegram): await the alert collector before emitting` | Reprodução: `delay(200)` temporário antes do `collect` em `start()` → `gradlew.bat desktopTest --tests "com.usagemonitor.TelegramBotServiceTest"`: 33 testes, **5 falhas** — exatamente os 5 que emitem alerta, incluindo o da issue. Com `startAndAwaitAlertCollector()` e o mesmo atraso: os 5 passam | concluída |
 | A2 | `test(telegram): drain the fake update queue atomically` | Achado da A1: com o atraso, falharam 2 testes que não emitem alerta. Reprodução: `Thread.sleep(30)` temporário entre `toList()` e `clear()` → 33 testes, **9 falhas**, todos com mensagem ou toque enfileirado depois de `start()`. Com `ConcurrentLinkedQueue` + `poll()` e a mesma espera dentro da retirada: 0 falhas. Sem instrumentação, A1 + A2: `gradlew.bat desktopTest --tests "com.usagemonitor.TelegramBotServiceTest" --rerun` 20×: 20 verdes, 33 testes, 0 falhas; `gradlew.bat allTests`: 2704 testes, 0 falhas | concluída |
+| B1/B2 | `docs: plan issue 411 guide round AC` | Inventário B1 neste documento. Galeria `issue-411-visual/options.html` aberta no painel do navegador: 10 opções + referência, console sem erro, sem rolagem horizontal a 375 px; dois defeitos achados e corrigidos na conferência (classe `.cur` do cursor da AC7 escondia o item atual da AC3; texto da dica espremido ao lado de miniatura). Publicada para o usuário, que escolheu **AC4** | concluída |
 
 ## Problemas em aberto e riscos
 
