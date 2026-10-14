@@ -129,6 +129,49 @@ class ArchitectureRulesTest {
         }
     }
 
+    /**
+     * O `toString` gerado de uma `data class` imprime todo campo — token, chave de
+     * API, senha — em log, relatório de bug e mensagem de exceção. Tipo com campo de
+     * segredo sobrescreve o `toString` com `redactedSecret` ou deixa de ser `data class`
+     * (precedente: `CursorSessionCredentials`). Campo de segredo com nome que o padrão
+     * não reconhece (as chaves por fonte de `ApiKeySettings`) depende de revisão.
+     */
+    @Test
+    fun `data class com campo de segredo redige o toString`() {
+        val violations = sources.flatMap { source ->
+            dataClassDeclarations(source.text)
+                .filter { declaration -> declaration.properties.any { property -> SECRET_PROPERTY.matches(property) } }
+                .filter { declaration -> !declaration.body.contains("override fun toString") }
+                .map { declaration -> "${source.path}: ${declaration.name}" }
+        }
+        if (violations.isNotEmpty()) {
+            fail("data class com segredo e toString gerado (use `redactedSecret`):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o scanner de data class le propriedades e corpo`() {
+        val source = """
+            data class Plain(val accessToken: String, val count: Int)
+
+            data class Safe(
+                val apiKey: String = "{",
+                var inputTokens: Long
+            ) : Marker {
+                override fun toString(): String = "Safe"
+            }
+        """.trimIndent()
+
+        val declarations = dataClassDeclarations(source).associateBy { declaration -> declaration.name }
+
+        assertEquals(listOf("accessToken", "count"), declarations.getValue("Plain").properties)
+        assertEquals("", declarations.getValue("Plain").body)
+        assertTrue(declarations.getValue("Safe").body.contains("override fun toString"))
+        assertTrue(SECRET_PROPERTY.matches("accessToken"))
+        assertTrue(SECRET_PROPERTY.matches("refresh_token"))
+        assertFalse(SECRET_PROPERTY.matches("inputTokens"))
+    }
+
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
         val violations = sources
             .filter { source -> source.path.substringAfter("/kotlin/").startsWith(layerPrefix) }
@@ -204,6 +247,9 @@ class ArchitectureRulesTest {
         )
 
         val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
+
+        /** Nome de campo que carrega segredo: `*Token`, `*_token`, `*ApiKey`, `password`, `*Secret`, `cookie`, `capSid`. */
+        val SECRET_PROPERTY = Regex("""(?i)\w*token|\w*apikey|password|\w*secret|cookie|capsid""")
 
         /** Medido em 2026-10-14, depois de B1/B2 do plano `boas-praticas-377`. Só desce. */
         const val INLINE_LANGUAGE_CHECKS_CEILING = 711

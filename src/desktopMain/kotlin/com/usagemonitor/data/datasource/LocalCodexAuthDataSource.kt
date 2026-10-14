@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -112,4 +113,8 @@ private data class CodexTokensDto(
     @SerialName("id_token") val idToken: String = "",
     @SerialName("access_token") val accessToken: String = "",
     @SerialName("account_id") val accountId: String = ""
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "CodexTokensDto(idToken=${redactedSecret(idToken)}, accessToken=${redactedSecret(accessToken)}, accountId=$accountId)"
+}

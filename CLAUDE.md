@@ -89,7 +89,8 @@ ser esquecidas:
 - Proxy: só vale após reiniciar; falha de conectividade é classificada por **tipo** de exceção.
 - TLS: `cacerts` + repositório do SO (`SystemTrustStore.kt`); `jdk.crypto.mscapi` entra no
   `modules(...)` **só** no build Windows (jlink de outro SO falharia).
-- Tipos com credencial (`CursorSessionCredentials`) não são `data class` — o `toString` vaza o token.
+- Tipo com credencial nunca usa o `toString` gerado: `data class` sobrescreve com `redactedSecret`, ou é
+  classe comum (`CursorSessionCredentials`). `ArchitectureRulesTest` cobra pelo nome do campo.
 - Antigravity: argumento por lista, nunca por shell; disjuntor e TTL de 5 min obrigatórios.
 - Codex: uma janela ao vivo basta; limite por modelo vem do rollout local, soma depois das janelas
   ao vivo e nunca derruba a fonte. `CodexQuotaLabels` é chave de série — não renomear.

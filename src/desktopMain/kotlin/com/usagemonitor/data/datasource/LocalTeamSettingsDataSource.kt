@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -24,7 +25,12 @@ private data class TeamSettingsDto(
      * legível, e o `ignoreUnknownKeys` cobre o caminho de volta.
      */
     val adminToken: String = ""
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "TeamSettingsDto(enabled=$enabled, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
+            "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)})"
+}
 
 /**
  * Persiste a configuração da integração com time em `~/.usage-monitor/team.json`.

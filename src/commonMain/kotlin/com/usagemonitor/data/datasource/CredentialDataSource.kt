@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 /**
  * Interface para leitura de credenciais locais.
  *
@@ -35,4 +36,9 @@ data class AnthropicSession(
     val subscriptionType: String? = null,
     /** `claudeAiOauth.rateLimitTier`: "default_claude_max_20x". */
     val rateLimitTier: String? = null
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "AnthropicSession(accessToken=${redactedSecret(accessToken)}, accountContext=$accountContext, " +
+            "subscriptionType=$subscriptionType, rateLimitTier=$rateLimitTier)"
+}

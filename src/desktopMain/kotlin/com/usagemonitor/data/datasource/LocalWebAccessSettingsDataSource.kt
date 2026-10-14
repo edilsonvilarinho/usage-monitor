@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.DEFAULT_WEB_ACCESS_PORT
 import com.usagemonitor.domain.entity.WebAccessSettings
 import kotlinx.serialization.Serializable
@@ -12,7 +13,11 @@ private data class WebAccessSettingsDto(
     val enabled: Boolean = false,
     val port: Int = DEFAULT_WEB_ACCESS_PORT,
     val token: String = ""
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "WebAccessSettingsDto(enabled=$enabled, port=$port, token=${redactedSecret(token)})"
+}
 
 /**
  * `~/.usage-monitor/web-access.json` (#388). Arquivo e não `PreferencesSettings`
