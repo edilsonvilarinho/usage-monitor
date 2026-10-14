@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.help
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.VerticalScrollbar
@@ -225,7 +226,7 @@ fun HelpContent(
                     // Uma primária por tela, e aqui ela é fechar: a tela informa,
                     // não propõe trabalho.
                     AppButton(
-                        label = if (isPt) "Fechar" else "Close",
+                        label = CommonLabels.close(language),
                         onClick = onClose,
                         tone = AppButtonTone.PRIMARY
                     )

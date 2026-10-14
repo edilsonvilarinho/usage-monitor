@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.help
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -127,7 +128,7 @@ fun StartupTipContent(
                     modifier = Modifier.testTag(STARTUP_TIP_NEXT_TAG)
                 )
                 AppButton(
-                    label = if (isPt) "Fechar" else "Close",
+                    label = CommonLabels.close(language),
                     onClick = onClose,
                     tone = AppButtonTone.PRIMARY
                 )

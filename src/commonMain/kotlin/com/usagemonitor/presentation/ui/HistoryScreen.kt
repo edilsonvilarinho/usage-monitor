@@ -202,7 +202,7 @@ private fun HistoryHeader(
         }
         if (showSourceSelector) {
             AppButton(
-                label = if (language == AppLanguage.PT) "Voltar" else "Back",
+                label = CommonLabels.back(language),
                 onClick = onBack,
                 tone = AppButtonTone.GHOST
             )

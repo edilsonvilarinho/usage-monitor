@@ -662,7 +662,7 @@ internal object TeamKeysLabels {
         if (language == AppLanguage.PT) "Ocultar" else "Hide"
 
     fun copy(language: AppLanguage): String =
-        if (language == AppLanguage.PT) "Copiar" else "Copy"
+        CommonLabels.copy(language)
 
     fun unclaimed(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "Sem conta vinculada — o vínculo nasce no primeiro envio."
@@ -689,7 +689,7 @@ internal object TeamKeysLabels {
         if (language == AppLanguage.PT) "Salvar" else "Save"
 
     fun cancel(language: AppLanguage): String =
-        if (language == AppLanguage.PT) "Cancelar" else "Cancel"
+        CommonLabels.cancel(language)
 
     fun dismiss(language: AppLanguage): String =
         if (language == AppLanguage.PT) "Dispensar" else "Dismiss"

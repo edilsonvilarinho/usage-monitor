@@ -383,7 +383,7 @@ internal fun buildHudAccounts(
                 targetKey = target,
                 label = first.stats.displayTitle(),
                 statusLabel = if (observed) {
-                    if (language == AppLanguage.PT) "Atividade local" else "Local activity"
+                    CommonLabels.localActivity(language)
                 } else worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) } ?: noForecast,
                 tone = if (observed) AppTone.NEUTRAL else worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
                 quotas = quotas,

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -285,7 +286,7 @@ private fun ApiKeyDialog(
                     )
                 }
                 AppButton(
-                    label = if (isPt) "Cancelar" else "Cancel",
+                    label = CommonLabels.cancel(language),
                     tone = AppButtonTone.GHOST,
                     onClick = onDismiss
                 )

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -110,7 +111,7 @@ fun WebAccessSection(model: WebAccessSectionModel, language: AppLanguage, modifi
                         maxLines = 1
                     )
                     AppButton(
-                        label = if (pt) "Copiar" else "Copy",
+                        label = CommonLabels.copy(language),
                         onClick = { clipboard.setText(AnnotatedString(url)) },
                         tone = AppButtonTone.GHOST
                     )

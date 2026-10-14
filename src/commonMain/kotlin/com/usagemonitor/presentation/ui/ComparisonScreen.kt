@@ -123,8 +123,8 @@ private fun ComparisonBody(state: ComparisonUiState.Success, language: AppLangua
     if (outcome != null) {
         AppBanner(
             title = when (outcome) {
-                is CliExportOutcome.Saved -> if (language == AppLanguage.PT) "Exportação concluída" else "Export complete"
-                is CliExportOutcome.Failed -> if (language == AppLanguage.PT) "Falha na exportação" else "Export failed"
+                is CliExportOutcome.Saved -> CommonLabels.exportDone(language)
+                is CliExportOutcome.Failed -> CommonLabels.exportFailed(language)
             },
             description = when (outcome) {
                 is CliExportOutcome.Saved -> outcome.path

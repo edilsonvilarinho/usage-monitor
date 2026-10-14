@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -133,7 +134,7 @@ internal fun expandedQuotaTitle(quota: QuotaInfo, language: AppLanguage): String
         PeriodType.INTERVAL -> if (language == AppLanguage.PT) "Sessão 5h" else "5h session"
         PeriodType.WEEKLY -> if (language == AppLanguage.PT) "Semanal" else "Weekly"
         PeriodType.MONTHLY -> if (language == AppLanguage.PT) "Mensal" else "Monthly"
-        PeriodType.REPORTED -> if (language == AppLanguage.PT) "Uso atual" else "Current usage"
+        PeriodType.REPORTED -> CommonLabels.currentUsage(language)
     }
     // Duas fontes têm mais de uma cota do mesmo `periodType`: o Antigravity, um
     // limite semanal por grupo de modelos, e o Cursor, várias franquias no mesmo
@@ -551,7 +552,7 @@ internal fun buildQuotaTooltipMetrics(
 
     if (quota.unit == UsageUnit.CURRENCY_USD) {
         metrics += TooltipMetric(
-            label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+            label = CommonLabels.currentBalance(language),
             value = formatCurrencyAmount(quota.total, quota.currencyCode)
         )
         metrics += TooltipMetric(
@@ -563,7 +564,7 @@ internal fun buildQuotaTooltipMetrics(
     }
 
     metrics += TooltipMetric(
-        label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+        label = CommonLabels.currentUsage(language),
         value = quotaTooltipUsageValue(quota = quota, language = language)
     )
 

@@ -14,7 +14,7 @@ import kotlin.time.Instant
 internal fun deepSeekMetricEntries(series: UsageHistorySeries, language: AppLanguage, referenceAt: Instant?): List<HistoryMetricEntry> {
     val pt = language == AppLanguage.PT
     return buildList {
-        add(HistoryMetricEntry(if (pt) "Saldo atual" else "Current balance", formatCents(series.currentDisplayUsed)))
+        add(HistoryMetricEntry(CommonLabels.currentBalance(language), formatCents(series.currentDisplayUsed)))
         add(HistoryMetricEntry(if (pt) "Gasto no período" else "Spent in range", formatCents(series.deltaDisplayUsed)))
         add(HistoryMetricEntry(if (pt) "Ritmo médio" else "Average pace", formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"))
         if (referenceAt != null) add(HistoryMetricEntry(if (pt) "Última coleta" else "Last snapshot", formatInstant(referenceAt)))

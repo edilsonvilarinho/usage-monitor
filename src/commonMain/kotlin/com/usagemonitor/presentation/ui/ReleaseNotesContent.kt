@@ -120,7 +120,7 @@ fun ReleaseNotesContent(
             // Uma primária por tela, e aqui ela é fechar: a tela informa, não
             // propõe trabalho. "Ver no GitHub" leva para fora do app.
             AppButton(
-                label = if (isPt) "Fechar" else "Close",
+                label = CommonLabels.close(language),
                 onClick = onClose,
                 tone = AppButtonTone.PRIMARY
             )

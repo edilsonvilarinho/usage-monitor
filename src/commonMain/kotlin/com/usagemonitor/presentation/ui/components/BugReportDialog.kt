@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -70,7 +71,7 @@ fun BugReportDialog(
         modifier = modifier,
         title = {
             Text(
-                text = if (isPt) "Reportar um bug" else "Report a bug",
+                text = CommonLabels.reportBug(language),
                 style = MaterialTheme.typography.titleSmall
             )
         },
@@ -196,7 +197,7 @@ fun BugReportDialog(
                 onClick = onOpenIssue
             )
             AppButton(
-                label = if (isPt) "Fechar" else "Close",
+                label = CommonLabels.close(language),
                 tone = AppButtonTone.GHOST,
                 onClick = onDismiss
             )

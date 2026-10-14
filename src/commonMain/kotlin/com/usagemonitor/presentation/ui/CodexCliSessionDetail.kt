@@ -66,7 +66,7 @@ internal fun CodexCliSessionDetailPane(
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
     ) {
         AppToolbar(spacing = AppSpacing.sm) {
-            AppButton(label = if (pt) "Voltar" else "Back", onClick = onCloseDetail, tone = AppButtonTone.GHOST)
+            AppButton(label = CommonLabels.back(language), onClick = onCloseDetail, tone = AppButtonTone.GHOST)
             Text(shortCodexId(summary.sessionId), style = MaterialTheme.typography.titleMedium)
         }
 
@@ -92,7 +92,7 @@ internal fun CodexCliSessionDetailPane(
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
         ) {
-            AppMetricBlock(label = if (pt) "Respostas" else "Responses", value = summary.responseCount.toString(), modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH))
+            AppMetricBlock(label = CliSessionsLabels.responses(language), value = summary.responseCount.toString(), modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH))
             AppMetricBlock(label = if (pt) "Tokens (com cache)" else "Tokens (cached)", value = formatQuantity(summary.totalTokens), modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH))
             AppMetricBlock(label = "Cache", value = codexCachePercent(summary), modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH))
             AppMetricBlock(label = if (pt) "Entrada" else "Input", value = formatQuantity(summary.inputTokens), modifier = Modifier.width(CODEX_METRIC_BLOCK_WIDTH))
@@ -155,7 +155,7 @@ private fun CodexTurnChartGrid(analytics: CodexCliSessionAnalytics, language: Ap
                 // Unidade no título: "33 tok/s" não cabe na coluna do eixo e saía cortado.
                 DetailSection(title = if (pt) "Vazão (tok/s)" else "Throughput (tok/s)", accent = accents.savings, language = language) {
                     TurnSeriesChart(
-                        series = listOf(TurnSeries(if (pt) "Vazão" else "Throughput", ratesAsLong(analytics.throughputPerTurn), accents.savings, BinMode.MAX)),
+                        series = listOf(TurnSeries(CliSessionsLabels.throughput(language), ratesAsLong(analytics.throughputPerTurn), accents.savings, BinMode.MAX)),
                         height = TURN_CHART_GRID_HEIGHT,
                         valueFormatter = { value -> value.toString() },
                         emptyLabel = if (pt) "sem resposta medida" else "no measured response"
@@ -183,11 +183,11 @@ private fun CodexTurnTable(detail: CodexCliSessionDetail, analytics: CodexCliSes
                 )
                 AppColumnHeaderRow(startGutter = 0.dp, modifier = Modifier.padding(vertical = AppSpacing.sm)) {
                     AppColumnHeaderLabel(label = "#", modifier = Modifier.width(CODEX_TURN_NUMBER_COLUMN))
-                    AppColumnHeaderLabel(label = if (pt) "Modelo" else "Model", modifier = Modifier.weight(1f))
+                    AppColumnHeaderLabel(label = CliSessionsLabels.columnModel(language), modifier = Modifier.weight(1f))
                     AppColumnHeaderLabel(label = if (pt) "Contexto" else "Context", modifier = Modifier.width(CODEX_TURN_VALUE_COLUMN))
                     AppColumnHeaderLabel(label = "Cache", modifier = Modifier.width(CODEX_TURN_VALUE_COLUMN))
                     AppColumnHeaderLabel(label = if (pt) "Saída" else "Output", modifier = Modifier.width(CODEX_TURN_VALUE_COLUMN))
-                    AppColumnHeaderLabel(label = if (pt) "Vazão" else "Throughput", modifier = Modifier.width(CODEX_TURN_VALUE_COLUMN))
+                    AppColumnHeaderLabel(label = CliSessionsLabels.throughput(language), modifier = Modifier.width(CODEX_TURN_VALUE_COLUMN))
                 }
             }
         }

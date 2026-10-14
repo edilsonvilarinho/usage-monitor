@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,7 +91,7 @@ internal fun SystemSettingsTab(
                 title = if (isPt) "Diagnóstico" else "Diagnostics",
                 trailing = {
                     AppButton(
-                        label = if (isPt) "Reportar um bug" else "Report a bug",
+                        label = CommonLabels.reportBug(currentLanguage),
                         tone = AppButtonTone.PRIMARY,
                         onClick = onReportBug,
                         modifier = Modifier.testTag(REPORT_BUG_BUTTON_TEST_TAG)

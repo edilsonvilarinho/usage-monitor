@@ -73,9 +73,9 @@ internal fun CodexCliSessionBreakdown(
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md)
     ) {
         CodexBucketTable(
-            title = if (pt) "Por projeto" else "By project",
+            title = BreakdownLabels.byProject(language),
             subtitle = null,
-            axisLabel = if (pt) "Projeto" else "Project",
+            axisLabel = CliSessionsLabels.columnProject(language),
             buckets = codexBucketsBy(sessions) { session -> session.projectName },
             language = language
         )
@@ -84,7 +84,7 @@ internal fun CodexCliSessionBreakdown(
             // O índice agrega por sessão: dizer "por modelo" sem a ressalva
             // faria a sessão que trocou de modelo parecer de um só.
             subtitle = if (pt) "Modelo principal de cada sessão" else "Primary model of each session",
-            axisLabel = if (pt) "Modelo" else "Model",
+            axisLabel = CliSessionsLabels.columnModel(language),
             buckets = codexBucketsBy(sessions) { session -> session.primaryModel },
             language = language
         )
@@ -107,7 +107,7 @@ private fun CodexBucketTable(
                 AppColumnHeaderRow(startGutter = 0.dp) {
                     AppColumnHeaderLabel(axisLabel, Modifier.weight(1f))
                     AppColumnHeaderLabel(CliSessionsLabels.columnSessions(language), Modifier.width(CODEX_BUCKET_NUMBER_COLUMN))
-                    AppColumnHeaderLabel(if (pt) "Respostas" else "Responses", Modifier.width(CODEX_BUCKET_NUMBER_COLUMN))
+                    AppColumnHeaderLabel(CliSessionsLabels.responses(language), Modifier.width(CODEX_BUCKET_NUMBER_COLUMN))
                     AppColumnHeaderLabel(CliSessionsLabels.columnTokens(language), Modifier.width(CODEX_BUCKET_NUMBER_COLUMN))
                     AppColumnHeaderLabel(CliSessionsLabels.columnCache(language), Modifier.width(CODEX_BUCKET_NUMBER_COLUMN))
                     AppColumnHeaderLabel(CliSessionsLabels.throughput(language), Modifier.width(CODEX_BUCKET_NUMBER_COLUMN))

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.help
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -220,7 +221,7 @@ fun OnboardingGuideContent(
                 Spacer(modifier = Modifier.weight(1f))
                 if (index > 0) {
                     AppButton(
-                        label = if (isPt) "Voltar" else "Back",
+                        label = CommonLabels.back(language),
                         onClick = onBack,
                         modifier = Modifier.testTag(ONBOARDING_BACK_TAG)
                     )
