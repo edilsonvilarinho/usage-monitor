@@ -240,10 +240,11 @@ internal fun ResponsiveDashboardCardGrid(
                                 // `UNDISPATCHED` faz o `snapTo` acontecer agora,
                                 // antes de o arrasto ser limpo: no quadro seguinte
                                 // a posição de partida já é a do ponteiro.
-                                val released = activeDrag?.let { drag ->
-                                    drag.frozenBounds[drag.target]?.let { bounds ->
-                                        (bounds.topLeft + drag.dragOffset).round()
-                                    }
+                                val releasedBounds = activeDrag?.frozenBounds?.get(activeDrag.target)
+                                val released = if (activeDrag != null && releasedBounds != null) {
+                                    (releasedBounds.topLeft + activeDrag.dragOffset).round()
+                                } else {
+                                    null
                                 }
                                 val releasedAnimatable = activeDrag?.let { drag -> placements[drag.target] }
                                 if (released != null && releasedAnimatable != null) {

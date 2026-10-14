@@ -77,7 +77,12 @@ internal object TelegramBotSummaryMessages {
         val line = snapshot.accounts.joinToString(" · ") { account ->
             val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
             val quota = fullestQuota(account)
-            val value = quota?.let { item -> " " + (item.percent?.let { percent -> "$percent%" } ?: TelegramBotMessages.quotaValue(item, pt)) }.orEmpty()
+            val percent = quota?.percent
+            val value = when {
+                quota == null -> ""
+                percent != null -> " $percent%"
+                else -> " " + TelegramBotMessages.quotaValue(quota, pt)
+            }
             TelegramBotMessages.escape("$mark${account.label}$value")
         }
         val updated = snapshot.lastCollectedAt?.let { at -> (if (pt) "coleta " else "collected ") + "${TelegramBotMessages.clock(at)} BRT" }

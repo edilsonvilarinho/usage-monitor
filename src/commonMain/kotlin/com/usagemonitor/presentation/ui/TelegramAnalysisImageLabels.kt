@@ -139,8 +139,15 @@ internal object TelegramAnalysisImageLabels {
 
     fun reportCaption(analysis: SessionAnalysis, language: AppLanguage): String {
         val pt = language == AppLanguage.PT
+        val fiveHour = analysis.fiveHour
+        val projected = fiveHour?.projectedAtReset
+        val projection = when {
+            projected == null -> ""
+            pt -> " (≈$projected% no reinício)"
+            else -> " (≈$projected% at reset)"
+        }
         val parts = listOfNotNull(
-            analysis.fiveHour?.let { window -> "5h ${window.percent}%" + (window.projectedAtReset?.let { value -> if (pt) " (≈$value% no reinício)" else " (≈$value% at reset)" } ?: "") },
+            fiveHour?.let { window -> "5h ${window.percent}%$projection" },
             analysis.fiveHour?.paceNow?.let { value -> "${TelegramAnalysisMessages.pace(value, pt).trim()} pp/h" },
             analysis.weekly?.let { window -> (if (pt) "semanal " else "weekly ") + "${window.percent}%" },
             analysis.modelSpeeds.takeIf { speeds -> speeds.isNotEmpty() }?.joinToString("/") { speed -> speed.tokensPerSecond.roundToInt().toString() }?.let { value -> "$value tok/s" }

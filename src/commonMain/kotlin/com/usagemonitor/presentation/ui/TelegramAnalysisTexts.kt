@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AnalysisSpan
+import com.usagemonitor.domain.entity.AnalysisWindowView
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.SessionAnalysis
 import kotlin.math.roundToInt
@@ -62,14 +63,9 @@ internal object TelegramAnalysisTexts {
     fun sentences(analysis: SessionAnalysis, language: AppLanguage): String {
         val pt = language == AppLanguage.PT
         val lines = mutableListOf<String>()
-        analysis.fiveHour?.let { window ->
-            val reset = window.resetsAt?.let { at -> TelegramBotMessages.clock(at) }
-            val ending = window.projectedAtReset?.let { value ->
-                val verdict = if (value >= 100) (if (pt) "<b>estoura antes</b>" else "<b>runs out before</b>") else (if (pt) "<b>não estoura</b>" else "<b>does not run out</b>")
-                if (pt) " e chega a <b>~$value%</b>" + (reset?.let { at -> " no reinício das $at" } ?: "") + " — $verdict"
-                else " and reaches <b>~$value%</b>" + (reset?.let { at -> " at the $at reset" } ?: "") + " — $verdict"
-            }.orEmpty()
-            lines += (if (pt) "A 5h está em <b>${window.percent}%</b>" else "The 5h window is at <b>${window.percent}%</b>") + "$ending."
+        val fiveHour = analysis.fiveHour
+        if (fiveHour != null) {
+            lines += fiveHourSentence(fiveHour, pt)
         }
         analysis.previous?.let { previous ->
             val current = previous.currentPace
@@ -89,13 +85,9 @@ internal object TelegramAnalysisTexts {
             val points = (peak.percentPoints ?: 0.0).roundToInt()
             lines += if (pt) "Hora mais pesada nas últimas 24 h: <b>${from}h</b> ($points pp)." else "Heaviest hour in the last 24 h: <b>${from}h</b> ($points pp)."
         }
-        analysis.weekly?.let { window ->
-            val room = window.safePace?.let { value -> TelegramAnalysisMessages.pace(value, pt).trim() }
-            lines += if (pt) {
-                "Semanal em <b>${window.percent}%</b>" + (room?.let { value -> "; até o reinício cabem <b>$value pp/h</b>." } ?: ".")
-            } else {
-                "Weekly at <b>${window.percent}%</b>" + (room?.let { value -> "; until the reset there is room for <b>$value pp/h</b>." } ?: ".")
-            }
+        val weekly = analysis.weekly
+        if (weekly != null) {
+            lines += weeklySentence(weekly, pt)
         }
         if (analysis.modelSpeeds.isNotEmpty()) {
             val speeds = analysis.modelSpeeds.joinToString(", ") { speed -> "<b>${TelegramBotMessages.escape(speed.model)} ${speed.tokensPerSecond.roundToInt()} tok/s</b>" }
@@ -104,6 +96,34 @@ internal object TelegramAnalysisTexts {
         val title = "<b>📐 ${TelegramBotMessages.escape(analysis.accountLabel)} · " + (if (pt) "leitura" else "reading") + "</b>"
         if (lines.isEmpty()) return title + "\n" + (if (pt) "Sem leitura suficiente para comentar ainda." else "Not enough readings to comment on yet.")
         return title + "\n" + lines.joinToString("\n") { line -> "• $line" }
+    }
+
+    /** "A 5h está em 62% e chega a ~83% no reinício das 14:00 — não estoura." Cada trecho só com dado medido. */
+    private fun fiveHourSentence(window: AnalysisWindowView, pt: Boolean): String {
+        val head = if (pt) "A 5h está em <b>${window.percent}%</b>" else "The 5h window is at <b>${window.percent}%</b>"
+        val projected = window.projectedAtReset ?: return "$head."
+        val verdict = when {
+            projected >= 100 && pt -> "<b>estoura antes</b>"
+            projected >= 100 -> "<b>runs out before</b>"
+            pt -> "<b>não estoura</b>"
+            else -> "<b>does not run out</b>"
+        }
+        val resetsAt = window.resetsAt
+        val reset = when {
+            resetsAt == null -> ""
+            pt -> " no reinício das ${TelegramBotMessages.clock(resetsAt)}"
+            else -> " at the ${TelegramBotMessages.clock(resetsAt)} reset"
+        }
+        val reaches = if (pt) " e chega a <b>~$projected%</b>" else " and reaches <b>~$projected%</b>"
+        return "$head$reaches$reset — $verdict."
+    }
+
+    /** "Semanal em 41%; até o reinício cabem 1,5 pp/h." A folga só sai quando medida. */
+    private fun weeklySentence(window: AnalysisWindowView, pt: Boolean): String {
+        val head = if (pt) "Semanal em <b>${window.percent}%</b>" else "Weekly at <b>${window.percent}%</b>"
+        val safePace = window.safePace ?: return "$head."
+        val room = TelegramAnalysisMessages.pace(safePace, pt).trim()
+        return if (pt) "$head; até o reinício cabem <b>$room pp/h</b>." else "$head; until the reset there is room for <b>$room pp/h</b>."
     }
 
     /**
