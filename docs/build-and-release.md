@@ -285,7 +285,10 @@ automática: sem ela a beta só é anunciada.
 
 **Ajuda dentro do app** (`presentation/ui/help/` + `desktopMain/help/HelpMediaPlayer.kt` +
 `desktopMain/presentation/ui/HelpWindow.kt` + `src/desktopMain/resources/help/*.gif`; issue #184,
-plano [`modal-de-ajuda-184-execucao.md`](planos/modal-de-ajuda-184-execucao.md)): doze tópicos
+plano [`modal-de-ajuda-184-execucao.md`](planos/modal-de-ajuda-184-execucao.md)): dezessete tópicos
+(doze até a #411, que somou contas, análise da sessão, comparação, bot do Telegram e HUD no
+navegador — **exceção aprovada** à regra de não crescer enum, porque o único `when` exaustivo sobre
+`HelpTopic` é o do catálogo; entradas em `HelpCatalogPt.kt`/`HelpCatalogEn.kt`, um `val` por tópico)
 com o que cada funcionalidade faz, **como ativá-la** e uma demo animada dela. Fora do app o produto
 já estava documentado no README; dentro dele não havia porta nenhuma, e as funcionalidades que
 precisam ser **ligadas** (HUD, somente cards, alertas, atualização automática, time, orçamento) só

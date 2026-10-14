@@ -35,7 +35,6 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
 import com.usagemonitor.domain.entity.UsageAlertSettings
-import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.AppUpdateBanner
@@ -44,7 +43,6 @@ import com.usagemonitor.presentation.ui.TeamPresenceContent
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
-import com.usagemonitor.presentation.ui.components.FooterBar
 import com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGrid
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.theme.AppSpacing
@@ -84,97 +82,42 @@ fun main(args: Array<String>) {
     val outputDir = File(args.firstOrNull() ?: "src/desktopMain/resources/help")
     outputDir.mkdirs()
 
-    if ("--history" in args) {
-        recordHistory(outputDir)
-        return
+    // Um roteiro por tópico, na ordem de leitura da ajuda. `-PhelpMediaTopic=<id>`
+    // grava só aqueles, separados por vírgula (`history` continua valendo):
+    // acertar a ponta do ponteiro pede várias passadas, e regravar as dezessete a
+    // cada uma é desperdício.
+    val recorders: List<Pair<HelpTopic, (File) -> Unit>> = listOf(
+        HelpTopic.DASHBOARD to ::recordIntegrations,
+        HelpTopic.ACCOUNTS to ::recordAccounts,
+        HelpTopic.HISTORY to ::recordHistory,
+        HelpTopic.SESSION_ANALYSIS to ::recordSessionAnalysis,
+        HelpTopic.CLI_SESSIONS to ::recordCliSessions,
+        HelpTopic.BREAKDOWN to ::recordBreakdown,
+        HelpTopic.COMPARISON to ::recordComparison,
+        HelpTopic.BUDGET to ::recordBudget,
+        HelpTopic.ALERTS to ::recordAlerts,
+        HelpTopic.TELEGRAM_BOT to ::recordTelegramBot,
+        HelpTopic.WEB_ACCESS to ::recordWebAccess,
+        HelpTopic.EXPORT to ::recordExport,
+        HelpTopic.TEAM to ::recordTeam,
+        HelpTopic.PRESENCE to ::recordPresence,
+        HelpTopic.WINDOW_MODES to ::recordWindowModes,
+        HelpTopic.APPEARANCE to ::recordAppearance,
+        HelpTopic.UPDATES to ::recordUpdates
+    )
+    val only = if ("--history" in args) {
+        HelpCatalog.mediaId(HelpTopic.HISTORY)
+    } else {
+        args.firstOrNull { arg -> arg.startsWith("--topic=") }?.removePrefix("--topic=")
     }
-
-    recordDashboard(outputDir)
-    recordHistory(outputDir)
-    recordCliSessions(outputDir)
-    recordBreakdown(outputDir)
-    recordBudget(outputDir)
-    recordAlerts(outputDir)
-    recordExport(outputDir)
-    recordTeam(outputDir)
-    recordPresence(outputDir)
-    recordWindowModes(outputDir)
-    recordAppearance(outputDir)
-    recordUpdates(outputDir)
+    recorders
+        .filter { (topic, _) -> only == null || HelpCatalog.mediaId(topic) in only.split(",") }
+        .forEach { (_, recordTopic) -> recordTopic(outputDir) }
 
     println("Demos geradas em ${outputDir.absolutePath}")
 }
 
 // --- Roteiros ----------------------------------------------------------------
-
-/**
- * Dashboard: a grade de cards e o rodapé, com uma coleta manual acontecendo.
- *
- * O rodapé entra na cena porque o primeiro passo de ativação deste tópico manda
- * abrir as Configurações pela engrenagem que mora nele.
- */
-private fun recordDashboard(outputDir: File) {
-    val state = DemoState()
-    var refreshing by mutableStateOf(emptySet<UsageTargetKey>())
-
-    record(outputDir, HelpTopic.DASHBOARD, state) { recorder ->
-        recorder.setContent {
-            DemoScene(state) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 16.dp)
-                    ) {
-                        ResponsiveDashboardCardGrid(
-                            items = ScreenshotFixtures.dashboardStats,
-                            refreshingTargets = refreshing,
-                            minimizedCards = emptySet(),
-                            riskSummaries = ScreenshotFixtures.dashboardRiskSummaries,
-                            language = AppLanguage.PT,
-                            onRefreshCard = {},
-                            onMoveCardToIndex = { _, _ -> },
-                            onToggleCardMinimized = {},
-                            onOpenHistoryCard = { _, _ -> },
-                            teamEnabledProfileIds = setOf("default"),
-                            now = ScreenshotFixtures.NOW,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    FooterBar(
-                        appVersion = APP_VERSION,
-                        language = AppLanguage.PT,
-                        nextRefreshAt = ScreenshotFixtures.NOW.plusSeconds(437),
-                        onRefresh = {},
-                        onOpenSettings = {},
-                        nowProvider = { ScreenshotFixtures.NOW },
-                        // O contador não pode andar: um laço de um segundo por tique
-                        // faria cada passada produzir quadros diferentes.
-                        countdownUpdatesEnabled = false
-                    )
-                }
-            }
-        }
-
-        // Os cards entram com atraso próprio por índice mais o fade deles.
-        recorder.animate(1_300) {}
-        recorder.hold(900)
-
-        // A ponta do ponteiro cai sobre o botão de atualizar do primeiro card.
-        // Medido no quadro gerado: em 462dp ela apontava para o de minimizar,
-        // que é o vizinho, e a demo mostrava um clique num botão e a reação de
-        // outro.
-        recorder.moveCursor(state.cursor, x = 436.dp, y = 36.dp, durationMillis = 500)
-        recorder.click(state.cursor) {
-            refreshing = setOf(ScreenshotFixtures.primaryAnthropicTarget)
-        }
-        recorder.animate(800) {}
-        refreshing = emptySet()
-        recorder.hold(1_200)
-    }
-}
 
 /** Histórico: resumo antes do gráfico, filtros e ação de relatório PDF. */
 private fun recordHistory(outputDir: File) {
@@ -627,7 +570,7 @@ private val HUD_DEMO_SIZES = hudNotchSizes(
  * [panTo] é determinístico; rolar por evento de ponteiro dependeria do
  * multiplicador de scroll da plataforma e do container certo estar sob o cursor.
  */
-private class DemoState(contentHeight: Dp = HEIGHT_DP.dp) {
+internal class DemoState(contentHeight: Dp = HEIGHT_DP.dp) {
 
     val cursor = CursorTrack()
 
@@ -645,14 +588,14 @@ private class DemoState(contentHeight: Dp = HEIGHT_DP.dp) {
  * indicar o que tinha sido acionado.
  */
 @Composable
-private fun DemoScene(state: DemoState, content: @Composable () -> Unit) {
+internal fun DemoScene(state: DemoState, content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         PannedViewport(contentHeight = state.contentHeight, pan = state.pan, content = content)
         TourCursorOverlay(state.cursor.pose)
     }
 }
 
-private fun SceneRecorder.panTo(state: DemoState, to: Dp, durationMillis: Long) {
+internal fun SceneRecorder.panTo(state: DemoState, to: Dp, durationMillis: Long) {
     panValue(from = state.pan, to = to, durationMillis = durationMillis) { value -> state.pan = value }
 }
 
@@ -663,7 +606,7 @@ private fun SceneRecorder.panTo(state: DemoState, to: Dp, durationMillis: Long) 
  * que a janela consulta para achar o recurso, e um nome digitado duas vezes
  * eventualmente divergiria — a demo simplesmente sumiria da tela, sem erro.
  */
-private fun record(
+internal fun record(
     outputDir: File,
     topic: HelpTopic,
     state: DemoState,

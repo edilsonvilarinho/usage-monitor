@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -286,6 +287,32 @@ class AppStructureTest {
 
         onNodeWithText("Alertas").performClick()
         assertEquals(1, selected)
+    }
+
+    /**
+     * #411: com mais itens que altura, o último ficava cortado e sem como ser
+     * alcançado. O trilho rola sozinho e o cabeçalho continua na vista.
+     */
+    @Test
+    fun `o trilho com mais itens que altura rola ate o ultimo`() = runDesktopComposeUiTest {
+        var selected = 0
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(600.dp).height(200.dp)) {
+                    AppSettingsNav(
+                        items = (1..17).map { index -> AppTab("Tópico $index", "nav-$index") },
+                        selectedIndex = selected,
+                        onSelect = { index -> selected = index },
+                        header = "Funcionalidades"
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag("nav-17").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Funcionalidades").assertIsDisplayed()
+        onNodeWithTag("nav-17").performClick()
+        assertEquals(16, selected)
     }
 
     @Test

@@ -2555,19 +2555,24 @@ O app fechou inesperadamente.
 
 <!-- ═══════════════════════════════ AJUDA ════════════════════════════ -->
 <h2 id="ajuda">14b · Ajuda — modal de funcionalidades</h2>
-<p class="lede">Issue #184. Doze tópicos num trilho lateral, e para cada um: resumo, uma demo animada gravada dos próprios componentes, a descrição e os passos de ativação. Janela em 900 × 620 dp, mínimo 600 × 320 dp.</p>
+<p class="lede">Issue #184; dezessete tópicos desde a #411 (contas, análise da sessão, comparação, bot do Telegram e HUD no navegador). Tópicos num trilho lateral, e para cada um: resumo, uma demo animada gravada dos próprios componentes, a descrição e os passos de ativação. Janela em 900 × 620 dp, mínimo 600 × 320 dp.</p>
 
 <div class="win">
   <div class="titlebar"><span class="t">Ajuda</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
   <div style="display:grid;grid-template-columns:200px 1fr;min-height:420px">
     <div style="border-right:1px solid var(--border);background:var(--surface);padding:var(--s3);display:flex;flex-direction:column;gap:2px">
       <span class="k" style="margin-bottom:var(--s2)">Funcionalidades</span>
-      <button class="btn ghost" type="button" style="justify-content:flex-start">Dashboard e integrações</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Integrações e cotas</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Contas e perfis</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Histórico e previsão</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Análise da sessão</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Sessões do Claude Code</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Resumo por eixo</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Comparar modelos e APIs</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Orçamento mensal</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Alertas e bandeja</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Bot do Telegram</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">HUD no navegador</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Exportação e relatório PDF</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Visão de time</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Presença ao vivo</button>
@@ -2595,7 +2600,9 @@ O app fechou inesperadamente.
 
 <p class="note"><b>A faixa da demo tem altura fixa, não a proporção da gravação.</b> Com <code>aspectRatio</code> ela media ~410dp numa janela de 900dp e empurrava a seção "Como ativar" inteira para fora da vista — três asserts de componente falharam com <em>not displayed</em> antes da troca. Altura fixa também é o que mantém a página parada ao trocar de tópico, e a gravação entra com <code>Fit</code>: o que sobra é margem, nunca corte.</p>
 
-<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Sistema", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola, pela mesma razão de sempre: ele é o controle.</p>
+<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Sistema", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola com o conteúdo, pela mesma razão de sempre: ele é o controle. Com 17 tópicos ele passa da altura mínima da janela, e por isso os itens rolam dentro do próprio trilho (#411), com o cabeçalho "Funcionalidades" parado.</p>
+
+<p class="note"><b>A demo de "Integrações e cotas" mostra a aba "APIs" (#411).</b> Ela gravava a grade de cards, que só existe nos testes desde que a HUD virou a única tela — a ajuda mostrava um layout que o usuário não tem.</p>
 
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>

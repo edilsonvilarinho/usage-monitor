@@ -9,6 +9,11 @@ import com.usagemonitor.domain.entity.AppLanguage
  * responder "o que este app faz e como ligo isso", e vinte e cinco entradas
  * granulares respondem à pergunta errada — vira índice de Configurações, que já
  * tem navegação própria.
+ *
+ * **Exceção aprovada à regra de não crescer enum** (#411): os valores de
+ * [ACCOUNTS] a [WEB_ACCESS] entraram para cobrir funções que a ajuda não
+ * mostrava. O único `when` exaustivo sobre este enum é o do catálogo, que é
+ * exatamente onde a entrada faltando tem de quebrar a compilação.
  */
 enum class HelpTopic {
     DASHBOARD,
@@ -22,7 +27,12 @@ enum class HelpTopic {
     PRESENCE,
     WINDOW_MODES,
     APPEARANCE,
-    UPDATES
+    UPDATES,
+    ACCOUNTS,
+    SESSION_ANALYSIS,
+    COMPARISON,
+    TELEGRAM_BOT,
+    WEB_ACCESS
 }
 
 /**
@@ -61,17 +71,24 @@ object HelpCatalog {
     /**
      * Ordem de leitura: do que se vê ao abrir o app para o que se liga depois.
      *
-     * Dashboard primeiro porque é a tela que já está na frente de quem procura
-     * ajuda; os modos de janela e a aparência no fim porque são preferências, e
-     * quem chega aqui pela primeira vez procura o que o app mede.
+     * Integrações primeiro porque é o que se liga antes de haver o que ler; os
+     * modos de janela e a aparência no fim porque são preferências, e quem chega
+     * aqui pela primeira vez procura o que o app mede. Cada tópico novo da #411
+     * entra ao lado do vizinho de assunto: análise e comparação com as leituras,
+     * bot e navegador depois dos alertas, que eles repassam.
      */
     val readingOrder: List<HelpTopic> = listOf(
         HelpTopic.DASHBOARD,
+        HelpTopic.ACCOUNTS,
         HelpTopic.HISTORY,
+        HelpTopic.SESSION_ANALYSIS,
         HelpTopic.CLI_SESSIONS,
         HelpTopic.BREAKDOWN,
+        HelpTopic.COMPARISON,
         HelpTopic.BUDGET,
         HelpTopic.ALERTS,
+        HelpTopic.TELEGRAM_BOT,
+        HelpTopic.WEB_ACCESS,
         HelpTopic.EXPORT,
         HelpTopic.TEAM,
         HelpTopic.PRESENCE,
