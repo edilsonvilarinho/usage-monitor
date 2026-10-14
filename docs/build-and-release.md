@@ -307,6 +307,9 @@ eram descobertas por acidente.
   **`Bitmap.makeClone()` compartilha os pixels** e reprova o teste de imutabilidade; e
   `Image.makeFromBitmap(...).toComposeImageBitmap()`, o caminho anterior, redesenha o quadro por um
   `Canvas` a ~59 ms por quadro — 35 s de suíte num teste só (issue #295).
+- **O laço só roda com `AppMotionPolicy.continuous`.** Com "Reduzir animações" a demo fica no
+  primeiro quadro (plano `boas-praticas-377`, C4): o laço ignorava a política e animava mesmo com a
+  preferência ligada.
 - **O laço de quadros mora em `desktopMain`, nunca no composable de conteúdo.** É essa separação que
   deixa `HelpContent` exercitável: animação infinita trava o `waitForIdle` dos testes de componente.
   Pela mesma razão o tópico selecionado é hasteado — quem carrega a demo é o tocador, que precisa
