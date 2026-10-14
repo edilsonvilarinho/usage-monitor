@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.requiresLocalApiKey
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -119,12 +120,7 @@ internal class LocalApiKeyDataSource(
     }
 
     private fun requireLocalKeySource(source: ApiSource) {
-        require(
-            source == ApiSource.MINIMAX ||
-                source == ApiSource.DEEPSEEK ||
-                source == ApiSource.OPENCODE_GO ||
-                source == ApiSource.OPENROUTER
-        ) {
+        require(source.requiresLocalApiKey()) {
             "Apenas MiniMax, DeepSeek, OpenCode Go e OpenRouter possuem chave de API local."
         }
     }

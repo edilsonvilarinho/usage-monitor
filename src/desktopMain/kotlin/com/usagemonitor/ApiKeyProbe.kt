@@ -25,7 +25,7 @@ import com.usagemonitor.domain.entity.ApiUsageStats
  * O `when` é **exaustivo e sem `else`**: fonte nova obriga a decidir se ela tem
  * chave testável, em vez de cair calada num ramo genérico. As fontes sem chave
  * lançam, e o texto diz por quê — nenhuma delas chega aqui, porque a aba APIs só
- * oferece o botão para as quatro de `requiresApiKey`.
+ * oferece o botão para as fontes de `requiresLocalApiKey`.
  */
 internal suspend fun testApiKeyUsage(
     source: ApiSource,

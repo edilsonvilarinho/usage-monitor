@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.requiresLocalApiKey
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -54,14 +55,12 @@ internal fun MonitoredApisTab(
         ApiSelector(
             enabledApis = enabledApis,
             configuredApiKeys = configuredApiKeys,
-            // `requiresApiKey` continua sendo o dono da resposta, e não um
-            // literal novo: o conjunto das fontes que dependem de chave já tem
-            // dois donos — este e o filtro de arranque —, e um terceiro seria
-            // onde a fonte seguinte ficaria esquecida.
+            // `requiresLocalApiKey` (domain) é o dono único da resposta; um
+            // literal aqui seria onde a fonte seguinte ficaria esquecida.
             editableApiKeys = EDITABLE_API_KEY_SOURCES,
             language = currentLanguage,
             onToggle = { api, checked ->
-                if (checked && api.requiresApiKey() && api !in configuredApiKeys) {
+                if (checked && api.requiresLocalApiKey() && api !in configuredApiKeys) {
                     onApiKeyCheckReset()
                     pendingApiKeySource = api
                 } else {
@@ -124,22 +123,12 @@ internal fun MonitoredApisTab(
 /**
  * Fontes cuja linha desta tela ganha o lápis de gerenciar chave.
  *
- * **Não é um segundo dono do conjunto**, e o nome diz isso: a resposta continua
- * saindo de [requiresApiKey], e este val é só a projeção dela em `Set` para o
- * [ApiSelector]. O nome `API_KEY_DEPENDENT_SOURCES` está tomado pelo literal do
- * `AppPreferenceKeys.kt`, que é o filtro de arranque; dois símbolos com o mesmo nome fariam
- * quem lê os dois concluir que são a mesma constante duplicada, quando um é
- * literal e o outro é derivado.
+ * **Não é um segundo dono do conjunto**: é a projeção de [requiresLocalApiKey] em
+ * `Set` para o [ApiSelector]. O filtro de arranque (`API_KEY_DEPENDENT_SOURCES`,
+ * em `desktopMain`) é outra projeção do mesmo predicado.
  */
 private val EDITABLE_API_KEY_SOURCES: Set<ApiSource> =
-    ApiSource.entries.filter { source -> source.requiresApiKey() }.toSet()
-
-private fun ApiSource.requiresApiKey(): Boolean {
-    return this == ApiSource.MINIMAX ||
-        this == ApiSource.DEEPSEEK ||
-        this == ApiSource.OPENCODE_GO ||
-        this == ApiSource.OPENROUTER
-}
+    ApiSource.entries.filter { source -> source.requiresLocalApiKey() }.toSet()
 
 @Composable
 private fun ApiKeyDialog(

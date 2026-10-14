@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.requiresLocalApiKey
 import com.usagemonitor.domain.entity.statusBadgeLabel
 import com.usagemonitor.domain.entity.statusSupportingText
 import com.usagemonitor.presentation.ui.theme.AppAccents
@@ -142,11 +143,7 @@ fun ApiCheckboxRow(
     modifier: Modifier = Modifier,
     showDivider: Boolean = false
 ) {
-    val badgeLabel = if (
-        api == ApiSource.MINIMAX ||
-        api == ApiSource.DEEPSEEK ||
-        api == ApiSource.OPENCODE_GO
-    ) {
+    val badgeLabel = if (api.requiresLocalApiKey()) {
         if (hasConfiguredApiKey) {
             if (language == AppLanguage.PT) "Chave configurada" else "Key configured"
         } else {

@@ -49,3 +49,4 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A0 | Este plano | Só documentação; `git diff --check` limpo |
+| A1 | `ApiSource.requiresLocalApiKey()` (domain, `when` exaustivo) vira dono único: `API_KEY_DEPENDENT_SOURCES`, `SettingsApisTab`, selo de `ApiCheckboxRow` e `LocalApiKeyDataSource` derivam dele. Corrige o selo ausente na OpenRouter (o protótipo, linha 2317, já o desenhava) | `gradlew.bat desktopTest --tests ApiSourceClassificationTest --tests ComponentTest --tests LocalApiKeyDataSourceTest --tests ApiKeyDialogTest --tests "com.usagemonitor.architecture.*"`: 100 testes, 0 falhas |
