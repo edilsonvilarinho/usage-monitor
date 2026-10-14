@@ -216,8 +216,7 @@ servidor do time.** Regras:
 
 ## Sistema visual
 
-Refatoração de agosto de 2026, inspirada na linguagem do OpenCode. O plano de execução com o
-histórico das decisões está em [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/refatoracao-visual-opencode-execucao.md).
+Histórico: [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/refatoracao-visual-opencode-execucao.md).
 
 ### Design system — precedência
 
@@ -245,10 +244,8 @@ e `AppStatusPill.kt`. Se a primitiva não existir, o commit que a cria e o commi
 mesmo: primitiva sem adoção não conserta nada (histórico em
 [`compose-implementation.md`](docs/design-system/compose-implementation.md)).
 
-**Cor de acento sai de `AppAccents.current` e de `AppTone`**, nunca de `darkAppAccents` ou
-`lightAppAccents` diretamente. Um `val` de topo de arquivo é resolvido uma vez por processo e não lê
-o tema em vigor: congelar a variante escura faz o valor cair a 2,64:1 contra a `surface` clara, que é
-o que `AppAccentsContrastTest` existe para impedir.
+**Cor de acento sai de `AppAccents.current` e de `AppTone`**, nunca de `darkAppAccents`/`lightAppAccents`
+nem de `val` de topo de arquivo (congela o tema; `AppAccentsContrastTest` guarda).
 
 **Toda alteração de tela é registrada nos dois documentos, no mesmo commit da mudança.** A regra de
 precedência acima só se sustenta enquanto os dois descreverem o app inteiro; desatualizado, cada um
@@ -286,61 +283,26 @@ Regras:
 (`FlowRow`+`weight`, semântica de ícone, placeholder, altura da cena, `modifier` do campo, borda) que
 já custaram uma suíte vermelha cada.
 
-**Janelas, cards e tooltips**: decisões e histórico em [`docs/presentation.md`](docs/presentation.md),
-seção "Sistema visual — janelas, cards e tooltips". **Leia a seção antes de mexer.** Regras:
+**Janelas, cards e tooltips**: regras e histórico em [`docs/presentation.md`](docs/presentation.md),
+seção "Sistema visual — janelas, cards e tooltips" — **leia antes de mexer**. Inegociáveis: escala da
+interface troca só a densidade, nunca `fontScale`, e **cada** janela recebe o valor; monitor por
+`workAreaForPosition`, nunca `defaultScreenDevice`; **a barra HUD é o único modo de visualização** — não
+reintroduzir seletor de modo nem segunda moldura (`DashboardScreen` só existe para testes e capturas).
 
-- Escala da interface troca só a **densidade**, nunca `fontScale`. Padrão persistido 115, default do
-  parâmetro 100 (geradores de captura e testes). **Cada** `Window`/`DialogWindow` recebe o valor.
-  Gravar no commit com debounce. `AppThemeScaleTest` mede pixel.
-- Monitores: `workAreaForPosition` (`ScreenLocator.kt`) encaixa no monitor de maior interseção, nunca
-  `defaultScreenDevice`. Escalas diferentes por monitor só se validam em máquina real.
-- **A barra HUD é o único modo de visualização** (plano `hud-modo-unico-execucao.md`): saíram a janela
-  principal com o dashboard, o modo somente cards, o menu de modos (`WindowMode`), "Manter sempre
-  visível" e `Ctrl+Shift+H`/`Ctrl+Shift+M`. Não reintroduzir seletor de modo nem segunda moldura.
-  `DashboardScreen` e a grade de cards só existem para testes e geradores de captura.
-- Tooltip de cota não abre abaixo de 320dp de card (`shouldShowQuotaTooltip`, constante própria, não
-  `NarrowCardWidthThreshold`); a `testTag` do bloco de cota mora no conteúdo; a explicação do
-  semáforo é o `footnote` da tooltip. Cabeçalho tem ponto **e** palavra do pior risco
-  (`worstQuotaRisk`, pela ordem do enum); sem projeção conhecida, sem badge.
-- Saldo pré-pago (`hasKnownResetAt = false`, persistido em `has_known_reset_at`) usa **tempo de
-  autonomia** (`BALANCE_*_RUNWAY_MILLIS`, 7/14 dias), nunca a razão até o reset.
-- Aviso de fonte é hint (`CardNoticeHint`), nunca `AppBanner`: um ícone por card, sem piso de
-  largura, frases inteiras no `contentDescription`.
-
-**Barra HUD — notch** (`HudWindow.kt`, `HudNotch.kt`, `HudBalloon.kt`, `HudHandles.kt`,
-`HudNotchGeometry.kt`, `HudModel.kt`; issue #164): decisões e histórico em
-[`docs/hud-notch.md`](docs/hud-notch.md). **Leia antes de mexer na HUD.** Regras:
-
-- A HUD está sempre composta — não há `hudMode`; `HudEdge` é enum próprio. Sem API habilitada as
-  Configurações abrem sozinhas uma vez por arranque (`OpenSettingsWithoutApis`).
-- Um anel por conta, até três arcos; janela mais longa por fora; uma linha por anel com janela e
-  percentual; palavra do **pior** risco. Faixa compacta acima de 45% da borda.
-- O notch não cresce: o balão é de **uma** conta (hover no anel) ou da engrenagem (hover ou clique,
-  que só abre — #317). Botões do card têm dona única (`cardActionsFor`).
-- **O tamanho é da geometria** (`hudNotchSizes`), nunca medido da composição; 1dp de folga por texto
-  (`HudNotchTextFitTest`). Janela com origem e tamanho fixos ao abrir; área de clique recortada por
-  `Window.shape` **só no Windows** (`hudUsesHitRegion`, #340); nenhum redimensionamento AWT por quadro.
-- Arrasto só pela mão, medido por `hudDragWindowBounds`; posição é borda + fração + monitor; parado
-  mora na área útil, fora da barra de tarefas.
-- Clique num anel recoleta aquela conta; botão direito não faz nada. Atualização pendente é o
-  ponto da engrenagem; reiniciar só pelo botão do balão.
-- Movimento contínuo (órbita de sessão, pulso de atenção) só atrás de `AppMotionPolicy.continuous`.
-- Balão é conteúdo da janela, nunca `Popup`; nenhum formato novo de percentual/reset/rótulo.
-- Modo recolher (#400): opt-in pelo alfinete (`hudAutoRetract`, nasce desligado); a íris (Z2) é recorte de
-  camada dentro da janela fixa, e a faixa parada é a área de clique. Crítico não abre a barra sozinho.
+**Barra HUD — notch** (`Hud*.kt`; issue #164): regras e histórico em [`docs/hud-notch.md`](docs/hud-notch.md)
+— **leia antes de mexer**. Inegociáveis: o tamanho é da geometria (`hudNotchSizes`), janela de origem e
+tamanho fixos, nenhum redimensionamento AWT por quadro e `Window.shape` só no Windows (`hudUsesHitRegion`,
+#340); o notch não cresce — balão de **uma** conta ou da engrenagem, conteúdo da janela e nunca `Popup`,
+botões do card com dona única (`cardActionsFor`); movimento contínuo só atrás de `AppMotionPolicy.continuous`.
 
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
-**Marca**: `tools/brand/render_icons.py` gera PNG, ICO e ICNS do ícone Gargantua com o nome (I10),
-desenhado **por tamanho lógico**: ≥ 96 px nome inteiro, 32–64 px `U·M`, ≤ 24 px só o núcleo. Janela
-lê `app_icon_window.png`, bandeja `app_icon_tray.png` — nunca o de 512 px, que traz texto. O `.icns`
-só é validado no job `build-macos` do release.
+**Marca**: `tools/brand/render_icons.py` gera os ícones por tamanho lógico; janela e bandeja nunca usam o
+de 512 px (detalhes em [`docs/build-and-release.md`](docs/build-and-release.md)).
 
-**Relatório PDF**: a IBM Plex Mono vai embutida (`PDType0Font.load` com subconjunto) e o
-saneamento WinAnsi de `UsageReportDocument.sanitized` **permanece** — a fonte tem os acentos, mas
-trocar o contrato de caracteres é outra migração. Sem o recurso no classpath, o relatório cai para
-Helvetica em vez de falhar.
+**Relatório PDF**: Plex Mono embutida e o saneamento WinAnsi de `UsageReportDocument.sanitized`
+**permanece**; sem a fonte, cai para Helvetica (decisão no `PdfUsageReportRenderer.kt`).
 
 ## CI e testes
 

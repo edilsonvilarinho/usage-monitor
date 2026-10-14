@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-visual-options
-description: Generate N animated HTML options side by side for a visual or animation change in Usage Monitor (HUD Gargantua, balloons, cards, data, screens) so the user picks a direction before any Kotlin is written. Use when the user asks for "opções", "modelos", "exemplos em HTML", "me dá N versões" of a visual change, or invokes /usage-monitor-visual-options with what to change and how many examples.
+description: Generate N animated HTML visual options side by side for a Usage Monitor visual or animation change, so the user picks a direction before any Kotlin. Use for "opções", "modelos", "exemplos em HTML", "me dá N versões", or /usage-monitor-visual-options.
 ---
 
 # Usage Monitor — opções visuais em HTML
