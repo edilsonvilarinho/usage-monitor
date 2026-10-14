@@ -185,6 +185,10 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 - **Arquivo de produção ≤ 800 linhas; função ≤ 300**, medida por varredura de chaves que ignora
   comentário e string. Nada de arquivo-deus nem composable-deus: estado, efeitos e ações de uma
   janela moram em arquivos próprios, e um host compõe.
+- **Texto PT/EN não cresce inline:** `INLINE_LANGUAGE_CHECKS_CEILING` é catraca de `== AppLanguage.PT`
+  em produção — texto novo vai por `localized(language, pt, en)` ou objeto de rótulos (`CommonLabels`,
+  `CliSessionsLabels`…); migrar um arquivo baixa o teto. Classificação de fonte é predicado do domain
+  com `when` exaustivo (`ApiSourceClassification.kt`), nunca conjunto literal repetido.
 - **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
   divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas (`DashboardViewModel`, `LocalCliSessionDataSource`,
   `ApiUsageCardFormatting`, `AutoStartManager`), a próxima mudança começa extraindo, não crescendo.
