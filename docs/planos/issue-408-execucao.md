@@ -183,6 +183,9 @@ Molde por tipo de opção:
 | R3 | `AppViewModels.kt` (454 linhas) cresce com a fiação; acima de ~700, extrair | fechado na A01: fiação em `TelegramBotWiring.kt`, `AppViewModels` com 394 linhas |
 
 ## Desvios do plano e achados da execução
+- Pós-A32 (CI do PR #409, run 38461985034): `machine name signs alerts…` falhou com `ConcurrentModificationException` no
+  `waitUntil` — o `FakeTelegramApi` usava `Collections.synchronizedList` e o teste a percorria sem o lock enquanto o serviço
+  gravava. Listas trocadas por `CopyOnWriteArrayList`; `gradlew.bat desktopTest --tests "*TelegramBotService*"`: 33 testes, 0 falhas.
 - A03: a linha do `/reinicios` no `/ajuda` não tinha entrado na A02 (a substituição não casou e passou calada); entrou aqui junto com a do `/quando`. Daqui em diante as edições falham quando o trecho não existe.
 - A12/A13: na conferência a olho, com três arcos o percentual do centro cobria o arco interno; raio e passo do anel foram ajustados antes do commit. O custo do mapa de calor sai no formato da janela de comparação (`formatMicrosUsd`, quatro casas), reaproveitado sem mudança.
 - A18: as opções novas da #408 passaram a morar em `TelegramBotPreferences` (data class sem segredo) em vez de campos soltos no `TelegramBotSettings`, para não reescrever o `copy`/`equals`/`hashCode` à mão a cada função.

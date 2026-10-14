@@ -32,7 +32,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -42,14 +42,20 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/** API falsa: entrega cada lote de mensagens uma vez e grava o que foi enviado. */
+/**
+ * API falsa: entrega cada lote de mensagens uma vez e grava o que foi enviado.
+ *
+ * As listas são `CopyOnWriteArrayList`, e não `Collections.synchronizedList`: o teste as
+ * percorre (`api.sent.any { … }`) enquanto o serviço grava em outra thread, e percorrer a
+ * lista sincronizada sem segurar o lock dava `ConcurrentModificationException` no CI.
+ */
 private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("") })) {
-    val pending = Collections.synchronizedList(mutableListOf<TelegramIncomingMessage>())
-    val sent = Collections.synchronizedList(mutableListOf<Pair<Long, String>>())
-    val keyboards = Collections.synchronizedList(mutableListOf<List<TelegramButton>>())
+    val pending = CopyOnWriteArrayList<TelegramIncomingMessage>()
+    val sent = CopyOnWriteArrayList<Pair<Long, String>>()
+    val keyboards = CopyOnWriteArrayList<List<TelegramButton>>()
     private val nextMessageId = AtomicInteger(800)
-    val edits = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
-    val answered = Collections.synchronizedList(mutableListOf<String>())
+    val edits = CopyOnWriteArrayList<Pair<Long, Long>>()
+    val answered = CopyOnWriteArrayList<String>()
 
     override suspend fun deleteWebhook(token: String) = Unit
 
@@ -62,14 +68,14 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
         return batch
     }
 
-    val menus = Collections.synchronizedList(mutableListOf<List<Pair<String, String>>>())
+    val menus = CopyOnWriteArrayList<List<Pair<String, String>>>()
 
-    val silentSends = Collections.synchronizedList(mutableListOf<String>())
-    val pins = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
-    val unpins = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
-    val editedTexts = Collections.synchronizedList(mutableListOf<String>())
+    val silentSends = CopyOnWriteArrayList<String>()
+    val pins = CopyOnWriteArrayList<Pair<Long, Long>>()
+    val unpins = CopyOnWriteArrayList<Pair<Long, Long>>()
+    val editedTexts = CopyOnWriteArrayList<String>()
 
-    val replyKeyboards = Collections.synchronizedList(mutableListOf<TelegramReplyKeyboard>())
+    val replyKeyboards = CopyOnWriteArrayList<TelegramReplyKeyboard>()
 
     override suspend fun sendMessage(
         token: String,
@@ -87,8 +93,8 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
         return nextMessageId.incrementAndGet().toLong()
     }
 
-    val photos = Collections.synchronizedList(mutableListOf<Pair<Long, Int>>())
-    val documents = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
+    val photos = CopyOnWriteArrayList<Pair<Long, Int>>()
+    val documents = CopyOnWriteArrayList<Pair<String, String>>()
 
     override suspend fun sendDocument(token: String, chatId: Long, bytes: ByteArray, fileName: String, contentType: String, caption: String) {
         documents += fileName to bytes.decodeToString()
