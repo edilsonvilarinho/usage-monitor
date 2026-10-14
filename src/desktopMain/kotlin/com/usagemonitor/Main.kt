@@ -321,6 +321,7 @@ private fun AppBackgroundWork(graph: AppGraph, viewModels: AppViewModels, single
     LaunchedEffect(graph) {
         while (isActive) {
             graph.codexCliSessionDataSource.syncIndex()
+            graph.codexIndexSyncedAt.value = kotlin.time.Clock.System.now()
             delay(CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS)
         }
     }

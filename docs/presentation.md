@@ -162,13 +162,24 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   (desktopMain), compartilhada pelo bot e pela janela.
 - **Janela "Análise"** (`AnalysisScreen`, `AnalysisViewModel`): aberta pelo `CardAction.ANALYSIS` — valor novo no enum,
   **exceção aprovada** pelo usuário (U2), em `cardActionsFor` para Anthropic e Codex, depois de Histórico; ícone
-  `Icons.Rounded.Insights`. Abas = vistas de texto do `/analise`, mesmo texto sem as marcas do Telegram, em `labelMedium`
-  (Plex Mono). Sob demanda, "Atualizar" relê; sem histórico, `AppEmptyState`.
-- **Gráficos na janela** (B21): as vistas de imagem são **os mesmos PNGs do bot** (`TelegramAnalysisRenderer`, Skia,
-  fundo escuro), decodificados por `AnalysisImageProvider` vindo de `desktopMain` — um desenho só para as duas portas.
-  Doze abas não cabem na janela mínima (640 dp): `AppSegmentedControl` **Texto | Gráficos** escolhe o grupo e `AppTabs`
-  a vista dentro dele (papéis distintos). Nome da aba sem o emoji do Telegram (a Plex não tem o glifo). **Desvio**: o
-  mockup falava em Canvas por vista; a imagem não segue o tema claro (fica escura nos dois temas).
+  `Icons.Rounded.Insights`. Sem histórico, `AppEmptyState`.
+- **Painel único ao vivo** (rodada AD, direção AD1; plano `docs/planos/analise-painel-ao-vivo-execucao.md`, galeria
+  `docs/planos/analise-modal-visual/`): as 12 abas em dois níveis e os PNGs do bot saíram da janela — repetiam o mesmo
+  número em cinco vistas, o texto do Telegram quebrava os blocos ▁▂█ na Plex e o PNG ficava escuro nos dois temas.
+  `AnalysisPanel` mostra as duas janelas lado a lado (`AppStatusPill` com o veredito escrito, `AppProgressTrack` com a
+  marca de onde a cota chega no reinício e três `AppMetricBlock` de ritmo), `AnalysisHoursChart` (Canvas: barras de pp
+  da 5h, linha de tok/s com máximo próprio escrito na legenda, bolha por hora como no histórico #392; `null` é lacuna
+  tracejada, zero é traço rente) e intervalos e antes × agora em `AppDataRow`. Textos e tons saem de
+  `AnalysisPanelModel` (puro, testado). O bot e o PDF continuam com o desenho dele — a decisão B21 "um desenho para as
+  duas portas" deixou de valer só para a janela.
+- **Ao vivo** (A01): o view model relê quando o `fetchedAt` da conta muda (coleta nova: 60 s com sessão CLI, 5 min sem)
+  e a cada `LIVE_INTERVAL_MILLIS` (30 s, o ritmo do índice do Claude), porque ritmo da última hora, ritmo seguro e fatias
+  andam com o relógio. `close()` no `onCloseRequest` para o laço — a janela só se esconde. Sem `drop(1)` no sinal: se a
+  coleta o trocar entre a abertura e a inscrição, o `StateFlow` entrega só o valor novo; o custo é uma releitura a mais
+  na abertura. Releitura que falha mantém os números (`liveFailedAt`) e o selo diz "Falhou às … · leitura das …"; o
+  selo "Ao vivo · HH:mm:ss" substituiu o "Atualizar". Custo medido: ~20 ms de SQL por releitura (D6 do plano). A vazão
+  do Codex vem de um índice sincronizado a cada 10 min — a linha diz a hora dele (`throughputIndexedAt`, de
+  `AppGraph.codexIndexSyncedAt`), em vez de sincronizar a mais.
 - **Relatório PDF** (B21b): botão na barra da janela, o mesmo PDF de uma página do `/analise pdf` e o mesmo nome de
   arquivo, gravado pelo `UsageExportWriter` com o payload novo `UsageExportPayload.Binary` (bytes prontos; não é `data
   class`). Cancelar o diálogo não publica nada; salvo ou falha vira `AppBanner`, como na Comparação.

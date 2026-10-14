@@ -1,6 +1,5 @@
 package com.usagemonitor.presentation.viewmodel
 
-import com.usagemonitor.domain.entity.AnalysisView
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.TelegramAnalysisImageLabels
 import com.usagemonitor.presentation.ui.UsageExportPayload
@@ -13,10 +12,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
+import kotlin.time.Instant
 
 sealed interface AnalysisUiState {
     data object Loading : AnalysisUiState
@@ -24,17 +31,23 @@ sealed interface AnalysisUiState {
     data object Empty : AnalysisUiState
     data class Success(
         val analysis: SessionAnalysis,
-        val view: AnalysisView,
-        val isRefreshing: Boolean = false,
         /** Resultado do "Relatório PDF" (B21b); `null` sem exportação ou com o diálogo cancelado. */
-        val exportOutcome: CliExportOutcome? = null
+        val exportOutcome: CliExportOutcome? = null,
+        /**
+         * Quando a última releitura ao vivo falhou; os números continuam os da [analysis]
+         * (`generatedAt`). `null` = a leitura mostrada é a mais recente.
+         */
+        val liveFailedAt: Instant? = null
     ) : AnalysisUiState
 }
 
 /**
  * Janela "Análise" de uma conta (rodada AB, B20): a mesma análise do `/analise` do bot.
  *
- * Lê sob demanda, ao abrir e no "Atualizar": é uma pergunta pontual, não um painel ao vivo.
+ * Ao vivo enquanto a janela está visível (rodada AD, A01): relê a cada leitura nova da conta
+ * ([freshness] muda — o host passa o `fetchedAt` dela) e a cada [liveIntervalMillis], porque
+ * ritmo da última hora, ritmo seguro e fatias andam com o relógio mesmo sem coleta nova.
+ * [close] para o laço: a janela de modal só se esconde, e escondida não lê nada.
  * [load] recebe o `storageKey` da conta e vem de quem tem o histórico e o índice CLI —
  * a apresentação não importa `data`.
  */
@@ -44,7 +57,11 @@ class AnalysisViewModel(
     /** Grava o PDF (B21b); `null` esconde o botão. */
     private val exportWriter: UsageExportWriter? = null,
     /** O PDF de uma página do `/analise pdf`, montado em `desktopMain` (PDFBox é JVM). */
-    private val pdfOf: (suspend (SessionAnalysis, AppLanguage) -> ByteArray)? = null
+    private val pdfOf: (suspend (SessionAnalysis, AppLanguage) -> ByteArray)? = null,
+    /** Muda a cada leitura nova da conta; qualquer valor serve, só a troca importa. */
+    private val freshness: (targetKey: String) -> Flow<Any?> = { emptyFlow() },
+    private val liveIntervalMillis: Long = LIVE_INTERVAL_MILLIS,
+    private val clock: () -> Instant = { kotlin.time.Clock.System.now() }
 ) {
     /** Há como exportar? Decide se a janela mostra "Relatório PDF". */
     val canExport: Boolean
@@ -52,8 +69,8 @@ class AnalysisViewModel(
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private var loadJob: Job? = null
+    private var liveJob: Job? = null
     private var targetKey: String? = null
-    private var view = AnalysisView.PANEL
 
     private val _uiState = MutableStateFlow<AnalysisUiState>(AnalysisUiState.Loading)
     val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
@@ -64,22 +81,37 @@ class AnalysisViewModel(
     fun openForAccount(targetKey: String, accountLabel: String) {
         this.targetKey = targetKey
         _accountLabel.value = accountLabel
-        view = AnalysisView.PANEL
         _uiState.value = AnalysisUiState.Loading
         refresh()
+        startLive(targetKey)
     }
 
-    fun selectView(selected: AnalysisView) {
-        view = selected
-        val current = _uiState.value
-        if (current is AnalysisUiState.Success) _uiState.value = current.copy(view = selected)
+    /** A janela se escondeu: nada de releitura até a próxima abertura. */
+    fun close() {
+        liveJob?.cancel()
+        liveJob = null
     }
 
-    fun refresh() {
+    private fun startLive(key: String) {
+        liveJob?.cancel()
+        val ticks = flow {
+            while (true) {
+                delay(liveIntervalMillis)
+                emit(Unit)
+            }
+        }
+        // Sem `drop(1)` no primeiro valor: se a coleta trocar o sinal entre a abertura e a
+        // inscrição, o `StateFlow` entrega só o valor novo e ele seria descartado. O custo é
+        // uma releitura a mais na abertura (~20 ms de SQL).
+        val readings = freshness(key).distinctUntilChanged().map { }
+        liveJob = scope.launch {
+            merge(ticks, readings).collect { refresh() }
+        }
+    }
+
+    private fun refresh() {
         val key = targetKey ?: return
         loadJob?.cancel()
-        val current = _uiState.value
-        if (current is AnalysisUiState.Success) _uiState.value = current.copy(isRefreshing = true)
         loadJob = scope.launch {
             val analysis = try {
                 load(key)
@@ -88,7 +120,13 @@ class AnalysisViewModel(
             } catch (_: Exception) {
                 null
             }
-            _uiState.value = if (analysis == null) AnalysisUiState.Empty else AnalysisUiState.Success(analysis, view)
+            val shown = _uiState.value
+            _uiState.value = when {
+                analysis != null -> if (shown is AnalysisUiState.Success) shown.copy(analysis = analysis, liveFailedAt = null) else AnalysisUiState.Success(analysis)
+                // Leitura que falha mantém os números anteriores e publica só a falha.
+                shown is AnalysisUiState.Success -> shown.copy(liveFailedAt = clock())
+                else -> AnalysisUiState.Empty
+            }
         }
     }
 
@@ -117,5 +155,10 @@ class AnalysisViewModel(
 
     fun onDestroy() {
         scope.cancel()
+    }
+
+    companion object {
+        /** O ritmo do índice do Claude (`SessionPulseViewModel`); a releitura custa ~20 ms de SQL (plano AD, D6). */
+        const val LIVE_INTERVAL_MILLIS = 30_000L
     }
 }

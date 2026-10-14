@@ -3,8 +3,6 @@ package com.usagemonitor
 import com.usagemonitor.presentation.ui.ComparisonScreen
 import com.usagemonitor.presentation.ui.AnalysisLabels
 import com.usagemonitor.presentation.ui.AnalysisScreen
-import androidx.compose.ui.graphics.toComposeImageBitmap
-import org.jetbrains.skia.Image
 
 import com.usagemonitor.presentation.ui.ComparisonLabels
 
@@ -129,17 +127,14 @@ internal fun ModalWindowsHost(
         diagnosticName = "análise da sessão",
         minWidthDp = 640,
         minHeightDp = 480,
-        onCloseRequest = { modal.isAnalysisOpen = false },
+        onCloseRequest = {
+            modal.isAnalysisOpen = false
+            viewModels.analysis.close()
+        },
         openGeneration = modal.analysisOpenGeneration
     ) {
-        AnalysisScreen(
-            viewModel = viewModels.analysis,
-            language = language,
-            // Os PNGs do `/analise` do bot (Skia), decodificados para a tela.
-            imageFor = { view, analysis, imageLanguage ->
-                TelegramAnalysisRenderer.render(view, analysis, imageLanguage)?.let { png -> Image.makeFromEncoded(png).toComposeImageBitmap() }
-            }
-        )
+        // Painel único desenhado em Compose (rodada AD); os PNGs do bot ficam só no bot.
+        AnalysisScreen(viewModel = viewModels.analysis, language = language)
     }
 
     AppDialogWindow(

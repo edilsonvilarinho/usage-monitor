@@ -73,6 +73,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -240,11 +241,15 @@ internal class AppViewModels(
         breadcrumbs = breadcrumbs
     )
 
-    // Análise da sessão (rodada AB): a mesma leitura do `/analise` do bot, sob demanda.
+    // Análise da sessão (rodada AB): a mesma leitura do `/analise` do bot, ao vivo com a
+    // janela visível (rodada AD) — relê quando a coleta da conta traz leitura nova.
     val analysis = AnalysisViewModel(
         load = sessionAnalysisReader(graph, dashboard),
         exportWriter = graph.usageExportWriter,
-        pdfOf = { result, language -> TelegramAnalysisPdf.render(result, language) }
+        pdfOf = { result, language -> TelegramAnalysisPdf.render(result, language) },
+        freshness = { key ->
+            dashboard.uiState.map { state -> (state as? UiState.Success)?.data?.firstOrNull { item -> item.targetKey.storageKey == key }?.fetchedAt }
+        }
     )
 
     // Uso detectado pela variação da cota (#385): acende o arco das fontes sem

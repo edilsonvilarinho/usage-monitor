@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — A00 concluída.`
+**Estado atual:** `Concluído — A00 e A01; aguardando commit.`
 
 | Campo | Valor |
 | --- | --- |
@@ -53,6 +53,7 @@ deixaria um commit intermediário com a tela antiga ligada a um view model que n
 | # | Data | Resultado | Comando e evidência |
 | --- | --- | --- | --- |
 | A00 | 2026-10-14 | concluída | plano e galeria; sem código |
+| A01 | 2026-10-14 | concluída | `gradlew.bat allTests` verde (2 752 testes; a primeira passada falhou em `HelpMediaResourcesTest`: a demo só trocava texto pequeno, fora da grade de amostra — ganhou ponteiro e barra que anda); `gradlew.bat generateHelpMedia -PhelpMediaTopic=session-analysis` (26 quadros); capturas da tela em escuro, claro e 640dp conferidas (rótulos cortados corrigidos) |
 
 ## Problemas em aberto e riscos
 
