@@ -15,9 +15,9 @@ object AutoStartManager {
     private const val WINDOWS_VALUE_NAME = "UsageMonitor"
     private const val WINDOWS_INSTALL_LOCATION_VALUE = "InstallLocation"
     private const val LINUX_AUTOSTART_FILE = "usage-monitor.desktop"
-    private const val MACOS_LAUNCH_AGENT_LABEL = "com.usagemonitor.app"
+    internal const val MACOS_LAUNCH_AGENT_LABEL = "com.usagemonitor.app"
     private const val MACOS_LAUNCH_AGENT_FILE = "$MACOS_LAUNCH_AGENT_LABEL.plist"
-    private const val APP_DISPLAY_NAME = "Usage Monitor"
+    internal const val APP_DISPLAY_NAME = "Usage Monitor"
 
     fun isAutoStartSupported(): Boolean {
         return currentPlatform() != Platform.OTHER
@@ -445,110 +445,6 @@ object AutoStartManager {
         return LinuxAutostartEntryState(present = true, valid = valid)
     }
 
-    /** Valor cru de uma chave do grupo `[Desktop Entry]`, sem interpretar nada. */
-    private fun desktopEntryValue(entry: String, key: String): String? {
-        return entry.lineSequence()
-            .map(String::trim)
-            .firstNotNullOfOrNull { line ->
-                line.removePrefix("$key=")
-                    .takeIf { it != line }
-                    ?.trim()
-                    ?.takeIf { it.isNotBlank() }
-            }
-    }
-
-    /**
-     * Primeiro argumento do `Exec=`, que e o programa.
-     *
-     * Aqui as aspas **sao** da especificacao e precisam ser desfeitas: no `Exec`
-     * elas delimitam o argumento e o leitor as remove antes do spawn. E o oposto
-     * exato do `Path=`, lido verbatim -- e a razao de as duas chaves nao se
-     * escreverem do mesmo jeito.
-     */
-    private fun firstDesktopExecArgument(exec: String): String? {
-        if (!exec.startsWith("\"")) {
-            return exec.substringBefore(' ').takeIf { it.isNotBlank() }
-        }
-
-        val program = StringBuilder()
-        var index = 1
-        while (index < exec.length) {
-            val character = exec[index]
-            when {
-                character == '\\' && index + 1 < exec.length -> {
-                    program.append(exec[index + 1])
-                    index += 2
-                }
-
-                character == '"' -> return program.toString().takeIf { it.isNotBlank() }
-
-                else -> {
-                    program.append(character)
-                    index += 1
-                }
-            }
-        }
-
-        // Aspas sem fechamento: entrada corrompida, e nao um caminho.
-        return null
-    }
-
-    /**
-     * As duas chaves nao se escrevem do mesmo jeito, e a simetria custou o
-     * arranque inteiro no Linux.
-     *
-     * A Desktop Entry Specification define regras de aspas **apenas para a chave
-     * `Exec`** (secao "The Exec key"): ali as aspas separam os argumentos e sao
-     * removidas pelo leitor. `Path` e do tipo `string` e e lida **verbatim** --
-     * a GLib guarda o valor em `info->path` e o passa como `working_directory`
-     * do `g_spawn`, e o KIO o passa para `QProcess::setWorkingDirectory`. Um
-     * diretorio cujo nome literal comeca com aspas nao existe, o spawn falha no
-     * `chdir` e nada aparece na tela: `isAutoStartEnabled()` so testa se o
-     * arquivo existe, entao o interruptor continua ligado (issue #120).
-     */
-    internal fun buildLinuxDesktopEntry(executablePath: String, parentDir: String): String {
-        return buildString {
-            appendLine("[Desktop Entry]")
-            appendLine("Type=Application")
-            appendLine("Version=1.0")
-            appendLine("Name=$APP_DISPLAY_NAME")
-            appendLine("Exec=${quoteDesktopValue(executablePath)} ${StartupOrigin.AUTO_START_ARGUMENT}")
-            appendLine("Path=$parentDir")
-            appendLine("Terminal=false")
-            appendLine("X-GNOME-Autostart-enabled=true")
-        }
-    }
-
-    internal fun buildLaunchAgentPlist(executablePath: String): String {
-        return buildString {
-            appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
-            appendLine(
-                """<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" """ +
-                    """"http://www.apple.com/DTDs/PropertyList-1.0.dtd">"""
-            )
-            appendLine("""<plist version="1.0">""")
-            appendLine("<dict>")
-            appendLine("    <key>Label</key>")
-            appendLine("    <string>$MACOS_LAUNCH_AGENT_LABEL</string>")
-            appendLine("    <key>ProgramArguments</key>")
-            appendLine("    <array>")
-            appendLine("        <string>${escapeXml(executablePath)}</string>")
-            appendLine("        <string>${StartupOrigin.AUTO_START_ARGUMENT}</string>")
-            appendLine("    </array>")
-            appendLine("    <key>RunAtLoad</key>")
-            appendLine("    <true/>")
-            appendLine("</dict>")
-            appendLine("</plist>")
-        }
-    }
-
-    private fun escapeXml(value: String): String {
-        return value
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-    }
-
     private fun macAutostartFile(): File {
         val homeDir = System.getProperty("user.home")
         return File(homeDir, "Library/LaunchAgents/$MACOS_LAUNCH_AGENT_FILE")
@@ -687,10 +583,6 @@ object AutoStartManager {
         return normalized == "java" ||
             normalized == "java.exe" ||
             normalized == "javaw.exe"
-    }
-
-    private fun quoteDesktopValue(value: String): String {
-        return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
     }
 
     private fun runCommand(command: List<String>): AutoStartCommandResult {

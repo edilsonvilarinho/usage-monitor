@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.AnthropicProfileLocation
 import com.usagemonitor.data.dto.CredentialsFileDto
 import com.usagemonitor.data.dto.OAuthCredentialsDto
@@ -279,14 +280,22 @@ internal class LocalCredentialDataSource(
         val refresh_token: String,
         val client_id: String,
         val scope: String,
-    )
+    ) {
+        /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+        override fun toString(): String =
+            "TokenRefreshRequest(grant_type=$grant_type, refresh_token=${redactedSecret(refresh_token)}, client_id=$client_id, scope=$scope)"
+    }
 
     @Serializable
     private data class TokenRefreshResponse(
         @SerialName("access_token") val accessToken: String? = null,
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("expires_in") val expiresIn: Long? = null,
-    )
+    ) {
+        /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+        override fun toString(): String =
+            "TokenRefreshResponse(accessToken=${redactedSecret(accessToken)}, refreshToken=${redactedSecret(refreshToken)}, expiresIn=$expiresIn)"
+    }
 
     @Serializable
     private data class ClaudeConfigDto(

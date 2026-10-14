@@ -105,7 +105,7 @@ internal fun historyMetricEntries(
 
     if (series.periodType == PeriodType.REPORTED) {
         entries += HistoryMetricEntry(
-            label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+            label = CommonLabels.currentUsage(language),
             value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
         )
         entries += HistoryMetricEntry(
@@ -120,7 +120,7 @@ internal fun historyMetricEntries(
         }
     } else if (series.unit == UsageUnit.CURRENCY_USD) {
         entries += HistoryMetricEntry(
-            label = if (language == AppLanguage.PT) "Saldo atual" else "Current balance",
+            label = CommonLabels.currentBalance(language),
             value = formatCents(series.currentDisplayUsed)
         )
         entries += HistoryMetricEntry(
@@ -134,7 +134,7 @@ internal fun historyMetricEntries(
     } else if (series.unit == UsageUnit.REQUESTS) {
         if (series.currentDisplayTotal > 0L) {
             entries += HistoryMetricEntry(
-                label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+                label = CommonLabels.currentUsage(language),
                 value = "${formatQuantity(series.currentDisplayUsed)}/${formatQuantity(series.currentDisplayTotal)} req"
             )
             entries += windowEntriesOrConsumed(series, language) {
@@ -156,7 +156,7 @@ internal fun historyMetricEntries(
         )
     } else {
         entries += HistoryMetricEntry(
-            label = if (language == AppLanguage.PT) "Uso atual" else "Current usage",
+            label = CommonLabels.currentUsage(language),
             value = "${currentUsagePercent(series.currentDisplayUsed, series.currentDisplayTotal)} / 100 %"
         )
         entries += windowEntriesOrConsumed(series, language) {

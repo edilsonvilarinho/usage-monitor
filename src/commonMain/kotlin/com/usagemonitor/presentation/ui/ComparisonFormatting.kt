@@ -23,7 +23,7 @@ internal object ComparisonLabels {
             ComparisonMetric.TOKENS -> "Tokens"
             ComparisonMetric.COST -> if (pt) "Custo" else "Cost"
             ComparisonMetric.CACHE -> "Cache"
-            ComparisonMetric.THROUGHPUT -> if (pt) "Vazão" else "Throughput"
+            ComparisonMetric.THROUGHPUT -> CliSessionsLabels.throughput(language)
             ComparisonMetric.QUOTA -> if (pt) "Cota da fonte" else "Source quota"
         }
     }

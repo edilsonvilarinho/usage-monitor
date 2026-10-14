@@ -1,5 +1,6 @@
 package com.usagemonitor.data.dto
 
+import com.usagemonitor.domain.entity.redactedSecret
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -25,4 +26,9 @@ data class OAuthCredentialsDto(
     val scopes: List<String> = emptyList(),
     val subscriptionType: String? = null,
     val rateLimitTier: String? = null
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "OAuthCredentialsDto(accessToken=${redactedSecret(accessToken)}, refreshToken=${redactedSecret(refreshToken)}, expiresAt=$expiresAt, " +
+            "scopes=$scopes, subscriptionType=$subscriptionType, rateLimitTier=$rateLimitTier)"
+}

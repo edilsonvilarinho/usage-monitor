@@ -1,10 +1,10 @@
 package com.usagemonitor.presentation.ui
 
-import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ComparisonMetric
 import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.hasCliSessionIndex
 import com.usagemonitor.domain.entity.heatIntensity
 
 /** Uma célula do mapa: o texto sempre escrito e a intensidade da cor (0–1), `null` sem valor. */
@@ -43,4 +43,4 @@ fun buildTelegramHeatmap(rows: List<ComparisonRow>, language: AppLanguage): Tele
 
 /** Modelo do Claude CLI e do Codex com a fonte na frente; linha de fonte já é o nome dela. */
 private fun heatmapLabel(row: ComparisonRow, language: AppLanguage): String =
-    if (row.source == ApiSource.ANTHROPIC || row.source == ApiSource.CODEX) "${row.source.displayName(language)} · ${row.label}" else row.label
+    if (row.source.hasCliSessionIndex()) "${row.source.displayName()} · ${row.label}" else row.label

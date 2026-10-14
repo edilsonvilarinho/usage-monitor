@@ -61,11 +61,10 @@ private fun ApiUsageStatsCacheDto.toDomainOrNull(savedAtEpochMillis: Long): ApiU
         return null
     }
 
+    val storedAccountSource = accountSource?.let { value -> runCatching { ApiSource.valueOf(value) }.getOrNull() }
     val parsedAccountContext = accountEmail?.let { email ->
         val providerAccountId = accountProviderAccountId ?: return@let null
-        val accountKeySource = accountSource
-            ?.let { value -> runCatching { ApiSource.valueOf(value) }.getOrNull() }
-            ?: parsedSource
+        val accountKeySource = storedAccountSource ?: parsedSource
         runCatching {
             UsageAccountContext(
                 key = UsageAccountKey(

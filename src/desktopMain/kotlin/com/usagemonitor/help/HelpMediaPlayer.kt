@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import com.usagemonitor.presentation.ui.help.HelpMediaState
+import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
@@ -131,12 +132,17 @@ internal fun readHelpMediaBytes(mediaId: String): ByteArray? {
  * toca por vez, e cada quadro publicado é um bitmap novo — reter os quadros
  * todos de uma gravação de cinquenta quadros custaria dezenas de megabytes de
  * memória para mostrar um de cada vez.
+ *
+ * O laço é animação contínua e só roda com `AppMotionPolicy.continuous`: com
+ * "Reduzir animações" (e nos testes e geradores, que nascem `Static`) a demo
+ * fica no primeiro quadro.
  */
 @Composable
 internal fun rememberHelpMedia(mediaId: String): HelpMediaState {
     var state by remember(mediaId) { mutableStateOf<HelpMediaState>(HelpMediaState.Loading) }
+    val animate = LocalAppMotionPolicy.current.continuous
 
-    LaunchedEffect(mediaId) {
+    LaunchedEffect(mediaId, animate) {
         val clip = withContext(Dispatchers.IO) {
             readHelpMediaBytes(mediaId)?.let { bytes -> decodeHelpMedia(bytes) }
         }
@@ -161,9 +167,10 @@ internal fun rememberHelpMedia(mediaId: String): HelpMediaState {
                 }
                 state = HelpMediaState.Frame(frame)
 
-                if (clip.frameCount == 1) {
-                    // Imagem parada não tem laço para rodar, mas o codec só pode
-                    // ser fechado quando o tópico sair da tela.
+                if (clip.frameCount == 1 || !animate) {
+                    // Imagem parada não tem laço para rodar, nem demo com movimento
+                    // contínuo desligado; o codec só pode ser fechado quando o
+                    // tópico sair da tela.
                     awaitCancellation()
                 }
                 delay(clip.frameDelayMillis(index))

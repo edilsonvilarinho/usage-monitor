@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,7 +19,7 @@ fun RefreshWarningDialog(
         "Forcing a refresh ahead of the scheduled time consumes API quota and may accelerate hitting the request limit. Continue?"
     }
     val confirmLabel = if (language == AppLanguage.PT) "Atualizar" else "Refresh"
-    val dismissLabel = if (language == AppLanguage.PT) "Cancelar" else "Cancel"
+    val dismissLabel = CommonLabels.cancel(language)
 
     // Os botões do app, sendo o de confirmar o único com peso, porque é a ação
     // que o diálogo propõe. Escurecimento, foco preso e Esc vêm do `AppDialog`.

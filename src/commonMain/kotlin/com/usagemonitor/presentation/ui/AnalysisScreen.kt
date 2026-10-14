@@ -27,14 +27,12 @@ internal const val ANALYSIS_LIVE_TAG = "analysisLive"
 
 /** Rótulos da janela "Análise" (rodadas AB e AD), no idioma do app. */
 internal object AnalysisLabels {
-    private fun pick(language: AppLanguage, pt: String, en: String): String = if (language == AppLanguage.PT) pt else en
-
     fun title(accountLabel: String?, language: AppLanguage): String =
-        pick(language, "Análise", "Analysis") + (accountLabel?.let { label -> " · $label" }.orEmpty())
+        localized(language, "Análise", "Analysis") + (accountLabel?.let { label -> " · $label" }.orEmpty())
 
-    fun loading(language: AppLanguage): String = pick(language, "Lendo o histórico e o uso local…", "Reading the history and local usage…")
+    fun loading(language: AppLanguage): String = localized(language, "Lendo o histórico e o uso local…", "Reading the history and local usage…")
 
-    fun empty(language: AppLanguage): String = pick(
+    fun empty(language: AppLanguage): String = localized(
         language,
         "Sem histórico desta conta ainda. A análise aparece depois de algumas coletas.",
         "No history for this account yet. The analysis shows up after a few collections."
@@ -42,21 +40,21 @@ internal object AnalysisLabels {
 
     // Os três blocos de ritmo dividem o card: a 640dp cada um tem ~85dp, por isso rótulo
     // curto e o que cada um mede numa linha só abaixo deles.
-    fun paceNow(language: AppLanguage): String = pick(language, "agora", "now")
-    fun paceAverage(language: AppLanguage): String = pick(language, "média", "average")
-    fun paceSafe(language: AppLanguage): String = pick(language, "seguro", "safe")
-    fun paceLegend(language: AppLanguage): String = pick(
+    fun paceNow(language: AppLanguage): String = localized(language, "agora", "now")
+    fun paceAverage(language: AppLanguage): String = localized(language, "média", "average")
+    fun paceSafe(language: AppLanguage): String = localized(language, "seguro", "safe")
+    fun paceLegend(language: AppLanguage): String = localized(
         language,
         "agora: última 1 h · média: desde o início da janela · seguro: chega a 100% no reinício",
         "now: last 1 h · average: since the window start · safe: reaches 100% at the reset"
     )
-    fun hoursTitle(language: AppLanguage): String = pick(language, "Últimas 24 h", "Last 24 h")
-    fun intervalsTitle(language: AppLanguage): String = pick(language, "Ritmo por intervalo", "Pace by interval")
-    fun versusWeek(language: AppLanguage): String = pick(language, "vs 7 d", "vs 7 d")
-    fun versusTitle(language: AppLanguage): String = pick(language, "Esta janela × anterior", "This window × previous")
-    fun now(language: AppLanguage): String = pick(language, "agora", "now")
-    fun before(language: AppLanguage): String = pick(language, "antes", "before")
-    fun noPreviousWindow(language: AppLanguage): String = pick(language, "Sem janela 5h anterior no histórico.", "No previous 5h window in the history.")
+    fun hoursTitle(language: AppLanguage): String = localized(language, "Últimas 24 h", "Last 24 h")
+    fun intervalsTitle(language: AppLanguage): String = localized(language, "Ritmo por intervalo", "Pace by interval")
+    fun versusWeek(language: AppLanguage): String = localized(language, "vs 7 d", "vs 7 d")
+    fun versusTitle(language: AppLanguage): String = localized(language, "Esta janela × anterior", "This window × previous")
+    fun now(language: AppLanguage): String = localized(language, "agora", "now")
+    fun before(language: AppLanguage): String = localized(language, "antes", "before")
+    fun noPreviousWindow(language: AppLanguage): String = localized(language, "Sem janela 5h anterior no histórico.", "No previous 5h window in the history.")
 }
 
 /**
@@ -101,8 +99,8 @@ internal fun AnalysisContent(
         if (outcome != null) {
             AppBanner(
                 title = when (outcome) {
-                    is CliExportOutcome.Saved -> if (language == AppLanguage.PT) "Exportação concluída" else "Export complete"
-                    is CliExportOutcome.Failed -> if (language == AppLanguage.PT) "Falha na exportação" else "Export failed"
+                    is CliExportOutcome.Saved -> CommonLabels.exportDone(language)
+                    is CliExportOutcome.Failed -> CommonLabels.exportFailed(language)
                 },
                 description = when (outcome) {
                     is CliExportOutcome.Saved -> outcome.path

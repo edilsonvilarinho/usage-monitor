@@ -178,3 +178,53 @@ private fun lineOf(code: String, offset: Int): Int {
     }
     return line
 }
+
+/** Uma `data class`: nome, propriedades do construtor e corpo (vazio quando não tem). */
+internal data class DataClassDeclaration(val name: String, val properties: List<String>, val body: String)
+
+private val DATA_CLASS_HEADER = Regex("""\bdata\s+class\s+(\w+)\s*(?:<[^>]*>)?\s*\(""")
+private val CONSTRUCTOR_PROPERTY = Regex("""\b(?:val|var)\s+(\w+)\s*:""")
+
+/**
+ * Cada `data class` do arquivo, lida do código sem comentários nem strings. O corpo
+ * é o bloco depois do construtor (e da lista de supertipos, quando há), na mesma linha.
+ */
+internal fun dataClassDeclarations(source: String): List<DataClassDeclaration> {
+    val code = stripCommentsAndStrings(source)
+    return DATA_CLASS_HEADER.findAll(code).mapNotNull { match ->
+        val open = match.range.last
+        val close = matchingParenthesis(code, open) ?: return@mapNotNull null
+        val properties = CONSTRUCTOR_PROPERTY.findAll(code.substring(open + 1, close))
+            .map { property -> property.groupValues[1] }
+            .toList()
+        DataClassDeclaration(match.groupValues[1], properties, bodyAfterConstructor(code, close + 1))
+    }.toList()
+}
+
+private fun bodyAfterConstructor(code: String, from: Int): String {
+    var index = from
+    while (index < code.length && code[index] != '\n' && code[index] != '{') {
+        index++
+    }
+    if (index >= code.length || code[index] != '{') {
+        return ""
+    }
+    val close = matchingBrace(code, index) ?: return ""
+    return code.substring(index, close + 1)
+}
+
+private fun matchingParenthesis(code: String, open: Int): Int? {
+    var depth = 0
+    for (index in open until code.length) {
+        when (code[index]) {
+            '(' -> depth++
+            ')' -> {
+                depth--
+                if (depth == 0) {
+                    return index
+                }
+            }
+        }
+    }
+    return null
+}

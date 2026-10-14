@@ -30,6 +30,11 @@ data class TeamIntegrationSettings(
      */
     val adminToken: String = ""
 ) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "TeamIntegrationSettings(enabled=$enabled, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
+            "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)})"
+
     /** Sem a barra final, para concatenar o caminho sem gerar `//`. */
     val normalizedServerUrl: String
         get() = serverUrl.trim().trimEnd('/')

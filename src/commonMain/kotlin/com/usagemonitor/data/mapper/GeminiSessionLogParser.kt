@@ -77,7 +77,7 @@ internal object GeminiSessionLogParser {
 
             record["messages"]?.arrayOrNull()?.let { embedded ->
                 recognizedRecords += 1
-                embedded.forEach { message -> message.objectOrNull()?.let { value -> recordCall(value, answered) } }
+                embedded.mapNotNull { message -> message.objectOrNull() }.forEach { value -> recordCall(value, answered) }
                 return@forEach
             }
 

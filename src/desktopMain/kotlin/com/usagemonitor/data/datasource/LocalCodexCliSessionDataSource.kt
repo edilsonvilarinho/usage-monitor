@@ -113,7 +113,10 @@ class LocalCodexCliSessionDataSource(
                 readSessionIds(connection).mapNotNull { sessionId ->
                     val turns = readTurns(connection, sessionId, sinceEpochMillis)
                     if (turns.isEmpty()) null else buildSummary(connection, sessionId, turns)
-                }.sortedByDescending { summary -> summary.lastTs }
+                }.sortedWith(
+                    // `readSessionIds` não tem ORDER BY: sem o id, o empate de `lastTs` seguiria a ordem física do SQLite.
+                    compareByDescending<CodexCliSessionSummary> { summary -> summary.lastTs }.thenBy { summary -> summary.sessionId }
+                )
             }
         }
     }

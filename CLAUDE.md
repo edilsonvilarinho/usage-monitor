@@ -89,7 +89,8 @@ ser esquecidas:
 - Proxy: só vale após reiniciar; falha de conectividade é classificada por **tipo** de exceção.
 - TLS: `cacerts` + repositório do SO (`SystemTrustStore.kt`); `jdk.crypto.mscapi` entra no
   `modules(...)` **só** no build Windows (jlink de outro SO falharia).
-- Tipos com credencial (`CursorSessionCredentials`) não são `data class` — o `toString` vaza o token.
+- Tipo com credencial nunca usa o `toString` gerado: `data class` sobrescreve com `redactedSecret`, ou é
+  classe comum (`CursorSessionCredentials`). `ArchitectureRulesTest` cobra pelo nome do campo.
 - Antigravity: argumento por lista, nunca por shell; disjuntor e TTL de 5 min obrigatórios.
 - Codex: uma janela ao vivo basta; limite por modelo vem do rollout local, soma depois das janelas
   ao vivo e nunca derruba a fonte. `CodexQuotaLabels` é chave de série — não renomear.
@@ -185,9 +186,14 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 - **Arquivo de produção ≤ 800 linhas; função ≤ 300**, medida por varredura de chaves que ignora
   comentário e string. Nada de arquivo-deus nem composable-deus: estado, efeitos e ações de uma
   janela moram em arquivos próprios, e um host compõe.
+- **Texto PT/EN não cresce inline:** `INLINE_LANGUAGE_CHECKS_CEILING` é catraca de `== AppLanguage.PT`
+  em produção — texto novo vai por `localized(language, pt, en)` ou objeto de rótulos (`CommonLabels`,
+  `CliSessionsLabels`…); migrar um arquivo baixa o teto. Classificação de fonte é predicado do domain
+  com `when` exaustivo (`ApiSourceClassification.kt`), nunca conjunto literal repetido.
 - **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
-  divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas (`DashboardViewModel`, `LocalCliSessionDataSource`,
-  `ApiUsageCardFormatting`, `AutoStartManager`), a próxima mudança começa extraindo, não crescendo.
+  divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas
+  (`TeamUsageViewModel`, `DashboardViewModel`; logo abaixo, `TeamUsageScreen` com 749), a próxima mudança começa
+  extraindo, não crescendo. Medido em 2026-10-14 (`boas-praticas-377`).
 
 ## Integração com time (`server/`)
 

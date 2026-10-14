@@ -417,7 +417,7 @@ internal object TeamUsageLabels {
     }
 
     fun cancel(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Cancelar" else "Cancel"
+        return CommonLabels.cancel(language)
     }
 
     /** Esta máquina não pode se remover: o próximo envio a recriaria. */

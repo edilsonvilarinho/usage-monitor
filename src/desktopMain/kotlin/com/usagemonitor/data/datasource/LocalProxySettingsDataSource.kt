@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.ProxySettings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -15,7 +16,12 @@ private data class ProxySettingsDto(
     val port: Int = 0,
     val username: String = "",
     val password: String = ""
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "ProxySettingsDto(useEnvironmentProxy=$useEnvironmentProxy, host=$host, port=$port, username=$username, " +
+            "password=${redactedSecret(password)})"
+}
 
 /**
  * Persiste a configuração de proxy HTTP corporativo em

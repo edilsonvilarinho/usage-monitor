@@ -1,6 +1,8 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.requiresLocalApiKey
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -22,6 +24,11 @@ data class ApiKeySettings(
     val openCodeGo: String = "",
     val openRouter: String = ""
 ) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "ApiKeySettings(minimax=${redactedSecret(minimax)}, deepSeek=${redactedSecret(deepSeek)}, openCodeGo=${redactedSecret(openCodeGo)}, " +
+            "openRouter=${redactedSecret(openRouter)})"
+
     fun forSource(source: ApiSource): String? {
         return when (source) {
             ApiSource.MINIMAX -> minimax
@@ -76,7 +83,12 @@ private data class ApiKeySettingsDto(
     val deepSeek: String = "",
     val openCodeGo: String = "",
     val openRouter: String = ""
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "ApiKeySettingsDto(minimax=${redactedSecret(minimax)}, deepSeek=${redactedSecret(deepSeek)}, openCodeGo=${redactedSecret(openCodeGo)}, " +
+            "openRouter=${redactedSecret(openRouter)})"
+}
 
 /**
  * Persiste as chaves de MiniMax, DeepSeek e OpenCode fora das preferências do Windows.
@@ -119,12 +131,7 @@ internal class LocalApiKeyDataSource(
     }
 
     private fun requireLocalKeySource(source: ApiSource) {
-        require(
-            source == ApiSource.MINIMAX ||
-                source == ApiSource.DEEPSEEK ||
-                source == ApiSource.OPENCODE_GO ||
-                source == ApiSource.OPENROUTER
-        ) {
+        require(source.requiresLocalApiKey()) {
             "Apenas MiniMax, DeepSeek, OpenCode Go e OpenRouter possuem chave de API local."
         }
     }

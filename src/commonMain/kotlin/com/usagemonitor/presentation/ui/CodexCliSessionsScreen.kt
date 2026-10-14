@@ -210,8 +210,8 @@ private fun CodexCliSessionContent(
         val outcome = state.exportOutcome
         AppBanner(
             title = when (outcome) {
-                is CodexCliExportOutcome.Saved -> if (language == AppLanguage.PT) "Exportação concluída" else "Export complete"
-                is CodexCliExportOutcome.Failed -> if (language == AppLanguage.PT) "Falha na exportação" else "Export failed"
+                is CodexCliExportOutcome.Saved -> CommonLabels.exportDone(language)
+                is CodexCliExportOutcome.Failed -> CommonLabels.exportFailed(language)
             },
             description = when (outcome) {
                 is CodexCliExportOutcome.Saved -> outcome.path
@@ -285,7 +285,7 @@ private fun CodexSessionColumnHeader(language: AppLanguage) {
             modifier = Modifier.width(CODEX_SESSION_ID_COLUMN)
         )
         AppColumnHeaderLabel(
-            label = if (language == AppLanguage.PT) "Projeto" else "Project",
+            label = CliSessionsLabels.columnProject(language),
             modifier = Modifier.width(CODEX_SESSION_PROJECT_COLUMN)
         )
         AppColumnHeaderLabel(
@@ -297,11 +297,11 @@ private fun CodexSessionColumnHeader(language: AppLanguage) {
             modifier = Modifier.width(CODEX_SESSION_CACHE_COLUMN)
         )
         AppColumnHeaderLabel(
-            label = if (language == AppLanguage.PT) "Respostas" else "Responses",
+            label = CliSessionsLabels.responses(language),
             modifier = Modifier.width(CODEX_SESSION_RESPONSES_COLUMN)
         )
         AppColumnHeaderLabel(
-            label = if (language == AppLanguage.PT) "Modelo" else "Model",
+            label = CliSessionsLabels.columnModel(language),
             modifier = Modifier.width(CODEX_SESSION_MODEL_COLUMN)
         )
         AppColumnHeaderLabel(

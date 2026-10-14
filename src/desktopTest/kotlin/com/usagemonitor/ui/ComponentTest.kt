@@ -1962,6 +1962,29 @@ class ComponentTest {
     }
 
     /**
+     * O selo saía de um literal próprio que esquecia a OpenRouter; agora sai de
+     * `requiresLocalApiKey`, o mesmo predicado do filtro de arranque.
+     */
+    @Test
+    fun `ApiCheckboxRow shows the key badge for OpenRouter`() = runDesktopComposeUiTest {
+        var configured by mutableStateOf(false)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                ApiCheckboxRow(
+                    api = ApiSource.OPENROUTER,
+                    isChecked = true,
+                    hasConfiguredApiKey = configured,
+                    onCheckedChange = {}
+                )
+            }
+        }
+
+        onNodeWithText("Chave necessária").assertIsDisplayed()
+        configured = true
+        onNodeWithText("Chave configurada").assertIsDisplayed()
+    }
+
+    /**
      * Issue #125: fonte sem chave local não tem o que gerenciar, e um lápis que
      * abrisse um diálogo vazio seria pior que ícone nenhum.
      */

@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.TeamTrendRow
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamTurnUploadDto
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.TeamIngestPayload
@@ -172,7 +173,9 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
                 // ali significa "nenhum intervalo dentro do corte".
                 summary.copy(activeMillis = activeMillisByKey[deviceId to summary.sessionId] ?: 0L)
             }
-            .sortedByDescending { summary -> summary.lastTs }
+            // Mais recente primeiro; o id desempata duas sessões no mesmo carimbo,
+            // senão a ordem herdaria a da resposta e a lista mudaria sem dado mudar.
+            .sortedWith(compareByDescending<CliSessionSummary> { summary -> summary.lastTs }.thenBy { summary -> summary.sessionId })
     }
 
     val knownDeviceIds = members.map { member -> member.deviceId }.toSet()

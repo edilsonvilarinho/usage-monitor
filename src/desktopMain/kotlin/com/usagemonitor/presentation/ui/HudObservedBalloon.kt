@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.ui.components.observedPrimaryWindowLabel
+import com.usagemonitor.presentation.ui.components.observedUnitNoun
+import com.usagemonitor.presentation.ui.components.observedWeekWindowLabel
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.rememberScrollState
@@ -57,7 +60,6 @@ private const val COUNT_WEIGHT = 0.29f
 internal fun HudObservedBalloonContent(account: HudAccount, language: AppLanguage, maxBodyHeight: Dp) {
     val scroll = rememberScrollState()
     val tokens = account.observedModels.firstOrNull()?.unit == UsageUnit.TOKENS
-    val unit = if (tokens) "tokens" else if (language == AppLanguage.PT) "requisições" else "requests"
     Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
     Text(
         text = if (language == AppLanguage.PT) {
@@ -93,7 +95,7 @@ internal fun HudObservedBalloonContent(account: HudAccount, language: AppLanguag
                 .testTag(HUD_OBSERVED_MODELS_TAG)
         ) {
             account.observedModels.forEachIndexed { index, model ->
-                ObservedModelTableRow(model, language, unit, showDivider = index != account.observedModels.lastIndex)
+                ObservedModelTableRow(model, language, showDivider = index != account.observedModels.lastIndex)
             }
         }
         VerticalScrollbar(
@@ -112,17 +114,16 @@ internal fun HudObservedBalloonContent(account: HudAccount, language: AppLanguag
 }
 
 @Composable
-private fun ObservedModelTableRow(model: HudObservedModel, language: AppLanguage, unit: String, showDivider: Boolean) {
+private fun ObservedModelTableRow(model: HudObservedModel, language: AppLanguage, showDivider: Boolean) {
     val formatter = remember(language) {
         NumberFormat.getIntegerInstance(if (language == AppLanguage.PT) Locale.forLanguageTag("pt-BR") else Locale.US)
     }
     val fiveHours = formatter.format(model.amountFiveHours)
     val sevenDays = formatter.format(model.amountSevenDays)
-    val fiveLabel = if (language == AppLanguage.PT) "Últimas 5h" else "Last 5h"
-    val sevenLabel = if (language == AppLanguage.PT) "Últimos 7 dias" else "Last 7 days"
-    val singular = if (language == AppLanguage.PT) "requisição" else "request"
-    val fiveUnit = if (model.unit == UsageUnit.REQUESTS && model.amountFiveHours == 1L) singular else unit
-    val sevenUnit = if (model.unit == UsageUnit.REQUESTS && model.amountSevenDays == 1L) singular else unit
+    val fiveLabel = observedPrimaryWindowLabel(language)
+    val sevenLabel = observedWeekWindowLabel(language)
+    val fiveUnit = observedUnitNoun(model.amountFiveHours, model.unit, language)
+    val sevenUnit = observedUnitNoun(model.amountSevenDays, model.unit, language)
     val description = "${model.modelName}. $fiveLabel: $fiveHours $fiveUnit. $sevenLabel: $sevenDays $sevenUnit."
     HoverTooltipBox(
         title = model.modelName,

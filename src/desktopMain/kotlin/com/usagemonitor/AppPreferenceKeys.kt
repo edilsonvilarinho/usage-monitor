@@ -7,6 +7,7 @@ import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.requiresLocalApiKey
 
 /*
  * As chaves de preferência que o app lê e grava em `PreferencesSettings`, e a
@@ -17,18 +18,11 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 internal val DEFAULT_ENABLED_APIS = emptySet<ApiSource>()
 
 /**
- * Fontes cuja coleta exige uma chave em `~/.usage-monitor/api-keys.json`.
- *
- * Existe como constante e não como literal repetido no filtro de arranque porque
- * a mesma pergunta é feita nas Configurações (`requiresApiKey`) e no
- * `LocalApiKeyDataSource`: três donos do mesmo conjunto já seria demais.
+ * Fontes cuja coleta exige uma chave em `~/.usage-monitor/api-keys.json`, para o
+ * filtro de arranque. É projeção de [requiresLocalApiKey], o dono único do conjunto.
  */
-internal val API_KEY_DEPENDENT_SOURCES = setOf(
-    ApiSource.MINIMAX,
-    ApiSource.DEEPSEEK,
-    ApiSource.OPENCODE_GO,
-    ApiSource.OPENROUTER
-)
+internal val API_KEY_DEPENDENT_SOURCES: Set<ApiSource> =
+    ApiSource.entries.filter { source -> source.requiresLocalApiKey() }.toSet()
 
 internal const val ENABLED_APIS_KEY = "enabledApis"
 

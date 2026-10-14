@@ -39,7 +39,7 @@ internal object TelegramBotUsageMessages {
         }
         val lines = measured.map { (row, speed) ->
             val turns = row.turnCount?.let { count -> " · $count " + if (pt) "turnos" else "turns" }.orEmpty()
-            "<b>${TelegramBotMessages.escape(row.source.displayName(language))} · ${TelegramBotMessages.escape(row.label)}</b> — " +
+            "<b>${TelegramBotMessages.escape(row.source.displayName())} · ${TelegramBotMessages.escape(row.label)}</b> — " +
                 "<b>${speed.roundToInt()} tok/s</b>$turns"
         }
         val header = if (pt) "<b>⚡ Vazão de saída — 24 h</b>" else "<b>⚡ Output throughput — 24 h</b>"

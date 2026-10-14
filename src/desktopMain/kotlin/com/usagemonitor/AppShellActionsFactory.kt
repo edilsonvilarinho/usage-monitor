@@ -121,7 +121,7 @@ internal fun buildShellActions(
             // O rótulo é o do retrato (fonte e apelido), o mesmo do bot; nunca o e-mail cru.
             val stats = (dashboardState as? UiState.Success)?.data?.firstOrNull { item -> item.targetKey == target }
             modal.openAnalysis()
-            viewModels.analysis.openForAccount(target.storageKey, stats?.snapshotLabel ?: target.source.displayName(storedLanguage(graph.settings)))
+            viewModels.analysis.openForAccount(target.storageKey, stats?.snapshotLabel ?: target.source.displayName())
         },
         openTeamPresenceOverview = if (teamSettings.isAdminMode) {
             {

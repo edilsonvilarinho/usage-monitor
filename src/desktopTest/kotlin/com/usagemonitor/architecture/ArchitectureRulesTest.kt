@@ -19,6 +19,8 @@ import kotlin.test.fail
  *   [MAX_FUNCTION_LINES].
  * - Recorte nativo de janela (`window.shape`) só nos arquivos de
  *   [NATIVE_WINDOW_SHAPE_OWNERS] (issue #340).
+ * - Comparações de idioma inline (`== AppLanguage.PT`) não crescem: o teto
+ *   [INLINE_LANGUAGE_CHECKS_CEILING] só desce (plano `boas-praticas-377`).
  *
  * As listas de exceção **só encolhem**. O teto de cada item é o tamanho de hoje:
  * crescer falha, e diminuir também falha até o teto ser baixado — senão a folga
@@ -104,6 +106,72 @@ class ArchitectureRulesTest {
         assertFalse(NATIVE_WINDOW_SHAPE.containsMatchIn("if (window.shape == null) return"))
     }
 
+    /**
+     * Texto PT/EN repetido em cada tela divergiu (nove traduções inconsistentes
+     * na auditoria do plano `boas-praticas-377`). Texto novo passa por
+     * `localized(language, pt, en)` ou por um objeto de rótulos existente
+     * (`CommonLabels`, `CliSessionsLabels`…), nunca por comparação nova. A catraca
+     * vale para o projeto inteiro: arquivo tocado que migra baixa o teto.
+     */
+    @Test
+    fun `comparacao de idioma inline nao cresce`() {
+        val count = sources.sumOf { source ->
+            INLINE_LANGUAGE_CHECK.findAll(stripCommentsAndStrings(source.text)).count()
+        }
+        when {
+            count > INLINE_LANGUAGE_CHECKS_CEILING -> fail(
+                "Comparações `== AppLanguage.PT` em produção: $count (teto $INLINE_LANGUAGE_CHECKS_CEILING). " +
+                    "Use `localized(language, pt, en)` ou um objeto de rótulos existente."
+            )
+            count < INLINE_LANGUAGE_CHECKS_CEILING -> fail(
+                "Comparações `== AppLanguage.PT` caíram para $count. Baixe o teto de $INLINE_LANGUAGE_CHECKS_CEILING para $count."
+            )
+        }
+    }
+
+    /**
+     * O `toString` gerado de uma `data class` imprime todo campo — token, chave de
+     * API, senha — em log, relatório de bug e mensagem de exceção. Tipo com campo de
+     * segredo sobrescreve o `toString` com `redactedSecret` ou deixa de ser `data class`
+     * (precedente: `CursorSessionCredentials`). Campo de segredo com nome que o padrão
+     * não reconhece (as chaves por fonte de `ApiKeySettings`) depende de revisão.
+     */
+    @Test
+    fun `data class com campo de segredo redige o toString`() {
+        val violations = sources.flatMap { source ->
+            dataClassDeclarations(source.text)
+                .filter { declaration -> declaration.properties.any { property -> SECRET_PROPERTY.matches(property) } }
+                .filter { declaration -> !declaration.body.contains("override fun toString") }
+                .map { declaration -> "${source.path}: ${declaration.name}" }
+        }
+        if (violations.isNotEmpty()) {
+            fail("data class com segredo e toString gerado (use `redactedSecret`):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o scanner de data class le propriedades e corpo`() {
+        val source = """
+            data class Plain(val accessToken: String, val count: Int)
+
+            data class Safe(
+                val apiKey: String = "{",
+                var inputTokens: Long
+            ) : Marker {
+                override fun toString(): String = "Safe"
+            }
+        """.trimIndent()
+
+        val declarations = dataClassDeclarations(source).associateBy { declaration -> declaration.name }
+
+        assertEquals(listOf("accessToken", "count"), declarations.getValue("Plain").properties)
+        assertEquals("", declarations.getValue("Plain").body)
+        assertTrue(declarations.getValue("Safe").body.contains("override fun toString"))
+        assertTrue(SECRET_PROPERTY.matches("accessToken"))
+        assertTrue(SECRET_PROPERTY.matches("refresh_token"))
+        assertFalse(SECRET_PROPERTY.matches("inputTokens"))
+    }
+
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
         val violations = sources
             .filter { source -> source.path.substringAfter("/kotlin/").startsWith(layerPrefix) }
@@ -177,6 +245,14 @@ class ArchitectureRulesTest {
             "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/DesktopWindowFrame.kt"
         )
+
+        val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
+
+        /** Nome de campo que carrega segredo: `*Token`, `*_token`, `*ApiKey`, `password`, `*Secret`, `cookie`, `capSid`. */
+        val SECRET_PROPERTY = Regex("""(?i)\w*token|\w*apikey|password|\w*secret|cookie|capsid""")
+
+        /** Medido em 2026-10-14, depois de B1/B2 do plano `boas-praticas-377`. Só desce. */
+        const val INLINE_LANGUAGE_CHECKS_CEILING = 711
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FILE_CEILINGS: Map<String, Int> = emptyMap()

@@ -61,7 +61,7 @@ internal fun OpenCodeHistoryContent(report: ApiUsageHistoryReport, accentColor: 
                     HistorySummary(entries, selection)
                     HistoryProviderChart(model.modelName, openCodeHistorySubtitle(model.chartSeries.periodType, language), model.chartSeries, accentColor, language, selection)
                     HistoryDetailsSection(if (language == AppLanguage.PT) "Resumo da atividade" else "Activity summary", "historyMetrics:$selection", expanded, { expanded = !expanded }, language) {
-                        AppDataSurfaceFlush(header = { AppSectionHeader(title = if (language == AppLanguage.PT) "Atividade local" else "Local activity") }) {
+                        AppDataSurfaceFlush(header = { AppSectionHeader(title = CommonLabels.localActivity(language)) }) {
                             Column(Modifier.fillMaxWidth().padding(AppSpacing.md)) { HistoryMetricTable(entries) }
                         }
                     }

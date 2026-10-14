@@ -177,7 +177,11 @@ fun buildSessionAnalysis(
         heatDays = heatDays,
         days = days,
         slices = slices,
-        previous = fiveHourSeries?.let { item -> windowStart?.let { start -> compareWithPrevious(item, fivePoints, start, now, throughput) } },
+        previous = if (fiveHourSeries != null && windowStart != null) {
+            compareWithPrevious(fiveHourSeries, fivePoints, windowStart, now, throughput)
+        } else {
+            null
+        },
         modelSpeeds = throughput.byModel(now - 1.hours, now)
     )
 }

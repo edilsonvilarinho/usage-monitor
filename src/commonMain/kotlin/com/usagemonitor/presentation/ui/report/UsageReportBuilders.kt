@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.report
 
+import com.usagemonitor.presentation.ui.localized
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
@@ -503,85 +504,81 @@ internal fun formatTimestamp(instant: Instant, timeZone: TimeZone, includeZone: 
  */
 internal object ReportLabels {
 
-    private fun pick(language: AppLanguage, pt: String, en: String): String {
-        return if (language == AppLanguage.PT) pt else en
-    }
-
     fun cliTitle(language: AppLanguage) =
-        pick(language, "Relatório de uso — Sessões CLI", "Usage report — CLI sessions")
+        localized(language, "Relatório de uso — Sessões CLI", "Usage report — CLI sessions")
 
     fun teamTitle(language: AppLanguage) =
-        pick(language, "Relatório de uso — Sessões do time", "Usage report — Team sessions")
+        localized(language, "Relatório de uso — Sessões do time", "Usage report — Team sessions")
 
-    fun totals(language: AppLanguage) = pick(language, "Totais", "Totals")
+    fun totals(language: AppLanguage) = localized(language, "Totais", "Totals")
 
-    fun sessions(language: AppLanguage) = pick(language, "Sessões", "Sessions")
+    fun sessions(language: AppLanguage) = localized(language, "Sessões", "Sessions")
 
-    fun sessionsHeading(language: AppLanguage) = pick(language, "Sessões", "Sessions")
+    fun sessionsHeading(language: AppLanguage) = localized(language, "Sessões", "Sessions")
 
-    fun session(language: AppLanguage) = pick(language, "Sessão", "Session")
+    fun session(language: AppLanguage) = localized(language, "Sessão", "Session")
 
-    fun turns(language: AppLanguage) = pick(language, "Turnos", "Turns")
+    fun turns(language: AppLanguage) = localized(language, "Turnos", "Turns")
 
-    fun calls(language: AppLanguage) = pick(language, "Chamadas", "Calls")
+    fun calls(language: AppLanguage) = localized(language, "Chamadas", "Calls")
 
-    fun project(language: AppLanguage) = pick(language, "Projeto", "Project")
+    fun project(language: AppLanguage) = localized(language, "Projeto", "Project")
 
-    fun branch(language: AppLanguage) = pick(language, "Branch", "Branch")
+    fun branch(language: AppLanguage) = localized(language, "Branch", "Branch")
 
-    fun model(language: AppLanguage) = pick(language, "Modelo", "Model")
+    fun model(language: AppLanguage) = localized(language, "Modelo", "Model")
 
-    fun member(language: AppLanguage) = pick(language, "Integrante", "Member")
+    fun member(language: AppLanguage) = localized(language, "Integrante", "Member")
 
-    fun members(language: AppLanguage) = pick(language, "Integrantes ativos", "Active members")
+    fun members(language: AppLanguage) = localized(language, "Integrantes ativos", "Active members")
 
-    fun machine(language: AppLanguage) = pick(language, "Máquina", "Machine")
+    fun machine(language: AppLanguage) = localized(language, "Máquina", "Machine")
 
-    fun lastTurn(language: AppLanguage) = pick(language, "Último turno", "Last turn")
+    fun lastTurn(language: AppLanguage) = localized(language, "Último turno", "Last turn")
 
-    fun cacheSavings(language: AppLanguage) = pick(language, "Economia do cache", "Cache savings")
+    fun cacheSavings(language: AppLanguage) = localized(language, "Economia do cache", "Cache savings")
 
-    fun burnRate(language: AppLanguage) = pick(language, "Ritmo de queima", "Burn rate")
+    fun burnRate(language: AppLanguage) = localized(language, "Ritmo de queima", "Burn rate")
 
-    fun allAccounts(language: AppLanguage) = pick(language, "Todas as contas", "All accounts")
+    fun allAccounts(language: AppLanguage) = localized(language, "Todas as contas", "All accounts")
 
-    fun accountsByEmail(language: AppLanguage) = pick(language, "Resumo por e-mail", "Summary by email")
+    fun accountsByEmail(language: AppLanguage) = localized(language, "Resumo por e-mail", "Summary by email")
 
-    fun email(language: AppLanguage) = pick(language, "E-mail", "Email")
+    fun email(language: AppLanguage) = localized(language, "E-mail", "Email")
 
     fun uuid(language: AppLanguage) = "UUID"
 
     fun uuids(language: AppLanguage) = "UUIDs"
 
-    fun noEmail(language: AppLanguage) = pick(language, "Sem e-mail", "No email")
+    fun noEmail(language: AppLanguage) = localized(language, "Sem e-mail", "No email")
 
-    fun provisionalEmailNote(language: AppLanguage) = pick(
+    fun provisionalEmailNote(language: AppLanguage) = localized(
         language,
         "Alguns agrupamentos usam provisoriamente um rótulo administrativo com formato de e-mail.",
         "Some groups provisionally use an administrative label formatted as an email address."
     )
 
-    fun generatedAt(language: AppLanguage) = pick(language, "gerado em", "generated at")
+    fun generatedAt(language: AppLanguage) = localized(language, "gerado em", "generated at")
 
-    fun period(start: String, end: String, language: AppLanguage) = pick(
+    fun period(start: String, end: String, language: AppLanguage) = localized(
         language,
         "Período considerado: $start a $end",
         "Period considered: $start to $end"
     )
 
-    fun allHistoryUntil(end: String, language: AppLanguage) = pick(
+    fun allHistoryUntil(end: String, language: AppLanguage) = localized(
         language,
         "Período considerado: todo o histórico disponível até $end",
         "Period considered: all available history until $end"
     )
 
-    fun activityNote(language: AppLanguage) = pick(
+    fun activityNote(language: AppLanguage) = localized(
         language,
         "Intensidade pelo custo, relativa ao pico desta janela. Hora local (BRT).",
         "Intensity by cost, relative to this window's peak. Local time (BRT)."
     )
 
-    fun activeTimeNote(language: AppLanguage) = pick(
+    fun activeTimeNote(language: AppLanguage) = localized(
         language,
         "Tempo ativo não é duração: soma só os intervalos entre turnos seguidos menores que cinco " +
             "minutos, e ignora os turnos de subagente.",
@@ -589,13 +586,13 @@ internal object ReportLabels {
             "five minutes, and ignores subagent turns."
     )
 
-    fun activeTimeUnavailable(language: AppLanguage) = pick(
+    fun activeTimeUnavailable(language: AppLanguage) = localized(
         language,
         "Tempo ativo não medido: o servidor de time é anterior à versão 0.7.0.",
         "Active time not measured: the team server predates version 0.7.0."
     )
 
-    fun slidingWindowNote(language: AppLanguage) = pick(
+    fun slidingWindowNote(language: AppLanguage) = localized(
         language,
         "Visão de todas as contas: cada conta reseta a quota numa hora diferente, então o recorte " +
             "aqui é deslizante e não corresponde à janela de nenhuma delas.",
@@ -604,7 +601,7 @@ internal object ReportLabels {
     )
 
     fun page(current: Int, total: Int, language: AppLanguage) =
-        pick(language, "Página $current de $total", "Page $current of $total")
+        localized(language, "Página $current de $total", "Page $current of $total")
 
-    fun continued(language: AppLanguage) = pick(language, "continuação", "continued")
+    fun continued(language: AppLanguage) = localized(language, "continuação", "continued")
 }

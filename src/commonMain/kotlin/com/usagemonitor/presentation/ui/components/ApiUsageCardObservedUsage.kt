@@ -76,9 +76,9 @@ internal fun ObservedUsageSummary(
                         "Usage appears when Gemini CLI records local sessions with token counts."
                     }
                 } else if (language == AppLanguage.PT) {
-                    "Abra o ${source.displayName(language)} e use um modelo free para começar a preencher este card."
+                    "Abra o ${source.displayName()} e use um modelo free para começar a preencher este card."
                 } else {
-                    "Use a free ${source.displayName(language)} model to start populating this card."
+                    "Use a free ${source.displayName()} model to start populating this card."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

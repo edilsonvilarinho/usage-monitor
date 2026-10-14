@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -43,7 +44,12 @@ private data class TelegramSettingsDto(
     val livePanelEnabled: Boolean = false,
     val panelMessages: List<TelegramPanelMessageDto> = emptyList(),
     val preferences: TelegramPreferencesDto = TelegramPreferencesDto()
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "TelegramSettingsDto(enabled=$enabled, botToken=${redactedSecret(botToken)}, chats=${authorizedChats.size}, " +
+            "pairingCode=${redactedSecret(pairingCode)})"
+}
 
 /**
  * `~/.usage-monitor/telegram.json` (#387). Arquivo de segredo pelo mesmo motivo

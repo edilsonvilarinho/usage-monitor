@@ -41,6 +41,11 @@ internal class TelegramBotReadings(
      * integração de time; falha é o servidor que não respondeu.
      */
     val teamPresence: suspend () -> Result<List<TeamMemberPresence>>? = { null },
+    /**
+     * Desvio medido do relógio do servidor do time. O "visto há" do `/time` subtrai
+     * `lastSeenAt`, carimbo do servidor, do agora do servidor — nunca do relógio local.
+     */
+    val teamClockOffsetMillis: () -> Long = { 0L },
     /** AA17: a versão baixada e conferida, pronta para instalar; `null` sem nenhuma. */
     val readyUpdate: () -> String? = { null },
     /** AA17: fecha o app e instala a versão pronta — o mesmo botão da faixa do app. */

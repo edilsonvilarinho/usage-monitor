@@ -17,6 +17,11 @@ data class ProxySettings(
     val username: String = "",
     val password: String = ""
 ) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "ProxySettings(useEnvironmentProxy=$useEnvironmentProxy, host=$host, port=$port, username=$username, " +
+            "password=${redactedSecret(password)})"
+
     val isManualConfigured: Boolean
         get() = host.isNotBlank() && port in 1..65535
 
@@ -35,7 +40,11 @@ data class ProxyEnvironmentConfig(
     val port: Int,
     val username: String? = null,
     val password: String? = null
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "ProxyEnvironmentConfig(scheme=$scheme, host=$host, port=$port, username=$username, password=${redactedSecret(password)})"
+}
 
 /**
  * Parser puro de `HTTP_PROXY`/`HTTPS_PROXY` no formato

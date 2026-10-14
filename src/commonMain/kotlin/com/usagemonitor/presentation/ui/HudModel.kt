@@ -13,6 +13,7 @@ import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.domain.entity.saturatingAdd
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -23,6 +24,8 @@ import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.buildObservedUsageSummaries
 import com.usagemonitor.presentation.ui.components.compactObservedCount
 import com.usagemonitor.presentation.ui.components.localizedObservedCount
+import com.usagemonitor.presentation.ui.components.observedPrimaryWindowLabel
+import com.usagemonitor.presentation.ui.components.observedWeekWindowLabel
 import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
 import com.usagemonitor.presentation.ui.components.hudQuotaShortLabel
@@ -149,8 +152,7 @@ data class HudAccount(
             if (source.isObservedActivitySource()) {
                 val unit = observedModels.firstOrNull()?.unit ?: UsageUnit.REQUESTS
                 val amount = observedModels.fold(0L) { total, model ->
-                    val value = model.amountFiveHours.coerceAtLeast(0L)
-                    if (Long.MAX_VALUE - total < value) Long.MAX_VALUE else total + value
+                    saturatingAdd(total, model.amountFiveHours.coerceAtLeast(0L))
                 }
                 return HudStripLine("5h", compactObservedCount(amount, unit))
             }
@@ -309,9 +311,9 @@ internal fun hudRingDescription(account: HudAccount, language: AppLanguage): Str
         append(account.statusLabel)
         account.observedModels.forEach { model ->
             append(" · ${model.modelName}")
-            append(if (language == AppLanguage.PT) " · Últimas 5h: " else " · Last 5h: ")
+            append(" · ${observedPrimaryWindowLabel(language)}: ")
             append(localizedObservedCount(model.amountFiveHours, model.unit, language))
-            append(if (language == AppLanguage.PT) " · Últimos 7 dias: " else " · Last 7 days: ")
+            append(" · ${observedWeekWindowLabel(language)}: ")
             append(localizedObservedCount(model.amountSevenDays, model.unit, language))
         }
         rings.forEachIndexed { index, quota ->
@@ -383,7 +385,7 @@ internal fun buildHudAccounts(
                 targetKey = target,
                 label = first.stats.displayTitle(),
                 statusLabel = if (observed) {
-                    if (language == AppLanguage.PT) "Atividade local" else "Local activity"
+                    CommonLabels.localActivity(language)
                 } else worst?.risk?.let { risk -> riskLevelLabel(risk.level, language) } ?: noForecast,
                 tone = if (observed) AppTone.NEUTRAL else worst?.risk?.let { risk -> toneFor(risk.level) } ?: AppTone.NEUTRAL,
                 quotas = quotas,

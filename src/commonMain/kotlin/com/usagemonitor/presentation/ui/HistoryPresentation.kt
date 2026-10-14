@@ -14,7 +14,7 @@ import kotlin.time.Instant
 internal fun deepSeekMetricEntries(series: UsageHistorySeries, language: AppLanguage, referenceAt: Instant?): List<HistoryMetricEntry> {
     val pt = language == AppLanguage.PT
     return buildList {
-        add(HistoryMetricEntry(if (pt) "Saldo atual" else "Current balance", formatCents(series.currentDisplayUsed)))
+        add(HistoryMetricEntry(CommonLabels.currentBalance(language), formatCents(series.currentDisplayUsed)))
         add(HistoryMetricEntry(if (pt) "Gasto no período" else "Spent in range", formatCents(series.deltaDisplayUsed)))
         add(HistoryMetricEntry(if (pt) "Ritmo médio" else "Average pace", formatCents(series.averageDisplayConsumptionPerHour.toLong()) + "/h"))
         if (referenceAt != null) add(HistoryMetricEntry(if (pt) "Última coleta" else "Last snapshot", formatInstant(referenceAt)))
@@ -35,9 +35,15 @@ internal fun observedMetricEntries(model: OpenCodeHistoryModelReport, language: 
     )
 }
 
+/**
+ * DeepSeek e as fontes de atividade observada montam os próprios cards de histórico:
+ * sem seletor de janela e sem recorte de séries por família de cota.
+ */
+internal fun ApiSource.buildsOwnHistoryCards(): Boolean = this == ApiSource.DEEPSEEK || isObservedActivitySource()
+
 /** A mesma seleção de cotas do gráfico; séries independentes permanecem no relatório. */
 internal fun selectedHistorySeries(state: HistoryUiState.Success): List<UsageHistorySeries> {
-    if (state.report.source == ApiSource.DEEPSEEK || state.report.source.isObservedActivitySource()) return state.report.series
+    if (state.report.source.buildsOwnHistoryCards()) return state.report.series
     return buildGenericHistoryGroups(state.report.series).flatMap { group ->
         val weekly = group.weeklySummary
         when {

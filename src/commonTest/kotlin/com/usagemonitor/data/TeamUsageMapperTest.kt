@@ -155,6 +155,18 @@ class TeamUsageMapperTest {
     }
 
     @Test
+    fun `sessoes no mesmo carimbo saem na mesma ordem qualquer que seja a da resposta`() {
+        fun sessionIds(rows: List<TeamUsageRowDto>) =
+            TeamSnapshotDto(members = listOf(member()), rows = rows).toDomain().members.single().sessions.map { it.sessionId }
+        val newer = row(sessionId = "s-new", lastTs = 9_000L)
+        val tieB = row(sessionId = "s-b", lastTs = 2_000L)
+        val tieA = row(sessionId = "s-a", lastTs = 2_000L)
+
+        assertEquals(listOf("s-new", "s-a", "s-b"), sessionIds(listOf(tieB, newer, tieA)))
+        assertEquals(listOf("s-new", "s-a", "s-b"), sessionIds(listOf(tieA, tieB, newer)))
+    }
+
+    @Test
     fun `agrupa sessoes por maquina`() {
         val snapshot = TeamSnapshotDto(
             members = listOf(member(), member(deviceId = "device-2", alias = "maria", hostName = "NOTE-B2")),

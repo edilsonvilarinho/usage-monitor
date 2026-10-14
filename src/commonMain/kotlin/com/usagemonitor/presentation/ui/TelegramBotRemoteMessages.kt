@@ -33,7 +33,7 @@ internal object TelegramBotRemoteMessages {
         if (allowed) {
             return header + "\n" + (if (pt) "Toque para ligar ou desligar." else "Tap to turn on or off.")
         }
-        val lines = ApiSource.entries.joinToString("\n") { source -> mark(source in enabled) + " " + TelegramBotMessages.escape(source.displayName(language)) }
+        val lines = ApiSource.entries.joinToString("\n") { source -> mark(source in enabled) + " " + TelegramBotMessages.escape(source.displayName()) }
         val hint = if (pt) {
             "<i>Mudar fontes pelo bot está desligado em Configurações › Alertas › Bot do Telegram.</i>"
         } else {
@@ -45,12 +45,12 @@ internal object TelegramBotRemoteMessages {
     /** Um botão por fonte, duas por linha; o rótulo diz o estado atual. */
     fun sourceButtons(enabled: Set<ApiSource>, language: AppLanguage): List<List<Pair<String, String>>> =
         ApiSource.entries
-            .map { source -> (mark(source in enabled) + " " + source.displayName(language)) to BotTap.Source(source).data() }
+            .map { source -> (mark(source in enabled) + " " + source.displayName()) to BotTap.Source(source).data() }
             .chunked(SOURCE_BUTTONS_PER_ROW)
 
     fun sourceToggled(source: ApiSource, nowEnabled: Boolean, language: AppLanguage): String {
         val pt = language == AppLanguage.PT
-        val name = "<b>" + TelegramBotMessages.escape(source.displayName(language)) + "</b>"
+        val name = "<b>" + TelegramBotMessages.escape(source.displayName()) + "</b>"
         return when {
             nowEnabled && pt -> "✅ $name ligada. A primeira leitura chega na próxima coleta."
             nowEnabled -> "✅ $name on. Its first reading comes with the next collection."

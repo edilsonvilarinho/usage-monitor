@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.domain.entity.TeamIngestPayload
@@ -56,7 +57,11 @@ internal data class ConfirmedIdentity(
     val alias: String,
     val apiKey: String,
     val accountEmail: String?
-)
+) {
+    /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
+    override fun toString(): String =
+        "ConfirmedIdentity(alias=$alias, apiKey=${redactedSecret(apiKey)}, accountEmail=$accountEmail)"
+}
 
 /**
  * A frase do servidor quando ele **recusou esta conta**, ou `null`.

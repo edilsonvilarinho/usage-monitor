@@ -169,7 +169,7 @@ fun DashboardScreen(
             if (stats != null) {
                 coroutineScope.launch {
                     val message = runCatching { exportAction(stats) }.fold(
-                        onSuccess = { path -> path?.let { ExportLabels.exportSaved(it, language) } },
+                        onSuccess = { path -> if (path == null) null else ExportLabels.exportSaved(path, language) },
                         onFailure = { error ->
                             onExportFailure(error)
                             ExportLabels.exportFailed(error.message ?: UNKNOWN_ERROR_MESSAGE, language)

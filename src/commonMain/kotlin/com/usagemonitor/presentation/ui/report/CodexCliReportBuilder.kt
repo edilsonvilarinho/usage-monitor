@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui.report
 
+import com.usagemonitor.presentation.ui.BreakdownLabels
 import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
@@ -36,12 +37,12 @@ fun reportForCodexCliSessions(
         heading = ReportLabels.totals(language),
         entries = listOf(
             UsageReportEntry(ReportLabels.sessions(language), sessions.size.toString()),
-            UsageReportEntry(if (pt) "Respostas" else "Responses", sessions.sumOf { it.responseCount }.toString()),
+            UsageReportEntry(CliSessionsLabels.responses(language), sessions.sumOf { it.responseCount }.toString()),
             UsageReportEntry(CliSessionsLabels.columnTokens(language), formatQuantity(sessions.sumOf { it.totalTokens })),
             UsageReportEntry(CliSessionsLabels.throughput(language), formatThroughput(throughput))
         )
     )
-    sections += bucketSection(if (pt) "Por projeto" else "By project", ReportLabels.project(language), codexBucketsBy(sessions) { it.projectName }, language)
+    sections += bucketSection(BreakdownLabels.byProject(language), ReportLabels.project(language), codexBucketsBy(sessions) { it.projectName }, language)
     sections += bucketSection(
         if (pt) "Por modelo principal da sessão" else "By session primary model",
         ReportLabels.model(language),
@@ -54,7 +55,7 @@ fun reportForCodexCliSessions(
             UsageReportColumn(ReportLabels.session(language), weight = 1.4f),
             UsageReportColumn(ReportLabels.project(language), weight = 1.6f),
             UsageReportColumn(ReportLabels.model(language), weight = 1.5f),
-            UsageReportColumn(if (pt) "Respostas" else "Responses", weight = 0.9f, alignEnd = true),
+            UsageReportColumn(CliSessionsLabels.responses(language), weight = 0.9f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.1f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.throughput(language), weight = 1f, alignEnd = true)
         ),
@@ -103,7 +104,7 @@ private fun bucketSection(
         columns = listOf(
             UsageReportColumn(axisLabel, weight = 2f),
             UsageReportColumn(ReportLabels.sessions(language), weight = 0.8f, alignEnd = true),
-            UsageReportColumn(if (pt) "Respostas" else "Responses", weight = 0.9f, alignEnd = true),
+            UsageReportColumn(CliSessionsLabels.responses(language), weight = 0.9f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.columnTokens(language), weight = 1.1f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.columnCache(language), weight = 0.8f, alignEnd = true),
             UsageReportColumn(CliSessionsLabels.throughput(language), weight = 1f, alignEnd = true)

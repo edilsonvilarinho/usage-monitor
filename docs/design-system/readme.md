@@ -255,6 +255,32 @@ permanent green dot is decoration.
 | `SKILL.md` | Agent Skills entry point |
 | `compose-implementation.md` | How the tokens, depth, motion, modals, type and primitives are built in Compose, with the decisions and measurements behind them (PT; moved from `CLAUDE.md`) |
 
+### Compose names
+
+Most components here carry the prototype's name; the Compose primitive that implements them
+sometimes has another. An audit on 2026-10-14 (`docs/planos/boas-praticas-377-execucao.md`, F2)
+found 16 public `App*` composables whose name no contract cited. Where each one is specified:
+
+| Compose (`presentation/ui/components/`) | Contract |
+| --- | --- |
+| `AppWindowScaffold` | `shell/AppWindowFrame` — the body only: background, margin, status bar. The title bar is `DesktopDialogFrame` (desktop) |
+| `AppDataSurface` | `core/AppPanel` |
+| `AppDataSurfaceFlush` | `core/AppPanel`, `AppPanelBody flush` |
+| `AppSectionHeader` | `core/AppPanel`, `AppPanelHeader` |
+| `AppSourceMarker` | `core/AppSourceMark` |
+| `AppMetricBlock` | `core/AppMetric` |
+| `AppAnimatedNumber` | `core/AppMetric`, **Motion** |
+| `AppTooltip` | `core/AppTooltipSurface` — the plain-text tooltip, one of the four owners it names |
+| `AppColumnHeaderRow` | `data/AppDataTable`, `data/AppColumnHeader` |
+| `AppColumnHeaderLabel` | `data/AppColumnHeader` |
+| `AppCellValue` | `data/AppDataTable` |
+| `AppDivider`, `AppVerticalDivider` | *Visual foundations → Borders and dividers*, above |
+| `AppModalRevealScope` | `shell/AppModalRevealRow`, **Replay on content change** |
+| `AppExpandable` | `feedback/AppBanner` describes its one use (the update strip); **no contract of its own** |
+| `AppToggleChip` | **No contract** — `forms/AppSwatchChip` only names it as the contrast ("switches one restriction on or off") |
+
+The last two are open gaps: a contract for each is design work, not a rename.
+
 ### Intentional additions
 
 The prototype names 17 shared primitives but does not enumerate them all. Beyond the ones it

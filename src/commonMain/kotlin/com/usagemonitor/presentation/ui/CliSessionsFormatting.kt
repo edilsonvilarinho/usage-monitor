@@ -162,7 +162,7 @@ internal object CliSessionsLabels {
     }
 
     fun back(language: AppLanguage): String {
-        return if (language == AppLanguage.PT) "Voltar" else "Back"
+        return CommonLabels.back(language)
     }
 
     fun copyResumeCommand(language: AppLanguage): String {
@@ -236,6 +236,15 @@ internal object CliSessionsLabels {
 
     fun columnProject(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Projeto" else "Project"
+    }
+
+    fun columnModel(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Modelo" else "Model"
+    }
+
+    /** Respostas do modelo num turno do Codex (tela, resumo e PDF). */
+    fun responses(language: AppLanguage): String {
+        return if (language == AppLanguage.PT) "Respostas" else "Responses"
     }
 
     fun columnWhen(language: AppLanguage): String {

@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.usagemonitor.domain.entity.AppLanguage
@@ -63,7 +64,7 @@ internal fun BugReportWindow(
     val close = { modal.isBugReportOpen = false }
     AppDialogWindow(
         visible = modal.isBugReportOpen,
-        title = if (language == AppLanguage.PT) "Reportar um bug" else "Report a bug",
+        title = CommonLabels.reportBug(language),
         state = windows.bugReport,
         environment = environment,
         diagnosticName = "relatório de bug",
