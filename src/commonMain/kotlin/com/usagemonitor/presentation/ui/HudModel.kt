@@ -23,6 +23,8 @@ import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.buildObservedUsageSummaries
 import com.usagemonitor.presentation.ui.components.compactObservedCount
 import com.usagemonitor.presentation.ui.components.localizedObservedCount
+import com.usagemonitor.presentation.ui.components.observedPrimaryWindowLabel
+import com.usagemonitor.presentation.ui.components.observedWeekWindowLabel
 import com.usagemonitor.presentation.ui.components.displayTitle
 import com.usagemonitor.presentation.ui.components.expandedQuotaTitle
 import com.usagemonitor.presentation.ui.components.hudQuotaShortLabel
@@ -309,9 +311,9 @@ internal fun hudRingDescription(account: HudAccount, language: AppLanguage): Str
         append(account.statusLabel)
         account.observedModels.forEach { model ->
             append(" · ${model.modelName}")
-            append(if (language == AppLanguage.PT) " · Últimas 5h: " else " · Last 5h: ")
+            append(" · ${observedPrimaryWindowLabel(language)}: ")
             append(localizedObservedCount(model.amountFiveHours, model.unit, language))
-            append(if (language == AppLanguage.PT) " · Últimos 7 dias: " else " · Last 7 days: ")
+            append(" · ${observedWeekWindowLabel(language)}: ")
             append(localizedObservedCount(model.amountSevenDays, model.unit, language))
         }
         rings.forEachIndexed { index, quota ->

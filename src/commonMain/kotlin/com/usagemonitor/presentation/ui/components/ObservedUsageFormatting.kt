@@ -23,14 +23,17 @@ internal fun localizedObservedCount(
     unit: UsageUnit,
     language: AppLanguage
 ): String {
-    val noun = when {
-        unit == UsageUnit.TOKENS && language == AppLanguage.PT -> "tokens"
+    val amount = if (unit == UsageUnit.TOKENS) abbreviate(value) else value.toString()
+    return "$amount ${observedUnitNoun(value, unit, language)}"
+}
+
+/** O substantivo da contagem observada, no plural certo para [value]: "tokens", "requisição", "requisições". */
+internal fun observedUnitNoun(value: Long, unit: UsageUnit, language: AppLanguage): String {
+    return when {
         unit == UsageUnit.TOKENS -> "tokens"
         language == AppLanguage.PT -> if (value == 1L) "requisição" else "requisições"
         else -> if (value == 1L) "request" else "requests"
     }
-    val amount = if (unit == UsageUnit.TOKENS) abbreviate(value) else value.toString()
-    return "$amount $noun"
 }
 
 internal fun compactObservedCount(value: Long, unit: UsageUnit): String {
@@ -43,6 +46,14 @@ internal fun compactObservedCount(value: Long, unit: UsageUnit): String {
 
 internal fun observedPrimaryWindowLabel(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Últimas 5h" else "Last 5h"
+}
+
+/**
+ * A janela semanal por extenso, como no balão do HUD e na sua descrição acessível.
+ * O tooltip do card usa a forma curta "Últimos 7d" por espaço (`AppHudBar.prompt.md`).
+ */
+internal fun observedWeekWindowLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Últimos 7 dias" else "Last 7 days"
 }
 
 internal fun observedSecondaryWindowLabel(
