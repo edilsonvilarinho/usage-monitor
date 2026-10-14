@@ -18,6 +18,7 @@ import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
 import com.usagemonitor.presentation.ui.HelpWindow
 import com.usagemonitor.presentation.ui.OnboardingGuideWindow
+import com.usagemonitor.presentation.ui.StartupTipWindow
 import com.usagemonitor.presentation.ui.HistoryScreen
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
 import com.usagemonitor.presentation.ui.ReleaseNotesWindow
@@ -213,7 +214,9 @@ internal fun ModalWindowsHost(
         onReplayGuide = {
             modal.isHelpOpen = false
             startupGuide.openGuide()
-        }
+        },
+        requestedTopic = modal.helpTopic,
+        openGeneration = modal.helpOpenGeneration
     )
 
     // Guia de introdução (#411): sozinho na primeira abertura depois de
@@ -224,6 +227,22 @@ internal fun ModalWindowsHost(
         language = language,
         environment = environment,
         onCloseRequest = { startupGuide.closeGuide() }
+    )
+
+    // Dica do dia (#411): uma por dia, sem disputar a abertura com o guia nem
+    // com as Novidades — a decisão mora no controlador.
+    StartupTipWindow(
+        tipIndex = startupGuide.tipIndex,
+        tipsEnabled = startupGuide.tipsEnabled,
+        language = language,
+        environment = environment,
+        onTipsEnabledChange = startupGuide::updateTipsEnabled,
+        onNext = startupGuide::nextTip,
+        onOpenHelp = { topic ->
+            startupGuide.closeTip()
+            modal.openHelp(topic)
+        },
+        onCloseRequest = startupGuide::closeTip
     )
 
     // Sem notas ela não compõe nada; a decisão inteira mora no controlador.

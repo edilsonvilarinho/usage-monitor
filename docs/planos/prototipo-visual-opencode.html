@@ -623,6 +623,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#chrome">Molduras e densidade</a>
   <a href="#ajuda">Ajuda</a>
   <a href="#guia">Guia de introdução</a>
+  <a href="#dica">Dica do dia</a>
   <a href="#checklist">Checklist de aprovação</a>
 </nav>
 
@@ -2136,6 +2137,8 @@ TOKENS/s (1 h)  claude-sonnet 71 · claude-opus 48</pre></div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Inicialização e bandeja</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Inicialização com Sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Anel de uso na bandeja</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta.</span></div><span class="sw"></span></div>
+        <!-- Issue #411: dica do dia, ligada por padrão; o mesmo interruptor do modal da dica. -->
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Mostrar a dica do dia ao abrir</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda.</span></div><span class="sw on"></span></div>
       </div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Atualizações</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
@@ -2624,6 +2627,25 @@ O app fechou inesperadamente.
 <p class="note"><b>A ilustração é a demo real da Ajuda, não um desenho próprio.</b> O mockup da rodada AC usou emoji e uma moldura inventada; o usuário escolheu a AC4 com a ressalva de que aquele visual não era o do app. Por isso o cartão é o mesmo <code>HelpMediaFrame</code> da Ajuda e as primitivas de sempre (<code>AppSectionHeader</code>, <code>AppButton</code>), e o passo é escrito ("Passo 2 de 6") em vez de pontos — pontos seriam primitiva nova e forma sem palavra.</p>
 
 <p class="note"><b>Troca de cartão = revelação E9.</b> O mesmo <code>AppModalRevealScope</code> que a Ajuda usa ao trocar de tópico; com "Reduzir animações", troca seca. "Voltar" some no primeiro cartão em vez de ficar cinza.</p>
+
+<h2 id="dica">14d · Dica do dia</h2>
+<p class="lede">Issue #411, direção AC4 em tamanho menor. No máximo uma por dia (dia em BRT), na primeira abertura do dia — inclusive pelo início com o sistema, por decisão do usuário —, sempre depois da HUD e nunca na mesma abertura das Novidades ou do guia. 24 dicas em roda, sem repetir até esgotar. Janela em 680 × 560 dp, mínimo 480 × 420 dp.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Dica do dia</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--info)"></span><span class="ptitle">Bot do Telegram</span><span class="psub">Dica 3 de 24</span></div><div class="pbody">
+      <div style="height:200px;border:1px solid var(--border);border-radius:var(--r6);background:var(--raised);display:flex;align-items:center;justify-content:center"><span class="k">demo · help/telegram-bot.gif · reduzida</span></div>
+      <span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg)">Em Configurações → "Alertas" → "Bot do Telegram", os avisos e o /status chegam no celular.</span>
+    </div></div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Mostrar a dica do dia ao abrir</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda.</span></div><span class="sw on"></span></div>
+    </div></div>
+    <div class="hstack"><button class="btn ghost" type="button">Ver na Ajuda</button><span class="sp"></span><button class="btn" type="button">Próxima dica</button><button class="btn primary" type="button">Fechar</button></div>
+  </div>
+</div>
+
+<p class="note"><b>Título = tópico da Ajuda, demo = a do tópico.</b> "Ver na Ajuda" fecha a dica e abre a Ajuda já nesse tópico (<code>AppModalState.openHelp(topic)</code>). O interruptor é o mesmo de Configurações › Sistema — desligar aqui desliga lá. Primária é "Fechar": a dica informa, como as Novidades.</p>
 
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>

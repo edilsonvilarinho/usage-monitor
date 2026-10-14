@@ -28,6 +28,8 @@ internal fun SystemSettingsTab(
     onReportBug: () -> Unit,
     trayUsageRing: Boolean,
     onTrayUsageRingChange: (Boolean) -> Unit,
+    startupTipsEnabled: Boolean,
+    onStartupTipsEnabledChange: (Boolean) -> Unit,
     receiveBetaUpdates: Boolean,
     onReceiveBetaUpdatesChange: (Boolean) -> Unit
 ) {
@@ -46,7 +48,13 @@ internal fun SystemSettingsTab(
         TrayUsageRingToggle(
             enabled = trayUsageRing,
             language = currentLanguage,
-            onToggle = onTrayUsageRingChange,
+            onToggle = onTrayUsageRingChange
+        )
+        // Também é "o que o app faz ao abrir": a dica do dia (#411).
+        StartupTipsToggle(
+            enabled = startupTipsEnabled,
+            language = currentLanguage,
+            onToggle = onStartupTipsEnabledChange,
             showDivider = false
         )
     }

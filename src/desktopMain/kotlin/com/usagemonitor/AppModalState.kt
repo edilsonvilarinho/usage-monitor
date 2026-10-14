@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.presentation.ui.help.HelpTopic
 
 /**
  * Quais janelas modais estão abertas, e sobre o quê.
@@ -20,6 +21,12 @@ internal class AppModalState(bugReportOpenAtStart: Boolean) {
     var settingsOpenGeneration by mutableStateOf(0)
         private set
     var isHelpOpen by mutableStateOf(false)
+    var helpOpenGeneration by mutableStateOf(0)
+        private set
+
+    /** Tópico pedido por quem abriu a Ajuda ("Ver na Ajuda" da dica, #411); `null` é o primeiro. */
+    var helpTopic by mutableStateOf<HelpTopic?>(null)
+        private set
     var isBugReportOpen by mutableStateOf(bugReportOpenAtStart)
     var isTeamKeysOpen by mutableStateOf(false)
 
@@ -66,6 +73,12 @@ internal class AppModalState(bugReportOpenAtStart: Boolean) {
 
     /** Por que o último diretório Codex não entrou (issue #329); some na próxima tentativa. */
     var codexProfileError by mutableStateOf<String?>(null)
+
+    fun openHelp(topic: HelpTopic? = null) {
+        helpTopic = topic
+        isHelpOpen = true
+        helpOpenGeneration++
+    }
 
     fun openSettings() {
         isSettingsOpen = true

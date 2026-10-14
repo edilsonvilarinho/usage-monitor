@@ -187,6 +187,11 @@ Plano e pontos de situação em `docs/planos/issues-411-412-execucao.md`; galeri
   (`AppModalRevealScope`). A marca é gravada **ao abrir**. Reabre do primeiro cartão por "Rever guia de
   introdução" (rodapé da Ajuda e menu da bandeja). **Desvio**: o plano previa também a engrenagem; o
   balão dela não ganhou botão (a Ajuda já está nele, e o balão tem dona única — `hud-notch.md`).
+- **Dica do dia** (`StartupTipCatalog`, `StartupTipContent`, `StartupTipWindow`): 24 dicas em roda, cada
+  uma com rótulo real e `HelpTopic`; título e demo são do tópico; "Ver na Ajuda" abre a Ajuda nele
+  (`AppModalState.openHelp`). Data e índice gravados ao abrir; "Próxima dica" anda a roda. O interruptor
+  `StartupTipsToggle` é o mesmo no modal e em Configurações › Sistema ("Inicialização e bandeja"), um
+  valor só no controlador. Nasce ligada; vale também na abertura pelo `--autostart` (decisão do usuário).
 
 ## Sistema visual — janelas, cards e tooltips
 

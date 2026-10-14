@@ -23,6 +23,7 @@ import com.usagemonitor.update.ensureLinuxMenuIconCurrent
 import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.onboarding.rememberStartupGuideController
+import com.usagemonitor.presentation.ui.help.StartupTipCatalog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -151,7 +152,7 @@ internal fun runUsageMonitor(
         settings = settings,
         receipt = autoUpdate.lastReceipt,
         ready = hudShown,
-        tipCount = 0
+        tipCount = StartupTipCatalog.tips.size
     )
     AppBackgroundWork(graph, viewModels, singleInstanceGuard)
 
@@ -303,7 +304,8 @@ internal fun runUsageMonitor(
         accountColors = accountColors,
         accountEmojis = accountEmojis,
         state = windows.settings,
-        environment = modalEnvironment.copy(prewarmReady = settingsPrewarmReady)
+        environment = modalEnvironment.copy(prewarmReady = settingsPrewarmReady),
+        startupGuide = startupGuide
     )
 }
 

@@ -38,7 +38,7 @@ internal fun buildShellActions(
         },
         openHelp = {
             breadcrumbs.recordScreenOpened("Ajuda")
-            modal.isHelpOpen = true
+            modal.openHelp()
         },
         openComparison = {
             breadcrumbs.recordScreenOpened("Comparar modelos e APIs")

@@ -74,7 +74,7 @@ internal fun ApplicationScope.AppTrayHost(
                 text = if (pt) "Ajuda" else "Help",
                 onClick = {
                     breadcrumbs.recordScreenOpened("Ajuda (bandeja)")
-                    modal.isHelpOpen = true
+                    modal.openHelp()
                 }
             )
             Item(
