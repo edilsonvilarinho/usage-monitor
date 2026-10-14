@@ -622,6 +622,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#pdf">Relatório PDF</a>
   <a href="#chrome">Molduras e densidade</a>
   <a href="#ajuda">Ajuda</a>
+  <a href="#guia">Guia de introdução</a>
   <a href="#checklist">Checklist de aprovação</a>
 </nav>
 
@@ -2603,6 +2604,26 @@ O app fechou inesperadamente.
 <p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Sistema", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola com o conteúdo, pela mesma razão de sempre: ele é o controle. Com 17 tópicos ele passa da altura mínima da janela, e por isso os itens rolam dentro do próprio trilho (#411), com o cabeçalho "Funcionalidades" parado.</p>
 
 <p class="note"><b>A demo de "Integrações e cotas" mostra a aba "APIs" (#411).</b> Ela gravava a grade de cards, que só existe nos testes desde que a HUD virou a única tela — a ajuda mostrava um layout que o usuário não tem.</p>
+
+<h2 id="guia">14c · Guia de introdução — carrossel ilustrado</h2>
+<p class="lede">Issue #411, direção AC4. Abre sozinho só na primeira abertura depois de instalar (sem marca das Novidades, sem marca do guia, sem recibo de instalador), depois de a HUD estar na tela; volta por "Rever guia de introdução" na Ajuda e na bandeja. Seis cartões, cada um apontando para um tópico da Ajuda. Janela em 1080 × 700 dp, mínimo 600 × 460 dp, sem pré-aquecimento.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Guia de introdução</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--info)"></span><span class="ptitle">Um anel por conta</span><span class="psub">Passo 1 de 6</span></div><div class="pbody">
+      <div style="height:260px;border:1px solid var(--border);border-radius:var(--r6);background:var(--raised);display:flex;align-items:center;justify-content:center"><span class="k">demo · help/window-modes.gif · a mesma da Ajuda · toca em laço</span></div>
+      <span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg)">Na barra HUD, o arco de fora é a janela semanal e o de dentro a de 5h; cor e palavra dizem o risco. O ponteiro sobre o anel abre o balão com as cotas e a hora do reinício, e um clique atualiza só aquela conta.</span>
+    </div></div>
+    <div class="hstack"><button class="btn ghost" type="button">Pular guia</button><span class="sp"></span><button class="btn primary" type="button">Próximo</button></div>
+  </div>
+</div>
+
+<p class="note"><b>Cartões, na ordem de uso:</b> Um anel por conta (Barra HUD) · Integrações · Avisos antes do limite (Alertas) · Avisos no celular (Bot do Telegram) · A HUD no navegador · Entender o ritmo (Análise da sessão). O último troca "Próximo" por "Concluir", perde "Pular guia" e cita onde o guia volta.</p>
+
+<p class="note"><b>A ilustração é a demo real da Ajuda, não um desenho próprio.</b> O mockup da rodada AC usou emoji e uma moldura inventada; o usuário escolheu a AC4 com a ressalva de que aquele visual não era o do app. Por isso o cartão é o mesmo <code>HelpMediaFrame</code> da Ajuda e as primitivas de sempre (<code>AppSectionHeader</code>, <code>AppButton</code>), e o passo é escrito ("Passo 2 de 6") em vez de pontos — pontos seriam primitiva nova e forma sem palavra.</p>
+
+<p class="note"><b>Troca de cartão = revelação E9.</b> O mesmo <code>AppModalRevealScope</code> que a Ajuda usa ao trocar de tópico; com "Reduzir animações", troca seca. "Voltar" some no primeiro cartão em vez de ficar cinza.</p>
 
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>

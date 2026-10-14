@@ -19,6 +19,7 @@ import kotlin.time.Clock
 import androidx.compose.ui.input.key.type
 import com.russhwolf.settings.Settings
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.presentation.ui.help.helpReplayGuideLabel
 
 /**
  * O ícone da bandeja: ponto de risco, resumo das contas no tooltip, menu com os
@@ -32,7 +33,9 @@ internal fun ApplicationScope.AppTrayHost(
     iconImage: Painter?,
     breadcrumbs: com.usagemonitor.domain.repository.BreadcrumbRecorder,
     onFocusHud: () -> Unit,
-    onQuit: () -> Unit
+    onQuit: () -> Unit,
+    /** "Rever guia de introdução" (#411). */
+    onOpenGuide: () -> Unit = {}
 ) {
     val language = shell.language
     val trayState = rememberTrayState()
@@ -72,6 +75,13 @@ internal fun ApplicationScope.AppTrayHost(
                 onClick = {
                     breadcrumbs.recordScreenOpened("Ajuda (bandeja)")
                     modal.isHelpOpen = true
+                }
+            )
+            Item(
+                text = helpReplayGuideLabel(language),
+                onClick = {
+                    breadcrumbs.recordScreenOpened("Guia de introdução (bandeja)")
+                    onOpenGuide()
                 }
             )
             Separator()

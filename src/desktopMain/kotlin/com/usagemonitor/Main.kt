@@ -22,6 +22,7 @@ import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.update.ensureLinuxMenuIconCurrent
 import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
+import com.usagemonitor.onboarding.rememberStartupGuideController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -143,6 +144,15 @@ internal fun runUsageMonitor(
         breadcrumbs = breadcrumbs
     )
     val viewModels = remember { AppViewModels(graph, autoUpdate) }
+    // Pré-aquecimento das modais e o guia de introdução esperam a HUD na tela.
+    var hudShown by remember { mutableStateOf(false) }
+    // Guia de introdução e dica do dia (#411): decide uma vez, com a HUD já na tela.
+    val startupGuide = rememberStartupGuideController(
+        settings = settings,
+        receipt = autoUpdate.lastReceipt,
+        ready = hudShown,
+        tipCount = 0
+    )
     AppBackgroundWork(graph, viewModels, singleInstanceGuard)
 
     val profileRecords by graph.profileRegistry.profiles.collectAsState()
@@ -212,7 +222,7 @@ internal fun runUsageMonitor(
     FocusRequestService(startup, focusHud)
 
     if (isTraySupported) {
-        AppTrayHost(viewModels, shell, modal, trayIconImage, breadcrumbs, focusHud, shutdownApplication)
+        AppTrayHost(viewModels, shell, modal, trayIconImage, breadcrumbs, focusHud, shutdownApplication, startupGuide::openGuide)
     }
 
     // As ações do rodapé moram no balão da engrenagem da barra HUD.
@@ -226,7 +236,6 @@ internal fun runUsageMonitor(
 
     // Pré-aquecimento das modais (ver `AppDialogWindow`): só depois de o arranque
     // assentar, para não disputar a CPU com ele.
-    var hudShown by remember { mutableStateOf(false) }
     var settingsPrewarmReady by remember { mutableStateOf(false) }
     var modalPrewarmReady by remember { mutableStateOf(false) }
     LaunchedEffect(hudShown) {
@@ -250,7 +259,7 @@ internal fun runUsageMonitor(
         breadcrumbs = breadcrumbs,
         prewarmReady = modalPrewarmReady
     )
-    ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamSettings, releaseNotes)
+    ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamSettings, releaseNotes, startupGuide)
     BugReportWindow(graph, shell, modal, pendingCrash, windows, modalEnvironment)
 
     // A barra HUD numa janela própria (`HudWindow.kt`): a única de visualização.

@@ -39,7 +39,9 @@ internal fun HelpWindow(
     visible: Boolean,
     language: AppLanguage,
     environment: ModalWindowEnvironment,
-    onCloseRequest: () -> Unit
+    onCloseRequest: () -> Unit,
+    /** "Rever guia de introdução" (#411): fecha a Ajuda e abre o guia do começo. */
+    onReplayGuide: (() -> Unit)? = null
 ) {
     val title = helpWindowTitle(language)
     var selectedTopic by remember { mutableStateOf(HelpCatalog.readingOrder.first()) }
@@ -76,7 +78,8 @@ internal fun HelpWindow(
             language = language,
             onClose = onCloseRequest,
             media = media,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onReplayGuide = onReplayGuide
         )
     }
 }
