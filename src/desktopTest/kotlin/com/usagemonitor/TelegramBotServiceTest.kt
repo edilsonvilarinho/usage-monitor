@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
@@ -48,9 +49,13 @@ import kotlin.time.Instant
  * As listas são `CopyOnWriteArrayList`, e não `Collections.synchronizedList`: o teste as
  * percorre (`api.sent.any { … }`) enquanto o serviço grava em outra thread, e percorrer a
  * lista sincronizada sem segurar o lock dava `ConcurrentModificationException` no CI.
+ *
+ * [pending] é fila com retirada atômica (#412): o lote antigo era `toList()` seguido de
+ * `clear()`, e o `+=` do teste não passava pelo lock — mensagem enfileirada entre os dois
+ * era apagada sem ser entregue, e o `waitUntil` seguinte estourava.
  */
 private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("") })) {
-    val pending = CopyOnWriteArrayList<TelegramIncomingMessage>()
+    val pending = ConcurrentLinkedQueue<TelegramIncomingMessage>()
     val sent = CopyOnWriteArrayList<Pair<Long, String>>()
     val keyboards = CopyOnWriteArrayList<List<TelegramButton>>()
     private val nextMessageId = AtomicInteger(800)
@@ -64,8 +69,7 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
     override suspend fun getUpdates(token: String, offset: Long?, timeoutSeconds: Int): List<TelegramIncomingMessage> {
         if (offset == -1L) return emptyList()
         delay(20)
-        val batch = synchronized(pending) { pending.toList().also { pending.clear() } }
-        return batch
+        return generateSequence { pending.poll() }.toList()
     }
 
     val menus = CopyOnWriteArrayList<List<Pair<String, String>>>()

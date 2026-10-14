@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução — #412: A1 concluída, A2 em seguida; #411 aguardando a rodada visual AC.`
+**Estado atual:** `Em execução — #412 concluída (A1, A2); #411 aguardando a escolha da rodada visual AC.`
 
 | Campo | Valor |
 | --- | --- |
@@ -67,6 +67,7 @@
 | Atividade | Commit | Evidência | Estado |
 | --- | --- | --- | --- |
 | A1 | `test(telegram): await the alert collector before emitting` | Reprodução: `delay(200)` temporário antes do `collect` em `start()` → `gradlew.bat desktopTest --tests "com.usagemonitor.TelegramBotServiceTest"`: 33 testes, **5 falhas** — exatamente os 5 que emitem alerta, incluindo o da issue. Com `startAndAwaitAlertCollector()` e o mesmo atraso: os 5 passam | concluída |
+| A2 | `test(telegram): drain the fake update queue atomically` | Achado da A1: com o atraso, falharam 2 testes que não emitem alerta. Reprodução: `Thread.sleep(30)` temporário entre `toList()` e `clear()` → 33 testes, **9 falhas**, todos com mensagem ou toque enfileirado depois de `start()`. Com `ConcurrentLinkedQueue` + `poll()` e a mesma espera dentro da retirada: 0 falhas. Sem instrumentação, A1 + A2: `gradlew.bat desktopTest --tests "com.usagemonitor.TelegramBotServiceTest" --rerun` 20×: 20 verdes, 33 testes, 0 falhas; `gradlew.bat allTests`: 2704 testes, 0 falhas | concluída |
 
 ## Problemas em aberto e riscos
 
