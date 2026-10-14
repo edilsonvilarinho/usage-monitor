@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TELEGRAM_PAIRING_TTL_MILLIS
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -39,6 +40,14 @@ internal class TelegramBotActions(
 
     fun sendTest() = service.sendTest()
 
+    /** As opções da #408 de uma vez: o card muda uma e manda o conjunto. */
+    fun setPreferences(preferences: TelegramBotPreferences) = update { current -> current.copy(preferences = preferences) }
+
+    /** Controle (`true`) ou só leitura da conversa (#408, AA21); vale no próximo comando ou toque. */
+    fun setChatControl(chatId: Long, control: Boolean) = update { current ->
+        current.copy(authorizedChats = current.authorizedChats.map { chat -> if (chat.id == chatId) chat.copy(readOnly = !control) else chat })
+    }
+
     fun setAllowSourceControl(allowed: Boolean) = update { current -> current.copy(allowSourceControl = allowed) }
 
     /**
@@ -63,7 +72,9 @@ internal fun telegramBotSectionModel(
     snapshot: UsageSnapshot?,
     language: AppLanguage,
     actions: TelegramBotActions,
-    nowMillis: Long = Clock.System.now().toEpochMilliseconds()
+    nowMillis: Long = Clock.System.now().toEpochMilliseconds(),
+    /** Nome deste PC para o card mostrar o que a opção AA20 vai escrever. */
+    machineName: String? = null
 ): TelegramBotSectionModel {
     val pt = language == AppLanguage.PT
     val (label, tone) = when (status) {
@@ -78,6 +89,7 @@ internal fun telegramBotSectionModel(
             }
         }
         is TelegramBotStatus.Failed -> ((if (pt) "Falha: " else "Failed: ") + status.message) to AppTone.CRITICAL
+        TelegramBotStatus.TokenRejected -> (if (pt) "Falha: token do bot recusado pelo Telegram." else "Failed: the Telegram bot token was rejected.") to AppTone.CRITICAL
     }
     val expiresAt = settings.pairingExpiresAtMillis
     val openCode = settings.pairingCode?.takeIf { expiresAt != null && nowMillis < expiresAt }
@@ -103,7 +115,11 @@ internal fun telegramBotSectionModel(
         dailySummaryHour = settings.dailySummaryHour,
         onDailySummaryHourChange = actions::setDailySummaryHour,
         livePanelEnabled = settings.livePanelEnabled,
-        onLivePanelChange = actions::setLivePanel
+        onLivePanelChange = actions::setLivePanel,
+        onChatControlChange = actions::setChatControl,
+        preferences = settings.preferences,
+        onPreferencesChange = actions::setPreferences,
+        machineName = machineName
     )
 }
 

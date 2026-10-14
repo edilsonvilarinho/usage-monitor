@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
@@ -19,6 +20,14 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX
+import com.usagemonitor.presentation.ui.components.TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.presentation.ui.components.TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TelegramBotSection
 import com.usagemonitor.presentation.ui.components.TelegramBotSectionModel
@@ -29,6 +38,69 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class TelegramBotSectionTest {
+
+    @Test
+    fun `each chat has a control switch that turns it read only`() = runDesktopComposeUiTest {
+        var change: Pair<Long, Boolean>? = null
+        val base = model(enabled = true, code = null)
+        val withRoles = TelegramBotSectionModel(
+            enabled = base.enabled, token = base.token, statusLabel = base.statusLabel, statusTone = base.statusTone,
+            chats = listOf(TelegramChat(51L, "@edilson"), TelegramChat(52L, "Time Infra", readOnly = true)),
+            pairingCode = null, pairingHint = null, statusPreview = base.statusPreview,
+            onEnabledChange = {}, onTokenChange = {}, onStartPairing = {}, onRemoveChat = {}, onSendTest = {},
+            connected = true, onChatControlChange = { id, control -> change = id to control }
+        )
+        setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(withRoles, AppLanguage.PT) } } }
+
+        onNodeWithText("Controle").assertIsDisplayed()
+        onNodeWithText("Só leitura").assertIsDisplayed()
+        onNodeWithTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + 52L).assertIsOff()
+        onNodeWithTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + 51L).performClick()
+        assertEquals(51L to false, change)
+    }
+
+    @Test
+    fun `pc actions switch starts off and sends the preference`() = runDesktopComposeUiTest {
+        var sent: TelegramBotPreferences? = null
+        val base = model(enabled = true, code = null)
+        val withCallback = TelegramBotSectionModel(
+            enabled = base.enabled, token = base.token, statusLabel = base.statusLabel, statusTone = base.statusTone,
+            chats = base.chats, pairingCode = null, pairingHint = null, statusPreview = base.statusPreview,
+            onEnabledChange = {}, onTokenChange = {}, onStartPairing = {}, onRemoveChat = {}, onSendTest = {},
+            connected = true, onPreferencesChange = { preferences -> sent = preferences }
+        )
+        setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(withCallback, AppLanguage.PT) } } }
+
+        onNodeWithTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG).assertIsOff()
+        onNodeWithTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG).performClick()
+        assertEquals(TelegramBotPreferences(allowPcActions = true), sent)
+    }
+
+    /** #408, AA26: "Só alerta crítico toca" nasce ligado; desligar devolve o conjunto com o campo invertido. */
+    @Test
+    fun `critical sound switch starts on and sends the preference`() = runDesktopComposeUiTest(width = 1024, height = 2000) {
+        var sent: TelegramBotPreferences? = null
+        val base = model(enabled = true, code = null)
+        val withCallback = TelegramBotSectionModel(
+            enabled = base.enabled, token = base.token, statusLabel = base.statusLabel, statusTone = base.statusTone,
+            chats = base.chats, pairingCode = null, pairingHint = null, statusPreview = base.statusPreview,
+            onEnabledChange = {}, onTokenChange = {}, onStartPairing = {}, onRemoveChat = {}, onSendTest = {},
+            connected = true, onPreferencesChange = { preferences -> sent = preferences }
+        )
+        setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(withCallback, AppLanguage.PT) } } }
+
+        onNodeWithTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG).assertIsOn()
+        onNodeWithTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG).performClick()
+        assertEquals(TelegramBotPreferences(soundOnlyOnCritical = false), sent)
+        // #408, AA1: "Agrupar alertas repetidos" também nasce ligado.
+        onNodeWithTag(TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG).assertIsOn()
+        // #408, AA25: "Juntar alertas" também.
+        onNodeWithTag(TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG).assertIsOn()
+        // #408, AA15: "Painel em uma linha" também.
+        onNodeWithTag(TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG).assertIsOn()
+        // #408, AA18: "Avisar fonte com falha" também.
+        onNodeWithTag(TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG).assertIsOn()
+    }
 
     private fun model(enabled: Boolean, code: String? = "AB12CD", onPair: () -> Unit = {}) = TelegramBotSectionModel(
         enabled = enabled,
@@ -70,7 +142,8 @@ class TelegramBotSectionTest {
     }
 
     @Test
-    fun `the sample reply opens on demand`() = runDesktopComposeUiTest {
+    // Cena alta: as opções da #408 empurram o exemplo para baixo da altura padrão (768).
+    fun `the sample reply opens on demand`() = runDesktopComposeUiTest(width = 1024, height = 2000) {
         setContent { ScreenTestTheme { Box(Modifier.width(640.dp)) { TelegramBotSection(model(enabled = true, code = null), AppLanguage.PT) } } }
 
         assertEquals(0, onAllNodesWithText("Claude 5h", substring = true).fetchSemanticsNodes().size)

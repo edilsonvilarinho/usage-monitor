@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAlert
+import com.usagemonitor.domain.entity.TelegramBatchItem
 import com.usagemonitor.domain.entity.accountByKey
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.presentation.ui.components.riskLevelLabel
@@ -30,37 +31,15 @@ import kotlin.time.Instant
  */
 internal object TelegramBotMessages {
 
-    /** Comandos do botão "Menu" do Telegram (`setMyCommands`), no idioma do app. */
-    fun menu(language: AppLanguage): List<Pair<String, String>> = if (language == AppLanguage.PT) {
-        listOf(
-            "status" to "Cotas de todas as contas",
-            "conta" to "Uma conta por vez",
-            "atualizar" to "Coleta agora e mostra as cotas",
-            "api" to "Fontes monitoradas",
-            "resumo" to "Resumo do dia",
-            "grafico" to "Gráfico do uso (24h ou 7d)",
-            "alertas" to "Liga ou desliga os alertas (on ou off)",
-            "silencio" to "Horário de silêncio (22-07 ou off)",
-            "limiar" to "Limiares de alerta de cota (75,90)",
-            "ajuda" to "Lista de comandos"
-        )
-    } else {
-        listOf(
-            "status" to "Quotas of every account",
-            "account" to "One account at a time",
-            "refresh" to "Collect now and show the quotas",
-            "api" to "Monitored sources",
-            "summary" to "Summary of the day",
-            "chart" to "Usage chart (24h or 7d)",
-            "alerts" to "Turn alerts on or off",
-            "quiet" to "Quiet hours (22-07 or off)",
-            "threshold" to "Quota alert thresholds (75,90)",
-            "help" to "List of commands"
-        )
-    }
+    /** Comandos do botão "Menu" do Telegram (`setMyCommands`), no idioma do app, por categoria. */
+    fun menu(language: AppLanguage): List<Pair<String, String>> = TelegramCommandCatalog.menu(language)
 
-    /** `/status`: um cartão por conta — risco, uso e, por cota, reinício e barra de 10 células. */
-    fun status(snapshot: UsageSnapshot?, language: AppLanguage): String {
+    /**
+     * `/status`: um cartão por conta — risco, uso e, por cota, reinício e barra de 10 células.
+     * [sparklines] (#408, AA13) é rótulo da conta → rótulo da cota → a linha das últimas
+     * 6 h; cota sem histórico fica só com a barra.
+     */
+    fun status(snapshot: UsageSnapshot?, language: AppLanguage, sparklines: Map<String, Map<String, String>> = emptyMap()): String {
         val pt = language == AppLanguage.PT
         if (snapshot == null || snapshot.accounts.isEmpty()) {
             return noReading(pt)
@@ -70,7 +49,7 @@ internal object TelegramBotMessages {
             (if (pt) "coleta " else "collected ") + "${clock(at)} BRT · " + elapsed(snapshot.generatedAt - at, pt)
         } ?: if (pt) "sem coleta ainda" else "not collected yet"
         val header = "<b>📊 Usage Monitor</b>\n<i>$collected</i>"
-        val cards = snapshot.accounts.map { account -> accountCard(account, snapshot.generatedAt, language) }
+        val cards = snapshot.accounts.map { account -> accountCard(account, snapshot.generatedAt, language, sparklines[account.label].orEmpty()) }
         return (listOf(header) + cards).joinToString("\n\n")
     }
 
@@ -107,7 +86,7 @@ internal object TelegramBotMessages {
     internal fun noReading(pt: Boolean): String =
         if (pt) "Sem leitura ainda. Abra o Usage Monitor e habilite ao menos uma API." else "No reading yet. Open Usage Monitor and enable at least one API."
 
-    private fun accountCard(account: UsageSnapshotAccount, now: Instant, language: AppLanguage): String {
+    private fun accountCard(account: UsageSnapshotAccount, now: Instant, language: AppLanguage, sparklines: Map<String, String> = emptyMap()): String {
         val pt = language == AppLanguage.PT
         val tags = listOfNotNull(
             account.worstRisk?.let { level -> "${riskEmoji(level)} ${riskLevelLabel(level, language)}" },
@@ -116,7 +95,8 @@ internal object TelegramBotMessages {
         val title = "<b>${escape(account.label)}</b>" + if (tags.isEmpty()) "" else " — " + tags.joinToString(" · ")
         val quotas = account.quotas.map { quota ->
             val reset = quota.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + resetLabel(at, now, pt) }.orEmpty()
-            "${escape(quota.label)}$reset\n<code>${escape(quotaValue(quota, pt))}</code>"
+            val spark = sparklines[quota.label]?.let { line -> "\n<code>$line</code> <i>6 h</i>" }.orEmpty()
+            "${escape(displayQuotaLabel(quota.label, pt))}$reset\n<code>${escape(quotaValue(quota, pt))}</code>$spark"
         }
         return (listOf(title) + quotas).joinToString("\n")
     }
@@ -160,10 +140,14 @@ internal object TelegramBotMessages {
         val pt = language == AppLanguage.PT
         val percents = settings.quotaPercents.joinToString(", ") { percent -> "<b>$percent%</b>" }.ifEmpty { if (pt) "nenhum" else "none" }
         val off = if (settings.quotaAlertsEnabled) "" else if (pt) " (alertas de cota desligados)" else " (quota alerts off)"
+        // Limiar por conta (#408, AA10): uma linha por conta com limiar próprio, por rótulo.
+        val own = settings.quotaPercentsByTarget.values.sortedBy { override -> override.label }.joinToString("") { override ->
+            "\n• ${escape(override.label)}: " + override.percents.joinToString(", ") { percent -> "<b>$percent%</b>" }
+        }
         return if (pt) {
-            "⚙ Limiares de cota: $percents$off\nMude com <code>/limiar 75,90</code>"
+            "⚙ Limiares de cota: $percents$off$own\nMude com <code>/limiar 75,90</code> ou, por conta, <code>/limiar</code>"
         } else {
-            "⚙ Quota thresholds: $percents$off\nChange with <code>/threshold 75,90</code>"
+            "⚙ Quota thresholds: $percents$off$own\nChange with <code>/threshold 75,90</code> or, per account, <code>/threshold</code>"
         }
     }
 
@@ -173,31 +157,8 @@ internal object TelegramBotMessages {
         UsageRiskLevel.WILL_EXCEED -> "🔴"
     }
 
-    fun help(language: AppLanguage): String = if (language == AppLanguage.PT) {
-        "<b>Comandos</b>\n" +
-            "<code>/status</code> — cotas de todas as contas\n" +
-            "<code>/conta</code> — escolha uma conta e veja só ela\n" +
-            "<code>/atualizar</code> — coleta agora e mostra as cotas\n" +
-            "<code>/api</code> — fontes monitoradas\n" +
-            "<code>/resumo</code> — resumo do dia\n" +
-            "<code>/grafico</code> · <code>/grafico 7d</code> — gráfico do uso\n" +
-            "<code>/alertas on</code> · <code>/alertas off</code> — liga ou desliga os alertas\n" +
-            "<code>/silencio</code> — 1 h, 4 h ou até 08:00 · <code>/silencio 22-07</code> · <code>/silencio off</code>\n" +
-            "<code>/limiar 75,90</code> — avisa em 75% e 90%\n" +
-            "<i>Toque num comando para copiar.</i>"
-    } else {
-        "<b>Commands</b>\n" +
-            "<code>/status</code> — quotas of every account\n" +
-            "<code>/account</code> — pick one account and see only it\n" +
-            "<code>/refresh</code> — collect now and show the quotas\n" +
-            "<code>/api</code> — monitored sources\n" +
-            "<code>/summary</code> — summary of the day\n" +
-            "<code>/chart</code> · <code>/chart 7d</code> — usage chart\n" +
-            "<code>/alerts on</code> · <code>/alerts off</code> — turn alerts on or off\n" +
-            "<code>/quiet</code> — 1 h, 4 h or until 08:00 · <code>/quiet 22-07</code> · <code>/quiet off</code>\n" +
-            "<code>/threshold 75,90</code> — alert at 75% and 90%\n" +
-            "<i>Tap a command to copy it.</i>"
-    }
+    /** O `/ajuda`, por categoria ([TelegramCommandCatalog]). */
+    fun help(language: AppLanguage): String = TelegramCommandCatalog.help(language)
 
     fun paired(language: AppLanguage): String = if (language == AppLanguage.PT) {
         "✅ <b>Conversa pareada.</b>\nToque em /status ou abra o <b>Menu</b> para ver os comandos."
@@ -214,6 +175,13 @@ internal object TelegramBotMessages {
                 if (pt) "🔕 Silêncio $range aplicado." else "🔕 Quiet hours $range set."
             } ?: if (pt) "🔔 Silêncio desligado." else "🔔 Quiet hours off."
             is BotCommand.Threshold -> (if (pt) "Limiares de cota: " else "Quota thresholds: ") + command.percents.joinToString(", ") { "<b>$it%</b>" }
+            is BotCommand.Remind -> command.minutes?.let { minutes ->
+                if (pt) {
+                    "⏰ Combinado: aviso <b>$minutes min</b> antes de reiniciar qualquer cota acima de um limiar."
+                } else {
+                    "⏰ Done: I'll warn <b>$minutes min</b> before any quota above a threshold resets."
+                }
+            } ?: if (pt) "⏰ Lembrete antes do reinício desligado." else "⏰ Reminder before resets off."
             else -> help(language)
         }
     }
@@ -225,6 +193,33 @@ internal object TelegramBotMessages {
     fun alert(alert: UsageAlert, language: AppLanguage): String {
         val message = usageAlertMessage(alert, language)
         return "<b>${escape(message.title)}</b>\n${escape(message.body)}"
+    }
+
+    /**
+     * Lote de alertas (#408, AA25): cabeçalho com a quantidade e a faixa de horário (BRT),
+     * um tópico por item com título, repetições e corpo — o mesmo texto do alerta avulso.
+     */
+    fun alertBatch(items: List<TelegramBatchItem>, from: Instant, to: Instant, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        val total = items.sumOf { item -> item.count }
+        val header = "<b>🔔 $total " + (if (pt) "alertas" else "alerts") + " · ${clock(from)}–${clock(to)}</b>"
+        val lines = items.map { item ->
+            val message = usageAlertMessage(item.alert, language)
+            val repeated = if (item.count > 1) " (${item.count}×)" else ""
+            "• <b>${escape(message.title)}</b>$repeated: ${escape(message.body)}"
+        }
+        return (listOf(header) + lines).joinToString("\n")
+    }
+
+    /**
+     * O mesmo alerta repetido no dia (#408, AA1): a mensagem anterior editada com o
+     * contador, a hora da primeira e a da última.
+     */
+    fun repeatedAlert(alert: UsageAlert, count: Int, firstAt: Instant, lastAt: Instant, language: AppLanguage): String {
+        val message = usageAlertMessage(alert, language)
+        val pt = language == AppLanguage.PT
+        return "<b>${escape(message.title)}</b> · <b>$count×</b> " + (if (pt) "desde " else "since ") + clock(firstAt) +
+            "\n${escape(message.body)}\n<i>" + (if (pt) "última: " else "last: ") + clock(lastAt) + "</i>"
     }
 
     fun test(language: AppLanguage): String =

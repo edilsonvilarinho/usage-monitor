@@ -28,7 +28,12 @@ data class UsageSnapshotAccount(
     val active: Boolean,
     val quotas: List<UsageSnapshotQuota>,
     /** Quando a leitura desta conta foi coletada; `null` antes da primeira coleta. */
-    val fetchedAt: Instant? = null
+    val fetchedAt: Instant? = null,
+    /**
+     * `UsageTargetKey.storageKey` da conta (#408, AA10): o limiar por conta é gravado por
+     * ela, que não muda com o apelido. Id interno do app — não identifica ninguém.
+     */
+    val targetKey: String? = null
 ) {
     /** O pior risco entre as cotas, pela ordem do enum — a palavra da HUD. `null` sem projeção. */
     val worstRisk: UsageRiskLevel?
@@ -51,8 +56,21 @@ data class UsageSnapshotQuota(
      * "sem projeção" — cota vencida, saldo sem histórico, fonte observada — e a
      * HUD o mostra neutro; a página faz o mesmo em vez de inventar limiar próprio.
      */
-    val risk: UsageRiskLevel? = null
+    val risk: UsageRiskLevel? = null,
+    /**
+     * Quando a cota esgota no ritmo observado — o `estimatedExhaustionAt` da mesma
+     * projeção de [risk] (#408, `/quando`). `null` é "sem data": com reinício
+     * conhecido e risco [UsageRiskLevel.ON_TRACK], o reinício chega antes.
+     */
+    val exhaustsAt: Instant? = null
 )
+
+/**
+ * Rótulo da conta no retrato: a fonte e, com mais de uma conta, o apelido. Um dono
+ * só — o bot casa o histórico de cada conta com o cartão do `/status` por ele (#408).
+ */
+val ApiUsageStats.snapshotLabel: String
+    get() = profileLabel?.let { label -> "$apiName · $label" } ?: apiName
 
 /** Monta o retrato na ordem em que o dashboard publica as fontes. */
 fun buildUsageSnapshot(
@@ -66,11 +84,14 @@ fun buildUsageSnapshot(
         accounts = stats.map { item ->
             UsageSnapshotAccount(
                 source = item.source,
-                label = item.profileLabel?.let { label -> "${item.apiName} · $label" } ?: item.apiName,
+                label = item.snapshotLabel,
                 active = item.targetKey in activeTargets,
                 fetchedAt = item.fetchedAt,
+                targetKey = item.targetKey.storageKey,
                 quotas = item.quotas.map { quota ->
                     val hasWindow = quota.hasKnownResetAt && quota.unit != UsageUnit.CURRENCY_USD && quota.total > 0L
+                    // Mesmo filtro do `worstQuotaRisk`: cota vencida não tem projeção válida.
+                    val summary = riskSummaries[item.targetKey]?.get(quota.seriesKey)?.takeUnless { quota.isExpiredAt(now) }
                     UsageSnapshotQuota(
                         label = quota.label,
                         periodType = quota.periodType,
@@ -80,10 +101,8 @@ fun buildUsageSnapshot(
                         percent = if (hasWindow) (quota.percentageUsed * 100f).toInt() else null,
                         resetsAt = if (quota.hasKnownResetAt) quota.periodEndAt else null,
                         currencyCode = quota.currencyCode,
-                        // Mesmo filtro do `worstQuotaRisk`: cota vencida não tem projeção válida.
-                        risk = riskSummaries[item.targetKey]?.get(quota.seriesKey)
-                            ?.takeUnless { quota.isExpiredAt(now) }
-                            ?.level
+                        risk = summary?.level,
+                        exhaustsAt = summary?.estimatedExhaustionAt
                     )
                 }
             )

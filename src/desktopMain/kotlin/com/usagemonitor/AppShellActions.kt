@@ -33,5 +33,7 @@ internal class AppShellActions(
     val openCliSessions: (UsageTargetKey) -> Unit,
     val openCodexCliSessions: (UsageTargetKey) -> Unit,
     val openTeamUsage: (UsageTargetKey) -> Unit,
-    val openTeamPresence: (UsageTargetKey) -> Unit
+    val openTeamPresence: (UsageTargetKey) -> Unit,
+    /** Janela "Análise" da conta (rodada AB): ritmo, vazão e janelas. */
+    val openAnalysis: (UsageTargetKey) -> Unit
 )

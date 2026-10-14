@@ -109,6 +109,8 @@ fun DashboardScreen(
     onOpenTeamUsage: (UsageTargetKey) -> Unit = {},
     /** Presença da conta do card — a porta do integrante comum. */
     onOpenTeamPresence: (UsageTargetKey) -> Unit = {},
+    /** Janela "Análise" da conta do card (rodada AB). */
+    onOpenAnalysis: (UsageTargetKey) -> Unit = {},
     /** Perfis que participam do time; vazio esconde o botão de todos os cards. */
     teamEnabledProfileIds: Set<String> = emptySet(),
     /**
@@ -295,6 +297,7 @@ fun DashboardScreen(
                                     onOpenCodexCliSessionsCard = onOpenCodexCliSessions,
                                     onOpenTeamUsageCard = onOpenTeamUsage,
                                     onOpenTeamPresenceCard = onOpenTeamPresence,
+                                    onOpenAnalysisCard = onOpenAnalysis,
                                     teamEnabledProfileIds = teamEnabledProfileIds,
                                     cliSessionPulses = cliSessionPulses,
                                     teamSessionPulses = teamSessionPulses,
@@ -467,6 +470,7 @@ private fun SuccessContent(
     onOpenCodexCliSessionsCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamUsageCard: (UsageTargetKey) -> Unit = {},
     onOpenTeamPresenceCard: (UsageTargetKey) -> Unit = {},
+    onOpenAnalysisCard: (UsageTargetKey) -> Unit = {},
     teamEnabledProfileIds: Set<String> = emptySet(),
     cliSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
     teamSessionPulses: Map<UsageTargetKey, SessionPulse> = emptyMap(),
@@ -544,6 +548,7 @@ private fun SuccessContent(
                 onOpenCodexCliSessionsCard = onOpenCodexCliSessionsCard,
                 onOpenTeamUsageCard = onOpenTeamUsageCard,
                 onOpenTeamPresenceCard = onOpenTeamPresenceCard,
+                onOpenAnalysisCard = onOpenAnalysisCard,
                 teamEnabledProfileIds = teamEnabledProfileIds,
                 cliSessionPulses = cliSessionPulses,
                 teamSessionPulses = teamSessionPulses,

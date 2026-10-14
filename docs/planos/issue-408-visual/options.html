@@ -1,0 +1,225 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#408 opções do bot</title><style>body{margin:0;background:#101010}</style></head><body>
+<style>
+.ux{--bg:#131010;--surface:#1B1818;--raised:#211E1E;--border:#3D3838;--fg:#F2EDED;--muted:#B8B2B2;--ok:#4CAF50;--warn:#FFA726;--crit:#E86A6A;--info:#4C8DFF;--gold:#E8AE63;--hot:#FFF0CB;--dust:#8C643F;
+  background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux h2{font-size:14px;color:#fff;margin:26px 0 4px;font-weight:500;border-top:1px solid #2c2c2c;padding-top:16px}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 12px;color:#e9d6b8;font-size:11.5px}
+.ux .fix b{color:var(--gold)}
+.ux .fix ul{margin:4px 0 0;padding-left:16px}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:12px}
+.ux .opt.ref{border-style:dashed;border-color:#4a4a4a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt p{margin:0 0 8px;color:#8f8f8f;font-size:11px}
+.ux .tags{font-size:10.5px;color:#7a7a7a;margin-top:8px}
+.ux .tags b{color:#c9a46e;font-weight:500}
+.ux .tags .no{color:var(--crit)}
+.ux .tags .lo{color:#66BB6A}
+.ux .tags .md{color:var(--warn)}
+.ux .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.ux .grid2 .opt{margin-bottom:0}
+.ux .row{display:flex;align-items:center;gap:8px;padding:3px 0}
+.ux .row .l{flex:1;min-width:0}
+.ux .row .l b{display:block;color:var(--fg);font-weight:500;font-size:10.5px}
+.ux .row .l i{display:block;font-style:normal;font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--muted);font-size:9.5px}
+.ux .sw{width:24px;height:13px;border-radius:7px;background:#3a3535;position:relative;flex:none}
+.ux .sw::after{content:"";position:absolute;left:2px;top:2px;width:9px;height:9px;border-radius:50%;background:#bbb}
+.ux .sw.on{background:#2e7d32}.ux .sw.on::after{left:auto;right:2px;background:#fff}
+.ux .cfg{margin-top:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px 8px;font-size:10.5px}
+.ux .cfg .t{font-size:9.5px;color:#7d7676;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+/* ---------- Telegram ---------- */
+.ux .tg{background:#0e1621 radial-gradient(circle at 20% 20%,#17202c,#0e1621);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:12px;line-height:1.38;color:#f5f5f5;min-height:200px}
+.ux .tg .in,.ux .tg .out{max-width:94%;padding:6px 9px 5px;border-radius:10px;white-space:pre-wrap;word-break:break-word}
+.ux .tg .in{background:#212d3b;align-self:flex-start;border-bottom-left-radius:3px}
+.ux .tg .out{background:#766ac8;align-self:flex-end;border-bottom-right-radius:3px}
+.ux .tg .in.ghost{opacity:.45;text-decoration:line-through}
+.ux .tg .tm{float:right;font-size:10px;color:rgba(255,255,255,.45);margin:6px 0 -3px 8px}
+.ux .tg code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:11px;color:#9fd0ff}
+.ux .tg pre{font-family:"IBM Plex Mono",Consolas,monospace;font-size:10.5px;background:rgba(0,0,0,.28);border-radius:6px;padding:5px 7px;margin:3px 0;white-space:pre;overflow-x:auto;color:#e8e8e8;line-height:1.4}
+.ux .tg i{color:#a9b4c0}
+.ux .tg a{color:#6ab3f3;text-decoration:none}
+.ux .tg .kb{display:grid;gap:4px;align-self:flex-start;width:94%}
+.ux .tg .kb span{background:rgba(33,45,59,.85);border-radius:6px;text-align:center;padding:4px 2px;font-size:11px}
+.ux .tg .rk{display:grid;gap:4px;align-self:stretch;background:#17212b;border-top:1px solid #233;padding:6px;border-radius:0 0 6px 6px;margin:4px -10px -10px}
+.ux .tg .rk span{background:#2b3a4b;border-radius:6px;text-align:center;padding:6px 2px;font-size:11.5px}
+.ux .tg .pin{align-self:stretch;background:#17212b;border-left:3px solid #6ab3f3;border-radius:4px;padding:4px 8px;font-size:11px;color:#cfd8e3}
+.ux .tg .pin b{color:#6ab3f3;font-weight:500}
+.ux .tg .img{border-radius:8px;background:#0b0f15;border:1px solid #233;position:relative;overflow:hidden;margin:2px 0}
+.ux .tg .file{display:flex;gap:8px;align-items:center}
+.ux .tg .file .ic{width:34px;height:34px;border-radius:50%;background:#6ab3f3;color:#0e1621;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;flex:none}
+.ux .tg .note{align-self:center;font-size:10.5px;color:#8fa1b3;background:rgba(0,0,0,.25);border-radius:10px;padding:1px 8px}
+.ux .tg .bell{font-size:10px;color:#8fa1b3}
+.ux .heat{display:grid;grid-template-columns:78px repeat(3,1fr);gap:2px;font-family:"IBM Plex Mono",Consolas,monospace;font-size:9.5px;padding:6px}
+.ux .heat span{padding:3px 4px;border-radius:3px;text-align:right;color:#f5f5f5}
+.ux .heat span.h{background:none;color:#a9b4c0;text-align:left}
+.ux .rings{display:flex;gap:14px;justify-content:center;padding:10px 6px 8px}
+.ux .rg{display:flex;flex-direction:column;align-items:center;gap:4px;font-family:"IBM Plex Mono",Consolas,monospace;font-size:9.5px;color:#cfd8e3}
+.ux .rg .r{width:52px;height:52px;border-radius:50%;position:relative;box-shadow:0 0 10px #E8AE6333}
+.ux .rg .r::after{content:"";position:absolute;inset:6px;border-radius:50%;background:#030508;box-shadow:0 0 6px #E8AE6355 inset}
+.ux .rg .r b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;color:#FFF0CB;font-weight:500;font-size:11px}
+</style>
+<div class="ux" id="ux">
+<h1>#408 — Modo Telegram: 30 funções novas para o bot</h1>
+<p class="sub">Rodada <b>AA</b>, estática. Escolha quantas quiser; dá para combinar. Cada card mostra a conversa no formato HTML que o bot já usa (cartão W5, risco em emoji <b>e</b> palavra), o que entra nas Configurações quando há controle novo, e o custo no código.</p>
+<div class="fix"><b>Restrições levantadas antes de desenhar (código lido):</b>
+<ul>
+<li><b>Fora desta rodada</b>, por decisão sua: Y3 <code>/custo</code>, Y7 <code>/sessoes</code>, Y9 botões no alerta e Y10 PDF semanal (não escolhidas na #398).</li>
+<li><b><code>BotButton</code> é enum</b> — não recebe valor novo (CLAUDE.md). Todo botão novo usa o caminho <code>BotTap</code> com prefixo curto em <code>callback_data</code> (≤ 64 bytes, nunca rótulo nem e-mail).</li>
+<li><b>Só metadados saem</b>: nenhuma opção manda prompt, resposta, <code>cwd</code> ou <code>session_id</code>. O nome do projeto já viaja hoje nos alertas de sessão.</li>
+<li><b>Ação remota ou dado de terceiros nasce desligado</b> atrás de interruptor, como o "Permitir mudar fontes pelo bot" (AA16, AA17, AA21, AA29).</li>
+<li><b>Não existe <code>sendDocument</code></b> no <code>TelegramBotApi</code>: AA23 o cria. <b>Não há nome de máquina</b> localizado no código ainda: AA20 começa verificando a origem.</li>
+<li>O print da issue mostra três "Sessão CLI saturada" de <i>alem-das-sombras</i>. A dedup é por <code>sessionId</code> e rearma quando a sessão sai do pulso — causa da repetição <b>não confirmada</b>; AA1 e AA25 atacam o efeito, não diagnosticam.</li>
+</ul></div>
+
+<h2>Referência</h2>
+<div id="ref"></div>
+
+<h2>AA · Ler o uso</h2>
+<p class="sub">Comandos de consulta. Nada muda no app.</p>
+<div class="grid2" id="g1"></div>
+
+<h2>AA · Alertas</h2>
+<p class="sub">O que chega sem pedir, e como.</p>
+<div class="grid2" id="g2"></div>
+
+<h2>AA · Conversa e controle</h2>
+<p class="sub">Pareamento, permissões, idioma, ações no PC.</p>
+<div class="grid2" id="g3"></div>
+</div>
+<script>
+(function(){
+const tm=t=>`<span class="tm">${t}</span>`;
+const out=(t,h)=>`<div class="out">${t}${tm(h)}</div>`;
+const inn=(t,h,c='')=>`<div class="in ${c}">${t}${tm(h)}</div>`;
+const kb=(cols,b)=>`<div class="kb" style="grid-template-columns:repeat(${cols},1fr)">${b.map(x=>`<span>${x}</span>`).join('')}</div>`;
+const sw=on=>`<span class="sw${on?' on':''}"></span>`;
+const row=(l,d,c)=>`<div class="row"><div class="l"><b>${l}</b>${d?`<i>${d}</i>`:''}</div>${c||''}</div>`;
+const cfg=rows=>`<div class="cfg"><div class="t">Configurações › Bot do Telegram</div>${rows}</div>`;
+const tg=b=>`<div class="tg">${b}</div>`;
+const LO='<span class="lo">custo baixo</span>',MD='<span class="md">custo médio</span>',HI='<span class="no">custo alto</span>';
+const card=o=>`<div class="opt${o.id==='ref'?' ref':''}"><h3>${o.n}</h3><p>${o.d}</p>${o.h}${o.c||''}${o.t?`<div class="tags">${o.t}</div>`:''}</div>`;
+const ring=(p,col,lab)=>`<div class="rg"><div class="r" style="background:conic-gradient(${col} 0 ${p}%,#2a2626 ${p}% 100%)"><b>${p}%</b></div>${lab}</div>`;
+
+const REF={id:'ref',n:'Hoje (referência — print da issue)',d:'Menu com 10 comandos (/status, /conta, /atualizar, /api, /resumo, /grafico, /alertas, /silencio, /limiar, /ajuda), painel fixado, resumo diário e repasse dos alertas da bandeja. Cada alerta é uma mensagem nova — a mesma sessão saturada chegou três vezes.',
+ h:tg(inn('<b>Padrão · Claude 5h</b>\nUso em 50%, acima do limiar de 50%.\nReinício: Ter 13/10 8h50 BRT.','06:58')+inn('<b>Sessão CLI saturada</b>\nA sessão em alem-das-sombras encheu a janela de contexto. Rode <a>/compact</a> ou comece uma sessão nova.','11:43')+inn('<b>Sessão CLI saturada</b>\nA sessão em alem-das-sombras encheu a janela de contexto. Rode <a>/compact</a> ou comece uma sessão nova.','11:43'))};
+
+const G1=[
+ {id:'AA2',n:'AA2 · /quando — quando cada cota estoura',d:'No ritmo atual, quando cada cota chega a 100%, comparado com o reinício. Cota sem projeção conhecida diz "sem projeção", nunca um palpite.',
+  h:tg(out('/quando','14:05')+inn('<b>⏳ No ritmo atual</b>\n\n🔴 <b>Padrão · 5h</b> chega a 100% às 15:40\n   reinicia 16:00 — <b>estoura 20 min antes</b>\n🟡 <b>Padrão · Semanal</b> 100% sex 11:00\n   reinicia sex 19:44\n🟢 <b>Codex · 7d</b> não estoura antes de ter 03:28\n⚪ <b>MiniMax</b> sem projeção','14:05')),
+  t:LO+' · Dado: projeção do <code>worstQuotaRisk</code> / <code>addProjectionMetric</code>. Novo: comando e mensagem.'},
+ {id:'AA3',n:'AA3 · /reinicios — linha do tempo',d:'Os próximos reinícios de todas as contas em ordem de chegada, com o uso atual de cada janela. Responde "o que libera primeiro?".',
+  h:tg(out('/reinicios','14:06')+inn('<b>🔁 Próximos reinícios</b>\n<pre>16:00  Padrão 5h      86%\n21:00  Padrão 5h      —\nter 03:28 Codex 7d    22%\nsex 19:44 Padrão sem. 61%</pre>','14:06')),
+  t:LO+' · Dado: <code>resetsAt</code> do <code>UsageSnapshot</code>. Ordem total e determinística (regra das listas).'},
+ {id:'AA5',n:'AA5 · /vazao — velocidade por modelo',d:'Tokens de saída por segundo nas últimas 24 h, por modelo, ponta a ponta (regra do índice #381). Mostra também quantos turnos entraram na conta.',
+  h:tg(out('/vazao','10:30')+inn('<b>⚡ Vazão de saída — 24 h</b>\n<pre>Opus 5.5      48 tok/s  212 turnos\nSonnet 5.5    91 tok/s   64 turnos\ngpt-5-codex   57 tok/s   88 turnos</pre><i>ponta a ponta: pedido → última linha</i>','10:30')),
+  t:LO+' · Dado: <code>OutputThroughput</code>. Novo: comando; nunca média de razões.'},
+ {id:'AA6',n:'AA6 · /comparar — mapa de calor em imagem',d:'O mapa de calor P7 da janela de comparação, renderizado em PNG: valor sobre o máximo da coluna, número sempre escrito, cor da fonte.',
+  h:tg(out('/comparar 7d','18:12')+`<div class="in" style="width:94%"><div class="img"><div class="heat"><span class="h"></span><span class="h">custo</span><span class="h">tok/s</span><span class="h">cache</span><span class="h">Opus 5.5</span><span style="background:#8a5a2a">$96</span><span style="background:#3a3a2a">48</span><span style="background:#7a5a2a">93%</span><span class="h">Sonnet 5.5</span><span style="background:#4a3a24">$31</span><span style="background:#8a5a2a">91</span><span style="background:#6a4e26">88%</span><span class="h">gpt-5-codex</span><span style="background:#3a3024">$18</span><span style="background:#5a4428">57</span><span style="background:#4a3a24">71%</span></div></div><i>7 dias · comparação entre modelos</i>${tm('18:12')}</div>`),
+  t:MD+' · Dado: <code>BuildModelComparisonUseCase</code>. Novo: modelo puro + render Skia (padrão <code>TelegramChartRenderer</code>).'},
+ {id:'AA7',n:'AA7 · /semana — esta semana × a anterior',d:'Consumo de cada cota nesta semana comparado com a semana passada, mesma hora. Seta e número, nunca só cor.',
+  h:tg(out('/semana','19:00')+inn('<b>📅 Semana × anterior</b> (seg–ter 19:00)\n<pre>Padrão semanal   61%  ▲ +18 pp\nCodex 7d         22%  ▼  −9 pp\nMiniMax req.      9%  =</pre>','19:00')),
+  t:MD+' · Dado: histórico (<code>GetUsageHistoryUseCase</code>). Novo: recorte por <code>sinceEpochMillis</code>, sem valor novo em <code>CliSessionRange</code>.'},
+ {id:'AA11',n:'AA11 · /pico — o que tem de diferente hoje',d:'Explica o pico de consumo sob demanda: quanto hoje está acima do seu hábito, em que cota e com base em quantos dias.',
+  h:tg(out('/pico','15:20')+inn('<b>📈 Hoje × seu hábito</b>\n\n<b>Padrão · Semanal</b> — <b>3,1×</b> o normal\nhoje +19 pp · média +6 pp (14 dias)\n\n<b>Codex · 7d</b> — dentro do normal','15:20')),
+  t:LO+' · Dado: <code>UsageSpike</code> (o mesmo do alerta de pico). Novo: comando.'},
+ {id:'AA12',n:'AA12 · /janelas 5h — as últimas janelas',d:'As últimas janelas de 5 h de uma conta com o pico de cada uma e quanto tempo ficou ativa — a lista S9 do Histórico em texto.',
+  h:tg(out('/janelas 5h','20:40')+inn('<b>🪟 Padrão · janelas de 5 h</b>\n<pre>hoje 16:00–21:00  pico 64%  2h10 ativa\nhoje 11:00–16:00  pico 97%  4h40 ativa\nhoje 06:00–11:00  pico 50%  1h05 ativa\nontem 18:00–23:00 pico 31%  0h50 ativa</pre>','20:40')),
+  t:MD+' · Dado: lista de janelas do Histórico (#392) e faixa ativa (#382).'},
+ {id:'AA13',n:'AA13 · Sparkline no /status',d:'Cada cota do /status ganha uma linha de 12 blocos com as últimas 6 h (30 min por bloco). O número continua escrito; o desenho só mostra a tendência.',
+  h:tg(out('/status','14:31')+inn('<b>📊 Usage Monitor</b>\n<i>coleta 14:30 BRT · há menos de 1 min</i>\n\n<b>Padrão</b> — 🔴 Vai estourar · ⚡ em uso\nSessão 5h · reinicia 16:00\n<code>▰▰▰▰▰▰▰▰▱▱  86%</code>\n<code>▁▁▂▂▃▄▄▅▆▆▇█</code> <i>6 h</i>\nSemanal · reinicia sex 19:44\n<code>▰▰▰▰▰▰▱▱▱▱  61%</code>\n<code>▅▅▅▅▅▆▆▆▆▆▇▇</code> <i>6 h</i>','14:31')),
+  t:LO+' · Dado: histórico. Risco: mensagem mais longa; teto de linhas no cartão.'},
+ {id:'AA14',n:'AA14 · /status em imagem — anéis Gargantua',d:'Uma imagem com um anel por conta (até três arcos, janela mais longa por fora), percentual escrito no centro e a palavra do pior risco embaixo.',
+  h:tg(out('/status img','14:32')+`<div class="in" style="width:94%"><div class="img"><div class="rings">${ring(86,'#E86A6A','Padrão · 🔴 estoura')}${ring(22,'#4CAF50','Codex · 🟢 em dia')}${ring(9,'#4CAF50','MiniMax · 🟢')}</div></div><i>coleta 14:30 BRT</i>${tm('14:32')}</div>`),
+  t:HI+' · O anel é desenhado pelo Compose (<code>AppGargantuaRing</code>); renderizar fora da janela exige portar o desenho para Skia puro, com teste de pixel.'},
+ {id:'AA27',n:'AA27 · /ritmo — quanto dá para gastar hoje',d:'Divide o que resta da cota semanal pelos dias até o reinício: "hoje cabem 14 pp". Rotulado como estimativa, não como número da API.',
+  h:tg(out('/ritmo','09:00')+inn('<b>🧭 Ritmo sugerido</b> <i>(estimativa)</i>\n\n<b>Padrão · Semanal</b> 61% · reinicia sex 19:44\nrestam 39 pp em 3,4 dias → <b>~11 pp por dia</b>\nhoje já foram 6 pp\n\n<b>Codex · 7d</b> 22% · folga larga','09:00')),
+  t:LO+' · Cálculo de apresentação. Regra: "número que a API não informa não é derivado" vale para a camada data — aqui fica explícito como estimativa.'},
+ {id:'AA28',n:'AA28 · /qual — que conta usar agora',d:'Ordena as contas da mesma ferramenta pela folga real (menor risco, depois reinício mais próximo) e diz qual está melhor agora.',
+  h:tg(out('/qual','14:40')+inn('<b>🎯 Melhor conta agora</b>\n\nClaude: <b>Trabalho</b> — 5h 12% · semanal 30%\n  (Padrão: 🔴 5h 86%)\nCodex: <b>Codex</b> — única conta, 7d 22%','14:40')),
+  t:LO+' · Dado: snapshot + risco por conta. Útil com contas extras (Codex <code>codex-*</code>, perfis Anthropic).'}
+];
+
+const G2=[
+ {id:'AA1',n:'AA1 · Alerta repetido vira contador',d:'A segunda "Sessão CLI saturada" do mesmo projeto no mesmo dia não abre mensagem nova: edita a anterior com o contador e a hora da última. O aparelho vibra só na primeira.',
+  h:tg(inn('<b>Sessão CLI saturada</b> · <b>3×</b> desde 06:55\nA sessão em alem-das-sombras encheu a janela de contexto. Rode <a>/compact</a> ou comece uma sessão nova.\n<i>última: 11:43</i>','06:55 ✎')+inn('<b>Sessão CLI saturada</b>\nA sessão em alem-das-sombras…','11:43','ghost')+`<span class="note">as repetições não chegam mais como mensagem</span>`),
+  c:cfg(row('Agrupar alertas repetidos','Mesmo tipo e projeto no mesmo dia',sw(true))),
+  t:MD+' · Novo: mapa (chave do alerta → id da mensagem) por conversa, com virada do dia. Resolve o efeito do print sem tocar na dedup da bandeja.'},
+ {id:'AA4',n:'AA4 · Lembrete antes do reinício',d:'"Me avise 15 min antes de liberar": o bot avisa quando uma cota que está alta vai reiniciar em N minutos. Só para janelas acima do primeiro limiar.',
+  h:tg(out('/avise 15','15:10')+inn('Combinado: aviso 15 min antes de reiniciar qualquer cota acima de 75%.','15:10')+inn('⏰ <b>Padrão · 5h reinicia em 15 min</b> (16:00)\nEstá em 97%. Dá para retomar às 16:00.','15:45')),
+  c:cfg(row('Lembrete antes do reinício','15 min · só cota acima do limiar',sw(true))),
+  t:MD+' · Novo: subtipo de <code>UsageAlert</code> (sealed, não enum) avaliado na função pura; campo com default em <code>UsageAlertSettings</code>. Vale para a bandeja também.'},
+ {id:'AA8',n:'AA8 · Modo foco',d:'/foco 2h: por duas horas só passa alerta crítico (≥ 90% ou cota que vai estourar). Diferente do silêncio, que cala tudo.',
+  h:tg(out('/foco 2h','13:00')+inn('🎧 <b>Foco até 15:00</b>\nSó chegam alertas críticos (≥ 90%). /foco off encerra.','13:00')+inn('🔴 <b>Padrão · 5h em 92%</b>\nReinício 16:00 BRT.','14:21')),
+  t:MD+' · Novo: <code>focusUntilEpochMillis</code> em <code>UsageAlertSettings</code> (default <code>null</code>), filtro na decisão pura; "adia, não consome" vale para o que ficou retido.'},
+ {id:'AA9',n:'AA9 · Tipos de alerta no bot',d:'/alertas sem argumento abre um teclado com um interruptor por tipo: cota, reinício, sessão saturada, sessão sem resposta, pico. Hoje é tudo ou nada.',
+  h:tg(out('/alertas','09:40')+inn('<b>Alertas</b> — toque para ligar ou desligar','09:40')+kb(2,['✅ Cota','✅ Reinício','⬜ Sessão saturada','✅ Sem resposta','✅ Pico','🔕 Silenciar 1h'])),
+  t:LO+' · Dado: os interruptores já existem em <code>UsageAlertSettings</code> (<code>sessionAlertsEnabled</code> etc.). Novo: <code>BotTap</code> com prefixo.'},
+ {id:'AA10',n:'AA10 · Limiar por conta',d:'/limiar pergunta a conta antes dos números: a conta de trabalho avisa em 50,80; a pessoal em 75,90. Sem conta, continua o limiar geral.',
+  h:tg(out('/limiar','10:00')+inn('Limiar de qual conta?','10:00')+kb(2,['Padrão','Trabalho','Codex','Todas'])+out('50,80','10:01')+inn('<b>Trabalho</b>: alertas em 50% e 80%.\nAs outras seguem 75%, 90%.','10:01')),
+  t:HI+' · Novo: mapa por <code>UsageTargetKey</code> em <code>UsageAlertSettings</code>, avaliação, Configurações (Alertas) e protótipo. Mexe na decisão de todos os canais.'},
+ {id:'AA18',n:'AA18 · Fonte quebrada',d:'Quando uma fonte falha várias coletas seguidas (token recusado, 401, sessão do Cursor expirada), o bot avisa uma vez com o motivo e o que fazer. Avisa de novo quando ela volta.',
+  h:tg(inn('⚠ <b>Claude parou de atualizar</b>\nO token foi recusado 3× desde 09:12. Os números mostrados são de 09:10.\nAbra o Claude Code para renovar o login.','09:40')+inn('✅ <b>Claude voltou</b> — coleta 10:05.','10:05')),
+  c:cfg(row('Avisar fonte com falha','Depois de 3 coletas seguidas',sw(true))),
+  t:MD+' · Dado: <code>statsRetainedAfterFailure</code> e mensagem de erro por alvo. Novo: alerta com dedup por fonte; texto nunca leva token.'},
+ {id:'AA25',n:'AA25 · Alertas em lote',d:'Em vez de uma mensagem por alerta, junta o que disparou em 15 min numa mensagem só, com um tópico por item. Crítico sai na hora, fora do lote.',
+  h:tg(inn('<b>🔔 4 alertas · 11:30–11:45</b>\n• Padrão · 5h passou de 75% (78%)\n• Sessão saturada em alem-das-sombras\n• Sessão saturada em alem-das-sombras (2×)\n• Codex · 7d reiniciou','11:45')),
+  c:cfg(row('Juntar alertas','A cada 15 min; crítico sai na hora',sw(true))),
+  t:MD+' · Novo: buffer no <code>TelegramBotService</code>; só no Telegram — a bandeja segue imediata.'},
+ {id:'AA26',n:'AA26 · Som por gravidade',d:'Alerta crítico (≥ 90% ou estouro previsto) toca; os demais chegam em silêncio (aparecem, não vibram). Usa o <code>disable_notification</code> do Telegram.',
+  h:tg(inn('🟡 <b>Padrão · Semanal em 75%</b>\nReinício sex 19:44 BRT.','10:12')+'<span class="bell">🔕 chegou sem som</span>'+inn('🔴 <b>Padrão · 5h em 92%</b>\nEstoura antes das 16:00.','14:21')+'<span class="bell">🔔 tocou</span>'),
+  c:cfg(row('Só crítico toca','Os outros chegam em silêncio',sw(true))),
+  t:LO+' · Dado: <code>sendMessage(silent=)</code> já existe (painel). Novo: gravidade por tipo de alerta.'},
+ {id:'AA15',n:'AA15 · Painel fixado em uma linha',d:'O painel fixado vira a faixa do modo recolher (#400): um ponto de risco por conta e o pior percentual. Cabe inteiro no banner do topo sem abrir.',
+  h:tg('<div class="pin"><b>📌 Mensagem fixada</b>\n🔴 Padrão 86% · 🟢 Codex 22% · 🟢 MiniMax 9% · 14:30</div>'+inn('🔴 Padrão 86% · 🟢 Codex 22% · 🟢 MiniMax 9%\n<i>coleta 14:30 BRT</i>','09:00 ✎')),
+  c:cfg(row('Painel fixado','Formato: uma linha',sw(true))),
+  t:LO+' · Novo: variante de <code>TelegramBotSummaryMessages.panel</code> e escolha do formato.'}
+];
+
+const G3=[
+ {id:'AA16',n:'AA16 · /time — resumo do time',d:'Com a integração de time ligada: quem está ativo agora e o consumo do dia de cada pessoa, pelo apelido. Só para quem tem o token de relatório.',
+  h:tg(out('/time','16:00')+inn('<b>👥 Time — hoje</b>\n<pre>edi       ⚡ ativo   US$ 22,40\nmarina    ⚡ ativo   US$ 14,10\njoão      há 2 h     US$  3,80</pre><i>servidor do time · 15:59</i>','16:00')),
+  c:cfg(row('Mostrar o time no bot','Expõe dados de outras pessoas na conversa',sw(false))),
+  t:HI+' · Dado de terceiros: nasce desligado. Servidor não precifica — o cliente aplica <code>ModelPricingTable</code>. Rota nova → 404 lembrado por URL.'},
+ {id:'AA17',n:'AA17 · Atualização pelo bot',d:'Quando sai versão nova, o bot avisa com o resumo das novidades e um botão "Atualizar e reiniciar". O texto diz o que reinicia.',
+  h:tg(inn('⬆ <b>Usage Monitor 42.1.0 disponível</b>\n• Bot com /quando e /reinicios\n• Correções na HUD\nO app fecha e reabre sozinho (~20 s).','09:00')+kb(2,['⬆ Atualizar e reiniciar','Depois'])),
+  c:cfg(row('Permitir atualizar pelo bot','Reinicia o app no PC',sw(false))),
+  t:HI+' · Ação remota: nasce desligada. Dado: <code>AppUpdate*</code> (SHA-256 do digest). Risco: reiniciar sem ninguém no PC.'},
+ {id:'AA19',n:'AA19 · /ping — o app está vivo?',d:'Versão, há quanto tempo o app está aberto, última coleta por fonte e próxima coleta. Responde "o bot está calado porque não tem nada ou porque o PC desligou?".',
+  h:tg(out('/ping','22:10')+inn('<b>🏓 Usage Monitor 42.0.0</b>\nAberto há 6 h 12 min\n<pre>Claude    coleta 22:09  próxima 22:10\nCodex     coleta 22:05  próxima 22:10\nMiniMax   coleta 22:06  próxima 22:11</pre>','22:10')),
+  t:LO+' · Dado: <code>CURRENT_APP_VERSION</code>, horários da coleta adaptativa.'},
+ {id:'AA20',n:'AA20 · Nome da máquina nas mensagens',d:'Com o bot ligado em mais de um PC na mesma conversa, cada mensagem diz de onde veio. Com um PC só, nada muda.',
+  h:tg(inn('<b>Padrão · Claude 5h</b> · <i>💻 NOTE-EDI</i>\nUso em 75%, acima do limiar de 75%.','10:12')+inn('<b>Codex · 7d</b> · <i>🖥 DESKTOP-CASA</i>\nUso em 80%.','10:14')),
+  c:cfg(row('Nome deste PC no bot','NOTE-EDI','')),
+  t:MD+' · <b>Origem do nome a verificar</b> (não há nome de máquina localizado no código). Risco: dois PCs fazendo polling do mesmo token disputam os updates (409 do Telegram).'},
+ {id:'AA21',n:'AA21 · Papéis por conversa',d:'Cada conversa pareada é "só leitura" ou "controle". Um grupo da equipe vê o /status; só a sua conversa privada muda alertas, fontes e silêncio.',
+  h:tg(out('/alertas off','11:00')+inn('Esta conversa é <b>só leitura</b>. Peça a quem pareou para dar controle nas Configurações.','11:00')),
+  c:cfg(row('Edi (privada)','Controle','<span class="sw on"></span>')+row('Time Infra (grupo)','Só leitura',sw(false))),
+  t:MD+' · Novo: campo em <code>TelegramChat</code> (default "controle" = comportamento de hoje), checagem no despacho e no toque.'},
+ {id:'AA22',n:'AA22 · /conversas e /sair',d:'/conversas lista quem está pareado; /sair desfaz o pareamento desta conversa pelo próprio Telegram, sem abrir o PC.',
+  h:tg(out('/conversas','12:00')+inn('<b>Conversas pareadas</b>\n• Edi (privada) — esta\n• Time Infra (grupo)','12:00')+out('/sair','12:01')+inn('Pareamento desfeito. Esta conversa não recebe mais nada. Para voltar, gere um código novo nas Configurações.','12:01')),
+  t:LO+' · Dado: <code>authorizedChats</code>. Novo: comandos; remover a si mesmo não exige permissão.'},
+ {id:'AA23',n:'AA23 · /exportar — arquivo com o uso',d:'Manda o mesmo CSV ou JSON da exportação do app, do período pedido, como arquivo na conversa.',
+  h:tg(out('/exportar 7d csv','18:00')+`<div class="in"><div class="file"><span class="ic">CSV</span><div><b>usage-monitor-2026-10-06_12.csv</b><br><i>38 KB · 7 dias</i></div></div>${tm('18:00')}</div>`),
+  t:MD+' · Dado: <code>UsageExportEncoder</code>. Novo: <code>sendDocument</code> multipart no <code>TelegramBotApi</code> (padrão do <code>sendPhoto</code>).'},
+ {id:'AA24',n:'AA24 · /idioma por conversa',d:'Cada conversa escolhe PT ou EN para as respostas e alertas, independente do idioma do app no PC.',
+  h:tg(out('/idioma en','08:00')+inn('Language set to English for this chat.','08:00')+inn('<b>Default · Claude 5h</b>\nUsage at 50%, above the 50% threshold.','08:58')),
+  t:MD+' · Novo: idioma em <code>TelegramChat</code> (default = do app); <code>broadcast</code> monta o texto por conversa.'},
+ {id:'AA29',n:'AA29 · /hud — trazer a HUD à frente',d:'Do celular, traz a HUD do PC para a frente (o mesmo pedido da segunda instância). Útil na apresentação ou quando a HUD ficou atrás de outra janela.',
+  h:tg(out('/hud','15:00')+inn('HUD trazida para a frente no PC.','15:00')),
+  c:cfg(row('Permitir ações no PC pelo bot','Trazer a HUD à frente',sw(false))),
+  t:LO+' · Dado: <code>focus.request</code> / <code>focusHud</code>. Ação no PC: nasce desligada.'},
+ {id:'AA30',n:'AA30 · Teclado fixo de atalhos',d:'Um teclado persistente no lugar do teclado do celular, com os quatro comandos mais usados. Um toque, sem abrir o Menu.',
+  h:tg(inn('Atalhos ligados. /teclado off remove.','08:00')+out('📊 Status','08:01')+inn('<b>📊 Usage Monitor</b>\n<i>coleta 08:00 BRT</i>\n…','08:01')+`<div class="rk" style="grid-template-columns:1fr 1fr">${['📊 Status','👤 Conta','📈 Gráfico','🔔 Alertas'].map(x=>`<span>${x}</span>`).join('')}</div>`),
+  t:LO+' · Novo: <code>reply_markup</code> com <code>ReplyKeyboardMarkup</code>; o toque chega como texto e é mapeado ao comando.'}
+];
+
+document.getElementById('ref').innerHTML=card(REF);
+document.getElementById('g1').innerHTML=G1.map(card).join('');
+document.getElementById('g2').innerHTML=G2.map(card).join('');
+document.getElementById('g3').innerHTML=G3.map(card).join('');
+window.AA_COUNT=G1.length+G2.length+G3.length;
+})();
+</script>
+</body></html>

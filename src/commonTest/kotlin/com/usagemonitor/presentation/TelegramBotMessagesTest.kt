@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -126,5 +127,44 @@ class TelegramBotMessagesTest {
         assertTrue(text.startsWith("<b>📌 Painel ao vivo</b>\n<i>atualizado 22:28 BRT</i>"), text)
         assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>" in text, text)
         assertEquals(text, TelegramBotSummaryMessages.panel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
+    }
+
+    /** #408, AA15: uma linha com risco, conta e pior percentual (saldo com o valor); a hora da coleta na segunda. */
+    @Test
+    fun `compact panel fits one line per chat`() {
+        val text = TelegramBotSummaryMessages.compactPanel(snapshot, AppLanguage.PT)
+        val lines = text.lines()
+
+        assertEquals(2, lines.size, text)
+        assertTrue(lines[0].startsWith("🔴 Anthropic · &lt;Padrão&gt; 42% · "), text)
+        assertTrue("DeepSeek saldo US$ 37,66" in lines[0], text)
+        assertEquals("<i>coleta 22:28 BRT</i>", lines[1])
+        assertEquals(text, TelegramBotSummaryMessages.compactPanel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
+    }
+
+    /** #408, AA1: a repetição edita a mensagem com o contador, a hora da primeira e a da última (BRT). */
+    @Test
+    fun `repeated alert carries the count and both times`() {
+        val text = TelegramBotMessages.repeatedAlert(
+            UsageAlert.SessionSaturated("s2", "alem-das-sombras"),
+            count = 3,
+            firstAt = Instant.parse("2026-10-06T09:55:00Z"),
+            lastAt = Instant.parse("2026-10-06T14:43:00Z"),
+            language = AppLanguage.PT
+        )
+        assertTrue(text.startsWith("<b>Sessão CLI saturada</b> · <b>3×</b> desde 06:55\n"))
+        assertTrue(text.endsWith("\n<i>última: 11:43</i>"))
+        assertTrue("alem-das-sombras" in text)
+    }
+
+    /** B03: chave de série em português sai traduzida no inglês; rótulo neutro sai como veio; no português, nada muda. */
+    @Test
+    fun `quota labels follow the app language without renaming the series key`() {
+        assertEquals("Balance", com.usagemonitor.presentation.ui.displayQuotaLabel("Saldo", AppLanguage.EN))
+        assertEquals("Go weekly", com.usagemonitor.presentation.ui.displayQuotaLabel("Go semanal", AppLanguage.EN))
+        assertEquals("Claude 5h", com.usagemonitor.presentation.ui.displayQuotaLabel("Claude 5h", AppLanguage.EN))
+        assertEquals("Saldo", com.usagemonitor.presentation.ui.displayQuotaLabel("Saldo", AppLanguage.PT))
+        val status = TelegramBotMessages.status(snapshot, AppLanguage.EN)
+        assertTrue("Balance" in status && "Saldo" !in status, status)
     }
 }

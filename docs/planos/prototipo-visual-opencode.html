@@ -605,6 +605,7 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#time">Uso do time</a>
   <a href="#tendencia">Tendência do time</a>
   <a href="#comparacao">Comparar modelos</a>
+  <a href="#analise">Análise da sessão</a>
   <a href="#presenca">Presença</a>
   <a href="#presenca-contas">Presença · todas as contas</a>
   <a href="#chaves">Administração de chaves</a>
@@ -1929,6 +1930,34 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
   <div class="statusbar"><span>Lido 06/10 11:42 BRT</span></div>
 </div>
 
+<h2 id="analise">9d · Análise da sessão</h2>
+<p class="note"><b>Rodada AB (todas as opções AB1–AB15).</b> Janela própria, aberta pelo botão <b>Análise</b> (ícone
+<i>insights</i>) da barra do card e do balão da conta na HUD, só em contas Anthropic e Codex — <code>CardAction.ANALYSIS</code>,
+exceção aprovada ao enum. As abas são as vistas de texto do <code>/analise</code> do bot (Painel, Tendência, Intervalos,
+Frases, Janela 5h, Antes × agora), com o mesmo texto sem as marcas do Telegram, em Plex Mono. Ritmo em pp/h pela subida
+entre leituras do histórico; vazão (tok/s) pela soma de tokens sobre a soma do tempo do índice CLI. Não medido é "—".
+Lê sob demanda, ao abrir e no <b>Atualizar</b>; sem histórico, o estado vazio explica. <b>Texto | Gráficos</b>
+(segmentado) troca o grupo de abas; em Gráficos as abas são Velocímetro, Horas, Dia × hora, Curva, Dias e Cartão, com os
+mesmos PNGs escuros do bot.</p>
+<div class="win" style="max-width:820px">
+  <div class="titlebar"><span class="ttl">Análise · Anthropic · Padrão</span></div>
+  <div class="toolbar"><span class="v">Análise · Anthropic · Padrão</span><span class="sp"></span><button class="btn">Relatório PDF</button><button class="btn">Atualizar</button></div>
+  <div class="seg" style="margin:var(--s3) 0"><button class="on" type="button">Texto</button><button type="button">Gráficos</button></div>
+  <div class="tabs"><button class="on" type="button">Painel</button><button type="button">Tendência</button><button type="button">Intervalos</button><button type="button">Frases</button><button type="button">Janela 5h</button><button type="button">Antes × agora</button></div>
+  <div class="panel"><div class="pbody"><pre style="margin:0;font-family:var(--mono);font-size:var(--t12)">📐 Anthropic · Padrão · análise 12:30 BRT
+JANELA 5h    62%   reinicia 14:00
+  agora    14,0 pp/h  (última 1 h)
+  média    17,7 pp/h  (desde 09:00)
+  seguro   25,3 pp/h  → folga
+  no reset ≈ 83%
+
+SEMANAL      41%   reinicia sex 19:44
+  agora     0,9 pp/h  (última 1 h)
+  seguro    1,5 pp/h  → folga
+
+TOKENS/s (1 h)  claude-sonnet 71 · claude-opus 48</pre></div></div>
+</div>
+
 <h2 id="presenca">10 · Presença</h2>
 <div class="win">
   <div class="titlebar"><span class="t">Conectados agora</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
@@ -2145,6 +2174,10 @@ mede é "—" (MiniMax não informa tokens) ou "sem tarifa" (Codex) — nunca ze
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Limiares de cota</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O limiar mede percentual contra o teto da cota. Saldo pré-pago não tem teto (DeepSeek, OpenRouter) e atividade observada não informa limite (OpenCode Zen Free, Kilo Free): nessas fontes nenhum limiar é avaliado.</span></div><div class="hstack"><input class="field" value="75" style="width:56px"><input class="field" value="90" style="width:56px"><input class="field" value="100" style="width:56px"><span class="k">%</span></div></div>
       <!-- #398, Y2: aviso de reinício, logo abaixo dos limiares que ele responde. -->
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Avisar quando a cota reiniciar</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só das cotas que passaram de um limiar na janela anterior.</span></div><span class="sw on"></span></div>
+      <!-- #408 (AA10): limiar por conta, gravado pelo /limiar do bot; aqui só aparece e se desfaz. -->
+      <div class="row"><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted);flex:1">Limiar próprio: Anthropic · Trabalho 50%, 80% · Codex 90%</span><button type="button" class="btn ghost">Usar o geral em todas</button></div>
+      <!-- #408 (AA4): lembrete antes do reinício, nasce ligado em 15 min. -->
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Lembrar antes de a cota reiniciar</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">15 min antes, só de cota acima de um limiar. No bot, /avise 30 muda os minutos.</span></div><span class="sw on"></span></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI saturada</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Só o veredito saturado vira notificação. Atenção apareceu em 7 de 70 sessões medidas — notificar nesse patamar tornaria o alerta rotina.</span></div><span class="sw on"></span></div>
       <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Sessão CLI sem resposta</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Houve pedido e não houve resposta no transcript acima do limiar. O app não verifica o processo do Claude Code, e o texto do aviso não afirma que ele travou.</span></div><span class="sw on"></span></div>
       <div class="row"><span class="v sm" style="flex:1">Limiar sem resposta</span><div class="seg"><button type="button">30min</button><button type="button">1h</button><button class="on" type="button">2h</button><button type="button">4h</button></div></div>
@@ -2194,7 +2227,18 @@ o prazo, <b>Abrir no Telegram</b> pelo link <code>t.me/&lt;bot&gt;?start=&lt;có
 teste</b>, só depois do pareamento). A conversa de exemplo saiu do card: <b>▸ Ver como o bot responde</b> abre, recolhida
 por padrão, a resposta real do <code>/status</code> sem as marcas HTML. Discord aparece como segunda fase, com o motivo.
 <b>#398:</b> bloco <b>Opções do bot</b> abaixo dos passos — "Resumo diário" (Y1, segmentado Desligado/07/08/09/12/18 h BRT), "Painel fixado ao vivo" (Y5), "Permitir mudar fontes pelo bot" (Y8, nasce desligado: com ele,
-quem está numa conversa pareada muda o que o app monitora; desligado, o <code>/api</code> só lista).</p>
+quem está numa conversa pareada muda o que o app monitora; desligado, o <code>/api</code> só lista).
+<b>#408 (AA21):</b> cada conversa pareada ganha o interruptor <b>Controle</b> com a palavra do papel ao lado
+(<b>Controle</b>/<b>Só leitura</b>) — a conversa só de leitura vê tudo, mas não muda alertas, fontes nem silêncio; o
+papel é relido em cada comando e toque. <b>Permitir ações no PC</b> (AA29, nasce desligado) libera o <code>/hud</code>. <b>Nome deste PC nas mensagens</b> (AA20)
+assina alertas e respostas com o nome da máquina, mostrado na própria descrição. <b>Mostrar o time no bot</b> (AA16,
+nasce desligado) libera o <code>/time</code>. <b>Permitir atualizar pelo bot</b> (AA17, nasce desligado) avisa a versão
+pronta uma vez e oferece o reinício. <b>Só alerta crítico toca</b> (AA26, nasce ligado): cota em 90% ou mais toca; os
+outros alertas chegam sem som. <b>Agrupar alertas repetidos</b> (AA1, nasce ligado): o mesmo alerta no mesmo dia edita a
+mensagem anterior com o contador. <b>Juntar alertas</b> (AA25, nasce ligado): os não críticos de 15 min chegam numa
+mensagem só; o crítico sai na hora. <b>Painel em uma linha</b> (AA15, nasce ligado): o painel fixado vira
+<code>🔴 Padrão 86% · 🟢 Codex 22%</code> com a hora da coleta embaixo, e cabe no banner do topo. <b>Avisar fonte com falha</b> (AA18, nasce ligado): depois de
+15 min falhando, o motivo e a hora dos números mantidos; de novo quando a fonte volta.</p>
 <div class="win" style="max-width:660px">
   <div class="titlebar"><span class="t">Configurações › Alertas</span></div>
   <div class="body"><div class="panel">
@@ -2204,7 +2248,8 @@ quem está numa conversa pareada muda o que o app monitora; desligado, o <code>/
       <div class="hstack"><span class="v">1 · Token do bot</span><span class="st ok">Feito</span></div>
       <span class="v sm">••••••••••••••••••••</span><span class="st ok">Conectado como @usage_monitor_bot · 1 conversa(s)</span>
       <div class="hstack"><span class="v">2 · Parear uma conversa</span><span class="st" style="color:var(--info)">Agora</span></div>
-      <div class="hstack"><span class="v sm">@edilson</span><button class="btn">Remover</button></div>
+      <div class="hstack"><span class="v sm">@edilson</span><span class="k">Controle</span><span class="sw on"></span><button class="btn">Remover</button></div>
+      <div class="hstack"><span class="v sm">Time Infra</span><span class="k">Só leitura</span><span class="sw"></span><button class="btn">Remover</button></div>
       <span class="k">Envie ao bot no Telegram</span>
       <div class="hstack panel" style="padding:var(--s2)"><span class="v">/start AB12CD</span><span class="sp"></span><button class="btn primary">Copiar</button></div>
       <span class="k">Vale por mais 10 min.</span>
@@ -2217,6 +2262,16 @@ quem está numa conversa pareada muda o que o app monitora; desligado, o <code>/
       <div class="seg"><button type="button">Desligado</button><button type="button">07:00</button><button class="on" type="button">08:00</button><button type="button">09:00</button><button type="button">12:00</button><button type="button">18:00</button></div>
       <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Painel fixado ao vivo</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Fixa uma mensagem no topo da conversa e a edita a cada coleta, sem notificar. Desligar desafixa.</span></div><span class="sw"></span></div>
       <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Permitir mudar fontes pelo bot</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Com ele, o /api liga e desliga as APIs monitoradas. Desligado, o /api só lista.</span></div><span class="sw"></span></div>
+      <!-- #408: opções novas do bot, todas abaixo das da #398. -->
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Permitir ações no PC</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Com ele, o /hud traz a HUD para a frente neste computador. Desligado, o bot só lê.</span></div><span class="sw"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Nome deste PC nas mensagens</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Útil com o bot em mais de um computador. Este assina como NOTE-EDI.</span></div><span class="sw"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Mostrar o time no bot</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Com ele, o /time lista quem do time está online pelo apelido. Expõe dado de outras pessoas na conversa.</span></div><span class="sw"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Permitir atualizar pelo bot</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Avisa quando uma versão nova já foi baixada e oferece "Atualizar e reiniciar o app": o app fecha e reabre neste PC.</span></div><span class="sw"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Só alerta crítico toca</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Cota em 90% ou mais toca no celular; os outros alertas chegam em silêncio, sem vibrar.</span></div><span class="sw on"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Agrupar alertas repetidos</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O mesmo alerta no mesmo dia edita a mensagem anterior com um contador, sem vibrar de novo. Crítico sempre abre outra.</span></div><span class="sw on"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Juntar alertas</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Os alertas de 15 min chegam numa mensagem só, um tópico por alerta. Crítico sai na hora.</span></div><span class="sw on"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Painel em uma linha</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">O painel fixado vira uma linha com o risco e o pior percentual de cada conta, que cabe no topo da conversa.</span></div><span class="sw on"></span></div>
+      <div class="hstack"><div class="stack" style="gap:0;flex:1"><span class="v sm">Avisar fonte com falha</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Depois de 15 min falhando, o bot diz o motivo e de quando são os números. Avisa de novo quando ela voltar.</span></div><span class="sw on"></span></div>
       <span class="k">▸ Ver como o bot responde</span>
     </div></div>
   </div></div>

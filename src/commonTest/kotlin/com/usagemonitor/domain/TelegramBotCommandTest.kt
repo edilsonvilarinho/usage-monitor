@@ -1,6 +1,12 @@
 package com.usagemonitor.domain
 
+import com.usagemonitor.domain.entity.AlertKind
+import com.usagemonitor.domain.entity.AnalysisView
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.isOn
+import com.usagemonitor.domain.entity.toggled
+import com.usagemonitor.domain.entity.UsageExportFormat
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BotButton
 import com.usagemonitor.domain.entity.BotTap
 import com.usagemonitor.domain.entity.HistoryRange
@@ -17,6 +23,10 @@ import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.applyBotCommand
+import com.usagemonitor.domain.entity.focusAlerts
+import com.usagemonitor.domain.entity.parseThresholdPercents
+import com.usagemonitor.domain.entity.changesApp
+import com.usagemonitor.domain.entity.parseKeyboardLabel
 import com.usagemonitor.domain.entity.parseBotCommand
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -38,6 +48,47 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Threshold(listOf(75, 90)), parseBotCommand("/limiar 90,75"))
         assertEquals(BotCommand.Start("AB12CD"), parseBotCommand("/start AB12CD"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/conta"))
+        assertEquals(BotCommand.Resets, parseBotCommand("/reinícios"))
+        assertEquals(BotCommand.Resets, parseBotCommand("/resets"))
+        assertEquals(BotCommand.Exhaustion, parseBotCommand("/quando"))
+        assertEquals(BotCommand.BestAccount, parseBotCommand("/qual"))
+        assertEquals(BotCommand.Pace, parseBotCommand("/ritmo"))
+        assertEquals(BotCommand.Ping, parseBotCommand("/ping"))
+        assertEquals(BotCommand.Spike, parseBotCommand("/pico"))
+        assertEquals(BotCommand.Throughput, parseBotCommand("/vazão"))
+        assertEquals(BotCommand.Week, parseBotCommand("/semana"))
+        assertEquals(BotCommand.Windows(weekly = false), parseBotCommand("/janelas"))
+        assertEquals(BotCommand.Compare(7), parseBotCommand("/comparar"))
+        assertEquals(BotCommand.StatusImage, parseBotCommand("/status img"))
+        assertEquals(BotCommand.Chats, parseBotCommand("/conversas"))
+        assertTrue(BotCommand.Alerts(false).changesApp())
+        assertEquals(BotCommand.Keyboard(true), parseBotCommand("/teclado"))
+        assertEquals(BotCommand.FocusHud, parseBotCommand("/hud"))
+        assertEquals(BotCommand.Team, parseBotCommand("/time"))
+        assertEquals(BotCommand.AlertMenu, parseBotCommand("/alertas"))
+        AlertKind.entries.forEach { kind ->
+            assertEquals(BotTap.ToggleAlert(kind), parseBotTap(BotTap.ToggleAlert(kind).data()))
+            assertEquals(!UsageAlertSettings().isOn(kind), UsageAlertSettings().toggled(kind).isOn(kind))
+        }
+        assertEquals(BotTap.UpdateNow("42.1.0"), parseBotTap(BotTap.UpdateNow("42.1.0").data()))
+        assertEquals(null, parseBotTap("upd:"))
+        assertEquals(BotCommand.Export(7, UsageExportFormat.CSV), parseBotCommand("/exportar"))
+        assertEquals(BotCommand.Export(30, UsageExportFormat.JSON), parseBotCommand("/export json 30d"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/exportar pdf"))
+        assertTrue(BotCommand.FocusHud.changesApp())
+        assertEquals(BotCommand.Keyboard(false), parseBotCommand("/keyboard off"))
+        assertEquals(BotCommand.Accounts, parseKeyboardLabel("👤 Account"))
+        assertEquals(null, parseKeyboardLabel("oi"))
+        assertFalse(BotCommand.Leave.changesApp())
+        assertTrue(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(1))
+        assertFalse(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(2))
+        assertEquals(BotCommand.Leave, parseBotCommand("/sair"))
+        // O idioma do app manda (análise da sessão, B02): o `/idioma` por conversa saiu.
+        assertEquals(BotCommand.Invalid("/ajuda"), parseBotCommand("/idioma en"))
+        assertEquals(BotCommand.Status, parseBotCommand("/status qualquer"))
+        assertEquals(BotCommand.Compare(30), parseBotCommand("/compare 30d"))
+        assertEquals(BotCommand.Windows(weekly = true), parseBotCommand("/windows 7d"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/janelas 3h"))
         assertEquals(BotCommand.Accounts, parseBotCommand("/accounts@usage_monitor_bot"))
         assertEquals(BotCommand.Refresh, parseBotCommand("/atualizar"))
         assertEquals(BotCommand.Sources, parseBotCommand("/api"))
@@ -130,5 +181,59 @@ class TelegramBotCommandTest {
         assertEquals(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(dawn))
         // Exatamente 08:00 já passou: vai para o dia seguinte.
         assertEquals(Instant.parse("2026-10-08T11:00:00Z").toEpochMilliseconds(), nextMorningMillis(Instant.parse("2026-10-07T11:00:00Z").toEpochMilliseconds()))
+    }
+
+    /** #408, AA8: `/foco 2h` liga por duas horas, `/foco off` encerra; fora do teto, o uso. */
+    @Test
+    fun `focus command parses hours and off and sets the deadline`() {
+        assertEquals(BotCommand.Focus(2), parseBotCommand("/foco 2h"))
+        assertEquals(BotCommand.Focus(3), parseBotCommand("/focus 3"))
+        assertEquals(BotCommand.Focus(null), parseBotCommand("/foco off"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/foco 13h"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/foco"))
+        assertTrue(BotCommand.Focus(2).changesApp())
+
+        val focused = focusAlerts(UsageAlertSettings(), BotCommand.Focus(2), nowMillis = 1_000L)
+        assertEquals(1_000L + 2 * 3_600_000L, focused.focusUntilEpochMillis)
+        assertEquals(null, focusAlerts(focused, BotCommand.Focus(null), nowMillis = 5_000L).focusUntilEpochMillis)
+    }
+
+    /** #408, AA4: `/avise 30` muda a antecedência, `/avise off` desliga; fora da faixa, o uso. */
+    @Test
+    fun `remind command parses minutes and off`() {
+        assertEquals(BotCommand.Remind(30), parseBotCommand("/avise 30"))
+        assertEquals(BotCommand.Remind(15), parseBotCommand("/remind 15min"))
+        assertEquals(BotCommand.Remind(null), parseBotCommand("/avise off"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/avise 2"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/avise"))
+        assertEquals(30, applyBotCommand(UsageAlertSettings(), BotCommand.Remind(30))?.resetReminderMinutes)
+        assertTrue(BotCommand.Remind(null).changesApp())
+    }
+
+    /** #408, AA10: `/limiar` sem números pergunta a conta; o toque vai e volta com a chave ou "todas". */
+    @Test
+    fun `threshold without numbers asks for the account`() {
+        assertEquals(BotCommand.ThresholdMenu, parseBotCommand("/limiar"))
+        assertEquals(BotCommand.Threshold(listOf(75, 90)), parseBotCommand("/limiar 90,75"))
+        assertTrue(BotCommand.ThresholdMenu.changesApp())
+        for (tap in listOf(BotTap.ThresholdAccount("ANTHROPIC:1a2b3c"), BotTap.ThresholdAccount(null))) {
+            assertEquals(tap, parseBotTap(tap.data()))
+        }
+        assertEquals(listOf(50, 80), parseThresholdPercents("80, 50"))
+        assertEquals(null, parseThresholdPercents("geral"))
+    }
+
+    /** Rodada AB: `/analise` com fonte, placar e vista em qualquer ordem; os toques vão e voltam. */
+    @Test
+    fun `analysis command reads source, scoreboard and view`() {
+        assertEquals(BotCommand.Analysis(null, null, false), parseBotCommand("/analise"))
+        assertEquals(BotCommand.Analysis(AnalysisView.HOURS, ApiSource.CODEX, false), parseBotCommand("/analise horas codex"))
+        assertEquals(BotCommand.Analysis(null, null, true), parseBotCommand("/analysis all"))
+        assertEquals(BotCommand.Analysis(AnalysisView.CURVE, null, false), parseBotCommand("/analise 5h img"))
+        assertIs<BotCommand.Invalid>(parseBotCommand("/analise xyz"))
+        assertFalse(BotCommand.Analysis(null, null, false).changesApp())
+        for (tap in listOf(BotTap.AnalysisAccount(null), BotTap.AnalysisAccount("CODEX:9f"), BotTap.AnalysisShow("ANTHROPIC:1a2b", AnalysisView.REPORT))) {
+            assertEquals(tap, parseBotTap(tap.data()))
+        }
     }
 }

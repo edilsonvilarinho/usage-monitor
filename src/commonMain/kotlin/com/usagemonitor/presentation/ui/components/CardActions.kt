@@ -4,19 +4,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import com.usagemonitor.domain.entity.ANALYSIS_SOURCES
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.SessionPulse
 
 /** As janelas que o card de uma conta abre, na ordem da barra dele. */
-enum class CardAction { HISTORY, CODEX_CLI_SESSIONS, CLI_SESSIONS, TEAM_USAGE, TEAM_PRESENCE }
+/**
+ * [ANALYSIS] (rodada AB, B20) é valor novo em enum existente — **exceção aprovada** pelo
+ * usuário (decisão U2 de `docs/planos/analise-sessao-execucao.md`), como as abas da #399.
+ * Todo `when` sobre o enum é exaustivo: a ação nova não compila sem dizer o que abre.
+ */
+enum class CardAction { HISTORY, ANALYSIS, CODEX_CLI_SESSIONS, CLI_SESSIONS, TEAM_USAGE, TEAM_PRESENCE }
 
 /**
  * Quais janelas a conta [target] oferece. **Dono único** da regra, que tem duas
@@ -30,6 +37,8 @@ enum class CardAction { HISTORY, CODEX_CLI_SESSIONS, CLI_SESSIONS, TEAM_USAGE, T
 internal fun cardActionsFor(target: UsageTargetKey, teamEnabledProfileIds: Set<String>): List<CardAction> {
     return buildList {
         add(CardAction.HISTORY)
+        // A análise da sessão cobre só as fontes com janela 5h e semanal em percentual.
+        if (target.source in ANALYSIS_SOURCES) add(CardAction.ANALYSIS)
         if (target.source == ApiSource.CODEX) add(CardAction.CODEX_CLI_SESSIONS)
         if (target.source == ApiSource.ANTHROPIC) add(CardAction.CLI_SESSIONS)
         if (target.source == ApiSource.ANTHROPIC && target.profileId in teamEnabledProfileIds) {
@@ -42,6 +51,7 @@ internal fun cardActionsFor(target: UsageTargetKey, teamEnabledProfileIds: Set<S
 /** O rótulo da ação, que é também a descrição do botão. */
 internal fun cardActionLabel(action: CardAction, language: AppLanguage): String = when (action) {
     CardAction.HISTORY -> historyActionLabel(language)
+    CardAction.ANALYSIS -> if (language == AppLanguage.PT) "Análise da sessão: ritmo, vazão e janelas" else "Session analysis: pace, throughput and windows"
     CardAction.CODEX_CLI_SESSIONS -> codexCliSessionsActionLabel(language)
     CardAction.CLI_SESSIONS -> cliSessionsActionLabel(language)
     CardAction.TEAM_USAGE -> teamUsageActionLabel(language)
@@ -71,6 +81,7 @@ internal fun CardActionButton(
     }
     val icon = when (action) {
         CardAction.HISTORY -> Icons.Rounded.History
+        CardAction.ANALYSIS -> Icons.Rounded.Insights
         CardAction.CODEX_CLI_SESSIONS, CardAction.CLI_SESSIONS -> Icons.Rounded.Terminal
         CardAction.TEAM_USAGE -> Icons.Rounded.Groups
         CardAction.TEAM_PRESENCE -> Icons.Rounded.Sensors

@@ -300,7 +300,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   `TelegramBotMessages.escape` (`&`, `<`, `>`): sem ele um rótulo de conta com `<` faria o Telegram recusar a mensagem
   inteira com 400. A prévia das Configurações mostra o mesmo texto sem as marcas (`TelegramBotMessages.plain`).
 - **Menu**: ao conectar um token o serviço chama `setMyCommands` com os comandos no idioma do app — o botão "Menu" do
-  Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão.
+  Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão. **Por categoria** (análise da sessão, B01):
+  `TelegramCommandCatalog` é o dono único do menu e do `/ajuda` — 📊 Agora, 📐 Análises, 🔔 Alertas, 💬 Conversa e PC.
+  O `setMyCommands` não tem seção, então a categoria vai na ordem e no emoji que abre a descrição; no `/ajuda` ela vira
+  cabeçalho. Comando novo entra numa categoria do catálogo, nunca solto no fim da lista.
 - **`getMe`** ao conectar dá o `@` do bot: as Configurações dizem "Conectado como @bot" e oferecem "Abrir no Telegram" pelo
   link `https://t.me/<bot>?start=<código>`, que abre a conversa e manda o `/start <código>` sozinho. Sem resposta do
   `getMe`, o link some e o resto segue.
@@ -354,6 +357,145 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   (sem dependência nova; Plex Mono do classpath): eixo 0–100%, tracejado dourado no reinício e **o segmento que atravessa
   o reinício não é ligado** — a queda não foi consumo. A legenda escreve rótulo e último percentual. Sem histórico, a
   resposta é texto.
+- **Funções da #408** (galeria AA, `docs/planos/issue-408-execucao.md`). Toda resposta sai do `UsageSnapshot` ou de
+  leitura que o app já faz; nenhuma leva prompt, resposta, `cwd` ou `session_id`.
+  - `/reinicios` (`/resets`, AA3): toda cota com reinício conhecido ainda por vir, na ordem do relógio (empate por conta e
+    cota), com o percentual; teto de 12 linhas e "+N mais".
+  - `/quando` (`/when`, AA2): a data de esgotamento da mesma projeção do arco da HUD (`QuotaRiskSummary.estimatedExhaustionAt`,
+    agora também em `UsageSnapshotQuota.exhaustsAt`, com o mesmo filtro de cota vencida) contra o reinício: "estoura N antes"
+    ou "não estoura antes de reiniciar"; saldo diz quando acaba; sem projeção, a linha diz "sem projeção".
+  - `/qual` (`/which`, AA28): por fonte, a conta com mais folga — menor risco, depois menor percentual, depois rótulo (ordem
+    total); as outras da fonte vêm embaixo com o emoji do pior risco. Conta só com saldo fica fora: não se compara com janela.
+  - `/ritmo` (`/pace`, AA27): para cota em percentual com mais de 24 h até o reinício, (100 − uso) dividido pelos dias que
+    faltam, em pp por dia. Rotulado **estimativa** — a API não informa ritmo; é cálculo de apresentação, não da camada data.
+  - `/ping` (AA19): versão (`CURRENT_APP_VERSION`), tempo aberto (instante da montagem do bot), próxima coleta
+    (`DashboardViewModel.nextRefreshAt`) e a hora da última leitura de cada conta. As leituras que não vêm do retrato
+    entram por `TelegramBotReadings` (um parâmetro só no serviço, default vazio por leitura).
+  - `/pico` (`/spike`, AA11): as mesmas anomalias do alerta "consumo acima do habitual" (`DashboardViewModel.spikes`), mais
+    forte primeiro, em pontos da cota (hoje × mediana dos dias completos até a mesma hora). Sem nenhuma, diz o fator a partir
+    do qual o aviso sai (`effectiveSpikeFactor`).
+  - `/vazao` (`/throughput`, AA5): tokens de saída por segundo por modelo nas últimas 24 h, das linhas da comparação entre
+    modelos (`BuildModelComparisonUseCase`, #386) — ponta a ponta e total sobre total, nunca média de razões. Modelo sem vazão
+    medida fica fora; índice ilegível responde que não deu para ler, em vez de lista vazia.
+  - `/semana` (`/week`, AA7): por cota, os pontos consumidos nos últimos 7 dias contra os 7 anteriores
+    (`UsageHistorySeries.comparison`, o mesmo do Histórico: reinício conta zero), com seta e número. O histórico de cada
+    conta é lido com a mesma chave da projeção do painel (`accountContext.key`) e casado com o cartão pelo `snapshotLabel`
+    (`TelegramAccountHistory`) — nunca pelo e-mail. Saldo em dinheiro fica fora.
+  - `/janelas` (`/windows`, AA12): as 4 últimas janelas curtas (`/janelas 7d`: semanais, lidas de 30 dias) de cada conta,
+    mais nova primeiro — início observado e reinício, pico, hora em que esgotou e a faixa ativa (#382). Mesmas
+    `QuotaWindowSummary` do Histórico.
+  - **Sparkline no `/status`** (AA13): embaixo da barra de cada cota com pelo menos duas leituras nas últimas 6 h, doze blocos
+    `▁…█` de 30 min — cada bloco com o uso da última leitura até o fim dele (não inventa ponto entre leituras), espaço antes
+    da primeira. O número continua escrito na barra; a linha só dá a forma. Vale também para a edição do botão Atualizar.
+  - `/comparar [24h|7d|30d]` (`/compare`, AA6; padrão 7 d): PNG com o mapa de calor da comparação entre modelos (#386, P7) —
+    mesmas células (`comparisonCell`) e intensidade (`heatIntensity`, contra todas as linhas mesmo com o teto de 12),
+    desenhado por `TelegramHeatmapRenderer` no Skia do `/grafico`; o dourado da célula tem teto para o número claro manter
+    contraste. Índice ilegível ou recorte vazio respondem em texto.
+  - `/status img` (AA14): PNG com um anel por conta (quatro por linha) no vocabulário da HUD — até três arcos com a janela
+    de reinício mais distante por fora, o maior percentual no centro e a palavra do pior risco embaixo (`buildTelegramRings`,
+    pura; `TelegramRingsRenderer`, Skia). Conta só com saldo fica fora da imagem; sem nenhuma, a resposta manda para o
+    `/status` em texto. Desenho estático: o arco nunca passa do número do centro.
+  - `/conversas` (`/chats`) e `/sair` (`/leave`, AA22): a lista das conversas pareadas com a atual marcada, e o pareamento
+    desfeito pelo próprio Telegram. Sair grava a lista antes de responder (a confirmação é a última mensagem da conversa),
+    desafixa o painel dela e não pede permissão — é a conversa decidindo por si.
+  - **Papéis por conversa** (AA21): `TelegramChat.readOnly` (em `telegram.json`, nasce `false` = comportamento de antes).
+    Conversa só de leitura recebe tudo, mas comando que muda o app (`BotCommand.changesApp`, `when` exaustivo — comando
+    novo não compila sem decidir) responde com a recusa, e toque de fonte ou silêncio só fecha o "carregando" com o aviso.
+    O papel é relido a cada comando e toque. Interruptor **Controle** por conversa no card.
+  - ~~`/idioma`~~ (AA24) **saiu** na análise da sessão (B02, decisão do usuário: o idioma do app manda). Menu, respostas,
+    toques, alertas, resumo diário e painel saem sempre no idioma do app; o `pollLoop` guarda o idioma em que registrou o
+    menu e chama `setMyCommands` de novo quando o do app muda (dentro de um ciclo de long polling, até 25 s). O campo
+    `language` das conversas no `telegram.json` antigo é ignorado (`ignoreUnknownKeys`).
+  - **Auditoria de idioma** (B03): todo texto das mensagens já tinha os dois idiomas; o que vazava em português no bot em
+    inglês eram as chaves de série nascidas em português ("Créditos", "Saldo", "Gratuito", "Go semanal", "Go mensal").
+    `displayQuotaLabel` (presentation) traduz **só na exibição** — a chave do histórico não muda — no bot, no gráfico e nos
+    títulos dos alertas (bandeja inclusive). O estado "token recusado" das Configurações deixou de ser texto fixo em
+    português (`TelegramBotStatus.TokenRejected`).
+  - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado (📊 Status,
+    👤 Conta, 📈 Gráfico, ⏳ Quando, no idioma da conversa); `off` manda `remove_keyboard`. O toque chega como **texto** com o
+    rótulo e `parseKeyboardLabel` o traduz no comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos
+    `resize_keyboard`/`is_persistent` não têm default no DTO porque o `Json` do cliente não grava valor padrão.
+  - `/hud` (AA29): grava o mesmo `focus.request` da segunda instância (`FocusRequestChannel`), que o laço do `Main` atende
+    trazendo a HUD à frente. Só com **"Permitir ações no PC"** (nasce desligado), relido a cada pedido; conversa só de leitura
+    é recusada (`changesApp`). As opções novas da #408 moram em `TelegramBotPreferences` (`data class` sem segredo, objeto
+    `preferences` no `telegram.json` com default por campo), e não como campos soltos do `TelegramBotSettings`, cujo
+    `copy`/`equals`/`hashCode` é escrito à mão por causa do token.
+  - **Nome do PC** (AA20): com "Nome deste PC nas mensagens" ligado, alertas, resumo, painel, `/status` e respostas de
+    texto terminam com `💻 <nome>` — o mesmo nome do índice CLI (`resolveLocalHostName`, `COMPUTERNAME`/`HOSTNAME`, depois
+    `InetAddress`; saiu do `LocalCliSessionDataSource` para um dono só). Sem nome, a mensagem segue sem assinatura. Dois PCs
+    com o **mesmo** token disputam o `getUpdates` (o Telegram responde 409 a um deles): o nome resolve "de onde veio o
+    alerta", não a disputa — para comandos, um token por PC.
+  - `/exportar [24h|7d|30d] [csv|json]` (`/export`, AA23; padrão 7 d CSV): o consumo do Claude CLI do recorte
+    (`getUsageBreakdown` com `sinceEpochMillis`) no mesmo formato da exportação do app (`DefaultUsageExportEncoder`), enviado
+    por `sendDocument` (multipart novo, como o `sendPhoto`). Projeto, branch e integrante são **zerados antes de codificar** —
+    o arquivo sai do PC; ficam modelo, ferramenta e totais. Índice ilegível responde em texto.
+  - `/time` (`/team`, AA16): presença do time (`GetTeamPresenceUseCase`, com o desvio de relógio medido) nas mesmas contas
+    do semáforo dos cards (`buildSessionPulseTargets`), uma linha por pessoa — trabalhando agora com o número de sessões,
+    online parado, ou fora com a última batida —, **só pelo apelido**: nunca e-mail nem nome da máquina. Só com **"Mostrar o
+    time no bot"** (nasce desligado: expõe dado de outras pessoas); desligado, o servidor nem é consultado. O consumo em
+    dinheiro por pessoa do mockup ficou fora (desvio registrado no plano).
+  - **Atualização pelo bot** (AA17): com **"Permitir atualizar pelo bot"** (nasce desligado: reinicia o app no PC a pedido de
+    uma conversa), o serviço checa a cada minuto se há versão **pronta** (`AppUpdateUiState.Ready`: baixada e com SHA-256
+    conferido; a só disponível não tem o que instalar) e avisa uma vez por versão — `announcedUpdateVersion` gravada antes do
+    envio — com o botão "⬆ Atualizar e reiniciar o app" (`upd:<versão>`). O toque relê permissão e versão: aviso antigo
+    responde "não está mais pronta", e só a versão pronta chama `restartAndUpdateNow`, o mesmo botão da faixa do app. O texto
+    diz o que reinicia. Conversa só de leitura não reinicia (`tapChangesApp`).
+  - **Tipos de alerta** (AA9): `/alertas` sem argumento (antes "uso inválido") manda um botão por tipo — Cota, Reinício,
+    Sessão saturada, Sem resposta, Pico — com ✅/⬜ e o nome (`alt:<tipo>`). O toque inverte **o mesmo campo** das
+    Configurações (`AlertKind`, enum novo que aponta para os interruptores de `UsageAlertSettings`) e redesenha o teclado da
+    mensagem. `/alertas on|off` continua mudando todos.
+  - **Som por gravidade** (AA26): com **"Só alerta crítico toca"** (nasce **ligado**, como no mockup aprovado — não age no PC
+    nem expõe dado, só tira o som), o alerta sai com `disable_notification` salvo se for crítico. Crítico tem dono único no
+    domain, `isCriticalAlert`: `QuotaThreshold` com percentual real ≥ `CRITICAL_ALERT_PERCENT` (90), o que inclui a esgotada.
+    Sessão, reinício, sem resposta e pico nunca são críticos. A mensagem de teste e as respostas a comandos seguem com som.
+  - **Alerta repetido vira contador** (AA1): com **"Agrupar alertas repetidos"** (nasce ligado), a repetição do mesmo alerta
+    no mesmo dia local (BRT) **edita** a mensagem anterior daquela conversa — `<b>N×</b> desde HH:MM` no título e
+    `última: HH:MM` no fim —, e a edição não toca. "O mesmo" é `alertGroupKey` (domain): tipo e assunto — projeto da sessão
+    (sessões diferentes do mesmo projeto contam juntas, que é o caso do print da issue), cota da conta com o limiar. Crítico
+    nunca agrupa: precisa tocar. O mapa (conversa, chave) → mensagem vive só em memória no coletor de alertas: reiniciar o
+    app abre mensagem nova, e edição que falha (mensagem apagada, rede) cai numa mensagem nova. Não mexe na dedup da
+    bandeja (`UsageAlertState`): a causa das repetições (D4 do plano) segue sem diagnóstico.
+  - **Alertas em lote** (AA25): com **"Juntar alertas"** (nasce ligado), o alerta não crítico fica retido até 15 min
+    contados do primeiro do lote; ao fim, um lote de um alerta sai como alerta avulso (com o agrupamento da AA1) e dois ou
+    mais saem numa mensagem — `🔔 N alertas · HH:MM–HH:MM` e um tópico por grupo (`batchAlertItems`: mesmo `alertGroupKey`
+    vira `(k×)`, com o alerta mais recente), sem som quando "Só alerta crítico toca" está ligado. O crítico sai na hora,
+    fora do lote. Só no Telegram: a bandeja segue imediata. Lote e grupos ficam sob um `Mutex` (coletor × esvaziamento
+    atrasado); fechar o app com alerta retido o perde, como um envio que falha.
+  - **Painel em uma linha** (AA15): com **"Painel em uma linha"** (nasce ligado; o painel fixado em si continua opt-in), o
+    painel vira `🔴 Padrão 86% · 🟢 Codex 22% · DeepSeek US$ 37,66` — ponto de risco, conta e a cota mais cheia (saldo com o
+    valor) — e a hora da coleta na segunda linha (`compactPanel`). O banner de mensagem fixada do Telegram mostra só a
+    primeira linha, sem marcas. Desligado, volta o formato de #398 com a barra por conta.
+  - **Modo foco** (AA8): `/foco 2h` (1 a 12 h; `/focus` em inglês) grava `focusUntilEpochMillis` em `UsageAlertSettings`
+    (registro, `alertsFocusUntilMillis`) e `/foco off` apaga. A decisão pura (`evaluateUsageAlerts`) trata o foco como o
+    silêncio para tudo que não é crítico — **adia, não consome**: limiar abaixo de `CRITICAL_ALERT_PERCENT`, reinício,
+    sessão, sem resposta e pico ficam pendentes e saem na primeira coleta depois do fim. A cota decide por leitura: a mesma
+    janela que passa de 90% durante o foco sai na hora, com todos os limiares cruzados (todos levam o percentual crítico).
+    Vale para a bandeja também, porque mora na decisão. Diferente do silêncio, que cala tudo. Conversa só de leitura não
+    liga foco (`changesApp`).
+  - **Lembrete antes do reinício** (AA4): `/avise 15` (5 a 120 min; `/remind`) e `/avise off` gravam
+    `resetReminderMinutes` pelo mesmo caminho do `/limiar` (`applyBotCommand`). O alerta é `UsageAlert.ResetSoon`, decidido
+    na função pura e entregue pela bandeja e pelo bot (decisão em `docs/presentation.md`).
+  - **Fonte quebrada** (AA18): com **"Avisar fonte com falha"** (nasce ligado), o serviço lê a cada minuto os erros que o
+    `UiState` já publica (`sourceHealthOf` na fiação: mensagem **saneada** da tela, nunca token; hora dos números mantidos
+    por `statsRetainedAfterFailure`) e `evaluateSourceHealth` (domain, pura) decide: conta falhando há
+    `SOURCE_BROKEN_AFTER_MILLIS` (15 min — três coletas no ritmo sem sessão) avisa **uma vez** "⚠ X parou de atualizar /
+    Falhando desde HH:MM: motivo / Os números mostrados são de HH:MM"; quando volta a ler, "✅ X voltou" — só se tinha
+    avisado. Fonte desligada sai calada; silêncio adia. O 429 conta como falha (a fonte de fato parou, e a mensagem diz que é
+    limite). **Desvio do mockup**: "3 coletas seguidas" virou 15 min seguidos — o `UiState` é `StateFlow` e não emite duas
+    falhas iguais, então contar coletas exigiria um evento novo no `DashboardViewModel` (751 linhas, faixa que não cresce).
+    O estado vive em memória: reiniciar o app recomeça a contagem.
+  - **Limiar por conta** (AA10): `/limiar` sem números (antes "uso inválido") pergunta a conta — um botão por conta com cota em
+    percentual (`thr:<botAccountKey>`) e "Todas" (`thr:*`). O toque abre um pedido por conversa, **só em memória e por 10
+    min**; o texto solto seguinte (`50,80` ou `geral`) grava o limiar daquela conta (`withAccountThreshold`) ou, em "Todas",
+    o geral. Sem pedido aberto, texto solto continua sem resposta. Conversa só de leitura é recusada no comando, no toque e
+    na resposta. `/limiar 75,90` segue mudando o geral. Decisão e persistência em `docs/presentation.md`.
+- **Análise da sessão** (rodada AB, `docs/planos/analise-sessao-execucao.md`): `/analise` (`/analysis`), categoria 📐 Análises.
+  Cobre contas Anthropic e Codex (`ANALYSIS_SOURCES`); com uma só, abre direto, com mais, pergunta a conta
+  (`ana:<botAccountKey>`). A resposta é o painel de bordo (AB1) com **abas** (AB12): cada aba é `anv:<conta>:<código>` e as
+  vistas de texto **editam a mesma mensagem**; imagem e PDF saem como mensagem nova. Argumentos em qualquer ordem: fonte
+  (`claude`, `codex`), `todas` (placar) e a vista (`horas`, `img`, `pdf`…). Dados: `buildSessionAnalysis` (domain) —
+  ritmo em pp/h pela subida entre leituras do histórico de 7 dias, vazão por diferença de dois recortes "desde" do índice
+  CLI (Anthropic pelo perfil da conta, Codex pela máquina). Só leitura (`changesApp` falso); nada de prompt ou projeto.
 - Nunca trafega prompt, resposta ou caminho de projeto: o `/status` sai do `UsageSnapshot`.
 - **Discord** fica para uma segunda fase: bot bidirecional exige Gateway (WebSocket permanente, heartbeat, intents).
 

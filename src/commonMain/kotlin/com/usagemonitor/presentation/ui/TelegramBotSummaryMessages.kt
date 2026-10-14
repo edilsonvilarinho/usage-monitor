@@ -56,10 +56,9 @@ internal object TelegramBotSummaryMessages {
             ?: if (pt) "sem coleta ainda" else "not collected yet"
         val lines = snapshot.accounts.map { account ->
             val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
-            val quota = account.quotas.filter { item -> item.percent != null }.maxByOrNull { item -> item.percent ?: 0 }
-                ?: account.quotas.firstOrNull()
+            val quota = fullestQuota(account)
             val value = quota?.let { item ->
-                " · ${TelegramBotMessages.escape(item.label)}\n<code>${TelegramBotMessages.escape(TelegramBotMessages.quotaValue(item, pt))}</code>"
+                " · ${TelegramBotMessages.escape(displayQuotaLabel(item.label, pt))}\n<code>${TelegramBotMessages.escape(TelegramBotMessages.quotaValue(item, pt))}</code>"
             }.orEmpty()
             "$mark<b>${TelegramBotMessages.escape(account.label)}</b>$value"
         }
@@ -67,15 +66,36 @@ internal object TelegramBotSummaryMessages {
         return "$title\n<i>$updated</i>\n\n" + lines.joinToString("\n")
     }
 
+    /**
+     * Painel em uma linha (#408, AA15): ponto de risco, conta e o pior percentual (saldo
+     * mostra o valor), separados por `·` — o banner do topo da conversa mostra só a primeira
+     * linha, sem as marcas. A hora da coleta vai na segunda, pelo mesmo motivo de [panel].
+     */
+    fun compactPanel(snapshot: UsageSnapshot?, language: AppLanguage): String {
+        val pt = language == AppLanguage.PT
+        if (snapshot == null || snapshot.accounts.isEmpty()) return TelegramBotMessages.noReading(pt)
+        val line = snapshot.accounts.joinToString(" · ") { account ->
+            val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
+            val quota = fullestQuota(account)
+            val value = quota?.let { item -> " " + (item.percent?.let { percent -> "$percent%" } ?: TelegramBotMessages.quotaValue(item, pt)) }.orEmpty()
+            TelegramBotMessages.escape("$mark${account.label}$value")
+        }
+        val updated = snapshot.lastCollectedAt?.let { at -> (if (pt) "coleta " else "collected ") + "${TelegramBotMessages.clock(at)} BRT" }
+            ?: if (pt) "sem coleta ainda" else "not collected yet"
+        return "$line\n<i>$updated</i>"
+    }
+
+    private fun fullestQuota(account: UsageSnapshotAccount): UsageSnapshotQuota? =
+        account.quotas.filter { item -> item.percent != null }.maxByOrNull { item -> item.percent ?: 0 }
+            ?: account.quotas.firstOrNull()
+
     /** A cota mais cheia da conta; sem percentual (saldo), a primeira, com o valor que o `/status` mostra. */
     private fun accountLine(account: UsageSnapshotAccount, now: Instant, pt: Boolean): String {
         val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
         val name = "<b>${TelegramBotMessages.escape(account.label)}</b>"
-        val quota = account.quotas.filter { item -> item.percent != null }.maxByOrNull { item -> item.percent ?: 0 }
-            ?: account.quotas.firstOrNull()
-            ?: return mark + name
+        val quota = fullestQuota(account) ?: return mark + name
         val reset = quota.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + TelegramBotMessages.resetLabel(at, now, pt) }.orEmpty()
-        return "$mark$name · ${TelegramBotMessages.escape(quota.label)} ${valueOf(quota, pt)}$reset"
+        return "$mark$name · ${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))} ${valueOf(quota, pt)}$reset"
     }
 
     private fun valueOf(quota: UsageSnapshotQuota, pt: Boolean): String {
@@ -89,7 +109,7 @@ internal object TelegramBotSummaryMessages {
         val entries = snapshot.accounts.flatMap { account ->
             account.quotas.mapNotNull { quota ->
                 val at = quota.resetsAt?.takeIf { instant -> instant > now && instant.toLocalDateTime(SAO_PAULO).date == today }
-                at?.let { instant -> instant to "${TelegramBotMessages.escape(account.label)} ${TelegramBotMessages.escape(quota.label)} " + (if (pt) "às " else "at ") + TelegramBotMessages.clock(instant) }
+                at?.let { instant -> instant to "${TelegramBotMessages.escape(account.label)} ${TelegramBotMessages.escape(displayQuotaLabel(quota.label, pt))} " + (if (pt) "às " else "at ") + TelegramBotMessages.clock(instant) }
             }
         }.sortedBy { (instant, _) -> instant }
         if (entries.isEmpty()) return null

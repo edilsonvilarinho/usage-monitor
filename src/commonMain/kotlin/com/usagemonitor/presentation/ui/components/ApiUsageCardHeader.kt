@@ -469,7 +469,8 @@ internal fun ApiUsageCardNavigationBar(
     onOpenCliSessions: (() -> Unit)?,
     onOpenCodexCliSessions: (() -> Unit)?,
     onOpenTeamUsage: (() -> Unit)?,
-    onOpenTeamPresence: (() -> Unit)?
+    onOpenTeamPresence: (() -> Unit)?,
+    onOpenAnalysis: (() -> Unit)? = null
 ) {
     // As quatro ações de navegação desceram do cabeçalho para uma barra
     // própria. No topo elas dividiam espaço com atualizar e minimizar, que
@@ -486,6 +487,7 @@ internal fun ApiUsageCardNavigationBar(
         // regra; aqui chegam como lambdas nulas ou não.
         val actions = buildList {
             add(CardAction.HISTORY)
+            if (onOpenAnalysis != null) add(CardAction.ANALYSIS)
             if (onOpenCodexCliSessions != null) add(CardAction.CODEX_CLI_SESSIONS)
             if (onOpenCliSessions != null) add(CardAction.CLI_SESSIONS)
             if (onOpenTeamUsage != null) add(CardAction.TEAM_USAGE)
@@ -501,6 +503,7 @@ internal fun ApiUsageCardNavigationBar(
                 teamSessionPulse = teamSessionPulse,
                 onClick = when (action) {
                     CardAction.HISTORY -> onOpenHistory
+                    CardAction.ANALYSIS -> onOpenAnalysis ?: {}
                     CardAction.CODEX_CLI_SESSIONS -> onOpenCodexCliSessions ?: {}
                     CardAction.CLI_SESSIONS -> onOpenCliSessions ?: {}
                     CardAction.TEAM_USAGE -> onOpenTeamUsage ?: {}

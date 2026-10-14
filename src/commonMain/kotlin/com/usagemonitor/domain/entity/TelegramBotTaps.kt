@@ -29,12 +29,37 @@ sealed interface BotTap {
 
     /** Silencia até a próxima 08:00 em BRT (#398, Y8). */
     data object SnoozeUntilMorning : BotTap
+
+    /** "Atualizar e reiniciar" da versão [version] (#408, AA17); versão diferente da pronta não reinicia nada. */
+    data class UpdateNow(val version: String) : BotTap
+
+    /** Liga ou desliga um tipo de alerta (#408, AA9). */
+    data class ToggleAlert(val kind: AlertKind) : BotTap
+
+    /** Conta escolhida no `/limiar` (#408, AA10): [key] de [botAccountKey], ou `null` para todas. */
+    data class ThresholdAccount(val key: String?) : BotTap
+
+    /** Conta escolhida no `/analise` (rodada AB): [key] de [botAccountKey], ou `null` para o placar. */
+    data class AnalysisAccount(val key: String?) : BotTap
+
+    /** Aba da análise (AB12): a vista [view] da conta [key]. */
+    data class AnalysisShow(val key: String, val view: AnalysisView) : BotTap
+
+    /** "📐 Análise" do `/status` (rodada AB, B19): o mesmo que mandar `/analise`. */
+    data object AnalysisPick : BotTap
 }
 
 private const val ACCOUNT_PREFIX = "acc:"
 private const val SOURCE_PREFIX = "api:"
 private const val SNOOZE_PREFIX = "snz:"
 private const val SNOOZE_MORNING = "am"
+private const val UPDATE_PREFIX = "upd:"
+private const val ALERT_PREFIX = "alt:"
+private const val THRESHOLD_PREFIX = "thr:"
+private const val THRESHOLD_ALL = "*"
+private const val ANALYSIS_PREFIX = "ana:"
+private const val ANALYSIS_VIEW_PREFIX = "anv:"
+private const val ANALYSIS_PICK = "anp"
 
 /** `null` para dado que não é deste formato — inclusive os de [BotButton]. */
 fun parseBotTap(data: String?): BotTap? {
@@ -44,6 +69,14 @@ fun parseBotTap(data: String?): BotTap? {
         value.startsWith(SOURCE_PREFIX) -> ApiSource.entries.firstOrNull { source -> source.name == value.removePrefix(SOURCE_PREFIX) }?.let(BotTap::Source)
         value == SNOOZE_PREFIX + SNOOZE_MORNING -> BotTap.SnoozeUntilMorning
         value.startsWith(SNOOZE_PREFIX) -> value.removePrefix(SNOOZE_PREFIX).toIntOrNull()?.takeIf { minutes -> minutes in 1..MAX_SNOOZE_MINUTES }?.let(BotTap::SnoozeFor)
+        value.startsWith(UPDATE_PREFIX) -> value.removePrefix(UPDATE_PREFIX).takeIf { version -> version.isNotEmpty() }?.let(BotTap::UpdateNow)
+        value.startsWith(ALERT_PREFIX) -> AlertKind.entries.firstOrNull { kind -> kind.data == value.removePrefix(ALERT_PREFIX) }?.let(BotTap::ToggleAlert)
+        value == THRESHOLD_PREFIX + THRESHOLD_ALL -> BotTap.ThresholdAccount(null)
+        value.startsWith(THRESHOLD_PREFIX) -> value.removePrefix(THRESHOLD_PREFIX).takeIf { key -> key.isNotEmpty() }?.let(BotTap::ThresholdAccount)
+        value == ANALYSIS_PICK -> BotTap.AnalysisPick
+        value == ANALYSIS_PREFIX + THRESHOLD_ALL -> BotTap.AnalysisAccount(null)
+        value.startsWith(ANALYSIS_PREFIX) -> value.removePrefix(ANALYSIS_PREFIX).takeIf { key -> key.isNotEmpty() }?.let(BotTap::AnalysisAccount)
+        value.startsWith(ANALYSIS_VIEW_PREFIX) -> parseAnalysisShow(value.removePrefix(ANALYSIS_VIEW_PREFIX))
         else -> null
     }
 }
@@ -54,6 +87,19 @@ fun BotTap.data(): String = when (this) {
     is BotTap.Source -> SOURCE_PREFIX + source.name
     is BotTap.SnoozeFor -> SNOOZE_PREFIX + minutes
     BotTap.SnoozeUntilMorning -> SNOOZE_PREFIX + SNOOZE_MORNING
+    is BotTap.UpdateNow -> UPDATE_PREFIX + version
+    is BotTap.ToggleAlert -> ALERT_PREFIX + kind.data
+    is BotTap.ThresholdAccount -> THRESHOLD_PREFIX + (key ?: THRESHOLD_ALL)
+    is BotTap.AnalysisAccount -> ANALYSIS_PREFIX + (key ?: THRESHOLD_ALL)
+    is BotTap.AnalysisShow -> ANALYSIS_VIEW_PREFIX + key + ":" + view.code
+    BotTap.AnalysisPick -> ANALYSIS_PICK
+}
+
+/** `<chave da conta>:<código da vista>`; a chave já tem `:` (fonte:resumo), então o código é o último trecho. */
+private fun parseAnalysisShow(value: String): BotTap? {
+    val key = value.substringBeforeLast(':', missingDelimiterValue = "")
+    val view = AnalysisView.entries.firstOrNull { item -> item.code == value.substringAfterLast(':') }
+    return if (key.isEmpty() || view == null) null else BotTap.AnalysisShow(key, view)
 }
 
 /** Teto do silêncio por toque: um dia. Dado maior é forjado, não do teclado do bot. */

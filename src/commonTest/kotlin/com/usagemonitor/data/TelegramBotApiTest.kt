@@ -4,6 +4,7 @@ import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
+import com.usagemonitor.data.datasource.TelegramReplyKeyboard
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -48,6 +49,32 @@ class TelegramBotApiTest {
         api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }.sendMessage("123:abc", 51L, "Olá")
 
         assertEquals("""{"chat_id":51,"text":"Olá"}""", sent)
+    }
+
+    @Test
+    fun `reply keyboard goes persistent and resized, and remove clears it`() = runTest {
+        var sent: String? = null
+        val client = api(HttpStatusCode.OK, """{"ok":true}""") { _, body -> sent = body }
+
+        client.sendMessage("123:abc", 51L, "ok", replyKeyboard = TelegramReplyKeyboard.Show(listOf(listOf("📊 Status", "👤 Conta"))))
+        assertEquals(
+            """{"chat_id":51,"text":"ok","reply_markup":{"keyboard":[[{"text":"📊 Status"},{"text":"👤 Conta"}]],"resize_keyboard":true,"is_persistent":true}}""",
+            sent
+        )
+        client.sendMessage("123:abc", 51L, "ok", replyKeyboard = TelegramReplyKeyboard.Remove)
+        assertEquals("""{"chat_id":51,"text":"ok","reply_markup":{"remove_keyboard":true}}""", sent)
+    }
+
+    @Test
+    fun `document goes as multipart to sendDocument`() = runTest {
+        var url = ""
+        val engine = MockEngine { request ->
+            url = request.url.toString()
+            respond("""{"ok":true}""", HttpStatusCode.OK)
+        }
+        TelegramBotApi(HttpClient(engine)).sendDocument("123:abc", 51L, "a,b\n1,2".encodeToByteArray(), "uso.csv", "text/csv", "<b>Uso</b>")
+
+        assertTrue(url.endsWith("/bot123:abc/sendDocument"), url)
     }
 
     @Test

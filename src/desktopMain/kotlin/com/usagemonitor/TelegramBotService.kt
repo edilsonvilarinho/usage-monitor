@@ -2,6 +2,9 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.TelegramButton
+import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.data
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
 import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import com.usagemonitor.domain.entity.ApiSource
@@ -11,11 +14,21 @@ import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.domain.entity.dailySummaryDate
 import com.usagemonitor.domain.entity.isDailySummaryDue
+import com.usagemonitor.domain.entity.isCriticalAlert
+import com.usagemonitor.domain.entity.TelegramAlertGroup
+import com.usagemonitor.domain.entity.alertGroupKey
+import com.usagemonitor.domain.entity.batchAlertItems
+import com.usagemonitor.domain.entity.SOURCE_BROKEN_AFTER_MILLIS
+import com.usagemonitor.domain.entity.SourceHealthEntry
+import com.usagemonitor.domain.entity.evaluateSourceHealth
+import com.usagemonitor.domain.entity.isAlertSilenced
+import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
+import com.usagemonitor.presentation.ui.TelegramBotChatMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +42,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 /** Estado do bot para a seção das Configurações. */
 internal sealed interface TelegramBotStatus {
@@ -38,6 +54,8 @@ internal sealed interface TelegramBotStatus {
     /** [botUsername] sem `@`; `null` quando o `getMe` falhou — o link "Abrir no Telegram" some. */
     data class Connected(val chatCount: Int, val botUsername: String? = null) : TelegramBotStatus
     data class Failed(val message: String) : TelegramBotStatus
+    /** 401 do Telegram: o texto sai no idioma do app em quem mostra o estado (B03), não aqui. */
+    data object TokenRejected : TelegramBotStatus
 }
 
 /**
@@ -75,14 +93,43 @@ internal class TelegramBotService(
     private val spendProvider: suspend () -> TelegramDailySpend? = { null },
     /** Gráfico do `/grafico` (#398, Y6), montado de quem tem o histórico. */
     private val chartProvider: suspend (HistoryRange) -> TelegramChart? = { null },
+    /** Leituras das funções da #408 (`/ping` e as seguintes). */
+    private val readings: TelegramBotReadings = TelegramBotReadings(),
     /** Intervalo do painel fixado (#398, Y5); parâmetro para o teste não esperar um minuto. */
-    private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS
+    private val panelIntervalMillis: Long = PANEL_INTERVAL_MILLIS,
+    /** Intervalo da checagem de versão pronta (#408, AA17); parâmetro pelo mesmo motivo. */
+    private val updateCheckMillis: Long = UPDATE_CHECK_MILLIS,
+    /** Janela do lote de alertas (#408, AA25); parâmetro para o teste não esperar 15 minutos. */
+    private val alertBatchMillis: Long = ALERT_BATCH_MILLIS,
+    /** Intervalo da checagem de fonte quebrada (#408, AA18). */
+    private val sourceHealthCheckMillis: Long = SOURCE_HEALTH_CHECK_MILLIS,
+    /** Quanto a fonte falha antes do aviso (#408, AA18); parâmetro para o teste não esperar 15 minutos. */
+    private val sourceBrokenAfterMillis: Long = SOURCE_BROKEN_AFTER_MILLIS
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pollJob: Job? = null
     private var alertJob: Job? = null
     private var summaryJob: Job? = null
     private var panelJob: Job? = null
+    private var updateJob: Job? = null
+    private var sourceHealthJob: Job? = null
+
+    /** Contas falhando e se já avisaram (#408, AA18). Só no laço da checagem; reiniciar o app recomeça a contagem. */
+    private var sourceHealth: Map<String, SourceHealthEntry> = emptyMap()
+
+    /**
+     * Mensagem de cada alerta agrupável por conversa (#408, AA1), `(chatId, chave)` →
+     * grupo. Só em memória e só no coletor de alertas: reiniciar o app abre mensagem nova.
+     */
+    private val alertGroups = mutableMapOf<Pair<Long, String>, TelegramAlertGroup>()
+
+    /**
+     * Alertas retidos no lote (#408, AA25) e o instante do primeiro. O coletor e o
+     * esvaziamento atrasado disputam o lote e os grupos: tudo sob [alertMutex].
+     */
+    private val alertBatch = mutableListOf<UsageAlert>()
+    private var alertBatchStartedAt: Instant? = null
+    private val alertMutex = Mutex()
 
     /** Último texto do painel por conversa, para editar só o que mudou. Só neste laço. */
     private val panelTexts = mutableMapOf<Long, String>()
@@ -101,7 +148,8 @@ internal class TelegramBotService(
         enabledSources = enabledSources,
         toggleSource = toggleSource,
         summaryText = { language -> TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language) },
-        chartProvider = chartProvider
+        chartProvider = chartProvider,
+        readings = readings
     )
 
     private val _status = MutableStateFlow<TelegramBotStatus>(TelegramBotStatus.Off)
@@ -112,9 +160,21 @@ internal class TelegramBotService(
         if (pollJob?.isActive == true) return
         pollJob = scope.launch { pollLoop() }
         alertJob = scope.launch {
-            alerts.collect { alert -> broadcast(TelegramBotMessages.alert(alert, languageProvider())) }
+            alerts.collect { alert -> receiveAlert(alert) }
         }
         summaryJob = scope.launch { summaryLoop() }
+        updateJob = scope.launch {
+            while (true) {
+                runCatching { announceReadyUpdate() }.onFailure { error -> if (error is CancellationException) throw error }
+                delay(updateCheckMillis)
+            }
+        }
+        sourceHealthJob = scope.launch {
+            while (true) {
+                runCatching { checkSourceHealth() }.onFailure { error -> if (error is CancellationException) throw error }
+                delay(sourceHealthCheckMillis)
+            }
+        }
         panelJob = scope.launch {
             while (true) {
                 runCatching { syncPanels() }.onFailure { error -> if (error is CancellationException) throw error }
@@ -129,11 +189,14 @@ internal class TelegramBotService(
 
     /** Botão "Enviar teste" das Configurações. */
     fun sendTest() {
-        scope.launch { broadcast(TelegramBotMessages.test(languageProvider())) }
+        scope.launch { broadcast { language -> TelegramBotMessages.test(language) } }
     }
 
     private suspend fun pollLoop() {
         var activeToken: String? = null
+        // Idioma em que o menu foi registrado: trocar o idioma do app registra de novo
+        // (análise da sessão, B02) — antes o menu ficava no idioma da conexão.
+        var menuLanguage: AppLanguage? = null
         var botUsername: String? = null
         var offset: Long? = null
         var failures = 0
@@ -152,8 +215,13 @@ internal class TelegramBotService(
                     // Pula o acumulado: o último update vira o ponto de partida.
                     offset = api.getUpdates(settings.botToken, offset = -1, timeoutSeconds = 0).lastOrNull()?.updateId?.plus(1)
                     activeToken = settings.botToken
-                    registerMenu(settings.botToken)
+                    menuLanguage = null
                     botUsername = fetchUsername(settings.botToken)
+                }
+                val appLanguage = languageProvider()
+                if (appLanguage != menuLanguage) {
+                    registerMenu(settings.botToken, appLanguage)
+                    menuLanguage = appLanguage
                 }
                 _status.value = TelegramBotStatus.Connected(settings.authorizedChats.size, botUsername)
                 val updates = api.getUpdates(settings.botToken, offset, LONG_POLL_SECONDS)
@@ -167,7 +235,7 @@ internal class TelegramBotService(
             } catch (limited: TelegramRateLimitedException) {
                 delay(limited.retryAfterSeconds * 1_000L)
             } catch (_: TelegramUnauthorizedException) {
-                _status.value = TelegramBotStatus.Failed("Token do bot recusado pelo Telegram.")
+                _status.value = TelegramBotStatus.TokenRejected
                 activeToken = null
                 delay(UNAUTHORIZED_RETRY_MILLIS)
             } catch (error: Exception) {
@@ -182,8 +250,8 @@ internal class TelegramBotService(
         runCatching { api.getMe(token) }.onFailure { error -> if (error is CancellationException) throw error }.getOrNull()
 
     /** Menu de comandos do Telegram (#396). Falhar aqui não derruba a conexão: o bot responde sem o menu. */
-    private suspend fun registerMenu(token: String) {
-        runCatching { api.setMyCommands(token, TelegramBotMessages.menu(languageProvider())) }
+    private suspend fun registerMenu(token: String, language: AppLanguage) {
+        runCatching { api.setMyCommands(token, TelegramBotMessages.menu(language)) }
             .onFailure { error -> if (error is CancellationException) throw error }
     }
 
@@ -202,8 +270,9 @@ internal class TelegramBotService(
                 runCatching { saveSettings(marked) }
                 settingsFlow.value = marked
                 runCatching {
-                    val language = languageProvider()
-                    broadcast(TelegramBotSummaryMessages.summary(snapshotProvider(), spendProvider(), language))
+                    val snapshot = snapshotProvider()
+                    val spend = spendProvider()
+                    broadcast { language -> TelegramBotSummaryMessages.summary(snapshot, spend, language) }
                 }.onFailure { error -> if (error is CancellationException) throw error }
             }
             delay(SUMMARY_CHECK_MILLIS)
@@ -231,9 +300,17 @@ internal class TelegramBotService(
             savePanels(emptyMap())
             return
         }
-        val text = TelegramBotSummaryMessages.panel(snapshotProvider(), languageProvider())
+        val snapshot = snapshotProvider()
         val panels = settings.panelMessages.filterKeys { chatId -> chatId in chats }.toMutableMap()
         for (chatId in chats) {
+            val machine = if (settings.preferences.showMachineName) readings.machineName() else null
+            val language = languageProvider()
+            val body = if (settings.preferences.compactPanel) {
+                TelegramBotSummaryMessages.compactPanel(snapshot, language)
+            } else {
+                TelegramBotSummaryMessages.panel(snapshot, language)
+            }
+            val text = TelegramBotChatMessages.withMachine(body, machine)
             val messageId = panels[chatId]
             if (messageId != null && panelTexts[chatId] == text) continue
             val kept = messageId != null && editPanel(token, chatId, messageId, text)
@@ -246,6 +323,133 @@ internal class TelegramBotService(
             delay(SEND_SPACING_MILLIS)
         }
         if (panels != settings.panelMessages) savePanels(panels)
+    }
+
+    /**
+     * Versão pronta para instalar (#408, AA17): avisa uma vez por versão, com o botão
+     * "Atualizar e reiniciar". A versão é gravada **antes** do envio, como o resumo
+     * diário: falhar no meio perde o aviso em vez de repeti-lo a cada minuto.
+     */
+    private suspend fun announceReadyUpdate() {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank() || !settings.preferences.allowRemoteUpdate) return
+        val version = readings.readyUpdate() ?: return
+        if (version == settings.preferences.announcedUpdateVersion) return
+        val marked = settings.copy(preferences = settings.preferences.copy(announcedUpdateVersion = version))
+        runCatching { saveSettings(marked) }
+        settingsFlow.value = marked
+        broadcast(buttons = { language -> listOf(listOf(TelegramButton(TelegramBotChatMessages.updateButton(language), BotTap.UpdateNow(version).data()))) }) { language ->
+            TelegramBotChatMessages.updateReady(version, language)
+        }
+    }
+
+    /**
+     * Porta de entrada dos alertas. Com o lote ligado (#408, AA25), o não crítico espera
+     * até [alertBatchMillis] contados do primeiro retido; o crítico sai na hora, fora do
+     * lote. Encerrar o app com alerta retido o perde — o mesmo de um envio que falha.
+     */
+    private suspend fun receiveAlert(alert: UsageAlert) {
+        alertMutex.withLock {
+            val batching = settingsFlow.value.preferences.batchAlerts && !isCriticalAlert(alert)
+            if (!batching) {
+                deliverAlert(alert)
+                return
+            }
+            alertBatch += alert
+            if (alertBatchStartedAt != null) return
+            alertBatchStartedAt = clock.now()
+        }
+        scope.launch {
+            delay(alertBatchMillis)
+            alertMutex.withLock { flushAlertBatch() }
+        }
+    }
+
+    /** Lote de um alerta só sai como alerta avulso (com o agrupamento da AA1); dois ou mais, numa mensagem. */
+    private suspend fun flushAlertBatch() {
+        val retained = alertBatch.toList()
+        val startedAt = alertBatchStartedAt ?: clock.now()
+        alertBatch.clear()
+        alertBatchStartedAt = null
+        if (retained.isEmpty()) return
+        if (retained.size == 1) {
+            deliverAlert(retained.single())
+            return
+        }
+        val items = batchAlertItems(retained)
+        val now = clock.now()
+        val silent = settingsFlow.value.preferences.soundOnlyOnCritical
+        broadcast(silent = silent) { language -> TelegramBotMessages.alertBatch(items, startedAt, now, language) }
+    }
+
+    /**
+     * Entrega de um alerta. Som por gravidade (#408, AA26): sem som não some — chega e não
+     * vibra. Repetição no mesmo dia (AA1) edita a mensagem da conversa com o contador; a
+     * edição não toca, então o aparelho vibra só na primeira. Edição que falha (mensagem
+     * apagada, rede) cai numa mensagem nova, que passa a ser o grupo.
+     */
+    private suspend fun deliverAlert(alert: UsageAlert) {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank()) return
+        val preferences = settings.preferences
+        val silent = preferences.soundOnlyOnCritical && !isCriticalAlert(alert)
+        val key = if (preferences.groupRepeatedAlerts) alertGroupKey(alert) else null
+        val now = clock.now()
+        val day = dailySummaryDate(now)
+        alertGroups.entries.removeAll { entry -> entry.value.day != day }
+        val machine = if (preferences.showMachineName) readings.machineName() else null
+        for (chat in settings.authorizedChats) {
+            val language = languageProvider()
+            val group = key?.let { groupKey -> alertGroups[chat.id to groupKey] }
+            if (key != null && group != null) {
+                val next = group.copy(count = group.count + 1)
+                val firstAt = Instant.fromEpochMilliseconds(group.firstAtMillis)
+                val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.repeatedAlert(alert, next.count, firstAt, now, language), machine)
+                if (editAlert(settings.botToken, chat.id, group.messageId, text)) {
+                    alertGroups[chat.id to key] = next
+                    delay(SEND_SPACING_MILLIS)
+                    continue
+                }
+            }
+            val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.alert(alert, language), machine)
+            val sentId = runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, silent = silent) }
+                .onFailure { error -> if (error is CancellationException) throw error }
+                .getOrNull()
+            if (key != null && sentId != null) alertGroups[chat.id to key] = TelegramAlertGroup(sentId, 1, now.toEpochMilliseconds(), day)
+            delay(SEND_SPACING_MILLIS)
+        }
+    }
+
+    /** `true` quando a mensagem agrupada foi editada (ou já estava igual). */
+    private suspend fun editAlert(token: String, chatId: Long, messageId: Long, text: String): Boolean =
+        try {
+            api.editMessageText(token, chatId, messageId, text)
+            true
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (bad: TelegramBadRequestException) {
+            bad.isNotModified
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Fonte quebrada (#408, AA18): a decisão é de [evaluateSourceHealth]; aqui só a leitura,
+     * o silêncio e o envio. Desligado, a contagem é esquecida — religar recomeça do zero.
+     */
+    private suspend fun checkSourceHealth() {
+        val settings = settingsFlow.value
+        if (!settings.enabled || settings.botToken.isBlank() || !settings.preferences.sourceHealthAlerts) {
+            sourceHealth = emptyMap()
+            return
+        }
+        val observations = readings.sourceHealth() ?: return
+        val now = clock.now()
+        val evaluation = evaluateSourceHealth(observations, sourceHealth, now, isAlertSilenced(alertSettingsFlow.value, now), sourceBrokenAfterMillis)
+        sourceHealth = evaluation.state
+        for (event in evaluation.events) {
+            broadcast(silent = settings.preferences.soundOnlyOnCritical) { language -> TelegramBotRemoteMessages.sourceHealth(event, language) }
+        }
     }
 
     /** `false` quando a mensagem sumiu e tem de ser recriada; "not modified" conta como mantida. */
@@ -267,12 +471,24 @@ internal class TelegramBotService(
         runCatching { block() }.onFailure { error -> if (error is CancellationException) throw error }
     }
 
-    /** Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa. */
-    private suspend fun broadcast(text: String) {
+    /**
+     * Uma mensagem por conversa, espaçadas: o Telegram limita ~1 mensagem/s por conversa.
+     * O texto sai no idioma de cada conversa (#408, AA24), montado uma vez por idioma.
+     * [silent] entrega sem som (`disable_notification`).
+     */
+    private suspend fun broadcast(
+        buttons: (AppLanguage) -> List<List<TelegramButton>> = { emptyList() },
+        silent: Boolean = false,
+        textFor: suspend (AppLanguage) -> String
+    ) {
         val settings = settingsFlow.value
         if (!settings.enabled || settings.botToken.isBlank()) return
+        val texts = mutableMapOf<AppLanguage, String>()
+        val machine = if (settings.preferences.showMachineName) readings.machineName() else null
         for (chat in settings.authorizedChats) {
-            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true) }
+            val language = languageProvider()
+            val text = texts[language] ?: TelegramBotChatMessages.withMachine(textFor(language), machine).also { built -> texts[language] = built }
+            runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, buttons = buttons(language), silent = silent) }
                 .onFailure { error -> if (error is CancellationException) throw error }
             delay(SEND_SPACING_MILLIS)
         }
@@ -287,5 +503,8 @@ internal class TelegramBotService(
         const val SEND_SPACING_MILLIS = 1_100L
         const val SUMMARY_CHECK_MILLIS = 60_000L
         const val PANEL_INTERVAL_MILLIS = 60_000L
+        const val UPDATE_CHECK_MILLIS = 60_000L
+        const val ALERT_BATCH_MILLIS = 15 * 60_000L
+        const val SOURCE_HEALTH_CHECK_MILLIS = 60_000L
     }
 }

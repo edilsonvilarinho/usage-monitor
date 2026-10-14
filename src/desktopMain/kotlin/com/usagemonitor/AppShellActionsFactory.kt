@@ -4,6 +4,8 @@ import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.displayName
+import com.usagemonitor.domain.entity.snapshotLabel
 import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.recordFailure
@@ -113,6 +115,13 @@ internal fun buildShellActions(
                 // próprio usuário aparecendo offline por até 30 segundos.
                 viewModels.teamSync.requestImmediateSync()
             }
+        },
+        openAnalysis = { target ->
+            breadcrumbs.recordScreenOpened("análise da sessão de ${target.source.name}")
+            // O rótulo é o do retrato (fonte e apelido), o mesmo do bot; nunca o e-mail cru.
+            val stats = (dashboardState as? UiState.Success)?.data?.firstOrNull { item -> item.targetKey == target }
+            modal.openAnalysis()
+            viewModels.analysis.openForAccount(target.storageKey, stats?.snapshotLabel ?: target.source.displayName(storedLanguage(graph.settings)))
         },
         openTeamPresenceOverview = if (teamSettings.isAdminMode) {
             {

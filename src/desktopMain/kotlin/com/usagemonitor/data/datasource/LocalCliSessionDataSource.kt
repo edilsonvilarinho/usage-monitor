@@ -65,7 +65,7 @@ class LocalCliSessionDataSource(
      * Máquina desta instância, resolvida uma única vez: `InetAddress` consulta DNS
      * e não pode entrar no laço de indexação.
      */
-    private val hostName: String? by lazy { resolveHostName() }
+    private val hostName: String? by lazy { resolveLocalHostName() }
 
     /**
      * Vereditos de cauda já calculados, por caminho de transcript.
@@ -713,20 +713,6 @@ class LocalCliSessionDataSource(
             )
         }
 
-        /**
-         * Nome da máquina local. As variáveis de ambiente cobrem Windows e Linux
-         * sem tocar em DNS; `InetAddress` fica como último recurso.
-         */
-        private fun resolveHostName(): String? {
-            val fromEnvironment = System.getenv("COMPUTERNAME")?.takeIf { it.isNotBlank() }
-                ?: System.getenv("HOSTNAME")?.takeIf { it.isNotBlank() }
-            if (fromEnvironment != null) {
-                return fromEnvironment
-            }
-            return runCatching { java.net.InetAddress.getLocalHost().hostName }
-                .getOrNull()
-                ?.takeIf { it.isNotBlank() }
-        }
 
         fun defaultDatabaseFile(): File {
             val homeDir = System.getProperty("user.home")

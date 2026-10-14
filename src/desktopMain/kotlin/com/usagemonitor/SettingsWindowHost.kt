@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.DialogState
+import com.usagemonitor.data.datasource.resolveLocalHostName
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.AppDialogWindow
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
@@ -54,6 +55,8 @@ internal fun SettingsWindowHost(
     val webAccessActions = remember(graph) { WebAccessActions(graph.webAccessSettingsDataSource, graph.webAccessSettingsFlow) }
     val telegramSettings by graph.telegramSettingsFlow.collectAsState()
     val telegramStatus by viewModels.telegramBot.status.collectAsState()
+    // Uma leitura por janela: variável de ambiente, sem custo, mas não a cada recomposição.
+    val telegramMachineName = remember { resolveLocalHostName() }
     val telegramActions = remember(graph) {
         TelegramBotActions(graph.telegramSettingsDataSource, graph.telegramSettingsFlow, viewModels.telegramBot)
     }
@@ -151,7 +154,9 @@ internal fun SettingsWindowHost(
             onProxyPasswordChange = actions::changeProxyPassword,
             onProxyTestConnection = feedback::checkProxyConnection,
             webAccess = webAccessSectionModel(webAccessSettings, webAccessStatus, webAccessActions),
-            telegramBot = telegramBotSectionModel(telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions),
+            telegramBot = telegramBotSectionModel(
+                telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions, machineName = telegramMachineName
+            ),
             toastEvent = feedback.toastEvent,
             appearancePreview = {
                 // Parada: sem pulso de sessão nem coleta em curso — a prévia é do

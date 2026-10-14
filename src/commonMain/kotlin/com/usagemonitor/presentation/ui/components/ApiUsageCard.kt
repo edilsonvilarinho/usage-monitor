@@ -141,6 +141,8 @@ fun ApiUsageCard(
      * Mesma condição de [onOpenTeamUsage]: nulo esconde o botão.
      */
     onOpenTeamPresence: (() -> Unit)? = null,
+    /** Abre a janela "Análise" desta conta (rodada AB); nulo esconde o botão. */
+    onOpenAnalysis: (() -> Unit)? = null,
     /**
      * Sessões desta máquina, nesta conta, com interação nos últimos minutos e
      * veredito laranja ou vermelho. Vazio deixa o botão como qualquer outro.
@@ -330,7 +332,8 @@ fun ApiUsageCard(
                 onOpenCliSessions = onOpenCliSessions,
                 onOpenCodexCliSessions = onOpenCodexCliSessions,
                 onOpenTeamUsage = onOpenTeamUsage,
-                onOpenTeamPresence = onOpenTeamPresence
+                onOpenTeamPresence = onOpenTeamPresence,
+                onOpenAnalysis = onOpenAnalysis
             )
             }
         }

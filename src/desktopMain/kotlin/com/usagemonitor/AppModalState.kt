@@ -89,6 +89,14 @@ internal class AppModalState(bugReportOpenAtStart: Boolean) {
         codexCliSessionsOpenGeneration++
     }
 
+    var isAnalysisOpen by mutableStateOf(false)
+    var analysisOpenGeneration by mutableStateOf(0)
+
+    fun openAnalysis() {
+        isAnalysisOpen = true
+        analysisOpenGeneration++
+    }
+
     fun openComparison() {
         isComparisonOpen = true
         comparisonOpenGeneration++

@@ -2,11 +2,15 @@ package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.DEFAULT_QUOTA_ALERT_PERCENTS
+import com.usagemonitor.domain.entity.DEFAULT_RESET_REMINDER_MINUTES
+import com.usagemonitor.domain.entity.RESET_REMINDER_MINUTES_RANGE
 import com.usagemonitor.domain.entity.DEFAULT_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.DEFAULT_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.MIN_SPIKE_FACTOR
 import com.usagemonitor.domain.entity.MIN_STALL_THRESHOLD_MILLIS
 import com.usagemonitor.domain.entity.QuietHours
+import com.usagemonitor.domain.entity.QuotaThresholdOverride
+import com.usagemonitor.domain.entity.normalizeQuotaPercents
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import kotlin.math.roundToInt
 
@@ -20,6 +24,9 @@ private const val SPIKE_FACTOR_TENTHS_KEY = "alertsSpikeFactorTenths"
 private const val QUIET_HOURS_KEY = "alertsQuietHours"
 private const val SNOOZED_UNTIL_KEY = "alertsSnoozedUntilMillis"
 private const val QUOTA_RESET_ALERTS_ENABLED_KEY = "alertsQuotaResetEnabled"
+private const val FOCUS_UNTIL_KEY = "alertsFocusUntilMillis"
+private const val RESET_REMINDER_MINUTES_KEY = "alertsResetReminderMinutes"
+private const val QUOTA_PERCENTS_BY_TARGET_KEY = "alertsQuotaPercentsByTarget"
 
 /**
  * Preferências de alerta no mesmo armazenamento das demais (registro/plist via
@@ -40,7 +47,10 @@ internal fun readPersistedAlertSettings(settings: PreferencesSettings): UsageAle
         spikeFactor = decodeSpikeFactor(settings.getIntOrNull(SPIKE_FACTOR_TENTHS_KEY)),
         quietHours = decodeQuietHours(settings.getStringOrNull(QUIET_HOURS_KEY)),
         snoozedUntilEpochMillis = settings.getLongOrNull(SNOOZED_UNTIL_KEY),
-        quotaResetAlertsEnabled = settings.getBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, true)
+        quotaResetAlertsEnabled = settings.getBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, true),
+        focusUntilEpochMillis = settings.getLongOrNull(FOCUS_UNTIL_KEY),
+        resetReminderMinutes = decodeResetReminderMinutes(settings.getIntOrNull(RESET_REMINDER_MINUTES_KEY)),
+        quotaPercentsByTarget = decodeQuotaPercentsByTarget(settings.getStringOrNull(QUOTA_PERCENTS_BY_TARGET_KEY))
     )
 }
 
@@ -56,6 +66,42 @@ internal fun persistAlertSettings(settings: PreferencesSettings, value: UsageAle
     settings.putBoolean(QUOTA_RESET_ALERTS_ENABLED_KEY, value.quotaResetAlertsEnabled)
     val snoozedUntil = value.snoozedUntilEpochMillis
     if (snoozedUntil == null) settings.remove(SNOOZED_UNTIL_KEY) else settings.putLong(SNOOZED_UNTIL_KEY, snoozedUntil)
+    val focusUntil = value.focusUntilEpochMillis
+    if (focusUntil == null) settings.remove(FOCUS_UNTIL_KEY) else settings.putLong(FOCUS_UNTIL_KEY, focusUntil)
+    settings.putInt(RESET_REMINDER_MINUTES_KEY, value.resetReminderMinutes ?: 0)
+    settings.putString(QUOTA_PERCENTS_BY_TARGET_KEY, encodeQuotaPercentsByTarget(value.quotaPercentsByTarget))
+}
+
+/**
+ * Limiar por conta (#408, AA10): uma linha por conta, `chave<TAB>75,90<TAB>rótulo`. A chave
+ * (`storageKey`) não tem tabulação nem quebra; o rótulo tem as duas trocadas por espaço.
+ * Linha que não se lê (registro editado à mão) é descartada, não derruba as outras.
+ */
+internal fun encodeQuotaPercentsByTarget(overrides: Map<String, QuotaThresholdOverride>): String =
+    overrides.entries.sortedBy { (key, _) -> key }.joinToString("\n") { (key, override) ->
+        val label = override.label.replace('\t', ' ').replace('\n', ' ')
+        "$key\t${encodeQuotaPercents(override.percents)}\t$label"
+    }
+
+internal fun decodeQuotaPercentsByTarget(stored: String?): Map<String, QuotaThresholdOverride> {
+    if (stored.isNullOrBlank()) return emptyMap()
+    return stored.lines().mapNotNull { line ->
+        val parts = line.split('\t')
+        if (parts.size != 3 || parts[0].isBlank()) return@mapNotNull null
+        val percents = normalizeQuotaPercents(parts[1].split(',').mapNotNull { part -> part.trim().toIntOrNull() })
+        if (percents.isEmpty()) null else parts[0] to QuotaThresholdOverride(parts[2], percents)
+    }.toMap()
+}
+
+/**
+ * Lembrete de reinício (#408, AA4) gravado em minutos, com `0` para desligado: ausente é
+ * o padrão, e não "desligado", senão quem já tinha o app nunca receberia o lembrete.
+ * Fora da faixa do `/avise` (registro editado à mão) cai para dentro dela.
+ */
+internal fun decodeResetReminderMinutes(stored: Int?): Int? = when (stored) {
+    null -> DEFAULT_RESET_REMINDER_MINUTES
+    0 -> null
+    else -> stored.coerceIn(RESET_REMINDER_MINUTES_RANGE)
 }
 
 /**

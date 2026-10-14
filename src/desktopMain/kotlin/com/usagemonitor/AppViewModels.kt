@@ -1,12 +1,6 @@
 package com.usagemonitor
 
-import com.usagemonitor.domain.entity.TelegramDailySpend
-import com.usagemonitor.presentation.ui.buildTelegramChart
-import com.usagemonitor.presentation.ui.TelegramChart
-import com.usagemonitor.domain.entity.displayName
-import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageSnapshot
-import com.usagemonitor.data.datasource.TelegramBotApi
 import kotlin.time.Clock
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.domain.entity.buildUsageSnapshot
@@ -60,6 +54,7 @@ import com.usagemonitor.presentation.viewmodel.CliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.ComparisonViewModel
+import com.usagemonitor.presentation.viewmodel.AnalysisViewModel
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
 import com.usagemonitor.presentation.viewmodel.QuotaActivityTracker
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
@@ -245,6 +240,13 @@ internal class AppViewModels(
         breadcrumbs = breadcrumbs
     )
 
+    // Análise da sessão (rodada AB): a mesma leitura do `/analise` do bot, sob demanda.
+    val analysis = AnalysisViewModel(
+        load = sessionAnalysisReader(graph, dashboard),
+        exportWriter = graph.usageExportWriter,
+        pdfOf = { result, language -> TelegramAnalysisPdf.render(result, language) }
+    )
+
     // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
     // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.
     val quotaActivity = QuotaActivityTracker(dashboardState = dashboard.uiState)
@@ -286,36 +288,7 @@ internal class AppViewModels(
      * Bot do Telegram (#387): repassa os alertas da bandeja e atende comandos das
      * conversas pareadas. Desligado até o usuário ligar e colar o token.
      */
-    val telegramBot = TelegramBotService(
-        api = TelegramBotApi(graph.httpClient),
-        settingsFlow = graph.telegramSettingsFlow,
-        saveSettings = graph.telegramSettingsDataSource::save,
-        alertSettingsFlow = graph.alertSettingsFlow,
-        saveAlertSettings = { updated ->
-            graph.alertSettingsFlow.value = updated
-            persistAlertSettings(graph.settings, updated)
-        },
-        alerts = usageAlert.alerts,
-        snapshotProvider = ::currentSnapshot,
-        requestRefresh = { refreshForBot(dashboard) },
-        languageProvider = { storedLanguage(graph.settings) },
-        enabledSources = { graph.enabledApis.value },
-        // O mesmo caminho do interruptor da aba APIs: grava e recoleta a fonte.
-        toggleSource = { source, on ->
-            val current = graph.enabledApis.value
-            persistEnabledApis(graph, if (on) current + source else current - source)
-            dashboard.refresh(source)
-        },
-        // Corte de 24 h por `sinceEpochMillis`: o repositório não tem fim de
-        // janela, e "ontem" exigiria um `CliSessionRange` novo (proibido).
-        spendProvider = {
-            val since = Clock.System.now().toEpochMilliseconds() - DAILY_SPEND_WINDOW_MILLIS
-            graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.totals?.let { totals ->
-                TelegramDailySpend(totals.costMicros, totals.sessionCount, totals.unpricedTurnCount)
-            }
-        },
-        chartProvider = { range -> telegramChartOf(graph, range) }
-    ).also { service -> service.start() }
+    val telegramBot = createTelegramBot(graph, dashboard, usageAlert.alerts, ::currentSnapshot).also { service -> service.start() }
 
     val teamKeys = TeamKeysAdminViewModel(
         listKeys = ListTeamKeysUseCase(graph.teamAdminRepository),
@@ -370,6 +343,7 @@ internal class AppViewModels(
         sessionPulse.onDestroy()
         quotaActivity.onDestroy()
         comparison.onDestroy()
+        analysis.onDestroy()
         webAccess.stop()
         telegramBot.onDestroy()
         usageAlert.onDestroy()
@@ -427,28 +401,3 @@ internal const val TEAM_PRESENCE_LIVE_INTERVAL_MILLIS = 5_000L
  * de 30 em 30 segundos.
  */
 internal const val SESSION_PULSE_INTERVAL_MILLIS = 30_000L
-
-/** Janela do gasto no resumo diário do bot (#398, Y1). */
-private const val DAILY_SPEND_WINDOW_MILLIS = 24 * 60 * 60 * 1_000L
-
-/**
- * Histórico das fontes ligadas para o `/grafico` (#398, Y6). Uma série por conta:
- * sem `listAccounts`, a fonte tem uma conta só e vai sem chave. O nome é o da fonte,
- * numerado quando há mais de uma conta — nunca o e-mail da conta.
- */
-private suspend fun telegramChartOf(graph: AppGraph, range: HistoryRange): TelegramChart? {
-    val now = Clock.System.now()
-    val language = storedLanguage(graph.settings)
-    val reports = graph.enabledApis.value.sortedBy { source -> source.ordinal }.flatMap { source ->
-        val accounts = runCatching { graph.getUsageHistory.listAccounts(source) }.getOrDefault(emptyList())
-        if (accounts.isEmpty()) {
-            listOfNotNull(runCatching { source.displayName(language) to graph.getUsageHistory(source, range, null, now) }.getOrNull())
-        } else {
-            accounts.mapIndexedNotNull { index, account ->
-                val name = if (accounts.size > 1) "${source.displayName(language)} ${index + 1}" else source.displayName(language)
-                runCatching { name to graph.getUsageHistory(source, range, account.key, now) }.getOrNull()
-            }
-        }
-    }
-    return buildTelegramChart(reports, range, now).takeUnless { chart -> chart.isEmpty }
-}

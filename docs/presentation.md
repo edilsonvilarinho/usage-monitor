@@ -96,6 +96,8 @@
 - **Alertas na bandeja** (`evaluateUsageAlerts` em `domain/entity/UsageAlert.kt` + `UsageAlertViewModel` + `Tray` no `AppTrayHost.kt`): notificação nativa quando uma cota cruza um limiar (default 75/90/100) ou uma sessão CLI satura. A decisão é **função pura** — entra `UiState.Success` (que já traz `riskSummaries`), o `SessionPulse` mesclado e o estado anterior; sai a lista a emitir e o estado novo. O view model **não tem laço próprio**: reage às emissões da coleta adaptativa (60 s com sessão ativa, 5 min sem — #269) e da passada de 30s que já existem.
   - **`UsageAlertState` é a dedup**, e sem ela o mesmo alerta sairia a cada coleta. A chave da janela é `QuotaAlertScope` (alvo + rótulo + `periodType`), **sem** o `periodEndAt`: o reset entra como valor guardado e a comparação passa por `isSamePeriod`, a mesma tolerância de 5 min que o histórico usa contra o jitter de ~1s do `resets_at`. Comparar o reset por igualdade rearmaria o alerta a cada poll.
   - **Aviso de reinício de cota** (#398, direção Y2; `UsageAlert.QuotaReset`, `quotaResetAlertsEnabled` = `true`, chave `alertsQuotaResetEnabled`): quando a janela de uma cota vira e a anterior **tinha cruzado limiar** (`FiredQuotaWindow.firedPercents` não vazio), sai "A cota reiniciou: dá para voltar a usar", com o mesmo título `alvo · cota` do limiar e o próximo reinício. Cota que nunca alertou reinicia calada — avisar todo reinício de 5 h seria ruído. No silêncio o aviso fica pendente (`FiredQuotaWindow.resetPending`) e sai quando ele acaba: adia, não consome. A leitura **vencida** entre as duas janelas agora carrega a memória da janela adiante; antes ela era descartada, e a leitura nova não saberia que a anterior tinha alertado. Saldo pré-pago (`hasKnownResetAt = false`) não reinicia. Interruptor "Avisar quando a cota reiniciar" logo abaixo dos limiares; o bot repassa como qualquer alerta.
+  - **Lembrete antes do reinício** (#408, AA4; `UsageAlert.ResetSoon`, `resetReminderMinutes` = 15, chave `alertsResetReminderMinutes` com `0` = desligado e ausente = padrão): cota com reinício conhecido e acima do primeiro limiar avisa **uma vez por janela** (`FiredQuotaWindow.reminded`) quando faltam menos que N minutos — "Padrão · Sessão 5h reinicia em 14 min / Está em 80%. Dá para retomar em … BRT". No silêncio e no foco espera a próxima leitura; se o reinício chega antes, não há mais o que lembrar. Não é crítico. Interruptor "Lembrar antes de a cota reiniciar" abaixo do de reinício; os minutos mudam pelo `/avise` do bot (5 a 120).
+  - **Limiar por conta** (#408, AA10; `quotaPercentsByTarget`, chave `alertsQuotaPercentsByTarget`, uma linha `storageKey<TAB>75,90<TAB>rótulo` por conta): `quotaPercentsFor(target)` dá os limiares da conta ou os gerais, e a decisão pura avalia cada conta com os dela — conta sem limiar nenhum não deixa rastro, como o alerta de cota desligado. A identidade é o `storageKey` (o retrato ganhou `UsageSnapshotAccount.targetKey`); o rótulo gravado só serve para mostrar. Grava-se pelo `/limiar` do bot; nas Configurações aparece "Limiar próprio: …" abaixo dos limiares, com "Usar o geral em todas". `normalizeQuotaPercents` é o dono único da normalização.
   - **Cota vencida não alerta** (`isExpiredAt`): a janela descreve um período que já não existe.
   - **O limiar é piso**: o percentual é truncado, não arredondado — 89,9% não cruzou 90%.
   - **Silêncio adia, não consome.** No período silenciado o limiar cruzado **não** é marcado como disparado: dentro de uma janela o consumo só cresce, então o aviso é reavaliado e sai quando o silêncio terminar. Marcá-lo ali perderia o alerta para sempre.
@@ -147,6 +149,29 @@
     destinatário do aviso: quem deixou automação rodando e não está olhando a tela.
   - **O texto diz "sem resposta desde o último pedido", nunca "travou"**, e há teste afirmando isso nos dois
     idiomas: a evidência é o transcript, e o app não olha o sistema operacional.
+
+## Análise da sessão (rodada AB)
+
+Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeria em `docs/planos/analise-sessao-visual/`.
+
+- **Dados** (`SessionAnalysis`, domain, `buildSessionAnalysis` pura): janela 5h e semanal (percentual, ritmo agora na
+  última hora, ritmo médio desde o início nominal, ritmo seguro até o reinício e onde chega no reinício), intervalos de 1 h
+  a 7 d, 24 horas, mapa 7 × 24, dias, fatias de 30 min da janela aberta, a janela anterior no mesmo ponto e a vazão por
+  modelo. Ritmo é a subida entre leituras do histórico (a regra de `positiveDeltaOf`); vazão é a diferença de dois recortes
+  "desde" do índice CLI, somas e nunca média de razões. `null` é não medido. Leitura em `SessionAnalysisReader.kt`
+  (desktopMain), compartilhada pelo bot e pela janela.
+- **Janela "Análise"** (`AnalysisScreen`, `AnalysisViewModel`): aberta pelo `CardAction.ANALYSIS` — valor novo no enum,
+  **exceção aprovada** pelo usuário (U2), em `cardActionsFor` para Anthropic e Codex, depois de Histórico; ícone
+  `Icons.Rounded.Insights`. Abas = vistas de texto do `/analise`, mesmo texto sem as marcas do Telegram, em `labelMedium`
+  (Plex Mono). Sob demanda, "Atualizar" relê; sem histórico, `AppEmptyState`.
+- **Gráficos na janela** (B21): as vistas de imagem são **os mesmos PNGs do bot** (`TelegramAnalysisRenderer`, Skia,
+  fundo escuro), decodificados por `AnalysisImageProvider` vindo de `desktopMain` — um desenho só para as duas portas.
+  Doze abas não cabem na janela mínima (640 dp): `AppSegmentedControl` **Texto | Gráficos** escolhe o grupo e `AppTabs`
+  a vista dentro dele (papéis distintos). Nome da aba sem o emoji do Telegram (a Plex não tem o glifo). **Desvio**: o
+  mockup falava em Canvas por vista; a imagem não segue o tema claro (fica escura nos dois temas).
+- **Relatório PDF** (B21b): botão na barra da janela, o mesmo PDF de uma página do `/analise pdf` e o mesmo nome de
+  arquivo, gravado pelo `UsageExportWriter` com o payload novo `UsageExportPayload.Binary` (bytes prontos; não é `data
+  class`). Cancelar o diálogo não publica nada; salvo ou falha vira `AppBanner`, como na Comparação.
 
 ## Sistema visual — janelas, cards e tooltips
 

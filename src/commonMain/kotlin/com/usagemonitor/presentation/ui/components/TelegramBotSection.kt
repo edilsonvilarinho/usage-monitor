@@ -22,12 +22,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import kotlinx.coroutines.delay
 
 const val TELEGRAM_SECTION_TEST_TAG = "telegramSection"
 const val TELEGRAM_SWITCH_TEST_TAG = "telegramSwitch"
+
+/** Interruptor "Controle" de cada conversa (#408, AA21); sufixo é o id da conversa. */
+const val TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX = "telegramChatControl-"
 
 /**
  * O que a seção do bot mostra (#387; #396, direção V2 — três passos).
@@ -60,7 +64,14 @@ class TelegramBotSectionModel(
     val onDailySummaryHourChange: (Int?) -> Unit = {},
     /** Painel fixado que se atualiza sozinho (#398, Y5). */
     val livePanelEnabled: Boolean = false,
-    val onLivePanelChange: (Boolean) -> Unit = {}
+    val onLivePanelChange: (Boolean) -> Unit = {},
+    /** Papel de cada conversa (#408, AA21): `true` dá controle, `false` deixa só leitura. */
+    val onChatControlChange: (Long, Boolean) -> Unit = { _, _ -> },
+    /** Opções da #408; o card muda uma e devolve o conjunto. */
+    val preferences: TelegramBotPreferences = TelegramBotPreferences(),
+    val onPreferencesChange: (TelegramBotPreferences) -> Unit = {},
+    /** Nome deste PC (#408, AA20); `null` quando o sistema não informa. */
+    val machineName: String? = null
 )
 
 /**
@@ -159,7 +170,11 @@ private fun TelegramStep(number: Int, title: String, state: StepState, pt: Boole
     }
 }
 
-/** Conversas pareadas; "Remover" colado ao nome, não na outra ponta da coluna. */
+/**
+ * Conversas pareadas; "Remover" colado ao nome, não na outra ponta da coluna. O
+ * interruptor "Controle" (#408, AA21) separa a conversa que muda alertas e fontes da
+ * que só lê — um grupo da equipe, por exemplo.
+ */
 @Composable
 private fun TelegramChats(model: TelegramBotSectionModel, pt: Boolean) {
     if (model.chats.isEmpty()) {
@@ -169,6 +184,16 @@ private fun TelegramChats(model: TelegramBotSectionModel, pt: Boolean) {
     model.chats.forEach { chat ->
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Text(chat.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                if (chat.readOnly) (if (pt) "Só leitura" else "Read only") else (if (pt) "Controle" else "Control"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AppSwitch(
+                checked = !chat.readOnly,
+                onCheckedChange = { control -> model.onChatControlChange(chat.id, control) },
+                modifier = Modifier.testTag(TELEGRAM_CHAT_CONTROL_TEST_TAG_PREFIX + chat.id)
+            )
             AppButton(label = if (pt) "Remover" else "Remove", onClick = { model.onRemoveChat(chat.id) }, tone = AppButtonTone.GHOST)
         }
     }

@@ -17,6 +17,15 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 const val TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG = "telegramSourceControlSwitch"
 const val TELEGRAM_DAILY_SUMMARY_TEST_TAG = "telegramDailySummary"
 const val TELEGRAM_LIVE_PANEL_SWITCH_TEST_TAG = "telegramLivePanelSwitch"
+const val TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG = "telegramPcActionsSwitch"
+const val TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG = "telegramMachineNameSwitch"
+const val TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG = "telegramCriticalSoundSwitch"
+const val TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG = "telegramGroupAlertsSwitch"
+const val TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG = "telegramBatchAlertsSwitch"
+const val TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG = "telegramCompactPanelSwitch"
+const val TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG = "telegramSourceHealthSwitch"
+const val TELEGRAM_TEAM_SWITCH_TEST_TAG = "telegramTeamSwitch"
+const val TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG = "telegramRemoteUpdateSwitch"
 
 /**
  * Opções do que o bot faz além de responder (#398): permissões e envios por conta
@@ -72,6 +81,134 @@ internal fun TelegramBotOptions(model: TelegramBotSectionModel, pt: Boolean) {
                 checked = model.allowSourceControl,
                 onCheckedChange = model.onAllowSourceControlChange,
                 modifier = Modifier.testTag(TELEGRAM_SOURCE_CONTROL_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Permitir ações no PC" else "Allow PC actions",
+            description = if (pt) {
+                "Com ele, o /hud traz a HUD para a frente neste computador. Desligado, o bot só lê."
+            } else {
+                "With it, /hud brings the HUD to the front on this computer. Off, the bot only reads."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.allowPcActions,
+                onCheckedChange = { allowed -> model.onPreferencesChange(model.preferences.copy(allowPcActions = allowed)) },
+                modifier = Modifier.testTag(TELEGRAM_PC_ACTIONS_SWITCH_TEST_TAG)
+            )
+        }
+        val machine = model.machineName
+        TelegramOptionRow(
+            label = if (pt) "Nome deste PC nas mensagens" else "This PC's name in messages",
+            description = when {
+                machine == null && pt -> "Útil com o bot em mais de um computador. O sistema não informou o nome deste."
+                machine == null -> "Useful with the bot on more than one computer. The system did not report this one's name."
+                pt -> "Útil com o bot em mais de um computador. Este assina como $machine."
+                else -> "Useful with the bot on more than one computer. This one signs as $machine."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.showMachineName,
+                onCheckedChange = { show -> model.onPreferencesChange(model.preferences.copy(showMachineName = show)) },
+                modifier = Modifier.testTag(TELEGRAM_MACHINE_NAME_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Mostrar o time no bot" else "Show the team in the bot",
+            description = if (pt) {
+                "Com ele, o /time lista quem do time está online pelo apelido. Expõe dado de outras pessoas na conversa."
+            } else {
+                "With it, /team lists who from the team is online by nickname. It shows other people's data in the chat."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.showTeam,
+                onCheckedChange = { show -> model.onPreferencesChange(model.preferences.copy(showTeam = show)) },
+                modifier = Modifier.testTag(TELEGRAM_TEAM_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Permitir atualizar pelo bot" else "Allow updating from the bot",
+            description = if (pt) {
+                "Avisa quando uma versão nova já foi baixada e oferece \"Atualizar e reiniciar o app\": o app fecha e reabre neste PC."
+            } else {
+                "Says when a new version is downloaded and offers \"Update and restart the app\": the app closes and reopens on this PC."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.allowRemoteUpdate,
+                onCheckedChange = { allowed -> model.onPreferencesChange(model.preferences.copy(allowRemoteUpdate = allowed)) },
+                modifier = Modifier.testTag(TELEGRAM_REMOTE_UPDATE_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Só alerta crítico toca" else "Only critical alerts ring",
+            description = if (pt) {
+                "Cota em 90% ou mais toca no celular; os outros alertas chegam em silêncio, sem vibrar."
+            } else {
+                "A quota at 90% or more rings the phone; the other alerts arrive silently, without vibrating."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.soundOnlyOnCritical,
+                onCheckedChange = { only -> model.onPreferencesChange(model.preferences.copy(soundOnlyOnCritical = only)) },
+                modifier = Modifier.testTag(TELEGRAM_CRITICAL_SOUND_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Agrupar alertas repetidos" else "Group repeated alerts",
+            description = if (pt) {
+                "O mesmo alerta no mesmo dia edita a mensagem anterior com um contador, sem vibrar de novo. Crítico sempre abre outra."
+            } else {
+                "The same alert on the same day edits the previous message with a counter, without vibrating again. Critical always opens a new one."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.groupRepeatedAlerts,
+                onCheckedChange = { group -> model.onPreferencesChange(model.preferences.copy(groupRepeatedAlerts = group)) },
+                modifier = Modifier.testTag(TELEGRAM_GROUP_ALERTS_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Juntar alertas" else "Batch alerts",
+            description = if (pt) {
+                "Os alertas de 15 min chegam numa mensagem só, um tópico por alerta. Crítico sai na hora."
+            } else {
+                "Alerts from 15 min arrive in a single message, one bullet per alert. Critical goes out right away."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.batchAlerts,
+                onCheckedChange = { batch -> model.onPreferencesChange(model.preferences.copy(batchAlerts = batch)) },
+                modifier = Modifier.testTag(TELEGRAM_BATCH_ALERTS_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Painel em uma linha" else "One-line panel",
+            description = if (pt) {
+                "O painel fixado vira uma linha com o risco e o pior percentual de cada conta, que cabe no topo da conversa."
+            } else {
+                "The pinned panel becomes one line with each account's risk and worst percentage, which fits the top of the chat."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.compactPanel,
+                onCheckedChange = { compact -> model.onPreferencesChange(model.preferences.copy(compactPanel = compact)) },
+                modifier = Modifier.testTag(TELEGRAM_COMPACT_PANEL_SWITCH_TEST_TAG)
+            )
+        }
+        TelegramOptionRow(
+            label = if (pt) "Avisar fonte com falha" else "Warn about a failing source",
+            description = if (pt) {
+                "Depois de 15 min falhando, o bot diz o motivo e de quando são os números. Avisa de novo quando ela voltar."
+            } else {
+                "After 15 min failing, the bot says why and how old the numbers are. It tells you again when it is back."
+            }
+        ) {
+            AppSwitch(
+                checked = model.preferences.sourceHealthAlerts,
+                onCheckedChange = { warn -> model.onPreferencesChange(model.preferences.copy(sourceHealthAlerts = warn)) },
+                modifier = Modifier.testTag(TELEGRAM_SOURCE_HEALTH_SWITCH_TEST_TAG)
             )
         }
     }

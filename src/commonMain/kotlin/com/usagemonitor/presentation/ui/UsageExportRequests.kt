@@ -26,6 +26,12 @@ import com.usagemonitor.presentation.ui.report.UsageReportDocument
 sealed interface UsageExportPayload {
     data class Text(val content: String) : UsageExportPayload
     data class Report(val document: UsageReportDocument, val language: AppLanguage? = null) : UsageExportPayload
+
+    /**
+     * Arquivo já pronto em bytes (análise da sessão, B21b: o PDF de uma página que o bot também
+     * manda). Não é `data class`: igualdade de `ByteArray` é por referência.
+     */
+    class Binary(val content: ByteArray) : UsageExportPayload
 }
 
 data class UsageExportRequest(

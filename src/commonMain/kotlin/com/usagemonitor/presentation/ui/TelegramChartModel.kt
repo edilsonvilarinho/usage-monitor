@@ -36,7 +36,12 @@ const val TELEGRAM_CHART_MAX_LINES = 8
  * Saldo em dinheiro fica de fora (não é "uso de 0 a 100"), e série sem ponto no
  * intervalo também — linha vazia na legenda diria um número que não foi medido.
  */
-fun buildTelegramChart(reports: List<Pair<String, ApiUsageHistoryReport>>, range: HistoryRange, now: Instant): TelegramChart {
+fun buildTelegramChart(
+    reports: List<Pair<String, ApiUsageHistoryReport>>,
+    range: HistoryRange,
+    now: Instant,
+    language: AppLanguage = AppLanguage.PT
+): TelegramChart {
     val start = range.windowStart(now).toEpochMilliseconds()
     val end = now.toEpochMilliseconds()
     val lines = reports.flatMap { (accountName, report) ->
@@ -51,7 +56,7 @@ fun buildTelegramChart(reports: List<Pair<String, ApiUsageHistoryReport>>, range
                     .filter { (before, after) -> !isSamePeriod(before.periodEndAt, after.periodEndAt) }
                     .map { (_, after) -> after.capturedAt.toEpochMilliseconds() }
                 TelegramChartLine(
-                    label = "$accountName · ${series.quotaLabel}",
+                    label = "$accountName · ${displayQuotaLabel(series.quotaLabel, language)}",
                     points = inside.map { point -> point.capturedAt.toEpochMilliseconds() to point.normalizedUsage * 100f },
                     resets = resets,
                     lastPercent = (inside.last().normalizedUsage * 100f).toInt()

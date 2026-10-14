@@ -24,6 +24,7 @@ import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.evaluateUsageAlerts
+import com.usagemonitor.domain.entity.withAccountThreshold
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
@@ -783,6 +784,57 @@ class UsageAlertTest {
         settings = settings,
         now = now
     )
+
+    /** #408, AA8: no foco, a cota abaixo de 90% espera e a crítica sai; a sessão saturada espera o fim do foco. */
+    @Test
+    fun `focus lets only critical quota alerts through and postpones the rest`() {
+        val settings = UsageAlertSettings.DEFAULT.copy(focusUntilEpochMillis = (NOW + 1.hours).toEpochMilliseconds())
+        val pulse = SessionPulse(listOf(sessionAlert("s1", CliSessionHealth.SATURATED)))
+
+        val calm = evaluateUsageAlerts(listOf(stats(usedPercent = 80)), pulse, UsageAlertState.EMPTY, settings, NOW)
+        assertTrue(calm.alerts.isEmpty())
+
+        val critical = evaluateUsageAlerts(listOf(stats(usedPercent = 92)), pulse, calm.state, settings, NOW + 10.minutes)
+        assertEquals(listOf(75, 90), critical.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().map { alert -> alert.thresholdPercent })
+        assertTrue(critical.alerts.none { alert -> alert is UsageAlert.SessionSaturated })
+
+        val after = evaluateUsageAlerts(listOf(stats(usedPercent = 92)), pulse, critical.state, settings, NOW + 1.hours)
+        assertEquals(listOf("s1"), after.alerts.filterIsInstance<UsageAlert.SessionSaturated>().map { alert -> alert.sessionId })
+        assertTrue(after.alerts.none { alert -> alert is UsageAlert.QuotaThreshold })
+    }
+
+    /** #408, AA4: cota acima do limiar avisa uma vez dentro dos 15 min antes do reinício; abaixo, nunca. */
+    @Test
+    fun `a high quota reminds once before it resets`() {
+        val early = evaluate(stats(usedPercent = 80), UsageAlertState.EMPTY, RESET_AT - 20.minutes, UsageAlertSettings.DEFAULT)
+        assertTrue(early.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+
+        val due = evaluate(stats(usedPercent = 80), early.state, RESET_AT - 14.minutes, UsageAlertSettings.DEFAULT)
+        val reminder = due.alerts.filterIsInstance<UsageAlert.ResetSoon>().single()
+        assertEquals(14, reminder.minutesLeft)
+        assertEquals(80, reminder.actualPercent)
+
+        val again = evaluate(stats(usedPercent = 81), due.state, RESET_AT - 5.minutes, UsageAlertSettings.DEFAULT)
+        assertTrue(again.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+
+        val low = evaluate(stats(usedPercent = 40), UsageAlertState.EMPTY, RESET_AT - 10.minutes, UsageAlertSettings.DEFAULT)
+        assertTrue(low.alerts.isEmpty())
+        val off = evaluate(stats(usedPercent = 80), early.state, RESET_AT - 10.minutes, UsageAlertSettings.DEFAULT.copy(resetReminderMinutes = null))
+        assertTrue(off.alerts.none { alert -> alert is UsageAlert.ResetSoon })
+    }
+
+    /** #408, AA10: a conta com limiar próprio avisa nos dela; sem ele, nos gerais. */
+    @Test
+    fun `an account threshold replaces the general one only for that account`() {
+        val own = UsageAlertSettings.DEFAULT.withAccountThreshold(TARGET.storageKey, "Anthropic · Trabalho", listOf(80, 50))
+        val result = evaluate(stats(usedPercent = 60), UsageAlertState.EMPTY, NOW, own)
+        assertEquals(listOf(50), result.alerts.filterIsInstance<UsageAlert.QuotaThreshold>().map { alert -> alert.thresholdPercent })
+        assertEquals(listOf(50, 80), own.quotaPercentsFor(TARGET))
+
+        val general = evaluate(stats(usedPercent = 60), UsageAlertState.EMPTY, NOW)
+        assertTrue(general.alerts.isEmpty())
+        assertEquals(UsageAlertSettings.DEFAULT.effectiveQuotaPercents, own.withAccountThreshold(TARGET.storageKey, "x", null).quotaPercentsFor(TARGET))
+    }
 }
 
 /** A forma exata de `DeepSeekMapper`/`OpenRouterMapper`: `used = 0`, sem reset. */
@@ -883,3 +935,4 @@ private fun sessionAlert(sessionId: String, health: CliSessionHealth): ActiveSes
         projectName = "usage-monitor"
     )
 }
+

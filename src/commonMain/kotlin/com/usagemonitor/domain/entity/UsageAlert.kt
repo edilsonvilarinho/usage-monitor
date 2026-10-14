@@ -29,7 +29,24 @@ data class UsageAlertSettings(
      * Aviso de que uma cota reiniciou (#398, Y2) — só das que tinham alertado na
      * janela anterior, para não virar ruído a cada 5 h. Vale para bandeja e bot.
      */
-    val quotaResetAlertsEnabled: Boolean = true
+    val quotaResetAlertsEnabled: Boolean = true,
+    /**
+     * Modo foco até este instante (`/foco`, #408, AA8): só o alerta crítico
+     * ([isCriticalAlert]) sai; o resto é adiado como no silêncio — adia, não consome.
+     * Diferente do silêncio, que cala tudo. `null` = sem foco.
+     */
+    val focusUntilEpochMillis: Long? = null,
+    /**
+     * Lembrete N minutos antes do reinício de uma cota acima do primeiro limiar (#408,
+     * AA4; `/avise`). `null` desliga. Nasce em [DEFAULT_RESET_REMINDER_MINUTES], como o
+     * interruptor ligado do mockup aprovado; vale para a bandeja e o bot.
+     */
+    val resetReminderMinutes: Int? = DEFAULT_RESET_REMINDER_MINUTES,
+    /**
+     * Limiar próprio por conta (#408, AA10), por `UsageTargetKey.storageKey`. Conta fora do
+     * mapa segue [quotaPercents]. Vale para a bandeja e o bot: mora na decisão.
+     */
+    val quotaPercentsByTarget: Map<String, QuotaThresholdOverride> = emptyMap()
 ) {
     /**
      * Fator saneado, com [MIN_SPIKE_FACTOR] como piso.
@@ -60,15 +77,45 @@ data class UsageAlertSettings(
      * própria acabariam divergindo.
      */
     val effectiveQuotaPercents: List<Int>
-        get() = quotaPercents
-            .filter { percent -> percent in 1..100 }
-            .distinct()
-            .sorted()
+        get() = normalizeQuotaPercents(quotaPercents)
+
+    /** Os limiares que valem para [target]: os dela, se tiver, ou os gerais — já normalizados. */
+    fun quotaPercentsFor(target: UsageTargetKey): List<Int> =
+        quotaPercentsByTarget[target.storageKey]?.let { override -> normalizeQuotaPercents(override.percents) } ?: effectiveQuotaPercents
 
     companion object {
         val DEFAULT = UsageAlertSettings()
     }
 }
+
+/** Antecedência padrão do lembrete de reinício (#408, AA4). */
+const val DEFAULT_RESET_REMINDER_MINUTES = 15
+
+/** Faixa aceita no `/avise`: menos que 5 min não dá tempo de ler; mais que 2 h já é o `/reinicios`. */
+val RESET_REMINDER_MINUTES_RANGE = 5..120
+
+/** Dentro de 1..100, sem repetidos e em ordem — o dono único da normalização dos limiares. */
+fun normalizeQuotaPercents(percents: List<Int>): List<Int> =
+    percents.filter { percent -> percent in 1..100 }.distinct().sorted()
+
+/**
+ * Limiar próprio de uma conta (#408, AA10). [label] é o rótulo de quando foi gravado, só para
+ * mostrar nas Configurações sem consultar o painel; a identidade é a chave do mapa.
+ */
+data class QuotaThresholdOverride(
+    val label: String,
+    val percents: List<Int>
+)
+
+/** Grava ([percents]) ou tira (`null`) o limiar próprio da conta [targetKey]. Função pura. */
+fun UsageAlertSettings.withAccountThreshold(targetKey: String, label: String, percents: List<Int>?): UsageAlertSettings =
+    copy(
+        quotaPercentsByTarget = if (percents == null) {
+            quotaPercentsByTarget - targetKey
+        } else {
+            quotaPercentsByTarget + (targetKey to QuotaThresholdOverride(label, normalizeQuotaPercents(percents)))
+        }
+    )
 
 /** Limiares padrão: um aviso antecipado, um urgente e o estouro. */
 val DEFAULT_QUOTA_ALERT_PERCENTS: List<Int> = listOf(75, 90, 100)
@@ -132,6 +179,19 @@ sealed interface UsageAlert {
         val nextResetAt: Instant
     ) : UsageAlert
 
+    /**
+     * Uma cota acima do limiar reinicia em [minutesLeft] minutos (#408, AA4): dá para
+     * planejar a volta. Um por janela; não é crítico — não diz que o uso vai parar.
+     */
+    data class ResetSoon(
+        val target: UsageTargetKey,
+        val targetLabel: String,
+        val quotaLabel: String,
+        val actualPercent: Int,
+        val resetAt: Instant,
+        val minutesLeft: Int
+    ) : UsageAlert
+
     /** Uma sessão CLI com interação recente saturou a janela de contexto. */
     data class SessionSaturated(
         val sessionId: String,
@@ -172,6 +232,18 @@ sealed interface UsageAlert {
     ) : UsageAlert
 }
 
+/** Piso do alerta crítico (#408): a partir daqui o limiar é o urgente dos padrões, não o aviso antecipado. */
+const val CRITICAL_ALERT_PERCENT = 90
+
+/**
+ * Alerta crítico (#408): uma cota em [CRITICAL_ALERT_PERCENT]% ou mais, o que inclui a
+ * esgotada. Dono único da gravidade — o som do bot (AA26), o modo foco (AA8) e o lote
+ * (AA25) perguntam aqui, para "crítico" nunca ter duas definições. Sessão, reinício e
+ * anomalia não são críticos: nenhum deles diz que o uso vai parar.
+ */
+fun isCriticalAlert(alert: UsageAlert): Boolean =
+    alert is UsageAlert.QuotaThreshold && alert.actualPercent >= CRITICAL_ALERT_PERCENT
+
 /**
  * Memória de disparo entre passadas do polling.
  *
@@ -210,7 +282,9 @@ data class FiredQuotaWindow(
      * A janela anterior alertou e o aviso de reinício ainda não saiu (#398, Y2) —
      * caiu no silêncio. Fica pendente até sair, como os limiares: adia, não consome.
      */
-    val resetPending: Boolean = false
+    val resetPending: Boolean = false,
+    /** O lembrete antes do reinício (#408, AA4) já saiu nesta janela. */
+    val reminded: Boolean = false
 )
 
 /** Alertas a emitir agora e o estado a guardar para a próxima passada. */
@@ -241,32 +315,37 @@ fun evaluateUsageAlerts(
 ): UsageAlertEvaluation {
     val snoozed = settings.snoozedUntilEpochMillis?.let { until -> now.toEpochMilliseconds() < until } == true
     val silenced = snoozed || (currentLocalHour != null && settings.quietHours?.contains(currentLocalHour) == true)
+    val focused = settings.focusUntilEpochMillis?.let { until -> now.toEpochMilliseconds() < until } == true
+    // No foco, o que não é crítico é adiado pelo mesmo caminho do silêncio; a cota
+    // decide por leitura, porque a mesma janela pode virar crítica antes do fim do foco.
+    val deferred = silenced || focused
 
     val quotaResult = evaluateQuotaAlerts(
         stats = stats,
         previous = previous.quotaWindows,
         settings = settings,
         now = now,
-        silenced = silenced
+        silenced = silenced,
+        focused = focused
     )
     val sessionResult = evaluateSessionAlerts(
         pulse = sessionPulse,
         previous = previous.firedSessionIds,
         settings = settings,
-        silenced = silenced
+        silenced = deferred
     )
     val stalledResult = evaluateStalledSessionAlerts(
         stalledSessions = stalledSessions,
         previous = previous.firedStalledSessionIds,
         settings = settings,
-        silenced = silenced
+        silenced = deferred
     )
 
     val spikeResult = evaluateSpikeAlerts(
         spikes = spikes,
         previous = previous.firedSpikeDays,
         settings = settings,
-        silenced = silenced
+        silenced = deferred
     )
 
     return UsageAlertEvaluation(
@@ -290,10 +369,10 @@ private fun evaluateQuotaAlerts(
     previous: Map<QuotaAlertScope, FiredQuotaWindow>,
     settings: UsageAlertSettings,
     now: Instant,
-    silenced: Boolean
+    silenced: Boolean,
+    focused: Boolean = false
 ): QuotaAlertResult {
-    val thresholds = settings.effectiveQuotaPercents
-    if (!settings.quotaAlertsEnabled || thresholds.isEmpty()) {
+    if (!settings.quotaAlertsEnabled) {
         // Alerta desligado não pode deixar rastro: religá-lo tem de voltar a
         // avisar sobre a janela corrente, não herdar disparos de quando estava
         // ligado.
@@ -304,6 +383,10 @@ private fun evaluateQuotaAlerts(
     val windows = mutableMapOf<QuotaAlertScope, FiredQuotaWindow>()
 
     for (stat in stats) {
+        // Por conta (#408, AA10): sem limiar nenhum, a conta não deixa rastro, como o
+        // alerta de cota desligado.
+        val thresholds = settings.quotaPercentsFor(stat.targetKey)
+        if (thresholds.isEmpty()) continue
         for (quota in stat.quotas) {
             val scope = QuotaAlertScope(
                 target = stat.targetKey,
@@ -331,7 +414,9 @@ private fun evaluateQuotaAlerts(
                 isSameWindow -> storedWindow.resetPending
                 else -> storedWindow.firedPercents.isNotEmpty()
             }
-            if (resetDue && !silenced) {
+            // Reinício não é crítico: no foco, fica pendente como no silêncio.
+            val resetDeferred = silenced || focused
+            if (resetDue && !resetDeferred) {
                 alerts += UsageAlert.QuotaReset(
                     target = stat.targetKey,
                     targetLabel = targetLabel,
@@ -339,18 +424,40 @@ private fun evaluateQuotaAlerts(
                     nextResetAt = quota.periodEndAt
                 )
             }
-            val resetPending = resetDue && silenced
+            val resetPending = resetDue && resetDeferred
 
             val actualPercent = quotaPercentUsed(quota)
             val crossed = thresholds.filter { threshold -> actualPercent >= threshold }
             val pending = crossed.filter { threshold -> threshold !in alreadyFired }
 
-            if (silenced || pending.isEmpty()) {
+            // Lembrete antes do reinício (#408, AA4): só cota acima do primeiro limiar e
+            // com reinício conhecido, um por janela. No silêncio e no foco fica para a
+            // próxima leitura — se o reinício chegar antes, não há mais o que lembrar.
+            val alreadyReminded = isSameWindow && storedWindow.reminded
+            val minutesLeft = (quota.periodEndAt - now).inWholeMinutes
+            val reminderWindow = settings.resetReminderMinutes
+            val reminderDue = reminderWindow != null && quota.hasKnownResetAt && crossed.isNotEmpty() && !alreadyReminded &&
+                quota.periodEndAt > now && minutesLeft < reminderWindow
+            if (reminderDue && !resetDeferred) {
+                alerts += UsageAlert.ResetSoon(
+                    target = stat.targetKey,
+                    targetLabel = targetLabel,
+                    quotaLabel = quota.label,
+                    actualPercent = actualPercent,
+                    resetAt = quota.periodEndAt,
+                    minutesLeft = minutesLeft.toInt().coerceAtLeast(1)
+                )
+            }
+            val reminded = alreadyReminded || (reminderDue && !resetDeferred)
+
+            // Foco (#408, AA8): abaixo do crítico, o limiar espera como no silêncio.
+            val focusDeferred = focused && actualPercent < CRITICAL_ALERT_PERCENT
+            if (silenced || focusDeferred || pending.isEmpty()) {
                 // No silêncio o limiar cruzado não é marcado como disparado: o
                 // consumo só cresce dentro de uma janela, então o alerta volta a
                 // ser avaliado — e emitido — quando o silêncio terminar. Marcá-lo
                 // aqui perderia o aviso para sempre.
-                windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired, resetPending)
+                windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired, resetPending, reminded)
                 continue
             }
 
@@ -367,7 +474,7 @@ private fun evaluateQuotaAlerts(
                     hasKnownResetAt = quota.hasKnownResetAt
                 )
             }
-            windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired + pending, resetPending)
+            windows[scope] = FiredQuotaWindow(quota.periodEndAt, alreadyFired + pending, resetPending, reminded)
         }
     }
 
