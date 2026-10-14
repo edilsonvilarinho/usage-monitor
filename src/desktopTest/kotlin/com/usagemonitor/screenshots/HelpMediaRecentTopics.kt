@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.usagemonitor.domain.entity.AnalysisView
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
@@ -32,6 +31,7 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.viewmodel.AnalysisUiState
 import com.usagemonitor.presentation.viewmodel.ComparisonUiState
 import java.io.File
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Demos dos tópicos da ajuda que vieram com a #411 e a regravação de
@@ -111,20 +111,18 @@ internal fun recordAccounts(outputDir: File) {
     }
 }
 
-/** Análise da sessão: o painel em texto e a troca para outra vista. */
+/** Análise da sessão: o painel único ao vivo (rodada AD) e a leitura seguinte chegando sozinha. */
 internal fun recordSessionAnalysis(outputDir: File) {
     val state = DemoState()
-    var view by mutableStateOf(AnalysisView.PANEL)
+    var analysis by mutableStateOf(AnalysisFixture.analysis)
 
     record(outputDir, HelpTopic.SESSION_ANALYSIS, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 AnalysisContent(
-                    state = AnalysisUiState.Success(AnalysisFixture.analysis, view),
+                    state = AnalysisUiState.Success(analysis),
                     accountLabel = "Anthropic · Padrão",
                     language = AppLanguage.PT,
-                    onSelect = {},
-                    onRefresh = {},
                     onExportPdf = {}
                 )
             }
@@ -132,9 +130,15 @@ internal fun recordSessionAnalysis(outputDir: File) {
 
         recorder.animate(800) {}
         recorder.hold(1_400)
-        recorder.moveCursor(state.cursor, x = ANALYSIS_TAB_X.dp, y = ANALYSIS_TAB_Y.dp, durationMillis = 600)
-        recorder.click(state.cursor) { view = AnalysisView.INTERVALS }
-        recorder.animate(500) {}
+        // O ponteiro vai até o selo "Ao vivo": é ele que diz de quando é a leitura.
+        recorder.moveCursor(state.cursor, x = ANALYSIS_LIVE_X.dp, y = ANALYSIS_LIVE_Y.dp, durationMillis = 600)
+        // A coleta seguinte: a janela relê sozinha, a barra da 5h anda e a hora no selo também.
+        recorder.animate(600) {
+            analysis = AnalysisFixture.analysis.copy(
+                generatedAt = AnalysisFixture.analysis.generatedAt + 1.minutes,
+                fiveHour = AnalysisFixture.analysis.fiveHour?.copy(percent = 71, projectedAtReset = 92)
+            )
+        }
         recorder.hold(2_000)
     }
 }
@@ -259,9 +263,9 @@ private const val INTEGRATION_SWITCH_X = 957
 private const val INTEGRATION_SWITCH_Y = 107
 private const val ACCOUNTS_EDIT_X = 958
 private const val ACCOUNTS_EDIT_Y = 97
-private const val ANALYSIS_TAB_X = 204
-private const val ANALYSIS_TAB_Y = 79
 private const val COMPARISON_RANGE_X = 771
+private const val ANALYSIS_LIVE_X = 786
+private const val ANALYSIS_LIVE_Y = 33
 private const val COMPARISON_RANGE_Y = 34
 private const val TELEGRAM_PAIR_X = 115
 private const val TELEGRAM_PAIR_Y = 272

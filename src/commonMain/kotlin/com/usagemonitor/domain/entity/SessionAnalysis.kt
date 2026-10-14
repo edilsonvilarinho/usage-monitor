@@ -40,7 +40,12 @@ data class SessionAnalysis(
     val slices: List<AnalysisBucket>,
     val previous: AnalysisWindowComparison?,
     /** Vazão por modelo na última hora, do mais rápido ao mais lento. */
-    val modelSpeeds: List<AnalysisModelSpeed>
+    val modelSpeeds: List<AnalysisModelSpeed>,
+    /**
+     * Fim da última sincronização do índice que deu a vazão, quando ele não acompanha a
+     * janela ao vivo (Codex, 10 min; rodada AD). `null` = não informado.
+     */
+    val throughputIndexedAt: Instant? = null
 )
 
 /** Uma janela (5h ou semanal) agora. */

@@ -171,6 +171,12 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
     )
     // Índice separado: rollouts do Codex não entram nas tabelas `cli_*` do Claude.
     val codexCliSessionDataSource = LocalCodexCliSessionDataSource()
+
+    /**
+     * Fim da última sincronização do índice do Codex nesta execução (laço de 10 min do
+     * `AppBackgroundWork`); a análise diz de quando é a vazão do Codex (plano AD, U4).
+     */
+    val codexIndexSyncedAt = MutableStateFlow<Instant?>(null)
     // Mesma conexão do índice de sessões, não uma segunda para o mesmo arquivo:
     // `useConnection` é sincronizado, então o envio espera a indexação terminar
     // em vez de disputar a escrita e receber `SQLITE_BUSY`.

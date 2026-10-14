@@ -296,18 +296,19 @@ private val EN_ACCOUNTS = HelpEntry(
 
 private val EN_SESSION_ANALYSIS = HelpEntry(
     title = "Session analysis",
-    summary = "Pace, throughput and windows for one account, as text and charts.",
+    summary = "Pace, throughput and windows for one account, in a panel that updates itself.",
     description = "The analysis reads the account history and the CLI's local usage and " +
         "answers whether the current pace reaches the end of the window: the 5h and weekly " +
         "percentages, the pace over the last hour, the safe pace until the reset and where the " +
         "quota lands at the reset. It also covers spans from 1 h to 7 days, the 24 hours, the " +
-        "week map and throughput per model. It applies to Anthropic and Codex accounts; what " +
-        "was not measured shows as not measured, never as zero.",
+        "previous window at the same point and throughput per model. While the window is open " +
+        "it reads again on every collection of the account and every 30 seconds. It applies to " +
+        "Anthropic and Codex accounts; what was not measured shows as not measured, never as zero.",
     steps = listOf(
         "In the account balloon (hover its ring), click \"Session analysis: pace, throughput " +
             "and windows\".",
-        "Pick \"Text\" or \"Charts\", then the view in the tabs.",
-        "\"Refresh\" reads the history again; \"PDF report\" saves the same analysis on one page.",
+        "Hover the bars in \"Last 24 h\" to see each hour's points and tok/s.",
+        "The \"Live\" badge shows the time of the reading on screen; \"PDF report\" saves the same analysis on one page.",
         "The same analysis is available from the Telegram bot with /analise."
     ),
     mediaId = "session-analysis"
