@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
@@ -48,9 +49,13 @@ import kotlin.time.Instant
  * As listas são `CopyOnWriteArrayList`, e não `Collections.synchronizedList`: o teste as
  * percorre (`api.sent.any { … }`) enquanto o serviço grava em outra thread, e percorrer a
  * lista sincronizada sem segurar o lock dava `ConcurrentModificationException` no CI.
+ *
+ * [pending] é fila com retirada atômica (#412): o lote antigo era `toList()` seguido de
+ * `clear()`, e o `+=` do teste não passava pelo lock — mensagem enfileirada entre os dois
+ * era apagada sem ser entregue, e o `waitUntil` seguinte estourava.
  */
 private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("") })) {
-    val pending = CopyOnWriteArrayList<TelegramIncomingMessage>()
+    val pending = ConcurrentLinkedQueue<TelegramIncomingMessage>()
     val sent = CopyOnWriteArrayList<Pair<Long, String>>()
     val keyboards = CopyOnWriteArrayList<List<TelegramButton>>()
     private val nextMessageId = AtomicInteger(800)
@@ -64,8 +69,7 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
     override suspend fun getUpdates(token: String, offset: Long?, timeoutSeconds: Int): List<TelegramIncomingMessage> {
         if (offset == -1L) return emptyList()
         delay(20)
-        val batch = synchronized(pending) { pending.toList().also { pending.clear() } }
-        return batch
+        return generateSequence { pending.poll() }.toList()
     }
 
     val menus = CopyOnWriteArrayList<List<Pair<String, String>>>()
@@ -194,6 +198,19 @@ class TelegramBotServiceTest {
         withTimeout(5_000) { while (!condition()) delay(20) }
     }
 
+    /**
+     * Liga o serviço e só devolve com o coletor de alertas inscrito (#412).
+     *
+     * `start()` lança o `collect` numa corrotina de `Dispatchers.IO`, e o fluxo
+     * de alertas não tem `replay`: emitir antes da inscrição descarta o alerta, e
+     * o `waitUntil` seguinte estoura sem dizer por quê. Todo teste que emite
+     * alerta liga o serviço por aqui.
+     */
+    private fun startAndAwaitAlertCollector() {
+        service.start()
+        waitUntil { alerts.subscriptionCount.value > 0 }
+    }
+
     @Test
     fun `pairing code authorizes the chat and stranger commands are ignored`() {
         service.start()
@@ -302,7 +319,7 @@ class TelegramBotServiceTest {
     @Test
     fun `menu and alerts follow the app language when it changes`() {
         settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed"), TelegramChat(52L, "@outra")))
-        service.start()
+        startAndAwaitAlertCollector()
         waitUntil { api.menus.isNotEmpty() }
         assertEquals("conta", api.menus.first()[1].first)
 
@@ -349,7 +366,7 @@ class TelegramBotServiceTest {
     @Test
     fun `machine name signs alerts and replies only when turned on`() {
         paired()
-        service.start()
+        startAndAwaitAlertCollector()
         api.pending += message(1, chat = 51, text = "/ping")
         waitUntil { api.sent.any { it.second.startsWith("🏓") } }
         assertTrue(api.sent.none { "💻" in it.second })
@@ -375,7 +392,7 @@ class TelegramBotServiceTest {
     @Test
     fun `only critical alerts ring by default`() {
         paired()
-        service.start()
+        startAndAwaitAlertCollector()
         runBlocking { alerts.emit(quotaAlert(75)) }
         waitUntil { api.sent.size == 1 }
         assertEquals(1, api.silentSends.size)
@@ -394,7 +411,7 @@ class TelegramBotServiceTest {
     @Test
     fun `repeated alert edits the first message with a counter`() {
         paired()
-        service.start()
+        startAndAwaitAlertCollector()
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
         waitUntil { api.sent.size == 1 }
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s2", "alem-das-sombras")) }
@@ -414,7 +431,7 @@ class TelegramBotServiceTest {
     fun `non critical alerts arrive in one batch and critical goes out at once`() {
         paired()
         settings.value = settings.value.copy(preferences = TelegramBotPreferences(batchAlerts = true))
-        service.start()
+        startAndAwaitAlertCollector()
         runBlocking {
             alerts.emit(quotaAlert(75))
             alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras"))

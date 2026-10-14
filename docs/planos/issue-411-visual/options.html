@@ -1,0 +1,517 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#411 guia e dicas</title>
+<style>
+@property --hx{syntax:'<length>';inherits:true;initial-value:0px}
+@property --hy{syntax:'<length>';inherits:true;initial-value:0px}
+@property --hr{syntax:'<length>';inherits:true;initial-value:0px}
+:root{--s:1}
+body{margin:0;background:#101010}
+.ux{--bg:#131010;--surface:#1B1818;--raised:#211E1E;--border:#3D3838;--fg:#F2EDED;--muted:#B8B2B2;--ok:#4CAF50;--warn:#FFA726;--crit:#E86A6A;--info:#4C8DFF;--gold:#E8AE63;--hot:#FFF0CB;--ember:#B4501E;--dust:#8C643F;
+  background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 12px;color:#e9d6b8;font-size:11.5px}
+.ux .fix b{color:var(--gold)}
+.ux .fix ul{margin:4px 0 0;padding-left:16px}
+.ux .bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px;position:sticky;top:0;background:#101010;padding:6px 0;z-index:5}
+.ux .ctl{font:inherit;font-size:11px;background:#1b1b1b;color:#ccc;border:1px solid #333;border-radius:6px;padding:4px 9px;cursor:pointer}
+.ux .ctl.on{border-color:var(--gold);color:var(--hot)}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:12px}
+.ux .opt.ref{border-style:dashed;border-color:#4a4a4a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt p{margin:0 0 8px;color:#8f8f8f;font-size:11px}
+.ux .tags{font-size:10.5px;color:#7a7a7a;margin-top:8px}
+.ux .tags b{color:#c9a46e;font-weight:500}
+.ux .tags .no{color:var(--crit)}
+.ux .cap{font-size:10.5px;color:#9a9a9a;margin:8px 0 4px;display:flex;gap:8px}
+.ux .cap .ph{color:var(--gold);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* palco: desenhado em 640px e escalado para caber */
+.ux .box{position:relative;overflow:hidden;border-radius:8px;border:1px solid #2a2626}
+.ux .sc{position:absolute;left:0;top:0;width:640px;height:300px;transform-origin:0 0;overflow:hidden;
+  background:radial-gradient(ellipse at 75% 130%,#22160f 0,#0c0a0a 55%,#090808 100%);font-size:11px;color:var(--fg)}
+.ux .sc.tipsc{height:230px}
+.ux .T{transition-property:opacity,transform,clip-path,left,top,width,height,background,border-color,box-shadow,--hx,--hy,--hr,stroke-dashoffset;
+  transition-duration:calc(var(--d,420ms)*var(--s));transition-timing-function:cubic-bezier(.22,.8,.3,1)}
+/* notch (M1: núcleo escuro, anel de fótons) */
+.ux .notch{position:absolute;left:50%;top:0;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px 12px 6px;
+  background:#030508;border:1px solid rgba(232,174,99,.35);border-top:none;border-radius:0 0 14px 14px;box-shadow:0 0 18px rgba(232,174,99,.08)}
+.ux .acct{display:flex;flex-direction:column;align-items:center;margin:0 -2px}
+.ux .acct canvas{width:52px;height:52px;margin:-8px -6px -10px}
+.ux .acct i{font-style:normal;font-size:8px;line-height:1.15;color:var(--muted);white-space:nowrap;text-align:center}
+.ux .hd{width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:#b9b0a6;font-size:12px;border-radius:5px}
+/* balão (F10) */
+.ux .bal{position:absolute;width:210px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px;box-shadow:0 10px 30px #000c;
+  clip-path:inset(0 0 100% 0);opacity:0}
+.ux .bal.open{clip-path:inset(0 0 0 0);opacity:1}
+.ux .bal b{color:var(--fg);font-weight:500}
+.ux .bal .q{display:flex;gap:6px;align-items:center;margin-top:5px;font-size:10px;color:var(--muted)}
+.ux .bal .tr{flex:1;height:4px;background:#2c2828;border-radius:2px;position:relative;overflow:hidden}
+.ux .bal .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+.ux .menu{position:absolute;width:150px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:5px;box-shadow:0 10px 30px #000c;clip-path:inset(0 0 100% 0);opacity:0}
+.ux .menu.open{clip-path:inset(0);opacity:1}
+.ux .menu div{padding:4px 7px;border-radius:6px;color:var(--muted);font-size:10px}
+.ux .menu div.hot{background:var(--raised);color:var(--fg);box-shadow:inset 2px 0 0 var(--gold)}
+/* janelas (AppDialogWindow) */
+.ux .win{position:absolute;background:var(--bg);border:1px solid #3a3030;border-radius:10px;box-shadow:0 14px 40px #000d;overflow:hidden;opacity:0;transform:translateY(8px)}
+.ux .win.open{opacity:1;transform:none}
+.ux .win .tb{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);font-size:10.5px;color:var(--fg);background:var(--surface)}
+.ux .win .tb .x{margin-left:auto;color:var(--muted)}
+.ux .btn{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--raised);color:var(--fg);border-radius:6px;padding:2px 8px;font-size:9.5px;white-space:nowrap}
+.ux .btn.pri{background:#2a3b5c;border-color:#3f5f99;color:#dbe7ff}
+.ux .btn.gh{background:transparent;border-color:transparent;color:var(--muted)}
+.ux .chk{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;color:var(--muted);font-family:"IBM Plex Sans",system-ui,sans-serif}
+.ux .chk::before{content:"";width:10px;height:10px;border:1px solid #6a6060;border-radius:3px}
+.ux .body{font-family:"IBM Plex Sans",system-ui,sans-serif;color:#d9d2d2;font-size:11px;line-height:1.45}
+.ux .kbd{font-family:"IBM Plex Mono",Consolas,monospace;color:var(--hot);background:#2a1f12;border-radius:3px;padding:0 3px;font-size:10px}
+.ux .row2{display:flex;gap:6px;align-items:center}
+.ux .row2>.tx{flex:1;min-width:0}
+/* cartão de dica genérico */
+.ux .tip{position:absolute;background:var(--surface);border:1px solid #4a3a20;border-radius:10px;box-shadow:0 12px 36px #000d;padding:9px 11px;opacity:0;transform:translateY(6px)}
+.ux .tip.in{opacity:1;transform:none}
+.ux .tip .hdr{display:flex;align-items:center;gap:6px;font-size:9.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.ux .tip .hdr span:last-child{margin-left:auto;color:#8a8080;text-transform:none;letter-spacing:0}
+.ux .tip .tx{position:relative;min-height:46px}
+.ux .tip .tx>div{position:absolute;left:0;right:0;top:0;transition:opacity calc(240ms*var(--s))}
+.ux .tip .tx>div+div{opacity:0}
+.ux .tip.alt .tx>div{opacity:0}.ux .tip.alt .tx>div+div{opacity:1}
+.ux .tip .ft{display:flex;align-items:center;gap:6px;margin-top:8px}
+.ux .tip .ft .sp{flex:1}
+/* toast */
+.ux .toast{position:absolute;right:12px;bottom:12px;width:220px;background:#1f1c1c;border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:10px;opacity:0;transform:translateY(8px)}
+.ux .toast.in{opacity:1;transform:none}
+.ux .toast b{color:var(--fg);font-weight:500;display:block}
+/* AC1 holofote */
+.ux .dim{position:absolute;inset:0;background:rgba(3,5,8,.78);opacity:0;
+  -webkit-mask:radial-gradient(circle var(--hr) at var(--hx) var(--hy),transparent 96%,#000 100%);mask:radial-gradient(circle var(--hr) at var(--hx) var(--hy),transparent 96%,#000 100%)}
+.ux .dim.on{opacity:1}
+.ux .halo{position:absolute;border-radius:50%;border:1px solid rgba(255,240,203,.85);box-shadow:0 0 14px rgba(232,174,99,.55),inset 0 0 10px rgba(232,174,99,.25);opacity:0;pointer-events:none}
+.ux .halo.on{opacity:1}
+.ux .callout{position:absolute;width:230px;background:var(--surface);border:1px solid #4a3a20;border-radius:10px;padding:8px 10px;opacity:0}
+.ux .callout.on{opacity:1}
+.ux .callout .n{font-size:9px;color:var(--gold);letter-spacing:.06em}
+/* AC2 constelação */
+.ux .sky{position:absolute;left:0;top:0;width:250px;bottom:0;background:radial-gradient(circle at 40% 40%,#14100c,#07080a)}
+.ux .sky svg{position:absolute;inset:0}
+.ux .star{fill:#5a5048;transition:fill calc(420ms*var(--s)),r calc(420ms*var(--s))}
+.ux .star.lit{fill:#FFF0CB}
+.ux .star.on{fill:#FFF0CB;filter:drop-shadow(0 0 4px #E8AE63)}
+.ux .lnk{stroke:#E8AE63;stroke-width:1;fill:none;opacity:.7}
+.ux .slab{font-size:8.5px;fill:#8a7f74;font-family:"IBM Plex Mono",Consolas,monospace}
+.ux .slab.on{fill:#FFF0CB}
+/* AC3 checklist */
+.ux .cl{list-style:none;margin:0;padding:0}
+.ux .cl li{display:flex;gap:8px;align-items:flex-start;padding:5px 8px;border-radius:7px;border:1px solid transparent}
+.ux .cl li.cur{background:var(--raised);border-color:#4a3a20}
+.ux .cl .bx{width:13px;height:13px;border:1px solid #6a6060;border-radius:4px;flex:none;margin-top:1px;position:relative}
+.ux .cl li.done .bx{background:#1f3a22;border-color:var(--ok)}
+.ux .cl li.done .bx::after{content:"✓";position:absolute;left:1px;top:-3px;font-size:10px;color:#9be39f}
+.ux .cl li .w{flex:1;min-width:0}
+.ux .cl li .w b{display:block;font-weight:500;color:var(--fg);font-size:10.5px}
+.ux .cl li .w i{display:block;font-style:normal;font-size:9.5px;color:var(--muted);font-family:"IBM Plex Sans",system-ui,sans-serif;max-height:0;overflow:hidden;transition:max-height calc(360ms*var(--s))}
+.ux .cl li.cur .w i{max-height:40px}
+.ux .cl li .st{font-size:9px;color:#8a8080}
+.ux .cl li.done .st{color:#7fcf83}
+.ux .segs{display:flex;gap:3px}
+.ux .segs span{flex:1;height:4px;border-radius:2px;background:#2c2828;transition:background calc(240ms*var(--s))}
+.ux .segs span.on{background:var(--gold)}
+/* AC4 carrossel */
+.ux .track{display:flex;width:600%;height:100%}
+.ux .slide{width:16.6667%;height:100%;flex:none;position:relative}
+.ux .dots{display:flex;gap:4px}
+.ux .dots i{width:6px;height:6px;border-radius:50%;background:#4a4242}
+.ux .dots i.on{background:var(--gold)}
+.ux .ill{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:radial-gradient(ellipse at 50% 120%,#2a1a10,#0b0909 70%)}
+/* AC5 dia */
+.ux .tl{position:absolute;left:24px;right:24px;bottom:22px;height:22px}
+.ux .tl .ax{position:absolute;left:0;right:0;top:10px;height:2px;background:#3a3232;border-radius:1px}
+.ux .tl .h{position:absolute;top:16px;font-size:8.5px;color:#8a8080;transform:translateX(-50%)}
+.ux .tl .ev{position:absolute;top:6px;width:10px;height:10px;border-radius:50%;background:#2a2424;border:1px solid #6a5a48;transform:translateX(-50%)}
+.ux .tl .ev.on{background:var(--gold);border-color:var(--hot)}
+.ux .tl .pl{position:absolute;top:-4px;width:2px;height:30px;background:var(--hot);box-shadow:0 0 8px var(--gold);transform:translateX(-1px)}
+.ux .phone{position:absolute;right:20px;top:60px;width:130px;height:150px;border:1px solid #3a3a46;border-radius:14px;background:#0e1621;padding:10px 8px;opacity:0;transform:translateY(10px);font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:9.5px;color:#f5f5f5}
+.ux .phone.in{opacity:1;transform:none}
+.ux .phone .m{background:#182533;border-radius:8px;padding:5px 6px;margin-top:6px;line-height:1.35}
+.ux .story{position:absolute;left:24px;top:84px;width:330px;font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:11.5px;color:#e6dede}
+.ux .story b{display:block;font-family:"IBM Plex Mono",Consolas,monospace;color:var(--gold);font-weight:500;font-size:10px;margin-bottom:3px}
+/* AC7 cursor */
+.ux .cursor{position:absolute;width:14px;height:20px;left:600px;top:260px;pointer-events:none;filter:drop-shadow(0 1px 2px #000)}
+.ux .cursor.click::after{content:"";position:absolute;left:-8px;top:-8px;width:16px;height:16px;border-radius:50%;border:1px solid var(--hot);animation:ck calc(400ms*var(--s)) ease-out forwards}
+@keyframes ck{from{transform:scale(.3);opacity:1}to{transform:scale(1.6);opacity:0}}
+.ux .capbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(10,8,8,.92);border-top:1px solid #3a2e20;font-size:10px}
+.ux .sw{width:24px;height:13px;border-radius:7px;background:#3a3535;position:relative;flex:none;transition:background calc(240ms*var(--s))}
+.ux .sw::after{content:"";position:absolute;left:2px;top:2px;width:9px;height:9px;border-radius:50%;background:#bbb;transition:left calc(240ms*var(--s))}
+.ux .sw.on{background:#2e7d32}.ux .sw.on::after{left:13px;background:#fff}
+/* AC8 trilhas */
+.ux .pf{border:1px solid var(--border);border-radius:8px;padding:7px 8px;background:var(--surface);transition:border-color calc(300ms*var(--s)),box-shadow calc(300ms*var(--s)),opacity calc(300ms*var(--s))}
+.ux .pf b{display:block;color:var(--fg);font-weight:500;font-size:10.5px}
+.ux .pf i{font-style:normal;font-size:9.5px;color:var(--muted);font-family:"IBM Plex Sans",system-ui,sans-serif}
+.ux .pf.sel{border-color:var(--gold);box-shadow:0 0 0 1px #E8AE6355}
+.ux .pf.dim2{opacity:.35}
+.ux .path{display:flex;flex-direction:column;gap:6px}
+.ux .path .p{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);opacity:.5;transition:opacity calc(300ms*var(--s)),border-color calc(300ms*var(--s))}
+.ux .path .p.cur{opacity:1;border-color:var(--gold)}
+.ux .path .p.done{opacity:.85}
+.ux .path .p .k{width:18px;height:18px;border-radius:50%;border:1px solid #6a5a48;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--gold);flex:none}
+.ux .path .p.done .k{background:#1f3a22;border-color:var(--ok);color:#9be39f}
+.ux .chip{font-size:9px;border-radius:10px;padding:1px 7px;border:1px solid #4a3a20;color:var(--hot);background:#2a1f12;white-space:nowrap}
+/* AC9 anatomia */
+.ux .bigring{position:absolute;left:50px;top:40px;width:240px;height:240px;transform-origin:50% 50%}
+.ux .bigring canvas{width:240px;height:240px}
+.ux .lead{position:absolute;inset:0;pointer-events:none}
+.ux .lead path{stroke:#E8AE63;stroke-width:1;fill:none;stroke-dasharray:200;stroke-dashoffset:200}
+.ux .lead path.on{stroke-dashoffset:0}
+.ux .lab{position:absolute;font-size:10px;color:var(--fg);opacity:0;width:210px}
+.ux .lab.on{opacity:1}
+.ux .lab i{display:block;font-style:normal;color:var(--muted);font-size:9.5px;font-family:"IBM Plex Sans",system-ui,sans-serif}
+/* AC10 descobrir */
+.ux .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;perspective:600px}
+.ux .fc{position:relative;height:58px;transform-style:preserve-3d}
+.ux .fc>div{position:absolute;inset:0;backface-visibility:hidden;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px 7px}
+.ux .fc .bk{transform:rotateY(180deg);border-color:var(--gold);background:#1d1710}
+.ux .fc.flip{transform:rotateY(180deg)}
+.ux .fc.hl>div:first-child{border-color:var(--gold)}
+.ux .fc b{display:block;color:var(--fg);font-weight:500;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .fc .bk i{font-style:normal;font-size:9px;color:#e9d6b8;font-family:"IBM Plex Sans",system-ui,sans-serif;display:block;line-height:1.3}
+.ux .stt{display:inline-block;margin-top:4px;font-size:8.5px;border-radius:4px;padding:0 5px}
+.ux .stt.u{background:#1a2e1c;color:#7fcf83}
+.ux .stt.n{background:#2a2626;color:#a9a0a0}
+.ux .stt.nw{background:#33260f;color:var(--gold)}
+@media (max-width:420px){.ux{padding:12px}}
+</style></head><body>
+<div class="ux">
+<h1>#411 · Guia de introdução e dica do dia — rodada AC</h1>
+<p class="sub">10 direções. Cada uma mostra as duas superfícies: o guia que abre na primeira execução depois de instalar e a dica do dia, que abre no máximo uma vez por dia (inclusive pelo autostart) e se desliga pelo próprio modal ou em Configurações › Sistema.</p>
+<div class="fix"><b>Regras comuns a todas</b><ul>
+<li>Precedência por abertura: <b>Novidades &gt; Guia &gt; Dica</b> — nunca dois modais juntos. Guia automático só em instalação nova; depois, em Ajuda › "Rever guia".</li>
+<li>Textos citam o rótulo real do controle. Dado nunca anima errado: o anel mostra o valor, efeito vai por cima.</li>
+<li>Transições finitas (180–680 ms). "Reduzir animações" = corte seco em todas (botão abaixo simula).</li>
+<li>Aqui o guia roda em laço só para a demonstração; no app cada passo espera o "Próximo".</li>
+</ul></div>
+<div class="bar"><button class="ctl" id="slow">Câmera lenta ×3</button><button class="ctl" id="red">Reduzir animações</button><span class="sub" id="tag" style="margin:0"></span></div>
+<div id="opts"></div>
+</div>
+<script>
+/* ---------- anel Gargantua (assets/gargantua-ring.js da skill) ---------- */
+const TONE={ok:'#4CAF50',warn:'#FFA726',crit:'#EF5350'};
+const S=64,STROKE=2.5,GAP=1.5,PAD=28,W=S+PAD*2;
+const LIGHT=-135*Math.PI/180;
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const easeOut=t=>1-Math.pow(1-t,3);
+function hex(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16))}
+function rgba(c,a){const [r,g,b]=hex(c);return `rgba(${r},${g},${b},${a})`}
+function mix(c,w,k){const a=hex(c),b=hex(w);return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*k).toString(16).padStart(2,'0')).join('')}
+function drawCore(ctx,room,ph,o){
+  const c=S/2,h=room*.62*o.core;
+  ctx.globalAlpha=o.disk;
+  let g=ctx.createRadialGradient(c,c,Math.max(0,h*.9),c,c,room);
+  g.addColorStop(0,'rgba(232,174,99,.16)');g.addColorStop(1,'rgba(232,174,99,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(c,c,room,0,7);ctx.fill();
+  ctx.lineWidth=room*.05;ctx.strokeStyle='rgba(255,230,190,.35)';ctx.beginPath();ctx.arc(c,c,h+room*.1,Math.PI*1.08,Math.PI*1.92);ctx.stroke();
+  ctx.lineWidth=room*.025;ctx.strokeStyle='rgba(255,230,190,.18)';ctx.beginPath();ctx.arc(c,c,h+room*.08,Math.PI*.15,Math.PI*.85);ctx.stroke();
+  const disk=front=>{ctx.save();ctx.translate(c,c+room*.08);ctx.rotate(-12*Math.PI/180);
+    const rx=room*.95*o.diskScale,ry=rx*.16;const lg=ctx.createLinearGradient(-rx,0,rx,0);
+    lg.addColorStop(0,'rgba(180,80,30,.25)');lg.addColorStop(.5,'rgba(232,174,99,.55)');lg.addColorStop(1,'rgba(255,240,203,.8)');
+    ctx.strokeStyle=lg;ctx.lineWidth=room*.07;ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:Math.PI*2);ctx.stroke();
+    for(let k=0;k<3;k++){const a=((ph*360*(1+k%2))+k*120)%360;if(front!==(a<180))continue;const r=a*Math.PI/180,e=Math.abs(Math.sin(r));
+      ctx.strokeStyle=`rgba(255,248,230,${.45*e})`;ctx.lineWidth=room*.035;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,r,r+Math.min(.35,(front?Math.PI:Math.PI*2)-r));ctx.stroke();}
+    ctx.restore();};
+  disk(false);ctx.globalAlpha=1;
+  ctx.fillStyle='#030508';ctx.beginPath();ctx.arc(c,c,h,0,7);ctx.fill();
+  ctx.globalAlpha=o.disk;ctx.strokeStyle='rgba(255,240,203,.8)';ctx.lineWidth=room*.022;ctx.beginPath();ctx.arc(c,c,h+room*.01,0,7);ctx.stroke();
+  disk(true);ctx.globalAlpha=1;
+}
+function glassArc(ctx,r,tone,f,ph,o){
+  const c=S/2,a0=-Math.PI/2,end=a0+f*Math.PI*2,step=Math.PI/60;
+  ctx.globalAlpha=o.glass;ctx.lineCap='butt';
+  ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=STROKE*1.4;ctx.beginPath();ctx.arc(c,c,r,0,7);ctx.stroke();
+  for(let a=0;a<Math.PI*2;a+=step){const lit=.5+.5*Math.cos(a-LIGHT);
+    ctx.strokeStyle=`rgba(255,255,255,${.28*lit*lit*lit})`;ctx.lineWidth=.45;ctx.beginPath();ctx.arc(c,c,r-STROKE*.5,a,a+step+.01);ctx.stroke();
+    ctx.strokeStyle=`rgba(255,255,255,${.12*lit})`;ctx.lineWidth=.35;ctx.beginPath();ctx.arc(c,c,r+STROKE*.5,a,a+step+.01);ctx.stroke();}
+  ctx.globalAlpha=1;
+  if(f<=.001)return;
+  ctx.lineCap='round';
+  ctx.strokeStyle=rgba(tone,.25);ctx.lineWidth=STROKE*2.4;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  ctx.strokeStyle=tone;ctx.lineWidth=STROKE*.9;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  ctx.strokeStyle=mix(tone,'#ffffff',.6);ctx.lineWidth=STROKE*.35;ctx.beginPath();ctx.arc(c,c,r,a0,end);ctx.stroke();
+  for(let k=0;k<3;k++){const p=(ph+k/3)%1,fade=Math.sin(p*Math.PI);if(fade<.02)continue;
+    const x=c+r*Math.cos(a0+p*f*Math.PI*2),y=c+r*Math.sin(a0+p*f*Math.PI*2);const g=ctx.createRadialGradient(x,y,0,x,y,2.4);
+    g.addColorStop(0,`rgba(255,255,255,${.9*fade})`);g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,2.4,0,7);ctx.fill();}
+}
+function mark(ctx,kind){
+  const c=S/2;ctx.save();ctx.translate(c,c);ctx.strokeStyle='#F2EDED';
+  if(kind==='claude'){ctx.lineWidth=1.6;ctx.lineCap='round';for(let i=0;i<12;i++){const a=i*Math.PI/6+.13;const l=i%2?6.5:8.5;ctx.beginPath();ctx.moveTo(Math.cos(a)*1.5,Math.sin(a)*1.5);ctx.lineTo(Math.cos(a)*l,Math.sin(a)*l);ctx.stroke();}}
+  else{ctx.lineWidth=1.3;for(let i=0;i<6;i++){ctx.save();ctx.rotate(i*Math.PI/3);ctx.beginPath();ctx.ellipse(0,-3.2,2.6,5.4,0,0,Math.PI*2);ctx.stroke();ctx.restore();}}
+  ctx.restore();
+}
+const BASE={core:1,disk:1,diskScale:1,glass:1};
+function drawRing(ctx,acc,ph){
+  const room=S/2-acc.arcs.length*(STROKE+GAP);
+  drawCore(ctx,room,ph/5,BASE);
+  acc.arcs.forEach((a,i)=>glassArc(ctx,S/2-STROKE/2-i*(STROKE+GAP),TONE[a.t],a.f,ph,BASE));
+  mark(ctx,acc.mark);
+}
+/* Contas da demonstração: 7d por fora, 5h por dentro. */
+const ACCS=[{arcs:[{f:.62,t:'warn'},{f:.38,t:'ok'}],mark:'claude'},{arcs:[{f:.25,t:'ok'},{f:.12,t:'ok'}],mark:'openai'}];
+
+/* ---------- peças compartilhadas ---------- */
+const notch=()=>`<div class="notch"><span class="hd" data-k="hand">✋</span>
+ <div class="acct" data-k="r1"><canvas class="rg" data-a="0" width="104" height="104"></canvas><i>7d 62%<br>5h 38%</i></div>
+ <div class="acct" data-k="r2"><canvas class="rg" data-a="1" width="104" height="104"></canvas><i>7d 25%<br>5h 12%</i></div>
+ <span class="hd" data-k="gear">⚙</span><span class="hd" data-k="pin">📌</span></div>`;
+const balloon=(x,y)=>`<div class="bal T" data-k="bal" style="left:${x}px;top:${y}px;--d:520ms"><b>Claude · Trabalho 😺</b>
+ <div class="q">7d<span class="tr"><i style="width:62%;background:var(--warn)"></i></span>62% · atenção</div>
+ <div class="q" style="font-size:9px">reinicia sex 14:00 BRT · resta 38%</div>
+ <div class="q">5h<span class="tr"><i style="width:38%;background:var(--ok)"></i></span>38% · ok</div>
+ <div class="q" style="font-size:9px">reinicia 16:20 BRT · resta 62%</div></div>`;
+const gearMenu=(x,y)=>`<div class="menu T" data-k="menu" style="left:${x}px;top:${y}px;--d:520ms">
+ <div data-m="cfg">Configurações</div><div data-m="help">Ajuda</div><div>Atualizar agora</div><div>Exportar cotas atuais (CSV)</div>
+ <div style="font-size:9px;color:#8a8080">próxima coleta em 3 min</div></div>`;
+const TIPS=[
+ ['Passe o ponteiro sobre um anel: o balão mostra cada cota, quanto resta e a hora do reinício.','Clique num anel para atualizar só aquela conta.'],
+ ['Configurações › Alertas › bot do Telegram: o <span class="kbd">/status</span> e os alertas chegam no celular.','<span class="kbd">"Silenciar num período do dia"</span> adia os alertas da noite — nenhum se perde.'],
+ ['Arraste pela mão na ponta do notch: a HUD gruda em qualquer borda, de qualquer monitor.','O alfinete recolhe a HUD numa faixa de risco quando você não está olhando.'],
+ ['Rodapé › <span class="kbd">"Comparar modelos e APIs"</span>: custo e vazão lado a lado, em mapa de calor.','Configurações › Rede: abra a HUD no navegador do celular, na mesma rede.'],
+ ['<span class="kbd">"Análise da sessão: ritmo, vazão e janelas"</span> diz se o ritmo atual estoura antes do reinício.','<span class="kbd">"Teto mensal em USD"</span> avisa antes de o gasto do mês passar do limite.'],
+];
+const tipFoot=(n)=>`<div class="ft"><span class="chk">Não mostrar dicas ao abrir</span><span class="sp"></span><span class="btn gh">Fechar</span><span class="btn pri">Próxima dica</span></div>`;
+const tipText=(i)=>`<div class="tx body"><div>${TIPS[i][0]}</div><div>${TIPS[i][1]}</div></div>`;
+
+/* ---------- opções ---------- */
+const OPTS=[];
+function opt(o){OPTS.push(o)}
+
+opt({id:'REF',ref:true,name:'Hoje (referência)',
+ desc:'A ajuda existe (12 tópicos com GIF e "Como ativar"), mas só abre pela engrenagem ou pela bandeja. Nada aparece na primeira execução, não há dica ao abrir, e não há tópico para o bot do Telegram, a HUD no navegador, a comparação, a análise da sessão nem as contas. O tópico "Dashboard" ainda cita uma janela principal que não existe.',
+ tags:'<b>problema</b>: o usuário não sabe que as funções existem',
+ g:{n:1,dur:4000,html:()=>`${notch()}<div class="win open" style="left:90px;top:70px;width:460px;height:210px"><div class="tb">Ajuda<span class="x">✕</span></div>
+   <div style="display:flex;height:180px"><div style="width:130px;border-right:1px solid var(--border);padding:6px;font-size:9.5px;color:var(--muted);line-height:1.7">
+   <div style="color:var(--fg);box-shadow:inset 2px 0 0 var(--gold);padding-left:5px">Dashboard e integrações</div><div>Histórico</div><div>Sessões CLI</div><div>Custo por sessão</div><div>Orçamento</div><div>Alertas</div><div>Exportação</div><div>…mais 5</div></div>
+   <div style="flex:1;padding:8px"><div style="height:80px;border:1px dashed #4a4242;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#7a7070">GIF da demo</div>
+   <div class="body" style="margin-top:6px">"A janela principal traz um card por fonte…"</div><div style="color:var(--gold);font-size:9.5px;margin-top:4px">COMO ATIVAR</div></div></div></div>`,set(){}},
+ tip:{html:()=>`${notch()}<div class="body" style="position:absolute;left:0;right:0;top:110px;text-align:center;color:#7a7070">nenhuma dica ao abrir</div>`,set(){}}});
+
+opt({id:'AC1',name:'AC1 · Holofote orbital',
+ desc:'A tela escurece e um anel de fótons (o mesmo fio dourado do notch) abre um buraco de luz sobre cada controle real da HUD: anel, balão, mão, engrenagem, alfinete. O buraco desliza entre os alvos em 520 ms e o cartão do passo acompanha. A dica do dia é um cartão pendurado sob a engrenagem, com um pulso único do anel em volta do controle citado.',
+ tags:'<b>custo</b> alto · <span class="no">overlay transparente sobre a área de trabalho = janela nativa nova; nasce só no Windows (#340), Linux/macOS caem para a janela comum</span>',
+ g:{n:6,dur:2600,labels:['anel','balão','mão','engrenagem','alfinete','pronto'],
+  html:()=>`${notch()}${balloon(140,70)}<div class="dim T" style="--d:520ms"></div><div class="halo T" style="--d:520ms"></div>
+   <div class="callout T" style="--d:520ms"><div class="n"></div><div class="body tx2"></div><div class="row2" style="margin-top:6px"><span class="btn gh">Pular guia</span><span class="sp" style="flex:1"></span><span class="btn pri">Próximo</span></div></div>
+   <div class="toast T"><b>Pronto.</b>Para rever: Ajuda › "Rever guia".</div>`,
+  steps:[['r1',26,'Cada anel é uma conta. O arco de fora é a semana (7d), o de dentro a sessão de 5h.'],['bal',122,'Passe o ponteiro: o balão mostra cada cota, quanto resta e a hora do reinício (BRT).'],['hand',18,'Arraste pela mão: a HUD gruda na borda mais próxima, de qualquer monitor.'],['gear',18,'A engrenagem abre Configurações, Ajuda, "Atualizar agora" e a exportação.'],['pin',18,'O alfinete recolhe a HUD numa faixa de risco quando você não está olhando.'],[null,0,'']],
+  set(sc,i){const st=this.steps[i],dim=sc.q('.dim'),halo=sc.q('.halo'),co=sc.q('.callout');
+   sc.q('.bal').classList.toggle('open',i===1);sc.q('.toast').classList.toggle('in',i===5);
+   if(!st[0]){dim.classList.remove('on');halo.classList.remove('on');co.classList.remove('on');return;}
+   const p=sc.pos(st[0]),r=st[1];dim.classList.add('on');halo.classList.add('on');co.classList.add('on');
+   dim.style.setProperty('--hx',p.x+'px');dim.style.setProperty('--hy',p.y+'px');dim.style.setProperty('--hr',r+'px');
+   Object.assign(halo.style,{left:(p.x-r)+'px',top:(p.y-r)+'px',width:2*r+'px',height:2*r+'px'});
+   const cx=p.x+r+16>400?p.x-r-246:p.x+r+16;Object.assign(co.style,{left:clamp(cx,8,402)+'px',top:clamp(p.y-20,70,200)+'px'});
+   co.querySelector('.n').textContent=`PASSO ${i+1} DE 5`;co.querySelector('.tx2').textContent=st[2];}},
+ tip:{html:()=>`${notch()}<div class="halo T" style="--d:600ms"></div><div class="tip T" style="left:300px;top:66px;width:300px"><div class="hdr"><span>✦ Dica do dia</span><span>1 de 28</span></div>${tipText(0)}${tipFoot()}</div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);
+   const h=sc.q('.halo'),p=sc.pos('r1');h.classList.toggle('on',ph===1);Object.assign(h.style,{left:(p.x-26)+'px',top:(p.y-26)+'px',width:'52px',height:'52px'});}}});
+
+opt({id:'AC2',name:'AC2 · Constelação de funções',
+ desc:'Janela do guia: à esquerda um céu com uma estrela por grupo de função (Ver, Entender, Avisos, Remoto, Exportar, Time, Personalizar). Cada passo acende a estrela, traça o filamento até ela em 420 ms e mostra à direita o que faz e onde liga. A dica do dia é a mesma constelação em miniatura com a estrela da dica acesa.',
+ tags:'<b>custo</b> médio · janela comum (<code>AppDialogWindow</code>), igual nos três SOs · conteúdo vem do catálogo da ajuda',
+ g:{n:7,dur:2200,labels:['ver','entender','avisos','remoto','exportar','time','personalizar'],
+  pts:[[60,60,'Ver'],[120,40,'Entender'],[190,70,'Avisos'],[200,140,'Remoto'],[130,170,'Exportar'],[60,150,'Time'],[100,105,'Personalizar']],
+  txt:[['Ver','O notch mostra um anel por conta. Passe o ponteiro para o balão; clique para atualizar.'],['Entender','Histórico, Sessões CLI, Análise da sessão e "Comparar modelos e APIs" — pelo card e pelo rodapé.'],['Avisos','Configurações › Alertas: limiar de cota, sessão saturada, reinício e silêncio por horário.'],['Remoto','Bot do Telegram (Alertas) e a HUD no navegador do celular (Rede).'],['Exportar','CSV, JSON e Relatório PDF pela engrenagem e pelas janelas.'],['Time','Configurações › Time: uma conta em várias máquinas e presença.'],['Personalizar','Aparência: tema, idioma, tamanho da interface e "Reduzir animações".']],
+  html(){const st=this.pts.map((p,i)=>`<circle class="star" data-i="${i}" cx="${p[0]}" cy="${p[1]}" r="3"/><text class="slab" data-i="${i}" x="${p[0]+6}" y="${p[1]-5}">${p[2]}</text>`).join('');
+   const ln=this.pts.slice(1).map((p,i)=>{const a=this.pts[i];const L=Math.hypot(p[0]-a[0],p[1]-a[1]);return `<line class="lnk T" data-i="${i+1}" x1="${a[0]}" y1="${a[1]}" x2="${p[0]}" y2="${p[1]}" stroke-dasharray="${L}" stroke-dashoffset="${L}" style="--d:420ms"/>`}).join('');
+   return `<div class="win open" style="left:40px;top:24px;width:560px;height:250px"><div class="tb">Guia de introdução<span class="x">✕</span></div>
+   <div style="position:relative;height:222px"><div class="sky"><svg viewBox="0 0 250 222">${ln}${st}</svg></div>
+   <div style="position:absolute;left:266px;right:12px;top:14px;bottom:10px;display:flex;flex-direction:column;gap:6px">
+   <div style="font-size:9px;color:var(--gold)" class="n2"></div><div style="font-size:13px;color:var(--fg)" class="t2"></div><div class="body d2"></div>
+   <div style="flex:1"></div><div class="row2"><span class="btn gh">Pular guia</span><span style="flex:1"></span><span class="btn">Voltar</span><span class="btn pri">Próximo</span></div></div></div></div>`},
+  set(sc,i){sc.qa('.star').forEach(s=>{const k=+s.dataset.i;s.classList.toggle('lit',k<i);s.classList.toggle('on',k===i);s.setAttribute('r',k===i?5:3);});
+   sc.qa('.slab').forEach(s=>s.classList.toggle('on',+s.dataset.i===i));
+   sc.qa('.lnk').forEach(l=>{const k=+l.dataset.i;l.style.strokeDashoffset=k<=i?0:l.getAttribute('stroke-dasharray');});
+   sc.q('.n2').textContent=`ESTRELA ${i+1} DE 7`;sc.q('.t2').textContent=this.txt[i][0];sc.q('.d2').textContent=this.txt[i][1];}},
+ tip:{html:()=>`<div class="tip T" style="left:150px;top:30px;width:340px"><div class="hdr"><span>✦ Dica do dia · Remoto</span><span>2 de 28</span></div>
+   <div class="row2" style="align-items:flex-start"><svg width="70" height="56" viewBox="0 0 250 222" style="flex:none;background:#07080a;border-radius:6px">${[[60,60],[120,40],[190,70],[200,140],[130,170],[60,150],[100,105]].map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===3?12:7}" fill="${i===3?'#FFF0CB':'#5a5048'}"/>`).join('')}</svg>${tipText(1)}</div>${tipFoot()}</div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC3',name:'AC3 · Lista de primeiros passos',
+ desc:'O guia é uma lista do que ligar, não do que existe: contas detectadas, alertas, borda da HUD, iniciar com o sistema, bot do Telegram e HUD no celular (os dois últimos opcionais). O item atual abre uma linha de como fazer e o botão "Fazer agora" abre a aba certa; ao voltar, o item marca sozinho (estado lido das preferências). A dica do dia lembra o primeiro item que falta.',
+ tags:'<b>custo</b> médio · janela comum, três SOs · "feito" sai das preferências (ligado/desligado), nunca de rastreio de uso',
+ g:{n:6,dur:2200,labels:['contas','alertas','borda','autostart','telegram','celular'],
+  items:[['Conferir as contas detectadas','Anthropic e Codex já aparecem pela credencial do CLI; MiniMax e outras pedem chave em APIs.','Configurações › Contas'],['Ligar os alertas de cota','"Avisar quando a quota cruzar um limiar" — 75, 90 e 100%.','Configurações › Alertas'],['Escolher a borda da HUD','Arraste pela mão e solte perto de qualquer borda.','na própria HUD'],['Iniciar com o sistema','"Inicialização com Sistema" — a HUD sobe no login.','Configurações › Sistema'],['Conectar o bot do Telegram (opcional)','Token, pareamento por código e teste, em três passos.','Configurações › Alertas'],['Abrir a HUD no celular (opcional)','Mesma rede, endereço com token.','Configurações › Rede']],
+  html(){return `<div class="win open" style="left:110px;top:16px;width:420px;height:268px"><div class="tb">Primeiros passos<span class="x">✕</span></div>
+   <div style="padding:8px 10px"><div class="row2" style="margin-bottom:6px"><span class="cnt" style="font-size:10px;color:var(--fg)"></span><div class="segs" style="flex:1">${this.items.map(()=>'<span></span>').join('')}</div></div>
+   <ul class="cl">${this.items.map(it=>`<li><span class="bx"></span><div class="w"><b>${it[0]}</b><i>${it[1]} <span class="kbd">Fazer agora → ${it[2]}</span></i></div><span class="st"></span></li>`).join('')}</ul></div></div>`},
+  set(sc,i){sc.qa('.cl li').forEach((li,k)=>{li.classList.toggle('done',k<i);li.classList.toggle('cur',k===i);li.querySelector('.st').textContent=k<i?'feito':k===i?'agora':'';});
+   sc.qa('.segs span').forEach((s,k)=>s.classList.toggle('on',k<i));sc.q('.cnt').textContent=`${i} de 6 feitos`;}},
+ tip:{html:()=>`<div class="tip T" style="left:150px;top:40px;width:340px"><div class="hdr"><span>✦ Falta um passo</span><span>2 de 6 feitos</span></div>
+   <div class="tx body"><div><b style="color:var(--fg)">Ligar os alertas de cota</b> — "Avisar quando a quota cruzar um limiar" toca em 75, 90 e 100%.</div><div><b style="color:var(--fg)">Iniciar com o sistema</b> — "Inicialização com Sistema" sobe a HUD no login.</div></div>
+   <div class="ft"><span class="chk">Não mostrar dicas ao abrir</span><span class="sp"></span><span class="btn gh">Depois</span><span class="btn pri">Fazer agora</span></div></div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC4',name:'AC4 · Carrossel ilustrado',
+ desc:'Formato clássico de boas-vindas: um cartão por assunto com ilustração viva no topo (o anel real, o balão, o menu da engrenagem, o celular com o bot, o navegador, a exportação), título, duas linhas e pontos de progresso. Troca de cartão desliza 360 ms. A dica do dia usa o mesmo cartão em tamanho menor.',
+ tags:'<b>custo</b> baixo · janela comum, três SOs · ilustração pode reaproveitar os GIFs da ajuda',
+ g:{n:6,dur:2200,labels:['anéis','balão','engrenagem','telegram','navegador','exportar'],
+  sl:[['Um anel por conta','Fora: a semana (7d). Dentro: a sessão de 5h. Cor e palavra dizem o risco.'],['O balão explica','Passe o ponteiro no anel: cada cota, quanto resta e quando reinicia.'],['Tudo pela engrenagem','Configurações, Ajuda, "Atualizar agora" e exportação ficam na ponta do notch.'],['Alertas no celular','Configurações › Alertas › bot do Telegram: /status, gráficos e avisos.'],['A HUD no navegador','Configurações › Rede: a mesma leitura no celular, só na sua rede.'],['Leve os números','CSV, JSON e Relatório PDF — só metadados de uso, nunca prompt.']],
+  html(){const ills=['<canvas class="rg" data-a="0" width="104" height="104" style="width:70px;height:70px"></canvas><canvas class="rg" data-a="1" width="104" height="104" style="width:70px;height:70px"></canvas>',
+    '<canvas class="rg" data-a="0" width="104" height="104" style="width:56px;height:56px"></canvas><div class="bal open" style="position:relative;width:150px;opacity:1;clip-path:none"><b>Claude · Trabalho</b><div class="q">7d<span class="tr"><i style="width:62%;background:var(--warn)"></i></span>62%</div><div class="q">5h<span class="tr"><i style="width:38%;background:var(--ok)"></i></span>38%</div></div>',
+    '<div class="menu open" style="position:relative;opacity:1;clip-path:none"><div class="hot">Configurações</div><div>Ajuda</div><div>Atualizar agora</div></div>',
+    '<div class="phone in" style="position:relative;right:auto;top:auto;height:100px;width:120px"><div class="m">📊 Claude · Trabalho<br>7d ▰▰▰▰▰▰▱▱▱▱ 62%</div></div>',
+    '<div style="width:170px;height:86px;border:1px solid #3a3a46;border-radius:6px;background:#0d0d10;padding:4px"><div style="font-size:8px;color:#888">192.168.0.12:8787</div><div style="display:flex;gap:4px;justify-content:center;margin-top:4px"><canvas class="rg" data-a="0" width="104" height="104" style="width:52px;height:52px"></canvas><canvas class="rg" data-a="1" width="104" height="104" style="width:52px;height:52px"></canvas></div></div>',
+    '<span class="btn">Exportar CSV</span><span class="btn">Exportar JSON</span><span class="btn pri">Relatório PDF</span>'];
+   return `<div class="win open" style="left:130px;top:12px;width:380px;height:276px"><div class="tb">Boas-vindas<span class="x">✕</span></div>
+   <div style="height:120px;overflow:hidden;position:relative"><div class="track T" style="--d:360ms">${ills.map(h=>`<div class="slide"><div class="ill">${h}</div></div>`).join('')}</div></div>
+   <div style="padding:9px 12px"><div class="t2" style="font-size:13px;color:var(--fg)"></div><div class="body d2" style="margin-top:4px;min-height:32px"></div>
+   <div class="row2" style="margin-top:10px"><div class="dots">${ills.map(()=>'<i></i>').join('')}</div><span style="flex:1"></span><span class="btn gh">Pular</span><span class="btn pri">Próximo</span></div></div></div>`},
+  set(sc,i){sc.q('.track').style.transform=`translateX(${-i*16.6667}%)`;sc.qa('.dots i').forEach((d,k)=>d.classList.toggle('on',k===i));
+   sc.q('.t2').textContent=this.sl[i][0];sc.q('.d2').textContent=this.sl[i][1];}},
+ tip:{html:()=>`<div class="tip T" style="left:170px;top:20px;width:300px;padding:0;overflow:hidden"><div style="height:60px;background:radial-gradient(ellipse at 50% 120%,#2a1a10,#0b0909 70%);display:flex;align-items:center;justify-content:center;font-size:24px">✋</div>
+   <div style="padding:8px 11px"><div class="hdr"><span>✦ Dica do dia</span><span>3 de 28</span></div>${tipText(2)}${tipFoot()}</div></div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC5',name:'AC5 · Um dia com o app',
+ desc:'O guia conta um dia de trabalho numa linha do tempo de 09:00 a 18:00: a HUD na borda, o alerta de 75% na bandeja às 11h, o balão com a análise às 13h, o /status no Telegram às 15h, o silêncio programado às 17h e o reinício da 5h às 18h. O anel acompanha a história com tween de 480 ms, sem passar do valor. A dica do dia vira um "evento" da linha.',
+ tags:'<b>custo</b> médio · janela comum, três SOs · números são de demonstração, rotulados assim na tela',
+ g:{n:6,dur:2400,labels:['09:00','11:00','13:00','15:00','17:00','18:00'],
+  hrs:[9,11,13,15,17,18],f:[[.20,.05],[.62,.38],[.66,.52],[.70,.61],[.72,.64],[.72,0]],
+  st:[['09:00 · abriu o PC','A HUD já está na borda, com um anel por conta.'],['11:00 · alerta','A semana cruzou 75%: aviso na bandeja (e no Telegram, se ligado).'],['13:00 · análise','"Análise da sessão: ritmo, vazão e janelas": no ritmo atual a semana estoura sex 10:00.'],['15:00 · longe do PC','O /status no Telegram traz a mesma leitura no celular.'],['17:00 · silêncio','"Silenciar num período do dia": 22:00–07:00. O alerta adia, não se perde.'],['18:00 · reinício','A janela de 5h reiniciou: o arco de dentro volta a 0%.']],
+  html(){return `${notch()}<div class="story"><b class="h2"></b><span class="d2"></span><div style="font-size:9px;color:#7a7070;margin-top:6px">números de demonstração</div></div>
+   <div class="toast T"><b>Usage Monitor</b>Claude · Trabalho: 7d em 75% (reinicia sex 14:00 BRT)</div>
+   <div class="phone T"><div style="font-size:9px;color:#8aa">Usage Monitor bot</div><div class="m">/status</div><div class="m">📊 Claude · Trabalho<br>7d ▰▰▰▰▰▰▰▱▱▱ 70%<br>5h ▰▰▰▰▰▰▱▱▱▱ 61%</div></div>
+   <div class="tl"><div class="ax"></div>${this.hrs.map((h,k)=>`<div class="ev" data-i="${k}" style="left:${(h-9)/9*100}%"></div><div class="h" style="left:${(h-9)/9*100}%">${String(h).padStart(2,'0')}h</div>`).join('')}<div class="pl T" style="--d:600ms"></div></div>`},
+  set(sc,i){sc.q('.pl').style.left=((this.hrs[i]-9)/9*100)+'%';sc.qa('.ev').forEach(e=>e.classList.toggle('on',+e.dataset.i<=i));
+   sc.q('.toast').classList.toggle('in',i===1);sc.q('.phone').classList.toggle('in',i===3);
+   sc.q('.h2').textContent=this.st[i][0];sc.q('.d2').textContent=this.st[i][1];
+   sc.tween('r1',this.f[i]);sc.q(`[data-k="r1"] i`).innerHTML=`7d ${Math.round(this.f[i][0]*100)}%<br>5h ${Math.round(this.f[i][1]*100)}%`;}},
+ tip:{html:()=>`${notch()}<div class="tip T" style="left:120px;top:76px;width:400px"><div class="hdr"><span>✦ Hoje, 09:12 · dica do dia</span><span>5 de 28</span></div>${tipText(4)}${tipFoot()}</div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC6',name:'AC6 · Guia dentro do notch',
+ desc:'Sem janela: o guia sai do próprio notch, no mesmo balão das contas (abre com o jato B3, 520 ms) e salta de controle em controle — anel, mão, engrenagem, alfinete. A dica do dia sai da engrenagem como um balão.',
+ tags:'<b>custo</b> baixo em pixels, mas <span class="no">fere a regra do notch (#164): balão só de uma conta ou da engrenagem — exige exceção aprovada</span> · três SOs',
+ g:{n:5,dur:2400,labels:['anel','mão','engrenagem','alfinete','fim'],
+  st:[['r1','Cada anel é uma conta: fora a semana, dentro a 5h. Passe o ponteiro para o balão.'],['hand','Arraste pela mão: a HUD gruda em qualquer borda.'],['gear','Engrenagem: Configurações, Ajuda, "Atualizar agora", exportação.'],['pin','O alfinete recolhe a HUD numa faixa de risco.'],['gear','Pronto. Rever o guia: Ajuda › "Rever guia".']],
+  html:()=>`${notch()}<div class="bal T gb" style="width:230px;--d:520ms"><div style="font-size:9px;color:var(--gold)" class="n2"></div><div class="body d2" style="margin-top:3px"></div><div class="row2" style="margin-top:6px"><span class="btn gh">Pular</span><span style="flex:1"></span><span class="btn pri">Próximo</span></div></div>`,
+  set(sc,i){const b=sc.q('.gb');b.classList.remove('open');const st=this.st[i],p=sc.pos(st[0]);
+   setTimeout(()=>{Object.assign(b.style,{left:clamp(p.x-115,8,402)+'px',top:'64px'});b.querySelector('.n2').textContent=i<4?`PASSO ${i+1} DE 4`:'FIM';b.querySelector('.d2').textContent=st[1];b.classList.add('open');},REDUCED?0:240*SPEED);}},
+ tip:{html:()=>`${notch()}<div class="bal T gb" style="width:260px;--d:520ms"><div class="hdr" style="font-size:9.5px;color:var(--gold);letter-spacing:.06em">✦ DICA DO DIA</div><div class="tip" style="position:static;opacity:1;transform:none;border:none;box-shadow:none;padding:0;background:none">${tipText(3)}</div><div class="ft" style="display:flex;gap:6px;margin-top:6px;align-items:center"><span class="chk">Não mostrar</span><span style="flex:1"></span><span class="btn pri">Próxima</span></div></div>`,
+  set(sc,ph){const b=sc.q('.gb'),p=sc.pos('gear');Object.assign(b.style,{left:clamp(p.x-130,8,372)+'px',top:'64px'});b.classList.toggle('open',ph===1||ph===2);sc.q('.tip').classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC7',name:'AC7 · Piloto automático',
+ desc:'Um cursor demonstra sozinho, sobre a HUD real: passa no anel (o balão abre), vai à engrenagem, entra em Configurações › Alertas e liga "Avisar quando a quota cruzar um limiar". Barra de legenda embaixo com "Pular" e "Fazer eu mesmo" (devolve o controle no passo atual). A dica do dia é um replay curto de uma ação com "Rever".',
+ tags:'<b>custo</b> alto · <span class="no">cursor sobre a HUD = overlay transparente (nativo, Windows primeiro, #340)</span>; a demo também envelhece a cada mudança de tela',
+ g:{n:6,dur:2200,labels:['anel','balão','engrenagem','configurações','alertas','pronto'],
+  html:()=>`${notch()}${balloon(222,70)}${gearMenu(330,64)}
+   <div class="win T" style="left:150px;top:58px;width:340px;height:170px;--d:680ms"><div class="tb">Configurações<span class="x">✕</span></div>
+   <div style="display:flex;height:140px"><div style="width:90px;border-right:1px solid var(--border);padding:6px;font-size:9.5px;line-height:1.8;color:var(--muted)"><div>Aparência</div><div>Sistema</div><div style="color:var(--fg);box-shadow:inset 2px 0 0 var(--gold);padding-left:5px">Alertas</div><div>APIs</div><div>Contas</div></div>
+   <div style="flex:1;padding:8px"><div class="row2" style="justify-content:space-between"><span class="body">Avisar quando a quota cruzar um limiar</span><span class="sw T sw1"></span></div><div class="row2" style="justify-content:space-between;margin-top:8px;opacity:.6"><span class="body">Silenciar num período do dia</span><span class="sw"></span></div></div></div></div>
+   <svg class="cursor T" viewBox="0 0 14 20" style="--d:700ms"><path d="M1 1 L1 16 L5 12 L8 19 L10 18 L7 11 L13 11 Z" fill="#fff" stroke="#000" stroke-width="1"/></svg>
+   <div class="capbar"><span class="c2" style="color:var(--fg)"></span><span style="flex:1"></span><span class="btn gh">Pular demonstração</span><span class="btn">Fazer eu mesmo</span></div>`,
+  st:['Passe o ponteiro sobre um anel…','…e o balão mostra as cotas e o reinício.','A engrenagem abre o menu.','"Configurações" abre na aba certa.','Liga o alerta de limiar.','Pronto — agora é com você.'],
+  set(sc,i){const c=sc.q(".cursor");const go=(k,dx=0,dy=0)=>{const p=sc.pos(k);c.style.left=(p.x+dx)+'px';c.style.top=(p.y+dy)+'px';};
+   sc.q('.bal').classList.toggle('open',i===1);sc.q('.menu').classList.toggle('open',i===2);sc.q('.win').classList.toggle('open',i>=3&&i<=4);sc.q('.sw1').classList.toggle('on',i===4);
+   sc.qa('.menu div').forEach(d=>d.classList.toggle('hot',i===2&&d.dataset.m==='cfg'));
+   if(i===0)go('r1',4,6);if(i===1)go('r1',4,6);if(i===2)go('gear',3,4);if(i===3)c.style.left='420px',c.style.top='100px';if(i===4){c.style.left='470px';c.style.top='94px';}if(i===5){c.style.left='600px';c.style.top='250px';}
+   c.classList.remove('click');if(i===2||i===4){void c.offsetWidth;c.classList.add('click');}
+   sc.q('.c2').textContent=`${i+1}/6 · ${this.st[i]}`;}},
+ tip:{html:()=>`<div class="tip T" style="left:120px;top:24px;width:400px"><div class="hdr"><span>✦ Dica do dia</span><span>1 de 28</span></div>
+   <div class="row2" style="align-items:flex-start"><div style="width:120px;height:62px;border-radius:6px;background:#0b0909;border:1px solid var(--border);position:relative;flex:none;overflow:hidden"><div style="position:absolute;left:30px;top:0;width:60px;height:18px;background:#030508;border:1px solid rgba(232,174,99,.35);border-top:none;border-radius:0 0 7px 7px"></div><svg class="cursor T mini" viewBox="0 0 14 20" style="width:9px;height:13px;left:90px;top:44px;--d:900ms"><path d="M1 1 L1 16 L5 12 L8 19 L10 18 L7 11 L13 11 Z" fill="#fff"/></svg></div>${tipText(0)}</div>
+   <div class="ft"><span class="chk">Não mostrar dicas ao abrir</span><span class="sp"></span><span class="btn">Rever</span><span class="btn pri">Próxima dica</span></div></div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);const m=sc.q('.mini');m.style.left=ph===1?'55px':'90px';m.style.top=ph===1?'10px':'44px';}}});
+
+opt({id:'AC8',name:'AC8 · Trilhas por perfil',
+ desc:'A primeira tela pergunta como você usa: "Só Claude Code", "Várias contas e APIs", "Em time", "Longe do PC". A escolha monta uma trilha de 3 passos só com o que importa para aquele uso; o resto fica na Ajuda. A dica do dia prioriza a trilha escolhida e mostra o chip dela.',
+ tags:'<b>custo</b> médio · janela comum, três SOs · trilha escolhida vira preferência (pode trocar na Ajuda)',
+ g:{n:6,dur:2200,labels:['pergunta','escolha','passo 1','passo 2','passo 3','fim'],
+  html:()=>`<div class="win open" style="left:100px;top:14px;width:440px;height:272px"><div class="tb">Guia de introdução<span class="x">✕</span></div>
+   <div style="position:relative;height:244px">
+   <div class="pa T" style="position:absolute;inset:10px;--d:360ms"><div style="font-size:12px;color:var(--fg);margin-bottom:8px">Como você usa o Usage Monitor?</div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="pf"><b>Só Claude Code</b><i>uma conta, um PC</i></div><div class="pf"><b>Várias contas e APIs</b><i>Claude, Codex, MiniMax…</i></div><div class="pf"><b>Em time</b><i>servidor próprio, presença</i></div><div class="pf" data-p="far"><b>Longe do PC</b><i>celular, Telegram</i></div></div></div>
+   <div class="pb T" style="position:absolute;inset:10px;opacity:0;--d:360ms"><div class="row2" style="margin-bottom:8px"><span style="font-size:12px;color:var(--fg)">Sua trilha</span><span class="chip">Longe do PC</span><span style="flex:1"></span><span class="btn gh">Trocar</span></div>
+   <div class="path"><div class="p"><span class="k">1</span><div class="body">Alertas › bot do Telegram: token, pareamento e teste.</div></div><div class="p"><span class="k">2</span><div class="body">Rede: a HUD no navegador do celular, na mesma rede.</div></div><div class="p"><span class="k">3</span><div class="body">Alertas: "Lembrar antes de a cota reiniciar".</div></div></div>
+   <div class="row2" style="margin-top:12px"><span class="fin" style="font-size:10px;color:#7fcf83"></span><span style="flex:1"></span><span class="btn pri">Abrir Configurações</span></div></div></div></div>`,
+  set(sc,i){const a=sc.q('.pa'),b=sc.q('.pb');a.style.opacity=i<2?1:0;a.style.transform=i<2?'none':'translateX(-20px)';b.style.opacity=i>=2?1:0;b.style.transform=i>=2?'none':'translateX(20px)';
+   sc.qa('.pf').forEach(p=>{p.classList.toggle('sel',i===1&&p.dataset.p==='far');p.classList.toggle('dim2',i===1&&p.dataset.p!=='far');});
+   sc.qa('.path .p').forEach((p,k)=>{p.classList.toggle('cur',k===i-2);p.classList.toggle('done',k<i-2);p.querySelector('.k').textContent=k<i-2?'✓':k+1;});
+   sc.q('.fin').textContent=i===5?'Trilha concluída':'';}},
+ tip:{html:()=>`<div class="tip T" style="left:150px;top:36px;width:340px"><div class="hdr"><span>✦ Dica do dia</span><span class="chip" style="text-transform:none;letter-spacing:0">Longe do PC</span></div>${tipText(1)}${tipFoot()}</div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC9',name:'AC9 · Anatomia do anel',
+ desc:'Antes de qualquer botão, o guia ensina a ler o dado: o anel aparece a 3× e as legendas entram por fios dourados — arco de fora = 7 dias, de dentro = 5h, cor e palavra = risco, emoji = conta, clique = atualizar. No fim o anel encolhe e voa para o lugar dele no notch (600 ms). A dica do dia é "Você sabia?" com um anel pequeno e uma legenda.',
+ tags:'<b>custo</b> médio · janela comum, três SOs · ensina leitura, não ativação — precisa de outra superfície para "como ligar"',
+ g:{n:6,dur:2200,labels:['7 dias','5h','risco','conta','clique','no notch'],
+  html:()=>`${notch()}<div class="bigring T" style="--d:600ms"><canvas class="rg" data-a="0" width="480" height="480"></canvas></div>
+   <svg class="lead" viewBox="0 0 640 300"><path class="T" style="--d:420ms" data-i="0" d="M218 120 L330 50 L415 50"/><path class="T" style="--d:420ms" data-i="1" d="M224 151 L330 100 L415 100"/><path class="T" style="--d:420ms" data-i="2" d="M224 191 L330 150 L415 150"/><path class="T" style="--d:420ms" data-i="3" d="M180 165 L330 200 L415 200"/><path class="T" style="--d:420ms" data-i="4" d="M130 205 L330 250 L415 250"/></svg>
+   <div class="lab T" data-i="0" style="left:422px;top:42px">Arco de fora · 7 dias<i>62% da semana usado</i></div><div class="lab T" data-i="1" style="left:422px;top:92px">Arco de dentro · 5h<i>38% da sessão usado</i></div>
+   <div class="lab T" data-i="2" style="left:422px;top:142px">Cor e palavra · risco<i>laranja e "atenção": o ritmo estoura antes do reinício</i></div><div class="lab T" data-i="3" style="left:422px;top:192px">Marca e emoji · conta<i>Configurações › Contas › "Editar"</i></div>
+   <div class="lab T" data-i="4" style="left:422px;top:242px">Clique · atualizar<i>só esta conta; o ponteiro abre o balão</i></div>`,
+  set(sc,i){sc.qa('.lead path').forEach(p=>p.classList.toggle('on',+p.dataset.i<=i&&i<5));sc.qa('.lab').forEach(l=>l.classList.toggle('on',+l.dataset.i<=i&&i<5));
+   const r=sc.q('.bigring'),p=sc.pos('r1');if(i===5){const dx=p.x-170,dy=p.y-160;r.style.transform=`translate(${dx}px,${dy}px) scale(.22)`;r.style.opacity=.0;}else{r.style.transform='none';r.style.opacity=1;}}},
+ tip:{html:()=>`<div class="tip T" style="left:140px;top:36px;width:360px"><div class="hdr"><span>✦ Você sabia?</span><span>4 de 28</span></div>
+   <div class="row2" style="align-items:flex-start"><canvas class="rg" data-a="0" width="104" height="104" style="width:64px;height:64px;flex:none;margin:-6px"></canvas>${tipText(0)}</div>${tipFoot()}</div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+opt({id:'AC10',name:'AC10 · Central de descobertas',
+ desc:'O guia é um painel "Descobrir" com uma carta por função e o estado escrito: "Em uso", "Ainda não usado", "Novo". O destaque percorre só as não usadas, e cada uma vira (420 ms) mostrando como ligar e o botão "Mostrar onde". O cabeçalho diz quantas estão ligadas. A dica do dia é uma carta não usada.',
+ tags:'<b>custo</b> médio-alto · janela comum, três SOs · "em uso" só para o que as preferências provam (ligado/desligado); o resto fica sem rótulo — <code>null</code> não vira "não usado"',
+ g:{n:5,dur:2400,labels:['visão','telegram','navegador','comparar','análise'],
+  cards:[['Alertas de cota','u'],['Bot do Telegram','n','Configurações › Alertas › bot do Telegram: token, código e teste.'],['HUD no navegador','n','Configurações › Rede: a HUD no celular, mesma rede.'],['Comparar modelos e APIs','nw','Rodapé › "Comparar modelos e APIs".'],['Análise da sessão','nw','No balão: "Análise da sessão: ritmo, vazão e janelas".'],['Iniciar com o sistema','u'],['Time','n','Configurações › Time: servidor próprio.'],['Relatório PDF','u'],['Silêncio por horário','u']],
+  html(){const L={u:'Em uso',n:'Ainda não usado',nw:'Novo'};return `<div class="win open" style="left:70px;top:12px;width:500px;height:276px"><div class="tb">Descobrir<span class="x">✕</span></div>
+   <div style="padding:8px 10px"><div class="row2" style="margin-bottom:8px"><span style="font-size:10.5px;color:var(--fg)">4 de 9 funções ligadas</span><span style="flex:1"></span><span class="btn gh">Só não usadas</span></div>
+   <div class="grid">${this.cards.map((c,k)=>`<div class="fc T" data-i="${k}" style="--d:420ms"><div><b>${c[0]}</b><span class="stt ${c[1]}">${L[c[1]]}</span></div><div class="bk"><b>${c[0]}</b><i>${c[2]||''}</i><span class="btn pri" style="margin-top:3px;font-size:8.5px;padding:0 6px">Mostrar onde</span></div></div>`).join('')}</div></div></div>`},
+  order:[-1,1,2,3,4],
+  set(sc,i){const k=this.order[i];sc.qa('.fc').forEach(c=>{const j=+c.dataset.i;c.classList.toggle('flip',j===k);c.classList.toggle('hl',i===0&&this.cards[j][1]!=='u');});}},
+ tip:{html:()=>`<div class="tip T" style="left:150px;top:30px;width:340px"><div class="hdr"><span>✦ Ainda não usado</span><span>5 de 9 por descobrir</span></div>
+   <div class="tx body"><div><b style="color:var(--fg)">Comparar modelos e APIs</b> — custo e vazão lado a lado. Rodapé › "Comparar modelos e APIs".</div><div><b style="color:var(--fg)">HUD no navegador</b> — Configurações › Rede, no celular e só na sua rede.</div></div>
+   <div class="ft"><span class="chk">Não mostrar dicas ao abrir</span><span class="sp"></span><span class="btn">Próxima</span><span class="btn pri">Mostrar onde</span></div></div>`,
+  set(sc,ph){const t=sc.q('.tip');t.classList.toggle('in',ph===1||ph===2);t.classList.toggle('alt',ph===2);}}});
+
+/* ---------- motor ---------- */
+let SPEED=1,REDUCED=false;
+function applyS(){document.documentElement.style.setProperty('--s',REDUCED?0:SPEED);
+  document.getElementById('tag').textContent=(REDUCED?'corte seco em todas':'')+(SPEED===3&&!REDUCED?'tempos ×3 para inspecionar':'');}
+document.getElementById('slow').onclick=e=>{SPEED=SPEED===1?3:1;e.target.classList.toggle('on',SPEED===3);applyS();};
+document.getElementById('red').onclick=e=>{REDUCED=!REDUCED;e.target.classList.toggle('on',REDUCED);applyS();};
+const STAGES=[];
+function mkStage(host,o,kind){
+  const box=document.createElement('div');box.className='box';
+  const sc=document.createElement('div');sc.className='sc'+(kind==='tip'?' tipsc':'');
+  const part=kind==='tip'?o.tip:o.g;
+  sc.innerHTML=typeof part.html==='function'?part.html.call(part):part.html;
+  box.appendChild(sc);host.appendChild(box);
+  const s={o,kind,part,box,sc,last:-1,t0:performance.now()+Math.random()*300,tw:{}};
+  sc.q=sel=>sc.querySelector(sel);sc.qa=sel=>[...sc.querySelectorAll(sel)];
+  sc.pos=k=>{const el=sc.querySelector(`[data-k="${k}"]`);const r=el.getBoundingClientRect(),b=sc.getBoundingClientRect(),z=s.k||1;
+    return {x:(r.left-b.left+r.width/2)/z,y:(r.top-b.top+r.height/2)/z};};
+  sc.tween=(k,to)=>{const cv=sc.querySelector(`[data-k="${k}"] canvas`);const now=performance.now();
+    const cur=cv._f||ACCS[+cv.dataset.a].arcs.map(a=>a.f);cv._from=cv._now||cur;cv._f=to;cv._t0=now;};
+  STAGES.push(s);return s;
+}
+function relayout(){STAGES.forEach(s=>{const w=s.box.clientWidth,H=s.kind==='tip'?230:300;s.k=w/640;s.sc.style.transform=`scale(${s.k})`;s.box.style.height=(H*s.k)+'px';});}
+function ringsOf(s){return s.rings||(s.rings=[...s.sc.querySelectorAll('canvas.rg')]);}
+function tick(now){
+  const ph=REDUCED?0:(now/2800)%1;
+  for(const s of STAGES){
+    const T=window.FREEZE!=null?window.FREEZE:(now-s.t0);
+    if(s.kind==='g'){const dur=s.part.dur*SPEED,i=Math.floor((T%(s.part.n*dur))/dur);
+      if(i!==s.last){s.last=i;s.part.set&&s.part.set.call(s.part,s.sc,i);}
+      if(s.cap)s.cap.textContent=`passo ${i+1}/${s.part.n}${s.part.labels?' · '+s.part.labels[i]:''}`;}
+    else{const TT=7000*SPEED,u=(T%TT)/SPEED,p=u<700?0:u<4200?1:u<6400?2:3;
+      if(p!==s.last){s.last=p;s.part.set&&s.part.set.call(s.part,s.sc,p);}
+      if(s.cap)s.cap.textContent=['fechada','abrindo · dica 1','"Próxima dica" · dica 2','fechando'][p];}
+    for(const cv of ringsOf(s)){const x=cv.getContext('2d'),acc=ACCS[+cv.dataset.a];let arcs=acc.arcs;
+      if(cv._f){const e=REDUCED?1:easeOut(clamp((now-cv._t0)/(480*SPEED)));cv._now=cv._f.map((f,j)=>cv._from[j]+(f-cv._from[j])*e);arcs=acc.arcs.map((a,j)=>({f:cv._now[j],t:cv._now[j]>.6?'warn':'ok'}));}
+      const z=cv.width/W;x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,cv.width,cv.height);x.setTransform(z,0,0,z,0,0);x.translate(PAD,PAD);drawRing(x,{arcs,mark:acc.mark},ph);}
+  }
+  requestAnimationFrame(tick);
+}
+const host=document.getElementById('opts');
+OPTS.forEach(o=>{const el=document.createElement('div');el.className='opt'+(o.ref?' ref':'');el.id=o.id;
+  el.innerHTML=`<h3>${o.name}</h3><p>${o.desc}</p>`;host.appendChild(el);
+  const c1=document.createElement('div');c1.className='cap';c1.innerHTML='<span>Primeira abertura</span><span class="ph"></span>';el.appendChild(c1);
+  mkStage(el,o,'g').cap=c1.querySelector('.ph');
+  const c2=document.createElement('div');c2.className='cap';c2.innerHTML='<span>Dica do dia</span><span class="ph"></span>';el.appendChild(c2);
+  mkStage(el,o,'tip').cap=c2.querySelector('.ph');
+  const tg=document.createElement('div');tg.className='tags';tg.innerHTML=o.tags;el.appendChild(tg);});
+applyS();relayout();window.addEventListener('resize',relayout);window.addEventListener('load',relayout);
+requestAnimationFrame(tick);
+</script></body></html>

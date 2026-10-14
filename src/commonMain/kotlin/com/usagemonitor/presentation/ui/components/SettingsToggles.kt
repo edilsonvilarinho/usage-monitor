@@ -103,6 +103,47 @@ fun TrayUsageRingToggle(
     }
 }
 
+/** Interruptor da dica do dia (#411), nas Configurações e no próprio modal. */
+const val STARTUP_TIPS_SWITCH_TEST_TAG = "startupTipsSwitch"
+
+/**
+ * Dica do dia ao abrir (#411). O texto diz **quando** ela aparece — uma por dia,
+ * inclusive na abertura pelo início com o sistema —, porque é isso que decide se
+ * ela incomoda. É o mesmo controle nas Configurações › Sistema e no modal da
+ * dica: dois interruptores para o mesmo valor divergiriam.
+ */
+@Composable
+fun StartupTipsToggle(
+    enabled: Boolean,
+    language: AppLanguage = AppLanguage.PT,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    showDivider: Boolean = true
+) {
+    val isPt = language == AppLanguage.PT
+    SettingsOptionRow(
+        label = startupTipsToggleLabel(language),
+        description = if (isPt) {
+            "Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda."
+        } else {
+            "One a day, on the day's first opening, startup with the system included. Every feature stays in Help."
+        },
+        showDivider = showDivider,
+        modifier = modifier
+    ) {
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = { onToggle(it) },
+            modifier = Modifier.testTag(STARTUP_TIPS_SWITCH_TEST_TAG)
+        )
+    }
+}
+
+/** O rótulo é citado na Ajuda e nas dicas; sai de uma função para não divergir. */
+fun startupTipsToggleLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Mostrar a dica do dia ao abrir" else "Show the tip of the day on opening"
+}
+
 /**
  * Atualização automática: baixar a versão nova em segundo plano e aplicá-la ao
  * fechar o app.

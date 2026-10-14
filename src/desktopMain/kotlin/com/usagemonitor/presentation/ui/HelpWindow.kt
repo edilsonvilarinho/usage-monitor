@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,6 +17,7 @@ import com.usagemonitor.help.rememberHelpMedia
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.help.HelpContent
 import com.usagemonitor.presentation.ui.help.HelpMediaState
+import com.usagemonitor.presentation.ui.help.HelpTopic
 import com.usagemonitor.presentation.ui.help.helpWindowTitle
 import com.usagemonitor.uiScaleFactor
 
@@ -39,10 +41,21 @@ internal fun HelpWindow(
     visible: Boolean,
     language: AppLanguage,
     environment: ModalWindowEnvironment,
-    onCloseRequest: () -> Unit
+    onCloseRequest: () -> Unit,
+    /** "Rever guia de introdução" (#411): fecha a Ajuda e abre o guia do começo. */
+    onReplayGuide: (() -> Unit)? = null,
+    /** Tópico pedido por quem abriu ("Ver na Ajuda" da dica); `null` mantém o atual. */
+    requestedTopic: HelpTopic? = null,
+    openGeneration: Int = 0
 ) {
     val title = helpWindowTitle(language)
     var selectedTopic by remember { mutableStateOf(HelpCatalog.readingOrder.first()) }
+    // Cada abertura com tópico pedido vai a ele; sem pedido, fica onde estava.
+    LaunchedEffect(openGeneration) {
+        if (requestedTopic != null) {
+            selectedTopic = requestedTopic
+        }
+    }
 
     val windowState = rememberDialogState(
         size = fitWindowSize(
@@ -63,7 +76,8 @@ internal fun HelpWindow(
         minWidthDp = HELP_MIN_WINDOW_WIDTH_DP,
         minHeightDp = HELP_MIN_WINDOW_HEIGHT_DP,
         onCloseRequest = onCloseRequest,
-        prewarm = true
+        prewarm = true,
+        openGeneration = openGeneration
     ) {
         val media = if (LocalModalWindowOnScreen.current) {
             rememberHelpMedia(HelpCatalog.mediaId(selectedTopic))
@@ -76,7 +90,8 @@ internal fun HelpWindow(
             language = language,
             onClose = onCloseRequest,
             media = media,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onReplayGuide = onReplayGuide
         )
     }
 }

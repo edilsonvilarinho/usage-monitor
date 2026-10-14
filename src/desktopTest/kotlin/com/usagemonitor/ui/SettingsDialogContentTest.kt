@@ -38,6 +38,7 @@ import com.usagemonitor.presentation.ui.components.SETTINGS_TOAST_HOST_TEST_TAG
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
 import com.usagemonitor.presentation.ui.components.TRAY_USAGE_RING_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.STARTUP_TIPS_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.UI_SCALE_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.WINDOW_OPACITY_VALUE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.apiSelectorEditKeyTestTag
@@ -493,6 +494,35 @@ class SettingsDialogContentTest {
         onNodeWithTag(TRAY_USAGE_RING_SWITCH_TEST_TAG).performScrollTo().performClick()
 
         assertEquals(true, enabled)
+    }
+
+    /** Dica do dia (#411): nasce ligada e desligar sai daqui, na aba Sistema. */
+    @Test
+    fun `SettingsDialogContent emits the startup tips change`() = runDesktopComposeUiTest {
+        var enabled: Boolean? = null
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                SettingsDialogContent(
+                    currentTheme = AppThemePreset.OBSIDIANA_DARK,
+                    currentLanguage = AppLanguage.PT,
+                    enabledApis = setOf(ApiSource.ANTHROPIC),
+                    autoStartEnabled = false,
+                    startupTipsEnabled = true,
+                    onStartupTipsEnabledChange = { value -> enabled = value },
+                    onThemeChange = {},
+                    onLanguageChange = {},
+                    onAutoStartChange = {},
+                    onApiToggle = { _, _ -> },
+                    initialTab = SettingsTab.SYSTEM
+                )
+            }
+        }
+
+        onNodeWithText("Mostrar a dica do dia ao abrir").assertExists()
+        onNodeWithTag(STARTUP_TIPS_SWITCH_TEST_TAG).performScrollTo().assertIsOn().performClick()
+
+        assertEquals(false, enabled)
     }
 
     @Test

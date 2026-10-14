@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.onboarding.StartupGuideController
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,7 +42,9 @@ internal fun SettingsWindowHost(
     accountColors: Map<String, AccountAccent>,
     accountEmojis: Map<String, AccountEmoji>,
     state: DialogState,
-    environment: ModalWindowEnvironment
+    environment: ModalWindowEnvironment,
+    /** Dica do dia (#411): o interruptor de Sistema e o do modal são o mesmo valor. */
+    startupGuide: StartupGuideController
 ) {
     val enabledApis by graph.enabledApis.collectAsState()
     val apiKeySettings by graph.apiKeySettings.collectAsState()
@@ -90,6 +93,8 @@ internal fun SettingsWindowHost(
             onReducedMotionChange = actions::changeReducedMotion,
             trayUsageRing = shell.trayUsageRing,
             onTrayUsageRingChange = actions::changeTrayUsageRing,
+            startupTipsEnabled = startupGuide.tipsEnabled,
+            onStartupTipsEnabledChange = startupGuide::updateTipsEnabled,
             onReportBug = actions::reportBug,
             onThemeChange = actions::changeTheme,
             onLanguageChange = actions::changeLanguage,

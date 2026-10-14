@@ -2,6 +2,9 @@ package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.ComposeUiTest
@@ -15,6 +18,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.help.HELP_MEDIA_TAG
+import com.usagemonitor.presentation.ui.help.HELP_REPLAY_GUIDE_TAG
 import com.usagemonitor.presentation.ui.help.HelpCatalog
 import com.usagemonitor.presentation.ui.help.HelpContent
 import com.usagemonitor.presentation.ui.help.HelpMediaState
@@ -97,6 +101,32 @@ class HelpContentTest {
         onNodeWithText("Fechar").performClick()
 
         assertEquals(1, closed)
+    }
+
+    /** #411: o guia de introdução volta pela Ajuda; sem quem o abra, o botão não aparece. */
+    @Test
+    fun `replay guide reports the event and hides without a handler`() = runDesktopComposeUiTest {
+        var replayed = 0
+        var withHandler by mutableStateOf(true)
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.size(width = 1_180.dp, height = 780.dp)) {
+                    HelpContent(
+                        selectedTopic = HelpTopic.DASHBOARD,
+                        onSelectTopic = {},
+                        language = AppLanguage.PT,
+                        onClose = {},
+                        onReplayGuide = if (withHandler) ({ replayed++ }) else null
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Rever guia de introdução").performClick()
+        assertEquals(1, replayed)
+
+        withHandler = false
+        onNodeWithTag(HELP_REPLAY_GUIDE_TAG).assertDoesNotExist()
     }
 
     private fun ComposeUiTest.showHelp(

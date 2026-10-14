@@ -622,6 +622,8 @@ table.dt td.num, table.dt th.num { text-align: right; }
   <a href="#pdf">Relatório PDF</a>
   <a href="#chrome">Molduras e densidade</a>
   <a href="#ajuda">Ajuda</a>
+  <a href="#guia">Guia de introdução</a>
+  <a href="#dica">Dica do dia</a>
   <a href="#checklist">Checklist de aprovação</a>
 </nav>
 
@@ -2135,6 +2137,8 @@ TOKENS/s (1 h)  claude-sonnet 71 · claude-opus 48</pre></div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Inicialização e bandeja</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Inicialização com Sistema</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Registra a aplicação na inicialização do usuário atual.</span></div><span class="sw on"></span></div>
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Anel de uso na bandeja</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta.</span></div><span class="sw"></span></div>
+        <!-- Issue #411: dica do dia, ligada por padrão; o mesmo interruptor do modal da dica. -->
+        <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Mostrar a dica do dia ao abrir</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda.</span></div><span class="sw on"></span></div>
       </div></div>
       <div class="panel"><div class="phead"><span class="ptitle">Atualizações</span></div><div class="pbody flush">
         <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Atualização automática</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Baixa a versão nova em segundo plano (~120 MB) e a aplica ao fechar o app.</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Última atualização: 37.0.0 → 38.0.0, concluída.</span></div><span class="sw"></span></div>
@@ -2555,19 +2559,24 @@ O app fechou inesperadamente.
 
 <!-- ═══════════════════════════════ AJUDA ════════════════════════════ -->
 <h2 id="ajuda">14b · Ajuda — modal de funcionalidades</h2>
-<p class="lede">Issue #184. Doze tópicos num trilho lateral, e para cada um: resumo, uma demo animada gravada dos próprios componentes, a descrição e os passos de ativação. Janela em 900 × 620 dp, mínimo 600 × 320 dp.</p>
+<p class="lede">Issue #184; dezessete tópicos desde a #411 (contas, análise da sessão, comparação, bot do Telegram e HUD no navegador). Tópicos num trilho lateral, e para cada um: resumo, uma demo animada gravada dos próprios componentes, a descrição e os passos de ativação. Janela em 900 × 620 dp, mínimo 600 × 320 dp.</p>
 
 <div class="win">
   <div class="titlebar"><span class="t">Ajuda</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
   <div style="display:grid;grid-template-columns:200px 1fr;min-height:420px">
     <div style="border-right:1px solid var(--border);background:var(--surface);padding:var(--s3);display:flex;flex-direction:column;gap:2px">
       <span class="k" style="margin-bottom:var(--s2)">Funcionalidades</span>
-      <button class="btn ghost" type="button" style="justify-content:flex-start">Dashboard e integrações</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Integrações e cotas</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Contas e perfis</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Histórico e previsão</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Análise da sessão</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Sessões do Claude Code</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Resumo por eixo</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Comparar modelos e APIs</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Orçamento mensal</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Alertas e bandeja</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">Bot do Telegram</button>
+      <button class="btn ghost" type="button" style="justify-content:flex-start">HUD no navegador</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Exportação e relatório PDF</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Visão de time</button>
       <button class="btn ghost" type="button" style="justify-content:flex-start">Presença ao vivo</button>
@@ -2595,7 +2604,48 @@ O app fechou inesperadamente.
 
 <p class="note"><b>A faixa da demo tem altura fixa, não a proporção da gravação.</b> Com <code>aspectRatio</code> ela media ~410dp numa janela de 900dp e empurrava a seção "Como ativar" inteira para fora da vista — três asserts de componente falharam com <em>not displayed</em> antes da troca. Altura fixa também é o que mantém a página parada ao trocar de tópico, e a gravação entra com <code>Fit</code>: o que sobra é margem, nunca corte.</p>
 
-<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Sistema", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola, pela mesma razão de sempre: ele é o controle.</p>
+<p class="note"><b>Trilho de 200dp, e não os 150dp das Configurações.</b> Lá os rótulos são de uma palavra ("Sistema", "Rede"); aqui são nomes de funcionalidade, e "Dashboard e integrações" não cabe em 150dp sem cortar. O trilho não rola com o conteúdo, pela mesma razão de sempre: ele é o controle. Com 17 tópicos ele passa da altura mínima da janela, e por isso os itens rolam dentro do próprio trilho (#411), com o cabeçalho "Funcionalidades" parado.</p>
+
+<p class="note"><b>A demo de "Integrações e cotas" mostra a aba "APIs" (#411).</b> Ela gravava a grade de cards, que só existe nos testes desde que a HUD virou a única tela — a ajuda mostrava um layout que o usuário não tem.</p>
+
+<h2 id="guia">14c · Guia de introdução — carrossel ilustrado</h2>
+<p class="lede">Issue #411, direção AC4. Abre sozinho só na primeira abertura depois de instalar (sem marca das Novidades, sem marca do guia, sem recibo de instalador), depois de a HUD estar na tela; volta por "Rever guia de introdução" na Ajuda e na bandeja. Seis cartões, cada um apontando para um tópico da Ajuda. Janela em 1080 × 700 dp, mínimo 600 × 460 dp, sem pré-aquecimento.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Guia de introdução</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--info)"></span><span class="ptitle">Um anel por conta</span><span class="psub">Passo 1 de 6</span></div><div class="pbody">
+      <div style="height:260px;border:1px solid var(--border);border-radius:var(--r6);background:var(--raised);display:flex;align-items:center;justify-content:center"><span class="k">demo · help/window-modes.gif · a mesma da Ajuda · toca em laço</span></div>
+      <span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg)">Na barra HUD, o arco de fora é a janela semanal e o de dentro a de 5h; cor e palavra dizem o risco. O ponteiro sobre o anel abre o balão com as cotas e a hora do reinício, e um clique atualiza só aquela conta.</span>
+    </div></div>
+    <div class="hstack"><button class="btn ghost" type="button">Pular guia</button><span class="sp"></span><button class="btn primary" type="button">Próximo</button></div>
+  </div>
+</div>
+
+<p class="note"><b>Cartões, na ordem de uso:</b> Um anel por conta (Barra HUD) · Integrações · Avisos antes do limite (Alertas) · Avisos no celular (Bot do Telegram) · A HUD no navegador · Entender o ritmo (Análise da sessão). O último troca "Próximo" por "Concluir", perde "Pular guia" e cita onde o guia volta.</p>
+
+<p class="note"><b>A ilustração é a demo real da Ajuda, não um desenho próprio.</b> O mockup da rodada AC usou emoji e uma moldura inventada; o usuário escolheu a AC4 com a ressalva de que aquele visual não era o do app. Por isso o cartão é o mesmo <code>HelpMediaFrame</code> da Ajuda e as primitivas de sempre (<code>AppSectionHeader</code>, <code>AppButton</code>), e o passo é escrito ("Passo 2 de 6") em vez de pontos — pontos seriam primitiva nova e forma sem palavra.</p>
+
+<p class="note"><b>Troca de cartão = revelação E9.</b> O mesmo <code>AppModalRevealScope</code> que a Ajuda usa ao trocar de tópico; com "Reduzir animações", troca seca. "Voltar" some no primeiro cartão em vez de ficar cinza.</p>
+
+<h2 id="dica">14d · Dica do dia</h2>
+<p class="lede">Issue #411, direção AC4 em tamanho menor. No máximo uma por dia (dia em BRT), na primeira abertura do dia — inclusive pelo início com o sistema, por decisão do usuário —, sempre depois da HUD e nunca na mesma abertura das Novidades ou do guia. 24 dicas em roda, sem repetir até esgotar. Janela em 680 × 560 dp, mínimo 480 × 420 dp.</p>
+
+<div class="win">
+  <div class="titlebar"><span class="t">Dica do dia</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="panel"><div class="phead"><span class="srcmark" style="background:var(--info)"></span><span class="ptitle">Bot do Telegram</span><span class="psub">Dica 3 de 24</span></div><div class="pbody">
+      <div style="height:200px;border:1px solid var(--border);border-radius:var(--r6);background:var(--raised);display:flex;align-items:center;justify-content:center"><span class="k">demo · help/telegram-bot.gif · reduzida</span></div>
+      <span style="font-family:var(--sans);font-size:var(--t14);color:var(--fg)">Em Configurações → "Alertas" → "Bot do Telegram", os avisos e o /status chegam no celular.</span>
+    </div></div>
+    <div class="panel"><div class="pbody flush">
+      <div class="row"><div class="stack" style="gap:0;flex:1"><span class="v sm">Mostrar a dica do dia ao abrir</span><span style="font-family:var(--sans);font-size:var(--t12);color:var(--muted)">Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda.</span></div><span class="sw on"></span></div>
+    </div></div>
+    <div class="hstack"><button class="btn ghost" type="button">Ver na Ajuda</button><span class="sp"></span><button class="btn" type="button">Próxima dica</button><button class="btn primary" type="button">Fechar</button></div>
+  </div>
+</div>
+
+<p class="note"><b>Título = tópico da Ajuda, demo = a do tópico.</b> "Ver na Ajuda" fecha a dica e abre a Ajuda já nesse tópico (<code>AppModalState.openHelp(topic)</code>). O interruptor é o mesmo de Configurações › Sistema — desligar aqui desliga lá. Primária é "Fechar": a dica informa, como as Novidades.</p>
 
 <!-- ═══════════════════════════════ CHECKLIST ═════════════════════════ -->
 <h2 id="checklist">15 · O que este protótipo não decide</h2>

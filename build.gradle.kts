@@ -320,7 +320,9 @@ tasks.register<JavaExec>("generateHelpMedia") {
     mainClass.set("com.usagemonitor.screenshots.HelpMediaGeneratorKt")
     classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
     args(layout.projectDirectory.dir("src/desktopMain/resources/help").asFile.absolutePath)
-    if (providers.gradleProperty("helpMediaTopic").orNull == "history") args("--history")
+    // `-PhelpMediaTopic=<mediaId>` grava só aquela demo; `history` segue como antes.
+    val helpMediaTopic = providers.gradleProperty("helpMediaTopic").orNull
+    if (helpMediaTopic == "history") args("--history") else if (helpMediaTopic != null) args("--topic=$helpMediaTopic")
 }
 
 // Pre-extracao da nativa do Skiko antes dos forks paralelos -- ver o comentario

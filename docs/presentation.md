@@ -173,6 +173,26 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   arquivo, gravado pelo `UsageExportWriter` com o payload novo `UsageExportPayload.Binary` (bytes prontos; não é `data
   class`). Cancelar o diálogo não publica nada; salvo ou falha vira `AppBanner`, como na Comparação.
 
+## Guia de introdução e dica do dia (#411)
+
+Plano e pontos de situação em `docs/planos/issues-411-412-execucao.md`; galeria da rodada AC em
+`docs/planos/issue-411-visual/`.
+
+- **Quando abre** (`startupGuideDecision`, domain, pura): Novidades `SHOW` > guia > dica, nunca dois na
+  mesma abertura. Guia só sem marca das Novidades, sem `onboardingCompletedVersion` e sem recibo de
+  instalador — o recibo é guarda, não condição (macOS não tem; Linux o escreve depois de subir). A marca
+  das Novidades é lida na composição, antes do efeito que a grava. Decide uma vez, com `hudShown`.
+- **Guia** (`OnboardingGuideContent` + `OnboardingGuideWindow`, direção AC4): seis cartões, cada um um
+  `HelpTopic`; ilustração = demo da Ajuda pelo mesmo `HelpMediaFrame`; passo escrito; troca refaz o E9
+  (`AppModalRevealScope`). A marca é gravada **ao abrir**. Reabre do primeiro cartão por "Rever guia de
+  introdução" (rodapé da Ajuda e menu da bandeja). **Desvio**: o plano previa também a engrenagem; o
+  balão dela não ganhou botão (a Ajuda já está nele, e o balão tem dona única — `hud-notch.md`).
+- **Dica do dia** (`StartupTipCatalog`, `StartupTipContent`, `StartupTipWindow`): 24 dicas em roda, cada
+  uma com rótulo real e `HelpTopic`; título e demo são do tópico; "Ver na Ajuda" abre a Ajuda nele
+  (`AppModalState.openHelp`). Data e índice gravados ao abrir; "Próxima dica" anda a roda. O interruptor
+  `StartupTipsToggle` é o mesmo no modal e em Configurações › Sistema ("Inicialização e bandeja"), um
+  valor só no controlador. Nasce ligada; vale também na abertura pelo `--autostart` (decisão do usuário).
+
 ## Sistema visual — janelas, cards e tooltips
 
 Movido do `CLAUDE.md`, que guarda só as regras.

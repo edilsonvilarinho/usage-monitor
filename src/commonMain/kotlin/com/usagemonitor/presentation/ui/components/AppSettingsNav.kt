@@ -2,6 +2,8 @@ package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,8 +39,9 @@ private val SETTINGS_NAV_WIDTH = 150.dp
  *
  * Irmão do [AppTabs] e não uma variante dele: aba troca o que a tela mostra numa
  * faixa horizontal sublinhada, e este troca a seção de uma janela alta, numa
- * coluna que **não rola**. A coluna é o controle; conteúdo que rola não pode
- * tirá-la da vista. Largura fixa pelo mesmo motivo: item selecionado não pode
+ * coluna que **não rola com o conteúdo**. A coluna é o controle; conteúdo que
+ * rola não pode tirá-la da vista. Itens que passam da altura rolam dentro do
+ * próprio trilho (#411). Largura fixa pelo mesmo motivo: item selecionado não pode
  * mudar a largura do trilho, ou a lista inteira se mexe a cada clique.
  *
  * Reaproveita [AppTab] como item porque a forma é a mesma — rótulo mais a
@@ -80,7 +83,16 @@ fun AppSettingsNav(
         val indicator = rememberSlidingIndicatorState()
         val span = animatedIndicatorSpan(indicator, selectedIndex)
         val density = LocalDensity.current
-        Box(modifier = Modifier.fillMaxWidth()) {
+        // Os itens rolam sozinhos quando passam da altura (#411: a Ajuda chegou a
+        // 17 tópicos, e na altura mínima da janela os últimos ficavam cortados,
+        // sem como alcançá-los). O cabeçalho fica parado, e a rolagem do conteúdo
+        // ao lado continua sem mexer no trilho. Cabendo, nada muda.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+        ) {
             if (span != null) {
                 Box(
                     modifier = Modifier

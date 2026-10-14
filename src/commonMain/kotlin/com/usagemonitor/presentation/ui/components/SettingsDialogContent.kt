@@ -136,6 +136,9 @@ fun SettingsDialogContent(
     onReducedMotionChange: (Boolean) -> Unit = {},
     trayUsageRing: Boolean = false,
     onTrayUsageRingChange: (Boolean) -> Unit = {},
+    /** Dica do dia ao abrir (#411). */
+    startupTipsEnabled: Boolean = true,
+    onStartupTipsEnabledChange: (Boolean) -> Unit = {},
     /** Abre o diálogo de relatório de bug. Default vazio: os geradores de captura não o abrem. */
     onReportBug: () -> Unit = {},
     onThemeChange: (AppThemePreset) -> Unit,
@@ -310,6 +313,8 @@ fun SettingsDialogContent(
                                 onReportBug = onReportBug,
                                 trayUsageRing = trayUsageRing,
                                 onTrayUsageRingChange = onTrayUsageRingChange,
+                                startupTipsEnabled = startupTipsEnabled,
+                                onStartupTipsEnabledChange = onStartupTipsEnabledChange,
                                 receiveBetaUpdates = receiveBetaUpdates,
                                 onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange
                             )

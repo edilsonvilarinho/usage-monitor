@@ -72,6 +72,9 @@ export function Settings() {
               {/* Issue #328: desligado por padrão; o anel mostra o maior percentual vigente. */}
               <AppSwitch checked={false} label="Anel de uso na bandeja"
                 hint="Desenha em volta do ícone da bandeja o maior percentual entre as cotas vigentes. A dica do ícone continua listando cada conta." />
+              {/* Issue #411: ligada por padrão; o mesmo interruptor aparece no modal da dica. */}
+              <AppSwitch checked={true} label="Mostrar a dica do dia ao abrir"
+                hint="Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda." />
               <AppKey>Atualizações</AppKey>
               <AppSwitch checked={false} disabled label="Atualização automática"
                 reason="Instalação .deb: aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma árvore que o próximo apt upgrade desfaz." />

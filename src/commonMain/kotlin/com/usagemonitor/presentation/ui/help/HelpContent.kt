@@ -49,6 +49,8 @@ const val HELP_CONTENT_TAG = "helpContent"
 
 const val HELP_MEDIA_TAG = "helpMedia"
 
+const val HELP_REPLAY_GUIDE_TAG = "helpReplayGuide"
+
 /** Marcado por tópico: o rótulo é traduzido e buscar por texto amarraria o teste ao idioma. */
 fun helpTopicTestTag(topic: HelpTopic): String = "helpTopic_${topic.name}"
 
@@ -91,7 +93,9 @@ fun HelpContent(
     language: AppLanguage,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
-    media: HelpMediaState = HelpMediaState.Unavailable
+    media: HelpMediaState = HelpMediaState.Unavailable,
+    /** Reabre o guia de introdução (#411); `null` esconde o botão. */
+    onReplayGuide: (() -> Unit)? = null
 ) {
     val isPt = language == AppLanguage.PT
     val topics = HelpCatalog.readingOrder
@@ -210,6 +214,14 @@ fun HelpContent(
                     horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (onReplayGuide != null) {
+                        AppButton(
+                            label = helpReplayGuideLabel(language),
+                            onClick = onReplayGuide,
+                            tone = AppButtonTone.GHOST,
+                            modifier = Modifier.testTag(HELP_REPLAY_GUIDE_TAG)
+                        )
+                    }
                     // Uma primária por tela, e aqui ela é fechar: a tela informa,
                     // não propõe trabalho.
                     AppButton(
@@ -238,7 +250,7 @@ fun HelpContent(
  * tópico, não é o tópico.
  */
 @Composable
-private fun HelpMediaFrame(
+internal fun HelpMediaFrame(
     media: HelpMediaState,
     title: String,
     isPt: Boolean,
@@ -288,6 +300,11 @@ private fun HelpMediaFrame(
             )
         }
     }
+}
+
+/** Rótulo do botão que reabre o guia de introdução, na Ajuda e na bandeja. */
+fun helpReplayGuideLabel(language: AppLanguage): String {
+    return if (language == AppLanguage.PT) "Rever guia de introdução" else "Replay the welcome guide"
 }
 
 /** Título da janela, na barra da moldura. */
