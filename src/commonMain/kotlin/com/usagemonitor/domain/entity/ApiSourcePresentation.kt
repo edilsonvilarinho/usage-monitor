@@ -16,18 +16,6 @@ fun ApiSource.displayName(language: AppLanguage = AppLanguage.PT): String {
     }
 }
 
-/**
- * Fontes cujo card mostra atividade observada localmente — requisições do OpenCode
- * e Kilo, tokens registrados pelo Gemini CLI — em vez de cotas de conta.
- *
- * `OPENCODE_GO` deliberadamente **não** entra: ele devolve percentual de três
- * janelas com `resetsAt`, exatamente a forma da Anthropic, e o resumo de
- * atividade observada não desenha barra nem projeção.
- */
-fun ApiSource.isObservedActivitySource(): Boolean {
-    return this == ApiSource.OPENCODE || this == ApiSource.KILO || this == ApiSource.GEMINI
-}
-
 fun ApiSource.statusBadgeLabel(language: AppLanguage = AppLanguage.PT): String? {
     return if (this == ApiSource.GEMINI) {
         if (language == AppLanguage.PT) "Uso local" else "Local usage"

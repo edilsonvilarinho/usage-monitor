@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.ANALYSIS_SOURCES
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.SessionAnalysis
@@ -18,7 +19,7 @@ import kotlin.time.Clock
  */
 internal fun sessionAnalysisReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (String) -> SessionAnalysis? = reader@{ key ->
     val stats = (dashboard.uiState.value as? UiState.Success)?.data?.firstOrNull { item -> item.targetKey.storageKey == key } ?: return@reader null
-    if (stats.source != ApiSource.ANTHROPIC && stats.source != ApiSource.CODEX) return@reader null
+    if (stats.source !in ANALYSIS_SOURCES) return@reader null
     val now = Clock.System.now()
     val report = runCatching { graph.getUsageHistory(stats.source, HistoryRange.LAST_7_DAYS, stats.accountContext?.key, now) }.getOrNull() ?: return@reader null
     val cumulative = analysisThroughputCuts(report.series, now).mapNotNull { since ->

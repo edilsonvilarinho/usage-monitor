@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 
@@ -76,7 +75,7 @@ internal fun GroupedHistoryContent(
  * um seletor escrito `5h` ali descreveria outra cota.
  */
 internal fun quotaViewLabels(report: ApiUsageHistoryReport, language: AppLanguage): List<String>? {
-    if (report.source == ApiSource.DEEPSEEK || report.source.isObservedActivitySource()) {
+    if (report.source.buildsOwnHistoryCards()) {
         return null
     }
     val merged = buildGenericHistoryGroups(report.series).firstOrNull { model -> model.weeklySummary != null }

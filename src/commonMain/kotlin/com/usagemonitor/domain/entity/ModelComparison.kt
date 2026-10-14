@@ -103,7 +103,7 @@ fun buildComparisonRows(
         )
     }
     val sourceRows = stats
-        .filter { item -> item.source != ApiSource.ANTHROPIC && item.source != ApiSource.CODEX }
+        .filter { item -> !item.source.hasCliSessionIndex() }
         .map { item ->
             ComparisonRow(
                 source = item.source,
