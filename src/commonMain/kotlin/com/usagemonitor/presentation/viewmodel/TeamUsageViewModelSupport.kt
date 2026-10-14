@@ -70,6 +70,9 @@ internal fun flattenTeamAccounts(accounts: List<TeamAccountUsage>): List<TeamMem
                 .thenBy { member -> member.accountKey.orEmpty() }
                 .thenByDescending { member -> member.totalTokens }
                 .thenBy { member -> member.alias.lowercase() }
+                // Duas máquinas da mesma conta com o mesmo apelido e o mesmo total
+                // (zero, no caso comum) empatam até aqui; o dispositivo fecha a ordem.
+                .thenBy { member -> member.deviceId }
         )
 }
 
