@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução (B00).`
+**Estado atual:** `Concluído — B00–B22 (com B21b) no PR #409.`
 
 **Direção escolhida (2026-10-13):** o usuário aprovou **todas** as opções AB1 a AB15, mais:
 
@@ -113,6 +113,7 @@ Regras que valem para todas:
 | B19 | `feat(telegram): reach the session analysis from /status and /conta` | `gradlew.bat desktopTest --tests "*Telegram*"`: 129 testes, 0 falhas (novo: `/status` com conta Anthropic ou Codex ganha a linha "📐 Análise" (`anp`, toque novo `BotTap.AnalysisPick` — `BotButton` é enum e não cresce), e o toque abre a mesma análise do `/analise`; a conta analisável do `/conta` ganha "📐 Analisar esta conta" (`ana:<conta>`)). Primeira rodada: compilação falhou por falta do import da extensão `data` | concluída |
 | B20 | `feat(analysis): open the session analysis window from the card and the HUD` | `gradlew.bat desktopTest --tests "*Telegram*" --tests "*CardAction*" --tests "*Analysis*"`: 0 falhas (novos: `AnalysisScreenTest` — título com a conta, aba Painel com o texto sem marcas, clique em Intervalos pede a vista; estado vazio em inglês). `CardActionsTest` atualizado: Anthropic e Codex ganham `ANALYSIS` depois de Histórico (exceção U2). Primeira rodada: 2 falhas esperadas no `CardActionsTest` (lista fixada antes da regra nova) e 1 erro de compilação (`weight` fora de `ColumnScope`). Leitura extraída para `SessionAnalysisReader.kt`, usada pelo bot e pela janela | concluída |
 | B21 | `feat(analysis): show the analysis charts in the app window` | `gradlew.bat desktopTest --tests "*Analysis*"`: 0 falhas (`AnalysisScreenTest` com 3: aba de imagem mostra o desenho, "Horas" pede a vista, "Texto" volta ao painel). Os mesmos PNGs do bot, por `AnalysisImageProvider` de `desktopMain`; segmentado Texto · Gráficos para as 12 abas caberem em 640 dp. Não conferido na janela real (risco R4) | concluída |
+| B22 | `docs: close the session analysis plan` | `gradlew.bat allTests`: 2704 testes, 0 falhas, 0 ignorados (inclui `ArchitectureRulesTest`: nenhum arquivo de produção acima de 800 linhas nem função acima de 300). Branch publicada e descrição do PR #409 atualizada com a rodada AB | concluída |
 | B21b | `feat(analysis): export the session analysis pdf from the app window` | `gradlew.bat desktopTest --tests "*Analysis*" --tests "*Export*"`: 0 falhas (novos: `AnalysisViewModelTest` — abre a conta, troca a vista, exporta com o nome do bot `analise-anthropic-2026-10-06-1230.pdf` e os bytes do PDF; conta sem histórico fica vazia; `AnalysisScreenTest` — "Relatório PDF" chama a exportação e o caminho salvo aparece na faixa). Atividade fora da tabela original: o "No app" do AB15 pedia o botão | concluída |
 
 ## Problemas em aberto e riscos
@@ -122,6 +123,7 @@ Regras que valem para todas:
 | R1 | Nada é conferido contra o Telegram real (edição com teclado, `sendPhoto`, `sendDocument`) | aberto |
 | R2 | Tokens/s por intervalo pode não existir para o Codex (D5) | fechado na B04: `CodexCliModelUsage.throughput`. O Codex mede a máquina toda, não a conta |
 | R3 | O PR #409 cresce com esta entrega (decisão U3) | aceito |
+| R4 | A janela "Análise" foi conferida só por teste de tela, não aberta no app real (nem no Linux/X11, regra #342); os PNGs ficam escuros no tema claro | aberto |
 
 ## Desvios do plano e achados da execução
 - B21: os gráficos da janela são os mesmos PNGs escuros do bot (não Canvas por vista, como dizia a galeria) e não seguem o
