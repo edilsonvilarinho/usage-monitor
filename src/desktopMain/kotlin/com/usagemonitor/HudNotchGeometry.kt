@@ -692,7 +692,7 @@ internal fun nearestHudPlacement(centerX: Dp, centerY: Dp, area: ScreenWorkArea)
         HudEdge.LEFT to abs(fromLeft),
         HudEdge.RIGHT to abs(width - fromLeft)
     )
-    val edge = distances.minByOrNull { (_, distance) -> distance }!!.key
+    val edge = distances.minBy { (_, distance) -> distance }.key
     val fraction = if (edge.isHorizontal) fromLeft / width else fromTop / height
     return HudPlacement(edge, fraction.coerceIn(0f, 1f))
 }

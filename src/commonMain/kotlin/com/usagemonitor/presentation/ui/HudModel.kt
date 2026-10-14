@@ -13,6 +13,7 @@ import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import com.usagemonitor.domain.entity.isObservedActivitySource
+import com.usagemonitor.domain.entity.saturatingAdd
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -151,8 +152,7 @@ data class HudAccount(
             if (source.isObservedActivitySource()) {
                 val unit = observedModels.firstOrNull()?.unit ?: UsageUnit.REQUESTS
                 val amount = observedModels.fold(0L) { total, model ->
-                    val value = model.amountFiveHours.coerceAtLeast(0L)
-                    if (Long.MAX_VALUE - total < value) Long.MAX_VALUE else total + value
+                    saturatingAdd(total, model.amountFiveHours.coerceAtLeast(0L))
                 }
                 return HudStripLine("5h", compactObservedCount(amount, unit))
             }

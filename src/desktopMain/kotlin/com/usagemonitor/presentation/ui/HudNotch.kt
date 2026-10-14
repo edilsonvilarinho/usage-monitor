@@ -386,7 +386,7 @@ internal fun HudNotch(
                 if (account != null || app != null) {
                     HudBalloon(
                         edge = edge,
-                        bodyHeight = if (app != null) appBalloonHeight else hudBalloonHeight(account!!, sizes.balloon.height),
+                        bodyHeight = if (app == null && account != null) hudBalloonHeight(account, sizes.balloon.height) else appBalloonHeight,
                         tailCenter = { (ringCenters[index] ?: 0f) - balloonAlong.value },
                         reveal = jet,
                         beamOrigin = { balloonBox.depthTo(edge, ringDepths[index]) },

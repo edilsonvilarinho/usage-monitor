@@ -107,7 +107,7 @@ object AntigravityUsageMapper {
             // mostraria 21% onde o CLI diz que restam 78%.
             used = floor((1.0 - fraction) * SCALE + FLOAT_TOLERANCE).toLong().coerceIn(0L, SCALE),
             total = SCALE,
-            periodEndAt = if (hasKnownResetAt) parsedReset!! else ANTIGRAVITY_UNKNOWN_RESET_AT,
+            periodEndAt = parsedReset?.takeIf { hasKnownResetAt } ?: ANTIGRAVITY_UNKNOWN_RESET_AT,
             hasKnownResetAt = hasKnownResetAt,
             periodType = periodType,
             unit = UsageUnit.PERCENTAGE

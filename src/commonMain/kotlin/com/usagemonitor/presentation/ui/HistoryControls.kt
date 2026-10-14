@@ -69,9 +69,10 @@ internal fun HistoryFilters(
                 modifier = Modifier.testTag(HISTORY_EXPORT_PDF_TAG).semantics { contentDescription = ExportLabels.exportPdf(language) })
         }
         val quota: @Composable () -> Unit = {
-            if (quotaLabels != null) AppSegmentedControl(
+            // `quotaLabels` só existe com `success`; o par de checagens dá o smart cast aos dois.
+            if (quotaLabels != null && success != null) AppSegmentedControl(
                 options = HistoryQuotaView.entries.mapIndexed { index, view -> AppSegment(quotaLabels[index], historyQuotaViewChipTag(view)) },
-                selectedIndex = success!!.selectedQuotaView.ordinal, onSelect = { viewModel.selectQuotaView(HistoryQuotaView.entries[it]) },
+                selectedIndex = success.selectedQuotaView.ordinal, onSelect = { viewModel.selectQuotaView(HistoryQuotaView.entries[it]) },
                 modifier = Modifier.semantics { contentDescription = if (pt) "Cota" else "Quota" }
             )
         }

@@ -1,5 +1,6 @@
 package com.usagemonitor.data.repository
 
+import com.usagemonitor.domain.entity.saturatingAdd
 import com.usagemonitor.data.datasource.GeminiMessageUsage
 import com.usagemonitor.data.datasource.GeminiUsageDataSource
 import com.usagemonitor.domain.entity.ApiSource
@@ -106,9 +107,6 @@ class GeminiRepositoryImpl(
         periodType = periodType,
         unit = unit
     )
-
-    private fun saturatingAdd(left: Long, right: Long): Long =
-        if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
 
     private companion object {
         const val GEMINI_API_NAME = "Gemini CLI"

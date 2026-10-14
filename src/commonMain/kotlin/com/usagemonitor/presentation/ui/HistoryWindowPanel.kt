@@ -79,9 +79,10 @@ internal fun HistoryWindowAnalysisPanel(
             )
         }
     ) {
-        if (series.windows.isEmpty()) {
+        // Sem janelas, a distribuição existe (o retorno acima cobre os dois vazios).
+        if (series.windows.isEmpty() && distribution != null) {
             Column(Modifier.fillMaxWidth().padding(vertical = AppSpacing.sm)) {
-                HistoryHourlyDistribution(distribution = distribution!!, color = accentColor, language = language)
+                HistoryHourlyDistribution(distribution = distribution, color = accentColor, language = language)
             }
             return@AppDataSurfaceFlush
         }
