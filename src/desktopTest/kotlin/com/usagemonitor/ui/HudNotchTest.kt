@@ -1410,6 +1410,31 @@ class HudNotchTest {
         onNodeWithTag(HUD_BALLOON_SESSION_SIGNALS_TAG).assertDoesNotExist()
     }
 
+    /**
+     * Cotas com grupo (Antigravity: um limite semanal por grupo de modelos) viram
+     * caixa com título no balão. O ramo `run.group != null` de `hudBalloonHeight`
+     * só tinha teste puro; aqui a coluna desenhada mede o que a geometria soma.
+     */
+    @Test
+    fun `cotas agrupadas medem no balao o que a geometria calcula`() = runDesktopComposeUiTest {
+        val grouped = account(
+            "Antigravity", "Normal", AppTone.OK,
+            HudQuota("5h", "12%", 0.12f, AppTone.OK, resetText = "18h00", hasForecast = false, title = "Sessão 5h", periodType = PeriodType.INTERVAL),
+            HudQuota("7d", "40%", 0.4f, AppTone.OK, resetText = "Ter 21h00", hasForecast = false, title = "Gemini Pro", group = "Modelos Gemini", periodType = PeriodType.WEEKLY),
+            HudQuota("7d", "8%", 0.08f, AppTone.OK, resetText = "Ter 21h00", hasForecast = false, title = "Gemini Flash", group = "Modelos Gemini", periodType = PeriodType.WEEKLY)
+        )
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                    HudAccountBalloonContent(account = grouped, language = AppLanguage.PT)
+                }
+            }
+        }
+        onNodeWithText("Modelos Gemini").assertIsDisplayed()
+        val column = onNodeWithTag(HUD_BALLOON_CONTENT_TEST_TAG).getUnclippedBoundsInRoot()
+        assertEquals(hudBalloonHeight(grouped) - HUD_BALLOON_PADDING * 2, column.height)
+    }
+
     /** Um anel só não tem posição a apontar: o saldo do DeepSeek fica sem glifo. */
     @Test
     fun `conta de um anel so nao tem glifo`() = runDesktopComposeUiTest {
