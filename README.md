@@ -72,6 +72,23 @@ API key, entered in **Settings > APIs**; environment variables are never read.
 
 </details>
 
+### Command line
+
+| Option | What it does |
+|---|---|
+| `-h`, `--help` | Prints the options and exits |
+| `-v`, `--version` | Prints the version and exits |
+| `--diagnostics` | Saves a diagnostics zip (metadata only) to your home folder and exits — no window |
+| `--locale <pt\|en>` | Opens the interface in that language for this run only; the saved choice does not change |
+
+Without options it opens the app, or brings the running one to the front. On Windows, use
+`usage-monitor.exe` from the install folder: `Usage Monitor.exe` is a windowed program, so its output
+never reaches the terminal. The installer does not add the folder to `PATH`:
+
+```powershell
+& "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --help
+```
+
 ## Supported integrations
 
 | Integration | Reads | Needs |

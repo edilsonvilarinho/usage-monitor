@@ -152,6 +152,9 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
   Publicação pela skill `usage-monitor-release-beta`.
 - Diagnóstico (#416): `app.log` recebe falha não tratada (registro no `CrashHandler`, nunca handler por escopo),
   `recordFailure`, `stderr` e EDT parado; `--diagnostics` empacota por **lista fechada**, sem janela.
+- Linha de comando (#418): `parseCommandLine` é o dono do `argv`; opção desconhecida avisa e **não** impede a abertura;
+  saída em inglês/ASCII. `usage-monitor.exe` (launcher de console) só imprime e sai; sem opção de ação, relança o exe
+  GUI (a chave `Run` lê `jpackage.app-path`). `--locale` nunca grava; o idioma efetivo é só pela `LanguageSelection`.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia
   imutável dos bytes; laço de quadros em `desktopMain`; `gradlew.bat generateHelpMedia` regenera.
 

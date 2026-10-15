@@ -79,6 +79,23 @@ de uma chave de API, informada em **Configurações > APIs**; variáveis de ambi
 
 </details>
 
+### Linha de comando
+
+| Opção | O que faz |
+|---|---|
+| `-h`, `--help` | Mostra as opções e sai |
+| `-v`, `--version` | Mostra a versão e sai |
+| `--diagnostics` | Grava um zip de diagnóstico (só metadados) na pasta do usuário e sai, sem abrir janela |
+| `--locale <pt\|en>` | Abre a interface nesse idioma só nesta execução; a escolha gravada não muda |
+
+Sem opção, abre o app ou traz para a frente o que já está aberto. No Windows, use o
+`usage-monitor.exe` da pasta de instalação: o `Usage Monitor.exe` é um programa de janela, e a saída
+dele nunca chega ao terminal. O instalador não põe a pasta no `PATH`. A saída das opções é em inglês:
+
+```powershell
+& "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --help
+```
+
 ## Integrações suportadas
 
 | Integração | Lê | Precisa de |

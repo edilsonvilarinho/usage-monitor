@@ -91,8 +91,9 @@ body:
         is stuck or does not start, and it holds metadata only — no prompt, response or credential.
         - Linux (.deb): `"$(dpkg -L usage-monitor | grep '/bin/' | head -n 1)" --diagnostics`
           (.rpm: replace `dpkg -L` with `rpm -ql`)
-        - Windows: run the app's `.exe` from its install folder (`%LOCALAPPDATA%\Usage Monitor` by
-          default) with `--diagnostics`
+        - Windows (PowerShell): `& "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --diagnostics`
+          (versions without `usage-monitor.exe`: run `Usage Monitor.exe` from the same folder with
+          `--diagnostics`; it prints nothing, but the zip is created)
         On versions older than the `--diagnostics` option, attach the files from
         `~/.usage-monitor/diagnostics/` instead — `startup.jsonl`, `hud-window.jsonl` and, on Linux,
         `linux-update.log`. Screenshots help for anything visual.
