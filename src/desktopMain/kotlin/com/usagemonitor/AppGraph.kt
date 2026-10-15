@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.data.datasource.LocalAnthropicCreditsDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalAntigravityUsageDataSource
@@ -94,7 +95,8 @@ internal class AppGraph(
     // desativados neste cliente para nunca encaminhar a sessão a outro host.
     val cursorHttpClient = buildHttpClient(effectiveProxy, followRedirects = false)
 
-    val preferencesNode: Preferences = Preferences.userRoot().node("com.usagemonitor")
+    // Nó da raiz de dados (#419): `com.usagemonitor` sem `--user-data-dir`.
+    val preferencesNode: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName)
     val settings = PreferencesSettings(preferencesNode)
     val languageSelection = LanguageSelection(settings, languageOverride)
 

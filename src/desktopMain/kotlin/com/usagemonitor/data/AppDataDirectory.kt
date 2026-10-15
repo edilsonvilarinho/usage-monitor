@@ -1,6 +1,7 @@
 package com.usagemonitor.data
 
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * A raiz dos dados do app **neste processo**: `~/.usage-monitor`, ou a pasta de
@@ -20,6 +21,7 @@ import java.io.File
  */
 internal object AppDataDirectory {
     const val DEFAULT_DIRECTORY_NAME = ".usage-monitor"
+    const val DEFAULT_PREFERENCES_NODE = "com.usagemonitor"
 
     private val process = AppDataRoot(defaultRoot = ::defaultAppDataRoot)
 
@@ -32,6 +34,10 @@ internal object AppDataDirectory {
     /** `false` quando o processo roda com `--user-data-dir` numa pasta que não é a padrão. */
     val isDefault: Boolean
         get() = process.isDefault
+
+    /** Nó de `java.util.prefs` desta raiz; ver [AppDataRoot.preferencesNodeName]. */
+    val preferencesNodeName: String
+        get() = process.preferencesNodeName
 
     fun file(relative: String): File = process.file(relative)
 
@@ -71,9 +77,30 @@ internal class AppDataRoot(private val defaultRoot: () -> File) {
             configured == null
         }
 
+    /**
+     * O nó de preferências acompanha a raiz. A padrão continua em
+     * `com.usagemonitor`, e quem nunca usou `--user-data-dir` não perde nada. As
+     * outras ganham um nó **irmão**, e não filho: `removeNode` apaga a subárvore,
+     * e limpar o nó padrão levaria junto as raízes isoladas. O nome sai do hash do
+     * caminho canônico, porque o caminho cru pode passar do limite de 80
+     * caracteres do `java.util.prefs` e traz `/`, que ali separa nós.
+     */
+    val preferencesNodeName: String
+        get() = synchronized(lock) {
+            read = true
+            val custom = configured ?: return@synchronized AppDataDirectory.DEFAULT_PREFERENCES_NODE
+            "${AppDataDirectory.DEFAULT_PREFERENCES_NODE}.data.${shortHash(custom.path)}"
+        }
+
     fun file(relative: String): File = File(root, relative)
 
     fun installationFile(relative: String): File = File(defaultRoot(), relative)
+
+    private fun shortHash(text: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(text.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
+            .take(16)
 }
 
 internal fun defaultAppDataRoot(): File {
