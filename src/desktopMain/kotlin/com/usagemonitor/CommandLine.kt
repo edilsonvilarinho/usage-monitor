@@ -19,8 +19,8 @@ internal sealed interface CommandLineRequest {
     /** Imprime [commandLineVersion] e sai. */
     data object Version : CommandLineRequest
 
-    /** Empacota o diagnóstico e sai, sem janela (#416). */
-    data object Diagnostics : CommandLineRequest
+    /** Empacota o diagnóstico e sai, sem janela (#416), da raiz de [userDataDir] quando dada. */
+    data class Diagnostics(val userDataDir: String? = null) : CommandLineRequest
 
     /**
      * Abre o app (ou foca a instância viva).
@@ -34,7 +34,9 @@ internal sealed interface CommandLineRequest {
         val autostart: Boolean,
         val unknownOptions: List<String>,
         /** `--locale`: idioma só desta execução, nunca gravado; `null` = a preferência. */
-        val locale: AppLanguage? = null
+        val locale: AppLanguage? = null,
+        /** `--user-data-dir` como digitado (#419); o `main()` resolve e valida no disco. */
+        val userDataDir: String? = null
     ) : CommandLineRequest
 
     /**
@@ -51,6 +53,7 @@ internal object CommandLineOptions {
     const val VERSION = "--version"
     const val VERSION_SHORT = "-v"
     const val LOCALE = "--locale"
+    const val USER_DATA_DIR = "--user-data-dir"
 }
 
 internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
@@ -59,33 +62,40 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
     var diagnostics = false
     var autostart = false
     var locale: AppLanguage? = null
+    var userDataDir: String? = null
     var invalid: String? = null
     val unknown = mutableListOf<String>()
-    // `trim` como o `StartupOrigin.from` sempre fez (o teste dele cobre " --autostart ").
-    val tokens = arguments.map { raw -> raw.trim() }.filter { argument -> argument.isNotEmpty() }
+    val tokens = commandLineTokens(arguments)
     var index = 0
     while (index < tokens.size) {
         val argument = tokens[index]
+        val next = tokens.getOrNull(index + 1)
+        val localeValue = optionValue(argument, CommandLineOptions.LOCALE, next)
+        val dataDirValue = optionValue(argument, CommandLineOptions.USER_DATA_DIR, next)
         when {
             argument == CommandLineOptions.HELP || argument == CommandLineOptions.HELP_SHORT -> help = true
             argument == CommandLineOptions.VERSION || argument == CommandLineOptions.VERSION_SHORT -> version = true
             argument == DiagnosticsExport.ARGUMENT -> diagnostics = true
             argument == StartupOrigin.AUTO_START_ARGUMENT -> autostart = true
-            argument == CommandLineOptions.LOCALE || argument.startsWith("${CommandLineOptions.LOCALE}=") -> {
-                // Duas formas: `--locale en`, a documentada, e `--locale=en`.
-                val inline = if (argument.contains('=')) argument.substringAfter('=') else null
-                val value = inline ?: tokens.getOrNull(index + 1)?.takeUnless { next -> next.startsWith("-") }
-                if (inline == null && value != null) {
-                    index += 1
-                }
-                val parsed = value?.let(::localeOf)
+            localeValue != null -> {
+                val parsed = localeValue.value?.let(::localeOf)
                 if (parsed == null) {
-                    invalid = invalid ?: localeError(value)
+                    invalid = invalid ?: localeError(localeValue.value)
                 } else {
                     locale = parsed
                 }
             }
+            dataDirValue != null -> {
+                if (dataDirValue.value.isNullOrEmpty()) {
+                    invalid = invalid ?: "Error: ${CommandLineOptions.USER_DATA_DIR} needs a folder."
+                } else {
+                    userDataDir = dataDirValue.value
+                }
+            }
             else -> unknown += argument
+        }
+        if (localeValue?.consumedNext == true || dataDirValue?.consumedNext == true) {
+            index += 1
         }
         index += 1
     }
@@ -98,9 +108,62 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
     }
     invalid?.let { message -> return CommandLineRequest.Invalid(message) }
     if (diagnostics) {
-        return CommandLineRequest.Diagnostics
+        return CommandLineRequest.Diagnostics(userDataDir = userDataDir)
     }
-    return CommandLineRequest.Launch(autostart = autostart, unknownOptions = unknown, locale = locale)
+    return CommandLineRequest.Launch(
+        autostart = autostart,
+        unknownOptions = unknown,
+        locale = locale,
+        userDataDir = userDataDir
+    )
+}
+
+/** `trim` como o `StartupOrigin.from` sempre fez (o teste dele cobre " --autostart "). */
+private fun commandLineTokens(arguments: Array<String>): List<String> =
+    arguments.map { raw -> raw.trim() }.filter { argument -> argument.isNotEmpty() }
+
+private class OptionValue(val value: String?, val consumedNext: Boolean)
+
+/**
+ * Valor de uma opção nas duas formas: `--opcao valor`, a documentada, e
+ * `--opcao=valor`. O próximo argumento só é consumido se não for outra opção.
+ * `null` quando [argument] não é [option].
+ */
+private fun optionValue(argument: String, option: String, next: String?): OptionValue? {
+    if (argument == option) {
+        val value = next?.takeUnless { candidate -> candidate.startsWith("-") }
+        return OptionValue(value, consumedNext = value != null)
+    }
+    if (argument.startsWith("$option=")) {
+        return OptionValue(argument.substringAfter('='), consumedNext = false)
+    }
+    return null
+}
+
+/**
+ * Os argumentos com `--user-data-dir` trocado por [absoluteRoot] — ou removido,
+ * com `null` (raiz padrão).
+ *
+ * Existe para o relançamento do `usage-monitor.exe`: o exe GUI sobe com outro
+ * diretório de trabalho, e um caminho relativo apontaria para outra pasta.
+ */
+internal fun withUserDataDir(arguments: Array<String>, absoluteRoot: String?): List<String> {
+    val tokens = commandLineTokens(arguments)
+    val kept = mutableListOf<String>()
+    var index = 0
+    while (index < tokens.size) {
+        val dataDirValue = optionValue(tokens[index], CommandLineOptions.USER_DATA_DIR, tokens.getOrNull(index + 1))
+        if (dataDirValue == null) {
+            kept += tokens[index]
+        } else if (dataDirValue.consumedNext) {
+            index += 1
+        }
+        index += 1
+    }
+    if (absoluteRoot != null) {
+        kept += listOf(CommandLineOptions.USER_DATA_DIR, absoluteRoot)
+    }
+    return kept
 }
 
 /**
@@ -149,4 +212,8 @@ internal fun commandLineHelp(version: String = CURRENT_APP_VERSION): String = ""
     |                     It holds metadata only: no prompt, response or credential.
     |  --locale <pt|en>   Interface language for this run only. The saved choice
     |                     does not change. Ignored if Usage Monitor is already open.
+    |  --user-data-dir <dir>
+    |                     Keep this run's settings, history, keys and logs in <dir>
+    |                     instead of ~/.usage-monitor. Another folder runs side by
+    |                     side with the default one.
 """.trimMargin()

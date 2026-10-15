@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.application
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.diagnostics.AppLogFile
 import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
 import com.usagemonitor.presentation.ui.windowDragSink
@@ -27,6 +28,7 @@ import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.onboarding.rememberStartupGuideController
 import com.usagemonitor.presentation.ui.help.StartupTipCatalog
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -86,9 +88,14 @@ fun main(args: Array<String>) {
         CommandLineRequest.Help -> exitProcess(printAndSucceed(commandLineHelp()))
         CommandLineRequest.Version -> exitProcess(printAndSucceed(commandLineVersion()))
         is CommandLineRequest.Invalid -> exitProcess(printUsageError(request.message))
-        CommandLineRequest.Diagnostics -> exitProcess(DiagnosticsExport.run())
+        is CommandLineRequest.Diagnostics -> {
+            configureDataRoot(request.userDataDir)
+            exitProcess(DiagnosticsExport.run())
+        }
         is CommandLineRequest.Launch -> request
     }
+    // Antes de qualquer arquivo aberto: a raiz de dados só pode ser trocada uma vez (#419).
+    val dataRoot = configureDataRoot(launch.userDataDir)
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
     }
@@ -96,7 +103,8 @@ fun main(args: Array<String>) {
     val guiRelaunch = ConsoleLauncher.guiRelaunchCommand(
         isWindows = System.getProperty("os.name").orEmpty().lowercase().contains("win"),
         appPath = System.getProperty("jpackage.app-path"),
-        arguments = args
+        // Caminho já absoluto: o exe GUI sobe com outro diretório de trabalho.
+        arguments = withUserDataDir(args, dataRoot?.path).toTypedArray()
     )
     if (guiRelaunch != null) {
         exitProcess(ConsoleLauncher.relaunch(guiRelaunch))
@@ -133,6 +141,19 @@ fun main(args: Array<String>) {
 private fun printAndSucceed(text: String): Int {
     println(text)
     return 0
+}
+
+/**
+ * Resolve `--user-data-dir` e configura a raiz do processo. Pasta inválida sai
+ * com 2 antes de qualquer arquivo ser aberto. `null` = raiz padrão.
+ */
+private fun configureDataRoot(value: String?): File? {
+    val workingDirectory = File(System.getProperty("user.dir") ?: ".")
+    return when (val resolution = resolveDataRoot(value, workingDirectory)) {
+        DataRootResolution.Default -> null
+        is DataRootResolution.Custom -> resolution.root.also { root -> AppDataDirectory.configure(root) }
+        is DataRootResolution.Error -> exitProcess(printUsageError(resolution.message))
+    }
 }
 
 /** Saída 2, a convenção de "uso incorreto" dos CLIs, separada da falha de execução (1). */

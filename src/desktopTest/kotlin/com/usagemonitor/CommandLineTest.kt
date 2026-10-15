@@ -15,14 +15,14 @@ class CommandLineTest {
 
     @Test
     fun `diagnostics is recognized only as a whole word`() {
-        assertEquals(CommandLineRequest.Diagnostics, parseCommandLine(arrayOf("--diagnostics")))
-        assertEquals(CommandLineRequest.Diagnostics, parseCommandLine(arrayOf(" --diagnostics ")))
+        assertEquals(CommandLineRequest.Diagnostics(), parseCommandLine(arrayOf("--diagnostics")))
+        assertEquals(CommandLineRequest.Diagnostics(), parseCommandLine(arrayOf(" --diagnostics ")))
         assertEquals(launch(unknown = listOf("--diagnostics-x")), parseCommandLine(arrayOf("--diagnostics-x")))
     }
 
     @Test
     fun `diagnostics wins over the auto start flag`() {
-        assertEquals(CommandLineRequest.Diagnostics, parseCommandLine(arrayOf("--autostart", "--diagnostics")))
+        assertEquals(CommandLineRequest.Diagnostics(), parseCommandLine(arrayOf("--autostart", "--diagnostics")))
     }
 
     @Test
@@ -75,7 +75,7 @@ class CommandLineTest {
     fun `the help lists every public option and hides the auto start mark`() {
         val help = commandLineHelp("9.9.9")
         assertTrue(help.startsWith("Usage Monitor 9.9.9\n"), help)
-        for (option in listOf("--help", "-h", "--version", "-v", DiagnosticsExport.ARGUMENT, "--locale <pt|en>")) {
+        for (option in listOf("--help", "-h", "--version", "-v", DiagnosticsExport.ARGUMENT, "--locale <pt|en>", "--user-data-dir <dir>")) {
             assertTrue(help.contains(option), "help sem $option")
         }
         assertFalse(help.contains(StartupOrigin.AUTO_START_ARGUMENT), help)
@@ -146,6 +146,54 @@ class CommandLineTest {
         assertTrue(error.message.all { char -> char.code in 0x20..0x7E }, error.message)
     }
 
-    private fun launch(autostart: Boolean = false, unknown: List<String> = emptyList(), locale: AppLanguage? = null) =
-        CommandLineRequest.Launch(autostart = autostart, unknownOptions = unknown, locale = locale)
+    @Test
+    fun `user data dir takes its value after a space or an equals sign`() {
+        assertEquals(launch(userDataDir = "/dados"), parseCommandLine(arrayOf("--user-data-dir", "/dados")))
+        assertEquals(launch(userDataDir = "dados=a"), parseCommandLine(arrayOf("--user-data-dir=dados=a")))
+        assertEquals(
+            launch(locale = AppLanguage.EN, userDataDir = "teste"),
+            parseCommandLine(arrayOf("--user-data-dir", "teste", "--locale", "en"))
+        )
+    }
+
+    @Test
+    fun `user data dir without a folder is an error`() {
+        val missing = CommandLineRequest.Invalid("Error: --user-data-dir needs a folder.")
+        assertEquals(missing, parseCommandLine(arrayOf("--user-data-dir")))
+        assertEquals(missing, parseCommandLine(arrayOf("--user-data-dir=")))
+        assertEquals(missing, parseCommandLine(arrayOf("--user-data-dir", "--locale", "en")))
+    }
+
+    @Test
+    fun `diagnostics carries the user data dir`() {
+        assertEquals(
+            CommandLineRequest.Diagnostics(userDataDir = "teste"),
+            parseCommandLine(arrayOf("--diagnostics", "--user-data-dir", "teste"))
+        )
+    }
+
+    @Test
+    fun `the relaunch arguments carry the absolute root in place of the typed one`() {
+        assertEquals(
+            listOf("--locale", "en", "--user-data-dir", "/abs/dados"),
+            withUserDataDir(arrayOf("--user-data-dir", "dados", "--locale", "en"), "/abs/dados")
+        )
+        assertEquals(
+            listOf("--bogus", "--user-data-dir", "/abs/dados"),
+            withUserDataDir(arrayOf("--user-data-dir=dados", "--bogus"), "/abs/dados")
+        )
+    }
+
+    @Test
+    fun `the relaunch arguments drop the option for the default root`() {
+        assertEquals(listOf("--locale", "pt"), withUserDataDir(arrayOf("--user-data-dir", "x", "--locale", "pt"), null))
+        assertEquals(listOf("--bogus"), withUserDataDir(arrayOf(" ", "--bogus"), null))
+    }
+
+    private fun launch(
+        autostart: Boolean = false,
+        unknown: List<String> = emptyList(),
+        locale: AppLanguage? = null,
+        userDataDir: String? = null
+    ) = CommandLineRequest.Launch(autostart = autostart, unknownOptions = unknown, locale = locale, userDataDir = userDataDir)
 }
