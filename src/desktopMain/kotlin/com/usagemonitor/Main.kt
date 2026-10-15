@@ -92,6 +92,9 @@ fun main(args: Array<String>) {
         screenshots = RobotWindowScreenshotCapturer { appMainWindow }
     ).install()
 
+    // Travamento da interface não lança exceção: só um observador de fora o vê.
+    EdtWatchdog(appLog).start()
+
     runUsageMonitor(args, breadcrumbs)
 }
 

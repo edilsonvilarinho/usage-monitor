@@ -265,11 +265,12 @@ internal fun uncaughtOriginOf(thread: Thread, error: Throwable): UncaughtOrigin 
     if (error.suppressed.any { suppressed -> suppressed.javaClass.simpleName == COROUTINE_CONTEXT_MARKER }) {
         return UncaughtOrigin.COROUTINE
     }
-    if (thread.name.startsWith(EDT_THREAD_PREFIX)) {
+    if (thread.name.startsWith(EDT_THREAD_NAME_PREFIX)) {
         return UncaughtOrigin.EDT
     }
     return UncaughtOrigin.THREAD
 }
 
 private const val COROUTINE_CONTEXT_MARKER = "DiagnosticCoroutineContextException"
-private const val EDT_THREAD_PREFIX = "AWT-EventQueue"
+/** Nome que a AWT dá à thread do EDT (`AWT-EventQueue-N`). */
+internal const val EDT_THREAD_NAME_PREFIX = "AWT-EventQueue"
