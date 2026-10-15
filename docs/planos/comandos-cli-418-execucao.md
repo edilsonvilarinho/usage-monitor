@@ -1,0 +1,71 @@
+# Opções de linha de comando — issue #418
+
+## Objetivo
+
+A #418 traz só uma captura de `code --help` (VS Code 1.142.0, recortada em `--user-data-dir`) e o texto
+"Implementar esses comandos". O VS Code é um editor, então a lista não se transpõe inteira: este plano
+separa as opções que têm análogo no Usage Monitor das que não têm e implementa o escopo aprovado:
+parser, `--help`/`--version`, saída visível no console do Windows e `--locale`. `--user-data-dir` vai
+para uma issue própria.
+
+## Fatos confirmados (antes de qualquer código)
+
+- Argumentos existentes: `--autostart` (`StartupOrigin.AUTO_START_ARGUMENT`, gravado pelo instalador na
+  chave `Run`) e `--diagnostics` (`DiagnosticsExport.ARGUMENT`, #416). Argumento desconhecido é
+  ignorado sem aviso.
+- `Usage Monitor.exe` instalado é do **subsistema GUI** do Windows (campo `Subsystem` do cabeçalho PE = 2).
+- `jvmToolchain(17)`; o runtime empacotado é o 17.0.20.1; JNA não está no classpath do app.
+- O plugin Compose 1.12.1 expõe só `windows { console }`, que vale para o launcher **principal**. Ligado,
+  o atalho e o autostart abririam uma janela de console. Não há `--add-launcher` na DSL.
+- O JDK 17 traz os dois modelos de launcher do jpackage em `jdk.jpackage`:
+  `jpackageapplauncher.exe` (console, subsistema 3) e `jpackageapplauncherw.exe` (GUI).
+- `AutoStartManager` e `WindowsInstallOriginResolver` leem `jpackage.app-path`. Um app inteiro rodando
+  pelo launcher de console gravaria esse executável na chave `Run`, e o login abriria um console.
+- O NSIS empacota `build/installer/files` inteiro (`File /r`), e a desinstalação faz `RMDir /r "$INSTDIR"`.
+- O instalador **não** mexe no `PATH`.
+- No Linux, `--diagnostics` já funcionou no `.deb` do relator da #416 (L11 de
+  `log-passivo-416-execucao.md`). Uma opção `--x` simples atravessa o launcher nativo.
+  `--update-ack=X` (com `=`) foi recusado ali como opção da JVM (#118).
+
+## Mapeamento da captura
+
+| Opção do VS Code | Análogo no Usage Monitor | Decisão |
+|---|---|---|
+| `-d --diff`, `-m --merge`, `-g --goto`, `-a --add`, `--remove`, `-w --wait`, `--agents` | nenhum: são operações de editor sobre arquivos e pastas | fora |
+| `-n --new-window` | contraria a instância única e a HUD como janela única | fora |
+| `-r --reuse-window` | já é o comportamento padrão (pedido de foco à instância viva) | fora: seria um apelido sem efeito |
+| `--locale <locale>` | idioma da interface (`AppLanguage` PT/EN) | **S4** |
+| `--user-data-dir <dir>` | raiz `~/.usage-monitor` | issue separada: 40 arquivos citam `.usage-monitor`, há 70 leituras de `user.home` (várias de **outras** ferramentas, como `~/.claude`, que não podem mudar de lugar), e as preferências vivem no registro (`Preferences.userRoot().node("com.usagemonitor")`) |
+| `-h --help`, `-v --version` (fora do recorte, mas presentes em todo CLI) | — | **S2** |
+
+## Atividades
+
+| Item | O que faz |
+|---|---|
+| S0 | Medir a saída do exe GUI no console e a alternativa de launcher de console (sem código) |
+| S1 | `CommandLine.kt`: parser puro (`Help`/`Version`/`Diagnostics`/`Launch`/`Invalid`), testado; `main()` passa a decidir por ele; opção desconhecida vira aviso no `stderr` e no `app.log`, sem impedir a abertura |
+| S2 | `--help`/`-h` e `--version`/`-v`: saída em inglês/ASCII (precedente da #416), antes do log, da instância única e do Compose |
+| S3 | Windows: `usage-monitor.exe` (launcher de console do jpackage do **mesmo** JDK do `createDistributable`) + `app/usage-monitor.cfg`, adicionados em `prepareInstallerFiles`. Sem opção de ação, o processo de console relança `Usage Monitor.exe` destacado e sai: a chave `Run` e a origem da instalação continuam vendo o exe GUI |
+| S4 | `--locale <pt\|en>`: idioma só desta execução, sem gravar a preferência. Um dono só para o idioma efetivo (`LanguageSelection`); escolher outro idioma nas Configurações encerra o override. Ignorado quando o app já está aberto (a instância nova sai pelo pedido de foco) |
+| S7 | Documentação (`docs/build-and-release.md`, `README`, `CLAUDE.md`) e issue nova para `--user-data-dir` |
+
+S5 e S6 do levantamento (`-n`/`-r` e `--user-data-dir`) ficaram fora do escopo aprovado.
+
+## Riscos
+
+- **R1 — sem `PATH`.** O instalador não põe a pasta no `PATH`; o comando funciona pelo caminho completo
+  (`%LOCALAPPDATA%\Usage Monitor\usage-monitor.exe`). Escrever o `PATH` do usuário pelo NSIS tem risco
+  conhecido de truncar a variável no limite de string do NSIS; fica como decisão separada.
+- **R2 — Linux e macOS não medidos nesta máquina** (#342). O parser e a saída são JVM pura; o launcher de
+  console é só Windows. `--locale pt` (com espaço) é a forma documentada; `--locale=pt` também é aceita,
+  mas a forma com `=` foi a que o launcher do Linux recusou na #118.
+- **R3 — launcher de console sem ícone e sem recurso de versão.** O modelo do JDK não passa pelo passo
+  que o jpackage usa para gravar ícone e versão no exe principal. O exe só aparece no terminal.
+- **R4 — relançamento destacado.** O exe GUI filho não fica preso ao console, mas o fechamento do
+  terminal com o app aberto só foi verificado com o app já em execução (caminho do pedido de foco).
+
+## Pontos de situação
+
+| Item | Data | Commit | Resultado | Comando e evidência |
+|---|---|---|---|---|
+| S0 | 2026-10-15 | este commit | concluída | Script PowerShell num terminal real (ConPTY), contra a instalação 41.11.0-beta.5. **A** — `& 'Usage Monitor.exe' --diagnostics`: voltou em 10 ms, sem texto e com `$LASTEXITCODE` vazio; o zip foi gerado (o processo rodou destacado). **B** — `cmd /c` sobre um `.cmd` que chama o exe: esperou (797 ms), `ERRORLEVEL=0`, **sem texto**. **C** — cópia da instalação com `jpackageapplauncher.exe` (extraído do `ms-17.0.15` por `jimage extract`) renomeado para `usage-monitor.exe` e `app/usage-monitor.cfg` copiado do `.cfg` principal: texto completo no terminal, esperou (914 ms), `exit=0`. O launcher renomeado acha o `.cfg` pelo próprio nome. No Git Bash a saída aparece nos três casos, porque o `stdout` é um pipe; a medição que vale é a do console. Zips de teste apagados |
