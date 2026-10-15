@@ -43,8 +43,6 @@ internal object DiagnosticsExport {
         "pending-crash.json"
     )
 
-    fun isRequested(arguments: Array<String>): Boolean = arguments.any { it.trim() == ARGUMENT }
-
     /**
      * Grava o zip em [outputDir] e devolve o arquivo. Lança se nem o zip puder ser
      * escrito — quem chama decide o código de saída.

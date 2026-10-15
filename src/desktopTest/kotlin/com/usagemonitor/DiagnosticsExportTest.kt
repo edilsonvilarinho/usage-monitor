@@ -76,13 +76,6 @@ class DiagnosticsExportTest {
         }
     }
 
-    @Test
-    fun `the argument is recognized only as a whole word`() {
-        assertTrue(DiagnosticsExport.isRequested(arrayOf("--diagnostics")))
-        assertFalse(DiagnosticsExport.isRequested(arrayOf("--autostart")))
-        assertFalse(DiagnosticsExport.isRequested(arrayOf("--diagnostics-x")))
-    }
-
     private fun withDirs(block: (File, File) -> Unit) {
         val tempDir = kotlin.io.path.createTempDirectory("diagnostics-export-test").toFile()
         try {

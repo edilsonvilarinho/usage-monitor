@@ -81,13 +81,21 @@ private fun loadIconResource(path: String) = runCatching {
 fun main(args: Array<String>) {
     // Antes de tudo, inclusive da instância única: precisa funcionar com o app
     // aberto e travado, ou que nem sobe (#416).
-    if (DiagnosticsExport.isRequested(args)) {
-        exitProcess(DiagnosticsExport.run())
+    val launch = when (val request = parseCommandLine(args)) {
+        CommandLineRequest.Diagnostics -> exitProcess(DiagnosticsExport.run())
+        is CommandLineRequest.Launch -> request
+    }
+    for (option in launch.unknownOptions) {
+        System.err.println(unknownOptionWarning(option))
     }
 
     // O log que não depende da interface (#416) nasce primeiro: todo o resto pode
     // escrever nele, inclusive quem está caindo.
     val appLog = AppLogFile()
+    // O exe GUI do Windows não tem console: o aviso acima só chega ao usuário por aqui.
+    for (option in launch.unknownOptions) {
+        appLog.warn("command-line", unknownOptionWarning(option))
+    }
     // Sem terminal, o que a JVM, a AWT e o Skiko escrevem aqui iria para lugar nenhum.
     StderrCapture(appLog).install()
     // Cada arrasto de janela: pedido × obtido, para ver se o sistema recusa a posição.
