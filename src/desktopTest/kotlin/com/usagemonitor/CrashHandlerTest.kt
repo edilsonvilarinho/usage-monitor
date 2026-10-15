@@ -279,6 +279,48 @@ class CrashHandlerTest {
         )
     }
 
+    /** Toda falha que chega ao handler fica no `app.log`, com pilha e origem (#416). */
+    @Test
+    fun `every uncaught failure lands in the app log with its origin and stack`() {
+        withTempFile { marker ->
+            val logFile = File(marker.parentFile, "app.log")
+            val handler = CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                appLog = com.usagemonitor.data.diagnostics.AppLogFile(logFile = logFile),
+                markerFile = marker
+            )
+
+            handler.uncaughtException(Thread("trabalhador"), thrown())
+
+            val line = logFile.readLines().single()
+            assertTrue(line.contains("\"level\":\"fatal\""), line)
+            assertTrue(line.contains("\"source\":\"uncaught-thread\""), line)
+            assertTrue(line.contains("\"thread\":\"trabalhador\""), line)
+            assertTrue(line.contains("\"error\":\"IllegalStateException: índice indisponível\""), line)
+            assertTrue(line.contains("\"stack\":["), line)
+            // O marcador continua sendo gravado: o log soma, não substitui.
+            assertTrue(marker.exists())
+        }
+    }
+
+    @Test
+    fun `a failure on the event thread is logged as an error, not fatal`() {
+        withTempFile { marker ->
+            val logFile = File(marker.parentFile, "app.log")
+            val handler = CrashHandler(
+                breadcrumbs = CapturingRecorder(),
+                appLog = com.usagemonitor.data.diagnostics.AppLogFile(logFile = logFile),
+                markerFile = marker
+            )
+
+            handler.uncaughtException(Thread("AWT-EventQueue-0"), thrown())
+
+            val line = logFile.readLines().single()
+            assertTrue(line.contains("\"level\":\"error\""), line)
+            assertTrue(line.contains("\"source\":\"uncaught-edt\""), line)
+        }
+    }
+
     private fun thrown(): Throwable {
         return runCatching { throw IllegalStateException("índice indisponível") }
             .exceptionOrNull()!!

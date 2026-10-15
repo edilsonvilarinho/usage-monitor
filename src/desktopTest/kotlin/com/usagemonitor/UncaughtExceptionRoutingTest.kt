@@ -9,6 +9,7 @@ import java.awt.EventQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,13 +20,15 @@ import kotlin.test.assertTrue
  * O KDoc do [CrashHandler] afirmava que exceção do laço da AWT e de coroutine
  * com `SupervisorJob` **não** chegava a ele. Nenhum escopo do app instala
  * `CoroutineExceptionHandler`, então o caminho real decide se uma falha
- * não-fatal vira marcador de queda. Esta sonda mede em vez de deduzir.
+ * não-fatal vira marcador de queda. Esta sonda mede em vez de deduzir, e prende
+ * a classificação de origem ([uncaughtOriginOf]) ao que a JVM e o kotlinx de
+ * fato entregam.
  */
 class UncaughtExceptionRoutingTest {
 
     @Test
     fun `a failing launch in a supervisor scope reaches the default handler`() {
-        val received = captureDefaultHandler { onFailure ->
+        val (failedThread, received) = captureDefaultHandler { onFailure ->
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             scope.launch { throw IllegalStateException("sonda-coroutine") }
             onFailure.await(5, TimeUnit.SECONDS)
@@ -33,16 +36,30 @@ class UncaughtExceptionRoutingTest {
         }
 
         assertEquals("sonda-coroutine", received?.message)
+        // O último recurso do kotlinx.coroutines anexa o contexto como suprimida;
+        // é por ela que o `CrashHandler` sabe que a falha veio de uma coroutine.
+        assertEquals(UncaughtOrigin.COROUTINE, uncaughtOriginOf(failedThread!!, received!!))
     }
 
     @Test
     fun `an exception thrown on the AWT event thread reaches the default handler`() {
-        val received = captureDefaultHandler { onFailure ->
+        val (failedThread, received) = captureDefaultHandler { onFailure ->
             EventQueue.invokeLater { throw IllegalStateException("sonda-edt") }
             onFailure.await(5, TimeUnit.SECONDS)
         }
 
         assertEquals("sonda-edt", received?.message)
+        assertEquals(UncaughtOrigin.EDT, uncaughtOriginOf(failedThread!!, received!!))
+    }
+
+    @Test
+    fun `an exception that kills a plain thread is classified as a thread failure`() {
+        val (failedThread, received) = captureDefaultHandler { onFailure ->
+            thread(name = "sonda-thread") { throw IllegalStateException("sonda-thread") }
+            onFailure.await(5, TimeUnit.SECONDS)
+        }
+
+        assertEquals(UncaughtOrigin.THREAD, uncaughtOriginOf(failedThread!!, received!!))
     }
 
     @Test
@@ -57,12 +74,12 @@ class UncaughtExceptionRoutingTest {
         assertTrue(served.await(5, TimeUnit.SECONDS))
     }
 
-    private fun captureDefaultHandler(block: (CountDownLatch) -> Unit): Throwable? {
+    private fun captureDefaultHandler(block: (CountDownLatch) -> Unit): Pair<Thread?, Throwable?> {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
-        val received = AtomicReference<Throwable?>(null)
+        val received = AtomicReference<Pair<Thread, Throwable>?>(null)
         val latch = CountDownLatch(1)
-        Thread.setDefaultUncaughtExceptionHandler { _, error ->
-            received.compareAndSet(null, error)
+        Thread.setDefaultUncaughtExceptionHandler { failedThread, error ->
+            received.compareAndSet(null, failedThread to error)
             latch.countDown()
         }
         try {
@@ -70,6 +87,7 @@ class UncaughtExceptionRoutingTest {
         } finally {
             Thread.setDefaultUncaughtExceptionHandler(previous)
         }
-        return received.get()
+        val captured = received.get()
+        return captured?.first to captured?.second
     }
 }

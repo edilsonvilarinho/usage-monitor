@@ -88,6 +88,7 @@ fun main(args: Array<String>) {
     // handler se ele já estiver de pé aqui.
     CrashHandler(
         breadcrumbs = breadcrumbs,
+        appLog = appLog,
         screenshots = RobotWindowScreenshotCapturer { appMainWindow }
     ).install()
 

@@ -1,6 +1,8 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
+import com.usagemonitor.data.diagnostics.AppLogFile
+import com.usagemonitor.data.diagnostics.AppLogLevel
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -103,13 +105,21 @@ internal fun consumePendingCrash(
  * dentro de uma coroutine num escopo `SupervisorJob` sem `CoroutineExceptionHandler`
  * também chega, pelo último recurso do kotlinx.coroutines. Nos dois casos o app
  * continua de pé, e o marcador gravado aqui descreve uma falha que não derrubou
- * nada.
+ * nada. O marcador continua sendo gravado nesses casos de propósito: falha de
+ * EDT pode deixar uma janela morta, e coroutine que cai leva junto o laço que a
+ * rodava — defeitos que o usuário não consegue relatar pela tela.
+ *
+ * Toda falha que chega aqui também vai para o `app.log` ([appLog], issue #416),
+ * com a pilha e a origem ([UncaughtOrigin]): o marcador guarda só a última, e o
+ * relatório só sai se alguém abrir a tela no arranque seguinte.
  *
  * A escrita é síncrona pelo motivo de sempre: a JVM está de saída, e trabalho
  * enfileirado para outra thread não chega ao disco.
  */
-class CrashHandler(
+internal class CrashHandler(
     private val breadcrumbs: BreadcrumbRecorder,
+    /** Nulo nos testes que exercitam só o marcador. */
+    private val appLog: AppLogFile? = null,
     private val markerFile: File = defaultMarkerFile(),
     /**
      * Captura da janela, *best-effort*. Default que não captura: quem não passa
@@ -138,6 +148,19 @@ class CrashHandler(
     override fun uncaughtException(thread: Thread, error: Throwable) {
         val exceptionName = error::class.simpleName ?: error::class.qualifiedName ?: "Throwable"
         val stackTop = error.stackTrace.take(STACK_TOP_FRAMES).map { frame -> frame.toString() }
+
+        // Primeiro o `app.log`: é a linha mais completa (pilha e causas) e a única
+        // que guarda todas as falhas, não só a última.
+        runCatching {
+            val origin = uncaughtOriginOf(thread, error)
+            appLog?.log(
+                level = if (origin == UncaughtOrigin.THREAD) AppLogLevel.FATAL else AppLogLevel.ERROR,
+                source = "uncaught-${origin.wireValue}",
+                message = "exceção não tratada",
+                error = error,
+                threadName = thread.name
+            )
+        }
 
         // A mensagem da exceção entra aqui, ao contrário do que `breadcrumbReasonOf`
         // faz com as falhas engolidas. São dois casos diferentes: aquelas são
@@ -212,3 +235,41 @@ class CrashHandler(
         }
     }
 }
+
+/**
+ * De onde veio uma falha que chegou ao handler default (medido em
+ * `UncaughtExceptionRoutingTest`). A origem muda a leitura: só [THREAD] derrubou
+ * a thread; o EDT segue despachando e o worker da coroutine segue no pool.
+ */
+internal enum class UncaughtOrigin {
+    EDT,
+    COROUTINE,
+    THREAD;
+
+    val wireValue: String
+        get() = when (this) {
+            EDT -> "edt"
+            COROUTINE -> "coroutine"
+            THREAD -> "thread"
+        }
+}
+
+/**
+ * Classifica pela evidência que a JVM e o kotlinx entregam: o EDT pelo nome da
+ * thread (`AWT-EventQueue-N`), a coroutine pela suprimida que o último recurso do
+ * kotlinx.coroutines anexa (`DiagnosticCoroutineContextException`). A classe é
+ * interna do kotlinx, por isso comparada pelo nome simples e presa por teste: se
+ * uma versão nova a renomear, a sonda falha antes de a classificação mentir.
+ */
+internal fun uncaughtOriginOf(thread: Thread, error: Throwable): UncaughtOrigin {
+    if (error.suppressed.any { suppressed -> suppressed.javaClass.simpleName == COROUTINE_CONTEXT_MARKER }) {
+        return UncaughtOrigin.COROUTINE
+    }
+    if (thread.name.startsWith(EDT_THREAD_PREFIX)) {
+        return UncaughtOrigin.EDT
+    }
+    return UncaughtOrigin.THREAD
+}
+
+private const val COROUTINE_CONTEXT_MARKER = "DiagnosticCoroutineContextException"
+private const val EDT_THREAD_PREFIX = "AWT-EventQueue"
