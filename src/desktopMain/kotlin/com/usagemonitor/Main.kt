@@ -82,6 +82,8 @@ fun main(args: Array<String>) {
     // Antes de tudo, inclusive da instância única: precisa funcionar com o app
     // aberto e travado, ou que nem sobe (#416).
     val launch = when (val request = parseCommandLine(args)) {
+        CommandLineRequest.Help -> exitProcess(printAndSucceed(commandLineHelp()))
+        CommandLineRequest.Version -> exitProcess(printAndSucceed(commandLineVersion()))
         CommandLineRequest.Diagnostics -> exitProcess(DiagnosticsExport.run())
         is CommandLineRequest.Launch -> request
     }
@@ -115,6 +117,11 @@ fun main(args: Array<String>) {
     EdtWatchdog(appLog).start()
 
     runUsageMonitor(args, breadcrumbs)
+}
+
+private fun printAndSucceed(text: String): Int {
+    println(text)
+    return 0
 }
 
 /**
