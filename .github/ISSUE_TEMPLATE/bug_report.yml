@@ -86,10 +86,16 @@ body:
     attributes:
       label: Diagnostics
       description: |
-        If the problem is with startup or with an update, attach the relevant file from
-        `~/.usage-monitor/diagnostics/` — `startup.jsonl`, or `linux-update.log` on Linux. For the
-        HUD notch, attach `hud-window.jsonl` and `startup.jsonl`.
-        Screenshots help for anything visual.
+        Run the app with `--diagnostics` and attach the zip it creates in your home folder
+        (`usage-monitor-diagnostics-<date>.zip`). It opens no window, so it works even when the app
+        is stuck or does not start, and it holds metadata only — no prompt, response or credential.
+        - Linux (.deb): `"$(dpkg -L usage-monitor | grep '/bin/' | head -n 1)" --diagnostics`
+          (.rpm: replace `dpkg -L` with `rpm -ql`)
+        - Windows: run the app's `.exe` from its install folder (`%LOCALAPPDATA%\Usage Monitor` by
+          default) with `--diagnostics`
+        On versions older than the `--diagnostics` option, attach the files from
+        `~/.usage-monitor/diagnostics/` instead — `startup.jsonl`, `hud-window.jsonl` and, on Linux,
+        `linux-update.log`. Screenshots help for anything visual.
       render: text
 
   - type: checkboxes

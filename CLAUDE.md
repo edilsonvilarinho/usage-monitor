@@ -150,6 +150,8 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
   protege quem não optou. Opt-in `receiveBetaUpdates`; desligar não faz downgrade; só o sufixo
   `-beta.N` é aceito (workflow e updater do Linux). Exe/Dmg levam só o número; Deb/Rpm `~beta.N`.
   Publicação pela skill `usage-monitor-release-beta`.
+- Diagnóstico (#416): `app.log` recebe falha não tratada (registro no `CrashHandler`, nunca handler por escopo),
+  `recordFailure`, `stderr` e EDT parado; `--diagnostics` empacota por **lista fechada**, sem janela.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia
   imutável dos bytes; laço de quadros em `desktopMain`; `gradlew.bat generateHelpMedia` regenera.
 
