@@ -80,6 +80,7 @@ API key, entered in **Settings > APIs**; environment variables are never read.
 | `-v`, `--version` | Prints the version and exits |
 | `--diagnostics` | Saves a diagnostics zip (metadata only) to your home folder and exits — no window |
 | `--locale <pt\|en>` | Opens the interface in that language for this run only; the saved choice does not change |
+| `--user-data-dir <dir>` | Keeps this run's settings, history, keys and logs in `<dir>` instead of `~/.usage-monitor`; another folder runs side by side with the default one, with automatic updates and start with the system off |
 
 Without options it opens the app, or brings the running one to the front. On Windows, use
 `usage-monitor.exe` from the install folder: `Usage Monitor.exe` is a windowed program, so its output

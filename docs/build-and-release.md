@@ -183,6 +183,14 @@ Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `St
 - **`--locale` nunca é gravado.** `LanguageSelection` é o dono único do idioma efetivo, porque exportação, bot do Telegram e mensagens das Configurações leem o idioma fora da composição. Escolher um idioma nas Configurações grava e encerra o override. Com o app já aberto, o processo novo sai pelo pedido de foco e o `--locale` não tem efeito (a ajuda diz isso).
 - **Sem `PATH`.** O instalador não escreve o `PATH` do usuário; o comando documentado usa o caminho completo.
 
+**Raiz de dados por execução — `--user-data-dir`** (issue #419; plano [`user-data-dir-419-execucao.md`](planos/user-data-dir-419-execucao.md)): isola dados para teste e segundo perfil, em paralelo com a instância padrão. Não é instalação portátil: as preferências continuam no registro, num nó próprio.
+- **`AppDataDirectory` é o dono de `~/.usage-monitor`.** As 22 montagens de caminho derivam dele, e o `ArchitectureRulesTest` proíbe o literal fora do dono. A raiz é configurada uma vez no `main()`; configurar depois da primeira leitura lança, para uma execução nunca ficar dividida entre duas pastas.
+- **Três escopos.** Dados (credenciais do app, bancos, diagnóstico) e instância (`app.lock`, `focus.request`) seguem a raiz, e por isso duas raízes rodam em paralelo, cada uma com o próprio foco. Instalação (`update-receipt.properties`, `update-ack`, `updates/`, `linux-update.log`) fica sempre na raiz padrão, porque o NSIS e o updater do Linux usam caminho fixo.
+- **Preferências:** a raiz padrão continua em `com.usagemonitor`; outra raiz usa o nó **irmão** `com.usagemonitor.data.<16 hex do SHA-256 do caminho canônico>`, porque `removeNode` apaga a subárvore. Pedir a própria pasta padrão não cria nó novo.
+- **Atualização e autostart desligados fora da raiz padrão.** O instalador, o updater e a chave `Run` relançam sem argumentos, e a instância voltaria na pasta padrão. O controlador nasce sem instalador e responde `ISOLATED_DATA_ROOT` (exceção declarada ao enum, como `UNSUPPORTED_ARCHITECTURE`). O efeito de arranque não lê nem reescreve a entrada de inicialização, que antes era **reescrita no arranque sem clique** (`ensureAutoStartCommandCurrent`). O tooltip da bandeja começa por `Usage Monitor (<pasta>)`.
+- **O `usage-monitor.exe` relança com o caminho absoluto**: o exe GUI sobe com outro diretório de trabalho.
+- **Riscos não medidos:** duas instâncias renovando ao mesmo tempo o OAuth do Claude Code (credencial compartilhada); `web-access.json` copiado com a mesma porta; `team.json` copiado com o mesmo `device_id`; nós de raízes apagadas ficam no registro.
+
 **Atualização automática** (`desktopMain/update/`; planos
 [`atualizacao-automatica-windows-execucao.md`](planos/atualizacao-automatica-windows-execucao.md)
 e [`atualizacao-automatica-linux-execucao.md`](planos/atualizacao-automatica-linux-execucao.md)):

@@ -87,6 +87,7 @@ de uma chave de API, informada em **Configurações > APIs**; variáveis de ambi
 | `-v`, `--version` | Mostra a versão e sai |
 | `--diagnostics` | Grava um zip de diagnóstico (só metadados) na pasta do usuário e sai, sem abrir janela |
 | `--locale <pt\|en>` | Abre a interface nesse idioma só nesta execução; a escolha gravada não muda |
+| `--user-data-dir <dir>` | Guarda configurações, histórico, chaves e logs desta execução em `<dir>`, no lugar de `~/.usage-monitor`; outra pasta roda em paralelo com a padrão, com atualização automática e início com o sistema desligados |
 
 Sem opção, abre o app ou traz para a frente o que já está aberto. No Windows, use o
 `usage-monitor.exe` da pasta de instalação: o `Usage Monitor.exe` é um programa de janela, e a saída
