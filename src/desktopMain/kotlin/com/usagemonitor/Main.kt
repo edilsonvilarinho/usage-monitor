@@ -90,6 +90,15 @@ fun main(args: Array<String>) {
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
     }
+    // Pelo `usage-monitor.exe` (console), abrir o app é tarefa do exe GUI.
+    val guiRelaunch = ConsoleLauncher.guiRelaunchCommand(
+        isWindows = System.getProperty("os.name").orEmpty().lowercase().contains("win"),
+        appPath = System.getProperty("jpackage.app-path"),
+        arguments = args
+    )
+    if (guiRelaunch != null) {
+        exitProcess(ConsoleLauncher.relaunch(guiRelaunch))
+    }
 
     // O log que não depende da interface (#416) nasce primeiro: todo o resto pode
     // escrever nele, inclusive quem está caindo.

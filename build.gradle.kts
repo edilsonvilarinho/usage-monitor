@@ -1,4 +1,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.net.URI
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -372,6 +376,30 @@ tasks.register<Copy>("prepareInstallerFiles") {
 
     from(file("build/compose/binaries/main/app/Usage Monitor"))
     into(installerFilesDir)
+
+    // `usage-monitor.exe` (issue #418): o exe do jpackage e do subsistema GUI, e a
+    // saida dele nunca chega a um console -- medido na S0 de
+    // `docs/planos/comandos-cli-418-execucao.md`. O plugin Compose so liga console
+    // no launcher principal, o que abriria uma janela de console no atalho e no
+    // autostart. Entao entra um segundo launcher: o modelo de console do MESMO JDK
+    // que gerou a imagem (o `.cfg` e o formato dele), achando o `.cfg` pelo proprio
+    // nome. Sem icone nem recurso de versao: ele so aparece no terminal.
+    val jpackageJavaHome = compose.desktop.application.javaHome
+    doLast {
+        val consoleLauncherResource = "modules/jdk.jpackage/jdk/jpackage/internal/resources/jpackageapplauncher.exe"
+        FileSystems.newFileSystem(
+            URI.create("jrt:/"),
+            mapOf("java.home" to jpackageJavaHome)
+        ).use { jrt ->
+            Files.copy(
+                jrt.getPath(consoleLauncherResource),
+                installerFilesDir.resolve("usage-monitor.exe").toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+            )
+        }
+        installerFilesDir.resolve("app/Usage Monitor.cfg")
+            .copyTo(installerFilesDir.resolve("app/usage-monitor.cfg"), overwrite = true)
+    }
 }
 
 tasks.register<Exec>("buildNsisInstaller") {
