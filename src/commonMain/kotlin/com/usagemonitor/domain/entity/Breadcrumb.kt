@@ -247,9 +247,13 @@ private val WHITESPACE_RUN = Regex("\\s+")
  * caminho de verdade tem espaço, acento, ponto e til. O que ela **não** aceita é
  * aspas e `<`/`>`, senão o casamento atravessaria a mensagem inteira quando o
  * caminho vier entre aspas.
+ *
+ * A letra de unidade não pode vir colada em caractere de esquema de URL: sem o
+ * lookbehind, o `s:/` de `https://` casava e a URL virava `http<caminho>/…`
+ * (#416). `file:///C:/…` continua redigido — ali a letra vem depois de `/`.
  */
 private val ABSOLUTE_PATH = Regex(
-    """(?:[A-Za-z]:[\\/]|\\\\|/(?:home|Users|users|root)/)[^\s"'<>|]*"""
+    """(?:(?<![A-Za-z0-9+.\-])[A-Za-z]:[\\/]|\\\\|/(?:home|Users|users|root)/)[^\s"'<>|]*"""
 )
 
 /** Pontuação que termina a frase e não pertence ao caminho. */

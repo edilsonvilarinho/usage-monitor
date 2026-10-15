@@ -121,6 +121,26 @@ class BreadcrumbTest {
     }
 
     /**
+     * O `s:/` de `https://` casava como letra de unidade e a URL inteira virava
+     * `http<caminho>/…` — medido no `app.log` da #416 com o aviso do SLF4J. URL
+     * não identifica quem rodou o app; o caminho de verdade continua redigido,
+     * inclusive dentro de `file:///`.
+     */
+    @Test
+    fun `a url scheme is not mistaken for a drive letter`() {
+        val message = Breadcrumb.of(AT, BreadcrumbCategory.ERROR, "See https://www.slf4j.org/codes.html#noProviders for details").message
+
+        assertEquals("See https://www.slf4j.org/codes.html#noProviders for details", message)
+    }
+
+    @Test
+    fun `a windows path inside a file url is still redacted`() {
+        val message = Breadcrumb.of(AT, BreadcrumbCategory.ERROR, "abrir file:///C:/Users/fulano/x.json falhou").message
+
+        assertEquals("abrir file:///<caminho>/x.json falhou", message)
+    }
+
+    /**
      * Cortar antes de redigir não protegeria nada: `C:\Users\<nome>` são os
      * primeiros caracteres do caminho, e o teto de 200 nunca chegaria perto dele.
      */
