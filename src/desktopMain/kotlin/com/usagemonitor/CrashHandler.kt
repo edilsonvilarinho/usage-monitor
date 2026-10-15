@@ -97,12 +97,13 @@ internal fun consumePendingCrash(
  * vai mostrar, e o repasse vem por último porque o handler anterior é quem pode
  * derrubar o processo.
  *
- * **O que ele NÃO cobre**, e é melhor estar escrito do que descoberto depois:
- * exceção lançada dentro do laço de eventos da AWT não chega aqui — o
- * `EventDispatchThread` a captura e a imprime por conta própria —, e falha dentro
- * de uma coroutine com `SupervisorJob` é entregue ao `CoroutineExceptionHandler`
- * do escopo, não ao handler default da thread. Este handler pega o que derruba
- * uma thread comum, que é o caso em que o app some sem deixar nada.
+ * **O que chega aqui é mais do que queda fatal** (medido em
+ * `UncaughtExceptionRoutingTest`, issue #416): exceção lançada no laço de eventos
+ * da AWT chega, e o `EventDispatchThread` segue despachando depois dela; falha
+ * dentro de uma coroutine num escopo `SupervisorJob` sem `CoroutineExceptionHandler`
+ * também chega, pelo último recurso do kotlinx.coroutines. Nos dois casos o app
+ * continua de pé, e o marcador gravado aqui descreve uma falha que não derrubou
+ * nada.
  *
  * A escrita é síncrona pelo motivo de sempre: a JVM está de saída, e trabalho
  * enfileirado para outra thread não chega ao disco.
