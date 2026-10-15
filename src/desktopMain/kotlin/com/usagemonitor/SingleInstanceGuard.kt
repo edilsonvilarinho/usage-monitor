@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import java.io.File
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
@@ -42,9 +43,7 @@ internal class SingleInstanceGuard private constructor(
         }
 
         private fun defaultLockFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/app.lock")
+            return AppDataDirectory.file("app.lock")
         }
     }
 }

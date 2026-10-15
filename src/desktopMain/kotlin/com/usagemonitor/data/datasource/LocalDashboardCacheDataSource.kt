@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.dto.DashboardCacheDto
 import com.usagemonitor.data.mapper.toCacheDto
 import com.usagemonitor.data.mapper.toDomain
@@ -93,9 +94,7 @@ internal class LocalDashboardCacheDataSource(
 
     private companion object {
         fun defaultCacheFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/dashboard-cache.json")
+            return AppDataDirectory.file("dashboard-cache.json")
         }
     }
 }

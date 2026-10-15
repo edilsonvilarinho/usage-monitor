@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.DEFAULT_WEB_ACCESS_PORT
 import com.usagemonitor.domain.entity.WebAccessSettings
@@ -42,8 +43,7 @@ internal class LocalWebAccessSettingsDataSource(
 
     companion object {
         fun defaultSettingsFile(): File {
-            val home = System.getProperty("user.home") ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(home, ".usage-monitor/web-access.json")
+            return AppDataDirectory.file("web-access.json")
         }
 
         /** 32 bytes aleatórios em hex: 256 bits, o mesmo tamanho das chaves de time. */

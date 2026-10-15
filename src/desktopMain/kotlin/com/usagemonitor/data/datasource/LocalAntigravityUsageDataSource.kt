@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.repository.AntigravityUsageFailureKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
@@ -259,7 +260,9 @@ internal fun findAgyExecutable(
  * pessoal como projeto, com o que isso tiver de detecção ou pergunta de confiança.
  */
 private fun antigravityWorkingDirectory(): File =
-    File(System.getProperty("user.home") ?: ".", ".usage-monitor/antigravity-work").absoluteFile
+    runCatching { AppDataDirectory.file("antigravity-work") }
+        .getOrElse { File(".", "${AppDataDirectory.DEFAULT_DIRECTORY_NAME}/antigravity-work") }
+        .absoluteFile
 
 private fun isWindows(): Boolean =
     System.getProperty("os.name").orEmpty().contains("win", ignoreCase = true)

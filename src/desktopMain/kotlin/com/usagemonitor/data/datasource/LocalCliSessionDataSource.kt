@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.CliSessionActiveTime
 import com.usagemonitor.domain.entity.CliSessionDetail
@@ -715,9 +716,7 @@ class LocalCliSessionDataSource(
 
 
         fun defaultDatabaseFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/usage-history.db")
+            return AppDataDirectory.file("usage-history.db")
         }
     }
 }

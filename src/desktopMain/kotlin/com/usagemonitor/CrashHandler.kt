@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
 import com.usagemonitor.data.diagnostics.AppLogFile
 import com.usagemonitor.data.diagnostics.AppLogLevel
@@ -228,10 +229,8 @@ internal class CrashHandler(
         }
 
         private fun diagnosticsFile(name: String): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
 
-            return File(homeDir, ".usage-monitor/diagnostics/$name")
+            return AppDataDirectory.file("diagnostics/$name")
         }
     }
 }

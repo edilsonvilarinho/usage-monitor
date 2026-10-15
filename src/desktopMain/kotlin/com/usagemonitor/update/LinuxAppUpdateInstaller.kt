@@ -1,6 +1,7 @@
 package com.usagemonitor.update
 
 import com.usagemonitor.CURRENT_APP_VERSION
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.AppUpdateArchitecture
 import com.usagemonitor.domain.entity.AppUpdateArtifact
 import com.usagemonitor.domain.entity.AppUpdateArtifactKind
@@ -47,8 +48,7 @@ internal const val MIN_LINUX_UPDATABLE_TARGET_VERSION = "38.0.1"
  * alguém procura.
  */
 internal fun defaultLinuxUpdateLogFile(): File {
-    val home = System.getProperty("user.home") ?: error("user.home is unavailable")
-    return File(home, ".usage-monitor/diagnostics/linux-update.log")
+    return AppDataDirectory.installationFile("diagnostics/linux-update.log")
 }
 
 /**

@@ -1,5 +1,6 @@
 package com.usagemonitor.update
 
+import com.usagemonitor.data.AppDataDirectory
 import java.io.File
 
 /**
@@ -76,9 +77,7 @@ internal class UpdateAckChannel(
 
     internal companion object {
         fun defaultUpdateAckFile(): File {
-            val home = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(home, ".usage-monitor/update-ack")
+            return AppDataDirectory.installationFile("update-ack")
         }
     }
 }

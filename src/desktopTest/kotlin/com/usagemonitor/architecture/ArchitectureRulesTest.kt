@@ -98,6 +98,31 @@ class ArchitectureRulesTest {
         }
     }
 
+    /**
+     * A raiz `~/.usage-monitor` tem dono único (`AppDataDirectory`, issue #419).
+     * Caminho montado à mão fora dele ignora o `--user-data-dir` em silêncio: a
+     * execução isolada passaria a gravar na pasta do usuário. Texto de ajuda que
+     * cita `~/.usage-monitor/…` não casa, porque o literal não começa na raiz.
+     */
+    @Test
+    fun `a raiz de dados so e montada pelo dono`() {
+        val violations = sources
+            .filter { source -> source.path != APP_DATA_DIRECTORY_OWNER }
+            .filter { source -> APP_DATA_DIRECTORY_LITERAL.containsMatchIn(source.text) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail("Caminho em `.usage-monitor` montado fora do `AppDataDirectory` (#419):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o padrao da raiz de dados pega o caminho e ignora o texto de ajuda e o marcador`() {
+        assertTrue(APP_DATA_DIRECTORY_LITERAL.containsMatchIn("""File(home, ".usage-monitor/api-keys.json")"""))
+        assertTrue(APP_DATA_DIRECTORY_LITERAL.containsMatchIn("""File(home, ".usage-monitor")"""))
+        assertFalse(APP_DATA_DIRECTORY_LITERAL.containsMatchIn(""""salva em ~/.usage-monitor/api-keys.json""""))
+        assertFalse(APP_DATA_DIRECTORY_LITERAL.containsMatchIn("""const val MARKER = ".usage-monitor-managed""""))
+    }
+
     @Test
     fun `o padrao do recorte pega a chamada nativa e ignora o argumento do Compose`() {
         assertTrue(NATIVE_WINDOW_SHAPE.containsMatchIn("window.shape = null"))
@@ -247,6 +272,11 @@ class ArchitectureRulesTest {
         )
 
         val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
+
+        const val APP_DATA_DIRECTORY_OWNER = "src/desktopMain/kotlin/com/usagemonitor/data/AppDataDirectory.kt"
+
+        /** Literal que **começa** na raiz: `".usage-monitor/…"` ou `".usage-monitor"`. */
+        val APP_DATA_DIRECTORY_LITERAL = Regex(""""\.usage-monitor(/|")""")
 
         /** Nome de campo que carrega segredo: `*Token`, `*_token`, `*ApiKey`, `password`, `*Secret`, `cookie`, `capSid`. */
         val SECRET_PROPERTY = Regex("""(?i)\w*token|\w*apikey|password|\w*secret|cookie|capsid""")

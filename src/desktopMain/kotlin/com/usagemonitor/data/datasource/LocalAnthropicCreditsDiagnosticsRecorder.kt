@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -46,10 +47,7 @@ class LocalAnthropicCreditsDiagnosticsRecorder(
         }
 
         fun defaultDiagnosticsFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-
-            return File(homeDir, ".usage-monitor/diagnostics/anthropic-credits.jsonl")
+            return AppDataDirectory.file("diagnostics/anthropic-credits.jsonl")
         }
     }
 }

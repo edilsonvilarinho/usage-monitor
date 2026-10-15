@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import java.io.File
 
 /**
@@ -61,10 +62,8 @@ internal class FocusRequestChannel(
         const val POLL_INTERVAL_MILLIS = 500L
 
         fun defaultRequestFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
 
-            return File(homeDir, ".usage-monitor/focus.request")
+            return AppDataDirectory.file("focus.request")
         }
     }
 }

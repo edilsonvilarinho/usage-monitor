@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactBreadcrumbIdentity
 import java.awt.GraphicsDevice
 import java.awt.GraphicsEnvironment
@@ -39,16 +40,25 @@ internal object DiagnosticsExport {
         "startup.jsonl",
         "hud-window.jsonl",
         "breadcrumbs.jsonl",
-        "linux-update.log",
+        LINUX_UPDATE_LOG,
         "pending-crash.json"
     )
 
     /**
+     * Não segue `--user-data-dir` (#419): o updater do Linux grava sempre na raiz
+     * padrão, que é a da instalação.
+     */
+    private const val LINUX_UPDATE_LOG = "linux-update.log"
+
+    /**
      * Grava o zip em [outputDir] e devolve o arquivo. Lança se nem o zip puder ser
      * escrito — quem chama decide o código de saída.
+     *
+     * [installationDiagnosticsDir] só difere de [diagnosticsDir] com `--user-data-dir`.
      */
     fun export(
-        diagnosticsDir: File = defaultDiagnosticsDir(),
+        diagnosticsDir: File = AppDataDirectory.file("diagnostics"),
+        installationDiagnosticsDir: File = diagnosticsDir,
         outputDir: File = File(System.getProperty("user.home")),
         environmentReport: () -> String = ::currentEnvironmentReport,
         nowMillis: Long = Clock.System.now().toEpochMilliseconds()
@@ -63,7 +73,8 @@ internal object DiagnosticsExport {
             zip.write(redactLines(runCatching(environmentReport).getOrElse { error -> "falha ao medir: ${error::class.simpleName}" }).toByteArray())
             zip.closeEntry()
             for (name in EXPORTED_FILES) {
-                val file = File(diagnosticsDir, name)
+                val directory = if (name == LINUX_UPDATE_LOG) installationDiagnosticsDir else diagnosticsDir
+                val file = File(directory, name)
                 if (!file.isFile) {
                     continue
                 }
@@ -83,7 +94,7 @@ internal object DiagnosticsExport {
      * `gradlew.bat run --args=--diagnostics`).
      */
     fun run(): Int {
-        return runCatching { export() }
+        return runCatching { export(installationDiagnosticsDir = AppDataDirectory.installationFile("diagnostics")) }
             .fold(
                 onSuccess = { zip ->
                     println("Diagnostics saved to: ${zip.absolutePath}")
@@ -99,12 +110,6 @@ internal object DiagnosticsExport {
 
     private fun redactLines(content: String): String =
         content.lineSequence().joinToString("\n") { line -> redactBreadcrumbIdentity(line) }
-
-    private fun defaultDiagnosticsDir(): File {
-        val homeDir = System.getProperty("user.home")
-            ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-        return File(homeDir, ".usage-monitor/diagnostics")
-    }
 }
 
 /**

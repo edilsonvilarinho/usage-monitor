@@ -1,15 +1,19 @@
 package com.usagemonitor.update
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.AppUpdateReceipt
 import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import java.io.File
 import java.util.Properties
 
 /** Caminho padrão do recibo, escrito pelo instalador silencioso. */
-internal fun defaultUpdateReceiptFile(): File {
-    val home = System.getProperty("user.home") ?: return File(".usage-monitor/update-receipt.properties")
-    return File(home, ".usage-monitor/update-receipt.properties")
-}
+internal fun defaultUpdateReceiptFile(): File =
+    // Raiz de instalação, e não a de `--user-data-dir`: o NSIS grava o recibo em
+    // caminho fixo. Sem `user.home`, o caminho relativo de antes.
+    runCatching { AppDataDirectory.installationFile(UPDATE_RECEIPT_FILE_NAME) }
+        .getOrElse { File(AppDataDirectory.DEFAULT_DIRECTORY_NAME, UPDATE_RECEIPT_FILE_NAME) }
+
+private const val UPDATE_RECEIPT_FILE_NAME = "update-receipt.properties"
 
 /**
  * Lê o recibo da última tentativa de atualização.

@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.ProxySettings
 import kotlinx.serialization.Serializable
@@ -122,9 +123,7 @@ internal class LocalProxySettingsDataSource(
 
     private companion object {
         fun defaultSettingsFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/proxy.json")
+            return AppDataDirectory.file("proxy.json")
         }
     }
 }

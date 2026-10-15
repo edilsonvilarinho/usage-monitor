@@ -1,5 +1,6 @@
 package com.usagemonitor.update
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.AppUpdateArchitecture
 import com.usagemonitor.domain.entity.AppUpdateArtifact
 import com.usagemonitor.domain.entity.AppUpdateArtifactKind
@@ -185,8 +186,7 @@ class WindowsAppUpdateInstaller(
 
 /** `internal` porque a poda de abertura precisa do mesmo caminho, e dois resolvedores divergiriam. */
 internal fun defaultUpdatesDirectory(): File {
-    val home = System.getProperty("user.home") ?: error("user.home is unavailable")
-    return File(home, ".usage-monitor/updates")
+    return AppDataDirectory.installationFile("updates")
 }
 
 /**

@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
 import com.usagemonitor.domain.entity.TelegramBotPreferences
@@ -139,8 +140,7 @@ internal class LocalTelegramSettingsDataSource(
 
     companion object {
         fun defaultSettingsFile(): File {
-            val home = System.getProperty("user.home") ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(home, ".usage-monitor/telegram.json")
+            return AppDataDirectory.file("telegram.json")
         }
 
         /** Seis caracteres sem os ambíguos (0/O, 1/I): digitável no celular sem erro. */

@@ -76,6 +76,28 @@ class DiagnosticsExportTest {
         }
     }
 
+    @Test
+    fun `the linux update log comes from the installation root, not from the data root`() {
+        withDirs { diagnostics, output ->
+            val installation = File(output.parentFile, "installation-diagnostics").apply { mkdirs() }
+            File(diagnostics, "linux-update.log").writeText("da raiz de dados\n")
+            File(installation, "linux-update.log").writeText("da instalacao\n")
+            File(diagnostics, "app.log").writeText("app\n")
+
+            val zip = DiagnosticsExport.export(
+                diagnosticsDir = diagnostics,
+                installationDiagnosticsDir = installation,
+                outputDir = output,
+                environmentReport = { "" }
+            )
+
+            ZipFile(zip).use { file ->
+                assertEquals("da instalacao", file.getInputStream(file.getEntry("linux-update.log")).reader().readText().trim())
+                assertEquals("app", file.getInputStream(file.getEntry("app.log")).reader().readText().trim())
+            }
+        }
+    }
+
     private fun withDirs(block: (File, File) -> Unit) {
         val tempDir = kotlin.io.path.createTempDirectory("diagnostics-export-test").toFile()
         try {

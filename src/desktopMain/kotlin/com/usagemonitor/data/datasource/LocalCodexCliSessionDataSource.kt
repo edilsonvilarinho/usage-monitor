@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.parser.CodexCliRolloutMetadata
 import com.usagemonitor.data.parser.CodexCliRolloutParser
 import com.usagemonitor.data.CodexCliHomeProvider
@@ -673,9 +674,7 @@ class LocalCodexCliSessionDataSource(
         private const val INDEX_VERSION_KEY = "schema_version"
 
         fun defaultDatabaseFile(): File {
-            val home = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(home, ".usage-monitor/codex-cli-history.db")
+            return AppDataDirectory.file("codex-cli-history.db")
         }
     }
 }

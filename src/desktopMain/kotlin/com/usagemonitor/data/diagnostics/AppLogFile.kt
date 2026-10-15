@@ -1,6 +1,7 @@
 package com.usagemonitor.data.diagnostics
 
 import com.usagemonitor.CURRENT_APP_VERSION
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
 import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.entity.sanitizeBreadcrumbMessage
@@ -192,9 +193,7 @@ internal class AppLogFile(
         private val PROCESS_LOCK = Any()
 
         fun defaultLogFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/diagnostics/app.log")
+            return AppDataDirectory.file("diagnostics/app.log")
         }
     }
 }

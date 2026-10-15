@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
 import kotlin.time.Clock
 import kotlinx.serialization.Serializable
@@ -103,9 +104,7 @@ internal class HudWindowDiagnostics(
 
     internal companion object {
         fun defaultDiagnosticsFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/diagnostics/hud-window.jsonl")
+            return AppDataDirectory.file("diagnostics/hud-window.jsonl")
         }
     }
 }

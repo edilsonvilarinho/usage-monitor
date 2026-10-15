@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.requiresLocalApiKey
@@ -181,9 +182,7 @@ internal class LocalApiKeyDataSource(
 
     private companion object {
         fun defaultSettingsFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/api-keys.json")
+            return AppDataDirectory.file("api-keys.json")
         }
     }
 }

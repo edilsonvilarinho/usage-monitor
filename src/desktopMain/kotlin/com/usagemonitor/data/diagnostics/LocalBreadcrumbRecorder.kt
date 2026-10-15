@@ -1,6 +1,7 @@
 package com.usagemonitor.data.diagnostics
 
 import com.usagemonitor.StartupDiagnostics
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.datasource.restrictToOwnerReadWrite
 import com.usagemonitor.domain.entity.Breadcrumb
 import com.usagemonitor.domain.entity.BreadcrumbCategory
@@ -143,10 +144,8 @@ class LocalBreadcrumbRecorder(
 
     companion object {
         fun defaultBreadcrumbsFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
 
-            return File(homeDir, ".usage-monitor/diagnostics/breadcrumbs.jsonl")
+            return AppDataDirectory.file("diagnostics/breadcrumbs.jsonl")
         }
     }
 }

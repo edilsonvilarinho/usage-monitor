@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.dto.UsageSnapshotRecord
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -443,9 +444,7 @@ class LocalUsageHistoryDataSource(
         fun normalizeWorkspaceId(workspaceId: String?): String = workspaceId?.trim().orEmpty()
 
         fun defaultDatabaseFile(): File {
-            val homeDir = System.getProperty("user.home")
-                ?: throw IllegalStateException("Propriedade 'user.home' não disponível")
-            return File(homeDir, ".usage-monitor/usage-history.db")
+            return AppDataDirectory.file("usage-history.db")
         }
     }
 }
