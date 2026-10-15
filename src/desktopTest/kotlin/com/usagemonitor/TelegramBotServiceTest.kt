@@ -21,6 +21,7 @@ import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramBotSettings
+import com.usagemonitor.domain.entity.TelegramPendingRestart
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
@@ -41,6 +42,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -143,6 +145,9 @@ class TelegramBotServiceTest {
     private val refreshes = AtomicInteger()
     private val focusRequests = AtomicInteger()
     private val applied = AtomicInteger()
+    @Volatile private var lastSaved: TelegramBotSettings? = null
+    /** O reinício pendente já gravado no instante em que o app fecharia (#417). */
+    @Volatile private var pendingSavedAtApply: TelegramPendingRestart? = null
     @Volatile private var readyVersion: String? = null
     @Volatile private var snapshot: UsageSnapshot? = null
     @Volatile private var appLanguage = AppLanguage.PT
@@ -151,7 +156,7 @@ class TelegramBotServiceTest {
     private val service = TelegramBotService(
         api = api,
         settingsFlow = settings,
-        saveSettings = {},
+        saveSettings = { saved -> lastSaved = saved },
         alertSettingsFlow = alertSettings,
         saveAlertSettings = { updated -> alertSettings.value = updated },
         alerts = alerts,
@@ -174,7 +179,11 @@ class TelegramBotServiceTest {
             machineName = { "NOTE-EDI" },
             exportUsage = { since, format -> "$format desde $since" },
             readyUpdate = { readyVersion },
-            applyUpdate = { applied.incrementAndGet() },
+            applyUpdate = {
+                pendingSavedAtApply = lastSaved?.preferences?.pendingRestart
+                applied.incrementAndGet()
+            },
+            currentVersion = { "42.0.0" },
             sourceHealth = { sourceHealth },
             teamPresence = {
                 Result.success(
@@ -610,8 +619,25 @@ class TelegramBotServiceTest {
         api.pending += tap(1, chat = 51, data = "upd:41.0.0")
         waitUntil { "cb1" in api.answered }
         assertEquals(0, applied.get())
+        // Toque que não reinicia não deixa reinício pendente (#417).
+        assertNull(settings.value.preferences.pendingRestart)
         api.pending += tap(2, chat = 51, data = "upd:42.1.0")
         waitUntil { applied.get() == 1 }
+        // Gravado antes de o app fechar: é o app reaberto quem responde (#417).
+        assertEquals(TelegramPendingRestart(targetVersion = "42.1.0", fromVersion = "42.0.0"), pendingSavedAtApply)
+    }
+
+    /** #417: sem permissão o toque nem reinicia nem deixa reinício pendente. */
+    @Test
+    fun `a refused update tap leaves no pending restart`() {
+        paired()
+        readyVersion = "42.1.0"
+        service.start()
+        api.pending += tap(1, chat = 51, data = "upd:42.1.0")
+
+        waitUntil { "cb1" in api.answered }
+        assertEquals(0, applied.get())
+        assertNull(settings.value.preferences.pendingRestart)
     }
 
     /** #408, AA9: `/alertas` sem argumento abre um interruptor por tipo; o toque muda só aquele e redesenha o teclado. */

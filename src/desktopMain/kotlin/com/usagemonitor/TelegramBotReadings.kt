@@ -50,6 +50,8 @@ internal class TelegramBotReadings(
     val readyUpdate: () -> String? = { null },
     /** AA17: fecha o app e instala a versão pronta — o mesmo botão da faixa do app. */
     val applyUpdate: () -> Unit = {},
+    /** A versão em execução (#417): a de origem do reinício e a que o app reaberto confere. */
+    val currentVersion: () -> String = { CURRENT_APP_VERSION },
     /** AA18: como cada conta saiu da última coleta; `null` antes da primeira. */
     val sourceHealth: () -> List<SourceHealthObservation>? = { null },
     /** Análise da sessão (rodada AB) da conta de `storageKey`; `null` fora de Anthropic e Codex ou sem leitura. */

@@ -36,6 +36,7 @@ import com.usagemonitor.domain.entity.accountByKey
 import com.usagemonitor.domain.entity.parseThresholdPercents
 import com.usagemonitor.domain.entity.withAccountThreshold
 import com.usagemonitor.domain.entity.changesApp
+import com.usagemonitor.domain.entity.TelegramPendingRestart
 import com.usagemonitor.domain.entity.toggled
 import com.usagemonitor.domain.entity.parseBotCommand
 import com.usagemonitor.domain.entity.snoozeAlerts
@@ -420,9 +421,24 @@ internal class TelegramBotHandlers(
                     else -> TelegramBotChatMessages.UpdateTapResult.STARTED
                 }
                 api.answerCallbackQuery(token, callbackId, TelegramBotChatMessages.updateTap(result, language))
-                if (result == TelegramBotChatMessages.UpdateTapResult.STARTED) readings.applyUpdate()
+                if (result == TelegramBotChatMessages.UpdateTapResult.STARTED) {
+                    rememberRestart(tap.version)
+                    readings.applyUpdate()
+                }
             }
         }
+    }
+
+    /**
+     * O reinício pedido (#417), gravado **antes** de o app fechar: quem responde à
+     * conversa é o app que abre depois, e só o `telegram.json` atravessa o reinício.
+     */
+    private fun rememberRestart(version: String) {
+        val settings = settingsFlow.value
+        val pending = TelegramPendingRestart(targetVersion = version, fromVersion = readings.currentVersion())
+        val next = settings.copy(preferences = settings.preferences.copy(pendingRestart = pending))
+        runCatching { saveSettings(next) }
+        settingsFlow.value = next
     }
 
     /** Toques que mudam o app (#408, AA21): ligar fonte e silenciar. Ver conta e atualizar só leem. */
