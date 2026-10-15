@@ -78,6 +78,12 @@ private fun loadIconResource(path: String) = runCatching {
  * que so compoe os hosts.
  */
 fun main(args: Array<String>) {
+    // Antes de tudo, inclusive da instância única: precisa funcionar com o app
+    // aberto e travado, ou que nem sobe (#416).
+    if (DiagnosticsExport.isRequested(args)) {
+        exitProcess(DiagnosticsExport.run())
+    }
+
     // O log que não depende da interface (#416) nasce primeiro: todo o resto pode
     // escrever nele, inclusive quem está caindo.
     val appLog = AppLogFile()
