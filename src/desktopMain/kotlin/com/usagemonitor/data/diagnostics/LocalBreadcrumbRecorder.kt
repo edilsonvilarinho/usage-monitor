@@ -49,7 +49,15 @@ private data class BreadcrumbLineDto(
 class LocalBreadcrumbRecorder(
     private val breadcrumbsFile: File = defaultBreadcrumbsFile(),
     private val json: Json = Json { ignoreUnknownKeys = true },
-    private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() }
+    private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /**
+     * Para onde vai também cada passo [BreadcrumbCategory.ERROR] (issue #416): o
+     * `app.log`, que é coletado sem a interface. A trilha só sai do disco pelo
+     * relatório de bug, aberto pela tela — e falha registrada que só o relatório
+     * lê some quando a tela é o defeito. Função e não o tipo do log: este
+     * recorder é público e o log é `internal`.
+     */
+    private val errorSink: ((String) -> Unit)? = null
 ) : BreadcrumbRecorder {
 
     private val lock = Any()
@@ -73,6 +81,11 @@ class LocalBreadcrumbRecorder(
         // Anotar o passo não pode virar a segunda falha do dia -- muito menos a
         // que derruba o app enquanto ele tenta explicar a primeira.
         runCatching { appendLine(json.encodeToString(line)) }
+
+        // A mensagem que segue já é a redigida pela fábrica, a mesma da trilha.
+        if (category == BreadcrumbCategory.ERROR) {
+            runCatching { errorSink?.invoke(breadcrumb.message) }
+        }
     }
 
     override fun read(limit: Int): List<Breadcrumb> {

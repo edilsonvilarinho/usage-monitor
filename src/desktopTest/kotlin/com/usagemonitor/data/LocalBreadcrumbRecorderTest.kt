@@ -145,6 +145,31 @@ class LocalBreadcrumbRecorderTest {
         }
     }
 
+    /** Falha registrada na trilha também chega ao `app.log`, coletado sem a interface (#416). */
+    @Test
+    fun `only error steps reach the error sink, already redacted`() {
+        withTempFile { file ->
+            val sunk = mutableListOf<String>()
+            val recorder = LocalBreadcrumbRecorder(breadcrumbsFile = file, errorSink = { message -> sunk += message })
+
+            recorder.record(BreadcrumbCategory.NAVIGATION, "abriu as Configurações")
+            recorder.record(BreadcrumbCategory.ERROR, "ler C:\\Users\\fulano\\a.json falhou")
+
+            assertEquals(listOf("ler <caminho>/a.json falhou"), sunk)
+        }
+    }
+
+    @Test
+    fun `a failing error sink never reaches the caller nor loses the step`() {
+        withTempFile { file ->
+            val recorder = LocalBreadcrumbRecorder(breadcrumbsFile = file, errorSink = { error("sink quebrado") })
+
+            recorder.record(BreadcrumbCategory.ERROR, "x falhou")
+
+            assertEquals(1, file.readLines().size)
+        }
+    }
+
     private fun recorderOn(file: File, startMillis: Long = 1_700_000_000_000L): LocalBreadcrumbRecorder {
         var current = startMillis
         return LocalBreadcrumbRecorder(

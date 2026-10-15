@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.toPainter
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.application
+import com.usagemonitor.data.diagnostics.AppLogFile
 import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -77,7 +78,10 @@ private fun loadIconResource(path: String) = runCatching {
  * que so compoe os hosts.
  */
 fun main(args: Array<String>) {
-    val breadcrumbs = LocalBreadcrumbRecorder()
+    // O log que não depende da interface (#416) nasce primeiro: todo o resto pode
+    // escrever nele, inclusive quem está caindo.
+    val appLog = AppLogFile()
+    val breadcrumbs = LocalBreadcrumbRecorder(errorSink = { message -> appLog.error("breadcrumb", message) })
 
     // Registrado ANTES da janela: uma exceção que derrube uma thread durante a
     // construção dos recursos -- que é onde o app some sem deixar nada -- só tem
