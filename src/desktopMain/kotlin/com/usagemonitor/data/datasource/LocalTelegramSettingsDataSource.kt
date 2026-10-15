@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.TELEGRAM_SUMMARY_HOURS
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
+import com.usagemonitor.domain.entity.TelegramPendingRestart
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -15,6 +16,9 @@ private data class TelegramChatDto(val id: Long, val name: String = "", val read
 
 @Serializable
 private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
+
+@Serializable
+private data class TelegramPendingRestartDto(val targetVersion: String, val fromVersion: String)
 
 /** Opções da #408; cada campo com default, para o arquivo antigo continuar valendo. */
 @Serializable
@@ -28,7 +32,8 @@ private data class TelegramPreferencesDto(
     val groupRepeatedAlerts: Boolean = true,
     val batchAlerts: Boolean = true,
     val compactPanel: Boolean = true,
-    val sourceHealthAlerts: Boolean = true
+    val sourceHealthAlerts: Boolean = true,
+    val pendingRestart: TelegramPendingRestartDto? = null
 )
 
 @Serializable
@@ -90,7 +95,10 @@ internal class LocalTelegramSettingsDataSource(
                 groupRepeatedAlerts = dto.preferences.groupRepeatedAlerts,
                 batchAlerts = dto.preferences.batchAlerts,
                 compactPanel = dto.preferences.compactPanel,
-                sourceHealthAlerts = dto.preferences.sourceHealthAlerts
+                sourceHealthAlerts = dto.preferences.sourceHealthAlerts,
+                pendingRestart = dto.preferences.pendingRestart?.let { pending ->
+                    TelegramPendingRestart(pending.targetVersion, pending.fromVersion)
+                }
             )
         )
     }
@@ -117,7 +125,10 @@ internal class LocalTelegramSettingsDataSource(
                 groupRepeatedAlerts = settings.preferences.groupRepeatedAlerts,
                 batchAlerts = settings.preferences.batchAlerts,
                 compactPanel = settings.preferences.compactPanel,
-                sourceHealthAlerts = settings.preferences.sourceHealthAlerts
+                sourceHealthAlerts = settings.preferences.sourceHealthAlerts,
+                pendingRestart = settings.preferences.pendingRestart?.let { pending ->
+                    TelegramPendingRestartDto(pending.targetVersion, pending.fromVersion)
+                }
             )
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))

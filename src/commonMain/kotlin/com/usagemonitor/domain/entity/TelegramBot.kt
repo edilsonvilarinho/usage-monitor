@@ -60,7 +60,12 @@ data class TelegramBotPreferences(
      */
     val sourceHealthAlerts: Boolean = true,
     /** Última versão avisada pelo bot — estado, não opção: o aviso sai uma vez por versão, mesmo entre reinícios. */
-    val announcedUpdateVersion: String? = null
+    val announcedUpdateVersion: String? = null,
+    /**
+     * Reinício pedido pelo bot e ainda não confirmado na conversa (#417) — estado, como
+     * [announcedUpdateVersion]: atravessa o reinício que ele mesmo descreve.
+     */
+    val pendingRestart: TelegramPendingRestart? = null
 )
 
 /**
