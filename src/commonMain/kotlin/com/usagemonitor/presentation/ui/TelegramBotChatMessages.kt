@@ -1,9 +1,12 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramChat
+import com.usagemonitor.domain.entity.TelegramPendingRestart
 import com.usagemonitor.domain.entity.TelegramPing
+import com.usagemonitor.domain.entity.TelegramRestartOutcome
 import com.usagemonitor.domain.entity.UsageSnapshot
 import kotlin.time.Instant
 
@@ -75,13 +78,62 @@ internal object TelegramBotChatMessages {
 
     /**
      * Aviso da versão pronta (AA17). O texto diz **o que** reinicia — o app neste PC —,
-     * como a faixa de atualização do app.
+     * como a faixa de atualização do app, e onde chega a resposta (#417).
      */
-    fun updateReady(version: String, language: AppLanguage): String = if (language == AppLanguage.PT) {
-        "⬆ <b>Usage Monitor ${TelegramBotMessages.escape(version)} pronto para instalar</b>\nO app fecha e reabre neste PC para instalar. Novidades na janela do app depois do reinício."
-    } else {
-        "⬆ <b>Usage Monitor ${TelegramBotMessages.escape(version)} ready to install</b>\nThe app closes and reopens on this PC to install. What's new shows in the app after the restart."
+    fun updateReady(version: String, language: AppLanguage): String {
+        val escaped = TelegramBotMessages.escape(version)
+        return localized(
+            language,
+            "⬆ <b>Usage Monitor $escaped pronto para instalar</b>\nO app fecha e reabre neste PC para instalar. Depois do reinício, a confirmação e as novidades chegam aqui.",
+            "⬆ <b>Usage Monitor $escaped ready to install</b>\nThe app closes and reopens on this PC to install. After the restart, the confirmation and what's new arrive here."
+        )
     }
+
+    /**
+     * A resposta do app reaberto ao "Atualizar e reiniciar" (#417). [notes] é a busca das
+     * novidades: sucesso nulo é release sem nada a mostrar (só `chore`/`docs`) e não vira
+     * lista; falha aponta a janela do app, que tenta de novo sozinha; nulo é "não buscou".
+     * Até [RESTART_NOTES_LIMIT] itens, os mesmos da janela, e o resto pelo link da release.
+     */
+    fun restartDone(
+        outcome: TelegramRestartOutcome,
+        pending: TelegramPendingRestart,
+        currentVersion: String,
+        notes: Result<ReleaseNotes?>?,
+        language: AppLanguage
+    ): String {
+        val current = TelegramBotMessages.escape(currentVersion)
+        if (outcome == TelegramRestartOutcome.NOT_APPLIED) {
+            val target = TelegramBotMessages.escape(pending.targetVersion)
+            return localized(
+                language,
+                "⚠ <b>A atualização para $target não foi aplicada</b>\nO app reabriu neste PC na versão $current.",
+                "⚠ <b>The update to $target was not applied</b>\nThe app reopened on this PC on version $current."
+            )
+        }
+        val header = localized(
+            language,
+            "✅ <b>Usage Monitor $current instalado</b>\nO app reiniciou neste PC.",
+            "✅ <b>Usage Monitor $current installed</b>\nThe app restarted on this PC."
+        )
+        if (notes == null) return header
+        val fetched = notes.getOrElse {
+            return header + "\n" + localized(language, "Novidades na janela do app.", "What's new shows in the app.")
+        } ?: return header
+        val shown = fetched.items.take(RESTART_NOTES_LIMIT).map { item -> "• ${TelegramBotMessages.escape(item)}" }
+        val hidden = fetched.items.size - shown.size
+        val linkText = if (hidden > 0) {
+            localized(language, "+$hidden na página da versão", "+$hidden on the release page")
+        } else {
+            localized(language, "Página da versão", "Release page")
+        }
+        val link = "<a href=\"${TelegramBotMessages.escape(fetched.releasePageUrl)}\">$linkText</a>"
+        val title = "<b>" + localized(language, "Novidades", "What's new") + "</b>"
+        return (listOf(header, "", title) + shown + link).joinToString("\n")
+    }
+
+    /** Itens das novidades na mensagem do reinício (#417): o resto fica no link da release. */
+    const val RESTART_NOTES_LIMIT = 10
 
     fun updateButton(language: AppLanguage): String =
         if (language == AppLanguage.PT) "⬆ Atualizar e reiniciar o app" else "⬆ Update and restart the app"

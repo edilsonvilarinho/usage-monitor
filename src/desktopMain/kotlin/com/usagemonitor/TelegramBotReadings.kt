@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramPing
@@ -52,6 +53,13 @@ internal class TelegramBotReadings(
     val applyUpdate: () -> Unit = {},
     /** A versão em execução (#417): a de origem do reinício e a que o app reaberto confere. */
     val currentVersion: () -> String = { CURRENT_APP_VERSION },
+    /**
+     * Suspende até a janela existir e o ACK da atualização ser gravado (#417): antes
+     * dele o updater do Linux ainda pode restaurar a versão anterior.
+     */
+    val appReady: suspend () -> Unit = {},
+    /** As novidades da versão (#417), pela mesma busca da janela do app. */
+    val releaseNotes: suspend (version: String, previousVersion: String?) -> Result<ReleaseNotes?> = { _, _ -> Result.success(null) },
     /** AA18: como cada conta saiu da última coleta; `null` antes da primeira. */
     val sourceHealth: () -> List<SourceHealthObservation>? = { null },
     /** Análise da sessão (rodada AB) da conta de `storageKey`; `null` fora de Anthropic e Codex ou sem leitura. */

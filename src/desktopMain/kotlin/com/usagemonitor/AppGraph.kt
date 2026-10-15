@@ -145,6 +145,13 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
     @Volatile
     var mainWindow: java.awt.Window? = null
 
+    /**
+     * Liga quando a janela existe e o ACK da atualização foi gravado (`anchorAppWindow`).
+     * O bot só confirma um reinício depois dele (#417): antes, o updater do Linux ainda
+     * pode restaurar a versão anterior.
+     */
+    val appAnchored = MutableStateFlow(false)
+
     private val credentialDataSource = LocalCredentialDataSource(
         httpClient = httpClient,
         profileLocationProvider = { profile -> profileRegistry.locationFor(profile.id) }

@@ -22,6 +22,7 @@ import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramPendingRestart
+import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
@@ -33,6 +34,7 @@ import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -148,6 +150,11 @@ class TelegramBotServiceTest {
     @Volatile private var lastSaved: TelegramBotSettings? = null
     /** O reinício pendente já gravado no instante em que o app fecharia (#417). */
     @Volatile private var pendingSavedAtApply: TelegramPendingRestart? = null
+    @Volatile private var runningVersion = "42.0.0"
+    /** A janela e o ACK (#417): o bot só confirma o reinício depois deles. */
+    private val anchored = MutableStateFlow(true)
+    @Volatile private var releaseNotesResult: Result<ReleaseNotes?> = Result.success(null)
+    private val releaseNotesRequests = CopyOnWriteArrayList<Pair<String, String?>>()
     @Volatile private var readyVersion: String? = null
     @Volatile private var snapshot: UsageSnapshot? = null
     @Volatile private var appLanguage = AppLanguage.PT
@@ -183,7 +190,12 @@ class TelegramBotServiceTest {
                 pendingSavedAtApply = lastSaved?.preferences?.pendingRestart
                 applied.incrementAndGet()
             },
-            currentVersion = { "42.0.0" },
+            currentVersion = { runningVersion },
+            appReady = { anchored.first { ready -> ready } },
+            releaseNotes = { version, previous ->
+                releaseNotesRequests += version to previous
+                releaseNotesResult
+            },
             sourceHealth = { sourceHealth },
             teamPresence = {
                 Result.success(
@@ -625,6 +637,80 @@ class TelegramBotServiceTest {
         waitUntil { applied.get() == 1 }
         // Gravado antes de o app fechar: é o app reaberto quem responde (#417).
         assertEquals(TelegramPendingRestart(targetVersion = "42.1.0", fromVersion = "42.0.0"), pendingSavedAtApply)
+    }
+
+    private fun pendingRestart() {
+        paired()
+        val pending = TelegramPendingRestart(targetVersion = "42.1.0", fromVersion = "42.0.0")
+        settings.value = settings.value.copy(preferences = settings.value.preferences.copy(pendingRestart = pending))
+    }
+
+    private fun notesWith(count: Int) = ReleaseNotes(
+        version = "42.1.0",
+        previousVersion = "42.0.0",
+        publishedAt = null,
+        releasePageUrl = "https://github.com/edilsonvilarinho/usage-monitor/releases/tag/v42.1.0",
+        items = (1..count).map { index -> "item $index" }
+    )
+
+    /** #417: o app reaberto confirma o reinício pedido pelo bot, só depois do ACK, uma vez, com as novidades. */
+    @Test
+    fun `a restart requested from the bot is confirmed after the ack with what is new`() {
+        pendingRestart()
+        runningVersion = "42.1.0"
+        anchored.value = false
+        releaseNotesResult = Result.success(notesWith(12))
+        service.start()
+        Thread.sleep(200)
+        assertTrue(api.sent.none { it.second.startsWith("✅") })
+        assertEquals("42.1.0", settings.value.preferences.pendingRestart?.targetVersion)
+
+        anchored.value = true
+        waitUntil { api.sent.any { it.second.startsWith("✅ <b>Usage Monitor 42.1.0 instalado</b>") } }
+        val text = api.sent.single { it.second.startsWith("✅") }.second
+        assertTrue("<b>Novidades</b>\n• item 1\n" in text, text)
+        assertTrue("• item 10\n" in text, text)
+        assertFalse("item 11" in text, text)
+        assertTrue(">+2 na página da versão</a>" in text, text)
+        assertEquals(listOf("42.1.0" to "42.0.0"), releaseNotesRequests.toList())
+        assertNull(settings.value.preferences.pendingRestart)
+        assertNull(lastSaved?.preferences?.pendingRestart)
+    }
+
+    /** #417: o app que reabre na versão de origem diz que a atualização não foi aplicada, sem buscar novidades. */
+    @Test
+    fun `a restart that reopens on the old version says the update was not applied`() {
+        pendingRestart()
+        service.start()
+
+        waitUntil { api.sent.any { it.second.startsWith("⚠ <b>A atualização para 42.1.0 não foi aplicada</b>") } }
+        assertTrue(api.sent.single { it.second.startsWith("⚠") }.second.endsWith("na versão 42.0.0."))
+        assertTrue(releaseNotesRequests.isEmpty())
+    }
+
+    /** #417: sem novidades por falha de rede, a confirmação sai e aponta a janela do app. */
+    @Test
+    fun `a failed release notes fetch still confirms the restart`() {
+        pendingRestart()
+        runningVersion = "42.1.0"
+        releaseNotesResult = Result.failure(IllegalStateException("offline"))
+        service.start()
+
+        waitUntil { api.sent.any { it.second.startsWith("✅") } }
+        assertTrue(api.sent.single { it.second.startsWith("✅") }.second.endsWith("Novidades na janela do app."))
+    }
+
+    /** #417: com o bot desligado a marca é limpa sem mensagem — a resposta de dias depois não descreveria nada. */
+    @Test
+    fun `a disabled bot clears the pending restart without sending`() {
+        pendingRestart()
+        settings.value = settings.value.copy(enabled = false)
+        runningVersion = "42.1.0"
+        service.start()
+
+        waitUntil { settings.value.preferences.pendingRestart == null }
+        Thread.sleep(100)
+        assertTrue(api.sent.isEmpty())
     }
 
     /** #417: sem permissão o toque nem reinicia nem deixa reinício pendente. */

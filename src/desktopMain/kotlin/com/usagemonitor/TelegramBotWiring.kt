@@ -23,6 +23,7 @@ import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
+import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.TelegramChart
@@ -30,6 +31,7 @@ import com.usagemonitor.presentation.ui.buildTelegramChart
 import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 
 /**
@@ -101,6 +103,8 @@ private fun createTelegramBotService(
         // Só a pronta (baixada e com SHA-256 conferido): a só "disponível" não tem o que instalar.
         readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Ready)?.update?.version },
         applyUpdate = { dashboard.restartAndUpdateNow() },
+        appReady = { graph.appAnchored.first { anchored -> anchored } },
+        releaseNotes = { version, previous -> GetReleaseNotesUseCase(graph.appUpdateRepository)(version, previous) },
         sourceHealth = { sourceHealthOf(dashboard.uiState.value, storedLanguage(graph.settings)) },
         sessionAnalysis = sessionAnalysisReader(graph, dashboard),
         exportUsage = { since, format ->

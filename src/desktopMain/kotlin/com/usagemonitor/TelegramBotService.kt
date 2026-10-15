@@ -25,6 +25,8 @@ import com.usagemonitor.domain.entity.isAlertSilenced
 import com.usagemonitor.presentation.ui.TelegramBotRemoteMessages
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.domain.entity.TelegramBotSettings
+import com.usagemonitor.domain.entity.TelegramRestartOutcome
+import com.usagemonitor.domain.entity.telegramRestartOutcome
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
@@ -113,6 +115,7 @@ internal class TelegramBotService(
     private var panelJob: Job? = null
     private var updateJob: Job? = null
     private var sourceHealthJob: Job? = null
+    private var restartJob: Job? = null
 
     /** Contas falhando e se já avisaram (#408, AA18). Só no laço da checagem; reiniciar o app recomeça a contagem. */
     private var sourceHealth: Map<String, SourceHealthEntry> = emptyMap()
@@ -163,6 +166,9 @@ internal class TelegramBotService(
             alerts.collect { alert -> receiveAlert(alert) }
         }
         summaryJob = scope.launch { summaryLoop() }
+        restartJob = scope.launch {
+            runCatching { confirmRestart() }.onFailure { error -> if (error is CancellationException) throw error }
+        }
         updateJob = scope.launch {
             while (true) {
                 runCatching { announceReadyUpdate() }.onFailure { error -> if (error is CancellationException) throw error }
@@ -341,6 +347,26 @@ internal class TelegramBotService(
         broadcast(buttons = { language -> listOf(listOf(TelegramButton(TelegramBotChatMessages.updateButton(language), BotTap.UpdateNow(version).data()))) }) { language ->
             TelegramBotChatMessages.updateReady(version, language)
         }
+    }
+
+    /**
+     * Resposta ao "Atualizar e reiniciar" (#417), dada pelo app que abriu depois do toque.
+     * Espera o ACK ([TelegramBotReadings.appReady]): antes dele o updater do Linux ainda
+     * pode restaurar a anterior. A marca sai **antes** do envio, como no aviso de versão
+     * pronta: falha no envio perde a confirmação em vez de repeti-la a cada abertura. Bot
+     * desligado também limpa — a resposta de semanas depois não descreveria mais nada.
+     */
+    private suspend fun confirmRestart() {
+        val pending = settingsFlow.value.preferences.pendingRestart ?: return
+        readings.appReady()
+        val settings = settingsFlow.value
+        val cleared = settings.copy(preferences = settings.preferences.copy(pendingRestart = null))
+        runCatching { saveSettings(cleared) }
+        settingsFlow.value = cleared
+        val current = readings.currentVersion()
+        val outcome = telegramRestartOutcome(pending, current)
+        val notes = if (outcome == TelegramRestartOutcome.UPDATED) readings.releaseNotes(current, pending.fromVersion) else null
+        broadcast { language -> TelegramBotChatMessages.restartDone(outcome, pending, current, notes, language) }
     }
 
     /**

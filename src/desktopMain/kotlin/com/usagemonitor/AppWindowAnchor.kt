@@ -44,6 +44,7 @@ internal suspend fun anchorAppWindow(window: java.awt.Window, graph: AppGraph, s
     if (ackToken != null) {
         withContext(Dispatchers.IO) { UpdateAckChannel().acknowledge(ackToken) }
     }
+    graph.appAnchored.value = true
 }
 
 /**
