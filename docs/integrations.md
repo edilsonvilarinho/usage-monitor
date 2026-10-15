@@ -440,6 +440,14 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     envio — com o botão "⬆ Atualizar e reiniciar o app" (`upd:<versão>`). O toque relê permissão e versão: aviso antigo
     responde "não está mais pronta", e só a versão pronta chama `restartAndUpdateNow`, o mesmo botão da faixa do app. O texto
     diz o que reinicia. Conversa só de leitura não reinicia (`tapChangesApp`).
+  - **Confirmação do reinício** (#417): o toque que reinicia grava `pendingRestart` (versão pedida e de origem) no
+    `telegram.json` **antes** de `applyUpdate()` — só o arquivo atravessa o reinício, e a resposta efêmera do toque era
+    tudo o que a conversa recebia. O app que abre espera o ACK de atualização (`AppGraph.appAnchored`, no fim do
+    `anchorAppWindow`; antes dele o updater do Linux ainda restaura a anterior), limpa a marca antes do envio e manda a
+    todas as conversas: "✅ Usage Monitor X instalado" com até 10 itens das novidades (os mesmos da janela, por
+    `GetReleaseNotesUseCase`) e o link da release, ou "⚠ A atualização para X não foi aplicada" quando a versão em execução
+    é anterior à pedida (`telegramRestartOutcome`, SemVer de `compareAppVersions`, nunca o recibo). Busca falhando:
+    confirma e aponta a janela do app. Bot desligado: limpa sem enviar. Atualização pela faixa do app não manda nada.
   - **Tipos de alerta** (AA9): `/alertas` sem argumento (antes "uso inválido") manda um botão por tipo — Cota, Reinício,
     Sessão saturada, Sem resposta, Pico — com ✅/⬜ e o nome (`alt:<tipo>`). O toque inverte **o mesmo campo** das
     Configurações (`AlertKind`, enum novo que aponta para os interruptores de `UsageAlertSettings`) e redesenha o teclado da
