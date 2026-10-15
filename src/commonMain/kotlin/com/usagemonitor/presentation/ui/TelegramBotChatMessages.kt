@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TelegramKeyboardPage
 import com.usagemonitor.domain.entity.ReleaseNotes
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramChat
@@ -170,6 +171,21 @@ internal object TelegramBotChatMessages {
         language == AppLanguage.PT -> "⌨ Atalhos removidos."
         else -> "⌨ Shortcuts removed."
     }
+
+    /** Troca de página do teclado fixo (rodada AE, AE4): o Telegram só troca o teclado junto de uma mensagem. */
+    fun keyboardPage(page: TelegramKeyboardPage, language: AppLanguage): String = when (page) {
+        TelegramKeyboardPage.MORE -> localized(language, "☰ Mais atalhos.", "☰ More shortcuts.")
+        TelegramKeyboardPage.MAIN -> localized(language, "‹ Atalhos principais.", "‹ Main shortcuts.")
+    }
+
+    /** O teclado novo (AE4) chegando a uma conversa pareada antes dele, uma vez. */
+    fun keyboardIntroduced(language: AppLanguage): String = localized(
+        language,
+        "⌨ <b>Atalhos novos</b> no lugar do teclado: o uso diário aqui embaixo e o resto em ☰ Mais. " +
+            "Todos os comandos continuam em /ajuda; <code>/teclado off</code> tira os atalhos.",
+        "⌨ <b>New shortcuts</b> in place of the keyboard: daily use down here and the rest under ☰ More. " +
+            "Every command is still in /help; <code>/keyboard off</code> removes the shortcuts."
+    )
 
     /** Recusa de conversa só de leitura (AA21): diz o papel e onde mudá-lo. */
     fun readOnly(language: AppLanguage): String = if (language == AppLanguage.PT) {

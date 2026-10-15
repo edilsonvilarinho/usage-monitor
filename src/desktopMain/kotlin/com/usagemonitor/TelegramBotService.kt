@@ -3,6 +3,9 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.TelegramBadRequestException
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.TelegramButton
+import com.usagemonitor.data.datasource.TelegramReplyKeyboard
+import com.usagemonitor.domain.entity.TELEGRAM_KEYBOARD_LAYOUT
+import com.usagemonitor.domain.entity.telegramKeyboardRows
 import com.usagemonitor.domain.entity.BotTap
 import com.usagemonitor.domain.entity.data
 import com.usagemonitor.data.datasource.TelegramRateLimitedException
@@ -229,6 +232,7 @@ internal class TelegramBotService(
                     registerMenu(settings.botToken, appLanguage)
                     menuLanguage = appLanguage
                 }
+                deliverKeyboard(settings.botToken)
                 _status.value = TelegramBotStatus.Connected(settings.authorizedChats.size, botUsername)
                 val updates = api.getUpdates(settings.botToken, offset, LONG_POLL_SECONDS)
                 failures = 0
@@ -329,6 +333,30 @@ internal class TelegramBotService(
             delay(SEND_SPACING_MILLIS)
         }
         if (panels != settings.panelMessages) savePanels(panels)
+    }
+
+    /**
+     * Teclado fixo novo (rodada AE, AE4) para as conversas pareadas antes dele: uma vez, na
+     * primeira conexão com esta versão. A marca é gravada **antes** do envio, como o aviso
+     * de versão pronta: falha perde o teclado (o `/teclado` o traz) em vez de repeti-lo a
+     * cada conexão. Sem conversa pareada, só marca — o pareamento já entrega o teclado.
+     */
+    private suspend fun deliverKeyboard(token: String) {
+        val settings = settingsFlow.value
+        if (settings.preferences.keyboardLayout >= TELEGRAM_KEYBOARD_LAYOUT) return
+        val marked = settings.copy(preferences = settings.preferences.copy(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT))
+        runCatching { saveSettings(marked) }
+        settingsFlow.value = marked
+        for (chat in settings.authorizedChats) {
+            val language = languageProvider()
+            runCatching {
+                api.sendMessage(
+                    token, chat.id, TelegramBotChatMessages.keyboardIntroduced(language), html = true, silent = true,
+                    replyKeyboard = TelegramReplyKeyboard.Show(telegramKeyboardRows(language))
+                )
+            }.onFailure { error -> if (error is CancellationException) throw error }
+            delay(SEND_SPACING_MILLIS)
+        }
     }
 
     /**

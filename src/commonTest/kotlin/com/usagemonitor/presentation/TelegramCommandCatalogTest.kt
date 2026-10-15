@@ -23,17 +23,18 @@ class TelegramCommandCatalogTest {
         }
     }
 
+    /** Rodada AE, AE4: o botão Menu leva só três comandos, cada um com ícone próprio. */
     @Test
-    fun `menu groups each category together and opens each description with its emoji`() {
+    fun `menu keeps only status, keyboard and help, each with its own icon`() {
+        assertEquals(listOf("status", "teclado", "ajuda"), TelegramCommandCatalog.menu(AppLanguage.PT).map { (name, _) -> name })
+        assertEquals(listOf("status", "keyboard", "help"), TelegramCommandCatalog.menu(AppLanguage.EN).map { (name, _) -> name })
         for (language in AppLanguage.entries) {
             val menu = TelegramCommandCatalog.menu(language)
-            val categories = menu.map { (_, description) -> TelegramCommandCategory.entries.first { category -> description.startsWith(category.emoji) } }
-            assertEquals(categories.sortedBy { category -> category.ordinal }, categories)
-            assertEquals(menu.size, menu.map { (name, _) -> name }.toSet().size)
+            val icons = menu.map { (_, description) -> description.substringBefore(' ') }
+            assertEquals(icons.size, icons.toSet().size, menu.toString())
             assertTrue(menu.all { (name, _) -> name.matches(Regex("[a-z0-9_]{1,32}")) }, "o Telegram só aceita a-z, 0-9 e _")
         }
-        assertEquals("status", TelegramCommandCatalog.menu(AppLanguage.PT).first().first)
-        assertEquals("account", TelegramCommandCatalog.menu(AppLanguage.EN)[1].first)
+        assertEquals("📊 Cotas de todas as contas", TelegramCommandCatalog.menu(AppLanguage.PT).first().second)
     }
 
     @Test

@@ -312,8 +312,11 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
 - **Menu**: ao conectar um token o serviço chama `setMyCommands` com os comandos no idioma do app — o botão "Menu" do
   Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão. **Por categoria** (análise da sessão, B01):
   `TelegramCommandCatalog` é o dono único do menu e do `/ajuda` — 📊 Agora, 📐 Análises, 🔔 Alertas, 💬 Conversa e PC.
-  O `setMyCommands` não tem seção, então a categoria vai na ordem e no emoji que abre a descrição; no `/ajuda` ela vira
-  cabeçalho. Comando novo entra numa categoria do catálogo, nunca solto no fim da lista.
+  No `/ajuda` a categoria vira cabeçalho. Comando novo entra numa categoria do catálogo, nunca solto no fim da lista.
+  **Rodada AE, direção AE4:** com os 29 no menu, o emoji repetia a categoria (📊 em 7 linhas, 📐 em 10) e a lista não
+  tinha divisória (o `setMyCommands` só aceita nome e descrição). O menu passou a levar só `/status`, `/teclado` e
+  `/ajuda`, cada um com ícone próprio; o uso diário mora no teclado fixo e o `/ajuda` lista os 29. Os outros continuam
+  funcionando digitados — saem só do autocompletar do `/` (custo aceito na escolha).
 - **`getMe`** ao conectar dá o `@` do bot: as Configurações dizem "Conectado como @bot" e oferecem "Abrir no Telegram" pelo
   link `https://t.me/<bot>?start=<código>`, que abre a conversa e manda o `/start <código>` sozinho. Sem resposta do
   `getMe`, o link some e o resto segue.
@@ -424,7 +427,16 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado, no idioma
     da conversa; `off` manda `remove_keyboard`. O toque chega como **texto** com o rótulo e `parseKeyboardLabel` o traduz no
     comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos `resize_keyboard`/`is_persistent` não
-    têm default no DTO porque o `Json` do cliente não grava valor padrão.
+    têm default no DTO porque o `Json` do cliente não grava valor padrão. **Rodada AE, direção AE4 — controle em duas
+    páginas** (`telegramKeyboardRows`, linhas de três): principal com 📊 Cotas, 👤 Conta, 🔄 Coletar, 🔬 Análise, 🔔 Alertas
+    e ☰ Mais; a outra com ⏰ Reinícios, ⏳ Quando, 🏁 Qual, 📏 Ritmo, 📉 Gráfico, 📝 Resumo, 🖥 HUD e 👥 Time só com a
+    permissão ligada (relida a cada troca), e ‹ Voltar. Trocar de página (`BotCommand.KeyboardPage`) manda uma linha
+    curta com o teclado novo — o Telegram só troca teclado de resposta junto de uma mensagem. Os rótulos da AA30
+    (📊 Status, 📈 Gráfico) continuam entendidos: o teclado antigo fica no celular até o próximo envio. **Nasce ligado**:
+    o pareamento já manda a página principal; conversa pareada antes recebe o teclado uma vez, em silêncio, na primeira
+    conexão com esta versão (`TelegramBotPreferences.keyboardLayout` contra `TELEGRAM_KEYBOARD_LAYOUT`, gravado **antes**
+    do envio — falha perde o teclado em vez de repeti-lo). Conversa que tinha tirado os atalhos com `/teclado off` os
+    recebe de novo nesse envio único (o estado do teclado nunca foi gravado); `/teclado off` volta a tirar.
   - `/hud` (AA29): grava o mesmo `focus.request` da segunda instância (`FocusRequestChannel`), que o laço do `Main` atende
     trazendo a HUD à frente. Só com **"Permitir ações no PC"** (nasce desligado), relido a cada pedido; conversa só de leitura
     é recusada (`changesApp`). As opções novas da #408 moram em `TelegramBotPreferences` (`data class` sem segredo, objeto

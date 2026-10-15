@@ -27,6 +27,8 @@ import com.usagemonitor.domain.entity.focusAlerts
 import com.usagemonitor.domain.entity.parseThresholdPercents
 import com.usagemonitor.domain.entity.changesApp
 import com.usagemonitor.domain.entity.parseKeyboardLabel
+import com.usagemonitor.domain.entity.telegramKeyboardRows
+import com.usagemonitor.domain.entity.TelegramKeyboardPage
 import com.usagemonitor.domain.entity.parseBotCommand
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -79,6 +81,16 @@ class TelegramBotCommandTest {
         assertEquals(BotCommand.Keyboard(false), parseBotCommand("/keyboard off"))
         assertEquals(BotCommand.Accounts, parseKeyboardLabel("👤 Account"))
         assertEquals(null, parseKeyboardLabel("oi"))
+        // Rodada AE, AE4: as duas páginas e os rótulos antigos da AA30.
+        assertEquals(BotCommand.KeyboardPage(TelegramKeyboardPage.MORE), parseKeyboardLabel("☰ More"))
+        assertEquals(BotCommand.KeyboardPage(TelegramKeyboardPage.MAIN), parseKeyboardLabel("‹ Voltar"))
+        assertEquals(BotCommand.Status, parseKeyboardLabel("📊 Status"))
+        assertEquals(BotCommand.Chart(HistoryRange.LAST_24_HOURS), parseKeyboardLabel("📈 Gráfico"))
+        assertFalse(BotCommand.KeyboardPage(TelegramKeyboardPage.MORE).changesApp())
+        val everyLabel = (telegramKeyboardRows(AppLanguage.PT, TelegramKeyboardPage.MAIN) +
+            telegramKeyboardRows(AppLanguage.EN, TelegramKeyboardPage.MORE, allowPcActions = true, showTeam = true)).flatten()
+        assertTrue(everyLabel.all { label -> parseKeyboardLabel(label) != null }, everyLabel.toString())
+        assertTrue(telegramKeyboardRows(AppLanguage.EN, TelegramKeyboardPage.MAIN).all { row -> row.size == 3 })
         assertFalse(BotCommand.Leave.changesApp())
         assertTrue(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(1))
         assertFalse(TelegramBotSettings(authorizedChats = listOf(TelegramChat(1, "a", readOnly = true))).isReadOnly(2))

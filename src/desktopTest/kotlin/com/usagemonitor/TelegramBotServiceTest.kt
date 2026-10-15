@@ -18,6 +18,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.SourceHealthObservation
 import com.usagemonitor.domain.entity.botAccountTapData
 import com.usagemonitor.domain.entity.TelegramBotPreferences
+import com.usagemonitor.domain.entity.TELEGRAM_KEYBOARD_LAYOUT
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -140,7 +141,11 @@ class TelegramBotServiceTest {
 
     private val api = FakeTelegramApi()
     private val settings = MutableStateFlow(
-        TelegramBotSettings(enabled = true, botToken = "123:abc", pairingCode = "AB12CD", pairingExpiresAtMillis = Long.MAX_VALUE)
+        TelegramBotSettings(
+            enabled = true, botToken = "123:abc", pairingCode = "AB12CD", pairingExpiresAtMillis = Long.MAX_VALUE,
+            // O teclado da rodada AE já entregue: o envio único tem teste próprio e não entra nas contas dos outros.
+            preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT)
+        )
     )
     private val alertSettings = MutableStateFlow(UsageAlertSettings())
     private val alerts = MutableSharedFlow<UsageAlert>(extraBufferCapacity = 4)
@@ -358,16 +363,16 @@ class TelegramBotServiceTest {
         settings.value = settings.value.copy(authorizedChats = listOf(TelegramChat(51L, "@ed"), TelegramChat(52L, "@outra")))
         startAndAwaitAlertCollector()
         waitUntil { api.menus.isNotEmpty() }
-        assertEquals("conta", api.menus.first()[1].first)
+        assertEquals("teclado", api.menus.first()[1].first)
 
         appLanguage = AppLanguage.EN
         waitUntil { api.menus.size >= 2 }
-        assertEquals("account", api.menus.last()[1].first)
+        assertEquals("keyboard", api.menus.last()[1].first)
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
         waitUntil { api.sent.count { it.second.startsWith("<b>CLI session saturated</b>") } == 2 }
     }
 
-    /** #408, AA30: `/teclado on` manda o teclado fixo, e tocar um botão dele é o comando. */
+    /** #408, AA30 + rodada AE, AE4: `/teclado on` manda a página principal, e tocar um botão dele é o comando. */
     @Test
     fun `keyboard command shows the persistent keyboard and its labels run commands`() {
         paired()
@@ -376,12 +381,73 @@ class TelegramBotServiceTest {
 
         waitUntil { api.replyKeyboards.isNotEmpty() }
         val shown = api.replyKeyboards.first() as TelegramReplyKeyboard.Show
-        assertEquals(listOf(listOf("📊 Status", "👤 Conta"), listOf("📈 Gráfico", "⏳ Quando")), shown.rows)
+        assertEquals(listOf(listOf("📊 Cotas", "👤 Conta", "🔄 Coletar"), listOf("🔬 Análise", "🔔 Alertas", "☰ Mais")), shown.rows)
 
-        api.pending += message(2, chat = 51, text = "⏳ Quando")
+        api.pending += message(2, chat = 51, text = "📊 Cotas")
         waitUntil { api.sent.any { it.second.startsWith("Sem leitura ainda.") } }
         api.pending += message(3, chat = 51, text = "/teclado off")
         waitUntil { TelegramReplyKeyboard.Remove in api.replyKeyboards }
+    }
+
+    /** Rodada AE, AE4: "☰ Mais" troca a página; HUD e Time só aparecem com a permissão; "‹ Voltar" volta. */
+    @Test
+    fun `more and back switch the keyboard page and permissions decide the extra keys`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "☰ Mais")
+
+        waitUntil { api.replyKeyboards.isNotEmpty() }
+        assertEquals(
+            listOf(listOf("⏰ Reinícios", "⏳ Quando", "🏁 Qual"), listOf("📏 Ritmo", "📉 Gráfico", "📝 Resumo"), listOf("‹ Voltar")),
+            (api.replyKeyboards.first() as TelegramReplyKeyboard.Show).rows
+        )
+        assertTrue(api.sent.any { it.second == "☰ Mais atalhos." })
+
+        settings.value = settings.value.copy(preferences = settings.value.preferences.copy(allowPcActions = true, showTeam = true))
+        api.pending += message(2, chat = 51, text = "☰ Mais")
+        waitUntil { api.replyKeyboards.size == 2 }
+        assertEquals(listOf("🖥 HUD", "👥 Time", "‹ Voltar"), (api.replyKeyboards[1] as TelegramReplyKeyboard.Show).rows.last())
+
+        api.pending += message(3, chat = 51, text = "‹ Voltar")
+        waitUntil { api.replyKeyboards.size == 3 }
+        assertEquals("📊 Cotas", (api.replyKeyboards[2] as TelegramReplyKeyboard.Show).rows.first().first())
+        // O teclado da AA30 ainda no celular continua valendo.
+        api.pending += message(4, chat = 51, text = "📊 Status")
+        waitUntil { api.sent.any { it.second.startsWith("Sem leitura ainda.") } }
+    }
+
+    /** Rodada AE, AE4: o pareamento já entrega o teclado; nasce ligado. */
+    @Test
+    fun `pairing sends the keyboard with the confirmation`() {
+        service.start()
+        api.pending += message(1, chat = 51, text = "/start ab12cd")
+
+        waitUntil { api.replyKeyboards.isNotEmpty() }
+        assertTrue(api.sent.single().second.startsWith("✅ <b>Conversa pareada.</b>"), api.sent.toString())
+        assertEquals("📊 Cotas", (api.replyKeyboards.single() as TelegramReplyKeyboard.Show).rows.first().first())
+    }
+
+    /**
+     * Rodada AE, AE4: conversa pareada antes do teclado novo o recebe uma vez, em silêncio,
+     * e a marca é gravada antes do envio — reconectar não repete.
+     */
+    @Test
+    fun `chats paired before the new keyboard receive it once`() {
+        settings.value = settings.value.copy(
+            authorizedChats = listOf(TelegramChat(51L, "@ed"), TelegramChat(52L, "@time")),
+            preferences = settings.value.preferences.copy(keyboardLayout = 0)
+        )
+        service.start()
+
+        waitUntil { api.replyKeyboards.size == 2 }
+        assertEquals(TELEGRAM_KEYBOARD_LAYOUT, settings.value.preferences.keyboardLayout)
+        assertEquals(TELEGRAM_KEYBOARD_LAYOUT, lastSaved?.preferences?.keyboardLayout)
+        assertEquals(setOf(51L, 52L), api.sent.map { it.first }.toSet())
+        assertTrue(api.silentSends.all { it.startsWith("⌨ <b>Atalhos novos</b>") } && api.silentSends.size == 2)
+
+        settings.value = settings.value.copy(botToken = "456:def")
+        waitUntil { api.menus.size == 2 }
+        assertEquals(2, api.replyKeyboards.size)
     }
 
     /**
@@ -391,7 +457,7 @@ class TelegramBotServiceTest {
     @Test
     fun `team command measures last seen against the server clock`() {
         paired()
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(showTeam = true))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, showTeam = true))
         service.start()
         api.pending += message(1, chat = 51, text = "/time")
         waitUntil { api.sent.any { it.second.startsWith("<b>👥 Time agora</b>") } }
@@ -407,7 +473,7 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("🔒 Ações no PC pelo bot estão desligadas.") } }
         assertEquals(0, focusRequests.get())
 
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(allowPcActions = true))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, allowPcActions = true))
         api.pending += message(2, chat = 51, text = "/hud")
         waitUntil { api.sent.any { it.second == "🖥 HUD trazida para a frente no PC." } }
         assertEquals(1, focusRequests.get())
@@ -422,7 +488,7 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.any { it.second.startsWith("🏓") } }
         assertTrue(api.sent.none { "💻" in it.second })
 
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(showMachineName = true))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, showMachineName = true))
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
         waitUntil { api.sent.any { it.second.startsWith("<b>Sessão CLI saturada</b>") && it.second.endsWith("<i>💻 NOTE-EDI</i>") } }
         api.pending += message(2, chat = 51, text = "/reinicios")
@@ -452,7 +518,7 @@ class TelegramBotServiceTest {
         waitUntil { api.sent.size == 2 }
         assertEquals(1, api.silentSends.size)
 
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(soundOnlyOnCritical = false))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, soundOnlyOnCritical = false))
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s1", "alem-das-sombras")) }
         waitUntil { api.sent.size == 3 }
         assertEquals(1, api.silentSends.size)
@@ -471,7 +537,7 @@ class TelegramBotServiceTest {
         assertEquals(1, api.sent.size)
         assertEquals(51L to 801L, api.edits.single())
 
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(groupRepeatedAlerts = false))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, groupRepeatedAlerts = false))
         runBlocking { alerts.emit(UsageAlert.SessionSaturated("s3", "alem-das-sombras")) }
         waitUntil { api.sent.size == 2 }
         assertEquals(1, api.edits.size)
@@ -481,7 +547,7 @@ class TelegramBotServiceTest {
     @Test
     fun `non critical alerts arrive in one batch and critical goes out at once`() {
         paired()
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(batchAlerts = true))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, batchAlerts = true))
         startAndAwaitAlertCollector()
         runBlocking {
             alerts.emit(quotaAlert(75))
@@ -621,7 +687,7 @@ class TelegramBotServiceTest {
         Thread.sleep(200)
         assertTrue(api.sent.none { it.second.startsWith("⬆") })
 
-        settings.value = settings.value.copy(preferences = TelegramBotPreferences(allowRemoteUpdate = true))
+        settings.value = settings.value.copy(preferences = TelegramBotPreferences(keyboardLayout = TELEGRAM_KEYBOARD_LAYOUT, allowRemoteUpdate = true))
         waitUntil { api.sent.any { it.second.startsWith("⬆ <b>Usage Monitor 42.1.0 pronto para instalar</b>") } }
         assertEquals("upd:42.1.0", api.keyboards.last { it.isNotEmpty() }.single().data)
         assertEquals("42.1.0", settings.value.preferences.announcedUpdateVersion)

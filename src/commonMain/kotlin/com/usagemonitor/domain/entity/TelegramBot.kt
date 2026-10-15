@@ -65,7 +65,13 @@ data class TelegramBotPreferences(
      * Reinício pedido pelo bot e ainda não confirmado na conversa (#417) — estado, como
      * [announcedUpdateVersion]: atravessa o reinício que ele mesmo descreve.
      */
-    val pendingRestart: TelegramPendingRestart? = null
+    val pendingRestart: TelegramPendingRestart? = null,
+    /**
+     * Desenho do teclado fixo já entregue às conversas pareadas (rodada AE, AE4) — estado,
+     * como [announcedUpdateVersion]. Abaixo de `TELEGRAM_KEYBOARD_LAYOUT`, o arranque manda
+     * o teclado novo uma vez. Nasce 0: arquivo antigo recebe o teclado na primeira vez.
+     */
+    val keyboardLayout: Int = 0
 )
 
 /**
@@ -199,6 +205,8 @@ sealed interface BotCommand {
     data object Leave : BotCommand
     /** `/teclado on|off` (#408, AA30): o teclado fixo de atalhos desta conversa. */
     data class Keyboard(val on: Boolean) : BotCommand
+    /** "☰ Mais" e "‹ Voltar" do teclado fixo (rodada AE, AE4): troca a página dos atalhos. */
+    data class KeyboardPage(val page: TelegramKeyboardPage) : BotCommand
     /** `/hud` (#408, AA29): traz a HUD à frente no PC — só com "Permitir ações no PC". */
     data object FocusHud : BotCommand
     /** `/exportar [24h|7d|30d] [csv|json]` (#408, AA23): o consumo do Claude CLI como arquivo. */
@@ -230,7 +238,7 @@ fun BotCommand.changesApp(): Boolean = when (this) {
     BotCommand.Sources, BotCommand.QuietMenu, BotCommand.Summary, is BotCommand.Chart, BotCommand.Resets,
     BotCommand.Exhaustion, BotCommand.BestAccount, BotCommand.Pace, BotCommand.Ping, BotCommand.Spike,
     BotCommand.Throughput, BotCommand.Week, is BotCommand.Windows, is BotCommand.Compare, BotCommand.Chats,
-    BotCommand.Leave, is BotCommand.Keyboard, is BotCommand.Analysis, BotCommand.Help, is BotCommand.Invalid -> false
+    BotCommand.Leave, is BotCommand.Keyboard, is BotCommand.KeyboardPage, is BotCommand.Analysis, BotCommand.Help, is BotCommand.Invalid -> false
 }
 
 /**
@@ -306,25 +314,79 @@ fun parseBotCommand(text: String): BotCommand? {
     }
 }
 
+/** As duas páginas do teclado fixo (rodada AE, AE4). */
+enum class TelegramKeyboardPage { MAIN, MORE }
+
 /**
- * Os botões do teclado fixo (#408, AA30), duas linhas de dois, no idioma da conversa.
- * O toque chega como texto com o rótulo; [parseKeyboardLabel] o traduz no comando.
+ * Versão do desenho do teclado fixo. Sobe quando os botões mudam: no arranque, a conversa
+ * pareada antes recebe o teclado novo uma vez (`TelegramBotPreferences.keyboardLayout`).
  */
-fun telegramKeyboardRows(language: AppLanguage): List<List<String>> =
-    TELEGRAM_KEYBOARD.map { row -> row.map { key -> if (language == AppLanguage.PT) key.pt else key.en } }
+const val TELEGRAM_KEYBOARD_LAYOUT = 1
+
+/**
+ * Os botões do teclado fixo (rodada AE, AE4), em linhas de três, no idioma da conversa.
+ * A página principal tem o uso diário e "☰ Mais"; a outra, o resto e "‹ Voltar". HUD e
+ * Time só entram com a permissão ligada: botão que só responde "não pode" é promessa
+ * falsa. O toque chega como texto com o rótulo; [parseKeyboardLabel] o traduz no comando.
+ */
+fun telegramKeyboardRows(
+    language: AppLanguage,
+    page: TelegramKeyboardPage = TelegramKeyboardPage.MAIN,
+    allowPcActions: Boolean = false,
+    showTeam: Boolean = false
+): List<List<String>> {
+    val keys = when (page) {
+        TelegramKeyboardPage.MAIN -> MAIN_KEYS
+        TelegramKeyboardPage.MORE -> MORE_KEYS +
+            listOfNotNull(HUD_KEY.takeIf { allowPcActions }, TEAM_KEY.takeIf { showTeam }) + BACK_KEY
+    }
+    return keys.map { key -> key.label(language) }.chunked(KEYBOARD_COLUMNS)
+}
 
 /** O comando de um rótulo do teclado fixo, nos dois idiomas; outro texto é `null`, como conversa solta. */
 fun parseKeyboardLabel(text: String): BotCommand? {
     val trimmed = text.trim()
-    return TELEGRAM_KEYBOARD.flatten().firstOrNull { key -> key.pt == trimmed || key.en == trimmed }?.command
+    return ALL_KEYS.firstOrNull { key -> key.pt == trimmed || key.en == trimmed }?.command
 }
 
-private class KeyboardKey(val pt: String, val en: String, val command: BotCommand)
+private class KeyboardKey(val pt: String, val en: String, val command: BotCommand) {
+    fun label(language: AppLanguage): String = if (language == AppLanguage.PT) pt else en
+}
 
-private val TELEGRAM_KEYBOARD = listOf(
-    listOf(KeyboardKey("📊 Status", "📊 Status", BotCommand.Status), KeyboardKey("👤 Conta", "👤 Account", BotCommand.Accounts)),
-    listOf(KeyboardKey("📈 Gráfico", "📈 Chart", BotCommand.Chart(HistoryRange.LAST_24_HOURS)), KeyboardKey("⏳ Quando", "⏳ When", BotCommand.Exhaustion))
+private const val KEYBOARD_COLUMNS = 3
+
+private val MAIN_KEYS = listOf(
+    KeyboardKey("📊 Cotas", "📊 Quotas", BotCommand.Status),
+    KeyboardKey("👤 Conta", "👤 Account", BotCommand.Accounts),
+    KeyboardKey("🔄 Coletar", "🔄 Collect", BotCommand.Refresh),
+    KeyboardKey("🔬 Análise", "🔬 Analysis", BotCommand.Analysis(view = null, source = null, all = false)),
+    KeyboardKey("🔔 Alertas", "🔔 Alerts", BotCommand.AlertMenu),
+    KeyboardKey("☰ Mais", "☰ More", BotCommand.KeyboardPage(TelegramKeyboardPage.MORE))
 )
+
+private val MORE_KEYS = listOf(
+    KeyboardKey("⏰ Reinícios", "⏰ Resets", BotCommand.Resets),
+    KeyboardKey("⏳ Quando", "⏳ When", BotCommand.Exhaustion),
+    KeyboardKey("🏁 Qual", "🏁 Which", BotCommand.BestAccount),
+    KeyboardKey("📏 Ritmo", "📏 Pace", BotCommand.Pace),
+    KeyboardKey("📉 Gráfico", "📉 Chart", BotCommand.Chart(HistoryRange.LAST_24_HOURS)),
+    KeyboardKey("📝 Resumo", "📝 Summary", BotCommand.Summary)
+)
+
+private val HUD_KEY = KeyboardKey("🖥 HUD", "🖥 HUD", BotCommand.FocusHud)
+private val TEAM_KEY = KeyboardKey("👥 Time", "👥 Team", BotCommand.Team)
+private val BACK_KEY = KeyboardKey("‹ Voltar", "‹ Back", BotCommand.KeyboardPage(TelegramKeyboardPage.MAIN))
+
+/**
+ * Rótulos do teclado da AA30: continuam entendidos porque o teclado antigo fica no
+ * celular até o próximo envio. "👤 Conta" e "⏳ Quando" não mudaram.
+ */
+private val LEGACY_KEYS = listOf(
+    KeyboardKey("📊 Status", "📊 Status", BotCommand.Status),
+    KeyboardKey("📈 Gráfico", "📈 Chart", BotCommand.Chart(HistoryRange.LAST_24_HOURS))
+)
+
+private val ALL_KEYS = MAIN_KEYS + MORE_KEYS + HUD_KEY + TEAM_KEY + BACK_KEY + LEGACY_KEYS
 
 /** Período e formato em qualquer ordem; sem eles, 7 dias em CSV. */
 private fun parseExport(args: List<String>): BotCommand {

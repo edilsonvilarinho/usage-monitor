@@ -117,7 +117,11 @@ internal class TelegramBotHandlers(
                 )
                 runCatching { saveSettings(paired) }
                 settingsFlow.value = paired
-                api.sendMessage(token, message.chatId, TelegramBotMessages.paired(language), html = true)
+                // O teclado fixo nasce ligado (rodada AE, AE4): chega junto da confirmação.
+                api.sendMessage(
+                    token, message.chatId, TelegramBotMessages.paired(language), html = true,
+                    replyKeyboard = TelegramReplyKeyboard.Show(telegramKeyboardRows(language))
+                )
             }
             return
         }
@@ -210,6 +214,15 @@ internal class TelegramBotHandlers(
                 token, chatId, TelegramBotChatMessages.keyboard(command.on, language), html = true,
                 replyKeyboard = if (command.on) TelegramReplyKeyboard.Show(telegramKeyboardRows(language)) else TelegramReplyKeyboard.Remove
             )
+            is BotCommand.KeyboardPage -> {
+                // Permissões relidas a cada troca: HUD e Time só aparecem ligados.
+                val preferences = settingsFlow.value.preferences
+                val rows = telegramKeyboardRows(language, command.page, preferences.allowPcActions, preferences.showTeam)
+                api.sendMessage(
+                    token, chatId, TelegramBotChatMessages.keyboardPage(command.page, language), html = true,
+                    replyKeyboard = TelegramReplyKeyboard.Show(rows)
+                )
+            }
             is BotCommand.Windows -> {
                 // Semanais pedem o mês: em 7 dias cabem uma ou duas janelas de 7 d.
                 val range = if (command.weekly) HistoryRange.LAST_30_DAYS else HistoryRange.LAST_7_DAYS

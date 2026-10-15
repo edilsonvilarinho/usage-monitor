@@ -115,9 +115,16 @@ internal object TelegramCommandCatalog {
             "<code>/ajuda</code> — esta lista", "<code>/help</code> — this list")
     )
 
-    /** O botão Menu do Telegram: na ordem das categorias, a descrição aberta pelo emoji dela. */
+    /**
+     * O botão Menu do Telegram (rodada AE, AE4): só [MENU], cada um com ícone próprio — o
+     * uso diário mora no teclado fixo e o `/ajuda` lista os 29. Os outros continuam
+     * funcionando digitados; saem só do autocompletar do `/`.
+     */
     fun menu(language: AppLanguage): List<Pair<String, String>> =
-        ordered().map { entry -> entry.name(language) to "${entry.category.emoji} ${entry.menuDescription(language)}" }
+        MENU.map { (namePt, icon) ->
+            val entry = entries.first { candidate -> candidate.namePt == namePt }
+            entry.name(language) to "$icon ${entry.menuDescription(language)}"
+        }
 
     /** O `/ajuda`: um cabeçalho por categoria e as linhas dela, com as variantes de argumento. */
     fun help(language: AppLanguage): String {
@@ -130,7 +137,8 @@ internal object TelegramCommandCatalog {
         return (listOf(title) + sections + tip).joinToString("\n\n")
     }
 
-    private fun ordered(): List<TelegramCommandEntry> = entries.sortedBy { entry -> entry.category.ordinal }
+    /** Os comandos do botão Menu, pelo nome em português, com o ícone de cada um. */
+    private val MENU = listOf("status" to "📊", "teclado" to "⌨", "ajuda" to "❓")
 
     private fun entry(
         category: TelegramCommandCategory,

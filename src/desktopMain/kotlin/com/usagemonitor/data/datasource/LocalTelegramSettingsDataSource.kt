@@ -33,7 +33,8 @@ private data class TelegramPreferencesDto(
     val batchAlerts: Boolean = true,
     val compactPanel: Boolean = true,
     val sourceHealthAlerts: Boolean = true,
-    val pendingRestart: TelegramPendingRestartDto? = null
+    val pendingRestart: TelegramPendingRestartDto? = null,
+    val keyboardLayout: Int = 0
 )
 
 @Serializable
@@ -98,7 +99,8 @@ internal class LocalTelegramSettingsDataSource(
                 sourceHealthAlerts = dto.preferences.sourceHealthAlerts,
                 pendingRestart = dto.preferences.pendingRestart?.let { pending ->
                     TelegramPendingRestart(pending.targetVersion, pending.fromVersion)
-                }
+                },
+                keyboardLayout = dto.preferences.keyboardLayout
             )
         )
     }
@@ -128,7 +130,8 @@ internal class LocalTelegramSettingsDataSource(
                 sourceHealthAlerts = settings.preferences.sourceHealthAlerts,
                 pendingRestart = settings.preferences.pendingRestart?.let { pending ->
                     TelegramPendingRestartDto(pending.targetVersion, pending.fromVersion)
-                }
+                },
+                keyboardLayout = settings.preferences.keyboardLayout
             )
         )
         writeSecretFile(settingsFile, json.encodeToString(TelegramSettingsDto.serializer(), dto))

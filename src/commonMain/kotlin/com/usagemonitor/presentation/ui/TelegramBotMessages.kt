@@ -212,9 +212,9 @@ internal object TelegramBotMessages {
     fun help(language: AppLanguage): String = TelegramCommandCatalog.help(language)
 
     fun paired(language: AppLanguage): String = if (language == AppLanguage.PT) {
-        "✅ <b>Conversa pareada.</b>\nToque em /status ou abra o <b>Menu</b> para ver os comandos."
+        "✅ <b>Conversa pareada.</b>\nOs atalhos estão aqui embaixo, no lugar do teclado; /ajuda lista todos os comandos."
     } else {
-        "✅ <b>Chat paired.</b>\nTap /status or open the <b>Menu</b> for the commands."
+        "✅ <b>Chat paired.</b>\nThe shortcuts are down here, in place of the keyboard; /help lists every command."
     }
 
     fun applied(command: BotCommand, language: AppLanguage): String {
