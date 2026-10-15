@@ -73,7 +73,7 @@ private fun createTelegramBotService(
     alerts = alerts,
     snapshotProvider = snapshot,
     requestRefresh = { refreshForBot(dashboard) },
-    languageProvider = { storedLanguage(graph.settings) },
+    languageProvider = { graph.languageSelection.current() },
     enabledSources = { graph.enabledApis.value },
     // O mesmo caminho do interruptor da aba APIs: grava e recoleta a fonte.
     toggleSource = { source, on ->
@@ -105,7 +105,7 @@ private fun createTelegramBotService(
         applyUpdate = { dashboard.restartAndUpdateNow() },
         appReady = { graph.appAnchored.first { anchored -> anchored } },
         releaseNotes = { version, previous -> GetReleaseNotesUseCase(graph.appUpdateRepository)(version, previous) },
-        sourceHealth = { sourceHealthOf(dashboard.uiState.value, storedLanguage(graph.settings)) },
+        sourceHealth = { sourceHealthOf(dashboard.uiState.value, graph.languageSelection.current()) },
         sessionAnalysis = sessionAnalysisReader(graph, dashboard),
         exportUsage = { since, format ->
             graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
@@ -201,7 +201,7 @@ private const val DAILY_SPEND_WINDOW_MILLIS = 24 * 60 * 60 * 1_000L
  */
 private suspend fun telegramChartOf(graph: AppGraph, range: HistoryRange): TelegramChart? {
     val now = Clock.System.now()
-    val language = storedLanguage(graph.settings)
+    val language = graph.languageSelection.current()
     val reports = graph.enabledApis.value.sortedBy { source -> source.ordinal }.flatMap { source ->
         val accounts = runCatching { graph.getUsageHistory.listAccounts(source) }.getOrDefault(emptyList())
         if (accounts.isEmpty()) {

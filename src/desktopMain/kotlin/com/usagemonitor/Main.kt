@@ -16,6 +16,7 @@ import androidx.compose.ui.window.application
 import com.usagemonitor.data.diagnostics.AppLogFile
 import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
 import com.usagemonitor.presentation.ui.windowDragSink
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
@@ -84,6 +85,7 @@ fun main(args: Array<String>) {
     val launch = when (val request = parseCommandLine(args)) {
         CommandLineRequest.Help -> exitProcess(printAndSucceed(commandLineHelp()))
         CommandLineRequest.Version -> exitProcess(printAndSucceed(commandLineVersion()))
+        is CommandLineRequest.Invalid -> exitProcess(printUsageError(request.message))
         CommandLineRequest.Diagnostics -> exitProcess(DiagnosticsExport.run())
         is CommandLineRequest.Launch -> request
     }
@@ -125,12 +127,18 @@ fun main(args: Array<String>) {
     // Travamento da interface não lança exceção: só um observador de fora o vê.
     EdtWatchdog(appLog).start()
 
-    runUsageMonitor(args, breadcrumbs)
+    runUsageMonitor(args, breadcrumbs, languageOverride = launch.locale)
 }
 
 private fun printAndSucceed(text: String): Int {
     println(text)
     return 0
+}
+
+/** Saída 2, a convenção de "uso incorreto" dos CLIs, separada da falha de execução (1). */
+private fun printUsageError(message: String): Int {
+    System.err.println(message)
+    return 2
 }
 
 /**
@@ -156,7 +164,8 @@ internal fun BreadcrumbRecorder.recordScreenOpened(screen: String) {
 
 internal fun runUsageMonitor(
     args: Array<String>,
-    breadcrumbs: BreadcrumbRecorder
+    breadcrumbs: BreadcrumbRecorder,
+    languageOverride: AppLanguage? = null
 ) = application {
     val startup = remember { AppStartup(args) }
     val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
@@ -176,7 +185,7 @@ internal fun runUsageMonitor(
     // O grafo e os view models vivem fora da composição (`AppGraph`,
     // `AppViewModels`): são criados uma vez por processo, depois da checagem de
     // instância única.
-    val graph = remember { AppGraph(breadcrumbs) }
+    val graph = remember { AppGraph(breadcrumbs, languageOverride) }
     val settings = graph.settings
     // Uma chamada, e todo o estado da atualização automática mora fora daqui.
     val autoUpdate = rememberAutoUpdateController(settings = settings, httpClient = graph.httpClient)
@@ -216,7 +225,7 @@ internal fun runUsageMonitor(
     val dashboardState by viewModels.dashboard.uiState.collectAsState()
 
     val shell = remember {
-        AppShellState(settings, initialTargets = availableTargets)
+        AppShellState(settings, initialTargets = availableTargets, languageSelection = graph.languageSelection)
     }
     // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
     // é o mesmo arranque que abre o relatório, então ela foi oferecida.

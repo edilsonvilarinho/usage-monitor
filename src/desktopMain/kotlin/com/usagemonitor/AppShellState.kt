@@ -25,7 +25,8 @@ import com.usagemonitor.presentation.ui.theme.AppThemePreset
 @Stable
 internal class AppShellState(
     private val settings: PreferencesSettings,
-    initialTargets: List<UsageTargetKey>
+    initialTargets: List<UsageTargetKey>,
+    private val languageSelection: LanguageSelection = LanguageSelection(settings, initialOverride = null)
 ) {
     /** Escala da interface; o valor persistido acompanha pelo coletor com debounce. */
     var uiScalePercent by mutableStateOf(readPersistedUiScalePercent(settings))
@@ -50,7 +51,7 @@ internal class AppShellState(
     var themePreset by mutableStateOf(readPersistedThemePreset(settings))
         private set
 
-    var language by mutableStateOf(storedLanguage(settings))
+    var language by mutableStateOf(languageSelection.current())
         private set
 
     /** O que estava gravado no arranque; a leitura real do sistema chega depois. */
@@ -96,7 +97,7 @@ internal class AppShellState(
 
     fun changeLanguage(selected: AppLanguage) {
         language = selected
-        settings.putString(LANGUAGE_KEY, selected.name)
+        languageSelection.choose(selected)
     }
 
     /**

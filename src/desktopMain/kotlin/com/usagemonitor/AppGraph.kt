@@ -47,6 +47,7 @@ import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
@@ -75,7 +76,10 @@ import kotlin.time.Instant
  * Criado **depois** do `SingleInstanceGuard`: a segunda instância sai antes de
  * abrir banco ou arquivo de ninguém.
  */
-internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
+internal class AppGraph(
+    val breadcrumbs: BreadcrumbRecorder,
+    languageOverride: AppLanguage? = null
+) {
 
     // Lido ANTES do `httpClient`: o proxy precisa estar resolvido no momento em
     // que o engine é montado, e o client é criado uma única vez — mudar a
@@ -92,6 +96,7 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
 
     val preferencesNode: Preferences = Preferences.userRoot().node("com.usagemonitor")
     val settings = PreferencesSettings(preferencesNode)
+    val languageSelection = LanguageSelection(settings, languageOverride)
 
     // Chaves de API são segredos: não entram em PreferencesSettings, que grava
     // os valores em claro no registro do Windows.
@@ -259,11 +264,11 @@ internal class AppGraph(val breadcrumbs: BreadcrumbRecorder) {
     val getStalledCliSessions = GetStalledCliSessionsUseCase(cliSessionRepository)
 
     // A janela principal só existe depois da composição; por isso o writer
-    // recebe uma função e não a referência. O idioma sai das preferências na hora
+    // recebe uma função e não a referência. O idioma efetivo é lido na hora
     // de gerar: o relatório precisa do idioma corrente, não do que valia no arranque.
     val usageExportWriter = DesktopUsageExportWriter(
         parentWindow = { mainWindow },
-        language = { storedLanguage(settings) }
+        language = { languageSelection.current() }
     )
 
     /**
