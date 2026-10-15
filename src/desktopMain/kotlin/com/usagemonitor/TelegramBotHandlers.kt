@@ -311,12 +311,9 @@ internal class TelegramBotHandlers(
         api.sendPhoto(token, chatId, TelegramHeatmapRenderer.render(heatmap), TelegramBotUsageMessages.compareCaption(days, language))
     }
 
-    /** O `/status` com a sparkline das últimas 6 h de cada cota (#408, AA13). */
-    private suspend fun statusText(snapshot: UsageSnapshot?, language: AppLanguage): String {
-        val now = snapshot?.generatedAt ?: return TelegramBotMessages.status(null, language)
-        val sparklines = TelegramBotUsageMessages.sparklines(readings.accountHistory(HistoryRange.LAST_24_HOURS), now)
-        return TelegramBotMessages.status(snapshot, language, sparklines)
-    }
+    /** O `/status` com a barra por zona dos limiares de cada conta (rodada AE, AE7). */
+    private fun statusText(snapshot: UsageSnapshot?, language: AppLanguage): String =
+        TelegramBotMessages.status(snapshot, language, alertSettingsFlow.value)
 
     private suspend fun sendSources(token: String, chatId: Long, language: AppLanguage) {
         val allowed = settingsFlow.value.allowSourceControl
@@ -383,7 +380,7 @@ internal class TelegramBotHandlers(
                 } else {
                     emptyList()
                 }
-                api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true, buttons = buttons)
+                api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language, alertSettingsFlow.value), html = true, buttons = buttons)
             }
             is BotTap.Source -> toggleFromTap(token, message, callbackId, tap.source, language)
             is BotTap.SnoozeFor -> snoozeFromTap(token, message.chatId, callbackId, clock.now().toEpochMilliseconds() + tap.minutes * 60_000L, language)
@@ -407,7 +404,7 @@ internal class TelegramBotHandlers(
                 val targetKey = account?.targetKey
                 if (tap.key != null && targetKey == null) {
                     // A conta saiu do retrato entre o teclado e o toque.
-                    api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language), html = true)
+                    api.sendMessage(token, message.chatId, TelegramBotMessages.account(snapshotProvider(), tap.key, language, alertSettingsFlow.value), html = true)
                     return
                 }
                 pendingThresholds[message.chatId] = PendingThreshold(targetKey, account?.label, clock.now().toEpochMilliseconds() + THRESHOLD_REPLY_MILLIS)

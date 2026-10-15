@@ -10,13 +10,6 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaWindowSummary
 import com.usagemonitor.domain.entity.TelegramAccountHistory
 import com.usagemonitor.domain.entity.UsageForecast
-import com.usagemonitor.domain.entity.UsageHistoryPoint
-import com.usagemonitor.domain.entity.UsageRiskLevel
-import com.usagemonitor.domain.entity.UsageSnapshot
-import com.usagemonitor.domain.entity.UsageSnapshotAccount
-import com.usagemonitor.domain.entity.UsageSnapshotQuota
-import com.usagemonitor.presentation.ui.TelegramBotMessages
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsagePeriodComparison
@@ -99,40 +92,6 @@ class TelegramBotUsageMessagesTest {
             TelegramBotUsageMessages.windows(listOf(history("Anthropic · Padrão", short)), weekly = false, language = AppLanguage.PT)
         )
         assertEquals("🪟 Sem janelas semanais no histórico ainda.", TelegramBotUsageMessages.windows(listOf(history("Anthropic · Padrão", short)), weekly = true, language = AppLanguage.PT))
-    }
-
-    private fun point(at: String, used: Long) = UsageHistoryPoint(
-        capturedAt = Instant.parse(at), used = used, total = 100, rawUsed = used, rawTotal = 100, periodEndAt = Instant.parse("2026-10-13T19:00:00Z")
-    )
-
-    @Test
-    fun `sparkline carries the last reading forward in 30 minute blocks and needs two readings`() {
-        // 6 h antes de `now` = 11:00Z; blocos terminam em 11:30Z, 12:00Z… 17:00Z.
-        val points = listOf(point("2026-10-13T12:10:00Z", 0), point("2026-10-13T14:40:00Z", 50), point("2026-10-13T16:50:00Z", 100))
-
-        assertEquals("  ▁▁▁▁▁▄▄▄▄█", TelegramBotUsageMessages.sparkline(points, now))
-        assertNull(TelegramBotUsageMessages.sparkline(points.take(1), now))
-    }
-
-    @Test
-    fun `status shows the sparkline under the quota that has history`() {
-        val snapshot = UsageSnapshot(
-            generatedAt = now,
-            accounts = listOf(
-                UsageSnapshotAccount(
-                    ApiSource.ANTHROPIC, "Anthropic · Padrão", false,
-                    listOf(
-                        UsageSnapshotQuota("5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 86, 100, 86, null, "USD", UsageRiskLevel.WILL_EXCEED),
-                        UsageSnapshotQuota("Semanal", PeriodType.WEEKLY, UsageUnit.PERCENTAGE, 61, 100, 61, null, "USD")
-                    )
-                )
-            )
-        )
-        val history = history("Anthropic · Padrão", series("5h", PeriodType.INTERVAL, null).copy(points = listOf(point("2026-10-13T12:10:00Z", 0), point("2026-10-13T16:50:00Z", 86))))
-
-        val text = TelegramBotMessages.status(snapshot, AppLanguage.PT, TelegramBotUsageMessages.sparklines(listOf(history), now))
-
-        assertTrue("5h\n<code>▰▰▰▰▰▰▰▰▱▱  86%</code>\n<code>  ▁▁▁▁▁▁▁▁▁▇</code> <i>6 h</i>\nSemanal\n<code>▰▰▰▰▰▰▱▱▱▱  61%</code>" in text, text)
     }
 
     private val now = Instant.parse("2026-10-13T17:00:00Z")

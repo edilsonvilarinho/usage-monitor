@@ -9,6 +9,9 @@ import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.UsageAlert
+import com.usagemonitor.domain.entity.UsageAlertSettings
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.withAccountThreshold
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.presentation.ui.TelegramBotSummaryMessages
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -47,16 +50,32 @@ class TelegramBotMessagesTest {
         )
     )
 
+    /** Rodada AE, AE7: nome e risco em linhas próprias, barra de quadrados e a legenda geral no fim. */
     @Test
-    fun `status is one card per account with risk word, bar and reset`() {
+    fun `status is one card per account with risk word, square bar and reset`() {
         val text = TelegramBotMessages.status(snapshot, AppLanguage.PT)
 
         assertTrue(text.startsWith("<b>📊 Usage Monitor</b>\n<i>coleta 22:28 BRT · há 1 min</i>"), text)
-        assertTrue("<b>Anthropic · &lt;Padrão&gt;</b> — 🔴 Crítico · ⚡ em uso" in text, text)
-        assertTrue("Claude 5h · reinicia 02:10\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>" in text, text)
+        assertTrue("<b>Anthropic · &lt;Padrão&gt;</b>\n🔴 Crítico · ⚡ em uso\n" in text, text)
+        assertTrue("Claude 5h · reinicia 02:10\n🟩🟩🟩🟩⬛⬛⬛⬛⬛⬛ <b>42%</b>" in text, text)
         // Reinício a mais de 24 h ganha o dia da semana.
-        assertTrue("Claude 7d · reinicia sáb 01:00\n<code>▰▰▱▱▱▱▱▱▱▱  21%</code>" in text, text)
+        assertTrue("Claude 7d · reinicia sáb 01:00\n🟩🟩⬛⬛⬛⬛⬛⬛⬛⬛ <b>21%</b>" in text, text)
         assertTrue("<b>DeepSeek</b>\nSaldo\n<code>saldo US$ 37,66</code>" in text, text)
+        assertTrue(text.endsWith("\n\n<i>🟩 até 75% · 🟨 até 90% · 🟥 acima</i>"), text)
+        assertFalse("▰" in text || "6 h</i>" in text, text)
+    }
+
+    /** AA10 + AE7: conta com limiar próprio pinta pela dela e diz qual é; as outras seguem o geral do rodapé. */
+    @Test
+    fun `account with its own threshold paints by it and carries its legend`() {
+        val own = snapshot.copy(accounts = snapshot.accounts.mapIndexed { index, account -> if (index == 0) account.copy(targetKey = "anthropic:padrao") else account })
+        val settings = UsageAlertSettings(quotaPercents = listOf(75, 90)).withAccountThreshold("anthropic:padrao", "Padrão", listOf(30, 40))
+
+        val text = TelegramBotMessages.status(own, AppLanguage.PT, settings)
+
+        assertTrue("🔴 Crítico · ⚡ em uso\n<i>limiar próprio: 🟩 até 30% · 🟨 até 40% · 🟥 acima</i>\n" in text, text)
+        assertTrue("Claude 5h · reinicia 02:10\n🟩🟩🟩🟨⬛⬛⬛⬛⬛⬛ <b>42%</b>" in text, text)
+        assertTrue(text.endsWith("<i>🟩 até 75% · 🟨 até 90% · 🟥 acima</i>"), text)
     }
 
     @Test
@@ -67,11 +86,32 @@ class TelegramBotMessagesTest {
         assertFalse("coleta —" in text)
     }
 
+    /** AE7: cheia pelo piso (nunca passa do número); a cor é quantos limiares a célula já passou. */
     @Test
-    fun `bar never fills past the written percent`() {
-        assertEquals("▱▱▱▱▱▱▱▱▱▱", TelegramBotMessages.bar(0))
-        assertEquals("▰▰▰▰▰▰▰▰▰▱", TelegramBotMessages.bar(99))
-        assertEquals("▰▰▰▰▰▰▰▰▰▰", TelegramBotMessages.bar(140))
+    fun `square bar never fills past the written percent and colors by thresholds passed`() {
+        val defaults = listOf(75, 90, 100)
+        assertEquals("⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛", TelegramBotMessages.zoneBar(0, defaults))
+        assertEquals("🟩🟩🟩🟩🟩🟩🟩🟨🟨⬛", TelegramBotMessages.zoneBar(99, defaults))
+        assertEquals("🟩🟩🟩🟩🟩🟩🟩🟨🟨🟥", TelegramBotMessages.zoneBar(140, defaults))
+        assertEquals("🟩🟩🟩🟩🟩🟩🟩🟩🟩🟨", TelegramBotMessages.zoneBar(100, listOf(90)))
+        assertEquals("🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩", TelegramBotMessages.zoneBar(100, emptyList()))
+        assertEquals("🟩 até 90% · 🟨 acima", TelegramBotMessages.zoneLegend(listOf(90), AppLanguage.PT))
+        assertEquals("🟩 up to 75% · 🟨 up to 90% · 🟥 above", TelegramBotMessages.zoneLegend(defaults, AppLanguage.EN))
+        assertEquals(null, TelegramBotMessages.zoneLegend(emptyList(), AppLanguage.PT))
+    }
+
+    /** AE7: o alerta de limiar leva a barra com os limiares da conta dele; alerta sem cota, não. */
+    @Test
+    fun `quota alert carries the square bar`() {
+        val alert = UsageAlert.QuotaThreshold(
+            UsageTargetKey(ApiSource.MINIMAX), "MiniMax", "5h", thresholdPercent = 75, actualPercent = 88,
+            periodEndAt = Instant.parse("2026-10-13T04:00:00Z"), hasKnownResetAt = true
+        )
+
+        val lines = TelegramBotMessages.alert(alert, AppLanguage.PT).lines()
+
+        assertEquals("🟩🟩🟩🟩🟩🟩🟩🟨⬛⬛ <b>88%</b>", lines[1])
+        assertFalse("🟩" in TelegramBotMessages.alert(UsageAlert.SessionSaturated("s1", "x"), AppLanguage.PT))
     }
 
     @Test
@@ -125,7 +165,7 @@ class TelegramBotMessagesTest {
         val text = TelegramBotSummaryMessages.panel(snapshot, AppLanguage.PT)
 
         assertTrue(text.startsWith("<b>📌 Painel ao vivo</b>\n<i>atualizado 22:28 BRT</i>"), text)
-        assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h\n<code>▰▰▰▰▱▱▱▱▱▱  42%</code>" in text, text)
+        assertTrue("🔴 <b>Anthropic · &lt;Padrão&gt;</b> · Claude 5h\n🟩🟩🟩🟩⬛⬛⬛⬛⬛⬛ <b>42%</b>" in text, text)
         assertEquals(text, TelegramBotSummaryMessages.panel(snapshot.copy(generatedAt = now + kotlin.time.Duration.parse("5m")), AppLanguage.PT))
     }
 

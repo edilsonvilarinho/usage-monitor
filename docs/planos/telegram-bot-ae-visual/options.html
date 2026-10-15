@@ -1,0 +1,149 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bot do Telegram — opções AE</title><style>body{margin:0;background:#101010}</style></head><body>
+<div class="ux" id="ux">
+<style>
+.ux{background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 12px;color:#e9d6b8;font-size:11.5px}
+.ux .fix b{color:#E8AE63}
+.ux .fix ol{margin:4px 0 0;padding-left:18px}
+.ux .nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.ux .nav button{background:#252525;color:#eee;border:1px solid #444;border-radius:6px;padding:4px 8px;font:inherit;font-size:11px;cursor:pointer}
+.ux .nav button.on{background:#3a2a14;border-color:#8C643F;color:#FFE0B0}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:14px}
+.ux .opt.ref{border-style:dashed;border-color:#4a4a4a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt h3 small{color:#E8AE63;font-size:10.5px;margin-left:6px;font-weight:400}
+.ux .opt p{margin:0 0 6px;color:#9a9a9a;font-size:11px}
+.ux .opt p.risk{color:#c99a6a}
+.ux .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;margin-top:8px}
+.ux .cap{font-size:10px;color:#8C643F;margin:0 0 4px;text-align:center}
+/* ---------- telefone Telegram (tema escuro do Android) ---------- */
+.ux .ph{width:100%;max-width:316px;margin:0 auto;background:#0E1621;border:1px solid #22303d;border-radius:14px;overflow:hidden;font:13.5px/1.38 Roboto,"Segoe UI",system-ui,sans-serif;color:#F5F5F5;display:flex;flex-direction:column}
+.ux .hd{display:flex;align-items:center;gap:8px;background:#17212B;padding:7px 10px}
+.ux .av{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 50% 50%,#030508 38%,#E8AE63 40%,#B4501E 58%,#030508 62%);flex:none}
+.ux .hd b{font-size:13.5px;font-weight:500;display:block}
+.ux .hd span{font-size:11px;color:#7D8B99}
+.ux .ms{padding:8px 8px 6px;display:flex;flex-direction:column;gap:5px;min-height:120px}
+.ux .u{align-self:flex-end;background:#2B5278;border-radius:12px 12px 4px 12px;padding:5px 9px;font-size:13.5px}
+.ux .bw{align-self:flex-start;max-width:96%;display:flex;flex-direction:column;gap:3px}
+.ux .b{background:#182533;border-radius:12px 12px 12px 4px;padding:6px 9px 5px;white-space:normal}
+.ux .b code{font-family:"Roboto Mono",Consolas,monospace;font-size:12.5px;color:#E3ECF4;white-space:pre}
+.ux .b i{color:#C5D0DA}
+.ux .b .t{display:block;text-align:right;font-size:10.5px;color:#6D7F8F;margin-top:1px}
+.ux .b .ed{color:#6D7F8F;font-size:10.5px}
+.ux .kb{display:flex;flex-direction:column;gap:3px}
+.ux .kb div{display:flex;gap:3px}
+.ux .kb span{flex:1;text-align:center;background:#1C2A38;border-radius:8px;padding:6px 4px;font-size:12.5px;color:#F0F4F7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .kb span.sel{background:#2B5278}
+.ux .bq{border-left:3px solid #6AB3F3;background:rgba(106,179,243,.09);border-radius:4px;padding:4px 20px 4px 8px;margin:4px 0;position:relative}
+.ux .bq:after{content:"\201D";position:absolute;right:6px;top:0;color:#6AB3F3;font-size:16px}
+.ux .bq.exp{max-height:2.7em;overflow:hidden}
+.ux .bq.exp:after{content:"\25BE";top:auto;bottom:2px;font-size:12px}
+.ux .bq.open:after{content:"\25B4";top:auto;bottom:2px;font-size:12px}
+.ux .in{display:flex;align-items:center;gap:6px;background:#17212B;padding:6px 8px;border-top:1px solid #0b121a}
+.ux .mb{background:#3390EC;color:#fff;border-radius:14px;padding:3px 10px;font-size:12.5px;font-weight:500}
+.ux .in em{color:#6D7F8F;font-style:normal;font-size:13px;flex:1}
+/* menu de comandos (botão Menu) */
+.ux .mn{background:#17212B;max-height:330px;overflow:auto;padding:4px 0;border-top:1px solid #0b121a}
+.ux .mi{display:flex;align-items:baseline;gap:8px;padding:6px 12px;font-size:13.5px}
+.ux .mi .d{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux .mi .c{color:#7D8B99;font-size:12.5px;flex:none}
+.ux .mi.hd2 .d{color:#F5F5F5}
+.ux .mi.sub .d{color:#DDE5EC}
+/* teclado fixo (ReplyKeyboardMarkup) */
+.ux .rk{background:#17212B;padding:6px;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;border-top:1px solid #0b121a}
+.ux .rk span{background:#2A3846;border-radius:6px;text-align:center;padding:9px 2px;font-size:12.5px}
+.ux .photo{border-radius:10px 10px 0 0;overflow:hidden;background:#030508;display:block}
+</style>
+
+<h1>Bot do Telegram — menu e respostas · rodada AE</h1>
+<p class="sub">Estático: o Telegram não anima mensagem. Conteúdo do seu print (Anthropic · Padrão 55%/88%, OpenCode Go 0%), no idioma PT. Risco por cota e tendência são ilustrativos — o real sai de <code>UsageSnapshotQuota.risk</code> e do histórico.</p>
+
+<div class="fix"><b>Defeitos medidos no print (evidência, não hipótese)</b><ol>
+<li>Menu: o ícone repete a <b>categoria</b> (📊 em 7 linhas, 📐 em 10), não distingue o comando; 29 linhas sem divisória — o <code>setMyCommands</code> só aceita nome e descrição, sem seção.</li>
+<li>Sparkline ▁▂█ em <code>&lt;code&gt;</code>: 88% vira um retângulo branco, 0% vira um traço "_____ 6 h" sem informação (o mesmo defeito que tirou os blocos da janela Análise, <code>presentation.md</code>).</li>
+<li>Cotas em 0% gastam 3 linhas cada, igual à crítica: a mensagem não cabe numa tela.</li>
+<li>Título "Anthropic · Padrão — 🔴 Critical · ⚡ in use" quebra em duas linhas no celular.</li>
+</ol>Comum a todas as opções: sparkline sai do texto (tendência vira palavra ou vai para <code>/grafico</code>).</div>
+
+<div class="nav" id="nav"></div>
+<div id="opts"></div>
+</div>
+
+<script>
+(function(){
+const bar=p=>'▰'.repeat(Math.floor(p/10))+'▱'.repeat(10-Math.floor(p/10));
+const pad=(s,n)=>String(s).padStart(n);
+const t=h=>`<span class="t">${h||'12:25'}</span>`;
+const phone=(body,bottom)=>`<div class="ph"><div class="hd"><div class="av"></div><div><b>usage-monitor</b><span>bot</span></div></div><div class="ms">${body}</div>${bottom||'<div class="in"><span class="mb">☰ Menu</span><em>Mensagem</em></div>'}</div>`;
+const u=c=>`<div class="u">${c}</div>`;
+const kb=rows=>rows?`<div class="kb">${rows.map(r=>`<div>${r.map(x=>x.startsWith('*')?`<span class="sel">${x.slice(1)}</span>`:`<span>${x}</span>`).join('')}</div>`).join('')}</div>`:'';
+const b=(h,rows,time)=>`<div class="bw"><div class="b">${h}${t(time)}</div>${kb(rows)}</div>`;
+const menu=items=>`<div class="mn">${items.map(([d,c,cls])=>`<div class="mi ${cls||''}"><span class="d">${d}</span><span class="c">/${c}</span></div>`).join('')}</div><div class="in"><span class="mb">✕ Menu</span><em>Mensagem</em></div>`;
+const STATUS_KB=[['🔄 Atualizar','🔕 Silenciar 1h','⚙ Limiares']];
+
+// ---------- Hoje ----------
+const refMenu=[['📊 Cotas de todas as contas','status'],['📊 Uma conta por vez','conta'],['📊 Coleta agora e mostra as cotas','atualizar'],['📊 Que conta tem mais folga agora','qual'],['📊 Próximos reinícios das cotas','reinicios'],['📊 Quando cada cota estoura no ritmo atual','quando'],['📊 O app está aberto? Versão e última coleta','ping'],['📐 Análise da sessão: ritmo, vazão e janelas','analise'],['📐 Quanto da cota semanal cabe por dia','ritmo'],['📐 Tokens por segundo por modelo (24h)','vazao'],['📐 Esta semana contra a anterior','semana'],['📐 Últimas janelas com pico (5h ou 7d)','janelas'],['📐 Mapa de calor dos modelos (7d)','comparar'],['📐 Consumo de hoje acima do seu hábito','pico'],['📐 Gráfico do uso (24h ou 7d)','grafico'],['📐 Resumo do dia','resumo'],['📐 Uso do Claude CLI em arquivo (7d csv)','exportar'],['🔔 Alertas por tipo, ou todos (on ou off)','alertas'],['🔔 Limiares de cota (75,90), ou por conta','limiar'],['🔔 Horário de silêncio (22-07 ou off)','silencio'],['🔔 Só alertas críticos por um tempo (2h ou off)','foco'],['🔔 Lembrete antes do reinício (15 ou off)','avise'],['💬 Fontes monitoradas','api'],['💬 Conversas pareadas','conversas'],['💬 Desfaz o pareamento desta conversa','sair'],['💬 Atalhos no lugar do teclado (on ou off)','teclado'],['💬 Traz a HUD à frente no PC','hud'],['💬 Quem do time está online','time'],['💬 Lista de comandos','ajuda']];
+const refStatus=`<b>📊 Usage Monitor</b><br><i>coleta 12:24 BRT · há menos de 1 min</i><br><br><b>Anthropic · Padrão</b> — 🔴 Crítico · ⚡ em uso<br>Claude 5h · reinicia 14:50<br><code>${bar(55)}  55%</code><br><code>▁▁▁▁▁▂▃▃▄▅▅▆</code> <i>6 h</i><br>Claude 7d · reinicia ter 01:00<br><code>${bar(88)}  88%</code><br><code>▇▇▇▇▇▇▇▇▇▇▇▇</code> <i>6 h</i><br><br><b>OpenCode Go</b><br>Go 5h · reinicia 17:24<br><code>${bar(0)}   0%</code><br><code>▁▁▁▁▁▁▁▁▁▁▁▁</code> <i>6 h</i><br>Go semanal · reinicia dom 21:00<br><code>${bar(0)}   0%</code><br><code>▁▁▁▁▁▁▁▁▁▁▁▁</code> <i>6 h</i><br>Go mensal · reinicia qui 15:47<br><code>${bar(0)}   0%</code><br><code>▁▁▁▁▁▁▁▁▁▁▁▁</code> <i>6 h</i>`;
+
+// ---------- menus ----------
+const AREAS=[['*📊 Agora · 7','📐 Análises · 10'],['🔔 Alertas · 5','💬 Conversa e PC · 7']];
+const ANALISES_KB=[['🔬 Análise','📏 Ritmo'],['⚡ Vazão','📅 Semana'],['🪟 Janelas','🌡 Comparar'],['📈 Pico','📉 Gráfico'],['📝 Resumo','💾 Exportar'],['‹ Áreas']];
+const iconMenu=[['📊 Cotas de todas as contas','status'],['👤 Uma conta por vez','conta'],['🔄 Coletar agora','atualizar'],['🏁 Conta com mais folga','qual'],['⏰ Próximos reinícios','reinicios'],['⏳ Quando cada cota estoura','quando'],['🏓 App aberto? Versão','ping'],['🔬 Análise da sessão','analise'],['📏 Semanal por dia','ritmo'],['⚡ Tokens/s por modelo','vazao'],['📅 Semana × anterior','semana'],['🪟 Últimas janelas','janelas'],['🌡 Mapa de calor (7d)','comparar'],['📈 Acima do hábito hoje','pico'],['📉 Gráfico 24h ou 7d','grafico'],['📝 Resumo do dia','resumo'],['💾 Uso do CLI em CSV','exportar'],['🔔 Ligar e desligar alertas','alertas'],['🎚 Limiares de cota','limiar'],['🌙 Horário de silêncio','silencio'],['🎯 Só críticos por um tempo','foco'],['🛎 Aviso antes do reinício','avise'],['🔌 Fontes monitoradas','api'],['💬 Conversas pareadas','conversas'],['🚪 Desparear esta conversa','sair'],['⌨ Atalhos no teclado','teclado'],['🖥 HUD à frente no PC','hud'],['👥 Time online','time'],['❓ Todos os comandos','ajuda']];
+const titled=[['━━ 📊 AGORA ━━━━━━━━━','agora','hd2'],['└ Cotas de todas as contas','status','sub'],['└ Uma conta por vez','conta','sub'],['└ Coletar agora','atualizar','sub'],['└ Conta com mais folga','qual','sub'],['└ Próximos reinícios','reinicios','sub'],['└ Quando cada cota estoura','quando','sub'],['└ App aberto? Versão','ping','sub'],['━━ 📐 ANÁLISES ━━━━━━━','analises','hd2'],['└ Análise da sessão','analise','sub'],['└ Semanal por dia','ritmo','sub'],['└ Tokens/s por modelo','vazao','sub'],['└ Semana × anterior','semana','sub'],['└ Últimas janelas','janelas','sub'],['└ Mapa de calor (7d)','comparar','sub'],['└ Acima do hábito hoje','pico','sub'],['└ Gráfico 24h ou 7d','grafico','sub'],['└ Resumo do dia','resumo','sub'],['└ Uso do CLI em CSV','exportar','sub'],['━━ 🔔 ALERTAS ━━━━━━━━','avisos','hd2'],['└ Ligar e desligar alertas','alertas','sub'],['└ Limiares de cota','limiar','sub'],['└ Horário de silêncio','silencio','sub'],['└ Só críticos por um tempo','foco','sub'],['└ Aviso antes do reinício','avise','sub'],['━━ 💬 CONVERSA E PC ━━━','pc','hd2'],['└ Fontes monitoradas','api','sub'],['└ HUD à frente no PC','hud','sub'],['└ Todos os comandos','ajuda','sub']];
+
+// ---------- respostas ----------
+const head=`<b>📊 Usage Monitor</b> · <i>12:24 BRT · agora</i>`;
+const quoteStatus=open=>`${head}<div class="bq"><b>Anthropic · Padrão</b><br>🔴 Crítico · ⚡ em uso<br>5h · reinicia 14:50<br><code>${bar(55)}  55%</code><br>7d · reinicia ter 01:00<br><code>${bar(88)}  88%</code></div><div class="bq ${open?'open':'exp'}"><i>Últimas 6 h</i><br>5h subindo · +12 pp<br>7d subindo · +3 pp<br>esgota a 7d antes do reinício</div><div class="bq"><b>OpenCode Go</b> · 🟢 Normal<br>5h · reinicia 17:24<br><code>${bar(0)}   0%</code><br>semanal · reinicia dom 21:00<br><code>${bar(0)}   0%</code><br>mensal · reinicia qui 15:47<br><code>${bar(0)}   0%</code></div>`;
+const lineStatus=`<b>📊 12:24 BRT</b> <i>· agora</i><br><br><b>Anthropic · Padrão</b> ⚡ em uso<br>🟡 <code>${pad(55,3)}%</code> 5h · 14:50 · <b>atenção</b> ↗<br>🔴 <code>${pad(88,3)}%</code> 7d · ter 01:00 · <b>crítico</b> ↗<br><br><b>OpenCode Go</b><br>🟢 <code>${pad(0,3)}%</code> 5h · 17:24<br>🟢 <code>${pad(0,3)}%</code> semanal · dom 21:00<br>🟢 <code>${pad(0,3)}%</code> mensal · qui 15:47<br><i>↗ subiu nas últimas 6 h</i>`;
+const sq=p=>{const n=Math.floor(p/10);let s='';for(let i=1;i<=10;i++)s+= i>n?'⬛':(i<=7?'🟩':i<=9?'🟨':'🟥');return s;};
+const squareStatus=`<b>📊 Usage Monitor</b> · <i>12:24 BRT</i><br><br><b>Anthropic · Padrão</b><br>🔴 Crítico · ⚡ em uso<br>5h · reinicia 14:50<br>${sq(55)} <b>55%</b><br>7d · reinicia ter 01:00<br>${sq(88)} <b>88%</b><br><br><b>OpenCode Go</b> · 🟢 Normal<br>5h · reinicia 17:24<br>${sq(0)} <b>0%</b><br>semanal · reinicia dom 21:00<br>${sq(0)} <b>0%</b><br>mensal · reinicia qui 15:47<br>${sq(0)} <b>0%</b><br><i>🟩 até 75% · 🟨 até 90% · 🟥 acima (seus limiares)</i>`;
+const ring=(cx,cy,r,p,col)=>{const a=2*Math.PI*r;return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#2a2420" stroke-width="5"/>`+(p>0?`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${a*p/100} ${a}" transform="rotate(-90 ${cx} ${cy})"/>`:'');};
+const img=`<svg class="photo" viewBox="0 0 300 170" width="100%"><rect width="300" height="170" fill="#0b0a0c"/><text x="12" y="20" fill="#E8AE63" font-family="Consolas,monospace" font-size="11">Usage Monitor · 12:24 BRT</text>${ring(70,92,38,88,'#E86A6A')}${ring(70,92,27,55,'#FFA726')}<circle cx="70" cy="92" r="18" fill="#030508"/><text x="70" y="96" fill="#FFF0CB" text-anchor="middle" font-family="Consolas,monospace" font-size="12">88%</text><text x="70" y="150" fill="#ddd" text-anchor="middle" font-family="Consolas,monospace" font-size="10">Padrão</text><text x="70" y="162" fill="#E86A6A" text-anchor="middle" font-family="Consolas,monospace" font-size="9">Crítico · 7d</text>${ring(205,92,38,0,'#4CAF50')}${ring(205,92,29,0,'#4CAF50')}${ring(205,92,20,0,'#4CAF50')}<circle cx="205" cy="92" r="13" fill="#030508"/><text x="205" y="96" fill="#FFF0CB" text-anchor="middle" font-family="Consolas,monospace" font-size="11">0%</text><text x="205" y="150" fill="#ddd" text-anchor="middle" font-family="Consolas,monospace" font-size="10">OpenCode Go</text><text x="205" y="162" fill="#4CAF50" text-anchor="middle" font-family="Consolas,monospace" font-size="9">Normal</text></svg>`;
+const tabs=sel=>[['Cotas','Reinícios','Ritmo','24 h'].map(x=>x===sel?'*● '+x:x),['🔄 Atualizar','🔕 1h','⚙ Limiares']];
+const tabCotas=`<b>📊 Cotas</b> · <i>12:24 BRT · agora</i><br><br><b>Anthropic · Padrão</b> 🔴 Crítico · ⚡<br><code>5h ${bar(55)}  55%</code><br><code>7d ${bar(88)}  88%</code><br><br><b>OpenCode Go</b> 🟢 Normal<br><code>5h ${bar(0)}   0%</code><br><code>sem${bar(0)}   0%</code><br><code>mês${bar(0)}   0%</code>`;
+const tabResets=`<b>⏰ Reinícios</b> · <i>em ordem</i><br><br><code>hoje 14:50</code> Padrão 5h · <b>55%</b><br><code>hoje 17:24</code> Go 5h · 0%<br><code>dom  21:00</code> Go semanal · 0%<br><code>ter  01:00</code> Padrão 7d · <b>88%</b> 🔴<br><code>qui  15:47</code> Go mensal · 0%`;
+const summaryStatus=open=>`<b>📊 12:24 BRT</b> <i>· agora</i><br>🔴 1 crítica · 🟢 1 em dia<br><br><b>Anthropic · Padrão</b><br>🔴 Crítico · ⚡ em uso<br>5h · reinicia 14:50<br><code>${bar(55)}  55%</code> ↗ subindo<br>7d · reinicia ter 01:00<br><code>${bar(88)}  88%</code> ↗ subindo<br><br>`+(open?`<b>OpenCode Go</b> · 🟢 Normal<br>5h · reinicia 17:24<br><code>${bar(0)}   0%</code><br>semanal · reinicia dom 21:00<br><code>${bar(0)}   0%</code><br>mensal · reinicia qui 15:47<br><code>${bar(0)}   0%</code>`:`<i>OpenCode Go — 3 cotas em 0% · próximo reinício 17:24</i>`);
+
+const OPTS=[
+{id:'ref',name:'Hoje (referência)',ref:1,txt:'Menu por <code>setMyCommands</code> com o emoji da categoria em cada linha; <code>/status</code> com cartão W5, barra ▰▱ e sparkline AA13.',
+ a:['Menu',phone(u('/status'),menu(refMenu))],b:['/status',phone(u('/status')+b(refStatus,STATUS_KB))]},
+{id:'AE1',area:'menu',name:'AE1 · Central de comandos',txt:'O botão Menu fica com <b>6</b> comandos de uso diário. <code>/ajuda</code> vira teclado por área; o toque numa área <b>edita a mesma mensagem</b> com um botão por comando e "‹ Áreas". Os 29 comandos continuam funcionando digitados.',
+ a:['Menu (6 linhas)',phone(u('/status'),menu([['📊 Cotas agora','status'],['👤 Uma conta','conta'],['🔄 Coletar e mostrar','atualizar'],['🔬 Análise da sessão','analise'],['🔔 Ligar e desligar alertas','alertas'],['☰ Todos os comandos, por área','ajuda']]))],
+ b:['/ajuda → toque em Análises',phone(u('/ajuda')+b('<b>Comandos</b> · escolha uma área',AREAS)+b('<b>📐 Análises</b> · toque para rodar <span class="ed">editada</span>',ANALISES_KB))]},
+{id:'AE2',area:'menu',name:'AE2 · Ícone próprio por comando',txt:'Os 29 ficam, mas cada um com <b>emoji único</b> e descrição de até 26 caracteres (uma linha no celular). Ordem por área mantida. O <code>/ajuda</code> repete o mesmo ícone — o ícone vira a identidade do comando.',
+ a:['Menu',phone(u('/status'),menu(iconMenu))],
+ b:['/ajuda',phone(u('/ajuda')+b('<b>Comandos</b><br><br><b>Agora</b><br>📊 <code>/status</code> cotas · <code>/status img</code><br>👤 <code>/conta</code> uma conta<br>🔄 <code>/atualizar</code> coletar agora<br>🏁 <code>/qual</code> mais folga<br>⏰ <code>/reinicios</code> · ⏳ <code>/quando</code><br><br><b>Análises</b><br>🔬 <code>/analise</code> · 📏 <code>/ritmo</code> · ⚡ <code>/vazao</code><br>📉 <code>/grafico 7d</code> · 🌡 <code>/comparar</code><br><br><b>Alertas</b><br>🔔 <code>/alertas</code> · 🎚 <code>/limiar 75,90</code><br>🌙 <code>/silencio 22-07</code> · 🎯 <code>/foco 2h</code><br><i>Toque num comando para copiar.</i>'))]},
+{id:'AE3',area:'menu',name:'AE3 · Áreas como títulos no menu',txt:'Cada área ganha uma linha-título (<code>/agora</code>, <code>/analises</code>, <code>/avisos</code>, <code>/pc</code>) e os filhos começam com "└". Sem cor nem negrito (o Telegram mostra a descrição como texto puro). O título é comando de verdade: abre o teclado da área. Gasta 4 das 100 vagas. Risco: <code>/avisos</code> × <code>/alertas</code> confunde — o nome fica para decidir.',
+ a:['Menu',phone(u('/status'),menu(titled))],
+ b:['/analises (toque no título)',phone(u('/analises')+b('<b>📐 Análises</b> · toque para rodar',ANALISES_KB))]},
+{id:'AE4',area:'menu',name:'AE4 · Teclado fixo como controle',txt:'Teclado de resposta (<code>ReplyKeyboardMarkup</code>) sempre aberto, 2×3, com página "☰ Mais". Menu reduzido a <code>/status</code>, <code>/ajuda</code>, <code>/teclado</code>. Hoje <code>/teclado</code> já existe como opt-in; aqui ele nasce ligado. O botão envia texto ("📊 Cotas"), que o bot precisa reconhecer.',
+ a:['Página 1',phone(u('📊 Cotas')+b(`<b>Anthropic · Padrão</b> 🔴 Crítico<br><code>5h ${bar(55)}  55%</code><br><code>7d ${bar(88)}  88%</code>`),`<div class="rk"><span>📊 Cotas</span><span>👤 Conta</span><span>🔄 Coletar</span><span>🔬 Análise</span><span>🔔 Alertas</span><span>☰ Mais</span></div>`)],
+ b:['☰ Mais (página 2)',phone(u('☰ Mais'),`<div class="rk"><span>⏰ Reinícios</span><span>⏳ Quando</span><span>🏁 Qual</span><span>📏 Ritmo</span><span>📉 Gráfico</span><span>📝 Resumo</span><span>🖥 HUD</span><span>👥 Time</span><span>‹ Voltar</span></div>`)]},
+{id:'AE5',area:'resp',name:'AE5 · Cartão em citação',txt:'Cada conta num <code>&lt;blockquote&gt;</code> (barra lateral do próprio Telegram) — a separação é visual, não linha em branco. Sem linha em branco entre contas e sem sparkline. Tendência num <code>&lt;blockquote expandable&gt;</code> recolhido: um toque abre.',
+ a:['/status',phone(u('/status')+b(quoteStatus(false),STATUS_KB))],b:['toque em "Últimas 6 h"',phone(u('/status')+b(quoteStatus(true),STATUS_KB))]},
+{id:'AE6',area:'resp',name:'AE6 · Uma linha por cota, número primeiro',txt:'Sem barra: <b>risco + número</b> abrem a linha, depois a cota e o reinício. A palavra do risco aparece quando não é normal (cor nunca sozinha). Tendência vira seta com legenda. A mensagem inteira cabe numa tela.',
+ a:['/status',phone(u('/status')+b(lineStatus,STATUS_KB))],
+ b:['alerta no mesmo formato',phone(b('🔴 <code> 90%</code> <b>Claude 7d · Padrão</b><br>reinicia ter 01:00 · <b>crítico</b><br><i>passou do seu limiar de 90%</i>',[['🔕 Silenciar 1h','📊 Cotas']],'13:02'))]},
+{id:'AE7',area:'resp',name:'AE7 · Barra de quadrados por zona',txt:'A barra vira 10 quadrados emoji (largura fixa no celular, não quebra como ▰▱). A cor do quadrado é a <b>zona dos seus limiares</b> (75/90), não o risco; o número está escrito em negrito ao lado.',
+ a:['/status',phone(u('/status')+b(squareStatus,STATUS_KB))],
+ b:['alerta no mesmo formato',phone(b(`⚠ <b>Claude 7d · Padrão</b> passou de 75%<br>${sq(88)} <b>88%</b><br>reinicia ter 01:00`,[['🔕 Silenciar 1h','📊 Cotas']],'12:40'))]},
+{id:'AE8',area:'resp',name:'AE8 · Painel em imagem',txt:'<code>/status</code> responde com o PNG dos anéis (pipeline do <code>/status img</code>, que já existe) e uma legenda de 2 linhas com o pior caso. "📝 Em texto" troca pela versão escrita. Risco medido antes: o PNG da Análise saiu do bot por ficar escuro — exige revisão de contraste.',
+ a:['/status',phone(u('/status')+`<div class="bw"><div class="b" style="padding:0;overflow:hidden">${img}<div style="padding:6px 9px 5px"><b>🔴 Padrão · 7d 88%</b> · reinicia ter 01:00<br><i>coleta 12:24 BRT · agora</i>${t()}</div></div>${kb([['🔄 Atualizar','📝 Em texto','⚙ Limiares']])}</div>`)],
+ b:['📝 Em texto',phone(u('/status')+b(lineStatus,[['🔄 Atualizar','🖼 Em imagem','⚙ Limiares']]))]},
+{id:'AE9',area:'resp',name:'AE9 · Abas na mensagem',txt:'Uma mensagem, quatro vistas: <b>Cotas · Reinícios · Ritmo · 24 h</b> em botões no topo do teclado; o toque <b>edita</b> a mesma mensagem (nada empilha no chat). A aba ativa leva "●".',
+ a:['aba Cotas',phone(u('/status')+b(tabCotas,tabs('Cotas')))],b:['aba Reinícios',phone(u('/status')+b(tabResets+' <span class="ed">editada</span>',tabs('Reinícios')))]},
+{id:'AE10',area:'resp',name:'AE10 · Resumo no topo, conta parada numa linha',txt:'Primeira linha conta os riscos ("🔴 1 crítica · 🟢 1 em dia"). Conta com todas as cotas em 0% vira <b>uma linha</b> com o próximo reinício; o botão dela abre o cartão. Diferente da W4 recusada: a ordem das contas não muda e só a conta sem uso recolhe.',
+ a:['/status',phone(u('/status')+b(summaryStatus(false),[['▸ OpenCode Go'],...STATUS_KB]))],b:['toque em ▸ OpenCode Go',phone(u('/status')+b(summaryStatus(true)+' <span class="ed">editada</span>',[['▾ OpenCode Go'],...STATUS_KB]))]}
+];
+
+const nav=document.getElementById('nav'),box=document.getElementById('opts');
+box.innerHTML=OPTS.map(o=>`<div class="opt ${o.ref?'ref':''}" id="o-${o.id}"><h3>${o.name}${o.area?`<small>${o.area==='menu'?'menu':'respostas'}</small>`:''}</h3><p>${o.txt}</p><div class="pair"><div><div class="cap">${o.a[0]}</div>${o.a[1]}</div><div><div class="cap">${o.b[0]}</div>${o.b[1]}</div></div></div>`).join('');
+const filters=[['Todas',()=>true],['Menu (AE1–AE4)',o=>o.ref||o.area==='menu'],['Respostas (AE5–AE10)',o=>o.ref||o.area==='resp']];
+nav.innerHTML=filters.map((f,i)=>`<button data-i="${i}" class="${i?'':'on'}">${f[0]}</button>`).join('');
+nav.onclick=e=>{const i=e.target.dataset.i;if(i==null)return;[...nav.children].forEach(x=>x.classList.toggle('on',x.dataset.i===i));OPTS.forEach(o=>{document.getElementById('o-'+o.id).style.display=filters[i][1](o)?'':'none';});};
+})();
+</script>
+</body></html>

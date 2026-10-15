@@ -80,8 +80,11 @@ data class UsageAlertSettings(
         get() = normalizeQuotaPercents(quotaPercents)
 
     /** Os limiares que valem para [target]: os dela, se tiver, ou os gerais — já normalizados. */
-    fun quotaPercentsFor(target: UsageTargetKey): List<Int> =
-        quotaPercentsByTarget[target.storageKey]?.let { override -> normalizeQuotaPercents(override.percents) } ?: effectiveQuotaPercents
+    fun quotaPercentsFor(target: UsageTargetKey): List<Int> = quotaPercentsFor(target.storageKey)
+
+    /** O mesmo por `UsageTargetKey.storageKey` (o retrato do bot só tem a chave); `null` segue os gerais. */
+    fun quotaPercentsFor(storageKey: String?): List<Int> =
+        storageKey?.let { key -> quotaPercentsByTarget[key] }?.let { override -> normalizeQuotaPercents(override.percents) } ?: effectiveQuotaPercents
 
     companion object {
         val DEFAULT = UsageAlertSettings()

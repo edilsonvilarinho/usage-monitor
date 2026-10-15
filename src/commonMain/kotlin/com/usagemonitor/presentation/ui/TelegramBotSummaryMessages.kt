@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramDailySpend
+import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageSnapshotAccount
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
@@ -47,9 +48,10 @@ internal object TelegramBotSummaryMessages {
     /**
      * Painel fixado (#398, Y5): uma linha por conta com a cota mais cheia e a barra.
      * A hora é a da **coleta**, nunca a do envio — o texto só muda quando há leitura
-     * nova, e é isso que segura as edições no ritmo da coleta.
+     * nova, e é isso que segura as edições no ritmo da coleta. A barra é a de quadrados
+     * por zona do `/status` (rodada AE, AE7), com os limiares de cada conta.
      */
-    fun panel(snapshot: UsageSnapshot?, language: AppLanguage): String {
+    fun panel(snapshot: UsageSnapshot?, language: AppLanguage, alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT): String {
         val pt = language == AppLanguage.PT
         if (snapshot == null || snapshot.accounts.isEmpty()) return TelegramBotMessages.noReading(pt)
         val updated = snapshot.lastCollectedAt?.let { at -> (if (pt) "atualizado " else "updated ") + "${TelegramBotMessages.clock(at)} BRT" }
@@ -58,7 +60,8 @@ internal object TelegramBotSummaryMessages {
             val mark = account.worstRisk?.let { level -> TelegramBotMessages.riskEmoji(level) + " " }.orEmpty()
             val quota = fullestQuota(account)
             val value = quota?.let { item ->
-                " · ${TelegramBotMessages.escape(displayQuotaLabel(item.label, pt))}\n<code>${TelegramBotMessages.escape(TelegramBotMessages.quotaValue(item, pt))}</code>"
+                " · ${TelegramBotMessages.escape(displayQuotaLabel(item.label, pt))}\n" +
+                    TelegramBotMessages.quotaLine(item, pt, alertSettings.quotaPercentsFor(account.targetKey))
             }.orEmpty()
             "$mark<b>${TelegramBotMessages.escape(account.label)}</b>$value"
         }

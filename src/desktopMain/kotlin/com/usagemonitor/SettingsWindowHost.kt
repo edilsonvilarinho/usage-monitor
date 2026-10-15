@@ -160,7 +160,8 @@ internal fun SettingsWindowHost(
             onProxyTestConnection = feedback::checkProxyConnection,
             webAccess = webAccessSectionModel(webAccessSettings, webAccessStatus, webAccessActions),
             telegramBot = telegramBotSectionModel(
-                telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions, machineName = telegramMachineName
+                telegramSettings, telegramStatus, viewModels.currentSnapshot(), language, telegramActions, machineName = telegramMachineName,
+                alertSettings = alertSettings
             ),
             toastEvent = feedback.toastEvent,
             appearancePreview = {

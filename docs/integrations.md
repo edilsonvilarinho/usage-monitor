@@ -296,9 +296,19 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   aviso de reinício de cota (#398, Y2, `UsageAlert.QuotaReset`) chega por este mesmo caminho.
 - **Formato (#396, direção W1)**: toda mensagem sai com `parse_mode: HTML` (`<b>`, `<i>`, `<code>`). O `/status` é um
   cartão por conta — risco com emoji **e** palavra, "⚡ em uso", e por cota o reinício (só a hora em menos de 24 h; com o dia
-  da semana depois) e uma barra de 10 células em `<code>` cheia pelo piso do percentual. Todo texto variável passa por
+  da semana depois) e uma barra de 10 células cheia pelo piso do percentual. Todo texto variável passa por
   `TelegramBotMessages.escape` (`&`, `<`, `>`): sem ele um rótulo de conta com `<` faria o Telegram recusar a mensagem
   inteira com 400. A prévia das Configurações mostra o mesmo texto sem as marcas (`TelegramBotMessages.plain`).
+- **Barra de quadrados por zona (rodada AE, direção AE7; plano `docs/planos/telegram-bot-ae-teclado-quadrados-execucao.md`)**:
+  a barra `▰▱` em `<code>` mudava de largura com a fonte do celular e virou dez emoji — `🟩`/`🟨`/`🟥` cheios e `⬛`
+  vazios — cheios pelo piso do percentual, com o número em `<b>` ao lado (`TelegramBotMessages.zoneBar`). A cor de cada
+  quadrado é quantos limiares o limite superior da célula já passou (nenhum verde, um amarelo, dois ou mais vermelho):
+  com os padrões 75/90/100, 80 e 90 são amarelos e 100 vermelho; sem limiar, tudo verde. Os limiares são os da conta
+  (`quotaPercentsByTarget`, AA10, pelo `targetKey` do retrato) ou os gerais. O `/status` termina com a legenda dos gerais
+  (`zoneLegend`); conta com limiar próprio leva a dela ("limiar próprio: …"), e o `/conta` sempre leva a da conta. Nome
+  da conta e risco ficam em linhas separadas (juntos quebravam no celular). Vale para `/status`, `/conta`, o painel
+  fixado (não o compacto) e o alerta de limiar e de reinício próximo (`UsageAlert.QuotaThreshold`/`ResetSoon`), avulso ou
+  repetido; o lote de alertas e o resumo diário seguem só com o número. Saldo e contagem continuam em `<code>`.
 - **Menu**: ao conectar um token o serviço chama `setMyCommands` com os comandos no idioma do app — o botão "Menu" do
   Telegram os lista sem `/ajuda`. Falha nessa chamada não derruba a conexão. **Por categoria** (análise da sessão, B01):
   `TelegramCommandCatalog` é o dono único do menu e do `/ajuda` — 📊 Agora, 📐 Análises, 🔔 Alertas, 💬 Conversa e PC.
@@ -384,9 +394,9 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
   - `/janelas` (`/windows`, AA12): as 4 últimas janelas curtas (`/janelas 7d`: semanais, lidas de 30 dias) de cada conta,
     mais nova primeiro — início observado e reinício, pico, hora em que esgotou e a faixa ativa (#382). Mesmas
     `QuotaWindowSummary` do Histórico.
-  - **Sparkline no `/status`** (AA13): embaixo da barra de cada cota com pelo menos duas leituras nas últimas 6 h, doze blocos
-    `▁…█` de 30 min — cada bloco com o uso da última leitura até o fim dele (não inventa ponto entre leituras), espaço antes
-    da primeira. O número continua escrito na barra; a linha só dá a forma. Vale também para a edição do botão Atualizar.
+  - ~~**Sparkline no `/status`**~~ (AA13) **saiu** na rodada AE: os blocos `▁…█` em `<code>` viravam um retângulo branco no
+    Android (88%) ou um traço sem informação (0%) — o mesmo defeito que os tirou da janela Análise. A tendência fica no
+    `/grafico`; o `/status` não lê mais o histórico.
   - `/comparar [24h|7d|30d]` (`/compare`, AA6; padrão 7 d): PNG com o mapa de calor da comparação entre modelos (#386, P7) —
     mesmas células (`comparisonCell`) e intensidade (`heatIntensity`, contra todas as linhas mesmo com o teto de 12),
     desenhado por `TelegramHeatmapRenderer` no Skia do `/grafico`; o dourado da célula tem teto para o número claro manter
@@ -411,10 +421,10 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     `displayQuotaLabel` (presentation) traduz **só na exibição** — a chave do histórico não muda — no bot, no gráfico e nos
     títulos dos alertas (bandeja inclusive). O estado "token recusado" das Configurações deixou de ser texto fixo em
     português (`TelegramBotStatus.TokenRejected`).
-  - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado (📊 Status,
-    👤 Conta, 📈 Gráfico, ⏳ Quando, no idioma da conversa); `off` manda `remove_keyboard`. O toque chega como **texto** com o
-    rótulo e `parseKeyboardLabel` o traduz no comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos
-    `resize_keyboard`/`is_persistent` não têm default no DTO porque o `Json` do cliente não grava valor padrão.
+  - `/teclado on|off` (`/keyboard`, AA30): `reply_markup` com `ReplyKeyboardMarkup` persistente e redimensionado, no idioma
+    da conversa; `off` manda `remove_keyboard`. O toque chega como **texto** com o rótulo e `parseKeyboardLabel` o traduz no
+    comando (nos dois idiomas); outro texto solto continua sem resposta. Os campos `resize_keyboard`/`is_persistent` não
+    têm default no DTO porque o `Json` do cliente não grava valor padrão.
   - `/hud` (AA29): grava o mesmo `focus.request` da segunda instância (`FocusRequestChannel`), que o laço do `Main` atende
     trazendo a HUD à frente. Só com **"Permitir ações no PC"** (nasce desligado), relido a cada pedido; conversa só de leitura
     é recusada (`changesApp`). As opções novas da #408 moram em `TelegramBotPreferences` (`data class` sem segredo, objeto

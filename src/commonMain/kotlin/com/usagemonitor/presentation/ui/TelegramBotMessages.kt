@@ -35,11 +35,11 @@ internal object TelegramBotMessages {
     fun menu(language: AppLanguage): List<Pair<String, String>> = TelegramCommandCatalog.menu(language)
 
     /**
-     * `/status`: um cartão por conta — risco, uso e, por cota, reinício e barra de 10 células.
-     * [sparklines] (#408, AA13) é rótulo da conta → rótulo da cota → a linha das últimas
-     * 6 h; cota sem histórico fica só com a barra.
+     * `/status`: um cartão por conta — risco, uso e, por cota, reinício e a barra de
+     * quadrados por zona (rodada AE, direção AE7), com a legenda dos limiares gerais no fim.
+     * A sparkline das últimas 6 h (AA13) saiu: os blocos viravam um retângulo no celular.
      */
-    fun status(snapshot: UsageSnapshot?, language: AppLanguage, sparklines: Map<String, Map<String, String>> = emptyMap()): String {
+    fun status(snapshot: UsageSnapshot?, language: AppLanguage, alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT): String {
         val pt = language == AppLanguage.PT
         if (snapshot == null || snapshot.accounts.isEmpty()) {
             return noReading(pt)
@@ -49,8 +49,10 @@ internal object TelegramBotMessages {
             (if (pt) "coleta " else "collected ") + "${clock(at)} BRT · " + elapsed(snapshot.generatedAt - at, pt)
         } ?: if (pt) "sem coleta ainda" else "not collected yet"
         val header = "<b>📊 Usage Monitor</b>\n<i>$collected</i>"
-        val cards = snapshot.accounts.map { account -> accountCard(account, snapshot.generatedAt, language, sparklines[account.label].orEmpty()) }
-        return (listOf(header) + cards).joinToString("\n\n")
+        val cards = snapshot.accounts.map { account -> accountCard(account, snapshot.generatedAt, language, alertSettings) }
+        val hasBar = snapshot.accounts.any { account -> account.quotas.any { quota -> quota.percent != null } }
+        val legend = zoneLegend(alertSettings.effectiveQuotaPercents, language)?.takeIf { hasBar }?.let { text -> "<i>$text</i>" }
+        return (listOf(header) + cards + listOfNotNull(legend)).joinToString("\n\n")
     }
 
     /** Pergunta do `/conta` (#398, Y4); o teclado sai de [accountButtons]. */
@@ -73,48 +75,97 @@ internal object TelegramBotMessages {
             .chunked(ACCOUNT_BUTTONS_PER_ROW)
 
     /** Só uma conta: o mesmo cartão do `/status`, com a hora da coleta dela. */
-    fun account(snapshot: UsageSnapshot?, key: String, language: AppLanguage): String {
+    fun account(snapshot: UsageSnapshot?, key: String, language: AppLanguage, alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT): String {
         val pt = language == AppLanguage.PT
         val account = snapshot?.accountByKey(key)
             ?: return if (pt) "Essa conta não está mais na leitura. Mande /conta de novo." else "That account is no longer in the reading. Send /account again."
         val collected = account.fetchedAt?.let { at ->
             "<i>" + (if (pt) "coleta " else "collected ") + "${clock(at)} BRT · " + elapsed(snapshot.generatedAt - at, pt) + "</i>"
         } ?: "<i>" + (if (pt) "sem coleta ainda" else "not collected yet") + "</i>"
-        return accountCard(account, snapshot.generatedAt, language) + "\n" + collected
+        // Só uma conta: a legenda dela vai no cartão, com ou sem limiar próprio.
+        return accountCard(account, snapshot.generatedAt, language, alertSettings, alwaysLegend = true) + "\n" + collected
     }
 
     internal fun noReading(pt: Boolean): String =
         if (pt) "Sem leitura ainda. Abra o Usage Monitor e habilite ao menos uma API." else "No reading yet. Open Usage Monitor and enable at least one API."
 
-    private fun accountCard(account: UsageSnapshotAccount, now: Instant, language: AppLanguage, sparklines: Map<String, String> = emptyMap()): String {
+    /**
+     * O cartão de uma conta: o nome numa linha e o risco na seguinte — juntos quebravam no
+     * celular. Conta com limiar próprio (AA10) leva a legenda dela, porque a do rodapé é a geral.
+     */
+    private fun accountCard(
+        account: UsageSnapshotAccount,
+        now: Instant,
+        language: AppLanguage,
+        alertSettings: UsageAlertSettings,
+        alwaysLegend: Boolean = false
+    ): String {
         val pt = language == AppLanguage.PT
         val tags = listOfNotNull(
             account.worstRisk?.let { level -> "${riskEmoji(level)} ${riskLevelLabel(level, language)}" },
             if (account.active) (if (pt) "⚡ em uso" else "⚡ in use") else null
         )
-        val title = "<b>${escape(account.label)}</b>" + if (tags.isEmpty()) "" else " — " + tags.joinToString(" · ")
+        val thresholds = alertSettings.quotaPercentsFor(account.targetKey)
+        val ownThresholds = account.targetKey?.let { key -> key in alertSettings.quotaPercentsByTarget } == true
+        val prefix = if (ownThresholds) localized(language, "limiar próprio: ", "own threshold: ") else ""
+        val legend = zoneLegend(thresholds, language)
+            ?.takeIf { (ownThresholds || alwaysLegend) && account.quotas.any { quota -> quota.percent != null } }
+            ?.let { text -> "<i>$prefix$text</i>" }
+        val head = listOfNotNull("<b>${escape(account.label)}</b>", tags.takeIf { list -> list.isNotEmpty() }?.joinToString(" · "), legend)
         val quotas = account.quotas.map { quota ->
             val reset = quota.resetsAt?.let { at -> (if (pt) " · reinicia " else " · resets ") + resetLabel(at, now, pt) }.orEmpty()
-            val spark = sparklines[quota.label]?.let { line -> "\n<code>$line</code> <i>6 h</i>" }.orEmpty()
-            "${escape(displayQuotaLabel(quota.label, pt))}$reset\n<code>${escape(quotaValue(quota, pt))}</code>$spark"
+            "${escape(displayQuotaLabel(quota.label, pt))}$reset\n${quotaLine(quota, pt, thresholds)}"
         }
-        return (listOf(title) + quotas).joinToString("\n")
+        return (head + quotas).joinToString("\n")
+    }
+
+    /**
+     * A linha do valor de uma cota: com percentual, a barra de quadrados e o número em
+     * negrito; saldo e contagem seguem em `<code>`, como antes.
+     */
+    internal fun quotaLine(quota: UsageSnapshotQuota, pt: Boolean, thresholds: List<Int>): String {
+        val percent = quota.percent ?: return "<code>${escape(quotaValue(quota, pt))}</code>"
+        return "${zoneBar(percent, thresholds)} <b>$percent%</b>"
     }
 
     internal fun quotaValue(quota: UsageSnapshotQuota, pt: Boolean): String {
         val percent = quota.percent
         return when {
-            percent != null -> "${bar(percent)} ${percent.toString().padStart(3)}%"
+            percent != null -> "$percent%"
             quota.unit == UsageUnit.CURRENCY_USD -> (if (pt) "saldo " else "balance ") + formatCents(quota.total - quota.used, quota.currencyCode)
             quota.total > 0L -> "${quota.used} / ${quota.total}"
             else -> quota.used.toString()
         }
     }
 
-    /** Dez células, cheias pelo piso do percentual: a barra nunca passa do número escrito ao lado. */
-    internal fun bar(percent: Int): String {
-        val filled = (percent.coerceIn(0, 100) / 10)
-        return "▰".repeat(filled) + "▱".repeat(10 - filled)
+    /**
+     * Barra da rodada AE (direção AE7): dez quadrados, cheios pelo **piso** do percentual —
+     * a barra nunca passa do número escrito ao lado. A cor de cada quadrado diz quantos
+     * [thresholds] (normalizados) o limite superior da célula já passou: nenhum verde, um
+     * amarelo, dois ou mais vermelho. Com os padrões 75/90/100, 80 e 90 são amarelos e 100
+     * vermelho. Sem limiar, tudo verde. Emoji tem largura fixa no celular, o que `▰▱` em
+     * `<code>` não tinha.
+     */
+    internal fun zoneBar(percent: Int, thresholds: List<Int>): String {
+        val filled = percent.coerceIn(0, 100) / 10
+        return (1..10).joinToString("") { cell ->
+            val passed = thresholds.count { threshold -> threshold < cell * 10 }
+            when {
+                cell > filled -> EMPTY_CELL
+                passed == 0 -> SAFE_CELL
+                passed == 1 -> WARN_CELL
+                else -> OVER_CELL
+            }
+        }
+    }
+
+    /** O que cada cor da [zoneBar] quer dizer com estes limiares; `null` sem limiar (tudo verde). */
+    internal fun zoneLegend(thresholds: List<Int>, language: AppLanguage): String? {
+        val first = thresholds.firstOrNull() ?: return null
+        val upTo = localized(language, "até", "up to")
+        val above = localized(language, "acima", "above")
+        val second = thresholds.getOrNull(1) ?: return "$SAFE_CELL $upTo $first% · $WARN_CELL $above"
+        return "$SAFE_CELL $upTo $first% · $WARN_CELL $upTo $second% · $OVER_CELL $above"
     }
 
     /** Teclado do `/status` (#396, W5): uma linha, nesta ordem. */
@@ -189,10 +240,23 @@ internal object TelegramBotMessages {
     fun invalid(usage: String, language: AppLanguage): String =
         (if (language == AppLanguage.PT) "Não entendi. Uso: " else "Not understood. Usage: ") + "<code>${escape(usage)}</code>"
 
-    /** O alerta da bandeja, no mesmo texto: título e corpo de `usageAlertMessage`. */
-    fun alert(alert: UsageAlert, language: AppLanguage): String {
+    /**
+     * O alerta da bandeja, no mesmo texto: título e corpo de `usageAlertMessage`. Alerta de
+     * cota (limiar e reinício próximo) leva a barra da AE7 com os limiares daquela conta.
+     */
+    fun alert(alert: UsageAlert, language: AppLanguage, alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT): String {
         val message = usageAlertMessage(alert, language)
-        return "<b>${escape(message.title)}</b>\n${escape(message.body)}"
+        val bar = alertBar(alert, alertSettings)?.let { line -> "\n$line" }.orEmpty()
+        return "<b>${escape(message.title)}</b>$bar\n${escape(message.body)}"
+    }
+
+    private fun alertBar(alert: UsageAlert, alertSettings: UsageAlertSettings): String? {
+        val (target, percent) = when (alert) {
+            is UsageAlert.QuotaThreshold -> alert.target to alert.actualPercent
+            is UsageAlert.ResetSoon -> alert.target to alert.actualPercent
+            else -> return null
+        }
+        return "${zoneBar(percent, alertSettings.quotaPercentsFor(target))} <b>$percent%</b>"
     }
 
     /**
@@ -215,11 +279,19 @@ internal object TelegramBotMessages {
      * O mesmo alerta repetido no dia (#408, AA1): a mensagem anterior editada com o
      * contador, a hora da primeira e a da última.
      */
-    fun repeatedAlert(alert: UsageAlert, count: Int, firstAt: Instant, lastAt: Instant, language: AppLanguage): String {
+    fun repeatedAlert(
+        alert: UsageAlert,
+        count: Int,
+        firstAt: Instant,
+        lastAt: Instant,
+        language: AppLanguage,
+        alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT
+    ): String {
         val message = usageAlertMessage(alert, language)
         val pt = language == AppLanguage.PT
+        val bar = alertBar(alert, alertSettings)?.let { line -> "\n$line" }.orEmpty()
         return "<b>${escape(message.title)}</b> · <b>$count×</b> " + (if (pt) "desde " else "since ") + clock(firstAt) +
-            "\n${escape(message.body)}\n<i>" + (if (pt) "última: " else "last: ") + clock(lastAt) + "</i>"
+            "$bar\n${escape(message.body)}\n<i>" + (if (pt) "última: " else "last: ") + clock(lastAt) + "</i>"
     }
 
     fun test(language: AppLanguage): String =
@@ -274,4 +346,9 @@ internal object TelegramBotMessages {
     private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
 
     private const val ACCOUNT_BUTTONS_PER_ROW = 2
+
+    private const val EMPTY_CELL = "⬛"
+    private const val SAFE_CELL = "🟩"
+    private const val WARN_CELL = "🟨"
+    private const val OVER_CELL = "🟥"
 }

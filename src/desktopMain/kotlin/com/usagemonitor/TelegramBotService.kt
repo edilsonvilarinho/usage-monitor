@@ -314,7 +314,7 @@ internal class TelegramBotService(
             val body = if (settings.preferences.compactPanel) {
                 TelegramBotSummaryMessages.compactPanel(snapshot, language)
             } else {
-                TelegramBotSummaryMessages.panel(snapshot, language)
+                TelegramBotSummaryMessages.panel(snapshot, language, alertSettingsFlow.value)
             }
             val text = TelegramBotChatMessages.withMachine(body, machine)
             val messageId = panels[chatId]
@@ -430,14 +430,14 @@ internal class TelegramBotService(
             if (key != null && group != null) {
                 val next = group.copy(count = group.count + 1)
                 val firstAt = Instant.fromEpochMilliseconds(group.firstAtMillis)
-                val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.repeatedAlert(alert, next.count, firstAt, now, language), machine)
+                val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.repeatedAlert(alert, next.count, firstAt, now, language, alertSettingsFlow.value), machine)
                 if (editAlert(settings.botToken, chat.id, group.messageId, text)) {
                     alertGroups[chat.id to key] = next
                     delay(SEND_SPACING_MILLIS)
                     continue
                 }
             }
-            val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.alert(alert, language), machine)
+            val text = TelegramBotChatMessages.withMachine(TelegramBotMessages.alert(alert, language, alertSettingsFlow.value), machine)
             val sentId = runCatching { api.sendMessage(settings.botToken, chat.id, text, html = true, silent = silent) }
                 .onFailure { error -> if (error is CancellationException) throw error }
                 .getOrNull()

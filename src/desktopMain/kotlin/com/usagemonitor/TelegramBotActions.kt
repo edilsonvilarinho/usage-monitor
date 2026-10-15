@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TELEGRAM_PAIRING_TTL_MILLIS
 import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
+import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -74,7 +75,9 @@ internal fun telegramBotSectionModel(
     actions: TelegramBotActions,
     nowMillis: Long = Clock.System.now().toEpochMilliseconds(),
     /** Nome deste PC para o card mostrar o que a opção AA20 vai escrever. */
-    machineName: String? = null
+    machineName: String? = null,
+    /** Limiares que pintam a barra da prévia como o bot pinta (rodada AE, AE7). */
+    alertSettings: UsageAlertSettings = UsageAlertSettings.DEFAULT
 ): TelegramBotSectionModel {
     val pt = language == AppLanguage.PT
     val (label, tone) = when (status) {
@@ -102,7 +105,7 @@ internal fun telegramBotSectionModel(
         chats = settings.authorizedChats,
         pairingCode = openCode,
         pairingHint = openCode?.let { if (pt) "Vale por mais $minutesLeft min." else "Valid for $minutesLeft more min." },
-        statusPreview = TelegramBotMessages.plain(TelegramBotMessages.status(snapshot, language)),
+        statusPreview = TelegramBotMessages.plain(TelegramBotMessages.status(snapshot, language, alertSettings)),
         onEnabledChange = actions::setEnabled,
         onTokenChange = actions::changeToken,
         onStartPairing = actions::startPairing,
