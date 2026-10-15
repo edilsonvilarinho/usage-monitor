@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -78,6 +79,11 @@ internal class SettingsActions(
      * que o sistema realmente tem e o aviso precisa dizer que falhou.
      */
     fun changeAutoStart(enabled: Boolean) {
+        // O interruptor já vem desligado com `--user-data-dir` (#419); isto é a
+        // segunda trava, para nenhum caminho gravar a chave `Run` sem a pasta.
+        if (!AppDataDirectory.isDefault) {
+            return
+        }
         val result = AutoStartManager.setAutoStart(enabled)
         val applied = result.isSuccess
         shell.recordAutoStart(if (applied) enabled else AutoStartManager.isAutoStartEnabled())

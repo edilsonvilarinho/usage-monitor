@@ -144,6 +144,8 @@ fun SettingsDialogContent(
     onThemeChange: (AppThemePreset) -> Unit,
     onLanguageChange: (AppLanguage) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
+    /** Falso com `--user-data-dir` (#419): a entrada de inicialização não leva a pasta. */
+    autoStartAvailable: Boolean = true,
     autoUpdateEnabled: Boolean = false,
     /**
      * Default `UNAVAILABLE`: quem não passa a origem não tem o mecanismo, e o
@@ -316,7 +318,8 @@ fun SettingsDialogContent(
                                 startupTipsEnabled = startupTipsEnabled,
                                 onStartupTipsEnabledChange = onStartupTipsEnabledChange,
                                 receiveBetaUpdates = receiveBetaUpdates,
-                                onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange
+                                onReceiveBetaUpdatesChange = onReceiveBetaUpdatesChange,
+                                autoStartAvailable = autoStartAvailable
                             )
 
                             SettingsTab.ALERTS -> {

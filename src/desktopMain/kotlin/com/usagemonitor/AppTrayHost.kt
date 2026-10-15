@@ -10,6 +10,7 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.rememberTrayState
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.hudTraySummary
@@ -48,7 +49,7 @@ internal fun ApplicationScope.AppTrayHost(
     val ringFraction = if (shell.trayUsageRing) trayUsageRingFraction(quotaRisks, Clock.System.now()) else null
     val trayIcon = remember(iconImage, worstRisk, ringFraction) { TrayRiskIconPainter(iconImage, worstRisk, ringFraction) }
     val tooltip = hudTraySummary(
-        appName = "Usage Monitor",
+        appName = trayAppName(isolatedDataRootName = AppDataDirectory.root.name.takeUnless { AppDataDirectory.isDefault }),
         accounts = buildHudAccounts(quotaRisks, shell.cardOrder, language, Clock.System.now())
     )
     val pt = language == AppLanguage.PT
@@ -100,3 +101,11 @@ internal fun ApplicationScope.AppTrayHost(
         }
     }
 }
+
+/**
+ * Nome no começo do tooltip da bandeja. Com `--user-data-dir` (#419) leva a pasta:
+ * duas instâncias abertas dariam dois ícones idênticos. Fica no começo porque o
+ * corte de 127 caracteres do tooltip come o fim.
+ */
+internal fun trayAppName(isolatedDataRootName: String?): String =
+    if (isolatedDataRootName == null) "Usage Monitor" else "Usage Monitor ($isolatedDataRootName)"

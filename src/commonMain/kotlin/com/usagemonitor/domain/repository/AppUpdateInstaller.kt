@@ -89,6 +89,18 @@ enum class AppUpdateSupport {
     UNSUPPORTED_ARCHITECTURE,
 
     /**
+     * O processo roda com `--user-data-dir` (issue #419). O instalador e o
+     * updater relançam o app **sem argumentos**, então a instância voltaria na
+     * pasta padrão depois de se atualizar; e o pacote baixado mora na raiz da
+     * instalação, que é da instância padrão.
+     *
+     * **Valor novo num enum existente**, pela mesma exceção declarada de
+     * [UNSUPPORTED_ARCHITECTURE]: o `when` exaustivo de `autoUpdateHint` obriga o
+     * texto a existir, e sem o valor a raiz isolada cairia num motivo falso.
+     */
+    ISOLATED_DATA_ROOT,
+
+    /**
      * Esta build não traz o mecanismo. Estado do PR 1, em que o interruptor
      * existe e nenhum caminho de código lança instalador.
      */

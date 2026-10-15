@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.presentation.ui.components.SettingsField
@@ -61,6 +62,11 @@ internal fun AppPreferenceEffects(
 @Composable
 private fun AutoStartResolution(shell: AppShellState, settings: PreferencesSettings, breadcrumbs: BreadcrumbRecorder) {
     LaunchedEffect(settings) {
+        // Com `--user-data-dir` (#419), a entrada de inicialização e o ícone de
+        // menu são da instância padrão: esta não lê nem reescreve nenhum dos dois.
+        if (!AppDataDirectory.isDefault) {
+            return@LaunchedEffect
+        }
         if (AutoStartManager.isAutoStartSupported()) {
             val resolved = withContext(Dispatchers.IO) { AutoStartManager.isAutoStartEnabled() }
             shell.applyResolvedAutoStart(resolved)

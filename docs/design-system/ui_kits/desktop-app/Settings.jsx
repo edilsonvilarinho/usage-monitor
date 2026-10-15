@@ -68,6 +68,7 @@ export function Settings() {
           {sec === 'Sistema' ? (
             <React.Fragment>
               <AppKey>Inicialização e bandeja</AppKey>
+              {/* Issue #419: com --user-data-dir o interruptor vem desligado, com reason="Indisponível com --user-data-dir: a entrada de inicialização abriria o app na pasta padrão, não nesta." */}
               <AppSwitch checked={autoStart} onChange={setAutoStart} label="Iniciar com o sistema" hint="Registro Run no Windows, .desktop no Linux, LaunchAgent no macOS." />
               {/* Issue #328: desligado por padrão; o anel mostra o maior percentual vigente. */}
               <AppSwitch checked={false} label="Anel de uso na bandeja"
@@ -76,6 +77,7 @@ export function Settings() {
               <AppSwitch checked={true} label="Mostrar a dica do dia ao abrir"
                 hint="Uma por dia, na primeira abertura do dia, inclusive pelo início com o sistema. Todas as funções continuam na Ajuda." />
               <AppKey>Atualizações</AppKey>
+              {/* Issue #419: com --user-data-dir o motivo é a raiz isolada — reason="Indisponível com --user-data-dir: o instalador reabre o app na pasta padrão. Atualize pela instância sem a opção." */}
               <AppSwitch checked={false} disabled label="Atualização automática"
                 reason="Instalação .deb: aqueles arquivos pertencem ao gerenciador de pacotes, e escrever por cima deles produz uma árvore que o próximo apt upgrade desfaz." />
               {/* Issue #355: canal beta, desligado por padrão; desligar não faz downgrade. */}

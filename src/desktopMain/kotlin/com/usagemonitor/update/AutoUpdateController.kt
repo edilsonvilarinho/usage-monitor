@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.CURRENT_APP_VERSION
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
 import com.usagemonitor.domain.entity.AppUpdatePlatform
 import com.usagemonitor.domain.entity.AppUpdateReceipt
@@ -85,7 +86,9 @@ internal class AutoUpdateController(
      * automática a beta é só anunciada, como qualquer versão.
      */
     val receiveBetaUpdates: MutableStateFlow<Boolean> = MutableStateFlow(false),
-    private val persistReceiveBetaUpdates: (Boolean) -> Unit = {}
+    private val persistReceiveBetaUpdates: (Boolean) -> Unit = {},
+    /** `--user-data-dir` (#419): vence qualquer outro motivo, e [installer] vem nulo. */
+    private val isolatedDataRoot: Boolean = false
 ) {
 
     /**
@@ -98,7 +101,7 @@ internal class AutoUpdateController(
      * futura resolveria o que não é problema de versão.
      */
     val support: AppUpdateSupport
-        get() = installer?.support() ?: when (platform) {
+        get() = if (isolatedDataRoot) AppUpdateSupport.ISOLATED_DATA_ROOT else installer?.support() ?: when (platform) {
             AppUpdatePlatform.MACOS, null -> AppUpdateSupport.UNSUPPORTED_PLATFORM
             AppUpdatePlatform.WINDOWS, AppUpdatePlatform.LINUX -> AppUpdateSupport.UNAVAILABLE
         }
@@ -146,7 +149,8 @@ internal fun AutoUpdateController.receivesBetaUpdates(): Boolean = receiveBetaUp
 @Composable
 internal fun rememberAutoUpdateController(
     settings: PreferencesSettings,
-    httpClient: HttpClient
+    httpClient: HttpClient,
+    isolatedDataRoot: Boolean = !AppDataDirectory.isDefault
 ): AutoUpdateController {
     val controller = remember(settings, httpClient) {
         val platform = currentUpdatePlatform()
@@ -163,7 +167,7 @@ internal fun rememberAutoUpdateController(
                 if (LINUX_AUTO_UPDATE_SHIPPED) LinuxAppUpdateInstaller(httpClient = httpClient) else null
 
             AppUpdatePlatform.MACOS, null -> null
-        }
+        }.takeUnless { isolatedDataRoot }
         AutoUpdateController(
             installer = installer,
             platform = platform,
@@ -175,7 +179,8 @@ internal fun rememberAutoUpdateController(
             feedUrlOverride = System.getenv(UPDATE_FEED_URL_ENV_VAR),
             persist = { value -> persistAutoUpdateEnabled(settings, value) },
             receiveBetaUpdates = MutableStateFlow(readPersistedReceiveBetaUpdates(settings)),
-            persistReceiveBetaUpdates = { value -> persistReceiveBetaUpdates(settings, value) }
+            persistReceiveBetaUpdates = { value -> persistReceiveBetaUpdates(settings, value) },
+            isolatedDataRoot = isolatedDataRoot
         )
     }
 
@@ -187,7 +192,8 @@ internal fun rememberAutoUpdateController(
     // atualização automática depois disso não o torna útil de novo. Idempotente,
     // então não há marcador a guardar — na abertura seguinte não sobra nada.
     LaunchedEffect(controller) {
-        if (shouldDiscardUpdateArtifacts(controller.lastReceipt, CURRENT_APP_VERSION)) {
+        // A pasta de pacotes é da instalação: a instância isolada não mexe nela.
+        if (!isolatedDataRoot && shouldDiscardUpdateArtifacts(controller.lastReceipt, CURRENT_APP_VERSION)) {
             withContext(Dispatchers.IO) {
                 pruneUpdateArtifacts(defaultUpdatesDirectory(), keepAssetName = null)
             }

@@ -215,5 +215,6 @@ internal fun commandLineHelp(version: String = CURRENT_APP_VERSION): String = ""
     |  --user-data-dir <dir>
     |                     Keep this run's settings, history, keys and logs in <dir>
     |                     instead of ~/.usage-monitor. Another folder runs side by
-    |                     side with the default one.
+    |                     side with the default one; there, automatic updates and
+    |                     start with the system stay off.
 """.trimMargin()

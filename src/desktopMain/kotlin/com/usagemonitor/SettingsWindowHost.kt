@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.onboarding.StartupGuideController
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -99,6 +100,7 @@ internal fun SettingsWindowHost(
             onThemeChange = actions::changeTheme,
             onLanguageChange = actions::changeLanguage,
             onAutoStartChange = actions::changeAutoStart,
+            autoStartAvailable = AppDataDirectory.isDefault,
             autoUpdateEnabled = autoUpdate.isEnabled(),
             autoUpdateSupport = autoUpdate.support,
             autoUpdatePlatform = autoUpdate.platform,

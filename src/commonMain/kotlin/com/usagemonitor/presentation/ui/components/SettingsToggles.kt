@@ -16,26 +16,36 @@ import com.usagemonitor.domain.entity.AppUpdateReceiptStatus
 import com.usagemonitor.domain.repository.AppUpdateSupport
 import com.usagemonitor.domain.repository.UPDATE_FEED_URL_ENV_VAR
 
+/**
+ * [available] falso: o processo roda com `--user-data-dir` (issue #419). A
+ * entrada de inicialização não leva a pasta, e o login abriria a instância
+ * padrão. Desligado, o interruptor diz o motivo (contrato do `AppSwitch`) e
+ * mostra desligado, e não o valor do sistema, que pertence à outra instância.
+ */
 @Composable
 fun AutoStartToggle(
     enabled: Boolean,
     language: AppLanguage = AppLanguage.PT,
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    showDivider: Boolean = true
+    showDivider: Boolean = true,
+    available: Boolean = true
 ) {
     val isPt = language == AppLanguage.PT
     SettingsOptionRow(
         label = if (isPt) "Inicialização com Sistema" else "System Startup",
-        description = if (isPt) {
-            "Registra a aplicação na inicialização do usuário atual."
-        } else {
-            "Registers the app to launch with the current user session."
+        description = when {
+            !available && isPt ->
+                "Indisponível com --user-data-dir: a entrada de inicialização abriria o app na pasta padrão, não nesta."
+            !available ->
+                "Unavailable with --user-data-dir: the startup entry would open the app on the default folder, not this one."
+            isPt -> "Registra a aplicação na inicialização do usuário atual."
+            else -> "Registers the app to launch with the current user session."
         },
         showDivider = showDivider,
         modifier = modifier
     ) {
-        AppSwitch(checked = enabled, onCheckedChange = { onToggle(it) })
+        AppSwitch(checked = enabled && available, onCheckedChange = { onToggle(it) }, enabled = available)
     }
 }
 
@@ -334,6 +344,12 @@ internal fun autoUpdateHint(
             "Não há pacote publicado para a arquitetura desta máquina. A atualização automática cobre apenas x86_64."
         } else {
             "No package is published for this machine's architecture. Automatic updates cover x86_64 only."
+        }
+
+        AppUpdateSupport.ISOLATED_DATA_ROOT -> if (isPt) {
+            "Indisponível com --user-data-dir: o instalador reabre o app na pasta padrão. Atualize pela instância sem a opção."
+        } else {
+            "Unavailable with --user-data-dir: the installer reopens the app on the default folder. Update from the instance without the option."
         }
 
         AppUpdateSupport.UNAVAILABLE -> if (isPt) {

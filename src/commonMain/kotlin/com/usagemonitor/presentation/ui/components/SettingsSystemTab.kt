@@ -32,7 +32,9 @@ internal fun SystemSettingsTab(
     startupTipsEnabled: Boolean,
     onStartupTipsEnabledChange: (Boolean) -> Unit,
     receiveBetaUpdates: Boolean,
-    onReceiveBetaUpdatesChange: (Boolean) -> Unit
+    onReceiveBetaUpdatesChange: (Boolean) -> Unit,
+    /** Falso com `--user-data-dir` (#419); ver `AutoStartToggle`. */
+    autoStartAvailable: Boolean = true
 ) {
     val isPt = currentLanguage == AppLanguage.PT
 
@@ -44,7 +46,8 @@ internal fun SystemSettingsTab(
         AutoStartToggle(
             enabled = autoStartEnabled,
             language = currentLanguage,
-            onToggle = onAutoStartChange
+            onToggle = onAutoStartChange,
+            available = autoStartAvailable
         )
         TrayUsageRingToggle(
             enabled = trayUsageRing,

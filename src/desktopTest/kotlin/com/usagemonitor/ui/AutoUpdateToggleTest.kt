@@ -177,6 +177,19 @@ class AutoUpdateToggleTest {
             ).assertIsDisplayed()
         }
 
+    /** `--user-data-dir` (#419): o motivo é a raiz isolada, e não a plataforma ou a origem. */
+    @Test
+    fun `an isolated data root names the option and where to update from`() = runDesktopComposeUiTest {
+        showToggle(enabled = true, support = AppUpdateSupport.ISOLATED_DATA_ROOT)
+
+        onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).assertIsNotEnabled()
+        onNodeWithTag(AUTO_UPDATE_SWITCH_TEST_TAG).assertIsOff()
+        onNodeWithText(
+            "Indisponível com --user-data-dir: o instalador reabre o app na pasta padrão. " +
+                "Atualize pela instância sem a opção."
+        ).assertIsDisplayed()
+    }
+
     @Test
     fun `build without the mechanism says so instead of promising`() = runDesktopComposeUiTest {
         showToggle(enabled = false, support = AppUpdateSupport.UNAVAILABLE)
