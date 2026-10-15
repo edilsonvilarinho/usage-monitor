@@ -81,6 +81,8 @@ fun main(args: Array<String>) {
     // O log que não depende da interface (#416) nasce primeiro: todo o resto pode
     // escrever nele, inclusive quem está caindo.
     val appLog = AppLogFile()
+    // Sem terminal, o que a JVM, a AWT e o Skiko escrevem aqui iria para lugar nenhum.
+    StderrCapture(appLog).install()
     val breadcrumbs = LocalBreadcrumbRecorder(errorSink = { message -> appLog.error("breadcrumb", message) })
 
     // Registrado ANTES da janela: uma exceção que derrube uma thread durante a
