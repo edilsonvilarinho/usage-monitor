@@ -1,11 +1,7 @@
 package com.usagemonitor
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import java.awt.EventQueue
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -26,19 +22,33 @@ import kotlin.test.assertTrue
  */
 class UncaughtExceptionRoutingTest {
 
+    /**
+     * Numa JVM filha ([CoroutineRoutingProbeMain]): na da suíte, o coletor global do
+     * `kotlinx-coroutines-test` guardaria a falha e derrubaria o próximo `runTest`.
+     */
     @Test
     fun `a failing launch in a supervisor scope reaches the default handler`() {
-        val (failedThread, received) = captureDefaultHandler { onFailure ->
-            val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            scope.launch { throw IllegalStateException("sonda-coroutine") }
-            onFailure.await(5, TimeUnit.SECONDS)
-            scope.cancel()
-        }
+        val argFile = File.createTempFile("probe-classpath", ".txt")
+        try {
+            // Classpath por arquivo de argumentos: na linha de comando ele passa do
+            // limite do Windows.
+            val classpath = System.getProperty("java.class.path").replace("\\", "\\\\")
+            argFile.writeText("-cp \"$classpath\"")
+            val java = File(System.getProperty("java.home"), "bin/java").path
+            val process = ProcessBuilder(java, "@${argFile.path}", CoroutineRoutingProbeMain::class.java.name)
+                .redirectErrorStream(true)
+                .start()
+            val finished = process.waitFor(30, TimeUnit.SECONDS)
+            val output = process.inputStream.bufferedReader().readText()
 
-        assertEquals("sonda-coroutine", received?.message)
-        // O último recurso do kotlinx.coroutines anexa o contexto como suprimida;
-        // é por ela que o `CrashHandler` sabe que a falha veio de uma coroutine.
-        assertEquals(UncaughtOrigin.COROUTINE, uncaughtOriginOf(failedThread!!, received!!))
+            assertTrue(finished, output)
+            assertEquals(0, process.exitValue(), output)
+            // O último recurso do kotlinx.coroutines anexa o contexto como suprimida;
+            // é por ela que o `CrashHandler` sabe que a falha veio de uma coroutine.
+            assertTrue(output.lines().contains("coroutine|sonda-coroutine"), output)
+        } finally {
+            argFile.delete()
+        }
     }
 
     @Test
