@@ -156,7 +156,8 @@ private fun WindowScope.DesktopDialogTitleBar(
     windowState: WindowState?,
     onCloseRequest: () -> Unit
 ) {
-    WindowDraggableArea {
+    // Só observa: grava no `app.log` se a janela acompanhou o arrasto (#416).
+    WindowDraggableArea(modifier = Modifier.windowDragProbe(window, title)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

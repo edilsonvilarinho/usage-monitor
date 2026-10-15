@@ -262,6 +262,7 @@ internal fun HudWindowHost(
         // da tela em que ele está — nunca da origem da janela aberta.
         dragWindowPosition = DpOffset(dragStart.x * scale, dragStart.y * scale)
         dragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
+        HudDragProbe.begin()
     }
     val dragTo = {
         val previous = dragPointer
@@ -284,6 +285,7 @@ internal fun HudWindowHost(
     }
     val dragFinish = {
         val position = dragWindowPosition
+        HudDragProbe.finish(position)
         if (position != null) {
             // O notch gruda na borda mais próxima do **centro** dele, no monitor
             // em que foi solto, e borda, fração e monitor são gravados. O encaixe

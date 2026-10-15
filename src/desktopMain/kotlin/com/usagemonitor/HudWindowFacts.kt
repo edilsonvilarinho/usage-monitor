@@ -1,9 +1,12 @@
 package com.usagemonitor
 
 import androidx.compose.ui.awt.ComposeWindow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.WindowPosition
 import com.usagemonitor.data.diagnostics.AppLogFile
+import com.usagemonitor.presentation.ui.windowDragMessage
+import com.usagemonitor.presentation.ui.windowDragSink
 import java.awt.GraphicsDevice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -87,3 +90,27 @@ private fun readHudWindowFacts(window: java.awt.Window, position: WindowPosition
 
 /** Depois do primeiro quadro e da resposta do compositor; antes de o usuário mexer. */
 internal const val HUD_FACTS_DELAY_MILLIS = 2_000L
+
+/**
+ * O arrasto da HUD visto de fora (issue #416): onde a janela estava ao começar,
+ * a última posição que o app pediu e onde ela está ao soltar. A janela é lida de
+ * [appMainWindow] — a HUD é a âncora do app — para a chamada caber numa linha em
+ * cada ponta do gesto, sem estado novo no host.
+ */
+internal object HudDragProbe {
+    @Volatile
+    private var start: java.awt.Point? = null
+
+    fun begin() {
+        start = runCatching { appMainWindow?.location }.getOrNull()
+    }
+
+    fun finish(requested: DpOffset?) {
+        val requestedPoint = requested?.let { offset -> java.awt.Point(offset.x.value.toInt(), offset.y.value.toInt()) }
+        val actual = runCatching { appMainWindow?.location }.getOrNull()
+        runCatching {
+            windowDragSink(windowDragMessage("hud", start, requestedPoint, actual))
+        }
+        start = null
+    }
+}

@@ -15,6 +15,7 @@ import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.application
 import com.usagemonitor.data.diagnostics.AppLogFile
 import com.usagemonitor.data.diagnostics.LocalBreadcrumbRecorder
+import com.usagemonitor.presentation.ui.windowDragSink
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
@@ -89,6 +90,8 @@ fun main(args: Array<String>) {
     val appLog = AppLogFile()
     // Sem terminal, o que a JVM, a AWT e o Skiko escrevem aqui iria para lugar nenhum.
     StderrCapture(appLog).install()
+    // Cada arrasto de janela: pedido × obtido, para ver se o sistema recusa a posição.
+    windowDragSink = { message -> appLog.info("window-drag", message) }
     val breadcrumbs = LocalBreadcrumbRecorder(errorSink = { message -> appLog.error("breadcrumb", message) })
 
     // Registrado ANTES da janela: uma exceção que derrube uma thread durante a
