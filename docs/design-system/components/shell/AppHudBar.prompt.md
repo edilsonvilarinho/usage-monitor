@@ -100,7 +100,14 @@ toggling would close what the pointer just opened — a balloon with
 update pending, an `AppBanner` (one-line title, detail on up to two lines) plus the **same action as
 the standard update strip** as an `AppButton` ("Reiniciar o app e atualizar", "Baixar atualização";
 none while downloading) — offered here, where the label says what the click does, and never on the
-notch. At rest each handle is a quarter arc in `outline` inside the shadow margin the resting window
+notch. Last, **always**, an `AppButton` "Sair do Usage Monitor" / "Quit Usage Monitor" (#416): with
+no tray (`tray.supported=false` on COSMIC) the tray's "Sair" does not exist and the undecorated HUD
+is the only window, so this is the app's way out. It calls the same shutdown as the tray item and the
+window close — never a second shutdown path. Always shown, not only without a tray: a supported
+tray does not mean a reachable icon (Windows 11 hides new icons in the overflow), and one balloon
+for every platform keeps the geometry a fixed sum. Its own row, not an eighth icon: with the seven
+admin actions the footer row takes 232 of the column's 240dp. Bordered like the update button —
+a frameless label only looked clickable on hover (#291). At rest each handle is a quarter arc in `outline` inside the shadow margin the resting window
 already has.
 
 

@@ -51,6 +51,7 @@ const clockIcon = (fraction) => (
 
 export function AppHudBar({
   accounts = [], edge = 'top', balloon, fallbackLabel = 'Carregando', countdown, refreshFraction, version = '38.2.0', update, updateHeadline, updateDetail, updateAction,
+  quitLabel = 'Sair do Usage Monitor',
   actions = ['⟲', '▣'], continuous = false, reduced = false, autoRetract = false, style
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
@@ -183,6 +184,8 @@ export function AppHudBar({
               ) : null}
             </>
           ) : null}
+          {/* Sempre, por último (#416): sem bandeja é a única saída do app. */}
+          <div><AppButton>{quitLabel}</AppButton></div>
         </>
       )}
     </div>

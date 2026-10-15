@@ -345,12 +345,14 @@ internal val HUD_APP_BALLOON_UPDATE_TEXT_WIDTH =
 
 /**
  * A altura do balão da engrenagem: título, a linha de versão e contagem (F10), a
- * fileira de ações do rodapé e, quando há atualização pendente, o banner dela e —
- * com ação — o botão, na altura de controle do sistema.
+ * fileira de ações do rodapé, quando há atualização pendente o banner dela e —
+ * com ação — o botão, e por último, sempre, "Sair do Usage Monitor" (#416), os
+ * dois botões na altura de controle do sistema.
  */
 internal fun hudAppBalloonHeight(hasUpdateIndicator: Boolean, hasUpdateAction: Boolean = false): Dp {
     var height = HUD_BALLOON_PADDING * 2 + HUD_BALLOON_HEADER + HUD_APP_BALLOON_STATUS +
-        HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS
+        HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_ACTIONS +
+        HUD_BALLOON_SECTION_GAP + AppChrome.control
     if (hasUpdateIndicator) {
         height += HUD_BALLOON_SECTION_GAP + HUD_APP_BALLOON_UPDATE_BANNER
         if (hasUpdateAction) {

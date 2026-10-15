@@ -22,6 +22,7 @@ import com.usagemonitor.hudDockedWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_QUIT_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_ACTION_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_UPDATE_BANNER_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_VERSION_TEST_TAG
@@ -800,9 +801,9 @@ class HudNotchTest {
 
     // ------------------------------------------------------------ balão da engrenagem (rodada 3)
 
-    /** O conteúdo de teste do balão da engrenagem: uma ação do rodapé. */
+    /** O conteúdo de teste do balão da engrenagem: uma ação do rodapé e a saída do app. */
     @Composable
-    private fun appBalloonFixture(onRefresh: () -> Unit) {
+    private fun appBalloonFixture(onRefresh: () -> Unit, onQuit: () -> Unit) {
         HudAppBalloonContent(
             language = AppLanguage.PT,
             appVersion = CURRENT_APP_VERSION,
@@ -810,12 +811,13 @@ class HudNotchTest {
             updateIndicator = null,
             actions = {
                 FooterActionGroup(language = AppLanguage.PT, onRefresh = onRefresh, onOpenSettings = {})
-            }
+            },
+            onQuit = onQuit
         )
     }
 
     @Composable
-    private fun notchWithActions(onRefresh: () -> Unit = {}) {
+    private fun notchWithActions(onRefresh: () -> Unit = {}, onQuit: () -> Unit = {}) {
         AppTheme(isDark = true) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
                 HudNotch(
@@ -824,7 +826,7 @@ class HudNotchTest {
                     sizes = hudNotchSizes(accounts, HudEdge.TOP, "Carregando", false),
                     fallbackLabel = "Carregando",
                     expanded = true,
-                    appBalloon = { appBalloonFixture(onRefresh) },
+                    appBalloon = { appBalloonFixture(onRefresh, onQuit) },
                     appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
                     gearDescription = GEAR
                 )
@@ -912,6 +914,7 @@ class HudNotchTest {
                                 countdown = null,
                                 updateIndicator = update,
                                 actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
+                                onQuit = {},
                                 onUpdateAction = action
                             )
                         }
@@ -928,7 +931,11 @@ class HudNotchTest {
     }
 
     @Composable
-    private fun appBalloonWithUpdate(update: HudUpdateIndicator, onUpdateAction: (() -> Unit)?) {
+    private fun appBalloonWithUpdate(
+        update: HudUpdateIndicator,
+        onUpdateAction: (() -> Unit)?,
+        onQuit: () -> Unit = {}
+    ) {
         AppTheme(isDark = true) {
             Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
                 HudAppBalloonContent(
@@ -937,6 +944,7 @@ class HudNotchTest {
                     countdown = null,
                     updateIndicator = update,
                     actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
+                    onQuit = onQuit,
                     onUpdateAction = onUpdateAction
                 )
             }
@@ -976,6 +984,42 @@ class HudNotchTest {
         onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).assertDoesNotExist()
     }
 
+    /**
+     * Sem bandeja (#416: `tray.supported=false` no Cosmic) o "Sair" do menu dela
+     * não existe, e a HUD sem moldura é a única janela. O balão da engrenagem
+     * oferece a saída sempre, aberto pelo notch como o usuário o abre.
+     */
+    @Test
+    fun `o balao da engrenagem oferece sair do usage monitor`() = runDesktopComposeUiTest {
+        var quits = 0
+        setContent { notchWithActions(onQuit = { quits += 1 }) }
+
+        onNodeWithContentDescription(GEAR).performClick()
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_QUIT_TAG)
+            .assertIsDisplayed()
+            .assertTextEquals("Sair do Usage Monitor")
+            .performClick()
+        assertEquals(1, quits)
+    }
+
+    /** A saída fica abaixo da ação da atualização, e as duas continuam distintas. */
+    @Test
+    fun `com atualizacao pronta o balao da engrenagem ainda oferece sair`() = runDesktopComposeUiTest {
+        var restarts = 0
+        var quits = 0
+        setContent {
+            appBalloonWithUpdate(READY_INDICATOR, onUpdateAction = { restarts += 1 }, onQuit = { quits += 1 })
+        }
+
+        val update = onNodeWithTag(HUD_APP_BALLOON_UPDATE_ACTION_TAG).getUnclippedBoundsInRoot()
+        val quit = onNodeWithTag(HUD_APP_BALLOON_QUIT_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(quit.top >= update.bottom, "sair em ${quit.top}, atualização termina em ${update.bottom}")
+        onNodeWithTag(HUD_APP_BALLOON_QUIT_TAG).performClick()
+        assertEquals(1, quits)
+        assertEquals(0, restarts)
+    }
+
     // ------------------------------------------------------------ contagem (#185, #269)
 
     /**
@@ -1005,7 +1049,8 @@ class HudNotchTest {
                     appVersion = CURRENT_APP_VERSION,
                     countdown = { countdownOf(now + 2.minutes + 5.seconds) },
                     updateIndicator = null,
-                    actions = {}
+                    actions = {},
+                    onQuit = {}
                 )
             }
         }

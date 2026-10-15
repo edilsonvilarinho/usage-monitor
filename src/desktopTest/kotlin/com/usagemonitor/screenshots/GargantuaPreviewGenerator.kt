@@ -186,7 +186,8 @@ private fun recordBalloon(output: File) {
                                     )
                                 },
                                 updateIndicator = null,
-                                actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) }
+                                actions = { FooterActionGroup(language = AppLanguage.PT, onRefresh = {}, onOpenSettings = {}) },
+                                onQuit = {}
                             )
                         },
                         appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),

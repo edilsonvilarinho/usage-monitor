@@ -96,6 +96,16 @@ internal const val HUD_APP_BALLOON_UPDATE_ACTION_TAG = "hudAppBalloonUpdateActio
 /** O banner da atualização pendente no balão da engrenagem (issue #291). */
 internal const val HUD_APP_BALLOON_UPDATE_BANNER_TAG = "hudAppBalloonUpdateBanner"
 
+/** O botão "Sair do Usage Monitor", última linha do balão da engrenagem (#416). */
+internal const val HUD_APP_BALLOON_QUIT_TAG = "hudAppBalloonQuit"
+
+/**
+ * O rótulo diz **o que** fecha: o balão está ao lado do notch, e "Sair" sozinho
+ * pode ser lido como sair do balão.
+ */
+internal fun hudQuitLabel(language: AppLanguage): String =
+    localized(language, "Sair do Usage Monitor", "Quit Usage Monitor")
+
 /**
  * A caixa inteira do balão na orientação de [edge]: o corpo e, do lado do notch,
  * a faixa de [HUD_BALLOON_GAP] por onde a cauda passa.
@@ -467,6 +477,13 @@ internal const val HUD_APP_BALLOON_VERSION_TEST_TAG = "hudAppBalloonVersion"
  * de propósito e o rótulo diz o que o clique faz, e no notch seria clique de
  * rotina reiniciando o app (#225).
  *
+ * Por último, **sempre**, "Sair do Usage Monitor" ([onQuit]) — a única saída do
+ * app pela interface quando não há bandeja (#416: `tray.supported=false` no
+ * Cosmic). Linha própria, e não um ícone na fileira do rodapé: com as sete ações
+ * de administrador a fileira mede 232 dos 240dp da coluna, e um oitavo ícone não
+ * cabe. `AppButton` com borda, como o da atualização: rótulo sem moldura só
+ * parecia clicável no hover (#291).
+ *
  * Alturas fixas, somadas por `hudAppBalloonHeight`, como no balão de conta.
  */
 @Composable
@@ -476,6 +493,7 @@ internal fun HudAppBalloonContent(
     countdown: (@Composable () -> Unit)?,
     updateIndicator: HudUpdateIndicator?,
     actions: @Composable () -> Unit,
+    onQuit: () -> Unit,
     onUpdateAction: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag(HUD_APP_BALLOON_CONTENT_TEST_TAG)) {
@@ -547,6 +565,12 @@ internal fun HudAppBalloonContent(
                 )
             }
         }
+        Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+        AppButton(
+            label = hudQuitLabel(language),
+            onClick = onQuit,
+            modifier = Modifier.height(AppChrome.control).testTag(HUD_APP_BALLOON_QUIT_TAG)
+        )
     }
 }
 

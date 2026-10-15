@@ -213,7 +213,7 @@ private val EN_WINDOW_MODES = HelpEntry(
         "Help — including how long is left until the next automatic collection.",
     steps = listOf(
         "Hover the gear at the end of the notch to open \"Settings\", \"Help\", " +
-            "\"Refresh now\" and the export.",
+            "\"Refresh now\" and the export; \"Quit Usage Monitor\" closes the app.",
         "The tray icon menu has \"Open\", which brings the notch to the front when another " +
             "window covers it.",
         "Drag the hand at the end of the notch (only the hand moves it) and " +

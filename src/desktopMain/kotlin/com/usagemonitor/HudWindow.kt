@@ -130,6 +130,10 @@ internal fun HudWindowHost(
     accountColors: Map<String, AccountAccent> = emptyMap(),
     /** O emoji escolhido por conta Claude (issue #287), por `profileId`. */
     accountEmojis: Map<String, AccountEmoji> = emptyMap(),
+    /**
+     * Encerra o app (`shutdownApplication` do `Main.kt`): o fechar da janela e o
+     * "Sair do Usage Monitor" do balão da engrenagem, a saída sem bandeja (#416).
+     */
     onCloseRequest: () -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
     activeTargets: StateFlow<Set<UsageTargetKey>>? = null,
@@ -381,7 +385,8 @@ internal fun HudWindowHost(
                             updateAction = updateAction,
                             actions = actions,
                             exportScope = exportScope,
-                            currentStats = { (dashboardState as? UiState.Success)?.data }
+                            currentStats = { (dashboardState as? UiState.Success)?.data },
+                            onQuit = onCloseRequest
                         )
                     },
                     appBalloonHeight = hudAppBalloonHeight(
@@ -422,7 +427,7 @@ private fun handleHudWindowKey(event: KeyEvent, onOpenHelp: () -> Unit): Boolean
 
 /**
  * O balão da engrenagem: o que o rodapé do modo padrão oferece — aqui não há
- * rodapé —, mais a contagem e o aviso de atualização.
+ * rodapé —, mais a contagem, o aviso de atualização e "Sair do Usage Monitor".
  *
  * [exportScope] é do host, não deste balão: o balão sai da composição quando o
  * ponteiro deixa a HUD, e um escopo dele cancelaria a exportação no meio.
@@ -436,7 +441,8 @@ private fun HudWindowAppBalloon(
     updateAction: (() -> Unit)?,
     actions: AppShellActions,
     exportScope: CoroutineScope,
-    currentStats: () -> List<ApiUsageStats>?
+    currentStats: () -> List<ApiUsageStats>?,
+    onQuit: () -> Unit
 ) {
     HudAppBalloonContent(
         language = language,
@@ -455,6 +461,7 @@ private fun HudWindowAppBalloon(
         },
         updateIndicator = updateIndicator,
         onUpdateAction = updateAction,
+        onQuit = onQuit,
         actions = {
             FooterActionGroup(
                 language = language,

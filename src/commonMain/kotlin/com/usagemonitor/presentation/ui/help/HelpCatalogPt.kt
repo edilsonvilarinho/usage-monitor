@@ -219,7 +219,7 @@ private val PT_WINDOW_MODES = HelpEntry(
         "Configurações e Ajuda — inclusive quanto falta para a próxima coleta automática.",
     steps = listOf(
         "Passe o ponteiro sobre a engrenagem na ponta do notch para abrir \"Configurações\", " +
-            "\"Ajuda\", \"Atualizar agora\" e a exportação.",
+            "\"Ajuda\", \"Atualizar agora\" e a exportação; \"Sair do Usage Monitor\" fecha o app.",
         "O menu do ícone da bandeja tem \"Abrir\", que traz o notch para a frente quando " +
             "ele está coberto por outra janela.",
         "Arraste pela mão da ponta do notch (só ela move) e solte " +

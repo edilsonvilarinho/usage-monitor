@@ -260,6 +260,16 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   ponto; aberto, a engrenagem leva um ponto no canto, e a frase inteira vai na descrição dela — cor
   nunca informa sozinha. O notch recolhido tem o mesmo tamanho com e sem atualização, e há teste
   afirmando. Clique nenhum no notch reinicia o app: seria clique de rotina.
+  - **"Sair do Usage Monitor" é a última linha do balão da engrenagem, sempre** (#416). O pacote
+    `--diagnostics` do Cosmic disse `tray.supported=false`: sem bandeja o "Sair" do menu dela não
+    existe, e a HUD sem moldura é a única janela — não havia saída pela interface. O botão chama o
+    `onCloseRequest` do `HudWindowHost`, que é o `shutdownApplication` do `Main.kt`, o mesmo do
+    "Sair" da bandeja: nenhum segundo caminho de encerramento. **Sempre, e não só sem bandeja:**
+    bandeja suportada não é ícone alcançável (o Windows 11 põe ícone novo no menu de estouro), e um
+    balão igual em toda plataforma mantém a altura uma soma fixa (`hudAppBalloonHeight`). **Linha
+    própria, e não um oitavo ícone:** com as sete ações de administrador a fileira do rodapé mede
+    232 dos 240dp da coluna. `AppButton` com borda, como o da atualização (#291). Não aberto numa
+    sessão gráfica Linux (#342).
   - **O balão da engrenagem mostra um `AppBanner` e um `AppButton`**, não frase colorida e rótulo
     com seta — aquele só parecia clicável no hover. O texto vem partido de `updateBannerContent`
     (`headline` numa linha, `detail` em até duas), porque o título de uma linha da faixa não cabe

@@ -68,6 +68,11 @@ export interface AppHudBarProps {
   updateDetail?: string;
   /** The update strip's action label, a button in the gear balloon only (none while downloading). */
   updateAction?: string;
+  /**
+   * The gear balloon's last row, always present (#416): an `AppButton` that quits the app — the
+   * only way out when there is no tray. Default `Sair do Usage Monitor`.
+   */
+  quitLabel?: string;
   /** Glyphs of the card's buttons shown in an account balloon (refresh is always last). */
   actions?: string[];
   continuous?: boolean;

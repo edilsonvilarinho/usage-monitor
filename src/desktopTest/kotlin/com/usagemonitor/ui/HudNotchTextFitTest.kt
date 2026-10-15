@@ -26,6 +26,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.StalledCliSession
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.hudSessionSignals
+import com.usagemonitor.presentation.ui.hudQuitLabel
 import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.presentation.ui.updateBannerContent
@@ -159,6 +160,7 @@ class HudNotchTextFitTest {
      * até duas, rótulo do botão numa. A primeira versão desta frase, "…it will be
      * applied when Usage Monitor closes", saía em três linhas no balão. Versão com
      * três dígitos por campo é o pior caso de largura, e os quatro estados entram.
+     * O botão de sair do balão (#416) entra pela mesma medida.
      */
     @Test
     fun `o banner e o botao da atualizacao cabem no balao em qualquer escala`() = runDesktopComposeUiTest {
@@ -217,6 +219,11 @@ class HudNotchTextFitTest {
                         overflow(label, typography.labelLarge, buttonText, 1, AppChrome.control)
                             ?.let { failure -> failures += "$scale%: $failure" }
                     }
+                }
+                // "Sair do Usage Monitor" (#416) é o mesmo `AppButton`, sempre presente.
+                AppLanguage.entries.forEach { language ->
+                    overflow(hudQuitLabel(language), typography.labelLarge, buttonText, 1, AppChrome.control)
+                        ?.let { failure -> failures += "$scale%: $failure" }
                 }
                 // F10: os sinais de sessão viraram as linhas do aviso da conta, com
                 // a mesma largura de texto do aviso de atualização e uma linha cada.
