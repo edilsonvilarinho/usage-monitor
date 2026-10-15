@@ -87,7 +87,10 @@ internal class AppLogFile(
     private val pid: Long = ProcessHandle.current().pid(),
     private val version: String = CURRENT_APP_VERSION
 ) {
-    private val lock = Any()
+    // Lock do processo, não da instância: quem grava de longe da injeção (a janela
+    // da HUD) cria a própria instância, e duas instâncias girando o mesmo arquivo
+    // ao mesmo tempo perderiam linhas.
+    private val lock = PROCESS_LOCK
 
     fun log(
         level: AppLogLevel,
@@ -185,6 +188,8 @@ internal class AppLogFile(
         /** Quadros do topo da pilha: o bastante para achar a origem sem virar despejo. */
         const val STACK_FRAMES = 25
         const val MAX_CAUSES = 4
+
+        private val PROCESS_LOCK = Any()
 
         fun defaultLogFile(): File {
             val homeDir = System.getProperty("user.home")

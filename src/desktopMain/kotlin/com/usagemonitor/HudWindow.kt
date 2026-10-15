@@ -325,6 +325,10 @@ internal fun HudWindowHost(
         LaunchedEffect(window) {
             onWindowReady(window)
         }
+        // O que o sistema fez com o pedido de posição e de alfa (#416).
+        LaunchedEffect(window) {
+            recordHudWindowFacts(window, { windowState.position }, { windowState.size })
+        }
         LaunchedEffect(windowOpacityPercent) {
             applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
         }
