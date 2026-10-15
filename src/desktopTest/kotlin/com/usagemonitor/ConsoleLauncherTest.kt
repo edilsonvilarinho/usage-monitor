@@ -7,7 +7,10 @@ import kotlin.test.assertNull
 
 class ConsoleLauncherTest {
 
-    private val installDir = File("C:\\Users\\someone\\AppData\\Local\\Usage Monitor")
+    // Montado com o separador da plataforma: literal `C:\...` no Linux vira um nome
+    // de arquivo só, e o teste reprovava a função por um caminho que ela nunca recebe
+    // (a suíte roda também no `desktop-linux`).
+    private val installDir = File(File(System.getProperty("java.io.tmpdir"), "AppData"), "Usage Monitor")
 
     @Test
     fun `the console launcher relaunches the gui exe next to it with the same arguments`() {
