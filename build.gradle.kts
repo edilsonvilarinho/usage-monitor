@@ -177,6 +177,11 @@ compose.desktop {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.png"))
                 debPackageVersion = linuxPackageVersion
                 rpmPackageVersion = linuxPackageVersion
+                
+                // Fix tela preta Bazzite#44 + distros Linux Wayland (issue#421, opencode model):
+                // JvmArgs injeta propriedades JVM no script shell gerado. -Dskiko.renderApi=SOFTWARE
+                // força software rendering sem depender de export no PATH do launcher.
+                jvmArgs("-Dskiko.renderApi=SOFTWARE")
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icons/app_icon.icns"))
