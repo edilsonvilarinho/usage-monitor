@@ -96,6 +96,17 @@ fun main(args: Array<String>) {
     }
     // Antes de qualquer arquivo aberto: a raiz de dados só pode ser trocada uma vez (#419).
     val dataRoot = configureDataRoot(launch.userDataDir)
+
+    // Fix tela preta Bazzite 44 + distros Linux Wayland (issue#421, opencode model):
+    // Skiko falha renderização nativa GPU no compositor Wayland com NVIDIA. Força fallback:
+    // - SOFTWARE: API de renderização via CPU sem aceleração OpenGL
+    // - JDK_X11_xxx: força superfície X11 em vez de saída direta Wayland (quando compatível)
+    val isLinux = System.getProperty("os.name").lowercase().contains("linux")
+    val isWayland = EnvironmentVariableReader.hasNonEmptyValue("WAYLAND_DISPLAY")
+    if (isLinux && isWayland) {
+        println(("[UsageMonitor] ${DateTimeFormatter.ofPattern("HHmmss").format(Clock.System.now())} Linux Wayland detected, applying software rendering via X11 fallback."))
+        System.setProperty("skiko.renderApi", "SOFTWARE")
+    }
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
     }
