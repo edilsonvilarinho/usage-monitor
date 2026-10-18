@@ -96,16 +96,20 @@ fun main(args: Array<String>) {
     }
     // Antes de qualquer arquivo aberto: a raiz de dados só pode ser trocada uma vez (#419).
     val dataRoot = configureDataRoot(launch.userDataDir)
-    // Fix tela preta no Wayland com GPU NVIDIA (issue #421): o Skiko lê a
-    // property ANTES da primeira inicialização, então ela tem de valer aqui, no
-    // arranque, e não na composição. Cobre quem executa o binário direto, sem o
-    // launcher estável. WAYLAND_DISPLAY="" e GDK_BACKEND=x11 -- o resto do
-    // workaround validado -- são variáveis de ambiente lidas por código nativo
-    // (AWT/GTK), sem equivalente Java: elas entram pelo launcher estável
-    // (`install-usage-monitor.sh`), que é o caminho do update e do menu.
+    // Fix tela preta no Wayland (issues #421 e #416, monitor secundario):
+    // o Skiko lê a property ANTES da primeira inicialização, então ela tem de
+    // valer aqui, no arranque, e não na composição. Cobre quem executa o
+    // binário direto, sem o launcher estável. Tenta `OPENGL` primeiro: o
+    // compositor KDE compõe alfa certo quando o SkiaLayer vem de um GL
+    // context. Se OpenGL não estiver funcional, o Skiko cai em
+    // `SOFTWARE_COMPAT` sozinho. WAYLAND_DISPLAY="" e GDK_BACKEND=x11 -- o
+    // resto do workaround validado -- são variáveis de ambiente lidas por
+    // código nativo (AWT/GTK), sem equivalente Java: elas entram pelo
+    // launcher estável (`install-usage-monitor.sh`), que é o caminho do
+    // update e do menu.
     val softwareRenderingFallback = isLinuxWayland()
     if (softwareRenderingFallback) {
-        System.setProperty("skiko.renderApi", "SOFTWARE")
+        System.setProperty("skiko.renderApi", "OPENGL")
     }
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
