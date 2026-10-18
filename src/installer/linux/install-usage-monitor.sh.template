@@ -137,6 +137,12 @@ cat > "$launcher" <<LAUNCHER
 # Gerado pelo Usage Monitor. Lê a versão ativa e executa a árvore dela.
 set -eu
 root='$root'
+# Fix tela preta no Wayland com GPU NVIDIA (issue #421): workaround validado na
+# Bazzite 44. Força o Skiko a renderizar por software e o AWT/GTK a usarem X11
+# via XWayland; valem para o processo lançado e os filhos dele.
+export SKIKO_RENDER_API=SOFTWARE
+export WAYLAND_DISPLAY=
+export GDK_BACKEND=x11
 version=\$(cat "\$root/current")
 exec "\$root/versions/\$version/$APP_DIR_NAME/$APP_LAUNCHER_RELATIVE" "\$@"
 LAUNCHER
