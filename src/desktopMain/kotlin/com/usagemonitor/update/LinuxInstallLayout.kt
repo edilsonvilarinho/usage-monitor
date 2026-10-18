@@ -244,6 +244,13 @@ internal fun buildLinuxStableLauncherScript(rootPath: String): String {
         appendLine("# Gerado pelo Usage Monitor. Lê a versão ativa e executa a árvore dela.")
         appendLine("set -eu")
         appendLine("root=$quotedRoot")
+        // Fix tela preta no Wayland com GPU NVIDIA (issue #421): o launcher é o
+        // mesmo gerado pelo instalador (`install-usage-monitor.sh.template`) -- os
+        // dois donos têm de escrever o mesmo conteúdo, ou a reescrita de um lado
+        // apagaria o fallback do outro.
+        appendLine("export SKIKO_RENDER_API=SOFTWARE")
+        appendLine("export WAYLAND_DISPLAY=")
+        appendLine("export GDK_BACKEND=x11")
         appendLine("version=\$(cat \"\$root/$LINUX_CURRENT_FILE_NAME\")")
         appendLine(
             "exec \"\$root/$LINUX_VERSIONS_DIRECTORY_NAME/\$version/" +

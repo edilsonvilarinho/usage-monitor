@@ -132,6 +132,13 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.usagemonitor.MainKt"
+        // Fix tela preta no Wayland com GPU NVIDIA (issue #421): o `-D` vira
+        // `--java-options` no jpackage (deb/rpm) e DEFAULT_JVM_OPTS no app-image.
+        // Condicionado ao build Linux: sem a condicao, o Exe (Windows) e o Dmg
+        // (macOS) tambem renderizariam por CPU, perdendo aceleracao de GPU.
+        if (System.getProperty("os.name").startsWith("Linux")) {
+            jvmArgs += "-Dskiko.renderApi=SOFTWARE"
+        }
 
         nativeDistributions {
             targetFormats(

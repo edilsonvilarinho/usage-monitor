@@ -269,6 +269,26 @@ class LinuxInstallLayoutTest {
     }
 
     /**
+     * Fallback do Wayland (issue #421): o launcher estável tem dois donos -- o
+     * template do instalador e o builder do app -- e a reescrita de um lado
+     * apagaria os exports do outro. O teste amarra os dois ao mesmo conjunto.
+     */
+    @Test
+    fun `the installer template and the generated launcher share the wayland fallback`() {
+        val template = File("src/installer/linux/install-usage-monitor.sh.template")
+        val script = buildLinuxStableLauncherScript("/home/edils/.local/share/usage-monitor")
+
+        listOf(
+            "export SKIKO_RENDER_API=SOFTWARE",
+            "export WAYLAND_DISPLAY=",
+            "export GDK_BACKEND=x11"
+        ).forEach { line ->
+            assertTrue(template.readText().contains(line), "o template não define '$line'")
+            assertTrue(script.contains(line), "o launcher gerado não define '$line'")
+        }
+    }
+
+    /**
      * O caminho do `$HOME` é texto do usuário. Um apóstrofo num nome de conta
      * basta para transformar interpolação ingênua em execução de comando.
      */

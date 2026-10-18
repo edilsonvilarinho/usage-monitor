@@ -96,6 +96,17 @@ fun main(args: Array<String>) {
     }
     // Antes de qualquer arquivo aberto: a raiz de dados só pode ser trocada uma vez (#419).
     val dataRoot = configureDataRoot(launch.userDataDir)
+    // Fix tela preta no Wayland com GPU NVIDIA (issue #421): o Skiko lê a
+    // property ANTES da primeira inicialização, então ela tem de valer aqui, no
+    // arranque, e não na composição. Cobre quem executa o binário direto, sem o
+    // launcher estável. WAYLAND_DISPLAY="" e GDK_BACKEND=x11 -- o resto do
+    // workaround validado -- são variáveis de ambiente lidas por código nativo
+    // (AWT/GTK), sem equivalente Java: elas entram pelo launcher estável
+    // (`install-usage-monitor.sh`), que é o caminho do update e do menu.
+    val softwareRenderingFallback = isLinuxWayland()
+    if (softwareRenderingFallback) {
+        System.setProperty("skiko.renderApi", "SOFTWARE")
+    }
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
     }
@@ -113,6 +124,11 @@ fun main(args: Array<String>) {
     // O log que não depende da interface (#416) nasce primeiro: todo o resto pode
     // escrever nele, inclusive quem está caindo.
     val appLog = AppLogFile()
+    // Rastro do fallback da issue #421: sem ele, a execução direta do binário em
+    // Wayland renderiza por CPU sem deixar nada no log para diagnosticar.
+    if (softwareRenderingFallback) {
+        appLog.info("skiko-render", "Wayland detectado; renderização por software forçada")
+    }
     // O exe GUI do Windows não tem console: o aviso acima só chega ao usuário por aqui.
     for (option in launch.unknownOptions) {
         appLog.warn("command-line", unknownOptionWarning(option))
@@ -141,6 +157,17 @@ fun main(args: Array<String>) {
 private fun printAndSucceed(text: String): Int {
     println(text)
     return 0
+}
+
+/**
+ * Linux com compositor Wayland (issue #421): é o ambiente onde o Skiko falha a
+ * renderização nativa com GPU NVIDIA. Leitura direta do ambiente do processo,
+ * sem kotlinx nem I/O -- roda antes de qualquer arquivo ser aberto.
+ */
+private fun isLinuxWayland(): Boolean {
+    val os = System.getProperty("os.name").orEmpty().lowercase()
+    val waylandDisplay = System.getenv("WAYLAND_DISPLAY").orEmpty()
+    return os.contains("linux") && waylandDisplay.isNotBlank()
 }
 
 /**
