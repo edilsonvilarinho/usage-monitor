@@ -176,15 +176,74 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     margem de 16dp. Sem suporte a `PERPIXEL_TRANSPARENT` o `setShape` lança e a HUD segue sem
     recorte: a área do balão volta a engolir clique, mas o notch não pisca. `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
     em `Path2D`, que nunca é igual ao pedido.
-  - **O recorte é só do Windows** (`hudUsesHitRegion`, issue #340). Relato de usuário no elementary OS 6.1
-    (Ubuntu 20.04, X11, Gala), notch na borda direita: com o ponteiro em cima, o balão aparecia só
-    como a tira de 16dp da margem, com a cauda, e as alças saíam como círculos cortados. O
-    `shape = null` da abertura não tirava o recorte ali. **Regressão da #294** (`d3ff05b`, v41.0.0):
-    o mesmo usuário, na mesma máquina, abria o balão inteiro até 25/09, quando a janela ainda
-    redimensionava ao abrir e não havia recorte. O Windows é a única plataforma medida, e só
-    nele o host aplica `Window.shape`; no Linux e no macOS a janela fica sem recorte — o balão abre
-    inteiro, e o preço aceito é a área vazia dele poder engolir o clique da janela de baixo com o
-    notch parado. Esse custo no Linux ainda não foi medido.
+  - **O recorte é do Windows sempre, e do Linux só sem alfa** (`hudHitRegionMode`, issues #340 e #426).
+    Relato de usuário no elementary OS 6.1 (Ubuntu 20.04, X11, Gala), notch na borda direita: com o
+    ponteiro em cima, o balão aparecia só como a tira de 16dp da margem, com a cauda, e as alças
+    saíam como círculos cortados. O `shape = null` da abertura não tirava o recorte ali.
+    **Regressão da #294** (`d3ff05b`, v41.0.0): o mesmo usuário, na mesma máquina, abria o balão
+    inteiro até 25/09, quando a janela ainda redimensionava ao abrir e não havia recorte. A #340
+    fechou o recorte no Windows, a única plataforma medida.
+
+    A #426 reabriu **só o caminho sem alfa**. Quando a janela perde a transparência, ela pinta
+    442×557 de preto sobre todas as outras e engole clique em toda a área — o relato da #416 chegou
+    como "congelou". Ali o recorte é o mal menor: o pior caso vira um notch sozinho. Com a
+    transparência funcionando — o caso normal depois do reparo da #426 — o Linux **não toca** em
+    `Window.shape`, e o balão cortado da #340 não tem como voltar. Duas consequências de desenho:
+    a limpeza no X11 é o **retângulo do tamanho da janela**, nunca `null` (foi o `null` que não
+    limpava), e o host continua compondo o aplicador quando o recorte deixa de valer, senão o
+    recorte ficaria para sempre. macOS nunca foi medido e segue sem recorte, com o preço aceito de
+    a área vazia do balão poder engolir o clique da janela de baixo com o notch parado.
+- **O alfa da janela é por monitor, e o AWT o perde ao cruzar a fronteira**
+  (`HudWindowFrame.kt`, `HudWindowTranslucency.kt`; issue #426, relatada na #416). Uma janela
+  transparente só guarda a `GraphicsConfiguration` de 32 bits no `GraphicsDevice` em que nasceu. Ao
+  cruzar para outro device, o AWT a troca pela **configuração padrão do destino**, que no X11 é de
+  24 bits — e janela de 24 bits não tem canal alfa: ela pinta 442×557 de preto, sobre todas as
+  janelas e engolindo clique.
+
+  Medido no Bazzite 44 (KDE Plasma, Wayland com XWayland, dois monitores, NVIDIA RTX 4070 SUPER),
+  com sonda em AWT puro amostrada contra o `xwininfo`: `32 → 24 → 32 → 24 → 32`. **Voltar para o
+  primário também perde o alfa** — a configuração padrão dos dois monitores é de 24 bits. O defeito
+  é cruzar a fronteira, não o monitor de destino.
+
+  **A janela nasce certa, e não é remendada.** Houve um remendo e ele foi retirado: devolver o alfa
+  a uma janela já aberta obriga o AWT a recriar a janela nativa (a visual é propriedade dela, não dá
+  para trocá-la em voo), e medido, o Compose **para de emitir quadros** depois disso — com o
+  dashboard vivo e publicando a cada 60 s, a barra não mudou um pixel em 75 s e só voltava a pintar
+  na recriação seguinte. Trocava o retângulo preto por uma barra congelada. No primário, sem
+  travessia e sem remendo, a mesma barra mudava 272 pixels em 80 s.
+
+  Por isso, **só no Linux**, a janela sai do `Window` de alto nível do Compose para o `SwingWindow`
+  de baixo nível, o único que aceita a janela já construída e portanto o único que deixa escolher a
+  `GraphicsConfiguration` do nascimento (`HudWindowFrame`). No Windows e no macOS nada muda — a
+  conversão de dp para pixel, o ícone e o fechar do caminho de alto nível estão medidos em HiDPI, e
+  comportamento nativo medido numa plataforma nasce restrito a ela (#340).
+
+  **Ela renasce em dois casos** (`HudWindowRebirth`, chave da composição): o monitor mudou, ou o alfa
+  caiu. O segundo existe porque um arrasto que cruza a fronteira e **volta** para o mesmo monitor
+  deixa o id final igual, mas o AWT já trocou a configuração no caminho — sem esse gatilho a barra
+  fica viva e opaca. O renascimento é uma janela Compose nova, com o desenho vivo, e não um remendo.
+  Orçamento de [HUD_ALPHA_REBUILD_LIMIT] por monitor: num ambiente que não compõe alfa ele nunca
+  voltaria, e repetir seria um pisca eterno; depois dele quem assume é o recorte de emergência.
+
+  **A troca de janelas não pode piscar.** No renascimento o Compose descarta a janela antiga antes de a
+  nova ficar visível e pintar o primeiro quadro, e o vão aparece como um piscar a cada travessia
+  (medido por amostragem de 20 Hz). A antiga é descartada `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois,
+  já com a sucessora na tela: as duas ocupam a mesma área e a nova nasce por cima, então a troca
+  deixa de aparecer.
+
+  **Armadilhas medidas, as duas custaram uma rodada:**
+  - Ler `state.size`/`state.position` **dentro** do `update` do `SwingWindow` não registra
+    dependência no Compose: a sincronização roda uma vez e nunca mais, e depois de um arrasto a
+    janela fica no tamanho do gesto enquanto o app pede outro (`pedido 1293,0 592x435 obtido
+    1457,769 118x541`). Tem de ser lido no corpo do composable.
+  - O gatilho do renascimento **não** pode depender de recomposição. A sondagem registrava
+    `capaz=false` e o `LaunchedEffect` que observava o retorno nunca corria. O gatilho sai do mesmo
+    laço que faz a medida, por callback.
+
+  O `app.log` ganha a fonte `hud-alpha`, com duas linhas: `estado` no instante em que o alfa muda, e
+  `renascer` quando a janela vai nascer de novo. A linha `hud-window` passa a trazer o monitor e a
+  profundidade (`device=:0.1 32bpp`).
+
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número
@@ -466,7 +525,10 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 
 | Comportamento | Windows 11 | Linux | macOS |
 |---|---|---|---|
-| Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340) — desligado | |
+| Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340). Ligado **só sem alfa** desde a #426, e a limpeza é o retângulo da janela, nunca `null`; limpar um recorte que nunca foi aplicado corta a pintura (medido) | |
+| Alfa da janela ao cruzar de `GraphicsDevice` | | **medido** (#426, Bazzite 44/KDE Plasma/Wayland com XWayland/NVIDIA, dois monitores): a configuração padrão de **todo** monitor é de 24 bits e o AWT troca a da janela ao cruzar — `32 → 24 → 32 → 24 → 32`, inclusive voltando ao primário. A janela nasce na configuração com alfa e renasce quando o monitor muda ou o alfa cai | |
+| Recriar a janela nativa para recuperar o alfa | | **medido** (#426): o Compose **para de emitir quadros** depois — 0 pixels em 75 s com o dashboard publicando a cada 60 s, contra 272 pixels em 80 s sem a travessia. Por isso não há remendo: a janela renasce inteira | |
+| Troca de janela no renascimento | | **medido** (#426): descartar a antiga antes de a nova pintar deixa um quadro sem janela, e a barra pisca a cada travessia. A antiga sai `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois | |
 | Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |
 | Janela transparente que muda de origem mostra quadro antigo | medido (#294, 39–49 de ~668 quadros) | | |
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |

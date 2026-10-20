@@ -138,3 +138,40 @@ private fun ScreenWorkArea.overlap(x: Float, y: Float, width: Float, height: Flo
     val overlapHeight = minOf(bottom, y + height) - maxOf(top, y)
     return if (overlapWidth > 0f && overlapHeight > 0f) overlapWidth * overlapHeight else 0f
 }
+
+/**
+ * A `GraphicsConfiguration` **com alfa** do monitor, que é a que a janela da HUD
+ * precisa ter desde o nascimento (issue #426).
+ *
+ * Medido no Bazzite (KDE Plasma, Wayland com XWayland, dois monitores): a
+ * configuração **padrão** de todo monitor é de 24 bits, e janela de 24 bits não
+ * tem canal alfa. Quando uma janela transparente cruza de `GraphicsDevice`, o
+ * AWT a troca pela padrão do destino e o alfa morre — e recuperá-lo depois
+ * obriga a recriar a janela nativa, o que para o desenho do Compose. Nascer na
+ * configuração certa evita o problema inteiro.
+ *
+ * `null` quando o AWT não responde; aí quem chama deixa o AWT escolher.
+ */
+internal fun translucencyCapableConfigurationFor(screenId: String?): GraphicsConfiguration? {
+    return runCatching {
+        val environment = GraphicsEnvironment.getLocalGraphicsEnvironment()
+        val devices = environment.screenDevices
+        val device = devices.firstOrNull { candidate -> candidate.getIDstring() == screenId }
+            ?: environment.defaultScreenDevice
+        firstTranslucencyCapable(
+            candidates = device.configurations.toList(),
+            capable = { configuration -> configuration.isTranslucencyCapable },
+            fallback = device.defaultConfiguration
+        )
+    }.getOrNull()
+}
+
+/**
+ * A primeira candidata que aceita alfa, ou o [fallback].
+ *
+ * Genérica só para caber num teste: `GraphicsConfiguration` não se constrói fora
+ * de um servidor gráfico, e a regra — "a primeira que aceita, senão a padrão" —
+ * é o que precisa estar coberto.
+ */
+internal fun <T> firstTranslucencyCapable(candidates: List<T>, capable: (T) -> Boolean, fallback: T): T =
+    candidates.firstOrNull(capable) ?: fallback

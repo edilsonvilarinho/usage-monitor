@@ -17,7 +17,7 @@ import java.io.File
  * bug pelo mesmo motivo.
  */
 internal enum class HudHitRegionEvent {
-    /** A plataforma usa o recorte (`hudUsesHitRegion`). */
+    /** A plataforma usa o recorte (`hudHitRegionMode`). */
     ENABLED,
 
     /** A plataforma não usa o recorte: a janela fica inteira clicável. */

@@ -15,7 +15,7 @@ class HudWindowFactsTest {
 
         assertEquals(
             "hud pedido 600,0 740x590 obtido 1185,265 740x590 (diferente); " +
-                "alfa px=true uni=true recorte=true; render=OPENGL",
+                "alfa px=true uni=true recorte=true; render=OPENGL; device=:0.1 32bpp",
             message
         )
     }
@@ -29,7 +29,19 @@ class HudWindowFactsTest {
         assertTrue(message.contains("render=null"), message)
     }
 
-    /** A fábrica da trilha corta em 200: a linha mais longa possível cabe inteira. */
+    /** Monitor não medido vira `?`, e não a palavra `null` colada no id. */
+    @Test
+    fun `an unknown monitor is written as a question mark`() {
+        val message = hudWindowFactsMessage(facts(deviceId = null, pixelSize = null))
+
+        assertTrue(message.endsWith("device=? ?bpp"), message)
+    }
+
+    /**
+     * A fábrica da trilha corta em 200: a linha mais longa possível cabe inteira.
+     * O id do Windows (`\Display2`) entra aqui de propósito — com **duas** barras
+     * ele casaria com o caminho UNC do saneamento e viraria `<caminho>`.
+     */
     @Test
     fun `the longest message survives the log sanitizer untouched`() {
         val message = hudWindowFactsMessage(
@@ -37,7 +49,7 @@ class HudWindowFactsTest {
                 requestedX = -10_000, requestedY = -10_000, requestedWidth = 10_000, requestedHeight = 10_000,
                 actualX = -10_000, actualY = -10_001, actualWidth = 10_000, actualHeight = 10_000,
                 perPixelTranslucent = false, uniformTranslucent = false, perPixelTransparent = false,
-                renderApi = "DIRECT3D"
+                renderApi = "DIRECT3D", deviceId = "\\Display2", pixelSize = 24
             )
         )
 
@@ -57,10 +69,12 @@ class HudWindowFactsTest {
         perPixelTranslucent: Boolean? = true,
         uniformTranslucent: Boolean? = true,
         perPixelTransparent: Boolean? = true,
-        renderApi: String? = "OPENGL"
+        renderApi: String? = "OPENGL",
+        deviceId: String? = ":0.1",
+        pixelSize: Int? = 32
     ) = HudWindowFacts(
         requestedX, requestedY, requestedWidth, requestedHeight,
         actualX, actualY, actualWidth, actualHeight,
-        perPixelTranslucent, uniformTranslucent, perPixelTransparent, renderApi
+        perPixelTranslucent, uniformTranslucent, perPixelTransparent, renderApi, deviceId, pixelSize
     )
 }

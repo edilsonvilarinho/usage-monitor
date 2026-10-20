@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -97,7 +98,8 @@ import kotlin.time.Instant
  * novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e na de
  * baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
  *
- * **O recorte é só do Windows** ([hudUsesHitRegion]). No elementary OS 6.1 (X11)
+ * **O recorte é do Windows sempre, e do Linux só sem alfa** ([hudHitRegionMode],
+ * #426). No elementary OS 6.1 (X11)
  * o `shape = null` da abertura não tirava o recorte: o balão pintava só dentro
  * da margem de 16dp e as alças saíam cortadas. Fora do Windows a janela fica sem
  * recorte — o balão abre inteiro, e a área vazia dele pode engolir clique.
@@ -114,6 +116,11 @@ internal fun HudWindowHost(
     motion: AppMotionPolicy,
     windowOpacityPercent: Int,
     iconImage: Painter?,
+    /**
+     * O mesmo ícone em `java.awt.Image`. No Linux a janela da HUD é construída
+     * direto na AWT (#426), e ali o ícone não é um `Painter`.
+     */
+    windowIconImage: java.awt.Image?,
     hudScreenArea: ScreenWorkArea,
     /**
      * A janela AWT, uma vez composta. Quem recebe faz o que a janela principal
@@ -186,24 +193,31 @@ internal fun HudWindowHost(
     // é o monitor gravado, resolvido de novo a cada abertura por hover — um
     // monitor reconectado volta a receber o notch sem reiniciar o app.
     var screenArea by remember { mutableStateOf(resolveHudScreenArea(settings, hudScreenArea)) }
+    // O id do monitor decide a `GraphicsConfiguration` com que a janela nasce
+    // (#426). Ele muda quando a barra é solta noutro monitor, e aí a janela
+    // **renasce** ali: remendar a janela aberta devolve o alfa mas para o
+    // desenho do Compose.
+    var screenId by remember { mutableStateOf(resolveHudScreen(settings)?.id) }
     var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, screenArea)) }
     var hovered by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     // A área de clique da janela inteira, sem o recorte do notch parado. Sai
     // **antes** do conteúdo ao abrir e volta **depois** dele ao fechar — ver o KDoc.
     var windowOpen by remember { mutableStateOf(false) }
-    var dragging by remember { mutableStateOf(false) }
+    val drag = remember { HudDragState() }
     val retract = remember { HudAutoRetractState(settings) }
     // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
     // janela (dp de janela). Nulo fora de arrasto.
     var dragWindowPosition by remember { mutableStateOf<DpOffset?>(null) }
     var dragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
 
-    LaunchedEffect(hovered, dragging) {
-        if (dragging) return@LaunchedEffect
+    LaunchedEffect(hovered, drag.dragging) {
+        if (drag.dragging) return@LaunchedEffect
         if (hovered) {
             delay(hudOpenDelayMillis(retract.enabled, alreadyOpen = windowOpen))
-            screenArea = resolveHudScreenArea(settings, hudScreenArea)
+            val resolved = resolveHudScreen(settings)
+            screenArea = resolved?.workArea ?: hudScreenArea
+            screenId = resolved?.id ?: screenId
             windowOpen = true
             // Um quadro para o recorte sair antes de o conteúdo começar a se
             // abrir; sem ele a mola corre nos primeiros quadros dentro do recorte
@@ -231,9 +245,13 @@ internal fun HudWindowHost(
         hasUpdateAction = updateAction != null
     )
     val composedArea = screenArea.inCompositionDp(scale)
-    val bounds = hudHostWindowBounds(dragging, placement, sizes, composedArea)
-    val hitRegionSupported = remember { hudUsesHitRegion(AutoStartManager.currentPlatform()) }
-    val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
+    val bounds = hudHostWindowBounds(drag.dragging, placement, sizes, composedArea)
+    val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
+    val restHitRegion = if (drag.dragging || windowOpen) {
+        null
+    } else {
+        hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
+    }
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
 
@@ -243,9 +261,9 @@ internal fun HudWindowHost(
         position = docked
     )
     // Um salto, nunca interpolação AWT: o movimento é do conteúdo.
-    LaunchedEffect(windowSize, docked, dragWindowPosition) {
+    LaunchedEffect(windowSize, docked, drag.windowPosition) {
         windowState.size = windowSize
-        val free = dragWindowPosition
+        val free = drag.windowPosition
         windowState.position = if (free != null) WindowPosition(free.x, free.y) else docked
     }
 
@@ -258,91 +276,67 @@ internal fun HudWindowHost(
     val dragStart = hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     val dragSize = DpSize(dragStart.size.width * scale, dragStart.size.height * scale)
 
+    // Estado e contas do gesto moram em `HudWindowDrag.kt`, onde são testáveis.
     val dragBegin = {
-        dragging = true
         expanded = false
         windowOpen = false
-        // O arrasto parte da janela de arrasto já encaixada, com o notch no ponto
-        // da tela em que ele está — nunca da origem da janela aberta.
-        dragWindowPosition = DpOffset(dragStart.x * scale, dragStart.y * scale)
-        dragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
-        HudDragProbe.begin()
+        drag.begin(DpOffset(dragStart.x * scale, dragStart.y * scale))
     }
-    val dragTo = {
-        val previous = dragPointer
-        val current = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
-        val position = dragWindowPosition
-        if (previous != null && current != null && position != null) {
-            dragPointer = current
-            // Incremental: somar o total desde o início deixaria o notch preso na
-            // borda, porque o excedente de um arrasto para fora da tela nunca
-            // seria descartado. A área é a do monitor **sob o ponteiro**, a tela
-            // inteira dele: presa ao primário, o notch nunca cruzava a divisa.
-            val moved = fitWindowPosition(
-                x = position.x + (current.x - previous.x).dp,
-                y = position.y + (current.y - previous.y).dp,
-                size = dragSize,
-                workArea = pointerScreen()?.bounds ?: screenArea
-            )
-            dragWindowPosition = DpOffset(moved.x, moved.y)
-        }
-    }
+    val dragTo = { drag.moveTo(dragSize, pointerScreen()?.bounds ?: screenArea) }
     val dragFinish = {
-        val position = dragWindowPosition
-        HudDragProbe.finish(position)
+        val position = drag.finish()
         if (position != null) {
-            // O notch gruda na borda mais próxima do **centro** dele, no monitor
-            // em que foi solto, e borda, fração e monitor são gravados. O encaixe
-            // é na área **útil**: a barra de tarefas também é *topmost* e volta
-            // para cima do notch a cada clique nela (issue #288).
+            // Borda, fração e monitor do ponto em que foi solto são gravados.
             val target = pointerScreen()
-            val area = target?.workArea ?: screenArea
-            val snapped = nearestHudPlacement(
-                centerX = position.x + dragSize.width / 2,
-                centerY = position.y + dragSize.height / 2,
-                area = area
-            )
+            val snapped = hudDragLanding(position, dragSize, screenArea, target)
             if (target != null) {
                 screenArea = target.workArea
+                screenId = target.id
                 persistHudScreen(settings, target)
             }
             placement = snapped
             persistHudPlacement(settings, snapped)
         }
-        dragPointer = null
-        dragWindowPosition = null
-        dragging = false
         Unit
     }
 
-    Window(
-        onCloseRequest = onCloseRequest,
-        title = "Usage Monitor",
-        icon = iconImage,
+    // A janela nasce na configuração **com alfa** do monitor em que a HUD vive,
+    // e renasce quando esse monitor muda (#426). Remendar a janela aberta
+    // devolveria o alfa recriando a janela nativa, e o Compose para de emitir
+    // quadros depois disso — a barra fica correta e congelada.
+    val rebirth = rememberHudWindowRebirth(screenId, AutoStartManager.currentPlatform())
+    key(rebirth.configuration, rebirth.generation) {
+    HudWindowFrame(
+        useExplicitConfiguration = rebirth.explicit,
+        graphicsConfiguration = rebirth.configuration,
         state = windowState,
-        undecorated = true,
-        transparent = true,
-        resizable = false,
-        alwaysOnTop = true,
+        size = windowSize,
+        // A posição desta composição: no arrasto, onde o gesto está; fora dele,
+        // a encaixada. O `windowState` só recebe isto no efeito abaixo, tarde
+        // demais para a janela que renasce (#426).
+        position = drag.windowPosition?.let { free -> WindowPosition(free.x, free.y) } ?: docked,
+        icon = iconImage,
+        iconImage = windowIconImage,
+        onCloseRequest = onCloseRequest,
         onKeyEvent = { event ->
             handleHudWindowKey(event = event, onOpenHelp = actions.openHelp)
         }
     ) {
-        LaunchedEffect(window) {
-            onWindowReady(window)
-        }
-        // O que o sistema fez com o pedido de posição e de alfa (#416).
-        LaunchedEffect(window) {
-            recordHudWindowFacts(window, { windowState.position }, { windowState.size })
-        }
-        LaunchedEffect(windowOpacityPercent) {
-            applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
-        }
-        // Recorte só no Windows: no elementary OS (X11) o balão saía cortado.
-        ApplyHudHitRegion(window, hitRegion, scale, supported = hitRegionSupported)
+        HudWindowEffects(
+            window = window,
+            windowState = windowState,
+            onWindowReady = onWindowReady,
+            windowOpacityPercent = windowOpacityPercent,
+            hitRegionMode = hitRegionMode,
+            restHitRegion = restHitRegion,
+            scale = scale,
+            platform = AutoStartManager.currentPlatform(),
+            dragging = drag.dragging,
+            onAlphaLost = { state -> rebirth.onAlphaLost(state, drag.dragging) }
+        )
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
-            val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
+            val centerInWindow = if (drag.dragging) null else bounds.notchCenterInWindow
             Box(modifier = Modifier.fillMaxSize()) {
                 HudNotch(
                     accounts = accounts,
@@ -351,8 +345,8 @@ internal fun HudWindowHost(
                     settledSizes = settledSizes,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
-                    expanded = expanded && !dragging,
-                    dragging = dragging,
+                    expanded = expanded && !drag.dragging,
+                    dragging = drag.dragging,
                     updateIndicator = updateIndicator,
                     notchCenter = centerInWindow,
                     language = language,
@@ -401,9 +395,21 @@ internal fun HudWindowHost(
             }
         }
     }
+    }
 }
 
-
+/**
+ * Se a HUD escolhe a `GraphicsConfiguration` da própria janela, em vez de
+ * deixar o AWT escolher (issue #426).
+ *
+ * **Só no Linux**, que é onde a perda de alfa ao cruzar de monitor foi medida
+ * (Bazzite 44, KDE Plasma em Wayland com XWayland, dois monitores). No Windows
+ * e no macOS a janela segue pelo `Window` de alto nível do Compose, que é o
+ * caminho em produção. Comportamento nativo medido numa plataforma nasce
+ * restrito a ela (regra do #340).
+ */
+internal fun hudPicksGraphicsConfiguration(platform: AutoStartManager.Platform): Boolean =
+    platform == AutoStartManager.Platform.LINUX
 
 private fun hudUpdateIndicatorOf(state: AppUpdateUiState, language: AppLanguage): HudUpdateIndicator {
     val content = updateBannerContent(state = state, language = language)
@@ -564,11 +570,14 @@ private fun pointerScreen(): ScreenInfo? =
  * monitor continua identificado pelos limites **inteiros** (`persistHudScreen`),
  * que não mudam quando a barra é movida.
  */
-private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: ScreenWorkArea): ScreenWorkArea {
+private fun resolveHudScreen(settings: PreferencesSettings): ScreenInfo? {
     val saved = readPersistedHudScreen(settings)
     val screens = availableScreens()
-    return resolveScreen(screens, saved.id, saved.bounds)?.workArea ?: screens.firstOrNull()?.workArea ?: fallback
+    return resolveScreen(screens, saved.id, saved.bounds) ?: screens.firstOrNull()
 }
+
+private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: ScreenWorkArea): ScreenWorkArea =
+    resolveHudScreen(settings)?.workArea ?: fallback
 
 /**
  * A área da tela na escala da composição. A geometria trabalha em dp de
@@ -581,14 +590,6 @@ private fun ScreenWorkArea.inCompositionDp(scale: Float): ScreenWorkArea = Scree
     size = DpSize(size.width / scale, size.height / scale)
 )
 
-/**
- * Se a HUD recorta a área de clique da janela parada por `Window.shape`. Só no
- * Windows, onde o recorte foi medido (C11, spike da #294); no Linux (X11) tirar
- * o recorte ao abrir não surtia efeito e o balão ficava cortado. macOS nunca foi
- * medido e fica do lado seguro.
- */
-internal fun hudUsesHitRegion(platform: AutoStartManager.Platform): Boolean =
-    platform == AutoStartManager.Platform.WINDOWS
 
 /**
  * A opacidade que a HUD usa, a partir da preferência do usuário.
@@ -619,7 +620,7 @@ internal fun hudWindowOpacityPercent(percent: Int, platform: AutoStartManager.Pl
 internal fun hudRepaintsAfterOpacityChange(platform: AutoStartManager.Platform): Boolean =
     platform == AutoStartManager.Platform.WINDOWS
 
-private fun applyHudWindowOpacity(window: java.awt.Window, percent: Int, platform: AutoStartManager.Platform) {
+internal fun applyHudWindowOpacity(window: java.awt.Window, percent: Int, platform: AutoStartManager.Platform) {
     applyWindowOpacity(window, hudWindowOpacityPercent(percent, platform))
     if (hudRepaintsAfterOpacityChange(platform)) {
         window.repaint()
@@ -629,66 +630,3 @@ private fun applyHudWindowOpacity(window: java.awt.Window, percent: Int, platfor
 /** O menor valor medido em que a HUD transparente ainda recebe o mouse no Windows. */
 internal const val HUD_WINDOWS_MIN_OPACITY_PERCENT = 55
 
-/**
- * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
- * antes de abrir o balão, já sai sem o recorte.
- *
- * Fora do Windows ([supported] falso) não aplica nada — só grava que pulou, para
- * o próximo relato vir com o que a HUD fez (issue #342).
- */
-@Composable
-private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float, supported: Boolean) {
-    val diagnostics = remember { HudWindowDiagnostics() }
-    val applier = remember { HudHitRegionApplier(onEvent = diagnostics::record) }
-    LaunchedEffect(supported) {
-        val event = if (supported) HudHitRegionEvent.ENABLED else HudHitRegionEvent.SKIPPED
-        withContext(Dispatchers.IO) { diagnostics.record(event) }
-    }
-    if (!supported) {
-        return
-    }
-    SideEffect {
-        applier.apply(window, region, scale)
-    }
-}
-
-/**
- * Aplica o recorte de clique da janela parada, ou o tira com a região nula.
- *
- * Guarda o último retângulo aplicado porque `Window.getShape()` devolve uma cópia
- * em `Path2D`, que nunca é igual ao `Rectangle` pedido: comparar por ela
- * refaria a região da janela no sistema a cada recomposição.
- *
- * `Window.shape` exige suporte a janela recortada (`PERPIXEL_TRANSPARENT`). Sem
- * ele a HUD continua funcionando sem recorte: a área do balão volta a engolir
- * clique, mas o notch não pisca — o defeito menor dos dois. Fora do Windows o
- * host nem o compõe ([hudUsesHitRegion]).
- */
-private class HudHitRegionApplier(
-    private val onEvent: (HudHitRegionEvent, String?) -> Unit
-) {
-    private var applied: java.awt.Rectangle? = null
-    private var hasApplied = false
-
-    fun apply(window: java.awt.Window, region: DpRect?, scale: Float) {
-        val shape = region?.let { rect ->
-            val left = floor(rect.left.value * scale).toInt()
-            val top = floor(rect.top.value * scale).toInt()
-            val right = ceil(rect.right.value * scale).toInt()
-            val bottom = ceil(rect.bottom.value * scale).toInt()
-            java.awt.Rectangle(left, top, right - left, bottom - top)
-        }
-        if (hasApplied && shape == applied) {
-            return
-        }
-        hasApplied = true
-        applied = shape
-        runCatching { window.shape = shape }
-            .onFailure { error -> onEvent(HudHitRegionEvent.SET_FAILED, "${error::class.simpleName}: ${error.message}") }
-            .onSuccess {
-                if (shape == null && window.shape != null) {
-                    onEvent(HudHitRegionEvent.CLEAR_NOT_EFFECTIVE, null)
-                }
-            }
-    }
-}

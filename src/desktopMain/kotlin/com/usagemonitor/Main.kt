@@ -62,6 +62,16 @@ private const val OTHER_MODALS_PREWARM_DELAY_MILLIS = 2_500L
 /** Ícone das janelas: as iniciais U·M, legíveis em 32–64 px. */
 internal fun loadWindowIcon() = loadIconResource(WINDOW_ICON_RESOURCE_PATH)
 
+/**
+ * O mesmo ícone das janelas, em `java.awt.Image`. No Linux a janela da HUD é
+ * construída direto na AWT para nascer na `GraphicsConfiguration` certa (#426),
+ * e ali o ícone não passa por um `Painter`.
+ */
+internal fun loadWindowIconImage(): java.awt.Image? = runCatching {
+    val stream = object {}.javaClass.getResourceAsStream(WINDOW_ICON_RESOURCE_PATH) ?: return@runCatching null
+    stream.use { resourceStream -> ImageIO.read(resourceStream) }
+}.getOrNull()
+
 /** Base do ícone da bandeja: só o núcleo com o disco, que é o que se lê em 16 px. */
 internal fun loadTrayIcon() = loadIconResource(TRAY_ICON_RESOURCE_PATH)
 
@@ -294,6 +304,7 @@ internal fun runUsageMonitor(
     val settingsActions = remember { SettingsActions(graph, viewModels, shell, modal, feedback, compositionScope) }
 
     val iconImage = remember { loadWindowIcon() }
+    val windowIconImage = remember { loadWindowIconImage() }
     val trayIconImage = remember { loadTrayIcon() }
     // A área útil é lida uma vez e vale para todas as janelas.
     val screenWorkArea = remember { availableWindowAreaDp() }
@@ -375,6 +386,7 @@ internal fun runUsageMonitor(
             motion = shell.motion,
             windowOpacityPercent = shell.windowOpacityPercent,
             iconImage = iconImage,
+            windowIconImage = windowIconImage,
             hudScreenArea = screenWorkArea,
             onWindowReady = { window ->
                 anchorAppWindow(window, graph, startup)

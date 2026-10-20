@@ -103,15 +103,30 @@ class HudNotchGeometryTest {
     }
 
     /**
-     * O recorte só foi medido no Windows. No elementary OS (X11) tirar o recorte
-     * ao abrir não surtia efeito e o balão aparecia só como a tira da margem.
+     * O recorte é do Windows sempre, e do Linux só quando a janela está sem
+     * alfa. No elementary OS (X11) tirar o recorte ao abrir não surtia efeito e
+     * o balão aparecia só como a tira da margem (#340) — por isso, com a
+     * transparência funcionando, o Linux não toca em `Window.shape`. Sem alfa a
+     * janela pintaria um retângulo preto que engole clique, e aí o recorte é o
+     * mal menor (#426). macOS nunca foi medido.
      */
     @Test
-    fun `o recorte de clique so vale no Windows`() {
-        assertTrue(hudUsesHitRegion(AutoStartManager.Platform.WINDOWS))
-        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.LINUX))
-        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.MACOS))
-        assertFalse(hudUsesHitRegion(AutoStartManager.Platform.OTHER))
+    fun `o recorte de clique vale sempre no Windows e so sem alfa no Linux`() {
+        assertEquals(HudHitRegionMode.ALWAYS, hudHitRegionMode(AutoStartManager.Platform.WINDOWS))
+        assertEquals(HudHitRegionMode.ONLY_WITHOUT_ALPHA, hudHitRegionMode(AutoStartManager.Platform.LINUX))
+        assertEquals(HudHitRegionMode.NEVER, hudHitRegionMode(AutoStartManager.Platform.MACOS))
+        assertEquals(HudHitRegionMode.NEVER, hudHitRegionMode(AutoStartManager.Platform.OTHER))
+
+        // Windows não consulta o alfa; macOS nunca recorta.
+        assertTrue(hudHitRegionActive(HudHitRegionMode.ALWAYS, hasAlpha = true))
+        assertTrue(hudHitRegionActive(HudHitRegionMode.ALWAYS, hasAlpha = false))
+        assertFalse(hudHitRegionActive(HudHitRegionMode.NEVER, hasAlpha = true))
+        assertFalse(hudHitRegionActive(HudHitRegionMode.NEVER, hasAlpha = false))
+
+        // Linux: com alfa não toca em `Window.shape` (a #340 não volta); sem
+        // alfa recorta, e o retângulo preto vira um notch sozinho (#426).
+        assertFalse(hudHitRegionActive(HudHitRegionMode.ONLY_WITHOUT_ALPHA, hasAlpha = true))
+        assertTrue(hudHitRegionActive(HudHitRegionMode.ONLY_WITHOUT_ALPHA, hasAlpha = false))
     }
 
     /**
