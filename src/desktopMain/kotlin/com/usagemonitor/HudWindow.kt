@@ -696,9 +696,19 @@ private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: F
  * clique, mas o notch não pisca — o defeito menor dos dois. Em
  * [HudHitRegionMode.NEVER] o host nem o compõe.
  *
- * [clearWithFullBounds] é a lição da #340: no X11 `window.shape = null` **não**
- * tira o recorte, e o balão abria cortado dentro da margem de 16dp. Ali a
- * limpeza é o retângulo do tamanho da janela, que o X aceita e que cobre tudo.
+ * **Recorte nunca aplicado não é limpo** ([hasApplied]): no caminho em que o
+ * recorte não vale — Linux com alfa — `window.shape` fica intocado. Medido na
+ * #426: limpar mesmo assim, com o retângulo do tamanho da janela, cortava a
+ * pintura. O retângulo era calculado na primeira composição, antes de as contas
+ * chegarem e a janela crescer, e ficava congelado naquele tamanho; a barra
+ * aparecia com o anel de cima e nada embaixo. É o balão cortado da #340 por
+ * outro caminho.
+ *
+ * [clearWithFullBounds] é a outra lição da #340: no X11 `window.shape = null`
+ * **não** tira o recorte. Quando há mesmo o que limpar — o alfa voltou depois
+ * de o recorte de emergência ter entrado —, a limpeza é o retângulo do tamanho
+ * da janela **naquele instante**, e ele é recalculado quando a janela muda de
+ * tamanho, porque entra na comparação com o último aplicado.
  */
 private class HudHitRegionApplier(
     private val onEvent: (HudHitRegionEvent, String?) -> Unit,
@@ -708,13 +718,18 @@ private class HudHitRegionApplier(
     private var hasApplied = false
 
     fun apply(window: java.awt.Window, region: DpRect?, scale: Float) {
-        val shape = region?.let { rect ->
-            val left = floor(rect.left.value * scale).toInt()
-            val top = floor(rect.top.value * scale).toInt()
-            val right = ceil(rect.right.value * scale).toInt()
-            val bottom = ceil(rect.bottom.value * scale).toInt()
-            java.awt.Rectangle(left, top, right - left, bottom - top)
-        } ?: fullBoundsShape(window)
+        val size = runCatching { window.size }.getOrNull()
+        val target = hudHitRegionTarget(
+            requested = region?.toAwtRectangle(scale),
+            hasApplied = hasApplied,
+            clearWithFullBounds = clearWithFullBounds,
+            windowWidth = size?.width ?: 0,
+            windowHeight = size?.height ?: 0
+        )
+        if (!target.touch) {
+            return
+        }
+        val shape = target.shape
         if (hasApplied && shape == applied) {
             return
         }
@@ -728,16 +743,56 @@ private class HudHitRegionApplier(
                 }
             }
     }
+}
 
-    /** `null` fora do X11: lá o nulo limpa, e é o caminho medido no Windows. */
-    private fun fullBoundsShape(window: java.awt.Window): java.awt.Rectangle? {
-        if (!clearWithFullBounds) {
-            return null
-        }
-        val size = runCatching { window.size }.getOrNull() ?: return null
-        if (size.width <= 0 || size.height <= 0) {
-            return null
-        }
-        return java.awt.Rectangle(0, 0, size.width, size.height)
+/** Pixels da AWT a partir do retângulo em dp da composição. */
+private fun DpRect.toAwtRectangle(scale: Float): java.awt.Rectangle {
+    val left = floor(this.left.value * scale).toInt()
+    val top = floor(this.top.value * scale).toInt()
+    val right = ceil(this.right.value * scale).toInt()
+    val bottom = ceil(this.bottom.value * scale).toInt()
+    return java.awt.Rectangle(left, top, right - left, bottom - top)
+}
+
+/**
+ * O que fazer com `window.shape`: [touch] falso é **não mexer**, que é diferente
+ * de mexer passando `null`.
+ */
+internal data class HudHitRegionTarget(
+    val touch: Boolean,
+    val shape: java.awt.Rectangle?
+)
+
+/**
+ * A decisão do recorte, separada da janela para caber num teste.
+ *
+ * Três casos. Com [requested], aplica — é o recorte do notch parado.
+ * Sem [requested] e sem nada aplicado antes, **não toca**: é o Linux com alfa,
+ * onde o recorte nunca valeu. Sem [requested] mas com algo aplicado, limpa — e
+ * aí [clearWithFullBounds] decide entre o `null` (Windows, onde ele limpa) e o
+ * retângulo do tamanho da janela (X11, onde o `null` não limpa, #340).
+ *
+ * O caso do meio custou uma regressão medida na #426: limpar o que nunca foi
+ * aplicado punha um retângulo do tamanho da janela **na primeira composição**,
+ * antes de as contas chegarem e a janela crescer. O retângulo ficava congelado
+ * naquele tamanho e cortava a pintura: a barra aparecia com o anel de cima e
+ * nada embaixo.
+ */
+internal fun hudHitRegionTarget(
+    requested: java.awt.Rectangle?,
+    hasApplied: Boolean,
+    clearWithFullBounds: Boolean,
+    windowWidth: Int,
+    windowHeight: Int
+): HudHitRegionTarget {
+    if (requested != null) {
+        return HudHitRegionTarget(touch = true, shape = requested)
     }
+    if (!hasApplied) {
+        return HudHitRegionTarget(touch = false, shape = null)
+    }
+    if (!clearWithFullBounds || windowWidth <= 0 || windowHeight <= 0) {
+        return HudHitRegionTarget(touch = true, shape = null)
+    }
+    return HudHitRegionTarget(touch = true, shape = java.awt.Rectangle(0, 0, windowWidth, windowHeight))
 }
