@@ -533,6 +533,26 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 | Janela transparente que muda de origem mostra quadro antigo | medido (#294, 39–49 de ~668 quadros) | | |
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
 | Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
+
+**Parte disso virou medida automática** (`./gradlew probeHudAlpha`, #426). A sonda abre uma janela
+transparente na mesma `GraphicsConfiguration` que o app escolhe, por monitor, e **falha** se ela não
+nascer com 32 bits; depois atravessa para cada outro monitor e reporta o que o AWT fez — isso ela só
+registra, porque é o comportamento que a HUD contorna renascendo. Precisa de sessão gráfica, e de
+dois monitores para a travessia valer, então fica fora do CI e do `allTests`. Saída da máquina de
+medição:
+
+```
+monitores: 2
+  :0.0  padrão=24bpp  alfaPorPixel=true  limites=[x=0,y=1440,width=3440,height=1440]
+  :0.1  padrão=24bpp  alfaPorPixel=true  limites=[x=421,y=0,width=2560,height=1440]
+ok    :0.0 nasce com 32bpp (esperado 32)
+      ao cruzar para :0.1: 24bpp (o AWT troca; a HUD renasce)
+ok    :0.1 nasce com 32bpp (esperado 32)
+      ao cruzar para :0.0: 24bpp (o AWT troca; a HUD renasce)
+RESULTADO: ok
+```
+
+O resto da lista continua sendo "abra e olhe": é por isso que ela existe.
 | Escalas diferentes por monitor | só em máquina real | | |
 | Faixa recolhida de 10dp recebe o ponteiro (modo recolher, #400), com opacidade 55% e 100% | | | |
 | Área vazia da janela sem recorte abre a barra recolhida sem querer (#400) | não se aplica (recorte) | | |

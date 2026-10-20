@@ -99,6 +99,73 @@ class ArchitectureRulesTest {
     }
 
     /**
+     * A janela da HUD precisa **nascer** na `GraphicsConfiguration` com alfa do
+     * monitor em que ela vive (issue #426): construí-la em qualquer outro lugar
+     * a faz nascer na configuração padrão, que no X11 é de 24 bits, e janela de
+     * 24 bits não tem canal alfa — vira um retângulo preto que engole clique.
+     *
+     * É por isso que a HUD desceu para o `SwingWindow` de baixo nível: o
+     * `Window` de alto nível do Compose constrói a janela por dentro e não
+     * deixa escolher a configuração. Quem construir uma `ComposeWindow` fora
+     * daqui perde essa escolha em silêncio.
+     */
+    @Test
+    fun `a janela do Compose so e construida por quem escolhe a configuracao`() {
+        val violations = sources
+            .filter { source -> source.path !in COMPOSE_WINDOW_OWNERS }
+            .filter { source -> COMPOSE_WINDOW_CONSTRUCTION.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "ComposeWindow construída fora de quem escolhe a GraphicsConfiguration (issue #426):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    /**
+     * Trocar o fundo de uma janela **não** devolve o alfa dela (issue #426).
+     *
+     * `java.awt.Window.setBackground` só troca a `GraphicsConfiguration` por
+     * uma com alfa quando o alfa **antigo é 255 e o novo é menor**. Numa janela
+     * já transparente, repetir `Color(0,0,0,0)` é um no-op — e foi assim que a
+     * primeira tentativa de correção registrou `reaplicar=ok` sem ter feito
+     * nada, deixando o log parecer saudável por três versões.
+     *
+     * Pior: o par que **funciona** (`null` e depois alfa 0) obriga o AWT a
+     * recriar a janela nativa, e medido no Bazzite o Compose para de emitir
+     * quadros depois disso — a barra fica correta e congelada. Não há uso
+     * legítimo: a janela nasce certa e renasce quando precisa.
+     */
+    @Test
+    fun `o fundo de uma janela nao e usado para consertar alfa`() {
+        val violations = sources
+            .filter { source -> WINDOW_BACKGROUND_ASSIGNMENT.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "Atribuição de `background` em janela: não devolve o alfa e congela o desenho (issue #426):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    /** Os dois padrões pegam a construção e a atribuição, e não o que se parece com elas. */
+    @Test
+    fun `os padroes da janela ignoram tipo e modifier`() {
+        assertTrue(COMPOSE_WINDOW_CONSTRUCTION.containsMatchIn("ComposeWindow(graphicsConfiguration).apply {"))
+        assertTrue(COMPOSE_WINDOW_CONSTRUCTION.containsMatchIn("val w = ComposeWindow()"))
+        assertFalse(COMPOSE_WINDOW_CONSTRUCTION.containsMatchIn("(window as? ComposeWindow)?.renderApi"))
+        assertFalse(COMPOSE_WINDOW_CONSTRUCTION.containsMatchIn("dispose = ComposeWindow::dispose"))
+        assertFalse(COMPOSE_WINDOW_CONSTRUCTION.containsMatchIn("fun f(window: ComposeWindow) {"))
+
+        assertTrue(WINDOW_BACKGROUND_ASSIGNMENT.containsMatchIn("window.background = Color(0, 0, 0, 0)"))
+        assertTrue(WINDOW_BACKGROUND_ASSIGNMENT.containsMatchIn("frame.background = null"))
+        assertFalse(WINDOW_BACKGROUND_ASSIGNMENT.containsMatchIn("Modifier.background(AppSurfaces.card)"))
+        assertFalse(WINDOW_BACKGROUND_ASSIGNMENT.containsMatchIn("if (window.background == null) return"))
+    }
+
+    /**
      * A raiz `~/.usage-monitor` tem dono único (`AppDataDirectory`, issue #419).
      * Caminho montado à mão fora dele ignora o `--user-data-dir` em silêncio: a
      * execução isolada passaria a gravar na pasta do usuário. Texto de ajuda que
@@ -270,6 +337,17 @@ class ArchitectureRulesTest {
             "src/desktopMain/kotlin/com/usagemonitor/HudWindowEffects.kt",
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/DesktopWindowFrame.kt"
         )
+
+        /** `ComposeWindow(`: a construção, não o tipo num parâmetro nem a referência de método. */
+        val COMPOSE_WINDOW_CONSTRUCTION = Regex("""\bComposeWindow\s*\(""")
+
+        /** Quem escolhe a `GraphicsConfiguration` da janela da HUD. */
+        val COMPOSE_WINDOW_OWNERS = setOf(
+            "src/desktopMain/kotlin/com/usagemonitor/HudWindowFrame.kt"
+        )
+
+        /** `.background = `; o `Modifier.background(` do Compose é chamada, não atribuição. */
+        val WINDOW_BACKGROUND_ASSIGNMENT = Regex("""\.background\s*=(?!=)""")
 
         val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
 
