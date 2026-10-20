@@ -525,7 +525,10 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 
 | Comportamento | Windows 11 | Linux | macOS |
 |---|---|---|---|
-| Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340) — desligado | |
+| Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340). Ligado **só sem alfa** desde a #426, e a limpeza é o retângulo da janela, nunca `null`; limpar um recorte que nunca foi aplicado corta a pintura (medido) | |
+| Alfa da janela ao cruzar de `GraphicsDevice` | | **medido** (#426, Bazzite 44/KDE Plasma/Wayland com XWayland/NVIDIA, dois monitores): a configuração padrão de **todo** monitor é de 24 bits e o AWT troca a da janela ao cruzar — `32 → 24 → 32 → 24 → 32`, inclusive voltando ao primário. A janela nasce na configuração com alfa e renasce quando o monitor muda ou o alfa cai | |
+| Recriar a janela nativa para recuperar o alfa | | **medido** (#426): o Compose **para de emitir quadros** depois — 0 pixels em 75 s com o dashboard publicando a cada 60 s, contra 272 pixels em 80 s sem a travessia. Por isso não há remendo: a janela renasce inteira | |
+| Troca de janela no renascimento | | **medido** (#426): descartar a antiga antes de a nova pintar deixa um quadro sem janela, e a barra pisca a cada travessia. A antiga sai `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois | |
 | Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |
 | Janela transparente que muda de origem mostra quadro antigo | medido (#294, 39–49 de ~668 quadros) | | |
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
