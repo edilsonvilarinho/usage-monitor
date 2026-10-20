@@ -267,7 +267,7 @@ class ArchitectureRulesTest {
 
         /** Quem hoje chama `window.shape`: a HUD e os cantos arredondados das janelas. */
         val NATIVE_WINDOW_SHAPE_OWNERS = setOf(
-            "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/HudWindowEffects.kt",
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/DesktopWindowFrame.kt"
         )
 

@@ -31,6 +31,12 @@ import kotlinx.coroutines.withContext
 internal suspend fun anchorAppWindow(window: java.awt.Window, graph: AppGraph, startup: AppStartup) {
     graph.mainWindow = window
     appMainWindow = window
+    // A HUD renasce quando muda de monitor (#426): a âncora passa a ser a janela
+    // nova, mas o arranque e o ACK da atualização já foram registrados e não se
+    // repetem — seriam uma segunda linha de `WINDOW_SHOWN` por arrasto.
+    if (graph.appAnchored.value) {
+        return
+    }
     // O efetivo é lido de volta da AWT (issue #120): a HUD sempre pede o topo, e
     // a diferença entre pedido e efetivo é o que o diagnóstico existe para ver.
     val effective = runCatching { window.isAlwaysOnTop }.getOrNull()

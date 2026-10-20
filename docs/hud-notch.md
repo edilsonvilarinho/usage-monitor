@@ -193,31 +193,50 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     limpava), e o host continua compondo o aplicador quando o recorte deixa de valer, senão o
     recorte ficaria para sempre. macOS nunca foi medido e segue sem recorte, com o preço aceito de
     a área vazia do balão poder engolir o clique da janela de baixo com o notch parado.
-- **O alfa da janela é por monitor, e o AWT o perde ao cruzar a fronteira** (`HudWindowTranslucency.kt`,
-  issue #426, relatada na #416). Uma janela transparente só guarda a `GraphicsConfiguration` de 32
-  bits no `GraphicsDevice` em que nasceu. Ao cruzar para outro device, o AWT a troca pela
-  **configuração padrão do destino**, que no X11 é de 24 bits — e janela de 24 bits não tem canal
-  alfa: ela pinta o retângulo inteiro.
+- **O alfa da janela é por monitor, e o AWT o perde ao cruzar a fronteira**
+  (`HudWindowFrame.kt`, `HudWindowTranslucency.kt`; issue #426, relatada na #416). Uma janela
+  transparente só guarda a `GraphicsConfiguration` de 32 bits no `GraphicsDevice` em que nasceu. Ao
+  cruzar para outro device, o AWT a troca pela **configuração padrão do destino**, que no X11 é de
+  24 bits — e janela de 24 bits não tem canal alfa: ela pinta 442×557 de preto, sobre todas as
+  janelas e engolindo clique.
 
   Medido no Bazzite 44 (KDE Plasma, Wayland com XWayland, dois monitores, NVIDIA RTX 4070 SUPER),
   com sonda em AWT puro amostrada contra o `xwininfo`: `32 → 24 → 32 → 24 → 32`. **Voltar para o
   primário também perde o alfa** — a configuração padrão dos dois monitores é de 24 bits. O defeito
-  é cruzar a fronteira, não o monitor de destino, e sem reparo só reiniciar o app o desfaz. É o
-  "travado para sempre" do relato.
+  é cruzar a fronteira, não o monitor de destino.
 
-  O reparo é `background = null` seguido de `background = Color(0,0,0,0)`. `java.awt.Window.setBackground`
-  só troca a configuração por uma com alfa quando o **alfa antigo é 255 e o novo é menor**: repetir
-  o alfa 0 numa janela já transparente é um no-op — foi nisso que a primeira tentativa tropeçou,
-  registrando `reaplicar=ok` sem ter feito nada. O `null` faz o AWT ler 255, e aí a troca acontece e
-  o peer nativo nasce de novo com 32 bits (o id da janela X muda a cada reparo).
+  **A janela nasce certa, e não é remendada.** Houve um remendo e ele foi retirado: devolver o alfa
+  a uma janela já aberta obriga o AWT a recriar a janela nativa (a visual é propriedade dela, não dá
+  para trocá-la em voo), e medido, o Compose **para de emitir quadros** depois disso — com o
+  dashboard vivo e publicando a cada 60 s, a barra não mudou um pixel em 75 s e só voltava a pintar
+  na recriação seguinte. Trocava o retângulo preto por uma barra congelada. No primário, sem
+  travessia e sem remendo, a mesma barra mudava 272 pixels em 80 s.
 
-  Regras: **só no Linux** (regra do #340); o gatilho é a **falta de alfa**, não a troca de monitor,
-  e com isso um caminho só cobre abrir no secundário, arrastar nos dois sentidos, religar monitor e
-  desbloquear a sessão; teto de três tentativas por monitor, porque o reparo recria a janela;
-  **pausado durante o arrasto**, senão a recriação do peer derrubaria os eventos de ponteiro; e
-  depois do reparo a posição, o tamanho, o `alwaysOnTop` e a opacidade são reafirmados, porque o
-  peer novo não os herda. O `app.log` ganha `hud-alpha` com a profundidade **antes e depois**
-  (`profundidade=24->32`), que é a medida que faltava para um relato dizer se o reparo pegou.
+  Por isso, **só no Linux**, a janela sai do `Window` de alto nível do Compose para o `SwingWindow`
+  de baixo nível, o único que aceita a janela já construída e portanto o único que deixa escolher a
+  `GraphicsConfiguration` do nascimento (`HudWindowFrame`). No Windows e no macOS nada muda — a
+  conversão de dp para pixel, o ícone e o fechar do caminho de alto nível estão medidos em HiDPI, e
+  comportamento nativo medido numa plataforma nasce restrito a ela (#340).
+
+  **Ela renasce em dois casos** (`HudWindowRebirth`, chave da composição): o monitor mudou, ou o alfa
+  caiu. O segundo existe porque um arrasto que cruza a fronteira e **volta** para o mesmo monitor
+  deixa o id final igual, mas o AWT já trocou a configuração no caminho — sem esse gatilho a barra
+  fica viva e opaca. O renascimento é uma janela Compose nova, com o desenho vivo, e não um remendo.
+  Orçamento de [HUD_ALPHA_REBUILD_LIMIT] por monitor: num ambiente que não compõe alfa ele nunca
+  voltaria, e repetir seria um pisca eterno; depois dele quem assume é o recorte de emergência.
+
+  **Armadilhas medidas, as duas custaram uma rodada:**
+  - Ler `state.size`/`state.position` **dentro** do `update` do `SwingWindow` não registra
+    dependência no Compose: a sincronização roda uma vez e nunca mais, e depois de um arrasto a
+    janela fica no tamanho do gesto enquanto o app pede outro (`pedido 1293,0 592x435 obtido
+    1457,769 118x541`). Tem de ser lido no corpo do composable.
+  - O gatilho do renascimento **não** pode depender de recomposição. A sondagem registrava
+    `capaz=false` e o `LaunchedEffect` que observava o retorno nunca corria. O gatilho sai do mesmo
+    laço que faz a medida, por callback.
+
+  O `app.log` ganha a fonte `hud-alpha`, com duas linhas: `estado` no instante em que o alfa muda, e
+  `renascer` quando a janela vai nascer de novo. A linha `hud-window` passa a trazer o monitor e a
+  profundidade (`device=:0.1 32bpp`).
 
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A

@@ -307,7 +307,8 @@ reintroduzir seletor de modo nem segunda moldura (`DashboardScreen` só existe p
 — **leia antes de mexer**. Inegociáveis: o tamanho é da geometria (`hudNotchSizes`), janela de origem e
 tamanho fixos, nenhum redimensionamento AWT por quadro e `Window.shape` no Windows sempre, no Linux só
 sem alfa (`hudHitRegionMode`, #340 e #426); o alfa da janela é **por monitor** e o AWT o perde ao cruzar a
-fronteira — quem o devolve é `HudWindowTranslucency.kt`, só no Linux, pausado no arrasto; o notch não
+fronteira — a janela **nasce** na configuração certa e **renasce** quando o monitor muda ou o alfa cai
+(`HudWindowFrame.kt`, só no Linux); remendar a janela aberta devolve o alfa e **congela o desenho**; o notch não
 cresce — balão de **uma** conta ou da engrenagem, conteúdo da janela e nunca `Popup`, botões do card
 com dona única (`cardActionsFor`); movimento contínuo só atrás de `AppMotionPolicy.continuous`.
 

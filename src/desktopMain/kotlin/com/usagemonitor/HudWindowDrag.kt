@@ -1,8 +1,13 @@
 package com.usagemonitor
 
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import java.awt.MouseInfo
 
 /**
  * A matemática do arrasto da HUD, fora do host.
@@ -61,4 +66,60 @@ internal fun hudDragLanding(
         centerY = position.y + size.height / 2,
         area = target?.workArea ?: fallbackArea
     )
+}
+
+/**
+ * O gesto de arrastar a HUD: se está em curso, onde a janela de arrasto está e
+ * onde o ponteiro estava no último tique.
+ *
+ * Estado e contas moram juntos aqui desde que `HudWindowHost` passou do limite
+ * de 300 linhas (#426). O ponteiro **não** é estado de composição: ninguém o
+ * desenha, e guardá-lo num `mutableStateOf` recomporia a tela a cada pixel do
+ * mouse.
+ */
+@Stable
+internal class HudDragState {
+    /** Em curso: o notch sai da borda e anda livre. */
+    var dragging by mutableStateOf(false)
+        private set
+
+    /** A posição da janela de arrasto, em dp de janela. Nula fora do gesto. */
+    var windowPosition by mutableStateOf<DpOffset?>(null)
+        private set
+
+    private var pointer: java.awt.Point? = null
+
+    /**
+     * O gesto parte da janela de arrasto já encaixada, com o notch no ponto da
+     * tela em que ele está — nunca da origem da janela aberta.
+     */
+    fun begin(start: DpOffset) {
+        dragging = true
+        windowPosition = start
+        pointer = readPointer()
+        HudDragProbe.begin()
+    }
+
+    /** Um tique do mouse. [workArea] é a tela **inteira** do monitor sob ele. */
+    fun moveTo(size: DpSize, workArea: ScreenWorkArea) {
+        val current = readPointer()
+        val moved = hudDragStep(pointer, current, windowPosition, size, workArea)
+        if (moved != null) {
+            pointer = current
+            windowPosition = moved
+        }
+    }
+
+    /** Encerra e devolve onde soltou; `null` quando o gesto não tinha posição. */
+    fun finish(): DpOffset? {
+        val position = windowPosition
+        HudDragProbe.finish(position)
+        pointer = null
+        windowPosition = null
+        dragging = false
+        return position
+    }
+
+    private fun readPointer(): java.awt.Point? =
+        runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
 }
