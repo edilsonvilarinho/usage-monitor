@@ -15,7 +15,7 @@ class HudWindowFactsTest {
 
         assertEquals(
             "hud pedido 600,0 740x590 obtido 1185,265 740x590 (diferente); " +
-                "alfa px=true uni=true recorte=true; render=OPENGL; device=:0.1",
+                "alfa px=true uni=true recorte=true; render=OPENGL; device=:0.1 32bpp",
             message
         )
     }
@@ -32,9 +32,9 @@ class HudWindowFactsTest {
     /** Monitor não medido vira `?`, e não a palavra `null` colada no id. */
     @Test
     fun `an unknown monitor is written as a question mark`() {
-        val message = hudWindowFactsMessage(facts(deviceId = null))
+        val message = hudWindowFactsMessage(facts(deviceId = null, pixelSize = null))
 
-        assertTrue(message.endsWith("device=?"), message)
+        assertTrue(message.endsWith("device=? ?bpp"), message)
     }
 
     /**
@@ -49,7 +49,7 @@ class HudWindowFactsTest {
                 requestedX = -10_000, requestedY = -10_000, requestedWidth = 10_000, requestedHeight = 10_000,
                 actualX = -10_000, actualY = -10_001, actualWidth = 10_000, actualHeight = 10_000,
                 perPixelTranslucent = false, uniformTranslucent = false, perPixelTransparent = false,
-                renderApi = "DIRECT3D", deviceId = "\\Display2"
+                renderApi = "DIRECT3D", deviceId = "\\Display2", pixelSize = 24
             )
         )
 
@@ -70,10 +70,11 @@ class HudWindowFactsTest {
         uniformTranslucent: Boolean? = true,
         perPixelTransparent: Boolean? = true,
         renderApi: String? = "OPENGL",
-        deviceId: String? = ":0.1"
+        deviceId: String? = ":0.1",
+        pixelSize: Int? = 32
     ) = HudWindowFacts(
         requestedX, requestedY, requestedWidth, requestedHeight,
         actualX, actualY, actualWidth, actualHeight,
-        perPixelTranslucent, uniformTranslucent, perPixelTransparent, renderApi, deviceId
+        perPixelTranslucent, uniformTranslucent, perPixelTransparent, renderApi, deviceId, pixelSize
     )
 }

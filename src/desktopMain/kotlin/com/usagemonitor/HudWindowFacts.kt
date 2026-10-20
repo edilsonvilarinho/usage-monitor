@@ -44,7 +44,13 @@ internal data class HudWindowFacts(
      * cada monitor tem a sua: sem o id, um relato não diz em qual deles a janela
      * nasceu, e a troca de monitor fica invisível no log (#426).
      */
-    val deviceId: String? = null
+    val deviceId: String? = null,
+    /**
+     * Bits por pixel da `GraphicsConfiguration` da janela: 32 com alfa, 24 sem.
+     * É o `Depth:` do `xwininfo` visto de dentro do app, e é o número que diz se
+     * a barra **pode** ser transparente neste monitor (#426).
+     */
+    val pixelSize: Int? = null
 )
 
 /**
@@ -58,7 +64,7 @@ internal fun hudWindowFactsMessage(facts: HudWindowFacts): String {
     return "hud pedido $requested obtido $actual ($moved); " +
         "alfa px=${facts.perPixelTranslucent} uni=${facts.uniformTranslucent} " +
         "recorte=${facts.perPixelTransparent}; render=${facts.renderApi}; " +
-        "device=${facts.deviceId ?: "?"}"
+        "device=${facts.deviceId ?: "?"} ${facts.pixelSize ?: "?"}bpp"
 }
 
 internal suspend fun recordHudWindowFacts(
@@ -93,7 +99,8 @@ private fun readHudWindowFacts(window: java.awt.Window, position: WindowPosition
         uniformTranslucent = supports(GraphicsDevice.WindowTranslucency.TRANSLUCENT),
         perPixelTransparent = supports(GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSPARENT),
         renderApi = runCatching { (window as? ComposeWindow)?.renderApi?.name }.getOrNull(),
-        deviceId = runCatching { device?.getIDstring() }.getOrNull()
+        deviceId = runCatching { device?.getIDstring() }.getOrNull(),
+        pixelSize = runCatching { window.graphicsConfiguration?.colorModel?.pixelSize }.getOrNull()
     )
 }
 

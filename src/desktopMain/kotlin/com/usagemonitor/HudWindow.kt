@@ -268,40 +268,28 @@ internal fun HudWindowHost(
         dragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
         HudDragProbe.begin()
     }
+    // As duas contas do gesto moram em `HudWindowDrag.kt`, onde são testáveis.
     val dragTo = {
-        val previous = dragPointer
         val current = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
-        val position = dragWindowPosition
-        if (previous != null && current != null && position != null) {
+        val moved = hudDragStep(
+            previous = dragPointer,
+            current = current,
+            position = dragWindowPosition,
+            size = dragSize,
+            workArea = pointerScreen()?.bounds ?: screenArea
+        )
+        if (moved != null) {
             dragPointer = current
-            // Incremental: somar o total desde o início deixaria o notch preso na
-            // borda, porque o excedente de um arrasto para fora da tela nunca
-            // seria descartado. A área é a do monitor **sob o ponteiro**, a tela
-            // inteira dele: presa ao primário, o notch nunca cruzava a divisa.
-            val moved = fitWindowPosition(
-                x = position.x + (current.x - previous.x).dp,
-                y = position.y + (current.y - previous.y).dp,
-                size = dragSize,
-                workArea = pointerScreen()?.bounds ?: screenArea
-            )
-            dragWindowPosition = DpOffset(moved.x, moved.y)
+            dragWindowPosition = moved
         }
     }
     val dragFinish = {
         val position = dragWindowPosition
         HudDragProbe.finish(position)
         if (position != null) {
-            // O notch gruda na borda mais próxima do **centro** dele, no monitor
-            // em que foi solto, e borda, fração e monitor são gravados. O encaixe
-            // é na área **útil**: a barra de tarefas também é *topmost* e volta
-            // para cima do notch a cada clique nela (issue #288).
+            // Borda, fração e monitor do ponto em que foi solto são gravados.
             val target = pointerScreen()
-            val area = target?.workArea ?: screenArea
-            val snapped = nearestHudPlacement(
-                centerX = position.x + dragSize.width / 2,
-                centerY = position.y + dragSize.height / 2,
-                area = area
-            )
+            val snapped = hudDragLanding(position, dragSize, screenArea, target)
             if (target != null) {
                 screenArea = target.workArea
                 persistHudScreen(settings, target)
@@ -335,6 +323,10 @@ internal fun HudWindowHost(
         LaunchedEffect(window) {
             recordHudWindowFacts(window, { windowState.position }, { windowState.size })
         }
+        // Devolve o alfa quando a janela cruza de monitor e o AWT a troca para a
+        // configuração de 24 bits do destino (#426). Pausado no arrasto: o reparo
+        // recria o peer nativo, e no meio do gesto isso derrubaria o ponteiro.
+        ApplyHudTranslucencyRepair(window, enabled = !dragging)
         LaunchedEffect(windowOpacityPercent) {
             applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
         }

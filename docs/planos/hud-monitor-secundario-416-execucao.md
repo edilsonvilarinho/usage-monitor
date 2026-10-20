@@ -64,7 +64,7 @@ padrão do primário também é de 24 bits. Só reiniciar o app resolve — o "p
 `alfaAntigo == 255 && alfaNovo < 255`. O fundo da HUD já é `Color(0,0,0,0)`: a reaplicação de
 `a1812d57` faz alfa 0 → alfa 0, a condição é falsa e **nada acontece** — mas o log registra
 `reaplicar=ok`. O toggle de `isVisible` e o empurrão de ±1px no tamanho também não trocam a
-configuração. O polling ainda lia e escrevia estado AWT fora da EDT.
+configuração.
 
 A troca de `skiko.renderApi` de `SOFTWARE` para `OPENGL` não ataca a causa e arrisca a #421 (tela
 preta no Wayland com NVIDIA, que é esta máquina). Os 5 s em `LinuxOpenGLRedrawer.swapBuffers` que
@@ -108,3 +108,4 @@ xwininfo -id $(DISPLAY=:0 xdotool search --name "Usage Monitor" | head -1) | gre
 |---|---|---|---|
 | A1 | Sonda do mecanismo em AWT puro, matriz de cenários, este plano e a issue de execução | `javac AlphaProbe.java && java AlphaProbe` com amostragem paralela de `xwininfo` | `32 → 24 → 32 → 24 → 32` nos dois níveis (AWT e janela X). Confirmado que voltar ao primário **também** perde o alfa: o defeito é cruzar a fronteira, não o monitor de destino |
 | A2 | Revert de `a1812d57` (volta `skiko.renderApi = SOFTWARE` no Linux e o arrasto ao vivo); preservado só o `deviceId` nas facts, com teste de que o id do Windows (`\\Display2`, uma barra) sobrevive ao saneamento | `sh gradlew desktopTest --tests "com.usagemonitor.HudWindowFactsTest"` | 4 testes, 0 falhas. Na primeira passada o teste novo acusou que `\\\\Display2` (duas barras) casa com o caminho UNC do saneamento e vira `<caminho>` — fixado o valor real, de uma barra |
+| A3 | `HudWindowTranslucency.kt`: decisão pura restrita ao Linux, reparo `background = null` → `Color(0,0,0,0)` na EDT, log `hud-alpha` com a profundidade antes/depois, `pixelSize` também na linha `hud-window`. `HudWindowHost` passou de 300 linhas com o efeito novo, então as duas contas do arrasto saíram para `HudWindowDrag.kt` (e viraram testáveis pela primeira vez) | `sh gradlew desktopTest --tests "com.usagemonitor.HudWindowTranslucencyTest" --tests "com.usagemonitor.HudWindowDragTest" --tests "com.usagemonitor.HudWindowFactsTest" --tests "com.usagemonitor.architecture.*"` | verde. Duas falhas reais na primeira passada: o `ArchitectureRulesTest` acusou `HudWindowHost` com 303 linhas (limite 300), corrigido pela extração; e o teste do saneamento mostrou a linha em 207 caracteres com uma mensagem de exceção longa — daí o teto `HUD_TRANSLUCENCY_FAILURE_LENGTH`, para o motivo não empurrar a profundidade para fora do log |
