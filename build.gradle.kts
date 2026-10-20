@@ -132,22 +132,12 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "com.usagemonitor.MainKt"
-        // Fix tela preta no Wayland (issues #421 e #416, monitor secundario):
-        // o `-D` vira `--java-options` no jpackage (deb/rpm) e DEFAULT_JVM_OPTS
-        // no app-image. Condicionado ao build Linux: sem a condicao, o Exe
-        // (Windows) e o Dmg (macOS) tambem cairiam em CPU, perdendo aceleracao
-        // de GPU. Forca `OPENGL` no Linux: medido no Bazzite com KDE Plasma
-        // (Wayland), o GL context compoe alfa por pixel no device de destino
-        // depois que a janela troca de monitor; o software renderer
-        // (`SOFTWARE_COMPAT` ou `SOFTWARE_FAST`) pinta o balao da HUD como
-        // retangulo opaco no secundario, mesmo com `Window.transparent=true`.
-        // Se o GL context nao estiver funcional, o Skiko cai em
-        // `SOFTWARE_COMPAT` sozinho, e a janela volta a ser opaca no
-        // secundario -- nesse caso, o proximo log `hud-window` dira
-        // `render=SOFTWARE_COMPAT` em vez de `render=OPENGL`, e a gente sabe
-        // que precisa investigar o driver.
+        // Fix tela preta no Wayland com GPU NVIDIA (issue #421): o `-D` vira
+        // `--java-options` no jpackage (deb/rpm) e DEFAULT_JVM_OPTS no app-image.
+        // Condicionado ao build Linux: sem a condicao, o Exe (Windows) e o Dmg
+        // (macOS) tambem renderizariam por CPU, perdendo aceleracao de GPU.
         if (System.getProperty("os.name").startsWith("Linux")) {
-            jvmArgs += "-Dskiko.renderApi=OPENGL"
+            jvmArgs += "-Dskiko.renderApi=SOFTWARE"
         }
 
         nativeDistributions {

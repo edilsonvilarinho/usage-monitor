@@ -18,8 +18,6 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.awt.ComposeWindow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
@@ -66,7 +64,6 @@ import com.usagemonitor.presentation.viewmodel.AppUpdateUiState
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
-import java.awt.GraphicsDevice
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlinx.coroutines.Dispatchers
@@ -83,25 +80,27 @@ import kotlin.time.Instant
  * A barra HUD numa janela **própria**, em forma de notch colado a uma borda.
  *
  * É a **única** janela de visualização do app: a janela principal com o
- * dashboard saiu quando a HUD virou o único modo. Por isso ela é também a
- * âncora do app — diálogo de arquivo, captura do relatório de bug, ativação
- * pela bandeja e pela segunda instância —, entregue por [onWindowReady].
+ * dashboard saiu quando a HUD virou o único modo. Por isso ela é também a âncora
+ * do app — diálogo de arquivo, captura do relatório de bug, ativação pela bandeja
+ * e pela segunda instância —, entregue por [onWindowReady]. Antes disso ela foi a
+ * janela principal encolhida, com a geometria de antes guardada à parte e a
+ * janela AWT redimensionada a cada quadro — a fonte do tranco.
  *
  * **Janela transparente, e ela engole clique na área vazia** (medido no Windows
- * 11, C11 do plano de execução). Por isso, parada, ela só aceita clique no
- * notch: a janela tem sempre o tamanho da aberta (`hudDockedWindowBounds`) e
- * a área de clique é recortada por `Window.shape` (`hudRestHitRegion`).
+ * 11, C11 do plano de execução). Por isso, parada, ela só aceita clique no notch:
+ * a janela tem sempre o tamanho da aberta (`hudDockedWindowBounds`) e a área de
+ * clique é recortada por `Window.shape` (`hudRestHitRegion`). Ao entrar, o
+ * recorte sai e o balão entra; ao sair, o balão some e só depois o recorte volta.
  *
- * A janela **não muda de origem nem de tamanho** entre parada e aberta. Mudar
- * a origem de uma janela transparente mostra um quadro do conteúdo antigo no
- * lugar novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e
- * na de baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
+ * A janela **não muda de origem nem de tamanho** entre parada e aberta. Mudar a
+ * origem de uma janela transparente mostra um quadro do conteúdo antigo no lugar
+ * novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e na de
+ * baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
  *
- * **O recorte é só do Windows** ([hudUsesHitRegion]). No elementary OS 6.1
- * (X11) o `shape = null` da abertura não tirava o recorte: o balão pintava
- * só dentro da margem de 16dp e as alças saíam cortadas. Fora do Windows a
- * janela fica sem recorte — o balão abre inteiro, e a área vazia pode
- * engolir clique.
+ * **O recorte é só do Windows** ([hudUsesHitRegion]). No elementary OS 6.1 (X11)
+ * o `shape = null` da abertura não tirava o recorte: o balão pintava só dentro
+ * da margem de 16dp e as alças saíam cortadas. Fora do Windows a janela fica sem
+ * recorte — o balão abre inteiro, e a área vazia dele pode engolir clique.
  */
 @Composable
 internal fun HudWindowHost(
@@ -158,8 +157,8 @@ internal fun HudWindowHost(
     // da engrenagem e o banner do balão dela, com o mesmo texto e tom de
     // `updateBannerContent` (#225, #291).
     val updateIndicator = appUpdateState?.let { state -> hudUpdateIndicatorOf(state, language) }
-    // A mesma ação da faixa, oferecida no balão da engrenagem — nunca no
-    // ícone do notch, onde seria clique de rotina reiniciando o app.
+    // A mesma ação da faixa, oferecida no balão da engrenagem — nunca no ícone do
+    // notch, onde seria clique de rotina reiniciando o app.
     val updateAction = appUpdateState?.let { state ->
         updateBannerAction(
             state = state,
@@ -167,8 +166,8 @@ internal fun HudWindowHost(
             onRestartAndUpdate = { viewModel.restartAndUpdateNow() }
         )
     }
-    // Conta que nasce ou colapsa (API ativada/desativada, início do app)
-    // fica na lista durante a transição; a geometria segue essa lista.
+    // Conta que nasce ou colapsa (API ativada/desativada, início do app) fica na
+    // lista durante a transição; a geometria segue essa lista.
     val accounts = rememberHudPresence(buildHudAccounts(
         quotaRisks = quotaRisks,
         cardOrder = cardOrder,
@@ -182,20 +181,21 @@ internal fun HudWindowHost(
         stalledSessions = stalled
     ), motion)
 
-    // O monitor do notch (issue #273): é o monitor gravado, resolvido de
-    // novo a cada abertura por hover. Um monitor reconectado volta a
-    // receber o notch sem reiniciar o app.
+    // O monitor do notch (issue #273). Era sempre o padrão: o arrasto era preso a
+    // ele e o encaixe usava as bordas dele, e o notch não saía do primário. Agora
+    // é o monitor gravado, resolvido de novo a cada abertura por hover — um
+    // monitor reconectado volta a receber o notch sem reiniciar o app.
     var screenArea by remember { mutableStateOf(resolveHudScreenArea(settings, hudScreenArea)) }
     var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, screenArea)) }
     var hovered by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     // A área de clique da janela inteira, sem o recorte do notch parado. Sai
-    // **antes** do conteúdo ao abrir e volta **depois** dele ao fechar.
+    // **antes** do conteúdo ao abrir e volta **depois** dele ao fechar — ver o KDoc.
     var windowOpen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     val retract = remember { HudAutoRetractState(settings) }
-    // Durante o arrasto o notch sai da borda e anda livre; esta é a
-    // posição da janela (dp de janela). Nulo fora de arrasto.
+    // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
+    // janela (dp de janela). Nulo fora de arrasto.
     var dragWindowPosition by remember { mutableStateOf<DpOffset?>(null) }
     var dragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
 
@@ -205,11 +205,14 @@ internal fun HudWindowHost(
             delay(hudOpenDelayMillis(retract.enabled, alreadyOpen = windowOpen))
             screenArea = resolveHudScreenArea(settings, hudScreenArea)
             windowOpen = true
-            // Um quadro para o recorte sair antes do conteúdo abrir.
+            // Um quadro para o recorte sair antes de o conteúdo começar a se
+            // abrir; sem ele a mola corre nos primeiros quadros dentro do recorte
+            // do notch e o balão sai cortado.
             withFrameNanos { }
             expanded = true
         } else {
-            // `Exit` de um quadro quando o ponteiro cruza a divisa notch/painel.
+            // Recolher espera uma passada: o ponteiro cruzando a divisa entre o
+            // notch e o painel gera um `Exit` de um quadro.
             delay(HUD_COLLAPSE_DELAY_MILLIS)
             expanded = false
             delay(HUD_COLLAPSE_SETTLE_MILLIS)
@@ -239,20 +242,19 @@ internal fun HudWindowHost(
         size = windowSize,
         position = docked
     )
-    // Sincroniza o `windowState` (tamanho + posição dock) **fora do arrasto**.
-    // Dentro do arrasto o efeito dentro do `Window` move a AWT direto
-    // (#416: passar por `windowState.position` a cada tick do mouse dispara
-    // recompose + redesenho Skia + `swapBuffers` síncrono, e o `EdtWatchdog`
-    // capturou 5s parado em `LinuxOpenGLRedrawer.swapBuffers` no Linux).
-    LaunchedEffect(windowSize, docked) {
+    // Um salto, nunca interpolação AWT: o movimento é do conteúdo.
+    LaunchedEffect(windowSize, docked, dragWindowPosition) {
         windowState.size = windowSize
-        if (!dragging) {
-            windowState.position = docked
-        }
+        val free = dragWindowPosition
+        windowState.position = if (free != null) WindowPosition(free.x, free.y) else docked
     }
 
-    // A janela de arrasto, que é o que se move (issue #288): esta medida sai
-    // da geometria e não muda no arrasto.
+    // A janela de arrasto, que é o que se move (issue #288). O gesto guarda os
+    // lambdas da composição em que começou, com o notch **aberto**: com
+    // `windowSize` ali, o primeiro passo prendia à tela uma janela da largura do
+    // balão e a jogava 274dp para dentro, e o vão seguia o arrasto inteiro —
+    // embaixo e à direita, onde a aberta é recuada. O encaixe lia o centro dessa
+    // mesma largura errada. Esta medida sai da geometria e não muda no arrasto.
     val dragStart = hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     val dragSize = DpSize(dragStart.size.width * scale, dragStart.size.height * scale)
 
@@ -260,8 +262,8 @@ internal fun HudWindowHost(
         dragging = true
         expanded = false
         windowOpen = false
-        // O arrasto parte da janela de arrasto já encaixada, com o notch no
-        // ponto da tela em que ele está — nunca da origem da janela aberta.
+        // O arrasto parte da janela de arrasto já encaixada, com o notch no ponto
+        // da tela em que ele está — nunca da origem da janela aberta.
         dragWindowPosition = DpOffset(dragStart.x * scale, dragStart.y * scale)
         dragPointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
         HudDragProbe.begin()
@@ -272,17 +274,16 @@ internal fun HudWindowHost(
         val position = dragWindowPosition
         if (previous != null && current != null && position != null) {
             dragPointer = current
-            // Incremental: somar o total desde o início prenderia o notch
-            // na borda. Área = monitor **sob o ponteiro**, bounds inteiros.
+            // Incremental: somar o total desde o início deixaria o notch preso na
+            // borda, porque o excedente de um arrasto para fora da tela nunca
+            // seria descartado. A área é a do monitor **sob o ponteiro**, a tela
+            // inteira dele: presa ao primário, o notch nunca cruzava a divisa.
             val moved = fitWindowPosition(
                 x = position.x + (current.x - previous.x).dp,
                 y = position.y + (current.y - previous.y).dp,
                 size = dragSize,
                 workArea = pointerScreen()?.bounds ?: screenArea
             )
-            // O efeito dentro do `Window` move a AWT direto, sem passar
-            // por `windowState.position` (recompose + `swapBuffers` trava
-            // o EDT no OpenGL do Linux, #416).
             dragWindowPosition = DpOffset(moved.x, moved.y)
         }
     }
@@ -290,8 +291,10 @@ internal fun HudWindowHost(
         val position = dragWindowPosition
         HudDragProbe.finish(position)
         if (position != null) {
-            // Borda mais próxima do **centro** do notch, no monitor em que
-            // foi solto; a barra de tarefas é *topmost* (issue #288).
+            // O notch gruda na borda mais próxima do **centro** dele, no monitor
+            // em que foi solto, e borda, fração e monitor são gravados. O encaixe
+            // é na área **útil**: a barra de tarefas também é *topmost* e volta
+            // para cima do notch a cada clique nela (issue #288).
             val target = pointerScreen()
             val area = target?.workArea ?: screenArea
             val snapped = nearestHudPlacement(
@@ -309,6 +312,7 @@ internal fun HudWindowHost(
         dragPointer = null
         dragWindowPosition = null
         dragging = false
+        Unit
     }
 
     Window(
@@ -331,18 +335,6 @@ internal fun HudWindowHost(
         LaunchedEffect(window) {
             recordHudWindowFacts(window, { windowState.position }, { windowState.size })
         }
-        // O `dragTo` só atualiza `dragWindowPosition`; a posição real da
-        // janela AWT é movida no `dragFinish`. Mover durante o arrasto
-        // dispararia recompose + `swapBuffers` síncrono a cada tick do
-        // mouse, e o `EdtWatchdog` capturou 5s parado em
-        // `LinuxOpenGLRedrawer.swapBuffers` no OpenGL do Linux (#416).
-        LaunchedEffect(dragWindowPosition) {
-            // Não move: ver KDoc acima. Só reage para o caso do arrasto
-            // ser cancelado por outro caminho (sem `dragFinish`).
-            if (dragWindowPosition != null) return@LaunchedEffect
-        }
-        // Reaplica o fundo transparente quando a janela cruza um `GraphicsDevice` (#416).
-        ApplyHudDeviceChangeReapply(window)
         LaunchedEffect(windowOpacityPercent) {
             applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
         }
@@ -354,17 +346,27 @@ internal fun HudWindowHost(
             Box(modifier = Modifier.fillMaxSize()) {
                 HudNotch(
                     accounts = accounts,
-                    edge = edge, sizes = sizes, settledSizes = settledSizes,
-                    fallbackLabel = fallbackLabel, fallbackTone = fallbackTone,
-                    expanded = expanded && !dragging, dragging = dragging,
-                    updateIndicator = updateIndicator, notchCenter = centerInWindow,
+                    edge = edge,
+                    sizes = sizes,
+                    settledSizes = settledSizes,
+                    fallbackLabel = fallbackLabel,
+                    fallbackTone = fallbackTone,
+                    expanded = expanded && !dragging,
+                    dragging = dragging,
+                    updateIndicator = updateIndicator,
+                    notchCenter = centerInWindow,
                     language = language,
-                    onHoverChange = { hovered = it },
-                    onDragStart = dragBegin, onDragMove = dragTo, onDragEnd = dragFinish,
+                    onHoverChange = { isHovered -> hovered = isHovered },
+                    onDragStart = dragBegin,
+                    onDragMove = dragTo,
+                    onDragEnd = dragFinish,
+                    // Clique num anel recoleta aquela conta, como no Codenotch.
                     onRefreshAccount = { target -> viewModel.refresh(target) },
+                    // Os botões do card daquela conta, pela mesma regra do card.
                     accountActions = { account ->
                         HudAccountActions(
-                            account = account, language = language,
+                            account = account,
+                            language = language,
                             teamEnabledProfileIds = teamEnabledProfileIds,
                             cliSessionPulse = cliSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
                             teamSessionPulse = teamSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
@@ -372,12 +374,17 @@ internal fun HudWindowHost(
                             onRefresh = { viewModel.refresh(account.targetKey) }
                         )
                     },
+                    // A engrenagem da ponta de longe abre o balão com o que o
+                    // rodapé do modo padrão oferece — aqui não há rodapé.
                     appBalloon = {
                         HudWindowAppBalloon(
                             language = language,
-                            nextRefreshAt = nextRefreshAt, refreshInterval = pollInterval,
-                            updateIndicator = updateIndicator, updateAction = updateAction,
-                            actions = actions, exportScope = exportScope,
+                            nextRefreshAt = nextRefreshAt,
+                            refreshInterval = pollInterval,
+                            updateIndicator = updateIndicator,
+                            updateAction = updateAction,
+                            actions = actions,
+                            exportScope = exportScope,
                             currentStats = { (dashboardState as? UiState.Success)?.data },
                             onQuit = onCloseRequest
                         )
@@ -387,7 +394,8 @@ internal fun HudWindowHost(
                         hasUpdateAction = updateAction != null
                     ),
                     gearDescription = hudGearDescription(language),
-                    autoRetract = retract.enabled, onToggleAutoRetract = retract::toggle,
+                    autoRetract = retract.enabled,
+                    onToggleAutoRetract = retract::toggle,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -416,6 +424,115 @@ private fun handleHudWindowKey(event: KeyEvent, onOpenHelp: () -> Unit): Boolean
     }
     return help
 }
+
+/**
+ * O balão da engrenagem: o que o rodapé do modo padrão oferece — aqui não há
+ * rodapé —, mais a contagem, o aviso de atualização e "Sair do Usage Monitor".
+ *
+ * [exportScope] é do host, não deste balão: o balão sai da composição quando o
+ * ponteiro deixa a HUD, e um escopo dele cancelaria a exportação no meio.
+ */
+@Composable
+private fun HudWindowAppBalloon(
+    language: AppLanguage,
+    nextRefreshAt: Instant?,
+    refreshInterval: Duration,
+    updateIndicator: HudUpdateIndicator?,
+    updateAction: (() -> Unit)?,
+    actions: AppShellActions,
+    exportScope: CoroutineScope,
+    currentStats: () -> List<ApiUsageStats>?,
+    onQuit: () -> Unit
+) {
+    HudAppBalloonContent(
+        language = language,
+        appVersion = CURRENT_APP_VERSION,
+        countdown = nextRefreshAt?.let { refreshAt ->
+            {
+                HudCountdown(
+                    nextRefreshAt = refreshAt,
+                    description = nextRefreshLabel(language),
+                    interval = refreshInterval,
+                    nowProvider = { Clock.System.now() },
+                    waitNextTick = { delay(1_000L) },
+                    updatesEnabled = true
+                )
+            }
+        },
+        updateIndicator = updateIndicator,
+        onUpdateAction = updateAction,
+        onQuit = onQuit,
+        actions = {
+            FooterActionGroup(
+                language = language,
+                onRefresh = actions.refreshAll,
+                onOpenSettings = actions.openSettings,
+                onOpenAdminOverview = actions.openAdminOverview,
+                onOpenTeamPresence = actions.openTeamPresenceOverview,
+                onOpenHelp = actions.openHelp,
+                onOpenComparison = actions.openComparison,
+                onExportSnapshot = {
+                    val stats = currentStats()
+                    if (stats != null) {
+                        // Sem snackbar aqui: o diálogo de arquivo é o retorno.
+                        exportScope.launch {
+                            runCatching { actions.exportSnapshot(stats) }
+                                .onFailure { error -> actions.onExportFailure(error) }
+                        }
+                    }
+                }
+            )
+        }
+    )
+}
+
+/**
+ * Os botões do card de uma conta, no balão dela: as janelas de
+ * `cardActionsFor` — a mesma regra do card — e, por último, atualizar só esta
+ * conta, com o glifo que gira enquanto coleta.
+ */
+@Composable
+private fun HudAccountActions(
+    account: HudAccount,
+    language: AppLanguage,
+    teamEnabledProfileIds: Set<String>,
+    cliSessionPulse: SessionPulse,
+    teamSessionPulse: SessionPulse,
+    actions: AppShellActions,
+    onRefresh: () -> Unit
+) {
+    val target = account.targetKey
+    cardActionsFor(target, teamEnabledProfileIds).forEach { action ->
+        CardActionButton(
+            action = action,
+            language = language,
+            buttonSize = HUD_BALLOON_ACTIONS,
+            iconSize = HUD_BALLOON_ACTION_ICON,
+            cliSessionPulse = cliSessionPulse,
+            teamSessionPulse = teamSessionPulse,
+            onClick = {
+                when (action) {
+                    CardAction.HISTORY -> actions.openHistory(target.source, account.accountKey)
+                    CardAction.ANALYSIS -> actions.openAnalysis(target)
+                    CardAction.CODEX_CLI_SESSIONS -> actions.openCodexCliSessions(target)
+                    CardAction.CLI_SESSIONS -> actions.openCliSessions(target)
+                    CardAction.TEAM_USAGE -> actions.openTeamUsage(target)
+                    CardAction.TEAM_PRESENCE -> actions.openTeamPresence(target)
+                }
+            }
+        )
+    }
+    CardIconActionButton(
+        label = refreshActionLabel(account.refreshing, language),
+        onClick = onRefresh,
+        buttonSize = HUD_BALLOON_ACTIONS,
+        enabled = !account.refreshing
+    ) { tint ->
+        RefreshGlyph(refreshing = account.refreshing, tint = tint, size = HUD_BALLOON_ACTION_ICON)
+    }
+}
+
+private val HUD_BALLOON_ACTION_ICON = 16.dp
 
 /** A engrenagem abre as ações do app; é o que ela diz ao leitor de tela. */
 internal fun hudGearDescription(language: AppLanguage): String =
@@ -514,8 +631,10 @@ internal const val HUD_WINDOWS_MIN_OPACITY_PERCENT = 55
 
 /**
  * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
- * antes de abrir o balão, já sai sem o recorte. Fora do Windows ([supported]
- * falso) não aplica nada — só grava que pulou (#342).
+ * antes de abrir o balão, já sai sem o recorte.
+ *
+ * Fora do Windows ([supported] falso) não aplica nada — só grava que pulou, para
+ * o próximo relato vir com o que a HUD fez (issue #342).
  */
 @Composable
 private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float, supported: Boolean) {
@@ -531,104 +650,6 @@ private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: F
     SideEffect {
         applier.apply(window, region, scale)
     }
-}
-
-/**
- * Detecta quando a janela da HUD atravessa um `GraphicsDevice` e tenta
- * recuperar a transparência perdida (issue #416, monitor secundário).
- *
- * **Três passos, na ordem:** (1) `setBackground(Color(0,0,0,0)) + repaint` —
- * acorda stacks que renegociam o peer AWT sem refazer o contexto. (2) toggle
- * de `isVisible` + nudge de `opacity` — re-mapeia o peer quando o passo 1
- * não basta. (3) nudge de `size +1/-1` — força o AWT a descartar o back
- * buffer e realocar um novo. Custa um pisca, mas é o que tira a janela do
- * estado opaco no secundário quando o compositor KDE/COSMIC deixa o buffer
- * sem canal alfa. O log diz qual dos passos funcionou e o que o peer está
- * pintando depois (`fundo`, `opaco`, `buffer-alfa`).
- *
- * **Sondagem em vez de `ComponentListener`/`componentMoved`:** o AWT não
- * dispara o evento de mover dentro do mesmo `GraphicsDevice`; o que a gente
- * quer é a interseção entre mover e trocar de device. 500ms cobre um arrasto
- * entre monitores sem custar a EDT ociosa.
- */
-@Composable
-private fun ApplyHudDeviceChangeReapply(window: java.awt.Window) {
-    LaunchedEffect(window) {
-        var previousDeviceId: String? = null
-        while (true) {
-            val currentDeviceId = hudDeviceIdOf(window)
-            if (currentDeviceId != null && previousDeviceId != null && currentDeviceId != previousDeviceId) {
-                val reapply = runCatching {
-                    window.background = java.awt.Color(0, 0, 0, 0)
-                    window.invalidate()
-                    window.repaint()
-                }
-                val remap = runCatching {
-                    if (window.isVisible) {
-                        window.isVisible = false
-                        window.isVisible = true
-                        val originalOpacity = window.opacity
-                        window.opacity = 0.99f
-                        window.opacity = originalOpacity
-                        window.invalidate()
-                        window.repaint()
-                    }
-                }
-                val bufferRecreate = runCatching {
-                    val size = window.size
-                    window.size = java.awt.Dimension(size.width + 1, size.height + 1)
-                    window.size = size
-                    window.invalidate()
-                    window.repaint()
-                }
-                recordHudDeviceChange(window, hudDeviceChangeFactsOf(
-                    window, previousDeviceId, currentDeviceId, reapply, remap, bufferRecreate
-                ))
-            }
-            previousDeviceId = currentDeviceId
-            delay(HUD_DEVICE_POLL_INTERVAL_MILLIS)
-        }
-    }
-}
-
-/** Lê o estado do peer no **novo** `GraphicsDevice` e empacota a fact de troca. */
-private fun hudDeviceChangeFactsOf(
-    window: java.awt.Window,
-    previousDeviceId: String,
-    currentDeviceId: String,
-    reapply: Result<Unit>,
-    remap: Result<Unit>,
-    bufferRecreate: Result<Unit>
-): HudDeviceChangeFacts {
-    val device = runCatching { window.graphicsConfiguration?.device }.getOrNull()
-    fun supports(kind: GraphicsDevice.WindowTranslucency): Boolean? =
-        device?.let { runCatching { it.isWindowTranslucencySupported(kind) }.getOrNull() }
-    return HudDeviceChangeFacts(
-        prevId = previousDeviceId,
-        newId = currentDeviceId,
-        x = window.x,
-        y = window.y,
-        width = window.width,
-        height = window.height,
-        perPixelTranslucent = supports(GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSLUCENT),
-        uniformTranslucent = supports(GraphicsDevice.WindowTranslucency.TRANSLUCENT),
-        perPixelTransparent = supports(GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSPARENT),
-        renderApi = runCatching { (window as? ComposeWindow)?.renderApi?.name }.getOrNull(),
-        reapplied = reapply.isSuccess,
-        reapplyError = reapply.exceptionOrNull()
-            ?.let { error -> "${error::class.simpleName}: ${error.message}" },
-        visibilityRemapped = remap.isSuccess,
-        remapError = remap.exceptionOrNull()
-            ?.takeIf { remap.isFailure }
-            ?.let { error -> "${error::class.simpleName}: ${error.message}" },
-        backgroundAlpha = runCatching { window.background?.alpha }.getOrNull(),
-        isOpaque = runCatching { window.isOpaque }.getOrNull(),
-        isDisplayable = runCatching { window.isDisplayable }.getOrNull(),
-        isShowing = runCatching { window.isShowing }.getOrNull(),
-        bufferRecreated = bufferRecreate.isSuccess,
-        bufferRecreateError = bufferRecreate.exceptionOrNull()
-            ?.let { error -> "${error::class.simpleName}: ${error.message}" }
-    )
 }
 
 /**

@@ -107,3 +107,4 @@ xwininfo -id $(DISPLAY=:0 xdotool search --name "Usage Monitor" | head -1) | gre
 | # | Atividade | Comando | Resultado |
 |---|---|---|---|
 | A1 | Sonda do mecanismo em AWT puro, matriz de cenários, este plano e a issue de execução | `javac AlphaProbe.java && java AlphaProbe` com amostragem paralela de `xwininfo` | `32 → 24 → 32 → 24 → 32` nos dois níveis (AWT e janela X). Confirmado que voltar ao primário **também** perde o alfa: o defeito é cruzar a fronteira, não o monitor de destino |
+| A2 | Revert de `a1812d57` (volta `skiko.renderApi = SOFTWARE` no Linux e o arrasto ao vivo); preservado só o `deviceId` nas facts, com teste de que o id do Windows (`\\Display2`, uma barra) sobrevive ao saneamento | `sh gradlew desktopTest --tests "com.usagemonitor.HudWindowFactsTest"` | 4 testes, 0 falhas. Na primeira passada o teste novo acusou que `\\\\Display2` (duas barras) casa com o caminho UNC do saneamento e vira `<caminho>` — fixado o valor real, de uma barra |
