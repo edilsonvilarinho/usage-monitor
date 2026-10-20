@@ -46,11 +46,16 @@ import kotlinx.coroutines.withContext
 /**
  * Intervalo entre leituras. O AWT não avisa quando troca a
  * `GraphicsConfiguration` de uma janela — não há evento nem property change
- * para isso —, então saber se o alfa caiu é por sondagem. Meio segundo é curto
- * o bastante para a rede de segurança reagir e barato o bastante para duas
- * leituras de campo.
+ * para isso —, então saber se o alfa caiu é por sondagem.
+ *
+ * Eram 500 ms, e foi medido o que isso custa: soltando a barra **de volta no
+ * monitor de origem** depois de cruzar, o id do monitor não muda, nada dispara
+ * o renascimento pela configuração, e a sondagem era a única a perceber — meio
+ * segundo de retângulo preto do tamanho da janela encaixada, bem visível. São
+ * duas leituras de campo por vez; 120 ms não pesa e encurta a tarja para o
+ * limiar do perceptível.
  */
-internal const val HUD_TRANSLUCENCY_POLL_INTERVAL_MILLIS = 500L
+internal const val HUD_TRANSLUCENCY_POLL_INTERVAL_MILLIS = 120L
 
 /** O que o AWT responde sobre o alfa da janela agora. `null` = não medido. */
 internal data class HudTranslucencyState(
@@ -60,7 +65,13 @@ internal data class HudTranslucencyState(
     /** A configuração **desta janela** tem alfa? É a pergunta que o defeito muda. */
     val translucencyCapable: Boolean?,
     /** 32 com alfa, 24 sem. É o `Depth:` do `xwininfo` visto de dentro do app. */
-    val pixelSize: Int?
+    val pixelSize: Int?,
+    /**
+     * Onde a janela estava na medida. Entrou porque o alfa cai de novo meio
+     * segundo **depois** de a janela renascer certa, no mesmo monitor (#426):
+     * sem a posição não dá para saber se ela encostou numa fronteira.
+     */
+    val bounds: java.awt.Rectangle? = null
 )
 
 internal fun readHudTranslucencyState(window: java.awt.Window): HudTranslucencyState {
@@ -74,7 +85,8 @@ internal fun readHudTranslucencyState(window: java.awt.Window): HudTranslucencyS
             }.getOrNull()
         },
         translucencyCapable = runCatching { configuration?.isTranslucencyCapable }.getOrNull(),
-        pixelSize = runCatching { configuration?.colorModel?.pixelSize }.getOrNull()
+        pixelSize = runCatching { configuration?.colorModel?.pixelSize }.getOrNull(),
+        bounds = runCatching { window.bounds }.getOrNull()
     )
 }
 
@@ -92,6 +104,8 @@ internal fun hudWindowHasAlpha(state: HudTranslucencyState): Boolean = state.tra
 @Composable
 internal fun rememberHudWindowAlpha(
     window: java.awt.Window,
+    /** Em arrasto: o fim do gesto reinicia a sondagem e mede na hora. */
+    dragging: Boolean,
     platform: AutoStartManager.Platform = AutoStartManager.currentPlatform(),
     appLog: AppLogFile = AppLogFile(),
     /**
@@ -107,22 +121,29 @@ internal fun rememberHudWindowAlpha(
     // não pode piscar no primeiro quadro, antes da primeira medida.
     var hasAlpha by remember { mutableStateOf(true) }
     val currentOnAlphaLost by rememberUpdatedState(onAlphaLost)
-    LaunchedEffect(window, platform) {
+    // Fora do laço: o efeito reinicia ao fim do arrasto, e o que já foi
+    // registrado não pode virar linha repetida no log.
+    val reported = remember(window) { arrayOfNulls<HudTranslucencyState>(1) }
+    // [dragging] é chave de propósito: o fim do gesto **reinicia** o efeito, e a
+    // primeira leitura acontece de imediato, sem esperar a sondagem. É o que
+    // tira a tarja preta de ~500 ms de quem solta a barra de volta no monitor
+    // de origem, onde o id não muda e nada mais dispara o renascimento (#426).
+    LaunchedEffect(window, platform, dragging) {
         if (platform != AutoStartManager.Platform.LINUX) {
             return@LaunchedEffect
         }
-        var reported: HudTranslucencyState? = null
         while (true) {
             val state = readHudTranslucencyState(window)
             val measured = hudWindowHasAlpha(state)
             hasAlpha = measured
             // Só a mudança vira linha: o que interessa num relato é o instante
             // em que o alfa caiu, não meio segundo de confirmação (#426).
-            val changed = reported == null ||
-                reported.translucencyCapable != state.translucencyCapable ||
-                reported.deviceId != state.deviceId
+            val previous = reported[0]
+            val changed = previous == null ||
+                previous.translucencyCapable != state.translucencyCapable ||
+                previous.deviceId != state.deviceId
             if (changed) {
-                reported = state
+                reported[0] = state
                 withContext(Dispatchers.IO) {
                     appLog.info("hud-alpha", hudTranslucencyStateMessage(state))
                 }
@@ -148,9 +169,11 @@ internal fun rememberHudWindowAlpha(
 internal const val HUD_ALPHA_REBUILD_LIMIT = 3
 
 /** O alfa da janela quando ele muda: é o instante que um relato precisa ver. */
-internal fun hudTranslucencyStateMessage(state: HudTranslucencyState): String =
-    "hud-alfa estado ${state.deviceId ?: "?"} capaz=${state.translucencyCapable ?: "?"} " +
-        "monitor=${state.perPixelTranslucent ?: "?"} profundidade=${state.pixelSize ?: "?"}bpp"
+internal fun hudTranslucencyStateMessage(state: HudTranslucencyState): String {
+    val where = state.bounds?.let { r -> "${r.x},${r.y} ${r.width}x${r.height}" } ?: "?"
+    return "hud-alfa estado ${state.deviceId ?: "?"} capaz=${state.translucencyCapable ?: "?"} " +
+        "monitor=${state.perPixelTranslucent ?: "?"} profundidade=${state.pixelSize ?: "?"}bpp em $where"
+}
 
 /** A linha do renascimento no `app.log`, com a profundidade que motivou. */
 internal fun hudAlphaRebuildMessage(state: HudTranslucencyState, attempt: Int): String =

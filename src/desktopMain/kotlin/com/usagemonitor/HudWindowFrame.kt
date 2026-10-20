@@ -56,6 +56,18 @@ internal fun HudWindowFrame(
     /** A configuração com alfa do monitor da HUD; `null` deixa o AWT escolher. */
     graphicsConfiguration: GraphicsConfiguration?,
     state: WindowState,
+    /**
+     * O tamanho e a posição **desta composição**, não os do [state].
+     *
+     * O `state` só é atualizado num efeito, depois da composição: no instante
+     * em que a janela renasce ele ainda guarda a posição do arrasto. A janela
+     * nascia então fora do monitor da própria configuração, o AWT disparava a
+     * troca de tela e a devolvia para a configuração **padrão** daquele
+     * monitor, de 24 bits — segunda tarja preta e segundo renascimento por
+     * travessia (medido na #426). Usados só no caminho de baixo nível.
+     */
+    size: DpSize,
+    position: WindowPosition,
     icon: Painter?,
     iconImage: java.awt.Image?,
     onCloseRequest: () -> Unit,
@@ -80,15 +92,12 @@ internal fun HudWindowFrame(
     // Lidos por referência: o `create` roda uma vez só, e a lambda que ele
     // guarda não pode congelar a versão do primeiro quadro.
     val currentClose by rememberUpdatedState(onCloseRequest)
-    // **Lidos aqui, no corpo.** Ler `state.size`/`state.position` dentro do
-    // `update` não registra dependência no Compose: a sincronização rodava uma
-    // vez e nunca mais, e depois de um arrasto a janela ficava no tamanho e na
-    // posição do gesto enquanto o app pedia outra coisa (medido na #426:
-    // `pedido 1293,0 592x435 obtido 1457,769 118x541`). Lidos no corpo, cada
-    // mudança recompõe e o `update` roda de novo.
+    // [size] e [position] chegam prontos do host, lidos no corpo da composição
+    // dele. Ler `state.size`/`state.position` aqui dentro do `update` não
+    // registraria dependência no Compose: a sincronização rodava uma vez e
+    // nunca mais, e depois de um arrasto a janela ficava no tamanho do gesto
+    // enquanto o app pedia outro (#426).
     val floating = state.placement == WindowPlacement.Floating
-    val size = state.size
-    val position = state.position
     // `SwingWindow` e o `Window` de baixo nivel com o nome de hoje: e o unico
     // que aceita a janela ja construida, e por isso o unico que deixa escolher
     // a `GraphicsConfiguration` com que ela nasce.

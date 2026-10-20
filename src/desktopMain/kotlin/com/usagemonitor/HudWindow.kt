@@ -310,6 +310,11 @@ internal fun HudWindowHost(
         useExplicitConfiguration = rebirth.explicit,
         graphicsConfiguration = rebirth.configuration,
         state = windowState,
+        size = windowSize,
+        // A posição desta composição: no arrasto, onde o gesto está; fora dele,
+        // a encaixada. O `windowState` só recebe isto no efeito abaixo, tarde
+        // demais para a janela que renasce (#426).
+        position = drag.windowPosition?.let { free -> WindowPosition(free.x, free.y) } ?: docked,
         icon = iconImage,
         iconImage = windowIconImage,
         onCloseRequest = onCloseRequest,
@@ -326,6 +331,7 @@ internal fun HudWindowHost(
             restHitRegion = restHitRegion,
             scale = scale,
             platform = AutoStartManager.currentPlatform(),
+            dragging = drag.dragging,
             onAlphaLost = { state -> rebirth.onAlphaLost(state, drag.dragging) }
         )
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {

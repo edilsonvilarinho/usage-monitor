@@ -51,7 +51,7 @@ class HudWindowTranslucencyTest {
     @Test
     fun `the state message names the monitor, the capability and the depth`() {
         assertEquals(
-            "hud-alfa estado :0.1 capaz=false monitor=true profundidade=24bpp",
+            "hud-alfa estado :0.1 capaz=false monitor=true profundidade=24bpp em 100,200 592x436",
             hudTranslucencyStateMessage(state(translucencyCapable = false, pixelSize = 24))
         )
     }
@@ -59,10 +59,13 @@ class HudWindowTranslucencyTest {
     @Test
     fun `an unmeasured answer is written as a question mark`() {
         val message = hudTranslucencyStateMessage(
-            state(deviceId = null, perPixelTranslucent = null, translucencyCapable = null, pixelSize = null)
+            state(
+                deviceId = null, perPixelTranslucent = null, translucencyCapable = null,
+                pixelSize = null, bounds = null
+            )
         )
 
-        assertEquals("hud-alfa estado ? capaz=? monitor=? profundidade=?bpp", message)
+        assertEquals("hud-alfa estado ? capaz=? monitor=? profundidade=?bpp em ?", message)
     }
 
     @Test
@@ -101,6 +104,7 @@ class HudWindowTranslucencyTest {
         deviceId: String? = ":0.1",
         perPixelTranslucent: Boolean? = true,
         translucencyCapable: Boolean? = true,
-        pixelSize: Int? = 32
-    ) = HudTranslucencyState(deviceId, perPixelTranslucent, translucencyCapable, pixelSize)
+        pixelSize: Int? = 32,
+        bounds: java.awt.Rectangle? = java.awt.Rectangle(100, 200, 592, 436)
+    ) = HudTranslucencyState(deviceId, perPixelTranslucent, translucencyCapable, pixelSize, bounds)
 }

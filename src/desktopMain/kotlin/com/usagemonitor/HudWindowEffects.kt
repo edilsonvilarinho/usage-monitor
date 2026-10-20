@@ -38,6 +38,8 @@ internal fun HudWindowEffects(
     restHitRegion: DpRect?,
     scale: Float,
     platform: AutoStartManager.Platform,
+    /** Em arrasto: a medida do alfa é refeita assim que o gesto termina. */
+    dragging: Boolean,
     onAlphaLost: suspend (HudTranslucencyState) -> Unit
 ): Boolean {
     LaunchedEffect(window) {
@@ -50,7 +52,7 @@ internal fun HudWindowEffects(
     // Só leitura: a janela já nasce com alfa (#426). Isto diz ao recorte se o
     // ambiente entregou o que prometeu, e dispara o renascimento quando um
     // arrasto fez o AWT trocar a configuração da janela.
-    val hasAlpha = rememberHudWindowAlpha(window, onAlphaLost = onAlphaLost)
+    val hasAlpha = rememberHudWindowAlpha(window, dragging = dragging, onAlphaLost = onAlphaLost)
     LaunchedEffect(windowOpacityPercent) {
         applyHudWindowOpacity(window, windowOpacityPercent, platform)
     }
