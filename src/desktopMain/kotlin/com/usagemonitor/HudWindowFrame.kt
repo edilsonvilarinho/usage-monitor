@@ -124,7 +124,7 @@ internal fun HudWindowFrame(
                 })
             }
         },
-        dispose = ComposeWindow::dispose,
+        dispose = ::disposeHudWindowAfterSuccessor,
         update = { window -> applyHudWindowBounds(window, floating, size, position) },
         content = content
     )
@@ -215,4 +215,33 @@ internal fun rememberHudWindowRebirth(screenId: String?, platform: AutoStartMana
     }
     LaunchedEffect(screenId) { rebirth.resetBudget() }
     return rebirth
+}
+
+/**
+ * Quanto a janela antiga fica na tela depois de a nova nascer (issue #426).
+ *
+ * Quando a HUD renasce, o Compose descarta a janela antiga **antes** de a nova
+ * ficar visível e pintar o primeiro quadro: sobra um vão em que não há janela
+ * nenhuma, e o usuário vê a barra **piscar**. Medido por amostragem de 20 Hz,
+ * o vão aparecia em quadros isolados — curto, mas visível a cada travessia de
+ * monitor.
+ *
+ * 150 ms cobre a criação da janela nova e o primeiro quadro do Skia com folga,
+ * e é curto o bastante para as duas janelas sobrepostas não darem tempo de
+ * aparecer como duas: elas ocupam exatamente a mesma área, e a nova nasce por
+ * cima.
+ */
+internal const val HUD_WINDOW_DISPOSE_DELAY_MILLIS = 150
+
+/**
+ * Descarta a janela substituída **depois** de a sucessora estar na tela.
+ *
+ * Sem o atraso, o descarte roda na mesma passada da EDT em que a nova janela
+ * ainda está sendo montada. Com ele, a antiga segue mostrando o último quadro
+ * dela até a nova pintar — a troca deixa de piscar.
+ */
+private fun disposeHudWindowAfterSuccessor(window: ComposeWindow) {
+    val timer = javax.swing.Timer(HUD_WINDOW_DISPOSE_DELAY_MILLIS) { window.dispose() }
+    timer.isRepeats = false
+    timer.start()
 }

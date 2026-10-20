@@ -225,6 +225,12 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   Orçamento de [HUD_ALPHA_REBUILD_LIMIT] por monitor: num ambiente que não compõe alfa ele nunca
   voltaria, e repetir seria um pisca eterno; depois dele quem assume é o recorte de emergência.
 
+  **A troca de janelas não pode piscar.** No renascimento o Compose descarta a janela antiga antes de a
+  nova ficar visível e pintar o primeiro quadro, e o vão aparece como um piscar a cada travessia
+  (medido por amostragem de 20 Hz). A antiga é descartada `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois,
+  já com a sucessora na tela: as duas ocupam a mesma área e a nova nasce por cima, então a troca
+  deixa de aparecer.
+
   **Armadilhas medidas, as duas custaram uma rodada:**
   - Ler `state.size`/`state.position` **dentro** do `update` do `SwingWindow` não registra
     dependência no Compose: a sincronização roda uma vez e nunca mais, e depois de um arrasto a
