@@ -66,8 +66,14 @@ off on elementary OS (X11) for three releases while every test stayed green. So:
   `*WindowHost`), **open the build on Linux (X11) before merging**, or say in the PR that you
   could not and what is at risk. [`docs/hud-notch.md`](docs/hud-notch.md#fora-do-alcance-dos-testes)
   lists what was measured on which platform.
-- Native window behaviour measured on one platform ships restricted to it (see `hudUsesHitRegion`),
-  and `ArchitectureRulesTest` fails a `window.shape` outside the files that own it.
+- `./gradlew probeHudAlpha` turns part of "open it and look" into a number: on a real display it
+  asserts the transparent window is born with alpha on **every** monitor, and reports what AWT does
+  to it on a crossing. It needs a desktop session (two monitors for the crossing), so it is outside
+  CI and outside `allTests` — run it before merging a window-host change (#426).
+- Native window behaviour measured on one platform ships restricted to it (see `hudHitRegionMode`),
+  and `ArchitectureRulesTest` fails a `window.shape` outside the files that own it, a `ComposeWindow`
+  built outside the file that chooses its `GraphicsConfiguration`, and any `background` assignment on
+  a window — the repair that looks like it works and does not (#426).
 - **Say which platforms you tested on** in the PR — OS, version and desktop/window manager. If you
   tested on Linux or macOS, that is worth more than it sounds.
 

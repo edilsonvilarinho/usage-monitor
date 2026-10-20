@@ -293,6 +293,17 @@ tasks.register<JavaExec>("probeHistoryWindow") {
     args(providers.gradleProperty("historyProbePrewarm").orElse("false").get())
 }
 
+// Portao manual do #342/#426: o que nenhum teste alcanca e o sistema de janelas.
+// Precisa de tela de verdade (e de dois monitores para a travessia valer), por
+// isso fica fora do CI e do `allTests`.
+tasks.register<JavaExec>("probeHudAlpha") {
+    group = "verification"
+    description = "Mede se a janela transparente nasce com alfa em cada monitor e o que o AWT faz ao cruzar (#426)."
+    mainClass.set("com.usagemonitor.HudAlphaProbe")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    systemProperty("skiko.renderApi", providers.gradleProperty("hudAlphaProbeRenderApi").orElse("SOFTWARE").get())
+}
+
 tasks.register<JavaExec>("generateScreenshots") {
     group = "documentation"
     description = "Renderiza offscreen os prints do README com dados sinteticos."
