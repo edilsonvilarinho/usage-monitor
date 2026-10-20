@@ -2,6 +2,10 @@ package com.usagemonitor
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.usagemonitor.data.diagnostics.AppLogFile
 import java.awt.Color
 import java.awt.GraphicsDevice
@@ -205,27 +209,34 @@ internal fun hudTranslucencyFailureOf(error: Throwable): String {
 }
 
 /**
- * Observa o alfa da janela e o repara quando ele cai.
+ * Observa o alfa da janela, o repara quando ele cai, e devolve se a janela
+ * **tem** alfa agora — que é o que decide o recorte de emergência do host.
  *
  * O gatilho é a **falta de alfa**, não a troca de monitor: com um caminho só
  * cobre o app que abre direto no secundário (o caso do relato), o arrasto nos
  * dois sentidos, e ainda o monitor religado e a sessão desbloqueada, que também
  * fazem o AWT renegociar a configuração.
  *
- * [enabled] fica falso durante o arrasto: o reparo recria o peer nativo, e
- * fazer isso no meio do gesto derrubaria os eventos de ponteiro. O efeito
+ * [repairEnabled] fica falso durante o arrasto: o reparo recria o peer nativo,
+ * e fazer isso no meio do gesto derrubaria os eventos de ponteiro. O efeito
  * re-roda ao fim do arrasto e verifica antes da primeira espera, então o preto
  * não sobrevive ao soltar.
+ *
+ * Fora do Linux a sondagem nem começa: não há o que reparar, e o recorte dessas
+ * plataformas não consulta o alfa. Ali a resposta é um `true` constante.
  */
 @Composable
-internal fun ApplyHudTranslucencyRepair(
+internal fun rememberHudWindowAlpha(
     window: java.awt.Window,
-    enabled: Boolean,
+    repairEnabled: Boolean,
     platform: AutoStartManager.Platform = AutoStartManager.currentPlatform(),
     appLog: AppLogFile = AppLogFile()
-) {
-    LaunchedEffect(window, enabled, platform) {
-        if (!enabled) {
+): Boolean {
+    // Nasce `true`: o caso comum é a janela ter alfa, e o recorte de emergência
+    // não pode piscar no primeiro quadro, antes da primeira medida.
+    var hasAlpha by remember { mutableStateOf(true) }
+    LaunchedEffect(window, repairEnabled, platform) {
+        if (platform != AutoStartManager.Platform.LINUX || !repairEnabled) {
             return@LaunchedEffect
         }
         var deviceId: String? = null
@@ -248,11 +259,16 @@ internal fun ApplyHudTranslucencyRepair(
             if (needed) {
                 attempts += 1
                 val repair = repairHudTranslucency(window, attempts)
+                // `null` é não medido: só uma medida negativa acende o recorte.
+                hasAlpha = repair.capableAfter != false
                 withContext(Dispatchers.IO) {
                     appLog.info("hud-alpha", hudTranslucencyRepairMessage(repair))
                 }
+            } else {
+                hasAlpha = state.translucencyCapable != false
             }
             delay(HUD_TRANSLUCENCY_POLL_INTERVAL_MILLIS)
         }
     }
+    return hasAlpha
 }

@@ -97,7 +97,8 @@ import kotlin.time.Instant
  * novo — era o pisca ao passar o ponteiro (E11) e, na borda direita e na de
  * baixo, o notch saltando 274px a cada abrir e fechar (issue #294).
  *
- * **O recorte é só do Windows** ([hudUsesHitRegion]). No elementary OS 6.1 (X11)
+ * **O recorte é do Windows sempre, e do Linux só sem alfa** ([hudHitRegionMode],
+ * #426). No elementary OS 6.1 (X11)
  * o `shape = null` da abertura não tirava o recorte: o balão pintava só dentro
  * da margem de 16dp e as alças saíam cortadas. Fora do Windows a janela fica sem
  * recorte — o balão abre inteiro, e a área vazia dele pode engolir clique.
@@ -232,8 +233,12 @@ internal fun HudWindowHost(
     )
     val composedArea = screenArea.inCompositionDp(scale)
     val bounds = hudHostWindowBounds(dragging, placement, sizes, composedArea)
-    val hitRegionSupported = remember { hudUsesHitRegion(AutoStartManager.currentPlatform()) }
-    val hitRegion = if (dragging || windowOpen) null else hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
+    val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
+    val restHitRegion = if (dragging || windowOpen) {
+        null
+    } else {
+        hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
+    }
     val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
 
@@ -326,12 +331,15 @@ internal fun HudWindowHost(
         // Devolve o alfa quando a janela cruza de monitor e o AWT a troca para a
         // configuração de 24 bits do destino (#426). Pausado no arrasto: o reparo
         // recria o peer nativo, e no meio do gesto isso derrubaria o ponteiro.
-        ApplyHudTranslucencyRepair(window, enabled = !dragging)
+        val hasAlpha = rememberHudWindowAlpha(window, repairEnabled = !dragging)
         LaunchedEffect(windowOpacityPercent) {
             applyHudWindowOpacity(window, windowOpacityPercent, AutoStartManager.currentPlatform())
         }
-        // Recorte só no Windows: no elementary OS (X11) o balão saía cortado.
-        ApplyHudHitRegion(window, hitRegion, scale, supported = hitRegionSupported)
+        // Windows sempre; Linux só sem alfa (o recorte de emergência da #426);
+        // macOS nunca. A região nula **tira** o recorte, e por isso o host
+        // continua compondo o aplicador quando ela não vale mais.
+        val hitRegion = restHitRegion.takeIf { hudHitRegionActive(hitRegionMode, hasAlpha) }
+        ApplyHudHitRegion(window, hitRegion, scale, mode = hitRegionMode)
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
             val centerInWindow = if (dragging) null else bounds.notchCenterInWindow
@@ -573,14 +581,40 @@ private fun ScreenWorkArea.inCompositionDp(scale: Float): ScreenWorkArea = Scree
     size = DpSize(size.width / scale, size.height / scale)
 )
 
+/** Quando a HUD recorta a área de clique da janela parada por `Window.shape`. */
+internal enum class HudHitRegionMode {
+    /** Windows: medido na #294 (C11), é o comportamento normal da janela parada. */
+    ALWAYS,
+
+    /**
+     * Linux: **só** quando a janela está sem alfa. Com a transparência
+     * funcionando — o caso normal depois do reparo da #426 — `Window.shape` não
+     * é tocado, e o balão cortado da #340 não tem como voltar. Sem alfa, a
+     * janela pintaria 442×557 de preto sobre tudo, engolindo clique; recortada
+     * ao notch, o pior caso vira um notch sozinho.
+     */
+    ONLY_WITHOUT_ALPHA,
+
+    /** macOS e o resto: nunca foi medido, e fica do lado seguro. */
+    NEVER
+}
+
 /**
- * Se a HUD recorta a área de clique da janela parada por `Window.shape`. Só no
- * Windows, onde o recorte foi medido (C11, spike da #294); no Linux (X11) tirar
- * o recorte ao abrir não surtia efeito e o balão ficava cortado. macOS nunca foi
- * medido e fica do lado seguro.
+ * O recorte por plataforma. Era um booleano "só Windows" (#340) e virou três
+ * estados quando o Linux ganhou o recorte de emergência (#426).
  */
-internal fun hudUsesHitRegion(platform: AutoStartManager.Platform): Boolean =
-    platform == AutoStartManager.Platform.WINDOWS
+internal fun hudHitRegionMode(platform: AutoStartManager.Platform): HudHitRegionMode = when (platform) {
+    AutoStartManager.Platform.WINDOWS -> HudHitRegionMode.ALWAYS
+    AutoStartManager.Platform.LINUX -> HudHitRegionMode.ONLY_WITHOUT_ALPHA
+    AutoStartManager.Platform.MACOS, AutoStartManager.Platform.OTHER -> HudHitRegionMode.NEVER
+}
+
+/** O recorte vale **agora**, com o que se sabe do alfa da janela. */
+internal fun hudHitRegionActive(mode: HudHitRegionMode, hasAlpha: Boolean): Boolean = when (mode) {
+    HudHitRegionMode.ALWAYS -> true
+    HudHitRegionMode.ONLY_WITHOUT_ALPHA -> !hasAlpha
+    HudHitRegionMode.NEVER -> false
+}
 
 /**
  * A opacidade que a HUD usa, a partir da preferência do usuário.
@@ -625,18 +659,24 @@ internal const val HUD_WINDOWS_MIN_OPACITY_PERCENT = 55
  * Síncrono na aplicação da composição: o quadro seguinte, que o hover espera
  * antes de abrir o balão, já sai sem o recorte.
  *
- * Fora do Windows ([supported] falso) não aplica nada — só grava que pulou, para
- * o próximo relato vir com o que a HUD fez (issue #342).
+ * Em [HudHitRegionMode.NEVER] não aplica nada — só grava que pulou, para o
+ * próximo relato vir com o que a HUD fez (issue #342).
  */
 @Composable
-private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float, supported: Boolean) {
+private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: Float, mode: HudHitRegionMode) {
     val diagnostics = remember { HudWindowDiagnostics() }
-    val applier = remember { HudHitRegionApplier(onEvent = diagnostics::record) }
-    LaunchedEffect(supported) {
-        val event = if (supported) HudHitRegionEvent.ENABLED else HudHitRegionEvent.SKIPPED
+    // No X11 o recorte nulo não limpa (#340): ali a limpeza é o retângulo cheio.
+    val applier = remember(mode) {
+        HudHitRegionApplier(
+            onEvent = diagnostics::record,
+            clearWithFullBounds = mode == HudHitRegionMode.ONLY_WITHOUT_ALPHA
+        )
+    }
+    LaunchedEffect(mode) {
+        val event = if (mode == HudHitRegionMode.NEVER) HudHitRegionEvent.SKIPPED else HudHitRegionEvent.ENABLED
         withContext(Dispatchers.IO) { diagnostics.record(event) }
     }
-    if (!supported) {
+    if (mode == HudHitRegionMode.NEVER) {
         return
     }
     SideEffect {
@@ -653,11 +693,16 @@ private fun ApplyHudHitRegion(window: java.awt.Window, region: DpRect?, scale: F
  *
  * `Window.shape` exige suporte a janela recortada (`PERPIXEL_TRANSPARENT`). Sem
  * ele a HUD continua funcionando sem recorte: a área do balão volta a engolir
- * clique, mas o notch não pisca — o defeito menor dos dois. Fora do Windows o
- * host nem o compõe ([hudUsesHitRegion]).
+ * clique, mas o notch não pisca — o defeito menor dos dois. Em
+ * [HudHitRegionMode.NEVER] o host nem o compõe.
+ *
+ * [clearWithFullBounds] é a lição da #340: no X11 `window.shape = null` **não**
+ * tira o recorte, e o balão abria cortado dentro da margem de 16dp. Ali a
+ * limpeza é o retângulo do tamanho da janela, que o X aceita e que cobre tudo.
  */
 private class HudHitRegionApplier(
-    private val onEvent: (HudHitRegionEvent, String?) -> Unit
+    private val onEvent: (HudHitRegionEvent, String?) -> Unit,
+    private val clearWithFullBounds: Boolean = false
 ) {
     private var applied: java.awt.Rectangle? = null
     private var hasApplied = false
@@ -669,7 +714,7 @@ private class HudHitRegionApplier(
             val right = ceil(rect.right.value * scale).toInt()
             val bottom = ceil(rect.bottom.value * scale).toInt()
             java.awt.Rectangle(left, top, right - left, bottom - top)
-        }
+        } ?: fullBoundsShape(window)
         if (hasApplied && shape == applied) {
             return
         }
@@ -682,5 +727,17 @@ private class HudHitRegionApplier(
                     onEvent(HudHitRegionEvent.CLEAR_NOT_EFFECTIVE, null)
                 }
             }
+    }
+
+    /** `null` fora do X11: lá o nulo limpa, e é o caminho medido no Windows. */
+    private fun fullBoundsShape(window: java.awt.Window): java.awt.Rectangle? {
+        if (!clearWithFullBounds) {
+            return null
+        }
+        val size = runCatching { window.size }.getOrNull() ?: return null
+        if (size.width <= 0 || size.height <= 0) {
+            return null
+        }
+        return java.awt.Rectangle(0, 0, size.width, size.height)
     }
 }

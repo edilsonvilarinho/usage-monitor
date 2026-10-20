@@ -95,12 +95,19 @@ xwininfo -id $(DISPLAY=:0 xdotool search --name "Usage Monitor" | head -1) | gre
 
 | # | Cenário | Antes | Depois |
 |---|---|---|---|
-| C1 | App abre com placement salvo no secundário (autostart) | 24 | — |
-| C2 | App abre com placement no primário | 32 | — |
-| C3 | Arrastar do primário para o secundário | 24 | — |
-| C4 | Arrastar de volta do secundário para o primário | 24 | — |
-| C5 | Trocar resolução / religar um monitor | coberto por desenho (o gatilho é a falta de alfa, não a troca de monitor) | — |
-| C6 | Bloquear e desbloquear a sessão | coberto por desenho | — |
+| C1 | App abre com placement salvo no secundário (autostart) | 24 | **32** |
+| C2 | App abre com placement no primário | 32 | **32** |
+| C3 | Cruzar do primário para o secundário | 24 | **32** |
+| C4 | Cruzar de volta do secundário para o primário | 24 | **32** |
+| C5 | Trocar resolução / religar um monitor | coberto por desenho (o gatilho é a falta de alfa, não a troca de monitor) | não medido |
+| C6 | Bloquear e desbloquear a sessão | coberto por desenho | não medido |
+
+A coluna "depois" foi medida com o app rodando (`sh gradlew run`), re-resolvendo o id da janela X a
+cada amostra: **o reparo recria o peer nativo, e o id muda** (`20971605 → 20971648 → 20971687`). O
+`app.log` registrou um reparo por travessia, todos `capaz=false->true profundidade=24->32 tentativa=1;
+restaurar=ok`, com `render=SOFTWARE_FAST` — ou seja, a transparência volta **sem** OpenGL, e a #421
+não precisa ser arriscada. Zero linhas de `error` e zero de `edt-watchdog`. Captura composta da área
+de trabalho confirma que a janela de baixo aparece através da barra: não há mais retângulo preto.
 
 ## Pontos de situação
 
@@ -109,3 +116,4 @@ xwininfo -id $(DISPLAY=:0 xdotool search --name "Usage Monitor" | head -1) | gre
 | A1 | Sonda do mecanismo em AWT puro, matriz de cenários, este plano e a issue de execução | `javac AlphaProbe.java && java AlphaProbe` com amostragem paralela de `xwininfo` | `32 → 24 → 32 → 24 → 32` nos dois níveis (AWT e janela X). Confirmado que voltar ao primário **também** perde o alfa: o defeito é cruzar a fronteira, não o monitor de destino |
 | A2 | Revert de `a1812d57` (volta `skiko.renderApi = SOFTWARE` no Linux e o arrasto ao vivo); preservado só o `deviceId` nas facts, com teste de que o id do Windows (`\\Display2`, uma barra) sobrevive ao saneamento | `sh gradlew desktopTest --tests "com.usagemonitor.HudWindowFactsTest"` | 4 testes, 0 falhas. Na primeira passada o teste novo acusou que `\\\\Display2` (duas barras) casa com o caminho UNC do saneamento e vira `<caminho>` — fixado o valor real, de uma barra |
 | A3 | `HudWindowTranslucency.kt`: decisão pura restrita ao Linux, reparo `background = null` → `Color(0,0,0,0)` na EDT, log `hud-alpha` com a profundidade antes/depois, `pixelSize` também na linha `hud-window`. `HudWindowHost` passou de 300 linhas com o efeito novo, então as duas contas do arrasto saíram para `HudWindowDrag.kt` (e viraram testáveis pela primeira vez) | `sh gradlew desktopTest --tests "com.usagemonitor.HudWindowTranslucencyTest" --tests "com.usagemonitor.HudWindowDragTest" --tests "com.usagemonitor.HudWindowFactsTest" --tests "com.usagemonitor.architecture.*"` | verde. Duas falhas reais na primeira passada: o `ArchitectureRulesTest` acusou `HudWindowHost` com 303 linhas (limite 300), corrigido pela extração; e o teste do saneamento mostrou a linha em 207 caracteres com uma mensagem de exceção longa — daí o teto `HUD_TRANSLUCENCY_FAILURE_LENGTH`, para o motivo não empurrar a profundidade para fora do log |
+| A4 | Rede de segurança: `hudUsesHitRegion` (booleano) virou `hudHitRegionMode` de três estados (`ALWAYS` Windows · `ONLY_WITHOUT_ALPHA` Linux · `NEVER` macOS/outros); no X11 a limpeza do recorte é o **retângulo cheio**, nunca `null` (#340); o host segue compondo o aplicador quando o recorte deixa de valer, senão ele ficaria para sempre. `docs/hud-notch.md` e `CLAUDE.md` atualizados | `sh gradlew allTests` | 2919 testes, 0 falhas, 0 erros, 0 ignorados |

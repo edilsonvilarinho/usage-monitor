@@ -176,15 +176,49 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     margem de 16dp. Sem suporte a `PERPIXEL_TRANSPARENT` o `setShape` lança e a HUD segue sem
     recorte: a área do balão volta a engolir clique, mas o notch não pisca. `HudHitRegionApplier` guarda o último retângulo porque `Window.getShape()` devolve cópia
     em `Path2D`, que nunca é igual ao pedido.
-  - **O recorte é só do Windows** (`hudUsesHitRegion`, issue #340). Relato de usuário no elementary OS 6.1
-    (Ubuntu 20.04, X11, Gala), notch na borda direita: com o ponteiro em cima, o balão aparecia só
-    como a tira de 16dp da margem, com a cauda, e as alças saíam como círculos cortados. O
-    `shape = null` da abertura não tirava o recorte ali. **Regressão da #294** (`d3ff05b`, v41.0.0):
-    o mesmo usuário, na mesma máquina, abria o balão inteiro até 25/09, quando a janela ainda
-    redimensionava ao abrir e não havia recorte. O Windows é a única plataforma medida, e só
-    nele o host aplica `Window.shape`; no Linux e no macOS a janela fica sem recorte — o balão abre
-    inteiro, e o preço aceito é a área vazia dele poder engolir o clique da janela de baixo com o
-    notch parado. Esse custo no Linux ainda não foi medido.
+  - **O recorte é do Windows sempre, e do Linux só sem alfa** (`hudHitRegionMode`, issues #340 e #426).
+    Relato de usuário no elementary OS 6.1 (Ubuntu 20.04, X11, Gala), notch na borda direita: com o
+    ponteiro em cima, o balão aparecia só como a tira de 16dp da margem, com a cauda, e as alças
+    saíam como círculos cortados. O `shape = null` da abertura não tirava o recorte ali.
+    **Regressão da #294** (`d3ff05b`, v41.0.0): o mesmo usuário, na mesma máquina, abria o balão
+    inteiro até 25/09, quando a janela ainda redimensionava ao abrir e não havia recorte. A #340
+    fechou o recorte no Windows, a única plataforma medida.
+
+    A #426 reabriu **só o caminho sem alfa**. Quando a janela perde a transparência, ela pinta
+    442×557 de preto sobre todas as outras e engole clique em toda a área — o relato da #416 chegou
+    como "congelou". Ali o recorte é o mal menor: o pior caso vira um notch sozinho. Com a
+    transparência funcionando — o caso normal depois do reparo da #426 — o Linux **não toca** em
+    `Window.shape`, e o balão cortado da #340 não tem como voltar. Duas consequências de desenho:
+    a limpeza no X11 é o **retângulo do tamanho da janela**, nunca `null` (foi o `null` que não
+    limpava), e o host continua compondo o aplicador quando o recorte deixa de valer, senão o
+    recorte ficaria para sempre. macOS nunca foi medido e segue sem recorte, com o preço aceito de
+    a área vazia do balão poder engolir o clique da janela de baixo com o notch parado.
+- **O alfa da janela é por monitor, e o AWT o perde ao cruzar a fronteira** (`HudWindowTranslucency.kt`,
+  issue #426, relatada na #416). Uma janela transparente só guarda a `GraphicsConfiguration` de 32
+  bits no `GraphicsDevice` em que nasceu. Ao cruzar para outro device, o AWT a troca pela
+  **configuração padrão do destino**, que no X11 é de 24 bits — e janela de 24 bits não tem canal
+  alfa: ela pinta o retângulo inteiro.
+
+  Medido no Bazzite 44 (KDE Plasma, Wayland com XWayland, dois monitores, NVIDIA RTX 4070 SUPER),
+  com sonda em AWT puro amostrada contra o `xwininfo`: `32 → 24 → 32 → 24 → 32`. **Voltar para o
+  primário também perde o alfa** — a configuração padrão dos dois monitores é de 24 bits. O defeito
+  é cruzar a fronteira, não o monitor de destino, e sem reparo só reiniciar o app o desfaz. É o
+  "travado para sempre" do relato.
+
+  O reparo é `background = null` seguido de `background = Color(0,0,0,0)`. `java.awt.Window.setBackground`
+  só troca a configuração por uma com alfa quando o **alfa antigo é 255 e o novo é menor**: repetir
+  o alfa 0 numa janela já transparente é um no-op — foi nisso que a primeira tentativa tropeçou,
+  registrando `reaplicar=ok` sem ter feito nada. O `null` faz o AWT ler 255, e aí a troca acontece e
+  o peer nativo nasce de novo com 32 bits (o id da janela X muda a cada reparo).
+
+  Regras: **só no Linux** (regra do #340); o gatilho é a **falta de alfa**, não a troca de monitor,
+  e com isso um caminho só cobre abrir no secundário, arrastar nos dois sentidos, religar monitor e
+  desbloquear a sessão; teto de três tentativas por monitor, porque o reparo recria a janela;
+  **pausado durante o arrasto**, senão a recriação do peer derrubaria os eventos de ponteiro; e
+  depois do reparo a posição, o tamanho, o `alwaysOnTop` e a opacidade são reafirmados, porque o
+  peer novo não os herda. O `app.log` ganha `hud-alpha` com a profundidade **antes e depois**
+  (`profundidade=24->32`), que é a medida que faltava para um relato dizer se o reparo pegou.
+
 - **O tamanho é da geometria, não da composição** (`hudNotchSizes`): a janela é dimensionada antes de
   existir composição, e medir para devolver fecharia o laço `redimensionar → recompor → medir`. A
   estimativa usa o avanço da Plex Mono — a escala `label*` é mono, e é isso que torna o número

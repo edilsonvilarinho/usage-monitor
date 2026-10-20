@@ -184,7 +184,8 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 
 - **Comportamento nativo medido numa plataforma só nasce restrito a ela** (issue #340): chamada ao
   sistema de janelas medida só no Windows entra atrás de função pura com teste da lista de
-  plataformas (precedente: `hudUsesHitRegion`); liberar outra plataforma é decisão com medição.
+  plataformas (precedente: `hudHitRegionMode`); liberar outra plataforma é decisão com medição,
+  e o estado novo **restringe**, nunca abre no escuro (#426: o Linux recorta só sem alfa).
   `window.shape`/`setShape` só em `HudWindow.kt` e `DesktopWindowFrame.kt` — outro arquivo falha.
 - **Direção das camadas por import**: `domain` não importa Ktor, Compose, `kotlinx.serialization`,
   `java.io`, `data` nem `presentation`; `data` não importa `presentation` nem Compose;
@@ -304,9 +305,11 @@ reintroduzir seletor de modo nem segunda moldura (`DashboardScreen` só existe p
 
 **Barra HUD — notch** (`Hud*.kt`; issue #164): regras e histórico em [`docs/hud-notch.md`](docs/hud-notch.md)
 — **leia antes de mexer**. Inegociáveis: o tamanho é da geometria (`hudNotchSizes`), janela de origem e
-tamanho fixos, nenhum redimensionamento AWT por quadro e `Window.shape` só no Windows (`hudUsesHitRegion`,
-#340); o notch não cresce — balão de **uma** conta ou da engrenagem, conteúdo da janela e nunca `Popup`,
-botões do card com dona única (`cardActionsFor`); movimento contínuo só atrás de `AppMotionPolicy.continuous`.
+tamanho fixos, nenhum redimensionamento AWT por quadro e `Window.shape` no Windows sempre, no Linux só
+sem alfa (`hudHitRegionMode`, #340 e #426); o alfa da janela é **por monitor** e o AWT o perde ao cruzar a
+fronteira — quem o devolve é `HudWindowTranslucency.kt`, só no Linux, pausado no arrasto; o notch não
+cresce — balão de **uma** conta ou da engrenagem, conteúdo da janela e nunca `Popup`, botões do card
+com dona única (`cardActionsFor`); movimento contínuo só atrás de `AppMotionPolicy.continuous`.
 
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
