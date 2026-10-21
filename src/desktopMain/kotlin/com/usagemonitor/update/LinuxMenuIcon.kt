@@ -2,8 +2,46 @@ package com.usagemonitor.update
 
 import com.usagemonitor.APP_ICON_RESOURCE_PATH
 import java.io.File
+import java.security.MessageDigest
 
 private const val ICON_LINE_PREFIX = "Icon="
+
+/** 12 hex = 48 bits: basta para distinguir as poucas versões do ícone que já existiram. */
+private const val ICON_HASH_HEX_LENGTH = 12
+
+private val CONTENT_ADDRESSED_ICON_NAME = Regex(
+    "${Regex.escape(LINUX_MENU_ICON_FILE_PREFIX)}[0-9a-f]{$ICON_HASH_HEX_LENGTH}${Regex.escape(LINUX_MENU_ICON_FILE_SUFFIX)}"
+)
+
+/**
+ * Nome da cópia estável para estes bytes: `icon-<12 hex do SHA-256>.png`.
+ *
+ * Endereçar por conteúdo é o que faz o ícone novo chegar ao menu (issue
+ * #432): bytes novos dão caminho novo, o `Icon=` deixa de bater e
+ * [linuxMenuIconNeedsRepair] reescreve a linha. Regravar os bytes no mesmo
+ * caminho não basta — o KDE guarda o pixmap pelo caminho e só o relê quando
+ * a entrada de menu muda.
+ */
+internal fun linuxMenuIconFileName(iconBytes: ByteArray): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(iconBytes)
+    val hex = digest.joinToString(separator = "") { byte -> "%02x".format(byte) }
+    return "$LINUX_MENU_ICON_FILE_PREFIX${hex.take(ICON_HASH_HEX_LENGTH)}$LINUX_MENU_ICON_FILE_SUFFIX"
+}
+
+/**
+ * Cópias antigas do ícone que podem ser apagadas da raiz de dados.
+ *
+ * Só nomes que o próprio app criou entram: o `icon.png` fixo da #133 e
+ * `icon-<hash>.png` com outro hash. Qualquer outro arquivo da raiz
+ * (`current`, o marcador, um `.png` que alguém pôs à mão) fica. Ordenado para
+ * a remoção ser determinística.
+ */
+internal fun staleLinuxMenuIconFileNames(existingFileNames: Collection<String>, currentFileName: String): List<String> {
+    return existingFileNames
+        .filter { name -> name != currentFileName }
+        .filter { name -> name == LINUX_LEGACY_MENU_ICON_FILE_NAME || CONTENT_ADDRESSED_ICON_NAME.matches(name) }
+        .sorted()
+}
 
 /**
  * Se a entrada de menu precisa ser reparada para apontar para o ícone
@@ -59,7 +97,10 @@ internal fun rewriteLinuxMenuIconLine(desktopEntryText: String, stableIconPath: 
  * Roda a cada abertura do app, no mesmo `LaunchedEffect` que já chama
  * [com.usagemonitor.AutoStartManager.ensureAutoStartCommandCurrent] — é o
  * que alcança quem já está com o `.desktop` de menu quebrado, e não só quem
- * instala a partir de agora (issue #133, mesmo princípio da #120).
+ * instala a partir de agora (issue #133, mesmo princípio da #120). Pelo
+ * mesmo caminho chega o ícone novo quando a marca muda (issue #432): a cópia
+ * tem nome por conteúdo, o `Icon=` é reescrito para ela e as cópias antigas
+ * saem da raiz.
  *
  * Nunca lê da árvore versionada, que é exatamente o caminho que o
  * `linux-updater.sh` está prestes a podar: o app já carrega os próprios
@@ -71,7 +112,7 @@ internal fun rewriteLinuxMenuIconLine(desktopEntryText: String, stableIconPath: 
  * de [com.usagemonitor.AutoStartManager.ensureAutoStartCommandCurrent], não
  * é unit-testada isoladamente: é IO de ponta a ponta sobre caminhos reais do
  * Linux, e a suíte roda no Windows. A prova é a verificação ao vivo na
- * Bazzite (plano da issue #133), como já é o caso para a migração irmã do
+ * Bazzite (planos das issues #133 e #432), como já é o caso para a migração irmã do
  * autostart.
  */
 internal fun ensureLinuxMenuIconCurrent() {
@@ -81,7 +122,10 @@ internal fun ensureLinuxMenuIconCurrent() {
         }
 
         val layout = resolveLinuxInstallLayout() ?: return@runCatching
-        if (!ensureStableIconFile(layout.iconFile)) {
+        val iconBytes = readBundledIconBytes() ?: return@runCatching
+        val iconFileName = linuxMenuIconFileName(iconBytes)
+        val iconPath = layout.iconPath(iconFileName)
+        if (!ensureStableIconFile(File(iconPath), iconBytes)) {
             return@runCatching
         }
 
@@ -93,34 +137,48 @@ internal fun ensureLinuxMenuIconCurrent() {
         }
 
         val currentText = runCatching { menuDesktopFile.readText() }.getOrNull() ?: return@runCatching
-        if (!linuxMenuIconNeedsRepair(currentText, layout.iconPath)) {
-            return@runCatching
+        if (linuxMenuIconNeedsRepair(currentText, iconPath)) {
+            val rewritten = rewriteLinuxMenuIconLine(currentText, iconPath)
+            if (!writeAtomically(menuDesktopFile, rewritten)) {
+                // A cópia antiga ainda é a que o menu mostra: apagá-la agora
+                // deixaria o menu sem ícone nenhum.
+                return@runCatching
+            }
         }
 
-        val rewritten = rewriteLinuxMenuIconLine(currentText, layout.iconPath)
-        writeAtomically(menuDesktopFile, rewritten)
+        deleteStaleIconFiles(layout.root, iconFileName)
     }
 }
 
+private fun readBundledIconBytes(): ByteArray? {
+    val resourceStream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH) ?: return null
+    return resourceStream.use { input -> runCatching { input.readBytes() }.getOrNull() }
+}
+
 /**
- * Copia o ícone do classpath para o caminho estável, se ele ainda não
- * existir. Já existente não é reescrito — evita mexer no `mtime` a cada
- * abertura do app, o que rebuildaria o cache de ícones do desktop à toa.
+ * Grava a cópia estável, se ela ainda não existir. Já existente não é
+ * reescrita: o nome carrega o hash do conteúdo, então arquivo presente é
+ * arquivo certo — e não mexer no `mtime` a cada abertura evita reconstruir o
+ * cache de ícones do desktop à toa.
  */
-private fun ensureStableIconFile(iconFile: File): Boolean {
+private fun ensureStableIconFile(iconFile: File, iconBytes: ByteArray): Boolean {
     if (iconFile.isFile) {
         return true
     }
 
-    val resourceStream = object {}.javaClass.getResourceAsStream(APP_ICON_RESOURCE_PATH)
-        ?: return false
-    return resourceStream.use { input ->
-        runCatching {
-            iconFile.parentFile?.mkdirs()
-            val tempFile = File(iconFile.parentFile, "${iconFile.name}.next")
-            tempFile.outputStream().use { output -> input.copyTo(output) }
-            tempFile.renameTo(iconFile)
-        }.getOrDefault(false)
+    return runCatching {
+        iconFile.parentFile?.mkdirs()
+        val tempFile = File(iconFile.parentFile, "${iconFile.name}.next")
+        tempFile.writeBytes(iconBytes)
+        tempFile.renameTo(iconFile)
+    }.getOrDefault(false)
+}
+
+/** Só depois que o `.desktop` aponta para a cópia nova; falha em apagar é só lixo. */
+private fun deleteStaleIconFiles(root: File, currentFileName: String) {
+    val existingFileNames = root.list()?.toList() ?: return
+    staleLinuxMenuIconFileNames(existingFileNames, currentFileName).forEach { name ->
+        runCatching { File(root, name).delete() }
     }
 }
 

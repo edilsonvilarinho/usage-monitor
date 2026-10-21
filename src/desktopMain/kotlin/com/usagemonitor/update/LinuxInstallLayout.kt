@@ -66,8 +66,16 @@ internal const val LINUX_STABLE_LAUNCHER_RELATIVE_PATH = ".local/bin/usage-monit
  * (issue #133). [com.usagemonitor.update.ensureLinuxMenuIconCurrent] mantém
  * este arquivo e a entrada de menu sincronizados a cada abertura do app, sem
  * nunca ler da árvore versionada.
+ *
+ * O nome leva um hash do conteúdo (`icon-<hash>.png`, issue #432): ícone novo
+ * vira caminho novo, e só assim o `Icon=` muda e o desktop descarta o pixmap
+ * que guardou pelo caminho antigo.
  */
-internal const val LINUX_MENU_ICON_FILE_NAME = "icon.png"
+internal const val LINUX_MENU_ICON_FILE_PREFIX = "icon-"
+internal const val LINUX_MENU_ICON_FILE_SUFFIX = ".png"
+
+/** Nome fixo que a #133 usava antes do hash; só existe para ser apagado. */
+internal const val LINUX_LEGACY_MENU_ICON_FILE_NAME = "icon.png"
 
 /**
  * Onde vive uma instalação Linux gerenciada.
@@ -89,13 +97,14 @@ internal class LinuxInstallLayout(val rootPath: String) {
     val currentPath: String = "$rootPath/$LINUX_CURRENT_FILE_NAME"
     val versionsPath: String = "$rootPath/$LINUX_VERSIONS_DIRECTORY_NAME"
     val updatesPath: String = "$rootPath/$LINUX_UPDATES_DIRECTORY_NAME"
-    val iconPath: String = "$rootPath/$LINUX_MENU_ICON_FILE_NAME"
 
     val markerFile: File get() = File(markerPath)
     val currentFile: File get() = File(currentPath)
     val versionsDirectory: File get() = File(versionsPath)
     val updatesDirectory: File get() = File(updatesPath)
-    val iconFile: File get() = File(iconPath)
+
+    /** Cópia estável do ícone de menu, com o nome de [linuxMenuIconFileName]. */
+    fun iconPath(iconFileName: String): String = "$rootPath/$iconFileName"
 
     /** `versions/<versão>` — a árvore instalada, uma por versão retida. */
     fun versionPath(version: String): String = "$versionsPath/$version"
