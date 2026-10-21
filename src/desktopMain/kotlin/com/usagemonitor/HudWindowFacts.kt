@@ -130,3 +130,70 @@ internal object HudDragProbe {
         start = null
     }
 }
+
+/**
+ * A janela da HUD movida **pelo sistema**, e não pelo app (issue #430).
+ *
+ * O COSMIC ignora a posição pedida na abertura: o relator da #416 pedia `404,0`
+ * e recebia `731,163` em toda abertura, e na `41.10.0` todo arrasto começava de
+ * `731,163` mesmo depois de a barra ter sido solta noutro ponto. O `hud-window`
+ * mede uma vez, 2 s depois de a janela existir, e não diz se o compositor a
+ * devolve ao lugar dele depois. Esta é a medida que falta para decidir o
+ * reencaixe na abertura (A6 do plano).
+ *
+ * Só no caminho Linux da HUD, que é quem pede a posição direto à janela AWT
+ * ([HudWindowFrame]). O arrasto fica fora: o `window-drag` já o registra, e os
+ * ajustes de poucos pixels do compositor a cada passo esgotariam o teto antes
+ * do que interessa.
+ */
+internal class HudSystemMoveProbe(
+    private val sink: (String) -> Unit = { message -> AppLogFile().info("hud-window", message) }
+) {
+    private var requested: java.awt.Point? = null
+    private var lastReported: java.awt.Point? = null
+    private var reportedCount = 0
+
+    /** A posição que o app acabou de pedir. Na EDT, como [moved]. */
+    fun requested(point: java.awt.Point) {
+        requested = point
+    }
+
+    fun moved(actual: java.awt.Point, size: java.awt.Dimension, dragging: Boolean) {
+        if (dragging) {
+            return
+        }
+        if (!hudSystemMoveIsReported(requested, actual, lastReported, reportedCount)) {
+            return
+        }
+        lastReported = actual
+        reportedCount += 1
+        val message = hudSystemMoveMessage(requested, actual, size)
+        runCatching { sink(message) }
+    }
+}
+
+/** Quantas linhas uma janela da HUD pode escrever sobre movimento do sistema. */
+internal const val HUD_SYSTEM_MOVE_REPORT_LIMIT = 20
+
+/**
+ * Se o movimento vira linha: há um pedido para comparar, a janela não está
+ * nele, a posição é nova e o teto não acabou.
+ */
+internal fun hudSystemMoveIsReported(
+    requested: java.awt.Point?,
+    actual: java.awt.Point,
+    lastReported: java.awt.Point?,
+    reportedCount: Int
+): Boolean = requested != null &&
+    actual != requested &&
+    actual != lastReported &&
+    reportedCount < HUD_SYSTEM_MOVE_REPORT_LIMIT
+
+internal fun hudSystemMoveMessage(
+    requested: java.awt.Point?,
+    actual: java.awt.Point,
+    size: java.awt.Dimension
+): String {
+    val asked = requested?.let { point -> "${point.x},${point.y}" } ?: "?"
+    return "hud movida pelo sistema: pedido $asked obtido ${actual.x},${actual.y} ${size.width}x${size.height}"
+}

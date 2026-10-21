@@ -552,6 +552,15 @@ ok    :0.1 nasce com 32bpp (esperado 32)
 RESULTADO: ok
 ```
 
+**O pacote `--diagnostics` também mede o que não dá para pedir ao relator** (#430). O
+`environment.txt` traz uma linha por monitor (`screen.N=id=… bounds=… insets=… default=…bpp
+alpha=…`): o pacote da #416 não trazia, e os limites dos monitores do COSMIC tiveram de ser
+deduzidos de onde ele centralizou a janela. No `app.log`, `hud-alfa sem orçamento` marca o fim das
+tentativas de renascimento (antes só a falta de uma quarta tentativa contava isso), e `hud movida
+pelo sistema: pedido … obtido …` registra, só no caminho Linux e fora do arrasto, cada vez que a
+janela aparece fora da última posição pedida pelo app, com teto de
+`HUD_SYSTEM_MOVE_REPORT_LIMIT` linhas por janela.
+
 O resto da lista continua sendo "abra e olhe": é por isso que ela existe.
 | Escalas diferentes por monitor | só em máquina real | | |
 | Faixa recolhida de 10dp recebe o ponteiro (modo recolher, #400), com opacidade 55% e 100% | | | |

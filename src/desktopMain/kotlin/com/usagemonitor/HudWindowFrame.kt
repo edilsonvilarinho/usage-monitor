@@ -72,6 +72,8 @@ internal fun HudWindowFrame(
     iconImage: java.awt.Image?,
     onCloseRequest: () -> Unit,
     onKeyEvent: (KeyEvent) -> Boolean,
+    /** Em arrasto: o movimento é do app, e a sonda do sistema não o registra (#430). */
+    dragging: Boolean,
     content: @Composable FrameWindowScope.() -> Unit
 ) {
     if (!useExplicitConfiguration) {
@@ -92,6 +94,9 @@ internal fun HudWindowFrame(
     // Lidos por referência: o `create` roda uma vez só, e a lambda que ele
     // guarda não pode congelar a versão do primeiro quadro.
     val currentClose by rememberUpdatedState(onCloseRequest)
+    val currentDragging by rememberUpdatedState(dragging)
+    // Uma por janela: cada renascimento é uma janela nova, com o teto zerado.
+    val moveProbe = remember { HudSystemMoveProbe() }
     // [size] e [position] chegam prontos do host, lidos no corpo da composição
     // dele. Ler `state.size`/`state.position` aqui dentro do `update` não
     // registraria dependência no Compose: a sincronização rodava uma vez e
@@ -116,16 +121,22 @@ internal fun HudWindowFrame(
                 isResizable = false
                 isAlwaysOnTop = true
                 iconImage?.let { image -> setIconImage(image) }
-                applyHudWindowBounds(this, floating, size, position)
+                applyHudWindowBounds(this, floating, size, position, moveProbe)
                 addWindowListener(object : java.awt.event.WindowAdapter() {
                     override fun windowClosing(event: java.awt.event.WindowEvent) {
                         currentClose()
                     }
                 })
+                // Só leitura: o que o compositor fez com a posição pedida (#430).
+                addComponentListener(object : java.awt.event.ComponentAdapter() {
+                    override fun componentMoved(event: java.awt.event.ComponentEvent) {
+                        moveProbe.moved(event.component.location, event.component.size, currentDragging)
+                    }
+                })
             }
         },
         dispose = ::disposeHudWindowAfterSuccessor,
-        update = { window -> applyHudWindowBounds(window, floating, size, position) },
+        update = { window -> applyHudWindowBounds(window, floating, size, position, moveProbe) },
         content = content
     )
 }
@@ -145,7 +156,8 @@ private fun applyHudWindowBounds(
     window: ComposeWindow,
     floating: Boolean,
     size: DpSize,
-    position: WindowPosition
+    position: WindowPosition,
+    moveProbe: HudSystemMoveProbe
 ) {
     if (!floating) {
         return
@@ -156,6 +168,7 @@ private fun applyHudWindowBounds(
     }
     if (position is WindowPosition.Absolute) {
         val point = Point(position.x.value.roundToInt(), position.y.value.roundToInt())
+        moveProbe.requested(point)
         if (window.location != point) {
             window.location = point
         }
@@ -186,8 +199,12 @@ internal class HudWindowRebirth(internal val explicit: Boolean) {
 
     private var rebuilds = 0
 
+    /** O esgotamento vira **uma** linha por ciclo de orçamento, não uma por sondagem. */
+    private var exhaustionReported = false
+
     internal fun resetBudget() {
         rebuilds = 0
+        exhaustionReported = false
     }
 
     /**
@@ -196,7 +213,14 @@ internal class HudWindowRebirth(internal val explicit: Boolean) {
      * derrubaria os eventos de ponteiro.
      */
     suspend fun onAlphaLost(state: HudTranslucencyState, dragging: Boolean) {
-        if (!explicit || dragging || rebuilds >= HUD_ALPHA_REBUILD_LIMIT) {
+        if (!explicit || dragging) {
+            return
+        }
+        if (rebuilds >= HUD_ALPHA_REBUILD_LIMIT) {
+            if (!exhaustionReported) {
+                exhaustionReported = true
+                recordHudAlphaBudgetExhausted(state, rebuilds)
+            }
             return
         }
         rebuilds += 1

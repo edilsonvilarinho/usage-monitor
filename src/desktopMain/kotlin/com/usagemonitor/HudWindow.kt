@@ -320,7 +320,8 @@ internal fun HudWindowHost(
         onCloseRequest = onCloseRequest,
         onKeyEvent = { event ->
             handleHudWindowKey(event = event, onOpenHelp = actions.openHelp)
-        }
+        },
+        dragging = drag.dragging
     ) {
         HudWindowEffects(
             window = window,
