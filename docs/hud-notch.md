@@ -239,6 +239,19 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   que alternasse os monitores viraria um pisca eterno. Fora do COSMIC `hudRebirthScreen` devolve
   sempre `null` e o renascimento é o de antes. Liberar outro compositor é decisão com medição.
 
+  **No COSMIC a HUD não é gerenciada** (`hudWindowType`; issue #434). O COSMIC ignora **toda**
+  posição que uma janela X11 gerenciada pede, e não só na abertura: medido no `cosmic-comp` 1.10.0
+  aninhado, nenhum pedido de mover vale depois (nem o do AWT, nem `_NET_MOVERESIZE_WINDOW`). Por isso
+  a barra abria no meio da tela, não arrastava pela alça, ganhava a borda de janela ativa e a sombra
+  em volta do retângulo transparente, e ficava atrás das outras — o `alwaysOnTop` do AWT não vira
+  `_NET_WM_STATE_ABOVE` lá. Só no COSMIC, a janela nasce com `Window.Type.POPUP`, que o AWT do X11
+  cria *override-redirect*: o compositor não a gerencia, ela fica onde é pedida e onde é movida, por
+  cima, sem borda, com 32 bits, e recebe clique e tecla depois do clique. O arrasto pela alça, o
+  encaixe e o renascimento voltam a funcionar como no KWin, e a adoção acima deixa de ser acionada
+  (a janela não é mais posta em outro monitor). Simulado no KWin com `XDG_CURRENT_DESKTOP=COSMIC`
+  e dois monitores: movida por fora para o outro monitor, a HUD cai para 24 bits, adota o monitor e
+  renasce com 32 bits na posição encaixada, numa tentativa. Fora do COSMIC, `NORMAL`, o de sempre.
+
   **A troca de janelas não pode piscar.** No renascimento o Compose descarta a janela antiga antes de a
   nova ficar visível e pintar o primeiro quadro, e o vão aparece como um piscar a cada travessia
   (medido por amostragem de 20 Hz). A antiga é descartada `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois,
@@ -541,7 +554,7 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 |---|---|---|---|
 | Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340). Ligado **só sem alfa** desde a #426, e a limpeza é o retângulo da janela, nunca `null`; limpar um recorte que nunca foi aplicado corta a pintura (medido) | |
 | Alfa da janela ao cruzar de `GraphicsDevice` | | **medido** (#426, Bazzite 44/KDE Plasma/Wayland com XWayland/NVIDIA, dois monitores): a configuração padrão de **todo** monitor é de 24 bits e o AWT troca a da janela ao cruzar — `32 → 24 → 32 → 24 → 32`, inclusive voltando ao primário. A janela nasce na configuração com alfa e renasce quando o monitor muda ou o alfa cai | |
-| Posição pedida respeitada na abertura | | KWin: **medido** (#426, `pedido == obtido`). COSMIC (Pop!_OS, XWayland): **ignorada** (#430, pacote do relator da #416) — a janela é centralizada no monitor que o compositor escolhe, às vezes o outro. A adoção do monitor no renascimento é **só** do COSMIC e não foi medida nele: simulada no KWin com `XDG_CURRENT_DESKTOP=COSMIC` e a janela movida por fora | |
+| Posição pedida respeitada na abertura | | KWin: **medido** (#426, `pedido == obtido`). COSMIC (Pop!_OS, XWayland): **ignorada** (#430, pacote do relator da #416) — a janela é centralizada no monitor que o compositor escolhe, às vezes o outro. A adoção do monitor no renascimento é **só** do COSMIC e não foi medida nele: simulada no KWin com `XDG_CURRENT_DESKTOP=COSMIC` e a janela movida por fora. **Medido no COSMIC aninhado** (#434, `cosmic-comp` 1.10.0): ignorada também **depois** da abertura, em toda janela gerenciada; a HUD `POPUP` (override-redirect) fica na posição pedida | |
 | Recriar a janela nativa para recuperar o alfa | | **medido** (#426): o Compose **para de emitir quadros** depois — 0 pixels em 75 s com o dashboard publicando a cada 60 s, contra 272 pixels em 80 s sem a travessia. Por isso não há remendo: a janela renasce inteira | |
 | Troca de janela no renascimento | | **medido** (#426): descartar a antiga antes de a nova pintar deixa um quadro sem janela, e a barra pisca a cada travessia. A antiga sai `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois | |
 | Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |

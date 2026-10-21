@@ -13,6 +13,7 @@ multiplatform-settings = "1.3.0"
 sqlite-jdbc = "3.53.4.0"
 pdfbox = "3.0.8"
 commons-compress = "1.28.0"
+jna = "5.19.1"
 kover = "0.9.9"
 
 [libraries]
@@ -46,6 +47,7 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 # Preferências persistidas (tema, idioma)
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 
 # Leitura do .tar.gz da atualizacao Linux. O JDK nao traz leitor de tar, e
 # depender do comando `tar` deixaria o update na mao do que estiver no PATH.
