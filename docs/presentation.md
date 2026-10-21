@@ -260,6 +260,12 @@ nenhuma janela do app arrastava, e o AWT ainda acreditava que ela tinha andado (
   motivo da falha. Se o pedido não sai, nada acontece — o arrasto antigo também não moveria nada.
 - O cliente recebe o soltar do botão no fim do arrasto do compositor (medido): o gesto fecha e o
   clique seguinte funciona.
+- **Diálogos sem modalidade** (`dialogModality`): o `DialogWindow` do Compose nasce
+  `DocumentModal`, e quem mantém o modal visível é o gerenciador de janelas, que o empilha acima do
+  que ele bloqueia. O COSMIC não faz isso: as Configurações vieram para a frente das Novidades
+  (modal) e pararam de receber clique, sem nada na tela explicando — até as Novidades, escondidas
+  atrás, serem fechadas. No COSMIC os diálogos (Configurações, Ajuda, Novidades, Dica do dia, Guia,
+  Chaves do time, Relatório de bug) são `Modeless`; fora dele, `DocumentModal`.
 
 **Janela principal e dashboard — removidos do app** (setembro de 2026, plano
 [`hud-modo-unico-execucao.md`](planos/hud-modo-unico-execucao.md)): a barra HUD é o único modo de

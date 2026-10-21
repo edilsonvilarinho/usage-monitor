@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -20,9 +21,11 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogState
+import androidx.compose.ui.window.DialogModalityType
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowScope
+import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowState
 import com.usagemonitor.ApplyWindowMinimumSize
 import com.usagemonitor.AutoStartManager
@@ -169,9 +172,28 @@ internal fun AppDialogWindow(
 }
 
 /**
+ * A modalidade dos diálogos (issue #434).
+ *
+ * **No COSMIC, `Modeless`.** O diálogo modal bloqueia as outras janelas do app,
+ * e quem o mantém visível é o empilhamento do gerenciador de janelas, que põe o
+ * modal acima do que ele bloqueia. O COSMIC não faz isso: medido no
+ * `cosmic-comp` 1.10.0 aninhado, as Configurações vieram para a frente das
+ * Novidades (modal) e deixaram de receber clique, sem nada na tela explicando
+ * por quê — até as Novidades, escondidas atrás, serem fechadas.
+ *
+ * Fora dele, `DocumentModal`, o padrão do Compose e o de sempre (regra do #340).
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+internal fun dialogModality(cosmic: Boolean): DialogModalityType =
+    if (cosmic) DialogModalityType.Modeless else DialogModalityType.DocumentModal
+
+/**
  * A mesma janela como diálogo do sistema — sem botão na barra de tarefas e sem
  * maximizar. É o que Configurações, Chaves, Ajuda e Novidades já eram.
  */
+// `modalityType` só existe na sobrecarga com `WindowDecoration`, ainda experimental;
+// a de `undecorated = true` chama esta mesma com `DocumentModal` (lido no bytecode da 1.12.1).
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun AppDialogWindow(
     visible: Boolean,
@@ -194,8 +216,9 @@ internal fun AppDialogWindow(
         icon = environment.iconImage,
         state = state,
         visible = host.onScreen,
+        decoration = WindowDecoration.Undecorated(),
         resizable = true,
-        undecorated = true,
+        modalityType = dialogModality(dragsWindowsByCompositor),
         onKeyEvent = { event -> closesModal(event, onCloseRequest) }
     ) {
         ModalWindowBody(
