@@ -64,9 +64,16 @@ class CompositorWindowDragTest {
         assertEquals(DialogModalityType.DocumentModal, dialogModality(cosmic = false))
     }
 
-    /** O `XEvent` tem 24 `long`; o Xlib lê a união inteira ao converter o evento. */
+    /**
+     * O `XEvent` tem 24 `long`; o Xlib lê a união inteira ao converter o evento.
+     * É ABI do X11 (LP64/ILP32): no Windows (LLP64) o `long` tem 32 bits e o
+     * ponteiro 64, a conta não vale e a estrutura nunca é usada.
+     */
     @Test
     fun `the client message is as large as an XEvent`() {
+        if (com.sun.jna.Platform.isWindows()) {
+            return
+        }
         assertEquals(24 * com.sun.jna.Native.LONG_SIZE, X11CompositorMove.ClientMessage().size())
     }
 }
