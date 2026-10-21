@@ -181,6 +181,51 @@ internal fun hudAlphaRebuildMessage(state: HudTranslucencyState, attempt: Int): 
         "profundidade=${state.pixelSize ?: "?"}bpp tentativa=$attempt"
 
 /**
+ * A linha do orçamento esgotado (#430). Sem ela, o estado só se percebia pela
+ * **ausência** de uma quarta tentativa no `app.log` do relator da #416.
+ */
+internal fun hudAlphaBudgetExhaustedMessage(state: HudTranslucencyState, attempts: Int): String =
+    "hud-alfa sem orçamento ${state.deviceId ?: "?"} profundidade=${state.pixelSize ?: "?"}bpp " +
+        "tentativas=$attempts; recorte de emergência assume"
+
+internal suspend fun recordHudAlphaBudgetExhausted(
+    state: HudTranslucencyState,
+    attempts: Int,
+    appLog: AppLogFile = AppLogFile()
+) {
+    withContext(Dispatchers.IO) {
+        appLog.info("hud-alpha", hudAlphaBudgetExhaustedMessage(state, attempts))
+    }
+}
+
+/**
+ * A linha da adoção (#430): a janela renasce no monitor onde o compositor a pôs,
+ * e não no configurado. A posição é a prova de que ela estava lá.
+ */
+internal fun hudAlphaAdoptionMessage(
+    state: HudTranslucencyState,
+    fromScreenId: String?,
+    toScreenId: String,
+    attempt: Int
+): String {
+    val where = state.bounds?.let { r -> "${r.x},${r.y}" } ?: "?"
+    return "hud-alfa adotar ${fromScreenId ?: "?"}->$toScreenId (a janela está em $where) " +
+        "profundidade=${state.pixelSize ?: "?"}bpp tentativa=$attempt"
+}
+
+internal suspend fun recordHudAlphaAdoption(
+    state: HudTranslucencyState,
+    fromScreenId: String?,
+    toScreenId: String,
+    attempt: Int,
+    appLog: AppLogFile = AppLogFile()
+) {
+    withContext(Dispatchers.IO) {
+        appLog.info("hud-alpha", hudAlphaAdoptionMessage(state, fromScreenId, toScreenId, attempt))
+    }
+}
+
+/**
  * Registra que a janela vai renascer por ter perdido o alfa. A escrita vai
  * para a IO, porque a janela some logo em seguida.
  */

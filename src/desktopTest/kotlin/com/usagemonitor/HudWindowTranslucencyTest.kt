@@ -87,13 +87,26 @@ class HudWindowTranslucencyTest {
         assertTrue(HUD_ALPHA_REBUILD_LIMIT in 1..5)
     }
 
-    /** A fábrica da trilha corta em 200: as duas linhas cabem inteiras. */
+    /**
+     * O esgotamento só se percebia pela ausência de uma quarta tentativa no
+     * `app.log` do relator da #416 (#430).
+     */
     @Test
-    fun `both messages survive the log sanitizer untouched`() {
+    fun `the exhausted budget has a line of its own`() {
+        assertEquals(
+            "hud-alfa sem orçamento :0.1 profundidade=24bpp tentativas=3; recorte de emergência assume",
+            hudAlphaBudgetExhaustedMessage(state(translucencyCapable = false, pixelSize = 24), attempts = 3)
+        )
+    }
+
+    /** A fábrica da trilha corta em 200: as linhas cabem inteiras. */
+    @Test
+    fun `every message survives the log sanitizer untouched`() {
         val longest = state(deviceId = "\\Display2", perPixelTranslucent = false, pixelSize = 24)
         for (message in listOf(
             hudTranslucencyStateMessage(longest),
-            hudAlphaRebuildMessage(longest, attempt = HUD_ALPHA_REBUILD_LIMIT)
+            hudAlphaRebuildMessage(longest, attempt = HUD_ALPHA_REBUILD_LIMIT),
+            hudAlphaBudgetExhaustedMessage(longest, attempts = HUD_ALPHA_REBUILD_LIMIT)
         )) {
             assertTrue(message.length <= Breadcrumb.MAX_MESSAGE_LENGTH, "${message.length}: $message")
             assertEquals(message, sanitizeBreadcrumbMessage(message))

@@ -76,6 +76,53 @@ class DiagnosticsExportTest {
         }
     }
 
+    /**
+     * O pacote da #416 não listava os monitores: os limites tiveram de ser
+     * deduzidos da posição em que o COSMIC centralizou a janela (#430).
+     */
+    @Test
+    fun `every monitor gets a line with bounds, insets, default depth and alpha`() {
+        val lines = screenEnvironmentLines(
+            listOf(
+                ScreenEnvironmentEntry(":0.0", java.awt.Rectangle(0, 1440, 3440, 1440), java.awt.Insets(0, 0, 0, 0), 24, true),
+                ScreenEnvironmentEntry(":0.1", java.awt.Rectangle(421, 0, 2560, 1440), java.awt.Insets(48, 0, 0, 0), 24, false)
+            )
+        )
+
+        assertEquals(
+            listOf(
+                "screens" to "2",
+                "screen.0" to "id=:0.0 bounds=0,1440 3440x1440 insets=t0,l0,b0,r0 default=24bpp alpha=true",
+                "screen.1" to "id=:0.1 bounds=421,0 2560x1440 insets=t48,l0,b0,r0 default=24bpp alpha=false"
+            ),
+            lines
+        )
+    }
+
+    @Test
+    fun `an unmeasured monitor is written as question marks, and no session as null`() {
+        assertEquals(listOf("screens" to null), screenEnvironmentLines(null))
+        assertEquals(
+            "id=? bounds=? insets=? default=?bpp alpha=?",
+            screenEnvironmentText(ScreenEnvironmentEntry(null, null, null, null, null))
+        )
+    }
+
+    /** O `environment.txt` passa pelo saneamento linha a linha; o id e os números têm de sobreviver. */
+    @Test
+    fun `the monitor lines survive the redaction of the package`() {
+        withDirs { diagnostics, output ->
+            val line = "screen.0=" + screenEnvironmentText(
+                ScreenEnvironmentEntry("\\Display1", java.awt.Rectangle(-1920, 0, 1920, 1080), java.awt.Insets(0, 0, 40, 0), 32, true)
+            )
+            val zip = DiagnosticsExport.export(diagnosticsDir = diagnostics, outputDir = output, environmentReport = { "$line\n" })
+
+            ZipFile(zip).use { file ->
+                assertEquals(line, file.getInputStream(file.getEntry("environment.txt")).reader().readText().trim())
+            }
+        }
+    }
+
     @Test
     fun `the linux update log comes from the installation root, not from the data root`() {
         withDirs { diagnostics, output ->

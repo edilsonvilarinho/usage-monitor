@@ -225,6 +225,20 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   Orçamento de [HUD_ALPHA_REBUILD_LIMIT] por monitor: num ambiente que não compõe alfa ele nunca
   voltaria, e repetir seria um pisca eterno; depois dele quem assume é o recorte de emergência.
 
+  **No COSMIC ela renasce onde o compositor a pôs** (`hudFollowsCompositorScreen`,
+  `hudRebirthScreen`; issue #430). O renascimento acima supõe que a janela aparece onde o app pede,
+  e isso só foi medido no KWin (`pedido == obtido`). O COSMIC ignora a posição na abertura: o
+  relator da #416 pedia `404,0` e recebia `731,163` em 12 de 13 aberturas, e na 13ª a janela foi
+  mapeada no **outro** monitor. Ali o AWT a trocou para a configuração de 24 bits, a janela
+  renasceu de novo com a configuração do monitor gravado, o COSMIC a jogou de volta, e as três
+  tentativas acabaram em meio segundo, sem alfa. Agora, só no COSMIC, quando o alfa cai fora de um
+  arrasto e a janela está majoritariamente noutro monitor, a HUD **adota** esse monitor
+  (`HudScreenSelection.moveTo`, que grava) e renasce com a configuração e a posição encaixada
+  **dele**. Gravar impede o laço do hover, que relê o monitor gravado; e a troca de monitor causada
+  pela adoção **não** zera o orçamento (`HudWindowRebirth.onScreenChanged`), senão um compositor
+  que alternasse os monitores viraria um pisca eterno. Fora do COSMIC `hudRebirthScreen` devolve
+  sempre `null` e o renascimento é o de antes. Liberar outro compositor é decisão com medição.
+
   **A troca de janelas não pode piscar.** No renascimento o Compose descarta a janela antiga antes de a
   nova ficar visível e pintar o primeiro quadro, e o vão aparece como um piscar a cada travessia
   (medido por amostragem de 20 Hz). A antiga é descartada `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois,
@@ -527,6 +541,7 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 |---|---|---|---|
 | Recorte da janela parada (`Window.shape`) deixa o clique passar e corta a pintura | medido (C11, #294) | quebrado no elementary 6.1/Gala (X11): o `shape = null` não tira o recorte e o balão sai cortado (#340). Ligado **só sem alfa** desde a #426, e a limpeza é o retângulo da janela, nunca `null`; limpar um recorte que nunca foi aplicado corta a pintura (medido) | |
 | Alfa da janela ao cruzar de `GraphicsDevice` | | **medido** (#426, Bazzite 44/KDE Plasma/Wayland com XWayland/NVIDIA, dois monitores): a configuração padrão de **todo** monitor é de 24 bits e o AWT troca a da janela ao cruzar — `32 → 24 → 32 → 24 → 32`, inclusive voltando ao primário. A janela nasce na configuração com alfa e renasce quando o monitor muda ou o alfa cai | |
+| Posição pedida respeitada na abertura | | KWin: **medido** (#426, `pedido == obtido`). COSMIC (Pop!_OS, XWayland): **ignorada** (#430, pacote do relator da #416) — a janela é centralizada no monitor que o compositor escolhe, às vezes o outro. A adoção do monitor no renascimento é **só** do COSMIC e não foi medida nele: simulada no KWin com `XDG_CURRENT_DESKTOP=COSMIC` e a janela movida por fora | |
 | Recriar a janela nativa para recuperar o alfa | | **medido** (#426): o Compose **para de emitir quadros** depois — 0 pixels em 75 s com o dashboard publicando a cada 60 s, contra 272 pixels em 80 s sem a travessia. Por isso não há remendo: a janela renasce inteira | |
 | Troca de janela no renascimento | | **medido** (#426): descartar a antiga antes de a nova pintar deixa um quadro sem janela, e a barra pisca a cada travessia. A antiga sai `HUD_WINDOW_DISPOSE_DELAY_MILLIS` depois | |
 | Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |
@@ -551,6 +566,15 @@ ok    :0.1 nasce com 32bpp (esperado 32)
       ao cruzar para :0.0: 24bpp (o AWT troca; a HUD renasce)
 RESULTADO: ok
 ```
+
+**O pacote `--diagnostics` também mede o que não dá para pedir ao relator** (#430). O
+`environment.txt` traz uma linha por monitor (`screen.N=id=… bounds=… insets=… default=…bpp
+alpha=…`): o pacote da #416 não trazia, e os limites dos monitores do COSMIC tiveram de ser
+deduzidos de onde ele centralizou a janela. No `app.log`, `hud-alfa sem orçamento` marca o fim das
+tentativas de renascimento (antes só a falta de uma quarta tentativa contava isso), e `hud movida
+pelo sistema: pedido … obtido …` registra, só no caminho Linux e fora do arrasto, cada vez que a
+janela aparece fora da última posição pedida pelo app, com teto de
+`HUD_SYSTEM_MOVE_REPORT_LIMIT` linhas por janela.
 
 O resto da lista continua sendo "abra e olhe": é por isso que ela existe.
 | Escalas diferentes por monitor | só em máquina real | | |

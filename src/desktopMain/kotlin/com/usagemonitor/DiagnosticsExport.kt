@@ -143,6 +143,55 @@ internal fun currentEnvironmentReport(): String {
         "translucency.shaped" to supports(GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSPARENT)?.toString(),
         "tray.supported" to (if (headless == false) runCatching { SystemTray.isSupported() }.getOrNull()?.toString() else null),
         "alwaysOnTop.supported" to (if (headless == false) runCatching { java.awt.Toolkit.getDefaultToolkit().isAlwaysOnTopSupported }.getOrNull()?.toString() else null)
-    )
+    ) + screenEnvironmentLines(if (headless == false) readScreenEnvironment() else null)
     return lines.joinToString(separator = "\n", postfix = "\n") { (key, value) -> "$key=${value ?: "null"}" }
 }
+
+/**
+ * Um monitor no `environment.txt` (issue #430). O pacote da #416 dizia que havia
+ * dois monitores só porque o `app.log` citava `:0.0` e `:0.1`: os limites tiveram
+ * de ser deduzidos da posição em que o COSMIC centralizou a janela. `null` = não
+ * medido.
+ */
+internal data class ScreenEnvironmentEntry(
+    val id: String?,
+    val bounds: java.awt.Rectangle?,
+    val insets: java.awt.Insets?,
+    /** Bits da configuração **padrão**: é a que o AWT dá à janela que cruza para este monitor. */
+    val defaultPixelSize: Int?,
+    /** Se o monitor oferece alguma configuração com alfa — a que a HUD precisa para nascer. */
+    val translucentConfiguration: Boolean?
+)
+
+/** As linhas dos monitores, o padrão primeiro. `null` = sem sessão gráfica, ou a consulta lançou. */
+internal fun screenEnvironmentLines(entries: List<ScreenEnvironmentEntry>?): List<Pair<String, String?>> {
+    if (entries == null) {
+        return listOf("screens" to null)
+    }
+    val count = listOf("screens" to entries.size.toString())
+    return count + entries.mapIndexed { index, entry -> "screen.$index" to screenEnvironmentText(entry) }
+}
+
+internal fun screenEnvironmentText(entry: ScreenEnvironmentEntry): String {
+    val bounds = entry.bounds?.let { r -> "${r.x},${r.y} ${r.width}x${r.height}" } ?: "?"
+    val insets = entry.insets?.let { i -> "t${i.top},l${i.left},b${i.bottom},r${i.right}" } ?: "?"
+    return "id=${entry.id ?: "?"} bounds=$bounds insets=$insets " +
+        "default=${entry.defaultPixelSize ?: "?"}bpp alpha=${entry.translucentConfiguration ?: "?"}"
+}
+
+private fun readScreenEnvironment(): List<ScreenEnvironmentEntry>? = runCatching {
+    val environment = GraphicsEnvironment.getLocalGraphicsEnvironment()
+    val primary = environment.defaultScreenDevice
+    environment.screenDevices
+        .sortedBy { device -> if (device == primary) 0 else 1 }
+        .map { device ->
+            val configuration = runCatching { device.defaultConfiguration }.getOrNull()
+            ScreenEnvironmentEntry(
+                id = runCatching { device.getIDstring() }.getOrNull(),
+                bounds = runCatching { configuration?.bounds }.getOrNull(),
+                insets = configuration?.let { gc -> runCatching { java.awt.Toolkit.getDefaultToolkit().getScreenInsets(gc) }.getOrNull() },
+                defaultPixelSize = runCatching { configuration?.colorModel?.pixelSize }.getOrNull(),
+                translucentConfiguration = runCatching { device.configurations.any { gc -> gc.isTranslucencyCapable } }.getOrNull()
+            )
+        }
+}.getOrNull()

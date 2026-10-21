@@ -77,4 +77,45 @@ class HudWindowFactsTest {
         actualX, actualY, actualWidth, actualHeight,
         perPixelTranslucent, uniformTranslucent, perPixelTransparent, renderApi, deviceId, pixelSize
     )
+
+    /**
+     * O COSMIC ignora a posição pedida (#430): a sonda registra quando a janela
+     * aparece fora do último pedido, uma linha por posição nova, com teto.
+     */
+    @Test
+    fun `the system move probe reports only what the app did not ask for`() {
+        val lines = mutableListOf<String>()
+        val probe = HudSystemMoveProbe(sink = { line -> lines += line })
+        val size = java.awt.Dimension(459, 368)
+
+        probe.moved(java.awt.Point(731, 163), size, dragging = false) // nada pedido ainda
+        probe.requested(java.awt.Point(404, 0))
+        probe.moved(java.awt.Point(404, 0), size, dragging = false) // o pedido, respeitado
+        probe.moved(java.awt.Point(731, 163), size, dragging = false) // o compositor escolheu
+        probe.moved(java.awt.Point(731, 163), size, dragging = false) // repetida
+        probe.moved(java.awt.Point(900, 10), size, dragging = true) // arrasto: é do app
+
+        assertEquals(listOf("hud movida pelo sistema: pedido 404,0 obtido 731,163 459x368"), lines)
+    }
+
+    @Test
+    fun `the system move probe stops at its ceiling`() {
+        val lines = mutableListOf<String>()
+        val probe = HudSystemMoveProbe(sink = { line -> lines += line })
+        probe.requested(java.awt.Point(0, 0))
+
+        repeat(HUD_SYSTEM_MOVE_REPORT_LIMIT + 5) { index ->
+            probe.moved(java.awt.Point(index + 1, 1), java.awt.Dimension(10, 10), dragging = false)
+        }
+
+        assertEquals(HUD_SYSTEM_MOVE_REPORT_LIMIT, lines.size)
+    }
+
+    @Test
+    fun `the system move line survives the log sanitizer untouched`() {
+        val message = hudSystemMoveMessage(java.awt.Point(-1920, -1440), java.awt.Point(-2651, -1163), java.awt.Dimension(3440, 1440))
+
+        assertTrue(message.length <= Breadcrumb.MAX_MESSAGE_LENGTH, message)
+        assertEquals(message, sanitizeBreadcrumbMessage(message))
+    }
 }
