@@ -1,0 +1,62 @@
+# Ícone do menu Linux acompanha a troca do ícone do app — issue #432
+
+**Issue:** [#432](https://github.com/edilsonvilarinho/usage-monitor/issues/432)
+**Branch:** `fix/issue-432-linux-menu-icon-refresh` · **Worktree:** `../usage-monitor-432`
+**Antecedente:** [#133](https://github.com/edilsonvilarinho/usage-monitor/issues/133),
+[`linux-icone-menu-estavel-execucao.md`](linux-icone-menu-estavel-execucao.md)
+
+## Contexto
+
+Na Bazzite (KDE Plasma), depois da troca de marca da #367, o menu de aplicativos seguiu mostrando o
+ícone antigo. A versão instalada (`41.11.0-beta.8`) já carregava o ícone novo, byte a byte igual ao
+`src/desktopMain/resources/icons/app_icon.png`, tanto no jar quanto no `Usage Monitor.png` do
+jpackage. O que estava velho era a cópia estável criada na #133:
+
+```
+~/.local/share/usage-monitor/icon.png   29/ago   19 816 bytes   (ícone atual: 89 318 bytes)
+```
+
+## Fatos confirmados
+
+- `ensureStableIconFile` (`LinuxMenuIcon.kt`) só grava a cópia quando ela **não existe**. A intenção
+  era não mexer no `mtime` a cada abertura; o efeito é que nenhum ícone novo chega a quem já instalou.
+- Regravar os bytes no **mesmo** caminho não basta para o KDE: o `Icon=` não muda, então a entrada de
+  menu não é reconstruída, e o pixmap fica guardado por caminho no `icon-cache.kcache`, mapeado em
+  memória pelo `plasmashell`. Na máquina afetada a recuperação manual precisou de
+  `kbuildsycoca6 --noincremental` mais a remoção do `kcache`.
+- Só o app (`ensureLinuxMenuIconCurrent`) conhece o caminho estável. O instalador `.sh` continua
+  escrevendo `Icon=` para dentro de `versions/`, e o primeiro lançamento corrige; o
+  `linux-updater.sh` não toca no ícone.
+
+## Decisão
+
+Nome da cópia **endereçado por conteúdo**: `icon-<12 hex do SHA-256 dos bytes embutidos>.png`.
+
+- Ícone novo ⇒ nome novo ⇒ `linuxMenuIconNeedsRepair` já detecta o `Icon=` diferente e reescreve a
+  linha ⇒ o KDE reconstrói o menu sozinho, e nenhum cache tem a chave nova.
+- Mesmo ícone ⇒ mesmo nome ⇒ arquivo já existe ⇒ nenhuma escrita: preserva a regra original de não
+  mexer no `mtime` a cada abertura.
+- Cópias antigas (`icon.png` da #133 e `icon-<hash>.png` anteriores) são apagadas **depois** que o
+  `.desktop` aponta para a nova; se a reescrita falhar, a antiga fica, e o menu não perde o ícone.
+- Nome e seleção do que apagar são funções puras com teste; o IO segue sem lançar.
+
+Alternativa recusada: manter `icon.png` e regravar quando os bytes diferirem, mais um `touch` no
+`.desktop`. Corrige o arquivo, mas depende de cada ambiente invalidar o cache por caminho, que é
+exatamente o que o KDE não faz.
+
+## Micro-atividades
+
+| # | Micro-atividade | Toca |
+|---|---|---|
+| A01 | Branch/worktree + este plano + comentário na issue #432 | `docs/planos/` |
+| A02 | Nome por conteúdo, reescrita do `Icon=` e limpeza das cópias antigas + testes | `LinuxMenuIcon.kt`, `LinuxInstallLayout.kt`, testes |
+| A03 | Verificação ao vivo na Bazzite com o binário real numa pasta `versions/` descartável | — |
+| A04 | PR para `main` + comentário de fechamento na issue | — |
+
+## Pontos de situação
+
+Uma linha por micro-atividade, escrita **no mesmo commit** da micro-atividade.
+
+| # | Data | Commit | Micro-atividade | Estado | Evidência |
+|---|---|---|---|---|---|
+| A01 | 2026-10-20 | `docs(plan): open the execution plan for the linux menu icon refresh (#432)` | Este plano | concluída | `git worktree add ../usage-monitor-432 -b fix/issue-432-linux-menu-icon-refresh main`. Plano publicado como comentário na issue #432 |
