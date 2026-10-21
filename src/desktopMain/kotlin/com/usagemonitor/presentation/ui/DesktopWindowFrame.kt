@@ -156,8 +156,7 @@ private fun WindowScope.DesktopDialogTitleBar(
     windowState: WindowState?,
     onCloseRequest: () -> Unit
 ) {
-    // Só observa: grava no `app.log` se a janela acompanhou o arrasto (#416).
-    WindowDraggableArea(modifier = Modifier.windowDragProbe(window, title)) {
+    TitleBarDragArea(title = title) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -217,6 +216,24 @@ private fun WindowScope.DesktopDialogTitleBar(
     }
 
     AppDivider()
+}
+
+/**
+ * Onde a barra de título arrasta a janela. No COSMIC quem arrasta é o
+ * compositor, porque ele ignora a posição que o app pede (#434); no resto,
+ * o `WindowDraggableArea` de sempre.
+ */
+@Composable
+private fun WindowScope.TitleBarDragArea(title: String, content: @Composable () -> Unit) {
+    // Só observa: grava no `app.log` se a janela acompanhou o arrasto (#416).
+    val probe = Modifier.windowDragProbe(window, title)
+    if (dragsWindowsByCompositor) {
+        Box(modifier = probe.compositorWindowDrag(window)) {
+            content()
+        }
+    } else {
+        WindowDraggableArea(modifier = probe, content = content)
+    }
 }
 
 @Composable

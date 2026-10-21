@@ -242,6 +242,25 @@ app trata pixel como dp. Os testes não pegam isso.
   conversão para `Dp` usa a densidade do próprio nó, que é a que está sendo alterada, e devolveria
   100dp nos dois casos — um teste que passa sem medir nada.
 
+**Janelas no COSMIC** (`CompositorWindowDrag.kt`; issue #434): o compositor do COSMIC ignora
+**toda** posição que uma janela X11 gerenciada pede para si — na abertura e depois —, e o
+`WindowDraggableArea` arrasta exatamente assim, pedindo a posição nova a cada movimento. No COSMIC
+nenhuma janela do app arrastava, e o AWT ainda acreditava que ela tinha andado (o `window-drag` do
+`app.log` dizia `moveu`). Medido no `cosmic-comp` 1.10.0 aninhado (`tools/cosmic/`).
+
+- **Só no COSMIC** (`windowDragByCompositor`: Linux e `COSMIC` no `XDG_CURRENT_DESKTOP`) a barra
+  de título entrega o arrasto ao compositor por `_NET_WM_MOVERESIZE` (EWMH), depois do *touch
+  slop*, como o Compose. Fora dele, o `WindowDraggableArea` de sempre (regra do #340).
+- **JNA, conexão X própria.** O AWT não expõe o X11, e as classes internas `sun.awt.X11` exigiriam
+  `--add-opens` e mudam a cada JDK. O pedido sai de outra conexão sem soltar a captura do ponteiro
+  (medido), e as coordenadas vêm do servidor (`XQueryPointer`), fora da escala do AWT.
+- **O alvo é a janela com `WM_STATE`, não o filho da raiz.** O gerenciador X11 do COSMIC (Smithay)
+  reparenta cada janela numa moldura dele, e o pedido mandado à moldura é ignorado em silêncio.
+- **Cada pedido deixa uma linha** `arrasto pelo compositor: pedido enviado, janela 0x… em x,y` ou o
+  motivo da falha. Se o pedido não sai, nada acontece — o arrasto antigo também não moveria nada.
+- O cliente recebe o soltar do botão no fim do arrasto do compositor (medido): o gesto fecha e o
+  clique seguinte funciona.
+
 **Janela principal e dashboard — removidos do app** (setembro de 2026, plano
 [`hud-modo-unico-execucao.md`](planos/hud-modo-unico-execucao.md)): a barra HUD é o único modo de
 visualização. Saíram `MainWindowHost`, `DesktopWindowFrame`, a geometria persistida da janela
