@@ -3,11 +3,12 @@ package com.usagemonitor.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class LinuxMenuIconTest {
 
-    private val stableIconPath = "/home/edils/.local/share/usage-monitor/icon.png"
+    private val stableIconPath = "/home/edils/.local/share/usage-monitor/icon-0123456789ab.png"
 
     @Test
     fun `an absent entry does not need repair`() {
@@ -74,6 +75,58 @@ class LinuxMenuIconTest {
         assertEquals(
             "[Desktop Entry]\nName=Usage Monitor\nExec=usage-monitor\nIcon=$stableIconPath\n",
             rewritten
+        )
+    }
+
+    @Test
+    fun `the icon file name is content addressed`() {
+        // SHA-256 de "abc", conferível com `printf abc | sha256sum`.
+        assertEquals("icon-ba7816bf8f01.png", linuxMenuIconFileName("abc".encodeToByteArray()))
+    }
+
+    @Test
+    fun `the same bytes give the same name and new bytes give a new one`() {
+        val oldIcon = byteArrayOf(1, 2, 3)
+
+        assertEquals(linuxMenuIconFileName(oldIcon), linuxMenuIconFileName(byteArrayOf(1, 2, 3)))
+        assertNotEquals(linuxMenuIconFileName(oldIcon), linuxMenuIconFileName(byteArrayOf(1, 2, 4)))
+    }
+
+    @Test
+    fun `a new icon name makes the entry pointing at the previous copy need repair`() {
+        // É isto que faz a troca da marca chegar ao menu (issue #432): o
+        // nome novo deixa de bater com o `Icon=` gravado.
+        val previousCopy = "/home/edils/.local/share/usage-monitor/icon.png"
+        val entry = "[Desktop Entry]\nName=Usage Monitor\nIcon=$previousCopy\n"
+
+        assertTrue(linuxMenuIconNeedsRepair(entry, stableIconPath))
+    }
+
+    @Test
+    fun `stale copies are the legacy name and other hashes only`() {
+        val existing = listOf(
+            "icon-0123456789ab.png",
+            "icon.png",
+            "icon-ffffffffffff.png",
+            "current",
+            ".usage-monitor-managed",
+            "versions",
+            "icon-0123456789ab.png.next",
+            "icon-nothex000000.png",
+            "meu-icone.png"
+        )
+
+        assertEquals(
+            listOf("icon-ffffffffffff.png", "icon.png"),
+            staleLinuxMenuIconFileNames(existing, currentFileName = "icon-0123456789ab.png")
+        )
+    }
+
+    @Test
+    fun `nothing is stale when only the current copy exists`() {
+        assertEquals(
+            emptyList(),
+            staleLinuxMenuIconFileNames(listOf("icon-0123456789ab.png", "current"), "icon-0123456789ab.png")
         )
     }
 }

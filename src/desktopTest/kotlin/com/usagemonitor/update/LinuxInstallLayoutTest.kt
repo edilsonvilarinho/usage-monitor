@@ -87,7 +87,10 @@ class LinuxInstallLayoutTest {
         assertEquals("/home/edils/.local/share/usage-monitor/current", layout.currentPath)
         assertEquals("/home/edils/.local/share/usage-monitor/versions", layout.versionsPath)
         assertEquals("/home/edils/.local/share/usage-monitor/updates", layout.updatesPath)
-        assertEquals("/home/edils/.local/share/usage-monitor/icon.png", layout.iconPath)
+        assertEquals(
+            "/home/edils/.local/share/usage-monitor/icon-0123456789ab.png",
+            layout.iconPath("icon-0123456789ab.png")
+        )
         assertEquals(
             "/home/edils/.local/share/usage-monitor/versions/39.0.0",
             layout.versionPath("39.0.0")
