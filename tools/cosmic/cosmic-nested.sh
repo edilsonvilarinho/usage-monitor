@@ -11,6 +11,7 @@
 #   sh tools/cosmic/cosmic-nested.sh app [args…]      abre o app instalado dentro do COSMIC
 #   sh tools/cosmic/cosmic-nested.sh placement        sonda de colocação por tipo de janela
 #   sh tools/cosmic/cosmic-nested.sh drag [modo]      sonda de arrasto por _NET_WM_MOVERESIZE
+#   sh tools/cosmic/cosmic-nested.sh awt              sonda AWT por tipo de janela (NORMAL/UTILITY/POPUP)
 #   sh tools/cosmic/cosmic-nested.sh window-drag NOME arrasta a janela NOME pelo ponto (100,20)
 #
 # O clique sintético só chega pelo X do host: o xdotool no DISPLAY do COSMIC não
@@ -82,6 +83,19 @@ case "${1:-}" in
         echo "drag $mode: antes $before depois $(window_position "$display" "$window")"
         wait
         ;;
+    awt)
+        DISPLAY=$(cosmic_display) java "$HERE/AwtWindowTypeProbe.java" 8 &
+        sleep 5
+        display=$(cosmic_display)
+        for window in $(DISPLAY=$display xdotool search --name '^awt-'); do
+            name=$(DISPLAY=$display xdotool getwindowname "$window")
+            DISPLAY=$display xwininfo -id "$window" | awk -v name="$name" '
+                /Absolute upper-left X/ { x = $NF } /Absolute upper-left Y/ { y = $NF }
+                /Depth/ { depth = $NF } /Override Redirect/ { redirect = $NF }
+                END { print name ": obtido " x "," y " profundidade=" depth " override-redirect=" redirect }'
+        done
+        wait
+        ;;
     window-drag)
         display=$(cosmic_display)
         window=$(DISPLAY=$display xdotool search --name "$2" | head -n 1)
@@ -90,7 +104,7 @@ case "${1:-}" in
         echo "window-drag '$2': antes $before depois $(window_position "$display" "$window")"
         ;;
     *)
-        sed -n '2,18p' "$0"
+        sed -n '2,19p' "$0"
         exit 2
         ;;
 esac

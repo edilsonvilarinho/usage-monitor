@@ -4,6 +4,8 @@
 # Modo (1º argumento):
 #   same   -- o pedido sai da conexão que recebeu o clique
 #   other  -- o pedido sai de outra conexão, como faria uma biblioteca ao lado do AWT
+# Acrescentar "-slop" espera o ponteiro andar 8 px com o botão preso antes do pedido,
+# como o Compose (`awaitTouchSlopOrCancellation`).
 # Acrescentar "-ungrab" solta a captura implícita do ponteiro antes do pedido.
 import sys
 import time
@@ -26,7 +28,7 @@ def atom(name):
 
 window = root.create_window(
     100, 100, 200, 120, 0, screen.root_depth, X.InputOutput, X.CopyFromParent,
-    background_pixel=0x00aa00, event_mask=X.ButtonPressMask | X.ButtonReleaseMask)
+    background_pixel=0x00aa00, event_mask=X.ButtonPressMask | X.ButtonReleaseMask | X.ButtonMotionMask)
 window.set_wm_name('drag-probe-' + MODE)
 # Sem decoração, como a HUD (flags=MWM_HINTS_DECORATIONS, decorations=0).
 window.change_property(atom('_MOTIF_WM_HINTS'), atom('_MOTIF_WM_HINTS'), 32, [2, 0, 0, 0, 0])
@@ -39,21 +41,36 @@ def position():
     return -translated.x, -translated.y
 
 
+
+
+def request(received):
+    if MODE.endswith('-ungrab'):
+        d.ungrab_pointer(X.CurrentTime)
+        d.flush()
+    sender = other if MODE.startswith('other') else d
+    message = event.ClientMessage(
+        window=window, client_type=atom('_NET_WM_MOVERESIZE'),
+        data=(32, [received.root_x, received.root_y, 8, 1, 1]))
+    sender.screen().root.send_event(
+        message, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+    sender.flush()
+
+
+pressed_at = None
 deadline = time.time() + SECONDS
 while time.time() < deadline:
     while d.pending_events():
         received = d.next_event()
-        if received.type == X.ButtonPress:
-            if MODE.endswith('-ungrab'):
-                d.ungrab_pointer(X.CurrentTime)
-                d.flush()
-            sender = other if MODE.startswith('other') else d
-            message = event.ClientMessage(
-                window=window, client_type=atom('_NET_WM_MOVERESIZE'),
-                data=(32, [received.root_x, received.root_y, 8, received.detail, 1]))
-            sender.screen().root.send_event(
-                message, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
-            sender.flush()
+        if received.type == X.MotionNotify and pressed_at is not None and '-slop' in MODE:
+            if abs(received.root_x - pressed_at[0]) + abs(received.root_y - pressed_at[1]) >= 8:
+                request(received)
+                print(f"slop em {received.root_x},{received.root_y} posição {position()}", flush=True)
+                pressed_at = None
+        elif received.type == X.ButtonPress:
+            if '-slop' in MODE:
+                pressed_at = (received.root_x, received.root_y)
+                continue
+            request(received)
             print(f"press em {received.root_x},{received.root_y} posição {position()}", flush=True)
         elif received.type == X.ButtonRelease:
             # Medida para o app: o cliente recebe o release depois do arrasto do compositor?
