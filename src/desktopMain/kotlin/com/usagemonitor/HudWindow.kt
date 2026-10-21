@@ -188,16 +188,9 @@ internal fun HudWindowHost(
         stalledSessions = stalled
     ), motion)
 
-    // O monitor do notch (issue #273). Era sempre o padrão: o arrasto era preso a
-    // ele e o encaixe usava as bordas dele, e o notch não saía do primário. Agora
-    // é o monitor gravado, resolvido de novo a cada abertura por hover — um
-    // monitor reconectado volta a receber o notch sem reiniciar o app.
-    var screenArea by remember { mutableStateOf(resolveHudScreenArea(settings, hudScreenArea)) }
-    // O id do monitor decide a `GraphicsConfiguration` com que a janela nasce
-    // (#426). Ele muda quando a barra é solta noutro monitor, e aí a janela
-    // **renasce** ali: remendar a janela aberta devolve o alfa mas para o
-    // desenho do Compose.
-    var screenId by remember { mutableStateOf(resolveHudScreen(settings)?.id) }
+    // O monitor do notch: área de encaixe e id da configuração (#273, #426, #430).
+    val screen = remember { HudScreenSelection(settings, hudScreenArea) }
+    val screenArea = screen.area
     var placement by remember { mutableStateOf(readPersistedHudPlacement(settings, screenArea)) }
     var hovered by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
@@ -215,9 +208,7 @@ internal fun HudWindowHost(
         if (drag.dragging) return@LaunchedEffect
         if (hovered) {
             delay(hudOpenDelayMillis(retract.enabled, alreadyOpen = windowOpen))
-            val resolved = resolveHudScreen(settings)
-            screenArea = resolved?.workArea ?: hudScreenArea
-            screenId = resolved?.id ?: screenId
+            screen.reload(hudScreenArea)
             windowOpen = true
             // Um quadro para o recorte sair antes de o conteúdo começar a se
             // abrir; sem ele a mola corre nos primeiros quadros dentro do recorte
@@ -282,17 +273,15 @@ internal fun HudWindowHost(
         windowOpen = false
         drag.begin(DpOffset(dragStart.x * scale, dragStart.y * scale))
     }
-    val dragTo = { drag.moveTo(dragSize, pointerScreen()?.bounds ?: screenArea) }
+    val dragTo = { drag.moveTo(dragSize, pointerScreen()?.bounds ?: screen.area) }
     val dragFinish = {
         val position = drag.finish()
         if (position != null) {
             // Borda, fração e monitor do ponto em que foi solto são gravados.
             val target = pointerScreen()
-            val snapped = hudDragLanding(position, dragSize, screenArea, target)
+            val snapped = hudDragLanding(position, dragSize, screen.area, target)
             if (target != null) {
-                screenArea = target.workArea
-                screenId = target.id
-                persistHudScreen(settings, target)
+                screen.moveTo(target)
             }
             placement = snapped
             persistHudPlacement(settings, snapped)
@@ -304,7 +293,7 @@ internal fun HudWindowHost(
     // e renasce quando esse monitor muda (#426). Remendar a janela aberta
     // devolveria o alfa recriando a janela nativa, e o Compose para de emitir
     // quadros depois disso — a barra fica correta e congelada.
-    val rebirth = rememberHudWindowRebirth(screenId, AutoStartManager.currentPlatform())
+    val rebirth = rememberHudWindowRebirth(screen.id, AutoStartManager.currentPlatform())
     key(rebirth.configuration, rebirth.generation) {
     HudWindowFrame(
         useExplicitConfiguration = rebirth.explicit,
@@ -333,7 +322,8 @@ internal fun HudWindowHost(
             scale = scale,
             platform = AutoStartManager.currentPlatform(),
             dragging = drag.dragging,
-            onAlphaLost = { state -> rebirth.onAlphaLost(state, drag.dragging) }
+            // No COSMIC, renasce no monitor onde o compositor pôs a janela (#430).
+            onAlphaLost = { state -> rebirth.onAlphaLost(state, drag.dragging, screen.id, onAdopt = screen::moveTo) }
         )
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
             val edge = placement.edge
@@ -558,27 +548,6 @@ private const val HUD_COLLAPSE_SETTLE_MILLIS = AppGargantuaTokens.jetCloseMillis
 /** O monitor sob o ponteiro; `null` se o AWT não souber dizer. */
 private fun pointerScreen(): ScreenInfo? =
     runCatching { MouseInfo.getPointerInfo()?.device?.toScreenInfo() }.getOrNull()
-
-/**
- * A área útil do monitor gravado para o notch; sem gravação, ou com o monitor
- * desligado, a do padrão. O que está gravado **não é apagado** quando o monitor
- * some: ele pode voltar.
- *
- * Área **útil**, e não a tela inteira (issue #288). A #256 deixou o notch ocupar
- * a faixa da barra de tarefas, mas no Windows ela também é *topmost* e volta
- * para cima de toda janela *topmost* a cada clique, hover ou notificação: o
- * `alwaysOnTop` perde essa disputa, e o notch de baixo ficava meio coberto. O
- * monitor continua identificado pelos limites **inteiros** (`persistHudScreen`),
- * que não mudam quando a barra é movida.
- */
-private fun resolveHudScreen(settings: PreferencesSettings): ScreenInfo? {
-    val saved = readPersistedHudScreen(settings)
-    val screens = availableScreens()
-    return resolveScreen(screens, saved.id, saved.bounds) ?: screens.firstOrNull()
-}
-
-private fun resolveHudScreenArea(settings: PreferencesSettings, fallback: ScreenWorkArea): ScreenWorkArea =
-    resolveHudScreen(settings)?.workArea ?: fallback
 
 /**
  * A área da tela na escala da composição. A geometria trabalha em dp de
