@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
 
 /**
  * O COSMIC ignora toda posição que uma janela X11 gerenciada pede (#434): o
- * arrasto das janelas passa ao compositor. Vale **só** nele; os outros desktops
- * seguem o caminho medido de antes.
+ * arrasto das janelas passa ao compositor e a HUD deixa de ser gerenciada. As
+ * duas coisas valem **só** nele; os outros desktops seguem o caminho medido de antes.
  */
 class CompositorWindowDragTest {
 
@@ -36,6 +36,19 @@ class CompositorWindowDragTest {
         }
         for (os in listOf("Windows 11", "Mac OS X", "FreeBSD")) {
             assertFalse(windowDragByCompositor(os, "COSMIC"), os)
+        }
+    }
+
+    @Test
+    fun `only COSMIC on Linux makes the HUD unmanaged`() {
+        val linux = AutoStartManager.Platform.LINUX
+        assertEquals(java.awt.Window.Type.POPUP, hudWindowType(linux, "COSMIC"))
+        assertEquals(java.awt.Window.Type.POPUP, hudWindowType(linux, "pop:COSMIC"))
+        for (desktop in otherDesktops) {
+            assertEquals(java.awt.Window.Type.NORMAL, hudWindowType(linux, desktop), "$desktop")
+        }
+        for (platform in listOf(AutoStartManager.Platform.WINDOWS, AutoStartManager.Platform.MACOS, AutoStartManager.Platform.OTHER)) {
+            assertEquals(java.awt.Window.Type.NORMAL, hudWindowType(platform, "COSMIC"), "$platform")
         }
     }
 

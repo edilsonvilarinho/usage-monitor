@@ -20,6 +20,7 @@ import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.awt.SwingWindow
 import com.usagemonitor.data.diagnostics.AppLogFile
+import com.usagemonitor.presentation.ui.isCosmicDesktop
 import java.awt.Dimension
 import java.awt.GraphicsConfiguration
 import java.awt.Point
@@ -119,6 +120,8 @@ internal fun HudWindowFrame(
                 // `isTransparent` exige a janela sem decoração e ainda não
                 // exibida; esta ordem é a que o AWT aceita.
                 isUndecorated = true
+                // Antes de exibir: o tipo decide se o compositor gerencia a janela (#434).
+                type = hudWindowType(AutoStartManager.currentPlatform(), linuxGraphicsEnvironment().desktop)
                 isTransparent = true
                 isResizable = false
                 isAlwaysOnTop = true
@@ -304,12 +307,29 @@ internal fun rememberHudWindowRebirth(screenId: String?, platform: AutoStartMana
  *
  * [desktop] é o `XDG_CURRENT_DESKTOP` verbatim, uma lista separada por `:`.
  */
-internal fun hudFollowsCompositorScreen(platform: AutoStartManager.Platform, desktop: String?): Boolean {
-    if (platform != AutoStartManager.Platform.LINUX || desktop == null) {
-        return false
+internal fun hudFollowsCompositorScreen(platform: AutoStartManager.Platform, desktop: String?): Boolean =
+    platform == AutoStartManager.Platform.LINUX && isCosmicDesktop(desktop)
+
+/**
+ * O tipo da janela da HUD (issue #434).
+ *
+ * **No COSMIC, `POPUP`**, que o AWT do X11 cria *override-redirect*: o
+ * compositor não a gerencia. Gerenciada, ela ignora toda posição pedida — abre
+ * fora do topo e não arrasta —, ganha a borda de janela ativa em volta do
+ * retângulo transparente e fica atrás das outras, porque o `alwaysOnTop` do AWT
+ * não chega ao COSMIC (`_NET_WM_STATE` vazio). Medido no `cosmic-comp` 1.10.0
+ * aninhado: a `POPUP` fica onde é pedida e onde é movida, por cima, sem borda,
+ * com 32 bits, e recebe clique e tecla depois do clique.
+ *
+ * Fora do COSMIC, `NORMAL`, o de sempre: no KWin a janela gerenciada está
+ * medida (#426), e nos outros nada foi medido (regra do #340).
+ */
+internal fun hudWindowType(platform: AutoStartManager.Platform, desktop: String?): java.awt.Window.Type =
+    if (platform == AutoStartManager.Platform.LINUX && isCosmicDesktop(desktop)) {
+        java.awt.Window.Type.POPUP
+    } else {
+        java.awt.Window.Type.NORMAL
     }
-    return desktop.split(':').any { item -> item.trim().equals("COSMIC", ignoreCase = true) }
-}
 
 /**
  * O monitor em que a janela deve renascer quando não é o configurado; `null`
