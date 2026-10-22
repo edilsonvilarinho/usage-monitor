@@ -20,7 +20,7 @@ private val HELP_PT = """
     |
     |Sem comando, abre o Usage Monitor ou traz o aberto para a frente.
     |
-    |Comandos
+    |Ver o uso
     |  status [--json] [--max-age <tempo>]
     |                     Mostra as cotas de todas as contas e sai.
     |  check [--max <n>] [--max-age <tempo>] [--quiet]
@@ -30,9 +30,36 @@ private val HELP_PT = """
     |                     cota sai no status --json.
     |  statusline <claude-code|tmux>
     |                     Uma linha de uso para o Claude Code ou para o tmux.
+    |  alerts [--since <tempo>]
+    |                     Os avisos de hoje, quando e para onde foram.
     |
-    |  Os comandos leem a última coleta do app e não consultam as APIs.
-    |  Tempo: 90s, 10m ou 2h.
+    |Configurar (os mesmos arquivos do app; com ele ou o serviço coletando,
+    |quem grava é ele)
+    |  setup              Configuração inicial, passo a passo.
+    |  config list|get|set
+    |                     Os ajustes das Configurações: alertas, teto mensal,
+    |                     idioma, atualização, opções do bot e proxy.
+    |  sources list|enable|disable
+    |                     As fontes monitoradas.
+    |  keys set|test|remove <fonte>
+    |                     Chaves de API, lidas da entrada, nunca do comando.
+    |  accounts list|add|rename|enable|disable|remove|rescan
+    |                     Contas do Claude Code e do Codex.
+    |  telegram setup|pair|test|status|enable|disable|remove|readonly
+    |                     O bot do Telegram.
+    |  team join|status|leave
+    |                     A integração com o time.
+    |  web enable|disable|status|token
+    |                     O acesso pela rede local.
+    |  update             Confere se há versão nova e diz como atualizar.
+    |
+    |Servidor sem tela
+    |  service install|uninstall|start|stop|restart|status|logs
+    |                     O serviço do usuário no systemd (só no Linux).
+    |  service run        A coleta em primeiro plano, sem janela.
+    |
+    |  Os comandos de ver o uso leem a última coleta e não consultam as APIs.
+    |  Tempo: 90s, 10m, 2h ou 7d.
     |
     |Opções
     |  -h, --help         Mostra esta ajuda e sai.
@@ -53,7 +80,7 @@ private val HELP_EN = """
     |
     |Without a command, opens Usage Monitor, or brings the running one to the front.
     |
-    |Commands
+    |See the usage
     |  status [--json] [--max-age <time>]
     |                     Print the quotas of every account and exit.
     |  check [--max <n>] [--max-age <time>] [--quiet]
@@ -63,9 +90,36 @@ private val HELP_EN = """
     |                     quota id is in status --json.
     |  statusline <claude-code|tmux>
     |                     One usage line for Claude Code or for tmux.
+    |  alerts [--since <time>]
+    |                     Today's alerts, when and where they went.
     |
-    |  The commands read the app's last collection and never call the APIs.
-    |  Time: 90s, 10m or 2h.
+    |Configure (the app's own files; with it or the service collecting, it is
+    |the one that writes)
+    |  setup              First-time setup, step by step.
+    |  config list|get|set
+    |                     The settings: alerts, monthly budget, language,
+    |                     updates, bot options and proxy.
+    |  sources list|enable|disable
+    |                     The monitored sources.
+    |  keys set|test|remove <source>
+    |                     API keys, read from the input, never from the command.
+    |  accounts list|add|rename|enable|disable|remove|rescan
+    |                     Claude Code and Codex accounts.
+    |  telegram setup|pair|test|status|enable|disable|remove|readonly
+    |                     The Telegram bot.
+    |  team join|status|leave
+    |                     The team integration.
+    |  web enable|disable|status|token
+    |                     Access from the local network.
+    |  update             Check for a new version and say how to update.
+    |
+    |Headless server
+    |  service install|uninstall|start|stop|restart|status|logs
+    |                     The systemd user service (Linux only).
+    |  service run        The collection in the foreground, without a window.
+    |
+    |  The commands that show the usage read the last collection and never call
+    |  the APIs. Time: 90s, 10m, 2h or 7d.
     |
     |Options
     |  -h, --help         Print this help and exit.

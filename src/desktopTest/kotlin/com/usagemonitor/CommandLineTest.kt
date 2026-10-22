@@ -78,14 +78,16 @@ class CommandLineTest {
             val help = commandLineHelp(language, "9.9.9")
             assertTrue(help.startsWith("Usage Monitor 9.9.9\n"), help)
             val expected = listOf("--help", "-h", "--version", "-v", DiagnosticsExport.ARGUMENT, "--locale <pt|en>", "--user-data-dir <dir>") +
-                listOf("status [--json]", "check [--max <n>]", "wait <", "--below <n>", "statusline <claude-code|tmux>")
+                listOf("status [--json]", "check [--max <n>]", "wait <", "--below <n>", "statusline <claude-code|tmux>") +
+                // Os comandos da #440: cada nome que o parser reconhece aparece na ajuda.
+                com.usagemonitor.terminal.TerminalCommandNames.ALL.map { name -> "  $name" }
             for (option in expected) {
                 assertTrue(help.contains(option), "help $language sem $option")
             }
             assertFalse(help.contains(StartupOrigin.AUTO_START_ARGUMENT), help)
         }
-        assertTrue(commandLineHelp(AppLanguage.PT).contains("Comandos"))
-        assertTrue(commandLineHelp(AppLanguage.EN).contains("Commands"))
+        assertTrue(commandLineHelp(AppLanguage.PT).contains("Configurar"))
+        assertTrue(commandLineHelp(AppLanguage.EN).contains("Configure"))
     }
 
     @Test

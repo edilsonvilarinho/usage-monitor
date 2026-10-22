@@ -157,6 +157,9 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 - Modo terminal (#439): só lê — `dashboard-cache.json`, preferências e índice de sessões em somente leitura; nunca
   requisição nem trava segura (sonda e solta, e o arranque tenta a trava 3 vezes). `status --json` é contrato. `usage-monitor.exe` (launcher de console) só imprime e sai; sem opção de ação, relança o exe
   GUI (a chave `Run` lê `jpackage.app-path`). `--locale` nunca grava; o idioma efetivo é só pela `LanguageSelection`.
+- Modo terminal, configurar e serviço (#440): com coletor vivo, configurar é **pedido** (`control/`) aplicado pelo `ConfigApplier`
+  do coletor — um escritor só; sem coletor, o terminal aplica direto. Segredo só pela entrada, sem eco. Motor sem Compose
+  (`CollectorEngine`); `service` (systemd do usuário) só no Linux e só na raiz padrão.
 - Raiz de dados (#419): caminho em `~/.usage-monitor` só pelo `AppDataDirectory` (`file` = dados/instância, `installationFile` = o que
   NSIS/updater leem em caminho fixo); configurada uma vez no `main()`. Fora da raiz padrão: atualização e autostart desligados.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia

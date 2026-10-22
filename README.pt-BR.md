@@ -110,6 +110,35 @@ sendo o app. Eles seguem o idioma do app (`--locale` vale aqui também):
 set -g status-right '#(usage-monitor statusline tmux)'
 ```
 
+Tudo o que a janela de Configurações faz também se faz pelo terminal, que é o que um servidor sem
+tela precisa. Os comandos gravam os mesmos arquivos do app; com o app ou o serviço coletando, a
+mudança vai para ele, que é quem grava, e vale na hora (o proxy depois de reiniciar, como no app).
+Chaves e tokens são lidos da entrada, sem eco, nunca de argumento:
+
+| Comando | O que faz |
+|---|---|
+| `setup` | Configuração inicial: contas, chaves de API, avisos, Telegram, idioma e, no Linux, o serviço |
+| `config list\|get\|set` | Alertas, teto mensal, idioma, atualização, opções do bot do Telegram e proxy, por nomes estáveis como `alerts.quota.thresholds` |
+| `sources list\|enable\|disable` | As fontes monitoradas |
+| `keys set\|test\|remove <fonte>` | Chaves de API; a chave é testada com uma coleta de verdade antes de ser gravada |
+| `accounts list\|add\|rename\|enable\|disable\|remove\|rescan` | Contas do Claude Code e do Codex |
+| `telegram setup\|pair\|test\|status\|enable\|disable\|remove\|readonly` | O bot do Telegram; o `pair` espera a conversa mandar `/start <código>` |
+| `team join\|status\|leave` | A integração com o time; o `join` confere o servidor e o vínculo das contas antes |
+| `web enable\|disable\|status\|token` | O acesso pela rede local; o endereço com o token só sai com `token --show` |
+| `alerts [--since <tempo>]` | Os avisos de hoje, quando e para onde foram |
+| `update` | Confere se há versão nova e diz como atualizar esta instalação |
+
+Num servidor Linux sem tela, `service install` cria um serviço do usuário no systemd que roda o
+mesmo motor de coleta do app, sem janela (`service run`); `service status` mostra a saúde de cada
+parte e `service logs --follow`, o journal. O `.deb`/`.rpm` funciona num servidor; sem as bibliotecas
+`libGL`, `libX11` e `fontconfig`, o bot do Telegram responde em texto no lugar das imagens.
+
+```sh
+usage-monitor setup                 # responde as perguntas e instala o serviço
+sudo loginctl enable-linger "$USER" # mantém o serviço depois de sair do SSH
+usage-monitor service status
+```
+
 Sem opção, abre o app ou traz para a frente o que já está aberto. No Windows, use o
 `usage-monitor.exe` da pasta de instalação: o `Usage Monitor.exe` é um programa de janela, e a saída
 dele nunca chega ao terminal. O instalador não põe a pasta no `PATH`:
