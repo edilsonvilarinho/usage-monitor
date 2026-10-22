@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.terminal
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.QuotaZone
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.localized
@@ -55,7 +56,12 @@ internal class TerminalLabels(val language: AppLanguage) {
         }
     }
 
-    fun readByApp(age: Duration): String = localized(language, "lido ${ago(age)} pelo app aberto", "read ${ago(age)} by the open app")
+    /** "lido há 38 s pelo app aberto" ou "pelo serviço": de onde e de quando é a leitura. */
+    fun readBy(collector: CollectorKind, age: Duration): String =
+        when (collector) {
+            CollectorKind.APP -> localized(language, "lido ${ago(age)} pelo app aberto", "read ${ago(age)} by the open app")
+            CollectorKind.SERVICE -> localized(language, "lido ${ago(age)} pelo serviço", "read ${ago(age)} by the service")
+        }
 
     fun quotaCount(count: Int): String = localized(language, "$count cotas", if (count == 1) "1 quota" else "$count quotas")
 

@@ -356,7 +356,8 @@ class ArchitectureRulesTest {
         /** Quem hoje chama `window.shape`: a HUD e os cantos arredondados das janelas. */
         /** O motor do serviço sem tela e o que só ele usa (#440). */
         val HEADLESS_ENGINE_FILES = setOf(
-            "src/desktopMain/kotlin/com/usagemonitor/CollectorEngine.kt"
+            "src/desktopMain/kotlin/com/usagemonitor/CollectorEngine.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/HeadlessService.kt"
         )
 
         val NATIVE_WINDOW_SHAPE_OWNERS = setOf(

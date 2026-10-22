@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
@@ -53,7 +54,7 @@ internal class AppViewModels(
     private val shutdownStarted = AtomicBoolean(false)
 
     /** O mesmo motor que o serviço sem tela roda sozinho (#440). */
-    val engine = CollectorEngine(graph, autoUpdate)
+    val engine = CollectorEngine(graph, autoUpdate, CollectorKind.APP)
     val dashboard get() = engine.dashboard
     val cliSessions get() = engine.cliSessions
     val sessionPulse get() = engine.sessionPulse

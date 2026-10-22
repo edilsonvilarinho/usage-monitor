@@ -28,6 +28,7 @@ import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.onboarding.rememberStartupGuideController
 import com.usagemonitor.presentation.ui.help.StartupTipCatalog
+import com.usagemonitor.presentation.terminal.TerminalServiceLabels
 import com.usagemonitor.terminal.TerminalCommands
 import com.usagemonitor.terminal.TerminalConsole
 import com.usagemonitor.terminal.TerminalReader
@@ -134,6 +135,12 @@ fun main(args: Array<String>) {
     }
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
+    }
+    // Sem tela, a janela nunca abre e o processo ficava parado em silêncio (#440, A01):
+    // diz o que fazer e sai. Só no Linux a AWT se declara sem tela pela falta de `DISPLAY`.
+    if (java.awt.GraphicsEnvironment.isHeadless()) {
+        TerminalConsole.system().printText(TerminalServiceLabels(TerminalReader().language(launch.locale)).noDisplay)
+        exitProcess(1)
     }
     // Pelo `usage-monitor.exe` (console), abrir o app é tarefa do exe GUI.
     val guiRelaunch = ConsoleLauncher.guiRelaunchCommand(

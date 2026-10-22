@@ -1,6 +1,9 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.datasource.CollectorRegistration
+import com.usagemonitor.data.datasource.LocalCollectorRegistrationDataSource
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.data.export.JsonUsageSnapshotEncoder
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -65,10 +68,18 @@ import kotlin.time.Clock
  */
 internal class CollectorEngine(
     private val graph: AppGraph,
-    autoUpdate: AutoUpdateController
+    autoUpdate: AutoUpdateController,
+    /** Quem roda o motor, para o terminal dizer de onde vem a leitura. */
+    kind: CollectorKind,
+    private val registration: LocalCollectorRegistrationDataSource = LocalCollectorRegistrationDataSource()
 ) {
     private val breadcrumbs = graph.breadcrumbs
     private val shutdownStarted = AtomicBoolean(false)
+
+    init {
+        // Quem chega aqui já tomou a trava: o registro só vale enquanto ela está tomada.
+        registration.write(CollectorRegistration(kind, ProcessHandle.current().pid(), Clock.System.now(), CURRENT_APP_VERSION))
+    }
 
     /**
      * Há sessão CLI rodando — a cadência de 60 s da coleta (issue #269). O
@@ -277,6 +288,7 @@ internal class CollectorEngine(
         graph.codexCliSessionDataSource.close()
         graph.openCodeUsageDataSource.close()
         graph.kiloUsageDataSource.close()
+        registration.clear()
         singleInstanceGuard.close()
         // Por último, e não primeiro: o instalador espera este processo sair de
         // qualquer forma, mas entregar o pacote antes de o SQLite fechar seria

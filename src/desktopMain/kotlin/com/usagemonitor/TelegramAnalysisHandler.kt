@@ -94,7 +94,8 @@ internal class TelegramAnalysisHandler(
             }
             AnalysisViewKind.IMAGE -> {
                 // A imagem sai como mensagem nova: o Telegram não troca texto por foto na edição.
-                val png = TelegramAnalysisRenderer.render(shown, analysis, language)
+                // Sem Skia (servidor sem bibliotecas gráficas, #440), o painel em texto.
+                val png = if (readings.imagesAvailable()) TelegramAnalysisRenderer.render(shown, analysis, language) else null
                 if (png == null) {
                     send(token, chatId, TelegramAnalysisMessages.panel(analysis, language))
                 } else {

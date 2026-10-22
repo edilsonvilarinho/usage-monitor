@@ -10,20 +10,23 @@ import kotlin.time.Duration.Companion.seconds
  * app continua sendo `usage-monitor` sem comando.
  */
 internal sealed interface TerminalCommand {
+    /** Os comandos que só leem a última coleta (#439). */
+    sealed interface Reading : TerminalCommand
+
     /** `status [--json] [--max-age <tempo>]`: as cotas de todas as contas. */
-    data class Status(val maxAge: Duration? = null, val json: Boolean = false) : TerminalCommand
+    data class Status(val maxAge: Duration? = null, val json: Boolean = false) : Reading
 
     /** `check [--max <n>] [--max-age <tempo>] [--quiet]`: a decisão pelo código de saída. */
-    data class Check(val max: Int? = null, val maxAge: Duration? = null, val quiet: Boolean = false) : TerminalCommand
+    data class Check(val max: Int? = null, val maxAge: Duration? = null, val quiet: Boolean = false) : Reading
 
     /** `wait <id> --below <n> [--timeout <tempo>]`: espera a cota cair abaixo de n%. */
-    data class Wait(val quotaId: String, val below: Int, val timeout: Duration? = null) : TerminalCommand
+    data class Wait(val quotaId: String, val below: Int, val timeout: Duration? = null) : Reading
 
     /** `statusline claude-code`: a linha embaixo do prompt do Claude Code, lida do JSON da entrada. */
-    data object ClaudeCodeStatusLine : TerminalCommand
+    data object ClaudeCodeStatusLine : Reading
 
     /** `statusline tmux`: o segmento da barra do tmux, no formato de estilo dele. */
-    data object TmuxStatusLine : TerminalCommand
+    data object TmuxStatusLine : Reading
 }
 
 internal object TerminalCommandNames {
@@ -39,9 +42,10 @@ internal object TerminalCommandNames {
     const val STATUS_LINE = "statusline"
     const val CLAUDE_CODE = "claude-code"
     const val TMUX = "tmux"
+    const val SERVICE = "service"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE)
 
     /** Os alvos da linha de status. */
     val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE, TMUX)
@@ -63,6 +67,7 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
         TerminalCommandNames.CHECK -> parseCheck(arguments)
         TerminalCommandNames.WAIT -> parseWait(arguments)
         TerminalCommandNames.STATUS_LINE -> parseStatusLine(arguments)
+        TerminalCommandNames.SERVICE -> parseServiceCommand(arguments)
         else -> TerminalCommandParse.Invalid("Error: '$name' is not a command. Run with --help to list the commands.")
     }
 
@@ -155,7 +160,7 @@ private class OptionReader(private val arguments: List<String>) {
     }
 }
 
-private fun unknownOption(command: String, argument: String): TerminalCommandParse =
+internal fun unknownOption(command: String, argument: String): TerminalCommandParse =
     TerminalCommandParse.Invalid("Error: '$argument' is not an option of '$command'. Run with --help to list the options.")
 
 /**

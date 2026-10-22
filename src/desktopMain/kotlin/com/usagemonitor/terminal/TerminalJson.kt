@@ -67,6 +67,7 @@ internal object TerminalJson {
             generatedAt = reading.now.toString(),
             lastCollectedAt = reading.lastCollectedAt?.toString(),
             collectorRunning = reading.collectorRunning,
+            collector = reading.collector?.name?.lowercase(),
             quotas = quotas
         )
         return json.encodeToString(StatusDto.serializer(), dto)
@@ -86,6 +87,8 @@ internal object TerminalJson {
         @SerialName("generated_at") val generatedAt: String,
         @SerialName("last_collected_at") val lastCollectedAt: String?,
         @SerialName("collector_running") val collectorRunning: Boolean,
+        /** `app` ou `service` (#440); `null` sem coletor. Campo novo: a versão não sobe. */
+        @SerialName("collector") val collector: String?,
         @SerialName("quotas") val quotas: List<QuotaDto>
     )
 

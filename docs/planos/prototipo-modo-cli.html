@@ -636,6 +636,21 @@ S.service = () => render([
   L(c('mu', '  de outro computador: o modo interativo inteiro pelo SSH')),
 ]);
 
+S.foreground = () => render([
+  sh('usage-monitor'),
+  L('Este computador não tem tela, e o app precisa de uma.'),
+  L('  Para ver o uso:          usage-monitor status'),
+  L('  Para coletar sem tela:   usage-monitor service run'),
+  L(''),
+  sh('usage-monitor service run'),
+  L('Usage Monitor 41.12.0 coletando sem janela · dados em /home/dev/.usage-monitor · encerre com Ctrl+C ou SIGTERM'),
+  L(c('mu', '^C')),
+  L('Coleta encerrada.'),
+  L(''),
+  sh('usage-monitor service run'),
+  L('O serviço já está coletando nesta pasta de dados.'),
+]);
+
 S.alertsLog = () => render([
   sh('usage-monitor telegram pair'),
   L('No Telegram, abra o seu bot e envie: ', c('b', '/start K7P2QD')),
@@ -744,6 +759,8 @@ const PARTS = [
         text: 'Um comando cria o serviço do usuário e o liga com o sistema. O <b>service status</b> mostra a saúde de cada parte: última coleta, cada fonte, histórico, Telegram, time e acesso web.' },
       { id: 's52', num: '5.2', title: 'Avisos sem bandeja', win: 'ssh dev@servidor', body: S.alertsLog,
         text: 'O pareamento do Telegram sai pelo terminal, e o <b>alerts</b> mostra o que foi avisado, quando e para onde. O silêncio adia o aviso, não o descarta, como no app.' },
+      { id: 's53', num: '5.3', title: 'Sem tela e em primeiro plano', win: 'ssh dev@servidor', body: S.foreground,
+        text: 'O app aberto num computador sem tela diz o que fazer e sai, em vez de ficar parado. O <b>service run</b> é o motor do app sem janela, em primeiro plano: é o que o serviço do sistema executa, e também serve para testar. Só um coleta por pasta de dados.' },
     ] },
   { id: 'parte6', step: 'Parte 6', title: 'Quando algo falha',
     text: 'A mesma regra do app: uma leitura que falha mantém os números anteriores e diz de quando eles são. Nada some e nada é inventado.',

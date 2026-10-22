@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.QuotaZone
@@ -65,15 +66,15 @@ class TerminalPrimitivesTest {
     @Test
     fun `rodape conta os estados na ordem critico, atencao, em dia`() {
         val zones = listOf(QuotaZone.ON_TRACK, QuotaZone.CRITICAL, QuotaZone.ATTENTION, QuotaZone.ATTENTION, null, QuotaZone.ON_TRACK)
-        val footer = TerminalPrimitives.readingFooter(38.seconds, zones, pt)
+        val footer = TerminalPrimitives.readingFooter(CollectorKind.APP, 38.seconds, zones, pt)
         assertEquals("lido há 38 s pelo app aberto · 6 cotas: 1 crítica, 2 em atenção, 2 em dia", footer.plainText)
         assertEquals(TerminalColor.Crit, footer.spans.first { span -> span.text == "1 crítica" }.color)
     }
 
     @Test
-    fun `rodape em ingles e sem estado com contagem zero`() {
-        val footer = TerminalPrimitives.readingFooter(18.minutes, listOf(QuotaZone.ON_TRACK, QuotaZone.ON_TRACK), en)
-        assertEquals("read 18 min ago by the open app · 2 quotas: 2 on track", footer.plainText)
+    fun `rodape em ingles, pelo servico e sem estado com contagem zero`() {
+        val footer = TerminalPrimitives.readingFooter(CollectorKind.SERVICE, 18.minutes, listOf(QuotaZone.ON_TRACK, QuotaZone.ON_TRACK), en)
+        assertEquals("read 18 min ago by the service · 2 quotas: 2 on track", footer.plainText)
     }
 
     @Test

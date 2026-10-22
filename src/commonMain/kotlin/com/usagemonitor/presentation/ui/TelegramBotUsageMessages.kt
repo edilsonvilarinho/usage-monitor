@@ -127,6 +127,14 @@ internal object TelegramBotUsageMessages {
     fun ringsEmpty(language: AppLanguage): String =
         if (language == AppLanguage.PT) "Nenhuma conta com cota em percentual para desenhar. Use /status." else "No account with a percentage quota to draw. Use /status."
 
+    /** Servidor sem `libGL`, `libX11` e `fontconfig` (#440): o Skia não carrega. */
+    fun imagesUnavailable(language: AppLanguage): String =
+        localized(
+            language,
+            "Este computador não desenha imagens: faltam as bibliotecas libGL, libX11 e fontconfig. Use /status.",
+            "This computer cannot draw images: the libGL, libX11 and fontconfig libraries are missing. Use /status."
+        )
+
     fun compareEmpty(language: AppLanguage): String =
         if (language == AppLanguage.PT) "Nenhum uso no recorte para comparar." else "No usage in range to compare."
 

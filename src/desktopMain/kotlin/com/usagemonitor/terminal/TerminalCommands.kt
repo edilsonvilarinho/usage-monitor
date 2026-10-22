@@ -57,11 +57,29 @@ internal object TerminalCommands {
         // O driver do SQLite avisa no `stderr` que não há provedor de log; no app esse texto
         // vai para o `app.log`, mas no terminal sujaria a saída de quem chamou.
         System.setProperty(SLF4J_VERBOSITY_PROPERTY, "ERROR")
+        quietPreferencesLog()
+        return when (command) {
+            is TerminalCommand.Reading -> runReading(command, languageOverride, reader, console, pause, statusLineInput, sessionMetrics, environment, home)
+            is ServiceCommand -> TerminalServiceCommands.run(command, languageOverride, console)
+        }
+    }
+
+    private fun runReading(
+        command: TerminalCommand.Reading,
+        languageOverride: AppLanguage?,
+        reader: TerminalReader,
+        console: TerminalConsole,
+        pause: (Duration) -> Unit,
+        statusLineInput: () -> String,
+        sessionMetrics: (String) -> CliSessionMetrics?,
+        environment: Map<String, String>,
+        home: File
+    ): Int {
         val reading = reader.read(languageOverride)
         val labels = TerminalLabels(reading.language)
         val output: TerminalOutput = when (command) {
             is TerminalCommand.Status ->
-                TerminalStatusView.render(reading.accounts, reading.now, reading.collectorRunning, command.maxAge, labels, console.profile)
+                TerminalStatusView.render(reading.accounts, reading.now, reading.collector, command.maxAge, labels, console.profile)
             is TerminalCommand.Check ->
                 TerminalCheckView.render(reading.accounts, reading.now, command.max, command.maxAge, command.quiet, labels, console.profile)
             // O `wait` não imprime uma vez e sai: tem o laço dele, que relê o cache.
@@ -131,6 +149,17 @@ internal object TerminalCommands {
             reading = reader.read(languageOverride)
         }
     }
+}
+
+/**
+ * O `java.util.prefs` avisa no `stderr` ("Created user preferences directory") na primeira
+ * execução num computador novo, como um servidor recém-instalado: sujaria a saída. O
+ * logger fica guardado aqui porque o `java.util.logging` só guarda referência fraca.
+ */
+private val preferencesLogger: java.util.logging.Logger = java.util.logging.Logger.getLogger("java.util.prefs")
+
+internal fun quietPreferencesLog() {
+    preferencesLogger.level = java.util.logging.Level.WARNING
 }
 
 private val TerminalCommand.isStatusLine: Boolean
