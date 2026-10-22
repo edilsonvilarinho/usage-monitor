@@ -108,6 +108,27 @@ internal class TerminalLabels(val language: AppLanguage) {
 
     fun highest(quota: String): String = localized(language, "maior uso: $quota", "highest: $quota")
 
+    fun unknownQuota(id: String): String = localized(language, "a cota '$id' não existe", "there is no quota '$id'")
+
+    fun knownQuotas(ids: List<String>): String = localized(language, "Cotas: ", "Quotas: ") + ids.joinToString(", ")
+
+    fun noPercent(name: String): String = localized(language, "$name não tem percentual para esperar", "$name has no percentage to wait for")
+
+    fun reachedBelow(name: String, percent: Int, below: Int): String =
+        localized(language, "$name está em $percent%, abaixo de $below%", "$name is at $percent%, below $below%")
+
+    fun waitingFor(name: String, percent: Int, below: Int): String =
+        localized(language, "aguardando $name cair abaixo de $below% (agora $percent%)", "waiting for $name to drop below $below% (now $percent%)")
+
+    fun resetsAtIn(at: String, remaining: Duration): String =
+        localized(language, "reinicia $at BRT, ", "resets $at BRT, ") + inDuration(remaining)
+
+    val waitNeedsCollector: String
+        get() = localized(language, "Nada está coletando: a cota só muda com o Usage Monitor aberto.", "Nothing is collecting: the quota only changes with Usage Monitor open.")
+
+    fun waitTimedOut(id: String, below: Int): String =
+        localized(language, "tempo esgotado: '$id' não caiu abaixo de $below%", "timed out: '$id' did not drop below $below%")
+
     fun staleReading(age: Duration, maxAge: Duration): String =
         localized(
             language,

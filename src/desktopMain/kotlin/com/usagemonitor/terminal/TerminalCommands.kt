@@ -3,6 +3,11 @@ package com.usagemonitor.terminal
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.terminal.TerminalAnsi
 import com.usagemonitor.presentation.terminal.TerminalCheckView
+import com.usagemonitor.presentation.terminal.TerminalColor
+import com.usagemonitor.presentation.terminal.TerminalSpan
+import com.usagemonitor.presentation.terminal.TerminalWaitStep
+import com.usagemonitor.presentation.terminal.TerminalWaitView
+import com.usagemonitor.presentation.terminal.terminalLine
 import com.usagemonitor.presentation.terminal.TerminalLabels
 import com.usagemonitor.presentation.terminal.TerminalOutput
 import com.usagemonitor.presentation.terminal.TerminalProfile
@@ -12,6 +17,8 @@ import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.PrintStream
 import java.nio.charset.Charset
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Executa um comando do modo terminal e devolve o código de saída. Roda antes da
@@ -19,11 +26,15 @@ import java.nio.charset.Charset
  */
 internal object TerminalCommands {
 
+    /** De quanto em quanto o `wait` relê o cache. A coleta é de 60 s com sessão ativa. */
+    val WAIT_INTERVAL: Duration = 15.seconds
+
     fun run(
         command: TerminalCommand,
         languageOverride: AppLanguage?,
         reader: TerminalReader = TerminalReader(),
-        console: TerminalConsole = TerminalConsole.system()
+        console: TerminalConsole = TerminalConsole.system(),
+        pause: (Duration) -> Unit = { duration -> Thread.sleep(duration.inWholeMilliseconds) }
     ): Int {
         val reading = reader.read(languageOverride)
         val labels = TerminalLabels(reading.language)
@@ -32,6 +43,8 @@ internal object TerminalCommands {
                 TerminalStatusView.render(reading.accounts, reading.now, reading.collectorRunning, command.maxAge, labels, console.profile)
             is TerminalCommand.Check ->
                 TerminalCheckView.render(reading.accounts, reading.now, command.max, command.maxAge, command.quiet, labels, console.profile)
+            // O `wait` não imprime uma vez e sai: tem o laço dele, que relê o cache.
+            is TerminalCommand.Wait -> return runWait(command, reading, languageOverride, reader, console, pause)
         }
         // O JSON sai sempre, mesmo sem leitura: quem lê decide pelo código e pelos campos.
         if (command is TerminalCommand.Status && command.json) {
@@ -40,6 +53,50 @@ internal object TerminalCommands {
             console.print(TerminalAnsi.render(output.lines, console.profile))
         }
         return output.exitCode
+    }
+
+    /**
+     * O laço do `wait`: relê o cache a cada [WAIT_INTERVAL] e só reescreve a linha quando o
+     * percentual muda. Nenhuma requisição: quem atualiza o número é o coletor.
+     */
+    private fun runWait(
+        command: TerminalCommand.Wait,
+        firstReading: TerminalReading,
+        languageOverride: AppLanguage?,
+        reader: TerminalReader,
+        console: TerminalConsole,
+        pause: (Duration) -> Unit
+    ): Int {
+        var reading = firstReading
+        val deadline = command.timeout?.let { timeout -> reading.now + timeout }
+        var shownPercent: Int? = null
+        var warnedCollector = false
+        while (true) {
+            val labels = TerminalLabels(reading.language)
+            when (val step = TerminalWaitView.evaluate(reading.accounts, command.quotaId, command.below, reading.now, labels, console.profile)) {
+                is TerminalWaitStep.Finished -> {
+                    console.print(TerminalAnsi.render(step.lines, console.profile))
+                    return step.exitCode
+                }
+                is TerminalWaitStep.Waiting -> {
+                    if (!reading.collectorRunning && !warnedCollector) {
+                        console.print(TerminalAnsi.render(terminalLine(TerminalSpan(console.profile.glyphs.warning + " " + labels.waitNeedsCollector, TerminalColor.Warn)), console.profile))
+                        warnedCollector = true
+                    }
+                    if (step.percent != shownPercent) {
+                        console.print(TerminalAnsi.render(step.line, console.profile))
+                        shownPercent = step.percent
+                    }
+                }
+            }
+            if (deadline != null && reading.now >= deadline) {
+                val timedOut = TerminalWaitView.timedOut(command.quotaId, command.below, labels)
+                console.print(TerminalAnsi.render(timedOut.lines, console.profile))
+                return timedOut.exitCode
+            }
+            pause(deadline?.let { limit -> minOf(WAIT_INTERVAL, limit - reading.now) } ?: WAIT_INTERVAL)
+            reading = reader.read(languageOverride)
+        }
     }
 }
 

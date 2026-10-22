@@ -23,6 +23,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class TerminalCommandsTest {
@@ -78,5 +79,68 @@ class TerminalCommandsTest {
     @Test
     fun `status exits with 3 without any reading`() {
         assertEquals(3, run(TerminalCommand.Status(), collectedAt = null).first)
+    }
+
+    /** O relógio anda só quando o `wait` pausa; a coleta "acontece" no meio da pausa. */
+    private class WaitScenario(start: Instant) {
+        var now = start
+        val clock = object : Clock {
+            override fun now(): Instant = now
+        }
+    }
+
+    private fun waitRun(command: TerminalCommand.Wait, percents: List<Long>): Triple<Int, String, Int> {
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        try {
+            val dir = Files.createTempDirectory("usage-monitor-terminal").toFile()
+            val cache = File(dir, "dashboard-cache.json")
+            val scenario = WaitScenario(now)
+            fun collect(used: Long) {
+                val stats = ApiUsageStats(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(QuotaInfo(label = "Codex 5h", used = used, total = 100, periodEndAt = now + 2.hours, unit = UsageUnit.PERCENTAGE)),
+                    fetchedAt = scenario.now
+                )
+                runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats), scenario.now) }
+            }
+            collect(percents.first())
+            var pauses = 0
+            val buffer = ByteArrayOutputStream()
+            val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
+            val reader = TerminalReader(cache, File(dir, "app.lock"), PreferencesSettings(node), scenario.clock)
+            val code = TerminalCommands.run(command, AppLanguage.PT, reader, console, pause = { duration ->
+                pauses += 1
+                scenario.now += duration
+                percents.getOrNull(pauses)?.let(::collect)
+            })
+            return Triple(code, buffer.toString(Charsets.UTF_8), pauses)
+        } finally {
+            runCatching {
+                node.removeNode()
+                node.flush()
+            }
+        }
+    }
+
+    @Test
+    fun `wait rereads the cache until the quota drops and prints only when it changes`() {
+        val (code, text, pauses) = waitRun(TerminalCommand.Wait("codex:codex-5h", below = 50), listOf(80, 80, 72, 10))
+        assertEquals(0, code)
+        assertEquals(3, pauses)
+        val lines = text.trim().lines()
+        assertEquals(4, lines.size)
+        assertTrue(lines[0].startsWith("▲ Nada está coletando"))
+        assertTrue(lines[1].contains("(agora 80%)"))
+        assertTrue(lines[2].contains("(agora 72%)"))
+        assertEquals("✓ Codex 5h (Codex) está em 10%, abaixo de 50%", lines[3])
+    }
+
+    @Test
+    fun `wait gives up with 1 at the timeout`() {
+        val (code, text, pauses) = waitRun(TerminalCommand.Wait("codex:codex-5h", below = 50, timeout = 40.seconds), listOf(80))
+        assertEquals(1, code)
+        assertEquals(3, pauses)
+        assertTrue(text.trim().lines().last().startsWith("tempo esgotado"))
     }
 }

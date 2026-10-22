@@ -88,6 +88,23 @@ class TerminalCommandLineTest {
     }
 
     @Test
+    fun `wait takes a quota id, below and an optional timeout`() {
+        assertEquals(
+            CommandLineRequest.Terminal(TerminalCommand.Wait("anthropic:trabalho:claude-5h", 50, 2.hours)),
+            parse("wait", "anthropic:trabalho:claude-5h", "--below", "50", "--timeout", "2h")
+        )
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Wait("codex:codex-5h", 30)), parse("wait", "--below=30", "codex:codex-5h"))
+    }
+
+    @Test
+    fun `wait without an id or a valid below is an error`() {
+        assertTrue(parse("wait", "--below", "50") is CommandLineRequest.Invalid)
+        assertTrue(parse("wait", "codex:codex-5h") is CommandLineRequest.Invalid)
+        assertTrue(parse("wait", "codex:codex-5h", "--below", "0") is CommandLineRequest.Invalid)
+        assertTrue(parse("wait", "a", "b", "--below", "50") is CommandLineRequest.Invalid)
+    }
+
+    @Test
     fun `durations accept seconds, minutes, hours and a bare number of seconds`() {
         assertEquals(90.seconds, parseTerminalDuration("90s"))
         assertEquals(10.minutes, parseTerminalDuration("10M"))

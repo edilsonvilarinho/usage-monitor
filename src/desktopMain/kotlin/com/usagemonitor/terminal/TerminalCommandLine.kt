@@ -15,6 +15,9 @@ internal sealed interface TerminalCommand {
 
     /** `check [--max <n>] [--max-age <tempo>] [--quiet]`: a decisão pelo código de saída. */
     data class Check(val max: Int? = null, val maxAge: Duration? = null, val quiet: Boolean = false) : TerminalCommand
+
+    /** `wait <id> --below <n> [--timeout <tempo>]`: espera a cota cair abaixo de n%. */
+    data class Wait(val quotaId: String, val below: Int, val timeout: Duration? = null) : TerminalCommand
 }
 
 internal object TerminalCommandNames {
@@ -24,9 +27,12 @@ internal object TerminalCommandNames {
     const val JSON = "--json"
     const val MAX = "--max"
     const val QUIET = "--quiet"
+    const val WAIT = "wait"
+    const val BELOW = "--below"
+    const val TIMEOUT = "--timeout"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT)
 }
 
 internal sealed interface TerminalCommandParse {
@@ -43,6 +49,7 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
     when (name) {
         TerminalCommandNames.STATUS -> parseStatus(arguments)
         TerminalCommandNames.CHECK -> parseCheck(arguments)
+        TerminalCommandNames.WAIT -> parseWait(arguments)
         else -> TerminalCommandParse.Invalid("Error: '$name' is not a command. Run with --help to list the commands.")
     }
 
@@ -79,6 +86,27 @@ private fun parseCheck(arguments: List<String>): TerminalCommandParse {
         }
     }
     return TerminalCommandParse.Parsed(TerminalCommand.Check(max, maxAge, quiet))
+}
+
+private fun parseWait(arguments: List<String>): TerminalCommandParse {
+    var quotaId: String? = null
+    var below: Int? = null
+    var timeout: Duration? = null
+    val reader = OptionReader(arguments)
+    while (reader.hasNext()) {
+        val argument = reader.next()
+        when {
+            reader.isOption(argument, TerminalCommandNames.BELOW) -> below = reader.value(argument)?.toIntOrNull()?.takeIf { value -> value in 1..100 }
+                ?: return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.BELOW} needs a percentage from 1 to 100.")
+            reader.isOption(argument, TerminalCommandNames.TIMEOUT) -> timeout = reader.value(argument)?.let(::parseTerminalDuration)
+                ?: return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.TIMEOUT} needs a time such as 90s, 10m or 2h.")
+            quotaId == null && !argument.startsWith("-") -> quotaId = argument
+            else -> return unknownOption(TerminalCommandNames.WAIT, argument)
+        }
+    }
+    val id = quotaId ?: return TerminalCommandParse.Invalid("Error: '${TerminalCommandNames.WAIT}' needs a quota id. Run 'usage-monitor status --json' to list them.")
+    val percent = below ?: return TerminalCommandParse.Invalid("Error: '${TerminalCommandNames.WAIT}' needs ${TerminalCommandNames.BELOW} <percentage>.")
+    return TerminalCommandParse.Parsed(TerminalCommand.Wait(id, percent, timeout))
 }
 
 private fun invalidMaxAge(): TerminalCommandParse =
