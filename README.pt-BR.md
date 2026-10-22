@@ -23,9 +23,38 @@ Um pequeno notch colado na borda da tela mostra um anel por conta e um arco por 
 credenciais que você já tem, guarda o histórico em SQLite local e nunca envia conteúdo de prompt ou
 de resposta para lugar nenhum.
 
+O mesmo app também funciona pelo terminal: uma tabela de status, linhas de status para o Claude Code
+e o tmux, um modo interativo em tela cheia e, num servidor Linux sem tela, um serviço sem janela.
+
 ![O notch da HUD: um anel por conta, um arco por cota, e o balão de detalhes](img/hud.gif)
 
 <img src="img/divider.svg" width="100%" alt="">
+
+## Guia rápido
+
+**Com a janela.** [Baixe o instalador](https://github.com/edilsonvilarinho/usage-monitor/releases/latest) e abra o Usage Monitor: o notch se cola na borda da
+tela. As contas do Claude Code e do Codex são encontradas sozinhas; as fontes que pedem chave de API
+(MiniMax, DeepSeek, OpenCode Go, OpenRouter) recebem a chave em **Configurações > APIs**.
+
+**Pelo terminal** — o mesmo app, no seu computador ou num servidor pelo SSH:
+
+```sh
+usage-monitor status                  # todas as cotas: barra, estado e quando reinicia
+usage-monitor tui                     # tela cheia por teclado: visão geral, sessões, histórico, time, configurações
+usage-monitor setup                   # primeira vez num servidor: contas, chaves, alertas e o serviço
+usage-monitor statusline claude-code  # uma linha embaixo do prompt do Claude Code
+```
+
+Onde fica o comando:
+
+| Instalação | Comando |
+|---|---|
+| Linux `.sh` | `usage-monitor` (em `~/.local/bin`) |
+| Linux `.deb` / `.rpm` | `"/opt/usage-monitor/bin/Usage Monitor"`; `sudo ln -s "/opt/usage-monitor/bin/Usage Monitor" /usr/local/bin/usage-monitor` dá o nome curto |
+| Windows | `usage-monitor.exe` na pasta de instalação (`%LOCALAPPDATA%\Usage Monitor`) |
+| macOS | `"/Applications/Usage Monitor.app/Contents/MacOS/Usage Monitor"` |
+
+Todos os comandos estão em [Linha de comando e modo terminal](#linha-de-comando-e-modo-terminal).
 
 ## Recursos
 
@@ -44,6 +73,9 @@ de resposta para lugar nenhum.
   recua.
 - **Exportação** — CSV e JSON de sessões e resumos, e relatórios em PDF. O PDF do histórico respeita
   fonte, conta, intervalo e cota selecionados e inclui todas as janelas disponíveis, mesmo recolhidas.
+- **Modo terminal** — `status`, `check` e `wait` para scripts, linhas de status para o Claude Code e o
+  tmux, um modo interativo em tela cheia e toda configuração por comando; num servidor Linux ele roda
+  como serviço sem janela.
 - **Visão de time (opcional)** — um servidor que você hospeda agrega uma conta entre máquinas, com
   tendência de 30 dias e presença ao vivo. Veja [`server/README.md`](server/README.md).
 - **Desktop** — início automático, temas claro e escuro, inglês e português, escala da interface,
@@ -79,7 +111,11 @@ de uma chave de API, informada em **Configurações > APIs**; variáveis de ambi
 
 </details>
 
-### Linha de comando
+## Linha de comando e modo terminal
+
+![O modo terminal: usage-monitor status e depois usage-monitor tui passando pelas cinco abas](img/terminal-pt.gif)
+
+<sub>Desenhado pelo próprio código de terminal do app, com dados sintéticos (`gradlew generateTerminalMedia`).</sub>
 
 | Opção | O que faz |
 |---|---|
