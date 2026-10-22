@@ -54,4 +54,24 @@ class TuiSparklineTest {
         assertEquals(TerminalColor.Muted, spans.first { span -> span.text == "┆" }.color)
         assertEquals(".=@|.", TuiSparkline.render(spark, color, TerminalGlyphs.ASCII).joinToString("") { span -> span.text })
     }
+
+    @Test
+    fun `janela corrida, cujo fim anda a cada leitura, nao marca reinicio`() {
+        val spark = TuiSparkline.build(
+            listOf(point(start + 1.hours, 30, start + 6.hours), point(start + 2.hours, 20, start + 7.hours), point(start + 3.hours, 25, start + 8.hours)),
+            start, end, cellCount = 48
+        )
+        assertEquals(emptySet(), spark.resets)
+    }
+
+    @Test
+    fun `leitura ociosa entre duas janelas nao esconde o reinicio`() {
+        val idle = UsageHistoryPoint(capturedAt = start + 3.hours + 5.minutes, used = 0, total = 100, rawUsed = 0, rawTotal = 0, periodEndAt = start + 240.hours, hasKnownResetAt = false)
+        val spark = TuiSparkline.build(
+            listOf(point(start + 2.hours, 100, firstWindowEnds), idle, point(start + 5.hours, 3, secondWindowEnds)),
+            start, end, cellCount = 48
+        )
+        assertEquals(setOf(10), spark.resets)
+        assertEquals(0, spark.cells[6])
+    }
 }

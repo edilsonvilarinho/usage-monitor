@@ -19,11 +19,28 @@ data class TuiData(
     /** As contas na ordem do painel, com o que a Visão geral mostra de cada uma. */
     val accounts: List<TuiAccount> = emptyList(),
     /** A aba 2; `null` enquanto ela não foi aberta. */
-    val sessions: TuiSessions? = null
+    val sessions: TuiSessions? = null,
+    /** A aba 3; `null` enquanto ela não foi aberta. */
+    val history: TuiHistory? = null
 ) {
     /** A última tentativa de coleta falhou em alguma conta (6.2). */
     val lastFailed: Boolean
         get() = accounts.any { account -> account.failure != null }
+
+    /**
+     * A primeira trilha de cada conta na aba 3, que lista as cotas com percentual na ordem do
+     * painel; `null` para a conta sem nenhuma.
+     */
+    val historyRowOfAccount: List<Int?>
+        get() {
+            var next = 0
+            return accounts.map { item ->
+                val count = item.account.quotas.count { quota -> quota.percent != null }
+                val first = if (count > 0) next else null
+                next += count
+                first
+            }
+        }
 
     /** A leitura mais velha entre as que falharam: é dela que o status fala. */
     val oldestFailedReading: Instant?

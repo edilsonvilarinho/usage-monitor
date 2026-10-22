@@ -17,7 +17,9 @@ internal object TuiScreen {
             stacked = size.stacked,
             accountCount = data.accounts.size,
             sessionCount = data.sessions?.sessions?.size ?: 0,
-            turnCount = data.sessions?.turns?.size ?: 0
+            turnCount = data.sessions?.turns?.size ?: 0,
+            historyRowCount = data.history?.rows?.size ?: 0,
+            historyRowOfAccount = data.historyRowOfAccount
         )
 
     fun render(state: TuiState, data: TuiData, size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {
@@ -60,7 +62,8 @@ internal object TuiScreen {
         when (state.tab) {
             TuiTab.OVERVIEW -> TuiOverviewView.render(data, state.overview, size, TuiOverviewLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.SESSIONS -> TuiSessionsView.render(data.sessions, state.sessions, size, TuiSessionsLabels(labels.language), profile)
-            TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> TuiTabView(emptyList())
+            TuiTab.HISTORY -> TuiHistoryView.render(data.history, state.history, size, TuiHistoryLabels(labels.language), TerminalLabels(labels.language), profile)
+            TuiTab.TEAM, TuiTab.SETTINGS -> TuiTabView(emptyList())
         }
 
     /** O aviso de resultado na última linha do corpo, `✓` verde ou `▲`, sobre o que estiver ali. */

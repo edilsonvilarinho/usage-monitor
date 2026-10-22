@@ -146,7 +146,11 @@ custo em negrito. A linha selecionada leva `▸` e fundo de seleção. Modelo se
 custo, com nota de rodapé.
 
 **Sparkline** (3.3). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
-reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado.
+reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado. A célula leva o
+maior uso lido nela, pelo piso; sem leitura fica em branco. Reinício é a leitura em que a janela
+anterior já tinha acabado (o fim mudou e ficou para trás), comparada com a última leitura que
+conhecia o fim: numa janela corrida o fim anda a cada leitura, e a leitura ociosa vem sem fim.
+Em tela estreita a trilha perde o começo, nunca o agora.
 
 **Composição de tokens** (3.2). Segmentos `█` nas cores da série (`--term-input`, `--term-output`,
 `--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série. Sem Unicode, o

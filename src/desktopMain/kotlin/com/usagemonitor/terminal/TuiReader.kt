@@ -11,6 +11,9 @@ import com.usagemonitor.presentation.terminal.TerminalAccount
 import com.usagemonitor.presentation.terminal.TuiAccount
 import com.usagemonitor.presentation.terminal.TuiActiveSession
 import com.usagemonitor.presentation.terminal.TuiData
+import com.usagemonitor.presentation.terminal.TuiHistory
+import com.usagemonitor.presentation.terminal.TuiHistoryRow
+import com.usagemonitor.presentation.terminal.TuiHistoryState
 import com.usagemonitor.presentation.terminal.TuiReadFailure
 import com.usagemonitor.presentation.terminal.TuiSpark
 import com.usagemonitor.presentation.terminal.TuiSparkline
@@ -59,7 +62,8 @@ internal class TuiReader(
                     last24h = if (overview) last24h(account, reading.now) else null
                 )
             },
-            sessions = if (state.tab == TuiTab.SESSIONS) sessionsReader?.load(state.sessions, reading.now) else null
+            sessions = if (state.tab == TuiTab.SESSIONS) sessionsReader?.load(state.sessions, reading.now) else null,
+            history = if (state.tab == TuiTab.HISTORY) history(reading.accounts, state.history.range, reading.now) else null
         )
     }
 
@@ -119,6 +123,27 @@ internal class TuiReader(
             }
             else -> null
         }
+    }
+
+    /**
+     * A aba 3: uma trilha por cota com percentual, na ordem do painel, pelo mesmo caso de uso
+     * do Histórico do app. Uma consulta por conta; conta sem histórico fica com a trilha vazia.
+     */
+    private fun history(accounts: List<TerminalAccount>, range: HistoryRange, now: Instant): TuiHistory? {
+        val stores = stores ?: return null
+        val start = range.windowStart(now)
+        val rows = accounts.flatMap { account ->
+            val quotas = account.quotas.filter { quota -> quota.percent != null }
+            if (quotas.isEmpty()) {
+                return@flatMap emptyList()
+            }
+            val report = runCatching { runBlocking { stores.getUsageHistory(account.source, range, account.accountKey, now) } }.getOrNull()
+            quotas.map { quota ->
+                val series = report?.series?.firstOrNull { item -> item.quotaLabel == quota.label && item.periodType == quota.periodType }
+                TuiHistoryRow(account, quota, series?.let { found -> TuiSparkline.build(found.points, start, now, TuiHistoryState.cellCount(range)) })
+            }
+        }
+        return TuiHistory(range, rows)
     }
 
     /** As últimas 24 h da primeira cota com percentual, em células de meia hora. */

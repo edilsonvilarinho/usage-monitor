@@ -29,22 +29,31 @@ internal object TuiSparkline {
         val cellMillis = (span / cellCount).coerceAtLeast(1L)
         val cells = MutableList<Int?>(cellCount) { null }
         val resets = mutableSetOf<Int>()
-        val ordered = points.sortedBy { point -> point.capturedAt }
-        ordered.forEachIndexed { index, point ->
+        // A leitura ociosa (a 5h sem sessão) vem sem reinício conhecido e com um fim fictício:
+        // a comparação é com a última leitura que conhecia o fim da janela.
+        var lastKnown: UsageHistoryPoint? = null
+        for (point in points.sortedBy { item -> item.capturedAt }) {
             val offset = (point.capturedAt - startsAt).inWholeMilliseconds
-            if (offset < 0L || point.capturedAt > endsAt) {
-                return@forEachIndexed
-            }
+            val inside = offset >= 0L && point.capturedAt <= endsAt
             val cell = (offset / cellMillis).toInt().coerceAtMost(cellCount - 1)
-            val percent = (point.normalizedUsage * 100f).toInt().coerceIn(0, 100)
-            cells[cell] = maxOf(cells[cell] ?: 0, percent)
-            val previous = ordered.getOrNull(index - 1)
-            if (previous != null && point.hasKnownResetAt && !isSamePeriod(previous.periodEndAt, point.periodEndAt)) {
+            if (inside) {
+                val percent = (point.normalizedUsage * 100f).toInt().coerceIn(0, 100)
+                cells[cell] = maxOf(cells[cell] ?: 0, percent)
+            }
+            if (!point.hasKnownResetAt) {
+                continue
+            }
+            val previous = lastKnown
+            if (inside && previous != null && isReset(previous, point)) {
                 resets += cell
             }
+            lastKnown = point
         }
         return TuiSpark(cells, resets, startsAt, cellMillis)
     }
+
+    private fun isReset(previous: UsageHistoryPoint, current: UsageHistoryPoint): Boolean =
+        !isSamePeriod(previous.periodEndAt, current.periodEndAt) && previous.periodEndAt <= current.capturedAt
 
     /**
      * Uma célula por degrau na cor da fonte, `┆` muted no reinício e espaço sem leitura. O

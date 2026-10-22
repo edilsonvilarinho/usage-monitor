@@ -48,9 +48,8 @@ internal object TuiOverviewView {
         val glyphs = profile.glyphs
         val shortcuts = buildList {
             add(TuiShortcut("↑↓", labels.keySource))
-            if (size.stacked) {
-                add(if (state.detailOpen) TuiShortcut("esc", TuiLabels(labels.language).keyBackLabel) else TuiShortcut("enter", labels.keyOpenAccount))
-            }
+            // Lado a lado, `enter` abre o histórico da conta; empilhado, o detalhe dela.
+            add(if (size.stacked && state.detailOpen) TuiShortcut("esc", TuiLabels(labels.language).keyBackLabel) else TuiShortcut("enter", labels.keyOpenAccount))
         }
         if (data.accounts.isEmpty()) {
             return TuiTabView(listOf(terminalLine(TerminalSpan(labels.noAccounts, TerminalColor.Muted))), shortcuts)
