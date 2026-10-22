@@ -11,6 +11,7 @@
 | `gradlew.bat packageDmg` | macOS only — jpackage does not cross-compile |
 | `gradlew.bat generateScreenshots` | regenerates `img/*.png` |
 | `gradlew.bat generateTourGif` | regenerates `img/tour.gif` |
+| `gradlew.bat generateTerminalMedia` | regenerates `img/terminal.gif` and `img/terminal-pt.gif` (terminal mode, synthetic data) |
 
 `build-with-icon.ps1` is a Windows helper flow: it builds the distributable, applies the icon with
 `rcedit`, and calls NSIS by hand.

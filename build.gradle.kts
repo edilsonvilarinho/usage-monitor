@@ -349,6 +349,17 @@ tasks.register<JavaExec>("generateTourGif") {
 
 // Demos da janela de ajuda (issue #184). Saem em src/desktopMain/resources/help
 // para entrar no jar distribuido: sao lidas do classpath em tempo de execucao.
+tasks.register<JavaExec>("generateTerminalMedia") {
+    group = "documentation"
+    description = "Renderiza o GIF do modo terminal no README (status e tui) com dados sinteticos."
+
+    mainClass.set("com.usagemonitor.screenshots.TerminalMediaGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    args(layout.projectDirectory.dir("img").asFile.absolutePath)
+    // O Java2D desenha sem tela: o gerador roda no CI e num servidor sem DISPLAY.
+    jvmArgs("-Djava.awt.headless=true")
+}
+
 tasks.register<JavaExec>("generateHelpMedia") {
     group = "documentation"
     description = "Renderiza offscreen as demos da janela de ajuda com dados sinteticos."
