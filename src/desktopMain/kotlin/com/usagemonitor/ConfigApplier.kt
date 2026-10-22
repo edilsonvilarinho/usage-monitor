@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
 import com.usagemonitor.domain.entity.ApiSource
+import kotlinx.coroutines.flow.update
 
 /**
  * O que o coletor faz depois de uma mudança, além de gravar: recoletar a fonte, reenviar
@@ -29,12 +30,41 @@ internal class ConfigApplier(
             when (change) {
                 is ConfigChange.SourceEnabled -> sourceEnabled(change)
                 is ConfigChange.SetValue -> setValue(change)
+                is ConfigChange.SetApiKey -> setApiKey(change)
+                is ConfigChange.RemoveApiKey -> removeApiKey(change)
             }
         }.getOrElse { error -> ConfigOutcome.Refused(ConfigRefusals.FAILED, error.message) }
         // O terminal que lê logo depois precisa ver o valor gravado (risco R2).
         store.flush()
         return outcome
     }
+
+    /** Grava a chave e liga a fonte: quem salva uma chave pelo terminal quer a fonte coletando. */
+    private fun setApiKey(change: ConfigChange.SetApiKey): ConfigOutcome {
+        val source = keySourceOf(change.source) ?: return ConfigOutcome.Refused(ConfigRefusals.UNKNOWN_SOURCE, change.source)
+        val apiKey = change.apiKey.trim()
+        store.apiKeyDataSource.save(source, apiKey)
+        store.apiKeySettings.update { current -> current.withKey(source, apiKey) }
+        persistEnabledApis(store, store.enabledApis.value + source)
+        hooks.refreshSource(source)
+        return ConfigOutcome.Applied()
+    }
+
+    /**
+     * Apagar a chave desliga a fonte, e as duas gravações andam juntas, como na aba APIs
+     * (`SettingsActions.removeApiKey`): ligada sem chave, a coleta falharia a cada tique.
+     */
+    private fun removeApiKey(change: ConfigChange.RemoveApiKey): ConfigOutcome {
+        val source = keySourceOf(change.source) ?: return ConfigOutcome.Refused(ConfigRefusals.UNKNOWN_SOURCE, change.source)
+        store.apiKeyDataSource.clear(source)
+        store.apiKeySettings.update { current -> current.withoutKey(source) }
+        persistEnabledApis(store, store.enabledApis.value - source)
+        hooks.refreshSource(source)
+        return ConfigOutcome.Applied()
+    }
+
+    private fun keySourceOf(name: String): ApiSource? =
+        ApiSource.entries.firstOrNull { entry -> entry.name == name && entry in API_KEY_DEPENDENT_SOURCES }
 
     /** Um ajuste com nome: o valor é conferido aqui também, porque o pedido pode vir de outra versão. */
     private fun setValue(change: ConfigChange.SetValue): ConfigOutcome {

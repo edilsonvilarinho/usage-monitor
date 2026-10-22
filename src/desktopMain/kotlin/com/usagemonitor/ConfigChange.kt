@@ -19,6 +19,18 @@ internal sealed interface ConfigChange {
     @SerialName("source_enabled")
     data class SourceEnabled(val source: String, val enabled: Boolean) : ConfigChange
 
+    /** `keys set <fonte>`: grava a chave e liga a fonte. A chave viaja aqui; o `toString` a esconde. */
+    @Serializable
+    @SerialName("api_key_set")
+    data class SetApiKey(val source: String, val apiKey: String) : ConfigChange {
+        override fun toString(): String = "SetApiKey(source=$source, apiKey=${redactedSecret(apiKey)})"
+    }
+
+    /** `keys remove <fonte>`: apaga a chave e desliga a fonte, como na aba APIs. */
+    @Serializable
+    @SerialName("api_key_remove")
+    data class RemoveApiKey(val source: String) : ConfigChange
+
     /**
      * `config set <ajuste> <valor>` ([ConfigKeys]). O valor de um ajuste secreto
      * (`proxy.password`) viaja aqui, então o `toString` o esconde.

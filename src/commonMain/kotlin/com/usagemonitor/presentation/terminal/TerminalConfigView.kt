@@ -37,6 +37,9 @@ internal object TerminalConfigView {
         return TerminalLine(spans)
     }
 
+    /** Uma linha de complemento, indentada e em muted, abaixo de um resultado. */
+    fun note(text: String): TerminalLine = terminalLine(TerminalSpan("  $text", TerminalColor.Muted))
+
     /** `▲ aviso` e, se houver o que rodar, o comando na linha de baixo, indentado. */
     fun warning(text: String, command: String?, glyphs: TerminalGlyphs): List<TerminalLine> {
         val lines = mutableListOf(terminalLine(TerminalSpan(glyphs.warning + " ", TerminalColor.Warn), TerminalSpan(text)))

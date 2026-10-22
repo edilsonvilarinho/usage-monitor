@@ -1,6 +1,7 @@
 package com.usagemonitor.terminal
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.requiresLocalApiKey
 
 /**
  * Os comandos de configurar pelo terminal (#440). Cada família (`sources`, `config`,
@@ -108,3 +109,56 @@ private fun invalidSettingKey(name: String?, command: String): TerminalCommandPa
     } else {
         TerminalCommandParse.Invalid("Error: '$name' is not a setting. Run 'usage-monitor config list' to see them.")
     }
+
+/** `keys set <fonte> [--skip-test] | test <fonte> | remove <fonte>` (D5: a chave vem da entrada). */
+internal sealed interface KeysCommand : ConfigCommand {
+    val source: ApiSource
+
+    data class Set(override val source: ApiSource, val skipTest: Boolean = false) : KeysCommand
+
+    data class Test(override val source: ApiSource) : KeysCommand
+
+    data class Remove(override val source: ApiSource) : KeysCommand
+}
+
+internal object KeysCommandNames {
+    const val KEYS = "keys"
+    const val SET = "set"
+    const val TEST = "test"
+    const val REMOVE = "remove"
+    const val SKIP_TEST = "--skip-test"
+
+    val ACTIONS: kotlin.collections.List<String> = listOf(SET, TEST, REMOVE)
+}
+
+internal fun parseKeysCommand(arguments: kotlin.collections.List<String>): TerminalCommandParse {
+    val actions = KeysCommandNames.ACTIONS.joinToString(", ")
+    val action = arguments.firstOrNull()
+        ?: return TerminalCommandParse.Invalid("Error: '${KeysCommandNames.KEYS}' needs an action: $actions.")
+    if (action !in KeysCommandNames.ACTIONS) {
+        return TerminalCommandParse.Invalid("Error: '$action' is not a keys action. Use $actions.")
+    }
+    val command = "${KeysCommandNames.KEYS} $action"
+    // Só as fontes que leem a chave de `api-keys.json` (o mesmo predicado do app).
+    val ids = ApiSource.entries.filter { source -> source.requiresLocalApiKey() }.joinToString(", ") { source -> source.terminalId() }
+    val id = arguments.getOrNull(1)
+        ?: return TerminalCommandParse.Invalid("Error: '$command' needs a source: $ids.")
+    val source = apiSourceOfTerminalId(id)?.takeIf { candidate -> candidate.requiresLocalApiKey() }
+        ?: return TerminalCommandParse.Invalid("Error: '$id' has no API key. Use one of: $ids.")
+    var skipTest = false
+    for (extra in arguments.drop(2)) {
+        when {
+            action == KeysCommandNames.SET && extra == KeysCommandNames.SKIP_TEST -> skipTest = true
+            // Uma chave colada como argumento ficaria no histórico do shell: recusar, e dizer por quê.
+            !extra.startsWith("-") -> return TerminalCommandParse.Invalid("Error: the key is read from the input, never from an argument. Run '$command ${source.terminalId()}' and paste it.")
+            else -> return unknownOption(command, extra)
+        }
+    }
+    return TerminalCommandParse.Parsed(
+        when (action) {
+            KeysCommandNames.SET -> KeysCommand.Set(source, skipTest)
+            KeysCommandNames.TEST -> KeysCommand.Test(source)
+            else -> KeysCommand.Remove(source)
+        }
+    )
+}

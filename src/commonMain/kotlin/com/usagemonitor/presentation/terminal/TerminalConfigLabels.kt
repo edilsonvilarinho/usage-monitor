@@ -86,4 +86,25 @@ internal class TerminalConfigLabels(val language: AppLanguage) {
             "CLEAR_ONLY" -> localized(language, "off, que volta ao limiar geral em todas as contas", "off, which goes back to the general threshold in every account")
             else -> localized(language, "um texto", "a text")
         }
+
+    fun keyPrompt(name: String): String =
+        localized(
+            language,
+            "Cole a chave do $name e tecle enter (não aparece na tela nem vai para o histórico do shell):",
+            "Paste the $name key and press enter (it is not shown and stays out of the shell history):"
+        )
+
+    fun keySaved(name: String): String = localized(language, "chave do $name salva e a fonte ligada", "$name key saved and the source enabled")
+
+    fun keyRemoved(name: String): String = localized(language, "chave do $name removida e a fonte desligada", "$name key removed and the source disabled")
+
+    fun keyRejected(message: String): String = localized(language, "A chave não passou no teste, e nada mudou. $message", "The key did not pass the test, and nothing changed. $message")
+
+    val skipTestHint: String get() = localized(language, "Para gravar sem testar (por exemplo, sem rede agora):", "To save it without testing (for example, with no network now):")
+
+    fun keyTestedWithWarning(message: String): String = localized(language, "Testada, com ressalva: $message", "Tested, with a caveat: $message")
+
+    val keyNotTested: String get() = localized(language, "gravada sem teste", "saved without a test")
+
+    fun noSavedKey(name: String): String = localized(language, "$name não tem chave salva. Salve com:", "$name has no saved key. Save it with:")
 }

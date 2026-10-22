@@ -5,7 +5,6 @@ import com.usagemonitor.ConfigChange
 import com.usagemonitor.ConfigKeys
 import com.usagemonitor.ConfigReadSource
 import com.usagemonitor.ConfigValues
-import com.usagemonitor.ConfigOutcome
 import com.usagemonitor.ConfigRefusals
 import com.usagemonitor.ENABLED_APIS_KEY
 import com.usagemonitor.data.AppDataDirectory
@@ -19,7 +18,6 @@ import com.usagemonitor.domain.entity.requiresLocalApiKey
 import com.usagemonitor.presentation.terminal.TerminalAnsi
 import com.usagemonitor.presentation.terminal.TerminalConfigLabels
 import com.usagemonitor.presentation.terminal.TerminalConfigView
-import com.usagemonitor.presentation.terminal.TerminalLine
 import com.usagemonitor.presentation.terminal.TerminalOutput
 import com.usagemonitor.presentation.terminal.TerminalProfile
 import com.usagemonitor.presentation.terminal.TerminalSettingRow
@@ -44,7 +42,9 @@ internal class TerminalConfigRunner(
     private val reader: TerminalReader = TerminalReader(),
     private val preferences: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName),
     private val dataFile: (String) -> File = AppDataDirectory::file,
-    private val secretInput: TerminalSecretInput = TerminalSecretInput.SYSTEM
+    private val secretInput: TerminalSecretInput = TerminalSecretInput.SYSTEM,
+    private val keyProbe: (ApiSource, String) -> Throwable? =
+        TerminalKeysRunner.realProbe { LocalProxySettingsDataSource(dataFile("proxy.json")).load() }
 ) {
 
     fun run(command: ConfigCommand, languageOverride: AppLanguage?, console: TerminalConsole): Int {
@@ -52,6 +52,11 @@ internal class TerminalConfigRunner(
         val output = when (command) {
             is SourcesCommand -> sources(command, labels, console.profile)
             is SettingCommand -> setting(command, labels, console)
+            is KeysCommand -> TerminalKeysRunner(
+                client, secretInput,
+                savedKey = { source -> LocalApiKeyDataSource(dataFile("api-keys.json")).load().forSource(source) },
+                probe = keyProbe
+            ).run(command, labels, console.profile)
         }
         if (output.lines.isNotEmpty()) {
             console.print(TerminalAnsi.render(output.lines, console.profile))
@@ -138,30 +143,4 @@ internal class TerminalConfigRunner(
             TerminalSourceRow(source, source.terminalId(), source in stored && (!needsKey || hasKey), needsKey, hasKey)
         }
     }
-
-    /**
-     * A saída de uma mudança entregue: `✓` com a consequência, a recusa que o comando
-     * explica ([refusal]), ou o aviso genérico.
-     */
-    private fun delivered(
-        delivery: ConfigDelivery,
-        labels: TerminalConfigLabels,
-        profile: TerminalProfile,
-        doneText: String,
-        refusal: (ConfigOutcome.Refused) -> List<TerminalLine>?
-    ): TerminalOutput =
-        when (delivery) {
-            is ConfigDelivery.NotAnswered ->
-                TerminalOutput(TerminalConfigView.warning(labels.notAnswered(delivery.collector), null, profile.glyphs), TerminalConfigView.EXIT_REFUSED)
-            is ConfigDelivery.Answered -> when (val outcome = delivery.outcome) {
-                is ConfigOutcome.Applied -> {
-                    val consequence = if (outcome.restartNeeded) labels.restartNeeded(delivery.collector) else labels.appliedBy(delivery.collector)
-                    TerminalOutput(listOf(TerminalConfigView.done(doneText, consequence, profile.glyphs)), TerminalConfigView.EXIT_OK)
-                }
-                is ConfigOutcome.Refused -> TerminalOutput(
-                    refusal(outcome) ?: TerminalConfigView.warning(labels.failed(outcome.detail), null, profile.glyphs),
-                    TerminalConfigView.EXIT_REFUSED
-                )
-            }
-        }
 }

@@ -4,6 +4,7 @@ import com.usagemonitor.AppSettingsStore
 import com.usagemonitor.CommandLineRequest
 import com.usagemonitor.ConfigApplier
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
@@ -27,7 +28,9 @@ import kotlin.concurrent.thread
  */
 internal class TerminalConfigHarness(
     private val collector: CollectorKind? = null,
-    private val language: AppLanguage = AppLanguage.PT
+    private val language: AppLanguage = AppLanguage.PT,
+    /** A falha da coleta com a chave candidata; `null` é chave válida. */
+    private val keyProbe: (ApiSource, String) -> Throwable? = { _, _ -> null }
 ) : AutoCloseable {
     val dir: File = Files.createTempDirectory("usage-monitor-config").toFile()
     val node: Preferences = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
@@ -59,7 +62,8 @@ internal class TerminalConfigHarness(
         val client = TerminalConfigClient(collector = { collector }, channel = channel, localStore = ::store, timeoutMillis = 3_000)
         val runner = TerminalConfigRunner(
             client, TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node), node, ::file,
-            secretInput = { _ -> secret }
+            secretInput = { _ -> secret },
+            keyProbe = keyProbe
         )
         val code = runner.run(command, language, console)
         return code to buffer.toString(Charsets.UTF_8)
