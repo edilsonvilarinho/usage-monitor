@@ -274,6 +274,7 @@ internal class CollectorEngine(
         graph.store,
         ConfigHooks(
             refreshSource = { source -> dashboard.refresh(source) },
+            teamChanged = { teamSync.requestImmediateSync() },
             // O que o motor guarda em memória; o que mora na tela do app, o app relê.
             valueChanged = { key ->
                 when (key.name) {

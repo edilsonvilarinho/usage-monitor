@@ -11,7 +11,11 @@ import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
+import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
+import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.siteLocalIpv4Addresses
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.buildHttpClient
@@ -52,6 +56,9 @@ internal class TerminalConfigRunner(
     private val telegramApi: () -> TelegramBotApi = {
         TelegramBotApi(buildHttpClient(resolveEffectiveProxy(LocalProxySettingsDataSource(dataFile("proxy.json")).load())))
     },
+    private val teamCheck: (TeamIntegrationSettings, List<TeamCheckAccount>) -> List<String> =
+        TerminalTeamRunner.realCheck { LocalProxySettingsDataSource(dataFile("proxy.json")).load() },
+    private val webAddresses: () -> List<String> = ::siteLocalIpv4Addresses,
     private val keyProbe: (ApiSource, String) -> Throwable? =
         TerminalKeysRunner.realProbe { LocalProxySettingsDataSource(dataFile("proxy.json")).load() }
 ) {
@@ -73,6 +80,8 @@ internal class TerminalConfigRunner(
                 api = telegramApi,
                 secretInput = secretInput
             ).run(command, labels, console)
+            is TeamCommand -> teamRunner().runTeam(command, labels, console.profile)
+            is WebCommand -> teamRunner().runWeb(command, labels, console.profile)
             is AccountsCommand -> TerminalAccountsRunner(
                 client, preferences, home, codexHome,
                 codexSourceEnabled = { ApiSource.CODEX in readApiSourceCollection(PreferencesSettings(preferences), ENABLED_APIS_KEY) },
@@ -99,6 +108,15 @@ internal class TerminalConfigRunner(
                 }
             }
         }
+
+    private fun teamRunner() = TerminalTeamRunner(
+        client, preferences, home,
+        teamSettings = { LocalTeamSettingsDataSource(dataFile("team.json")).load() },
+        webSettings = { LocalWebAccessSettingsDataSource(dataFile("web-access.json")).load() },
+        secretInput = secretInput,
+        teamCheck = teamCheck,
+        addresses = webAddresses
+    )
 
     private fun setting(command: SettingCommand, labels: TerminalConfigLabels, console: TerminalConsole): TerminalOutput {
         val glyphs = console.profile.glyphs

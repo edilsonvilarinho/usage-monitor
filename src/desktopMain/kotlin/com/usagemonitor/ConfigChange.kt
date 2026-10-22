@@ -83,6 +83,28 @@ internal sealed interface ConfigChange {
     @SerialName("telegram_chat_readonly")
     data class TelegramChatReadOnly(val chat: String, val readOnly: Boolean) : ConfigChange
 
+    /** `team join`: servidor, chave (já conferida), apelido e as contas que participam. */
+    @Serializable
+    @SerialName("team_join")
+    data class TeamJoin(val serverUrl: String, val apiKey: String, val alias: String, val profileIds: Set<String>) : ConfigChange {
+        override fun toString(): String = "TeamJoin(serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, profileIds=$profileIds)"
+    }
+
+    /** `team leave`: desliga a integração e apaga a chave; servidor e apelido ficam para voltar. */
+    @Serializable
+    @SerialName("team_leave")
+    data object TeamLeave : ConfigChange
+
+    /** `web enable [--port] | disable`: ligar pela primeira vez gera o token, como nas Configurações. */
+    @Serializable
+    @SerialName("web_enabled")
+    data class WebEnabled(val enabled: Boolean, val port: Int? = null) : ConfigChange
+
+    /** `web token --regenerate`: token novo, e todo endereço já copiado deixa de valer. */
+    @Serializable
+    @SerialName("web_token")
+    data object WebRegenerateToken : ConfigChange
+
     /**
      * `config set <ajuste> <valor>` ([ConfigKeys]). O valor de um ajuste secreto
      * (`proxy.password`) viaja aqui, então o `toString` o esconde.

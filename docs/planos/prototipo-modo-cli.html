@@ -633,6 +633,16 @@ S.config = () => render([
   L(' ', c('a', '● '), pad('Anthropic', 11), pad('trabalho', 10), c('mu', pad('5f0c2a7e-91d3', 15)), c('mu', pad('/srv/claude-work', 22)), c('ok', 'monitorada'), c('mu', ' · pronta')),
   L(' ', c('c', '● '), pad('Codex', 11), pad('padrão', 10), c('mu', pad('codex', 15)), c('mu', pad('~/.codex', 22)), c('mu', 'pela fonte · pronta')),
   L(' ', c('c', '● '), pad('Codex', 11), pad('cliente', 10), c('mu', pad('codex-8d41b0e', 15)), c('mu', pad('~/.codex-cliente', 22)), c('ok', 'monitorada'), c('wa', ' · sem login')),
+  L(''),
+  sh('usage-monitor team join --server https://time.exemplo.com --alias edi'),
+  L('Cole a chave do time (a que o administrador deu) e tecle enter (não aparece na tela):'),
+  L(c('ok', '✓ '), 'no time em time.exemplo.com como edi, com 2 contas', c('mu', ' · o serviço já está usando')),
+  L(c('mu', '  servidor e vínculo das contas conferidos')),
+  L(''),
+  sh('usage-monitor web enable'),
+  L(c('ok', '✓ '), 'acesso pela rede ligado na porta 8787', c('mu', ' · o serviço já está usando')),
+  L(c('mu', '  O endereço com o token sai com:')),
+  L(c('b', '    usage-monitor web token --show')),
 ]);
 
 S.service = () => render([

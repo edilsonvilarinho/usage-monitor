@@ -8,6 +8,7 @@ import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.parseCommandLine
 import com.usagemonitor.presentation.terminal.TerminalPalette
@@ -32,7 +33,8 @@ internal class TerminalConfigHarness(
     private val language: AppLanguage = AppLanguage.PT,
     /** A falha da coleta com a chave candidata; `null` é chave válida. */
     private val keyProbe: (ApiSource, String) -> Throwable? = { _, _ -> null },
-    private val telegramApi: () -> TelegramBotApi = { error("o teste não fala com o Telegram") }
+    private val telegramApi: () -> TelegramBotApi = { error("o teste não fala com o Telegram") },
+    private val teamCheck: (TeamIntegrationSettings, List<TeamCheckAccount>) -> List<String> = { _, _ -> emptyList() }
 ) : AutoCloseable {
     val dir: File = Files.createTempDirectory("usage-monitor-config").toFile()
     val node: Preferences = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
@@ -68,7 +70,9 @@ internal class TerminalConfigHarness(
             home = dir,
             codexHome = File(dir, ".codex"),
             keyProbe = keyProbe,
-            telegramApi = telegramApi
+            telegramApi = telegramApi,
+            teamCheck = teamCheck,
+            webAddresses = { listOf("192.168.0.10") }
         )
         val code = runner.run(command, language, console)
         return code to buffer.toString(Charsets.UTF_8)

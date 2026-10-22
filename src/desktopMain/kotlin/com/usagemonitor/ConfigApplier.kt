@@ -3,6 +3,9 @@ package com.usagemonitor
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
+import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.WebAccessSettings
 import com.usagemonitor.domain.entity.TELEGRAM_PAIRING_TTL_MILLIS
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import kotlinx.coroutines.flow.update
@@ -14,6 +17,8 @@ import kotlin.time.Clock
  */
 internal class ConfigHooks(
     val refreshSource: (ApiSource) -> Unit = {},
+    /** O time mudou: o envio sai na hora, para o apelido e o vínculo chegarem logo. */
+    val teamChanged: () -> Unit = {},
     /** Um ajuste de [ConfigKeys] mudou: quem guarda o valor em memória o relê. */
     val valueChanged: (ConfigKey) -> Unit = {}
 )
@@ -44,6 +49,18 @@ internal class ConfigApplier(
                 is ConfigChange.AccountEnabled -> accounts.switch(change)
                 is ConfigChange.RemoveAccount -> accounts.remove(change)
                 ConfigChange.RescanAccounts -> accounts.rescan()
+                is ConfigChange.TeamJoin -> team { current ->
+                    current.copy(enabled = true, serverUrl = change.serverUrl.trim(), apiKey = change.apiKey.trim(), alias = change.alias.trim(), participatingProfileIds = change.profileIds)
+                }
+                ConfigChange.TeamLeave -> team { current -> current.copy(enabled = false, apiKey = "", participatingProfileIds = emptySet()) }
+                is ConfigChange.WebEnabled -> web { current ->
+                    current.copy(
+                        enabled = change.enabled,
+                        port = change.port ?: current.port,
+                        token = current.token.ifBlank { LocalWebAccessSettingsDataSource.newToken() }
+                    )
+                }
+                ConfigChange.WebRegenerateToken -> web { current -> current.copy(token = LocalWebAccessSettingsDataSource.newToken()) }
                 is ConfigChange.TelegramSetup -> telegramSetup(change)
                 is ConfigChange.TelegramEnabled -> telegramUpdate { current -> current.copy(enabled = change.enabled) }
                 ConfigChange.TelegramStartPairing -> telegramStartPairing()
@@ -81,6 +98,21 @@ internal class ConfigApplier(
         store.apiKeySettings.update { current -> current.withoutKey(source) }
         persistEnabledApis(store, store.enabledApis.value - source)
         hooks.refreshSource(source)
+        return ConfigOutcome.Applied()
+    }
+
+    private fun team(transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): ConfigOutcome {
+        if (!updateTeamSettings(store.teamSettingsFlow, store.teamSettingsDataSource, transform)) {
+            return ConfigOutcome.Refused(ConfigRefusals.FAILED, "team.json")
+        }
+        hooks.teamChanged()
+        return ConfigOutcome.Applied()
+    }
+
+    /** O motor sobe, derruba ou reinicia o servidor ao ver o flow mudar. */
+    private fun web(transform: (WebAccessSettings) -> WebAccessSettings): ConfigOutcome {
+        store.webAccessSettingsFlow.update(transform)
+        store.webAccessSettingsDataSource.save(store.webAccessSettingsFlow.value)
         return ConfigOutcome.Applied()
     }
 
