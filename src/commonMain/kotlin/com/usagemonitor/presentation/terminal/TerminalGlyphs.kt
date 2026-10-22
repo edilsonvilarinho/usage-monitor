@@ -22,7 +22,9 @@ data class TerminalGlyphs(
     val barOpen: String,
     val barClose: String,
     /** Anel em quartos da linha de status; vazio no ASCII, onde o número basta. */
-    val rings: String
+    val rings: String,
+    /** Segredo salvo, no lugar do valor (#440): nunca o segredo. */
+    val secretMask: String = "••••"
 ) {
     /** O quarto de anel de [percent], ou `null` quando a coluna não tem anel. */
     fun ring(percent: Int): String? {
@@ -69,7 +71,8 @@ data class TerminalGlyphs(
             barEighths = "",
             barOpen = "[",
             barClose = "]",
-            rings = ""
+            rings = "",
+            secretMask = "****"
         )
     }
 }

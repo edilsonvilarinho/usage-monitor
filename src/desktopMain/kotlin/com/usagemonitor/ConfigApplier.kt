@@ -8,7 +8,9 @@ import com.usagemonitor.domain.entity.ApiSource
  * ao time. Fora do coletor (terminal sem app nem serviço), nada.
  */
 internal class ConfigHooks(
-    val refreshSource: (ApiSource) -> Unit = {}
+    val refreshSource: (ApiSource) -> Unit = {},
+    /** Um ajuste de [ConfigKeys] mudou: quem guarda o valor em memória o relê. */
+    val valueChanged: (ConfigKey) -> Unit = {}
 )
 
 /**
@@ -26,11 +28,22 @@ internal class ConfigApplier(
         val outcome = runCatching {
             when (change) {
                 is ConfigChange.SourceEnabled -> sourceEnabled(change)
+                is ConfigChange.SetValue -> setValue(change)
             }
         }.getOrElse { error -> ConfigOutcome.Refused(ConfigRefusals.FAILED, error.message) }
         // O terminal que lê logo depois precisa ver o valor gravado (risco R2).
         store.flush()
         return outcome
+    }
+
+    /** Um ajuste com nome: o valor é conferido aqui também, porque o pedido pode vir de outra versão. */
+    private fun setValue(change: ConfigChange.SetValue): ConfigOutcome {
+        val key = ConfigKeys.named(change.key) ?: return ConfigOutcome.Refused(ConfigRefusals.UNKNOWN_KEY, change.key)
+        val normalized = ConfigValues.normalize(key.type, change.value)
+            ?: return ConfigOutcome.Refused(ConfigRefusals.INVALID_VALUE, key.name)
+        key.write(store, normalized.takeUnless { value -> value == ConfigValues.OFF })
+        hooks.valueChanged(key)
+        return ConfigOutcome.Applied(restartNeeded = key.restartNeeded)
     }
 
     /**

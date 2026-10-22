@@ -127,6 +127,16 @@ internal class AppShellState(
     }
 
     /**
+     * Um ajuste mudou pelo terminal com o app coletando (#440): o coletor já gravou e
+     * aplicou; aqui só se relê o que a tela guarda em estado próprio.
+     */
+    fun reloadFromSettings() {
+        language = languageSelection.current()
+        monthlyBudgetMicros = readPersistedBudgetMicros(settings)
+        autoStartEnabled = settings.getBoolean(AUTO_START_KEY, autoStartEnabled)
+    }
+
+    /**
      * Conta que sumiu sai da ordem; conta nova entra nela. A ordem é a que o
      * arrasto do dashboard gravava e que a barra HUD segue lendo.
      */

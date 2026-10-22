@@ -73,6 +73,7 @@ aqui, na seção Primitivas.
 | Anel na linha de status | `○ ◔ ◑ ◕ ●` (quartos de uso) | o número basta |
 | Valor ajustável | `‹ 70 ›` | `< 70 >` |
 | Legenda de série | `■` na cor da série | inicial da série |
+| Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 

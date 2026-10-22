@@ -13,6 +13,12 @@ internal data class TerminalSourceRow(
 )
 
 /**
+ * Um ajuste no `config list`: [value] nulo é desligado. Ajuste [masked] chega aqui já sem
+ * o segredo — só saber se há um — e sai como máscara.
+ */
+internal data class TerminalSettingRow(val key: String, val value: String?, val masked: Boolean)
+
+/**
  * As telas de configurar pelo terminal (#440, 4.3 do protótipo). Funções puras de dados
  * para linhas; a primitiva é o "Resultado de comando" do design system.
  */
@@ -62,6 +68,20 @@ internal object TerminalConfigView {
                 TerminalSpan((if (row.enabled) labels.enabled else labels.disabled).padEnd(stateWidth) + GAP, if (row.enabled) TerminalColor.Ok else TerminalColor.Muted),
                 key
             )
+        }
+        return TerminalOutput(lines, EXIT_OK)
+    }
+
+    /** `config list`: o nome em muted e o valor; desligado em muted; segredo como máscara. */
+    fun settings(rows: List<TerminalSettingRow>, labels: TerminalConfigLabels, glyphs: TerminalGlyphs): TerminalOutput {
+        val keyWidth = rows.maxOfOrNull { row -> row.key.length } ?: 0
+        val lines = rows.map { row ->
+            val value = when {
+                row.value == null -> TerminalSpan(if (row.masked) labels.empty else labels.off, TerminalColor.Muted)
+                row.masked -> TerminalSpan(glyphs.secretMask, TerminalColor.Muted)
+                else -> TerminalSpan(row.value)
+            }
+            terminalLine(TerminalSpan(row.key.padEnd(keyWidth) + GAP, TerminalColor.Muted), value)
         }
         return TerminalOutput(lines, EXIT_OK)
     }

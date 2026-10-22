@@ -2,11 +2,16 @@ package com.usagemonitor.terminal
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.ConfigChange
+import com.usagemonitor.ConfigKeys
+import com.usagemonitor.ConfigReadSource
+import com.usagemonitor.ConfigValues
 import com.usagemonitor.ConfigOutcome
 import com.usagemonitor.ConfigRefusals
 import com.usagemonitor.ENABLED_APIS_KEY
 import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
+import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
+import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.displayName
@@ -17,8 +22,12 @@ import com.usagemonitor.presentation.terminal.TerminalConfigView
 import com.usagemonitor.presentation.terminal.TerminalLine
 import com.usagemonitor.presentation.terminal.TerminalOutput
 import com.usagemonitor.presentation.terminal.TerminalProfile
+import com.usagemonitor.presentation.terminal.TerminalSettingRow
+import com.usagemonitor.presentation.terminal.TerminalSpan
+import com.usagemonitor.presentation.terminal.terminalLine
 import com.usagemonitor.presentation.terminal.TerminalSourceRow
 import com.usagemonitor.readApiSourceCollection
+import com.usagemonitor.readPersistedAlertSettings
 import java.io.File
 import java.util.prefs.Preferences
 
@@ -27,17 +36,22 @@ import java.util.prefs.Preferences
  * arquivos e preferências do app; mudar passa pelo [TerminalConfigClient], que entrega
  * ao coletor vivo ou aplica sem ele.
  */
+/** Valor que o ajuste não aceita: uso incorreto, como no parser. */
+private const val EXIT_USAGE = 2
+
 internal class TerminalConfigRunner(
     private val client: TerminalConfigClient = TerminalConfigClient(),
     private val reader: TerminalReader = TerminalReader(),
     private val preferences: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName),
-    private val dataFile: (String) -> File = AppDataDirectory::file
+    private val dataFile: (String) -> File = AppDataDirectory::file,
+    private val secretInput: TerminalSecretInput = TerminalSecretInput.SYSTEM
 ) {
 
     fun run(command: ConfigCommand, languageOverride: AppLanguage?, console: TerminalConsole): Int {
         val labels = TerminalConfigLabels(reader.language(languageOverride))
         val output = when (command) {
             is SourcesCommand -> sources(command, labels, console.profile)
+            is SettingCommand -> setting(command, labels, console)
         }
         if (output.lines.isNotEmpty()) {
             console.print(TerminalAnsi.render(output.lines, console.profile))
@@ -59,6 +73,60 @@ internal class TerminalConfigRunner(
                 }
             }
         }
+
+    private fun setting(command: SettingCommand, labels: TerminalConfigLabels, console: TerminalConsole): TerminalOutput {
+        val glyphs = console.profile.glyphs
+        return when (command) {
+            is SettingCommand.List -> {
+                val keys = ConfigKeys.ALL.filter { key -> command.prefix == null || key.name == command.prefix || key.name.startsWith(command.prefix + ".") }
+                if (keys.isEmpty()) {
+                    TerminalOutput(TerminalConfigView.warning(labels.noSettingIn(command.prefix.orEmpty()), "usage-monitor config list", glyphs), EXIT_USAGE)
+                } else {
+                    val source = readSource()
+                    // O segredo não sai daqui: a linha só sabe se há um.
+                    val rows = keys.map { key -> TerminalSettingRow(key.name, key.read(source)?.let { value -> if (key.secret) glyphs.secretMask else value }, key.secret) }
+                    TerminalConfigView.settings(rows, labels, glyphs)
+                }
+            }
+            // Para scripts: o valor cru, `off` quando desligado, e o segredo nunca.
+            is SettingCommand.Get -> {
+                val key = ConfigKeys.named(command.key) ?: return TerminalOutput(emptyList(), EXIT_USAGE)
+                val value = key.read(readSource())
+                val shown = if (key.secret && value != null) glyphs.secretMask else value ?: ConfigValues.OFF
+                TerminalOutput(listOf(terminalLine(TerminalSpan(shown))), TerminalConfigView.EXIT_OK)
+            }
+            is SettingCommand.Set -> setValue(command, labels, console)
+        }
+    }
+
+    private fun setValue(command: SettingCommand.Set, labels: TerminalConfigLabels, console: TerminalConsole): TerminalOutput {
+        val glyphs = console.profile.glyphs
+        val key = ConfigKeys.named(command.key) ?: return TerminalOutput(emptyList(), EXIT_USAGE)
+        val raw = command.value ?: secretInput.read(labels.secretPrompt)?.takeIf { text -> text.isNotBlank() }
+            ?: return TerminalOutput(TerminalConfigView.warning(labels.noSecretGiven, null, glyphs), TerminalConfigView.EXIT_REFUSED)
+        // Conferido aqui, no idioma de quem digitou, antes de ir ao coletor.
+        val normalized = ConfigValues.normalize(key.type, raw)
+            ?: return TerminalOutput(TerminalConfigView.warning(labels.invalidValue(key.name, labels.expected(key.type.name)), null, glyphs), EXIT_USAGE)
+        val doneText = if (key.secret) labels.secretSaved(key.name) else "${key.name} = $normalized"
+        return delivered(client.apply(ConfigChange.SetValue(key.name, raw)), labels, console.profile, doneText) { refused ->
+            if (refused.code == ConfigRefusals.INVALID_VALUE) {
+                TerminalConfigView.warning(labels.invalidValue(key.name, labels.expected(key.type.name)), null, glyphs)
+            } else {
+                null
+            }
+        }
+    }
+
+    /** Os valores como estão gravados: preferências e os dois arquivos, sem montar nada do app. */
+    private fun readSource(): ConfigReadSource {
+        val settings = PreferencesSettings(preferences)
+        return ConfigReadSource(
+            settings = settings,
+            alerts = readPersistedAlertSettings(settings),
+            proxy = LocalProxySettingsDataSource(dataFile("proxy.json")).load(),
+            telegram = LocalTelegramSettingsDataSource(dataFile("telegram.json")).load()
+        )
+    }
 
     /** O estado de cada fonte como o coletor o vê no arranque: ligada só com a chave, quando a pede. */
     private fun sourceRows(): List<TerminalSourceRow> {

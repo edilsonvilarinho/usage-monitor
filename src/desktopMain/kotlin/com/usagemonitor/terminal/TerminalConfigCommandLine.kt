@@ -50,3 +50,61 @@ internal fun parseSourcesCommand(arguments: kotlin.collections.List<String>): Te
         else -> TerminalCommandParse.Invalid("Error: '$action' is not a sources action. Use $actions.")
     }
 }
+
+/** `config list [seção] | get <ajuste> | set <ajuste> [valor]` (4.3 do protótipo). */
+internal sealed interface SettingCommand : ConfigCommand {
+    data class List(val prefix: String? = null) : SettingCommand
+
+    data class Get(val key: String) : SettingCommand
+
+    /** [value] nulo: ajuste secreto, lido da entrada (D5). */
+    data class Set(val key: String, val value: String?) : SettingCommand
+}
+
+internal object SettingCommandNames {
+    const val CONFIG = "config"
+    const val LIST = "list"
+    const val GET = "get"
+    const val SET = "set"
+
+    val ACTIONS: kotlin.collections.List<String> = listOf(LIST, GET, SET)
+}
+
+internal fun parseSettingCommand(arguments: kotlin.collections.List<String>): TerminalCommandParse {
+    val actions = SettingCommandNames.ACTIONS.joinToString(", ")
+    val action = arguments.firstOrNull()
+        ?: return TerminalCommandParse.Invalid("Error: '${SettingCommandNames.CONFIG}' needs an action: $actions.")
+    val rest = arguments.drop(1)
+    val command = "${SettingCommandNames.CONFIG} $action"
+    return when (action) {
+        SettingCommandNames.LIST -> rest.getOrNull(1)?.let { extra -> unknownOption(command, extra) }
+            ?: TerminalCommandParse.Parsed(SettingCommand.List(rest.firstOrNull()?.trim()?.lowercase()?.removeSuffix(".")))
+        SettingCommandNames.GET -> {
+            val key = settingKeyOf(rest.firstOrNull(), command) ?: return invalidSettingKey(rest.firstOrNull(), command)
+            rest.getOrNull(1)?.let { extra -> return unknownOption(command, extra) }
+            TerminalCommandParse.Parsed(SettingCommand.Get(key.name))
+        }
+        SettingCommandNames.SET -> {
+            val key = settingKeyOf(rest.firstOrNull(), command) ?: return invalidSettingKey(rest.firstOrNull(), command)
+            val value = rest.getOrNull(1)
+            rest.getOrNull(2)?.let { extra -> return unknownOption(command, extra) }
+            when {
+                // O segredo nunca vem por argumento: ficaria no histórico do shell e na lista de processos.
+                key.secret && value != null -> TerminalCommandParse.Invalid("Error: '${key.name}' is a secret and is read from the input, never from an argument. Run 'usage-monitor config set ${key.name}' and type it.")
+                !key.secret && value == null -> TerminalCommandParse.Invalid("Error: '$command ${key.name}' needs a value.")
+                else -> TerminalCommandParse.Parsed(SettingCommand.Set(key.name, value))
+            }
+        }
+        else -> TerminalCommandParse.Invalid("Error: '$action' is not a config action. Use $actions.")
+    }
+}
+
+private fun settingKeyOf(name: String?, command: String): com.usagemonitor.ConfigKey? =
+    name?.let(com.usagemonitor.ConfigKeys::named)
+
+private fun invalidSettingKey(name: String?, command: String): TerminalCommandParse =
+    if (name == null) {
+        TerminalCommandParse.Invalid("Error: '$command' needs a setting. Run 'usage-monitor config list' to see them.")
+    } else {
+        TerminalCommandParse.Invalid("Error: '$name' is not a setting. Run 'usage-monitor config list' to see them.")
+    }

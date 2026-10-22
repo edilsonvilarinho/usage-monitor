@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.redactedSecret
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -17,6 +18,17 @@ internal sealed interface ConfigChange {
     @Serializable
     @SerialName("source_enabled")
     data class SourceEnabled(val source: String, val enabled: Boolean) : ConfigChange
+
+    /**
+     * `config set <ajuste> <valor>` ([ConfigKeys]). O valor de um ajuste secreto
+     * (`proxy.password`) viaja aqui, então o `toString` o esconde.
+     */
+    @Serializable
+    @SerialName("set_value")
+    data class SetValue(val key: String, val value: String) : ConfigChange {
+        override fun toString(): String =
+            "SetValue(key=$key, value=${if (ConfigKeys.named(key)?.secret == true) redactedSecret(value) else value})"
+    }
 }
 
 /** O que aconteceu com uma [ConfigChange]. */
@@ -41,6 +53,8 @@ internal sealed interface ConfigOutcome {
 internal object ConfigRefusals {
     const val UNKNOWN_SOURCE = "unknown_source"
     const val KEY_REQUIRED = "key_required"
+    const val UNKNOWN_KEY = "unknown_key"
+    const val INVALID_VALUE = "invalid_value"
     const val FAILED = "failed"
 }
 

@@ -50,14 +50,17 @@ internal class TerminalConfigHarness(
     fun file(name: String): File = File(dir, name)
 
     /** Roda a linha de comando e devolve o código e a saída, sem cor. */
-    fun run(vararg arguments: String, unicode: Boolean = true): Pair<Int, String> {
+    fun run(vararg arguments: String, unicode: Boolean = true, secret: String? = null): Pair<Int, String> {
         val request = parseCommandLine(arrayOf(*arguments))
         val command = (request as? CommandLineRequest.Terminal)?.command as? ConfigCommand
             ?: error("não é um comando de configurar: $request")
         val buffer = ByteArrayOutputStream()
         val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = unicode), PrintStream(buffer, true, "UTF-8"))
         val client = TerminalConfigClient(collector = { collector }, channel = channel, localStore = ::store, timeoutMillis = 3_000)
-        val runner = TerminalConfigRunner(client, TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node), node, ::file)
+        val runner = TerminalConfigRunner(
+            client, TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node), node, ::file,
+            secretInput = { _ -> secret }
+        )
         val code = runner.run(command, language, console)
         return code to buffer.toString(Charsets.UTF_8)
     }

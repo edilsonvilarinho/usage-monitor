@@ -319,6 +319,10 @@ internal fun runUsageMonitor(
     val shell = remember {
         AppShellState(settings, initialTargets = availableTargets, languageSelection = graph.languageSelection)
     }
+    // O terminal mudou um ajuste com o app coletando (#440): a tela relê o que guarda.
+    LaunchedEffect(viewModels.engine) {
+        viewModels.engine.appliedConfigChanges.collect { shell.reloadFromSettings() }
+    }
     // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
     // é o mesmo arranque que abre o relatório, então ela foi oferecida.
     val pendingCrash = remember { consumePendingCrash() }

@@ -270,7 +270,19 @@ internal class CollectorEngine(
      * As mudanças de configuração, pelo mesmo caminho para as Configurações, o bot e o
      * terminal (decisão D1 da #440). O coletor é o único escritor enquanto vive.
      */
-    val configApplier = ConfigApplier(graph.store, ConfigHooks(refreshSource = { source -> dashboard.refresh(source) }))
+    val configApplier = ConfigApplier(
+        graph.store,
+        ConfigHooks(
+            refreshSource = { source -> dashboard.refresh(source) },
+            // O que o motor guarda em memória; o que mora na tela do app, o app relê.
+            valueChanged = { key ->
+                when (key.name) {
+                    "updates.auto" -> autoUpdate.enabled.value = readPersistedAutoUpdateEnabled(graph.settings)
+                    "updates.beta" -> autoUpdate.receiveBetaUpdates.value = readPersistedReceiveBetaUpdates(graph.settings)
+                }
+            }
+        )
+    )
 
     private val _appliedConfigChanges = MutableSharedFlow<ConfigChange>(extraBufferCapacity = CONFIG_CHANGE_BUFFER)
 
