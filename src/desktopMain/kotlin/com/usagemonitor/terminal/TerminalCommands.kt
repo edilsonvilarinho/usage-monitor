@@ -1,10 +1,13 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.data.datasource.LocalCliSessionMetricsReader
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionMetrics
 import com.usagemonitor.presentation.terminal.TerminalAnsi
 import com.usagemonitor.presentation.terminal.TerminalCheckView
 import com.usagemonitor.presentation.terminal.TerminalColor
 import com.usagemonitor.presentation.terminal.TerminalSpan
+import com.usagemonitor.presentation.terminal.TerminalStatusLineView
 import com.usagemonitor.presentation.terminal.TerminalWaitStep
 import com.usagemonitor.presentation.terminal.TerminalWaitView
 import com.usagemonitor.presentation.terminal.terminalLine
@@ -13,10 +16,13 @@ import com.usagemonitor.presentation.terminal.TerminalOutput
 import com.usagemonitor.presentation.terminal.TerminalProfile
 import com.usagemonitor.presentation.terminal.TerminalStatusView
 import com.usagemonitor.presentation.terminal.detectTerminalProfile
+import java.io.File
 import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.PrintStream
 import java.nio.charset.Charset
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,6 +32,11 @@ import kotlin.time.Duration.Companion.seconds
  */
 internal object TerminalCommands {
 
+    private const val SLF4J_VERBOSITY_PROPERTY = "slf4j.internal.verbosity"
+
+    /** A linha de status sempre sai com 0: código diferente faria o Claude Code esconder a linha. */
+    private const val EXIT_STATUS_LINE = 0
+
     /** De quanto em quanto o `wait` relê o cache. A coleta é de 60 s com sessão ativa. */
     val WAIT_INTERVAL: Duration = 15.seconds
 
@@ -33,9 +44,16 @@ internal object TerminalCommands {
         command: TerminalCommand,
         languageOverride: AppLanguage?,
         reader: TerminalReader = TerminalReader(),
-        console: TerminalConsole = TerminalConsole.system(),
-        pause: (Duration) -> Unit = { duration -> Thread.sleep(duration.inWholeMilliseconds) }
+        console: TerminalConsole = TerminalConsole.system(forceTerminal = command is TerminalCommand.ClaudeCodeStatusLine),
+        pause: (Duration) -> Unit = { duration -> Thread.sleep(duration.inWholeMilliseconds) },
+        statusLineInput: () -> String = { readPipedInput() },
+        sessionMetrics: (String) -> CliSessionMetrics? = LocalCliSessionMetricsReader()::read,
+        environment: Map<String, String> = System.getenv(),
+        home: File = File(System.getProperty("user.home").orEmpty())
     ): Int {
+        // O driver do SQLite avisa no `stderr` que não há provedor de log; no app esse texto
+        // vai para o `app.log`, mas no terminal sujaria a saída de quem chamou.
+        System.setProperty(SLF4J_VERBOSITY_PROPERTY, "ERROR")
         val reading = reader.read(languageOverride)
         val labels = TerminalLabels(reading.language)
         val output: TerminalOutput = when (command) {
@@ -45,6 +63,13 @@ internal object TerminalCommands {
                 TerminalCheckView.render(reading.accounts, reading.now, command.max, command.maxAge, command.quiet, labels, console.profile)
             // O `wait` não imprime uma vez e sai: tem o laço dele, que relê o cache.
             is TerminalCommand.Wait -> return runWait(command, reading, languageOverride, reader, console, pause)
+            TerminalCommand.ClaudeCodeStatusLine -> {
+                val input = ClaudeCodeStatusInput.parse(statusLineInput())
+                val target = anthropicTargetFor(claudeConfigDirectory(environment, input, home), reader.anthropicProfiles())
+                val account = target?.let { key -> reading.accounts.firstOrNull { item -> item.storageKey == key.storageKey } }
+                val line = TerminalStatusLineView.claudeCode(account, input.sessionId?.let(sessionMetrics), input.model, reading.now, labels, console.profile)
+                TerminalOutput(listOf(line), EXIT_STATUS_LINE)
+            }
         }
         // O JSON sai sempre, mesmo sem leitura: quem lê decide pelo código e pelos campos.
         if (command is TerminalCommand.Status && command.json) {
@@ -98,6 +123,19 @@ internal object TerminalCommands {
             reading = reader.read(languageOverride)
         }
     }
+}
+
+/**
+ * O que veio pela entrada, para a linha de status. Num terminal interativo (quem rodou o
+ * comando à mão) não há o que ler, e esperar travaria. Com a entrada num pipe, lê até o fim,
+ * mas com teto de tempo: um pipe que nunca fecha não pode segurar o prompt.
+ */
+internal fun readPipedInput(timeoutMillis: Long = 1_000L): String {
+    if (System.console() != null) {
+        return ""
+    }
+    val reading = CompletableFuture.supplyAsync { System.`in`.readBytes().toString(Charsets.UTF_8) }
+    return runCatching { reading.get(timeoutMillis, TimeUnit.MILLISECONDS) }.getOrDefault("")
 }
 
 /**

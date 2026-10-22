@@ -1,6 +1,8 @@
 package com.usagemonitor.terminal
 
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.AnthropicProfileRecord
+import com.usagemonitor.AnthropicProfileRegistry
 import com.usagemonitor.LanguageSelection
 import com.usagemonitor.SingleInstanceGuard
 import com.usagemonitor.data.AppDataDirectory
@@ -42,9 +44,14 @@ internal data class TerminalReading(
 internal class TerminalReader(
     private val cacheFile: File? = null,
     private val lockFile: File? = null,
-    private val settings: PreferencesSettings = PreferencesSettings(Preferences.userRoot().node(AppDataDirectory.preferencesNodeName)),
+    private val preferences: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName),
     private val clock: Clock = Clock.System
 ) {
+    private val settings = PreferencesSettings(preferences)
+
+    /** Os perfis Anthropic gravados pelo app, sem redescobrir nada (linha de status). */
+    fun anthropicProfiles(): List<AnthropicProfileRecord> = AnthropicProfileRegistry.readStored(preferences)
+
     fun read(languageOverride: AppLanguage?): TerminalReading {
         val dataSource = cacheFile?.let(::LocalDashboardCacheDataSource) ?: LocalDashboardCacheDataSource()
         val stats = runBlocking { dataSource.load() }

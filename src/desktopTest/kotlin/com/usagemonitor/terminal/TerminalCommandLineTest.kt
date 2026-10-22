@@ -105,6 +105,14 @@ class TerminalCommandLineTest {
     }
 
     @Test
+    fun `statusline takes exactly one known target`() {
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.ClaudeCodeStatusLine), parse("statusline", "claude-code"))
+        assertTrue(parse("statusline") is CommandLineRequest.Invalid)
+        assertTrue(parse("statusline", "vim") is CommandLineRequest.Invalid)
+        assertTrue(parse("statusline", "claude-code", "extra") is CommandLineRequest.Invalid)
+    }
+
+    @Test
     fun `durations accept seconds, minutes, hours and a bare number of seconds`() {
         assertEquals(90.seconds, parseTerminalDuration("90s"))
         assertEquals(10.minutes, parseTerminalDuration("10M"))

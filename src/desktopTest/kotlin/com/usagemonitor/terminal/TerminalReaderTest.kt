@@ -45,14 +45,14 @@ class TerminalReaderTest {
     )
 
     @Test
-    fun `le a ultima leitura do cache do app, com os limiares e o idioma das preferencias`() = withTestSettings { settings ->
+    fun `le a ultima leitura do cache do app, com os limiares e o idioma das preferencias`() = withTestSettings { node, settings ->
         val dir = tempDir()
         val cache = File(dir, "dashboard-cache.json")
         runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats(80)), now) }
         persistAlertSettings(settings, UsageAlertSettings(quotaPercents = listOf(70, 90)))
         settings.putString(LANGUAGE_KEY, AppLanguage.EN.name)
 
-        val reading = TerminalReader(cache, File(dir, "app.lock"), settings, fixedClock).read(languageOverride = null)
+        val reading = TerminalReader(cache, File(dir, "app.lock"), node, fixedClock).read(languageOverride = null)
 
         val account = reading.accounts.single()
         assertEquals("pessoal", account.profile)
@@ -63,28 +63,28 @@ class TerminalReaderTest {
     }
 
     @Test
-    fun `--locale vence a preferencia gravada`() = withTestSettings { settings ->
+    fun `--locale vence a preferencia gravada`() = withTestSettings { node, settings ->
         val dir = tempDir()
         settings.putString(LANGUAGE_KEY, AppLanguage.EN.name)
-        val reading = TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), settings, fixedClock).read(AppLanguage.PT)
+        val reading = TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node, fixedClock).read(AppLanguage.PT)
         assertEquals(AppLanguage.PT, reading.language)
     }
 
     @Test
-    fun `sem cache nao ha contas nem leitura`() = withTestSettings { settings ->
+    fun `sem cache nao ha contas nem leitura`() = withTestSettings { node, _ ->
         val dir = tempDir()
-        val reading = TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), settings, fixedClock).read(null)
+        val reading = TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node, fixedClock).read(null)
         assertTrue(reading.accounts.isEmpty())
         assertEquals(null, reading.lastCollectedAt)
     }
 
     @Test
-    fun `com o app segurando a trava, ha coletor vivo, e a leitura nao a toma`() = withTestSettings { settings ->
+    fun `com o app segurando a trava, ha coletor vivo, e a leitura nao a toma`() = withTestSettings { node, _ ->
         val dir = tempDir()
         val lock = File(dir, "app.lock")
         val app = SingleInstanceGuard.tryAcquire(lock)
         try {
-            val reading = TerminalReader(File(dir, "dashboard-cache.json"), lock, settings, fixedClock).read(null)
+            val reading = TerminalReader(File(dir, "dashboard-cache.json"), lock, node, fixedClock).read(null)
             assertTrue(reading.collectorRunning)
         } finally {
             app?.close()
@@ -98,10 +98,10 @@ class TerminalReaderTest {
         }
     }
 
-    private fun withTestSettings(block: (PreferencesSettings) -> Unit) {
+    private fun withTestSettings(block: (Preferences, PreferencesSettings) -> Unit) {
         val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
         try {
-            block(PreferencesSettings(node))
+            block(node, PreferencesSettings(node))
         } finally {
             runCatching {
                 node.removeNode()

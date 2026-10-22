@@ -18,6 +18,9 @@ internal sealed interface TerminalCommand {
 
     /** `wait <id> --below <n> [--timeout <tempo>]`: espera a cota cair abaixo de n%. */
     data class Wait(val quotaId: String, val below: Int, val timeout: Duration? = null) : TerminalCommand
+
+    /** `statusline claude-code`: a linha embaixo do prompt do Claude Code, lida do JSON da entrada. */
+    data object ClaudeCodeStatusLine : TerminalCommand
 }
 
 internal object TerminalCommandNames {
@@ -30,9 +33,14 @@ internal object TerminalCommandNames {
     const val WAIT = "wait"
     const val BELOW = "--below"
     const val TIMEOUT = "--timeout"
+    const val STATUS_LINE = "statusline"
+    const val CLAUDE_CODE = "claude-code"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE)
+
+    /** Os alvos da linha de status. */
+    val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE)
 }
 
 internal sealed interface TerminalCommandParse {
@@ -50,6 +58,7 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
         TerminalCommandNames.STATUS -> parseStatus(arguments)
         TerminalCommandNames.CHECK -> parseCheck(arguments)
         TerminalCommandNames.WAIT -> parseWait(arguments)
+        TerminalCommandNames.STATUS_LINE -> parseStatusLine(arguments)
         else -> TerminalCommandParse.Invalid("Error: '$name' is not a command. Run with --help to list the commands.")
     }
 
@@ -107,6 +116,16 @@ private fun parseWait(arguments: List<String>): TerminalCommandParse {
     val id = quotaId ?: return TerminalCommandParse.Invalid("Error: '${TerminalCommandNames.WAIT}' needs a quota id. Run 'usage-monitor status --json' to list them.")
     val percent = below ?: return TerminalCommandParse.Invalid("Error: '${TerminalCommandNames.WAIT}' needs ${TerminalCommandNames.BELOW} <percentage>.")
     return TerminalCommandParse.Parsed(TerminalCommand.Wait(id, percent, timeout))
+}
+
+private fun parseStatusLine(arguments: List<String>): TerminalCommandParse {
+    val targets = TerminalCommandNames.STATUS_LINE_TARGETS.joinToString(" or ")
+    val target = arguments.singleOrNull()
+        ?: return TerminalCommandParse.Invalid("Error: '${TerminalCommandNames.STATUS_LINE}' needs one target: $targets.")
+    return when (target) {
+        TerminalCommandNames.CLAUDE_CODE -> TerminalCommandParse.Parsed(TerminalCommand.ClaudeCodeStatusLine)
+        else -> TerminalCommandParse.Invalid("Error: '$target' is not a status line target. Use $targets.")
+    }
 }
 
 private fun invalidMaxAge(): TerminalCommandParse =

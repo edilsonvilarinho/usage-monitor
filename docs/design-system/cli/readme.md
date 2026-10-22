@@ -105,8 +105,13 @@ Cota sem percentual (saldo) mostra o valor no lugar da barra.
 **Rodapé de leitura** (2.2). Origem e idade da leitura, seguidas da contagem por estado, com cada
 estado na sua cor: "lido há 38 s pelo app aberto · 9 cotas: 1 crítica, 2 em atenção, 6 em dia".
 
-**Linha de status** (1.1, 1.2). `◑ Conta · 5h NN% barra HH:MM · 7d NN% · sessão US$ · tok/s ·
-modelo`. A conta é a que aquele CLI está usando. Acima do limiar: estado escrito e "reinicia em".
+**Linha de status** (1.1, 1.2). `◑ Conta · 5h NN% barra HH:MM · 7d NN% · sessão $1.84 · tok/s ·
+modelo`. A conta é a que aquele CLI está usando, achada pelo diretório de configuração dele com os
+links resolvidos; sem perfil que aponte para ele, a linha não mostra cota nenhuma (melhor que a de
+outra conta). Acima do limiar: estado escrito e "reinicia em" no lugar da hora. O custo vem do
+índice da #381, no formato da janela de Sessões do app (`$1.84`, com `+` quando há modelo sem
+tarifa); sem a sessão no índice, sem custo. Leitura com mais de 10 min mostra "leitura de HH:MM".
+A linha sempre sai com código 0: outro código faria o Claude Code escondê-la.
 
 **Segmento do tmux** (1.3). Sigla de duas letras na cor da fonte e número em negrito, sobre o fundo
 da barra. Estado abreviado (`crít`, `atn`) só acima do limiar.

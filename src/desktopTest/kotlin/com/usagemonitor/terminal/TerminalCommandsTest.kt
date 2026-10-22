@@ -1,10 +1,10 @@
 package com.usagemonitor.terminal
 
-import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CliSessionMetrics
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
@@ -50,7 +50,7 @@ class TerminalCommandsTest {
             }
             val buffer = ByteArrayOutputStream()
             val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
-            val reader = TerminalReader(cache, File(dir, "app.lock"), PreferencesSettings(node), clock)
+            val reader = TerminalReader(cache, File(dir, "app.lock"), node, clock)
             val code = TerminalCommands.run(command, AppLanguage.PT, reader, console)
             return code to buffer.toString(Charsets.UTF_8)
         } finally {
@@ -81,6 +81,43 @@ class TerminalCommandsTest {
         assertEquals(3, run(TerminalCommand.Status(), collectedAt = null).first)
     }
 
+    @Test
+    fun `statusline finds the account of the calling Claude Code and the session in the index`() {
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        try {
+            val dir = Files.createTempDirectory("usage-monitor-terminal").toFile()
+            val configDir = File(dir, ".claude-work")
+            node.node("anthropicProfiles").node("work").put("path", configDir.absolutePath)
+            val cache = File(dir, "dashboard-cache.json")
+            val stats = ApiUsageStats(
+                source = ApiSource.ANTHROPIC,
+                targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "work"),
+                apiName = "Anthropic",
+                profileLabel = "trabalho",
+                quotas = listOf(QuotaInfo(label = "Claude 5h", used = 62, total = 100, periodEndAt = now + 2.hours, unit = UsageUnit.PERCENTAGE)),
+                fetchedAt = now
+            )
+            runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats), now) }
+            val buffer = ByteArrayOutputStream()
+            val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
+            val input = """{"session_id":"s-1","transcript_path":"${configDir.absolutePath}/projects/-w/s-1.jsonl","model":{"display_name":"Opus 5.5"}}"""
+            val code = TerminalCommands.run(
+                TerminalCommand.ClaudeCodeStatusLine, AppLanguage.PT, TerminalReader(cache, File(dir, "app.lock"), node, clock), console,
+                statusLineInput = { input },
+                sessionMetrics = { id -> if (id == "s-1") CliSessionMetrics(1_840_000, 0, null) else null },
+                environment = emptyMap(),
+                home = dir
+            )
+            assertEquals(0, code)
+            assertEquals("◑ trabalho · 5h 62% ███████▍░░░░ 16:23 · sessão $1.84 · Opus 5.5", buffer.toString(Charsets.UTF_8).trim())
+        } finally {
+            runCatching {
+                node.removeNode()
+                node.flush()
+            }
+        }
+    }
+
     /** O relógio anda só quando o `wait` pausa; a coleta "acontece" no meio da pausa. */
     private class WaitScenario(start: Instant) {
         var now = start
@@ -108,7 +145,7 @@ class TerminalCommandsTest {
             var pauses = 0
             val buffer = ByteArrayOutputStream()
             val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
-            val reader = TerminalReader(cache, File(dir, "app.lock"), PreferencesSettings(node), scenario.clock)
+            val reader = TerminalReader(cache, File(dir, "app.lock"), node, scenario.clock)
             val code = TerminalCommands.run(command, AppLanguage.PT, reader, console, pause = { duration ->
                 pauses += 1
                 scenario.now += duration

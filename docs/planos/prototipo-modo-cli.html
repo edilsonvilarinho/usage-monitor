@@ -303,12 +303,12 @@ S.statusline = () => {
     L(c('bd', '│'), fit(L(' ', c('mu', '>'), ' agora rode o allTests', c('cursor', ' ')), w), c('bd', '│')),
     L(c('bd', '╰' + rep('─', w) + '╯')),
     L('  ', c('a', '◑ Claude Max'), c('mu', ' · '), '5h ', c('b', x.p + '%'), ' ', bar(x.p, 12, 'a'), ' ', c('mu', '16:40'),
-      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', ' · '), 'sessão ', c('b', 'US$ 1,84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
+      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', ' · '), 'sessão ', c('b', '$1.84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
     L(c('mu', '  ? for shortcuts')),
   ]);
 };
 S.statuslineCrit = () => render([
-  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', 'US$ 9,40')),
+  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', '$9.40')),
 ]);
 
 S.tmux = () => {

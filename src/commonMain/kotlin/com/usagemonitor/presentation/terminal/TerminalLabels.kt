@@ -123,6 +123,12 @@ internal class TerminalLabels(val language: AppLanguage) {
     fun resetsAtIn(at: String, remaining: Duration): String =
         localized(language, "reinicia $at BRT, ", "resets $at BRT, ") + inDuration(remaining)
 
+    val session: String get() = localized(language, "sessão", "session")
+
+    fun resetsIn(remaining: Duration): String = localized(language, "reinicia ", "resets ") + inDuration(remaining)
+
+    fun readingFrom(clock: String): String = localized(language, "leitura de $clock", "reading from $clock")
+
     val waitNeedsCollector: String
         get() = localized(language, "Nada está coletando: a cota só muda com o Usage Monitor aberto.", "Nothing is collecting: the quota only changes with Usage Monitor open.")
 
