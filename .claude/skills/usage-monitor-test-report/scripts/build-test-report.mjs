@@ -16,13 +16,16 @@ import { platform } from 'node:os'
 import { renderHtml } from './report-html.mjs'
 
 function parseArgs(argv) {
-    const parsed = { root: process.cwd(), out: 'build/test-report' }
+    // `--platform` existe para o CI: o relatorio e montado num runner Linux a
+    // partir da suite que rodou no Windows, e o cabecalho deve dizer Windows.
+    const parsed = { root: process.cwd(), out: 'build/test-report', platform: platform() }
     for (let index = 0; index < argv.length; index += 1) {
         const flag = argv[index]
         if (flag === '--root') parsed.root = argv[++index]
         else if (flag === '--out') parsed.out = argv[++index]
+        else if (flag === '--platform') parsed.platform = argv[++index]
         else {
-            console.error('uso: build-test-report.mjs [--root <repo>] [--out <pasta relativa>]')
+            console.error('uso: build-test-report.mjs [--root <repo>] [--out <pasta relativa>] [--platform win32|linux|darwin]')
             process.exit(2)
         }
     }
@@ -593,7 +596,7 @@ function main() {
     const report = {
         generatedAt: new Date().toISOString(),
         git: readGit(root),
-        platform: platform(),
+        platform: args.platform,
         kotlin: summarizeKotlin(kotlinSuites, kotlinFiles),
         server: summarizeServer(serverSuites, serverFiles),
         kover: readKover(join(root, 'build/reports/kover/report.xml'), root),

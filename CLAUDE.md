@@ -363,6 +363,8 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   `Thread.sleep` (`pauseForBackgroundWork`). `awaitSettledState` espera a coleta inteira
   (`refreshingTargets` vazio), não o primeiro `Success`.
 - Cobertura opt-in por `-Pcoverage`, sem piso.
+- Job `test-report` (skill `usage-monitor-test-report`): HTML de testes e cobertura no artefato `test-report` a cada
+  run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
 ## Convenções de código

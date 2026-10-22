@@ -206,6 +206,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # O `report.xml` do Kover vai junto: e o que o job `test-report` le. Suite
+      # vermelha pula o passo de cobertura, e o XML simplesmente nao vem.
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -214,6 +216,7 @@ jobs:
           path: |
             build/reports/tests/**
             build/test-results/**
+            build/reports/kover/report.xml
           if-no-files-found: ignore
           retention-days: 7
 
@@ -462,8 +465,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # `test:coverage` e o `test:ci` mais a cobertura v8 (suite inteira em
+      # 2,5 s medidos num Linux local): o resumo `coverage/coverage-summary.json`
+      # alimenta o job `test-report`.
       - name: Run tests
-        run: npm run test:ci
+        run: npm run test:coverage
 
       - name: Publish test summary
         if: always()
@@ -475,9 +481,82 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-reports-server
-          path: server/test-results/**
+          path: |
+            server/test-results/**
+            server/coverage/coverage-summary.json
           if-no-files-found: ignore
           retention-days: 7
+
+  # Relatorio de testes e cobertura da skill `usage-monitor-test-report`, montado
+  # com o que `desktop-windows` e `server` publicaram: HTML no artefato
+  # `test-report` e o resumo dos portoes no run. Informativo -- fica FORA do
+  # `ci-ok`: falha de suite ja derruba o job que a rodou, e um segundo vermelho
+  # pelo mesmo motivo so duplicaria o aviso. Roda quando a suite do desktop rodou.
+  test-report:
+    needs:
+      - desktop-windows
+      - server
+    if: always() && (needs.desktop-windows.result == 'success' || needs.desktop-windows.result == 'failure')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download desktop results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: test-reports
+          path: ci-artifacts/desktop
+
+      - name: Download server results
+        if: needs.server.result == 'success' || needs.server.result == 'failure'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: test-reports-server
+          path: ci-artifacts/server
+
+      # O artefato guarda os arquivos a partir do ancestral comum dos caminhos,
+      # e esse ancestral muda quando um deles falta (suite vermelha nao escreve
+      # cobertura). Procurar pelo nome devolve cada arquivo onde o gerador o le.
+      - name: Place results
+        run: |
+          set -euo pipefail
+          mkdir -p build/test-results/desktopTest build/reports/kover server/test-results server/coverage
+          find ci-artifacts/desktop -name 'TEST-*.xml' -exec cp {} build/test-results/desktopTest/ \;
+          find ci-artifacts/desktop -name 'report.xml' -path '*kover*' -exec cp {} build/reports/kover/ \; || true
+          if [ -d ci-artifacts/server ]; then
+            find ci-artifacts/server -name 'junit.xml' -exec cp {} server/test-results/ \;
+            find ci-artifacts/server -name 'coverage-summary.json' -exec cp {} server/coverage/ \;
+          fi
+          # Sem cobertura, o diretorio vazio nao pode parecer medicao.
+          rmdir --ignore-fail-on-non-empty build/reports/kover server/coverage server/test-results
+
+      # O gerador sai com 1 quando um portao bloqueia; aqui isso vira texto no
+      # resumo, nao um segundo job vermelho (ver o comentario do job).
+      - name: Build report
+        run: |
+          set -uo pipefail
+          node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs --platform win32 > report.txt
+          status=$?
+          {
+            echo "## Relatório de testes"
+            echo
+            echo '```'
+            cat report.txt
+            echo '```'
+            echo
+            echo "HTML completo no artefato \`test-report\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "gerador saiu com $status"
+
+      - name: Upload report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-report
+          path: build/test-report/**
+          if-no-files-found: error
+          retention-days: 14
 
   # O check unico que a protecao da `main` exige. `if: always()` para rodar
   # mesmo quando algo falhou ou foi pulado; `skipped` e sucesso (area nao
