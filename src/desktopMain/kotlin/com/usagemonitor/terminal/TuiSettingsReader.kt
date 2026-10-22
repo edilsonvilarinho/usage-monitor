@@ -162,9 +162,9 @@ internal class TuiSettingsReader(private val inputs: TuiSettingsInputs) {
         add(TuiSettingField.Info(labels.server, team?.normalizedServerUrl?.ifEmpty { null } ?: labels.none))
         add(TuiSettingField.Info(labels.alias, team?.alias?.ifBlank { null } ?: labels.none))
         add(TuiSettingField.Info(labels.teamAccounts, inputs.teamAccounts(team).joinToString(", ").ifEmpty { labels.none }))
-        // Entrar com a chave usa o servidor e o apelido que já estão gravados, como o `team join` sem opções.
+        // Entrar com a chave usa o servidor, o apelido e as contas que já estão gravados.
         if (team != null && team.normalizedServerUrl.isNotEmpty() && team.alias.isNotBlank()) {
-            add(TuiSettingField.Text(labels.teamKey, glyphs.secretMask.takeIf { team.apiKey.isNotBlank() }, TuiSettingEdit(TuiSettingsCommands.TEAM_KEY, secret = true), labels.teamKeyNote))
+            add(TuiSettingField.Text(labels.teamKey, glyphs.secretMask.takeIf { team.apiKey.isNotBlank() }, TuiSettingEdit(TuiSettingsCommands.teamKey(team.participatingProfileIds), secret = true), labels.teamKeyNote))
         }
         if (active) {
             add(TuiSettingField.Action(labels.leave, TuiSettingAction(TuiSettingsCommands.TEAM_LEAVE), labels.leaveNote, confirm = true))

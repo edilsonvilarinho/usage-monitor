@@ -25,7 +25,7 @@ internal object TuiSettingsCommands {
     const val TELEGRAM_TOKEN = "telegram-token"
     const val TELEGRAM_PAIR = "telegram-pair"
     const val TELEGRAM_TEST = "telegram-test"
-    const val TEAM_KEY = "team-key"
+    private const val TEAM_KEY = "team-key"
     const val TEAM_LEAVE = "team-leave"
     const val WEB = "web"
     const val WEB_TOKEN = "web-token"
@@ -39,6 +39,14 @@ internal object TuiSettingsCommands {
     fun accountLabel(id: String): String = ACCOUNT_LABEL + id
     fun chatReadOnly(chat: Long): String = CHAT_READ_ONLY + chat
     fun chatRemove(chat: Long): String = CHAT_REMOVE + chat
+
+    /**
+     * A chave do time com as contas que já participam (#441, A10): sem elas o `team join`
+     * poria no time todas as contas monitoradas, e não as que a pessoa escolheu. Sem conta
+     * participando (quem saiu do time), fica como o comando sem `--accounts`.
+     */
+    fun teamKey(participating: Collection<String>): String =
+        if (participating.isEmpty()) TEAM_KEY else TEAM_KEY + ":" + participating.sorted().joinToString(",")
 
     /** O comando e, num campo secreto, o segredo digitado; `null` para id desconhecido. */
     fun commandOf(action: TuiSettingAction): Pair<ConfigCommand, String?>? {
@@ -61,7 +69,10 @@ internal object TuiSettingsCommands {
             // Aqui o `pair` só abre o código: a conversa aparece na próxima leitura.
             id == TELEGRAM_PAIR -> TelegramCommand.Pair() to null
             id == TELEGRAM_TEST -> TelegramCommand.Test to null
-            id == TEAM_KEY -> TeamCommand.Join(server = null, alias = null, accounts = null) to value
+            id == TEAM_KEY || id.startsWith("$TEAM_KEY:") -> {
+                val accounts = id.substringAfter(':', "").split(',').filter { account -> account.isNotBlank() }.ifEmpty { null }
+                TeamCommand.Join(server = null, alias = null, accounts = accounts) to value
+            }
             id == TEAM_LEAVE -> TeamCommand.Leave to null
             id == WEB -> WebCommand.Switch(on) to null
             id == WEB_TOKEN -> WebCommand.RegenerateToken to null

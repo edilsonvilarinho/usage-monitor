@@ -1,6 +1,9 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.AnthropicProfileRegistry
+import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.presentation.terminal.TerminalGlyphs
@@ -112,6 +115,31 @@ class TuiSettingsTest {
     fun `id desconhecido nao vira comando`() {
         assertNull(TuiSettingsCommands.commandOf(TuiSettingAction("nada")))
         assertEquals(SettingCommand.Set("alerts.quota.thresholds", "75,95"), TuiSettingsCommands.commandOf(TuiSettingsCommands.set("alerts.quota.thresholds", "75,95"))?.first)
-        assertEquals(TeamCommand.Join() to "chave", TuiSettingsCommands.commandOf(TuiSettingAction(TuiSettingsCommands.TEAM_KEY, "chave", secret = true)))
+        assertEquals(TeamCommand.Join() to "chave", TuiSettingsCommands.commandOf(TuiSettingAction(TuiSettingsCommands.teamKey(emptySet()), "chave", secret = true)))
+    }
+
+    /** Um diretório de configuração do Claude Code já logado, como o do `accounts add`. */
+    private fun TerminalConfigHarness.claudeDirectory(name: String): java.io.File =
+        file(name).apply {
+            mkdirs()
+            java.io.File(this, ".credentials.json").writeText("""{"claudeAiOauth":{"accessToken":"a"}}""")
+            java.io.File(this, ".claude.json").writeText("""{"oauthAccount":{"accountUuid":"u-$name","emailAddress":"$name@example.com"}}""")
+        }
+
+    @Test
+    fun `redigitar a chave do time mantem as contas que ja participavam`() = TerminalConfigHarness().use { harness ->
+        harness.run("accounts", "add", "anthropic", harness.claudeDirectory("claude-work").path, "--label", "trabalho")
+        harness.run("accounts", "add", "anthropic", harness.claudeDirectory("claude-home").path, "--label", "pessoal")
+        val work = AnthropicProfileRegistry.readStored(harness.node).single { record -> record.label == "trabalho" }.id
+        val team = LocalTeamSettingsDataSource(harness.file("team.json"))
+        team.save(TeamIntegrationSettings(enabled = true, serverUrl = "https://time.exemplo.com", apiKey = "antiga", alias = "edi", deviceId = "d-1", participatingProfileIds = setOf(work)))
+
+        val field = harness.settings().field("Time", "Chave do time") as TuiSettingField.Text
+        val notice = harness.apply(TuiSettingAction(field.edit.id, "chave-nova", secret = true))!!
+
+        assertTrue(notice.ok, notice.toString())
+        // Antes da A10 o `team join` sem contas punha as duas monitoradas no time.
+        assertEquals(setOf(work), team.peek()!!.participatingProfileIds)
+        assertEquals("chave-nova", team.peek()!!.apiKey)
     }
 }
