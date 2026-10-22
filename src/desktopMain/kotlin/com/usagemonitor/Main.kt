@@ -51,8 +51,6 @@ internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 private const val WINDOW_ICON_RESOURCE_PATH = "/icons/app_icon_window.png"
 private const val TRAY_ICON_RESOURCE_PATH = "/icons/app_icon_tray.png"
 
-internal const val CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
-
 /**
  * Espera do pré-aquecimento das modais, contada da HUD **pintada**, e não do início
  * da composição. Os 10 s fixos da primeira versão perdiam o caso real: o usuário
@@ -293,7 +291,7 @@ internal fun runUsageMonitor(
         ready = hudShown,
         tipCount = StartupTipCatalog.tips.size
     )
-    AppBackgroundWork(graph, viewModels, singleInstanceGuard)
+    AppShutdownHook(viewModels, singleInstanceGuard)
 
     val profileRecords by graph.profileRegistry.profiles.collectAsState()
     val profileResolution = resolveAnthropicProfiles(graph.profileRegistry, profileRecords)
@@ -451,29 +449,12 @@ internal fun runUsageMonitor(
 }
 
 /**
- * O trabalho de fundo que não pertence a janela nenhuma: a indexação do Codex, o
- * envio do time e o encerramento ordenado — o mesmo (`AppViewModels.shutdown`)
- * no gancho da JVM e na saída da composição.
+ * O encerramento ordenado — o mesmo (`AppViewModels.shutdown`) no gancho da JVM e
+ * na saída da composição. O trabalho de fundo (índices, envio do time) mora no
+ * `CollectorEngine`, que o serviço sem tela também roda.
  */
 @Composable
-private fun AppBackgroundWork(graph: AppGraph, viewModels: AppViewModels, singleInstanceGuard: SingleInstanceGuard) {
-    // O índice local continua sendo atualizado com a janela fechada. A operação
-    // já muda para Dispatchers.IO no datasource; o laço não bloqueia a UI.
-    LaunchedEffect(graph) {
-        while (isActive) {
-            graph.codexCliSessionDataSource.syncIndex()
-            graph.codexIndexSyncedAt.value = kotlin.time.Clock.System.now()
-            delay(CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS)
-        }
-    }
-    val teamSettings by graph.teamSettingsFlow.collectAsState()
-    LaunchedEffect(viewModels.teamSync, teamSettings.isActive) {
-        if (teamSettings.isActive) {
-            viewModels.teamSync.start()
-        } else {
-            viewModels.teamSync.stop()
-        }
-    }
+private fun AppShutdownHook(viewModels: AppViewModels, singleInstanceGuard: SingleInstanceGuard) {
     DisposableEffect(viewModels, singleInstanceGuard) {
         val shutdownHook = Thread { viewModels.shutdown(singleInstanceGuard) }
         Runtime.getRuntime().addShutdownHook(shutdownHook)

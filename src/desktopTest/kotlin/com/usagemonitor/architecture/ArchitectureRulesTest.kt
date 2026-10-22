@@ -60,6 +60,27 @@ class ArchitectureRulesTest {
         assertNoImports(layerPrefix = "com/usagemonitor/presentation/", forbidden = listOf("com.usagemonitor.data."))
     }
 
+    /**
+     * O motor do serviço sem tela (#440) roda com `java.awt.headless` num servidor que
+     * pode não ter as bibliotecas gráficas: importar Compose ou Skia nele faria o
+     * serviço carregar o que não existe ali. O bot desenha imagens por arquivos
+     * próprios, carregados só quando desenha.
+     */
+    @Test
+    fun `o motor sem tela nao importa Compose nem Skia`() {
+        val violations = sources
+            .filter { source -> source.path in HEADLESS_ENGINE_FILES }
+            .flatMap { source ->
+                source.imports
+                    .filter { imported -> imported.startsWith("androidx.compose.") || imported.startsWith("org.jetbrains.skia") }
+                    .map { imported -> "${source.path}: import $imported" }
+            }
+        assertEquals(HEADLESS_ENGINE_FILES, sources.map { source -> source.path }.filter { path -> path in HEADLESS_ENGINE_FILES }.toSet())
+        if (violations.isNotEmpty()) {
+            fail("O motor sem tela importou Compose ou Skia (#440):\n" + violations.joinToString("\n"))
+        }
+    }
+
     @Test
     fun `arquivo de producao respeita o limite de linhas`() {
         val measured = sources.associate { source -> source.path to source.lineCount }
@@ -333,6 +354,11 @@ class ArchitectureRulesTest {
         val NATIVE_WINDOW_SHAPE = Regex("""\.shape\s*=(?!=)|setShape\s*\(""")
 
         /** Quem hoje chama `window.shape`: a HUD e os cantos arredondados das janelas. */
+        /** O motor do serviço sem tela e o que só ele usa (#440). */
+        val HEADLESS_ENGINE_FILES = setOf(
+            "src/desktopMain/kotlin/com/usagemonitor/CollectorEngine.kt"
+        )
+
         val NATIVE_WINDOW_SHAPE_OWNERS = setOf(
             "src/desktopMain/kotlin/com/usagemonitor/HudWindowEffects.kt",
             "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/DesktopWindowFrame.kt"
