@@ -140,6 +140,10 @@ Sem cor não há fundo de seleção: a ativa troca os espaços que a cercam por 
 
 **Rodapé de atalhos** (3.1). A tecla em negrito, o rótulo em muted, dois espaços entre pares. Os
 atalhos da aba vêm primeiro, os comuns depois (`1–5 aba`, `r atualizar`, `? ajuda`, `q sair`).
+Quando não cabem, saem **pares inteiros**, nunca meio par: primeiro `r atualizar` e `1–5 aba` (a
+ajuda lista todos), depois os da aba, do último para o primeiro; `? ajuda` e `q sair` ficam sempre.
+Com um campo de texto aberto (4.2), só `enter grava` e `esc desiste`: ali `q`, `r`, `?` e os
+dígitos são texto.
 
 **Lista e detalhe** (3.1, 4.2). Coluna de 21 células com cabeçalho em maiúsculas muted. O item
 selecionado leva `▸` em ouro e fundo de seleção. Um divisor `│` e, à direita, o detalhe.
@@ -182,6 +186,13 @@ muted.
 
 **Resultado de comando** (4.3, 5.1). `✓ ação` mais uma consequência em muted ("o serviço já está
 usando"). Aviso com `▲` e, se houver o que rodar, o comando na linha de baixo, indentado.
+
+**Aviso do modo interativo** (3.2, 4.2). O resultado de uma ação (o CSV, uma mudança da aba 5) nas
+últimas linhas do corpo, sobre o que estiver ali, até a próxima tecla: `✓` verde ou `▲` em
+`--term-warn` e a frase, que quebra por palavra (até três linhas além da primeira, alinhadas depois
+do glifo); o detalhe (o comando a rodar, a ressalva do teste) vem abaixo, em muted. Enquanto a
+mudança é aplicada (testar uma chave ou esperar o coletor leva segundos), "aplicando…" em muted,
+sem glifo. Não há animação: a tela só diz que está trabalhando.
 
 ## Texto
 
