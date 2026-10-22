@@ -151,7 +151,7 @@ set -g status-right '#(usage-monitor statusline tmux)'
 servidor do time, como a janela de time do app). As abas vão de `1` a `5`; `↑ ↓` movem, `enter`
 abre, `r` lê de novo e `?` mostra todas as teclas. A aba Configurações muda o mesmo que os comandos
 abaixo e mostra a saída deles; adicionar conta e entrar num servidor de time novo ficam nos
-comandos. Precisa de pelo menos 40×12 e foi desenhado para 80 a 96 colunas.
+comandos. Precisa de pelo menos 40×12, foi desenhado para 80 a 96 colunas e ocupa o terminal inteiro quando ele é mais largo.
 
 Tudo o que a janela de Configurações faz também se faz pelo terminal, que é o que um servidor sem
 tela precisa. Os comandos gravam os mesmos arquivos do app; com o app ou o serviço coletando, a

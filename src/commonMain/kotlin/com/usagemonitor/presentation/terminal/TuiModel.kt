@@ -40,12 +40,15 @@ data class TuiShortcut(val key: String, val label: String)
 /**
  * O tamanho do terminal e as larguras que saem dele (`cli/readme.md`, "Largura"): o modo
  * interativo foi desenhado para 96 colunas (94 internas); abaixo disso a coluna de detalhe
- * encolhe, e abaixo de 80 lista e detalhe se empilham.
+ * encolhe, e abaixo de 80 lista e detalhe se empilham. Mais largo, a moldura acompanha o terminal.
  */
 data class TuiSize(val columns: Int, val rows: Int) {
-    /** A moldura nunca passa de 96 colunas: mais largo, sobra terminal à direita. */
+    /**
+     * A moldura ocupa a largura toda, como já ocupa a altura: presa em 96 colunas, num monitor
+     * largo ela sobrava num canto e o resto do terminal ficava vazio.
+     */
     val frameWidth: Int
-        get() = columns.coerceAtMost(DESIGN_WIDTH)
+        get() = columns
 
     /** O que cabe entre `│ ` e `│`. */
     val bodyWidth: Int
@@ -69,7 +72,6 @@ data class TuiSize(val columns: Int, val rows: Int) {
         get() = if (stacked) bodyWidth else bodyWidth - LIST_WIDTH - 2
 
     companion object {
-        const val DESIGN_WIDTH = 96
         const val STACK_WIDTH = 80
         const val LIST_WIDTH = 21
         const val MIN_COLUMNS = 40

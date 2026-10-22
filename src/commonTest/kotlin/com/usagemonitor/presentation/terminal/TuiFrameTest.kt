@@ -31,8 +31,9 @@ class TuiFrameTest {
     }
 
     @Test
-    fun `terminal mais largo que 96 nao alarga a moldura`() {
-        assertTrue(frame(TuiSize(140, 24)).all { line -> line.width == 96 })
+    fun `terminal mais largo que 96 alarga a moldura ate a borda`() {
+        assertTrue(frame(TuiSize(140, 24)).all { line -> line.width == 140 })
+        assertTrue(frame(TuiSize(320, 60)).all { line -> line.width == 320 })
         assertTrue(frame(TuiSize(80, 24)).all { line -> line.width == 80 })
     }
 
