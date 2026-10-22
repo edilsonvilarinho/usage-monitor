@@ -76,6 +76,8 @@ internal object TerminalCommands {
             is TerminalCommand.Reading -> runReading(command, languageOverride, reader, console, pause, statusLineInput, sessionMetrics, environment, home)
             is ServiceCommand -> TerminalServiceCommands.run(command, languageOverride, console)
             is ConfigCommand -> TerminalConfigRunner().run(command, languageOverride, console)
+            SetupCommand -> TerminalSetupWiring.run(languageOverride, console)
+            UpdateCommand -> TerminalUpdateCommand().run(languageOverride, console)
         }
     }
 

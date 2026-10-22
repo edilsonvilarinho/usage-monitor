@@ -72,6 +72,12 @@ internal class TerminalAccountsRunner(
     private fun rowFor(reference: String): TerminalAccountRow? =
         rows().filter { row -> !row.bySource && (row.label.equals(reference, ignoreCase = true) || row.id == reference) }.singleOrNull()
 
+    /** As contas logadas que o `setup` oferece monitorar: as Anthropic e a Codex padrão. */
+    fun readyForSetup(): List<SetupAccount> =
+        rows().filter { row -> row.ready != false && (row.source == ApiSource.ANTHROPIC || row.bySource) }.map { row ->
+            SetupAccount(row.source, row.id, row.monitored)
+        }
+
     /** Na ordem das Configurações: Anthropic (a padrão primeiro), Codex padrão e as Codex extras. */
     private fun rows(): List<TerminalAccountRow> {
         val anthropic = AnthropicProfileRegistry.readStored(preferences)

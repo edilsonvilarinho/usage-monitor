@@ -52,7 +52,7 @@ internal object TerminalCommandNames {
     const val TODAY = "--today"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, ALERTS, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, ALERTS, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB, SetupCommandNames.SETUP, SetupCommandNames.UPDATE)
 
     /** Os alvos da linha de status. */
     val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE, TMUX)
@@ -83,6 +83,8 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
         TelegramCommandNames.TELEGRAM -> parseTelegramCommand(arguments)
         TeamCommandNames.TEAM -> parseTeamCommand(arguments)
         TeamCommandNames.WEB -> parseWebCommand(arguments)
+        SetupCommandNames.SETUP -> parseSingleCommand(name, SetupCommand, arguments)
+        SetupCommandNames.UPDATE -> parseSingleCommand(name, UpdateCommand, arguments)
         else -> TerminalCommandParse.Invalid("Error: '$name' is not a command. Run with --help to list the commands.")
     }
 
