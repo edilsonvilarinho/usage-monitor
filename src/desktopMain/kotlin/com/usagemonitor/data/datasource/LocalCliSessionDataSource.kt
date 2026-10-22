@@ -37,12 +37,18 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class LocalCliSessionDataSource(
     private val projectRootsProvider: () -> List<CliProjectRoot> = { listOf(defaultProjectRoot()) },
-    databaseFile: File = defaultDatabaseFile()
+    databaseFile: File = defaultDatabaseFile(),
+    /**
+     * Só lê o índice que o coletor mantém (#441): sem schema ao abrir e sem indexar. O
+     * [syncIndex] devolve um relatório vazio, e os casos de uso seguem para a leitura.
+     */
+    private val readOnly: Boolean = false
 ) : CliSessionDataSource, AutoCloseable {
 
     private val connectionManager = SqliteConnectionManager(
         databaseFile = databaseFile,
-        onOpen = { connection -> initializeCliIndexSchema(connection, hostName = { hostName }) }
+        onOpen = { connection -> initializeCliIndexSchema(connection, hostName = { hostName }) },
+        readOnly = readOnly
     )
 
     /**
@@ -76,7 +82,9 @@ class LocalCliSessionDataSource(
      */
     private val tailCache = ConcurrentHashMap<String, CachedTail>()
 
-    override suspend fun syncIndex(): CliSessionIndexReport = withContext(Dispatchers.IO) {
+    override suspend fun syncIndex(): CliSessionIndexReport = if (readOnly) CliSessionIndexReport() else indexTranscripts()
+
+    private suspend fun indexTranscripts(): CliSessionIndexReport = withContext(Dispatchers.IO) {
         val discovered = projectRootsProvider().flatMap { root -> listTranscriptFiles(root) }
         var updatedFiles = 0
         var skippedLines = 0

@@ -13,6 +13,8 @@ import com.usagemonitor.presentation.terminal.detectTerminalProfile
  */
 internal class TuiReader(
     private val reader: TerminalReader = TerminalReader(),
+    /** Os bancos do app em somente leitura; as abas de sessões e histórico leem por eles. */
+    private val stores: TuiStores? = null,
     private val teamSettings: LocalTeamSettingsDataSource = LocalTeamSettingsDataSource(),
     private val languageOverride: AppLanguage? = null
 ) {
@@ -45,8 +47,10 @@ internal object TuiWiring {
         Runtime.getRuntime().addShutdownHook(restore)
         try {
             val profile = detectTerminalProfile(System.getenv(), outputIsTerminal = true, outputEncoding = io.encoding)
-            val tuiReader = TuiReader(terminalReader, languageOverride = languageOverride)
-            return TuiRunner(io, tuiReader::load, labels, profile).run()
+            TuiStores().use { stores ->
+                val tuiReader = TuiReader(terminalReader, stores, languageOverride = languageOverride)
+                return TuiRunner(io, tuiReader::load, labels, profile).run()
+            }
         } finally {
             io.close()
             runCatching { Runtime.getRuntime().removeShutdownHook(restore) }
