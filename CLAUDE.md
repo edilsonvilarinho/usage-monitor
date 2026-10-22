@@ -343,6 +343,27 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
+## Fluxo de trabalho (desde 2026-10-22)
+
+O usuário entrega a atividade (issue, tarefa ou pergunta que muda o repositório); Claude conduz o resto, nesta ordem
+e sem esperar aprovação entre os passos. Esta regra **é** a autorização de commit, push e PR exigida pela skill
+`usage-monitor-commit-push`; **não** é de merge.
+
+1. **Dois planos.** O detalhado, que Claude segue: `docs/planos/` com atividades A01, A02… e tabela de pontos de
+   situação, publicado como comentário na issue quando houver uma. O do usuário, no chat: **no máximo um parágrafo**,
+   estruturado (o quê, onde, como valida).
+2. **Desenvolvimento** em worktree/branch própria, nunca na `main`; uma atividade, um commit.
+3. **Testes locais** antes do PR: os recortes de "Commands" e o relatório da skill `usage-monitor-test-report`.
+4. **PR** aberto por Claude, dizendo em que plataformas foi testado; Claude acompanha o CI até o `ci-ok` e corrige
+   o que ficar vermelho.
+5. **Parada de segurança:** cada run de CI vermelho, ou rodada de testes locais falhando depois de aberto o PR, é uma
+   incidência. **Na 5ª**, Claude para de desenvolver e devolve ao usuário com o diagnóstico de cada falha, o que tentou
+   e o estado da branch.
+6. **Merge só com o aval do usuário.** Com o PR verde, Claude avisa e espera; no merge, apaga a branch remota, a local
+   e a worktree.
+
+Pergunta que só pede explicação é respondida no chat, fora do fluxo.
+
 ## Convenções de código
 
 - **Nomes em inglês**, comentários em português.
