@@ -29,6 +29,31 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
+/** Um nó em memória que conta os `sync()`: o que importa é a TUI pedir ao disco o que outra JVM gravou. */
+private class CountingPreferences : java.util.prefs.AbstractPreferences(null, "") {
+    private val values = mutableMapOf<String, String>()
+    var syncs = 0
+
+    override fun putSpi(key: String, value: String) {
+        values[key] = value
+    }
+
+    override fun getSpi(key: String): String? = values[key]
+    override fun removeSpi(key: String) {
+        values.remove(key)
+    }
+
+    override fun removeNodeSpi() = Unit
+    override fun keysSpi(): Array<String> = values.keys.toTypedArray()
+    override fun childrenNamesSpi(): Array<String> = emptyArray()
+    override fun childSpi(name: String): java.util.prefs.AbstractPreferences = CountingPreferences()
+    override fun syncSpi() {
+        syncs += 1
+    }
+
+    override fun flushSpi() = Unit
+}
+
 class TuiReaderTest {
 
     private val now = Instant.parse("2026-10-21T17:23:00Z")
@@ -135,6 +160,21 @@ class TuiReaderTest {
             }
         } finally {
             runCatching { node.removeNode() }
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cada leitura ressincroniza as preferencias que o coletor grava em outra JVM`() {
+        val dir = Files.createTempDirectory("usage-monitor-tui").toFile()
+        val node = CountingPreferences()
+        try {
+            val reader = TuiReader(TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node, clock), health = LocalCollectorHealthDataSource(File(dir, "collector-health.json")))
+            reader.load(TuiState())
+            reader.load(TuiState())
+            // Dois `sync()` por leitura: o primeiro reconhece a gravação da outra JVM, o segundo relê.
+            assertEquals(4, node.syncs)
+        } finally {
             dir.deleteRecursively()
         }
     }

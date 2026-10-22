@@ -48,6 +48,8 @@ internal class TuiReader(
 
     /** Cada aba lê o que é dela: a Visão geral não paga a lista de sessões, e o contrário. */
     fun load(state: TuiState): TuiData {
+        // A TUI fica aberta enquanto o coletor grava: sem isto, preferência nova chega 30 s depois.
+        reader.syncPreferences()
         val reading = reader.read(languageOverride)
         // A saúde só vale com coletor vivo: sem ele, o arquivo é de uma execução que já acabou.
         val collectorHealth = if (reading.collector != null) health.read() else null
