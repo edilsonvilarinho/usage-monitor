@@ -82,6 +82,27 @@ API key, entered in **Settings > APIs**; environment variables are never read.
 | `--locale <pt\|en>` | Opens the interface in that language for this run only; the saved choice does not change |
 | `--user-data-dir <dir>` | Keeps this run's settings, history, keys and logs in `<dir>` instead of `~/.usage-monitor`; another folder runs side by side with the default one, with automatic updates and start with the system off |
 
+Terminal commands read the app's last collection and never call the APIs, so the app keeps being
+the one that collects. They follow the app language (`--locale` works here too):
+
+| Command | What it does |
+|---|---|
+| `status [--json] [--max-age <time>]` | Prints every quota: bar, state from your alert thresholds and when it resets. `--json` is a stable contract for scripts |
+| `check [--max <n>] [--max-age <time>] [--quiet]` | Exits with 0 on track, 1 warning, 2 critical, 3 no reading |
+| `wait <quota> --below <n> [--timeout <time>]` | Waits until the quota drops below n% (ids in `status --json`), e.g. `usage-monitor wait anthropic:work:claude-5h --below 50 && claude -p "run the suite"` |
+| `statusline claude-code` | One line under the Claude Code prompt: the account that Claude Code uses, 5h and 7d, session cost and throughput |
+| `statusline tmux` | A segment for the tmux status bar |
+
+```jsonc
+// ~/.claude/settings.json
+"statusLine": { "type": "command", "command": "usage-monitor statusline claude-code" }
+```
+
+```sh
+# ~/.tmux.conf
+set -g status-right '#(usage-monitor statusline tmux)'
+```
+
 Without options it opens the app, or brings the running one to the front. On Windows, use
 `usage-monitor.exe` from the install folder: `Usage Monitor.exe` is a windowed program, so its output
 never reaches the terminal. The installer does not add the folder to `PATH`:

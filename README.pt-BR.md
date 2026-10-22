@@ -89,9 +89,30 @@ de uma chave de API, informada em **Configurações > APIs**; variáveis de ambi
 | `--locale <pt\|en>` | Abre a interface nesse idioma só nesta execução; a escolha gravada não muda |
 | `--user-data-dir <dir>` | Guarda configurações, histórico, chaves e logs desta execução em `<dir>`, no lugar de `~/.usage-monitor`; outra pasta roda em paralelo com a padrão, com atualização automática e início com o sistema desligados |
 
+Os comandos de terminal leem a última coleta do app e nunca consultam as APIs; quem coleta continua
+sendo o app. Eles seguem o idioma do app (`--locale` vale aqui também):
+
+| Comando | O que faz |
+|---|---|
+| `status [--json] [--max-age <tempo>]` | Mostra todas as cotas: barra, estado pelos seus limiares de alerta e quando reinicia. `--json` é um contrato estável para scripts |
+| `check [--max <n>] [--max-age <tempo>] [--quiet]` | Sai com 0 em dia, 1 atenção, 2 crítico, 3 sem leitura |
+| `wait <cota> --below <n> [--timeout <tempo>]` | Espera a cota cair abaixo de n% (os ids estão no `status --json`), por exemplo `usage-monitor wait anthropic:trabalho:claude-5h --below 50 && claude -p "rode a suíte"` |
+| `statusline claude-code` | Uma linha embaixo do prompt do Claude Code: a conta que ele usa, 5h e 7d, custo e vazão da sessão |
+| `statusline tmux` | Um segmento para a barra do tmux |
+
+```jsonc
+// ~/.claude/settings.json
+"statusLine": { "type": "command", "command": "usage-monitor statusline claude-code" }
+```
+
+```sh
+# ~/.tmux.conf
+set -g status-right '#(usage-monitor statusline tmux)'
+```
+
 Sem opção, abre o app ou traz para a frente o que já está aberto. No Windows, use o
 `usage-monitor.exe` da pasta de instalação: o `Usage Monitor.exe` é um programa de janela, e a saída
-dele nunca chega ao terminal. O instalador não põe a pasta no `PATH`. A saída das opções é em inglês:
+dele nunca chega ao terminal. O instalador não põe a pasta no `PATH`:
 
 ```powershell
 & "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --help

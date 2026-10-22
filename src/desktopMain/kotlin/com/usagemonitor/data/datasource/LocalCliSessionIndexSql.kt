@@ -415,6 +415,22 @@ internal val SELECT_SESSION_THROUGHPUT_SQL = """
     GROUP BY t.session_id;
 """
 
+/** O mesmo corte de [SELECT_SESSION_THROUGHPUT_SQL], de uma sessão só (linha de status, #439). */
+internal val SELECT_ONE_SESSION_THROUGHPUT_SQL = """
+    SELECT SUM(t.output_tokens) AS output_tokens,
+           SUM(t.last_line_ts - t.request_ts) AS generation_millis
+    FROM cli_turns t
+    WHERE t.session_id = ?
+      AND t.request_ts IS NOT NULL
+      AND t.last_line_ts > t.request_ts
+      AND t.last_line_ts - t.request_ts < ?;
+"""
+
+/** Custo de uma sessão, já calculado dos tokens na indexação (linha de status, #439). */
+internal val SELECT_SESSION_COST_SQL = """
+    SELECT cost_micros, unpriced_turns FROM cli_sessions WHERE session_id = ?;
+"""
+
 /** O mesmo corte de [SELECT_SESSION_THROUGHPUT_SQL], agrupado por modelo (#386). */
 internal val SELECT_MODEL_THROUGHPUT_SQL = """
     SELECT t.model AS model,

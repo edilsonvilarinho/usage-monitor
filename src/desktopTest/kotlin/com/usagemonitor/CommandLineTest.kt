@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.terminal.withoutAccents
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -46,15 +47,15 @@ class CommandLineTest {
 
     @Test
     fun `help and version have a long and a short form`() {
-        assertEquals(CommandLineRequest.Help, parseCommandLine(arrayOf("--help")))
-        assertEquals(CommandLineRequest.Help, parseCommandLine(arrayOf("-h")))
+        assertEquals(CommandLineRequest.Help(), parseCommandLine(arrayOf("--help")))
+        assertEquals(CommandLineRequest.Help(), parseCommandLine(arrayOf("-h")))
         assertEquals(CommandLineRequest.Version, parseCommandLine(arrayOf("--version")))
         assertEquals(CommandLineRequest.Version, parseCommandLine(arrayOf("-v")))
     }
 
     @Test
     fun `reading options win over actions, help first`() {
-        assertEquals(CommandLineRequest.Help, parseCommandLine(arrayOf("--diagnostics", "--version", "-h")))
+        assertEquals(CommandLineRequest.Help(), parseCommandLine(arrayOf("--diagnostics", "--version", "-h")))
         assertEquals(CommandLineRequest.Version, parseCommandLine(arrayOf("--diagnostics", "-v", "--bogus")))
     }
 
@@ -72,19 +73,37 @@ class CommandLineTest {
     }
 
     @Test
-    fun `the help lists every public option and hides the auto start mark`() {
-        val help = commandLineHelp("9.9.9")
-        assertTrue(help.startsWith("Usage Monitor 9.9.9\n"), help)
-        for (option in listOf("--help", "-h", "--version", "-v", DiagnosticsExport.ARGUMENT, "--locale <pt|en>", "--user-data-dir <dir>")) {
-            assertTrue(help.contains(option), "help sem $option")
+    fun `the help lists every public option and command in both languages and hides the auto start mark`() {
+        for (language in AppLanguage.entries) {
+            val help = commandLineHelp(language, "9.9.9")
+            assertTrue(help.startsWith("Usage Monitor 9.9.9\n"), help)
+            val expected = listOf("--help", "-h", "--version", "-v", DiagnosticsExport.ARGUMENT, "--locale <pt|en>", "--user-data-dir <dir>") +
+                listOf("status [--json]", "check [--max <n>]", "wait <", "--below <n>", "statusline <claude-code|tmux>")
+            for (option in expected) {
+                assertTrue(help.contains(option), "help $language sem $option")
+            }
+            assertFalse(help.contains(StartupOrigin.AUTO_START_ARGUMENT), help)
         }
-        assertFalse(help.contains(StartupOrigin.AUTO_START_ARGUMENT), help)
+        assertTrue(commandLineHelp(AppLanguage.PT).contains("Comandos"))
+        assertTrue(commandLineHelp(AppLanguage.EN).contains("Commands"))
     }
 
     @Test
-    fun `the console texts are ASCII`() {
+    fun `the help fits an 80 column terminal`() {
+        for (language in AppLanguage.entries) {
+            for (line in commandLineHelp(language).lines()) {
+                assertTrue(line.length <= 80, "help $language: '$line' tem ${line.length} colunas")
+            }
+        }
+    }
+
+    @Test
+    fun `the console texts are ASCII once the accents are dropped`() {
         // O console do Windows decodifica com a página de código dele: acento sai corrompido.
-        for (text in listOf(commandLineHelp(), commandLineVersion(), unknownOptionWarning("--x"))) {
+        // Sem UTF-8, o `TerminalConsole` escreve o texto sem acento; o que sobra tem de ser ASCII.
+        val texts = AppLanguage.entries.map { language -> withoutAccents(commandLineHelp(language)) } +
+            listOf(commandLineVersion(), unknownOptionWarning("--x"), commandLineHelp(AppLanguage.EN))
+        for (text in texts) {
             assertTrue(text.all { char -> char.code in 0x0A..0x7E }, text)
         }
     }
@@ -128,7 +147,7 @@ class CommandLineTest {
 
     @Test
     fun `help and version still win over a bad locale`() {
-        assertEquals(CommandLineRequest.Help, parseCommandLine(arrayOf("--locale", "xx", "--help")))
+        assertEquals(CommandLineRequest.Help(), parseCommandLine(arrayOf("--locale", "xx", "--help")))
         assertEquals(CommandLineRequest.Version, parseCommandLine(arrayOf("--locale", "-v")))
     }
 

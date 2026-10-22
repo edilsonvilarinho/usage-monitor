@@ -28,6 +28,9 @@ import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.onboarding.rememberStartupGuideController
 import com.usagemonitor.presentation.ui.help.StartupTipCatalog
+import com.usagemonitor.terminal.TerminalCommands
+import com.usagemonitor.terminal.TerminalConsole
+import com.usagemonitor.terminal.TerminalReader
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -95,12 +98,26 @@ fun main(args: Array<String>) {
     // Antes de tudo, inclusive da instância única: precisa funcionar com o app
     // aberto e travado, ou que nem sobe (#416).
     val launch = when (val request = parseCommandLine(args)) {
-        CommandLineRequest.Help -> exitProcess(printAndSucceed(commandLineHelp()))
+        // Ajuda e diagnóstico no idioma do app (#439), lido das preferências da raiz pedida.
+        is CommandLineRequest.Help -> {
+            configureDataRootForReading(request.userDataDir)
+            val console = TerminalConsole.system()
+            console.printText(commandLineHelp(TerminalReader().language(request.locale)))
+            exitProcess(0)
+        }
         CommandLineRequest.Version -> exitProcess(printAndSucceed(commandLineVersion()))
         is CommandLineRequest.Invalid -> exitProcess(printUsageError(request.message))
         is CommandLineRequest.Diagnostics -> {
             configureDataRoot(request.userDataDir)
-            exitProcess(DiagnosticsExport.run())
+            val console = TerminalConsole.system()
+            val language = TerminalReader().language(request.locale)
+            exitProcess(DiagnosticsExport.run(language, out = console::printText, err = { text -> System.err.println(text) }))
+        }
+        // Modo terminal (#439): responde e sai, também pelo `usage-monitor.exe` de
+        // console, que por isso não relança o exe GUI.
+        is CommandLineRequest.Terminal -> {
+            configureDataRoot(request.userDataDir)
+            exitProcess(TerminalCommands.run(request.command, request.locale))
         }
         is CommandLineRequest.Launch -> request
     }
@@ -193,6 +210,18 @@ private fun configureDataRoot(value: String?): File? {
     }
 }
 
+/**
+ * A raiz de dados para quem só lê (a ajuda): pasta inválida não impede a ajuda de sair,
+ * que fica com a raiz padrão. O erro de pasta aparece quando ela for usada de fato.
+ */
+private fun configureDataRootForReading(value: String?) {
+    val workingDirectory = File(System.getProperty("user.dir") ?: ".")
+    val resolution = resolveDataRoot(value, workingDirectory)
+    if (resolution is DataRootResolution.Custom) {
+        AppDataDirectory.configure(resolution.root)
+    }
+}
+
 /** Saída 2, a convenção de "uso incorreto" dos CLIs, separada da falha de execução (1). */
 private fun printUsageError(message: String): Int {
     System.err.println(message)
@@ -226,7 +255,7 @@ internal fun runUsageMonitor(
     languageOverride: AppLanguage? = null
 ) = application {
     val startup = remember { AppStartup(args) }
-    val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
+    val singleInstanceGuard = remember { SingleInstanceGuard.acquireAtStartup() }
     if (singleInstanceGuard == null) {
         // Sair calado aqui é o que faz clicar no atalho com o app já rodando não
         // produzir nada -- indistinguível de "o app não abre". O pedido de foco

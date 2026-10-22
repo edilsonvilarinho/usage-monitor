@@ -163,7 +163,7 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
     <div class="flow">
       <div class="node"><b>App desktop (HUD)</b><span>É quem consulta as APIs, renova o login e respeita os limites.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Leitura pronta</b><span><code>~/.usage-monitor/snapshot.json</code>, regravado a cada coleta.</span></div>
+      <div class="node"><b>Leitura pronta</b><span><code>~/.usage-monitor/dashboard-cache.json</code>, que o app já regrava a cada coleta.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
       <div class="node cli"><b>Modo terminal</b><span>Lê a leitura pronta. Configurar pelo terminal muda os mesmos arquivos que o app usa.</span></div>
     </div>
@@ -171,7 +171,7 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
     <div class="flow">
       <div class="node cli"><b>Serviço <code>usage-monitor service</code></b><span>O mesmo motor do app, sem janela: coleta, histórico, alertas, time, Telegram e acesso web.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Leitura pronta</b><span>O mesmo <code>snapshot.json</code> e o mesmo histórico em SQLite.</span></div>
+      <div class="node"><b>Leitura pronta</b><span>O mesmo <code>dashboard-cache.json</code> e o mesmo histórico em SQLite.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
       <div class="node cli"><b>Modo terminal</b><span>Pelo SSH: <code>status</code>, <code>tui</code> e toda a configuração.</span></div>
     </div>
@@ -189,12 +189,12 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
   <section class="box" aria-labelledby="out">
     <h3 id="out">O que ficou de fora, e por quê</h3>
     <ul>
-      <li><b>Segmento no prompt do shell (AG6):</b> precisa de um leitor sem JVM para não atrasar cada comando. Pode vir depois, lendo o mesmo <code>snapshot.json</code>.</li>
+      <li><b>Segmento no prompt do shell (AG6):</b> precisa de um leitor sem JVM para não atrasar cada comando. Pode vir depois, lendo o mesmo <code>dashboard-cache.json</code>.</li>
       <li><b>Mosaico estilo btop (AG8) e conversa por comandos (AG9):</b> seriam um segundo jeito de desenhar a mesma tela. Ficou só o painel com abas, para haver um único jeito de navegar.</li>
       <li><b>Resposta em frases sem argumento (AG3):</b> hoje <code>usage-monitor</code> sem nada abre o app, e quem usa esse atalho seria pego de surpresa.</li>
       <li><b>Watch em linha (AG12) e HUD de bolso (AG13):</b> a barra do tmux já cobre o "ver de canto de olho".</li>
       <li><b>Tema, HUD e escala da interface:</b> não se aplicam ao terminal, que usa as cores dele (parte 7). Cor e emoji por conta continuam só no app.</li>
-      <li><b>Ainda em aberto, idioma:</b> pela regra do #418, a saída de linha de comando é em inglês. Aqui está em português para a conversa. Falta decidir se o modo terminal segue o idioma do app.</li>
+      <li><b>Idioma (decidido na #439):</b> o terminal segue o idioma do app. Em console que não é UTF-8, os glifos viram ASCII e o texto sai sem acento.</li>
       <li><b>Ainda em aberto, pacote para servidor:</b> o pacote de hoje leva Compose e Skiko. Falta medir se o mesmo <code>.deb</code>/<code>.rpm</code> roda sem bibliotecas gráficas instaladas ou se o servidor precisa de um pacote próprio, só com o motor.</li>
     </ul>
   </section>
@@ -251,6 +251,9 @@ const Q = [
   { src: 'MiniMax',     acct: '',         k: 'mm', win: '5h',  p: 28, reset: '18:00',     inn: '3h37' },
 ];
 const q = (src, win) => Q.find(x => x.src === src && x.win === win);
+// O rótulo da cota como o app o grava (chave de série), que é o que o `status` mostra.
+const quotaLabel = x => x.src.startsWith('Claude') ? 'Claude ' + x.win : x.src === 'Codex' ? 'Codex ' + x.win
+  : x.src === 'OpenCode Go' ? 'Go mensal' : x.src === 'Cursor' ? 'Cursor Included' : 'MiniMax-M3';
 
 function series(seed, resets, end){
   const v = []; let cur = seed;
@@ -300,18 +303,18 @@ S.statusline = () => {
     L(c('bd', '│'), fit(L(' ', c('mu', '>'), ' agora rode o allTests', c('cursor', ' ')), w), c('bd', '│')),
     L(c('bd', '╰' + rep('─', w) + '╯')),
     L('  ', c('a', '◑ Claude Max'), c('mu', ' · '), '5h ', c('b', x.p + '%'), ' ', bar(x.p, 12, 'a'), ' ', c('mu', '16:40'),
-      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', ' · '), 'sessão ', c('b', 'US$ 1,84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
+      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', ' · '), 'sessão ', c('b', '$1.84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
     L(c('mu', '  ? for shortcuts')),
   ]);
 };
 S.statuslineCrit = () => render([
-  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', 'US$ 9,40')),
+  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', '$9.40')),
 ]);
 
 S.tmux = () => {
   const W = 92;
   const left = L(c('inv b', ' dev '), c('inv', ' 0:nvim  1:claude* 2:codex '));
-  const right = L(c('inv', ' '), c('a', 'cl '), c('inv b', '62'), c('inv', ' '), c('a', 'tm '), c('inv b', '91'), c('cr', ' crít'), c('inv', ' '), c('c', 'cx '), c('inv b', '24'), c('inv', ' '), c('cu', 'cu '), c('inv b', '73'), c('wa', ' atn'), c('inv', ' │ 14:23 '));
+  const right = L(c('inv', ' '), c('a', 'cm '), c('inv b', '62'), c('inv', ' '), c('a', 'ct '), c('inv b', '91'), c('cr', ' crít'), c('inv', ' '), c('c', 'co '), c('inv b', '57'), c('inv', ' '), c('cu', 'cu '), c('inv b', '73'), c('wa', ' atn'), c('inv', ' │ 14:23 '));
   return render([
     L(c('mu', '~/workspace/usage-monitor'), ' ', c('oc', 'main'), ' ❯ claude'),
     L(''),
@@ -353,14 +356,14 @@ S.help = () => render([
 
 S.status = () => {
   const out = [sh('usage-monitor status'), L('')];
-  out.push(L(c('mu b', ' ' + pad('FONTE', 14) + ' ' + pad('CONTA', 9) + ' ' + pad('JAN.', 4) + ' ' + pad('USO', 20) + '       ' + pad('ESTADO', 8) + '  REINICIA')));
+  out.push(L(c('mu b', ' ' + pad('FONTE', 14) + ' ' + pad('CONTA', 9) + ' ' + pad('COTA', 15) + ' ' + pad('USO', 20) + '       ' + pad('ESTADO', 8) + '  REINICIA')));
   let prev = '';
   for (const x of Q){
     const [sc, sw] = st(x.p); const first = x.src + x.acct !== prev; prev = x.src + x.acct;
     out.push(L(' ', first ? c(x.k, pad('● ' + x.src, 14)) : pad('', 14), ' ', c('mu', pad(first ? x.acct : '', 9)), ' ',
-      pad(x.win, 4), ' ', bar(x.p, 20, x.k), ' ', c('b', lpad(x.p + '%', 4)), '  ', c(sc, pad(sw, 8)), '  ', x.reset + ' BRT', c('mu', ' · em ' + x.inn)));
+      pad(quotaLabel(x), 15), ' ', bar(x.p, 20, x.k), ' ', c('b', lpad(x.p + '%', 4)), '  ', c(sc, pad(sw, 8)), '  ', x.reset + ' BRT', c('mu', ' · em ' + x.inn)));
   }
-  out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('saldo', 4), ' ', c('b', 'US$ 7,82')));
+  out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('Saldo', 15), ' ', c('b', 'saldo US$ 7,82')));
   out.push(L(''));
   out.push(L(c('mu', ' lido há 38 s pelo app aberto · 9 cotas: '), c('cr', '1 crítica'), c('mu', ', '), c('wa', '2 em atenção'), c('mu', ', 6 em dia')));
   return render(out);
@@ -368,17 +371,17 @@ S.status = () => {
 
 S.scripts = () => render([
   sh("usage-monitor status --json | jq '.quotas[] | select(.percent >= 70)'"),
-  L(c('mu', '{ "source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho", ', c('mu', '"window"'), ': "5h",'),
-  L(c('mu', '  "percent"'), ': ', c('b', '91'), ', ', c('mu', '"state"'), ': "critical", ', c('mu', '"resetsAt"'), ': "2026-10-21T18:10:00Z" }'),
-  L(c('mu', '{ "source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho", ', c('mu', '"window"'), ': "7d", ', c('mu', '"percent"'), ': ', c('b', '74'), ', …}'),
-  L(c('mu', '{ "source"'), ': "cursor", ', c('mu', '"window"'), ': "month", ', c('mu', '"percent"'), ': ', c('b', '73'), ', …}'),
+  L(c('mu', '{ "id"'), ': "anthropic:trabalho:claude-5h", ', c('mu', '"source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho",'),
+  L(c('mu', '  "label"'), ': "Claude 5h", ', c('mu', '"percent"'), ': ', c('b', '91'), ', ', c('mu', '"state"'), ': "critical", ', c('mu', '"resets_at"'), ': "2026-10-21T18:10:00Z", …}'),
+  L(c('mu', '{ "id"'), ': "anthropic:trabalho:claude-7d", ', c('mu', '"percent"'), ': ', c('b', '74'), ', ', c('mu', '"state"'), ': "warning", …}'),
+  L(c('mu', '{ "id"'), ': "cursor:cursor-included", ', c('mu', '"percent"'), ': ', c('b', '73'), ', ', c('mu', '"state"'), ': "warning", …}'),
   L(''),
   sh('usage-monitor check --max 90; echo $?'),
-  L(c('cr', 'crítico'), '  Claude Team 5h 91% (limite 90%)'),
+  L(c('cr', 'crítico'), '  Anthropic · trabalho · Claude 5h 91% (limite 90%)'),
   L(c('b', '2')),
   L(''),
-  sh('usage-monitor wait anthropic:trabalho:5h --below 50 && claude -p "rode a suíte"'),
-  L(c('mu', 'aguardando Claude Team 5h cair abaixo de 50% · reinicia 15:10 BRT, em 47 min'), c('cursor', ' ')),
+  sh('usage-monitor wait anthropic:trabalho:claude-5h --below 50 && claude -p "rode a suíte"'),
+  L(c('mu', 'aguardando Claude 5h (Anthropic · trabalho) cair abaixo de 50% (agora 91%) · reinicia 15:10 BRT, em 47 min…'), c('cursor', ' ')),
 ]);
 
 // visão geral: lista de fontes à esquerda, detalhe à direita
@@ -512,8 +515,8 @@ S.appClosed = () => render([
   L(c('wa', '▲ '), 'Nada está coletando. Mostrando a última leitura, de ', c('b', '14:05 BRT'), ' (18 min atrás).'),
   L(c('mu', '  Abra o app ou rode usage-monitor service start. Até lá os números não mudam.')),
   L(''),
-  L(' ', c('a', pad('● Claude Max', 14)), ' 5h  ', bar(58, 20, 'a'), ' ', c('b', ' 58%'), '  ', c('ok', 'em dia '), '  16:40 BRT'),
-  L(' ', c('a', pad('● Claude Team', 14)), ' 5h  ', bar(88, 20, 'a'), ' ', c('b', ' 88%'), '  ', c('wa', 'atenção'), '  15:10 BRT'),
+  L(' ', c('a', pad('● Claude Max', 14)), ' Claude 5h  ', bar(58, 20, 'a'), ' ', c('b', ' 58%'), '  ', c('ok', 'em dia '), '  16:40 BRT'),
+  L(' ', c('a', pad('● Claude Team', 14)), ' Claude 5h  ', bar(88, 20, 'a'), ' ', c('b', ' 88%'), '  ', c('wa', 'atenção'), '  15:10 BRT'),
   L(c('mu', '  …')),
   L(''),
   sh('usage-monitor status --max-age 10m; echo $?'),
@@ -543,7 +546,7 @@ S.setup = () => render([
   L(c('mu', '     Salvas em ~/.usage-monitor/api-keys.json, legível só pelo seu usuário.')),
   L(''),
   L(c('b', '3/5  Avisos')),
-  L('     Limiares de atenção e crítico ', c('mu', '[70,90]'), ': ', c('mu', '(enter)')),
+  L('     Limiares de alerta ', c('mu', '[75,90,100]'), ': 70,90'),
   L('     Avisar pelo Telegram? ', c('mu', '[s/N]'), ' s ', c('mu', '→ continua em usage-monitor telegram pair')),
   L(''),
   L(c('b', '4/5  Idioma'), ' ', c('mu', '[pt/en] (pt)'), ': ', c('mu', '(enter)')),

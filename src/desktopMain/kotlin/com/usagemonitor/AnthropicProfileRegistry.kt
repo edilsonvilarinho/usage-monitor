@@ -339,26 +339,7 @@ internal class AnthropicProfileRegistry(
         )
     }
 
-    private fun readStoredProfiles(): List<AnthropicProfileRecord> {
-        val children = runCatching { profilesNode.childrenNames().toList() }.getOrDefault(emptyList())
-        return children.mapNotNull { childName ->
-            val node = profilesNode.node(childName)
-            val path = node.get(KEY_PATH, "").takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val origin = runCatching {
-                AnthropicProfileOrigin.valueOf(node.get(KEY_ORIGIN, AnthropicProfileOrigin.DISCOVERED.name))
-            }.getOrDefault(AnthropicProfileOrigin.DISCOVERED)
-            AnthropicProfileRecord(
-                id = childName,
-                label = node.get(KEY_LABEL, File(path).name.ifBlank { "Anthropic" }),
-                configDirectory = path,
-                enabled = node.getBoolean(KEY_ENABLED, false),
-                origin = origin,
-                hidden = node.getBoolean(KEY_HIDDEN, false),
-                color = node.get(KEY_COLOR, null)?.takeIf { value -> value.isNotBlank() },
-                emoji = node.get(KEY_EMOJI, null)?.takeIf { value -> value.isNotBlank() }
-            )
-        }
-    }
+    private fun readStoredProfiles(): List<AnthropicProfileRecord> = readStoredFrom(profilesNode)
 
     private fun writeProfile(record: AnthropicProfileRecord) {
         val node = profilesNode.node(record.id)
@@ -406,19 +387,50 @@ internal class AnthropicProfileRegistry(
         return UUID.nameUUIDFromBytes(normalizePath(path).toByteArray(StandardCharsets.UTF_8)).toString()
     }
 
-    private fun normalizePath(path: String): String {
-        return File(path).absoluteFile.normalize().path.trimEnd(File.separatorChar).lowercase()
-    }
+    private fun normalizePath(path: String): String = normalizedPath(path)
 
-    private companion object {
-        const val PREFERENCES_NODE = "anthropicProfiles"
-        const val KEY_LABEL = "label"
-        const val KEY_PATH = "path"
-        const val KEY_ENABLED = "enabled"
-        const val KEY_ORIGIN = "origin"
-        const val KEY_HIDDEN = "hidden"
-        const val KEY_COLOR = "color"
-        const val KEY_EMOJI = "emoji"
-        val LABEL_AUTOSAVE_DEBOUNCE = 300.milliseconds
+    companion object {
+        private const val PREFERENCES_NODE = "anthropicProfiles"
+        private const val KEY_LABEL = "label"
+        private const val KEY_PATH = "path"
+        private const val KEY_ENABLED = "enabled"
+        private const val KEY_ORIGIN = "origin"
+        private const val KEY_HIDDEN = "hidden"
+        private const val KEY_COLOR = "color"
+        private const val KEY_EMOJI = "emoji"
+        private val LABEL_AUTOSAVE_DEBOUNCE = 300.milliseconds
+
+        /**
+         * Os perfis gravados, sem descobrir nem gravar nada. O modo terminal (#439) os lê para
+         * saber de que conta é uma sessão do Claude Code; construir o registro dispararia a
+         * redescoberta, que escreve nas preferências do app.
+         */
+        internal fun readStored(preferences: Preferences): List<AnthropicProfileRecord> =
+            readStoredFrom(preferences.node(PREFERENCES_NODE))
+
+        /** A forma de comparar diretórios de configuração: absoluta, normalizada e sem caixa. */
+        internal fun normalizedPath(path: String): String =
+            File(path).absoluteFile.normalize().path.trimEnd(File.separatorChar).lowercase()
+
+        private fun readStoredFrom(profilesNode: Preferences): List<AnthropicProfileRecord> {
+            val children = runCatching { profilesNode.childrenNames().toList() }.getOrDefault(emptyList())
+            return children.mapNotNull { childName ->
+                val node = profilesNode.node(childName)
+                val path = node.get(KEY_PATH, "").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val origin = runCatching {
+                    AnthropicProfileOrigin.valueOf(node.get(KEY_ORIGIN, AnthropicProfileOrigin.DISCOVERED.name))
+                }.getOrDefault(AnthropicProfileOrigin.DISCOVERED)
+                AnthropicProfileRecord(
+                    id = childName,
+                    label = node.get(KEY_LABEL, File(path).name.ifBlank { "Anthropic" }),
+                    configDirectory = path,
+                    enabled = node.getBoolean(KEY_ENABLED, false),
+                    origin = origin,
+                    hidden = node.getBoolean(KEY_HIDDEN, false),
+                    color = node.get(KEY_COLOR, null)?.takeIf { value -> value.isNotBlank() },
+                    emoji = node.get(KEY_EMOJI, null)?.takeIf { value -> value.isNotBlank() }
+                )
+            }
+        }
     }
 }

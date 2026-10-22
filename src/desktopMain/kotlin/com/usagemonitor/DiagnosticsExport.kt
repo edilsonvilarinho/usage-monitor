@@ -1,7 +1,9 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.AppDataDirectory
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.redactBreadcrumbIdentity
+import com.usagemonitor.presentation.ui.localized
 import java.awt.GraphicsDevice
 import java.awt.GraphicsEnvironment
 import java.awt.SystemTray
@@ -89,20 +91,27 @@ internal object DiagnosticsExport {
 
     /**
      * Ponto de entrada do argumento: imprime onde o pacote ficou e devolve o código
-     * de saída. Texto em inglês e ASCII: o console do Windows decodifica a saída
-     * com a página de código dele, e acento saía corrompido (medido com
-     * `gradlew.bat run --args=--diagnostics`).
+     * de saída. No idioma do app (#439); quem chama escreve por [out] e [err], que tiram
+     * o acento quando o console não é UTF-8 — o console do Windows decodifica com a
+     * página de código dele, e acento saía corrompido (medido no #418).
      */
-    fun run(): Int {
+    fun run(language: AppLanguage, out: (String) -> Unit, err: (String) -> Unit): Int {
         return runCatching { export(installationDiagnosticsDir = AppDataDirectory.installationFile("diagnostics")) }
             .fold(
                 onSuccess = { zip ->
-                    println("Diagnostics saved to: ${zip.absolutePath}")
-                    println("Attach this file to the GitHub issue. It holds metadata only: no prompt, response or credential.")
+                    out(localized(language, "Diagnóstico salvo em: ${zip.absolutePath}", "Diagnostics saved to: ${zip.absolutePath}"))
+                    out(
+                        localized(
+                            language,
+                            "Anexe este arquivo à issue do GitHub. Só tem metadados: nenhum prompt, resposta ou credencial.",
+                            "Attach this file to the GitHub issue. It holds metadata only: no prompt, response or credential."
+                        )
+                    )
                     0
                 },
                 onFailure = { error ->
-                    System.err.println("Could not write the diagnostics package: ${error::class.simpleName}: ${error.message}")
+                    val reason = "${error::class.simpleName}: ${error.message}"
+                    err(localized(language, "Não foi possível gravar o pacote de diagnóstico: $reason", "Could not write the diagnostics package: $reason"))
                     1
                 }
             )

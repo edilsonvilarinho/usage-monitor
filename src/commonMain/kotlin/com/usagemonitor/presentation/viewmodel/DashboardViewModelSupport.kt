@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.QuotaSeriesKey
 import com.usagemonitor.domain.entity.UsageHistorySeries
 import com.usagemonitor.domain.entity.UsageSpike
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.usageTargetPublicationOrder
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.detectSpike
 import com.usagemonitor.domain.entity.HistoryRange
@@ -69,11 +70,11 @@ internal fun buildDashboardUiState(
     }
 
     val stats = enabledTargets
-        .sortedWith(compareBy<UsageTargetKey> { it.source.ordinal }.thenBy { it.profileId.orEmpty() })
+        .sortedWith(usageTargetPublicationOrder)
         .mapNotNull { target -> statsByTarget[target] }
 
     val errors = enabledTargets
-        .sortedWith(compareBy<UsageTargetKey> { it.source.ordinal }.thenBy { it.profileId.orEmpty() })
+        .sortedWith(usageTargetPublicationOrder)
         .mapNotNull { target -> errorsByTarget[target] }
 
     val riskSummaries = enabledTargets

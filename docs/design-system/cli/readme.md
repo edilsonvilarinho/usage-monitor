@@ -39,6 +39,8 @@ aqui, na seção Primitivas.
 3. **Quatro paletas, decididas pelo terminal, nunca pelo tema do app:** truecolor escuro (padrão),
    truecolor claro (fundo claro detectado por `COLORFGBG` ou OSC 11; na dúvida, escuro), 16 cores
    ANSI (sem `COLORTERM=truecolor`) e sem cor (`NO_COLOR`, `TERM=dumb` ou saída redirecionada).
+   **Glifos** são uma decisão separada da cor: saída que não é UTF-8 usa a coluna ASCII da tabela
+   de glifos, mesmo com cor.
 4. **Sem animação.** Só o cursor do terminal pisca. Espera se diz em texto ("aguardando…"), como o
    progresso da atualização do app.
 5. **Toda leitura diz de onde e de quando é:** "lido há 38 s pelo app aberto", "pelo serviço",
@@ -81,23 +83,42 @@ terminal. O número entre parênteses é a tela do protótipo onde ela aparece.
 
 **Barra de cota** (2.2, 3.1). Células `█` mais uma parcial em oitavos, na cor da fonte; o resto em
 `░` com `--term-dim`, sempre visível. Larguras fixas: 12 na linha de status, 20 em tabelas e
-comandos, 40 no detalhe. Nunca passa de 100% e nunca cresce por efeito.
+comandos, 40 no detalhe. Pelo **piso**: a barra nunca passa do número escrito ao lado, nem de 100%,
+e nunca cresce por efeito. No ASCII, `[####----]` com a mesma largura total.
 
-**Palavra de estado** (2.2). `em dia`, `atenção`, `crítico`, pelos **limiares do usuário** (padrão
-70 e 90, configuráveis), em `--term-ok`, `--term-warn` e `--term-crit`. Na linha de status e na
-barra do tmux, `em dia` não se escreve: só o que pede atenção aparece.
+**Palavra de estado** (2.2). `em dia`, `atenção`, `crítico`, em `--term-ok`, `--term-warn` e
+`--term-crit`, pelos **limiares de alerta da conta** (`UsageAlertSettings.quotaPercentsFor`: o
+limiar próprio da conta ou o geral, padrão 75, 90 e 100). A palavra conta quantos limiares o
+percentual já alcançou: nenhum, `em dia`; um, `atenção`; dois ou mais, `crítico`. É a mesma regra
+de zonas da barra do Telegram (AE7), então o bot e o terminal nunca discordam. Sem limiar nenhum,
+não há palavra: só o número. Cota sem percentual (saldo, contagem) também não leva palavra. Na
+linha de status e na barra do tmux, `em dia` não se escreve: só o que pede atenção aparece.
 
-**Linha de cota** (2.2). `● Fonte  conta  janela  barra  NN%  estado  HH:MM BRT · em X`. A fonte e
-a conta só na primeira janela da conta; a porcentagem em negrito; o "em X" em muted.
+**Linha de cota** (2.2). `● Fonte  conta  cota  barra  NN%  estado  HH:MM BRT · em X`. A coluna de
+cota traz o **rótulo do app** ("Claude 5h", "Go semanal", "Cursor Included"), e não uma janela
+abreviada: os rótulos são chave de série e variam por fonte, e só o rótulo diz o mesmo que a HUD e
+o bot (decisão da A05 da #439, que corrigiu o "JAN." do protótipo). A fonte e a conta só na primeira
+cota da conta; a porcentagem em negrito; o "em X" em muted. O reinício segue o bot até 6 dias
+("15:10", "qui 21:00"); mais longe, a data ("05/11 15:47"). Janela já vencida diz "reiniciando".
+Cota sem percentual (saldo) mostra o valor no lugar da barra.
 
 **Rodapé de leitura** (2.2). Origem e idade da leitura, seguidas da contagem por estado, com cada
 estado na sua cor: "lido há 38 s pelo app aberto · 9 cotas: 1 crítica, 2 em atenção, 6 em dia".
 
-**Linha de status** (1.1, 1.2). `◑ Conta · 5h NN% barra HH:MM · 7d NN% · sessão US$ · tok/s ·
-modelo`. A conta é a que aquele CLI está usando. Acima do limiar: estado escrito e "reinicia em".
+**Linha de status** (1.1, 1.2). `◑ Conta · 5h NN% barra HH:MM · 7d NN% · sessão $1.84 · tok/s ·
+modelo`. A conta é a que aquele CLI está usando, achada pelo diretório de configuração dele com os
+links resolvidos; sem perfil que aponte para ele, a linha não mostra cota nenhuma (melhor que a de
+outra conta). Acima do limiar: estado escrito e "reinicia em" no lugar da hora. O custo vem do
+índice da #381, no formato da janela de Sessões do app (`$1.84`, com `+` quando há modelo sem
+tarifa); sem a sessão no índice, sem custo. Leitura com mais de 10 min mostra "leitura de HH:MM".
+A linha sempre sai com código 0: outro código faria o Claude Code escondê-la.
 
-**Segmento do tmux** (1.3). Sigla de duas letras na cor da fonte e número em negrito, sobre o fundo
-da barra. Estado abreviado (`crít`, `atn`) só acima do limiar.
+**Segmento do tmux** (1.3). Uma entrada por conta: sigla de duas letras na cor da fonte (as
+iniciais das duas primeiras palavras do apelido ou do nome, ou as duas primeiras letras de um nome de
+uma palavra só: "Claude Max" → `cm`, "trabalho" → `tr`, "Codex" → `co`) e o **maior** percentual da
+conta em negrito, sobre o fundo da barra. Estado abreviado (`crít`, `atn`) só acima do limiar. A cor
+vai no formato do tmux (`#[fg=#4F8CFF]`, ou `colourN` em 16 cores), nunca em ANSI, e `#` do texto
+vira `##`. Leitura com mais de 10 min acrescenta "leitura de HH:MM".
 
 **Moldura do modo interativo** (3.1). Borda arredondada em `--term-border`. Na borda de cima, à
 esquerda, `usage monitor` em ouro e negrito; à direita, o status ("14:23 BRT · ao vivo", ou
@@ -144,19 +165,35 @@ usando"). Aviso com `▲` e, se houver o que rodar, o comando na linha de baixo,
 
 ## Texto
 
-- **Idioma: decisão em aberto.** A regra do #418 diz que a saída de linha de comando é em inglês e
-  ASCII; o protótipo está em português. A #439 decide se ele segue o
-  idioma do app (`LanguageSelection`) e, se seguir, revoga o #418 para os comandos novos.
+- **Idioma: o do app.** Decidido pelo dono na #439 (2026-10-21): toda saída de terminal, inclusive
+  `--help`, `--version` e `--diagnostics`, segue a `LanguageSelection` (preferência gravada ou
+  `--locale`). Isso revoga a regra "inglês/ASCII" do #418, cujo motivo continua valendo e é
+  tratado de outro jeito: **console que não é UTF-8** (o do Windows sem página 65001) recebe os
+  glifos da coluna ASCII e o texto **sem acento** ("critico", "atencao"). Nomes de comandos,
+  opções, ajustes e campos do `--json` são sempre em inglês. **Exceção:** as mensagens de uso
+  incorreto (opção desconhecida, valor inválido) seguem em inglês e ASCII, porque nascem no parser,
+  antes de o idioma ser lido das preferências; a ajuda para onde elas apontam sai no idioma do app.
 - Hora sempre em BRT: "15:10 BRT", "em 47 min", "em 1d06h", "qui 21:00".
 - Comandos no formato `usage-monitor <verbo> [objeto]`. Ajustes com nome em inglês e pontos
   (`alerts.quota.thresholds`), estáveis entre versões, porque viram contrato de script.
-- `check` sai com código pelo pior estado: 0 em dia, 1 atenção, 2 crítico, 3 sem leitura.
-- `--json` tem campos estáveis em inglês e nunca carrega segredo.
+- `check` sai com código pelo pior estado: 0 em dia, 1 atenção, 2 crítico, 3 sem leitura. Com
+  `--max <n>`, 2 quando alguma cota chegou a n%, senão 0. O 2 coincide com o de uso incorreto do
+  #418; script que precise separar os dois lê o `status --json`.
+- `--json` é contrato: campos em inglês e `snake_case` (o estilo do `/api/snapshot`), versão no
+  campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Campo novo pode
+  entrar; campo existente não muda sem subir a versão. Em saída que não é UTF-8, o que não é ASCII
+  sai como `\uXXXX`, e nunca como `?`.
+- Cada cota tem um **id estável** para scripts: `fonte[:conta]:cota`, em minúsculas, sem acento,
+  com hífen no lugar de espaço (`anthropic:pessoal:claude-5h`, `opencode_go:go-semanal`). Sai do
+  rótulo gravado, então não muda com o idioma.
 
 ## Comportamento que o visual pressupõe
 
 - **Um só coletor por pasta de dados**, pela mesma trava de instância única do app: no desktop o
   dono é o app, no servidor é `usage-monitor service`. O resto só lê.
+- **A leitura pronta é o `dashboard-cache.json`** que o app já grava, de forma atômica, a cada
+  coleta (o mesmo que reidrata a HUD no arranque). Não existe um segundo arquivo de retrato: um
+  dono só para "a última leitura de cada conta".
 - **Configurar pelo terminal muda os mesmos arquivos que o app usa.** O coletor aplica na hora,
   exceto o proxy, que vale depois de reiniciar (a mesma regra do app).
 - Sem tela não há bandeja: avisos vão para o Telegram e para o registro de `alerts`.

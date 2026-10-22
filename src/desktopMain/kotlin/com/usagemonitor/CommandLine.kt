@@ -1,6 +1,10 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.terminal.TerminalCommand
+import com.usagemonitor.terminal.TerminalCommandNames
+import com.usagemonitor.terminal.TerminalCommandParse
+import com.usagemonitor.terminal.parseTerminalCommand
 
 /**
  * O que a linha de comando pede ao processo (issue #418).
@@ -13,14 +17,18 @@ import com.usagemonitor.domain.entity.AppLanguage
  * precisa de processo nem de console.
  */
 internal sealed interface CommandLineRequest {
-    /** Imprime [commandLineHelp] e sai. Vence qualquer outra opção, como no `code --help`. */
-    data object Help : CommandLineRequest
+    /**
+     * Imprime [commandLineHelp] e sai. Vence qualquer outra opção, como no `code --help`.
+     * Leva [locale] e [userDataDir] porque a ajuda sai no idioma do app (#439), que mora nas
+     * preferências daquela raiz.
+     */
+    data class Help(val locale: AppLanguage? = null, val userDataDir: String? = null) : CommandLineRequest
 
     /** Imprime [commandLineVersion] e sai. */
     data object Version : CommandLineRequest
 
     /** Empacota o diagnóstico e sai, sem janela (#416), da raiz de [userDataDir] quando dada. */
-    data class Diagnostics(val userDataDir: String? = null) : CommandLineRequest
+    data class Diagnostics(val userDataDir: String? = null, val locale: AppLanguage? = null) : CommandLineRequest
 
     /**
      * Abre o app (ou foca a instância viva).
@@ -36,6 +44,16 @@ internal sealed interface CommandLineRequest {
         /** `--locale`: idioma só desta execução, nunca gravado; `null` = a preferência. */
         val locale: AppLanguage? = null,
         /** `--user-data-dir` como digitado (#419); o `main()` resolve e valida no disco. */
+        val userDataDir: String? = null
+    ) : CommandLineRequest
+
+    /**
+     * Um comando do modo terminal (#439): responde e sai, sem janela, antes da instância
+     * única. [locale] e [userDataDir] valem como na abertura do app.
+     */
+    data class Terminal(
+        val command: TerminalCommand,
+        val locale: AppLanguage? = null,
         val userDataDir: String? = null
     ) : CommandLineRequest
 
@@ -65,6 +83,8 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
     var userDataDir: String? = null
     var invalid: String? = null
     val unknown = mutableListOf<String>()
+    var terminalCommand: String? = null
+    val terminalArguments = mutableListOf<String>()
     val tokens = commandLineTokens(arguments)
     var index = 0
     while (index < tokens.size) {
@@ -92,6 +112,10 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
                     userDataDir = dataDirValue.value
                 }
             }
+            // O primeiro argumento solto que é nome de comando abre o modo terminal; dali
+            // em diante, o que não é opção global é argumento do comando.
+            terminalCommand == null && argument in TerminalCommandNames.ALL -> terminalCommand = argument
+            terminalCommand != null -> terminalArguments += argument
             else -> unknown += argument
         }
         if (localeValue?.consumedNext == true || dataDirValue?.consumedNext == true) {
@@ -101,14 +125,17 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
     }
     // Só leitura vence ação: `--help --diagnostics` não grava zip nenhum.
     if (help) {
-        return CommandLineRequest.Help
+        return CommandLineRequest.Help(locale, userDataDir)
     }
     if (version) {
         return CommandLineRequest.Version
     }
     invalid?.let { message -> return CommandLineRequest.Invalid(message) }
+    terminalCommand?.let { name ->
+        return terminalRequest(name, terminalArguments, unknown, diagnostics, locale, userDataDir)
+    }
     if (diagnostics) {
-        return CommandLineRequest.Diagnostics(userDataDir = userDataDir)
+        return CommandLineRequest.Diagnostics(userDataDir = userDataDir, locale = locale)
     }
     return CommandLineRequest.Launch(
         autostart = autostart,
@@ -116,6 +143,31 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
         locale = locale,
         userDataDir = userDataDir
     )
+}
+
+/**
+ * O pedido de um comando do modo terminal. Com comando, tudo é explícito: opção
+ * desconhecida antes dele e `--diagnostics` junto viram erro, em vez do aviso que a
+ * abertura do app dá.
+ */
+private fun terminalRequest(
+    name: String,
+    arguments: List<String>,
+    unknown: List<String>,
+    diagnostics: Boolean,
+    locale: AppLanguage?,
+    userDataDir: String?
+): CommandLineRequest {
+    unknown.firstOrNull()?.let { option ->
+        return CommandLineRequest.Invalid("Error: '$option' is not a known option. Run with --help to list the options.")
+    }
+    if (diagnostics) {
+        return CommandLineRequest.Invalid("Error: ${DiagnosticsExport.ARGUMENT} cannot be combined with '$name'.")
+    }
+    return when (val parsed = parseTerminalCommand(name, arguments)) {
+        is TerminalCommandParse.Parsed -> CommandLineRequest.Terminal(parsed.command, locale, userDataDir)
+        is TerminalCommandParse.Invalid -> CommandLineRequest.Invalid(parsed.message)
+    }
 }
 
 /** `trim` como o `StartupOrigin.from` sempre fez (o teste dele cobre " --autostart "). */
@@ -185,36 +237,12 @@ private fun localeError(value: String?): String =
     }
 
 /**
- * O aviso de opção ignorada. Inglês e ASCII pelo mesmo motivo do
- * `--diagnostics`: o console do Windows decodifica com a página de código dele.
+ * O aviso de opção ignorada. Fica em inglês e ASCII, como as mensagens de uso incorreto
+ * (`Invalid`): nasce no parser, antes de o idioma ser lido das preferências, e é o texto
+ * que se procura na web. A ajuda para onde ele aponta sai no idioma do app (#439).
  */
 internal fun unknownOptionWarning(option: String): String =
     "Warning: '$option' is not a known option and was ignored. Run with --help to list the options."
 
 internal fun commandLineVersion(version: String = CURRENT_APP_VERSION): String = "Usage Monitor $version"
 
-/**
- * Lista só o que existe: `--autostart` fica de fora porque é a marca que a chave
- * `Run` deixa para o registro de arranque, e quem a digita à mão só falsifica a
- * origem gravada. Inglês e ASCII, como [unknownOptionWarning].
- */
-internal fun commandLineHelp(version: String = CURRENT_APP_VERSION): String = """
-    |${commandLineVersion(version)}
-    |
-    |Usage: usage-monitor [options]
-    |
-    |Without options, opens Usage Monitor, or brings the running one to the front.
-    |
-    |Options
-    |  -h, --help         Print this help and exit.
-    |  -v, --version      Print the version and exit.
-    |  --diagnostics      Save a diagnostics package to the home folder and exit.
-    |                     It holds metadata only: no prompt, response or credential.
-    |  --locale <pt|en>   Interface language for this run only. The saved choice
-    |                     does not change. Ignored if Usage Monitor is already open.
-    |  --user-data-dir <dir>
-    |                     Keep this run's settings, history, keys and logs in <dir>
-    |                     instead of ~/.usage-monitor. Another folder runs side by
-    |                     side with the default one; there, automatic updates and
-    |                     start with the system stay off.
-""".trimMargin()
