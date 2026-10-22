@@ -28,6 +28,7 @@ import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.onboarding.rememberStartupGuideController
 import com.usagemonitor.presentation.ui.help.StartupTipCatalog
+import com.usagemonitor.terminal.TerminalCommands
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -101,6 +102,12 @@ fun main(args: Array<String>) {
         is CommandLineRequest.Diagnostics -> {
             configureDataRoot(request.userDataDir)
             exitProcess(DiagnosticsExport.run())
+        }
+        // Modo terminal (#439): responde e sai, também pelo `usage-monitor.exe` de
+        // console, que por isso não relança o exe GUI.
+        is CommandLineRequest.Terminal -> {
+            configureDataRoot(request.userDataDir)
+            exitProcess(TerminalCommands.run(request.command, request.locale))
         }
         is CommandLineRequest.Launch -> request
     }

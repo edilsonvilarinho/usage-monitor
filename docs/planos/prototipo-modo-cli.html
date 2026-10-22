@@ -251,6 +251,9 @@ const Q = [
   { src: 'MiniMax',     acct: '',         k: 'mm', win: '5h',  p: 28, reset: '18:00',     inn: '3h37' },
 ];
 const q = (src, win) => Q.find(x => x.src === src && x.win === win);
+// O rótulo da cota como o app o grava (chave de série), que é o que o `status` mostra.
+const quotaLabel = x => x.src.startsWith('Claude') ? 'Claude ' + x.win : x.src === 'Codex' ? 'Codex ' + x.win
+  : x.src === 'OpenCode Go' ? 'Go mensal' : x.src === 'Cursor' ? 'Cursor Included' : 'MiniMax-M3';
 
 function series(seed, resets, end){
   const v = []; let cur = seed;
@@ -353,14 +356,14 @@ S.help = () => render([
 
 S.status = () => {
   const out = [sh('usage-monitor status'), L('')];
-  out.push(L(c('mu b', ' ' + pad('FONTE', 14) + ' ' + pad('CONTA', 9) + ' ' + pad('JAN.', 4) + ' ' + pad('USO', 20) + '       ' + pad('ESTADO', 8) + '  REINICIA')));
+  out.push(L(c('mu b', ' ' + pad('FONTE', 14) + ' ' + pad('CONTA', 9) + ' ' + pad('COTA', 15) + ' ' + pad('USO', 20) + '       ' + pad('ESTADO', 8) + '  REINICIA')));
   let prev = '';
   for (const x of Q){
     const [sc, sw] = st(x.p); const first = x.src + x.acct !== prev; prev = x.src + x.acct;
     out.push(L(' ', first ? c(x.k, pad('● ' + x.src, 14)) : pad('', 14), ' ', c('mu', pad(first ? x.acct : '', 9)), ' ',
-      pad(x.win, 4), ' ', bar(x.p, 20, x.k), ' ', c('b', lpad(x.p + '%', 4)), '  ', c(sc, pad(sw, 8)), '  ', x.reset + ' BRT', c('mu', ' · em ' + x.inn)));
+      pad(quotaLabel(x), 15), ' ', bar(x.p, 20, x.k), ' ', c('b', lpad(x.p + '%', 4)), '  ', c(sc, pad(sw, 8)), '  ', x.reset + ' BRT', c('mu', ' · em ' + x.inn)));
   }
-  out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('saldo', 4), ' ', c('b', 'US$ 7,82')));
+  out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('Saldo', 15), ' ', c('b', 'saldo US$ 7,82')));
   out.push(L(''));
   out.push(L(c('mu', ' lido há 38 s pelo app aberto · 9 cotas: '), c('cr', '1 crítica'), c('mu', ', '), c('wa', '2 em atenção'), c('mu', ', 6 em dia')));
   return render(out);
@@ -512,8 +515,8 @@ S.appClosed = () => render([
   L(c('wa', '▲ '), 'Nada está coletando. Mostrando a última leitura, de ', c('b', '14:05 BRT'), ' (18 min atrás).'),
   L(c('mu', '  Abra o app ou rode usage-monitor service start. Até lá os números não mudam.')),
   L(''),
-  L(' ', c('a', pad('● Claude Max', 14)), ' 5h  ', bar(58, 20, 'a'), ' ', c('b', ' 58%'), '  ', c('ok', 'em dia '), '  16:40 BRT'),
-  L(' ', c('a', pad('● Claude Team', 14)), ' 5h  ', bar(88, 20, 'a'), ' ', c('b', ' 88%'), '  ', c('wa', 'atenção'), '  15:10 BRT'),
+  L(' ', c('a', pad('● Claude Max', 14)), ' Claude 5h  ', bar(58, 20, 'a'), ' ', c('b', ' 58%'), '  ', c('ok', 'em dia '), '  16:40 BRT'),
+  L(' ', c('a', pad('● Claude Team', 14)), ' Claude 5h  ', bar(88, 20, 'a'), ' ', c('b', ' 88%'), '  ', c('wa', 'atenção'), '  15:10 BRT'),
   L(c('mu', '  …')),
   L(''),
   sh('usage-monitor status --max-age 10m; echo $?'),

@@ -94,8 +94,13 @@ de zonas da barra do Telegram (AE7), então o bot e o terminal nunca discordam. 
 não há palavra: só o número. Cota sem percentual (saldo, contagem) também não leva palavra. Na
 linha de status e na barra do tmux, `em dia` não se escreve: só o que pede atenção aparece.
 
-**Linha de cota** (2.2). `● Fonte  conta  janela  barra  NN%  estado  HH:MM BRT · em X`. A fonte e
-a conta só na primeira janela da conta; a porcentagem em negrito; o "em X" em muted.
+**Linha de cota** (2.2). `● Fonte  conta  cota  barra  NN%  estado  HH:MM BRT · em X`. A coluna de
+cota traz o **rótulo do app** ("Claude 5h", "Go semanal", "Cursor Included"), e não uma janela
+abreviada: os rótulos são chave de série e variam por fonte, e só o rótulo diz o mesmo que a HUD e
+o bot (decisão da A05 da #439, que corrigiu o "JAN." do protótipo). A fonte e a conta só na primeira
+cota da conta; a porcentagem em negrito; o "em X" em muted. O reinício segue o bot até 6 dias
+("15:10", "qui 21:00"); mais longe, a data ("05/11 15:47"). Janela já vencida diz "reiniciando".
+Cota sem percentual (saldo) mostra o valor no lugar da barra.
 
 **Rodapé de leitura** (2.2). Origem e idade da leitura, seguidas da contagem por estado, com cada
 estado na sua cor: "lido há 38 s pelo app aberto · 9 cotas: 1 crítica, 2 em atenção, 6 em dia".

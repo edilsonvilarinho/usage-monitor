@@ -1,6 +1,10 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.terminal.TerminalCommand
+import com.usagemonitor.terminal.TerminalCommandNames
+import com.usagemonitor.terminal.TerminalCommandParse
+import com.usagemonitor.terminal.parseTerminalCommand
 
 /**
  * O que a linha de comando pede ao processo (issue #418).
@@ -40,6 +44,16 @@ internal sealed interface CommandLineRequest {
     ) : CommandLineRequest
 
     /**
+     * Um comando do modo terminal (#439): responde e sai, sem janela, antes da instância
+     * única. [locale] e [userDataDir] valem como na abertura do app.
+     */
+    data class Terminal(
+        val command: TerminalCommand,
+        val locale: AppLanguage? = null,
+        val userDataDir: String? = null
+    ) : CommandLineRequest
+
+    /**
      * Pedido explícito com valor inválido (`--locale xx`): sai com a mensagem e
      * o código 2. Ao contrário da opção desconhecida, aqui abrir o app num
      * idioma que não foi pedido seria ignorar o que o usuário digitou.
@@ -65,6 +79,8 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
     var userDataDir: String? = null
     var invalid: String? = null
     val unknown = mutableListOf<String>()
+    var terminalCommand: String? = null
+    val terminalArguments = mutableListOf<String>()
     val tokens = commandLineTokens(arguments)
     var index = 0
     while (index < tokens.size) {
@@ -92,6 +108,10 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
                     userDataDir = dataDirValue.value
                 }
             }
+            // O primeiro argumento solto que é nome de comando abre o modo terminal; dali
+            // em diante, o que não é opção global é argumento do comando.
+            terminalCommand == null && argument in TerminalCommandNames.ALL -> terminalCommand = argument
+            terminalCommand != null -> terminalArguments += argument
             else -> unknown += argument
         }
         if (localeValue?.consumedNext == true || dataDirValue?.consumedNext == true) {
@@ -107,6 +127,9 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
         return CommandLineRequest.Version
     }
     invalid?.let { message -> return CommandLineRequest.Invalid(message) }
+    terminalCommand?.let { name ->
+        return terminalRequest(name, terminalArguments, unknown, diagnostics, locale, userDataDir)
+    }
     if (diagnostics) {
         return CommandLineRequest.Diagnostics(userDataDir = userDataDir)
     }
@@ -116,6 +139,31 @@ internal fun parseCommandLine(arguments: Array<String>): CommandLineRequest {
         locale = locale,
         userDataDir = userDataDir
     )
+}
+
+/**
+ * O pedido de um comando do modo terminal. Com comando, tudo é explícito: opção
+ * desconhecida antes dele e `--diagnostics` junto viram erro, em vez do aviso que a
+ * abertura do app dá.
+ */
+private fun terminalRequest(
+    name: String,
+    arguments: List<String>,
+    unknown: List<String>,
+    diagnostics: Boolean,
+    locale: AppLanguage?,
+    userDataDir: String?
+): CommandLineRequest {
+    unknown.firstOrNull()?.let { option ->
+        return CommandLineRequest.Invalid("Error: '$option' is not a known option. Run with --help to list the options.")
+    }
+    if (diagnostics) {
+        return CommandLineRequest.Invalid("Error: ${DiagnosticsExport.ARGUMENT} cannot be combined with '$name'.")
+    }
+    return when (val parsed = parseTerminalCommand(name, arguments)) {
+        is TerminalCommandParse.Parsed -> CommandLineRequest.Terminal(parsed.command, locale, userDataDir)
+        is TerminalCommandParse.Invalid -> CommandLineRequest.Invalid(parsed.message)
+    }
 }
 
 /** `trim` como o `StartupOrigin.from` sempre fez (o teste dele cobre " --autostart "). */
