@@ -638,7 +638,7 @@ S.service = () => render([
 
 S.alertsLog = () => render([
   sh('usage-monitor telegram pair'),
-  L('No Telegram, abra o seu bot e envie: ', c('b', '/parear 482-917')),
+  L('No Telegram, abra o seu bot e envie: ', c('b', '/start K7P2QD')),
   L(c('mu', 'aguardando… '), c('ok', '✓ pareado'), ' · mandei uma mensagem de teste'),
   L(''),
   sh('usage-monitor alerts --today'),
@@ -654,15 +654,13 @@ S.alertsLog = () => render([
 
 S.mapping = () => {
   const rows = [
-    ['Aparência', '<b>Idioma</b>: aba 5 › Sistema, ou <code>config set language en</code>.', '<span class="na">Tema, HUD, escala e janela não se aplicam. O terminal usa as cores dele.</span>'],
-    ['Sistema', '<b>Iniciar com o sistema</b>: <code>service install</code>. <b>Atualizações e canal beta</b>: <code>update</code> e <code>config set updates.beta</code>. <b>Diagnóstico</b>: <code>--diagnostics</code>, que já existe.', 'Instalado por pacote, a atualização é pelo apt ou dnf, como hoje.'],
-    ['Coleta', '<b>Ritmo da coleta</b>: aba 5 › Coleta, ou <code>config set refresh.*</code>.', 'Mantém o backoff em 429 e o ritmo por sessão ativa.'],
-    ['Alertas', '<b>Todos os avisos, o silêncio e o teto mensal</b>: aba 5 › Alertas, ou <code>config set alerts.*</code>.', 'Sem tela, o destino é o Telegram e o registro do <code>alerts</code>.'],
-    ['Bot do Telegram', '<b>Token, pareamento e opções</b>: <code>telegram setup</code>, <code>telegram pair</code> e <code>telegram test</code>.', 'O token fica em <code>telegram.json</code>, como hoje.'],
-    ['APIs', '<b>Fontes monitoradas</b>: <code>sources enable|disable</code>. <b>Chaves</b>: <code>keys set|test|remove</code>.', 'A chave é lida da entrada, nunca de argumento ou variável de ambiente.'],
-    ['Contas', '<b>Anthropic e Codex extras</b>: <code>accounts list|add|rename|remove|rescan</code>.', 'Cor e emoji por conta só aparecem no app.'],
-    ['Time', '<b>Servidor, chave e apelido</b>: <code>team join</code>, <code>team status</code> e <code>team leave</code>.', 'A chave fica em <code>team.json</code>, como hoje.'],
-    ['Rede', '<b>Proxy</b>: <code>config set proxy.*</code>. <b>Acesso pela rede local</b>: <code>web enable</code> e <code>web token</code>.', 'O proxy só vale depois de <code>service restart</code>, a mesma regra do app.'],
+    ['Aparência', '<b>Idioma</b>: <code>config set language en</code>.', '<span class="na">Tema, opacidade, escala e movimento reduzido não se aplicam. O terminal usa as cores dele.</span>'],
+    ['Sistema', '<b>Iniciar com o sistema</b>: <code>service install</code> no servidor, <code>config set system.autostart</code> no desktop. <b>Atualização e canal beta</b>: <code>update</code>, <code>config set updates.auto</code> e <code>updates.beta</code>. <b>Relatar um problema</b>: <code>--diagnostics</code>.', 'Instalado por pacote, a atualização é pelo apt ou dnf. Anel na bandeja e dicas de início não se aplicam.'],
+    ['Alertas', '<b>Avisos, limiares, silêncio, lembrete e teto mensal</b>: <code>config set alerts.*</code> e <code>budget.monthly_usd</code>. <b>Bot do Telegram</b>: <code>telegram setup</code>, <code>pair</code>, <code>test</code>, <code>status</code> e <code>config set telegram.*</code>.', 'Sem tela, o destino é o Telegram e o registro do <code>alerts</code>. O token fica em <code>telegram.json</code>.'],
+    ['APIs', '<b>Fontes monitoradas</b>: <code>sources list|enable|disable</code>. <b>Chaves</b>: <code>keys set|test|remove</code>.', 'A chave é lida da entrada, nunca de argumento ou variável de ambiente.'],
+    ['Contas', '<b>Anthropic e Codex extras</b>: <code>accounts list|add|rename|enable|disable|remove|rescan</code>.', 'Cor e emoji por conta só aparecem no app.'],
+    ['Time', '<b>Servidor, chave, apelido e contas</b>: <code>team join</code>, <code>team status</code> e <code>team leave</code>.', 'A chave fica em <code>team.json</code>. O modo administrador (chaves das contas) continua no app.'],
+    ['Rede', '<b>Proxy</b>: <code>config set proxy.*</code>, com a senha pela entrada. <b>Acesso pela rede local</b>: <code>web enable|disable|status|token</code>.', 'O proxy só vale depois de <code>service restart</code>, a mesma regra do app.'],
   ];
   return `<div class="tablewrap"><table class="maptable">
     <thead><tr><th>Aba no app</th><th>No terminal</th><th>Observação</th></tr></thead>

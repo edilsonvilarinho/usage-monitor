@@ -1,0 +1,112 @@
+# Modo terminal: configurar tudo pelo terminal e rodar como serviço — issue #440
+
+## Objetivo
+
+Segunda das três issues do modo terminal (#439, #440, #441). Quem usa só o terminal, inclusive num
+servidor sem interface gráfica, faz tudo sem o app desktop: configura o que as Configurações do app
+configuram (partes 4.1, 4.3 e 4.4 do protótipo [`prototipo-modo-cli.html`](prototipo-modo-cli.html))
+e roda a coleta como serviço sem tela (partes 5.1 e 5.2). Regras e primitivas em
+[`docs/design-system/cli/readme.md`](../design-system/cli/readme.md), que vence o protótipo. A aba
+Configurações do modo interativo (4.2) é da #441.
+
+## Fatos confirmados (antes de qualquer código)
+
+- **Pacote, sem bibliotecas gráficas.** O `.deb` da 41.11.0 declara `libx11-6`, `libgl1`,
+  `libfontconfig1`, `libxtst6` e outras; num `debian:bookworm-slim` limpo, `apt-get install -s` puxa
+  **151 pacotes** e `apt-get install` ocupa **+569 MB** (208 MB do app). Instala e não precisa de
+  servidor gráfico: são só bibliotecas. O `.rpm` só exige `xdg-utils` e `/bin/sh`.
+- **O que roda sem nenhuma biblioteca gráfica** (build da `main` em `debian:trixie-slim`, zero
+  `libX11`/`libGL`/`libfreetype`/`libfontconfig`): `--version`, `status` e `check` funcionam, com o
+  `dashboard-cache.json` real (`check` saiu com 2, "CRITICO Anthropic - Padrao - Claude 5h 100%").
+  O Skia **não carrega** (`libskiko-linux-x64.so` exige `libGL.so.1`, `libX11.so.6` e
+  `libfontconfig.so.1`, pelo `ldd`), e é ele que desenha as imagens do bot do Telegram. Com só essas
+  três instaladas (`apt-get install --no-install-recommends libgl1 libx11-6 libfontconfig1`: 46
+  pacotes, 221 MB), uma sonda em raster desenhou e codificou PNG com `headless=true` e sem `DISPLAY`.
+- **O app sem tela fica parado em silêncio.** O pacote 41.11.0 (anterior à #439) tratou `status`
+  como opção desconhecida, abriu o app e ficou com a fila da AWT parada, sem janela, sem log e sem
+  sair. Num servidor, `usage-monitor` sem comando precisa dizer que não há tela.
+- **O binário do pacote é `/opt/usage-monitor/bin/Usage Monitor`**, com espaço, e o `.deb` não põe
+  `usage-monitor` no `PATH`. O launcher instalado pelo script do Linux (`~/.local/bin/usage-monitor`)
+  é o que a ajuda e o README citam.
+- **Aviso no `stderr` da primeira execução:** `java.util.prefs` imprime "Created user preferences
+  directory" (nível INFO) quando o nó ainda não existe — o que acontece num servidor novo.
+- **As abas reais das Configurações são sete** (`SettingsTab`): Aparência, Sistema, Alertas (com a
+  seção do bot do Telegram), APIs, Contas (Anthropic e Codex), Time e Rede (proxy e acesso web). Não
+  existem as abas "Coleta" nem "Bot do Telegram" que a 4.4 do protótipo cita, e o ritmo da coleta
+  não é configurável (60 s com sessão ativa, 5 min sem, backoff em 429).
+- **O app já aceita mudança de configuração de fora da tela:** o `/silenciar`, o `/foco` e os
+  limiares do bot mudam o `alertSettingsFlow` com o app aberto (`TelegramBotWiring`), e a tela das
+  Configurações coleta o mesmo flow. Fontes, chaves, contas, time, proxy e acesso web também moram em
+  flows do `AppGraph`; só idioma, teto mensal, início com o sistema e atualização moram no
+  `AppShellState`.
+- **Pareamento do Telegram:** o código sai de `LocalTelegramSettingsDataSource.newPairingCode()` e a
+  conversa manda `/start <código>` ao bot (o `/parear` do protótipo não existe). Quem atende é o bot
+  rodando no coletor.
+- **O que hoje só existe dentro da composição:** a atualização automática
+  (`rememberAutoUpdateController`) e o trabalho de fundo (`AppBackgroundWork`: índice do Codex,
+  ligar e desligar o envio do time, gancho de encerramento).
+
+## Decisões
+
+- **D1 · Um escritor por pasta de dados.** Com coletor vivo (a trava tomada), configurar vira um
+  **pedido** para ele: um arquivo em `~/.usage-monitor/control/requests/` (permissão só do dono), que
+  o coletor aplica pelos mesmos caminhos das Configurações e do bot, e responde em
+  `control/replies/`. Sem coletor, o terminal aplica direto nos arquivos, pela mesma função. Assim o
+  terminal nunca disputa arquivo com o coletor, e o app aberto não perde nem sobrescreve a mudança.
+  Sem resposta em 10 s (coletor de versão antiga ou travado), o terminal recolhe o pedido e diz que
+  nada mudou. Isto refina o "configurar escreve os mesmos arquivos" da issue: os arquivos são os
+  mesmos, e quem os escreve é o coletor.
+- **D2 · Um motor.** O motor de coleta sai do `AppViewModels` e do `AppBackgroundWork` para uma
+  classe sem Compose (`CollectorEngine`): coleta, semáforo, alertas, índices, envio do time, bot,
+  acesso web e o encerramento único. O app é o motor mais as telas; o serviço é o motor.
+- **D3 · Serviço só no Linux** (regra do #340): `service install` cria um serviço do usuário no
+  systemd. No Windows e no macOS, `service` responde que não existe ali e aponta o "Iniciar com o
+  sistema" do app. Configurar (`config`, `keys`, `accounts`…) vale nos três sistemas.
+- **D4 · Pacote:** o mesmo `.deb`/`.rpm` serve ao servidor (as bibliotecas que ele puxa não são um
+  servidor gráfico). Sem as bibliotecas gráficas, o motor roda e o bot manda texto no lugar da imagem
+  (o Skia é carregado só quando o bot desenha, e a falha vira texto). Pacote separado, só com o
+  motor, fica fora: a medição não mostrou necessidade.
+- **D5 · Segredo:** chave de API, token do bot, chave do time e senha do proxy só pela entrada
+  padrão (sem eco num terminal; por pipe, uma linha), nunca por argumento ou variável. A saída mostra
+  `••••` e o resultado do teste. O pedido para o coletor que leva segredo nasce com permissão só do
+  dono e é apagado ao ser lido. **Exceção registrada:** `web token --show` imprime o endereço com o
+  token, a pedido explícito, como o botão de copiar das Configurações; sem `--show`, nunca.
+- **D6 · Textos** por objeto de rótulos, nunca `== AppLanguage.PT` inline (catraca
+  `INLINE_LANGUAGE_CHECKS_CEILING`). Nomes de comandos, ajustes e campos em inglês; erros de uso em
+  inglês e ASCII (exceção da #439).
+
+## Atividades
+
+| Item | O que faz |
+| --- | --- |
+| A01 | Este plano, a worktree, as medições acima e as correções do protótipo e do design system: 4.4 com as abas reais, `/start` no pareamento, D1 a D5. Plano publicado como comentário na #440 |
+| A02 | Motor sem janela (D2): `CollectorEngine` extraído de `AppViewModels` e `AppBackgroundWork`, sem Compose; o app passa a ser o motor mais as telas, com o mesmo comportamento |
+| A03 | `service run`: o motor em primeiro plano, `java.awt.headless`, trava, `app.log`, encerramento pelo `SIGTERM`; quem segura a trava se registra (`collector.json`: app ou serviço), e a leitura diz "pelo serviço". Bot com texto quando o Skia não carrega. App sem tela avisa e sai |
+| A04 | Canal de configuração (D1): o que as Configurações gravam numa classe sem rede (`AppSettingsStore`), as mudanças como dados (`ConfigChange`), a aplicação única, os pedidos em `control/` atendidos pelo motor, e o app relendo idioma e teto mensal |
+| A05 | `config list\|get\|set` com o registro de ajustes (alertas, teto mensal, idioma, atualização, proxy, opções do bot) |
+| A06 | `keys set\|test\|remove` (D5) e `sources list\|enable\|disable` |
+| A07 | `accounts list\|add\|rename\|enable\|disable\|remove\|rescan` (Anthropic e Codex extras) |
+| A08 | `telegram setup\|pair\|test\|status` |
+| A09 | `team join\|status\|leave` e `web enable\|disable\|status\|token` |
+| A10 | Registro dos avisos (`alerts.jsonl`, gravado pelo coletor) e `alerts [--today]` (5.2) |
+| A11 | `service install\|uninstall\|start\|stop\|restart\|status\|logs` (5.1), com a saúde de cada parte |
+| A12 | `setup`, o assistente da primeira vez (4.1), e `update` |
+| A13 | Ajuda, README, `docs/build-and-release.md`, `CLAUDE.md`, conferência da 4.4 por teste, suíte completa, servidor sem tela de ponta a ponta, prints de todas as telas e PR |
+
+## Riscos
+
+- **R1 · Windows e macOS não medidos aqui** (#342): a configuração vale nos três, mas o console do
+  Windows só se mede lá. O PR diz o risco.
+- **R2 · `java.util.prefs` entre processos:** no Linux, as preferências são arquivos sincronizados
+  por temporizador; com um escritor só (D1), o leitor precisa ver o que o coletor gravou. Medir na
+  A04 e forçar `flush` depois de aplicar.
+- **R3 · `systemd` do usuário em servidor:** sem `loginctl enable-linger`, o serviço para quando a
+  sessão SSH fecha. O `service install` avisa e mostra o comando.
+- **R4 · Tamanho:** `Main.kt` (522), `AppViewModels.kt` (408) e `TelegramBotService.kt` (564) crescem
+  só extraindo; nenhum arquivo passa de 800 linhas.
+
+## Pontos de situação
+
+| Item | Data | Commit | Resultado | Comando e evidência |
+| --- | --- | --- | --- | --- |
+| A01 | 2026-10-22 | `docs(cli): plan the terminal configuration and headless service (#440)` | concluída | Worktree `../usage-monitor-440`, branch `feat/issue-440-terminal-config-service` a partir da `main` (`aa3c6a81`). **Pacote:** `gh release download v41.11.0` e, em `podman run debian:bookworm-slim`, `dpkg-deb -f … Depends` (lista acima), `apt-get install -s` (151 pacotes) e `apt-get install` ("After this operation, 569 MB"). **Sem bibliotecas gráficas:** `sh gradlew createDistributable` e, em `debian:trixie-slim` com o interpretador do launcher trocado por `patchelf` (o build local aponta para o `ld.so` do linuxbrew), `--version` exit 0, `status` exit 0 com a leitura real, `check` exit 2; a sonda Skia (`SkiaProbe`, raster 320×120 e PNG) falha no `System.load` do `libskiko`; com `libgl1 libx11-6 libfontconfig1` (46 pacotes, 221 MB), "headless=true DISPLAY=null png bytes=355". **App sem tela:** o pacote 41.11.0 com `status` ficou 20 s parado, despejo de threads só com a `AWT-EventQueue-0` em `getNextEvent`. Protótipo 4.4 e 5.2 e design system corrigidos (abas reais, `/start`, D1). Só documentação; nenhum teste rodado |
