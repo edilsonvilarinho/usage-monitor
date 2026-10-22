@@ -83,7 +83,8 @@ terminal. O número entre parênteses é a tela do protótipo onde ela aparece.
 
 **Barra de cota** (2.2, 3.1). Células `█` mais uma parcial em oitavos, na cor da fonte; o resto em
 `░` com `--term-dim`, sempre visível. Larguras fixas: 12 na linha de status, 20 em tabelas e
-comandos, 40 no detalhe. Nunca passa de 100% e nunca cresce por efeito.
+comandos, 40 no detalhe. Pelo **piso**: a barra nunca passa do número escrito ao lado, nem de 100%,
+e nunca cresce por efeito. No ASCII, `[####----]` com a mesma largura total.
 
 **Palavra de estado** (2.2). `em dia`, `atenção`, `crítico`, em `--term-ok`, `--term-warn` e
 `--term-crit`, pelos **limiares de alerta da conta** (`UsageAlertSettings.quotaPercentsFor`: o
