@@ -19,7 +19,14 @@ data class CollectorSourceHealth(
     val source: ApiSource,
     val label: String,
     val ok: Boolean,
-    val retryAtEpochMillis: Long? = null
+    val retryAtEpochMillis: Long? = null,
+    /**
+     * A chave do alvo (`UsageTargetKey.storageKey`), para quem lê de fora achar a conta sem
+     * depender do rótulo (#441). `null` no arquivo de um coletor anterior.
+     */
+    val target: String? = null,
+    /** A frase da falha, a mesma do aviso do app (#441, 6.2). Nunca token nem caminho. */
+    val failure: String? = null
 )
 
 /** O bot como o card das Configurações o mostra. [state]: `off`, `connecting`, `connected`, `failed`, `token_rejected`. */

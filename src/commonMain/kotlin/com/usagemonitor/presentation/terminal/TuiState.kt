@@ -6,7 +6,9 @@ package com.usagemonitor.presentation.terminal
  */
 data class TuiState(
     val tab: TuiTab = TuiTab.OVERVIEW,
-    val helpOpen: Boolean = false
+    val helpOpen: Boolean = false,
+    /** A conta escolhida na aba 1. */
+    val overview: TuiListState = TuiListState()
 ) {
     /** A aba 4 sumiu (o time foi desfeito entre duas leituras): volta para a 1. */
     fun normalized(context: TuiContext): TuiState =
@@ -18,7 +20,9 @@ data class TuiContext(
     /** A aba 4 só existe com time configurado. */
     val teamAvailable: Boolean,
     /** Abaixo de 80 colunas lista e detalhe se empilham, e `enter` abre o detalhe. */
-    val stacked: Boolean
+    val stacked: Boolean,
+    /** Quantas contas a aba 1 lista. */
+    val accountCount: Int = 0
 ) {
     /** As abas visíveis, na ordem e com o número fixo de cada uma. */
     val tabs: List<TuiTab>
@@ -45,8 +49,15 @@ object TuiReducer {
         if (common != null) {
             return common
         }
-        return TuiStep(state)
+        return reduceTab(state, key, context) ?: TuiStep(state)
     }
+
+    /** As teclas da aba ativa; `null` quando a aba não usa a tecla. */
+    private fun reduceTab(state: TuiState, key: TuiKey, context: TuiContext): TuiStep? =
+        when (state.tab) {
+            TuiTab.OVERVIEW -> state.overview.reduce(key, context.accountCount, context.stacked)?.let { overview -> TuiStep(state.copy(overview = overview)) }
+            TuiTab.SESSIONS, TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> null
+        }
 
     private fun reduceHelp(state: TuiState, key: TuiKey): TuiStep =
         when (key) {

@@ -3,6 +3,7 @@ package com.usagemonitor.presentation.terminal
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.QuotaZone
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.buildUsageSnapshot
@@ -22,7 +23,13 @@ data class TerminalAccount(
     val profile: String?,
     val fetchedAt: Instant?,
     val thresholds: List<Int>,
-    val quotas: List<UsageSnapshotQuota>
+    val quotas: List<UsageSnapshotQuota>,
+    /** A conta do histórico (#441): o modo interativo lê as 24 h dela. */
+    val accountKey: UsageAccountKey? = null,
+    /** O perfil do alvo (Anthropic e Codex extras), que também separa as sessões no índice. */
+    val targetProfileId: String? = null,
+    /** O plano que a fonte informa ("Max", "Pro"), quando informa. */
+    val plan: String? = null
 ) {
     fun zoneOf(quota: UsageSnapshotQuota): QuotaZone? = quotaZone(quota.percent, thresholds)
 }
@@ -43,7 +50,10 @@ fun terminalAccounts(stats: List<ApiUsageStats>, alertSettings: UsageAlertSettin
             profile = item.profileLabel,
             fetchedAt = item.fetchedAt,
             thresholds = alertSettings.quotaPercentsFor(item.targetKey),
-            quotas = account.quotas
+            quotas = account.quotas,
+            accountKey = item.accountContext?.key,
+            targetProfileId = item.targetKey.profileId,
+            plan = item.planLabel
         )
     }
 }

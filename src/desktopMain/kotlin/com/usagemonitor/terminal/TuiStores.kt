@@ -6,6 +6,8 @@ import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.repository.CliSessionRepositoryImpl
 import com.usagemonitor.data.repository.CodexCliSessionRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
+import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
@@ -40,6 +42,17 @@ internal class TuiStores(
     val getCodexSessions = GetCodexCliSessionsUseCase(codexRepository)
     val getCodexSessionDetail = GetCodexCliSessionDetailUseCase(codexRepository)
     val getUsageHistory = GetUsageHistoryUseCase(UsageHistoryRepositoryImpl(historyDataSource))
+
+    /**
+     * Sessões do Claude Code com corte por [sinceEpochMillis] (`null` são os agregados da
+     * sessão inteira). Direto pelo repositório: o caso de uso só recebe `CliSessionRange`, e
+     * corte novo vai por parâmetro, nunca por valor novo no enum (regra do CLAUDE.md).
+     */
+    suspend fun cliSessions(profileId: String?, sinceEpochMillis: Long?): Result<List<CliSessionSummary>> =
+        cliRepository.getSessions(profileId, sinceEpochMillis)
+
+    suspend fun codexSessions(sinceEpochMillis: Long?): Result<List<CodexCliSessionSummary>> =
+        codexRepository.getSessions(sinceEpochMillis)
 
     override fun close() {
         runCatching { cliDataSource.close() }

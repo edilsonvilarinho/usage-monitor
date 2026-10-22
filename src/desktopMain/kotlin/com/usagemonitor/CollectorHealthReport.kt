@@ -36,11 +36,25 @@ internal fun collectorHealthOf(
     val collected = data.map { stats ->
         val error = failing[stats.targetKey]
         val label = listOfNotNull(stats.source.displayName(), stats.profileLabel).joinToString(" ")
-        CollectorSourceHealth(stats.source, label, ok = error == null, retryAtEpochMillis = error?.retryAt?.toEpochMilliseconds())
+        CollectorSourceHealth(
+            stats.source,
+            label,
+            ok = error == null,
+            retryAtEpochMillis = error?.retryAt?.toEpochMilliseconds(),
+            target = stats.targetKey.storageKey,
+            failure = error?.message
+        )
     }
     val collectedTargets = data.map { stats -> stats.targetKey }.toSet()
     val onlyFailing = errors.filter { error -> error.target !in collectedTargets }.map { error ->
-        CollectorSourceHealth(error.source, error.targetLabel ?: error.source.displayName(), ok = false, retryAtEpochMillis = error.retryAt?.toEpochMilliseconds())
+        CollectorSourceHealth(
+            error.source,
+            error.targetLabel ?: error.source.displayName(),
+            ok = false,
+            retryAtEpochMillis = error.retryAt?.toEpochMilliseconds(),
+            target = error.target.storageKey,
+            failure = error.message
+        )
     }
     return CollectorHealth(
         updatedAtEpochMillis = now.toEpochMilliseconds(),

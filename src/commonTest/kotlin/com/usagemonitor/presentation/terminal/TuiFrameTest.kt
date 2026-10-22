@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
 import kotlin.test.Test
@@ -125,7 +126,7 @@ class TuiFrameTest {
     fun `status ao vivo so com coleta de pe e a ultima leitura certa`() {
         assertEquals("14:23 BRT · ao vivo", TuiScreen.status(data(), pt).text)
         assertEquals(TerminalColor.Muted, TuiScreen.status(data(), pt).color)
-        val failed = TuiScreen.status(data(lastFailed = true), pt)
+        val failed = TuiScreen.status(data(failedAt = now - 11.minutes), pt)
         assertEquals("leitura de 14:12", failed.text)
         assertEquals(TerminalColor.Warn, failed.color)
         assertEquals("leitura de 14:12", TuiScreen.status(data(collector = null), pt).text)
@@ -149,6 +150,12 @@ class TuiFrameTest {
     private fun data(
         collector: CollectorKind? = CollectorKind.SERVICE,
         lastCollectedAt: Instant? = now - 11.minutes,
-        lastFailed: Boolean = false
-    ) = TuiData(now = now, collector = collector, lastCollectedAt = lastCollectedAt, lastFailed = lastFailed)
+        failedAt: Instant? = null
+    ): TuiData {
+        // A conta que falhou mostra os números da leitura anterior, e é dela que o status fala.
+        val failing = failedAt?.let { fetchedAt ->
+            TuiAccount(TerminalAccount(ApiSource.ANTHROPIC, "ANTHROPIC:work", "Anthropic", "trabalho", fetchedAt, listOf(70, 90), emptyList()), TuiReadFailure("limite da API", null, null))
+        }
+        return TuiData(now = now, collector = collector, lastCollectedAt = lastCollectedAt, accounts = listOfNotNull(failing))
+    }
 }

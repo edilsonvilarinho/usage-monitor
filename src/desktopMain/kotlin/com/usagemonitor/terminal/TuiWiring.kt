@@ -1,35 +1,8 @@
 package com.usagemonitor.terminal
 
-import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiLabels
-import com.usagemonitor.presentation.terminal.TuiState
 import com.usagemonitor.presentation.terminal.detectTerminalProfile
-
-/**
- * O que o modo interativo lê a cada releitura (#441). Só leitura: o mesmo cache e as mesmas
- * preferências dos comandos da #439, sem requisição, sem trava e sem escrever nada.
- */
-internal class TuiReader(
-    private val reader: TerminalReader = TerminalReader(),
-    /** Os bancos do app em somente leitura; as abas de sessões e histórico leem por eles. */
-    private val stores: TuiStores? = null,
-    private val teamSettings: LocalTeamSettingsDataSource = LocalTeamSettingsDataSource(),
-    private val languageOverride: AppLanguage? = null
-) {
-    @Suppress("UNUSED_PARAMETER")
-    fun load(state: TuiState): TuiData {
-        val reading = reader.read(languageOverride)
-        val team = runCatching { teamSettings.load() }.getOrNull()
-        return TuiData(
-            now = reading.now,
-            collector = reading.collector,
-            lastCollectedAt = reading.lastCollectedAt,
-            teamConfigured = team != null && team.enabled && team.normalizedServerUrl.isNotEmpty() && team.apiKey.isNotBlank()
-        )
-    }
-}
 
 /** A montagem do `tui` com o terminal de verdade. */
 internal object TuiWiring {
