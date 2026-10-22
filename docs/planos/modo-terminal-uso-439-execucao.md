@@ -59,17 +59,19 @@ Nesta issue o terminal **só lê**: quem coleta continua sendo o app. Coletar se
 | Item | O que faz |
 |---|---|
 | A01 | Este plano, a worktree e as correções do design system: limiares reais (75/90/100 por conta, zonas da AE7), idioma decidido (D1), leitura pelo `dashboard-cache.json` (D2). Plano publicado como comentário na #439 |
-| A02 | `parseCommandLine` reconhece os subcomandos (`status`, `check`, `wait`, `statusline`) e as opções deles; opção desconhecida fora de subcomando continua só avisando. No Windows, subcomando é ação: o launcher de console imprime e não relança o exe GUI |
-| A03 | Perfil do terminal, em função pura: paleta (NO_COLOR, `TERM=dumb`, `COLORTERM`, `COLORFGBG`, saída que não é terminal), glifos (UTF-8 ou ASCII) e largura. Renderização de linhas com estilo para ANSI truecolor, 16 cores, sem cor e para o formato do tmux. Transliteração sem acento |
-| A04 | Primitivas do design system: barra de cota, palavra de estado, linha de cota, rodapé de leitura, com rótulos PT/EN em `TerminalLabels` |
-| A05 | Leitura do terminal (`desktopMain`): cache, limiares, idioma, perfis e se há coletor vivo, num grafo leve. Contas na ordem do dashboard |
-| A06 | `usage-monitor status` (2.2) e o caso "nada coletando" com `--max-age` (6.1) |
-| A07 | `status --json` (campos estáveis em inglês, sem segredo, documentados como contrato) e `check --max <n>` (sai com 0, 1, 2 ou 3) |
-| A08 | `wait <cota> --below <n>`: relê o cache a cada coleta, sem requisição; sai quando a cota cai abaixo do valor, com `--timeout` |
-| A09 | `statusline claude-code` (1.1, 1.2): JSON da entrada, conta pelo diretório de configuração, custo e vazão da sessão pelo índice da #381 (sem a sessão no índice, não mostra custo, porque não medido não vira zero). Tempo medido |
-| A10 | `statusline tmux` (1.3): siglas por conta e cor no formato `#[fg=…]` do tmux, que não aceita ANSI na barra |
-| A11 | `--help` com os comandos novos (2.1) e D1 aplicado à ajuda, à versão e ao diagnóstico. `CLAUDE.md` e `docs/build-and-release.md` registram a revogação do "inglês/ASCII" |
-| A12 | Documentação de uso (`README`, `docs/build-and-release.md`), conferência das telas contra o protótipo nas quatro paletas e PR |
+| A02 | Perfil do terminal, em função pura: paleta (`NO_COLOR`, `TERM=dumb`, `FORCE_COLOR`, `COLORTERM`, `WT_SESSION`, `COLORFGBG`, saída que não é terminal) e glifos (UTF-8 ou ASCII), separados. Linhas com estilo por papel de token e renderização em ANSI truecolor, 16 cores e sem cor, com transliteração sem acento |
+| A03 | Primitivas do design system: barra de cota, palavra de estado, linha de cota e rodapé de leitura, com rótulos PT/EN em `TerminalLabels` |
+| A04 | Leitura do terminal (`desktopMain`): cache, limiares, idioma, perfis e se há coletor vivo, num grafo leve. O comparador de ordem do dashboard vira um só, nomeado, usado pelos dois |
+| A05 | Subcomandos no `parseCommandLine` e `usage-monitor status` de ponta a ponta (2.2), com o caso "nada coletando" e `--max-age` (6.1). Opção desconhecida fora de subcomando continua só avisando; no Windows, subcomando é ação e o launcher de console imprime em vez de relançar o exe GUI |
+| A06 | `status --json` (campos estáveis em inglês, sem segredo, documentados como contrato) e `check [--max <n>]` (sai com 0, 1, 2 ou 3) |
+| A07 | `wait <cota> --below <n>`: relê o cache a cada coleta, sem requisição; sai quando a cota cai abaixo do valor, com `--timeout` |
+| A08 | `statusline claude-code` (1.1, 1.2): JSON da entrada, conta pelo diretório de configuração, custo e vazão da sessão pelo índice da #381 (sem a sessão no índice, não mostra custo, porque não medido não vira zero). Tempo medido |
+| A09 | `statusline tmux` (1.3): siglas por conta e cor no formato `#[fg=…]` do tmux, que não aceita ANSI na barra |
+| A10 | `--help` com os comandos novos (2.1) e D1 aplicado à ajuda, à versão e ao diagnóstico. `CLAUDE.md` e `docs/build-and-release.md` registram a revogação do "inglês/ASCII" |
+| A11 | Documentação de uso (`README`, `docs/build-and-release.md`), conferência das telas contra o protótipo nas quatro paletas e PR |
+
+A ordem mudou depois da A01: o parser saiu da frente e entrou junto com o primeiro comando (A05), porque um
+subcomando reconhecido sem comando que o atenda seria um commit que só fecha com o próximo.
 
 ## Riscos
 
@@ -86,3 +88,4 @@ Nesta issue o terminal **só lê**: quem coleta continua sendo o app. Coletar se
 | Item | Data | Commit | Resultado | Comando e evidência |
 |---|---|---|---|---|
 | A01 | 2026-10-21 | este commit | concluída | Worktree `../usage-monitor-439`, branch `feat/issue-439-terminal-usage` sobre `docs/cli-design-system` (PR #442 ainda aberto). Medição do arranque: `/usr/bin/time -f "%e s %M KB" ~/.local/bin/usage-monitor --version`, três vezes: 0,14 s, cerca de 46 MB. Design system corrigido: a palavra de estado sai de `quotaPercentsFor` com as zonas da AE7, o idioma segue o app com fallback ASCII sem acento, e a leitura pronta é o `dashboard-cache.json`. No protótipo, o assistente mostra o padrão `[75,90,100]` e o exemplo digita `70,90`, o que mantém as palavras das outras telas coerentes. Só documentação; nenhum teste rodado |
+| A02 | 2026-10-21 | `feat(cli): detect the terminal profile and render styled lines (#439)` | concluída | `presentation/terminal/` (`commonMain`, sem Compose): `TerminalText` (trecho com cor por papel de token, negrito e seleção), `TerminalProfile` + `detectTerminalProfile` (paleta e glifos, decisões separadas), `TerminalGlyphs` (as duas colunas da tabela do readme) e `TerminalAnsi` (truecolor escuro e claro com os hexes do `terminal.css`, 16 cores pelo mapa comentado ali, sem cor; sem Unicode, `withoutAccents`, com tabela própria porque `java.text.Normalizer` não existe no `commonMain`). Mapa de acento por `when` exaustivo sobre `ApiSource`. OSC 11 fica fora: pede o terminal em modo cru, e `COLORFGBG` cobre o caso sem custo. `sh gradlew desktopTest --tests "com.usagemonitor.presentation.terminal.*"`: `TerminalAnsiTest` 10 e `TerminalProfileTest` 11, 0 falhas |
