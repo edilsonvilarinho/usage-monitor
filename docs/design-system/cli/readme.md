@@ -60,6 +60,9 @@ aqui, na seção Primitivas.
   Mais largo que 96, a moldura não cresce. A moldura ocupa a altura toda do terminal; abaixo de
   40×12, só a frase que diz o tamanho que falta (6.3).
 - Comandos de uma tacada cabem em 100 colunas, e a linha de status também.
+- O `status --watch` (#453) desliga a quebra automática de linha enquanto roda: num painel mais estreito
+  que a tabela, a linha é cortada na borda, e o cabeçalho não sai do painel. Mais linhas que a altura
+  rolam a tela; o comando não lê o tamanho do terminal.
 
 ## Glifos
 
@@ -111,6 +114,12 @@ Cota sem percentual (saldo) mostra o valor no lugar da barra.
 
 **Rodapé de leitura** (2.2). Origem e idade da leitura, seguidas da contagem por estado, com cada
 estado na sua cor: "lido há 38 s pelo app aberto · 9 cotas: 1 crítica, 2 em atenção, 6 em dia".
+
+**Cabeçalho do `status --watch`** (2.4, #453). `usage monitor` em ouro e negrito, o título da moldura da
+TUI, e em muted "14:23 BRT · relê a cada 15 s · Ctrl+C sai": a hora do quadro, o intervalo e como sair.
+Não diz "ao vivo": com nada coletando, a tabela abaixo avisa que os números não mudam. Uma linha em
+branco e a tabela do `status`, inteira, redesenhada no lugar (cursor no canto, "apaga até o fim" em
+cada linha, sem limpar a tela antes), com o cursor escondido até o Ctrl+C.
 
 **Linha de status** (1.1, 1.2). `◑ Conta · 5h NN% barra HH:MM · 7d NN% · sessão $1.84 · tok/s ·
 modelo`. A conta é a que aquele CLI está usando, achada pelo diretório de configuração dele com os

@@ -173,7 +173,7 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
       <div class="arrow" aria-hidden="true">→</div>
       <div class="node"><b>Leitura pronta</b><span>O mesmo <code>dashboard-cache.json</code> e o mesmo histórico em SQLite.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
-      <div class="node cli"><b>Modo terminal</b><span>Pelo SSH: <code>status</code>, <code>tui</code> e toda a configuração.</span></div>
+      <div class="node cli"><b>Modo terminal</b><span>Pelo SSH: <code>status</code>, <code>status --watch</code>, <code>tui</code> e toda a configuração.</span></div>
     </div>
     <p class="flow-note">Só um coleta por pasta de dados. É a mesma trava que hoje impede duas instâncias do app: no desktop o dono é o app, no servidor é o serviço. Assim não há polling em dobro nem duas renovações de login disputando o mesmo arquivo.</p>
   </section>
@@ -331,6 +331,7 @@ S.help = () => render([
   L('Sem comando, abre o Usage Monitor ou traz o aberto para a frente.'), L(''),
   L(c('b', 'Ver o uso'), c('gd', '  (novo)')),
   L('  status [--json]         Mostra as cotas de todas as contas e sai.'),
+  L('  status --watch          A mesma tabela, redesenhada até o Ctrl+C.'),
   L('  check --max <n>         Sai com 0 em dia, 1 atenção, 2 crítico, 3 sem leitura.'),
   L('  wait <cota> --below <n> Espera a cota cair abaixo de <n>% e sai.'),
   L('  statusline <alvo>       Uma linha de uso para claude-code ou tmux.'),
@@ -354,8 +355,9 @@ S.help = () => render([
   L(c('mu', '  (as mesmas de hoje, sem mudança)')),
 ]);
 
-S.status = () => {
-  const out = [sh('usage-monitor status'), L('')];
+// A tabela do `status`, que o `status --watch` (2.4) redesenha no lugar.
+function statusTable(){
+  const out = [];
   out.push(L(c('mu b', ' ' + pad('FONTE', 14) + ' ' + pad('CONTA', 9) + ' ' + pad('COTA', 15) + ' ' + pad('USO', 20) + '       ' + pad('ESTADO', 8) + '  REINICIA')));
   let prev = '';
   for (const x of Q){
@@ -366,8 +368,14 @@ S.status = () => {
   out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('Saldo', 15), ' ', c('b', 'saldo US$ 7,82')));
   out.push(L(''));
   out.push(L(c('mu', ' lido há 38 s pelo app aberto · 9 cotas: '), c('cr', '1 crítica'), c('mu', ', '), c('wa', '2 em atenção'), c('mu', ', 6 em dia')));
-  return render(out);
-};
+  return out;
+}
+S.status = () => render([sh('usage-monitor status'), L(''), ...statusTable()]);
+S.watch = () => render([
+  L(c('gd b', ' usage monitor'), c('mu', '  14:23 BRT · relê a cada 15 s · Ctrl+C sai')),
+  L(''),
+  ...statusTable(),
+]);
 
 S.scripts = () => render([
   sh("usage-monitor status --json | jq '.quotas[] | select(.percent >= 70)'"),
@@ -788,6 +796,9 @@ const PARTS = [
         text: 'Uma linha por cota, na mesma ordem do app, com barra na cor da fonte, estado e reinício. O rodapé diz de quando é a leitura e resume os estados.' },
       { id: 's23', num: '2.3', title: 'Usar em scripts', win: 'bash', body: S.scripts,
         text: '<b>--json</b> para filtrar, <b>check</b> para decidir pelo código de saída, e <b>wait</b> para segurar uma tarefa longa até a janela reiniciar.' },
+      { id: 's24', num: '2.4', title: 'Aberto num painel do tmux', win: 'tmux — usage-monitor status --watch', body: S.watch,
+        text: 'O <b>status --watch</b> deixa a tabela da 2.2 aberta, como um <code>btop</code> num painel, e a redesenha no lugar a cada 15 s (<b>--interval</b>, de 5 s para cima) até o Ctrl+C. Só relê a última coleta: quem muda o número é o app ou o serviço, e o rodapé continua dizendo de quando ela é. A linha do alto não diz "ao vivo", porque com nada coletando a tabela avisa que os números não mudam. Num painel estreito a linha é cortada na borda, em vez de quebrar; sem terminal, diz o que usar e sai com 1, como o <b>tui</b>.',
+        snippet: '<span class="k"># um painel à direita, com 100 colunas</span>\ntmux split-window -h -l 100 \'usage-monitor status --watch\'' },
     ] },
   { id: 'parte3', step: 'Parte 3', title: 'Modo interativo',
     text: 'usage-monitor tui abre uma tela cheia com cinco abas, sempre na mesma moldura: o título, as abas no alto e os atalhos no rodapé. Muda a aba, a moldura fica. Em tela estreita o rodapé tira atalhos inteiros (primeiro <b>r</b> e <b>1–5</b>), e <b>? ajuda</b> e <b>q sair</b> ficam sempre. A aba 5, Configurações, está na parte 4.',

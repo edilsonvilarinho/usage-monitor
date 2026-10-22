@@ -23,6 +23,9 @@ private val HELP_PT = """
     |Ver o uso
     |  status [--json] [--max-age <tempo>]
     |                     Mostra as cotas de todas as contas e sai.
+    |  status --watch [--interval <tempo>]
+    |                     A mesma tabela, redesenhada a cada 15 s até o Ctrl+C:
+    |                     para deixar aberta num painel do tmux.
     |  check [--max <n>] [--max-age <tempo>] [--quiet]
     |                     Sai com 0 em dia, 1 atenção, 2 crítico, 3 sem leitura.
     |  wait <cota> --below <n> [--timeout <tempo>]
@@ -84,6 +87,9 @@ private val HELP_EN = """
     |See the usage
     |  status [--json] [--max-age <time>]
     |                     Print the quotas of every account and exit.
+    |  status --watch [--interval <time>]
+    |                     The same table, redrawn every 15 s until Ctrl+C:
+    |                     to keep open in a tmux pane.
     |  check [--max <n>] [--max-age <time>] [--quiet]
     |                     Exit with 0 on track, 1 warning, 2 critical, 3 no reading.
     |  wait <quota> --below <n> [--timeout <time>]

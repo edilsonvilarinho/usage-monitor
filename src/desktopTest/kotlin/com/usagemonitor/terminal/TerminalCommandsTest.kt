@@ -182,4 +182,77 @@ class TerminalCommandsTest {
         assertEquals(3, pauses)
         assertTrue(text.trim().lines().last().startsWith("tempo esgotado"))
     }
+
+    /** Para o laço do `--watch`, que só sai pelo Ctrl+C. */
+    private class StopWatching : RuntimeException()
+
+    private fun watchRun(percents: List<Long>, redrawsInPlace: Boolean = true): Triple<Int?, String, Int> {
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        try {
+            val dir = Files.createTempDirectory("usage-monitor-terminal").toFile()
+            val cache = File(dir, "dashboard-cache.json")
+            val scenario = WaitScenario(now)
+            fun collect(used: Long) {
+                val stats = ApiUsageStats(
+                    source = ApiSource.CODEX,
+                    apiName = "Codex",
+                    quotas = listOf(QuotaInfo(label = "Codex 5h", used = used, total = 100, periodEndAt = now + 2.hours, unit = UsageUnit.PERCENTAGE)),
+                    fetchedAt = scenario.now
+                )
+                runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats), scenario.now) }
+            }
+            collect(percents.first())
+            var pauses = 0
+            val buffer = ByteArrayOutputStream()
+            val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
+            val reader = TerminalReader(cache, File(dir, "app.lock"), node, scenario.clock)
+            val code = runCatching {
+                TerminalCommands.run(TerminalCommand.Status(watch = 15.seconds), AppLanguage.PT, reader, console, redrawsInPlace = redrawsInPlace, pause = { duration ->
+                    pauses += 1
+                    scenario.now += duration
+                    val next = percents.getOrNull(pauses) ?: throw StopWatching()
+                    collect(next)
+                })
+            }.onFailure { failure -> if (failure !is StopWatching) throw failure }.getOrNull()
+            return Triple(code, buffer.toString(Charsets.UTF_8), pauses)
+        } finally {
+            runCatching {
+                node.removeNode()
+                node.flush()
+            }
+        }
+    }
+
+    @Test
+    fun `status watch redraws the table in place at each reread`() {
+        val (code, text, pauses) = watchRun(listOf(62, 80))
+        assertEquals(null, code)
+        assertEquals(2, pauses)
+        assertTrue(text.startsWith("\u001B[?25l\u001B[?7l"))
+        // Cursor e quebra de linha voltam ao sair, mesmo quando o laço termina por exceção.
+        assertTrue(text.endsWith("\u001B[?7h\u001B[?25h\n"))
+        val frames = text.split("\u001B[H").drop(1)
+        assertEquals(2, frames.size)
+        assertTrue(frames[0].startsWith(" usage monitor  14:23 BRT · relê a cada 15 s · Ctrl+C sai"))
+        assertTrue(frames[0].contains("62%"))
+        assertTrue(frames[1].startsWith(" usage monitor  14:23 BRT"))
+        assertTrue(frames[1].contains("80%"))
+        assertTrue(frames.all { frame -> frame.contains("\u001B[J") })
+    }
+
+    @Test
+    fun `status watch without a terminal says what to use and exits with 1`() {
+        val (code, text, pauses) = watchRun(listOf(62), redrawsInPlace = false)
+        assertEquals(1, code)
+        assertEquals(0, pauses)
+        assertEquals("O --watch redesenha a tela e precisa de um terminal. Para ler o uso num script, rode usage-monitor status.", text.trim())
+    }
+
+    @Test
+    fun `redrawing in place needs a console that is not dumb`() {
+        assertTrue(canRedrawInPlace(consolePresent = true, environment = mapOf("TERM" to "xterm-256color")))
+        assertTrue(canRedrawInPlace(consolePresent = true, environment = emptyMap()))
+        assertTrue(!canRedrawInPlace(consolePresent = false, environment = mapOf("TERM" to "xterm-256color")))
+        assertTrue(!canRedrawInPlace(consolePresent = true, environment = mapOf("TERM" to "dumb")))
+    }
 }

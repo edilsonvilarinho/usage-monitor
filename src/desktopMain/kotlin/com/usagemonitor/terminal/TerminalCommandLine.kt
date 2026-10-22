@@ -14,8 +14,11 @@ internal sealed interface TerminalCommand {
     /** Os comandos que só leem a última coleta (#439). */
     sealed interface Reading : TerminalCommand
 
-    /** `status [--json] [--max-age <tempo>]`: as cotas de todas as contas. */
-    data class Status(val maxAge: Duration? = null, val json: Boolean = false) : Reading
+    /**
+     * `status [--json] [--max-age <tempo>]`: as cotas de todas as contas. Com `--watch`
+     * (#453), [watch] é o intervalo da releitura, e a tabela se redesenha até o Ctrl+C.
+     */
+    data class Status(val maxAge: Duration? = null, val json: Boolean = false, val watch: Duration? = null) : Reading
 
     /** `check [--max <n>] [--max-age <tempo>] [--quiet]`: a decisão pelo código de saída. */
     data class Check(val max: Int? = null, val maxAge: Duration? = null, val quiet: Boolean = false) : Reading
@@ -50,6 +53,8 @@ internal object TerminalCommandNames {
     const val ALERTS = "alerts"
     const val SINCE = "--since"
     const val TODAY = "--today"
+    const val WATCH = "--watch"
+    const val INTERVAL = "--interval"
 
     /** Os nomes que fazem de um argumento solto um comando. */
     val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, ALERTS, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB, SetupCommandNames.SETUP, SetupCommandNames.UPDATE, TuiCommandNames.TUI)
@@ -92,18 +97,40 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
 private fun parseStatus(arguments: List<String>): TerminalCommandParse {
     var maxAge: Duration? = null
     var json = false
+    var watch = false
+    var interval: Duration? = null
     val reader = OptionReader(arguments)
     while (reader.hasNext()) {
         val argument = reader.next()
         when {
             argument == TerminalCommandNames.JSON -> json = true
+            argument == TerminalCommandNames.WATCH -> watch = true
             reader.isOption(argument, TerminalCommandNames.MAX_AGE) -> maxAge = reader.value(argument)?.let(::parseTerminalDuration)
                 ?: return invalidMaxAge()
+            reader.isOption(argument, TerminalCommandNames.INTERVAL) -> interval = reader.value(argument)?.let(::parseTerminalDuration)?.takeIf { value -> value >= MIN_WATCH_INTERVAL }
+                ?: return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.INTERVAL} needs a time of at least ${MIN_WATCH_INTERVAL.inWholeSeconds}s, such as 15s or 1m.")
             else -> return unknownOption(TerminalCommandNames.STATUS, argument)
         }
     }
-    return TerminalCommandParse.Parsed(TerminalCommand.Status(maxAge, json))
+    if (!watch) {
+        if (interval != null) {
+            return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.INTERVAL} only goes with ${TerminalCommandNames.WATCH}.")
+        }
+        return TerminalCommandParse.Parsed(TerminalCommand.Status(maxAge, json))
+    }
+    // `--json` e `--max-age` são contrato de quem roda uma vez e lê a saída ou o código (D3 da #453).
+    val conflicting = listOfNotNull(TerminalCommandNames.JSON.takeIf { json }, TerminalCommandNames.MAX_AGE.takeIf { maxAge != null })
+    if (conflicting.isNotEmpty()) {
+        return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.WATCH} does not go with ${conflicting.joinToString(" or ")}.")
+    }
+    return TerminalCommandParse.Parsed(TerminalCommand.Status(watch = interval ?: DEFAULT_WATCH_INTERVAL))
 }
+
+/** O do `wait` e da TUI: a coleta é de 60 s com sessão ativa. */
+internal val DEFAULT_WATCH_INTERVAL: Duration = 15.seconds
+
+/** Reler mais rápido que isso só avança a idade da leitura: o cache muda a cada coleta (D2 da #453). */
+internal val MIN_WATCH_INTERVAL: Duration = 5.seconds
 
 private fun parseCheck(arguments: List<String>): TerminalCommandParse {
     var max: Int? = null

@@ -156,6 +156,17 @@ internal class TerminalLabels(val language: AppLanguage) {
             "the last one is ${amount(age)} old, more than the ${amount(maxAge)} asked for"
         )
 
+    /** O cabeçalho do `status --watch` (#453): a hora do quadro, o intervalo e como sair. */
+    fun watchHeader(clock: String, interval: Duration): String =
+        localized(language, "$clock BRT · relê a cada ${amount(interval)} · Ctrl+C sai", "$clock BRT · rereads every ${amount(interval)} · Ctrl+C quits")
+
+    val watchNeedsTerminal: String
+        get() = localized(
+            language,
+            "O --watch redesenha a tela e precisa de um terminal. Para ler o uso num script, rode usage-monitor status.",
+            "--watch redraws the screen and needs a terminal. To read the usage in a script, run usage-monitor status."
+        )
+
     companion object {
         private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
 
