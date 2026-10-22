@@ -65,6 +65,14 @@ data class UsageTargetKey(
 }
 
 /**
+ * A ordem em que as contas aparecem: pela fonte (a ordem de [ApiSource]) e, dentro da
+ * fonte, pelo perfil. Total e determinística, para duas leituras iguais darem a mesma
+ * lista. Um dono só: o painel e o modo terminal mostram as contas na mesma ordem.
+ */
+val usageTargetPublicationOrder: Comparator<UsageTargetKey> =
+    compareBy<UsageTargetKey> { target -> target.source.ordinal }.thenBy { target -> target.profileId.orEmpty() }
+
+/**
  * O perfil Anthropic do alvo, ou `null` para qualquer outra fonte. Cor e emoji por
  * conta (issues #275 e #287) são mapas por `profileId` de perfil **Anthropic**; com
  * contas Codex extras (issue #329) o `profileId` sozinho deixou de dizer de qual

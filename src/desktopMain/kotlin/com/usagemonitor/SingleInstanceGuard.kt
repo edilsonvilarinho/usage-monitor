@@ -42,6 +42,39 @@ internal class SingleInstanceGuard private constructor(
             }
         }
 
+        /**
+         * A tomada do arranque: até [attempts] tentativas, com [pauseMillis] entre elas.
+         *
+         * O modo terminal (#439) descobre se o app está aberto tomando e soltando esta
+         * trava ([isHeld]). Um app que abrisse exatamente nesse instante a acharia tomada
+         * e sairia como segunda instância, sem janela. A segunda tentativa cobre essa
+         * janela de microssegundos; a segunda instância de verdade só espera 100 ms a mais.
+         */
+        fun acquireAtStartup(
+            lockFile: File = defaultLockFile(),
+            attempts: Int = 3,
+            pauseMillis: Long = 50L,
+            pause: (Long) -> Unit = Thread::sleep
+        ): SingleInstanceGuard? {
+            repeat(attempts) { attempt ->
+                tryAcquire(lockFile)?.let { guard -> return guard }
+                if (attempt < attempts - 1) {
+                    pause(pauseMillis)
+                }
+            }
+            return null
+        }
+
+        /**
+         * Há um coletor vivo nesta raiz de dados? Toma e solta a trava na hora; quem a
+         * segura é o app aberto. Nunca a mantém: o modo terminal só lê.
+         */
+        fun isHeld(lockFile: File = defaultLockFile()): Boolean {
+            val guard = tryAcquire(lockFile) ?: return true
+            guard.close()
+            return false
+        }
+
         private fun defaultLockFile(): File {
             return AppDataDirectory.file("app.lock")
         }

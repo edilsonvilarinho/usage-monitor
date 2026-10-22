@@ -226,7 +226,7 @@ internal fun runUsageMonitor(
     languageOverride: AppLanguage? = null
 ) = application {
     val startup = remember { AppStartup(args) }
-    val singleInstanceGuard = remember { SingleInstanceGuard.tryAcquire() }
+    val singleInstanceGuard = remember { SingleInstanceGuard.acquireAtStartup() }
     if (singleInstanceGuard == null) {
         // Sair calado aqui é o que faz clicar no atalho com o app já rodando não
         // produzir nada -- indistinguível de "o app não abre". O pedido de foco
