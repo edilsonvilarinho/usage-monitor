@@ -64,7 +64,9 @@ internal object TerminalSetupWiring {
     }
 
     private fun shown(path: String, home: File): String {
-        val homePath = home.path.trimEnd(File.separatorChar)
-        return if (homePath.isNotEmpty() && path.startsWith(homePath + File.separator)) "~" + path.removePrefix(homePath) else path
+        // Canônicos dos dois lados: no Windows um pode vir com o nome curto 8.3.
+        val homePath = runCatching { home.canonicalPath }.getOrDefault(home.path).trimEnd(File.separatorChar)
+        val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
+        return if (homePath.isNotEmpty() && canonical.startsWith(homePath + File.separator)) "~" + canonical.removePrefix(homePath) else path
     }
 }

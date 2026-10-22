@@ -110,9 +110,14 @@ internal class TerminalAccountsRunner(
     /** O começo do id que basta para achar a conta (o coletor aceita o id inteiro ou este começo). */
     private fun shortId(id: String): String = if (id.length > SHORT_ID) id.take(SHORT_ID) else id
 
+    /**
+     * A origem com `~` no lugar da pasta pessoal. Pelos caminhos canônicos dos dois lados: no
+     * Windows um vem com o nome curto 8.3 (`RUNNER~1`) e o outro longo (o CI pegou).
+     */
     private fun shown(path: String): String {
-        val homePath = home.path.trimEnd(File.separatorChar)
-        return if (homePath.isNotEmpty() && (path == homePath || path.startsWith(homePath + File.separator))) "~" + path.removePrefix(homePath) else path
+        val homePath = runCatching { home.canonicalPath }.getOrDefault(home.path).trimEnd(File.separatorChar)
+        val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
+        return if (homePath.isNotEmpty() && (canonical == homePath || canonical.startsWith(homePath + File.separator))) "~" + canonical.removePrefix(homePath) else path
     }
 
     private companion object {

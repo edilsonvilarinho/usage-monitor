@@ -57,7 +57,7 @@ class TerminalAccountsCommandTest {
         assertTrue(record.enabled)
         assertEquals(listOf(ApiSource.ANTHROPIC), readApiSourceCollection(harness.store().settings, ENABLED_APIS_KEY))
         val listed = harness.run("accounts", "list").second.lines()
-        assertTrue(listed.any { line -> line.contains("trabalho") && line.contains("~/claude-work") && line.contains("monitorada · pronta") }, listed.joinToString("\n"))
+        assertTrue(listed.any { line -> line.contains("trabalho") && line.replace('\\', '/').contains("~/claude-work") && line.contains("monitorada · pronta") }, listed.joinToString("\n"))
     }
 
     @Test
