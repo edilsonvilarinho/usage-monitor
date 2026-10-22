@@ -125,6 +125,14 @@ internal class TerminalLabels(val language: AppLanguage) {
 
     val session: String get() = localized(language, "sessão", "session")
 
+    /** O estado em quatro letras, para a barra do tmux; em dia não se escreve ali. */
+    fun zoneShort(zone: QuotaZone): String =
+        when (zone) {
+            QuotaZone.ON_TRACK -> localized(language, "ok", "ok")
+            QuotaZone.ATTENTION -> localized(language, "atn", "warn")
+            QuotaZone.CRITICAL -> localized(language, "crít", "crit")
+        }
+
     fun resetsIn(remaining: Duration): String = localized(language, "reinicia ", "resets ") + inDuration(remaining)
 
     fun readingFrom(clock: String): String = localized(language, "leitura de $clock", "reading from $clock")

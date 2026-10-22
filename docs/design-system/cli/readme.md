@@ -113,8 +113,12 @@ outra conta). Acima do limiar: estado escrito e "reinicia em" no lugar da hora. 
 tarifa); sem a sessão no índice, sem custo. Leitura com mais de 10 min mostra "leitura de HH:MM".
 A linha sempre sai com código 0: outro código faria o Claude Code escondê-la.
 
-**Segmento do tmux** (1.3). Sigla de duas letras na cor da fonte e número em negrito, sobre o fundo
-da barra. Estado abreviado (`crít`, `atn`) só acima do limiar.
+**Segmento do tmux** (1.3). Uma entrada por conta: sigla de duas letras na cor da fonte (as
+iniciais das duas primeiras palavras do apelido ou do nome, ou as duas primeiras letras de um nome de
+uma palavra só: "Claude Max" → `cm`, "trabalho" → `tr`, "Codex" → `co`) e o **maior** percentual da
+conta em negrito, sobre o fundo da barra. Estado abreviado (`crít`, `atn`) só acima do limiar. A cor
+vai no formato do tmux (`#[fg=#4F8CFF]`, ou `colourN` em 16 cores), nunca em ANSI, e `#` do texto
+vira `##`. Leitura com mais de 10 min acrescenta "leitura de HH:MM".
 
 **Moldura do modo interativo** (3.1). Borda arredondada em `--term-border`. Na borda de cima, à
 esquerda, `usage monitor` em ouro e negrito; à direita, o status ("14:23 BRT · ao vivo", ou

@@ -107,6 +107,7 @@ class TerminalCommandLineTest {
     @Test
     fun `statusline takes exactly one known target`() {
         assertEquals(CommandLineRequest.Terminal(TerminalCommand.ClaudeCodeStatusLine), parse("statusline", "claude-code"))
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.TmuxStatusLine), parse("statusline", "tmux"))
         assertTrue(parse("statusline") is CommandLineRequest.Invalid)
         assertTrue(parse("statusline", "vim") is CommandLineRequest.Invalid)
         assertTrue(parse("statusline", "claude-code", "extra") is CommandLineRequest.Invalid)

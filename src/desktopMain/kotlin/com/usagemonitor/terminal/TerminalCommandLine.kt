@@ -21,6 +21,9 @@ internal sealed interface TerminalCommand {
 
     /** `statusline claude-code`: a linha embaixo do prompt do Claude Code, lida do JSON da entrada. */
     data object ClaudeCodeStatusLine : TerminalCommand
+
+    /** `statusline tmux`: o segmento da barra do tmux, no formato de estilo dele. */
+    data object TmuxStatusLine : TerminalCommand
 }
 
 internal object TerminalCommandNames {
@@ -35,12 +38,13 @@ internal object TerminalCommandNames {
     const val TIMEOUT = "--timeout"
     const val STATUS_LINE = "statusline"
     const val CLAUDE_CODE = "claude-code"
+    const val TMUX = "tmux"
 
     /** Os nomes que fazem de um argumento solto um comando. */
     val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE)
 
     /** Os alvos da linha de status. */
-    val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE)
+    val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE, TMUX)
 }
 
 internal sealed interface TerminalCommandParse {
@@ -124,6 +128,7 @@ private fun parseStatusLine(arguments: List<String>): TerminalCommandParse {
         ?: return TerminalCommandParse.Invalid("Error: '${TerminalCommandNames.STATUS_LINE}' needs one target: $targets.")
     return when (target) {
         TerminalCommandNames.CLAUDE_CODE -> TerminalCommandParse.Parsed(TerminalCommand.ClaudeCodeStatusLine)
+        TerminalCommandNames.TMUX -> TerminalCommandParse.Parsed(TerminalCommand.TmuxStatusLine)
         else -> TerminalCommandParse.Invalid("Error: '$target' is not a status line target. Use $targets.")
     }
 }

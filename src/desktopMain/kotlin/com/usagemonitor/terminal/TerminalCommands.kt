@@ -8,6 +8,7 @@ import com.usagemonitor.presentation.terminal.TerminalCheckView
 import com.usagemonitor.presentation.terminal.TerminalColor
 import com.usagemonitor.presentation.terminal.TerminalSpan
 import com.usagemonitor.presentation.terminal.TerminalStatusLineView
+import com.usagemonitor.presentation.terminal.TerminalTmux
 import com.usagemonitor.presentation.terminal.TerminalWaitStep
 import com.usagemonitor.presentation.terminal.TerminalWaitView
 import com.usagemonitor.presentation.terminal.terminalLine
@@ -44,7 +45,8 @@ internal object TerminalCommands {
         command: TerminalCommand,
         languageOverride: AppLanguage?,
         reader: TerminalReader = TerminalReader(),
-        console: TerminalConsole = TerminalConsole.system(forceTerminal = command is TerminalCommand.ClaudeCodeStatusLine),
+        // A linha de status sai por um pipe que o Claude Code e o tmux desenham com cor.
+        console: TerminalConsole = TerminalConsole.system(forceTerminal = command.isStatusLine),
         pause: (Duration) -> Unit = { duration -> Thread.sleep(duration.inWholeMilliseconds) },
         statusLineInput: () -> String = { readPipedInput() },
         sessionMetrics: (String) -> CliSessionMetrics? = LocalCliSessionMetricsReader()::read,
@@ -69,6 +71,11 @@ internal object TerminalCommands {
                 val account = target?.let { key -> reading.accounts.firstOrNull { item -> item.storageKey == key.storageKey } }
                 val line = TerminalStatusLineView.claudeCode(account, input.sessionId?.let(sessionMetrics), input.model, reading.now, labels, console.profile)
                 TerminalOutput(listOf(line), EXIT_STATUS_LINE)
+            }
+            TerminalCommand.TmuxStatusLine -> {
+                // Formato do tmux, e não ANSI: sai direto, sem passar pelo renderizador de linhas.
+                console.print(TerminalTmux.render(reading.accounts, reading.now, labels, console.profile))
+                return EXIT_STATUS_LINE
             }
         }
         // O JSON sai sempre, mesmo sem leitura: quem lê decide pelo código e pelos campos.
@@ -124,6 +131,9 @@ internal object TerminalCommands {
         }
     }
 }
+
+private val TerminalCommand.isStatusLine: Boolean
+    get() = this is TerminalCommand.ClaudeCodeStatusLine || this is TerminalCommand.TmuxStatusLine
 
 /**
  * O que veio pela entrada, para a linha de status. Num terminal interativo (quem rodou o
