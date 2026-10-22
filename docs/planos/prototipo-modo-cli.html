@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Protótipo do modo terminal: o mockup de cada tela. As regras e primitivas são
+     docs/design-system/cli/readme.md, que vence este arquivo em caso de divergência. -->
+<title>Usage Monitor no terminal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: um percurso em coluna única, parte por parte, como o produto ficaria inteiro.
+   Cromo da página: tokens do design system (colors.css), escuro primeiro.
+   Dentro do terminal: tokens --t-* próprios, porque o terminal não segue o tema da página. */
+:root {
+  --bg: #131010; --surface: #1B1818; --raised: #211E1E; --border: #3D3838;
+  --fg: #F2EDED; --muted: #B8B2B2; --gold: #E8AE63;
+  --font-label: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-term: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+
+  --t-bg: #131010; --t-fg: #F2EDED; --t-mu: #B8B2B2; --t-dim: #4A4444; --t-bd: #5A5353; --t-sel: #2A2626;
+  --a: #4F8CFF; --c: #27BFA3; --oc: #7BD389; --cu: #C7E9A5; --mm: #FF8A3D; --ds: #C084FC;
+  --ok: #4CAF50; --wa: #FFA726; --cr: #E86A6A;
+  --in: #4C8DFF; --out: #B07CFF; --crd: #4CAF50; --cwr: #FFA726; --gd: #E8AE63;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F6F3F3; --surface: #FFFCFC; --raised: #EFEAEA; --border: #D7D0D0;
+    --fg: #171414; --muted: #686060; --gold: #8C643F; color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F6F3F3; --surface: #FFFCFC; --raised: #EFEAEA; --border: #D7D0D0;
+  --fg: #171414; --muted: #686060; --gold: #8C643F; color-scheme: light;
+}
+body.tlight .term, .modes .term.pal-light {
+  --t-bg: #FFFCFC; --t-fg: #171414; --t-mu: #686060; --t-dim: #D7D0D0; --t-bd: #B9B1B1; --t-sel: #EFEAEA;
+  --a: #1565C0; --c: #00695C; --oc: #2E7D32; --cu: #477915; --mm: #9A4A00; --ds: #7B3FC4;
+  --ok: #2E7D32; --wa: #8A5000; --cr: #B3261E;
+  --in: #1565C0; --out: #6A3FB5; --crd: #2E7D32; --cwr: #8A5000; --gd: #8C643F;
+}
+body.nocolor .term, .modes .term.pal-mono {
+  --a: var(--t-fg); --c: var(--t-fg); --oc: var(--t-fg); --cu: var(--t-fg); --mm: var(--t-fg); --ds: var(--t-fg);
+  --ok: var(--t-fg); --wa: var(--t-fg); --cr: var(--t-fg);
+  --in: var(--t-fg); --out: var(--t-fg); --crd: var(--t-fg); --cwr: var(--t-fg); --gd: var(--t-fg);
+}
+.modes .term.pal-dark {
+  --t-bg: #131010; --t-fg: #F2EDED; --t-mu: #B8B2B2; --t-dim: #4A4444; --t-bd: #5A5353;
+  --a: #4F8CFF; --c: #27BFA3; --ok: #4CAF50; --wa: #FFA726; --cr: #E86A6A;
+}
+.modes .term.pal-16 {
+  --t-bg: #1E1E1E; --t-fg: #CCCCCC; --t-mu: #8A8A8A; --t-dim: #555555; --t-bd: #777777;
+  --a: #3B8EEA; --c: #29B8DB; --ok: #23D18B; --wa: #E5E510; --cr: #F14C4C;
+}
+
+body {
+  margin: 0;
+  background: var(--bg); color: var(--fg); font: 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 72px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
+header { display: grid; gap: 14px; }
+.eyebrow { font: 600 12px/1 var(--font-label); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+h1 { font: 600 clamp(26px, 4vw, 38px)/1.15 var(--font-label); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h2 { font: 600 22px/1.25 var(--font-label); margin: 0; text-wrap: balance; }
+h3 { font: 600 16px/1.3 var(--font-label); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+.lead { color: var(--muted); font-size: 16px; }
+code { font-family: var(--font-label); font-size: .88em; background: var(--raised); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
+
+.map { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 10px; }
+.map a { display: grid; gap: 4px; text-decoration: none; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.map a:hover, .map a:focus-visible { border-color: var(--gold); outline: none; }
+.map b { font: 600 12px/1 var(--font-label); color: var(--gold); letter-spacing: .04em; }
+.map span { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.flow .node { flex: 1 1 200px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.flow .node b { font: 600 13px/1.3 var(--font-label); }
+.flow .node span { font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+.flow .arrow { align-self: center; font: 600 18px/1 var(--font-label); color: var(--gold); }
+.flow .node.cli { border-color: color-mix(in srgb, var(--gold) 55%, var(--border)); }
+.flow-label { font: 600 12px/1 var(--font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.flow-note { color: var(--muted); font-size: 14px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+.maptable { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+.maptable th, .maptable td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+.maptable tr:last-child td { border-bottom: 0; }
+.maptable th { font: 600 11.5px/1.2 var(--font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--raised); }
+.maptable td:first-child { font: 600 13px/1.4 var(--font-label); white-space: nowrap; }
+.maptable td { color: var(--muted); }
+.maptable td b { color: var(--fg); font-weight: 500; }
+.maptable .na { color: var(--muted); font-style: italic; }
+
+.toolbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); padding-block: 10px; border-bottom: 1px solid var(--border); }
+.toolbar label { display: inline-flex; gap: 8px; align-items: center; font: 500 13px/1 var(--font-label); color: var(--muted); cursor: pointer; }
+.toolbar input { accent-color: var(--gold); width: 16px; height: 16px; }
+.toolbar input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.toolbar .note { font-size: 13px; color: var(--muted); margin-left: auto; }
+
+.part { display: flex; flex-direction: column; gap: 22px; scroll-margin-top: 64px; }
+.part-head { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 22px; }
+.part-head .step { font: 600 12px/1 var(--font-label); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+.part-head p { color: var(--muted); }
+.screen { display: flex; flex-direction: column; gap: 10px; min-width: 0; scroll-margin-top: 64px; }
+.screen-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.screen-head .num { font: 600 12px/1 var(--font-label); color: var(--muted); }
+.screen > p { color: var(--muted); font-size: 14.5px; }
+.screen > p b { color: var(--fg); font-weight: 500; }
+
+.win { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--t-bg); min-width: 0; }
+.win-bar { display: flex; gap: 10px; align-items: center; padding: 7px 12px; font: 500 11.5px/1 var(--font-label); color: var(--muted); background: var(--raised); border-bottom: 1px solid var(--border); }
+.win-bar i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--border); display: inline-block; }
+.scroll { overflow-x: auto; }
+.term { margin: 0; padding: 12px 14px; font: 400 12.5px/1.32 var(--font-term); color: var(--t-fg); background: var(--t-bg); white-space: pre; width: max-content; min-width: 100%; box-sizing: border-box; font-variant-ligatures: none; }
+.term .g { display: inline-block; width: 1ch; text-align: center; overflow: hidden; vertical-align: bottom; }
+.snippet { margin: 0; padding: 10px 12px; font: 400 12px/1.45 var(--font-term); color: var(--fg); background: var(--raised); border: 1px solid var(--border); border-radius: 6px; white-space: pre; overflow-x: auto; }
+.snippet .k { color: var(--muted); }
+
+.a{color:var(--a)} .c{color:var(--c)} .oc{color:var(--oc)} .cu{color:var(--cu)} .mm{color:var(--mm)} .ds{color:var(--ds)}
+.ok{color:var(--ok)} .wa{color:var(--wa)} .cr{color:var(--cr)} .mu{color:var(--t-mu)} .dim{color:var(--t-dim)} .bd{color:var(--t-bd)} .gd{color:var(--gd)}
+.in{color:var(--in)} .out{color:var(--out)} .crd{color:var(--crd)} .cwr{color:var(--cwr)}
+.b{font-weight:700} .sel{background:var(--t-sel)} .inv{background:var(--t-sel); color:var(--t-fg)}
+.cursor{background:var(--t-fg); color:var(--t-bg)}
+@media (prefers-reduced-motion: no-preference) { .cursor { animation: blink 1.1s steps(1) infinite; } }
+@keyframes blink { 50% { background: transparent; color: var(--t-fg); } }
+
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; }
+.modes figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.modes figcaption { font: 500 12px/1.3 var(--font-label); color: var(--muted); }
+
+.box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: grid; gap: 12px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--muted); }
+.box li b { color: var(--fg); font-weight: 500; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Design system · modo terminal · aprovado em 21/10/2026</div>
+    <h1>Usage Monitor no terminal</h1>
+    <p class="lead">O mockup de cada tela do modo terminal, na ordem em que alguém o usaria. As regras e as primitivas estão em docs/design-system/cli/readme.md. O modo terminal funciona de dois jeitos. Ao lado do app desktop, ele só lê. Num servidor sem tela, ele substitui o app: coleta, guarda o histórico, avisa e se configura sozinho. Os números são <b>de exemplo</b>: quarta, 21/10, 14:23 BRT.</p>
+    <nav class="map" aria-label="Partes da proposta">
+      <a href="#parte1"><b>1 · Sem abrir nada</b><span>Uma linha de uso no Claude Code e no tmux</span></a>
+      <a href="#parte2"><b>2 · Comandos</b><span>Perguntar pelo terminal e receber a resposta</span></a>
+      <a href="#parte3"><b>3 · Modo interativo</b><span>Uma tela cheia com cinco abas</span></a>
+      <a href="#parte4"><b>4 · Configuração</b><span>Primeira vez, aba Configurações e comandos</span></a>
+      <a href="#parte5"><b>5 · Servidor sem tela</b><span>Serviço em segundo plano e avisos sem bandeja</span></a>
+      <a href="#parte6"><b>6 · Quando algo falha</b><span>Nada coletando e leitura que falhou</span></a>
+      <a href="#parte7"><b>7 · Cores</b><span>Terminal claro, escuro, 16 cores e sem cor</span></a>
+    </nav>
+  </header>
+
+  <section class="box" aria-labelledby="how">
+    <h3 id="how">Como funciona por baixo</h3>
+    <p class="flow-label">Num computador com tela</p>
+    <div class="flow">
+      <div class="node"><b>App desktop (HUD)</b><span>É quem consulta as APIs, renova o login e respeita os limites.</span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node"><b>Leitura pronta</b><span><code>~/.usage-monitor/snapshot.json</code>, regravado a cada coleta.</span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node cli"><b>Modo terminal</b><span>Lê a leitura pronta. Configurar pelo terminal muda os mesmos arquivos que o app usa.</span></div>
+    </div>
+    <p class="flow-label">Num servidor sem tela</p>
+    <div class="flow">
+      <div class="node cli"><b>Serviço <code>usage-monitor service</code></b><span>O mesmo motor do app, sem janela: coleta, histórico, alertas, time, Telegram e acesso web.</span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node"><b>Leitura pronta</b><span>O mesmo <code>snapshot.json</code> e o mesmo histórico em SQLite.</span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="node cli"><b>Modo terminal</b><span>Pelo SSH: <code>status</code>, <code>tui</code> e toda a configuração.</span></div>
+    </div>
+    <p class="flow-note">Só um coleta por pasta de dados. É a mesma trava que hoje impede duas instâncias do app: no desktop o dono é o app, no servidor é o serviço. Assim não há polling em dobro nem duas renovações de login disputando o mesmo arquivo.</p>
+  </section>
+
+  <div class="toolbar">
+    <label for="opt-light"><input type="checkbox" id="opt-light"> ver em terminal claro</label>
+    <label for="opt-nocolor"><input type="checkbox" id="opt-nocolor"> ver sem cor</label>
+    <span class="note">O fundo é sempre o do terminal da pessoa</span>
+  </div>
+
+  <div id="parts"></div>
+
+  <section class="box" aria-labelledby="out">
+    <h3 id="out">O que ficou de fora, e por quê</h3>
+    <ul>
+      <li><b>Segmento no prompt do shell (AG6):</b> precisa de um leitor sem JVM para não atrasar cada comando. Pode vir depois, lendo o mesmo <code>snapshot.json</code>.</li>
+      <li><b>Mosaico estilo btop (AG8) e conversa por comandos (AG9):</b> seriam um segundo jeito de desenhar a mesma tela. Ficou só o painel com abas, para haver um único jeito de navegar.</li>
+      <li><b>Resposta em frases sem argumento (AG3):</b> hoje <code>usage-monitor</code> sem nada abre o app, e quem usa esse atalho seria pego de surpresa.</li>
+      <li><b>Watch em linha (AG12) e HUD de bolso (AG13):</b> a barra do tmux já cobre o "ver de canto de olho".</li>
+      <li><b>Tema, HUD e escala da interface:</b> não se aplicam ao terminal, que usa as cores dele (parte 7). Cor e emoji por conta continuam só no app.</li>
+      <li><b>Ainda em aberto, idioma:</b> pela regra do #418, a saída de linha de comando é em inglês. Aqui está em português para a conversa. Falta decidir se o modo terminal segue o idioma do app.</li>
+      <li><b>Ainda em aberto, pacote para servidor:</b> o pacote de hoje leva Compose e Skiko. Falta medir se o mesmo <code>.deb</code>/<code>.rpm</code> roda sem bibliotecas gráficas instaladas ou se o servidor precisa de um pacote próprio, só com o motor.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// ── primitivas de texto de terminal: cada linha guarda o HTML e a largura em células ──
+const SAFE = /[\x20-\x7EÀ-ÿ─-▟]/;
+function esc(ch){ return ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch; }
+function c(cls, t){
+  let h = '';
+  for (const ch of String(t)) h += SAFE.test(ch) ? esc(ch) : `<span class="g">${esc(ch)}</span>`;
+  return { h: cls ? `<span class="${cls}">${h}</span>` : h, n: [...String(t)].length };
+}
+function L(...parts){
+  let h = '', n = 0;
+  for (const p of parts){ const s = typeof p === 'object' ? p : c('', p); h += s.h; n += s.n; }
+  return { h, n };
+}
+function wrap(cls, l){ return { h: `<span class="${cls}">${l.h}</span>`, n: l.n }; }
+function fit(l, w){ return l.n >= w ? l : L(l, ' '.repeat(w - l.n)); }
+function pad(t, n){ t = String(t); const k = [...t].length; return k >= n ? t : t + ' '.repeat(n - k); }
+function lpad(t, n){ t = String(t); const k = [...t].length; return k >= n ? t : ' '.repeat(n - k) + t; }
+function rep(ch, n){ return ch.repeat(Math.max(0, n)); }
+function render(lines){ return lines.map(l => l.h).join('\n'); }
+const sh = cmd => L(c('mu', '$ '), cmd);
+
+function st(p){ return p >= 90 ? ['cr', 'crítico'] : p >= 70 ? ['wa', 'atenção'] : ['ok', 'em dia']; }
+function bar(p, w, k){
+  const parts = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
+  const exact = p / 100 * w; let full = Math.floor(exact); let i = Math.round((exact - full) * 8);
+  if (i === 8){ full += 1; i = 0; }
+  const filled = rep('█', full) + parts[i];
+  return L(c(k, filled), c('dim', rep('░', w - [...filled].length)));
+}
+function box(title, k, lines, inner){
+  const t = title ? ` ${title} ` : '';
+  const out = [L(c('bd', '╭─'), c(k, t), c('bd', rep('─', inner - [...t].length - 1) + '╮'))];
+  for (const l of lines) out.push(L(c('bd', '│'), ' ', fit(l, inner - 1), c('bd', '│')));
+  out.push(L(c('bd', '╰' + rep('─', inner) + '╯')));
+  return out;
+}
+
+// ── dados de exemplo (quarta 21/10, 14:23 BRT) ──
+const Q = [
+  { src: 'Claude Max',  acct: 'pessoal',  k: 'a',  win: '5h',  p: 62, reset: '16:40',     inn: '2h17' },
+  { src: 'Claude Max',  acct: 'pessoal',  k: 'a',  win: '7d',  p: 38, reset: 'seg 09:00', inn: '4d18h' },
+  { src: 'Claude Team', acct: 'trabalho', k: 'a',  win: '5h',  p: 91, reset: '15:10',     inn: '47 min' },
+  { src: 'Claude Team', acct: 'trabalho', k: 'a',  win: '7d',  p: 74, reset: 'qui 21:00', inn: '1d06h' },
+  { src: 'Codex',       acct: 'padrão',   k: 'c',  win: '5h',  p: 24, reset: '17:55',     inn: '3h32' },
+  { src: 'Codex',       acct: 'padrão',   k: 'c',  win: '7d',  p: 57, reset: 'sáb 11:20', inn: '2d21h' },
+  { src: 'OpenCode Go', acct: '',         k: 'oc', win: 'mês', p: 41, reset: '01/11',     inn: '11d' },
+  { src: 'Cursor',      acct: '',         k: 'cu', win: 'mês', p: 73, reset: '05/11',     inn: '15d' },
+  { src: 'MiniMax',     acct: '',         k: 'mm', win: '5h',  p: 28, reset: '18:00',     inn: '3h37' },
+];
+const q = (src, win) => Q.find(x => x.src === src && x.win === win);
+
+function series(seed, resets, end){
+  const v = []; let cur = seed;
+  for (let i = 0; i < 48; i++){
+    if (resets.includes(i)) cur = 3;
+    else cur = Math.min(100, cur + ((i * 37 + seed) % 7) * 1.6 * (i > 18 && i < 30 ? .25 : 1));
+    v.push(cur);
+  }
+  const k = end / v[47]; return v.map((x, i) => i > resets[resets.length - 1] ? Math.min(100, x * k) : x);
+}
+function spark(vals, k, resets){
+  const ch = ' ▁▂▃▄▅▆▇█';
+  return L(...vals.map((x, i) => resets.includes(i) ? c('mu', '┆') : c(k, ch[Math.max(1, Math.round(x / 100 * 8))])));
+}
+
+// ── a moldura única do modo interativo: título, quatro abas, corpo e atalhos ──
+const FW = 94;
+const TABS = ['Visão geral', 'Sessões', 'Histórico', 'Time', 'Configurações'];
+function frame(active, body, keys, status = '14:23 BRT · ao vivo', statusCls = 'mu'){
+  const tabs = L(...TABS.flatMap((t, i) => {
+    const lab = ` ${i + 1} ${t} `;
+    return [i === active ? wrap('sel', c('gd b', lab)) : c('mu', lab), ' '];
+  }));
+  const title = c('gd b', ' usage monitor ');
+  const s = c(statusCls, ' ' + status + ' ');
+  const out = [L(c('bd', '╭─'), title, c('bd', rep('─', FW - title.n - s.n - 2)), s, c('bd', '─╮'))];
+  out.push(L(c('bd', '│'), fit(tabs, FW), c('bd', '│')));
+  out.push(L(c('bd', '├' + rep('─', FW) + '┤')));
+  for (const l of body) out.push(L(c('bd', '│'), ' ', fit(l, FW - 1), c('bd', '│')));
+  out.push(L(c('bd', '├' + rep('─', FW) + '┤')));
+  out.push(L(c('bd', '│'), ' ', fit(keys, FW - 1), c('bd', '│')));
+  out.push(L(c('bd', '╰' + rep('─', FW) + '╯')));
+  return render(out);
+}
+const key = (k, label) => L(c('b', k), c('mu', ' ' + label + '  '));
+const commonKeys = [key('1–5', 'aba'), key('r', 'atualizar'), key('?', 'ajuda'), key('q', 'sair')];
+
+// ── as telas ──
+const S = {};
+
+S.statusline = () => {
+  const w = 86, x = q('Claude Max', '5h'), y = q('Claude Max', '7d');
+  return render([
+    L(c('mu', '  ⏺ '), 'Pronto. Movi a leitura de ', c('b', '--locale'), ' para o parser e adicionei 3 testes.'),
+    L(''),
+    L(c('bd', '╭' + rep('─', w) + '╮')),
+    L(c('bd', '│'), fit(L(' ', c('mu', '>'), ' agora rode o allTests', c('cursor', ' ')), w), c('bd', '│')),
+    L(c('bd', '╰' + rep('─', w) + '╯')),
+    L('  ', c('a', '◑ Claude Max'), c('mu', ' · '), '5h ', c('b', x.p + '%'), ' ', bar(x.p, 12, 'a'), ' ', c('mu', '16:40'),
+      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', ' · '), 'sessão ', c('b', 'US$ 1,84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
+    L(c('mu', '  ? for shortcuts')),
+  ]);
+};
+S.statuslineCrit = () => render([
+  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', 'US$ 9,40')),
+]);
+
+S.tmux = () => {
+  const W = 92;
+  const left = L(c('inv b', ' dev '), c('inv', ' 0:nvim  1:claude* 2:codex '));
+  const right = L(c('inv', ' '), c('a', 'cl '), c('inv b', '62'), c('inv', ' '), c('a', 'tm '), c('inv b', '91'), c('cr', ' crít'), c('inv', ' '), c('c', 'cx '), c('inv b', '24'), c('inv', ' '), c('cu', 'cu '), c('inv b', '73'), c('wa', ' atn'), c('inv', ' │ 14:23 '));
+  return render([
+    L(c('mu', '~/workspace/usage-monitor'), ' ', c('oc', 'main'), ' ❯ claude'),
+    L(''),
+    L(c('mu', '  ✻ Pensando… (12 s · ↑ 3,1 k tokens)')),
+    L(''),
+    L(left, wrap('inv', L(rep(' ', W - left.n - right.n))), wrap('inv', right)),
+  ]);
+};
+
+S.help = () => render([
+  sh('usage-monitor --help'),
+  L('Usage Monitor 41.11.0'), L(''),
+  L('Uso: usage-monitor [comando] [opções]'), L(''),
+  L('Sem comando, abre o Usage Monitor ou traz o aberto para a frente.'), L(''),
+  L(c('b', 'Ver o uso'), c('gd', '  (novo)')),
+  L('  status [--json]         Mostra as cotas de todas as contas e sai.'),
+  L('  check --max <n>         Sai com 0 em dia, 1 atenção, 2 crítico, 3 sem leitura.'),
+  L('  wait <cota> --below <n> Espera a cota cair abaixo de <n>% e sai.'),
+  L('  statusline <alvo>       Uma linha de uso para claude-code ou tmux.'),
+  L('  tui                     Abre o modo interativo no terminal.'),
+  L(''),
+  L(c('b', 'Configurar'), c('gd', '  (novo)')),
+  L('  setup                   Configuração inicial, passo a passo.'),
+  L('  config list|get|set     Qualquer ajuste das Configurações do app.'),
+  L('  keys set|test|remove    Chaves de API. A chave é lida da entrada, nunca do comando.'),
+  L('  accounts list|add|...   Contas Anthropic e Codex.'),
+  L('  sources enable|disable  Liga e desliga cada fonte.'),
+  L('  telegram · team · web   Bot, integração com time e acesso pela rede.'),
+  L(''),
+  L(c('b', 'Servidor'), c('gd', '  (novo)')),
+  L('  service install|start|stop|status|logs'),
+  L('                          Roda a coleta em segundo plano, sem tela.'),
+  L('  alerts [--today]        Os avisos enviados e para onde foram.'),
+  L(''),
+  L(c('b', 'Opções')),
+  L(c('mu', '  -h, --help · -v, --version · --diagnostics · --locale · --user-data-dir')),
+  L(c('mu', '  (as mesmas de hoje, sem mudança)')),
+]);
+
+S.status = () => {
+  const out = [sh('usage-monitor status'), L('')];
+  out.push(L(c('mu b', ' ' + pad('FONTE', 14) + ' ' + pad('CONTA', 9) + ' ' + pad('JAN.', 4) + ' ' + pad('USO', 20) + '       ' + pad('ESTADO', 8) + '  REINICIA')));
+  let prev = '';
+  for (const x of Q){
+    const [sc, sw] = st(x.p); const first = x.src + x.acct !== prev; prev = x.src + x.acct;
+    out.push(L(' ', first ? c(x.k, pad('● ' + x.src, 14)) : pad('', 14), ' ', c('mu', pad(first ? x.acct : '', 9)), ' ',
+      pad(x.win, 4), ' ', bar(x.p, 20, x.k), ' ', c('b', lpad(x.p + '%', 4)), '  ', c(sc, pad(sw, 8)), '  ', x.reset + ' BRT', c('mu', ' · em ' + x.inn)));
+  }
+  out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('saldo', 4), ' ', c('b', 'US$ 7,82')));
+  out.push(L(''));
+  out.push(L(c('mu', ' lido há 38 s pelo app aberto · 9 cotas: '), c('cr', '1 crítica'), c('mu', ', '), c('wa', '2 em atenção'), c('mu', ', 6 em dia')));
+  return render(out);
+};
+
+S.scripts = () => render([
+  sh("usage-monitor status --json | jq '.quotas[] | select(.percent >= 70)'"),
+  L(c('mu', '{ "source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho", ', c('mu', '"window"'), ': "5h",'),
+  L(c('mu', '  "percent"'), ': ', c('b', '91'), ', ', c('mu', '"state"'), ': "critical", ', c('mu', '"resetsAt"'), ': "2026-10-21T18:10:00Z" }'),
+  L(c('mu', '{ "source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho", ', c('mu', '"window"'), ': "7d", ', c('mu', '"percent"'), ': ', c('b', '74'), ', …}'),
+  L(c('mu', '{ "source"'), ': "cursor", ', c('mu', '"window"'), ': "month", ', c('mu', '"percent"'), ': ', c('b', '73'), ', …}'),
+  L(''),
+  sh('usage-monitor check --max 90; echo $?'),
+  L(c('cr', 'crítico'), '  Claude Team 5h 91% (limite 90%)'),
+  L(c('b', '2')),
+  L(''),
+  sh('usage-monitor wait anthropic:trabalho:5h --below 50 && claude -p "rode a suíte"'),
+  L(c('mu', 'aguardando Claude Team 5h cair abaixo de 50% · reinicia 15:10 BRT, em 47 min'), c('cursor', ' ')),
+]);
+
+// visão geral: lista de fontes à esquerda, detalhe à direita
+function overviewBody(banner){
+  const LW = 21;
+  const src = [['Claude Max', 'a', '62%'], ['Claude Team', 'a', '91%'], ['Codex', 'c', '57%'], ['OpenCode Go', 'oc', '41%'], ['Cursor', 'cu', '73%'], ['MiniMax', 'mm', '28%'], ['DeepSeek', 'ds', '$7,82']];
+  const left = [L(c('mu b', 'FONTES')), L('')];
+  src.forEach(([n, k, v], i) => {
+    const row = L(i === 1 ? c('gd', '▸ ') : '  ', c(k, pad(n, 12)), lpad(v, 6), ' ');
+    left.push(i === 1 ? wrap('sel', fit(row, LW - 1)) : row);
+  });
+  const t5 = q('Claude Team', '5h'), t7 = q('Claude Team', '7d');
+  const right = [
+    L(c('a b', 'Claude Team'), c('mu', ' · trabalho'), c('mu', lpad('Anthropic', 48))),
+    L(''),
+  ];
+  if (banner) right.push(...banner, L(''));
+  right.push(
+    L('5h   ', bar(t5.p, 40, 'a'), '  ', c('b', '91%'), '  ', c('cr', 'crítico')),
+    L(c('mu', '     reinicia 15:10 BRT · em 47 min')),
+    L(''),
+    L('7d   ', bar(t7.p, 40, 'a'), '  ', c('b', '74%'), '  ', c('wa', 'atenção')),
+    L(c('mu', '     reinicia qui 21:00 BRT · em 1d06h')),
+    L(''),
+    L('créditos  ', c('b', 'US$ 12,40'), c('mu', ' de US$ 50,00'), '  ', bar(25, 16, 'a'), ' 25%'),
+    L(''),
+    L(c('mu b', 'SESSÃO ATIVA'), '  usage-monitor · Opus 5.5 · 1h12 · ', c('b', 'US$ 9,40'), ' · 38 tok/s'),
+    L(c('mu b', '24 H        '), '  ', spark(series(10, [8, 20, 34], 91).slice(0, 44), 'a', [8, 20, 34])),
+  );
+  const rows = Math.max(left.length, right.length);
+  const out = [];
+  for (let r = 0; r < rows; r++) out.push(L(fit(left[r] || L(''), LW), c('bd', '│'), ' ', right[r] || L('')));
+  return out;
+}
+S.overview = () => frame(0, overviewBody(), L(key('↑↓', 'fonte'), key('enter', 'abre a conta'), ...commonKeys));
+
+S.sessions = () => {
+  const rows = [
+    ['usage-monitor', 'Opus 5.5',   '1h12',   '4,8 M', 'US$ 9,40',  '38 tok/s', true],
+    ['server',        'Sonnet 5.5', '22 min', '1,1 M', 'US$ 1,22',  '61 tok/s'],
+    ['usage-monitor', 'Codex 5.3',  '48 min', '2,3 M', 'US$ 3,05',  '44 tok/s'],
+    ['dotfiles',      'Haiku 5.5',  '6 min',  '0,2 M', 'US$ 0,04',  '92 tok/s'],
+    ['notas',         'MiniMax M3', '15 min', '0,6 M', 'US$ 0,31+', '27 tok/s'],
+  ];
+  const body = [
+    L(c('b', 'hoje'), c('mu', '  ontem  7 dias'), c('mu', lpad('14 sessões · ', 62)), c('b', 'US$ 23,17')),
+    L(''),
+    L(c('mu b', '  ' + pad('PROJETO', 16) + pad('MODELO', 13) + pad('DURAÇÃO', 9) + pad('TOKENS', 8) + lpad('CUSTO', 10) + lpad('VAZÃO', 11))),
+  ];
+  rows.forEach(([p, m, d, t, cost, v, sel]) => {
+    const k = m.startsWith('Codex') ? 'c' : m.startsWith('MiniMax') ? 'mm' : 'a';
+    const row = L(sel ? c('gd', '▸ ') : '  ', pad(p, 16), c(k, pad(m, 13)), pad(d, 9), pad(t, 8), c('b', lpad(cost, 10)), c('mu', lpad(v, 11)), ' ');
+    body.push(sel ? wrap('sel', row) : row);
+  });
+  body.push(L(c('mu', '  + MiniMax M3 não tem tarifa na tabela; o custo mostrado é parcial')));
+  body.push(L(''));
+  body.push(L(c('bd', '── '), c('b', 'usage-monitor · Opus 5.5'), c('mu', ' · iniciada 13:02 BRT · 87 turnos '), c('bd', rep('─', 30))));
+  const seg = (n, k) => c(k, rep('█', n));
+  body.push(L(c('mu', 'composição  '), seg(3, 'in'), seg(2, 'out'), seg(30, 'crd'), seg(3, 'cwr'), c('dim', rep('░', 2)), '  ', c('in', '■'), ' entrada 6%  ', c('out', '■'), ' saída 3%'));
+  body.push(L(c('mu', '            '), rep(' ', 42), c('crd', '■'), ' cache lido 84%  ', c('cwr', '■'), ' cache gravado 7%'));
+  body.push(L(c('mu', 'contexto    '), bar(68, 40, 'a'), '  ', c('b', '136 k'), c('mu', ' de 200 k')));
+  return frame(1, body, L(key('↑↓', 'sessão'), key('←→', 'período'), key('enter', 'turnos'), key('e', 'CSV'), ...commonKeys));
+};
+
+S.history = () => {
+  const body = [
+    L(c('mu', 'janela '), wrap('sel', c('b', ' 24 h ')), c('mu', '  7 dias  30 dias'), c('mu', lpad('uma célula = meia hora', 55))),
+    L(''),
+  ];
+  const sets = [
+    ['Claude Team 5h', 'a', series(20, [8, 20, 34], 91), [8, 20, 34], 91],
+    ['Claude Max 5h', 'a', series(5, [6, 18, 31, 43], 62), [6, 18, 31, 43], 62],
+    ['Codex 5h', 'c', series(2, [12, 26, 40], 24), [12, 26, 40], 24],
+    ['MiniMax 5h', 'mm', series(1, [10, 24, 38], 28), [10, 24, 38], 28],
+  ];
+  for (const [n, k, v, r, p] of sets){
+    const [sc, sw] = st(p);
+    body.push(L(c(k, pad(n, 16)), spark(v, k, r), '  ', c('b', lpad(p + '%', 4)), ' ', c(sc, sw)));
+  }
+  body.push(L(c('mu', rep(' ', 16) + '15h   17h   19h   21h   23h   01h   03h   05h   07h   09h   11h   13h')));
+  body.push(L(''));
+  body.push(L(c('mu', '┆ reinício da janela · altura = uso da janela · cor = fonte')));
+  body.push(L(c('mu', 'o pico de hoje foi entre 10h e 14h BRT; a madrugada ficou quase parada')));
+  return frame(2, body, L(key('←→', 'janela'), key('↑↓', 'cota'), ...commonKeys));
+};
+
+S.team = () => {
+  const people = [
+    ['Ana',   'ok', 'claude · agora',   71, 48, 'US$ 12,40'],
+    ['Bruno', 'ok', 'codex · 3 min',    33, 61, 'US$ 4,95'],
+    ['Carla', 'ok', 'claude · 8 min',   92, 80, 'US$ 18,10'],
+    ['Diego', 'mu', 'ausente · 2h10',   12, 22, 'US$ 0,80'],
+    ['Elisa', 'ok', 'opencode · agora', 45, 30, 'US$ 2,35'],
+    ['Fábio', 'mu', 'ausente · ontem',   0,  9, 'US$ 0,00'],
+  ];
+  const body = [
+    L(c('b', 'dev-core'), c('mu', lpad('6 pessoas · 4 ativas agora', 85))),
+    L(''),
+    L(c('mu b', '  ' + pad('PESSOA', 9) + pad('AGORA', 19) + pad('CLAUDE 5h', 22) + pad('7d', 7) + lpad('HOJE', 10))),
+  ];
+  for (const [n, s, now, p5, p7, cost] of people){
+    const [sc, sw] = st(p5);
+    body.push(L(c(s, s === 'ok' ? '●' : '○'), ' ', c('b', pad(n, 9)), c('mu', pad(now, 19)), bar(p5, 10, 'a'), ' ', c('b', lpad(p5 + '%', 4)), ' ', p5 >= 70 ? c(sc, pad(sw.slice(0, 4), 5)) : pad('', 5), ' ', lpad(p7 + '%', 4), '   ', c('b', lpad(cost, 10))));
+  }
+  body.push(L(''));
+  body.push(L(c('mu', '● ativo · ○ ausente · custo calculado no seu computador · nunca prompt nem resposta')));
+  return frame(3, body, L(key('↑↓', 'pessoa'), key('t', 'troca de time'), ...commonKeys));
+};
+
+S.keys = () => {
+  const lines = [
+    L(c('b', 'Em qualquer aba'), rep(' ', 14), c('b', 'Dentro das listas')),
+    L(''),
+    L(c('gd', pad('1 a 5', 9)), pad('troca de aba', 20), c('gd', pad('↑ ↓', 9)), 'move a seleção'),
+    L(c('gd', pad('r', 9)), pad('lê de novo agora', 20), c('gd', pad('enter', 9)), 'abre o detalhe'),
+    L(c('gd', pad('?', 9)), pad('esta ajuda', 20), c('gd', pad('← →', 9)), 'período ou valor'),
+    L(c('gd', pad('q', 9)), pad('sai', 20), c('gd', pad('espaço', 9)), 'liga e desliga'),
+    L(''),
+    L(c('mu', 'Na aba 5 dá para mudar tudo o que as Configurações')),
+    L(c('mu', 'do app mudam, menos tema e HUD.')),
+  ];
+  const help = box('Ajuda', 'gd b', lines, 60);
+  const body = [L('')];
+  help.forEach(l => body.push(L(rep(' ', 15), l)));
+  body.push(L(''));
+  return frame(0, body, L(key('esc', 'fecha a ajuda'), ...commonKeys));
+};
+
+S.appClosed = () => render([
+  sh('usage-monitor status'),
+  L(c('wa', '▲ '), 'Nada está coletando. Mostrando a última leitura, de ', c('b', '14:05 BRT'), ' (18 min atrás).'),
+  L(c('mu', '  Abra o app ou rode usage-monitor service start. Até lá os números não mudam.')),
+  L(''),
+  L(' ', c('a', pad('● Claude Max', 14)), ' 5h  ', bar(58, 20, 'a'), ' ', c('b', ' 58%'), '  ', c('ok', 'em dia '), '  16:40 BRT'),
+  L(' ', c('a', pad('● Claude Team', 14)), ' 5h  ', bar(88, 20, 'a'), ' ', c('b', ' 88%'), '  ', c('wa', 'atenção'), '  15:10 BRT'),
+  L(c('mu', '  …')),
+  L(''),
+  sh('usage-monitor status --max-age 10m; echo $?'),
+  L(c('cr', 'sem leitura'), '  a última tem 18 min, mais que os 10 min pedidos'),
+  L(c('b', '3')),
+]);
+S.fetchFailed = () => frame(0,
+  overviewBody([L(c('wa', '▲ '), 'A leitura das 14:22 falhou (limite da API).'), L(c('mu', '  Mostrando os números de 14:12; tenta de novo às 14:27.'))]),
+  L(key('↑↓', 'fonte'), key('enter', 'abre a conta'), ...commonKeys),
+  'leitura de 14:12', 'wa');
+
+// ── configuração ──
+S.setup = () => render([
+  sh('usage-monitor setup'),
+  L(c('gd b', 'Usage Monitor 41.11.0'), c('mu', ' · configuração inicial · dados em ~/.usage-monitor')),
+  L(''),
+  L(c('b', '1/5  Contas encontradas neste computador')),
+  L('     ', c('ok', '✓'), ' ', c('a', pad('Claude Code', 13)), c('mu', pad('~/.claude/.credentials.json', 31)), 'plano Max'),
+  L('     ', c('ok', '✓'), ' ', c('c', pad('Codex', 13)), c('mu', pad('~/.codex/auth.json', 31)), 'plano Plus'),
+  L('     ', c('mu', '–'), ' ', c('cu', pad('Cursor', 13)), c('mu', 'não encontrado: o editor não está instalado aqui')),
+  L('     Monitorar as duas contas? ', c('mu', '[S/n]'), ' s'),
+  L(''),
+  L(c('b', '2/5  Chaves de API'), c('mu', ' · enter pula · a chave não aparece na tela')),
+  L('     ', pad('MiniMax', 13), 'chave: ', c('mu', '••••••••••••••••'), '   ', c('ok', '✓ testada'), c('mu', ' · 4.500 requisições por 5 h')),
+  L('     ', pad('DeepSeek', 13), 'chave: ', c('mu', '(enter)'), '            ', c('mu', 'pulada')),
+  L('     ', pad('OpenCode Go', 13), 'chave: ', c('mu', '••••••••••••'), '       ', c('ok', '✓ testada')),
+  L(c('mu', '     Salvas em ~/.usage-monitor/api-keys.json, legível só pelo seu usuário.')),
+  L(''),
+  L(c('b', '3/5  Avisos')),
+  L('     Limiares de atenção e crítico ', c('mu', '[70,90]'), ': ', c('mu', '(enter)')),
+  L('     Avisar pelo Telegram? ', c('mu', '[s/N]'), ' s ', c('mu', '→ continua em usage-monitor telegram pair')),
+  L(''),
+  L(c('b', '4/5  Idioma'), ' ', c('mu', '[pt/en] (pt)'), ': ', c('mu', '(enter)')),
+  L(''),
+  L(c('b', '5/5  Segundo plano')),
+  L('     Instalar como serviço que inicia com o sistema? ', c('mu', '[S/n]'), ' s'),
+  L('     ', c('ok', '✓'), ' serviço instalado e ativo · primeira leitura em 3 s'),
+  L(''),
+  L(c('ok', 'Pronto.'), ' Veja com ', c('b', 'usage-monitor status'), ' ou ', c('b', 'usage-monitor tui'), '.'),
+]);
+
+S.settings = () => {
+  const LW = 21;
+  const secs = ['Fontes e chaves', 'Contas', 'Alertas', 'Coleta', 'Telegram', 'Time', 'Rede e proxy', 'Acesso web', 'Sistema'];
+  const left = [L(c('mu b', 'SEÇÕES')), L('')];
+  secs.forEach((n, i) => { const row = L(i === 2 ? c('gd', '▸ ') : '  ', n); left.push(i === 2 ? wrap('sel', fit(row, LW - 1)) : row); });
+  const chk = on => on ? c('ok', '[x]') : c('mu', '[ ]');
+  const right = [
+    L(c('b', 'Alertas'), c('mu', lpad('muda na hora, sem reiniciar o serviço', 61))),
+    L(''),
+    L(chk(true), ' Avisar quando a cota cruzar um limiar'),
+    wrap('sel', fit(L('    limiares   ', c('gd', '‹'), c('b', ' 70 '), c('gd', '›'), '  ', c('gd', '‹'), c('b', ' 90 '), c('gd', '›'), ' %', c('mu', '     ←→ muda o valor')), 70)),
+    L(chk(true), ' Avisar quando a cota reiniciar'),
+    L(chk(false), ' Lembrar antes de a cota reiniciar', c('mu', '           30 min antes')),
+    L(chk(true), ' Avisar quando uma sessão CLI saturar'),
+    L(chk(true), ' Avisar quando uma sessão CLI ficar sem resposta'),
+    L(chk(true), ' Avisar quando o consumo do dia fugir do habitual'),
+    L(chk(false), ' Silenciar num período do dia', c('mu', '                22:00 – 07:00')),
+    L('    teto mensal   ', c('bd', '['), ' US$ 200      ', c('bd', ']'), c('mu', '  vazio desliga')),
+    L(''),
+    L(c('mu b', 'PARA ONDE VÃO OS AVISOS')),
+    L(chk(true), ' Telegram', c('mu', '   pareado · t envia uma mensagem de teste')),
+    L(chk(false), ' Bandeja ', c('mu', '   indisponível: este computador não tem tela')),
+  ];
+  const rows = Math.max(left.length, right.length);
+  const body = [];
+  for (let r = 0; r < rows; r++) body.push(L(fit(left[r] || L(''), LW), c('bd', '│'), ' ', right[r] || L('')));
+  return frame(4, body, L(key('↑↓', 'campo'), key('espaço', 'liga/desliga'), key('←→', 'valor'), key('tab', 'seção'), key('esc', 'desfaz'), key('?', 'ajuda'), key('q', 'sair')));
+};
+
+S.config = () => render([
+  sh('usage-monitor config list alerts'),
+  L(c('mu', pad('alerts.quota.enabled', 30)), 'true'),
+  L(c('mu', pad('alerts.quota.thresholds', 30)), '70,90'),
+  L(c('mu', pad('alerts.reset.enabled', 30)), 'true'),
+  L(c('mu', pad('alerts.reminder.minutes', 30)), c('mu', 'desligado')),
+  L(c('mu', pad('alerts.quiet', 30)), c('mu', 'desligado'), c('mu', ' (22:00-07:00)')),
+  L(c('mu', pad('budget.monthlyUsd', 30)), '200'),
+  L(''),
+  sh('usage-monitor config set alerts.quota.thresholds 75,95'),
+  L(c('ok', '✓ '), 'alerts.quota.thresholds = 75,95', c('mu', ' · o serviço já está usando')),
+  L(''),
+  sh('usage-monitor keys set minimax'),
+  L('Cole a chave e tecle enter ', c('mu', '(não aparece na tela nem vai para o histórico do shell):')),
+  L(c('ok', '✓ '), 'chave salva e testada', c('mu', ' · 4.500 requisições por 5 h')),
+  L(''),
+  sh('usage-monitor accounts add anthropic --label trabalho \\'),
+  L('    --credentials /srv/claude-work/.credentials.json'),
+  L(c('ok', '✓ '), 'conta ', c('a', 'Claude Team'), ' adicionada como ', c('b', 'trabalho'), c('mu', ' · primeira leitura na próxima coleta')),
+  L(''),
+  sh('usage-monitor accounts list'),
+  L(c('mu b', ' ' + pad('FONTE', 11) + pad('APELIDO', 10) + pad('ORIGEM', 38) + 'ESTADO')),
+  L(' ', c('a', pad('Anthropic', 11)), pad('pessoal', 10), c('mu', pad('~/.claude/.credentials.json', 38)), c('ok', 'pronta')),
+  L(' ', c('a', pad('Anthropic', 11)), pad('trabalho', 10), c('mu', pad('/srv/claude-work/.credentials.json', 38)), c('ok', 'pronta')),
+  L(' ', c('c', pad('Codex', 11)), pad('padrão', 10), c('mu', pad('~/.codex/auth.json', 38)), c('ok', 'pronta')),
+  L(' ', c('c', pad('Codex', 11)), pad('cliente', 10), c('mu', pad('~/.codex-cliente/auth.json', 38)), c('wa', 'login vencido')),
+]);
+
+S.service = () => render([
+  sh('usage-monitor service install'),
+  L(c('ok', '✓ '), 'serviço criado em ', c('mu', '~/.config/systemd/user/usage-monitor.service')),
+  L(c('ok', '✓ '), 'ativo e marcado para iniciar com o sistema'),
+  L(c('wa', '▲ '), 'Para continuar rodando depois que você sair do SSH, rode uma vez:'),
+  L('    sudo loginctl enable-linger dev'),
+  L(''),
+  sh('usage-monitor service status'),
+  L(c('ok', '● '), c('b', 'usage-monitor'), c('ok', ' ativo'), c('mu', ' há 3d04h · pid 4121 · 182 MB')),
+  L(c('mu', pad('  coleta', 14)), 'última 14:23:12 BRT · próxima 14:24 · 9 cotas, ', c('cr', '1 crítica')),
+  L(c('mu', pad('  fontes', 14)), c('ok', '✓'), ' Claude Max  ', c('ok', '✓'), ' Claude Team  ', c('ok', '✓'), ' Codex  ', c('wa', '▲'), ' Codex cliente  ', c('ok', '✓'), ' MiniMax  ', c('ok', '✓'), ' OpenCode Go'),
+  L(c('mu', pad('  histórico', 14)), '~/.usage-monitor/history.db · 38 dias · 41 MB'),
+  L(c('mu', pad('  telegram', 14)), 'pareado · último aviso 13:51 BRT'),
+  L(c('mu', pad('  time', 14)), 'enviado há 12 s para time.exemplo.com'),
+  L(c('mu', pad('  acesso web', 14)), 'http://10.0.0.12:8787 · exige o token'),
+  L(c('mu', pad('  versão', 14)), '41.11.0 · instalado pelo .deb ', c('mu', '(atualize com o apt)')),
+  L(''),
+  sh('ssh dev@servidor -t usage-monitor tui'),
+  L(c('mu', '  de outro computador: o modo interativo inteiro pelo SSH')),
+]);
+
+S.alertsLog = () => render([
+  sh('usage-monitor telegram pair'),
+  L('No Telegram, abra o seu bot e envie: ', c('b', '/parear 482-917')),
+  L(c('mu', 'aguardando… '), c('ok', '✓ pareado'), ' · mandei uma mensagem de teste'),
+  L(''),
+  sh('usage-monitor alerts --today'),
+  L(c('mu b', ' ' + pad('HORA', 7) + pad('TIPO', 11) + pad('AVISO', 42) + 'DESTINO')),
+  L(' ', pad('13:51', 7), c('cr', pad('crítico', 11)), pad('Claude Team 5h passou de 90%', 42), 'telegram ', c('ok', '✓')),
+  L(' ', pad('11:02', 7), c('wa', pad('atenção', 11)), pad('Cursor mês passou de 70%', 42), 'telegram ', c('ok', '✓')),
+  L(' ', pad('09:00', 7), c('ok', pad('reinício', 11)), pad('Claude Max 7d reiniciou', 42), 'telegram ', c('ok', '✓')),
+  L(' ', pad('03:10', 7), c('mu', pad('silêncio', 11)), pad('2 avisos adiados para as 07:00', 42), c('mu', 'adiado')),
+  L(''),
+  L(c('mu', ' Sem tela não há bandeja: os avisos vão para o Telegram e ficam neste registro.')),
+  L(c('mu', ' Com o modo interativo aberto, o aviso também aparece numa faixa no topo.')),
+]);
+
+S.mapping = () => {
+  const rows = [
+    ['Aparência', '<b>Idioma</b>: aba 5 › Sistema, ou <code>config set language en</code>.', '<span class="na">Tema, HUD, escala e janela não se aplicam. O terminal usa as cores dele.</span>'],
+    ['Sistema', '<b>Iniciar com o sistema</b>: <code>service install</code>. <b>Atualizações e canal beta</b>: <code>update</code> e <code>config set updates.beta</code>. <b>Diagnóstico</b>: <code>--diagnostics</code>, que já existe.', 'Instalado por pacote, a atualização é pelo apt ou dnf, como hoje.'],
+    ['Coleta', '<b>Ritmo da coleta</b>: aba 5 › Coleta, ou <code>config set refresh.*</code>.', 'Mantém o backoff em 429 e o ritmo por sessão ativa.'],
+    ['Alertas', '<b>Todos os avisos, o silêncio e o teto mensal</b>: aba 5 › Alertas, ou <code>config set alerts.*</code>.', 'Sem tela, o destino é o Telegram e o registro do <code>alerts</code>.'],
+    ['Bot do Telegram', '<b>Token, pareamento e opções</b>: <code>telegram setup</code>, <code>telegram pair</code> e <code>telegram test</code>.', 'O token fica em <code>telegram.json</code>, como hoje.'],
+    ['APIs', '<b>Fontes monitoradas</b>: <code>sources enable|disable</code>. <b>Chaves</b>: <code>keys set|test|remove</code>.', 'A chave é lida da entrada, nunca de argumento ou variável de ambiente.'],
+    ['Contas', '<b>Anthropic e Codex extras</b>: <code>accounts list|add|rename|remove|rescan</code>.', 'Cor e emoji por conta só aparecem no app.'],
+    ['Time', '<b>Servidor, chave e apelido</b>: <code>team join</code>, <code>team status</code> e <code>team leave</code>.', 'A chave fica em <code>team.json</code>, como hoje.'],
+    ['Rede', '<b>Proxy</b>: <code>config set proxy.*</code>. <b>Acesso pela rede local</b>: <code>web enable</code> e <code>web token</code>.', 'O proxy só vale depois de <code>service restart</code>, a mesma regra do app.'],
+  ];
+  return `<div class="tablewrap"><table class="maptable">
+    <thead><tr><th>Aba no app</th><th>No terminal</th><th>Observação</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+};
+
+S.modes = () => {
+  const t5 = q('Claude Team', '5h'), x5 = q('Codex', '5h');
+  const color = render([
+    L(c('a', '● '), pad('Claude Team', 12), '5h ', bar(t5.p, 20, 'a'), ' ', c('b', '91%'), ' ', c('cr', 'crítico')),
+    L(c('c', '● '), pad('Codex', 12), '5h ', bar(x5.p, 20, 'c'), ' ', c('b', '24%'), ' ', c('ok', 'em dia')),
+  ]);
+  const ascii = p => '[' + rep('#', Math.round(p / 5)) + rep('-', 20 - Math.round(p / 5)) + ']';
+  const mono = render([
+    L('* ', pad('Claude Team', 12), '5h ', ascii(91), ' ', c('b', '91%'), ' CRITICO'),
+    L('  ', pad('Codex', 12), '5h ', ascii(24), ' ', c('b', '24%'), ' em dia'),
+  ]);
+  return `<div class="modes">
+    <figure><figcaption>terminal escuro, truecolor</figcaption><div class="win scroll"><pre class="term pal-dark">${color}</pre></div></figure>
+    <figure><figcaption>terminal claro, truecolor</figcaption><div class="win scroll"><pre class="term pal-light">${color}</pre></div></figure>
+    <figure><figcaption>terminal antigo, 16 cores</figcaption><div class="win scroll"><pre class="term pal-16">${color}</pre></div></figure>
+    <figure><figcaption>NO_COLOR ou TERM=dumb, só ASCII</figcaption><div class="win scroll"><pre class="term pal-mono pal-dark">${mono}</pre></div></figure>
+  </div>`;
+};
+
+// ── o percurso ──
+const PARTS = [
+  { id: 'parte1', step: 'Parte 1', title: 'Sem abrir nada',
+    text: 'O uso aparece dentro do programa onde a pessoa já está. É a parte que mais gente vai usar, porque não exige lembrar de nenhum comando.',
+    screens: [
+      { id: 's11', num: '1.1', title: 'Linha de status do Claude Code', win: 'claude — ~/workspace/usage-monitor', body: S.statusline,
+        text: 'Embaixo da caixa de prompt: a conta que <b>este</b> Claude Code está usando, as duas janelas, o custo da sessão atual e a vazão. Atualiza a cada mensagem.',
+        snippet: '<span class="k">// ~/.claude/settings.json — uma vez só</span>\n"statusLine": { "type": "command", "command": "usage-monitor statusline claude-code" }' },
+      { id: 's12', num: '1.2', title: 'A mesma linha quando a cota aperta', win: 'claude — ~/workspace/trabalho', body: S.statuslineCrit,
+        text: 'Passou do limiar de atenção ou de crítico, a linha escreve o estado e o tempo até reiniciar. A cor acompanha, mas nunca é o único aviso.' },
+      { id: 's13', num: '1.3', title: 'Barra do tmux', win: 'tmux — dev', body: S.tmux,
+        text: 'Para quem divide o terminal entre Claude Code, Codex e editor. Cada conta tem uma sigla e o número, e o estado só aparece escrito quando importa.',
+        snippet: "<span class=\"k\"># ~/.tmux.conf</span>\nset -g status-right '#(usage-monitor statusline tmux)'" },
+    ] },
+  { id: 'parte2', step: 'Parte 2', title: 'Comandos',
+    text: 'Para perguntar algo e receber a resposta na hora, ou para usar em scripts. Os comandos novos entram ao lado das opções que já existem.',
+    screens: [
+      { id: 's21', num: '2.1', title: 'A ajuda com os comandos novos', win: 'bash', body: S.help,
+        text: 'O <code>--help</code> de hoje ganha a seção <b>Comandos</b>. As opções atuais não mudam, e <code>usage-monitor</code> sem nada continua abrindo o app.' },
+      { id: 's22', num: '2.2', title: 'Ver todas as cotas', win: 'bash', body: S.status,
+        text: 'Uma linha por cota, na mesma ordem do app, com barra na cor da fonte, estado e reinício. O rodapé diz de quando é a leitura e resume os estados.' },
+      { id: 's23', num: '2.3', title: 'Usar em scripts', win: 'bash', body: S.scripts,
+        text: '<b>--json</b> para filtrar, <b>check</b> para decidir pelo código de saída, e <b>wait</b> para segurar uma tarefa longa até a janela reiniciar.' },
+    ] },
+  { id: 'parte3', step: 'Parte 3', title: 'Modo interativo',
+    text: 'usage-monitor tui abre uma tela cheia com cinco abas, sempre na mesma moldura: o título, as abas no alto e os atalhos no rodapé. Muda a aba, a moldura fica. A aba 5, Configurações, está na parte 4.',
+    screens: [
+      { id: 's31', num: '3.1', title: 'Aba 1 · Visão geral', win: 'usage-monitor tui', body: S.overview,
+        text: 'As fontes à esquerda e o detalhe da escolhida à direita: as janelas, os créditos, a sessão ativa e as últimas 24 h.' },
+      { id: 's32', num: '3.2', title: 'Aba 2 · Sessões', win: 'usage-monitor tui', body: S.sessions,
+        text: 'As sessões CLI do período, com custo e vazão. Embaixo, a composição de tokens e o contexto da sessão selecionada. É a janela de sessões do app.' },
+      { id: 's33', num: '3.3', title: 'Aba 3 · Histórico', win: 'usage-monitor tui', body: S.history,
+        text: 'Uma trilha por cota, com os reinícios da janela marcados. As setas trocam entre 24 horas, 7 dias e 30 dias.' },
+      { id: 's34', num: '3.4', title: 'Aba 4 · Time', win: 'usage-monitor tui', body: S.team,
+        text: 'Só aparece para quem usa a integração com time. Mostra quem está ativo e em qual CLI, as cotas e o custo do dia. Pessoas e valores de exemplo.' },
+      { id: 's35', num: '3.5', title: 'Ajuda (tecla ?)', win: 'usage-monitor tui', body: S.keys,
+        text: 'Todos os atalhos numa caixa só. O modo terminal não muda configuração nenhuma: isso continua no app.' },
+    ] },
+  { id: 'parte4', step: 'Parte 4', title: 'Configuração',
+    text: 'Quem usa só o terminal configura tudo por ele: pelo assistente da primeira vez, pela aba Configurações do modo interativo ou por comandos, que servem para scripts e para montar vários servidores iguais. Os três mudam os mesmos arquivos que o app usa.',
+    screens: [
+      { id: 's41', num: '4.1', title: 'Primeira vez: o assistente', win: 'ssh dev@servidor', body: S.setup,
+        text: 'Encontra as contas do Claude Code e do Codex já logadas no computador, pede as chaves de API sem mostrá-las e testa cada uma. Depois pergunta pelos avisos e pelo idioma e oferece instalar o serviço. Pode ser refeito a qualquer momento.' },
+      { id: 's42', num: '4.2', title: 'Aba 5 · Configurações', win: 'usage-monitor tui', body: S.settings,
+        text: 'As mesmas seções das Configurações do app, numa lista à esquerda. Os campos mudam com as setas e o espaço, e o serviço passa a usar o valor na hora. Na imagem, a seção Alertas.' },
+      { id: 's43', num: '4.3', title: 'Os mesmos ajustes por comando', win: 'bash', body: S.config,
+        text: 'Cada ajuste tem um nome, para ler e mudar sem abrir tela nenhuma. A chave de API é lida da entrada, então não fica no histórico do shell nem na lista de processos.' },
+      { id: 's44', num: '4.4', title: 'Onde fica cada aba das Configurações do app', html: S.mapping,
+        text: 'A conferência de que nada ficou faltando: cada aba do app e o caminho dela no terminal.' },
+    ] },
+  { id: 'parte5', step: 'Parte 5', title: 'Servidor sem tela',
+    text: 'Num servidor, o serviço faz o papel do app: coleta, histórico, alertas, envio para o time, bot do Telegram e acesso pela rede. Você entra pelo SSH só para ver ou configurar.',
+    screens: [
+      { id: 's51', num: '5.1', title: 'Instalar e acompanhar o serviço', win: 'ssh dev@servidor', body: S.service,
+        text: 'Um comando cria o serviço do usuário e o liga com o sistema. O <b>service status</b> mostra a saúde de cada parte: última coleta, cada fonte, histórico, Telegram, time e acesso web.' },
+      { id: 's52', num: '5.2', title: 'Avisos sem bandeja', win: 'ssh dev@servidor', body: S.alertsLog,
+        text: 'O pareamento do Telegram sai pelo terminal, e o <b>alerts</b> mostra o que foi avisado, quando e para onde. O silêncio adia o aviso, não o descarta, como no app.' },
+    ] },
+  { id: 'parte6', step: 'Parte 6', title: 'Quando algo falha',
+    text: 'A mesma regra do app: uma leitura que falha mantém os números anteriores e diz de quando eles são. Nada some e nada é inventado.',
+    screens: [
+      { id: 's61', num: '6.1', title: 'Nada coletando', win: 'bash', body: S.appClosed,
+        text: 'Com o app fechado e sem serviço, o comando mostra a última leitura salva e avisa a idade dela. Num script, <b>--max-age</b> faz o comando falhar se a leitura for velha demais.' },
+      { id: 's62', num: '6.2', title: 'Leitura que falhou', win: 'usage-monitor tui', body: S.fetchFailed,
+        text: 'O título da moldura troca para a hora da leitura, e o detalhe explica o que houve e quando tenta de novo.' },
+    ] },
+  { id: 'parte7', step: 'Parte 7', title: 'Cores',
+    text: 'O tema do app adaptado ao terminal de cada pessoa. O fundo nunca é pintado e o estado sempre vem escrito, então nada depende só da cor.',
+    screens: [
+      { id: 's71', num: '7.1', title: 'O mesmo status em quatro terminais', html: S.modes,
+        text: 'Com truecolor, as cores do app. Em terminal claro, as versões claras. Com 16 cores, as mais próximas. Sem cor, as barras viram ASCII e o crítico fica em maiúsculas.' },
+    ] },
+];
+
+const host = document.getElementById('parts');
+for (const p of PARTS){
+  const sec = document.createElement('section');
+  sec.className = 'part'; sec.id = p.id;
+  let html = `<div class="part-head"><span class="step">${p.step}</span><h2>${p.title}</h2><p>${p.text}</p></div>`;
+  for (const s of p.screens){
+    const body = s.html ? s.html() : `<div class="win"><div class="win-bar"><i></i><i></i><i></i><span>${s.win}</span></div><div class="scroll"><pre class="term">${s.body()}</pre></div></div>`;
+    html += `<article class="screen" id="${s.id}">
+      <div class="screen-head"><span class="num">${s.num}</span><h3>${s.title}</h3></div>
+      <p>${s.text}</p>${body}${s.snippet ? `<pre class="snippet">${s.snippet}</pre>` : ''}</article>`;
+  }
+  sec.innerHTML = html;
+  host.appendChild(sec);
+}
+
+function toggle(id, cls){
+  const el = document.getElementById(id);
+  try { el.checked = localStorage.getItem('ag-' + cls) === '1'; } catch (e) {}
+  const apply = () => { document.body.classList.toggle(cls, el.checked); try { localStorage.setItem('ag-' + cls, el.checked ? '1' : '0'); } catch (e) {} };
+  el.addEventListener('change', apply); apply();
+}
+toggle('opt-light', 'tlight');
+toggle('opt-nocolor', 'nocolor');
+</script>

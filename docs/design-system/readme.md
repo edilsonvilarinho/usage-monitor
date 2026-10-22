@@ -242,7 +242,8 @@ permanent green dot is decoration.
 | Path | What it is |
 | --- | --- |
 | `styles.css` | Global entry point. `@import` lines only. |
-| `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base` |
+| `tokens/` | `fonts` `colors` `typography` `spacing` `shape` `motion` `base`, plus `terminal` (CLI only, not imported by `styles.css`) |
+| `cli/` | Terminal mode design system (CLI, status lines, `usage-monitor tui`, setup and headless service): foundations, glyphs, primitives, copy (PT). Screen mockups in `docs/planos/prototipo-modo-cli.html` |
 | `assets/` | App icon per size band (full name, initials, tray core), written by `render_icons.py` |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip · AppGlyphChip |

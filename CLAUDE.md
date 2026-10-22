@@ -316,6 +316,12 @@ com dona única (`cardActionsFor`); movimento contínuo só atrás de `AppMotion
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.
 
+**Modo terminal (CLI/TUI)**: design system próprio em [`docs/design-system/cli/`](docs/design-system/cli/readme.md)
+(tokens em `tokens/terminal.css`), mockup de cada tela em
+[`docs/planos/prototipo-modo-cli.html`](docs/planos/prototipo-modo-cli.html), com a mesma precedência e a mesma regra
+de registrar toda tela nos dois. Inegociáveis: fundo do terminal nunca pintado, estado sempre escrito, quatro paletas
+(truecolor escuro/claro, 16 cores, sem cor) e nenhum glifo fora da tabela.
+
 **Marca**: `tools/brand/render_icons.py` gera os ícones por tamanho lógico; janela e bandeja nunca usam o
 de 512 px (detalhes em [`docs/build-and-release.md`](docs/build-and-release.md)).
 

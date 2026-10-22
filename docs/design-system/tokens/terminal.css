@@ -1,0 +1,105 @@
+/* ── Terminal ────────────────────────────────────────────────────────────
+   Tokens do modo terminal (CLI e TUI), aprovados na rodada AG (2026-10-21).
+   Regras e primitivas em ../cli/readme.md; protótipo de cada tela em
+   docs/planos/prototipo-modo-cli.html.
+
+   Não entra no styles.css: estes nomes existem para o código que imprime em
+   terminal e para o protótipo, não para a interface Compose.
+
+   Quatro paletas, escolhidas pelo terminal da pessoa, nunca pelo tema do app:
+     1. truecolor escuro  — padrão quando COLORTERM é truecolor/24bit
+     2. truecolor claro   — quando o fundo do terminal é claro (COLORFGBG ou OSC 11)
+     3. 16 cores ANSI     — sem truecolor; o terminal decide o tom exato
+     4. sem cor           — NO_COLOR, TERM=dumb ou saída que não é um terminal
+
+   O fundo nunca é pintado: --term-bg só existe para o protótipo desenhar a
+   janela. Os acentos são os mesmos hexes de colors.css (identidade de fonte),
+   e por isso só há uma fonte de verdade para cada um.
+
+   Nomes no protótipo (curtos, para caber nas linhas de template):
+     --t-bg --t-fg --t-mu --t-dim --t-bd --t-sel  →  --term-bg … --term-selection
+     --a --c --oc --cu --mm --ds                   →  --term-anthropic … --term-deepseek
+     --ok --wa --cr                                →  --term-ok --term-warn --term-crit
+     --in --out --crd --cwr --gd                   →  --term-input … --term-gold
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  /* 1. truecolor escuro */
+  --term-bg:        #131010; /* só no protótipo */
+  --term-fg:        #F2EDED;
+  --term-muted:     #B8B2B2; /* rótulos, unidades, rodapés */
+  --term-dim:       #4A4444; /* parte vazia da barra (░) */
+  --term-border:    #5A5353; /* molduras e caixas */
+  --term-selection: #2A2626; /* item selecionado e aba ativa: o único fundo pintado */
+  --term-gold:      #E8AE63; /* marca: título da moldura, ▸, aba ativa, teclas da ajuda */
+
+  --term-ok:   #4CAF50;
+  --term-warn: #FFA726;
+  --term-crit: #E86A6A;
+
+  --term-anthropic:  #4F8CFF;
+  --term-codex:      #27BFA3;
+  --term-oc:         #7BD389;
+  --term-cursor:     #C7E9A5;
+  --term-minimax:    #FF8A3D;
+  --term-deepseek:   #C084FC;
+  --term-kilo:       #E6D84E;
+  --term-openrouter: #FF6FA8;
+  --term-gemini:     #E2A5E9;
+
+  --term-input:  #4C8DFF;
+  --term-output: #B07CFF;
+  --term-cread:  #4CAF50;
+  --term-cwrite: #FFA726;
+}
+
+/* 2. truecolor claro: os acentos claros de colors.css */
+[data-term-palette="light"] {
+  --term-bg:        #FFFCFC;
+  --term-fg:        #171414;
+  --term-muted:     #686060;
+  --term-dim:       #D7D0D0;
+  --term-border:    #B9B1B1;
+  --term-selection: #EFEAEA;
+  --term-gold:      #8C643F;
+
+  --term-ok:   #2E7D32;
+  --term-warn: #8A5000;
+  --term-crit: #B3261E;
+
+  --term-anthropic:  #1565C0;
+  --term-codex:      #00695C;
+  --term-oc:         #2E7D32;
+  --term-cursor:     #477915;
+  --term-minimax:    #9A4A00;
+  --term-deepseek:   #7B3FC4;
+  --term-kilo:       #5F5500;
+  --term-openrouter: #B23368;
+  --term-gemini:     #7C1D87;
+
+  --term-input:  #1565C0;
+  --term-output: #6A3FB5;
+  --term-cread:  #2E7D32;
+  --term-cwrite: #8A5000;
+}
+
+/* 3. 16 cores: o código emite o índice ANSI, não o hex. Os hexes abaixo são
+   só os de um terminal comum, para o protótipo. Mapa de cada token:
+     anthropic, input → azul (4/12)    codex → ciano (6/14)
+     oc, cread, ok    → verde (2/10)   minimax, cwrite, warn, gold → amarelo (3/11)
+     deepseek, output, gemini, openrouter → magenta (5/13)
+     crit → vermelho (1/9)   cursor, kilo → verde/amarelo claros (10/11)
+     muted → cinza (8)       dim, border → cinza (8) */
+[data-term-palette="ansi16"] {
+  --term-bg: #1E1E1E; --term-fg: #CCCCCC; --term-muted: #8A8A8A; --term-dim: #555555; --term-border: #777777;
+  --term-anthropic: #3B8EEA; --term-codex: #29B8DB; --term-ok: #23D18B; --term-warn: #E5E510; --term-crit: #F14C4C;
+}
+
+/* 4. sem cor: tudo na cor do texto. O estado continua escrito, as barras
+   viram ASCII ([####----]) e o crítico vai em maiúsculas (CRITICO). */
+[data-term-palette="mono"] {
+  --term-ok: var(--term-fg); --term-warn: var(--term-fg); --term-crit: var(--term-fg); --term-gold: var(--term-fg);
+  --term-anthropic: var(--term-fg); --term-codex: var(--term-fg); --term-oc: var(--term-fg); --term-cursor: var(--term-fg);
+  --term-minimax: var(--term-fg); --term-deepseek: var(--term-fg); --term-kilo: var(--term-fg);
+  --term-openrouter: var(--term-fg); --term-gemini: var(--term-fg);
+  --term-input: var(--term-fg); --term-output: var(--term-fg); --term-cread: var(--term-fg); --term-cwrite: var(--term-fg);
+}
