@@ -32,6 +32,9 @@ internal class TerminalConfigClient(
     private val sleep: (Long) -> Unit = Thread::sleep
 ) {
 
+    /** Quem coleta agora, pela mesma sonda que decide para onde a mudança vai. */
+    fun currentCollector(): CollectorKind? = collector()
+
     fun apply(change: ConfigChange): ConfigDelivery {
         val kind = collector()
         if (kind == null) {

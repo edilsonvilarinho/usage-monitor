@@ -2,7 +2,11 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
+import com.usagemonitor.domain.entity.TELEGRAM_PAIRING_TTL_MILLIS
+import com.usagemonitor.domain.entity.TelegramBotSettings
 import kotlinx.coroutines.flow.update
+import kotlin.time.Clock
 
 /**
  * O que o coletor faz depois de uma mudança, além de gravar: recoletar a fonte, reenviar
@@ -22,7 +26,8 @@ internal class ConfigHooks(
  */
 internal class ConfigApplier(
     private val store: AppSettingsStore,
-    private val hooks: ConfigHooks = ConfigHooks()
+    private val hooks: ConfigHooks = ConfigHooks(),
+    private val clock: Clock = Clock.System
 ) {
 
     private val accounts = ConfigAccounts(store, hooks)
@@ -39,6 +44,15 @@ internal class ConfigApplier(
                 is ConfigChange.AccountEnabled -> accounts.switch(change)
                 is ConfigChange.RemoveAccount -> accounts.remove(change)
                 ConfigChange.RescanAccounts -> accounts.rescan()
+                is ConfigChange.TelegramSetup -> telegramSetup(change)
+                is ConfigChange.TelegramEnabled -> telegramUpdate { current -> current.copy(enabled = change.enabled) }
+                ConfigChange.TelegramStartPairing -> telegramStartPairing()
+                is ConfigChange.TelegramRemoveChat -> telegramChat(change.chat) { current, id ->
+                    current.copy(authorizedChats = current.authorizedChats.filterNot { chat -> chat.id == id })
+                }
+                is ConfigChange.TelegramChatReadOnly -> telegramChat(change.chat) { current, id ->
+                    current.copy(authorizedChats = current.authorizedChats.map { chat -> if (chat.id == id) chat.copy(readOnly = change.readOnly) else chat })
+                }
             }
         }.getOrElse { error -> ConfigOutcome.Refused(ConfigRefusals.FAILED, error.message) }
         // O terminal que lê logo depois precisa ver o valor gravado (risco R2).
@@ -70,6 +84,39 @@ internal class ConfigApplier(
         return ConfigOutcome.Applied()
     }
 
+    private fun telegramSetup(change: ConfigChange.TelegramSetup): ConfigOutcome =
+        telegramUpdate { current -> current.copy(botToken = change.botToken.trim(), enabled = true) }
+
+    private fun telegramUpdate(transform: (TelegramBotSettings) -> TelegramBotSettings): ConfigOutcome {
+        updateTelegramSettings(store, transform)
+        return ConfigOutcome.Applied()
+    }
+
+    /**
+     * Abre um código por [TELEGRAM_PAIRING_TTL_MILLIS], como o "Parear" das Configurações
+     * (`TelegramBotActions.startPairing`); o anterior deixa de valer.
+     */
+    private fun telegramStartPairing(): ConfigOutcome {
+        if (store.telegramSettingsFlow.value.botToken.isBlank()) {
+            return ConfigOutcome.Refused(ConfigRefusals.NO_BOT_TOKEN)
+        }
+        val code = LocalTelegramSettingsDataSource.newPairingCode()
+        val expiresAt = clock.now().toEpochMilliseconds() + TELEGRAM_PAIRING_TTL_MILLIS
+        updateTelegramSettings(store) { current -> current.copy(enabled = true, pairingCode = code, pairingExpiresAtMillis = expiresAt) }
+        return ConfigOutcome.Applied(details = mapOf(DETAIL_CODE to code, DETAIL_EXPIRES_AT to expiresAt.toString()))
+    }
+
+    /** A conversa pelo id ou pelo nome (sem caixa e sem `@`). */
+    private fun telegramChat(reference: String, transform: (TelegramBotSettings, Long) -> TelegramBotSettings): ConfigOutcome {
+        val wanted = reference.trim().removePrefix("@")
+        val chats = store.telegramSettingsFlow.value.authorizedChats
+        val chat = chats.firstOrNull { candidate -> candidate.id.toString() == wanted }
+            ?: chats.filter { candidate -> candidate.name.removePrefix("@").equals(wanted, ignoreCase = true) }.singleOrNull()
+            ?: return ConfigOutcome.Refused(ConfigRefusals.UNKNOWN_CHAT, reference)
+        updateTelegramSettings(store) { current -> transform(current, chat.id) }
+        return ConfigOutcome.Applied(details = mapOf(DETAIL_CHAT to chat.name))
+    }
+
     private fun keySourceOf(name: String): ApiSource? =
         ApiSource.entries.firstOrNull { entry -> entry.name == name && entry in API_KEY_DEPENDENT_SOURCES }
 
@@ -99,6 +146,11 @@ internal class ConfigApplier(
         return ConfigOutcome.Applied()
     }
 }
+
+/** As chaves do que uma mudança aplicada devolve ([ConfigOutcome.Applied.details]). */
+internal const val DETAIL_CODE = "code"
+internal const val DETAIL_EXPIRES_AT = "expires_at"
+internal const val DETAIL_CHAT = "chat"
 
 /**
  * Atende os pedidos à espera no canal, na ordem de chegada: aplica, responde e avisa

@@ -58,10 +58,13 @@ internal object TerminalConfigView {
     fun warning(text: String, command: String?, glyphs: TerminalGlyphs): List<TerminalLine> {
         val lines = mutableListOf(terminalLine(TerminalSpan(glyphs.warning + " ", TerminalColor.Warn), TerminalSpan(text)))
         if (command != null) {
-            lines += terminalLine(TerminalSpan("    $command", bold = true))
+            lines += commandLine(command)
         }
         return lines
     }
+
+    /** Um comando para rodar, indentado e em negrito, abaixo de quem o pede. */
+    fun commandLine(command: String): TerminalLine = terminalLine(TerminalSpan("    $command", bold = true))
 
     /** `sources list`: fonte (na cor dela), id, estado e chave, na ordem do app. */
     fun sources(rows: List<TerminalSourceRow>, labels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {

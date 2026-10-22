@@ -12,6 +12,9 @@ import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
+import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.repository.resolveEffectiveProxy
+import com.usagemonitor.buildHttpClient
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.displayName
@@ -46,6 +49,9 @@ internal class TerminalConfigRunner(
     private val secretInput: TerminalSecretInput = TerminalSecretInput.SYSTEM,
     private val home: File = File(System.getProperty("user.home").orEmpty()),
     private val codexHome: File = CodexCliHomeProvider.resolve(),
+    private val telegramApi: () -> TelegramBotApi = {
+        TelegramBotApi(buildHttpClient(resolveEffectiveProxy(LocalProxySettingsDataSource(dataFile("proxy.json")).load())))
+    },
     private val keyProbe: (ApiSource, String) -> Throwable? =
         TerminalKeysRunner.realProbe { LocalProxySettingsDataSource(dataFile("proxy.json")).load() }
 ) {
@@ -60,6 +66,13 @@ internal class TerminalConfigRunner(
                 savedKey = { source -> LocalApiKeyDataSource(dataFile("api-keys.json")).load().forSource(source) },
                 probe = keyProbe
             ).run(command, labels, console.profile)
+            is TelegramCommand -> return TerminalTelegramRunner(
+                client,
+                collector = client::currentCollector,
+                settings = { LocalTelegramSettingsDataSource(dataFile("telegram.json")).load() },
+                api = telegramApi,
+                secretInput = secretInput
+            ).run(command, labels, console)
             is AccountsCommand -> TerminalAccountsRunner(
                 client, preferences, home, codexHome,
                 codexSourceEnabled = { ApiSource.CODEX in readApiSourceCollection(PreferencesSettings(preferences), ENABLED_APIS_KEY) },

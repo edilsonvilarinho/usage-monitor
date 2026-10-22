@@ -672,9 +672,17 @@ S.foreground = () => render([
 ]);
 
 S.alertsLog = () => render([
+  sh('usage-monitor telegram setup'),
+  L('Cole o token do bot (o que o @BotFather deu) e tecle enter (não aparece na tela):'),
+  L(c('ok', '✓ '), 'bot @uso_bot configurado e ligado', c('mu', ' · o serviço já está usando')),
+  L(c('mu', '  Pareie uma conversa com:')),
+  L(c('b', '    usage-monitor telegram pair')),
+  L(''),
   sh('usage-monitor telegram pair'),
-  L('No Telegram, abra o seu bot e envie: ', c('b', '/start K7P2QD')),
-  L(c('mu', 'aguardando… '), c('ok', '✓ pareado'), ' · mandei uma mensagem de teste'),
+  L(c('b', 'No Telegram, abra o seu bot (@uso_bot) e envie: /start K7P2QD')),
+  L(c('mu', '  ou abra https://t.me/uso_bot?start=K7P2QD')),
+  L(c('mu', 'aguardando… (o código vale até 14:33 BRT)')),
+  L(c('ok', '✓ '), 'pareado com @ed'),
   L(''),
   sh('usage-monitor alerts --today'),
   L(c('mu b', ' ' + pad('HORA', 7) + pad('TIPO', 11) + pad('AVISO', 42) + 'DESTINO')),

@@ -56,6 +56,33 @@ internal sealed interface ConfigChange {
     @SerialName("account_rescan")
     data object RescanAccounts : ConfigChange
 
+    /** `telegram setup`: o token do bot (já conferido no Telegram) e o bot ligado. */
+    @Serializable
+    @SerialName("telegram_setup")
+    data class TelegramSetup(val botToken: String) : ConfigChange {
+        override fun toString(): String = "TelegramSetup(botToken=${redactedSecret(botToken)})"
+    }
+
+    /** `telegram enable|disable`: o interruptor do bot nas Configurações. */
+    @Serializable
+    @SerialName("telegram_enabled")
+    data class TelegramEnabled(val enabled: Boolean) : ConfigChange
+
+    /** `telegram pair`: abre um código de pareamento; a resposta traz o código e quando vence. */
+    @Serializable
+    @SerialName("telegram_pairing")
+    data object TelegramStartPairing : ConfigChange
+
+    /** `telegram remove <conversa>`: a conversa deixa de ser atendida. */
+    @Serializable
+    @SerialName("telegram_chat_remove")
+    data class TelegramRemoveChat(val chat: String) : ConfigChange
+
+    /** `telegram readonly <conversa> on|off`: só leitura ou controle, como nas Configurações (#408, AA21). */
+    @Serializable
+    @SerialName("telegram_chat_readonly")
+    data class TelegramChatReadOnly(val chat: String, val readOnly: Boolean) : ConfigChange
+
     /**
      * `config set <ajuste> <valor>` ([ConfigKeys]). O valor de um ajuste secreto
      * (`proxy.password`) viaja aqui, então o `toString` o esconde.
@@ -95,6 +122,8 @@ internal object ConfigRefusals {
     const val UNKNOWN_ACCOUNT = "unknown_account"
     const val AMBIGUOUS_ACCOUNT = "ambiguous_account"
     const val DEFAULT_ACCOUNT = "default_account"
+    const val UNKNOWN_CHAT = "unknown_chat"
+    const val NO_BOT_TOKEN = "no_bot_token"
     const val FAILED = "failed"
 }
 
