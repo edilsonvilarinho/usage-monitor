@@ -29,7 +29,12 @@ protótipo [`prototipo-modo-cli.html`](prototipo-modo-cli.html). Regras e primit
 
 - **D1 · Biblioteca:** JLine 3, só para o terminal (modo cru, teclas, tamanho e redimensionamento). O
   desenho continua o da #439. Mosaic traria o runtime do Compose para a tela e um segundo jeito de desenhar;
-  Lanterna tem o próprio modelo de tela e de cor, que duplicaria as quatro paletas. Medição na A02.
+  Lanterna tem o próprio modelo de tela e de cor, que duplicaria as quatro paletas. **Medição (A02):**
+  `jline-terminal` 292 KB + `jline-terminal-jni` 51 KB + `jline-native` 190 KB = 533 KB na 3.30.17
+  (o pacote `org.jline:jline` inteiro tem 1,53 MB, com leitor de linha e shell que a TUI não usa);
+  Lanterna 3.1.3, 577 KB; Mosaic 0.18, 417 KB só o runtime, mais o Compose na tela. O JLine entra só
+  como terminal: as teclas são decodificadas pelo `TuiKeyDecoder` (função pura, `ESC [ A` e `ESC O A`,
+  a forma que o JLine gera no console do Windows pela terminfo `windows`), sem `jline-reader`.
 - **D2 · Dados em somente leitura:** `SqliteConnectionManager` ganha o modo somente leitura (sem schema, sem
   criar arquivo), e a TUI monta os repositórios e casos de uso do app sobre ele. Nenhuma requisição, exceto
   a aba Time (o mesmo `GET` da janela de time do app) e as mudanças da aba 5 (pelo canal da #440).
@@ -62,3 +67,4 @@ protótipo [`prototipo-modo-cli.html`](prototipo-modo-cli.html). Regras e primit
 | Item | Data | Commit | Resultado | Comando e evidência |
 | --- | --- | --- | --- | --- |
 | A01 | 2026-10-22 | `docs(cli): plan the interactive terminal mode (#441)` | concluída | Worktree `../usage-monitor-441`, branch `feat/issue-441-terminal-tui` a partir da `main` (`7c11e48c`, com a #440). Levantamento: telas 3.1–3.5, 4.2 e 6.2 do protótipo; `SqliteConnectionManager` roda o schema ao abrir (`onOpen`), por isso D2; `collector-health.json` e `dashboard-cache.json` já dão a 6.2. Só documentação; nenhum teste rodado |
+| A02 | 2026-10-22 | `feat(cli): open the interactive mode with its frame, tabs and help (#441)` | concluída | Moldura, abas, rodapé, caixa e lista/detalhe em `TuiFrame` (função pura, altura e largura exatas, 96 no máximo, empilhado abaixo de 80); estado e teclas em `TuiReducer`; teclas em `TuiKeyDecoder`; terminal em `JLineTuiIo` (modo cru, tela alternativa, cursor escondido, restauração também no shutdown hook). `gradlew desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.*CommandLine*"`: 224 testes, verdes depois de encurtar a linha do `tui` na ajuda (84 colunas no EN). `createDistributable` + tmux 96×26: moldura, `?`/`esc`, `3`, Ctrl+C devolvem o terminal. **Achado:** o runtime do jlink não tinha `jdk.unsupported` (`sun.misc.Signal`), e o SIGWINCH não chegava: o `tmux resize-window` deixava a tela velha. Entrou o módulo, e o laço também compara o tamanho a cada 200 ms. `tui < /dev/null \| cat` sai com 1 e a frase (6.3, novo no protótipo). O `pure virtual method called` impresso ao sair aparece também no `--version` da mesma distribuição local (runtime JDK 21 do jpackage local; a instalada, com 17, não imprime): não é da TUI |

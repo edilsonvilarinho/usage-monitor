@@ -54,6 +54,29 @@ data class TerminalLine(val spans: List<TerminalSpan>) {
         return if (missing > 0) TerminalLine(spans + TerminalSpan(" ".repeat(missing))) else this
     }
 
+    /** Corta em [maxWidth] células (#441): a moldura do modo interativo nunca quebra a linha. */
+    fun clip(maxWidth: Int): TerminalLine {
+        if (width <= maxWidth) {
+            return this
+        }
+        val kept = mutableListOf<TerminalSpan>()
+        var room = maxWidth.coerceAtLeast(0)
+        for (span in spans) {
+            if (room == 0) {
+                break
+            }
+            kept += if (span.text.length <= room) span else span.copy(text = span.text.take(room))
+            room -= kept.last().text.length
+        }
+        return TerminalLine(kept)
+    }
+
+    /** Exatamente [targetWidth] células: corta a mais larga e completa a mais curta. */
+    fun fit(targetWidth: Int): TerminalLine = clip(targetWidth).padEnd(targetWidth)
+
+    /** A linha inteira com o fundo de seleção (#441): item selecionado, aba ativa, linha em edição. */
+    fun selected(): TerminalLine = TerminalLine(spans.map { span -> span.copy(selected = true) })
+
     companion object {
         val EMPTY = TerminalLine(emptyList())
     }

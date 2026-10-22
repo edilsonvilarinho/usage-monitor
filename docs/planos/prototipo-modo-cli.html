@@ -527,6 +527,13 @@ S.fetchFailed = () => frame(0,
   overviewBody([L(c('wa', '▲ '), 'A leitura das 14:22 falhou (limite da API).'), L(c('mu', '  Mostrando os números de 14:12; tenta de novo às 14:27.'))]),
   L(key('↑↓', 'fonte'), key('enter', 'abre a conta'), ...commonKeys),
   'leitura de 14:12', 'wa');
+S.noTerminal = () => render([
+  sh('usage-monitor tui | less'),
+  L('O modo interativo precisa de um terminal. Para ler o uso num script, rode usage-monitor status.'),
+  L(''),
+  sh('usage-monitor tui'),
+  L(c('wa', 'O terminal tem 36x10; o modo interativo precisa de pelo menos 40x12.')),
+]);
 
 // ── configuração ──
 S.setup = () => render([
@@ -821,6 +828,8 @@ const PARTS = [
         text: 'Com o app fechado e sem serviço, o comando mostra a última leitura salva e avisa a idade dela. Num script, <b>--max-age</b> faz o comando falhar se a leitura for velha demais.' },
       { id: 's62', num: '6.2', title: 'Leitura que falhou', win: 'usage-monitor tui', body: S.fetchFailed,
         text: 'O título da moldura troca para a hora da leitura, e o detalhe explica o que houve e quando tenta de novo.' },
+      { id: 's63', num: '6.3', title: 'Terminal que não serve', win: 'bash', body: S.noTerminal,
+        text: 'Sem terminal (saída num pipe, entrada redirecionada, <code>TERM=dumb</code>), o <b>tui</b> diz o que usar e sai com 1. Terminal menor que 40×12 mostra só o tamanho que falta, sem moldura, e volta a desenhar quando a janela cresce.' },
     ] },
   { id: 'parte7', step: 'Parte 7', title: 'Cores',
     text: 'O tema do app adaptado ao terminal de cada pessoa. O fundo nunca é pintado e o estado sempre vem escrito, então nada depende só da cor.',

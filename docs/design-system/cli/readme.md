@@ -57,6 +57,8 @@ aqui, na seção Primitivas.
 
 - Modo interativo desenhado para **96 colunas** (94 internas). Abaixo de 96, a coluna de detalhe
   encolhe; abaixo de 80, lista e detalhe se empilham: a lista ocupa a tela e `enter` abre o detalhe.
+  Mais largo que 96, a moldura não cresce. A moldura ocupa a altura toda do terminal; abaixo de
+  40×12, só a frase que diz o tamanho que falta (6.3).
 - Comandos de uma tacada cabem em 100 colunas, e a linha de status também.
 
 ## Glifos
@@ -74,6 +76,7 @@ aqui, na seção Primitivas.
 | Valor ajustável | `‹ 70 ›` | `< 70 >` |
 | Legenda de série | `■` na cor da série | inicial da série |
 | Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
+| Sparkline (#441) | `▁▂▃▄▅▆▇█` na cor da fonte | `._-=+*#@` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 
@@ -129,6 +132,8 @@ separador e o corpo; no fim, outro separador e o rodapé de atalhos.
 **Abas** (3.1). Numeradas e fixas: `1 Visão geral`, `2 Sessões`, `3 Histórico`, `4 Time`,
 `5 Configurações`. A ativa vai em ouro e negrito sobre `--term-selection`, as outras em muted. Sem
 time configurado, a aba 4 não aparece e as outras **mantêm o número**: atalho não muda de tecla.
+Sem cor não há fundo de seleção: a ativa troca os espaços que a cercam por colchetes
+(`[1 Visão geral]`), com a mesma largura, para a linha não andar entre os modos.
 
 **Rodapé de atalhos** (3.1). A tecla em negrito, o rótulo em muted, dois espaços entre pares. Os
 atalhos da aba vêm primeiro, os comuns depois (`1–5 aba`, `r atualizar`, `? ajuda`, `q sair`).

@@ -1,0 +1,101 @@
+package com.usagemonitor.presentation.terminal
+
+import com.usagemonitor.domain.entity.CollectorKind
+import com.usagemonitor.presentation.ui.TelegramBotMessages
+import kotlin.time.Instant
+
+/**
+ * O que o modo interativo sabe da última leitura (#441). Cada aba lê só a parte dela; o
+ * leitor do `desktopMain` monta o valor a cada releitura (15 s, ou `r`).
+ */
+data class TuiData(
+    val now: Instant,
+    /** Quem coleta agora (app ou serviço); `null` quando nada coleta. */
+    val collector: CollectorKind?,
+    /** A coleta mais recente entre as contas; `null` sem leitura nenhuma. */
+    val lastCollectedAt: Instant?,
+    /** A última tentativa de coleta falhou em alguma fonte (6.2). */
+    val lastFailed: Boolean = false,
+    /** Com time configurado, a aba 4 aparece. */
+    val teamConfigured: Boolean = false
+)
+
+/** O corpo e os atalhos de uma aba; a moldura é a mesma para todas. */
+internal data class TuiTabView(val body: List<TerminalLine>, val shortcuts: List<TuiShortcut> = emptyList())
+
+/**
+ * A tela do modo interativo: a moldura com a aba ativa, ou a ajuda (3.5) no lugar do corpo.
+ * Função pura: o mesmo estado e os mesmos dados desenham a mesma tela.
+ */
+internal object TuiScreen {
+
+    fun context(data: TuiData, size: TuiSize): TuiContext = TuiContext(teamAvailable = data.teamConfigured, stacked = size.stacked)
+
+    fun render(state: TuiState, data: TuiData, size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {
+        if (size.tooSmall) {
+            return TuiFrame.tooSmall(size, labels)
+        }
+        val context = context(data, size)
+        val view = if (state.helpOpen) {
+            TuiTabView(help(size, labels, profile), listOf(TuiShortcut("esc", labels.keyCloseHelpLabel)))
+        } else {
+            tabView(state)
+        }
+        return TuiFrame.render(
+            size = size,
+            tabs = context.tabs,
+            active = state.tab,
+            status = status(data, labels),
+            body = view.body,
+            shortcuts = view.shortcuts + labels.commonShortcuts,
+            labels = labels,
+            profile = profile
+        )
+    }
+
+    /**
+     * O status da borda de cima. Ao vivo só com a coleta de pé e a última leitura certa; senão,
+     * a hora da leitura mostrada, em `--term-warn`: leitura velha nunca se passa por atual.
+     */
+    fun status(data: TuiData, labels: TuiLabels): TerminalSpan {
+        val last = data.lastCollectedAt ?: return TerminalSpan(labels.statusNoReading, TerminalColor.Warn)
+        if (data.collector != null && !data.lastFailed) {
+            return TerminalSpan(labels.statusLive(TelegramBotMessages.clock(data.now)), TerminalColor.Muted)
+        }
+        return TerminalSpan(labels.statusReadingOf(TelegramBotMessages.clock(last)), TerminalColor.Warn)
+    }
+
+    /** O corpo de cada aba entra com a atividade dela (A04 a A08 do plano da #441). */
+    private fun tabView(state: TuiState): TuiTabView =
+        when (state.tab) {
+            TuiTab.OVERVIEW, TuiTab.SESSIONS, TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> TuiTabView(emptyList())
+        }
+
+    /** A ajuda (3.5): todos os atalhos numa caixa, centrada no corpo. */
+    fun help(size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {
+        val keyWidth = 9
+        val descriptionWidth = 20
+        fun pair(leftKey: String, left: String, rightKey: String, right: String): TerminalLine =
+            terminalLine(
+                TerminalSpan(leftKey.padEnd(keyWidth), TerminalColor.Gold),
+                TerminalSpan(left.padEnd(descriptionWidth)),
+                TerminalSpan(rightKey.padEnd(keyWidth), TerminalColor.Gold),
+                TerminalSpan(right)
+            )
+        val lines = listOf(
+            terminalLine(TerminalSpan(labels.helpAnyTab.padEnd(keyWidth + descriptionWidth), bold = true), TerminalSpan(labels.helpInLists, bold = true)),
+            TerminalLine.EMPTY,
+            pair(labels.helpTabsKey, labels.helpTabs, "↑ ↓", labels.helpMove),
+            pair("r", labels.helpRefresh, "enter", labels.helpOpen),
+            pair("?", labels.helpHelp, "← →", labels.helpPeriod),
+            pair("q", labels.helpQuit, labels.helpSpaceKey, labels.helpToggle),
+            TerminalLine.EMPTY
+        ) + labels.helpSettingsNote.map { text -> terminalLine(TerminalSpan(text, TerminalColor.Muted)) }
+        val inner = (size.bodyWidth - 4).coerceAtMost(HELP_INNER_WIDTH)
+        val box = TuiFrame.box(TerminalSpan(labels.helpTitle, TerminalColor.Gold, bold = true), lines, inner, profile.glyphs.box)
+        val indent = TerminalSpan(" ".repeat(((size.bodyWidth - inner - 2) / 2).coerceAtLeast(0)))
+        return listOf(TerminalLine.EMPTY) + box.map { line -> terminalLine(indent) + line }
+    }
+
+    private const val HELP_INNER_WIDTH = 60
+}

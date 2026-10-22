@@ -78,6 +78,7 @@ internal object TerminalCommands {
             is ConfigCommand -> TerminalConfigRunner().run(command, languageOverride, console)
             SetupCommand -> TerminalSetupWiring.run(languageOverride, console)
             UpdateCommand -> TerminalUpdateCommand().run(languageOverride, console)
+            TuiCommand -> TuiWiring.run(languageOverride, console)
         }
     }
 

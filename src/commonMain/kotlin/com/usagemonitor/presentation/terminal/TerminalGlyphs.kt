@@ -24,7 +24,18 @@ data class TerminalGlyphs(
     /** Anel em quartos da linha de status; vazio no ASCII, onde o número basta. */
     val rings: String,
     /** Segredo salvo, no lugar do valor (#440): nunca o segredo. */
-    val secretMask: String = "••••"
+    val secretMask: String = "••••",
+    /** Moldura do modo interativo e caixa (#441), em cantos arredondados como o raio do app. */
+    val box: TerminalBoxGlyphs = TerminalBoxGlyphs.ROUNDED,
+    /** Item selecionado numa lista (#441), em ouro. */
+    val selection: String = "▸",
+    /** As setas de um valor ajustável, `‹ 70 ›` (#441). */
+    val adjustLeft: String = "‹",
+    val adjustRight: String = "›",
+    /** Legenda de série (#441); vazio no ASCII, que escreve a inicial da série. */
+    val legend: String = "■",
+    /** Os oito degraus da sparkline (#441), do mais baixo ao mais alto. */
+    val sparkLevels: String = "▁▂▃▄▅▆▇█"
 ) {
     /** O quarto de anel de [percent], ou `null` quando a coluna não tem anel. */
     fun ring(percent: Int): String? {
@@ -72,7 +83,33 @@ data class TerminalGlyphs(
             barOpen = "[",
             barClose = "]",
             rings = "",
-            secretMask = "****"
+            secretMask = "****",
+            box = TerminalBoxGlyphs.ASCII,
+            selection = ">",
+            adjustLeft = "<",
+            adjustRight = ">",
+            legend = "",
+            sparkLevels = "._-=+*#@"
         )
+    }
+}
+
+/**
+ * Os glifos de moldura e caixa (`cli/readme.md`, "Glifos", primeira linha): cantos, as duas
+ * linhas e as junções do separador. No ASCII, `+ - |`.
+ */
+data class TerminalBoxGlyphs(
+    val topLeft: Char,
+    val topRight: Char,
+    val bottomLeft: Char,
+    val bottomRight: Char,
+    val horizontal: Char,
+    val vertical: Char,
+    val teeLeft: Char,
+    val teeRight: Char
+) {
+    companion object {
+        val ROUNDED = TerminalBoxGlyphs('╭', '╮', '╰', '╯', '─', '│', '├', '┤')
+        val ASCII = TerminalBoxGlyphs('+', '+', '+', '+', '-', '|', '+', '+')
     }
 }

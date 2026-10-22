@@ -108,6 +108,12 @@ kotlin {
                 // JNA: o `_NET_WM_MOVERESIZE` do arrasto no COSMIC (#434). O AWT não
                 // expõe o X11, e as classes internas dele mudam a cada JDK.
                 implementation(libs.jna)
+
+                // JLine: o terminal do modo interativo (`usage-monitor tui`, #441) -- modo
+                // cru, teclas, tamanho e tela alternativa. So o terminal: o desenho continua
+                // o das primitivas da #439. Medicao da escolha no plano da #441 (D1).
+                implementation(libs.jline.terminal)
+                implementation(libs.jline.terminal.jni)
             }
         }
 
@@ -163,6 +169,10 @@ compose.desktop {
             // `jdk.httpserver`, presente no JDK das tres plataformas. Mesmo motivo
             // do `java.logging`: faltando, so o app empacotado quebraria.
             modules("jdk.httpserver")
+            // `sun.misc.Signal` (`jdk.unsupported`): o JLine do modo interativo (#441) ouve o
+            // SIGWINCH e o SIGINT por ele. Sem o modulo, o app empacotado nao percebe o
+            // terminal mudar de tamanho -- medido no `createDistributable` da A02.
+            modules("jdk.unsupported")
             // `Windows-ROOT` (repositório de certificados do Windows, issue #325) mora
             // em `jdk.crypto.mscapi`, que so existe no JDK do Windows: declarado sem
             // condicao, o jlink do build Linux/macOS falharia com modulo inexistente.
