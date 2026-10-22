@@ -1,7 +1,6 @@
 package com.usagemonitor.terminal
 
 import com.usagemonitor.data.datasource.LocalCollectorHealthDataSource
-import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorHealth
@@ -36,7 +35,8 @@ internal class TuiReader(
     private val reader: TerminalReader = TerminalReader(),
     /** Os bancos do app em somente leitura; sem eles, as abas que dependem deles ficam vazias. */
     private val stores: TuiStores? = null,
-    private val teamSettings: LocalTeamSettingsDataSource = LocalTeamSettingsDataSource(),
+    /** A aba 4; `null` sem os meios de ler o servidor do time. */
+    private val team: TuiTeamReader? = null,
     private val health: LocalCollectorHealthDataSource = LocalCollectorHealthDataSource(),
     private val languageOverride: AppLanguage? = null
 ) {
@@ -45,14 +45,13 @@ internal class TuiReader(
     /** Cada aba lê o que é dela: a Visão geral não paga a lista de sessões, e o contrário. */
     fun load(state: TuiState): TuiData {
         val reading = reader.read(languageOverride)
-        val team = teamSettings.peek()
         // A saúde só vale com coletor vivo: sem ele, o arquivo é de uma execução que já acabou.
         val collectorHealth = if (reading.collector != null) health.read() else null
         return TuiData(
             now = reading.now,
             collector = reading.collector,
             lastCollectedAt = reading.lastCollectedAt,
-            teamConfigured = team != null && team.enabled && team.normalizedServerUrl.isNotEmpty() && team.apiKey.isNotBlank(),
+            teamConfigured = team?.available() == true,
             accounts = reading.accounts.map { account ->
                 val overview = state.tab == TuiTab.OVERVIEW
                 TuiAccount(
@@ -63,7 +62,8 @@ internal class TuiReader(
                 )
             },
             sessions = if (state.tab == TuiTab.SESSIONS) sessionsReader?.load(state.sessions, reading.now) else null,
-            history = if (state.tab == TuiTab.HISTORY) history(reading.accounts, state.history.range, reading.now) else null
+            history = if (state.tab == TuiTab.HISTORY) history(reading.accounts, state.history.range, reading.now) else null,
+            team = if (state.tab == TuiTab.TEAM) team?.load(state.team, reading.now) else null
         )
     }
 

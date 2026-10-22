@@ -47,7 +47,8 @@ private data class TeamDto(
     @SerialName("active") val active: Boolean = false,
     @SerialName("server") val server: String? = null,
     @SerialName("last_success_at") val lastSuccessAt: Long? = null,
-    @SerialName("last_failure") val lastFailure: String? = null
+    @SerialName("last_failure") val lastFailure: String? = null,
+    @SerialName("clock_offset_ms") val clockOffsetMillis: Long = 0L
 )
 
 @Serializable
@@ -75,7 +76,7 @@ internal class LocalCollectorHealthDataSource(
                 nextCollectionAt = health.nextCollectionAtEpochMillis,
                 sources = health.sources.map { source -> SourceDto(source.source.name, source.label, source.ok, source.retryAtEpochMillis, source.target, source.failure) },
                 telegram = TelegramDto(health.telegram.state, health.telegram.botUsername, health.telegram.chatCount),
-                team = TeamDto(health.team.active, health.team.server, health.team.lastSuccessAtEpochMillis, health.team.lastFailure),
+                team = TeamDto(health.team.active, health.team.server, health.team.lastSuccessAtEpochMillis, health.team.lastFailure, health.team.clockOffsetMillis),
                 web = WebDto(health.web.state, health.web.port, health.web.addresses, health.web.failure)
             )
             file.parentFile?.mkdirs()
@@ -103,7 +104,7 @@ internal class LocalCollectorHealthDataSource(
                     CollectorSourceHealth(api, source.label, source.ok, source.retryAt, source.target, source.failure)
                 },
                 telegram = CollectorTelegramHealth(dto.telegram.state, dto.telegram.bot, dto.telegram.chats),
-                team = CollectorTeamHealth(dto.team.active, dto.team.server, dto.team.lastSuccessAt, dto.team.lastFailure),
+                team = CollectorTeamHealth(dto.team.active, dto.team.server, dto.team.lastSuccessAt, dto.team.lastFailure, dto.team.clockOffsetMillis),
                 web = CollectorWebHealth(dto.web.state, dto.web.port, dto.web.addresses, dto.web.failure)
             )
         }.getOrNull()

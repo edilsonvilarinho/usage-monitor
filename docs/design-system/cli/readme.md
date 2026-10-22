@@ -78,6 +78,7 @@ aqui, na seção Primitivas.
 | Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
 | Sparkline (#441) | `▁▂▃▄▅▆▇█` na cor da fonte | `._-=+*#@` |
 | Setas nos atalhos (#441) | `↑ ↓ ← →` | `^ v < >` |
+| Presença no time (#441) | `●` trabalhando e `◑` app aberto em verde, `○` ausente em muted | `*`, `+`, `-` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 
@@ -144,7 +145,8 @@ selecionado leva `▸` em ouro e fundo de seleção. Um divisor `│` e, à dire
 
 **Tabela** (3.2, 3.4). Cabeçalho em maiúsculas, muted e negrito. Números alinhados à direita e
 custo em negrito. A linha selecionada leva `▸` e fundo de seleção. Modelo sem tarifa leva `+` no
-custo, com nota de rodapé.
+custo, com nota de rodapé. Na 3.4, a marca de presença vem logo depois do `▸` e a palavra do estado
+está sempre escrita ao lado ("trabalhando · 1 sessão", "app aberto", "ausente · há 2 h").
 
 **Sparkline** (3.3). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
 reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado. A célula leva o

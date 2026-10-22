@@ -24,7 +24,8 @@ internal fun collectorHealthOf(
     teamSettings: TeamIntegrationSettings,
     teamSync: TeamSyncStatus,
     webStatus: WebAccessStatus,
-    now: Instant
+    now: Instant,
+    teamClockOffsetMillis: Long = 0L
 ): CollectorHealth {
     val data = (dashboard as? UiState.Success)?.data.orEmpty()
     val errors = when (dashboard) {
@@ -75,7 +76,8 @@ internal fun collectorHealthOf(
             active = teamSettings.isActive,
             server = teamSettings.normalizedServerUrl.ifEmpty { null },
             lastSuccessAtEpochMillis = teamSync.lastSuccessAt?.toEpochMilliseconds(),
-            lastFailure = teamSync.lastFailureMessage?.takeIf { teamSync.lastFailureAt != null && (teamSync.lastSuccessAt == null || teamSync.lastFailureAt > teamSync.lastSuccessAt) }
+            lastFailure = teamSync.lastFailureMessage?.takeIf { teamSync.lastFailureAt != null && (teamSync.lastSuccessAt == null || teamSync.lastFailureAt > teamSync.lastSuccessAt) },
+            clockOffsetMillis = teamClockOffsetMillis
         ),
         web = when (webStatus) {
             WebAccessStatus.Stopped -> CollectorWebHealth()

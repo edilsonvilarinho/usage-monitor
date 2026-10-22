@@ -1,6 +1,17 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.buildHttpClient
+import com.usagemonitor.data.AppDataDirectory
+import com.usagemonitor.data.datasource.LocalCollectorHealthDataSource
+import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
+import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
+import com.usagemonitor.data.datasource.RemoteTeamDataSource
+import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
+import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.AppLanguage
+import io.ktor.client.HttpClient
+import java.io.File
+import java.util.prefs.Preferences
 import com.usagemonitor.presentation.terminal.TuiLabels
 import com.usagemonitor.presentation.terminal.detectTerminalProfile
 
@@ -20,13 +31,45 @@ internal object TuiWiring {
         Runtime.getRuntime().addShutdownHook(restore)
         try {
             val profile = detectTerminalProfile(System.getenv(), outputIsTerminal = true, outputEncoding = io.encoding)
-            TuiStores().use { stores ->
-                val tuiReader = TuiReader(terminalReader, stores, languageOverride = languageOverride)
-                return TuiRunner(io, tuiReader::load, tuiReader::exportSessions, labels, profile).run()
+            val team = TuiTeamWiring()
+            try {
+                TuiStores().use { stores ->
+                    val tuiReader = TuiReader(terminalReader, stores, team.reader, languageOverride = languageOverride)
+                    return TuiRunner(io, tuiReader::load, tuiReader::exportSessions, labels, profile).run()
+                }
+            } finally {
+                team.close()
             }
         } finally {
             io.close()
             runCatching { Runtime.getRuntime().removeShutdownHook(restore) }
         }
+    }
+}
+
+/**
+ * O cliente do time, montado só quando a aba 4 lê pela primeira vez: quem não usa time não
+ * paga o `HttpClient`. Mesmo proxy efetivo do app (`resolveEffectiveProxy`).
+ */
+internal class TuiTeamWiring(
+    private val settingsSource: LocalTeamSettingsDataSource = LocalTeamSettingsDataSource(),
+    private val health: LocalCollectorHealthDataSource = LocalCollectorHealthDataSource()
+) : AutoCloseable {
+    private var httpClient: HttpClient? = null
+    private val preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName)
+    private val home = File(System.getProperty("user.home").orEmpty())
+
+    val reader = TuiTeamReader(
+        settings = { settingsSource.peek() },
+        accounts = { TuiTeamReader.participating(preferences, home, settingsSource.peek()) },
+        repository = { settings -> TeamUsageRepositoryImpl(RemoteTeamDataSource(client()), settingsProvider = { settings }) },
+        clockOffsetMillis = { health.read()?.team?.clockOffsetMillis ?: 0L }
+    )
+
+    private fun client(): HttpClient =
+        httpClient ?: buildHttpClient(resolveEffectiveProxy(LocalProxySettingsDataSource().load())).also { created -> httpClient = created }
+
+    override fun close() {
+        runCatching { httpClient?.close() }
     }
 }

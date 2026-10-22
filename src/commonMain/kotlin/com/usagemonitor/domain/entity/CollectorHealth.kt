@@ -41,7 +41,12 @@ data class CollectorTeamHealth(
     val active: Boolean = false,
     val server: String? = null,
     val lastSuccessAtEpochMillis: Long? = null,
-    val lastFailure: String? = null
+    val lastFailure: String? = null,
+    /**
+     * O desvio do relógio do servidor que a batida de presença mediu (#441): o modo interativo
+     * calcula a presença do time com ele, sem bater presença por conta própria.
+     */
+    val clockOffsetMillis: Long = 0L
 )
 
 /** O servidor da rede local. [state]: `stopped`, `running`, `failed`. Nunca o token. */

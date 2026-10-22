@@ -35,7 +35,11 @@ data class TerminalGlyphs(
     /** Legenda de série (#441); vazio no ASCII, que escreve a inicial da série. */
     val legend: String = "■",
     /** Os oito degraus da sparkline (#441), do mais baixo ao mais alto. */
-    val sparkLevels: String = "▁▂▃▄▅▆▇█"
+    val sparkLevels: String = "▁▂▃▄▅▆▇█",
+    /** Presença no time (#441): trabalhando agora, app aberto e ausente. */
+    val presenceWorking: String = "●",
+    val presenceOnline: String = "◑",
+    val presenceAway: String = "○"
 ) {
     /** O quarto de anel de [percent], ou `null` quando a coluna não tem anel. */
     fun ring(percent: Int): String? {
@@ -89,7 +93,10 @@ data class TerminalGlyphs(
             adjustLeft = "<",
             adjustRight = ">",
             legend = "",
-            sparkLevels = "._-=+*#@"
+            sparkLevels = "._-=+*#@",
+            presenceWorking = "*",
+            presenceOnline = "+",
+            presenceAway = "-"
         )
     }
 }

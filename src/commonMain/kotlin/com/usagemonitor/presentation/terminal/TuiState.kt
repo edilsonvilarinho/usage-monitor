@@ -13,6 +13,8 @@ data class TuiState(
     val sessions: TuiSessionsState = TuiSessionsState(),
     /** A janela e a trilha da aba 3. */
     val history: TuiHistoryState = TuiHistoryState(),
+    /** A conta do time e a pessoa da aba 4. */
+    val team: TuiTeamState = TuiTeamState(),
     /** O resultado da última ação (o CSV), até a próxima tecla. */
     val notice: TuiNotice? = null
 ) {
@@ -35,7 +37,10 @@ data class TuiContext(
     /** Quantas trilhas a aba 3 mostra. */
     val historyRowCount: Int = 0,
     /** A primeira trilha de cada conta da aba 1 na aba 3; `null` para conta sem percentual. */
-    val historyRowOfAccount: List<Int?> = emptyList()
+    val historyRowOfAccount: List<Int?> = emptyList(),
+    /** Quantas pessoas a aba 4 lista, e em quantas contas do time `t` anda. */
+    val teamMemberCount: Int = 0,
+    val teamAccountCount: Int = 0
 ) {
     /** As abas visíveis, na ordem e com o número fixo de cada uma. */
     val tabs: List<TuiTab>
@@ -74,7 +79,8 @@ object TuiReducer {
                 ?: state.overview.reduce(key, context.accountCount, context.stacked)?.let { overview -> TuiStep(state.copy(overview = overview)) }
             TuiTab.SESSIONS -> state.sessions.reduce(key, context.sessionCount, context.turnCount)?.let { (sessions, effects) -> TuiStep(state.copy(sessions = sessions), effects) }
             TuiTab.HISTORY -> state.history.reduce(key, context.historyRowCount)?.let { (history, effects) -> TuiStep(state.copy(history = history), effects) }
-            TuiTab.TEAM, TuiTab.SETTINGS -> null
+            TuiTab.TEAM -> state.team.reduce(key, context.teamMemberCount, context.teamAccountCount)?.let { (team, effects) -> TuiStep(state.copy(team = team), effects) }
+            TuiTab.SETTINGS -> null
         }
 
     /**

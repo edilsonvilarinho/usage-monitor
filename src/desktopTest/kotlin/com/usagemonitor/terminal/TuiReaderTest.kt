@@ -3,7 +3,6 @@ package com.usagemonitor.terminal
 import com.usagemonitor.SingleInstanceGuard
 import com.usagemonitor.data.datasource.LocalCollectorHealthDataSource
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
-import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -70,10 +69,9 @@ class TuiReaderTest {
                 )
             )
         )
-        val teamFile = File(dir, "team.json")
         val app = SingleInstanceGuard.tryAcquire(lock)
         try {
-            val reader = TuiReader(TerminalReader(cache, lock, node, clock), teamSettings = LocalTeamSettingsDataSource(teamFile), health = health)
+            val reader = TuiReader(TerminalReader(cache, lock, node, clock), health = health)
             val data = reader.load(TuiState())
 
             val (anthropic, codex) = data.accounts
@@ -83,8 +81,6 @@ class TuiReaderTest {
             assertNull(codex.failure?.reason)
             assertTrue(data.lastFailed)
             assertFalse(data.teamConfigured)
-            // Ler o time não cria o `team.json` (o `load` do app criaria o `deviceId`).
-            assertFalse(teamFile.exists())
         } finally {
             app?.close()
             runCatching { node.removeNode() }
@@ -101,7 +97,7 @@ class TuiReaderTest {
         val health = LocalCollectorHealthDataSource(File(dir, "collector-health.json"))
         health.write(CollectorHealth(now.toEpochMilliseconds(), sources = listOf(CollectorSourceHealth(ApiSource.CODEX, "Codex", ok = false, target = "CODEX"))))
         try {
-            val data = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), teamSettings = LocalTeamSettingsDataSource(File(dir, "team.json")), health = health).load(TuiState())
+            val data = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), health = health).load(TuiState())
             assertNull(data.accounts.single().failure)
             assertNull(data.collector)
         } finally {
@@ -128,7 +124,7 @@ class TuiReaderTest {
         }
         try {
             TuiStores(cliIndex = File(dir, "sem-indice.db"), codexIndex = File(dir, "sem-codex.db"), history = history).use { stores ->
-                val data = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), stores, LocalTeamSettingsDataSource(File(dir, "team.json"))).load(TuiState())
+                val data = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), stores).load(TuiState())
                 val spark = data.accounts.single().last24h
                 assertEquals(48, spark?.cells?.size)
                 assertEquals(10, spark?.cells?.get(42))

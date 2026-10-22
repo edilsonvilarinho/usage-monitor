@@ -468,26 +468,29 @@ S.history = () => {
 };
 
 S.team = () => {
+  // O servidor não guarda cota por pessoa: a tela não a deriva (as cotas da conta estão na aba 1).
   const people = [
-    ['Ana',   'ok', 'claude · agora',   71, 48, 'US$ 12,40'],
-    ['Bruno', 'ok', 'codex · 3 min',    33, 61, 'US$ 4,95'],
-    ['Carla', 'ok', 'claude · 8 min',   92, 80, 'US$ 18,10'],
-    ['Diego', 'mu', 'ausente · 2h10',   12, 22, 'US$ 0,80'],
-    ['Elisa', 'ok', 'opencode · agora', 45, 30, 'US$ 2,35'],
-    ['Fábio', 'mu', 'ausente · ontem',   0,  9, 'US$ 0,00'],
+    ['Ana',   'w', 'trabalhando · 1 sessão',      3, '4,8M', '$12.40'],
+    ['Carla', 'w', 'trabalhando · 2 sessões',     5, '7,1M', '$18.10'],
+    ['Bruno', 'o', 'app aberto · turno há 3 min', 2, '2,3M', '$4.95'],
+    ['Elisa', 'o', 'app aberto',                  1, '900K', '$2.35+'],
+    ['Diego', 'a', 'ausente · há 2 h',            1, '400K', '$0.80'],
+    ['Fábio', 'a', 'ausente',                     0, '0',    '$0.00'],
   ];
+  const mark = { w: c('ok', '●'), o: c('ok', '◑'), a: c('mu', '○') };
   const body = [
-    L(c('b', 'dev-core'), c('mu', lpad('6 pessoas · 4 ativas agora', 85))),
+    L(c('b', 'trabalho'), c('mu', lpad('6 pessoas · 2 ativas agora', 85))),
     L(''),
-    L(c('mu b', '  ' + pad('PESSOA', 9) + pad('AGORA', 19) + pad('CLAUDE 5h', 22) + pad('7d', 7) + lpad('HOJE', 10))),
+    L(c('mu b', '    ' + pad('PESSOA', 26) + pad('AGORA', 34) + lpad('SESSÕES', 9) + lpad('TOKENS', 9) + lpad('HOJE', 11))),
   ];
-  for (const [n, s, now, p5, p7, cost] of people){
-    const [sc, sw] = st(p5);
-    body.push(L(c(s, s === 'ok' ? '●' : '○'), ' ', c('b', pad(n, 9)), c('mu', pad(now, 19)), bar(p5, 10, 'a'), ' ', c('b', lpad(p5 + '%', 4)), ' ', p5 >= 70 ? c(sc, pad(sw.slice(0, 4), 5)) : pad('', 5), ' ', lpad(p7 + '%', 4), '   ', c('b', lpad(cost, 10))));
-  }
+  people.forEach(([n, s, now, ses, tok, cost], i) => {
+    const row = L(i === 0 ? c('gd', '▸ ') : '  ', mark[s], ' ', c('b', pad(n, 26)), c('mu', pad(now, 34)), lpad(String(ses), 9), lpad(tok, 9), c('b', lpad(cost, 11)), ' ');
+    body.push(i === 0 ? wrap('sel', row) : row);
+  });
   body.push(L(''));
-  body.push(L(c('mu', '● ativo · ○ ausente · custo calculado no seu computador · nunca prompt nem resposta')));
-  return frame(3, body, L(key('↑↓', 'pessoa'), key('t', 'troca de time'), ...commonKeys));
+  body.push(L(c('mu', '● trabalhando · ◑ app aberto · ○ ausente')));
+  body.push(L(c('mu', 'custo calculado no seu computador · nunca prompt nem resposta')));
+  return frame(3, body, L(key('↑↓', 'pessoa'), key('t', 'troca de conta'), ...commonKeys));
 };
 
 S.keys = () => {
@@ -794,7 +797,7 @@ const PARTS = [
       { id: 's33', num: '3.3', title: 'Aba 3 · Histórico', win: 'usage-monitor tui', body: S.history,
         text: 'Uma trilha por cota com percentual, na ordem do painel, com os reinícios da janela marcados (só quando a janela anterior acabou: numa janela corrida o fim anda a cada leitura) e o uso de agora no fim. As setas trocam entre 24 horas (meia hora por célula), 7 dias (3 h) e 30 dias (12 h); o <b>enter</b> da aba 1 abre aqui, na trilha da conta.' },
       { id: 's34', num: '3.4', title: 'Aba 4 · Time', win: 'usage-monitor tui', body: S.team,
-        text: 'Só aparece para quem usa a integração com time. Mostra quem está ativo e em qual CLI, as cotas e o custo do dia. Pessoas e valores de exemplo.' },
+        text: 'Só aparece para quem usa a integração com time (ligada e com ao menos uma conta participando). O mesmo <code>GET</code> da janela de time do app, com o corte do dia em BRT: quem está trabalhando (turno na janela ativa), com o app aberto ou ausente, sempre escrito, e as sessões, os tokens e o custo do dia, calculado aqui pela tabela de preços (o servidor não precifica). O servidor não guarda cota por pessoa, então a tela não mostra nenhuma: as cotas da conta estão na aba 1. Ordem e presença as da janela do app, no relógio do servidor que o coletor mediu (a TUI não bate presença); <b>t</b> troca entre as contas do time. Leitura que falha mantém os números anteriores, com a faixa da 6.2. Pessoas e valores de exemplo.' },
       { id: 's35', num: '3.5', title: 'Ajuda (tecla ?)', win: 'usage-monitor tui', body: S.keys,
         text: 'Todos os atalhos numa caixa só. O modo terminal não muda configuração nenhuma: isso continua no app.' },
     ] },
