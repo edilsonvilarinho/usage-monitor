@@ -43,6 +43,9 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 - Opções **distintas entre si** no gesto (não cinco variações de fade). Se duas ficarem parecidas,
   troque uma.
 - Mesma animação aplicada a todas as superfícies pedidas (ex.: balão da conta **e** da engrenagem).
+- **Opções só quando competem pelo mesmo lugar.** Quando o pedido é um produto com várias peças
+  complementares (rodada AG, modo terminal), a galeria de opções soltas confunde: mostre a proposta
+  fechada, tela por tela, e deixe a escolha para o que de fato disputa a mesma tela.
 
 ## 3. Como montar o HTML
 
@@ -122,7 +125,8 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Janela "Análise" remodelada, com atualização ao vivo (estática, galeria única `docs/planos/analise-modal-visual/`) | AD1 · painel único (as duas janelas lado a lado, 24 h com tok/s, intervalos e antes × agora em tabela; o usuário pediu tempo real: relê a cada coleta e a cada 30 s) | AD2 curva da janela, AD3 espelho 5h \| semanal, AD4 régua de ritmo, AD5 abas por pergunta, AD6 mestre e detalhe, AD7 grade de indicadores, AD8 relatório contínuo, AD9 mapa de calor em destaque, AD10 antes × agora sobreposto, AD11 escada de intervalos, AD12 leitura com prova, AD13 veredito no topo, AD14 instrumentos Gargantua, AD15 faixas sincronizadas 24 h, AD16 seletor de intervalo |
 | Bot do Telegram — menu de comandos e respostas (estática, galeria única `docs/planos/telegram-bot-ae-visual/`; defeitos medidos no print: emoji de categoria repetido, sparkline virando retângulo, cota em 0% com três linhas) | AE4 · teclado fixo como controle (menu do Telegram só com `/status`, `/teclado` e `/ajuda`; teclado em duas páginas, ligado desde o pareamento) + AE7 · barra de quadrados por zona (dez emoji coloridos pelos limiares da conta, número em negrito, legenda no fim; a sparkline saiu) | AE1 central de comandos, AE2 ícone próprio por comando, AE3 áreas como títulos no menu, AE5 cartão em citação, AE6 uma linha por cota, AE8 painel em imagem, AE9 abas na mensagem, AE10 resumo no topo com conta parada numa linha |
 | Vídeo de lançamento da 41.11 (EN e PT, legenda e voz Piper; galeria animada `build/gargantua-preview/video-v41-11-options.html`, roteiro `docs/planos/video-v41-11/roteiro.md`) | AF5 · mergulho no tesseract (assunto chega numa célula vindo do ponto de fuga em 900 ms e sai pela câmera em 700 ms; o usuário pediu 1 min e destaque ao processo do COSMIC) | AF1 órbita de apresentação, AF2 lente gravitacional, AF3 fita de acreção, AF4 jatos relativísticos |
+| Modo terminal (pedido de usuário, #439–#441; estática; virou o design system `docs/design-system/cli/` e o protótipo `docs/planos/prototipo-modo-cli.html`) | Proposta fechada em vez de escolha: AG1 status, AG2 scripts, AG4 statusline do Claude Code, AG5 tmux, AG7 painel com abas (+ AG10 sessões, AG11 histórico, AG14 time), AG15 regra de cor, mais configuração completa e serviço sem tela (o usuário pediu "o modo CLI tem que suprir tudo"). A galeria de 15 opções soltas foi recusada por confusa: rodada com escolha só quando as opções competem | AG3 frases sem argumento (abriria o app), AG6 prompt do shell (precisa leitor sem JVM), AG8 mosaico btop, AG9 conversa por comandos, AG12 watch em linha, AG13 HUD de bolso |
 
-Próxima rodada usa a próxima letra livre (letras duplas: AA, AB, AC…; U a Z e AA a AF já usadas). Trilha, fundo ou estado contínuo: as opções
+Próxima rodada usa a próxima letra livre (letras duplas: AA, AB, AC…; U a Z e AA a AG já usadas). Trilha, fundo ou estado contínuo: as opções
 já nascem animadas (laço atrás da política), nunca só o quadro parado. Ícone de sistema não anima: nessa rodada o
 card mostra os tamanhos reais (lupa ×4 no 16 px) sobre barra clara e escura, e não um laço.
