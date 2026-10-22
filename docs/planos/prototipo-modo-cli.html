@@ -163,7 +163,7 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
     <div class="flow">
       <div class="node"><b>App desktop (HUD)</b><span>É quem consulta as APIs, renova o login e respeita os limites.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Leitura pronta</b><span><code>~/.usage-monitor/snapshot.json</code>, regravado a cada coleta.</span></div>
+      <div class="node"><b>Leitura pronta</b><span><code>~/.usage-monitor/dashboard-cache.json</code>, que o app já regrava a cada coleta.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
       <div class="node cli"><b>Modo terminal</b><span>Lê a leitura pronta. Configurar pelo terminal muda os mesmos arquivos que o app usa.</span></div>
     </div>
@@ -171,7 +171,7 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
     <div class="flow">
       <div class="node cli"><b>Serviço <code>usage-monitor service</code></b><span>O mesmo motor do app, sem janela: coleta, histórico, alertas, time, Telegram e acesso web.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
-      <div class="node"><b>Leitura pronta</b><span>O mesmo <code>snapshot.json</code> e o mesmo histórico em SQLite.</span></div>
+      <div class="node"><b>Leitura pronta</b><span>O mesmo <code>dashboard-cache.json</code> e o mesmo histórico em SQLite.</span></div>
       <div class="arrow" aria-hidden="true">→</div>
       <div class="node cli"><b>Modo terminal</b><span>Pelo SSH: <code>status</code>, <code>tui</code> e toda a configuração.</span></div>
     </div>
@@ -189,12 +189,12 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
   <section class="box" aria-labelledby="out">
     <h3 id="out">O que ficou de fora, e por quê</h3>
     <ul>
-      <li><b>Segmento no prompt do shell (AG6):</b> precisa de um leitor sem JVM para não atrasar cada comando. Pode vir depois, lendo o mesmo <code>snapshot.json</code>.</li>
+      <li><b>Segmento no prompt do shell (AG6):</b> precisa de um leitor sem JVM para não atrasar cada comando. Pode vir depois, lendo o mesmo <code>dashboard-cache.json</code>.</li>
       <li><b>Mosaico estilo btop (AG8) e conversa por comandos (AG9):</b> seriam um segundo jeito de desenhar a mesma tela. Ficou só o painel com abas, para haver um único jeito de navegar.</li>
       <li><b>Resposta em frases sem argumento (AG3):</b> hoje <code>usage-monitor</code> sem nada abre o app, e quem usa esse atalho seria pego de surpresa.</li>
       <li><b>Watch em linha (AG12) e HUD de bolso (AG13):</b> a barra do tmux já cobre o "ver de canto de olho".</li>
       <li><b>Tema, HUD e escala da interface:</b> não se aplicam ao terminal, que usa as cores dele (parte 7). Cor e emoji por conta continuam só no app.</li>
-      <li><b>Ainda em aberto, idioma:</b> pela regra do #418, a saída de linha de comando é em inglês. Aqui está em português para a conversa. Falta decidir se o modo terminal segue o idioma do app.</li>
+      <li><b>Idioma (decidido na #439):</b> o terminal segue o idioma do app. Em console que não é UTF-8, os glifos viram ASCII e o texto sai sem acento.</li>
       <li><b>Ainda em aberto, pacote para servidor:</b> o pacote de hoje leva Compose e Skiko. Falta medir se o mesmo <code>.deb</code>/<code>.rpm</code> roda sem bibliotecas gráficas instaladas ou se o servidor precisa de um pacote próprio, só com o motor.</li>
     </ul>
   </section>
@@ -543,7 +543,7 @@ S.setup = () => render([
   L(c('mu', '     Salvas em ~/.usage-monitor/api-keys.json, legível só pelo seu usuário.')),
   L(''),
   L(c('b', '3/5  Avisos')),
-  L('     Limiares de atenção e crítico ', c('mu', '[70,90]'), ': ', c('mu', '(enter)')),
+  L('     Limiares de alerta ', c('mu', '[75,90,100]'), ': 70,90'),
   L('     Avisar pelo Telegram? ', c('mu', '[s/N]'), ' s ', c('mu', '→ continua em usage-monitor telegram pair')),
   L(''),
   L(c('b', '4/5  Idioma'), ' ', c('mu', '[pt/en] (pt)'), ': ', c('mu', '(enter)')),
