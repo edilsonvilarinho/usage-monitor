@@ -59,11 +59,14 @@ internal class TuiLabels(val language: AppLanguage) {
     val helpSpaceKey: String get() = localized(language, "espaço", "space")
     val helpToggle: String get() = localized(language, "liga e desliga", "turns on and off")
 
-    /** A nota do fim da ajuda, em duas linhas para caber na caixa. */
+    val applying: String get() = localized(language, "aplicando…", "applying…")
+
+    /** A nota do fim da ajuda, em três linhas para caber na caixa. */
     val helpSettingsNote: List<String>
         get() = listOf(
-            localized(language, "Na aba 5 dá para mudar tudo o que as Configurações", "Tab 5 changes everything the app's Settings"),
-            localized(language, "do app mudam, menos tema e HUD.", "change, except theme and HUD.")
+            localized(language, "A aba 5 muda o que as Configurações do app mudam,", "Tab 5 changes what the app's Settings change,"),
+            localized(language, "menos tema e HUD. Adicionar conta e entrar num", "except theme and HUD. Adding an account and joining"),
+            localized(language, "servidor de time novo ficam nos comandos.", "a new team server stay in the commands.")
         )
 
     fun tooSmall(columns: Int, rows: Int): String =

@@ -4,6 +4,7 @@ import com.usagemonitor.data.datasource.LocalCollectorHealthDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorHealth
+import com.usagemonitor.presentation.terminal.TerminalGlyphs
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.terminal.TerminalAccount
@@ -38,7 +39,10 @@ internal class TuiReader(
     /** A aba 4; `null` sem os meios de ler o servidor do time. */
     private val team: TuiTeamReader? = null,
     private val health: LocalCollectorHealthDataSource = LocalCollectorHealthDataSource(),
-    private val languageOverride: AppLanguage? = null
+    private val languageOverride: AppLanguage? = null,
+    /** A aba 5, com os glifos do perfil (a máscara do segredo); `null` nos testes das outras abas. */
+    private val settings: TuiSettingsReader? = null,
+    private val glyphs: TerminalGlyphs = TerminalGlyphs.UNICODE
 ) {
     private val sessionsReader = stores?.let(::TuiSessionsReader)
 
@@ -63,7 +67,8 @@ internal class TuiReader(
             },
             sessions = if (state.tab == TuiTab.SESSIONS) sessionsReader?.load(state.sessions, reading.now) else null,
             history = if (state.tab == TuiTab.HISTORY) history(reading.accounts, state.history.range, reading.now) else null,
-            team = if (state.tab == TuiTab.TEAM) team?.load(state.team, reading.now) else null
+            team = if (state.tab == TuiTab.TEAM) team?.load(state.team, reading.now) else null,
+            settings = if (state.tab == TuiTab.SETTINGS) settings?.load(reading.language, glyphs) else null
         )
     }
 

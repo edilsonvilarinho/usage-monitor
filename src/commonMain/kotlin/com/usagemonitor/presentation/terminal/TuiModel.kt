@@ -89,7 +89,30 @@ sealed interface TuiEffect {
 
     /** `e` na aba 2: as sessões do Claude Code do corte num CSV, na pasta de onde a TUI foi aberta. */
     data object ExportSessions : TuiEffect
+
+    /** Uma mudança da aba 5, pelo mesmo comando da 4.3 que a faria (#441, A08). */
+    data class ApplySetting(val action: TuiSettingAction) : TuiEffect
 }
 
 /** Uma frase de resultado no pé do corpo, até a próxima tecla ("CSV salvo em …"). */
-data class TuiNotice(val text: String, val ok: Boolean)
+data class TuiNotice(
+    val text: String,
+    val ok: Boolean,
+    val detail: List<String> = emptyList(),
+    /** A mudança ainda está sendo aplicada: sem `✓` nem `▲`, em muted. */
+    val pending: Boolean = false
+) {
+    companion object {
+        /**
+         * A saída de um comando de configurar como aviso: a primeira linha sem o `✓`/`▲` (a
+         * tela põe o dela), as outras como detalhe. Mesmo texto que o comando imprimiria.
+         */
+        internal fun of(output: TerminalOutput, glyphs: TerminalGlyphs): TuiNotice? {
+            val first = output.lines.firstOrNull() ?: return null
+            val marks = setOf(glyphs.done, glyphs.warning)
+            val spans = first.spans.dropWhile { span -> span.text.trim() in marks }
+            val detail = output.lines.drop(1).map { line -> line.plainText.trim() }.filter { text -> text.isNotEmpty() }
+            return TuiNotice(TerminalLine(spans).plainText.trim(), output.exitCode == 0, detail)
+        }
+    }
+}

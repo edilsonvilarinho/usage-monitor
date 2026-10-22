@@ -23,7 +23,9 @@ data class TuiData(
     /** A aba 3; `null` enquanto ela não foi aberta. */
     val history: TuiHistory? = null,
     /** A aba 4; `null` enquanto ela não foi aberta, ou sem time. */
-    val team: TuiTeam? = null
+    val team: TuiTeam? = null,
+    /** A aba 5; `null` enquanto ela não foi aberta. */
+    val settings: TuiSettings? = null
 ) {
     /** A última tentativa de coleta falhou em alguma conta (6.2). */
     val lastFailed: Boolean

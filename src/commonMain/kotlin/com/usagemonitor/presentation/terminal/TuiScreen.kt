@@ -21,7 +21,8 @@ internal object TuiScreen {
             historyRowCount = data.history?.rows?.size ?: 0,
             historyRowOfAccount = data.historyRowOfAccount,
             teamMemberCount = data.team?.members?.size ?: 0,
-            teamAccountCount = data.team?.accounts?.size ?: 0
+            teamAccountCount = data.team?.accounts?.size ?: 0,
+            settingsSections = data.settings?.sections.orEmpty()
         )
 
     fun render(state: TuiState, data: TuiData, size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {
@@ -40,7 +41,8 @@ internal object TuiScreen {
             active = state.tab,
             status = status(data, labels),
             body = withNotice(view.body, state.notice, size, profile),
-            shortcuts = view.shortcuts + labels.commonShortcuts,
+            // Com um campo de texto aberto, `q`, `r`, `?` e os dígitos são texto: os atalhos comuns somem.
+            shortcuts = if (state.tab == TuiTab.SETTINGS && state.settings.editing != null && !state.helpOpen) view.shortcuts else view.shortcuts + labels.commonShortcuts,
             labels = labels,
             profile = profile
         )
@@ -66,18 +68,52 @@ internal object TuiScreen {
             TuiTab.SESSIONS -> TuiSessionsView.render(data.sessions, state.sessions, size, TuiSessionsLabels(labels.language), profile)
             TuiTab.HISTORY -> TuiHistoryView.render(data.history, state.history, size, TuiHistoryLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.TEAM -> TuiTeamView.render(data.team, state.team, size, TuiTeamLabels(labels.language), TerminalLabels(labels.language), profile)
-            TuiTab.SETTINGS -> TuiTabView(emptyList())
+            TuiTab.SETTINGS -> TuiSettingsView.render(data.settings, state.settings, data.collector, size, TuiSettingsLabels(labels.language), profile)
         }
 
-    /** O aviso de resultado na última linha do corpo, `✓` verde ou `▲`, sobre o que estiver ali. */
+    /**
+     * O aviso de resultado nas últimas linhas do corpo, `✓` verde ou `▲`, sobre o que estiver
+     * ali; o detalhe (o comando a rodar, a ressalva) em muted, abaixo.
+     */
     private fun withNotice(body: List<TerminalLine>, notice: TuiNotice?, size: TuiSize, profile: TerminalProfile): List<TerminalLine> {
         notice ?: return body
         val glyphs = profile.glyphs
-        val mark = if (notice.ok) TerminalSpan(glyphs.done + " ", TerminalColor.Ok) else TerminalSpan(glyphs.warning + " ", TerminalColor.Warn)
-        val room = (size.bodyHeight - 1).coerceAtLeast(0)
+        val mark = when {
+            notice.pending -> TerminalSpan("")
+            notice.ok -> TerminalSpan(glyphs.done + " ", TerminalColor.Ok)
+            else -> TerminalSpan(glyphs.warning + " ", TerminalColor.Warn)
+        }
+        // A frase quebra por palavra (a recusa de um valor explica o formato e passa de 90 colunas).
+        val textWidth = (size.bodyWidth - 1 - mark.text.length).coerceAtLeast(10)
+        val (first, rest) = wrapped(notice.text, textWidth).let { parts -> parts.first() to parts.drop(1) }
+        val color = if (notice.pending) TerminalColor.Muted else null
+        val continuation = rest.map { part -> terminalLine(TerminalSpan(" ".repeat(mark.text.length) + part, color)) }
+        val detail = (continuation + notice.detail.map { text -> terminalLine(TerminalSpan("  $text", TerminalColor.Muted)) }).take(MAX_NOTICE_EXTRA)
+        val room = (size.bodyHeight - 1 - detail.size).coerceAtLeast(0)
         val kept = body.take(room)
-        return kept + List(room - kept.size) { TerminalLine.EMPTY } + terminalLine(mark, TerminalSpan(notice.text))
+        return kept + List(room - kept.size) { TerminalLine.EMPTY } + terminalLine(mark, TerminalSpan(first, color)) + detail
     }
+
+    /** [text] em linhas de até [width] células, quebrando no espaço; palavra maior que a linha é cortada. */
+    internal fun wrapped(text: String, width: Int): List<String> {
+        val lines = mutableListOf<String>()
+        var current = ""
+        for (word in text.split(' ')) {
+            current = when {
+                current.isEmpty() -> word
+                current.length + 1 + word.length <= width -> "$current $word"
+                else -> {
+                    lines += current
+                    word
+                }
+            }
+        }
+        lines += current
+        return lines.map { line -> line.take(width) }
+    }
+
+    /** Linhas além da primeira: a continuação da frase e o detalhe (o comando a rodar). */
+    private const val MAX_NOTICE_EXTRA = 3
 
     /** A ajuda (3.5): todos os atalhos numa caixa, centrada no corpo. */
     fun help(size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {

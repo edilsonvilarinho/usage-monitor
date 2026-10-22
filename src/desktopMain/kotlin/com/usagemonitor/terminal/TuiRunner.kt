@@ -7,6 +7,7 @@ import com.usagemonitor.presentation.terminal.TuiEffect
 import com.usagemonitor.presentation.terminal.TuiLabels
 import com.usagemonitor.presentation.terminal.TuiNotice
 import com.usagemonitor.presentation.terminal.TuiReducer
+import com.usagemonitor.presentation.terminal.TuiSettingAction
 import com.usagemonitor.presentation.terminal.TuiScreen
 import com.usagemonitor.presentation.terminal.TuiState
 import kotlin.time.Clock
@@ -29,6 +30,8 @@ internal class TuiRunner(
     private val io: TuiIo,
     private val load: (TuiState) -> TuiData,
     private val exportSessions: (TuiState) -> TuiNotice? = { null },
+    /** Uma mudança da aba 5, pelo comando da 4.3 que a faz; devolve a saída dele como aviso. */
+    private val applySetting: (TuiSettingAction) -> TuiNotice? = { null },
     private val labels: TuiLabels,
     private val profile: TerminalProfile,
     private val clock: Clock = Clock.System,
@@ -61,7 +64,13 @@ internal class TuiRunner(
             if (TuiEffect.ExportSessions in step.effects) {
                 state = state.copy(notice = exportSessions(state))
             }
-            if (TuiEffect.Refresh in step.effects) {
+            val change = step.effects.filterIsInstance<TuiEffect.ApplySetting>().firstOrNull()
+            if (change != null) {
+                // Testar uma chave ou esperar o coletor leva segundos: a tela diz que está aplicando.
+                draw(state.copy(notice = TuiNotice(labels.applying, ok = true, pending = true)), data)
+                state = state.copy(notice = applySetting(change.action))
+            }
+            if (TuiEffect.Refresh in step.effects || change != null) {
                 data = load(state)
                 nextRefresh = clock.now() + refreshInterval
             }

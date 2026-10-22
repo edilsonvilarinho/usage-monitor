@@ -4,6 +4,9 @@ import com.usagemonitor.AppSettingsStore
 import com.usagemonitor.CommandLineRequest
 import com.usagemonitor.ConfigApplier
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
+import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
+import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
+import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -63,8 +66,16 @@ internal class TerminalConfigHarness(
             ?: error("não é um comando de configurar: $request")
         val buffer = ByteArrayOutputStream()
         val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = unicode), PrintStream(buffer, true, "UTF-8"))
+        val runner = runner(secret)
+        val code = runner.run(command, language, console)
+        // `println` termina a linha com `\r\n` no Windows: o teste compara com `\n`.
+        return code to buffer.toString(Charsets.UTF_8).replace("\r\n", "\n")
+    }
+
+    /** O runner dos comandos sobre a pasta e o nó temporários; [secret] é a entrada sem eco. */
+    fun runner(secret: String? = null): TerminalConfigRunner {
         val client = TerminalConfigClient(collector = { collector }, channel = channel, localStore = ::store, timeoutMillis = 3_000)
-        val runner = TerminalConfigRunner(
+        return TerminalConfigRunner(
             client, TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node), node, ::file,
             secretInput = { _ -> secret },
             home = dir,
@@ -74,9 +85,21 @@ internal class TerminalConfigHarness(
             teamCheck = teamCheck,
             webAddresses = { listOf("192.168.0.10") }
         )
-        val code = runner.run(command, language, console)
-        // `println` termina a linha com `\r\n` no Windows: o teste compara com `\n`.
-        return code to buffer.toString(Charsets.UTF_8).replace("\r\n", "\n")
+    }
+
+    /** O que a aba 5 do modo interativo (#441) lê, pelas mesmas leituras dos comandos. */
+    fun settingsInputs(): TuiSettingsInputs {
+        val runner = runner()
+        return TuiSettingsInputs(
+            sources = runner::sourceRows,
+            accounts = { runner.accountsRunner().rows() },
+            values = runner::readSource,
+            telegram = { LocalTelegramSettingsDataSource(file("telegram.json")).load() },
+            team = { LocalTeamSettingsDataSource(file("team.json")).peek() },
+            teamAccounts = { _ -> emptyList() },
+            web = { LocalWebAccessSettingsDataSource(file("web-access.json")).load() },
+            autostartAvailable = false
+        )
     }
 
     override fun close() {

@@ -15,7 +15,9 @@ data class TuiState(
     val history: TuiHistoryState = TuiHistoryState(),
     /** A conta do time e a pessoa da aba 4. */
     val team: TuiTeamState = TuiTeamState(),
-    /** O resultado da última ação (o CSV), até a próxima tecla. */
+    /** A seção, o campo e a edição da aba 5. */
+    val settings: TuiSettingsState = TuiSettingsState(),
+    /** O resultado da última ação (o CSV, uma mudança da aba 5), até a próxima tecla. */
     val notice: TuiNotice? = null
 ) {
     /** A aba 4 sumiu (o time foi desfeito entre duas leituras): volta para a 1. */
@@ -40,7 +42,9 @@ data class TuiContext(
     val historyRowOfAccount: List<Int?> = emptyList(),
     /** Quantas pessoas a aba 4 lista, e em quantas contas do time `t` anda. */
     val teamMemberCount: Int = 0,
-    val teamAccountCount: Int = 0
+    val teamAccountCount: Int = 0,
+    /** As seções da aba 5, com os campos que a seleção visita. */
+    val settingsSections: List<TuiSettingsSection> = emptyList()
 ) {
     /** As abas visíveis, na ordem e com o número fixo de cada uma. */
     val tabs: List<TuiTab>
@@ -65,6 +69,10 @@ object TuiReducer {
         if (state.helpOpen) {
             return reduceHelp(state, key)
         }
+        // Um campo de texto aberto recebe tudo: `q`, `r`, `?` e os dígitos são texto ali.
+        if (state.tab == TuiTab.SETTINGS && state.settings.editing != null) {
+            return reduceTab(state, key, context) ?: TuiStep(state)
+        }
         val common = reduceCommon(state, key, context)
         if (common != null) {
             return common
@@ -80,7 +88,7 @@ object TuiReducer {
             TuiTab.SESSIONS -> state.sessions.reduce(key, context.sessionCount, context.turnCount)?.let { (sessions, effects) -> TuiStep(state.copy(sessions = sessions), effects) }
             TuiTab.HISTORY -> state.history.reduce(key, context.historyRowCount)?.let { (history, effects) -> TuiStep(state.copy(history = history), effects) }
             TuiTab.TEAM -> state.team.reduce(key, context.teamMemberCount, context.teamAccountCount)?.let { (team, effects) -> TuiStep(state.copy(team = team), effects) }
-            TuiTab.SETTINGS -> null
+            TuiTab.SETTINGS -> state.settings.reduce(key, context.settingsSections)?.let { (settings, effects) -> TuiStep(state.copy(settings = settings), effects) }
         }
 
     /**

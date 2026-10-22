@@ -79,7 +79,7 @@ internal class TerminalAccountsRunner(
         }
 
     /** Na ordem das Configurações: Anthropic (a padrão primeiro), Codex padrão e as Codex extras. */
-    private fun rows(): List<TerminalAccountRow> {
+    internal fun rows(): List<TerminalAccountRow> {
         val anthropic = AnthropicProfileRegistry.readStored(preferences)
             .filterNot { record -> record.hidden }
             .sortedWith(

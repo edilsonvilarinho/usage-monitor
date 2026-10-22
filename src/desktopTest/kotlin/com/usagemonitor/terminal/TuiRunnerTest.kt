@@ -10,6 +10,10 @@ import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiKey
 import com.usagemonitor.presentation.terminal.TuiLabels
 import com.usagemonitor.presentation.terminal.TuiNotice
+import com.usagemonitor.presentation.terminal.TuiSettingAction
+import com.usagemonitor.presentation.terminal.TuiSettingField
+import com.usagemonitor.presentation.terminal.TuiSettings
+import com.usagemonitor.presentation.terminal.TuiSettingsSection
 import com.usagemonitor.presentation.terminal.TuiSize
 import com.usagemonitor.presentation.terminal.TuiState
 import com.usagemonitor.presentation.terminal.TuiTab
@@ -107,9 +111,29 @@ class TuiRunnerTest {
         val clock = SteppingClock(start)
         val io = FakeTuiIo(listOf(TuiKey.Text('2'), TuiKey.Text('e'), TuiKey.Down))
         var exports = 0
-        TuiRunner(io, { _ -> data(clock) }, { _ -> exports += 1; TuiNotice("CSV salvo", ok = true) }, labels, profile, clock).run()
+        TuiRunner(io, { _ -> data(clock) }, { _ -> exports += 1; TuiNotice("CSV salvo", ok = true) }, labels = labels, profile = profile, clock = clock).run()
         assertEquals(1, exports)
         assertTrue(io.frames[2].any { line -> "CSV salvo" in line })
         assertTrue(io.frames[3].none { line -> "CSV salvo" in line })
+    }
+
+    @Test
+    fun `uma mudanca da aba 5 mostra que esta aplicando, roda o comando e rele`() {
+        val clock = SteppingClock(start)
+        val io = FakeTuiIo(listOf(TuiKey.Text('5'), TuiKey.Enter, TuiKey.Space))
+        val section = TuiSettingsSection("Alertas", listOf(TuiSettingField.Toggle("Avisar quando a cota reiniciar", true, TuiSettingAction("set:alerts.reset.enabled", "false"))))
+        var loads = 0
+        val applied = mutableListOf<TuiSettingAction>()
+        TuiRunner(
+            io,
+            { _ -> loads += 1; data(clock).copy(settings = TuiSettings(listOf(section))) },
+            applySetting = { action -> applied += action; TuiNotice("alerts.reset.enabled = false", ok = true) },
+            labels = labels, profile = profile, clock = clock
+        ).run()
+        assertEquals(listOf(TuiSettingAction("set:alerts.reset.enabled", "false")), applied)
+        // Quadros: abertura, aba 5, campos, "aplicando…" e o resultado depois de reler.
+        assertTrue(io.frames[3].any { line -> "aplicando…" in line })
+        assertTrue(io.frames[4].any { line -> "✓ alerts.reset.enabled = false" in line })
+        assertEquals(3, loads)
     }
 }

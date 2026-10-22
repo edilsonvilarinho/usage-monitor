@@ -39,7 +39,9 @@ data class TerminalGlyphs(
     /** Presença no time (#441): trabalhando agora, app aberto e ausente. */
     val presenceWorking: String = "●",
     val presenceOnline: String = "◑",
-    val presenceAway: String = "○"
+    val presenceAway: String = "○",
+    /** O cursor do campo em edição (#441, aba 5). */
+    val cursor: String = "▏"
 ) {
     /** O quarto de anel de [percent], ou `null` quando a coluna não tem anel. */
     fun ring(percent: Int): String? {
@@ -96,7 +98,8 @@ data class TerminalGlyphs(
             sparkLevels = "._-=+*#@",
             presenceWorking = "*",
             presenceOnline = "+",
-            presenceAway = "-"
+            presenceAway = "-",
+            cursor = "_"
         )
     }
 }

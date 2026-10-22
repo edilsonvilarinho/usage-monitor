@@ -5,6 +5,9 @@ import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.datasource.LocalCollectorHealthDataSource
 import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
+import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
+import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
+import com.usagemonitor.AnthropicProfileRegistry
 import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.resolveEffectiveProxy
@@ -13,6 +16,7 @@ import io.ktor.client.HttpClient
 import java.io.File
 import java.util.prefs.Preferences
 import com.usagemonitor.presentation.terminal.TuiLabels
+import com.usagemonitor.presentation.terminal.TuiSettingAction
 import com.usagemonitor.presentation.terminal.detectTerminalProfile
 
 /** A montagem do `tui` com o terminal de verdade. */
@@ -34,8 +38,15 @@ internal object TuiWiring {
             val team = TuiTeamWiring()
             try {
                 TuiStores().use { stores ->
-                    val tuiReader = TuiReader(terminalReader, stores, team.reader, languageOverride = languageOverride)
-                    return TuiRunner(io, tuiReader::load, tuiReader::exportSessions, labels, profile).run()
+                    val tuiReader = TuiReader(
+                        terminalReader, stores, team.reader, languageOverride = languageOverride,
+                        settings = TuiSettingsReader(tuiSettingsInputs()), glyphs = profile.glyphs
+                    )
+                    // O segredo digitado na aba 5 entra como a entrada do comando, e só dele.
+                    val apply = { action: TuiSettingAction ->
+                        TuiSettingsCommands.apply(action, { secret -> TerminalConfigRunner(secretInput = { _ -> secret }) }, languageOverride, profile)
+                    }
+                    return TuiRunner(io, tuiReader::load, tuiReader::exportSessions, apply, labels, profile).run()
                 }
             } finally {
                 team.close()
@@ -45,6 +56,25 @@ internal object TuiWiring {
             runCatching { Runtime.getRuntime().removeShutdownHook(restore) }
         }
     }
+}
+
+/** O que a aba 5 lê: as mesmas leituras dos comandos `sources`, `accounts` e `config list`. */
+internal fun tuiSettingsInputs(): TuiSettingsInputs {
+    val runner = TerminalConfigRunner()
+    val preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName)
+    return TuiSettingsInputs(
+        sources = runner::sourceRows,
+        accounts = { runner.accountsRunner().rows() },
+        values = runner::readSource,
+        telegram = { LocalTelegramSettingsDataSource().load() },
+        team = { LocalTeamSettingsDataSource().peek() },
+        teamAccounts = { settings ->
+            val wanted = settings?.participatingProfileIds.orEmpty()
+            AnthropicProfileRegistry.readStored(preferences).filter { record -> !record.hidden && record.id in wanted }.map { record -> record.label }
+        },
+        web = { LocalWebAccessSettingsDataSource().load() },
+        autostartAvailable = AppDataDirectory.isDefault
+    )
 }
 
 /**

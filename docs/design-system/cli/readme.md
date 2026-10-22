@@ -78,6 +78,7 @@ aqui, na seção Primitivas.
 | Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
 | Sparkline (#441) | `▁▂▃▄▅▆▇█` na cor da fonte | `._-=+*#@` |
 | Setas nos atalhos (#441) | `↑ ↓ ← →` | `^ v < >` |
+| Cursor do campo em edição (#441) | `▏` em ouro | `_` |
 | Presença no time (#441) | `●` trabalhando e `◑` app aberto em verde, `○` ausente em muted | `*`, `+`, `-` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
@@ -164,9 +165,13 @@ Tokens abreviados com uma casa no separador do idioma (`4,8M`, `136K`), nunca no
 qualquer sobreposição. Nunca há caixa dentro de caixa.
 
 **Campo de configuração** (4.2). `[x]` em verde e `[ ]` em muted, valor ajustável `‹ 70 ›` com as
-setas em ouro, campo de texto `[ valor ]`. A linha em edição leva fundo de seleção. No alto da
-seção, à direita: "muda na hora, sem reiniciar o serviço", ou o aviso de reinício quando o ajuste
-exigir (proxy).
+setas em ouro (em muted quando não há vizinho), campo de texto `[ valor ]`, ação em ouro e
+informação só de leitura com o rótulo em muted. A linha selecionada leva fundo de seleção; em
+edição, `[ texto▏ ]` com o cursor em ouro, e o segredo não ecoa nada, nem o tamanho. Ação que
+apaga ou invalida algo pede um segundo `enter` ("enter de novo confirma", em `--term-warn`). A nota
+de um campo vai em muted à direita e sai quando não cabe inteira. No alto da seção, à direita,
+quando a mudança vale (a mesma frase dos comandos da #440: "o serviço já está usando", ou o aviso
+de reinício em `--term-warn` no proxy). O resultado da mudança é a saída do comando, no pé do corpo.
 
 **Faixa de aviso** (6.2). `▲` em `--term-warn` e a frase do que houve; abaixo, em muted, o que
 está sendo mostrado e quando tenta de novo.
