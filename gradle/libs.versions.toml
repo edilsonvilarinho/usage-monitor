@@ -14,6 +14,7 @@ sqlite-jdbc = "3.53.4.0"
 pdfbox = "3.0.8"
 commons-compress = "1.28.0"
 jna = "5.19.1"
+jline = "3.30.17"
 kover = "0.9.9"
 
 [libraries]
@@ -48,6 +49,11 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+
+# Modo interativo do terminal (#441): so o terminal (modo cru, teclas, tamanho). O
+# `jline-terminal-jni` traz o provedor nativo das tres plataformas; o desenho e o da #439.
+jline-terminal = { module = "org.jline:jline-terminal", version.ref = "jline" }
+jline-terminal-jni = { module = "org.jline:jline-terminal-jni", version.ref = "jline" }
 
 # Leitura do .tar.gz da atualizacao Linux. O JDK nao traz leitor de tar, e
 # depender do comando `tar` deixaria o update na mao do que estiver no PATH.

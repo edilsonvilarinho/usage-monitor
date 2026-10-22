@@ -59,6 +59,21 @@ internal class TerminalReader(
     /** O idioma efetivo: o `--locale` desta execução ou a preferência gravada. */
     fun language(languageOverride: AppLanguage?): AppLanguage = LanguageSelection(settings, languageOverride).current()
 
+    /**
+     * Traz para esta JVM o que outra gravou nas preferências (#441). O `java.util.prefs` guarda o
+     * nó em cache e só relê o disco a cada 30 s: o modo interativo, que fica aberto, veria os
+     * limiares e as configurações que o serviço acabou de gravar meio minuto depois.
+     *
+     * Duas vezes, e não por engano: no Linux (`FileSystemPreferences`) o `sync()` só relê o
+     * arquivo quando o carimbo da raiz ainda é o que esta JVM gravou. Quando o coletor grava, ele
+     * troca o carimbo; o primeiro `sync()` daqui só o reconhece (e o regrava), e o segundo relê.
+     * Medido no contêiner da A09, com o serviço gravando e a TUI aberta pelo SSH. O próprio
+     * temporizador do `java.util.prefs` faz o mesmo `sync()` a cada 30 s: nada novo é escrito.
+     */
+    fun syncPreferences() {
+        repeat(2) { runCatching { preferences.sync() } }
+    }
+
     /** Os perfis Anthropic gravados pelo app, sem redescobrir nada (linha de status). */
     fun anthropicProfiles(): List<AnthropicProfileRecord> = AnthropicProfileRegistry.readStored(preferences)
 

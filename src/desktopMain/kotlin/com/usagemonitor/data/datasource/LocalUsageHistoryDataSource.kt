@@ -20,12 +20,15 @@ import kotlin.time.Duration.Companion.days
 
 class LocalUsageHistoryDataSource(
     private val databaseFile: File = defaultDatabaseFile(),
-    private val retentionPeriod: Duration = 90.days
+    private val retentionPeriod: Duration = 90.days,
+    /** Só lê o histórico que o coletor grava (#441): sem schema ao abrir. Gravar falha. */
+    readOnly: Boolean = false
 ) : UsageHistoryDataSource, AutoCloseable {
 
     private val connectionManager = SqliteConnectionManager(
         databaseFile = databaseFile,
-        onOpen = { connection -> initializeSchema(connection) }
+        onOpen = { connection -> initializeSchema(connection) },
+        readOnly = readOnly
     )
 
     override suspend fun insertSnapshot(stats: ApiUsageStats, capturedAt: Instant) {

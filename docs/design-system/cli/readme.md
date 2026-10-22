@@ -57,6 +57,8 @@ aqui, na seção Primitivas.
 
 - Modo interativo desenhado para **96 colunas** (94 internas). Abaixo de 96, a coluna de detalhe
   encolhe; abaixo de 80, lista e detalhe se empilham: a lista ocupa a tela e `enter` abre o detalhe.
+  Mais largo que 96, a moldura não cresce. A moldura ocupa a altura toda do terminal; abaixo de
+  40×12, só a frase que diz o tamanho que falta (6.3).
 - Comandos de uma tacada cabem em 100 colunas, e a linha de status também.
 
 ## Glifos
@@ -72,8 +74,12 @@ aqui, na seção Primitivas.
 | Reinício de janela | `┆` muted | `\|` |
 | Anel na linha de status | `○ ◔ ◑ ◕ ●` (quartos de uso) | o número basta |
 | Valor ajustável | `‹ 70 ›` | `< 70 >` |
-| Legenda de série | `■` na cor da série | inicial da série |
+| Legenda de série | `■` na cor da série | a letra da série: `e s l g` (entrada, saída, cache lido, cache gravado; em inglês `i o r w`) |
 | Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
+| Sparkline (#441) | `▁▂▃▄▅▆▇█` na cor da fonte | `._-=+*#@` |
+| Setas nos atalhos (#441) | `↑ ↓ ← →` | `^ v < >` |
+| Cursor do campo em edição (#441) | `▏` em ouro | `_` |
+| Presença no time (#441) | `●` trabalhando e `◑` app aberto em verde, `○` ausente em muted | `*`, `+`, `-` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 
@@ -129,6 +135,8 @@ separador e o corpo; no fim, outro separador e o rodapé de atalhos.
 **Abas** (3.1). Numeradas e fixas: `1 Visão geral`, `2 Sessões`, `3 Histórico`, `4 Time`,
 `5 Configurações`. A ativa vai em ouro e negrito sobre `--term-selection`, as outras em muted. Sem
 time configurado, a aba 4 não aparece e as outras **mantêm o número**: atalho não muda de tecla.
+Sem cor não há fundo de seleção: a ativa troca os espaços que a cercam por colchetes
+(`[1 Visão geral]`), com a mesma largura, para a linha não andar entre os modos.
 
 **Rodapé de atalhos** (3.1). A tecla em negrito, o rótulo em muted, dois espaços entre pares. Os
 atalhos da aba vêm primeiro, os comuns depois (`1–5 aba`, `r atualizar`, `? ajuda`, `q sair`).
@@ -138,21 +146,32 @@ selecionado leva `▸` em ouro e fundo de seleção. Um divisor `│` e, à dire
 
 **Tabela** (3.2, 3.4). Cabeçalho em maiúsculas, muted e negrito. Números alinhados à direita e
 custo em negrito. A linha selecionada leva `▸` e fundo de seleção. Modelo sem tarifa leva `+` no
-custo, com nota de rodapé.
+custo, com nota de rodapé. Na 3.4, a marca de presença vem logo depois do `▸` e a palavra do estado
+está sempre escrita ao lado ("trabalhando · 1 sessão", "app aberto", "ausente · há 2 h").
 
 **Sparkline** (3.3). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
-reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado.
+reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado. A célula leva o
+maior uso lido nela, pelo piso; sem leitura fica em branco. Reinício é a leitura em que a janela
+anterior já tinha acabado (o fim mudou e ficou para trás), comparada com a última leitura que
+conhecia o fim: numa janela corrida o fim anda a cada leitura, e a leitura ociosa vem sem fim.
+Em tela estreita a trilha perde o começo, nunca o agora.
 
 **Composição de tokens** (3.2). Segmentos `█` nas cores da série (`--term-input`, `--term-output`,
-`--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série.
+`--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série. Sem Unicode, o
+segmento e a legenda levam a letra da série, uma por série (a inicial colidiria nos dois caches).
+Tokens abreviados com uma casa no separador do idioma (`4,8M`, `136K`), nunca no do locale.
 
 **Caixa** (3.5). Borda arredondada e título opcional na cor de acento. Usada para a ajuda e para
 qualquer sobreposição. Nunca há caixa dentro de caixa.
 
 **Campo de configuração** (4.2). `[x]` em verde e `[ ]` em muted, valor ajustável `‹ 70 ›` com as
-setas em ouro, campo de texto `[ valor ]`. A linha em edição leva fundo de seleção. No alto da
-seção, à direita: "muda na hora, sem reiniciar o serviço", ou o aviso de reinício quando o ajuste
-exigir (proxy).
+setas em ouro (em muted quando não há vizinho), campo de texto `[ valor ]`, ação em ouro e
+informação só de leitura com o rótulo em muted. A linha selecionada leva fundo de seleção; em
+edição, `[ texto▏ ]` com o cursor em ouro, e o segredo não ecoa nada, nem o tamanho. Ação que
+apaga ou invalida algo pede um segundo `enter` ("enter de novo confirma", em `--term-warn`). A nota
+de um campo vai em muted à direita e sai quando não cabe inteira. No alto da seção, à direita,
+quando a mudança vale (a mesma frase dos comandos da #440: "o serviço já está usando", ou o aviso
+de reinício em `--term-warn` no proxy). O resultado da mudança é a saída do comando, no pé do corpo.
 
 **Faixa de aviso** (6.2). `▲` em `--term-warn` e a frase do que houve; abaixo, em muted, o que
 está sendo mostrado e quando tenta de novo.

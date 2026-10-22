@@ -340,7 +340,8 @@ internal class CollectorEngine(
                     teamSettings = graph.teamSettingsFlow.value,
                     teamSync = teamSync.syncStatus.value,
                     webStatus = webAccess.status.value,
-                    now = Clock.System.now()
+                    now = Clock.System.now(),
+                    teamClockOffsetMillis = graph.teamServerClockOffset.offsetMillis
                 )
                 withContext(Dispatchers.IO) { health.write(report) }
                 delay(HEALTH_WRITE_INTERVAL_MILLIS)

@@ -160,6 +160,9 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 - Modo terminal, configurar e serviço (#440): com coletor vivo, configurar é **pedido** (`control/`) aplicado pelo `ConfigApplier`
   do coletor — um escritor só; sem coletor, o terminal aplica direto. Segredo só pela entrada, sem eco. Motor sem Compose
   (`CollectorEngine`); `service` (systemd do usuário) só no Linux e só na raiz padrão.
+- Modo interativo (#441, `usage-monitor tui`): desenho é função pura (`TuiScreen`), JLine só para o terminal; bancos em somente
+  leitura (`SqliteConnectionManager(readOnly = true)`), nunca o view model. Rede só na aba Time (o `GET` do time; presença e desvio de
+  relógio vêm do coletor) e na aba 5, que roda os comandos da 4.3 por `TerminalConfigRunner.output` — nunca regra própria de gravação.
 - Raiz de dados (#419): caminho em `~/.usage-monitor` só pelo `AppDataDirectory` (`file` = dados/instância, `installationFile` = o que
   NSIS/updater leem em caminho fixo); configurada uma vez no `main()`. Fora da raiz padrão: atualização e autostart desligados.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia

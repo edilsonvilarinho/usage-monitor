@@ -64,35 +64,51 @@ internal class TerminalConfigRunner(
 ) {
 
     fun run(command: ConfigCommand, languageOverride: AppLanguage?, console: TerminalConsole): Int {
-        val labels = TerminalConfigLabels(reader.language(languageOverride))
-        val output = when (command) {
-            is SourcesCommand -> sources(command, labels, console.profile)
-            is SettingCommand -> setting(command, labels, console)
-            is KeysCommand -> TerminalKeysRunner(
-                client, secretInput,
-                savedKey = { source -> LocalApiKeyDataSource(dataFile("api-keys.json")).load().forSource(source) },
-                probe = keyProbe
-            ).run(command, labels, console.profile)
-            is TelegramCommand -> return TerminalTelegramRunner(
-                client,
-                collector = client::currentCollector,
-                settings = { LocalTelegramSettingsDataSource(dataFile("telegram.json")).load() },
-                api = telegramApi,
-                secretInput = secretInput
-            ).run(command, labels, console)
-            is TeamCommand -> teamRunner().runTeam(command, labels, console.profile)
-            is WebCommand -> teamRunner().runWeb(command, labels, console.profile)
-            is AccountsCommand -> TerminalAccountsRunner(
-                client, preferences, home, codexHome,
-                codexSourceEnabled = { ApiSource.CODEX in readApiSourceCollection(PreferencesSettings(preferences), ENABLED_APIS_KEY) },
-                credentialsInKeychain = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
-            ).run(command, labels, console.profile)
+        if (command is TelegramCommand) {
+            // O `pair` espera a conversa aparecer, imprimindo no console enquanto isso.
+            return telegramRunner().run(command, TerminalConfigLabels(reader.language(languageOverride)), console)
         }
+        val output = output(command, languageOverride, console.profile)
         if (output.lines.isNotEmpty()) {
             console.print(TerminalAnsi.render(output.lines, console.profile))
         }
         return output.exitCode
     }
+
+    /**
+     * A saída de um comando, sem imprimir: o modo interativo (#441, aba 5) mostra estas linhas
+     * como aviso. Aqui o `telegram pair` só abre o código, sem esperar a conversa.
+     */
+    fun output(command: ConfigCommand, languageOverride: AppLanguage?, profile: TerminalProfile): TerminalOutput {
+        val labels = TerminalConfigLabels(reader.language(languageOverride))
+        return when (command) {
+            is SourcesCommand -> sources(command, labels, profile)
+            is SettingCommand -> setting(command, labels, profile)
+            is KeysCommand -> TerminalKeysRunner(
+                client, secretInput,
+                savedKey = { source -> LocalApiKeyDataSource(dataFile("api-keys.json")).load().forSource(source) },
+                probe = keyProbe
+            ).run(command, labels, profile)
+            is TelegramCommand -> telegramRunner().let { telegram -> telegram.output(command, labels, profile) ?: telegram.openPairing(labels, profile) }
+            is TeamCommand -> teamRunner().runTeam(command, labels, profile)
+            is WebCommand -> teamRunner().runWeb(command, labels, profile)
+            is AccountsCommand -> accountsRunner().run(command, labels, profile)
+        }
+    }
+
+    private fun telegramRunner() = TerminalTelegramRunner(
+        client,
+        collector = client::currentCollector,
+        settings = { LocalTelegramSettingsDataSource(dataFile("telegram.json")).load() },
+        api = telegramApi,
+        secretInput = secretInput
+    )
+
+    internal fun accountsRunner() = TerminalAccountsRunner(
+        client, preferences, home, codexHome,
+        codexSourceEnabled = { ApiSource.CODEX in readApiSourceCollection(PreferencesSettings(preferences), ENABLED_APIS_KEY) },
+        credentialsInKeychain = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
+    )
 
     private fun sources(command: SourcesCommand, labels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput =
         when (command) {
@@ -118,8 +134,8 @@ internal class TerminalConfigRunner(
         addresses = webAddresses
     )
 
-    private fun setting(command: SettingCommand, labels: TerminalConfigLabels, console: TerminalConsole): TerminalOutput {
-        val glyphs = console.profile.glyphs
+    private fun setting(command: SettingCommand, labels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
+        val glyphs = profile.glyphs
         return when (command) {
             is SettingCommand.List -> {
                 val keys = ConfigKeys.ALL.filter { key -> command.prefix == null || key.name == command.prefix || key.name.startsWith(command.prefix + ".") }
@@ -139,12 +155,12 @@ internal class TerminalConfigRunner(
                 val shown = if (key.secret && value != null) glyphs.secretMask else value ?: ConfigValues.OFF
                 TerminalOutput(listOf(terminalLine(TerminalSpan(shown))), TerminalConfigView.EXIT_OK)
             }
-            is SettingCommand.Set -> setValue(command, labels, console)
+            is SettingCommand.Set -> setValue(command, labels, profile)
         }
     }
 
-    private fun setValue(command: SettingCommand.Set, labels: TerminalConfigLabels, console: TerminalConsole): TerminalOutput {
-        val glyphs = console.profile.glyphs
+    private fun setValue(command: SettingCommand.Set, labels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
+        val glyphs = profile.glyphs
         val key = ConfigKeys.named(command.key) ?: return TerminalOutput(emptyList(), EXIT_USAGE)
         val raw = command.value ?: secretInput.read(labels.secretPrompt)?.takeIf { text -> text.isNotBlank() }
             ?: return TerminalOutput(TerminalConfigView.warning(labels.noSecretGiven, null, glyphs), TerminalConfigView.EXIT_REFUSED)
@@ -152,7 +168,7 @@ internal class TerminalConfigRunner(
         val normalized = ConfigValues.normalize(key.type, raw)
             ?: return TerminalOutput(TerminalConfigView.warning(labels.invalidValue(key.name, labels.expected(key.type.name)), null, glyphs), EXIT_USAGE)
         val doneText = if (key.secret) labels.secretSaved(key.name) else "${key.name} = $normalized"
-        return delivered(client.apply(ConfigChange.SetValue(key.name, raw)), labels, console.profile, doneText) { refused ->
+        return delivered(client.apply(ConfigChange.SetValue(key.name, raw)), labels, profile, doneText) { refused ->
             if (refused.code == ConfigRefusals.INVALID_VALUE) {
                 TerminalConfigView.warning(labels.invalidValue(key.name, labels.expected(key.type.name)), null, glyphs)
             } else {
@@ -162,7 +178,7 @@ internal class TerminalConfigRunner(
     }
 
     /** Os valores como estão gravados: preferências e os dois arquivos, sem montar nada do app. */
-    private fun readSource(): ConfigReadSource {
+    internal fun readSource(): ConfigReadSource {
         val settings = PreferencesSettings(preferences)
         return ConfigReadSource(
             settings = settings,
@@ -173,7 +189,7 @@ internal class TerminalConfigRunner(
     }
 
     /** O estado de cada fonte como o coletor o vê no arranque: ligada só com a chave, quando a pede. */
-    private fun sourceRows(): List<TerminalSourceRow> {
+    internal fun sourceRows(): List<TerminalSourceRow> {
         val stored = readApiSourceCollection(PreferencesSettings(preferences), ENABLED_APIS_KEY).toSet()
         val keys = LocalApiKeyDataSource(dataFile("api-keys.json")).load()
         return ApiSource.entries.map { source ->

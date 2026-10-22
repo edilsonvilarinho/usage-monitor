@@ -24,7 +24,8 @@ internal fun collectorHealthOf(
     teamSettings: TeamIntegrationSettings,
     teamSync: TeamSyncStatus,
     webStatus: WebAccessStatus,
-    now: Instant
+    now: Instant,
+    teamClockOffsetMillis: Long = 0L
 ): CollectorHealth {
     val data = (dashboard as? UiState.Success)?.data.orEmpty()
     val errors = when (dashboard) {
@@ -36,11 +37,25 @@ internal fun collectorHealthOf(
     val collected = data.map { stats ->
         val error = failing[stats.targetKey]
         val label = listOfNotNull(stats.source.displayName(), stats.profileLabel).joinToString(" ")
-        CollectorSourceHealth(stats.source, label, ok = error == null, retryAtEpochMillis = error?.retryAt?.toEpochMilliseconds())
+        CollectorSourceHealth(
+            stats.source,
+            label,
+            ok = error == null,
+            retryAtEpochMillis = error?.retryAt?.toEpochMilliseconds(),
+            target = stats.targetKey.storageKey,
+            failure = error?.message
+        )
     }
     val collectedTargets = data.map { stats -> stats.targetKey }.toSet()
     val onlyFailing = errors.filter { error -> error.target !in collectedTargets }.map { error ->
-        CollectorSourceHealth(error.source, error.targetLabel ?: error.source.displayName(), ok = false, retryAtEpochMillis = error.retryAt?.toEpochMilliseconds())
+        CollectorSourceHealth(
+            error.source,
+            error.targetLabel ?: error.source.displayName(),
+            ok = false,
+            retryAtEpochMillis = error.retryAt?.toEpochMilliseconds(),
+            target = error.target.storageKey,
+            failure = error.message
+        )
     }
     return CollectorHealth(
         updatedAtEpochMillis = now.toEpochMilliseconds(),
@@ -61,7 +76,8 @@ internal fun collectorHealthOf(
             active = teamSettings.isActive,
             server = teamSettings.normalizedServerUrl.ifEmpty { null },
             lastSuccessAtEpochMillis = teamSync.lastSuccessAt?.toEpochMilliseconds(),
-            lastFailure = teamSync.lastFailureMessage?.takeIf { teamSync.lastFailureAt != null && (teamSync.lastSuccessAt == null || teamSync.lastFailureAt > teamSync.lastSuccessAt) }
+            lastFailure = teamSync.lastFailureMessage?.takeIf { teamSync.lastFailureAt != null && (teamSync.lastSuccessAt == null || teamSync.lastFailureAt > teamSync.lastSuccessAt) },
+            clockOffsetMillis = teamClockOffsetMillis
         ),
         web = when (webStatus) {
             WebAccessStatus.Stopped -> CollectorWebHealth()

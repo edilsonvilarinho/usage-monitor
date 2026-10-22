@@ -26,16 +26,21 @@ import java.sql.Connection
 /** Índice SQLite isolado dos rollouts locais do Codex CLI. */
 class LocalCodexCliSessionDataSource(
     private val codexHomeProvider: () -> File = { CodexCliHomeProvider.resolve() },
-    databaseFile: File = defaultDatabaseFile()
+    databaseFile: File = defaultDatabaseFile(),
+    /** Só lê o índice do coletor (#441), como o do Claude Code: sem schema e sem indexar. */
+    private val readOnly: Boolean = false
 ) : CodexCliSessionDataSource, AutoCloseable {
 
     private val parser = CodexCliRolloutParser()
     private val connectionManager = SqliteConnectionManager(
         databaseFile = databaseFile,
-        onOpen = ::initializeSchema
+        onOpen = ::initializeSchema,
+        readOnly = readOnly
     )
 
-    override suspend fun syncIndex(): CodexCliSessionIndexReport = withContext(Dispatchers.IO) {
+    override suspend fun syncIndex(): CodexCliSessionIndexReport = if (readOnly) CodexCliSessionIndexReport() else indexRollouts()
+
+    private suspend fun indexRollouts(): CodexCliSessionIndexReport = withContext(Dispatchers.IO) {
         val discovered = listRolloutFiles()
         var updatedFiles = 0
         var skippedLines = 0

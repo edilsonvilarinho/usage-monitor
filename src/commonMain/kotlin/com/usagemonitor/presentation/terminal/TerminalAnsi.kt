@@ -65,8 +65,8 @@ private const val PLAIN = "aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN"
 
 /**
  * O texto sem acento, letra por letra. A pontuação tipográfica dos textos (`·`, `–`,
- * `—`, `…`) vira a equivalente ASCII de mesma largura, e qualquer outro caractere fora
- * do ASCII vira `?`. Tabela própria em vez de `java.text.Normalizer`, que não existe no
+ * `—`, `…`) e as setas dos atalhos do modo interativo (`↑ ↓ ← →`, #441) viram a equivalente
+ * ASCII de mesma largura, e qualquer outro caractere fora do ASCII vira `?`. Tabela própria em vez de `java.text.Normalizer`, que não existe no
  * `commonMain`; o app só escreve em português e inglês.
  */
 internal fun withoutAccents(text: String): String =
@@ -78,6 +78,10 @@ internal fun withoutAccents(text: String): String =
                 char.code < 128 -> append(char)
                 char == '·' || char == '–' || char == '—' -> append('-')
                 char == '…' -> append('.')
+                char == '↑' -> append('^')
+                char == '↓' -> append('v')
+                char == '←' -> append('<')
+                char == '→' -> append('>')
                 else -> append('?')
             }
         }

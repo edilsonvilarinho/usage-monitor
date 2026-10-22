@@ -69,6 +69,18 @@ internal class LocalTeamSettingsDataSource(
         return withDeviceId.toDomain()
     }
 
+    /**
+     * Lê sem efeito nenhum (#441), para quem só olha o arquivo de fora, como o modo interativo:
+     * sem criar o `deviceId` e sem mover arquivo ilegível, que são decisões do dono da
+     * configuração. `null` sem arquivo ou com arquivo ilegível.
+     */
+    fun peek(): TeamIntegrationSettings? {
+        if (!settingsFile.isFile) {
+            return null
+        }
+        return runCatching { json.decodeFromString(TeamSettingsDto.serializer(), settingsFile.readText()).toDomain() }.getOrNull()
+    }
+
     fun save(settings: TeamIntegrationSettings) {
         // O deviceId nunca é editável pela UI; se vier vazio, preserva o gravado.
         val deviceId = settings.deviceId.takeIf { it.isNotBlank() }
