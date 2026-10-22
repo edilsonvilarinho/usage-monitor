@@ -1,10 +1,16 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.CollectorRegistration
+import com.usagemonitor.data.datasource.LocalAlertLogDataSource
 import com.usagemonitor.data.datasource.LocalCollectorRegistrationDataSource
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
+import com.usagemonitor.domain.entity.alertDestinationsFor
+import com.usagemonitor.domain.entity.AlertLogEntry
 import com.usagemonitor.domain.entity.CollectorKind
+import com.usagemonitor.domain.entity.alertLogKindOf
+import com.usagemonitor.domain.entity.alertLogPercentOf
+import com.usagemonitor.presentation.ui.usageAlertMessage
 import com.usagemonitor.data.export.JsonUsageSnapshotEncoder
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -74,9 +80,10 @@ internal class CollectorEngine(
     private val graph: AppGraph,
     autoUpdate: AutoUpdateController,
     /** Quem roda o motor, para o terminal dizer de onde vem a leitura. */
-    kind: CollectorKind,
+    private val kind: CollectorKind,
     private val registration: LocalCollectorRegistrationDataSource = LocalCollectorRegistrationDataSource(),
-    private val configRequests: LocalConfigRequestChannel = LocalConfigRequestChannel()
+    private val configRequests: LocalConfigRequestChannel = LocalConfigRequestChannel(),
+    private val alertLog: LocalAlertLogDataSource = LocalAlertLogDataSource()
 ) {
     private val breadcrumbs = graph.breadcrumbs
     private val shutdownStarted = AtomicBoolean(false)
@@ -221,6 +228,23 @@ internal class CollectorEngine(
     fun currentSnapshot(): UsageSnapshot? {
         val success = dashboard.uiState.value as? UiState.Success ?: return null
         return buildUsageSnapshot(success.data, hudActiveTargets.value, Clock.System.now(), success.riskSummaries)
+    }
+
+    init {
+        // O registro do que foi avisado (#440, 5.2): sem tela, é o que fica além do Telegram.
+        engineScope.launch {
+            usageAlert.alerts.collect { alert ->
+                val destinations = alertDestinationsFor(kind, graph.telegramSettingsFlow.value)
+                val entry = AlertLogEntry(
+                    atEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                    kind = alertLogKindOf(alert),
+                    title = usageAlertMessage(alert, graph.languageSelection.current()).title,
+                    percent = alertLogPercentOf(alert),
+                    destinations = destinations
+                )
+                withContext(Dispatchers.IO) { alertLog.append(entry) }
+            }
+        }
     }
 
     /**

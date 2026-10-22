@@ -1,6 +1,7 @@
 package com.usagemonitor.terminal
 
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -27,6 +28,9 @@ internal sealed interface TerminalCommand {
 
     /** `statusline tmux`: o segmento da barra do tmux, no formato de estilo dele. */
     data object TmuxStatusLine : Reading
+
+    /** `alerts [--since <tempo>]`: o registro do que foi avisado (#440, 5.2). Sem `--since`, hoje. */
+    data class Alerts(val since: Duration? = null) : Reading
 }
 
 internal object TerminalCommandNames {
@@ -43,9 +47,12 @@ internal object TerminalCommandNames {
     const val CLAUDE_CODE = "claude-code"
     const val TMUX = "tmux"
     const val SERVICE = "service"
+    const val ALERTS = "alerts"
+    const val SINCE = "--since"
+    const val TODAY = "--today"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, ALERTS, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB)
 
     /** Os alvos da linha de status. */
     val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE, TMUX)
@@ -68,6 +75,7 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
         TerminalCommandNames.WAIT -> parseWait(arguments)
         TerminalCommandNames.STATUS_LINE -> parseStatusLine(arguments)
         TerminalCommandNames.SERVICE -> parseServiceCommand(arguments)
+        TerminalCommandNames.ALERTS -> parseAlerts(arguments)
         SourcesCommandNames.SOURCES -> parseSourcesCommand(arguments)
         SettingCommandNames.CONFIG -> parseSettingCommand(arguments)
         KeysCommandNames.KEYS -> parseKeysCommand(arguments)
@@ -145,6 +153,21 @@ private fun parseStatusLine(arguments: List<String>): TerminalCommandParse {
     }
 }
 
+private fun parseAlerts(arguments: List<String>): TerminalCommandParse {
+    var since: Duration? = null
+    val reader = OptionReader(arguments)
+    while (reader.hasNext()) {
+        val argument = reader.next()
+        when {
+            argument == TerminalCommandNames.TODAY -> since = null
+            reader.isOption(argument, TerminalCommandNames.SINCE) -> since = reader.value(argument)?.let(::parseTerminalDuration)
+                ?: return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.SINCE} needs a time such as 12h or 7d.")
+            else -> return unknownOption(TerminalCommandNames.ALERTS, argument)
+        }
+    }
+    return TerminalCommandParse.Parsed(TerminalCommand.Alerts(since))
+}
+
 private fun invalidMaxAge(): TerminalCommandParse =
     TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.MAX_AGE} needs a time such as 90s, 10m or 2h.")
 
@@ -171,16 +194,17 @@ internal fun unknownOption(command: String, argument: String): TerminalCommandPa
     TerminalCommandParse.Invalid("Error: '$argument' is not an option of '$command'. Run with --help to list the options.")
 
 /**
- * "90s", "10m", "2h" ou só o número, em segundos. Zero ou negativo não é um tempo: `null`.
+ * "90s", "10m", "2h", "7d" ou só o número, em segundos. Zero ou negativo não é um tempo: `null`.
  */
 internal fun parseTerminalDuration(text: String): Duration? {
     val trimmed = text.trim().lowercase()
-    val unit = trimmed.lastOrNull()?.takeIf { char -> char == 's' || char == 'm' || char == 'h' }
+    val unit = trimmed.lastOrNull()?.takeIf { char -> char == 's' || char == 'm' || char == 'h' || char == 'd' }
     val amount = (if (unit != null) trimmed.dropLast(1) else trimmed).toLongOrNull() ?: return null
     if (amount <= 0L) {
         return null
     }
     return when (unit) {
+        'd' -> amount.days
         'h' -> amount.hours
         'm' -> amount.minutes
         else -> amount.seconds

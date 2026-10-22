@@ -1,6 +1,9 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.data.datasource.LocalAlertLogDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionMetricsReader
+import com.usagemonitor.presentation.terminal.TerminalAlertsLabels
+import com.usagemonitor.presentation.terminal.TerminalAlertsView
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionMetrics
 import com.usagemonitor.presentation.terminal.TerminalAnsi
@@ -19,6 +22,9 @@ import com.usagemonitor.presentation.terminal.TerminalProfile
 import com.usagemonitor.presentation.terminal.TerminalStatusView
 import com.usagemonitor.presentation.terminal.detectTerminalProfile
 import java.io.File
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.PrintStream
@@ -52,13 +58,21 @@ internal object TerminalCommands {
         statusLineInput: () -> String = { readPipedInput() },
         sessionMetrics: (String) -> CliSessionMetrics? = LocalCliSessionMetricsReader()::read,
         environment: Map<String, String> = System.getenv(),
-        home: File = File(System.getProperty("user.home").orEmpty())
+        home: File = File(System.getProperty("user.home").orEmpty()),
+        alertLog: LocalAlertLogDataSource = LocalAlertLogDataSource()
     ): Int {
         // O driver do SQLite avisa no `stderr` que não há provedor de log; no app esse texto
         // vai para o `app.log`, mas no terminal sujaria a saída de quem chamou.
         System.setProperty(SLF4J_VERBOSITY_PROPERTY, "ERROR")
         quietPreferencesLog()
         return when (command) {
+            is TerminalCommand.Alerts -> {
+                val reading = reader.read(languageOverride)
+                val since = command.since?.let { duration -> reading.now - duration } ?: startOfTodayBrt(reading.now)
+                val output = TerminalAlertsView.render(alertLog.read(since.toEpochMilliseconds()), reading.now, command.since == null, TerminalAlertsLabels(reading.language), console.profile)
+                console.print(TerminalAnsi.render(output.lines, console.profile))
+                output.exitCode
+            }
             is TerminalCommand.Reading -> runReading(command, languageOverride, reader, console, pause, statusLineInput, sessionMetrics, environment, home)
             is ServiceCommand -> TerminalServiceCommands.run(command, languageOverride, console)
             is ConfigCommand -> TerminalConfigRunner().run(command, languageOverride, console)
@@ -92,6 +106,8 @@ internal object TerminalCommands {
                 val line = TerminalStatusLineView.claudeCode(account, input.sessionId?.let(sessionMetrics), input.model, reading.now, labels, console.profile)
                 TerminalOutput(listOf(line), EXIT_STATUS_LINE)
             }
+            // Atendido antes, em `run`: não lê o cache de cotas.
+            is TerminalCommand.Alerts -> return 0
             TerminalCommand.TmuxStatusLine -> {
                 // Formato do tmux, e não ANSI: sai direto, sem passar pelo renderizador de linhas.
                 console.print(TerminalTmux.render(reading.accounts, reading.now, labels, console.profile))
@@ -150,6 +166,12 @@ internal object TerminalCommands {
             reading = reader.read(languageOverride)
         }
     }
+}
+
+/** Meia-noite de hoje em BRT: o `alerts` sem `--since` mostra o dia, como o "hoje" do bot. */
+internal fun startOfTodayBrt(now: kotlin.time.Instant): kotlin.time.Instant {
+    val zone = TimeZone.of("America/Sao_Paulo")
+    return now.toLocalDateTime(zone).date.atStartOfDayIn(zone)
 }
 
 /**
