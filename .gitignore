@@ -13,6 +13,7 @@ server/dist/
 server/data/
 server/.env
 server/test-results/
+server/coverage/
 
 # Cache do interpretador Python das ferramentas de marca
 tools/brand/__pycache__/
