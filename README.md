@@ -20,9 +20,38 @@ A small notch docked to the edge of your screen shows one ring per account and o
 It reads the credentials you already have, keeps history in local SQLite and never sends prompt or
 response content anywhere.
 
+The same app also works from the terminal: a status table, status lines for Claude Code and tmux,
+a full-screen interactive mode and, on a Linux server without a screen, a headless service.
+
 ![The HUD notch: one ring per account, one arc per quota, and the details balloon](img/hud.gif)
 
 <img src="img/divider.svg" width="100%" alt="">
+
+## Quick start
+
+**With the window.** [Download the installer](https://github.com/edilsonvilarinho/usage-monitor/releases/latest) and open Usage Monitor: the notch docks to the
+edge of the screen. Claude Code and Codex accounts are found on their own; sources that need an API
+key (MiniMax, DeepSeek, OpenCode Go, OpenRouter) take it in **Settings > APIs**.
+
+**From the terminal** — the same app, on your machine or on a server over SSH:
+
+```sh
+usage-monitor status                  # every quota: bar, state and when it resets
+usage-monitor tui                     # full screen by keyboard: overview, sessions, history, team, settings
+usage-monitor setup                   # first time on a server: accounts, keys, alerts and the service
+usage-monitor statusline claude-code  # one line under the Claude Code prompt
+```
+
+Where the command is:
+
+| Install | Command |
+|---|---|
+| Linux `.sh` | `usage-monitor` (in `~/.local/bin`) |
+| Linux `.deb` / `.rpm` | `"/opt/usage-monitor/bin/Usage Monitor"`; `sudo ln -s "/opt/usage-monitor/bin/Usage Monitor" /usr/local/bin/usage-monitor` gives it the short name |
+| Windows | `usage-monitor.exe` in the install folder (`%LOCALAPPDATA%\Usage Monitor`) |
+| macOS | `"/Applications/Usage Monitor.app/Contents/MacOS/Usage Monitor"` |
+
+Every command is in [Command line and terminal mode](#command-line-and-terminal-mode).
 
 ## Features
 
@@ -38,6 +67,9 @@ response content anywhere.
 - **Keeps working** — each source fails on its own and keeps its last reading; rate limits back off.
 - **Export** — CSV and JSON of sessions and summaries, and PDF reports. History PDF follows the
   selected source, account, range and quota and includes all available windows, even when collapsed.
+- **Terminal mode** — `status`, `check` and `wait` for scripts, status lines for Claude Code and tmux,
+  a full-screen interactive mode and every setting by command; on a Linux server it runs as a
+  headless service.
 - **Team view (optional)** — a server you host aggregates one account across machines, with a 30-day
   trend and live presence. See [`server/README.md`](server/README.md).
 - **Desktop** — auto-start, light and dark themes, English and Portuguese, UI scale, in-app help
@@ -72,7 +104,11 @@ API key, entered in **Settings > APIs**; environment variables are never read.
 
 </details>
 
-### Command line
+## Command line and terminal mode
+
+![The terminal mode: usage-monitor status, then usage-monitor tui going through its five tabs](img/terminal.gif)
+
+<sub>Drawn by the app's own terminal code with synthetic data (`gradlew generateTerminalMedia`).</sub>
 
 | Option | What it does |
 |---|---|

@@ -75,6 +75,8 @@ class TerminalStatusViewTest {
         val output = TerminalStatusView.render(accounts, now, collector = CollectorKind.APP, maxAge = null, labels = en, profile = color)
         assertTrue(text(output).first().startsWith(" SOURCE"))
         assertTrue(text(output)[3].contains("critical"))
+        // O saldo segue o idioma: em inglês, ponto decimal (antes saía `US$ 7,82`).
+        assertTrue(text(output)[4].trimEnd().endsWith("balance US$ 7.82"), text(output)[4])
         assertEquals(" read 38 s ago by the open app · 4 quotas: 1 critical, 2 on track", text(output).last())
     }
 

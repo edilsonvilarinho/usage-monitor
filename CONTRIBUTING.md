@@ -105,11 +105,13 @@ is the mandatory mockup for each screen's layout.
   `lightAppAccents` directly. A top-level `val` is resolved once per process and does not read the
   active theme.
 - **Colour never carries information on its own.** Every state carries a dot and a word.
-- If you change a screen, **regenerate the screenshots** and commit them:
+- If you change a screen, **regenerate the screenshots** and commit them (`generateTerminalMedia`
+  when the change is in the terminal mode):
 
 ```bat
 gradlew.bat generateScreenshots
 gradlew.bat generateTourGif
+gradlew.bat generateTerminalMedia
 ```
 
 ## Commits and pull requests

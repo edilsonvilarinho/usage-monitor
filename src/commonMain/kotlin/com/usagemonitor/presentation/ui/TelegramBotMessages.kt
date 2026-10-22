@@ -132,7 +132,7 @@ internal object TelegramBotMessages {
         val percent = quota.percent
         return when {
             percent != null -> "$percent%"
-            quota.unit == UsageUnit.CURRENCY_USD -> (if (pt) "saldo " else "balance ") + formatCents(quota.total - quota.used, quota.currencyCode)
+            quota.unit == UsageUnit.CURRENCY_USD -> (if (pt) "saldo " else "balance ") + formatCents(quota.total - quota.used, quota.currencyCode, pt)
             quota.total > 0L -> "${quota.used} / ${quota.total}"
             else -> quota.used.toString()
         }
@@ -336,11 +336,12 @@ internal object TelegramBotMessages {
         return "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
     }
 
-    private fun formatCents(cents: Long, currency: String): String {
+    /** O separador decimal é o do idioma da mensagem: `US$ 7,82` em português, `US$ 7.82` em inglês. */
+    private fun formatCents(cents: Long, currency: String, pt: Boolean): String {
         val units = cents / 100
         val rest = (cents % 100).toString().padStart(2, '0')
         val symbol = if (currency == "USD") "US$" else currency
-        return "$symbol $units,$rest"
+        return "$symbol $units${if (pt) ',' else '.'}$rest"
     }
 
     private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
