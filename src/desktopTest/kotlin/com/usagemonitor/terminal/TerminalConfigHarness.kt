@@ -75,7 +75,8 @@ internal class TerminalConfigHarness(
             webAddresses = { listOf("192.168.0.10") }
         )
         val code = runner.run(command, language, console)
-        return code to buffer.toString(Charsets.UTF_8)
+        // `println` termina a linha com `\r\n` no Windows: o teste compara com `\n`.
+        return code to buffer.toString(Charsets.UTF_8).replace("\r\n", "\n")
     }
 
     override fun close() {

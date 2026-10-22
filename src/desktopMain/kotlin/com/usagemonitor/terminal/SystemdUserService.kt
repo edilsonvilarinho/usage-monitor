@@ -4,6 +4,10 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** O resultado de um comando do sistema: código e a saída junta (`stdout` + `stderr`). */
+/** O caminho canônico com `/`, para comparar trechos de caminho em qualquer sistema. */
+internal fun portablePath(path: String): String =
+    runCatching { File(path).canonicalPath }.getOrDefault(path).replace(File.separatorChar, '/')
+
 internal data class ProcessResult(val exitCode: Int, val output: String)
 
 /** Roda um comando do sistema; o teste troca por um de mentira. */
@@ -100,7 +104,7 @@ internal class SystemdUserService(
         fun executable(appPath: String?, home: File): String? {
             val path = appPath?.takeIf { value -> value.isNotBlank() } ?: return null
             val launcher = File(home, ".local/bin/usage-monitor")
-            val managed = runCatching { File(path).canonicalPath }.getOrDefault(path).contains("/usage-monitor/versions/")
+            val managed = portablePath(path).contains("/usage-monitor/versions/")
             return if (managed && launcher.canExecute()) launcher.path else path
         }
     }

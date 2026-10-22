@@ -96,7 +96,8 @@ class TerminalServiceCommandsTest {
         val buffer = ByteArrayOutputStream()
         val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
         val code = commands.run(command, AppLanguage.PT, console)
-        return code to buffer.toString(Charsets.UTF_8)
+        // Fim de linha e separador do Windows: a unit e os caminhos do teste são os do Linux.
+        return code to buffer.toString(Charsets.UTF_8).replace("\r\n", "\n").replace('\\', '/')
     }
 
     @Test

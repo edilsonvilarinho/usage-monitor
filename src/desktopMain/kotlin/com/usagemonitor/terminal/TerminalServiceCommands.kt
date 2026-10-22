@@ -142,7 +142,7 @@ internal class TerminalServiceCommands(
         val report = health.read()?.takeIf { collector != null }
         val history = dataFile("usage-history.db")
         val lastAlert = alertLog.read(startOfTodayBrt(reading.now).toEpochMilliseconds()).maxByOrNull { entry -> entry.atEpochMillis }
-        val canonicalApp = appPath?.let { path -> runCatching { File(path).canonicalPath }.getOrDefault(path) }
+        val canonicalApp = appPath?.let(::portablePath)
         return TerminalServiceStatus(
             unitInstalled = systemd.unitFile.isFile && properties["LoadState"] != "not-found",
             unitActive = properties["ActiveState"] == "active",

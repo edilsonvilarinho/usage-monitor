@@ -89,7 +89,7 @@ class TerminalSetupCommandTest {
         )
         assertEquals(key, ran.single { (command, _) -> command == KeysCommand.Set(ApiSource.MINIMAX) }.second)
         assertEquals("123:tok", ran.single { (command, _) -> command == TelegramCommand.Setup }.second)
-        val output = buffer.toString(Charsets.UTF_8)
+        val output = buffer.toString(Charsets.UTF_8).replace("\r\n", "\n")
         assertTrue(output.startsWith("Usage Monitor 41.12.0 · configuração inicial · dados em ~/.usage-monitor\n"), output)
         assertTrue(output.contains("1/5  Contas encontradas neste computador") && output.contains("5/5  Segundo plano"), output)
         assertTrue(output.contains("– DeepSeek pulada"), output)
@@ -126,12 +126,12 @@ class TerminalSetupCommandTest {
 
             val upToDate = ByteArrayOutputStream()
             assertEquals(0, TerminalUpdateCommand({ Result.success(null) }, node, reader, null).run(AppLanguage.PT, console(upToDate)))
-            assertTrue(upToDate.toString(Charsets.UTF_8).startsWith("✓ "), upToDate.toString(Charsets.UTF_8))
+            assertTrue(upToDate.toString(Charsets.UTF_8).replace("\r\n", "\n").startsWith("✓ "), upToDate.toString(Charsets.UTF_8).replace("\r\n", "\n"))
 
             val script = ByteArrayOutputStream()
             TerminalUpdateCommand({ Result.success(latest) }, node, reader, "/home/dev/.local/share/usage-monitor/versions/41.12.0/Usage Monitor/bin/Usage Monitor")
                 .run(AppLanguage.PT, console(script))
-            assertTrue(script.toString(Charsets.UTF_8).contains("install-usage-monitor_41.13.0_linux_x64.sh | sh"), script.toString(Charsets.UTF_8))
+            assertTrue(script.toString(Charsets.UTF_8).replace("\r\n", "\n").contains("install-usage-monitor_41.13.0_linux_x64.sh | sh"), script.toString(Charsets.UTF_8).replace("\r\n", "\n"))
 
             val offline = ByteArrayOutputStream()
             assertEquals(1, TerminalUpdateCommand({ Result.failure(IllegalStateException("sem rede")) }, node, reader, null).run(AppLanguage.PT, console(offline)))

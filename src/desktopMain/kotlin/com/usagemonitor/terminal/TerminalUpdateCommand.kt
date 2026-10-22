@@ -55,7 +55,7 @@ internal class TerminalUpdateCommand(
             return 0
         }
         val lines = TerminalConfigView.warning(labels.available(update.version, CURRENT_APP_VERSION), null, glyphs).toMutableList()
-        val canonical = appPath?.let { path -> runCatching { File(path).canonicalPath }.getOrDefault(path) }
+        val canonical = appPath?.let(::portablePath)
         lines += when {
             canonical?.contains("/opt/usage-monitor/") == true -> listOf(TerminalConfigView.note(labels.updatePackage), TerminalConfigView.commandLine(update.releasePageUrl))
             canonical?.contains("/usage-monitor/versions/") == true -> listOf(
