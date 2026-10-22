@@ -125,14 +125,15 @@ internal object TuiFrame {
     /**
      * Lista e detalhe (3.1, 4.2): a lista em [TuiSize.listWidth] células, o divisor `│` e o
      * detalhe à direita. Empilhado (abaixo de 80 colunas), uma coisa de cada vez: a lista, ou
-     * o detalhe quando [detailOpen].
+     * o detalhe quando [detailOpen]. Lado a lado, as duas colunas descem até o fim do corpo,
+     * para o divisor não parar onde o conteúdo acaba.
      */
     fun listDetail(left: List<TerminalLine>, right: List<TerminalLine>, size: TuiSize, detailOpen: Boolean, box: TerminalBoxGlyphs): List<TerminalLine> {
         if (size.stacked) {
             return if (detailOpen) right else left
         }
         val divider = TerminalSpan(box.vertical.toString(), TerminalColor.Border)
-        val rows = maxOf(left.size, right.size)
+        val rows = maxOf(left.size, right.size, size.bodyHeight)
         return (0 until rows).map { row ->
             val listCell = (left.getOrNull(row) ?: TerminalLine.EMPTY).fit(size.listWidth)
             listCell + terminalLine(divider, TerminalSpan(" ")) + (right.getOrNull(row) ?: TerminalLine.EMPTY)

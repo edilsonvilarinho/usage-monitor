@@ -31,8 +31,9 @@ class TuiFrameTest {
     }
 
     @Test
-    fun `terminal mais largo que 96 nao alarga a moldura`() {
-        assertTrue(frame(TuiSize(140, 24)).all { line -> line.width == 96 })
+    fun `terminal mais largo que 96 alarga a moldura ate a borda`() {
+        assertTrue(frame(TuiSize(140, 24)).all { line -> line.width == 140 })
+        assertTrue(frame(TuiSize(320, 60)).all { line -> line.width == 320 })
         assertTrue(frame(TuiSize(80, 24)).all { line -> line.width == 80 })
     }
 
@@ -93,8 +94,12 @@ class TuiFrameTest {
     fun `lista e detalhe lado a lado e empilhados abaixo de 80 colunas`() {
         val left = listOf(terminalLine(TerminalSpan("FONTES")))
         val right = listOf(terminalLine(TerminalSpan("detalhe")))
-        val wide = TuiFrame.listDetail(left, right, TuiSize(96, 30), detailOpen = false, TerminalBoxGlyphs.ROUNDED)
-        assertEquals("FONTES" + " ".repeat(15) + "│ detalhe", wide.single().plainText)
+        val wideSize = TuiSize(96, 30)
+        val wide = TuiFrame.listDetail(left, right, wideSize, detailOpen = false, TerminalBoxGlyphs.ROUNDED)
+        assertEquals("FONTES" + " ".repeat(15) + "│ detalhe", wide.first().plainText)
+        // O divisor desce até o fim do corpo, mesmo sem conteúdo dos dois lados.
+        assertEquals(wideSize.bodyHeight, wide.size)
+        assertEquals(" ".repeat(21) + "│ ", wide.last().plainText)
         val narrow = TuiSize(70, 30)
         assertEquals("FONTES", TuiFrame.listDetail(left, right, narrow, detailOpen = false, TerminalBoxGlyphs.ROUNDED).single().plainText)
         assertEquals("detalhe", TuiFrame.listDetail(left, right, narrow, detailOpen = true, TerminalBoxGlyphs.ROUNDED).single().plainText)

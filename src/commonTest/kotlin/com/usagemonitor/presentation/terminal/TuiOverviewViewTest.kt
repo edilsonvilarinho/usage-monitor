@@ -104,8 +104,8 @@ class TuiOverviewViewTest {
     }
 
     @Test
-    fun `largura e altura exatas em 80 e 96 colunas`() {
-        for (size in listOf(TuiSize(96, 24), TuiSize(80, 24))) {
+    fun `largura e altura exatas de 80 a 200 colunas`() {
+        for (size in listOf(TuiSize(200, 40), TuiSize(96, 24), TuiSize(80, 24))) {
             val lines = TuiScreen.render(TuiState(overview = TuiListState(1)), data(), size, pt, color)
             assertEquals(size.rows, lines.size)
             assertTrue(lines.all { line -> line.width == size.columns }, "$size")

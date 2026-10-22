@@ -57,7 +57,8 @@ aqui, na seção Primitivas.
 
 - Modo interativo desenhado para **96 colunas** (94 internas). Abaixo de 96, a coluna de detalhe
   encolhe; abaixo de 80, lista e detalhe se empilham: a lista ocupa a tela e `enter` abre o detalhe.
-  Mais largo que 96, a moldura não cresce. A moldura ocupa a altura toda do terminal; abaixo de
+  A moldura ocupa o terminal inteiro, na largura e na altura: mais largo que 96, a coluna de detalhe e
+  as tabelas ganham o espaço, e as larguras fixas (barras, trilhas) continuam as mesmas. Abaixo de
   40×12, só a frase que diz o tamanho que falta (6.3).
 - Comandos de uma tacada cabem em 100 colunas, e a linha de status também.
 - O `status --watch` (#453) desliga a quebra automática de linha enquanto roda: num painel mais estreito

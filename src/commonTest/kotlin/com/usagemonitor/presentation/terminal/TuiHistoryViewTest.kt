@@ -69,7 +69,7 @@ class TuiHistoryViewTest {
 
     @Test
     fun `em tela estreita a trilha perde o comeco e nunca o agora`() {
-        for (size in listOf(TuiSize(80, 20), TuiSize(96, 20), TuiSize(60, 14))) {
+        for (size in listOf(TuiSize(200, 40), TuiSize(80, 20), TuiSize(96, 20), TuiSize(60, 14))) {
             val lines = screen(size = size)
             assertEquals(size.rows, lines.size)
             assertTrue(lines.all { line -> line.length == size.columns }, "$size")

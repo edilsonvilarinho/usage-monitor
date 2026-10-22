@@ -144,7 +144,7 @@ set -g status-right '#(usage-monitor statusline tmux)'
 asks the team server, like the app's team window). The tabs are numbered `1` to `5`; `↑ ↓` move,
 `enter` opens, `r` reads again and `?` shows every key. The Settings tab changes the same things as
 the commands below and shows their output; adding an account and joining a new team server stay in
-the commands. It needs at least 40×12 and is drawn for 80 to 96 columns.
+the commands. It needs at least 40×12, is drawn for 80 to 96 columns and fills wider terminals.
 
 Everything in the Settings window can also be done from the terminal, which is what a headless
 server needs. These commands write the app's own files; while the app or the service is collecting,
