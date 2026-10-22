@@ -1,13 +1,8 @@
 package com.usagemonitor
 
-import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
-import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
-import com.russhwolf.settings.PreferencesSettings
-import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.data.datasource.LocalAnthropicCreditsDiagnosticsRecorder
 import com.usagemonitor.data.datasource.LocalAntigravityUsageDataSource
-import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalCodexActivityDataSource
 import com.usagemonitor.data.datasource.LocalCodexAuthDataSource
@@ -20,8 +15,6 @@ import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.data.datasource.LocalGeminiUsageDataSource
 import com.usagemonitor.data.datasource.LocalKiloUsageDataSource
 import com.usagemonitor.data.datasource.LocalOpenCodeUsageDataSource
-import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
-import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.LocalUsageHistoryDataSource
 import com.usagemonitor.data.datasource.RemoteApiDataSource
@@ -82,12 +75,13 @@ internal class AppGraph(
     languageOverride: AppLanguage? = null
 ) {
 
-    // Lido ANTES do `httpClient`: o proxy precisa estar resolvido no momento em
-    // que o engine é montado, e o client é criado uma única vez — mudar a
-    // configuração nas Configurações só vale a partir do próximo arranque
-    // (issue #174).
-    val proxySettingsDataSource = LocalProxySettingsDataSource()
-    val proxySettingsFlow = MutableStateFlow(proxySettingsDataSource.load())
+    /** O que as Configurações gravam, sem rede (#440): o terminal monta só isto. */
+    val store = AppSettingsStore(breadcrumbs, languageOverride)
+    val proxySettingsDataSource get() = store.proxySettingsDataSource
+    val proxySettingsFlow get() = store.proxySettingsFlow
+
+    // O client é criado uma única vez — mudar o proxy nas Configurações só vale a
+    // partir do próximo arranque (issue #174).
     private val effectiveProxy = resolveEffectiveProxy(proxySettingsFlow.value)
 
     val httpClient = buildHttpClient(effectiveProxy)
@@ -95,54 +89,28 @@ internal class AppGraph(
     // desativados neste cliente para nunca encaminhar a sessão a outro host.
     val cursorHttpClient = buildHttpClient(effectiveProxy, followRedirects = false)
 
-    // Nó da raiz de dados (#419): `com.usagemonitor` sem `--user-data-dir`.
-    val preferencesNode: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName)
-    val settings = PreferencesSettings(preferencesNode)
-    val languageSelection = LanguageSelection(settings, languageOverride)
-
-    // Chaves de API são segredos: não entram em PreferencesSettings, que grava
-    // os valores em claro no registro do Windows.
-    val apiKeyDataSource = LocalApiKeyDataSource()
-    val apiKeySettings = MutableStateFlow(apiKeyDataSource.load())
-
-    val enabledApis = MutableStateFlow(persistedEnabledApis())
+    val preferencesNode: Preferences get() = store.preferencesNode
+    val settings get() = store.settings
+    val languageSelection get() = store.languageSelection
+    val apiKeyDataSource get() = store.apiKeyDataSource
+    val apiKeySettings get() = store.apiKeySettings
+    val enabledApis get() = store.enabledApis
 
     val persistedNextRefreshAt: Instant? = settings.getLong(NEXT_REFRESH_AT_KEY, -1L)
         .takeIf { millis -> millis > 0 }
         ?.let { millis -> Instant.fromEpochMilliseconds(millis) }
 
-    val profileRegistry = AnthropicProfileRegistry(
-        preferences = preferencesNode,
-        defaultEnabled = ApiSource.ANTHROPIC in enabledApis.value,
-        breadcrumbs = breadcrumbs
-    )
-    val enabledAnthropicProfiles = MutableStateFlow(
-        resolveAnthropicProfiles(profileRegistry, profileRegistry.profiles.value).enabledProfiles
-    )
-
-    // Contas Codex extras (issue #329): a padrão continua fora do registro.
-    val codexProfileRegistry = CodexProfileRegistry(preferencesNode)
-    val enabledCodexProfiles = MutableStateFlow(codexProfileRegistry.enabledProfiles)
-
-    // A chave do servidor é segredo e vai para um arquivo com permissão restrita
-    // ao dono, não para as preferências — estas são gravadas em claro no registro.
-    // `StateFlow`: o repositório e o serviço de envio leem as credenciais de fora
-    // da composição, e precisam sempre do valor corrente.
-    val teamSettingsDataSource = LocalTeamSettingsDataSource()
-    val teamSettingsFlow = MutableStateFlow(teamSettingsDataSource.load())
-
-    // Acesso web local (#388): token em arquivo de segredo, nunca no registro.
-    val webAccessSettingsDataSource = LocalWebAccessSettingsDataSource()
-    val webAccessSettingsFlow = MutableStateFlow(webAccessSettingsDataSource.load())
-
-    // Bot do Telegram (#387): token e conversas pareadas em arquivo de segredo.
-    val telegramSettingsDataSource = LocalTelegramSettingsDataSource()
-    val telegramSettingsFlow = MutableStateFlow(telegramSettingsDataSource.load())
-
-    // Preferências de alerta como flow, e não como estado da composição: quem as
-    // consome são os view models, que vivem fora dela — é delas que sai o fator
-    // da detecção de anomalia e o limiar de sessão sem resposta.
-    val alertSettingsFlow = MutableStateFlow(readPersistedAlertSettings(settings))
+    val profileRegistry get() = store.profileRegistry
+    val enabledAnthropicProfiles get() = store.enabledAnthropicProfiles
+    val codexProfileRegistry get() = store.codexProfileRegistry
+    val enabledCodexProfiles get() = store.enabledCodexProfiles
+    val teamSettingsDataSource get() = store.teamSettingsDataSource
+    val teamSettingsFlow get() = store.teamSettingsFlow
+    val webAccessSettingsDataSource get() = store.webAccessSettingsDataSource
+    val webAccessSettingsFlow get() = store.webAccessSettingsFlow
+    val telegramSettingsDataSource get() = store.telegramSettingsDataSource
+    val telegramSettingsFlow get() = store.telegramSettingsFlow
+    val alertSettingsFlow get() = store.alertSettingsFlow
 
     /**
      * Referência da janela principal para quem vive fora do `Window`: a bandeja,
@@ -272,19 +240,6 @@ internal class AppGraph(
         parentWindow = { mainWindow },
         language = { languageSelection.current() }
     )
-
-    /**
-     * As fontes habilitadas gravadas. Fonte que depende de chave não volta
-     * habilitada sem ela: o card abriria em erro de configuração a cada arranque.
-     */
-    private fun persistedEnabledApis(): Set<ApiSource> {
-        return readApiSourceCollection(settings, ENABLED_APIS_KEY)
-            .filter { source ->
-                source !in API_KEY_DEPENDENT_SOURCES || apiKeySettings.value.forSource(source) != null
-            }
-            .toSet()
-            .ifEmpty { DEFAULT_ENABLED_APIS }
-    }
 }
 
 /**

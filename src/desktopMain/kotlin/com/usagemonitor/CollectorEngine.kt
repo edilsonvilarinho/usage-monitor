@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.CollectorRegistration
 import com.usagemonitor.data.datasource.LocalCollectorRegistrationDataSource
+import com.usagemonitor.data.datasource.LocalConfigRequestChannel
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.data.export.JsonUsageSnapshotEncoder
@@ -42,7 +43,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -71,7 +75,8 @@ internal class CollectorEngine(
     autoUpdate: AutoUpdateController,
     /** Quem roda o motor, para o terminal dizer de onde vem a leitura. */
     kind: CollectorKind,
-    private val registration: LocalCollectorRegistrationDataSource = LocalCollectorRegistrationDataSource()
+    private val registration: LocalCollectorRegistrationDataSource = LocalCollectorRegistrationDataSource(),
+    private val configRequests: LocalConfigRequestChannel = LocalConfigRequestChannel()
 ) {
     private val breadcrumbs = graph.breadcrumbs
     private val shutdownStarted = AtomicBoolean(false)
@@ -262,6 +267,28 @@ internal class CollectorEngine(
     }
 
     /**
+     * As mudanças de configuração, pelo mesmo caminho para as Configurações, o bot e o
+     * terminal (decisão D1 da #440). O coletor é o único escritor enquanto vive.
+     */
+    val configApplier = ConfigApplier(graph.store, ConfigHooks(refreshSource = { source -> dashboard.refresh(source) }))
+
+    private val _appliedConfigChanges = MutableSharedFlow<ConfigChange>(extraBufferCapacity = CONFIG_CHANGE_BUFFER)
+
+    /** As mudanças pedidas pelo terminal e já aplicadas: o app atualiza o que mora na tela. */
+    val appliedConfigChanges: SharedFlow<ConfigChange> = _appliedConfigChanges.asSharedFlow()
+
+    init {
+        // Os pedidos do terminal (`control/requests/`). Atendidos um a um, na ordem de chegada.
+        engineScope.launch(Dispatchers.IO) {
+            configRequests.discardStale()
+            while (isActive) {
+                serveConfigRequests(configRequests, configApplier) { change -> _appliedConfigChanges.tryEmit(change) }
+                delay(CONFIG_REQUEST_POLL_MILLIS)
+            }
+        }
+    }
+
+    /**
      * Para o motor, fecha bancos e clientes, solta a trava e só então entrega a
      * atualização pendente. Idempotente: o gancho da JVM, o `onDispose` e a saída
      * pela janela (ou o `SIGTERM` do serviço) podem chamar, e só o primeiro faz algo.
@@ -280,7 +307,7 @@ internal class CollectorEngine(
         telegramBot.onDestroy()
         usageAlert.onDestroy()
         teamSync.onDestroy()
-        graph.profileRegistry.close()
+        graph.store.close()
         graph.httpClient.close()
         graph.cursorHttpClient.close()
         graph.usageHistoryDataSource.close()
@@ -296,6 +323,11 @@ internal class CollectorEngine(
         dashboard.scheduleUpdateOnExit()
     }
 }
+
+/** De quanto em quanto o coletor olha os pedidos do terminal; o terminal espera até 10 s. */
+internal const val CONFIG_REQUEST_POLL_MILLIS = 300L
+
+private const val CONFIG_CHANGE_BUFFER = 16
 
 /** Intervalo da indexação de transcripts em background, igual ao polling do dashboard. */
 internal const val CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L

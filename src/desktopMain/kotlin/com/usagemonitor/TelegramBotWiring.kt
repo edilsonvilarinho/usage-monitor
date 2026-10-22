@@ -78,7 +78,7 @@ private fun createTelegramBotService(
     // O mesmo caminho do interruptor da aba APIs: grava e recoleta a fonte.
     toggleSource = { source, on ->
         val current = graph.enabledApis.value
-        persistEnabledApis(graph, if (on) current + source else current - source)
+        persistEnabledApis(graph.store, if (on) current + source else current - source)
         dashboard.refresh(source)
     },
     // Corte de 24 h por `sinceEpochMillis`: o repositório não tem fim de

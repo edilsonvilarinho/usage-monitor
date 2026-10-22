@@ -588,6 +588,17 @@ S.settings = () => {
 };
 
 S.config = () => render([
+  sh('usage-monitor sources list'),
+  L(c('mu b', ' ' + pad('FONTE', 15) + pad('ID', 13) + pad('ESTADO', 11) + 'CHAVE')),
+  L(' ', c('a', '● '), pad('Anthropic', 13), c('mu', pad('anthropic', 13)), c('ok', pad('ligada', 11)), c('mu', '–')),
+  L(' ', c('mm', '● '), pad('MiniMax', 13), c('mu', pad('minimax', 13)), c('mu', pad('desligada', 11)), c('wa', 'sem chave')),
+  L(' ', c('c', '● '), pad('Codex', 13), c('mu', pad('codex', 13)), c('ok', pad('ligada', 11)), c('mu', '–')),
+  L(c('mu', ' …')),
+  L(''),
+  sh('usage-monitor sources enable minimax'),
+  L(c('wa', '▲ '), 'MiniMax precisa de uma chave antes de ligar. Salve com:'),
+  L(c('b', '    usage-monitor keys set minimax')),
+  L(''),
   sh('usage-monitor config list alerts'),
   L(c('mu', pad('alerts.quota.enabled', 30)), 'true'),
   L(c('mu', pad('alerts.quota.thresholds', 30)), '70,90'),

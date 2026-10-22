@@ -45,7 +45,7 @@ internal object TerminalCommandNames {
     const val SERVICE = "service"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, SourcesCommandNames.SOURCES)
 
     /** Os alvos da linha de status. */
     val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE, TMUX)
@@ -68,6 +68,7 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
         TerminalCommandNames.WAIT -> parseWait(arguments)
         TerminalCommandNames.STATUS_LINE -> parseStatusLine(arguments)
         TerminalCommandNames.SERVICE -> parseServiceCommand(arguments)
+        SourcesCommandNames.SOURCES -> parseSourcesCommand(arguments)
         else -> TerminalCommandParse.Invalid("Error: '$name' is not a command. Run with --help to list the commands.")
     }
 

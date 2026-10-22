@@ -346,7 +346,7 @@ internal class SettingsActions(
         updateProxy(resetConnection = false) { current -> current.copy(password = password) }
     }
 
-    private fun setEnabledApis(updated: Set<ApiSource>) = persistEnabledApis(graph, updated)
+    private fun setEnabledApis(updated: Set<ApiSource>) = persistEnabledApis(graph.store, updated)
 
     private fun refreshEnabledProfiles() {
         graph.enabledAnthropicProfiles.value = resolveAnthropicProfiles(
@@ -406,7 +406,7 @@ internal fun updateProxySettings(
  * Fontes ligadas: publica e grava. Um caminho só para a aba APIs e o `/api` do bot
  * (#398) — duas cópias divergiriam na chave ou na ordem das gravações.
  */
-internal fun persistEnabledApis(graph: AppGraph, updated: Set<ApiSource>) {
-    graph.enabledApis.value = updated
-    writeApiSourceCollection(graph.settings, ENABLED_APIS_KEY, updated)
+internal fun persistEnabledApis(store: AppSettingsStore, updated: Set<ApiSource>) {
+    store.enabledApis.value = updated
+    writeApiSourceCollection(store.settings, ENABLED_APIS_KEY, updated)
 }
