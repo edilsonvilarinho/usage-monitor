@@ -153,7 +153,9 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
 - Diagnóstico (#416): `app.log` recebe falha não tratada (registro no `CrashHandler`, nunca handler por escopo),
   `recordFailure`, `stderr` e EDT parado; `--diagnostics` empacota por **lista fechada**, sem janela.
 - Linha de comando (#418): `parseCommandLine` é o dono do `argv`; opção desconhecida avisa e **não** impede a abertura;
-  saída no idioma do app, sem acento em console que não é UTF-8 (#439; erro de uso continua em inglês). `usage-monitor.exe` (launcher de console) só imprime e sai; sem opção de ação, relança o exe
+  saída no idioma do app, sem acento em console que não é UTF-8 (#439; erro de uso continua em inglês).
+- Modo terminal (#439): só lê — `dashboard-cache.json`, preferências e índice de sessões em somente leitura; nunca
+  requisição nem trava segura (sonda e solta, e o arranque tenta a trava 3 vezes). `status --json` é contrato. `usage-monitor.exe` (launcher de console) só imprime e sai; sem opção de ação, relança o exe
   GUI (a chave `Run` lê `jpackage.app-path`). `--locale` nunca grava; o idioma efetivo é só pela `LanguageSelection`.
 - Raiz de dados (#419): caminho em `~/.usage-monitor` só pelo `AppDataDirectory` (`file` = dados/instância, `installationFile` = o que
   NSIS/updater leem em caminho fixo); configurada uma vez no `main()`. Fora da raiz padrão: atualização e autostart desligados.
