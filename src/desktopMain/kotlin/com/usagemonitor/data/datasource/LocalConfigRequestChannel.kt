@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.data.AppDataDirectory
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Pedidos de configuração do terminal para o coletor vivo (#440, decisão D1), em
@@ -24,9 +25,14 @@ internal class LocalConfigRequestChannel(
     private val processing = File(root, "processing")
     private val replies = File(root, "replies")
 
-    /** Deposita um pedido e devolve o id dele. O nome começa pelo instante: a ordem de chegada. */
+    /**
+     * Deposita um pedido e devolve o id dele. O nome começa pelo instante e por um contador
+     * do processo, com zeros à esquerda: a ordem do nome é a de chegada, inclusive para dois
+     * pedidos no mesmo milissegundo (o teste pegou o UUID decidindo a ordem).
+     */
     fun submit(payload: String): String {
-        val id = "${nowMillis()}-${UUID.randomUUID()}"
+        val id = nowMillis().toString().padStart(MILLIS_DIGITS, '0') + "-" +
+            sequence.incrementAndGet().toString().padStart(SEQUENCE_DIGITS, '0') + "-" + UUID.randomUUID()
         writeSecretFile(File(requests, "$id.json"), payload)
         return id
     }
@@ -93,5 +99,8 @@ internal class LocalConfigRequestChannel(
 
     companion object {
         const val STALE_MILLIS = 60_000L
+        private const val MILLIS_DIGITS = 15
+        private const val SEQUENCE_DIGITS = 9
+        private val sequence = AtomicLong()
     }
 }

@@ -103,10 +103,10 @@ internal class TerminalLabels(val language: AppLanguage) {
         )
 
     val openAppToRefresh: String
-        get() = localized(language, "Abra o Usage Monitor para voltar a atualizar. Até lá os números não mudam.", "Open Usage Monitor to refresh again. Until then the numbers stay the same.")
+        get() = localized(language, "Abra o app ou rode usage-monitor service start. Até lá os números não mudam.", "Open the app or run usage-monitor service start. Until then the numbers stay the same.")
 
     val noReadingYet: String
-        get() = localized(language, "Ainda não há leitura. Abra o Usage Monitor e espere a primeira coleta.", "There is no reading yet. Open Usage Monitor and wait for the first collection.")
+        get() = localized(language, "Ainda não há leitura. Abra o app ou rode usage-monitor service start, e espere a primeira coleta.", "There is no reading yet. Open the app or run usage-monitor service start, and wait for the first collection.")
 
     val noReadingWord: String get() = localized(language, "sem leitura", "no reading")
 
@@ -144,7 +144,7 @@ internal class TerminalLabels(val language: AppLanguage) {
     fun readingFrom(clock: String): String = localized(language, "leitura de $clock", "reading from $clock")
 
     val waitNeedsCollector: String
-        get() = localized(language, "Nada está coletando: a cota só muda com o Usage Monitor aberto.", "Nothing is collecting: the quota only changes with Usage Monitor open.")
+        get() = localized(language, "Nada está coletando: a cota só muda com o app aberto ou o serviço rodando.", "Nothing is collecting: the quota only changes with the app open or the service running.")
 
     fun waitTimedOut(id: String, below: Int): String =
         localized(language, "tempo esgotado: '$id' não caiu abaixo de $below%", "timed out: '$id' did not drop below $below%")

@@ -105,7 +105,7 @@ class TerminalStatusViewTest {
     fun `sem leitura nenhuma sai com 3 e diz o que fazer`() {
         val output = TerminalStatusView.render(emptyList(), now, collector = null, maxAge = null, labels = pt, profile = color)
         assertEquals(TerminalStatusView.EXIT_NO_READING, output.exitCode)
-        assertEquals(listOf("▲ Ainda não há leitura. Abra o Usage Monitor e espere a primeira coleta."), text(output))
+        assertEquals(listOf("▲ Ainda não há leitura. Abra o app ou rode usage-monitor service start, e espere a primeira coleta."), text(output))
     }
 
     @Test

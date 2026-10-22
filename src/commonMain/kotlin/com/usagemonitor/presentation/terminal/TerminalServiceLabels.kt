@@ -45,4 +45,42 @@ internal class TerminalServiceLabels(val language: AppLanguage) {
                 "  To see the usage:        usage-monitor status\n" +
                 "  To collect without one:  usage-monitor service run"
         )
+
+    val onlyLinux: String
+        get() = localized(
+            language,
+            "O serviço do sistema só existe no Linux (systemd). No Windows e no macOS, o app inicia com o sistema:",
+            "The system service only exists on Linux (systemd). On Windows and macOS, the app starts with the system:"
+        )
+
+    val customDataRoot: String
+        get() = localized(
+            language,
+            "Com --user-data-dir, o serviço não é instalado: iniciar com o sistema só vale na pasta de dados padrão (#419). Para coletar nesta pasta, rode em primeiro plano:",
+            "With --user-data-dir, the service is not installed: starting with the system only applies to the default data folder (#419). To collect in this folder, run it in the foreground:"
+        )
+
+    val notInstalledApp: String
+        get() = localized(language, "Este Usage Monitor não foi instalado (sem o caminho do app). Instale pelo pacote ou pelo script do Linux.", "This Usage Monitor was not installed (no app path). Install it from the package or the Linux script.")
+
+    val noSystemd: String
+        get() = localized(language, "O systemd do usuário não respondeu (systemctl --user). Numa sessão sem login gráfico, ele precisa do linger:", "The user systemd did not answer (systemctl --user). In a session without a graphical login, it needs linger:")
+
+    fun unitWritten(path: String): String = localized(language, "serviço criado em $path", "service created at $path")
+    val enabledAndStarted: String get() = localized(language, "ativo e marcado para iniciar com o sistema", "active and set to start with the system")
+    val lingerHint: String get() = localized(language, "Para continuar rodando depois que você sair do SSH, rode uma vez:", "To keep running after you leave SSH, run once:")
+    val appCollecting: String get() = localized(language, "O app está aberto e coletando: o serviço assume quando ele fechar.", "The app is open and collecting: the service takes over when it closes.")
+    val removed: String get() = localized(language, "serviço removido", "service removed")
+    val notInstalled: String get() = localized(language, "O serviço não está instalado. Instale com:", "The service is not installed. Install it with:")
+
+    fun actionDone(action: String): String =
+        when (action) {
+            "start" -> localized(language, "serviço iniciado", "service started")
+            "stop" -> localized(language, "serviço parado", "service stopped")
+            else -> localized(language, "serviço reiniciado", "service restarted")
+        }
+
+    fun actionFailed(output: String): String = localized(language, "O systemd recusou: $output", "systemd refused: $output")
+
+    val appLogNote: String get() = localized(language, "O log do próprio app:", "The app's own log:")
 }

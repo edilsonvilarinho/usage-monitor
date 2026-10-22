@@ -2,6 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.CollectorRegistration
 import com.usagemonitor.data.datasource.LocalAlertLogDataSource
+import com.usagemonitor.data.datasource.LocalCollectorHealthDataSource
 import com.usagemonitor.data.datasource.LocalCollectorRegistrationDataSource
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
@@ -83,7 +84,8 @@ internal class CollectorEngine(
     private val kind: CollectorKind,
     private val registration: LocalCollectorRegistrationDataSource = LocalCollectorRegistrationDataSource(),
     private val configRequests: LocalConfigRequestChannel = LocalConfigRequestChannel(),
-    private val alertLog: LocalAlertLogDataSource = LocalAlertLogDataSource()
+    private val alertLog: LocalAlertLogDataSource = LocalAlertLogDataSource(),
+    private val health: LocalCollectorHealthDataSource = LocalCollectorHealthDataSource()
 ) {
     private val breadcrumbs = graph.breadcrumbs
     private val shutdownStarted = AtomicBoolean(false)
@@ -325,6 +327,27 @@ internal class CollectorEngine(
         }
     }
 
+    init {
+        // A saúde de cada parte, para o `service status` ler de fora (#440, 5.1).
+        engineScope.launch {
+            delay(HEALTH_FIRST_WRITE_MILLIS)
+            while (isActive) {
+                val report = collectorHealthOf(
+                    dashboard = dashboard.uiState.value,
+                    nextCollectionAt = dashboard.nextRefreshAt.value,
+                    telegramStatus = telegramBot.status.value,
+                    telegramSettings = graph.telegramSettingsFlow.value,
+                    teamSettings = graph.teamSettingsFlow.value,
+                    teamSync = teamSync.syncStatus.value,
+                    webStatus = webAccess.status.value,
+                    now = Clock.System.now()
+                )
+                withContext(Dispatchers.IO) { health.write(report) }
+                delay(HEALTH_WRITE_INTERVAL_MILLIS)
+            }
+        }
+    }
+
     /**
      * Para o motor, fecha bancos e clientes, solta a trava e só então entrega a
      * atualização pendente. Idempotente: o gancho da JVM, o `onDispose` e a saída
@@ -352,6 +375,7 @@ internal class CollectorEngine(
         graph.codexCliSessionDataSource.close()
         graph.openCodeUsageDataSource.close()
         graph.kiloUsageDataSource.close()
+        health.clear()
         registration.clear()
         singleInstanceGuard.close()
         // Por último, e não primeiro: o instalador espera este processo sair de
@@ -360,6 +384,10 @@ internal class CollectorEngine(
         dashboard.scheduleUpdateOnExit()
     }
 }
+
+/** A saúde é gravada logo depois de o motor subir, e daí a cada 30 s. */
+private const val HEALTH_FIRST_WRITE_MILLIS = 5_000L
+private const val HEALTH_WRITE_INTERVAL_MILLIS = 30_000L
 
 /** De quanto em quanto o coletor olha os pedidos do terminal; o terminal espera até 10 s. */
 internal const val CONFIG_REQUEST_POLL_MILLIS = 300L

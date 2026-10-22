@@ -357,7 +357,8 @@ class ArchitectureRulesTest {
         /** O motor do serviço sem tela e o que só ele usa (#440). */
         val HEADLESS_ENGINE_FILES = setOf(
             "src/desktopMain/kotlin/com/usagemonitor/CollectorEngine.kt",
-            "src/desktopMain/kotlin/com/usagemonitor/HeadlessService.kt"
+            "src/desktopMain/kotlin/com/usagemonitor/HeadlessService.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/CollectorHealthReport.kt"
         )
 
         val NATIVE_WINDOW_SHAPE_OWNERS = setOf(
