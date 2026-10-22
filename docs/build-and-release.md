@@ -212,6 +212,11 @@ Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `St
 - **`--json` é contrato** (`version` 1, `snake_case`, lista plana `quotas` com `id` estável `fonte[:conta]:cota`); em saída não UTF-8, o não ASCII vira `\uXXXX`.
 - **Idioma:** toda a saída de terminal segue o app, inclusive `--help` e `--diagnostics`; console não UTF-8 recebe texto sem acento e glifos ASCII. Erros de uso seguem em inglês (nascem antes da leitura do idioma).
 
+**Modo terminal: `status --watch`** (issue #453; plano [`status-watch-453-execucao.md`](planos/status-watch-453-execucao.md)): a tabela do `status` aberta num painel, redesenhada a cada 15 s (`--interval`, piso de 5 s) até o Ctrl+C.
+- **`--watch`, e não `--attach`** (nome do pedido): `attach` dá a entender que se conecta a um processo já rodando, como o `tmux attach`.
+- **Sem JLine, sem tela alternativa e sem modo cru**: o comando não lê tecla. Cursor escondido e quebra automática de linha desligada (DECAWM) enquanto roda; o Ctrl+C sai com 130 e o shutdown hook devolve os dois. O último quadro fica na tela.
+- **`--json` e `--max-age` não combinam** com `--watch` (erro de uso): são contrato de quem roda uma vez. Sem terminal (pipe, `TERM=dumb`), sai com 1 e diz o que usar, como o `tui`.
+
 **Modo terminal: configurar e servidor sem tela** (issue #440; plano [`modo-terminal-configuracao-servico-440-execucao.md`](planos/modo-terminal-configuracao-servico-440-execucao.md)): `setup`, `config`, `sources`, `keys`, `accounts`, `telegram`, `team`, `web`, `alerts`, `update` e `service`.
 - **Um motor** (`CollectorEngine`, sem Compose; o `ArchitectureRulesTest` cobra): o app é o motor mais as telas, e `service run` é só o motor, com `java.awt.headless`. Quem segura a trava se registra em `collector.json` (app ou serviço), e a leitura diz "pelo serviço".
 - **Um escritor** (D1): com coletor vivo, configurar vira pedido em `control/` (permissão só do dono, tirado por `rename` atômico, respondido em `replies/`), aplicado pelo mesmo `ConfigApplier` das Configurações e do bot; sem coletor, o terminal aplica direto nos arquivos. Sem resposta em 10 s, o pedido é recolhido e nada muda. Depois de aplicar, `flush` das preferências: no Linux o `java.util.prefs` só iria ao disco em 30 s.

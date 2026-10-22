@@ -59,12 +59,17 @@ internal object TerminalCommands {
         sessionMetrics: (String) -> CliSessionMetrics? = LocalCliSessionMetricsReader()::read,
         environment: Map<String, String> = System.getenv(),
         home: File = File(System.getProperty("user.home").orEmpty()),
-        alertLog: LocalAlertLogDataSource = LocalAlertLogDataSource()
+        alertLog: LocalAlertLogDataSource = LocalAlertLogDataSource(),
+        redrawsInPlace: Boolean = canRedrawInPlace(System.console() != null, environment)
     ): Int {
         // O driver do SQLite avisa no `stderr` que não há provedor de log; no app esse texto
         // vai para o `app.log`, mas no terminal sujaria a saída de quem chamou.
         System.setProperty(SLF4J_VERBOSITY_PROPERTY, "ERROR")
         quietPreferencesLog()
+        // O `status --watch` não imprime uma vez e sai: tem o laço dele, que redesenha a tabela.
+        if (command is TerminalCommand.Status && command.watch != null) {
+            return TerminalStatusWatch.run(command.watch, languageOverride, reader, console, redrawsInPlace, pause)
+        }
         return when (command) {
             is TerminalCommand.Alerts -> {
                 val reading = reader.read(languageOverride)
@@ -214,6 +219,12 @@ internal class TerminalConsole(val profile: TerminalProfile, private val out: Pr
 
     fun print(text: String) {
         out.println(text)
+        out.flush()
+    }
+
+    /** Sem quebra de linha no fim: o quadro do `status --watch` não pode rolar a tela. */
+    fun write(text: String) {
+        out.print(text)
         out.flush()
     }
 

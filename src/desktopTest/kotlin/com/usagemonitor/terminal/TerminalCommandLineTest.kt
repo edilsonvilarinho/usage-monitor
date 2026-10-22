@@ -66,6 +66,23 @@ class TerminalCommandLineTest {
     }
 
     @Test
+    fun `status watch rereads every 15 s unless an interval is given`() {
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Status(watch = 15.seconds)), parse("status", "--watch"))
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Status(watch = 30.seconds)), parse("status", "--watch", "--interval", "30s"))
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Status(watch = 1.minutes)), parse("status", "--interval=1m", "--watch"))
+    }
+
+    @Test
+    fun `status watch rejects a short interval, an interval alone and the one-shot options`() {
+        assertTrue(parse("status", "--watch", "--interval", "4s") is CommandLineRequest.Invalid)
+        assertTrue(parse("status", "--watch", "--interval") is CommandLineRequest.Invalid)
+        assertTrue(parse("status", "--interval", "30s") is CommandLineRequest.Invalid)
+        assertTrue(parse("status", "--watch", "--json") is CommandLineRequest.Invalid)
+        assertTrue(parse("status", "--watch", "--max-age", "10m") is CommandLineRequest.Invalid)
+        assertTrue(parse("check", "--watch") is CommandLineRequest.Invalid)
+    }
+
+    @Test
     fun `a loose word that is not a command still only warns and opens the app`() {
         val request = parse("statuss")
         assertTrue(request is CommandLineRequest.Launch)
