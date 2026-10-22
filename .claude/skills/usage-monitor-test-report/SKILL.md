@@ -56,9 +56,14 @@ node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs
 - Imprime um resumo no console e **sai com 1** quando algum portão bloqueia (suíte não rodou, falha,
   regra de arquitetura quebrada). Quem automatiza decide pelo código de saída.
 - Opções: `--root <repo>` (padrão: diretório atual) e `--out <pasta relativa>`.
-- Para um run do CI: baixe o artefato `test-reports` para `build/` e rode só o gerador. O CI publica a
-  cobertura Kotlin só em HTML (`kover-report`), então o relatório a marca como não medida; e a
-  plataforma no cabeçalho é a da máquina que gerou, não a do runner — diga isso na resposta.
+- `--platform win32|linux|darwin` troca a plataforma do cabeçalho (padrão: a da máquina que gera).
+- `--ci` só no CI: lá o `desktopTest` pode vir do build cache (`FROM-CACHE`) com o carimbo da execução
+  original, e o portão "Resultado do código atual" deixa de comparar horário com o commit.
+- **Todo run do CI em que a suíte do desktop roda já gera este relatório**: job `test-report` do
+  `ci.yml`, com a suíte do Windows e a do servidor. O HTML fica no artefato `test-report` (14 dias) e
+  os portões no resumo do run. Para ler o de um PR sem rodar nada:
+  `gh run download <run-id> -n test-report -D build/test-report-ci`. Rodar localmente continua valendo
+  antes do push, porque o CI só responde depois dele.
 
 ## 3. Mostrar e ler
 

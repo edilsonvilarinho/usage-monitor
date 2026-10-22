@@ -35,7 +35,7 @@ first launch.
 
 | Workflow | Runs |
 |---|---|
-| `.github/workflows/ci.yml` | Everything on pull request and push to `main`: desktop suite (Windows, plus Linux as advisory), installer and Linux updater scenarios, team server, pricing parity — each only when its paths changed; `ci-ok` aggregates |
+| `.github/workflows/ci.yml` | Everything on pull request and push to `main`: desktop suite (Windows, plus Linux as advisory), installer and Linux updater scenarios, team server, pricing parity — each only when its paths changed; `ci-ok` aggregates; `test-report` builds the HTML test report |
 | `.github/workflows/release-linux.yml` | on `v*` tags: publishes Windows, Linux and macOS artifacts |
 | `.github/workflows/codeql.yml` | CodeQL on push to `main`, weekly and manually |
 
@@ -87,6 +87,25 @@ gradlew.bat koverHtmlReport -Pcoverage
 
 There is no `koverVerify` and no floor: a threshold calibrated before the baseline existed is a
 threshold calibrated in the dark. Baseline as of 2026-08-25: **82.7% of lines**, 52.3% of branches.
+On 2026-10-22 (Linux, `usage-monitor-test-report`): **83.0% of lines**, 58.0% of branches; the team
+server, measured by v8 since then, at 92.7% of lines and 86.3% of branches.
+
+The team server measures coverage with `npm run test:coverage` (`@vitest/coverage-v8`, opt-in like
+`-Pcoverage`); the `server` job runs it instead of `test:ci` (the whole suite took 2.5 s with coverage, measured on a
+local Linux machine).
+
+### Test report
+
+The `test-report` job assembles the report of the `usage-monitor-test-report` skill from what
+`desktop-windows` (JUnit XML plus Kover's `report.xml`) and `server` (JUnit XML plus
+`coverage-summary.json`) uploaded: counts by test type and area, coverage per layer, uncovered files,
+readiness gates and blind spots. The HTML goes to the `test-report` artifact (14 days) and the gates to
+the run summary. It runs whenever the desktop suite ran, red included, and it is **not** part of
+`ci-ok`: a failing suite already fails the job that ran it, and a second red check for the same cause
+would only repeat it. The generator runs on Linux and is told `--platform win32`, so the header names
+the platform the suite ran on, and `--ci`, because a `desktopTest` restored from the build cache
+(`FROM-CACHE`, the case in #451 itself) carries the timestamp of the original run, older than the
+commit; the cache key covers the inputs, so the result still holds for the commit.
 
 ## NSIS installer
 
