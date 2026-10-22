@@ -58,9 +58,11 @@ internal fun claudeConfigDirectory(environment: Map<String, String>, input: Clau
  * A conta do app que usa este diretório de configuração. `null` quando nenhum perfil
  * gravado aponta para ele: melhor não mostrar cota do que mostrar a de outra conta.
  *
- * Compara pelo caminho **canônico**, com os links resolvidos: no Fedora Silverblue `/home`
- * é link para `/var/home`, e o perfil gravado com um lado não casava com o transcript que
- * chegou pelo outro (medido na A08 da #439). Sem caixa, como o registro de perfis.
+ * Compara pelo caminho **real**, com os links resolvidos: no Fedora Silverblue `/home` é
+ * link para `/var/home`, e o perfil gravado com um lado não casava com o transcript que
+ * chegou pelo outro (medido na A08 da #439). `toRealPath`, e não `canonicalPath`, porque
+ * no Windows o `canonicalPath` não resolve link simbólico (o CI da #439 pegou). Diretório
+ * que não existe cai na normalização do registro. Sem caixa, como o registro de perfis.
  */
 internal fun anthropicTargetFor(configDirectory: File, profiles: List<AnthropicProfileRecord>): UsageTargetKey? {
     val wanted = canonicalKey(configDirectory.path)
@@ -69,5 +71,5 @@ internal fun anthropicTargetFor(configDirectory: File, profiles: List<AnthropicP
 }
 
 private fun canonicalKey(path: String): String =
-    runCatching { File(path).canonicalPath.trimEnd(File.separatorChar).lowercase() }
+    runCatching { File(path).toPath().toRealPath().toString().trimEnd(File.separatorChar).lowercase() }
         .getOrElse { AnthropicProfileRegistry.normalizedPath(path) }

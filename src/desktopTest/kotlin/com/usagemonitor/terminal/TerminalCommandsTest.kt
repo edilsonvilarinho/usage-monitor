@@ -100,7 +100,9 @@ class TerminalCommandsTest {
             runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats), now) }
             val buffer = ByteArrayOutputStream()
             val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
-            val input = """{"session_id":"s-1","transcript_path":"${configDir.absolutePath}/projects/-w/s-1.jsonl","model":{"display_name":"Opus 5.5"}}"""
+            // Barra invertida do caminho do Windows escapada, como o Claude Code manda no JSON.
+            val transcript = File(configDir, "projects/-w/s-1.jsonl").absolutePath.replace("\\", "\\\\")
+            val input = """{"session_id":"s-1","transcript_path":"$transcript","model":{"display_name":"Opus 5.5"}}"""
             val code = TerminalCommands.run(
                 TerminalCommand.ClaudeCodeStatusLine, AppLanguage.PT, TerminalReader(cache, File(dir, "app.lock"), node, clock), console,
                 statusLineInput = { input },
