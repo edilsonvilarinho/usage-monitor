@@ -608,8 +608,7 @@ S.settings = () => {
   const rows = Math.max(left.length, right.length);
   const body = [];
   for (let r = 0; r < rows; r++) body.push(L(fit(left[r] || L(''), LW), c('bd', '│'), ' ', right[r] || L('')));
-  body.push(L(''));
-  body.push(L(c('ok', '✓ '), 'alerts.quota.thresholds = 70,90', c('mu', ' · o serviço já está usando')));
+  // O aviso da mudança anterior some na tecla que abriu o campo: com o campo aberto, não há aviso.
   return frame(4, body, L(key('enter', 'grava'), key('esc', 'desiste')));
 };
 
@@ -791,7 +790,7 @@ const PARTS = [
         text: '<b>--json</b> para filtrar, <b>check</b> para decidir pelo código de saída, e <b>wait</b> para segurar uma tarefa longa até a janela reiniciar.' },
     ] },
   { id: 'parte3', step: 'Parte 3', title: 'Modo interativo',
-    text: 'usage-monitor tui abre uma tela cheia com cinco abas, sempre na mesma moldura: o título, as abas no alto e os atalhos no rodapé. Muda a aba, a moldura fica. A aba 5, Configurações, está na parte 4.',
+    text: 'usage-monitor tui abre uma tela cheia com cinco abas, sempre na mesma moldura: o título, as abas no alto e os atalhos no rodapé. Muda a aba, a moldura fica. Em tela estreita o rodapé tira atalhos inteiros (primeiro <b>r</b> e <b>1–5</b>), e <b>? ajuda</b> e <b>q sair</b> ficam sempre. A aba 5, Configurações, está na parte 4.',
     screens: [
       { id: 's31', num: '3.1', title: 'Aba 1 · Visão geral', win: 'usage-monitor tui', body: S.overview,
         text: 'As contas à esquerda, com o maior uso de cada uma, e o detalhe da escolhida à direita: uma linha de cota por cota do app (os créditos inclusive), a sessão ativa (a mais recente com atividade nos últimos 10 min, com o custo no formato da janela de Sessões) e as últimas 24 h da primeira cota. Abaixo de 80 colunas a lista ocupa a tela e <b>enter</b> abre a conta.' },
@@ -810,7 +809,7 @@ const PARTS = [
       { id: 's41', num: '4.1', title: 'Primeira vez: o assistente', win: 'ssh dev@servidor', body: S.setup,
         text: 'Encontra as contas do Claude Code e do Codex já logadas no computador, pede as chaves de API sem mostrá-las e testa cada uma. Depois pergunta pelos avisos e pelo idioma, oferece instalar o serviço e, com ele de pé, parear o Telegram. Cada passo é um dos comandos da 4.3, então nada aqui tem regra própria. Pode ser refeito a qualquer momento.' },
       { id: 's42', num: '4.2', title: 'Aba 5 · Configurações', win: 'usage-monitor tui', body: S.settings,
-        text: 'As seções das Configurações do app que têm ajuste, numa lista à esquerda, com os rótulos dos controles do app. Cada campo roda o mesmo comando da 4.3 (<code>config set</code>, <code>sources</code>, <code>keys</code>, <code>accounts</code>, <code>telegram</code>, <code>team</code>, <code>web</code>) e mostra a saída dele no pé: <b>espaço</b> liga e desliga, <b>← →</b> trocam o valor, <b>enter</b> abre o campo de texto (segredo sem eco, nem o tamanho) e, numa ação que apaga ou invalida algo (remover chave, sair do time, gerar endereço novo, remover conversa), pede um segundo <b>enter</b>. No alto da seção, quando a mudança vale: na hora com o coletor vivo, depois de reiniciar no proxy. Na imagem, a seção Alertas com os limiares em edição e o resultado da mudança anterior.' },
+        text: 'As seções das Configurações do app que têm ajuste, numa lista à esquerda, com os rótulos dos controles do app. Cada campo roda o mesmo comando da 4.3 (<code>config set</code>, <code>sources</code>, <code>keys</code>, <code>accounts</code>, <code>telegram</code>, <code>team</code>, <code>web</code>) e mostra a saída dele no pé: <b>espaço</b> liga e desliga, <b>← →</b> trocam o valor, <b>enter</b> abre o campo de texto (segredo sem eco, nem o tamanho) e, numa ação que apaga ou invalida algo (remover chave, sair do time, gerar endereço novo, remover conversa), pede um segundo <b>enter</b>. No alto da seção, quando a mudança vale: na hora com o coletor vivo, depois de reiniciar no proxy. Enquanto a mudança é aplicada, o pé diz "aplicando…" em muted; o resultado longo (a recusa de um valor explica o formato) quebra por palavra em mais linhas, e o comando a rodar, quando há, vem abaixo em muted. Com o campo aberto, o rodapé mostra só <b>enter grava</b> e <b>esc desiste</b>, como na imagem. Na imagem, a seção Alertas com os limiares em edição; o aviso de uma mudança some na tecla seguinte.' },
       { id: 's43', num: '4.3', title: 'Os mesmos ajustes por comando', win: 'bash', body: S.config,
         text: 'Cada ajuste tem um nome, para ler e mudar sem abrir tela nenhuma. A chave de API é lida da entrada, então não fica no histórico do shell nem na lista de processos.' },
       { id: 's44', num: '4.4', title: 'Onde fica cada aba das Configurações do app', html: S.mapping,
