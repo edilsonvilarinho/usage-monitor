@@ -9,6 +9,7 @@ import com.usagemonitor.presentation.terminal.TerminalProfile
 import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiKey
 import com.usagemonitor.presentation.terminal.TuiLabels
+import com.usagemonitor.presentation.terminal.TuiNotice
 import com.usagemonitor.presentation.terminal.TuiSize
 import com.usagemonitor.presentation.terminal.TuiState
 import com.usagemonitor.presentation.terminal.TuiTab
@@ -69,23 +70,24 @@ class TuiRunnerTest {
         val clock = SteppingClock(start)
         val io = FakeTuiIo(listOf(TuiKey.Text('?'), TuiKey.Escape, TuiKey.Text('3'), TuiKey.Text('q')))
         val states = mutableListOf<TuiState>()
-        val code = TuiRunner(io, { state -> states += state; data(clock) }, labels, profile, clock).run()
+        val code = TuiRunner(io, { state -> states += state; data(clock) }, labels = labels, profile = profile, clock = clock).run()
         assertEquals(TuiRunner.EXIT_OK, code)
         assertEquals(4, io.frames.size)
         assertTrue(io.frames[1].any { line -> "Ajuda" in line })
         assertTrue(io.frames[2].none { line -> "Ajuda" in line })
         assertTrue(io.frames[3][1].startsWith("│ 1 Visão geral   2 Sessões  [3 Histórico]  5 Configurações "), io.frames[3][1])
-        assertEquals(1, states.size)
+        // Abrir e trocar para a aba 3: cada aba lê o que é dela.
+        assertEquals(listOf(TuiTab.OVERVIEW, TuiTab.HISTORY), states.map { state -> state.tab })
         assertTrue(io.frames.all { frame -> frame.size == 24 })
     }
 
     @Test
-    fun `rele quando o prazo vence e com r, mantendo a aba`() {
+    fun `rele ao trocar de aba, quando o prazo vence e com r`() {
         val clock = SteppingClock(start)
         val io = FakeTuiIo(listOf(TuiKey.Text('2'), null, TuiKey.Text('r'))) { clock.now += 16.seconds }
         val loaded = mutableListOf<TuiTab>()
-        TuiRunner(io, { state -> loaded += state.tab; data(clock) }, labels, profile, clock).run()
-        assertEquals(listOf(TuiTab.OVERVIEW, TuiTab.SESSIONS, TuiTab.SESSIONS), loaded)
+        TuiRunner(io, { state -> loaded += state.tab; data(clock) }, labels = labels, profile = profile, clock = clock).run()
+        assertEquals(listOf(TuiTab.OVERVIEW, TuiTab.SESSIONS, TuiTab.SESSIONS, TuiTab.SESSIONS), loaded)
     }
 
     @Test
@@ -94,9 +96,20 @@ class TuiRunnerTest {
         lateinit var io: FakeTuiIo
         io = FakeTuiIo(listOf(null)) { io.size = TuiSize(70, 20); io.resized = true }
         var loads = 0
-        TuiRunner(io, { _ -> loads += 1; data(clock) }, labels, profile, clock).run()
+        TuiRunner(io, { _ -> loads += 1; data(clock) }, labels = labels, profile = profile, clock = clock).run()
         assertEquals(1, loads)
         assertEquals(20, io.frames.last().size)
         assertEquals(70, io.frames.last().first().length)
+    }
+
+    @Test
+    fun `e na aba 2 exporta e o aviso fica ate a proxima tecla`() {
+        val clock = SteppingClock(start)
+        val io = FakeTuiIo(listOf(TuiKey.Text('2'), TuiKey.Text('e'), TuiKey.Down))
+        var exports = 0
+        TuiRunner(io, { _ -> data(clock) }, { _ -> exports += 1; TuiNotice("CSV salvo", ok = true) }, labels, profile, clock).run()
+        assertEquals(1, exports)
+        assertTrue(io.frames[2].any { line -> "CSV salvo" in line })
+        assertTrue(io.frames[3].none { line -> "CSV salvo" in line })
     }
 }

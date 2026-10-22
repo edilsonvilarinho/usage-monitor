@@ -12,7 +12,13 @@ internal data class TuiTabView(val body: List<TerminalLine>, val shortcuts: List
 internal object TuiScreen {
 
     fun context(data: TuiData, size: TuiSize): TuiContext =
-        TuiContext(teamAvailable = data.teamConfigured, stacked = size.stacked, accountCount = data.accounts.size)
+        TuiContext(
+            teamAvailable = data.teamConfigured,
+            stacked = size.stacked,
+            accountCount = data.accounts.size,
+            sessionCount = data.sessions?.sessions?.size ?: 0,
+            turnCount = data.sessions?.turns?.size ?: 0
+        )
 
     fun render(state: TuiState, data: TuiData, size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {
         if (size.tooSmall) {
@@ -29,7 +35,7 @@ internal object TuiScreen {
             tabs = context.tabs,
             active = state.tab,
             status = status(data, labels),
-            body = view.body,
+            body = withNotice(view.body, state.notice, size, profile),
             shortcuts = view.shortcuts + labels.commonShortcuts,
             labels = labels,
             profile = profile
@@ -53,8 +59,19 @@ internal object TuiScreen {
     private fun tabView(state: TuiState, data: TuiData, size: TuiSize, labels: TuiLabels, profile: TerminalProfile): TuiTabView =
         when (state.tab) {
             TuiTab.OVERVIEW -> TuiOverviewView.render(data, state.overview, size, TuiOverviewLabels(labels.language), TerminalLabels(labels.language), profile)
-            TuiTab.SESSIONS, TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> TuiTabView(emptyList())
+            TuiTab.SESSIONS -> TuiSessionsView.render(data.sessions, state.sessions, size, TuiSessionsLabels(labels.language), profile)
+            TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> TuiTabView(emptyList())
         }
+
+    /** O aviso de resultado na última linha do corpo, `✓` verde ou `▲`, sobre o que estiver ali. */
+    private fun withNotice(body: List<TerminalLine>, notice: TuiNotice?, size: TuiSize, profile: TerminalProfile): List<TerminalLine> {
+        notice ?: return body
+        val glyphs = profile.glyphs
+        val mark = if (notice.ok) TerminalSpan(glyphs.done + " ", TerminalColor.Ok) else TerminalSpan(glyphs.warning + " ", TerminalColor.Warn)
+        val room = (size.bodyHeight - 1).coerceAtLeast(0)
+        val kept = body.take(room)
+        return kept + List(room - kept.size) { TerminalLine.EMPTY } + terminalLine(mark, TerminalSpan(notice.text))
+    }
 
     /** A ajuda (3.5): todos os atalhos numa caixa, centrada no corpo. */
     fun help(size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {

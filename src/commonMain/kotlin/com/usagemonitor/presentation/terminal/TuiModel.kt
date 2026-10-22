@@ -86,4 +86,10 @@ sealed interface TuiEffect {
 
     /** `r`, ou um corte novo (período, janela, time): lê de novo agora. */
     data object Refresh : TuiEffect
+
+    /** `e` na aba 2: as sessões do Claude Code do corte num CSV, na pasta de onde a TUI foi aberta. */
+    data object ExportSessions : TuiEffect
 }
+
+/** Uma frase de resultado no pé do corpo, até a próxima tecla ("CSV salvo em …"). */
+data class TuiNotice(val text: String, val ok: Boolean)

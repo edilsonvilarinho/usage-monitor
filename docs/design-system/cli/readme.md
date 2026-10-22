@@ -74,7 +74,7 @@ aqui, na seção Primitivas.
 | Reinício de janela | `┆` muted | `\|` |
 | Anel na linha de status | `○ ◔ ◑ ◕ ●` (quartos de uso) | o número basta |
 | Valor ajustável | `‹ 70 ›` | `< 70 >` |
-| Legenda de série | `■` na cor da série | inicial da série |
+| Legenda de série | `■` na cor da série | a letra da série: `e s l g` (entrada, saída, cache lido, cache gravado; em inglês `i o r w`) |
 | Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
 | Sparkline (#441) | `▁▂▃▄▅▆▇█` na cor da fonte | `._-=+*#@` |
 
@@ -149,7 +149,9 @@ custo, com nota de rodapé.
 reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado.
 
 **Composição de tokens** (3.2). Segmentos `█` nas cores da série (`--term-input`, `--term-output`,
-`--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série.
+`--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série. Sem Unicode, o
+segmento e a legenda levam a letra da série, uma por série (a inicial colidiria nos dois caches).
+Tokens abreviados com uma casa no separador do idioma (`4,8M`, `136K`), nunca no do locale.
 
 **Caixa** (3.5). Borda arredondada e título opcional na cor de acento. Usada para a ajuda e para
 qualquer sobreposição. Nunca há caixa dentro de caixa.

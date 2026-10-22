@@ -8,7 +8,11 @@ data class TuiState(
     val tab: TuiTab = TuiTab.OVERVIEW,
     val helpOpen: Boolean = false,
     /** A conta escolhida na aba 1. */
-    val overview: TuiListState = TuiListState()
+    val overview: TuiListState = TuiListState(),
+    /** O corte e a sessão da aba 2. */
+    val sessions: TuiSessionsState = TuiSessionsState(),
+    /** O resultado da última ação (o CSV), até a próxima tecla. */
+    val notice: TuiNotice? = null
 ) {
     /** A aba 4 sumiu (o time foi desfeito entre duas leituras): volta para a 1. */
     fun normalized(context: TuiContext): TuiState =
@@ -22,7 +26,10 @@ data class TuiContext(
     /** Abaixo de 80 colunas lista e detalhe se empilham, e `enter` abre o detalhe. */
     val stacked: Boolean,
     /** Quantas contas a aba 1 lista. */
-    val accountCount: Int = 0
+    val accountCount: Int = 0,
+    /** Quantas sessões a aba 2 lista, e quantos turnos tem a aberta. */
+    val sessionCount: Int = 0,
+    val turnCount: Int = 0
 ) {
     /** As abas visíveis, na ordem e com o número fixo de cada uma. */
     val tabs: List<TuiTab>
@@ -38,7 +45,9 @@ data class TuiStep(val state: TuiState, val effects: List<TuiEffect> = emptyList
  */
 object TuiReducer {
 
-    fun reduce(state: TuiState, key: TuiKey, context: TuiContext): TuiStep {
+    fun reduce(current: TuiState, key: TuiKey, context: TuiContext): TuiStep {
+        // O aviso de resultado vale até a próxima tecla.
+        val state = current.copy(notice = null)
         if (key == TuiKey.Interrupt) {
             return TuiStep(state, listOf(TuiEffect.Quit))
         }
@@ -56,7 +65,8 @@ object TuiReducer {
     private fun reduceTab(state: TuiState, key: TuiKey, context: TuiContext): TuiStep? =
         when (state.tab) {
             TuiTab.OVERVIEW -> state.overview.reduce(key, context.accountCount, context.stacked)?.let { overview -> TuiStep(state.copy(overview = overview)) }
-            TuiTab.SESSIONS, TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> null
+            TuiTab.SESSIONS -> state.sessions.reduce(key, context.sessionCount, context.turnCount)?.let { (sessions, effects) -> TuiStep(state.copy(sessions = sessions), effects) }
+            TuiTab.HISTORY, TuiTab.TEAM, TuiTab.SETTINGS -> null
         }
 
     private fun reduceHelp(state: TuiState, key: TuiKey): TuiStep =
@@ -74,7 +84,8 @@ object TuiReducer {
             char == 'r' -> TuiStep(state, listOf(TuiEffect.Refresh))
             char.isDigit() -> {
                 val tab = TuiTab.ofNumber(char.digitToInt())?.takeIf { candidate -> candidate in context.tabs } ?: return TuiStep(state)
-                TuiStep(state.copy(tab = tab))
+                // Cada aba lê o que é dela: a troca pede uma releitura.
+                if (tab == state.tab) TuiStep(state) else TuiStep(state.copy(tab = tab), listOf(TuiEffect.Refresh))
             }
             else -> null
         }

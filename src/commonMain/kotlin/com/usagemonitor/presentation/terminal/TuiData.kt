@@ -17,7 +17,9 @@ data class TuiData(
     /** Com time configurado, a aba 4 aparece. */
     val teamConfigured: Boolean = false,
     /** As contas na ordem do painel, com o que a Visão geral mostra de cada uma. */
-    val accounts: List<TuiAccount> = emptyList()
+    val accounts: List<TuiAccount> = emptyList(),
+    /** A aba 2; `null` enquanto ela não foi aberta. */
+    val sessions: TuiSessions? = null
 ) {
     /** A última tentativa de coleta falhou em alguma conta (6.2). */
     val lastFailed: Boolean

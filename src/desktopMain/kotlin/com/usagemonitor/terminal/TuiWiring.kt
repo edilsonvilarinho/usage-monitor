@@ -22,7 +22,7 @@ internal object TuiWiring {
             val profile = detectTerminalProfile(System.getenv(), outputIsTerminal = true, outputEncoding = io.encoding)
             TuiStores().use { stores ->
                 val tuiReader = TuiReader(terminalReader, stores, languageOverride = languageOverride)
-                return TuiRunner(io, tuiReader::load, labels, profile).run()
+                return TuiRunner(io, tuiReader::load, tuiReader::exportSessions, labels, profile).run()
             }
         } finally {
             io.close()

@@ -5,6 +5,7 @@ import com.usagemonitor.presentation.terminal.TerminalProfile
 import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiEffect
 import com.usagemonitor.presentation.terminal.TuiLabels
+import com.usagemonitor.presentation.terminal.TuiNotice
 import com.usagemonitor.presentation.terminal.TuiReducer
 import com.usagemonitor.presentation.terminal.TuiScreen
 import com.usagemonitor.presentation.terminal.TuiState
@@ -27,6 +28,7 @@ internal object TuiCommandNames {
 internal class TuiRunner(
     private val io: TuiIo,
     private val load: (TuiState) -> TuiData,
+    private val exportSessions: (TuiState) -> TuiNotice? = { null },
     private val labels: TuiLabels,
     private val profile: TerminalProfile,
     private val clock: Clock = Clock.System,
@@ -56,6 +58,9 @@ internal class TuiRunner(
                 return EXIT_OK
             }
             state = step.state
+            if (TuiEffect.ExportSessions in step.effects) {
+                state = state.copy(notice = exportSessions(state))
+            }
             if (TuiEffect.Refresh in step.effects) {
                 data = load(state)
                 nextRefresh = clock.now() + refreshInterval

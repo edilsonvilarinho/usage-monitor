@@ -14,7 +14,10 @@ import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiReadFailure
 import com.usagemonitor.presentation.terminal.TuiSpark
 import com.usagemonitor.presentation.terminal.TuiSparkline
+import com.usagemonitor.presentation.terminal.TuiNotice
+import com.usagemonitor.presentation.terminal.TuiSessionsLabels
 import com.usagemonitor.presentation.terminal.TuiState
+import com.usagemonitor.presentation.terminal.TuiTab
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -34,7 +37,9 @@ internal class TuiReader(
     private val health: LocalCollectorHealthDataSource = LocalCollectorHealthDataSource(),
     private val languageOverride: AppLanguage? = null
 ) {
-    @Suppress("UNUSED_PARAMETER")
+    private val sessionsReader = stores?.let(::TuiSessionsReader)
+
+    /** Cada aba lê o que é dela: a Visão geral não paga a lista de sessões, e o contrário. */
     fun load(state: TuiState): TuiData {
         val reading = reader.read(languageOverride)
         val team = teamSettings.peek()
@@ -46,15 +51,21 @@ internal class TuiReader(
             lastCollectedAt = reading.lastCollectedAt,
             teamConfigured = team != null && team.enabled && team.normalizedServerUrl.isNotEmpty() && team.apiKey.isNotBlank(),
             accounts = reading.accounts.map { account ->
+                val overview = state.tab == TuiTab.OVERVIEW
                 TuiAccount(
                     account = account,
                     failure = failureOf(account, collectorHealth),
-                    activeSession = activeSession(account, reading.now),
-                    last24h = last24h(account, reading.now)
+                    activeSession = if (overview) activeSession(account, reading.now) else null,
+                    last24h = if (overview) last24h(account, reading.now) else null
                 )
-            }
+            },
+            sessions = if (state.tab == TuiTab.SESSIONS) sessionsReader?.load(state.sessions, reading.now) else null
         )
     }
+
+    /** `e` na aba 2. Sem os bancos, não há o que exportar. */
+    fun exportSessions(state: TuiState): TuiNotice? =
+        sessionsReader?.export(state.sessions, reader.read(languageOverride).now, TuiSessionsLabels(reader.language(languageOverride)))
 
     /**
      * A falha da última coleta desta conta. Pela chave do alvo quando o coletor a grava; o

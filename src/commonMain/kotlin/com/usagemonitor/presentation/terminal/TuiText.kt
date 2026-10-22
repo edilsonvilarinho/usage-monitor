@@ -37,4 +37,24 @@ internal object TuiText {
         }
         return lines
     }
+
+    /**
+     * Tokens abreviados com uma casa, `4,8M` e `136K` em português e `4.8M` em inglês. Conta
+     * inteira, sem `String.format`: o separador sai do idioma do app, nunca do locale da JVM,
+     * para duas máquinas desenharem a mesma tela.
+     */
+    fun tokens(count: Long, pt: Boolean): String {
+        val separator = if (pt) ',' else '.'
+        fun scaled(unit: Long, suffix: String): String {
+            val tenths = count * 10 / unit
+            val whole = tenths / 10
+            val fraction = tenths % 10
+            return if (fraction == 0L || whole >= 100L) "$whole$suffix" else "$whole$separator$fraction$suffix"
+        }
+        return when {
+            count >= 1_000_000L -> scaled(1_000_000L, "M")
+            count >= 1_000L -> scaled(1_000L, "K")
+            else -> count.toString()
+        }
+    }
 }
