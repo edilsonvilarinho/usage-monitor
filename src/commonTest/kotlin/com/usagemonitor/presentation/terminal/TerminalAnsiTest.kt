@@ -55,6 +55,8 @@ class TerminalAnsiTest {
         assertEquals("atencao, critico, reinicio, sessao - 47 min.", withoutAccents("atenção, crítico, reinício, sessão · 47 min…"))
         assertEquals("ACAO EM DIA", withoutAccents("AÇÃO EM DIA"))
         assertEquals("?", withoutAccents("●"))
+        // As setas dos atalhos da TUI saíam `??` no rodapé e na ajuda (#441).
+        assertEquals("^v sessao  <> periodo  ^ v  < >", withoutAccents("↑↓ sessão  ←→ período  ↑ ↓  ← →"))
     }
 
     @Test

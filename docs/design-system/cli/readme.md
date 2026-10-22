@@ -77,6 +77,7 @@ aqui, na seção Primitivas.
 | Legenda de série | `■` na cor da série | a letra da série: `e s l g` (entrada, saída, cache lido, cache gravado; em inglês `i o r w`) |
 | Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
 | Sparkline (#441) | `▁▂▃▄▅▆▇█` na cor da fonte | `._-=+*#@` |
+| Setas nos atalhos (#441) | `↑ ↓ ← →` | `^ v < >` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 
