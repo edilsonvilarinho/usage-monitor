@@ -41,7 +41,9 @@ internal class SystemdUserService(
 ) {
     val unitFile: File get() = File(configHome, "systemd/user/$UNIT")
 
-    fun isAvailable(): Boolean = systemctl("show-environment").exitCode == 0
+    /** `null` quando o systemd do usuário responde; senão, o que ele (ou o sistema) disse. */
+    fun unavailableReason(): String? =
+        systemctl("show-environment").takeIf { result -> result.exitCode != 0 }?.let { result -> result.output.trim().lines().firstOrNull().orEmpty() }
 
     fun writeUnit(executable: String) {
         unitFile.parentFile.mkdirs()

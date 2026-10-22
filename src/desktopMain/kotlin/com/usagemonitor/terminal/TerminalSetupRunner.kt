@@ -25,17 +25,25 @@ internal interface TerminalPrompt {
             override fun line(prompt: String): String? {
                 val console = System.console()
                 if (console != null) return console.readLine("%s ", prompt)
-                print("$prompt ")
-                System.out.flush()
-                return input.readLine()
+                return piped(prompt)
             }
 
             override fun secret(prompt: String): String? {
                 val console = System.console()
                 if (console != null) return console.readPassword("%s ", prompt)?.let { chars -> String(chars) }
+                return piped(prompt)
+            }
+
+            /**
+             * Resposta por pipe (um script, o `setup` num servidor): sem terminal não há o
+             * enter de quem digitou, e a próxima linha grudaria na pergunta (medido na A14).
+             */
+            private fun piped(prompt: String): String? {
                 print("$prompt ")
                 System.out.flush()
-                return input.readLine()
+                val answer = input.readLine()
+                println()
+                return answer
             }
         }
     }

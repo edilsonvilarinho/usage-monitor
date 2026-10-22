@@ -63,8 +63,10 @@ internal class TerminalServiceLabels(val language: AppLanguage) {
     val notInstalledApp: String
         get() = localized(language, "Este Usage Monitor não foi instalado (sem o caminho do app). Instale pelo pacote ou pelo script do Linux.", "This Usage Monitor was not installed (no app path). Install it from the package or the Linux script.")
 
-    val noSystemd: String
-        get() = localized(language, "O systemd do usuário não respondeu (systemctl --user). Numa sessão sem login gráfico, ele precisa do linger:", "The user systemd did not answer (systemctl --user). In a session without a graphical login, it needs linger:")
+    fun noSystemd(detail: String): String =
+        localized(language, "O systemd do usuário não respondeu (systemctl --user", "The user systemd did not answer (systemctl --user") +
+            (if (detail.isNotBlank()) ": $detail" else "") +
+            localized(language, "). Numa sessão sem login gráfico, ele precisa do linger:", "). In a session without a graphical login, it needs linger:")
 
     fun unitWritten(path: String): String = localized(language, "serviço criado em $path", "service created at $path")
     val enabledAndStarted: String get() = localized(language, "ativo e marcado para iniciar com o sistema", "active and set to start with the system")

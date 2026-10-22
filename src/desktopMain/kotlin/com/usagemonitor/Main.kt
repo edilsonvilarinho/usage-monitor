@@ -32,6 +32,7 @@ import com.usagemonitor.presentation.terminal.TerminalServiceLabels
 import com.usagemonitor.terminal.TerminalCommands
 import com.usagemonitor.terminal.TerminalConsole
 import com.usagemonitor.terminal.TerminalReader
+import com.usagemonitor.terminal.quietPreferencesLog
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -115,6 +116,9 @@ fun main(args: Array<String>) {
         // Modo terminal (#439): responde e sai, também pelo `usage-monitor.exe` de
         // console, que por isso não relança o exe GUI.
         is CommandLineRequest.Terminal -> {
+            // Antes de qualquer leitura de preferências: num servidor novo, o `java.util.prefs`
+            // avisaria no `stderr` que criou a pasta (medido na A14 da #440).
+            quietPreferencesLog()
             configureDataRoot(request.userDataDir)
             exitProcess(TerminalCommands.run(request.command, request.locale))
         }

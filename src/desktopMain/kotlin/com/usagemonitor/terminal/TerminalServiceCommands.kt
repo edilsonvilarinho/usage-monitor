@@ -109,8 +109,9 @@ internal class TerminalServiceCommands(
             print(TerminalConfigView.warning(labels.notInstalledApp, null, glyphs))
             return EXIT_REFUSED
         }
-        if (!systemd.isAvailable()) {
-            print(TerminalConfigView.warning(labels.noSystemd, "sudo loginctl enable-linger $user", glyphs))
+        val unavailable = systemd.unavailableReason()
+        if (unavailable != null) {
+            print(TerminalConfigView.warning(labels.noSystemd(unavailable), "sudo loginctl enable-linger $user", glyphs))
             return EXIT_REFUSED
         }
         systemd.writeUnit(executable)
