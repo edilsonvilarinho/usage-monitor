@@ -25,6 +25,8 @@ internal class ConfigApplier(
     private val hooks: ConfigHooks = ConfigHooks()
 ) {
 
+    private val accounts = ConfigAccounts(store, hooks)
+
     fun apply(change: ConfigChange): ConfigOutcome {
         val outcome = runCatching {
             when (change) {
@@ -32,6 +34,11 @@ internal class ConfigApplier(
                 is ConfigChange.SetValue -> setValue(change)
                 is ConfigChange.SetApiKey -> setApiKey(change)
                 is ConfigChange.RemoveApiKey -> removeApiKey(change)
+                is ConfigChange.AddAccount -> accounts.add(change)
+                is ConfigChange.RenameAccount -> accounts.rename(change)
+                is ConfigChange.AccountEnabled -> accounts.switch(change)
+                is ConfigChange.RemoveAccount -> accounts.remove(change)
+                ConfigChange.RescanAccounts -> accounts.rescan()
             }
         }.getOrElse { error -> ConfigOutcome.Refused(ConfigRefusals.FAILED, error.message) }
         // O terminal que lê logo depois precisa ver o valor gravado (risco R2).

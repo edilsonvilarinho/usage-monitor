@@ -107,4 +107,34 @@ internal class TerminalConfigLabels(val language: AppLanguage) {
     val keyNotTested: String get() = localized(language, "gravada sem teste", "saved without a test")
 
     fun noSavedKey(name: String): String = localized(language, "$name não tem chave salva. Salve com:", "$name has no saved key. Save it with:")
+
+    val headerLabel: String get() = localized(language, "APELIDO", "LABEL")
+    val headerOrigin: String get() = localized(language, "ORIGEM", "ORIGIN")
+    val monitored: String get() = localized(language, "monitorada", "monitored")
+    val notMonitored: String get() = localized(language, "desligada", "off")
+    val ready: String get() = localized(language, "pronta", "ready")
+    val noLogin: String get() = localized(language, "sem login", "not logged in")
+    val bySource: String get() = localized(language, "pela fonte", "by the source")
+
+    fun accountAdded(source: String, label: String): String =
+        localized(language, "conta $source $label adicionada e monitorada", "$source account $label added and monitored")
+
+    fun accountRenamed(label: String): String = localized(language, "conta renomeada para $label", "account renamed to $label")
+
+    fun accountSwitched(label: String, enabled: Boolean): String =
+        if (enabled) localized(language, "$label monitorada", "$label monitored") else localized(language, "$label desligada", "$label off")
+
+    fun accountRemoved(label: String): String = localized(language, "$label removida da lista", "$label removed from the list")
+
+    val accountsRescanned: String get() = localized(language, "contas do Claude Code procuradas de novo", "Claude Code accounts searched again")
+
+    fun unknownAccount(account: String): String = localized(language, "A conta '$account' não existe. Veja as contas com:", "There is no account '$account'. See the accounts with:")
+
+    fun ambiguousAccount(account: String, ids: String): String =
+        localized(language, "'$account' é o apelido de mais de uma conta. Use o id: $ids", "'$account' is the label of more than one account. Use the id: $ids")
+
+    val defaultAccount: String
+        get() = localized(language, "A conta padrão do Claude Code não sai da lista. Para parar de monitorá-la:", "The default Claude Code account stays on the list. To stop monitoring it:")
+
+    fun accountFailed(detail: String?): String = localized(language, "A conta não foi adicionada", "The account was not added") + (detail?.let { text -> ": $text" } ?: ".")
 }

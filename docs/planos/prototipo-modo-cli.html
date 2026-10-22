@@ -624,16 +624,15 @@ S.config = () => render([
   L(c('ok', '✓ '), 'chave do MiniMax salva e a fonte ligada', c('mu', ' · o serviço já está usando')),
   L(c('mu', '  Chave válida.')),
   L(''),
-  sh('usage-monitor accounts add anthropic --label trabalho \\'),
-  L('    --credentials /srv/claude-work/.credentials.json'),
-  L(c('ok', '✓ '), 'conta ', c('a', 'Claude Team'), ' adicionada como ', c('b', 'trabalho'), c('mu', ' · primeira leitura na próxima coleta')),
+  sh('usage-monitor accounts add anthropic /srv/claude-work --label trabalho'),
+  L(c('ok', '✓ '), 'conta Anthropic trabalho adicionada e monitorada', c('mu', ' · o serviço já está usando')),
   L(''),
   sh('usage-monitor accounts list'),
-  L(c('mu b', ' ' + pad('FONTE', 11) + pad('APELIDO', 10) + pad('ORIGEM', 38) + 'ESTADO')),
-  L(' ', c('a', pad('Anthropic', 11)), pad('pessoal', 10), c('mu', pad('~/.claude/.credentials.json', 38)), c('ok', 'pronta')),
-  L(' ', c('a', pad('Anthropic', 11)), pad('trabalho', 10), c('mu', pad('/srv/claude-work/.credentials.json', 38)), c('ok', 'pronta')),
-  L(' ', c('c', pad('Codex', 11)), pad('padrão', 10), c('mu', pad('~/.codex/auth.json', 38)), c('ok', 'pronta')),
-  L(' ', c('c', pad('Codex', 11)), pad('cliente', 10), c('mu', pad('~/.codex-cliente/auth.json', 38)), c('wa', 'login vencido')),
+  L(c('mu b', ' ' + pad('FONTE', 13) + pad('APELIDO', 10) + pad('ID', 15) + pad('ORIGEM', 22) + 'ESTADO')),
+  L(' ', c('a', '● '), pad('Anthropic', 11), pad('pessoal', 10), c('mu', pad('default', 15)), c('mu', pad('~/.claude', 22)), c('ok', 'monitorada'), c('mu', ' · pronta')),
+  L(' ', c('a', '● '), pad('Anthropic', 11), pad('trabalho', 10), c('mu', pad('5f0c2a7e-91d3', 15)), c('mu', pad('/srv/claude-work', 22)), c('ok', 'monitorada'), c('mu', ' · pronta')),
+  L(' ', c('c', '● '), pad('Codex', 11), pad('padrão', 10), c('mu', pad('codex', 15)), c('mu', pad('~/.codex', 22)), c('mu', 'pela fonte · pronta')),
+  L(' ', c('c', '● '), pad('Codex', 11), pad('cliente', 10), c('mu', pad('codex-8d41b0e', 15)), c('mu', pad('~/.codex-cliente', 22)), c('ok', 'monitorada'), c('wa', ' · sem login')),
 ]);
 
 S.service = () => render([

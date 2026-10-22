@@ -48,7 +48,7 @@ internal class TerminalConfigHarness(
     }
 
     fun store(): AppSettingsStore =
-        AppSettingsStore(NoOpBreadcrumbRecorder, null, node, dataFile = { name -> File(dir, name) }, homeDirectory = { dir })
+        AppSettingsStore(NoOpBreadcrumbRecorder, null, node, dataFile = { name -> File(dir, name) }, homeDirectory = { dir }, environment = { null })
 
     fun file(name: String): File = File(dir, name)
 
@@ -63,6 +63,8 @@ internal class TerminalConfigHarness(
         val runner = TerminalConfigRunner(
             client, TerminalReader(File(dir, "dashboard-cache.json"), File(dir, "app.lock"), node), node, ::file,
             secretInput = { _ -> secret },
+            home = dir,
+            codexHome = File(dir, ".codex"),
             keyProbe = keyProbe
         )
         val code = runner.run(command, language, console)

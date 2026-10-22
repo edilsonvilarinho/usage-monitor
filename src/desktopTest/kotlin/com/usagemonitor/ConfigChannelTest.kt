@@ -33,7 +33,7 @@ class ConfigChannelTest {
         dir.deleteRecursively()
     }
 
-    private fun store() = AppSettingsStore(NoOpBreadcrumbRecorder, null, node, dataFile = { name -> File(dir, name) }, homeDirectory = { dir })
+    private fun store() = AppSettingsStore(NoOpBreadcrumbRecorder, null, node, dataFile = { name -> File(dir, name) }, homeDirectory = { dir }, environment = { null })
 
     private fun channel() = LocalConfigRequestChannel(File(dir, "control"))
 

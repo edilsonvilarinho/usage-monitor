@@ -30,7 +30,9 @@ internal class AppSettingsStore(
     /** Onde moram os arquivos de configuração; o teste passa uma pasta temporária. */
     dataFile: (String) -> File = AppDataDirectory::file,
     /** A pasta pessoal, onde as contas do Claude Code são descobertas. */
-    homeDirectory: () -> File = { File(System.getProperty("user.home").orEmpty()) }
+    homeDirectory: () -> File = { File(System.getProperty("user.home").orEmpty()) },
+    /** O ambiente (`CLAUDE_CONFIG_DIR`), onde a descoberta também procura contas. */
+    environment: (String) -> String? = System::getenv
 ) {
     // O proxy é lido antes do `HttpClient` do grafo: o engine é montado uma vez, e
     // mudar a configuração só vale a partir do próximo arranque (issue #174).
@@ -51,6 +53,7 @@ internal class AppSettingsStore(
         preferences = preferencesNode,
         defaultEnabled = ApiSource.ANTHROPIC in enabledApis.value,
         homeDirProvider = homeDirectory,
+        environmentProvider = environment,
         breadcrumbs = breadcrumbs
     )
     val enabledAnthropicProfiles = MutableStateFlow(

@@ -8,6 +8,7 @@ import com.usagemonitor.ConfigValues
 import com.usagemonitor.ConfigRefusals
 import com.usagemonitor.ENABLED_APIS_KEY
 import com.usagemonitor.data.AppDataDirectory
+import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalProxySettingsDataSource
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
@@ -43,6 +44,8 @@ internal class TerminalConfigRunner(
     private val preferences: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName),
     private val dataFile: (String) -> File = AppDataDirectory::file,
     private val secretInput: TerminalSecretInput = TerminalSecretInput.SYSTEM,
+    private val home: File = File(System.getProperty("user.home").orEmpty()),
+    private val codexHome: File = CodexCliHomeProvider.resolve(),
     private val keyProbe: (ApiSource, String) -> Throwable? =
         TerminalKeysRunner.realProbe { LocalProxySettingsDataSource(dataFile("proxy.json")).load() }
 ) {
@@ -56,6 +59,11 @@ internal class TerminalConfigRunner(
                 client, secretInput,
                 savedKey = { source -> LocalApiKeyDataSource(dataFile("api-keys.json")).load().forSource(source) },
                 probe = keyProbe
+            ).run(command, labels, console.profile)
+            is AccountsCommand -> TerminalAccountsRunner(
+                client, preferences, home, codexHome,
+                codexSourceEnabled = { ApiSource.CODEX in readApiSourceCollection(PreferencesSettings(preferences), ENABLED_APIS_KEY) },
+                credentialsInKeychain = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
             ).run(command, labels, console.profile)
         }
         if (output.lines.isNotEmpty()) {

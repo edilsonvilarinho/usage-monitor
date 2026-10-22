@@ -13,6 +13,20 @@ internal data class TerminalSourceRow(
 )
 
 /**
+ * Uma conta no `accounts list`. [ready] nulo: não dá para saber pelo disco (a conta padrão
+ * no macOS guarda o login no Keychain). [bySource]: a conta Codex padrão, que segue a fonte.
+ */
+internal data class TerminalAccountRow(
+    val source: ApiSource,
+    val label: String,
+    val id: String,
+    val origin: String,
+    val monitored: Boolean,
+    val ready: Boolean?,
+    val bySource: Boolean = false
+)
+
+/**
  * Um ajuste no `config list`: [value] nulo é desligado. Ajuste [masked] chega aqui já sem
  * o segredo — só saber se há um — e sai como máscara.
  */
@@ -85,6 +99,42 @@ internal object TerminalConfigView {
                 else -> TerminalSpan(row.value)
             }
             terminalLine(TerminalSpan(row.key.padEnd(keyWidth) + GAP, TerminalColor.Muted), value)
+        }
+        return TerminalOutput(lines, EXIT_OK)
+    }
+
+    /** `accounts list`: fonte na cor dela, apelido, id curto, origem e estado. */
+    fun accounts(rows: List<TerminalAccountRow>, labels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
+        val glyphs = profile.glyphs
+        val sourceWidth = maxOf(labels.headerSource.length, rows.maxOfOrNull { row -> row.source.displayName().length + 2 } ?: 0)
+        val labelWidth = maxOf(labels.headerLabel.length, rows.maxOfOrNull { row -> row.label.length } ?: 0)
+        val idWidth = maxOf(labels.headerId.length, rows.maxOfOrNull { row -> row.id.length } ?: 0)
+        val originWidth = maxOf(labels.headerOrigin.length, rows.maxOfOrNull { row -> row.origin.length } ?: 0)
+        val header = " " + listOf(
+            labels.headerSource.padEnd(sourceWidth), labels.headerLabel.padEnd(labelWidth), labels.headerId.padEnd(idWidth),
+            labels.headerOrigin.padEnd(originWidth), labels.headerState
+        ).joinToString(GAP)
+        val lines = mutableListOf(terminalLine(TerminalSpan(header, TerminalColor.Muted, bold = true)))
+        for (row in rows) {
+            val spans = mutableListOf(
+                TerminalSpan(" "),
+                TerminalSpan(glyphs.sourceMark + " ", TerminalColor.Source(row.source)),
+                TerminalSpan(row.source.displayName().padEnd(sourceWidth - 2) + GAP),
+                TerminalSpan(row.label.padEnd(labelWidth) + GAP),
+                TerminalSpan(row.id.padEnd(idWidth) + GAP, TerminalColor.Muted),
+                TerminalSpan(row.origin.padEnd(originWidth) + GAP, TerminalColor.Muted)
+            )
+            spans += when {
+                row.bySource -> TerminalSpan(labels.bySource, TerminalColor.Muted)
+                row.monitored -> TerminalSpan(labels.monitored, TerminalColor.Ok)
+                else -> TerminalSpan(labels.notMonitored, TerminalColor.Muted)
+            }
+            when (row.ready) {
+                true -> spans += TerminalSpan(" ${glyphs.separator} ${labels.ready}", TerminalColor.Muted)
+                false -> spans += TerminalSpan(" ${glyphs.separator} ${labels.noLogin}", TerminalColor.Warn)
+                null -> Unit
+            }
+            lines += TerminalLine(spans)
         }
         return TerminalOutput(lines, EXIT_OK)
     }

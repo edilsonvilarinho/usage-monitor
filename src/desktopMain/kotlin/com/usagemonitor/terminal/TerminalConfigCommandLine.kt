@@ -162,3 +162,84 @@ internal fun parseKeysCommand(arguments: kotlin.collections.List<String>): Termi
         }
     )
 }
+
+/** `accounts list|add|rename|enable|disable|remove|rescan` (aba Contas). */
+internal sealed interface AccountsCommand : ConfigCommand {
+    data object List : AccountsCommand
+
+    data class Add(val source: ApiSource, val directory: String, val label: String? = null) : AccountsCommand
+
+    data class Rename(val account: String, val label: String) : AccountsCommand
+
+    data class Switch(val account: String, val enabled: Boolean) : AccountsCommand
+
+    data class Remove(val account: String) : AccountsCommand
+
+    data object Rescan : AccountsCommand
+}
+
+internal object AccountsCommandNames {
+    const val ACCOUNTS = "accounts"
+    const val LIST = "list"
+    const val ADD = "add"
+    const val RENAME = "rename"
+    const val ENABLE = "enable"
+    const val DISABLE = "disable"
+    const val REMOVE = "remove"
+    const val RESCAN = "rescan"
+    const val LABEL = "--label"
+
+    val ACTIONS: kotlin.collections.List<String> = listOf(LIST, ADD, RENAME, ENABLE, DISABLE, REMOVE, RESCAN)
+}
+
+internal fun parseAccountsCommand(arguments: kotlin.collections.List<String>): TerminalCommandParse {
+    val actions = AccountsCommandNames.ACTIONS.joinToString(", ")
+    val action = arguments.firstOrNull()
+        ?: return TerminalCommandParse.Invalid("Error: '${AccountsCommandNames.ACCOUNTS}' needs an action: $actions.")
+    val rest = arguments.drop(1)
+    val command = "${AccountsCommandNames.ACCOUNTS} $action"
+    fun noExtra(from: Int, parsed: AccountsCommand): TerminalCommandParse =
+        rest.getOrNull(from)?.let { extra -> unknownOption(command, extra) } ?: TerminalCommandParse.Parsed(parsed)
+    fun account(): String? = rest.firstOrNull()?.takeIf { value -> !value.startsWith("-") }
+    val needsAccount = TerminalCommandParse.Invalid("Error: '$command' needs an account: its label or id. Run 'usage-monitor accounts list' to see them.")
+    return when (action) {
+        AccountsCommandNames.LIST -> noExtra(0, AccountsCommand.List)
+        AccountsCommandNames.RESCAN -> noExtra(0, AccountsCommand.Rescan)
+        AccountsCommandNames.ADD -> parseAccountAdd(rest, command)
+        AccountsCommandNames.RENAME -> {
+            val target = account() ?: return needsAccount
+            val label = rest.getOrNull(1)?.takeIf { value -> value.isNotBlank() }
+                ?: return TerminalCommandParse.Invalid("Error: '$command' needs the new label.")
+            noExtra(2, AccountsCommand.Rename(target, label))
+        }
+        AccountsCommandNames.ENABLE, AccountsCommandNames.DISABLE -> noExtra(1, AccountsCommand.Switch(account() ?: return needsAccount, action == AccountsCommandNames.ENABLE))
+        AccountsCommandNames.REMOVE -> noExtra(1, AccountsCommand.Remove(account() ?: return needsAccount))
+        else -> TerminalCommandParse.Invalid("Error: '$action' is not an accounts action. Use $actions.")
+    }
+}
+
+private fun parseAccountAdd(arguments: kotlin.collections.List<String>, command: String): TerminalCommandParse {
+    val sources = listOf(ApiSource.ANTHROPIC, ApiSource.CODEX)
+    val names = sources.joinToString(" or ") { source -> source.terminalId() }
+    val source = arguments.firstOrNull()?.let(::apiSourceOfTerminalId)?.takeIf { candidate -> candidate in sources }
+        ?: return TerminalCommandParse.Invalid("Error: '$command' needs the source, $names, and the config directory.")
+    var directory: String? = null
+    var label: String? = null
+    var index = 1
+    while (index < arguments.size) {
+        val argument = arguments[index]
+        when {
+            argument == AccountsCommandNames.LABEL -> {
+                label = arguments.getOrNull(index + 1) ?: return TerminalCommandParse.Invalid("Error: ${AccountsCommandNames.LABEL} needs a label.")
+                index += 1
+            }
+            argument.startsWith("${AccountsCommandNames.LABEL}=") -> label = argument.substringAfter('=')
+            directory == null && !argument.startsWith("-") -> directory = argument
+            else -> return unknownOption(command, argument)
+        }
+        index += 1
+    }
+    val path = directory
+        ?: return TerminalCommandParse.Invalid("Error: '$command ${source.terminalId()}' needs the config directory (CLAUDE_CONFIG_DIR for Claude Code, CODEX_HOME for Codex).")
+    return TerminalCommandParse.Parsed(AccountsCommand.Add(source, path, label))
+}

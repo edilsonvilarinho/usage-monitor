@@ -31,6 +31,31 @@ internal sealed interface ConfigChange {
     @SerialName("api_key_remove")
     data class RemoveApiKey(val source: String) : ConfigChange
 
+    /** `accounts add anthropic|codex <diretório> [--label]`: conta nova, já monitorada. */
+    @Serializable
+    @SerialName("account_add")
+    data class AddAccount(val source: String, val directory: String, val label: String? = null) : ConfigChange
+
+    /** `accounts rename <conta> <apelido>`. A conta é o apelido ou o id; quem resolve é o coletor. */
+    @Serializable
+    @SerialName("account_rename")
+    data class RenameAccount(val account: String, val label: String) : ConfigChange
+
+    /** `accounts enable|disable <conta>`. */
+    @Serializable
+    @SerialName("account_enabled")
+    data class AccountEnabled(val account: String, val enabled: Boolean) : ConfigChange
+
+    /** `accounts remove <conta>`: some da lista, como o "remover" das Configurações. */
+    @Serializable
+    @SerialName("account_remove")
+    data class RemoveAccount(val account: String) : ConfigChange
+
+    /** `accounts rescan`: procura as contas do Claude Code de novo, e traz de volta as removidas. */
+    @Serializable
+    @SerialName("account_rescan")
+    data object RescanAccounts : ConfigChange
+
     /**
      * `config set <ajuste> <valor>` ([ConfigKeys]). O valor de um ajuste secreto
      * (`proxy.password`) viaja aqui, então o `toString` o esconde.
@@ -67,6 +92,9 @@ internal object ConfigRefusals {
     const val KEY_REQUIRED = "key_required"
     const val UNKNOWN_KEY = "unknown_key"
     const val INVALID_VALUE = "invalid_value"
+    const val UNKNOWN_ACCOUNT = "unknown_account"
+    const val AMBIGUOUS_ACCOUNT = "ambiguous_account"
+    const val DEFAULT_ACCOUNT = "default_account"
     const val FAILED = "failed"
 }
 
