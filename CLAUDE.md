@@ -32,6 +32,10 @@ gradlew.bat allTests -PtestForks=4
 gradlew.bat allTests -Pcoverage
 gradlew.bat koverHtmlReport -Pcoverage
 
+# Relatorio de testes e cobertura (Kotlin + servidor) em HTML no design system:
+# skill `usage-monitor-test-report`; saida em build/test-report/index.html
+node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs
+
 # Limpar build cache
 gradlew.bat clean
 ```
@@ -41,6 +45,7 @@ Servidor de time (`server/`, opcional — só quem usa a integração com time):
 cd server
 npm install
 npm test        # vitest + supertest
+npm run test:coverage  # + cobertura v8 em coverage/ (lida pelo relatorio de testes)
 npm run dev     # http://localhost:3000
 ```
 
