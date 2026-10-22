@@ -99,6 +99,7 @@ sendo o app. Eles seguem o idioma do app (`--locale` vale aqui também):
 | `wait <cota> --below <n> [--timeout <tempo>]` | Espera a cota cair abaixo de n% (os ids estão no `status --json`), por exemplo `usage-monitor wait anthropic:trabalho:claude-5h --below 50 && claude -p "rode a suíte"` |
 | `statusline claude-code` | Uma linha embaixo do prompt do Claude Code: a conta que ele usa, 5h e 7d, custo e vazão da sessão |
 | `statusline tmux` | Um segmento para a barra do tmux |
+| `tui` | O modo interativo: visão geral, sessões, histórico, time e configurações numa tela cheia, por teclado — pelo SSH também |
 
 ```jsonc
 // ~/.claude/settings.json
@@ -109,6 +110,12 @@ sendo o app. Eles seguem o idioma do app (`--locale` vale aqui também):
 # ~/.tmux.conf
 set -g status-right '#(usage-monitor statusline tmux)'
 ```
+
+`usage-monitor tui` lê os mesmos arquivos e bancos sem escrever neles (só a aba Time pergunta ao
+servidor do time, como a janela de time do app). As abas vão de `1` a `5`; `↑ ↓` movem, `enter`
+abre, `r` lê de novo e `?` mostra todas as teclas. A aba Configurações muda o mesmo que os comandos
+abaixo e mostra a saída deles; adicionar conta e entrar num servidor de time novo ficam nos
+comandos. Precisa de pelo menos 40×12 e foi desenhado para 80 a 96 colunas.
 
 Tudo o que a janela de Configurações faz também se faz pelo terminal, que é o que um servidor sem
 tela precisa. Os comandos gravam os mesmos arquivos do app; com o app ou o serviço coletando, a

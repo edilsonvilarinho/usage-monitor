@@ -92,6 +92,7 @@ the one that collects. They follow the app language (`--locale` works here too):
 | `wait <quota> --below <n> [--timeout <time>]` | Waits until the quota drops below n% (ids in `status --json`), e.g. `usage-monitor wait anthropic:work:claude-5h --below 50 && claude -p "run the suite"` |
 | `statusline claude-code` | One line under the Claude Code prompt: the account that Claude Code uses, 5h and 7d, session cost and throughput |
 | `statusline tmux` | A segment for the tmux status bar |
+| `tui` | The interactive mode: overview, sessions, history, team and settings in one full-screen view, by keyboard — over SSH too |
 
 ```jsonc
 // ~/.claude/settings.json
@@ -102,6 +103,12 @@ the one that collects. They follow the app language (`--locale` works here too):
 # ~/.tmux.conf
 set -g status-right '#(usage-monitor statusline tmux)'
 ```
+
+`usage-monitor tui` reads the same files and databases without writing to them (only the Team tab
+asks the team server, like the app's team window). The tabs are numbered `1` to `5`; `↑ ↓` move,
+`enter` opens, `r` reads again and `?` shows every key. The Settings tab changes the same things as
+the commands below and shows their output; adding an account and joining a new team server stay in
+the commands. It needs at least 40×12 and is drawn for 80 to 96 columns.
 
 Everything in the Settings window can also be done from the terminal, which is what a headless
 server needs. These commands write the app's own files; while the app or the service is collecting,
