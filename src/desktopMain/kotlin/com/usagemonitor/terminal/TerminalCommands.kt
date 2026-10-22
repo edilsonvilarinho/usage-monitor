@@ -12,6 +12,7 @@ import com.usagemonitor.presentation.terminal.TerminalTmux
 import com.usagemonitor.presentation.terminal.TerminalWaitStep
 import com.usagemonitor.presentation.terminal.TerminalWaitView
 import com.usagemonitor.presentation.terminal.terminalLine
+import com.usagemonitor.presentation.terminal.withoutAccents
 import com.usagemonitor.presentation.terminal.TerminalLabels
 import com.usagemonitor.presentation.terminal.TerminalOutput
 import com.usagemonitor.presentation.terminal.TerminalProfile
@@ -159,6 +160,11 @@ internal class TerminalConsole(val profile: TerminalProfile, private val out: Pr
     fun print(text: String) {
         out.println(text)
         out.flush()
+    }
+
+    /** Texto corrido (ajuda, diagnóstico): sem acento quando a saída não é UTF-8. */
+    fun printText(text: String) {
+        print(if (profile.unicode) text else withoutAccents(text))
     }
 
     companion object {

@@ -170,7 +170,9 @@ usando"). Aviso com `▲` e, se houver o que rodar, o comando na linha de baixo,
   `--locale`). Isso revoga a regra "inglês/ASCII" do #418, cujo motivo continua valendo e é
   tratado de outro jeito: **console que não é UTF-8** (o do Windows sem página 65001) recebe os
   glifos da coluna ASCII e o texto **sem acento** ("critico", "atencao"). Nomes de comandos,
-  opções, ajustes e campos do `--json` são sempre em inglês.
+  opções, ajustes e campos do `--json` são sempre em inglês. **Exceção:** as mensagens de uso
+  incorreto (opção desconhecida, valor inválido) seguem em inglês e ASCII, porque nascem no parser,
+  antes de o idioma ser lido das preferências; a ajuda para onde elas apontam sai no idioma do app.
 - Hora sempre em BRT: "15:10 BRT", "em 47 min", "em 1d06h", "qui 21:00".
 - Comandos no formato `usage-monitor <verbo> [objeto]`. Ajustes com nome em inglês e pontos
   (`alerts.quota.thresholds`), estáveis entre versões, porque viram contrato de script.

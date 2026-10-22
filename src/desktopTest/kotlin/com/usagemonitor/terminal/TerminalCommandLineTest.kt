@@ -37,8 +37,13 @@ class TerminalCommandLineTest {
 
     @Test
     fun `help and version still win over a command`() {
-        assertEquals(CommandLineRequest.Help, parse("status", "--help"))
+        assertEquals(CommandLineRequest.Help(), parse("status", "--help"))
         assertEquals(CommandLineRequest.Version, parse("-v", "status"))
+    }
+
+    @Test
+    fun `help carries the locale and the data root, for the help to come out in the app language`() {
+        assertEquals(CommandLineRequest.Help(locale = AppLanguage.EN, userDataDir = "/tmp/um"), parse("--locale", "en", "--user-data-dir", "/tmp/um", "--help"))
     }
 
     @Test

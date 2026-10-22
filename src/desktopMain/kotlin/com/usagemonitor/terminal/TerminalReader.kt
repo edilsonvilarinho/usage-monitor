@@ -49,6 +49,9 @@ internal class TerminalReader(
 ) {
     private val settings = PreferencesSettings(preferences)
 
+    /** O idioma efetivo: o `--locale` desta execução ou a preferência gravada. */
+    fun language(languageOverride: AppLanguage?): AppLanguage = LanguageSelection(settings, languageOverride).current()
+
     /** Os perfis Anthropic gravados pelo app, sem redescobrir nada (linha de status). */
     fun anthropicProfiles(): List<AnthropicProfileRecord> = AnthropicProfileRegistry.readStored(preferences)
 
@@ -59,7 +62,7 @@ internal class TerminalReader(
         return TerminalReading(
             accounts = terminalAccounts(stats, readPersistedAlertSettings(settings), now),
             collectorRunning = lockFile?.let(SingleInstanceGuard::isHeld) ?: SingleInstanceGuard.isHeld(),
-            language = LanguageSelection(settings, languageOverride).current(),
+            language = language(languageOverride),
             now = now
         )
     }
