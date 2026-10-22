@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.QuotaZone
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.presentation.ui.TelegramBotMessages
@@ -30,7 +31,8 @@ internal object TerminalStatusView {
     fun render(
         accounts: List<TerminalAccount>,
         now: Instant,
-        collectorRunning: Boolean,
+        /** Quem coleta agora; `null` quando nada coleta. */
+        collector: CollectorKind?,
         maxAge: Duration?,
         labels: TerminalLabels,
         profile: TerminalProfile
@@ -46,16 +48,16 @@ internal object TerminalStatusView {
             return TerminalOutput(listOf(line), EXIT_NO_READING)
         }
         val lines = mutableListOf<TerminalLine>()
-        if (!collectorRunning) {
+        if (collector == null) {
             val at = TelegramBotMessages.clock(lastCollectedAt)
             lines += terminalLine(terminalSpan(profile.glyphs.warning + " ", TerminalColor.Warn), terminalSpan(labels.nothingCollecting(at, age)))
             lines += terminalLine(terminalSpan("  " + labels.openAppToRefresh, TerminalColor.Muted))
             lines += TerminalLine.EMPTY
         }
         lines += table(accounts, now, labels, profile)
-        if (collectorRunning) {
+        if (collector != null) {
             lines += TerminalLine.EMPTY
-            lines += terminalLine(terminalSpan(" ")) + TerminalPrimitives.readingFooter(age, zonesOf(accounts), labels)
+            lines += terminalLine(terminalSpan(" ")) + TerminalPrimitives.readingFooter(collector, age, zonesOf(accounts), labels)
         }
         return TerminalOutput(lines, EXIT_OK)
     }

@@ -165,6 +165,10 @@ class TelegramBotServiceTest {
     @Volatile private var appLanguage = AppLanguage.PT
     @Volatile private var sourceHealth: List<SourceHealthObservation>? = null
     private val enabledSources = MutableStateFlow(setOf(ApiSource.ANTHROPIC))
+    /** Servidor sem bibliotecas gráficas (#440): o Skia não carrega. */
+    @Volatile
+    private var imagesAvailable = true
+
     private val service = TelegramBotService(
         api = api,
         settingsFlow = settings,
@@ -187,6 +191,7 @@ class TelegramBotServiceTest {
         },
         panelIntervalMillis = 50L,
         readings = TelegramBotReadings(
+            imagesAvailable = { imagesAvailable },
             focusHud = { focusRequests.incrementAndGet(); true },
             machineName = { "NOTE-EDI" },
             exportUsage = { since, format -> "$format desde $since" },
@@ -962,5 +967,19 @@ class TelegramBotServiceTest {
 
         waitUntil { api.photos.isNotEmpty() && api.sent.any { it.second.startsWith("Sem histórico no intervalo") } }
         assertTrue(api.photos.single().second > 0)
+    }
+
+    /** #440: num servidor sem libGL, libX11 e fontconfig, o gráfico e a imagem viram texto. */
+    @Test
+    fun `without Skia the chart and the status image answer in text`() {
+        imagesAvailable = false
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/grafico")
+        api.pending += message(2, chat = 51, text = "/img")
+
+        waitUntil { api.sent.count { it.first == 51L } >= 2 }
+        assertTrue(api.photos.isEmpty())
+        assertTrue(api.sent.any { it.second.startsWith("Este computador não desenha imagens") })
     }
 }

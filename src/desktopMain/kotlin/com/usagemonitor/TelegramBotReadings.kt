@@ -17,6 +17,8 @@ import com.usagemonitor.domain.entity.UsageSpike
  * cada leitura tem default vazio, e o teste passa só a que exercita.
  */
 internal class TelegramBotReadings(
+    /** Se o Skia carrega aqui (#440); sem ele, as imagens viram texto. */
+    val imagesAvailable: () -> Boolean = { TelegramImageSupport.available },
     /** `/ping` (AA19): versão, quando o app abriu e a próxima coleta. */
     val ping: () -> TelegramPing? = { null },
     /** `/pico` (AA11): as anomalias de gasto que o painel já calcula para o alerta. */

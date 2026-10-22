@@ -82,6 +82,13 @@ internal class CodexProfileRegistry(
         publish()
     }
 
+    /** Apelido da conta extra (#440, `accounts rename`): o card e o terminal mostram este nome. */
+    fun rename(profileId: String, label: String) {
+        val current = _profiles.value.firstOrNull { it.id == profileId } ?: return
+        writeProfile(current.copy(label = label.trim().ifEmpty { current.label }))
+        publish()
+    }
+
     fun setEnabled(profileId: String, enabled: Boolean) {
         val current = _profiles.value.firstOrNull { it.id == profileId } ?: return
         writeProfile(current.copy(enabled = enabled))
@@ -95,20 +102,7 @@ internal class CodexProfileRegistry(
         _profiles.value = readStoredProfiles()
     }
 
-    /** Ordem total e determinística: nome, depois caminho — a lista vai para um `StateFlow`. */
-    private fun readStoredProfiles(): List<CodexProfileRecord> {
-        val children = runCatching { profilesNode.childrenNames().toList() }.getOrDefault(emptyList())
-        return children.mapNotNull { childName ->
-            val node = profilesNode.node(childName)
-            val path = node.get(KEY_PATH, "").takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            CodexProfileRecord(
-                id = childName,
-                label = node.get(KEY_LABEL, File(path).name.ifBlank { "Codex" }),
-                directory = path,
-                enabled = node.getBoolean(KEY_ENABLED, true)
-            )
-        }.sortedWith(compareBy<CodexProfileRecord> { it.label.lowercase() }.thenBy { normalizePath(it.directory) })
-    }
+    private fun readStoredProfiles(): List<CodexProfileRecord> = readStoredFrom(profilesNode)
 
     private fun writeProfile(record: CodexProfileRecord) {
         val node = profilesNode.node(record.id)
@@ -122,24 +116,44 @@ internal class CodexProfileRegistry(
         return ID_PREFIX + UUID.nameUUIDFromBytes(normalizePath(path).toByteArray(StandardCharsets.UTF_8)).toString()
     }
 
-    /**
-     * Canônico dos **dois** lados da comparação: o diretório escolhido chega
-     * canonicalizado, e o `CODEX_HOME` pode vir em nome curto 8.3 (`RUNNER~1`) ou
-     * por link simbólico. Comparar canônico com cru deixava a conta padrão entrar
-     * como extra — o CI do Windows pegou isso com o `TEMP` do runner.
-     */
-    private fun normalizePath(path: String): String {
-        val file = File(path)
-        val resolved = runCatching { file.canonicalFile }.getOrElse { file.absoluteFile.normalize() }
-        return resolved.path.trimEnd(File.separatorChar).lowercase()
-    }
+    private fun normalizePath(path: String): String = normalizedCodexPath(path)
 
-    private companion object {
+    internal companion object {
         const val PREFERENCES_NODE = "codexProfiles"
         const val ID_PREFIX = "codex-"
         const val AUTH_FILE = "auth.json"
         const val KEY_LABEL = "label"
         const val KEY_PATH = "path"
         const val KEY_ENABLED = "enabled"
+
+        /** As contas extras gravadas, sem montar o registro (o terminal só lê, #440). */
+        fun readStored(preferences: Preferences): List<CodexProfileRecord> = readStoredFrom(preferences.node(PREFERENCES_NODE))
+
+        /** Ordem total e determinística: nome, depois caminho — a lista vai para um `StateFlow`. */
+        private fun readStoredFrom(profilesNode: Preferences): List<CodexProfileRecord> {
+            val children = runCatching { profilesNode.childrenNames().toList() }.getOrDefault(emptyList())
+            return children.mapNotNull { childName ->
+                val node = profilesNode.node(childName)
+                val path = node.get(KEY_PATH, "").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                CodexProfileRecord(
+                    id = childName,
+                    label = node.get(KEY_LABEL, File(path).name.ifBlank { "Codex" }),
+                    directory = path,
+                    enabled = node.getBoolean(KEY_ENABLED, true)
+                )
+            }.sortedWith(compareBy<CodexProfileRecord> { it.label.lowercase() }.thenBy { normalizedCodexPath(it.directory) })
+        }
+
+        /**
+         * Canônico dos **dois** lados da comparação: o diretório escolhido chega
+         * canonicalizado, e o `CODEX_HOME` pode vir em nome curto 8.3 (`RUNNER~1`) ou
+         * por link simbólico. Comparar canônico com cru deixava a conta padrão entrar
+         * como extra — o CI do Windows pegou isso com o `TEMP` do runner.
+         */
+        fun normalizedCodexPath(path: String): String {
+            val file = File(path)
+            val resolved = runCatching { file.canonicalFile }.getOrElse { file.absoluteFile.normalize() }
+            return resolved.path.trimEnd(File.separatorChar).lowercase()
+        }
     }
 }

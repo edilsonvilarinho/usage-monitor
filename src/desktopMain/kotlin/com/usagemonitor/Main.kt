@@ -28,9 +28,11 @@ import com.usagemonitor.update.rememberAutoUpdateController
 import com.usagemonitor.update.rememberReleaseNotesController
 import com.usagemonitor.onboarding.rememberStartupGuideController
 import com.usagemonitor.presentation.ui.help.StartupTipCatalog
+import com.usagemonitor.presentation.terminal.TerminalServiceLabels
 import com.usagemonitor.terminal.TerminalCommands
 import com.usagemonitor.terminal.TerminalConsole
 import com.usagemonitor.terminal.TerminalReader
+import com.usagemonitor.terminal.quietPreferencesLog
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -50,8 +52,6 @@ internal const val APP_ICON_RESOURCE_PATH = "/icons/app_icon.png"
 // bandeja leem cada um a faixa que é desenhada para o tamanho em que aparecem.
 private const val WINDOW_ICON_RESOURCE_PATH = "/icons/app_icon_window.png"
 private const val TRAY_ICON_RESOURCE_PATH = "/icons/app_icon_tray.png"
-
-internal const val CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS = 10 * 60 * 1_000L
 
 /**
  * Espera do pré-aquecimento das modais, contada da HUD **pintada**, e não do início
@@ -116,6 +116,9 @@ fun main(args: Array<String>) {
         // Modo terminal (#439): responde e sai, também pelo `usage-monitor.exe` de
         // console, que por isso não relança o exe GUI.
         is CommandLineRequest.Terminal -> {
+            // Antes de qualquer leitura de preferências: num servidor novo, o `java.util.prefs`
+            // avisaria no `stderr` que criou a pasta (medido na A14 da #440).
+            quietPreferencesLog()
             configureDataRoot(request.userDataDir)
             exitProcess(TerminalCommands.run(request.command, request.locale))
         }
@@ -136,6 +139,12 @@ fun main(args: Array<String>) {
     }
     for (option in launch.unknownOptions) {
         System.err.println(unknownOptionWarning(option))
+    }
+    // Sem tela, a janela nunca abre e o processo ficava parado em silêncio (#440, A01):
+    // diz o que fazer e sai. Só no Linux a AWT se declara sem tela pela falta de `DISPLAY`.
+    if (java.awt.GraphicsEnvironment.isHeadless()) {
+        TerminalConsole.system().printText(TerminalServiceLabels(TerminalReader().language(launch.locale)).noDisplay)
+        exitProcess(1)
     }
     // Pelo `usage-monitor.exe` (console), abrir o app é tarefa do exe GUI.
     val guiRelaunch = ConsoleLauncher.guiRelaunchCommand(
@@ -293,7 +302,7 @@ internal fun runUsageMonitor(
         ready = hudShown,
         tipCount = StartupTipCatalog.tips.size
     )
-    AppBackgroundWork(graph, viewModels, singleInstanceGuard)
+    AppShutdownHook(viewModels, singleInstanceGuard)
 
     val profileRecords by graph.profileRegistry.profiles.collectAsState()
     val profileResolution = resolveAnthropicProfiles(graph.profileRegistry, profileRecords)
@@ -313,6 +322,10 @@ internal fun runUsageMonitor(
 
     val shell = remember {
         AppShellState(settings, initialTargets = availableTargets, languageSelection = graph.languageSelection)
+    }
+    // O terminal mudou um ajuste com o app coletando (#440): a tela relê o que guarda.
+    LaunchedEffect(viewModels.engine) {
+        viewModels.engine.appliedConfigChanges.collect { shell.reloadFromSettings() }
     }
     // A queda da sessão anterior é lida **e consumida** uma vez por arranque: este
     // é o mesmo arranque que abre o relatório, então ela foi oferecida.
@@ -451,29 +464,12 @@ internal fun runUsageMonitor(
 }
 
 /**
- * O trabalho de fundo que não pertence a janela nenhuma: a indexação do Codex, o
- * envio do time e o encerramento ordenado — o mesmo (`AppViewModels.shutdown`)
- * no gancho da JVM e na saída da composição.
+ * O encerramento ordenado — o mesmo (`AppViewModels.shutdown`) no gancho da JVM e
+ * na saída da composição. O trabalho de fundo (índices, envio do time) mora no
+ * `CollectorEngine`, que o serviço sem tela também roda.
  */
 @Composable
-private fun AppBackgroundWork(graph: AppGraph, viewModels: AppViewModels, singleInstanceGuard: SingleInstanceGuard) {
-    // O índice local continua sendo atualizado com a janela fechada. A operação
-    // já muda para Dispatchers.IO no datasource; o laço não bloqueia a UI.
-    LaunchedEffect(graph) {
-        while (isActive) {
-            graph.codexCliSessionDataSource.syncIndex()
-            graph.codexIndexSyncedAt.value = kotlin.time.Clock.System.now()
-            delay(CODEX_CLI_SESSION_INDEX_INTERVAL_MILLIS)
-        }
-    }
-    val teamSettings by graph.teamSettingsFlow.collectAsState()
-    LaunchedEffect(viewModels.teamSync, teamSettings.isActive) {
-        if (teamSettings.isActive) {
-            viewModels.teamSync.start()
-        } else {
-            viewModels.teamSync.stop()
-        }
-    }
+private fun AppShutdownHook(viewModels: AppViewModels, singleInstanceGuard: SingleInstanceGuard) {
     DisposableEffect(viewModels, singleInstanceGuard) {
         val shutdownHook = Thread { viewModels.shutdown(singleInstanceGuard) }
         Runtime.getRuntime().addShutdownHook(shutdownHook)

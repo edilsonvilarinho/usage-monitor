@@ -150,6 +150,8 @@ internal class TelegramBotHandlers(
                 val rings = buildTelegramRings(snapshotProvider(), language)
                 if (rings.rings.isEmpty()) {
                     send(token, chatId, TelegramBotUsageMessages.ringsEmpty(language))
+                } else if (!readings.imagesAvailable()) {
+                    sendStatus(token, chatId, language)
                 } else {
                     api.sendPhoto(token, chatId, TelegramRingsRenderer.render(rings), TelegramBotUsageMessages.ringsCaption(rings.collectedAt, language))
                 }
@@ -321,6 +323,10 @@ internal class TelegramBotHandlers(
             send(token, chatId, TelegramBotUsageMessages.compareEmpty(language))
             return
         }
+        if (!readings.imagesAvailable()) {
+            send(token, chatId, TelegramBotUsageMessages.imagesUnavailable(language))
+            return
+        }
         api.sendPhoto(token, chatId, TelegramHeatmapRenderer.render(heatmap), TelegramBotUsageMessages.compareCaption(days, language))
     }
 
@@ -339,6 +345,10 @@ internal class TelegramBotHandlers(
         val chart = chartProvider(range)
         if (chart == null || chart.isEmpty) {
             api.sendMessage(token, chatId, TelegramChartMessages.empty(language), html = true)
+            return
+        }
+        if (!readings.imagesAvailable()) {
+            send(token, chatId, TelegramBotUsageMessages.imagesUnavailable(language))
             return
         }
         api.sendPhoto(token, chatId, TelegramChartRenderer.render(chart), TelegramChartMessages.caption(range, chart, language))

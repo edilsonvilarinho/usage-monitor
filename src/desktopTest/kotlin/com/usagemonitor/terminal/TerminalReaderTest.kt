@@ -3,10 +3,13 @@ package com.usagemonitor.terminal
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.LANGUAGE_KEY
 import com.usagemonitor.SingleInstanceGuard
+import com.usagemonitor.data.datasource.CollectorRegistration
+import com.usagemonitor.data.datasource.LocalCollectorRegistrationDataSource
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaZone
 import com.usagemonitor.domain.entity.UsageAlertSettings
@@ -79,13 +82,36 @@ class TerminalReaderTest {
     }
 
     @Test
+    fun `o servico registrado e quem coleta, e o registro sem a trava nao vale`() = withTestSettings { node, _ ->
+        val dir = tempDir()
+        val lock = File(dir, "app.lock")
+        val registration = LocalCollectorRegistrationDataSource(File(dir, "collector.json"))
+        registration.write(CollectorRegistration(CollectorKind.SERVICE, 4121L, now, "41.12.0"))
+        val reader = TerminalReader(File(dir, "dashboard-cache.json"), lock, node, fixedClock, registration)
+
+        // Sobra de um serviço que caiu: a trava está livre, então ninguém coleta.
+        assertEquals(null, reader.read(null).collector)
+
+        val service = SingleInstanceGuard.tryAcquire(lock)
+        try {
+            assertEquals(CollectorKind.SERVICE, reader.read(null).collector)
+            assertEquals(4121L, registration.read()?.pid)
+        } finally {
+            service?.close()
+        }
+    }
+
+    @Test
     fun `com o app segurando a trava, ha coletor vivo, e a leitura nao a toma`() = withTestSettings { node, _ ->
         val dir = tempDir()
         val lock = File(dir, "app.lock")
         val app = SingleInstanceGuard.tryAcquire(lock)
         try {
-            val reading = TerminalReader(File(dir, "dashboard-cache.json"), lock, node, fixedClock).read(null)
+            val registration = LocalCollectorRegistrationDataSource(File(dir, "collector.json"))
+            val reading = TerminalReader(File(dir, "dashboard-cache.json"), lock, node, fixedClock, registration).read(null)
             assertTrue(reading.collectorRunning)
+            // Sem registro, quem segura a trava é um app anterior à #440.
+            assertEquals(CollectorKind.APP, reading.collector)
         } finally {
             app?.close()
         }

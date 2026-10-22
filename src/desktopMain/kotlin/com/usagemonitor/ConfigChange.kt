@@ -1,0 +1,165 @@
+package com.usagemonitor
+
+import com.usagemonitor.domain.entity.redactedSecret
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/**
+ * Uma mudança de configuração pedida pelo terminal (#440), como dado: é o que viaja até
+ * o coletor vivo num pedido (decisão D1), e o que o [ConfigApplier] aplica — no coletor,
+ * ou direto nos arquivos quando nada coleta. Nomes estáveis no JSON: um app aberto de
+ * versão vizinha precisa ler o pedido.
+ */
+@Serializable
+internal sealed interface ConfigChange {
+
+    /** `sources enable|disable <fonte>`. A fonte vai pelo nome do enum. */
+    @Serializable
+    @SerialName("source_enabled")
+    data class SourceEnabled(val source: String, val enabled: Boolean) : ConfigChange
+
+    /** `keys set <fonte>`: grava a chave e liga a fonte. A chave viaja aqui; o `toString` a esconde. */
+    @Serializable
+    @SerialName("api_key_set")
+    data class SetApiKey(val source: String, val apiKey: String) : ConfigChange {
+        override fun toString(): String = "SetApiKey(source=$source, apiKey=${redactedSecret(apiKey)})"
+    }
+
+    /** `keys remove <fonte>`: apaga a chave e desliga a fonte, como na aba APIs. */
+    @Serializable
+    @SerialName("api_key_remove")
+    data class RemoveApiKey(val source: String) : ConfigChange
+
+    /** `accounts add anthropic|codex <diretório> [--label]`: conta nova, já monitorada. */
+    @Serializable
+    @SerialName("account_add")
+    data class AddAccount(val source: String, val directory: String, val label: String? = null) : ConfigChange
+
+    /** `accounts rename <conta> <apelido>`. A conta é o apelido ou o id; quem resolve é o coletor. */
+    @Serializable
+    @SerialName("account_rename")
+    data class RenameAccount(val account: String, val label: String) : ConfigChange
+
+    /** `accounts enable|disable <conta>`. */
+    @Serializable
+    @SerialName("account_enabled")
+    data class AccountEnabled(val account: String, val enabled: Boolean) : ConfigChange
+
+    /** `accounts remove <conta>`: some da lista, como o "remover" das Configurações. */
+    @Serializable
+    @SerialName("account_remove")
+    data class RemoveAccount(val account: String) : ConfigChange
+
+    /** `accounts rescan`: procura as contas do Claude Code de novo, e traz de volta as removidas. */
+    @Serializable
+    @SerialName("account_rescan")
+    data object RescanAccounts : ConfigChange
+
+    /** `telegram setup`: o token do bot (já conferido no Telegram) e o bot ligado. */
+    @Serializable
+    @SerialName("telegram_setup")
+    data class TelegramSetup(val botToken: String) : ConfigChange {
+        override fun toString(): String = "TelegramSetup(botToken=${redactedSecret(botToken)})"
+    }
+
+    /** `telegram enable|disable`: o interruptor do bot nas Configurações. */
+    @Serializable
+    @SerialName("telegram_enabled")
+    data class TelegramEnabled(val enabled: Boolean) : ConfigChange
+
+    /** `telegram pair`: abre um código de pareamento; a resposta traz o código e quando vence. */
+    @Serializable
+    @SerialName("telegram_pairing")
+    data object TelegramStartPairing : ConfigChange
+
+    /** `telegram remove <conversa>`: a conversa deixa de ser atendida. */
+    @Serializable
+    @SerialName("telegram_chat_remove")
+    data class TelegramRemoveChat(val chat: String) : ConfigChange
+
+    /** `telegram readonly <conversa> on|off`: só leitura ou controle, como nas Configurações (#408, AA21). */
+    @Serializable
+    @SerialName("telegram_chat_readonly")
+    data class TelegramChatReadOnly(val chat: String, val readOnly: Boolean) : ConfigChange
+
+    /** `team join`: servidor, chave (já conferida), apelido e as contas que participam. */
+    @Serializable
+    @SerialName("team_join")
+    data class TeamJoin(val serverUrl: String, val apiKey: String, val alias: String, val profileIds: Set<String>) : ConfigChange {
+        override fun toString(): String = "TeamJoin(serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, profileIds=$profileIds)"
+    }
+
+    /** `team leave`: desliga a integração e apaga a chave; servidor e apelido ficam para voltar. */
+    @Serializable
+    @SerialName("team_leave")
+    data object TeamLeave : ConfigChange
+
+    /** `web enable [--port] | disable`: ligar pela primeira vez gera o token, como nas Configurações. */
+    @Serializable
+    @SerialName("web_enabled")
+    data class WebEnabled(val enabled: Boolean, val port: Int? = null) : ConfigChange
+
+    /** `web token --regenerate`: token novo, e todo endereço já copiado deixa de valer. */
+    @Serializable
+    @SerialName("web_token")
+    data object WebRegenerateToken : ConfigChange
+
+    /**
+     * `config set <ajuste> <valor>` ([ConfigKeys]). O valor de um ajuste secreto
+     * (`proxy.password`) viaja aqui, então o `toString` o esconde.
+     */
+    @Serializable
+    @SerialName("set_value")
+    data class SetValue(val key: String, val value: String) : ConfigChange {
+        override fun toString(): String =
+            "SetValue(key=$key, value=${if (ConfigKeys.named(key)?.secret == true) redactedSecret(value) else value})"
+    }
+}
+
+/** O que aconteceu com uma [ConfigChange]. */
+@Serializable
+internal sealed interface ConfigOutcome {
+
+    /** Aplicada. [restartNeeded]: só vale depois de reiniciar quem coleta (o proxy). */
+    @Serializable
+    @SerialName("applied")
+    data class Applied(val restartNeeded: Boolean = false, val details: Map<String, String> = emptyMap()) : ConfigOutcome
+
+    /**
+     * Recusada, com o motivo por código estável (texto, e não enum: um enum novo a cada
+     * comando seria valor novo em enum existente) e um detalhe opcional.
+     */
+    @Serializable
+    @SerialName("refused")
+    data class Refused(val code: String, val detail: String? = null) : ConfigOutcome
+}
+
+/** Os códigos de recusa. */
+internal object ConfigRefusals {
+    const val UNKNOWN_SOURCE = "unknown_source"
+    const val KEY_REQUIRED = "key_required"
+    const val UNKNOWN_KEY = "unknown_key"
+    const val INVALID_VALUE = "invalid_value"
+    const val UNKNOWN_ACCOUNT = "unknown_account"
+    const val AMBIGUOUS_ACCOUNT = "ambiguous_account"
+    const val DEFAULT_ACCOUNT = "default_account"
+    const val UNKNOWN_CHAT = "unknown_chat"
+    const val NO_BOT_TOKEN = "no_bot_token"
+    const val FAILED = "failed"
+}
+
+internal object ConfigJson {
+    val json = Json {
+        ignoreUnknownKeys = true
+        classDiscriminator = "type"
+    }
+
+    fun encodeChange(change: ConfigChange): String = json.encodeToString(ConfigChange.serializer(), change)
+
+    fun decodeChange(text: String): ConfigChange? = runCatching { json.decodeFromString(ConfigChange.serializer(), text) }.getOrNull()
+
+    fun encodeOutcome(outcome: ConfigOutcome): String = json.encodeToString(ConfigOutcome.serializer(), outcome)
+
+    fun decodeOutcome(text: String): ConfigOutcome? = runCatching { json.decodeFromString(ConfigOutcome.serializer(), text) }.getOrNull()
+}

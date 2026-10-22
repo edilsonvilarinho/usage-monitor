@@ -2,6 +2,7 @@ package com.usagemonitor.terminal
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 import com.usagemonitor.domain.entity.UsageUnit
@@ -34,7 +35,7 @@ class TerminalJsonTest {
                 listOf(UsageSnapshotQuota("Saldo", PeriodType.REPORTED, UsageUnit.CURRENCY_USD, 0, 782, null, null, "USD"))
             )
         ),
-        collectorRunning = true,
+        collector = CollectorKind.SERVICE,
         language = AppLanguage.PT,
         now = now
     )
@@ -42,7 +43,8 @@ class TerminalJsonTest {
     @Test
     fun `the contract fields are stable, in English and snake case`() {
         val root = Json.parseToJsonElement(TerminalJson.encode(reading)).jsonObject
-        assertEquals(setOf("version", "generated_at", "last_collected_at", "collector_running", "quotas"), root.keys)
+        assertEquals(setOf("version", "generated_at", "last_collected_at", "collector_running", "collector", "quotas"), root.keys)
+        assertEquals("service", root.getValue("collector").jsonPrimitive.content)
         assertEquals(1, root.getValue("version").jsonPrimitive.int)
         val quota = root.getValue("quotas").jsonArray.first().jsonObject
         assertEquals(

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.entity.QuotaZone
 import kotlin.time.Duration
 
@@ -67,10 +68,10 @@ internal object TerminalPrimitives {
      * Rodapé de leitura: de onde e de quando é a leitura, e a contagem por estado, cada
      * estado na sua cor. Estado com contagem zero não aparece.
      */
-    fun readingFooter(age: Duration, zones: List<QuotaZone?>, labels: TerminalLabels): TerminalLine {
+    fun readingFooter(collector: CollectorKind, age: Duration, zones: List<QuotaZone?>, labels: TerminalLabels): TerminalLine {
         val counted = zones.filterNotNull()
         val spans = mutableListOf(
-            TerminalSpan(labels.readByApp(age), TerminalColor.Muted),
+            TerminalSpan(labels.readBy(collector, age), TerminalColor.Muted),
             TerminalSpan(" · ${labels.quotaCount(zones.size)}", TerminalColor.Muted)
         )
         val parts = listOf(QuotaZone.CRITICAL, QuotaZone.ATTENTION, QuotaZone.ON_TRACK)

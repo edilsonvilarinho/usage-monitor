@@ -36,7 +36,7 @@ internal object TelegramAnalysisPdf {
                     AnalysisView.DAYS to (MARGIN * 2 + column to page.height / 2f - 4f)
                 )
                 for ((view, corner) in slots) {
-                    val png = TelegramAnalysisRenderer.render(view, analysis, language) ?: continue
+                    val png = (if (TelegramImageSupport.available) TelegramAnalysisRenderer.render(view, analysis, language) else null) ?: continue
                     val image = PDImageXObject.createFromByteArray(pdf, png, view.name)
                     val height = column * image.height / image.width
                     content.drawImage(image, corner.first, corner.second - height, column, height)

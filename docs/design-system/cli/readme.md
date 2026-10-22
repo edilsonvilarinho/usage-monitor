@@ -73,6 +73,7 @@ aqui, na seção Primitivas.
 | Anel na linha de status | `○ ◔ ◑ ◕ ●` (quartos de uso) | o número basta |
 | Valor ajustável | `‹ 70 ›` | `< 70 >` |
 | Legenda de série | `■` na cor da série | inicial da série |
+| Segredo salvo (#440) | `••••` muted, no lugar do valor | `****` |
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 
@@ -194,7 +195,12 @@ usando"). Aviso com `▲` e, se houver o que rodar, o comando na linha de baixo,
 - **A leitura pronta é o `dashboard-cache.json`** que o app já grava, de forma atômica, a cada
   coleta (o mesmo que reidrata a HUD no arranque). Não existe um segundo arquivo de retrato: um
   dono só para "a última leitura de cada conta".
-- **Configurar pelo terminal muda os mesmos arquivos que o app usa.** O coletor aplica na hora,
-  exceto o proxy, que vale depois de reiniciar (a mesma regra do app).
+- **Configurar pelo terminal muda os mesmos arquivos que o app usa, e quem os escreve é um só.**
+  Com coletor vivo (app ou serviço), o terminal manda um pedido (`~/.usage-monitor/control/`) e o
+  coletor aplica pelos mesmos caminhos das Configurações e do bot, na hora, exceto o proxy, que vale
+  depois de reiniciar (a mesma regra do app). Sem coletor, o terminal grava direto. Sem resposta em
+  10 s, o pedido é recolhido e a saída diz que nada mudou (decisão D1 da #440).
+- **Sem bibliotecas gráficas o motor roda** e o bot do Telegram manda texto no lugar da imagem: o
+  Skia exige `libGL`, `libX11` e `fontconfig` (medição da A01 da #440).
 - Sem tela não há bandeja: avisos vão para o Telegram e para o registro de `alerts`.
 - Tema, HUD, escala da interface, cor e emoji por conta não se aplicam ao terminal.

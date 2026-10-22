@@ -6,8 +6,10 @@ import com.usagemonitor.AnthropicProfileRegistry
 import com.usagemonitor.LanguageSelection
 import com.usagemonitor.SingleInstanceGuard
 import com.usagemonitor.data.AppDataDirectory
+import com.usagemonitor.data.datasource.LocalCollectorRegistrationDataSource
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.presentation.terminal.TerminalAccount
 import com.usagemonitor.presentation.terminal.terminalAccounts
 import com.usagemonitor.readPersistedAlertSettings
@@ -23,10 +25,14 @@ import kotlin.time.Instant
  */
 internal data class TerminalReading(
     val accounts: List<TerminalAccount>,
-    val collectorRunning: Boolean,
+    /** Quem coleta agora (app ou serviço, #440); `null` quando nada coleta. */
+    val collector: CollectorKind?,
     val language: AppLanguage,
     val now: Instant
 ) {
+    val collectorRunning: Boolean
+        get() = collector != null
+
     /** A coleta mais recente entre as contas; `null` sem leitura nenhuma. */
     val lastCollectedAt: Instant?
         get() = accounts.mapNotNull { account -> account.fetchedAt }.maxOrNull()
@@ -45,7 +51,8 @@ internal class TerminalReader(
     private val cacheFile: File? = null,
     private val lockFile: File? = null,
     private val preferences: Preferences = Preferences.userRoot().node(AppDataDirectory.preferencesNodeName),
-    private val clock: Clock = Clock.System
+    private val clock: Clock = Clock.System,
+    private val registration: LocalCollectorRegistrationDataSource = LocalCollectorRegistrationDataSource()
 ) {
     private val settings = PreferencesSettings(preferences)
 
@@ -61,9 +68,21 @@ internal class TerminalReader(
         val now = clock.now()
         return TerminalReading(
             accounts = terminalAccounts(stats, readPersistedAlertSettings(settings), now),
-            collectorRunning = lockFile?.let(SingleInstanceGuard::isHeld) ?: SingleInstanceGuard.isHeld(),
+            collector = collector(),
             language = language(languageOverride),
             now = now
         )
+    }
+
+    /**
+     * Quem segura a trava agora. O registro só vale com a trava tomada; sem ele, quem a
+     * segura é um app anterior à #440, que não se registrava.
+     */
+    fun collector(): CollectorKind? {
+        val held = lockFile?.let(SingleInstanceGuard::isHeld) ?: SingleInstanceGuard.isHeld()
+        if (!held) {
+            return null
+        }
+        return registration.read()?.kind ?: CollectorKind.APP
     }
 }
