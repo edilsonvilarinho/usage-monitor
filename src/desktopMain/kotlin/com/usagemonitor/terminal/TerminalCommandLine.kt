@@ -10,16 +10,23 @@ import kotlin.time.Duration.Companion.seconds
  * app continua sendo `usage-monitor` sem comando.
  */
 internal sealed interface TerminalCommand {
-    /** `status [--max-age <tempo>]`: as cotas de todas as contas. */
-    data class Status(val maxAge: Duration? = null) : TerminalCommand
+    /** `status [--json] [--max-age <tempo>]`: as cotas de todas as contas. */
+    data class Status(val maxAge: Duration? = null, val json: Boolean = false) : TerminalCommand
+
+    /** `check [--max <n>] [--max-age <tempo>] [--quiet]`: a decisão pelo código de saída. */
+    data class Check(val max: Int? = null, val maxAge: Duration? = null, val quiet: Boolean = false) : TerminalCommand
 }
 
 internal object TerminalCommandNames {
     const val STATUS = "status"
+    const val CHECK = "check"
     const val MAX_AGE = "--max-age"
+    const val JSON = "--json"
+    const val MAX = "--max"
+    const val QUIET = "--quiet"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS)
+    val ALL: Set<String> = setOf(STATUS, CHECK)
 }
 
 internal sealed interface TerminalCommandParse {
@@ -35,26 +42,65 @@ internal sealed interface TerminalCommandParse {
 internal fun parseTerminalCommand(name: String, arguments: List<String>): TerminalCommandParse =
     when (name) {
         TerminalCommandNames.STATUS -> parseStatus(arguments)
+        TerminalCommandNames.CHECK -> parseCheck(arguments)
         else -> TerminalCommandParse.Invalid("Error: '$name' is not a command. Run with --help to list the commands.")
     }
 
 private fun parseStatus(arguments: List<String>): TerminalCommandParse {
     var maxAge: Duration? = null
-    var index = 0
-    while (index < arguments.size) {
-        val argument = arguments[index]
+    var json = false
+    val reader = OptionReader(arguments)
+    while (reader.hasNext()) {
+        val argument = reader.next()
         when {
-            argument == TerminalCommandNames.MAX_AGE || argument.startsWith("${TerminalCommandNames.MAX_AGE}=") -> {
-                val inline = argument.substringAfter('=', missingDelimiterValue = "").takeIf { argument.contains('=') }
-                val value = inline ?: arguments.getOrNull(index + 1)?.also { index += 1 }
-                maxAge = value?.let(::parseTerminalDuration)
-                    ?: return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.MAX_AGE} needs a time such as 90s, 10m or 2h.")
-            }
+            argument == TerminalCommandNames.JSON -> json = true
+            reader.isOption(argument, TerminalCommandNames.MAX_AGE) -> maxAge = reader.value(argument)?.let(::parseTerminalDuration)
+                ?: return invalidMaxAge()
             else -> return unknownOption(TerminalCommandNames.STATUS, argument)
         }
-        index += 1
     }
-    return TerminalCommandParse.Parsed(TerminalCommand.Status(maxAge))
+    return TerminalCommandParse.Parsed(TerminalCommand.Status(maxAge, json))
+}
+
+private fun parseCheck(arguments: List<String>): TerminalCommandParse {
+    var max: Int? = null
+    var maxAge: Duration? = null
+    var quiet = false
+    val reader = OptionReader(arguments)
+    while (reader.hasNext()) {
+        val argument = reader.next()
+        when {
+            argument == TerminalCommandNames.QUIET -> quiet = true
+            reader.isOption(argument, TerminalCommandNames.MAX_AGE) -> maxAge = reader.value(argument)?.let(::parseTerminalDuration)
+                ?: return invalidMaxAge()
+            reader.isOption(argument, TerminalCommandNames.MAX) -> max = reader.value(argument)?.toIntOrNull()?.takeIf { value -> value in 1..100 }
+                ?: return TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.MAX} needs a percentage from 1 to 100.")
+            else -> return unknownOption(TerminalCommandNames.CHECK, argument)
+        }
+    }
+    return TerminalCommandParse.Parsed(TerminalCommand.Check(max, maxAge, quiet))
+}
+
+private fun invalidMaxAge(): TerminalCommandParse =
+    TerminalCommandParse.Invalid("Error: ${TerminalCommandNames.MAX_AGE} needs a time such as 90s, 10m or 2h.")
+
+/** Percorre os argumentos de um comando, com opção de valor nas formas `--x v` e `--x=v`. */
+private class OptionReader(private val arguments: List<String>) {
+    private var index = 0
+
+    fun hasNext(): Boolean = index < arguments.size
+
+    fun next(): String = arguments[index++]
+
+    fun isOption(argument: String, option: String): Boolean = argument == option || argument.startsWith("$option=")
+
+    /** O valor da opção: o que vem depois do `=`, ou o próximo argumento, que é consumido. */
+    fun value(argument: String): String? {
+        if (argument.contains('=')) {
+            return argument.substringAfter('=')
+        }
+        return arguments.getOrNull(index)?.also { index += 1 }
+    }
 }
 
 private fun unknownOption(command: String, argument: String): TerminalCommandParse =

@@ -165,8 +165,16 @@ usando"). Aviso com `▲` e, se houver o que rodar, o comando na linha de baixo,
 - Hora sempre em BRT: "15:10 BRT", "em 47 min", "em 1d06h", "qui 21:00".
 - Comandos no formato `usage-monitor <verbo> [objeto]`. Ajustes com nome em inglês e pontos
   (`alerts.quota.thresholds`), estáveis entre versões, porque viram contrato de script.
-- `check` sai com código pelo pior estado: 0 em dia, 1 atenção, 2 crítico, 3 sem leitura.
-- `--json` tem campos estáveis em inglês e nunca carrega segredo.
+- `check` sai com código pelo pior estado: 0 em dia, 1 atenção, 2 crítico, 3 sem leitura. Com
+  `--max <n>`, 2 quando alguma cota chegou a n%, senão 0. O 2 coincide com o de uso incorreto do
+  #418; script que precise separar os dois lê o `status --json`.
+- `--json` é contrato: campos em inglês e `snake_case` (o estilo do `/api/snapshot`), versão no
+  campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Campo novo pode
+  entrar; campo existente não muda sem subir a versão. Em saída que não é UTF-8, o que não é ASCII
+  sai como `\uXXXX`, e nunca como `?`.
+- Cada cota tem um **id estável** para scripts: `fonte[:conta]:cota`, em minúsculas, sem acento,
+  com hífen no lugar de espaço (`anthropic:pessoal:claude-5h`, `opencode_go:go-semanal`). Sai do
+  rótulo gravado, então não muda com o idioma.
 
 ## Comportamento que o visual pressupõe
 

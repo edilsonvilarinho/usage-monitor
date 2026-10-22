@@ -2,6 +2,7 @@ package com.usagemonitor.terminal
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.terminal.TerminalAnsi
+import com.usagemonitor.presentation.terminal.TerminalCheckView
 import com.usagemonitor.presentation.terminal.TerminalLabels
 import com.usagemonitor.presentation.terminal.TerminalOutput
 import com.usagemonitor.presentation.terminal.TerminalProfile
@@ -29,8 +30,15 @@ internal object TerminalCommands {
         val output: TerminalOutput = when (command) {
             is TerminalCommand.Status ->
                 TerminalStatusView.render(reading.accounts, reading.now, reading.collectorRunning, command.maxAge, labels, console.profile)
+            is TerminalCommand.Check ->
+                TerminalCheckView.render(reading.accounts, reading.now, command.max, command.maxAge, command.quiet, labels, console.profile)
         }
-        console.print(TerminalAnsi.render(output.lines, console.profile))
+        // O JSON sai sempre, mesmo sem leitura: quem lê decide pelo código e pelos campos.
+        if (command is TerminalCommand.Status && command.json) {
+            console.print(TerminalJson.encode(reading, asciiOnly = !console.profile.unicode))
+        } else if (output.lines.isNotEmpty()) {
+            console.print(TerminalAnsi.render(output.lines, console.profile))
+        }
         return output.exitCode
     }
 }

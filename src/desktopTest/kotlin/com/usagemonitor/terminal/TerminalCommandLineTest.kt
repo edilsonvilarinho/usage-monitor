@@ -68,6 +68,26 @@ class TerminalCommandLineTest {
     }
 
     @Test
+    fun `status json and check with its options`() {
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Status(json = true)), parse("status", "--json"))
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Check()), parse("check"))
+        assertEquals(
+            CommandLineRequest.Terminal(TerminalCommand.Check(max = 90, maxAge = 10.minutes, quiet = true)),
+            parse("check", "--max", "90", "--max-age=10m", "--quiet")
+        )
+        assertEquals(CommandLineRequest.Terminal(TerminalCommand.Check(max = 75)), parse("check", "--max=75"))
+    }
+
+    @Test
+    fun `check rejects a max outside 1 to 100 and options of other commands`() {
+        assertTrue(parse("check", "--max", "0") is CommandLineRequest.Invalid)
+        assertTrue(parse("check", "--max", "101") is CommandLineRequest.Invalid)
+        assertTrue(parse("check", "--max") is CommandLineRequest.Invalid)
+        assertTrue(parse("check", "--json") is CommandLineRequest.Invalid)
+        assertTrue(parse("status", "--quiet") is CommandLineRequest.Invalid)
+    }
+
+    @Test
     fun `durations accept seconds, minutes, hours and a bare number of seconds`() {
         assertEquals(90.seconds, parseTerminalDuration("90s"))
         assertEquals(10.minutes, parseTerminalDuration("10M"))

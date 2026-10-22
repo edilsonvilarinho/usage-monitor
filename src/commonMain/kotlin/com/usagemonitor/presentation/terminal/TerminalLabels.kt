@@ -104,6 +104,10 @@ internal class TerminalLabels(val language: AppLanguage) {
 
     val noReadingWord: String get() = localized(language, "sem leitura", "no reading")
 
+    fun limit(percent: Int): String = localized(language, "limite $percent%", "limit $percent%")
+
+    fun highest(quota: String): String = localized(language, "maior uso: $quota", "highest: $quota")
+
     fun staleReading(age: Duration, maxAge: Duration): String =
         localized(
             language,

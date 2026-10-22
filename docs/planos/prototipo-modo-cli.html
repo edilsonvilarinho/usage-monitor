@@ -371,17 +371,17 @@ S.status = () => {
 
 S.scripts = () => render([
   sh("usage-monitor status --json | jq '.quotas[] | select(.percent >= 70)'"),
-  L(c('mu', '{ "source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho", ', c('mu', '"window"'), ': "5h",'),
-  L(c('mu', '  "percent"'), ': ', c('b', '91'), ', ', c('mu', '"state"'), ': "critical", ', c('mu', '"resetsAt"'), ': "2026-10-21T18:10:00Z" }'),
-  L(c('mu', '{ "source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho", ', c('mu', '"window"'), ': "7d", ', c('mu', '"percent"'), ': ', c('b', '74'), ', …}'),
-  L(c('mu', '{ "source"'), ': "cursor", ', c('mu', '"window"'), ': "month", ', c('mu', '"percent"'), ': ', c('b', '73'), ', …}'),
+  L(c('mu', '{ "id"'), ': "anthropic:trabalho:claude-5h", ', c('mu', '"source"'), ': "anthropic", ', c('mu', '"account"'), ': "trabalho",'),
+  L(c('mu', '  "label"'), ': "Claude 5h", ', c('mu', '"percent"'), ': ', c('b', '91'), ', ', c('mu', '"state"'), ': "critical", ', c('mu', '"resets_at"'), ': "2026-10-21T18:10:00Z", …}'),
+  L(c('mu', '{ "id"'), ': "anthropic:trabalho:claude-7d", ', c('mu', '"percent"'), ': ', c('b', '74'), ', ', c('mu', '"state"'), ': "warning", …}'),
+  L(c('mu', '{ "id"'), ': "cursor:cursor-included", ', c('mu', '"percent"'), ': ', c('b', '73'), ', ', c('mu', '"state"'), ': "warning", …}'),
   L(''),
   sh('usage-monitor check --max 90; echo $?'),
-  L(c('cr', 'crítico'), '  Claude Team 5h 91% (limite 90%)'),
+  L(c('cr', 'crítico'), '  Anthropic · trabalho · Claude 5h 91% (limite 90%)'),
   L(c('b', '2')),
   L(''),
-  sh('usage-monitor wait anthropic:trabalho:5h --below 50 && claude -p "rode a suíte"'),
-  L(c('mu', 'aguardando Claude Team 5h cair abaixo de 50% · reinicia 15:10 BRT, em 47 min'), c('cursor', ' ')),
+  sh('usage-monitor wait anthropic:trabalho:claude-5h --below 50 && claude -p "rode a suíte"'),
+  L(c('mu', 'aguardando Claude 5h (Anthropic · trabalho) cair abaixo de 50% · reinicia 15:10 BRT, em 47 min'), c('cursor', ' ')),
 ]);
 
 // visão geral: lista de fontes à esquerda, detalhe à direita
