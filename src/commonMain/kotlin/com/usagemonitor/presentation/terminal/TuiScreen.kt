@@ -42,7 +42,11 @@ internal object TuiScreen {
             status = status(data, labels),
             body = withNotice(view.body, state.notice, size, profile),
             // Com um campo de texto aberto, `q`, `r`, `?` e os dígitos são texto: os atalhos comuns somem.
-            shortcuts = if (state.tab == TuiTab.SETTINGS && state.settings.editing != null && !state.helpOpen) view.shortcuts else view.shortcuts + labels.commonShortcuts,
+            shortcuts = if (state.tab == TuiTab.SETTINGS && state.settings.editing != null && !state.helpOpen) {
+                view.shortcuts
+            } else {
+                fittingShortcuts(view.shortcuts, labels.commonShortcuts, size.frameWidth - 3)
+            },
             labels = labels,
             profile = profile
         )
@@ -114,6 +118,25 @@ internal object TuiScreen {
 
     /** Linhas além da primeira: a continuação da frase e o detalhe (o comando a rodar). */
     private const val MAX_NOTICE_EXTRA = 3
+
+    /**
+     * Os atalhos que cabem inteiros em [width]: cortado no meio, o último par ("r atu") não diz
+     * nada. Saem primeiro `r` e `1–5` (a ajuda lista todos), depois os da aba pelo fim; `?` e
+     * `q` ficam sempre.
+     */
+    internal fun fittingShortcuts(tab: List<TuiShortcut>, common: List<TuiShortcut>, width: Int): List<TuiShortcut> {
+        fun widthOf(list: List<TuiShortcut>): Int = list.sumOf { shortcut -> shortcut.key.length + 1 + shortcut.label.length + 2 } - 2
+        val kept = (tab + common).toMutableList()
+        val (tabsKey, refresh) = common[0] to common[1]
+        val dropOrder = listOf(refresh, tabsKey) + tab.reversed()
+        for (shortcut in dropOrder) {
+            if (widthOf(kept) <= width) {
+                break
+            }
+            kept.remove(shortcut)
+        }
+        return kept
+    }
 
     /** A ajuda (3.5): todos os atalhos numa caixa, centrada no corpo. */
     fun help(size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {

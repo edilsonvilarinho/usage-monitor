@@ -155,4 +155,12 @@ class TuiSettingsViewTest {
         assertTrue(lines[lines.size - 4].startsWith("│   ") && "como 70,90." in lines[lines.size - 4], lines[lines.size - 4])
         assertEquals(2, shown.size)
     }
+
+    @Test
+    fun `rodape estreito abre mao de pares inteiros e guarda ajuda e sair`() {
+        val footer = screen(TuiSettingsState(inFields = true), size = TuiSize(70, 20)).let { lines -> lines[lines.size - 2] }
+        assertTrue(footer.trimEnd('│', ' ').endsWith("? ajuda  q sair"), footer)
+        assertFalse("atualizar" in footer)
+        assertTrue(footer.startsWith("│ ↑↓ campo  espaço liga/desliga"), footer)
+    }
 }
