@@ -220,6 +220,10 @@ Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `St
 - **Pacote** (D4): o mesmo `.deb`/`.rpm` serve ao servidor. Medido: o `.deb` puxa 151 pacotes de bibliotecas gráficas, mas nenhum servidor gráfico; sem `libGL`, `libX11` e `fontconfig` o motor roda e o bot manda texto no lugar da imagem (`TelegramImageSupport`). O app sem tela diz o que fazer e sai, em vez de ficar parado.
 - **Registro de avisos** (`alerts.jsonl`): o coletor grava cada aviso que sai, com o destino (bandeja só no app, Telegram com conversa pareada).
 
+**Modo terminal: modo interativo** (issue #441; plano [`modo-terminal-tui-441-execucao.md`](planos/modo-terminal-tui-441-execucao.md)): `usage-monitor tui`, cinco abas.
+- **Desenho é função pura** (`TuiScreen`); JLine só para o terminal. Bancos em somente leitura (`SqliteConnectionManager(readOnly = true)`), nunca o view model.
+- **Rede só em dois lugares:** a aba Time (o `GET` do time; presença e desvio de relógio vêm do coletor) e a aba 5, que roda os comandos da 4.3 por `TerminalConfigRunner.output` — nunca regra própria de gravação.
+
 **Raiz de dados por execução — `--user-data-dir`** (issue #419; plano [`user-data-dir-419-execucao.md`](planos/user-data-dir-419-execucao.md)): isola dados para teste e segundo perfil, em paralelo com a instância padrão. Não é instalação portátil: as preferências continuam no registro, num nó próprio.
 - **`AppDataDirectory` é o dono de `~/.usage-monitor`.** As 22 montagens de caminho derivam dele, e o `ArchitectureRulesTest` proíbe o literal fora do dono. A raiz é configurada uma vez no `main()`; configurar depois da primeira leitura lança, para uma execução nunca ficar dividida entre duas pastas.
 - **Três escopos.** Dados (credenciais do app, bancos, diagnóstico) e instância (`app.lock`, `focus.request`) seguem a raiz, e por isso duas raízes rodam em paralelo, cada uma com o próprio foco. Instalação (`update-receipt.properties`, `update-ack`, `updates/`, `linux-update.log`) fica sempre na raiz padrão, porque o NSIS e o updater do Linux usam caminho fixo.

@@ -159,15 +159,9 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
   `recordFailure`, `stderr` e EDT parado; `--diagnostics` empacota por **lista fechada**, sem janela.
 - Linha de comando (#418): `parseCommandLine` é o dono do `argv`; opção desconhecida avisa e **não** impede a abertura;
   saída no idioma do app, sem acento em console que não é UTF-8 (#439; erro de uso continua em inglês).
-- Modo terminal (#439): só lê — `dashboard-cache.json`, preferências e índice de sessões em somente leitura; nunca
-  requisição nem trava segura (sonda e solta, e o arranque tenta a trava 3 vezes). `status --json` é contrato. `usage-monitor.exe` (launcher de console) só imprime e sai; sem opção de ação, relança o exe
-  GUI (a chave `Run` lê `jpackage.app-path`). `--locale` nunca grava; o idioma efetivo é só pela `LanguageSelection`.
-- Modo terminal, configurar e serviço (#440): com coletor vivo, configurar é **pedido** (`control/`) aplicado pelo `ConfigApplier`
-  do coletor — um escritor só; sem coletor, o terminal aplica direto. Segredo só pela entrada, sem eco. Motor sem Compose
-  (`CollectorEngine`); `service` (systemd do usuário) só no Linux e só na raiz padrão.
-- Modo interativo (#441, `usage-monitor tui`): desenho é função pura (`TuiScreen`), JLine só para o terminal; bancos em somente
-  leitura (`SqliteConnectionManager(readOnly = true)`), nunca o view model. Rede só na aba Time (o `GET` do time; presença e desvio de
-  relógio vêm do coletor) e na aba 5, que roda os comandos da 4.3 por `TerminalConfigRunner.output` — nunca regra própria de gravação.
+- Modo terminal (#439, #440, #441; seções "Modo terminal" do `build-and-release.md`): só lê, em somente leitura, sem requisição
+  nem trava segura; `status --json` é contrato. Com coletor vivo, configurar é **pedido** ao `ConfigApplier` (um escritor só);
+  segredo só pela entrada. TUI desenha por função pura (`TuiScreen`), nunca pelo view model.
 - Raiz de dados (#419): caminho em `~/.usage-monitor` só pelo `AppDataDirectory` (`file` = dados/instância, `installationFile` = o que
   NSIS/updater leem em caminho fixo); configurada uma vez no `main()`. Fora da raiz padrão: atualização e autostart desligados.
 - Ajuda: passos citam o **rótulo real** do controle; GIF animado pelo `Codec` do Skia com cópia
@@ -186,9 +180,8 @@ arranque e ACK de atualização); estado de shell e de modais mora em
 `AppShellState`/`AppModalState`. Os arquivos ficaram no pacote `com.usagemonitor`, e não num
 subpacote, para não abrir a visibilidade dos helpers `internal`/`private` que eles usam.
 
-**O `gradle.properties` dá 3 GB ao daemon, e não é paliativo:** sem a folga o build cai em
-`OutOfMemoryError: GC overhead limit exceeded` — falta heap para o módulo, não para um método. Medida
-em [`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md) (M7).
+**`-Xmx3g` no `gradle.properties` não é paliativo** — sem ele o build cai em OOM; motivo no próprio arquivo e no M7 do
+[`main-refatoracao-298-execucao.md`](docs/planos/main-refatoracao-298-execucao.md).
 
 ## Regras de arquitetura e tamanho
 
@@ -247,14 +240,9 @@ Histórico: [`docs/planos/refatoracao-visual-opencode-execucao.md`](docs/planos/
 
 ### Design system — precedência
 
-**A fonte de verdade visual é [`docs/design-system/`](docs/design-system/).** Ali moram os tokens
-(`tokens/*.css`), as primitivas publicadas — cada uma com o contrato escrito em
-`components/**/*.prompt.md` — e as regras de conteúdo, iconografia e fundação do
-[`readme.md`](docs/design-system/readme.md). O protótipo aprovado,
-[`docs/planos/prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html), continua
-sendo o mockup obrigatório de **cada tela** — layout, colunas, estados —, mas deixou de ser a
-especificação de token, primitiva e copy: o design system foi derivado dele e o descreve com mais
-precisão.
+**A fonte de verdade visual é [`docs/design-system/`](docs/design-system/)** (tokens, contratos `components/**/*.prompt.md`,
+regras do [`readme.md`](docs/design-system/readme.md)); o protótipo [`prototipo-visual-opencode.html`](docs/planos/prototipo-visual-opencode.html)
+é o mockup obrigatório de **cada tela** (layout, colunas, estados), não de token, primitiva ou copy.
 
 | Divergência | Quem vence | O que fazer |
 |---|---|---|
@@ -274,18 +262,9 @@ mesmo: primitiva sem adoção não conserta nada (histórico em
 **Cor de acento sai de `AppAccents.current` e de `AppTone`**, nunca de `darkAppAccents`/`lightAppAccents`
 nem de `val` de topo de arquivo (congela o tema; `AppAccentsContrastTest` guarda).
 
-**Toda alteração de tela é registrada nos dois documentos, no mesmo commit da mudança.** A regra de
-precedência acima só se sustenta enquanto os dois descreverem o app inteiro; desatualizado, cada um
-vira ponteiro para um documento que não descreve mais o produto.
-
-- **No protótipo:** tela nova ou estado que ainda não existe ganha seção `<h2 id="…">N · …</h2>`
-  própria mais o link em `nav.index`; controle, coluna ou texto novo dentro de tela já desenhada vira
-  linha no mockup dela; risco conhecido e decisão pendente vão para `§15 #checklist`.
-- **No design system:** primitiva nova ou contrato alterado vira `components/<grupo>/<Nome>.prompt.md`
-  mais a entrada no índice do `readme.md`; tela que tem kit em `ui_kits/desktop-app/` tem o `.jsx`
-  correspondente atualizado.
-
-Vale para qualquer superfície visível — janela, diálogo, faixa, bandeja e relatório PDF.
+**Toda alteração de tela é registrada no protótipo e no design system, no mesmo commit da mudança** — janela, diálogo,
+faixa, bandeja e PDF; desatualizados, a precedência acima aponta para documentos que não descrevem o produto. Como
+registrar: skill `usage-monitor-design`, "Ao terminar".
 
 **Tokens, profundidade, motion, modais, tipografia e primitivas**: decisões e histórico em
 [`docs/design-system/compose-implementation.md`](docs/design-system/compose-implementation.md).
@@ -316,15 +295,12 @@ interface troca só a densidade, nunca `fontScale`, e **cada** janela recebe o v
 `workAreaForPosition`, nunca `defaultScreenDevice`; **a barra HUD é o único modo de visualização** — não
 reintroduzir seletor de modo nem segunda moldura (`DashboardScreen` só existe para testes e capturas).
 
-**Barra HUD — notch** (`Hud*.kt`; issue #164): regras e histórico em [`docs/hud-notch.md`](docs/hud-notch.md)
-— **leia antes de mexer**. Inegociáveis: o tamanho é da geometria (`hudNotchSizes`), janela de origem e
-tamanho fixos, nenhum redimensionamento AWT por quadro e `Window.shape` no Windows sempre, no Linux só
-sem alfa (`hudHitRegionMode`, #340 e #426); o alfa da janela é **por monitor** e o AWT o perde ao cruzar a
-fronteira — a janela **nasce** na configuração certa e **renasce** quando o monitor muda ou o alfa cai
-(`HudWindowFrame.kt`, só no Linux; no COSMIC, no monitor onde o compositor a pôs, sem zerar o orçamento — #430); no COSMIC a HUD é `POPUP`
-(override-redirect), porque ele ignora toda posição pedida por janela gerenciada (#434); remendar a janela aberta devolve o alfa e **congela o desenho**; o notch não
-cresce — balão de **uma** conta ou da engrenagem, conteúdo da janela e nunca `Popup`, botões do card
-com dona única (`cardActionsFor`); movimento contínuo só atrás de `AppMotionPolicy.continuous`.
+**Barra HUD — notch** (`Hud*.kt`): regras e histórico em [`docs/hud-notch.md`](docs/hud-notch.md) — **leia antes de
+mexer**. Inegociáveis: tamanho da geometria (`hudNotchSizes`), janela de origem e tamanho fixos, nenhum redimensionamento
+AWT por quadro; `Window.shape` pelo `hudHitRegionMode`; no Linux a janela **nasce** com o alfa certo e **renasce** quando o
+monitor muda ou o alfa cai (`HudWindowFrame.kt`) — remendar a aberta **congela o desenho**; no COSMIC é `POPUP`
+(`hudWindowType`); o notch não cresce — balão de **uma** conta ou da engrenagem, conteúdo da janela e nunca `Popup`;
+botões do card com dona única (`cardActionsFor`).
 
 **Regras que continuam valendo**: nenhuma composable nova em `runUsageMonitor` — ele só compõe os
 hosts; nenhum `Column + verticalScroll` vira `LazyColumn`; nenhum valor novo em enum existente.

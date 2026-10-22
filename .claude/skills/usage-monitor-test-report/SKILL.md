@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-test-report
-description: Run every test suite of usage-monitor (Kotlin allTests + team server vitest) with coverage and build a detailed HTML report in the project's design system — counts by test type and area, line/branch coverage per layer, uncovered files, failures, slow suites, readiness gates and known blind spots. Use for "relatório de testes", "cobertura", "quantos testes temos", "está seguro para PR/merge", before opening or merging a PR in the automated workflow, or /usage-monitor-test-report.
+description: Run every usage-monitor test suite (Kotlin allTests + server vitest) with coverage and build an HTML report: counts, coverage per layer, failures, readiness gates. Use for "relatório de testes", "cobertura", "está seguro para PR/merge", before opening or merging a PR, or /usage-monitor-test-report.
 ---
 
 # Usage Monitor — relatório de testes e cobertura

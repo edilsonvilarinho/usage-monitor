@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-token-cleanup
-description: Measure the context Claude Code loads every session in this repository (project and global CLAUDE.md, project memory, repo skills), report evidence-backed cleanup candidates with estimated token savings, and apply only the items the user approves one by one. Use when the user asks to save tokens, trim context, clean up memory, or shrink CLAUDE.md.
+description: Measure the context this repo loads every session (CLAUDE.md, memory, skills), report evidence-backed cleanup candidates with estimated savings, and apply only what the user approves. Use to save tokens, trim context, clean up memory or shrink CLAUDE.md.
 ---
 
 # Usage Monitor Token Cleanup

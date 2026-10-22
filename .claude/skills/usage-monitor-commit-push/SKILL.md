@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-commit-push
-description: Safely stage, commit, and push intended changes in the usage-monitor repository with the repo's required temporary git identity, narrow verification, and clean restoration of the original author config. Use when Claude needs to commit or push local changes for this project, especially when unrelated files may exist or the user explicitly asks to publish work.
+description: Stage, commit and push only the intended changes in usage-monitor, with the repo's temporary git identity, narrow verification and restoration of the author config. Use whenever committing or pushing in this project, especially with unrelated files around.
 ---
 
 # Usage Monitor Commit Push

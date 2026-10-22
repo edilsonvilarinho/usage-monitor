@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-release
-description: Prepare and publish a versioned release for the usage-monitor repository, including picking the next version, local verification, annotated tag creation, and the GitHub Actions workflow that publishes Windows, Linux, and macOS artifacts. Use when Claude needs to cut, ship, publish, or troubleshoot a release for this project.
+description: Cut and publish a stable usage-monitor release: pick the version, verify locally, create the annotated tag and follow the GitHub Actions workflow that publishes Windows, Linux and macOS artifacts. Use to cut, ship, publish or troubleshoot a release.
 ---
 
 # Usage Monitor Release

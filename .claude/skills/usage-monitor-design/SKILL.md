@@ -33,24 +33,29 @@ system — precedência*.
 - **Nenhuma tela reimplementa uma primitiva.** Antes de escrever `Surface`, `Card`,
   `Modifier.border`, `.background` com cor de superfície ou `RoundedCornerShape`, procure em
   `presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e nos vizinhos
-  `AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt` e
-  `AppTooltip.kt`.
+  `AppTabs.kt`, `AppSettingsNav.kt`, `AppSurfaceDepth.kt`, `AppChips.kt`, `AppMenu.kt`,
+  `AppTooltip.kt` e `AppStatusPill.kt`.
 - **Primitiva construída e não adotada não conserta nada.** O commit que cria e o que consome são o
   mesmo.
 - **Cor de acento vem de `AppAccents.current` e `AppTone`**, nunca de `darkAppAccents` /
   `lightAppAccents` diretamente — `val` de topo de arquivo não lê o tema em vigor.
 - **Cor nunca informa sozinha.** Todo estado carrega ponto **e** palavra (`AppStatusIndicator`).
-- **Nenhuma animação infinita.** Ela trava o `waitForIdle` dos testes de componente. Carregamento é
-  esqueleto estático, sem shimmer e sem spinner.
+- **Animação infinita só atrás de `AppMotionPolicy.continuous`.** Fora dela, trava o `waitForIdle` dos
+  testes de componente. Carregamento é esqueleto estático, sem shimmer e sem spinner.
 - **Sem emoji.** Os ícones são marcas Unicode em IBM Plex Mono, e a lista está no `readme.md`.
 - Escala tipográfica fechada em 10/12/14/16/20/28; raio com teto de 10dp; elevação 8 só para janela,
   diálogo, menu e overlay.
 
 ## Ao terminar
 
-Registrar a mudança **no mesmo commit**, nos dois documentos: a seção da tela no protótipo e, quando
-a tela tem kit, o `.jsx` em `ui_kits/desktop-app/`. Primitiva nova ou contrato alterado vira
-`components/<grupo>/<Nome>.prompt.md` mais a entrada no índice do `readme.md`.
+Registrar a mudança **no mesmo commit**, nos dois documentos:
+
+- **No protótipo:** tela nova ou estado que ainda não existe ganha seção `<h2 id="…">N · …</h2>`
+  própria mais o link em `nav.index`; controle, coluna ou texto novo dentro de tela já desenhada vira
+  linha no mockup dela; risco conhecido e decisão pendente vão para `§15 #checklist`.
+- **No design system:** primitiva nova ou contrato alterado vira `components/<grupo>/<Nome>.prompt.md`
+  mais a entrada no índice do `readme.md`; tela que tem kit em `ui_kits/desktop-app/` tem o `.jsx`
+  correspondente atualizado.
 
 Verificar com `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*"` e, para comparação visual,
 `gradlew.bat generateScreenshots`.
