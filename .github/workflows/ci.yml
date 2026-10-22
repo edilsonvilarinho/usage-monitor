@@ -537,7 +537,7 @@ jobs:
       - name: Build report
         run: |
           set -uo pipefail
-          node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs --platform win32 > report.txt
+          node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs --platform win32 --ci > report.txt
           status=$?
           {
             echo "## Relatório de testes"

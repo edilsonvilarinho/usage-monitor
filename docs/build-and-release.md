@@ -103,7 +103,9 @@ readiness gates and blind spots. The HTML goes to the `test-report` artifact (14
 the run summary. It runs whenever the desktop suite ran, red included, and it is **not** part of
 `ci-ok`: a failing suite already fails the job that ran it, and a second red check for the same cause
 would only repeat it. The generator runs on Linux and is told `--platform win32`, so the header names
-the platform the suite ran on.
+the platform the suite ran on, and `--ci`, because a `desktopTest` restored from the build cache
+(`FROM-CACHE`, the case in #451 itself) carries the timestamp of the original run, older than the
+commit; the cache key covers the inputs, so the result still holds for the commit.
 
 ## NSIS installer
 

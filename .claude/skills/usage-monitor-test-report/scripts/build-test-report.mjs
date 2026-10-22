@@ -18,14 +18,15 @@ import { renderHtml } from './report-html.mjs'
 function parseArgs(argv) {
     // `--platform` existe para o CI: o relatorio e montado num runner Linux a
     // partir da suite que rodou no Windows, e o cabecalho deve dizer Windows.
-    const parsed = { root: process.cwd(), out: 'build/test-report', platform: platform() }
+    const parsed = { root: process.cwd(), out: 'build/test-report', platform: platform(), ci: false }
     for (let index = 0; index < argv.length; index += 1) {
         const flag = argv[index]
         if (flag === '--root') parsed.root = argv[++index]
         else if (flag === '--out') parsed.out = argv[++index]
         else if (flag === '--platform') parsed.platform = argv[++index]
+        else if (flag === '--ci') parsed.ci = true
         else {
-            console.error('uso: build-test-report.mjs [--root <repo>] [--out <pasta relativa>] [--platform win32|linux|darwin]')
+            console.error('uso: build-test-report.mjs [--root <repo>] [--out <pasta relativa>] [--platform win32|linux|darwin] [--ci]')
             process.exit(2)
         }
     }
@@ -466,6 +467,19 @@ function evaluateGates(data) {
             `Cobertura ${stale.map(([name]) => name).join(' e ')} anterior à última execução da suíte: o número é de outra passada.`,
         )
 
+    // No CI o carimbo nao serve de prova: com entradas identicas o Gradle
+    // restaura o `desktopTest` do build cache (FROM-CACHE, medido no #451) e o
+    // XML traz a hora da execucao original, anterior ao commit. A chave do
+    // cache cobre as entradas, entao o resultado vale para este commit.
+    if (data.ci) {
+        add(
+            'fresh',
+            'Resultado do código atual',
+            'ok',
+            `Run do CI do commit ${data.git.sha}. Suíte restaurada do build cache traz o carimbo da execução original; o cache só reaproveita com entradas idênticas.`,
+        )
+        return gates
+    }
     const commitTime = data.git.commitTime ? Date.parse(data.git.commitTime) : null
     const oldestRun = [data.kotlin.oldestTimestamp, data.server.oldestTimestamp].filter(Boolean).sort()[0]
     if (oldestRun && commitTime && Date.parse(oldestRun) < commitTime)
@@ -597,6 +611,7 @@ function main() {
         generatedAt: new Date().toISOString(),
         git: readGit(root),
         platform: args.platform,
+        ci: args.ci,
         kotlin: summarizeKotlin(kotlinSuites, kotlinFiles),
         server: summarizeServer(serverSuites, serverFiles),
         kover: readKover(join(root, 'build/reports/kover/report.xml'), root),
