@@ -272,6 +272,18 @@ if ($script:Sentinel) {
 
 try {
 
+# Foto do PATH do usuario antes de qualquer cenario. Os cenarios S1-S8 deixam a
+# pasta de teste no PATH (nao desinstalam), e o restauro do finally tem de voltar ao
+# valor de antes da rodada, nao ao de antes do S10.
+# Le e grava o valor bruto (sem expandir %VAR%), para devolver o registro exatamente
+# como estava. Restaurado no finally: a suite pode rodar numa maquina de desenvolvimento.
+$script:UserEnvironment = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+$rawOptions = [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+$script:UserPathBefore = $script:UserEnvironment.GetValue('Path', $null, $rawOptions)
+$script:UserPathKind = if ($null -ne $script:UserPathBefore) { $script:UserEnvironment.GetValueKind('Path') } else { $null }
+# So marca o restauro depois da leitura: se ela falhasse antes, o finally apagaria o Path.
+$script:UserPathSaved = $true
+
 # ------------------------------------------------------------------ S1
 
 Write-Host "`n== S1: instalacao limpa da v1 =="
@@ -412,6 +424,32 @@ Assert-Equal 'jar orfao removido' $false (Test-Path (Join-Path $target 'app\jar-
 Assert-Equal 'desinstalador escrito' $true (Test-Path (Join-Path $target 'Uninstall.exe'))
 Assert-Equal 'registro atualizado para a versao nova' '1.0.0' (Get-RegistryValue $UninstallKey 'DisplayVersion')
 
+# ------------------------------------------------------------------ S10
+
+Write-Host "`n== S10: PATH do usuario recebe a pasta uma vez, e a desinstalacao tira a entrada =="
+
+function Get-UserPathRaw {
+    return [string]$script:UserEnvironment.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+}
+
+function Get-UserPathEntryCount {
+    param([string] $Directory)
+    return @((Get-UserPathRaw) -split ';' | Where-Object { $_ -ieq $Directory }).Count
+}
+
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code da primeira instalacao' 0 $code
+Assert-Equal 'pasta de instalacao no PATH uma vez' 1 (Get-UserPathEntryCount $target)
+
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'reinstalacao nao repete a entrada' 1 (Get-UserPathEntryCount $target)
+
+$uninstall = Start-Process -FilePath (Join-Path $target 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+Assert-Equal 'exit code da desinstalacao' 0 $uninstall.ExitCode
+Assert-Equal 'desinstalacao tira a pasta do PATH' 0 (Get-UserPathEntryCount $target)
+Assert-Equal 'PATH do usuario volta ao valor anterior' ([string]$script:UserPathBefore) (Get-UserPathRaw)
+
 # ------------------------------------------------------------------ S9
 
 Write-Host "`n== S9: a rodada nao mata JVM alheia =="
@@ -427,6 +465,14 @@ if ($script:Sentinel) {
 
 } finally {
     Write-Host "`n== limpeza =="
+    if ($script:UserPathSaved) {
+        if ($null -eq $script:UserPathBefore) {
+            $script:UserEnvironment.DeleteValue('Path', $false)
+        } else {
+            $script:UserEnvironment.SetValue('Path', $script:UserPathBefore, $script:UserPathKind)
+        }
+        $script:UserEnvironment.Close()
+    }
     if ($script:Sentinel -and -not $script:Sentinel.HasExited) {
         Stop-Process -Id $script:Sentinel.Id -Force -ErrorAction SilentlyContinue
     }

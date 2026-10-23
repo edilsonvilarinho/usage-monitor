@@ -405,6 +405,70 @@ Function WriteUpdateReceipt
 receiptDone:
 FunctionEnd
 
+; PATH do usuario para o comando de linha (#418): sem a pasta no PATH, o
+; `usage-monitor` so roda pelo caminho completo do exe. Acrescenta a pasta de
+; instalacao ao FIM do Path de HKCU\Environment, uma vez: reinstalar ou atualizar
+; nao repete a entrada. So o valor do usuario e tocado -- o do sistema exige
+; administrador, e este instalador roda como usuario.
+;
+; A presenca e checada pelo FIM do valor, a mesma invariante que a desinstalacao
+; usa: a entrada que este instalador grava fica no fim. Uma entrada que o usuario
+; levou para o meio nao e reconhecida, e a reinstalacao acrescenta outra -- aceito,
+; porque checar por substring exigiria macro do StrFunc, e a versao do NSIS do CI
+; nao aceitou a dele.
+;
+; O teto de 1900 caracteres e folga contra o limite de string do NSIS: um Path
+; truncado seria pior do que nao acrescentar. Acima do teto a entrada fica de
+; fora e o instalador avisa.
+Function AddInstallDirToUserPath
+    ReadRegStr $R7 HKCU "Environment" "Path"
+    StrCpy $R8 ";$R7;"
+    StrLen $R9 ";$INSTDIR;"
+    StrCpy $R5 $R8 "" -$R9
+    ${If} $R5 == ";$INSTDIR;"
+        DetailPrint "PATH do usuario ja termina com a pasta de instalacao."
+        Return
+    ${EndIf}
+    ${If} $R7 == ""
+        StrCpy $R8 "$INSTDIR"
+    ${Else}
+        StrCpy $R8 "$R7;$INSTDIR"
+    ${EndIf}
+    StrLen $R9 $R8
+    ${If} $R9 > 1900
+        DetailPrint "PATH do usuario cheio: a pasta de instalacao nao foi adicionada."
+        Return
+    ${EndIf}
+    WriteRegExpandStr HKCU "Environment" "Path" $R8
+    ; WM_SETTINGCHANGE avisa as janelas abertas; um terminal ja aberto so ve a
+    ; mudanca depois de reaberto. HWND_BROADCAST = 0xFFFF, WM_SETTINGCHANGE = 0x1A,
+    ; SMTO_ABORTIFHUNG = 0x2.
+    System::Call 'user32::SendMessageTimeout(i 0xFFFF, i 0x1A, i 0, t "Environment", i 0x2, i 5000, *i .r9)'
+    DetailPrint "Pasta de instalacao adicionada ao PATH do usuario."
+FunctionEnd
+
+; Desfaz o que AddInstallDirToUserPath gravou. So tira a entrada quando ela esta
+; no FIM do Path, que e onde a instalacao a grava: entrada no meio ou no comeco
+; fica como esta, porque remover por posicao arriscaria corromper o Path do
+; usuario. Se o Path ficar vazio, o valor sai do registro.
+Function un.RemoveInstallDirFromUserPath
+    ReadRegStr $R7 HKCU "Environment" "Path"
+    StrCpy $R8 ";$R7;"
+    StrLen $R9 ";$INSTDIR;"
+    StrCpy $R7 $R8 "" -$R9
+    ${If} $R7 != ";$INSTDIR;"
+        Return
+    ${EndIf}
+    StrCpy $R8 $R8 -$R9
+    StrCpy $R8 $R8 "" 1
+    ${If} $R8 == ""
+        DeleteRegValue HKCU "Environment" "Path"
+    ${Else}
+        WriteRegExpandStr HKCU "Environment" "Path" $R8
+    ${EndIf}
+    System::Call 'user32::SendMessageTimeout(i 0xFFFF, i 0x1A, i 0, t "Environment", i 0x2, i 5000, *i .r9)'
+FunctionEnd
+
 ; -----------------------------------------------
 ; Installer Sections
 ; -----------------------------------------------
@@ -532,6 +596,9 @@ updateDone:
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
 
+    DetailPrint "Adding the install folder to the user PATH..."
+    Call AddInstallDirToUserPath
+
     ; Create uninstaller
     DetailPrint "Creating uninstaller..."
     WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -628,6 +695,7 @@ Section "Uninstall"
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${AUTO_START_VALUE_NAME}"
+    Call un.RemoveInstallDirFromUserPath
 
     ; Remove files and directories
     DetailPrint "Removing application files..."
