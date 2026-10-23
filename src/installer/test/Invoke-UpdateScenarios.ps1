@@ -272,6 +272,18 @@ if ($script:Sentinel) {
 
 try {
 
+# Foto do PATH do usuario antes de qualquer cenario. Os cenarios S1-S8 deixam a
+# pasta de teste no PATH (nao desinstalam), e o restauro do finally tem de voltar ao
+# valor de antes da rodada, nao ao de antes do S10.
+# Le e grava o valor bruto (sem expandir %VAR%), para devolver o registro exatamente
+# como estava. Restaurado no finally: a suite pode rodar numa maquina de desenvolvimento.
+$script:UserEnvironment = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+$rawOptions = [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+$script:UserPathBefore = $script:UserEnvironment.GetValue('Path', $null, $rawOptions)
+$script:UserPathKind = if ($null -ne $script:UserPathBefore) { $script:UserEnvironment.GetValueKind('Path') } else { $null }
+# So marca o restauro depois da leitura: se ela falhasse antes, o finally apagaria o Path.
+$script:UserPathSaved = $true
+
 # ------------------------------------------------------------------ S1
 
 Write-Host "`n== S1: instalacao limpa da v1 =="
@@ -415,14 +427,6 @@ Assert-Equal 'registro atualizado para a versao nova' '1.0.0' (Get-RegistryValue
 # ------------------------------------------------------------------ S10
 
 Write-Host "`n== S10: PATH do usuario recebe a pasta uma vez, e a desinstalacao tira a entrada =="
-# Le e grava o valor bruto (sem expandir %VAR%), para devolver o registro exatamente
-# como estava. Restaurado no finally: a suite pode rodar numa maquina de desenvolvimento.
-$script:UserEnvironment = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
-$rawOptions = [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
-$script:UserPathBefore = $script:UserEnvironment.GetValue('Path', $null, $rawOptions)
-$script:UserPathKind = if ($null -ne $script:UserPathBefore) { $script:UserEnvironment.GetValueKind('Path') } else { $null }
-# So marca o restauro depois da leitura: se ela falhasse antes, o finally apagaria o Path.
-$script:UserPathSaved = $true
 
 function Get-UserPathRaw {
     return [string]$script:UserEnvironment.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
