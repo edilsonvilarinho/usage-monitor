@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.ModelPricingTable
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import com.usagemonitor.domain.entity.computeContextStatus
+import com.usagemonitor.domain.entity.toModelBreakdown
 
 /**
  * Deriva as métricas do detalhe de uma sessão. Puro: sem I/O, sem relógio.
@@ -60,7 +61,8 @@ class ComputeCliSessionAnalyticsUseCase {
             },
             // Só a thread principal: o subagente roda em paralelo, e somar os
             // intervalos dele contaria o mesmo tempo duas vezes.
-            activeTimeMillis = activeTimeMillisOf(mainTurns)
+            activeTimeMillis = activeTimeMillisOf(mainTurns),
+            modelBreakdown = turns.toModelBreakdown()
         )
     }
 
@@ -82,7 +84,10 @@ class ComputeCliSessionAnalyticsUseCase {
             liveContextTokens = status.liveContextTokens,
             nextInteractionCostMicros = status.nextInteractionCostMicros,
             contextSaturation = status.contextSaturation,
-            unpricedTurnCount = summary.unpricedTurnCount
+            unpricedTurnCount = summary.unpricedTurnCount,
+            // O corte por modelo é agregado `(sessão, modelo)`, não turno a turno:
+            // o resumo já o traz exato, sem estimativa.
+            modelBreakdown = summary.modelBreakdown
         )
     }
 

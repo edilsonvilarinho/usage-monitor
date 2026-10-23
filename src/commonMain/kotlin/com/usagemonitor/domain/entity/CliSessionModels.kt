@@ -119,8 +119,18 @@ data class CliSessionSummary(
     /** O `.jsonl` de origem não existe mais (retenção do CLI); só o resumo sobrevive. */
     val stale: Boolean = false,
     /** Vazão de saída dos turnos medidos na janela lida; `null` = nenhum turno medido (#381). */
-    val throughput: OutputThroughput? = null
+    val throughput: OutputThroughput? = null,
+    /**
+     * Consumo de cada modelo na janela lida, um balde por modelo (#445). Vazio
+     * significa **não lido** — servidor de time anterior ao campo, ou leitura que
+     * não o pediu —, nunca sessão sem modelo.
+     */
+    val modelBreakdown: List<CliUsageBucket> = emptyList()
 ) {
+    /** Fatia de cada modelo; ver [sessionModelMixOf]. */
+    val modelMix: SessionModelMix
+        get() = sessionModelMixOf(modelBreakdown)
+
     val cacheWriteTokens: Long
         get() = cacheWrite5mTokens + cacheWrite1hTokens
 
@@ -290,7 +300,12 @@ data class CliSessionAnalytics(
      * primeiro e o último turno, e uma sessão retomada no dia seguinte
      * "duraria" vinte horas.
      */
-    val activeTimeMillis: Long = 0L
+    val activeTimeMillis: Long = 0L,
+    /**
+     * Consumo de cada modelo na sessão inteira, dos turnos (#445). Diferente das
+     * séries, soma também o subagente: o gasto dele é real e pesa na cota.
+     */
+    val modelBreakdown: List<CliUsageBucket> = emptyList()
 ) {
     /**
      * Turnos por hora de trabalho. Zero sem tempo ativo medido — uma sessão de

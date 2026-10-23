@@ -86,8 +86,14 @@ data class CodexCliSessionSummary(
     val totalTokens: Long = 0L,
     val skippedLines: Int = 0,
     /** Vazão de saída das respostas medidas; `null` = nenhuma medida (#381). */
-    val throughput: OutputThroughput? = null
+    val throughput: OutputThroughput? = null,
+    /** Consumo de cada modelo da sessão (#445); vazio = não lido. Ver [toCodexModelBreakdown]. */
+    val modelBreakdown: List<CliUsageBucket> = emptyList()
 ) {
+    /** Fatia de cada modelo; sem tarifa no app, a base é tokens ([sessionModelMixOf]). */
+    val modelMix: SessionModelMix
+        get() = sessionModelMixOf(modelBreakdown)
+
     val projectName: String?
         get() = cwd
             ?.trimEnd('/', '\\')

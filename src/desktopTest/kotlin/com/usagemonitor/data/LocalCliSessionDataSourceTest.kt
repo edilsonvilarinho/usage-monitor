@@ -278,6 +278,33 @@ class LocalCliSessionDataSourceTest {
     }
 
     @Test
+    fun `model breakdown splits the session by model with and without a window`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z", model = "claude-opus-5", outputTokens = 1_000_000L),
+                assistantLine("session-a", "msg-2", "2026-08-01T10:01:00Z", model = "claude-sonnet-5", outputTokens = 1_000_000L),
+                assistantLine("session-a", "msg-3", "2026-08-01T10:02:00Z", model = "claude-opus-5", outputTokens = 1_000_000L)
+            )
+
+            dataSource.syncIndex()
+
+            // Sem janela o corte sai da consulta própria; com janela, do acumulador.
+            // Os dois caminhos têm de dar o mesmo corte (#445).
+            val total = dataSource.readSessions().single().modelBreakdown
+            val windowed = dataSource.readSessions(
+                profileId = null,
+                sinceEpochMillis = Instant.parse("2026-08-01T00:00:00Z").toEpochMilliseconds()
+            ).single().modelBreakdown
+            assertEquals(total, windowed)
+            assertEquals(listOf("claude-opus-5", "claude-sonnet-5"), total.map { bucket -> bucket.label })
+            assertEquals(listOf(2, 1), total.map { bucket -> bucket.turnCount })
+            assertEquals(listOf(50_000_000L, 10_000_000L), total.map { bucket -> bucket.costMicros })
+        }
+    }
+
+    @Test
     fun `unknown model is counted as unpriced`() = runTest {
         withFixture { root, dataSource ->
             writeTranscript(
