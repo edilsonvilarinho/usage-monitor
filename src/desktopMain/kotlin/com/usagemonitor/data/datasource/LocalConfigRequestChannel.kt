@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.data.AppDataDirectory
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
@@ -16,10 +17,18 @@ import java.util.concurrent.atomic.AtomicLong
  * pedido é de quem o tirou primeiro: o coletor o renomeia para `processing/` antes de
  * ler, e o terminal que desiste o apaga de `requests/`. Os dois são operações atômicas
  * no mesmo disco, então nunca acontecem as duas.
+ *
+ * No Windows, antivírus e indexador seguram por instantes um arquivo recém-escrito ou
+ * recém-movido (#460): ler, apagar e responder tentam de novo algumas vezes antes de
+ * desistir. As funções de arquivo são parâmetros só para o teste simular o arquivo preso.
  */
 internal class LocalConfigRequestChannel(
     root: File = AppDataDirectory.file("control"),
-    private val nowMillis: () -> Long = System::currentTimeMillis
+    private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val readFile: (File) -> String = File::readText,
+    private val deleteFile: (File) -> Boolean = File::delete,
+    private val writeFile: (File, String) -> Unit = ::writeSecretFile,
+    private val pause: (Long) -> Unit = Thread::sleep
 ) {
     private val requests = File(root, "requests")
     private val processing = File(root, "processing")
@@ -62,12 +71,26 @@ internal class LocalConfigRequestChannel(
 
     /**
      * Recolhe um pedido ainda não tirado. `true`: estava lá e não será mais aplicado.
-     * `false`: o coletor já o tirou, e a resposta pode chegar.
+     * `false`: o coletor já o tirou, e a resposta pode chegar. Apagar que falha com o
+     * arquivo ainda na fila é o arquivo preso, e não o coletor: tenta de novo.
      */
-    fun withdraw(id: String): Boolean = File(requests, "$id.json").delete()
+    fun withdraw(id: String): Boolean {
+        val file = File(requests, "$id.json")
+        return retrying {
+            when {
+                deleteFile(file) -> true
+                !file.exists() -> false
+                else -> null
+            }
+        } ?: false
+    }
 
-    /** Os pedidos à espera, na ordem de chegada, já tirados da fila (e do disco). */
-    fun takePending(): List<Pair<String, String>> {
+    /**
+     * Os pedidos à espera, na ordem de chegada, já tirados da fila (e do disco). Pedido
+     * tirado é de quem o tirou e precisa de resposta: se a leitura falhar mesmo depois das
+     * novas tentativas, ele vem com o conteúdo `null`, e não some (#460).
+     */
+    fun takePending(): List<Pair<String, String?>> {
         val files = requests.listFiles { file -> file.isFile && file.name.endsWith(".json") }?.sortedBy { file -> file.name } ?: return emptyList()
         processing.mkdirs()
         return files.mapNotNull { file ->
@@ -75,14 +98,40 @@ internal class LocalConfigRequestChannel(
             if (!file.renameTo(claimed)) {
                 return@mapNotNull null
             }
-            val text = runCatching { claimed.readText() }.getOrNull()
-            claimed.delete()
-            text?.let { payload -> file.name.removeSuffix(".json") to payload }
+            val text = retrying { runCatching { readFile(claimed) }.getOrNull() }
+            // Pedido pode levar segredo: o que não sair agora o `discardStale` leva depois.
+            retrying { if (deleteFile(claimed) || !claimed.exists()) true else null }
+            file.name.removeSuffix(".json") to text
         }
     }
 
+    /** Grava a resposta; a falha que sobra depois das novas tentativas sobe para quem atende. */
     fun reply(id: String, payload: String) {
-        writeSecretFile(File(replies, "$id.json"), payload)
+        val target = File(replies, "$id.json")
+        var lastFailure: Exception? = null
+        retrying {
+            try {
+                writeFile(target, payload)
+                true
+            } catch (failure: IOException) {
+                lastFailure = failure
+                null
+            }
+        } ?: throw checkNotNull(lastFailure)
+    }
+
+    /** [attempt] até devolver um valor, com uma pausa curta entre as tentativas; `null` se nenhuma devolveu. */
+    private fun <T : Any> retrying(attempt: () -> T?): T? {
+        for (index in 1..TRANSIENT_ATTEMPTS) {
+            val value = attempt()
+            if (value != null) {
+                return value
+            }
+            if (index < TRANSIENT_ATTEMPTS) {
+                pause(TRANSIENT_PAUSE_MILLIS)
+            }
+        }
+        return null
     }
 
     /**
@@ -99,6 +148,10 @@ internal class LocalConfigRequestChannel(
 
     companion object {
         const val STALE_MILLIS = 60_000L
+
+        /** Cinco tentativas a 100 ms: um arquivo preso por um antivírus solta em décimos de segundo. */
+        const val TRANSIENT_ATTEMPTS = 5
+        const val TRANSIENT_PAUSE_MILLIS = 100L
         private const val MILLIS_DIGITS = 15
         private const val SEQUENCE_DIGITS = 9
         private val sequence = AtomicLong()

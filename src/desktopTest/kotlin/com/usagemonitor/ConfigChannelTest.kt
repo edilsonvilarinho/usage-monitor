@@ -1,12 +1,14 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.LocalConfigRequestChannel
+import com.usagemonitor.data.datasource.writeSecretFile
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CollectorKind
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.terminal.ConfigDelivery
 import com.usagemonitor.terminal.TerminalConfigClient
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.util.UUID
 import java.util.prefs.Preferences
@@ -14,6 +16,7 @@ import kotlin.concurrent.thread
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -61,6 +64,78 @@ class ConfigChannelTest {
         val taken = channel.submit("b")
         channel.takePending()
         assertFalse(channel.withdraw(taken))
+    }
+
+    @Test
+    fun `a request the collector cannot read is answered as refused, never dropped`() {
+        val store = store()
+        val reader = LocalConfigRequestChannel(File(dir, "control"), readFile = { _ -> throw IOException("sharing violation") }, pause = {})
+        val collector = thread {
+            repeat(50) {
+                serveConfigRequests(reader, ConfigApplier(store))
+                Thread.sleep(20)
+            }
+        }
+        val client = TerminalConfigClient(collector = { CollectorKind.SERVICE }, channel = channel(), localStore = { error("o coletor está vivo") })
+
+        val delivery = client.apply(ConfigChange.SourceEnabled(ApiSource.ANTHROPIC.name, true))
+        collector.join()
+
+        assertEquals(ConfigDelivery.Answered(ConfigOutcome.Refused(ConfigRefusals.FAILED, "unreadable request"), CollectorKind.SERVICE), delivery)
+        assertFalse(ApiSource.ANTHROPIC in store.enabledApis.value)
+        assertTrue(File(dir, "control/processing").listFiles().isNullOrEmpty())
+        store.close()
+    }
+
+    @Test
+    fun `a request file held for a moment is read on a later attempt`() {
+        var failures = 2
+        val pauses = mutableListOf<Long>()
+        val channel = LocalConfigRequestChannel(
+            File(dir, "control"),
+            readFile = { file -> if (failures-- > 0) throw IOException("sharing violation") else file.readText() },
+            pause = { millis -> pauses += millis }
+        )
+        val id = channel.submit("um")
+
+        assertEquals(listOf<Pair<String, String?>>(id to "um"), channel.takePending())
+        assertEquals(2, pauses.size)
+    }
+
+    @Test
+    fun `withdrawing a held request tries again, and a taken one is not retried`() {
+        var failures = 2
+        val pauses = mutableListOf<Long>()
+        val channel = LocalConfigRequestChannel(
+            File(dir, "control"),
+            deleteFile = { file -> if (failures-- > 0) false else file.delete() },
+            pause = { millis -> pauses += millis }
+        )
+        val held = channel.submit("a")
+        assertTrue(channel.withdraw(held))
+        assertEquals(2, pauses.size)
+        assertTrue(channel.takePending().isEmpty())
+
+        pauses.clear()
+        val taken = channel.submit("b")
+        channel.takePending()
+        assertFalse(channel.withdraw(taken))
+        assertTrue(pauses.isEmpty())
+    }
+
+    @Test
+    fun `a reply that fails for a moment is written later, and one that keeps failing is reported`() {
+        var failures = 2
+        val channel = LocalConfigRequestChannel(
+            File(dir, "control"),
+            writeFile = { file, text -> if (failures-- > 0) throw IOException("sharing violation") else writeSecretFile(file, text) },
+            pause = {}
+        )
+        channel.reply("um", "feito")
+        assertEquals("feito", channel.awaitReply("um", timeoutMillis = 0))
+
+        failures = Int.MAX_VALUE
+        assertFailsWith<IOException> { channel.reply("dois", "feito") }
     }
 
     @Test

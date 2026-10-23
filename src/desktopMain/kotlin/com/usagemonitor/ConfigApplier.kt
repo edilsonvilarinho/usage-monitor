@@ -187,11 +187,12 @@ internal const val DETAIL_CHAT = "chat"
 /**
  * Atende os pedidos à espera no canal, na ordem de chegada: aplica, responde e avisa
  * [onApplied] do que mudou. Pedido ilegível (versão vizinha com um tipo que esta não
- * conhece) é recusado, e não ignorado: o terminal precisa ouvir que nada mudou.
+ * conhece, ou arquivo que não se deixou ler) é recusado, e não ignorado: o terminal
+ * precisa ouvir que nada mudou.
  */
 internal fun serveConfigRequests(channel: LocalConfigRequestChannel, applier: ConfigApplier, onApplied: (ConfigChange) -> Unit = {}) {
     for ((id, payload) in channel.takePending()) {
-        val change = ConfigJson.decodeChange(payload)
+        val change = payload?.let(ConfigJson::decodeChange)
         val outcome = change?.let(applier::apply) ?: ConfigOutcome.Refused(ConfigRefusals.FAILED, "unreadable request")
         channel.reply(id, ConfigJson.encodeOutcome(outcome))
         if (change != null && outcome is ConfigOutcome.Applied) {
