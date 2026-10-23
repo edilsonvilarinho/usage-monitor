@@ -43,10 +43,11 @@ tratadas numa branch só (`fix/terminal-config-and-test-report-460-461`):
 - **D2 · `withdraw` e `reply` também tentam de novo** em falha passageira. `withdraw` só desiste quando o arquivo
   sumiu (o coletor o tirou); `reply` que falha depois da mudança aplicada faria o terminal dizer "nada mudou" sobre
   algo que mudou.
-- **D3 · Um pedido que falha não derruba o laço.** `serveConfigRequests` isola cada pedido: exceção no `apply`
-  vira resposta `FAILED` com a mensagem; exceção no `reply` é registrada e o próximo pedido segue. Quem chama recebe
-  a falha por `onFailure`; o `CollectorEngine` a anota na trilha como `ERROR` (vai ao `app.log`, #416), só com o
-  tipo da exceção — o pedido pode levar segredo.
+- **D3 · Um pedido que falha não derruba o laço.** `serveConfigRequests` isola cada pedido. O `apply` já não
+  lança (o `ConfigApplier` converte a exceção em `FAILED`, e o `flush` é protegido; conferido na A03); quem lança é
+  o `reply`, e essa falha vai para `onFailure` enquanto o próximo pedido segue. O `CollectorEngine` a anota pelo
+  `recordFailure` (trilha `ERROR`, que vai ao `app.log`, #416, com a mensagem saneada); o harness imprime a pilha,
+  que cai no `system-err` do XML do CI.
 - **D4 · O texto do tempo esgotado vem do `timeoutMillis`.** `ConfigDelivery.NotAnswered` passa a levar o limite, e
   o rótulo diz os segundos arredondados para cima (nunca um número menor do que o esperado).
 - **D5 · #461: o portão vira texto, não interrupção.** `status` capturado com `|| status=$?`; o passo só falha se o
@@ -74,3 +75,4 @@ tratadas numa branch só (`fix/terminal-config-and-test-report-460-461`):
 | --- | --- | --- | --- | --- |
 | A01 | 2026-10-23 | `docs: plan the terminal config channel and test-report fixes (#460, #461)` | concluída | Worktree `../usage-monitor-460-461` a partir da `main` (`8e284706`). `gh api …/artifacts/12533316472/zip`: XML de `TerminalAccountsCommandTest` com 1 falha, `system-err` vazio. `gh api` nos `action.yml` fixados: `artifact-id` (upload) e `artifact-ids` (download v4.3.0). Só documentação; nenhum teste rodado |
 | A02 | 2026-10-23 | `fix(cli): answer every terminal request the collector takes (#460)` | concluída | `LocalConfigRequestChannel`: ler, apagar (`withdraw` e o pedido tirado) e responder tentam 5 vezes a 100 ms (`retrying`); `withdraw` só desiste quando o arquivo sumiu; `takePending` devolve `null` no conteúdo em vez de descartar, e `serveConfigRequests` responde `FAILED` ("unreadable request"). Funções de arquivo e pausa como parâmetro, só para o teste. `JAVA_HOME=~/.jdks/ms-21.0.12.1 bash ./gradlew desktopTest -Dorg.gradle.java.home=$JAVA_HOME --tests "com.usagemonitor.ConfigChannelTest" --tests "com.usagemonitor.terminal.*"`: 135 testes, 0 falhas (`ConfigChannelTest` 12, 4 novos: pedido ilegível respondido, leitura na 3ª tentativa, `withdraw` com arquivo preso e sem nova tentativa quando já tirado, resposta na 3ª tentativa e falha que sobe). Windows: só o CI |
+| A03 | 2026-10-23 | `fix(cli): keep serving terminal requests after a reply fails (#460)` | concluída | `serveConfigRequests(onFailure)`: `reply` que lança não encerra o laço, e a mudança aplicada ainda chega ao `onApplied`. **Achado:** o `try` planejado em volta do `apply` seria código morto — `ConfigApplier.apply` já faz `runCatching` e `AppSettingsStore.flush` também; ficou só o do `reply`. `CollectorEngine` anota por `recordFailure("atender pedido do terminal")`; o `TerminalConfigHarness` imprime a pilha. `bash ./gradlew desktopTest -Dorg.gradle.java.home=$JAVA_HOME --tests "com.usagemonitor.ConfigChannelTest" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"`: 154 testes, 0 falhas (2 novos: recusa seguida do próximo pedido; resposta que não grava, avisada, com as duas mudanças anunciadas) |

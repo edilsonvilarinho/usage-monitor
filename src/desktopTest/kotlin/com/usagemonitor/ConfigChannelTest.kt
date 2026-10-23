@@ -139,6 +139,44 @@ class ConfigChannelTest {
     }
 
     @Test
+    fun `a request that fails to apply is refused and the next one is still served`() {
+        val store = store()
+        val applier = ConfigApplier(store, ConfigHooks(refreshSource = { source -> check(source != ApiSource.ANTHROPIC) { "boom" } }))
+        val applied = mutableListOf<ConfigChange>()
+        val channel = channel()
+        val failing = channel.submit(ConfigJson.encodeChange(ConfigChange.SourceEnabled(ApiSource.ANTHROPIC.name, true)))
+        val next = channel.submit(ConfigJson.encodeChange(ConfigChange.SourceEnabled(ApiSource.CODEX.name, true)))
+
+        serveConfigRequests(channel, applier, onFailure = { error -> throw AssertionError("aplicar não lança", error) }) { change -> applied += change }
+
+        assertEquals(ConfigOutcome.Refused(ConfigRefusals.FAILED, "boom"), ConfigJson.decodeOutcome(channel.awaitReply(failing, timeoutMillis = 0)!!))
+        assertEquals(ConfigOutcome.Applied(), ConfigJson.decodeOutcome(channel.awaitReply(next, timeoutMillis = 0)!!))
+        assertEquals(listOf<ConfigChange>(ConfigChange.SourceEnabled(ApiSource.CODEX.name, true)), applied)
+        store.close()
+    }
+
+    @Test
+    fun `a reply that cannot be written is reported, and the change applied is still announced`() {
+        val store = store()
+        val failures = mutableListOf<Exception>()
+        val applied = mutableListOf<ConfigChange>()
+        val channel = LocalConfigRequestChannel(
+            File(dir, "control"),
+            writeFile = { file, text -> if (file.parentFile.name == "replies") throw IOException("disk full") else writeSecretFile(file, text) },
+            pause = {}
+        )
+        channel.submit(ConfigJson.encodeChange(ConfigChange.SourceEnabled(ApiSource.CODEX.name, true)))
+        channel.submit(ConfigJson.encodeChange(ConfigChange.SourceEnabled(ApiSource.ANTHROPIC.name, true)))
+
+        serveConfigRequests(channel, ConfigApplier(store), onFailure = { error -> failures += error }) { change -> applied += change }
+
+        assertEquals(listOf("disk full", "disk full"), failures.map { error -> error.message })
+        assertEquals(2, applied.size)
+        assertEquals(setOf(ApiSource.CODEX, ApiSource.ANTHROPIC), store.enabledApis.value)
+        store.close()
+    }
+
+    @Test
     fun `a request file is readable only by its owner`() {
         val channel = channel()
         val id = channel.submit("segredo")

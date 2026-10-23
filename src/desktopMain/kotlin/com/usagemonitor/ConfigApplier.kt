@@ -189,12 +189,27 @@ internal const val DETAIL_CHAT = "chat"
  * [onApplied] do que mudou. Pedido ilegível (versão vizinha com um tipo que esta não
  * conhece, ou arquivo que não se deixou ler) é recusado, e não ignorado: o terminal
  * precisa ouvir que nada mudou.
+ *
+ * Um pedido que falha não leva os outros junto (#460). Aplicar já devolve recusa em vez
+ * de lançar ([ConfigApplier.apply]); responder pode lançar (disco, arquivo preso), e essa
+ * falha vai para [onFailure] enquanto o próximo pedido segue. Quem chama roda isto em
+ * laço, e uma exceção que subisse encerraria o laço de vez.
  */
-internal fun serveConfigRequests(channel: LocalConfigRequestChannel, applier: ConfigApplier, onApplied: (ConfigChange) -> Unit = {}) {
+internal fun serveConfigRequests(
+    channel: LocalConfigRequestChannel,
+    applier: ConfigApplier,
+    onFailure: (Exception) -> Unit = {},
+    onApplied: (ConfigChange) -> Unit = {}
+) {
     for ((id, payload) in channel.takePending()) {
         val change = payload?.let(ConfigJson::decodeChange)
         val outcome = change?.let(applier::apply) ?: ConfigOutcome.Refused(ConfigRefusals.FAILED, "unreadable request")
-        channel.reply(id, ConfigJson.encodeOutcome(outcome))
+        try {
+            channel.reply(id, ConfigJson.encodeOutcome(outcome))
+        } catch (failure: Exception) {
+            onFailure(failure)
+        }
+        // A mudança já está gravada mesmo sem resposta: quem mostra o valor precisa saber.
         if (change != null && outcome is ConfigOutcome.Applied) {
             onApplied(change)
         }
