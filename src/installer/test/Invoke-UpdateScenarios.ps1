@@ -437,6 +437,35 @@ function Get-UserPathEntryCount {
     return @((Get-UserPathRaw) -split ';' | Where-Object { $_ -ieq $Directory }).Count
 }
 
+# $null apaga o valor. Sem tipo no parametro: [string] trocaria $null por ''.
+function Set-UserPathRaw {
+    param($Value)
+    if ($null -eq $Value) {
+        $script:UserEnvironment.DeleteValue('Path', $false)
+    } else {
+        $script:UserEnvironment.SetValue('Path', $Value, [Microsoft.Win32.RegistryValueKind]::ExpandString)
+    }
+}
+
+function Invoke-Uninstaller {
+    param([string] $TargetDirectory)
+    $process = Start-Process -FilePath (Join-Path $TargetDirectory 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+    return $process.ExitCode
+}
+
+# O Assert-Equal compara com -eq, que ignora caixa. PATH tem de voltar byte a byte.
+function Assert-UserPathExactly {
+    param([string] $What, [string] $Expected)
+    $actual = Get-UserPathRaw
+    $script:Checks++
+    if ($Expected -ceq $actual) {
+        Write-Host "   ok    $What"
+    } else {
+        Write-Host "   FALHA $What -- esperado [$Expected], obtido [$actual]" -ForegroundColor Red
+        $script:Failures++
+    }
+}
+
 Reset-Target -TargetDirectory $target
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'exit code da primeira instalacao' 0 $code
@@ -445,10 +474,26 @@ Assert-Equal 'pasta de instalacao no PATH uma vez' 1 (Get-UserPathEntryCount $ta
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'reinstalacao nao repete a entrada' 1 (Get-UserPathEntryCount $target)
 
-$uninstall = Start-Process -FilePath (Join-Path $target 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
-Assert-Equal 'exit code da desinstalacao' 0 $uninstall.ExitCode
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
 Assert-Equal 'desinstalacao tira a pasta do PATH' 0 (Get-UserPathEntryCount $target)
-Assert-Equal 'PATH do usuario volta ao valor anterior' ([string]$script:UserPathBefore) (Get-UserPathRaw)
+Assert-UserPathExactly 'PATH do usuario volta ao valor anterior' ([string]$script:UserPathBefore)
+
+# ------------------------------------------------------------------ S11
+
+Write-Host "`n== S11: entrada fora da pagina de codigo e %VAR% sobrevivem a instalacao e a desinstalacao =="
+# Montada por [char] para o roteiro continuar ASCII. U+65E5 U+672C nao existem na
+# cp1252 do runner: um instalador ANSI regravaria a entrada como "??".
+$nonAnsiEntry = 'C:\scenario\' + [char]0x65E5 + [char]0x672C
+$seeded = "$nonAnsiEntry;%SystemRoot%\scenario"
+Set-UserPathRaw $seeded
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'entradas intactas, pasta no fim' "$seeded;$target"
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-UserPathExactly 'desinstalacao devolve o valor semeado' $seeded
 
 # ------------------------------------------------------------------ S9
 

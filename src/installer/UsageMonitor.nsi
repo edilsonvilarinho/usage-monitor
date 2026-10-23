@@ -1,3 +1,10 @@
+; Unicode: o instalador le e regrava o PATH do usuario, que o registro guarda em
+; UTF-16. No modo ANSI o ReadRegStr converte para a pagina de codigo do sistema, e
+; uma entrada com caractere fora dela voltaria com `?` (ou trocada por "best-fit")
+; e seria regravada assim. Este script e o license.txt sao ASCII, entao nada
+; existente muda de codificacao.
+Unicode true
+
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
