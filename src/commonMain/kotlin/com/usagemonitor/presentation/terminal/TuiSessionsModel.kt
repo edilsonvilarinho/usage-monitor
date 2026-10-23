@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.terminal
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.OutputThroughput
+import com.usagemonitor.domain.entity.SessionModelMix
 import kotlin.time.Instant
 
 /**
@@ -32,7 +33,9 @@ data class TuiSession(
     val throughput: OutputThroughput?,
     /** Contexto vivo e a janela do modelo; `null` quando não se sabe. */
     val contextTokens: Long? = null,
-    val contextWindow: Long? = null
+    val contextWindow: Long? = null,
+    /** Os modelos que a sessão usou e a fatia de cada um (#445); vazio = não lido. */
+    val modelMix: SessionModelMix = SessionModelMix()
 ) {
     val totalTokens: Long
         get() = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens

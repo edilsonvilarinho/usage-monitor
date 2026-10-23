@@ -35,6 +35,21 @@ export function SessionDetail() {
         <AppMetric label="Saúde" value="Saturada" size="sm" hint="contexto 92% da janela" />
       </div>
 
+      {/* #445: modelos da sessão, fora do Avançado. Fatia do custo a preço de tabela;
+          sem custo nenhum (Codex, ou só modelos sem tarifa) a fatia é dos tokens e o
+          Codex não tem coluna de custo. Modelo sem tarifa: "sem tarifa", nunca 0%. */}
+      <AppPanel>
+        <AppPanelHeader title="Modelos da sessão" subtitle="3 modelos · participação no custo estimado" />
+        <AppDataTable
+          columns={[{ key: 'm', label: 'Modelo' }, { key: 't', label: 'Turnos', numeric: true }, { key: 'k', label: 'Tokens (com cache)', numeric: true }, { key: 'r', label: 'Cache lido', numeric: true }, { key: 'w', label: 'Cache gravado', numeric: true }, { key: 'c', label: 'Custo', numeric: true }, { key: 's', label: '% do custo', numeric: true }]}
+          rows={[
+            { id: 1, m: 'sonnet-4-5', t: 38, k: '1 012 000', r: '880 400', w: '96 200', c: 'US$ 2,4836', s: '78%' },
+            { id: 2, m: 'opus-4-1', t: 4, k: '182 600', r: '160 100', w: '18 700', c: 'US$ 0,6050', s: '19%' },
+            { id: 3, m: 'haiku-4-5', t: 6, k: '89 400', r: '81 300', w: '6 900', c: 'US$ 0,0955', s: '3%' }
+          ]}
+        />
+      </AppPanel>
+
       {/* #393 (T3): grade 2×2 de gráficos por turno, a mesma no Claude e no Codex.
           Claude: contexto, cache, saída, custo acumulado. Codex: contexto, cache, saída
           (visível + raciocínio), vazão — sem custo, o app não tem tarifa do Codex. */}

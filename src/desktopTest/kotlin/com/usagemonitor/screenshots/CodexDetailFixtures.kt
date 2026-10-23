@@ -1,5 +1,6 @@
 package com.usagemonitor.screenshots
 
+import com.usagemonitor.domain.entity.toCodexModelBreakdown
 import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
@@ -28,7 +29,8 @@ internal fun codexDetailFixture(responses: Int = 220): CodexCliSessionDetail {
             responseId = "resp_$seq",
             seq = seq,
             ts = at,
-            model = "gpt-6.1-sol",
+            // As últimas respostas trocam de modelo, como na sessão real da #445.
+            model = if (seq < 180) "gpt-6.1-sol" else "gpt-6.1-sol-mini",
             source = CodexCliRolloutSource.VSCODE,
             usage = CodexCliUsageDelta(
                 inputTokens = input,
@@ -50,6 +52,7 @@ internal fun codexDetailFixture(responses: Int = 220): CodexCliSessionDetail {
         originator = "Codex Desktop",
         source = CodexCliRolloutSource.VSCODE,
         cliVersion = "0.160.1",
+        modelBreakdown = turns.toCodexModelBreakdown(),
         turnCount = responses / 10,
         responseCount = responses,
         inputTokens = turns.sumOf { it.usage.inputTokens },

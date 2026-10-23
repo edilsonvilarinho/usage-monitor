@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.terminal
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.ModelShareBasis
 import com.usagemonitor.presentation.ui.localized
 
 /** Os textos da aba 2, Sessões (3.2). */
@@ -41,6 +42,25 @@ internal class TuiSessionsLabels(val language: AppLanguage) {
     fun turnCount(count: Int): String = localized(language, if (count == 1) "1 turno" else "$count turnos", if (count == 1) "1 turn" else "$count turns")
 
     val composition: String get() = localized(language, "composição", "tokens")
+    val models: String get() = localized(language, "modelos", "models")
+
+    /** A base da fatia, na segunda linha de modelos: cabe nas 12 células da legenda. */
+    fun shareBasis(basis: ModelShareBasis): String =
+        when (basis) {
+            ModelShareBasis.COST -> localized(language, "% do custo", "% of cost")
+            ModelShareBasis.TOKENS -> localized(language, "% tokens", "% of tokens")
+        }
+
+    /** Modelo sem tarifa numa base de custo: palavra, nunca 0%. */
+    val unpricedShare: String get() = localized(language, "sem tarifa", "no price")
+    val unknownModel: String get() = localized(language, "(desconhecido)", "(unknown)")
+
+    /** O separador vem do perfil: sem Unicode o `·` vira o da tabela de glifos. */
+    fun modelCache(read: String, written: String, separator: String): String =
+        localized(language, "lido $read $separator gravado $written", "read $read $separator written $written")
+
+    fun moreModels(count: Int): String = localized(language, if (count == 1) "+1 modelo" else "+$count modelos", if (count == 1) "+1 model" else "+$count models")
+
     val context: String get() = localized(language, "contexto", "context")
     val seriesInput: String get() = localized(language, "entrada", "input")
     val seriesOutput: String get() = localized(language, "saída", "output")

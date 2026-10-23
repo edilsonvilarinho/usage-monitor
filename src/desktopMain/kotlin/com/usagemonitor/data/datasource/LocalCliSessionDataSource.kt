@@ -16,6 +16,7 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
+import com.usagemonitor.domain.entity.modelBreakdownBySession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -144,7 +145,13 @@ class LocalCliSessionDataSource(
                 val activeTimes = readActiveTimes(connection, profileId, sinceEpochMillis ?: 0L)
                 val throughputs = readThroughputs(connection, profileId, sinceEpochMillis ?: 0L)
                 val sessions = if (sinceEpochMillis == null) {
-                    readStoredSessions(connection, profileId, liveContexts)
+                    // `cli_sessions` não guarda o corte por modelo (#445): ele sai das
+                    // linhas `(sessão, modelo)` do histórico inteiro, a mesma dobra que
+                    // a leitura com janela faz no acumulador.
+                    val modelBreakdowns = readUsageGroupRows(connection, profileId, 0L).modelBreakdownBySession()
+                    readStoredSessions(connection, profileId, liveContexts).map { session ->
+                        session.copy(modelBreakdown = modelBreakdowns[session.sessionId].orEmpty())
+                    }
                 } else {
                     readWindowedSessions(connection, profileId, sinceEpochMillis, liveContexts)
                 }
@@ -185,31 +192,7 @@ class LocalCliSessionDataSource(
     ): List<CliUsageGroupRow> {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
-                connection.prepareStatement(SELECT_USAGE_GROUPS_SQL).use { statement ->
-                    statement.setLong(1, sinceEpochMillis)
-                    statement.setInt(2, if (profileId == null) 1 else 0)
-                    statement.setString(3, profileId)
-                    statement.executeQuery().use { rows ->
-                        buildList {
-                            while (rows.next()) {
-                                add(
-                                    CliUsageGroupRow(
-                                        sessionId = rows.getString("session_id"),
-                                        cwd = rows.getString("cwd"),
-                                        gitBranch = rows.getString("git_branch"),
-                                        model = rows.getString("model"),
-                                        turnCount = rows.getInt("turn_count"),
-                                        inputTokens = rows.getLong("input_tokens"),
-                                        outputTokens = rows.getLong("output_tokens"),
-                                        cacheReadTokens = rows.getLong("cache_read_tokens"),
-                                        cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
-                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
+                readUsageGroupRows(connection, profileId, sinceEpochMillis)
             }
         }
     }

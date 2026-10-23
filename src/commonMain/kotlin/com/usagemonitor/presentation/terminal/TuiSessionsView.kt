@@ -4,10 +4,11 @@ import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.formatActiveTime
 import com.usagemonitor.presentation.ui.formatMicrosUsdShort
 import com.usagemonitor.presentation.ui.formatThroughput
+import kotlin.math.roundToInt
 
 /**
  * Aba 2, Sessões (3.2): as sessões CLI do corte, com custo e vazão, e embaixo a composição de
- * tokens e o contexto da selecionada. `enter` troca a lista pelos turnos dela. Custo do índice
+ * tokens, os modelos da sessão (#445) e o contexto da selecionada. `enter` troca a lista pelos turnos dela. Custo do índice
  * (recalculado pela `ModelPricingTable`), com `+` quando algum modelo não tem tarifa.
  */
 internal object TuiSessionsView {
@@ -20,6 +21,14 @@ internal object TuiSessionsView {
 
     /** O bloco da sessão selecionada: linha em branco, título, composição em duas linhas e contexto. */
     private const val DETAIL_ROWS = 5
+
+    /** Linhas de modelo no bloco da selecionada (#445); acima disso a última vira "+N modelos". */
+    private const val MAX_MODEL_ROWS = 3
+
+    private const val MODEL_NAME_MAX = 22
+    /** Cabe "sem tarifa", a palavra mais longa da coluna. */
+    private const val MODEL_SHARE_WIDTH = 10
+    private const val MODEL_BAR_WIDTH = 16
 
     fun render(sessions: TuiSessions?, state: TuiSessionsState, size: TuiSize, labels: TuiSessionsLabels, profile: TerminalProfile): TuiTabView {
         val shortcuts = if (state.turnsOpen) {
@@ -71,12 +80,13 @@ internal object TuiSessionsView {
 
     private fun table(sessions: List<TuiSession>, selected: Int, size: TuiSize, labels: TuiSessionsLabels, profile: TerminalProfile): List<TerminalLine> {
         val columns = Columns(size.bodyWidth)
-        val unpricedModels = sessions.filter { session -> session.costIncomplete }.mapNotNull { session -> session.model }.distinct().sorted()
+        val unpricedModels = sessions.filter { session -> session.costIncomplete }.flatMap(::unpricedModelsOf).distinct().sorted()
         val footnote = if (unpricedModels.isEmpty()) emptyList() else listOf(terminalLine(TerminalSpan("  " + labels.unpriced(unpricedModels), TerminalColor.Muted)))
         // Duas linhas antes da tabela (o corte e a em branco) e o cabeçalho.
         val room = size.bodyHeight - 3 - footnote.size
-        val withDetail = room - DETAIL_ROWS >= 3
-        val visible = (if (withDetail) room - DETAIL_ROWS else room).coerceAtLeast(1)
+        val detailRows = DETAIL_ROWS + modelRowCount(sessions[selected])
+        val withDetail = room - detailRows >= 3
+        val visible = (if (withDetail) room - detailRows else room).coerceAtLeast(1)
         val start = TuiFrame.scrollStart(selected, sessions.size, visible)
         val header = " ".repeat(MARKER_WIDTH) + labels.headerProject.padEnd(columns.project) + labels.headerModel.padEnd(columns.model) +
             labels.headerDuration.padEnd(DURATION_WIDTH) + labels.headerTokens.padStart(TOKENS_WIDTH - 1) + " " +
@@ -95,7 +105,10 @@ internal object TuiSessionsView {
 
     private fun row(session: TuiSession, selected: Boolean, columns: Columns, width: Int, labels: TuiSessionsLabels, profile: TerminalProfile): TerminalLine {
         val project = (session.project ?: labels.noProject).take(columns.project - 1).padEnd(columns.project)
-        val model = (session.model ?: "—").take(columns.model - 1).padEnd(columns.model)
+        // Com troca de modelo, o que mais pesou e `+N` (#445); o detalhe embaixo abre a lista.
+        val switched = (session.modelMix.shares.size - 1).coerceAtLeast(0)
+        val suffix = if (switched > 0) " +$switched" else ""
+        val model = ((session.model ?: "—").take((columns.model - 1 - suffix.length).coerceAtLeast(1)) + suffix).padEnd(columns.model)
         val cost = session.costMicros?.let { micros -> formatMicrosUsdShort(micros) + if (session.costIncomplete) "+" else "" } ?: "—"
         val content = terminalLine(
             TerminalSpan(project),
@@ -116,6 +129,7 @@ internal object TuiSessionsView {
     private fun detail(session: TuiSession, width: Int, labels: TuiSessionsLabels, profile: TerminalProfile): List<TerminalLine> {
         val lines = mutableListOf(titleLine(session, width, labels, profile))
         lines += composition(session, labels, profile)
+        lines += models(session, labels, profile)
         val window = session.contextWindow
         val context = session.contextTokens
         if (window != null && window > 0L && context != null) {
@@ -177,6 +191,68 @@ internal object TuiSessionsView {
         val first = TerminalLine(listOf(TerminalSpan(labels.composition.padEnd(LEGEND_INDENT), TerminalColor.Muted)) + bar + TerminalSpan("  ") + legend(0) + legend(1))
         val second = TerminalLine(listOf(TerminalSpan(" ".repeat(LEGEND_INDENT + BAR_WIDTH + 2))) + legend(2) + legend(3))
         return listOf(first, second)
+    }
+
+    /**
+     * Os modelos sem tarifa da sessão, pelo corte por modelo (#445): numa sessão que trocou de
+     * modelo, o da linha pode ser justamente o que tem tarifa. Sem o corte lido, o da linha.
+     */
+    private fun unpricedModelsOf(session: TuiSession): List<String> {
+        val buckets = session.modelMix.shares.map { share -> share.bucket }
+        if (buckets.isEmpty()) {
+            return listOfNotNull(session.model)
+        }
+        return buckets.filter { bucket -> !bucket.isCostComplete }.mapNotNull { bucket -> bucket.label }
+    }
+
+    private fun modelRowCount(session: TuiSession): Int = session.modelMix.shares.size.coerceAtMost(MAX_MODEL_ROWS)
+
+    /**
+     * Os modelos da sessão (#445), um por linha: nome na cor da fonte, a fatia, a barra dela e o
+     * cache lido e gravado de cada um. A legenda da primeira linha diz "modelos"; a da segunda,
+     * a base da fatia (custo ou tokens). Sem o corte lido, nada. Com mais de [MAX_MODEL_ROWS]
+     * modelos a última linha vira "+N modelos".
+     */
+    private fun models(session: TuiSession, labels: TuiSessionsLabels, profile: TerminalProfile): List<TerminalLine> {
+        val mix = session.modelMix
+        if (mix.isEmpty) {
+            return emptyList()
+        }
+        val shown = if (mix.shares.size > MAX_MODEL_ROWS) mix.shares.take(MAX_MODEL_ROWS - 1) else mix.shares
+        val nameWidth = shown.maxOf { share -> (share.bucket.label ?: labels.unknownModel).length }.coerceAtMost(MODEL_NAME_MAX) + 2
+        val separator = profile.glyphs.separator
+        val lines = shown.mapIndexed { index, share ->
+            val legend = when (index) {
+                0 -> labels.models
+                1 -> labels.shareBasis(mix.basis)
+                else -> ""
+            }
+            val name = (share.bucket.label ?: labels.unknownModel).take(nameWidth - 2).padEnd(nameWidth)
+            val fraction = share.share
+            val shareText = fraction?.let { value -> "${(value * 100.0).roundToInt()}%" } ?: labels.unpricedShare
+            val bar = if (fraction == null) {
+                listOf(TerminalSpan(" ".repeat(MODEL_BAR_WIDTH)))
+            } else {
+                TerminalPrimitives.quotaBar((fraction * 100.0).roundToInt(), MODEL_BAR_WIDTH, TerminalColor.Source(session.source), profile.glyphs)
+            }
+            val bucket = share.bucket
+            val cache = labels.modelCache(TuiText.tokens(bucket.cacheReadTokens, labels.pt), TuiText.tokens(bucket.cacheWriteTokens, labels.pt), separator)
+            TerminalLine(
+                listOf(
+                    TerminalSpan(legend.padEnd(LEGEND_INDENT), TerminalColor.Muted),
+                    TerminalSpan(name, TerminalColor.Source(session.source)),
+                    TerminalSpan(shareText.padStart(MODEL_SHARE_WIDTH) + "  ", bold = true)
+                ) + bar + listOf(TerminalSpan("  $cache", TerminalColor.Muted))
+            )
+        }
+        if (shown.size == mix.shares.size) {
+            return lines
+        }
+        val legend = if (lines.size == 1) labels.shareBasis(mix.basis) else ""
+        return lines + terminalLine(
+            TerminalSpan(legend.padEnd(LEGEND_INDENT), TerminalColor.Muted),
+            TerminalSpan(labels.moreModels(mix.shares.size - shown.size), TerminalColor.Muted)
+        )
     }
 
     /** Os turnos da sessão aberta, do mais recente ao mais antigo. */

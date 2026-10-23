@@ -175,6 +175,15 @@ Em tela estreita a trilha perde o começo, nunca o agora.
 segmento e a legenda levam a letra da série, uma por série (a inicial colidiria nos dois caches).
 Tokens abreviados com uma casa no separador do idioma (`4,8M`, `136K`), nunca no do locale.
 
+**Modelos da sessão** (3.2, #445). Abaixo da composição, um modelo por linha: nome na cor da fonte,
+a fatia em negrito alinhada à direita, uma barra de 16 células na cor da fonte e, em muted, `lido N ·
+gravado N` (cache lido e gravado daquele modelo). A legenda da primeira linha é `modelos`; a da segunda,
+a base da fatia: `% do custo` (custo a preço de tabela) ou `% tokens` quando nada na sessão tem tarifa
+(o Codex). Modelo sem tarifa numa base de custo leva `sem tarifa` no lugar da fatia e nenhuma barra,
+nunca 0%. No máximo três linhas; com mais modelos a terceira vira `+N modelos`. Na tabela, a coluna
+MODELO mostra o que mais pesou e `+N` quando a sessão trocou de modelo. Sem Unicode, a barra é a de
+colchetes e o separador é `-`; nenhum glifo novo.
+
 **Caixa** (3.5). Borda arredondada e título opcional na cor de acento. Usada para a ajuda e para
 qualquer sobreposição. Nunca há caixa dentro de caixa.
 

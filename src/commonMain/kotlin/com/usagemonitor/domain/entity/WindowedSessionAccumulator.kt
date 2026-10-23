@@ -39,6 +39,9 @@ class WindowedSessionAccumulator(
     private var primaryModel: String? = null
     private var primaryModelTurns = 0
 
+    /** Os grupos como chegaram, para o corte por modelo (#445) sair da mesma dobra do Resumo. */
+    private val modelGroups = mutableListOf<CliUsageGroupRow>()
+
     fun addModelGroup(
         model: String?,
         turnCount: Int,
@@ -72,6 +75,17 @@ class WindowedSessionAccumulator(
             )
         }
 
+        modelGroups += CliUsageGroupRow(
+            sessionId = sessionId,
+            model = model,
+            turnCount = turnCount,
+            inputTokens = inputTokens,
+            outputTokens = outputTokens,
+            cacheReadTokens = cacheReadTokens,
+            cacheWrite5mTokens = cacheWrite5mTokens,
+            cacheWrite1hTokens = cacheWrite1hTokens
+        )
+
         if (model != null && turnCount > primaryModelTurns) {
             primaryModel = model
             primaryModelTurns = turnCount
@@ -103,7 +117,8 @@ class WindowedSessionAccumulator(
             unpricedTurnCount = unpricedTurnCount,
             liveContextTokens = liveContextTokens,
             liveContextModel = liveContextModel,
-            stale = stale
+            stale = stale,
+            modelBreakdown = modelGroups.toUsageBreakdown().byModel
         )
     }
 }
