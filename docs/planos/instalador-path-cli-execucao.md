@@ -46,7 +46,7 @@ essa decisão: o instalador passa a registrar a pasta, uma vez, e a desinstalaç
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
 |---|---|---|---|---|
 | A01 | 2026-10-23 | este commit | concluída | `git worktree add ../usage-monitor-cli-path -b fix/instalador-path-cli main`. Plano criado. Sem código. |
-| A02 | 2026-10-23 | `26c8d3f6` | incidência 1 no `installer-windows` (run `40018581344`): `!insertmacro StrLoc` → `macro named "StrLoc" not found` na linha 418 do `.nsi`. Correção: sem StrFunc, presença checada pelo fim do valor | `Invoke-UpdateScenarios.ps1` ganha S10 (PATH uma vez, reinstalação sem repetir, desinstalação devolve o valor bruto, restaurado no `finally`). Sem NSIS/PowerShell/Windows nesta máquina: nada compilado nem executado localmente. |
+| A02 | 2026-10-23 | `26c8d3f6` | incidência 1 no `installer-windows` (run `40018581344`): `!insertmacro StrLoc` → `macro named "StrLoc" not found` na linha 418 do `.nsi`. Correção: sem StrFunc, presença checada pelo fim do valor; incidência 2 (run `40018973520`): S1–S8 passaram, S10 reprovou em `GetValue` com a string `DoNotExpandEnvironmentVariables` (o enum é `RegistryValueOptions`). O mesmo bloco marcava o restauro antes da leitura: uma falha ali faria o `finally` apagar o `Path`. Correção: enum e flag depois da leitura | `Invoke-UpdateScenarios.ps1` ganha S10 (PATH uma vez, reinstalação sem repetir, desinstalação devolve o valor bruto, restaurado no `finally`). Sem NSIS/PowerShell/Windows nesta máquina: nada compilado nem executado localmente. |
 
 ## Riscos
 

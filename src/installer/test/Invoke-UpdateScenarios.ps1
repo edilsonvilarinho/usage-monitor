@@ -418,12 +418,14 @@ Write-Host "`n== S10: PATH do usuario recebe a pasta uma vez, e a desinstalacao 
 # Le e grava o valor bruto (sem expandir %VAR%), para devolver o registro exatamente
 # como estava. Restaurado no finally: a suite pode rodar numa maquina de desenvolvimento.
 $script:UserEnvironment = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
-$script:UserPathSaved = $true
-$script:UserPathBefore = $script:UserEnvironment.GetValue('Path', $null, 'DoNotExpandEnvironmentVariables')
+$rawOptions = [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+$script:UserPathBefore = $script:UserEnvironment.GetValue('Path', $null, $rawOptions)
 $script:UserPathKind = if ($null -ne $script:UserPathBefore) { $script:UserEnvironment.GetValueKind('Path') } else { $null }
+# So marca o restauro depois da leitura: se ela falhasse antes, o finally apagaria o Path.
+$script:UserPathSaved = $true
 
 function Get-UserPathRaw {
-    return [string]$script:UserEnvironment.GetValue('Path', '', 'DoNotExpandEnvironmentVariables')
+    return [string]$script:UserEnvironment.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
 }
 
 function Get-UserPathEntryCount {
