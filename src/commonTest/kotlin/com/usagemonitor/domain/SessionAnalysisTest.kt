@@ -71,6 +71,20 @@ class SessionAnalysisTest {
     private fun near(expected: Double, actual: Double?) = assertTrue(actual != null && abs(expected - actual) < 0.05, "esperado $expected, veio $actual")
 
     @Test
+    fun `the open window carries its pace path and the previous window behind it`() {
+        // #463, AH1: 12:00Z–17:00Z, lida até 15:30Z → 70% do tempo, 62% da cota.
+        val window = analysis().fiveHour!!
+        val path = window.path!!
+        assertEquals(currentReset, path.resetsAt)
+        assertEquals(8, path.points.size)
+        assertEquals(0.7, path.points.last().elapsedFraction, 1e-9)
+        assertEquals(62.0, path.points.last().percent, 1e-9)
+        assertEquals(1, window.previousPaths.size)
+        assertEquals(previousReset, window.previousPaths.single().resetsAt)
+        assertEquals(90.0, window.previousPaths.single().points.last().percent, 1e-9)
+    }
+
+    @Test
     fun `the open window has its pace, the safe pace and where it ends`() {
         val window = analysis().fiveHour!!
         assertEquals(62, window.percent)

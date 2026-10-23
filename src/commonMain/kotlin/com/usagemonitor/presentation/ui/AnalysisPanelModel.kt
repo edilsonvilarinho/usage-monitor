@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.AnalysisWindowView
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.SessionAnalysis
+import com.usagemonitor.domain.entity.exhaustionTimeOf
 import com.usagemonitor.presentation.ui.components.AppTone
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -14,30 +15,22 @@ import kotlin.math.roundToInt
 import kotlin.time.Instant
 
 /**
- * O que o painel único da janela "Análise" mostra (rodada AD, direção AD1), já em texto e
- * tom: funções puras, testadas sem tela. `null` medido vira "—", nunca zero; a cor de cada
+ * O que o painel único da janela "Análise" mostra (rodada AD; janelas na diagonal do ritmo
+ * desde a #463, direção AH1), já em texto e tom: funções puras, testadas sem tela. `null` medido vira "—", nunca zero; a cor de cada
  * tom vem sempre com a palavra ou a seta escrita.
  */
 internal data class AnalysisWindowCardModel(
     val title: String,
-    val percent: Int,
-    val projectedPercent: Int?,
     val verdict: String,
     val verdictTone: AppTone,
     val resetLabel: String?,
-    val usedLabel: String,
-    val projectionLabel: String?,
-    val paceNow: String,
-    val paceAverage: String,
-    val safePace: String,
-    /** "folga" ou "acima do seguro"; `null` sem ritmo ou sem ritmo seguro. */
-    val safeVerdict: String?,
-    val safeTone: AppTone
+    /** O que a diagonal mostra, em frase: onde a janela está em relação à linha e como termina. */
+    val sentence: String,
+    /** `null` sem início e reinício conhecidos: sem eixo do tempo, só a frase. */
+    val diagonal: PaceDiagonalModel?
 )
 
 internal data class AnalysisIntervalRowModel(val span: String, val pace: String, val tokensPerSecond: String, val ratio: String, val ratioTone: AppTone)
-
-internal data class AnalysisVersusRowModel(val label: String, val now: String, val before: String, val change: String, val changeTone: AppTone)
 
 /** Uma hora das últimas 24: rótulo "07", pontos da 5h e vazão; `null` = não medido. */
 internal data class AnalysisHourBar(val label: String, val points: Double?, val tokensPerSecond: Double?)
@@ -45,36 +38,68 @@ internal data class AnalysisHourBar(val label: String, val points: Double?, val 
 internal object AnalysisPanelModel {
 
     fun windowCard(window: AnalysisWindowView, now: Instant, language: AppLanguage): AnalysisWindowCardModel {
-        val pt = language == AppLanguage.PT
         val projected = window.projectedAtReset
         val (verdict, tone) = when {
-            projected == null -> (if (pt) "sem projeção" else "no projection") to AppTone.NEUTRAL
-            projected >= 100 -> (if (pt) "estoura antes do reinício" else "runs out before the reset") to AppTone.CRITICAL
-            else -> (if (pt) "cabe até o reinício" else "fits until the reset") to AppTone.OK
+            projected == null -> localized(language, "sem projeção", "no projection") to AppTone.NEUTRAL
+            projected >= 100 -> localized(language, "esgota antes do reinício", "runs out before the reset") to AppTone.CRITICAL
+            else -> localized(language, "cabe até o reinício", "fits until the reset") to AppTone.OK
         }
-        val current = window.paceNow ?: window.paceAverage
-        val safe = window.safePace
-        val (safeVerdict, safeTone) = when {
-            current == null || safe == null -> null to AppTone.NEUTRAL
-            current <= safe -> (if (pt) "folga" else "room left") to AppTone.OK
-            else -> (if (pt) "acima do seguro" else "above the safe pace") to AppTone.CRITICAL
-        }
+        val sentence = windowSentence(window, now, language)
         return AnalysisWindowCardModel(
-            title = if (window.periodType == PeriodType.WEEKLY) (if (pt) "Semanal" else "Weekly") else "5h",
-            percent = window.percent,
-            projectedPercent = projected,
+            title = if (window.periodType == PeriodType.WEEKLY) localized(language, "Semanal", "Weekly") else "5h",
             verdict = verdict,
             verdictTone = tone,
-            resetLabel = window.resetsAt?.let { at -> (if (pt) "reinicia " else "resets ") + TelegramBotMessages.resetLabel(at, now, pt) },
-            usedLabel = if (pt) "${window.percent}% usado" else "${window.percent}% used",
-            projectionLabel = projected?.let { value -> if (pt) "≈$value% no reinício" else "≈$value% at the reset" },
-            paceNow = pace(window.paceNow, pt),
-            paceAverage = pace(window.paceAverage, pt),
-            safePace = pace(window.safePace, pt),
-            safeVerdict = safeVerdict,
-            safeTone = safeTone
+            resetLabel = window.resetsAt?.let { at -> localized(language, "reinicia ", "resets ") + resetClock(at, now, language) },
+            sentence = sentence,
+            diagonal = PaceDiagonalModels.forWindow(window, now, language, sentence)
         )
     }
+
+    /**
+     * A diagonal em frase (#463, AH1): quanto da cota e do tempo já foi, quantos pontos acima ou
+     * abaixo da linha que chega a 100% no reinício, e como a janela termina — quando esgota, no
+     * ritmo da projeção, ou onde chega. O ritmo seguro só entra assim: "safe 249.9" com 9 min
+     * para o reinício não decidia nada.
+     */
+    fun windowSentence(window: AnalysisWindowView, now: Instant, language: AppLanguage): String {
+        val used = localized(language, "${window.percent}% usada", "${window.percent}% used")
+        val gap = PaceDiagonalModels.gapNow(window, now)
+            ?: return used + localized(language, "; sem reinício conhecido, não há linha de ritmo.", "; with no known reset there is no pace line.")
+        val elapsed = window.percent - gap
+        val span = if (window.periodType == PeriodType.WEEKLY) localized(language, "da semana", "of the week") else localized(language, "da janela", "of the window")
+        val points = if (abs(gap) == 1) localized(language, "1 ponto", "1 point") else localized(language, "${abs(gap)} pontos", "${abs(gap)} points")
+        val position = when {
+            gap > 0 -> localized(language, "$points acima da linha", "$points over the line")
+            gap < 0 -> localized(language, "$points abaixo da linha", "$points under the line")
+            else -> localized(language, "em cima da linha", "right on the line")
+        }
+        val first = localized(language, "$used com $elapsed% $span já passada: $position.", "$used with $elapsed% $span gone: $position.")
+        return listOfNotNull(first, endingSentence(window, now, language)).joinToString(" ")
+    }
+
+    private fun endingSentence(window: AnalysisWindowView, now: Instant, language: AppLanguage): String? {
+        val resetsAt = window.resetsAt ?: return null
+        val pace = window.paceNow ?: window.paceAverage
+        val paceName = if (window.paceNow != null) localized(language, "No ritmo da última hora", "At the last hour's pace")
+        else localized(language, "No ritmo médio da janela", "At the window's average pace")
+        // O veredito do card decide (projeção ≥ 100%); o instante sai do mesmo ritmo.
+        val eta = if ((window.projectedAtReset ?: 0) >= 100) exhaustionTimeOf(window.percent, pace, now, resetsAt) else null
+        if (eta != null && pace != null) {
+            val before = PaceDiagonalModels.durationLabel((resetsAt - eta).inWholeMilliseconds)
+            val at = resetClock(eta, now, language)
+            return localized(
+                language,
+                "$paceName (${paceLabel(pace, language)}), esgota por volta de $at, $before antes do reinício.",
+                "$paceName (${paceLabel(pace, language)}) it runs out around $at, $before before the reset."
+            )
+        }
+        val projected = window.projectedAtReset ?: return null
+        val at = resetClock(resetsAt, now, language)
+        return localized(language, "Chega a ~$projected% no reinício ($at).", "Reaches ~$projected% at the reset ($at).")
+    }
+
+    private fun resetClock(at: Instant, now: Instant, language: AppLanguage): String =
+        TelegramBotMessages.resetLabel(at, now, language == AppLanguage.PT)
 
     /** 1 h a 7 d, com a razão do ritmo contra o de 7 dias — a mesma conta do `/analise intervalos`. */
     fun intervals(analysis: SessionAnalysis, language: AppLanguage): List<AnalysisIntervalRowModel> {
@@ -85,36 +110,11 @@ internal object AnalysisPanelModel {
             val (ratio, tone) = when {
                 row.span == AnalysisSpan.DAYS_7 -> (if (pt) "referência" else "reference") to AppTone.NEUTRAL
                 value == null || week == null || week <= 0.0 -> "—" to AppTone.NEUTRAL
-                value >= week -> "↑ ${pace(value / week, pt)}×" to AppTone.WARNING
-                else -> "↓ ${pace(value / week, pt)}×" to AppTone.OK
+                value >= week -> "↑ ${pace(value / week, pt)}× " + localized(language, "mais rápido", "faster") to AppTone.WARNING
+                else -> "↓ ${pace(value / week, pt)}× " + localized(language, "mais lento", "slower") to AppTone.OK
             }
             AnalysisIntervalRowModel(TelegramAnalysisTexts.spanLabel(row.span), pace(value, pt), speed(row.tokensPerSecond), ratio, tone)
         }
-    }
-
-    /**
-     * A janela 5h corrente contra a anterior no mesmo ponto; `null` sem janela anterior no
-     * histórico. Nas linhas de consumo, descer é folga; a vazão não tem lado bom.
-     */
-    fun versus(analysis: SessionAnalysis, language: AppLanguage): List<AnalysisVersusRowModel>? {
-        val pt = language == AppLanguage.PT
-        val previous = analysis.previous ?: return null
-        val today = analysis.days.lastOrNull()?.percentPoints
-        val yesterday = analysis.days.getOrNull(analysis.days.size - 2)?.percentPoints
-        val elapsed = elapsedLabel(previous.elapsedMillis)
-        return listOf(
-            versusRow((if (pt) "5h aos " else "5h at ") + elapsed, previous.currentPercent.toDouble(), previous.previousPercent?.toDouble(), true) { value -> "${value.roundToInt()}%" },
-            versusRow(if (pt) "ritmo médio" else "avg pace", previous.currentPace, previous.previousPace, true) { value -> pace(value, pt) },
-            versusRow(if (pt) "hora pesada" else "peak hour", previous.currentPeakHour, previous.previousPeakHour, true) { value -> "${value.roundToInt()} pp" },
-            versusRow("tok/s", previous.currentTokensPerSecond, previous.previousTokensPerSecond, false) { value -> value.roundToInt().toString() },
-            versusRow(if (pt) "semanal/dia" else "weekly/day", today, yesterday, true) { value -> pace(value, pt) }
-        )
-    }
-
-    fun versusFootnote(analysis: SessionAnalysis, language: AppLanguage): String? {
-        val previous = analysis.previous ?: return null
-        val elapsed = elapsedLabel(previous.elapsedMillis)
-        return if (language == AppLanguage.PT) "mesmo ponto da janela: $elapsed desde o início · semanal: hoje × ontem" else "same point of the window: $elapsed since the start · weekly: today × yesterday"
     }
 
     fun hours(analysis: SessionAnalysis): List<AnalysisHourBar> =
@@ -130,17 +130,17 @@ internal object AnalysisPanelModel {
         val index = peakIndex(bars) ?: return if (language == AppLanguage.PT) "sem consumo nas últimas 24 h" else "no usage in the last 24 h"
         val bar = bars[index]
         val points = (bar.points ?: 0.0).roundToInt()
-        return if (language == AppLanguage.PT) "pico ${bar.label}h · $points pp" else "peak ${bar.label}h · $points pp"
+        return localized(language, "pico ${bar.label}h · $points%", "peak ${bar.label}h · $points%")
     }
 
-    /** "23h–24h · 57 pp · 121 tok/s"; hora sem leitura diz que não foi medida. */
+    /** "23h–24h · 57,0% · 121 tok/s" (% da cota 5h); hora sem leitura diz que não foi medida. */
     fun hourTooltip(bar: AnalysisHourBar, language: AppLanguage): String {
         val pt = language == AppLanguage.PT
         val next = ((bar.label.toIntOrNull() ?: 0) + 1).toString().padStart(2, '0')
         val range = "${bar.label}h–${next}h"
         val points = bar.points ?: return "$range · " + (if (pt) "sem leitura" else "no reading")
         val speed = bar.tokensPerSecond?.let { value -> " · ${value.roundToInt()} tok/s" }.orEmpty()
-        return "$range · ${pace(points, pt)} pp$speed"
+        return "$range · ${pace(points, pt)}%$speed"
     }
 
     /** Vazão da última hora por modelo, e de quando é o índice quando ele não acompanha o ao vivo (Codex). */
@@ -161,31 +161,10 @@ internal object AnalysisPanelModel {
         return if (pt) "Ao vivo · ${clockSeconds(generatedAt)}" else "Live · ${clockSeconds(generatedAt)}"
     }
 
-    private fun versusRow(label: String, now: Double?, before: Double?, lowerIsBetter: Boolean, format: (Double) -> String): AnalysisVersusRowModel {
-        val (change, tone) = if (now == null || before == null || before <= 0.0) {
-            "—" to AppTone.NEUTRAL
-        } else {
-            val percent = ((now - before) / before * 100).roundToInt()
-            val mark = if (percent > 0) "↑" else if (percent < 0) "↓" else "="
-            val tone = when {
-                !lowerIsBetter || percent == 0 -> AppTone.NEUTRAL
-                percent < 0 -> AppTone.OK
-                else -> AppTone.WARNING
-            }
-            "$mark ${abs(percent)}%" to tone
-        }
-        return AnalysisVersusRowModel(label, now?.let(format) ?: "—", before?.let(format) ?: "—", change, tone)
-    }
-
     /** Uma casa, vírgula em português; `null` vira "—". */
     private fun pace(value: Double?, pt: Boolean): String = TelegramAnalysisMessages.pace(value, pt).trim()
 
     private fun speed(value: Double?): String = value?.roundToInt()?.toString() ?: "—"
-
-    private fun elapsedLabel(millis: Long): String {
-        val minutes = millis / 60_000L
-        return if (minutes < 60) "${minutes}min" else "${minutes / 60}h${(minutes % 60).toString().padStart(2, '0')}"
-    }
 
     private fun clockSeconds(instant: Instant): String {
         val local = instant.toLocalDateTime(TimeZone.of(ACTIVITY_TIME_ZONE_ID))

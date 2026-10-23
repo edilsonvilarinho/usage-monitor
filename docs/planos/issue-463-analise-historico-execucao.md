@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em andamento — A00 e A01 concluídas; A02 (Análise AH1) a seguir.`
+**Estado atual:** `Em andamento — A00 a A02 concluídas; A03 (Histórico na diagonal) a seguir.`
 
 | Campo | Valor |
 | --- | --- |
@@ -56,6 +56,7 @@
 | --- | --- | --- | --- |
 | A00 | 2026-10-23 | concluída | galeria renderizada no Chrome headless (`--dump-dom`: 12 cartões, console sem erro); capturas conferidas — corrigidos a escala do eixo Y das 24 h, o detalhe esticado da AH2 e o alinhamento dos glifos do terminal (todo glifo fora do ASCII em célula de 1ch) |
 | A01 | 2026-10-23 | concluída | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.architecture.*"` (Linux): 1 470 testes, 0 falhas; testes novos de `buildValueLabels` (100/50/0) e `paceLabel` (0,3 %/h) |
+| A02 | 2026-10-23 | concluída | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest` (Linux): 3 273 testes, 0 falhas (a primeira passada falhou em 2: o teto de `== AppLanguage.PT` caiu para 706 e foi baixado; o teste de tela achava duas diagonais, uma por janela). `generateHelpMedia -PhelpMediaTopic=session-analysis` (26 quadros); quadros do GIF e captura da tela inteira conferidos — o ponto ficava na leitura antiga quando o percentual andava (o caminho agora termina na leitura de agora) e "1 pontos" virou singular; a frase e a projeção seguem o veredito do card (`projectedAtReset`) |
 
 ## Problemas em aberto e riscos
 

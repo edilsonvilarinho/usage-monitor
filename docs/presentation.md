@@ -168,12 +168,25 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
 - **Painel único ao vivo** (rodada AD, direção AD1; plano `docs/planos/analise-painel-ao-vivo-execucao.md`, galeria
   `docs/planos/analise-modal-visual/`): as 12 abas em dois níveis e os PNGs do bot saíram da janela — repetiam o mesmo
   número em cinco vistas, o texto do Telegram quebrava os blocos ▁▂█ na Plex e o PNG ficava escuro nos dois temas.
-  `AnalysisPanel` mostra as duas janelas lado a lado (`AppStatusPill` com o veredito escrito, `AppProgressTrack` com a
-  marca de onde a cota chega no reinício e três `AppMetricBlock` de ritmo), `AnalysisHoursChart` (Canvas: barras de pp
-  da 5h, linha de tok/s com máximo próprio escrito na legenda, bolha por hora como no histórico #392; `null` é lacuna
-  tracejada, zero é traço rente) e intervalos e antes × agora em `AppDataRow`. Textos e tons saem de
+  `AnalysisPanel` mostra as duas janelas lado a lado (`AppStatusPill` com o veredito escrito; o corpo de cada card é a
+  diagonal do ritmo desde a #463, abaixo), `AnalysisHoursChart` (Canvas com bolha por hora como no histórico #392; `null` é
+  lacuna tracejada, zero é traço rente) e os intervalos em `AppDataRow`. Textos e tons saem de
   `AnalysisPanelModel` (puro, testado). O bot e o PDF continuam com o desenho dele — a decisão B21 "um desenho para as
   duas portas" deixou de valer só para a janela.
+- **Diagonal do ritmo** (#463, direção AH1; plano `docs/planos/issue-463-analise-historico-execucao.md`, galeria
+  `docs/planos/issue-463-visual/`): cada card de janela é `PaceDiagonalChart` — eixo X é o tempo da janela que passou, eixo
+  Y a cota usada, ambos escritos, e a diagonal dourada tracejada chega a 100% no reinício (acima esgota antes, abaixo cabe;
+  as regiões têm a frase). O caminho vem do domínio (`QuotaWindowPace.kt`: `AnalysisWindowView.path` e `previousPaths`,
+  até `ANALYSIS_PREVIOUS_PATHS` = 3, pelo mesmo corte de `splitIntoQuotaWindows`), e o eixo usa o início **nominal**
+  (reinício − 5 h ou 7 d), como o ritmo médio já fazia. A projeção usa o mesmo ritmo de `projectedAtReset` (última hora,
+  senão média); quando esgota antes, vai até 100% no instante de `exhaustionTimeOf` e segue rente ao topo. A frase
+  (`AnalysisPanelModel.windowSentence`) diz quanto da cota e do tempo já foi, quantos pontos acima ou abaixo da linha e
+  como termina. **Saíram** os três `AppMetricBlock` agora/média/seguro (o ritmo seguro com 9 min para o reinício dava
+  "249,9 folga"), a `AppProgressTrack` com tique e a tabela "esta janela × anterior" — as anteriores ficam desenhadas
+  atrás. O reinício fica em linha própria (a 640dp o cabeçalho não cabe com ele). As 24 h (`AnalysisHoursChart`) têm
+  **uma escala**: barras em % da cota 5h com eixo escrito (`analysisAxisMax`, topo par), e a vazão numa faixa própria com
+  o máximo dela; "pp" virou "%". Nos intervalos, a razão contra 7 d vem com a palavra ("1,9× mais rápido"). A linha
+  dourada usa `AppGargantuaTokens.gold`: é referência, não consumo nem estado.
 - **Ao vivo** (A01): o view model relê quando o `fetchedAt` da conta muda (coleta nova: 60 s com sessão CLI, 5 min sem)
   e a cada `LIVE_INTERVAL_MILLIS` (30 s, o ritmo do índice do Claude), porque ritmo da última hora, ritmo seguro e fatias
   andam com o relógio. `close()` no `onCloseRequest` para o laço — a janela só se esconde. Sem `drop(1)` no sinal: se a

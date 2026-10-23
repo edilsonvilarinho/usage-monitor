@@ -305,16 +305,18 @@ private val PT_SESSION_ANALYSIS = HelpEntry(
     title = "Análise da sessão",
     summary = "Ritmo, vazão e janelas de uma conta, num painel que se atualiza sozinho.",
     description = "A análise lê o histórico da conta e o uso local do CLI e responde se o " +
-        "ritmo atual chega ao fim da janela: o percentual da 5h e da semanal, o ritmo na última " +
-        "hora, o ritmo seguro até o reinício e onde a cota chega no reinício. Traz também " +
-        "intervalos de 1 h a 7 dias, as 24 horas, a janela anterior no mesmo ponto e a vazão por " +
-        "modelo. Com a janela aberta, ela relê a cada coleta da conta e a cada 30 segundos. Vale " +
-        "para contas Anthropic e Codex; o que não foi medido aparece como não medido, nunca " +
-        "como zero.",
+        "ritmo atual chega ao fim da janela. Cada janela (5h e semanal) é um gráfico: o tempo da " +
+        "janela que já passou contra a cota usada, com uma linha dourada que chega a 100% no " +
+        "reinício. Acima dela a cota esgota antes; abaixo, cabe. As janelas anteriores ficam atrás, " +
+        "em cinza, e uma frase diz quando esgota ou onde a cota chega. Traz também as 24 horas, " +
+        "os intervalos de 1 h a 7 dias e a vazão por modelo. Com a janela aberta, ela relê a cada " +
+        "coleta da conta e a cada 30 segundos. Vale para contas Anthropic e Codex; o que não foi " +
+        "medido aparece como não medido, nunca como zero.",
     steps = listOf(
         "No balão da conta (ponteiro sobre o anel), clique em \"Análise da sessão: ritmo, " +
             "vazão e janelas\".",
-        "Passe o ponteiro sobre as barras das \"Últimas 24 h\" para ver os pontos e os tok/s de cada hora.",
+        "Leia a posição na linha dourada: acima, a cota esgota antes do reinício; abaixo, cabe.",
+        "Passe o ponteiro sobre as barras das \"Últimas 24 h\" para ver o percentual e os tok/s de cada hora.",
         "O selo \"Ao vivo\" diz a hora da leitura na tela; \"Relatório PDF\" salva a mesma análise numa página.",
         "A mesma análise chega pelo bot do Telegram com /analise."
     ),
