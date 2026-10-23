@@ -1,7 +1,6 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
-!include "StrFunc.nsh"
 
 SetCompressor zlib
 
@@ -412,17 +411,22 @@ FunctionEnd
 ; nao repete a entrada. So o valor do usuario e tocado -- o do sistema exige
 ; administrador, e este instalador roda como usuario.
 ;
+; A presenca e checada pelo FIM do valor, a mesma invariante que a desinstalacao
+; usa: a entrada que este instalador grava fica no fim. Uma entrada que o usuario
+; levou para o meio nao e reconhecida, e a reinstalacao acrescenta outra -- aceito,
+; porque checar por substring exigiria macro do StrFunc, e a versao do NSIS do CI
+; nao aceitou a dele.
+;
 ; O teto de 1900 caracteres e folga contra o limite de string do NSIS: um Path
 ; truncado seria pior do que nao acrescentar. Acima do teto a entrada fica de
 ; fora e o instalador avisa.
-!insertmacro StrLoc
-
 Function AddInstallDirToUserPath
     ReadRegStr $R7 HKCU "Environment" "Path"
     StrCpy $R8 ";$R7;"
-    ${StrLoc} $R9 $R8 ";$INSTDIR;" ">"
-    ${If} $R9 != ""
-        DetailPrint "PATH do usuario ja contem a pasta de instalacao."
+    StrLen $R9 ";$INSTDIR;"
+    StrCpy $R5 $R8 "" -$R9
+    ${If} $R5 == ";$INSTDIR;"
+        DetailPrint "PATH do usuario ja termina com a pasta de instalacao."
         Return
     ${EndIf}
     ${If} $R7 == ""

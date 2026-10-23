@@ -22,8 +22,9 @@ essa decisão: o instalador passa a registrar a pasta, uma vez, e a desinstalaç
 
 - **Escopo: só o `PATH` do usuário** (`HKCU\Environment`, valor `Path`). O `PATH` do sistema não é tocado,
   porque exige privilégio de administrador e o instalador roda como usuário.
-- **Acrescenta no fim, uma vez.** Reinstalar ou atualizar não repete a entrada: a checagem é pela lista
-  delimitada por `;`.
+- **Acrescenta no fim, uma vez.** Reinstalar ou atualizar não repete a entrada: a presença é checada pelo
+  fim do valor (`;<pasta>;`), a mesma invariante que a desinstalação usa. Checar substring exigiria macro do
+  StrFunc, e a versão do NSIS do CI não aceitou a macro (incidência 1, abaixo).
 - **Teto de 1900 caracteres.** Acima disso, o instalador não grava e avisa. Truncar o `PATH` do usuário é
   pior do que não acrescentar; o comando continua funcionando pelo caminho completo.
 - **Remoção só do que a instalação grava** (entrada no fim do `PATH`). Entrada que o próprio usuário
@@ -45,15 +46,15 @@ essa decisão: o instalador passa a registrar a pasta, uma vez, e a desinstalaç
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
 |---|---|---|---|---|
 | A01 | 2026-10-23 | este commit | concluída | `git worktree add ../usage-monitor-cli-path -b fix/instalador-path-cli main`. Plano criado. Sem código. |
-| A02 | 2026-10-23 | este commit | código e docs prontos; validação no CI (`installer-windows`) pendente | `Invoke-UpdateScenarios.ps1` ganha S10 (PATH uma vez, reinstalação sem repetir, desinstalação devolve o valor bruto, restaurado no `finally`). Sem NSIS/PowerShell/Windows nesta máquina: nada compilado nem executado localmente. |
+| A02 | 2026-10-23 | `26c8d3f6` | incidência 1 no `installer-windows` (run `40018581344`): `!insertmacro StrLoc` → `macro named "StrLoc" not found` na linha 418 do `.nsi`. Correção: sem StrFunc, presença checada pelo fim do valor | `Invoke-UpdateScenarios.ps1` ganha S10 (PATH uma vez, reinstalação sem repetir, desinstalação devolve o valor bruto, restaurado no `finally`). Sem NSIS/PowerShell/Windows nesta máquina: nada compilado nem executado localmente. |
 
 ## Riscos
 
 - **R1 — NSIS sem runtime local.** A sintaxe e o comportamento de `ReadRegStr`, `WriteRegExpandStr`,
   `StrLoc` e `System::Call` só são medidos no `installer-windows`. Se o CI reprovar, o diagnóstico vai para
   o PR e a branch recebe a correção.
-- **R2 — `StrLoc` sem posição.** A checagem de presença usa `StrLoc` com `!= ""`. Se ele devolver outro valor
-  para "não encontrado", a reinstalação repete a entrada, e o cenário S10 reprova essa contagem.
+- **R2 — presença só pelo fim.** Uma entrada que o usuário levou para o meio do `PATH` não é reconhecida, e a
+  reinstalação acrescenta outra. O S10 cobre o caso que a instalação grava (no fim).
 - **R3 — teste mexe no `PATH` do usuário da máquina.** O S10 salva o valor bruto (`DoNotExpandEnvironmentVariables`)
   e restaura no `finally`. No CI o runner é descartável.
 - **R4 — instalações antigas.** A entrada só existe depois de instalar a versão que traz esta mudança. Quem
