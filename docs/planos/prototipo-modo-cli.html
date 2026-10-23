@@ -428,7 +428,7 @@ S.overview = () => frame(0, overviewBody(), L(key('↑↓', 'fonte'), key('enter
 
 S.sessions = () => {
   const rows = [
-    ['usage-monitor', 'claude-opus-5-5',   '1h12',  '4,8M', '$9.40',  '38 tok/s', true],
+    ['usage-monitor', 'claude-opus-5-5 +1', '1h12',  '4,8M', '$9.40',  '38 tok/s', true],
     ['server',        'claude-sonnet-5-5', '22min', '1,1M', '$1.22',  '61 tok/s'],
     ['usage-monitor', 'gpt-5.3-codex',     '48min', '2,3M', '—',      '44 tok/s'],
     ['dotfiles',      'claude-haiku-5-5',  '6min',  '200K', '$0.04',  '92 tok/s'],
@@ -450,6 +450,10 @@ S.sessions = () => {
   const seg = (n, k) => c(k, rep('█', n));
   body.push(L(c('mu', 'composição  '), seg(3, 'in'), seg(2, 'out'), seg(30, 'crd'), seg(3, 'cwr'), c('dim', rep('░', 2)), '  ', c('in', '■'), ' entrada 6%  ', c('out', '■'), ' saída 3%'));
   body.push(L(c('mu', '            '), rep(' ', 42), c('crd', '■'), ' cache lido 84%  ', c('cwr', '■'), ' cache gravado 7%'));
+  // #445: um modelo por linha (até 3; acima disso a última vira "+N modelos"). Legenda da
+  // primeira linha "modelos", da segunda a base da fatia (% do custo, ou % tokens sem tarifa).
+  body.push(L(c('mu', 'modelos     '), c('a', pad('claude-opus-5-5', 18)), c('b', lpad('91%', 9) + '  '), bar(91, 16, 'a'), c('mu', '  lido 3,6M · gravado 300K')));
+  body.push(L(c('mu', '% do custo  '), c('a', pad('claude-haiku-5-5', 18)), c('b', lpad('9%', 9) + '  '), bar(9, 16, 'a'), c('mu', '  lido 400K · gravado 50K')));
   body.push(L(c('mu', 'contexto    '), bar(68, 40, 'a'), '  ', c('b', '136K'), c('mu', ' de 200K')));
   return frame(1, body, L(key('↑↓', 'sessão'), key('←→', 'período'), key('enter', 'turnos'), key('e', 'CSV'), ...commonKeys));
 };
@@ -806,7 +810,7 @@ const PARTS = [
       { id: 's31', num: '3.1', title: 'Aba 1 · Visão geral', win: 'usage-monitor tui', body: S.overview,
         text: 'As contas à esquerda, com o maior uso de cada uma, e o detalhe da escolhida à direita: uma linha de cota por cota do app (os créditos inclusive), a sessão ativa (a mais recente com atividade nos últimos 10 min, com o custo no formato da janela de Sessões) e as últimas 24 h da primeira cota. Abaixo de 80 colunas a lista ocupa a tela e <b>enter</b> abre a conta.' },
       { id: 's32', num: '3.2', title: 'Aba 2 · Sessões', win: 'usage-monitor tui', body: S.sessions,
-        text: 'As sessões do Claude Code (todas as contas) e do Codex no corte: hoje (desde a meia-noite BRT), 7 dias ou 30 dias. Custo no formato da janela de Sessões, recalculado pela tabela de preços; o Codex não tem tarifa no app e mostra —. Embaixo, a composição de tokens e o contexto da selecionada; <b>enter</b> troca a lista pelos turnos e <b>e</b> grava o CSV do app (só o Claude Code) na pasta de onde a TUI abriu.' },
+        text: 'As sessões do Claude Code (todas as contas) e do Codex no corte: hoje (desde a meia-noite BRT), 7 dias ou 30 dias. Custo no formato da janela de Sessões, recalculado pela tabela de preços; o Codex não tem tarifa no app e mostra —. Embaixo, a composição de tokens, <b>os modelos da sessão</b> (#445: um por linha, com a fatia do custo — ou dos tokens, quando nada tem tarifa —, a barra e o cache lido e gravado de cada um; na tabela, o modelo que mais pesou e <b>+N</b> quando houve troca) e o contexto da selecionada; <b>enter</b> troca a lista pelos turnos e <b>e</b> grava o CSV do app (só o Claude Code) na pasta de onde a TUI abriu.' },
       { id: 's33', num: '3.3', title: 'Aba 3 · Histórico', win: 'usage-monitor tui', body: S.history,
         text: 'Uma trilha por cota com percentual, na ordem do painel, com os reinícios da janela marcados (só quando a janela anterior acabou: numa janela corrida o fim anda a cada leitura) e o uso de agora no fim. As setas trocam entre 24 horas (meia hora por célula), 7 dias (3 h) e 30 dias (12 h); o <b>enter</b> da aba 1 abre aqui, na trilha da conta.' },
       { id: 's34', num: '3.4', title: 'Aba 4 · Time', win: 'usage-monitor tui', body: S.team,

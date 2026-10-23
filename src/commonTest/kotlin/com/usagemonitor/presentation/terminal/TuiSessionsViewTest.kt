@@ -3,7 +3,12 @@ package com.usagemonitor.presentation.terminal
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
+import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.OutputThroughput
+import com.usagemonitor.domain.entity.SessionModelMix
+import com.usagemonitor.domain.entity.sessionModelMixOf
+import com.usagemonitor.domain.entity.toUsageBreakdown
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -17,12 +22,29 @@ class TuiSessionsViewTest {
     private val color = TerminalProfile(TerminalPalette.TRUECOLOR_DARK, unicode = true)
     private val ascii = TerminalProfile(TerminalPalette.NONE, unicode = false)
 
-    private fun session(id: String, project: String, model: String, cost: Long?, incomplete: Boolean = false, source: ApiSource = ApiSource.ANTHROPIC) = TuiSession(
+    private fun session(
+        id: String,
+        project: String,
+        model: String,
+        cost: Long?,
+        incomplete: Boolean = false,
+        source: ApiSource = ApiSource.ANTHROPIC,
+        modelMix: SessionModelMix = SessionModelMix()
+    ) = TuiSession(
         id = id, source = source, project = project, model = model, startedAt = now - 81.minutes, lastAt = now - 1.minutes,
         durationMillis = 72.minutes.inWholeMilliseconds, turnCount = 87, inputTokens = 300_000, outputTokens = 150_000,
         cacheReadTokens = 4_000_000, cacheWriteTokens = 350_000, costMicros = cost, costIncomplete = incomplete,
-        throughput = OutputThroughput(38_000, 1_000_000), contextTokens = 136_000, contextWindow = 200_000
+        throughput = OutputThroughput(38_000, 1_000_000), contextTokens = 136_000, contextWindow = 200_000,
+        modelMix = modelMix
     )
+
+    /** Opus na thread principal e Haiku nos subagentes, como na sessão da #445. */
+    private val switchedMix = mix(
+        CliUsageGroupRow(model = "claude-opus-5", turnCount = 80, outputTokens = 140_000, cacheReadTokens = 3_600_000, cacheWrite5mTokens = 300_000),
+        CliUsageGroupRow(model = "claude-haiku-4-5", turnCount = 7, outputTokens = 10_000, cacheReadTokens = 400_000, cacheWrite5mTokens = 50_000)
+    )
+
+    private fun mix(vararg rows: CliUsageGroupRow) = sessionModelMixOf(rows.map { row -> row.copy(sessionId = "a") }.toUsageBreakdown().byModel)
 
     private val sessions = TuiSessions(
         TuiSessionPeriod.TODAY,
@@ -56,6 +78,49 @@ class TuiSessionsViewTest {
         assertTrue("■ entrada 6%  ■ saída 3%" in text)
         assertTrue("■ cache lido 83%  ■ cache gravado 7%" in text)
         assertTrue(text.lines().any { line -> line.startsWith("│ contexto    ███████████████████████████▏░") && line.contains("░  136K de 200K") })
+    }
+
+    @Test
+    fun `sessao que trocou de modelo mostra o principal com +N e um modelo por linha no detalhe`() {
+        val data = sessions.copy(sessions = listOf(session("a", "usage-monitor", "claude-opus-5", 9_400_000, modelMix = switchedMix)))
+        val lines = screen(data = data, size = TuiSize(110, 30))
+        val opus = (switchedMix.shares[0].share!! * 100).roundToInt()
+        val haiku = (switchedMix.shares[1].share!! * 100).roundToInt()
+        assertTrue(lines[6].contains("claude-opus-5 +1"), lines[6])
+        val text = lines.joinToString("\n")
+        assertTrue(lines.any { line -> line.startsWith("│ modelos     claude-opus-5     ") && line.contains("$opus%") && line.contains("lido 3,6M · gravado 300K") }, text)
+        assertTrue(lines.any { line -> line.startsWith("│ % do custo  claude-haiku-4-5  ") && line.contains("$haiku%") && line.contains("lido 400K · gravado 50K") }, text)
+    }
+
+    @Test
+    fun `modelo sem tarifa diz sem tarifa e mais de tres modelos viram +N modelos`() {
+        val many = mix(
+            CliUsageGroupRow(model = "claude-opus-5", turnCount = 4, outputTokens = 1_000),
+            CliUsageGroupRow(model = "claude-haiku-4-5", turnCount = 3, outputTokens = 1_000),
+            CliUsageGroupRow(model = "claude-sonnet-5", turnCount = 2, outputTokens = 1_000),
+            CliUsageGroupRow(model = "minimax-m3", turnCount = 1, outputTokens = 1_000)
+        )
+        val data = sessions.copy(sessions = listOf(session("a", "usage-monitor", "claude-opus-5", 9_400_000, modelMix = many)))
+        val text = screen(data = data, size = TuiSize(110, 30)).joinToString("\n")
+        assertTrue("+2 modelos" in text, text)
+        val unpriced = mix(CliUsageGroupRow(model = "claude-opus-5", turnCount = 1, outputTokens = 1_000), CliUsageGroupRow(model = "minimax-m3", turnCount = 1, outputTokens = 1_000))
+        val other = screen(data = sessions.copy(sessions = listOf(session("a", "x", "claude-opus-5", 1, modelMix = unpriced))), size = TuiSize(110, 30)).joinToString("\n")
+        assertTrue(other.lines().any { line -> line.contains("minimax-m3") && line.contains("sem tarifa") && line.contains("lido") }, other)
+        // A nota de rodapé nomeia o modelo sem tarifa, não o que mais pesou na sessão.
+        val incomplete = sessions.copy(sessions = listOf(session("a", "x", "claude-opus-5", 1, incomplete = true, modelMix = unpriced)))
+        val footnote = screen(data = incomplete, size = TuiSize(110, 30)).single { line -> "sem tarifa na tabela" in line }
+        assertTrue(footnote.contains("+ minimax-m3 sem tarifa") && !footnote.contains("claude-opus-5"), footnote)
+    }
+
+    @Test
+    fun `sem cor e sem Unicode a linha de modelos usa o separador da tabela de glifos`() {
+        val data = sessions.copy(sessions = listOf(session("a", "usage-monitor", "claude-opus-5", 9_400_000, modelMix = switchedMix)))
+        val text = screen(data = data, size = TuiSize(110, 30), profile = ascii).joinToString("\n")
+        assertTrue("lido 3,6M - gravado 300K" in text, text)
+        // As linhas de modelo não trazem glifo fora da tabela ASCII: barra entre colchetes, separador `-`.
+        val modelLines = text.lines().filter { line -> " - gravado " in line }
+        assertEquals(2, modelLines.size, text)
+        assertTrue(modelLines.all { line -> line.all { char -> char.code < 128 } }, text)
     }
 
     @Test
@@ -98,8 +163,15 @@ class TuiSessionsViewTest {
 
     @Test
     fun `largura e altura exatas de 80 a 200 colunas`() {
+        val switched = sessions.copy(sessions = sessions.sessions.map { session -> session.copy(modelMix = switchedMix) })
         for (size in listOf(TuiSize(200, 40), TuiSize(96, 24), TuiSize(80, 24), TuiSize(70, 16))) {
             val lines = screen(size = size)
+            assertEquals(size.rows, lines.size)
+            assertTrue(lines.all { line -> line.length == size.columns }, "$size")
+        }
+        // Com as linhas de modelo (#445) o quadro continua exato.
+        for (size in listOf(TuiSize(200, 40), TuiSize(96, 24), TuiSize(80, 24), TuiSize(70, 16))) {
+            val lines = screen(data = switched, size = size)
             assertEquals(size.rows, lines.size)
             assertTrue(lines.all { line -> line.length == size.columns }, "$size")
         }

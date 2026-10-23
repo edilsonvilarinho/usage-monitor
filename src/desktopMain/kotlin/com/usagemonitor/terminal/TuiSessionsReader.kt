@@ -73,7 +73,8 @@ internal class TuiSessionsReader(
             id = session.sessionId,
             source = ApiSource.ANTHROPIC,
             project = session.projectName,
-            model = session.primaryModel,
+            // O que mais pesou na fatia, que é o que a linha de modelos mostra primeiro (#445).
+            model = session.modelMix.leadingModel ?: session.primaryModel,
             startedAt = session.firstTs,
             lastAt = session.lastTs,
             durationMillis = session.activeMillis ?: (session.lastTs - session.firstTs).inWholeMilliseconds,
@@ -86,7 +87,8 @@ internal class TuiSessionsReader(
             costIncomplete = !session.isCostComplete,
             throughput = session.throughput,
             contextTokens = session.liveContextTokens.takeIf { tokens -> tokens > 0L },
-            contextWindow = ModelContextWindowTable.forModel(session.liveContextModel ?: session.primaryModel)
+            contextWindow = ModelContextWindowTable.forModel(session.liveContextModel ?: session.primaryModel),
+            modelMix = session.modelMix
         )
 
     /** O Codex não tem tarifa no app: custo `null`, nunca zero. */
@@ -95,7 +97,7 @@ internal class TuiSessionsReader(
             id = session.sessionId,
             source = ApiSource.CODEX,
             project = session.projectName,
-            model = session.primaryModel,
+            model = session.modelMix.leadingModel ?: session.primaryModel,
             startedAt = session.firstTs,
             lastAt = session.lastTs,
             durationMillis = (session.lastTs - session.firstTs).inWholeMilliseconds,
@@ -106,7 +108,8 @@ internal class TuiSessionsReader(
             cacheWriteTokens = session.cacheWriteInputTokens,
             costMicros = null,
             costIncomplete = false,
-            throughput = session.throughput
+            throughput = session.throughput,
+            modelMix = session.modelMix
         )
 
     private fun turnsOf(session: TuiSession): List<TuiTurn> =
