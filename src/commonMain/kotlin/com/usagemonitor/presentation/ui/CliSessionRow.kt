@@ -316,6 +316,14 @@ internal fun CliSessionRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+
+            // Terceira linha (#445): quais modelos a sessão usou e quanto cada um
+            // pesou. Como coluna estouraria o orçamento de largura acima.
+            SessionModelMixLine(
+                mix = session.modelMix,
+                language = language,
+                modifier = Modifier.testTag(sessionModelMixLineTag(session.sessionId))
+            )
         }
 
         // Fora do fluxo de colunas, como nas listas de time e de presença: lá

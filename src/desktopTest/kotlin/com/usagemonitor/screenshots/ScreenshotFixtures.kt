@@ -14,6 +14,8 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.toUsageBreakdown
+import com.usagemonitor.domain.entity.CliUsageBucket
+import com.usagemonitor.domain.entity.toModelBreakdown
 import com.usagemonitor.domain.entity.DeepSeekQuotaLabels
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.PeriodType
@@ -72,6 +74,7 @@ internal object ScreenshotFixtures {
     /** Janela de contexto de 1M: a única forma de a saturação ser conhecida. */
     const val OPUS = "claude-opus-5"
     const val SONNET = "claude-sonnet-5"
+    const val HAIKU = "claude-haiku-4-5"
 
     private const val PRIMARY_PROFILE_ID = "default"
     private const val SECONDARY_PROFILE_ID = "sandbox"
@@ -393,7 +396,19 @@ internal object ScreenshotFixtures {
         liveContextTokens: Long,
         startedHoursAgo: Int,
         lastMinutesAgo: Int,
-        activeMillis: Long
+        activeMillis: Long,
+        // Corte por modelo da linha (#445); o padrão é a sessão inteira num modelo só.
+        modelBreakdown: List<CliUsageBucket> = listOf(
+            CliUsageGroupRow(
+                sessionId = id,
+                model = model,
+                turnCount = turnCount,
+                inputTokens = inputTokens,
+                outputTokens = outputTokens,
+                cacheReadTokens = cacheReadTokens,
+                cacheWrite5mTokens = cacheWriteTokens
+            )
+        ).toUsageBreakdown().byModel
     ) = CliSessionSummary(
         sessionId = id,
         filePath = "$cwd/.claude/$id.jsonl",
@@ -414,8 +429,54 @@ internal object ScreenshotFixtures {
         liveContextModel = model,
         activeMillis = activeMillis,
         // Vazão sintética entre 80 e 119 tok/s, perto da mediana medida (95, #381).
-        throughput = OutputThroughput(outputTokens, outputTokens * 1_000L / (80L + turnCount % 40))
+        throughput = OutputThroughput(outputTokens, outputTokens * 1_000L / (80L + turnCount % 40)),
+        modelBreakdown = modelBreakdown
     )
+
+    private const val SATURATED_SESSION_ID = "7c4a1f92d8b3"
+
+    /**
+     * Os turnos da sessão saturada: a thread principal no Opus e três subagentes
+     * no Haiku (#445), como numa sessão real que troca de modelo.
+     */
+    private val saturatedTurns: List<CliSessionTurn> = buildList {
+        val contextGrowth = listOf(
+            12_000L, 38_000L, 71_000L, 96_000L, 134_000L, 178_000L,
+            221_000L, 268_000L, 310_000L, 366_000L, 402_000L, 458_000L,
+            505_000L, 548_000L, 601_000L, 654_000L, 688_000L, 720_000L
+        )
+        contextGrowth.forEachIndexed { index, cacheRead ->
+            add(
+                CliSessionTurn(
+                    sessionId = SATURATED_SESSION_ID,
+                    seq = index,
+                    messageId = "msg-$index",
+                    ts = NOW.minusMinutes((contextGrowth.size - index) * 13),
+                    model = OPUS,
+                    inputTokens = 620L + index * 40L,
+                    outputTokens = 1_180L + index * 95L,
+                    cacheReadTokens = cacheRead,
+                    cacheWrite5mTokens = 9_400L + index * 320L
+                )
+            )
+        }
+        listOf(4, 9, 14).forEachIndexed { offset, index ->
+            add(
+                CliSessionTurn(
+                    sessionId = SATURATED_SESSION_ID,
+                    seq = contextGrowth.size + offset,
+                    messageId = "sub-$offset",
+                    ts = NOW.minusMinutes((contextGrowth.size - index) * 13 - 4),
+                    model = HAIKU,
+                    isSidechain = true,
+                    inputTokens = 2_400L,
+                    outputTokens = 3_800L,
+                    cacheReadTokens = 210_000L,
+                    cacheWrite5mTokens = 26_000L
+                )
+            )
+        }
+    }
 
     /**
      * Saturada: 720K de contexto vivo numa janela de 1M.
@@ -425,21 +486,24 @@ internal object ScreenshotFixtures {
      * imagem passariam por erro da app.
      */
     val saturatedSession = session(
-        id = "7c4a1f92d8b3",
+        id = SATURATED_SESSION_ID,
         cwd = "/home/dev/api-gateway",
         branch = "feat/checkout",
         host = "DESKTOP-A1",
         model = OPUS,
         turnCount = 48,
-        inputTokens = 31_400L,
-        outputTokens = 62_800L,
-        cacheReadTokens = 4_120_000L,
-        cacheWriteTokens = 186_000L,
-        costMicros = 5_479_200L,
+        // Tokens e custo saem dos turnos: o detalhe mostra o resumo e a tabela de
+        // modelos (#445) lado a lado, e números diferentes passariam por erro da app.
+        inputTokens = saturatedTurns.sumOf { turn -> turn.inputTokens },
+        outputTokens = saturatedTurns.sumOf { turn -> turn.outputTokens },
+        cacheReadTokens = saturatedTurns.sumOf { turn -> turn.cacheReadTokens },
+        cacheWriteTokens = saturatedTurns.sumOf { turn -> turn.cacheWriteTokens },
+        costMicros = saturatedTurns.sumOf { turn -> turn.costMicros ?: 0L },
         liveContextTokens = 720_000L,
         startedHoursAgo = 4,
         lastMinutesAgo = 2,
-        activeMillis = 8_040_000L
+        activeMillis = 8_040_000L,
+        modelBreakdown = saturatedTurns.toModelBreakdown()
     )
 
     /** Em atenção: 460K numa janela de 1M. */
@@ -578,28 +642,7 @@ internal object ScreenshotFixtures {
      */
     val saturatedSessionDetail: CliSessionDetail = CliSessionDetail(
         summary = saturatedSession,
-        turns = buildList {
-            val contextGrowth = listOf(
-                12_000L, 38_000L, 71_000L, 96_000L, 134_000L, 178_000L,
-                221_000L, 268_000L, 310_000L, 366_000L, 402_000L, 458_000L,
-                505_000L, 548_000L, 601_000L, 654_000L, 688_000L, 720_000L
-            )
-            contextGrowth.forEachIndexed { index, cacheRead ->
-                add(
-                    CliSessionTurn(
-                        sessionId = saturatedSession.sessionId,
-                        seq = index,
-                        messageId = "msg-$index",
-                        ts = NOW.minusMinutes((contextGrowth.size - index) * 13),
-                        model = OPUS,
-                        inputTokens = 620L + index * 40L,
-                        outputTokens = 1_180L + index * 95L,
-                        cacheReadTokens = cacheRead,
-                        cacheWrite5mTokens = 9_400L + index * 320L
-                    )
-                )
-            }
-        }
+        turns = saturatedTurns
     )
 
     // --- Sessões do time -----------------------------------------------------

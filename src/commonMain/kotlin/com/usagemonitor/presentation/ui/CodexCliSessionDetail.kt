@@ -104,6 +104,14 @@ internal fun CodexCliSessionDetailPane(
             )
         }
 
+        // Sem tarifa do Codex no app: a fatia é dos tokens e a coluna de custo some (#445).
+        SessionModelTable(
+            mix = summary.modelMix,
+            language = language,
+            markerColor = AppAccents.current.codex,
+            showCost = false
+        )
+
         if (detail.turns.isNotEmpty()) {
             CodexTurnChartGrid(analytics, language)
         }

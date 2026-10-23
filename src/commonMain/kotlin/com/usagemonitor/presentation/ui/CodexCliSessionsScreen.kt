@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
@@ -390,6 +391,16 @@ private fun CodexCliSessionRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // A coluna Modelo já diz o modelo de uma sessão de modelo único; a
+                // mistura só entra quando houve troca (#445).
+                val mix = session.modelMix
+                if (mix.shares.size > 1) {
+                    SessionModelMixLine(
+                        mix = mix,
+                        language = language,
+                        modifier = Modifier.testTag(sessionModelMixLineTag(session.sessionId))
+                    )
+                }
             }
         }
     }

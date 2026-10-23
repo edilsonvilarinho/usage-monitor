@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
@@ -38,6 +40,9 @@ import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.CliSessionsContent
 import com.usagemonitor.presentation.ui.cliSessionStalledTag
+import com.usagemonitor.presentation.ui.sessionModelMixLineTag
+import com.usagemonitor.presentation.ui.SESSION_MODEL_ROW_TAG_PREFIX
+import com.usagemonitor.presentation.ui.SESSION_MODEL_TABLE_TAG
 import com.usagemonitor.presentation.ui.TOTAL_SESSIONS_BLOCK_TAG
 import com.usagemonitor.presentation.ui.DETAIL_SCROLLBAR_TAG
 import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
@@ -431,6 +436,98 @@ class CliSessionsScreenTest {
     }
 
     @Test
+    fun `the list row names the models of the session with their share`() = runDesktopComposeUiTest {
+        val session = summary("session-abcdef01").copy(
+            modelBreakdown = listOf(
+                CliUsageGroupRow(sessionId = "session-abcdef01", model = "claude-opus-5", turnCount = 3, outputTokens = 1_000_000L),
+                CliUsageGroupRow(sessionId = "session-abcdef01", model = "claude-unknown-9", turnCount = 1, outputTokens = 1_000L)
+            ).toUsageBreakdown().byModel
+        )
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(session)),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // A fatia é do custo; o modelo sem tarifa leva a palavra, nunca 0% (#445).
+        onNodeWithTag(sessionModelMixLineTag("session-abcdef01"), useUnmergedTree = true)
+            .assertTextEquals("Modelos (% do custo): claude-opus-5 100% · claude-unknown-9 sem tarifa")
+    }
+
+    @Test
+    fun `the list row without a model breakdown draws no model line`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = listOf(summary("session-abcdef01"))),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(sessionModelMixLineTag("session-abcdef01"), useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `detail lists each model of the session with cache read and write`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01", costMicros = 5_000_000L)
+        val detail = CliSessionDetail(
+            summary = summary,
+            turns = listOf(
+                turn(seq = 1, cacheReadTokens = 10_000L, cacheWrite1hTokens = 4_000L, model = "claude-opus-5"),
+                turn(seq = 2, cacheReadTokens = 30_000L, cacheWrite5mTokens = 2_000L, model = "claude-haiku-4-5"),
+                turn(seq = 3, cacheReadTokens = 20_000L, model = "claude-opus-5")
+            )
+        )
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(1_400.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag(SESSION_MODEL_TABLE_TAG).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Modelos da sessão").assertExists()
+        onNodeWithText("2 modelos · participação no custo estimado").assertExists()
+        // Opus primeiro: a ordem é pela fatia do custo.
+        onNodeWithTag("${SESSION_MODEL_ROW_TAG_PREFIX}claude-opus-5")
+            .assert(hasAnyDescendant(hasText("2")))
+            .assert(hasAnyDescendant(hasText("30K")))
+        onNodeWithTag("${SESSION_MODEL_ROW_TAG_PREFIX}claude-haiku-4-5")
+            .assert(hasAnyDescendant(hasText("2K")))
+    }
+
+    @Test
     fun `the list row reports an unknown window instead of guessing one`() = runDesktopComposeUiTest {
         setContent {
             ScreenTestTheme(isDark = true) {
@@ -695,9 +792,11 @@ class CliSessionsScreenTest {
 
         // O essencial: veredito, resumo e a grade de gráficos por turno (#393, T3).
         onNodeWithText("Sessão saudável").assertIsDisplayed()
-        // "Custo" é o bloco do resumo e também a legenda do gráfico de custo da grade.
-        onAllNodesWithText("Custo").assertCountEquals(2)
-        onNodeWithText("Tokens (com cache)").assertExists()
+        // "Custo" é o bloco do resumo, a legenda do gráfico de custo da grade e a
+        // coluna da tabela de modelos da sessão (#445).
+        onAllNodesWithText("Custo").assertCountEquals(3)
+        // O bloco do resumo e a coluna da tabela de modelos da sessão (#445).
+        onAllNodesWithText("Tokens (com cache)").assertCountEquals(2)
         onNodeWithTag(CLI_TURN_CHART_GRID_TAG).assertExists()
         onNodeWithText("Contexto por turno").assertExists()
         onNodeWithText("Saída por turno").assertExists()
@@ -739,7 +838,8 @@ class CliSessionsScreenTest {
             }
         }
 
-        onNodeWithText("Avançado").performClick()
+        // A tabela de modelos da sessão (#445) empurra o cabeçalho para baixo da dobra.
+        onNodeWithText("Avançado").performScrollTo().performClick()
 
         assertEquals(true, toggled)
     }
@@ -1463,14 +1563,15 @@ class CliSessionsScreenTest {
         seq: Int,
         cacheReadTokens: Long = 0L,
         cacheWrite5mTokens: Long = 0L,
-        cacheWrite1hTokens: Long = 0L
+        cacheWrite1hTokens: Long = 0L,
+        model: String = "claude-opus-5"
     ): CliSessionTurn {
         return CliSessionTurn(
             sessionId = "session-abcdef01",
             seq = seq,
             messageId = "msg-$seq",
             ts = Instant.parse("2026-08-01T10:0$seq:00Z"),
-            model = "claude-opus-5",
+            model = model,
             outputTokens = 500L,
             cacheReadTokens = cacheReadTokens,
             cacheWrite5mTokens = cacheWrite5mTokens,

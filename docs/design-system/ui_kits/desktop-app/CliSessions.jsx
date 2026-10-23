@@ -1,8 +1,8 @@
 const { AppWindowFrame, AppToolbar, AppTabs, AppSegmentedControl, AppTextField, AppButton, AppPanel, AppPanelHeader, AppPanelBody, AppDataRow, AppKey, AppValue, AppStatusIndicator, AppColumnHeader, AppDataTable, AppMetric, AppEmptyState, AppSourceMark } = DS;
 
 const SESSIONS = [
-  { id: '7c4a1f92', projeto: 'api-gateway', branch: 'feat/rate-limit', modelo: 'sonnet-4-5', turnos: 48, tokens: '1 284 000', custo: 'US$ 3,1841', ativo: '2h 41m', vazao: '94 tok/s', saude: 'crit', veredito: 'Saturada' },
-  { id: 'b81e35c0', projeto: 'checkout-web', branch: 'main', modelo: 'sonnet-4-5', turnos: 26, tokens: '612 400', custo: 'US$ 1,6279', ativo: '1h 08m', vazao: '118 tok/s', saude: 'warn', veredito: 'Atenção' },
+  { id: '7c4a1f92', projeto: 'api-gateway', branch: 'feat/rate-limit', modelo: 'sonnet-4-5', turnos: 48, tokens: '1 284 000', custo: 'US$ 3,1841', ativo: '2h 41m', vazao: '94 tok/s', saude: 'crit', veredito: 'Saturada', mix: 'sonnet-4-5 78% · opus-4-1 19% · haiku-4-5 3%' },
+  { id: 'b81e35c0', projeto: 'checkout-web', branch: 'main', modelo: 'sonnet-4-5', turnos: 26, tokens: '612 400', custo: 'US$ 1,6279', ativo: '1h 08m', vazao: '118 tok/s', saude: 'warn', veredito: 'Atenção', mix: 'sonnet-4-5 100%' },
   { id: '3fd90a17', projeto: 'infra-terraform', branch: 'chore/tfsec', modelo: 'haiku-4-5', turnos: 12, tokens: '208 100', custo: 'US$ 0,1904', ativo: '0h 22m', vazao: '87 tok/s', saude: 'ok', veredito: 'Saudável' },
   { id: 'e02b7c44', projeto: 'api-gateway', branch: 'fix/timeout', modelo: 'opus-4-1', turnos: 9, tokens: '164 900', custo: 'US$ 2,4730', ativo: '0h 31m', vazao: '101 tok/s', saude: 'ok', veredito: 'Saudável' },
   { id: 'a5518d6b', projeto: 'docs-portal', branch: 'main', modelo: 'sonnet-4-5-legacy', turnos: 5, tokens: '61 200', custo: 'US$ 0,1620', ativo: '0h 14m', vazao: '—', saude: null, veredito: '—' }
@@ -10,9 +10,12 @@ const SESSIONS = [
 
 const COLS = [{ label: 'Sessão', flex: 2, width: 150 }, { label: 'Modelo', width: 112 }, { label: 'Turnos', width: 54, align: 'right' }, { label: 'Tokens', width: 84, align: 'right' }, { label: 'Custo', width: 84, align: 'right' }, { label: 'Ativo', width: 54, align: 'right' }, { label: 'Saúde', width: 88, align: 'right' }];
 
+// #445: a mistura de modelos da sessão desce para uma linha própria, como no
+// Compose: "Modelos (% do custo): …". Sem o corte lido (time antigo), não aparece.
 function SessionRow({ s, last, onOpen }) {
   return (
-    <AppDataRow last={last} onClick={onOpen} style={{ gap: 'var(--s2)' }}>
+    <AppDataRow last={last} onClick={onOpen} style={{ gap: 'var(--s1)', flexDirection: 'column', alignItems: 'stretch' }}>
+    <div style={{ display: 'flex', gap: 'var(--s2)', alignItems: 'center' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 2, minWidth: 150, overflow: 'hidden' }}>
         <AppValue size="sm">{s.id}</AppValue>
         <AppKey>{s.projeto} · {s.branch}</AppKey>
@@ -30,6 +33,8 @@ function SessionRow({ s, last, onOpen }) {
           <AppKey dim>sem veredito</AppKey>
         )}
       </span>
+    </div>
+    {s.mix ? <AppKey>Modelos (% do custo): {s.mix}</AppKey> : null}
     </AppDataRow>
   );
 }

@@ -29,6 +29,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.sessionModelMixOf
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -198,6 +199,14 @@ internal fun CliSessionDetailSections(
     }
 
     SessionSummaryRow(summary = summary, analytics = analytics, language = language)
+
+    // Fora do Avançado de propósito (#445): qual modelo pesou é parte da resposta
+    // a "por que esta sessão gastou tanto", não apuração.
+    SessionModelTable(
+        mix = sessionModelMixOf(analytics.modelBreakdown),
+        language = language,
+        markerColor = AppAccents.current.input
+    )
 
     if (missingTurnsNotice == null) {
         ClaudeTurnChartGrid(analytics = analytics, language = language)

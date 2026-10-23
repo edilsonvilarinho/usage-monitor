@@ -5,6 +5,8 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.CLI_TURN_CHART_GRID_TAG
 import com.usagemonitor.presentation.ui.CODEX_TURN_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.CodexCliSessionDetailPane
+import com.usagemonitor.presentation.ui.SESSION_MODEL_ROW_TAG_PREFIX
+import com.usagemonitor.presentation.ui.SESSION_MODEL_TABLE_TAG
 import com.usagemonitor.presentation.ui.formatQuantity
 import com.usagemonitor.screenshots.codexDetailFixture
 import kotlin.test.Test
@@ -40,5 +42,17 @@ class CodexCliSessionDetailTest {
         // Resposta 0 não tem vazão medida (múltiplo de 17): "—", nunca "0 tok/s".
         onNode(hasText("—") and hasAnyAncestor(hasTestTag("${CODEX_TURN_ROW_TAG_PREFIX}0")), useUnmergedTree = true).assertExists()
         onAllNodesWithText("resp_", substring = true, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `detail splits the session by model on a token basis without cost`() = runDesktopComposeUiTest(width = 1060, height = 1400) {
+        setContent { ScreenTestTheme(isDark = true) { CodexCliSessionDetailPane(codexDetailFixture(), AppLanguage.PT, {}) } }
+        onNodeWithTag(SESSION_MODEL_TABLE_TAG).performScrollTo().assertIsDisplayed()
+        // Sem tarifa do Codex no app: a fatia é dos tokens, e não há coluna de custo (#445).
+        onNodeWithText("2 modelos · participação nos tokens, sem tarifa").assertExists()
+        onNodeWithText("% dos tokens").assertExists()
+        onNodeWithTag("${SESSION_MODEL_ROW_TAG_PREFIX}gpt-6.1-sol").assertExists()
+        onNodeWithTag("${SESSION_MODEL_ROW_TAG_PREFIX}gpt-6.1-sol-mini").assertExists()
+        onAllNodesWithText("Custo").assertCountEquals(0)
     }
 }
