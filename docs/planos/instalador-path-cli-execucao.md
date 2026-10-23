@@ -34,12 +34,52 @@ essa decisão: o instalador passa a registrar a pasta, uma vez, e a desinstalaç
 - **Transmissão de `WM_SETTINGCHANGE`** para que terminais abertos vejam a mudança; quem já estava aberto
   continua sem a entrada até reabrir.
 
+## Revisão do PR #456 (2026-10-23, Claude Opus 5.5)
+
+Revisão pedida pelo usuário depois do merge, antes de qualquer release (`git tag --contains 8a18345b`: vazio).
+O CI verde provou o caso feliz, mas três defeitos ficaram fora do S10:
+
+- **D1 — PATH longo é apagado (grave).** O build oficial do NSIS, o que o CI e a release instalam por
+  `choco install nsis`, guarda strings de até 1024 caracteres (`NSIS_MAX_STRLEN`; o build de 8192 é especial).
+  Valor maior faz o `ReadRegStr` devolver vazio com erro, e o código mergeado lia isso como "Path ausente":
+  a instalação gravaria `Path = <pasta>`, **apagando o PATH do usuário**, e a desinstalação gravaria um valor
+  truncado. O teto de 1900 nunca disparava, porque a string composta já sai cortada em 1023.
+- **D2 — instalador ANSI.** O `.nsi` não declara `Unicode true`. O `ReadRegStr` ANSI converte o PATH para a
+  página de código do sistema: entrada com caractere fora dela volta com `?` ou trocada por "best-fit" e é
+  regravada assim.
+- **D3 — presença só pelo fim.** Outro programa que acrescente ao PATH depois da instalação tira a entrada do
+  fim: a próxima atualização automática acrescenta uma segunda, e a desinstalação deixa a primeira apontando
+  para uma pasta apagada.
+- **Registro corrigido:** a incidência 1 da A02 não foi "versão do NSIS que não aceita a macro". O StrFunc se
+  declara com `${StrLoc}` sozinho na linha, não com `!insertmacro StrLoc`. A nova implementação não usa StrFunc.
+- **Fechamento que faltava na A02:** run `40020272886` verde (`installer-windows`: `Verificacoes: 54 Falhas: 0`),
+  PR #456 mergeado em `8a18345b`.
+
+### Decisões da correção
+
+- **`Unicode true`** no instalador inteiro. O script e o `license.txt` são ASCII (verificado byte a byte), e os
+  `languages/*.nsh` não são incluídos, então nenhum texto existente muda de codificação.
+- **Leitura com guarda de tamanho.** O tamanho do valor sai de `RegGetValueW` (`RRF_NOEXPAND`) antes do
+  `ReadRegStr`. Valor que não cabe inteiro no buffer, de tipo inesperado ou que dê erro de leitura: a instalação
+  e a desinstalação **não tocam** o PATH. Valor final que não caiba: a instalação não grava.
+- **Membro por entrada exata.** O PATH é varrido entrada a entrada (separador `;`, comparação sem caixa, como o
+  Windows compara caminhos). A instalação não acrescenta se a pasta estiver em qualquer posição. A
+  desinstalação tira todas as entradas iguais à pasta, e as demais, vazias inclusive, ficam byte a byte.
+- **Ponto e vírgula final preservado.** `A;` vira `A;<pasta>;`, e a desinstalação devolve `A;`: nem entrada
+  vazia no meio (que ferramentas do MSYS leem como diretório corrente), nem perda do formato original.
+- **Limitação aceita:** com o build de 1024, um PATH de usuário acima de ~1000 caracteres não recebe a entrada.
+  O comando continua pelo caminho completo (README). Remover essa limitação exige o build especial do NSIS ou
+  escrever o PATH fora do NSIS. Isso fica como decisão separada.
+
 ## Atividades
 
 | ID | Atividade | Commit esperado |
 |---|---|---|
 | A01 | Plano de execução e worktree própria | `docs(installer): plan the user PATH entry for the CLI` |
 | A02 | NSIS grava e remove a entrada do `PATH` do usuário; cenário S10 no roteiro do CI; documentação atualizada | `feat(installer): add the install folder to the user PATH` |
+| A03 | Revisão do PR #456 registrada neste plano (D1–D3) | `docs(installer): record the review of the user PATH entry` |
+| A04 | Instalador em Unicode; cenário com entrada fora da página de código | `fix(installer): build the installer as Unicode` |
+| A05 | Leitura do PATH com guarda de tamanho, membro e remoção por entrada exata; cenários de PATH longo, entrada no meio e valor ausente; docs | `fix(installer): never rewrite a user PATH the installer cannot hold` |
 
 ## Pontos de situação
 
@@ -47,6 +87,9 @@ essa decisão: o instalador passa a registrar a pasta, uma vez, e a desinstalaç
 |---|---|---|---|---|
 | A01 | 2026-10-23 | este commit | concluída | `git worktree add ../usage-monitor-cli-path -b fix/instalador-path-cli main`. Plano criado. Sem código. |
 | A02 | 2026-10-23 | `26c8d3f6` | incidência 1 no `installer-windows` (run `40018581344`): `!insertmacro StrLoc` → `macro named "StrLoc" not found` na linha 418 do `.nsi`. Correção: sem StrFunc, presença checada pelo fim do valor; incidência 2 (run `40018973520`): S1–S8 passaram, S10 reprovou em `GetValue` com a string `DoNotExpandEnvironmentVariables` (o enum é `RegistryValueOptions`). O mesmo bloco marcava o restauro antes da leitura: uma falha ali faria o `finally` apagar o `Path`. Correção: enum e flag depois da leitura; incidência 3 (run `40019893379`): S10 passou no install/reinstall/uninstall, mas o "antes" foi lido no próprio S10, depois de S1–S8 deixarem a pasta no PATH (eles não desinstalam). Correção: foto do PATH movida para antes do S1, dentro do `try`, então o `finally` restaura o valor da rodada | `Invoke-UpdateScenarios.ps1` ganha S10 (PATH uma vez, reinstalação sem repetir, desinstalação devolve o valor bruto, restaurado no `finally`). Sem NSIS/PowerShell/Windows nesta máquina: nada compilado nem executado localmente. |
+| A03 | 2026-10-23 | este commit | concluída | `git worktree add ../usage-monitor-path-review -b fix/instalador-path-revisao origin/main`. Revisão do diff de `6574fdff..8a18345b`; limite de 1024 do build oficial confirmado em documentação do NSIS e em relatos de PATH corrompido (Red Hat #1090075, OpenVPN). Sem código. |
+| A04 | 2026-10-23 | `ef154259` | concluída: run `40021705190` verde, `installer-windows` com `Verificacoes: 77 Falhas: 0` (S10–S14 inclusos), `ci-ok` verde, 0 incidências | `Unicode true` no topo do `.nsi`; `LC_ALL=C grep -cP '[^\x00-\x7F]'` no `.nsi` e no `license.txt`: 0 linhas. S11 semeia `C:\scenario\日本;%SystemRoot%\scenario` e exige o valor byte a byte (`-ceq`, helper `Assert-UserPathExactly`) depois de instalar e de desinstalar; S10 passa a comparar o baseline com `-ceq`. Sem NSIS/PowerShell nesta máquina. |
+| A05 | 2026-10-23 | ver PR #457 | concluída: run `40021705190` verde, `installer-windows` com `Verificacoes: 77 Falhas: 0` (S10–S14 inclusos), `ci-ok` verde, 0 incidências | `.nsi`: `ReadUserPath` (tamanho por `RegGetValueW` com `RRF_NOEXPAND`, recusa acima de `NSIS_MAX_STRLEN`, `ReadRegStr` com `ClearErrors`), `UserPathWithoutInstallDir` (varredura por entrada, sem caixa), ambas geradas para instalador e desinstalador por macro. Cenários S12 (pasta no meio, `;` final), S13 (PATH de ~9800 caracteres, com e sem a pasta, intacto) e S14 (sem valor `Path`). README EN/PT e `build-and-release.md` dizem o limite de ~1000 caracteres. Sem NSIS/PowerShell nesta máquina. |
 
 ## Riscos
 

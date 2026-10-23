@@ -1,3 +1,10 @@
+; Unicode: o instalador le e regrava o PATH do usuario, que o registro guarda em
+; UTF-16. No modo ANSI o ReadRegStr converte para a pagina de codigo do sistema, e
+; uma entrada com caractere fora dela voltaria com `?` (ou trocada por "best-fit")
+; e seria regravada assim. Este script e o license.txt sao ASCII, entao nada
+; existente muda de codificacao.
+Unicode true
+
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
@@ -406,67 +413,156 @@ receiptDone:
 FunctionEnd
 
 ; PATH do usuario para o comando de linha (#418): sem a pasta no PATH, o
-; `usage-monitor` so roda pelo caminho completo do exe. Acrescenta a pasta de
-; instalacao ao FIM do Path de HKCU\Environment, uma vez: reinstalar ou atualizar
-; nao repete a entrada. So o valor do usuario e tocado -- o do sistema exige
-; administrador, e este instalador roda como usuario.
+; `usage-monitor` so roda pelo caminho completo do exe. A instalacao acrescenta a
+; pasta ao fim de HKCU\Environment\Path quando ela nao esta em nenhuma posicao; a
+; desinstalacao tira toda entrada igual a ela. So o valor do usuario e tocado -- o
+; do sistema exige administrador, e este instalador roda como usuario.
 ;
-; A presenca e checada pelo FIM do valor, a mesma invariante que a desinstalacao
-; usa: a entrada que este instalador grava fica no fim. Uma entrada que o usuario
-; levou para o meio nao e reconhecida, e a reinstalacao acrescenta outra -- aceito,
-; porque checar por substring exigiria macro do StrFunc, e a versao do NSIS do CI
-; nao aceitou a dele.
+; Regra de seguranca: o NSIS guarda strings de ate NSIS_MAX_STRLEN caracteres (1024
+; no build oficial, o que o CI e a release instalam). Valor maior faz o ReadRegStr
+; devolver vazio, e regravar a partir disso APAGARIA o PATH do usuario. Por isso o
+; tamanho sai antes, do RegGetValueW, e valor que nao cabe inteiro nao e tocado nem
+; na instalacao nem na desinstalacao. Revisao do PR #456 em
+; docs/planos/instalador-path-cli-execucao.md.
 ;
-; O teto de 1900 caracteres e folga contra o limite de string do NSIS: um Path
-; truncado seria pior do que nao acrescentar. Acima do teto a entrada fica de
-; fora e o instalador avisa.
-Function AddInstallDirToUserPath
-    ReadRegStr $R7 HKCU "Environment" "Path"
-    StrCpy $R8 ";$R7;"
-    StrLen $R9 ";$INSTDIR;"
-    StrCpy $R5 $R8 "" -$R9
-    ${If} $R5 == ";$INSTDIR;"
-        DetailPrint "PATH do usuario ja termina com a pasta de instalacao."
+; Registradores: as funcoes abaixo usam $R0-$R8 livremente. Quem chama nao guarda
+; nada neles (a Section so le $R5/$R6 depois de grava-los).
+
+!define HKCU_ROOT 0x80000001
+; RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ | RRF_NOEXPAND: valor bruto, %VAR% sem expandir.
+!define RRF_RAW_STRING 0x10000006
+
+; WM_SETTINGCHANGE avisa as janelas abertas; um terminal ja aberto so ve a mudanca
+; depois de reaberto. HWND_BROADCAST = 0xFFFF, WM_SETTINGCHANGE = 0x1A,
+; SMTO_ABORTIFHUNG = 0x2.
+!macro BROADCAST_ENVIRONMENT_CHANGE
+    System::Call 'user32::SendMessageTimeout(p 0xFFFF, i 0x1A, p 0, t "Environment", i 0x2, i 5000, *p .R0)'
+!macroend
+
+!macro USER_PATH_FUNCTIONS UN
+; Le o Path bruto em $R7. $R6 = "ok", "missing" (valor ausente) ou "unsafe" (nao
+; cabe inteiro numa string do NSIS, tipo inesperado ou erro de leitura).
+Function ${UN}ReadUserPath
+    StrCpy $R7 ""
+    System::Call 'advapi32::RegGetValueW(p ${HKCU_ROOT}, w "Environment", w "Path", i ${RRF_RAW_STRING}, p 0, p 0, *i .R1) i .R0'
+    ${If} $R0 = 2
+        ; ERROR_FILE_NOT_FOUND
+        StrCpy $R6 "missing"
         Return
     ${EndIf}
-    ${If} $R7 == ""
-        StrCpy $R8 "$INSTDIR"
-    ${Else}
-        StrCpy $R8 "$R7;$INSTDIR"
+    ${If} $R0 <> 0
+        StrCpy $R6 "unsafe"
+        Return
     ${EndIf}
-    StrLen $R9 $R8
-    ${If} $R9 > 1900
+    ; $R1 = bytes em UTF-16 com o terminador; dividido por 2, caracteres com o
+    ; terminador -- a mesma conta do buffer do ReadRegStr.
+    IntOp $R1 $R1 / 2
+    ${If} $R1 > ${NSIS_MAX_STRLEN}
+        StrCpy $R6 "unsafe"
+        Return
+    ${EndIf}
+    ClearErrors
+    ReadRegStr $R7 HKCU "Environment" "Path"
+    ${If} ${Errors}
+        StrCpy $R7 ""
+        StrCpy $R6 "unsafe"
+        Return
+    ${EndIf}
+    StrCpy $R6 "ok"
+FunctionEnd
+
+; Copia $R7 para $R8 sem as entradas iguais a $INSTDIR (comparacao sem caixa, como
+; o Windows compara caminhos); $R5 = quantas sairam. As demais entradas, vazias
+; inclusive, ficam byte a byte e na mesma ordem.
+Function ${UN}UserPathWithoutInstallDir
+    StrCpy $R8 ""
+    StrCpy $R5 0
+    StrCpy $R4 $R7
+    StrCpy $R3 0
+nextEntry:
+    StrCpy $R2 0
+findSeparator:
+    StrCpy $R1 $R4 1 $R2
+    StrCmp $R1 "" entryFound
+    StrCmp $R1 ";" entryFound
+    IntOp $R2 $R2 + 1
+    Goto findSeparator
+entryFound:
+    StrCpy $R0 $R4 $R2
+    ${If} $R0 == $INSTDIR
+        IntOp $R5 $R5 + 1
+    ${ElseIf} $R3 = 1
+        StrCpy $R8 "$R8;$R0"
+    ${Else}
+        StrCpy $R8 $R0
+        StrCpy $R3 1
+    ${EndIf}
+    StrCmp $R1 "" entriesDone
+    IntOp $R2 $R2 + 1
+    StrCpy $R4 $R4 "" $R2
+    Goto nextEntry
+entriesDone:
+FunctionEnd
+!macroend
+
+!insertmacro USER_PATH_FUNCTIONS ""
+!insertmacro USER_PATH_FUNCTIONS "un."
+
+Function AddInstallDirToUserPath
+    Call ReadUserPath
+    ${If} $R6 == "unsafe"
+        DetailPrint "PATH do usuario grande demais para regravar inteiro: nao alterado."
+        Return
+    ${EndIf}
+    Call UserPathWithoutInstallDir
+    ${If} $R5 > 0
+        DetailPrint "PATH do usuario ja contem a pasta de instalacao."
+        Return
+    ${EndIf}
+    ; Tamanho final contado ANTES de compor: a string composta ja sairia cortada.
+    ; +2 cobre o separador e o ponto e virgula final do pior caso.
+    StrLen $R1 $R7
+    StrLen $R2 $INSTDIR
+    IntOp $R1 $R1 + $R2
+    IntOp $R1 $R1 + 2
+    ${If} $R1 >= ${NSIS_MAX_STRLEN}
         DetailPrint "PATH do usuario cheio: a pasta de instalacao nao foi adicionada."
         Return
     ${EndIf}
+    StrCpy $R1 $R7 "" -1
+    ${If} $R7 == ""
+        StrCpy $R8 "$INSTDIR"
+    ${ElseIf} $R1 == ";"
+        ; Quem termina com `;` continua assim: `A;` vira `A;<pasta>;`, e a
+        ; desinstalacao devolve `A;`. Sem entrada vazia no meio, que ferramentas
+        ; do MSYS leem como diretorio corrente.
+        StrCpy $R8 "$R7$INSTDIR;"
+    ${Else}
+        StrCpy $R8 "$R7;$INSTDIR"
+    ${EndIf}
     WriteRegExpandStr HKCU "Environment" "Path" $R8
-    ; WM_SETTINGCHANGE avisa as janelas abertas; um terminal ja aberto so ve a
-    ; mudanca depois de reaberto. HWND_BROADCAST = 0xFFFF, WM_SETTINGCHANGE = 0x1A,
-    ; SMTO_ABORTIFHUNG = 0x2.
-    System::Call 'user32::SendMessageTimeout(i 0xFFFF, i 0x1A, i 0, t "Environment", i 0x2, i 5000, *i .r9)'
+    !insertmacro BROADCAST_ENVIRONMENT_CHANGE
     DetailPrint "Pasta de instalacao adicionada ao PATH do usuario."
 FunctionEnd
 
-; Desfaz o que AddInstallDirToUserPath gravou. So tira a entrada quando ela esta
-; no FIM do Path, que e onde a instalacao a grava: entrada no meio ou no comeco
-; fica como esta, porque remover por posicao arriscaria corromper o Path do
-; usuario. Se o Path ficar vazio, o valor sai do registro.
+; Desfaz o que AddInstallDirToUserPath gravou, em qualquer posicao. Valor que nao
+; cabe inteiro fica como esta: a entrada que sobrar aponta para uma pasta que nao
+; existe mais, o que e inofensivo; regravar um valor cortado nao seria.
 Function un.RemoveInstallDirFromUserPath
-    ReadRegStr $R7 HKCU "Environment" "Path"
-    StrCpy $R8 ";$R7;"
-    StrLen $R9 ";$INSTDIR;"
-    StrCpy $R7 $R8 "" -$R9
-    ${If} $R7 != ";$INSTDIR;"
+    Call un.ReadUserPath
+    ${If} $R6 != "ok"
         Return
     ${EndIf}
-    StrCpy $R8 $R8 -$R9
-    StrCpy $R8 $R8 "" 1
+    Call un.UserPathWithoutInstallDir
+    ${If} $R5 = 0
+        Return
+    ${EndIf}
     ${If} $R8 == ""
         DeleteRegValue HKCU "Environment" "Path"
     ${Else}
         WriteRegExpandStr HKCU "Environment" "Path" $R8
     ${EndIf}
-    System::Call 'user32::SendMessageTimeout(i 0xFFFF, i 0x1A, i 0, t "Environment", i 0x2, i 5000, *i .r9)'
+    !insertmacro BROADCAST_ENVIRONMENT_CHANGE
 FunctionEnd
 
 ; -----------------------------------------------
