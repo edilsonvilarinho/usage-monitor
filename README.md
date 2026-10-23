@@ -176,8 +176,10 @@ usage-monitor service status
 ```
 
 Without options it opens the app, or brings the running one to the front. On Windows, use
-`usage-monitor.exe` from the install folder: `Usage Monitor.exe` is a windowed program, so its output
-never reaches the terminal. The installer does not add the folder to `PATH`:
+`usage-monitor.exe`: `Usage Monitor.exe` is a windowed program, so its output never reaches the terminal.
+The installer adds the install folder to your user `PATH` (`HKCU\Environment`), so a terminal opened after
+the install runs `usage-monitor --help`. Terminals already open do not see the change until reopened. If the
+folder did not fit in `PATH` (the value was already near its size limit), use the full path:
 
 ```powershell
 & "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --help

@@ -45,7 +45,7 @@ essa decisão: o instalador passa a registrar a pasta, uma vez, e a desinstalaç
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
 |---|---|---|---|---|
 | A01 | 2026-10-23 | este commit | concluída | `git worktree add ../usage-monitor-cli-path -b fix/instalador-path-cli main`. Plano criado. Sem código. |
-| A02 | — | — | pendente | — |
+| A02 | 2026-10-23 | este commit | código e docs prontos; validação no CI (`installer-windows`) pendente | `Invoke-UpdateScenarios.ps1` ganha S10 (PATH uma vez, reinstalação sem repetir, desinstalação devolve o valor bruto, restaurado no `finally`). Sem NSIS/PowerShell/Windows nesta máquina: nada compilado nem executado localmente. |
 
 ## Riscos
 
