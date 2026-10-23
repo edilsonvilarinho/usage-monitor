@@ -2,12 +2,12 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Aguardando a escolha do usuário — A00 concluída (plano e galeria); A01 em diante dependem da direção.`
+**Estado atual:** `Em andamento — A00 e A01 concluídas; A02 (Análise AH1) a seguir.`
 
 | Campo | Valor |
 | --- | --- |
 | Modelo | Claude Opus 5.5 (`claude-opus-5-5`) |
-| Ferramenta | Claude Code (CLI, Linux) |
+| Ferramenta | Claude Code (CLI, Linux; a suíte roda aqui com `-Dorg.gradle.java.home` no JDK 17, porque o Gradle global aponta para um JDK 8) |
 | Data | 2026-10-23 |
 | Branch | `feat/analysis-history-clarity-463` (worktree `../usage-monitor-463`) |
 | Autor dos commits | identidade temporária `claude`, trailer `Co-Authored-By: Claude Opus 5.5` |
@@ -35,32 +35,35 @@
 
 | # | Pergunta | Resposta |
 | --- | --- | --- |
-| U1 | Direção do app (AH1–AH5, pode combinar) | _pendente_ |
-| U2 | Direção do terminal (AI1–AI5, pode combinar) | _pendente_ |
+| U1 | Direção do app (AH1–AH5, pode combinar) | **AH1 · Diagonal do ritmo** (2026-10-23) |
+| U2 | Direção do terminal (AI1–AI5, pode combinar) | **AI1 a AI5, todas** (2026-10-23): aba Histórico vira a tabela de janelas (AI4) e `enter` abre o gráfico alto (AI1); aba nova Análise (AI2) com a corrida (AI3); comando `analysis` com a corrida (AI3); `status` e linha de status com a linha "tempo" (AI5) |
 
 ## Execução — uma atividade, um commit
-
-A00 não depende da escolha. As demais são o rascunho para a direção que vier e serão reescritas com ela.
 
 | # | Atividade |
 | --- | --- |
 | A00 | `docs`: plano e galeria AH/AI |
-| A01 | `fix(history)`: correções que valem para qualquer direção — eixo Y escrito na curva do Histórico (D1), `paceLabel` com uma casa abaixo de 10 (D3), rótulos sem corte (D6); teste de tela no arquivo da tela; protótipo e design system no mesmo commit |
-| A02 | `feat(analysis)`: janela Analysis na direção escolhida — uma escala por gráfico (D2), ritmo seguro só quando decide algo (D4), o gráfico da pergunta principal (D7); modelo puro testado em `commonTest`; Ajuda e GIF, protótipo, `presentation.md` e histórico da skill no mesmo commit |
-| A03 | `feat(history)`: janela History na direção escolhida — 5h e 7d sem rolagem (D5); mesmos registros de A02 |
-| A04 | `feat(cli)`: terminal na direção escolhida (D8) — função pura de tela (`TuiScreen`), glifos só da tabela, quatro paletas; `docs/design-system/cli/readme.md` e `prototipo-modo-cli.html` no mesmo commit |
+| A01 | `fix(history)`: correções que valem para qualquer direção — eixo Y escrito na curva do Histórico (D1), `paceLabel` com uma casa abaixo de 10 (D3), início da janela na lista sem corte (D6); protótipo e `presentation.md` no mesmo commit |
+| A02 | `feat(analysis)`: janela Analysis na direção AH1 — domínio `QuotaWindowPace.kt` (caminho da janela, fração do tempo, instante em que esgota), `AnalysisWindowView` com o caminho da janela aberta e das anteriores, gráfico da diagonal com frase (D7), ritmo seguro só na frase (D4), 24 h com uma escala e tok/s em faixa própria (D2), intervalos em %/h; a tabela "esta janela × anterior" sai (as anteriores ficam desenhadas atrás); Ajuda e GIF, protótipo, `presentation.md` e histórico da skill no mesmo commit |
+| A03 | `feat(history)`: janelas do Histórico na diagonal — 5h e 7d lado a lado (D5), uma janela escolhida por chip; série sem duração nominal conhecida (MiniMax intervalar, mensal) fica com a lista e o detalhe de antes |
+| A04 | `feat(cli)`: aba Histórico vira a tabela de janelas (AI4) e `enter` abre o gráfico alto da janela (AI1); design system do terminal e protótipo do CLI no mesmo commit |
+| A05 | `feat(cli)`: aba Análise (AI2) com a corrida esgotar × reiniciar (AI3), e o comando `usage-monitor analysis` com a mesma corrida (`--json` como contrato) |
+| A06 | `feat(cli)`: `status` e linha de status com a linha "tempo" da janela (AI5) |
 
 ## Pontos de situação
 
 | # | Data | Resultado | Comando e evidência |
 | --- | --- | --- | --- |
 | A00 | 2026-10-23 | concluída | galeria renderizada no Chrome headless (`--dump-dom`: 12 cartões, console sem erro); capturas conferidas — corrigidos a escala do eixo Y das 24 h, o detalhe esticado da AH2 e o alinhamento dos glifos do terminal (todo glifo fora do ASCII em célula de 1ch) |
+| A01 | 2026-10-23 | concluída | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.architecture.*"` (Linux): 1 470 testes, 0 falhas; testes novos de `buildValueLabels` (100/50/0) e `paceLabel` (0,3 %/h) |
 
 ## Problemas em aberto e riscos
 
-- **AH4** junta duas janelas: muda a navegação e os dois view models (`AnalysisViewModel`, `HistoryViewModel`); é a de
-  maior risco e esforço. `TeamUsageViewModel` e `DashboardViewModel` estão perto do teto de 800 linhas — a mudança não
-  deve passar por eles.
-- **AH3** depende de histórico suficiente (mínimo de 5 janelas anteriores); com menos, a faixa some e a tela diz isso.
+- **Seletor de conta do Histórico** (parte do D6): continua cortando o rótulo longo no botão; o menu mostra o nome completo.
+  Fica fora desta entrega.
+- **Início nominal da janela**: a diagonal usa reinício − duração (5 h ou 7 d), como a Análise já fazia. O Histórico
+  evitava o início nominal ("a API não informa"); a lista continua dizendo o início **observado**, e o eixo do gráfico
+  diz "início" e "reinício".
+- `TeamUsageViewModel` e `DashboardViewModel` estão perto do teto de 800 linhas — a mudança não passa por eles.
 - **Linux (X11)**: mudança em host de janela é aberta no Linux antes do merge, ou o PR diz o risco; a suíte só roda no
   Windows.

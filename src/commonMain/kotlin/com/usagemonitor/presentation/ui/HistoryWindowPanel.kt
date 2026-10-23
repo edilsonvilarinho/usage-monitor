@@ -132,11 +132,12 @@ private fun HistoryWindowListItem(
         highlighted = selected
     ) {
         Column(Modifier.fillMaxWidth()) {
+            // Duas linhas antes de cortar (#463): "23/10 15:09 BRT · atual" saía "· curre…".
             Text(
                 text = windowStartLabel(window, language),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
@@ -200,7 +201,7 @@ private fun HistoryWindowDetail(
                 HistoryMetricEntry(if (pt) "Ativa" else "Active", activeSpanLabel(window, language)),
                 HistoryMetricEntry(if (pt) "Pico" else "Peak", "${window.peakPercent} %"),
                 HistoryMetricEntry(if (pt) "Esgotou em" else "Exhausted after", exhaustionLabel(window)),
-                HistoryMetricEntry(if (pt) "Ritmo" else "Pace", paceLabel(window.averagePercentPerHour))
+                HistoryMetricEntry(if (pt) "Ritmo" else "Pace", paceLabel(window.averagePercentPerHour, language))
             ))
         }
         // Uma leitura só não forma curva: o gráfico seria um ponto solto.

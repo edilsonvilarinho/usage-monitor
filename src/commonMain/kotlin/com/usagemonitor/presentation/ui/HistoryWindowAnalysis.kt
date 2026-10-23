@@ -97,11 +97,19 @@ internal fun exhaustionLabel(window: QuotaWindowSummary): String {
     return formatElapsed(window.firstObservedAt, exhaustedAt)
 }
 
-internal fun paceLabel(percentPerHour: Double?): String {
+/**
+ * Ritmo em %/h. Abaixo de 10, uma casa (#463): arredondar ~0,3 para "0 %/h" dizia que
+ * uma semanal com pico de 94% não andou.
+ */
+internal fun paceLabel(percentPerHour: Double?, language: AppLanguage): String {
     if (percentPerHour == null) {
         return "—"
     }
-    return "${percentPerHour.roundToLong()} %/h"
+    if (percentPerHour >= 10.0) {
+        return "${percentPerHour.roundToLong()} %/h"
+    }
+    val tenths = (percentPerHour * 10.0).roundToLong()
+    return "${tenths / 10}${localized(language, ",", ".")}${tenths % 10} %/h"
 }
 
 internal fun hourlyPeakLabel(distribution: QuotaHourlyDistribution, language: AppLanguage): String {
