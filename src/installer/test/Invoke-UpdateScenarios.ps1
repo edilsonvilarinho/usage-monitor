@@ -495,6 +495,69 @@ $code = Invoke-Uninstaller -TargetDirectory $target
 Assert-Equal 'exit code da desinstalacao' 0 $code
 Assert-UserPathExactly 'desinstalacao devolve o valor semeado' $seeded
 
+# ------------------------------------------------------------------ S12
+
+Write-Host "`n== S12: pasta no meio do PATH e ponto e virgula final =="
+# Outro programa acrescentou depois da instalacao: a entrada saiu do fim. A
+# atualizacao nao pode duplica-la, e a desinstalacao tem de acha-la ali.
+$seeded = "C:\scenario\a;$target;C:\scenario\b;"
+Set-UserPathRaw $seeded
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'pasta no meio nao e duplicada' $seeded
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-UserPathExactly 'desinstalacao tira a pasta do meio e preserva o resto' 'C:\scenario\a;C:\scenario\b;'
+
+# Termina com `;`: a pasta entra antes do `;` final, sem entrada vazia no meio.
+Set-UserPathRaw 'C:\scenario\a;'
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'ponto e virgula final preservado' "C:\scenario\a;$target;"
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-UserPathExactly 'desinstalacao devolve o formato original' 'C:\scenario\a;'
+
+# ------------------------------------------------------------------ S13
+
+Write-Host "`n== S13: PATH maior do que o NSIS guarda nao e tocado =="
+# ~9800 caracteres: acima do NSIS_MAX_STRLEN do build oficial (1024) e do especial
+# (8192). Ate a revisao do #456, o ReadRegStr devolvia vazio aqui e a instalacao
+# gravava so a pasta, apagando o PATH inteiro.
+$longPath = (1..100 | ForEach-Object { 'C:\scenario\long\' + ('x' * 80) + $_ }) -join ';'
+Set-UserPathRaw $longPath
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'instalacao nao altera PATH longo' $longPath
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-UserPathExactly 'desinstalacao nao altera PATH longo' $longPath
+
+# A pasta ja esta no PATH longo: a desinstalacao tambem nao pode regravar um valor
+# que nao consegue ler inteiro. A entrada que sobra e inofensiva.
+Set-UserPathRaw "$longPath;$target"
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-UserPathExactly 'desinstalacao nao trunca PATH longo com a pasta' "$longPath;$target"
+
+# ------------------------------------------------------------------ S14
+
+Write-Host "`n== S14: sem valor Path no usuario =="
+Set-UserPathRaw $null
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'PATH criado so com a pasta' $target
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-Equal 'valor Path removido de novo' $true ($null -eq $script:UserEnvironment.GetValue('Path'))
+
 # ------------------------------------------------------------------ S9
 
 Write-Host "`n== S9: a rodada nao mata JVM alheia =="
