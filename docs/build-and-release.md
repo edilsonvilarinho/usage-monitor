@@ -107,6 +107,13 @@ the platform the suite ran on, and `--ci`, because a `desktopTest` restored from
 (`FROM-CACHE`, the case in #451 itself) carries the timestamp of the original run, older than the
 commit; the cache key covers the inputs, so the result still holds for the commit.
 
+Two rules from #461. A blocking gate (generator exit 1) becomes text in the summary and the HTML is still
+uploaded: the step runs under `bash -e`, so the exit code is captured with `|| status=$?`, and only another
+code (usage error, crash) turns the step red. And the inputs are downloaded **by artifact id**, never by
+name: after `gh run rerun --failed` the run holds one `test-reports` per attempt, and a download by name
+returned the first one. `desktop-windows` and `server` expose the id of their upload as a job output; an
+empty id skips the download, because an empty `artifact-ids` would download every artifact of the run.
+
 ## NSIS installer
 
 Lessons already paid for in this project:

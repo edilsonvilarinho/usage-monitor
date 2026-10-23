@@ -48,7 +48,8 @@ internal class TerminalConfigHarness(
         val applier = ConfigApplier(store)
         thread(isDaemon = true) {
             while (serving.get()) {
-                serveConfigRequests(channel, applier)
+                // A pilha vai para o `system-err` do XML: no CI é o que diz por que um pedido falhou (#460).
+                serveConfigRequests(channel, applier, onFailure = { error -> error.printStackTrace() })
                 Thread.sleep(10)
             }
         }

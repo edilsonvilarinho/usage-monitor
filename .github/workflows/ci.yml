@@ -147,6 +147,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
     runs-on: windows-latest
+    # O id do artefato desta tentativa, para o `test-report` (#461).
+    outputs:
+      test-reports-id: ${{ steps.upload-test-reports.outputs.artifact-id }}
 
     steps:
       - name: Checkout
@@ -209,6 +212,7 @@ jobs:
       # O `report.xml` do Kover vai junto: e o que o job `test-report` le. Suite
       # vermelha pula o passo de cobertura, e o XML simplesmente nao vem.
       - name: Upload test reports
+        id: upload-test-reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -442,6 +446,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
+    # O id do artefato desta tentativa, para o `test-report` (#461).
+    outputs:
+      test-reports-id: ${{ steps.upload-test-reports.outputs.artifact-id }}
 
     defaults:
       run:
@@ -477,6 +484,7 @@ jobs:
         run: node tools/ci/test-summary.mjs --title "Servidor de time" --glob "server/test-results/*.xml" --require
 
       - name: Upload test reports
+        id: upload-test-reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -503,17 +511,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Pelo id, e nao pelo nome (#461): depois de um `rerun --failed` o run tem
+      # um `test-reports` por tentativa, e o nome trazia o da primeira. Job que nao
+      # roda de novo guarda a saida da tentativa em que rodou, que e a do artefato
+      # certo. Id vazio (nada subiu, job pulado) pula o passo: `artifact-ids` vazio
+      # baixaria todos os artefatos do run.
       - name: Download desktop results
+        if: needs.desktop-windows.outputs.test-reports-id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: test-reports
+          artifact-ids: ${{ needs.desktop-windows.outputs.test-reports-id }}
           path: ci-artifacts/desktop
 
       - name: Download server results
-        if: needs.server.result == 'success' || needs.server.result == 'failure'
+        if: needs.server.outputs.test-reports-id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: test-reports-server
+          artifact-ids: ${{ needs.server.outputs.test-reports-id }}
           path: ci-artifacts/server
 
       # O artefato guarda os arquivos a partir do ancestral comum dos caminhos,
@@ -533,12 +547,15 @@ jobs:
           rmdir --ignore-fail-on-non-empty build/reports/kover server/coverage server/test-results
 
       # O gerador sai com 1 quando um portao bloqueia; aqui isso vira texto no
-      # resumo, nao um segundo job vermelho (ver o comentario do job).
+      # resumo, nao um segundo job vermelho (ver o comentario do job). O shell do
+      # passo e `bash -e`, e `set -uo pipefail` nao desliga o `-e`: sem o `||`, o
+      # 1 encerrava o passo antes do resumo e pulava o upload (#461). Outro codigo
+      # e o gerador quebrado, e esse continua vermelho.
       - name: Build report
         run: |
           set -uo pipefail
-          node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs --platform win32 --ci > report.txt
-          status=$?
+          status=0
+          node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs --platform win32 --ci > report.txt || status=$?
           {
             echo "## Relatório de testes"
             echo
@@ -549,8 +566,12 @@ jobs:
             echo "HTML completo no artefato \`test-report\`."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "gerador saiu com $status"
+          if [ "$status" -gt 1 ]; then
+            exit "$status"
+          fi
 
       - name: Upload report
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-report

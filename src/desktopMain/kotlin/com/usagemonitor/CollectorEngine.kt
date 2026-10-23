@@ -42,6 +42,7 @@ import com.usagemonitor.presentation.viewmodel.QuotaActivityTracker
 import com.usagemonitor.presentation.viewmodel.SessionPulseViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
+import com.usagemonitor.presentation.viewmodel.recordFailure
 import com.usagemonitor.update.AutoUpdateController
 import com.usagemonitor.update.writeUpdateScheduleFailureReceipt
 import java.util.concurrent.atomic.AtomicBoolean
@@ -321,7 +322,11 @@ internal class CollectorEngine(
         engineScope.launch(Dispatchers.IO) {
             configRequests.discardStale()
             while (isActive) {
-                serveConfigRequests(configRequests, configApplier) { change -> _appliedConfigChanges.tryEmit(change) }
+                serveConfigRequests(
+                    configRequests,
+                    configApplier,
+                    onFailure = { error -> breadcrumbs.recordFailure("atender pedido do terminal", error) }
+                ) { change -> _appliedConfigChanges.tryEmit(change) }
                 delay(CONFIG_REQUEST_POLL_MILLIS)
             }
         }

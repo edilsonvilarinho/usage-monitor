@@ -15,8 +15,8 @@ internal sealed interface ConfigDelivery {
     /** Aplicada ou recusada por [collector] (`null`: aplicada direto nos arquivos, sem coletor). */
     data class Answered(val outcome: ConfigOutcome, val collector: CollectorKind?) : ConfigDelivery
 
-    /** O coletor não respondeu a tempo, e o pedido foi recolhido: nada mudou. */
-    data class NotAnswered(val collector: CollectorKind) : ConfigDelivery
+    /** O coletor não respondeu em [timeoutMillis], e o pedido foi recolhido: nada mudou. */
+    data class NotAnswered(val collector: CollectorKind, val timeoutMillis: Long) : ConfigDelivery
 }
 
 /**
@@ -48,11 +48,11 @@ internal class TerminalConfigClient(
         val id = channel.submit(ConfigJson.encodeChange(change))
         channel.awaitReply(id, timeoutMillis, sleep = sleep)?.let { reply -> return answered(reply, kind) }
         if (channel.withdraw(id)) {
-            return ConfigDelivery.NotAnswered(kind)
+            return ConfigDelivery.NotAnswered(kind, timeoutMillis)
         }
         // O coletor tirou o pedido no último instante: a resposta está a caminho.
         channel.awaitReply(id, timeoutMillis, sleep = sleep)?.let { reply -> return answered(reply, kind) }
-        return ConfigDelivery.NotAnswered(kind)
+        return ConfigDelivery.NotAnswered(kind, timeoutMillis)
     }
 
     private fun answered(reply: String, kind: CollectorKind): ConfigDelivery =
