@@ -22,19 +22,25 @@ internal class TerminalConfigLabels(val language: AppLanguage) {
             null -> localized(language, "vale quando o app ou o serviço abrir", "applies when the app or the service starts")
         }
 
-    fun notAnswered(collector: CollectorKind): String =
-        when (collector) {
+    /**
+     * O tempo dito é o limite que o cliente esperou, em segundos arredondados para cima: o
+     * texto nunca promete um número que não foi o esperado (#460).
+     */
+    fun notAnswered(collector: CollectorKind, timeoutMillis: Long): String {
+        val seconds = (timeoutMillis + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND
+        return when (collector) {
             CollectorKind.APP -> localized(
                 language,
-                "O app aberto não respondeu em 10 s, e nada mudou. Ele pode ser de uma versão anterior: atualize-o, ou feche-o e tente de novo.",
-                "The open app did not answer within 10 s, and nothing changed. It may be an older version: update it, or close it and try again."
+                "O app aberto não respondeu em $seconds s, e nada mudou. Ele pode ser de uma versão anterior: atualize-o, ou feche-o e tente de novo.",
+                "The open app did not answer within $seconds s, and nothing changed. It may be an older version: update it, or close it and try again."
             )
             CollectorKind.SERVICE -> localized(
                 language,
-                "O serviço não respondeu em 10 s, e nada mudou. Veja se ele está de pé com usage-monitor status.",
-                "The service did not answer within 10 s, and nothing changed. Check that it is up with usage-monitor status."
+                "O serviço não respondeu em $seconds s, e nada mudou. Veja se ele está de pé com usage-monitor status.",
+                "The service did not answer within $seconds s, and nothing changed. Check that it is up with usage-monitor status."
             )
         }
+    }
 
     fun failed(detail: String?): String =
         localized(language, "Não foi possível gravar", "Could not save") + (detail?.let { text -> ": $text" } ?: ".")
@@ -137,4 +143,8 @@ internal class TerminalConfigLabels(val language: AppLanguage) {
         get() = localized(language, "A conta padrão do Claude Code não sai da lista. Para parar de monitorá-la:", "The default Claude Code account stays on the list. To stop monitoring it:")
 
     fun accountFailed(detail: String?): String = localized(language, "A conta não foi adicionada", "The account was not added") + (detail?.let { text -> ": $text" } ?: ".")
+
+    private companion object {
+        const val MILLIS_PER_SECOND = 1_000L
+    }
 }

@@ -20,7 +20,7 @@ internal fun delivered(
 ): TerminalOutput =
     when (delivery) {
         is ConfigDelivery.NotAnswered ->
-            TerminalOutput(TerminalConfigView.warning(labels.notAnswered(delivery.collector), null, profile.glyphs), TerminalConfigView.EXIT_REFUSED)
+            TerminalOutput(TerminalConfigView.warning(labels.notAnswered(delivery.collector, delivery.timeoutMillis), null, profile.glyphs), TerminalConfigView.EXIT_REFUSED)
         is ConfigDelivery.Answered -> when (val outcome = delivery.outcome) {
             is ConfigOutcome.Applied -> {
                 val consequence = if (outcome.restartNeeded) labels.restartNeeded(delivery.collector) else labels.appliedBy(delivery.collector)

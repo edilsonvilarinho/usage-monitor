@@ -239,7 +239,7 @@ class ConfigChannelTest {
 
         val delivery = client.apply(ConfigChange.SourceEnabled(ApiSource.ANTHROPIC.name, true))
 
-        assertEquals(ConfigDelivery.NotAnswered(CollectorKind.APP), delivery)
+        assertEquals(ConfigDelivery.NotAnswered(CollectorKind.APP, 200), delivery)
         assertTrue(channel().takePending().isEmpty())
     }
 
