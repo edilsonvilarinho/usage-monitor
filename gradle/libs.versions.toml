@@ -14,7 +14,7 @@ sqlite-jdbc = "3.53.4.0"
 pdfbox = "3.0.8"
 commons-compress = "1.28.0"
 jna = "5.19.1"
-jline = "3.30.17"
+jline = "4.4.8"
 kover = "0.9.9"
 
 [libraries]
