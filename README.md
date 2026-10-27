@@ -180,8 +180,8 @@ Without options it opens the app, or brings the running one to the front. On Win
 `usage-monitor.exe`: `Usage Monitor.exe` is a windowed program, so its output never reaches the terminal.
 The installer adds the install folder to your user `PATH` (`HKCU\Environment`), so a terminal opened after
 the install runs `usage-monitor --help`. Terminals already open do not see the change until reopened. If the
-user `PATH` is longer than about 1,000 characters, the installer leaves it untouched, because rewriting it could
-truncate it. In that case, use the full path:
+user `PATH` would grow past 32,767 characters (the Windows limit for an environment variable), the installer
+leaves it untouched. In that case, use the full path:
 
 ```powershell
 & "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --help
