@@ -16,6 +16,7 @@ import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
+import com.usagemonitor.presentation.ui.ExportLabels
 import com.usagemonitor.presentation.ui.codexApplicationLabel
 import com.usagemonitor.presentation.ui.shortCodexId
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
@@ -146,6 +147,34 @@ class CodexCliSessionsScreenTest {
     }
 
     @Test
+    fun `pdf export goes through the same writer`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        var requests = 0
+        val viewModel = viewModel(FakeCodexRepository(), writer = { requests += 1; "C:/exports/codex.pdf" })
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        onNodeWithText(ExportLabels.exportPdf(AppLanguage.PT)).performClick()
+        waitForIdle()
+
+        assertEquals(1, requests)
+        onNodeWithText("C:/exports/codex.pdf").assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `detail failure keeps the list and explains why`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(FakeCodexRepository(detailFailure = IllegalStateException("rollout sumiu")))
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        onNodeWithText(shortCodexId(LONG_SESSION_ID)).performClick()
+        waitForIdle()
+
+        assertNull(assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).detail)
+        onNodeWithText("rollout sumiu").assertExists()
+        onNodeWithText("usage-monitor").assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `partial index keeps the list and shows a warning`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
         val viewModel = viewModel(FakeCodexRepository(indexFailure = IllegalStateException("rollout ilegível")))
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
@@ -234,7 +263,8 @@ private class FakeCodexRepository(
         summary(SHORT_SESSION_ID).copy(originator = "codex-tui")
     ),
     private val indexFailure: Throwable? = null,
-    private val readFailure: Throwable? = null
+    private val readFailure: Throwable? = null,
+    private val detailFailure: Throwable? = null
 ) : CodexCliSessionRepository {
     var lastSince: Long? = Long.MIN_VALUE
     var readCalls = 0
@@ -250,6 +280,7 @@ private class FakeCodexRepository(
     }
 
     override suspend fun getSessionDetail(sessionId: String): Result<CodexCliSessionDetail?> {
+        if (detailFailure != null) return Result.failure(detailFailure)
         val session = sessions.firstOrNull { it.sessionId == sessionId } ?: return Result.success(null)
         val turn = CodexCliSessionTurn(
             sessionId = sessionId,
