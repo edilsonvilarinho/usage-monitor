@@ -37,7 +37,7 @@ key (MiniMax, DeepSeek, OpenCode Go, OpenRouter) take it in **Settings > APIs**.
 
 ```sh
 usage-monitor status                  # every quota: bar, state and when it resets
-usage-monitor tui                     # full screen by keyboard: overview, sessions, history, team, settings
+usage-monitor tui                     # full screen by keyboard: overview, sessions, history, team, settings, analysis
 usage-monitor setup                   # first time on a server: accounts, keys, alerts and the service
 usage-monitor statusline claude-code  # one line under the Claude Code prompt
 ```
@@ -106,7 +106,7 @@ API key, entered in **Settings > APIs**; environment variables are never read.
 
 ## Command line and terminal mode
 
-![The terminal mode: usage-monitor status, then usage-monitor tui going through its five tabs](img/terminal.gif)
+![The terminal mode: usage-monitor status, then usage-monitor tui going through its six tabs](img/terminal.gif)
 
 <sub>Drawn by the app's own terminal code with synthetic data (`gradlew generateTerminalMedia`).</sub>
 
@@ -123,12 +123,13 @@ the one that collects. They follow the app language (`--locale` works here too):
 
 | Command | What it does |
 |---|---|
-| `status [--json] [--max-age <time>]` | Prints every quota: bar, state from your alert thresholds and when it resets. `--json` is a stable contract for scripts |
+| `status [--json] [--max-age <time>]` | Prints every quota: bar, state from your alert thresholds and when it resets, and under each 5h and weekly quota how much of the window has passed against how much of the quota is used. `--json` is a stable contract for scripts |
 | `check [--max <n>] [--max-age <time>] [--quiet]` | Exits with 0 on track, 1 warning, 2 critical, 3 no reading |
 | `wait <quota> --below <n> [--timeout <time>]` | Waits until the quota drops below n% (ids in `status --json`), e.g. `usage-monitor wait anthropic:work:claude-5h --below 50 && claude -p "run the suite"` |
-| `statusline claude-code` | One line under the Claude Code prompt: the account that Claude Code uses, 5h and 7d, session cost and throughput |
+| `analysis [claude|codex|<account>] [--json]` | Run out × reset: when each window resets and when the quota runs out at the last hour's and the average pace, on the same ruler |
+| `statusline claude-code` | One line under the Claude Code prompt: the account that Claude Code uses, 5h and 7d with the time gone (`5h 64%/97% ✓`), session cost and throughput |
 | `statusline tmux` | A segment for the tmux status bar |
-| `tui` | The interactive mode: overview, sessions, history, team and settings in one full-screen view, by keyboard — over SSH too |
+| `tui` | The interactive mode: overview, sessions, the windows of each quota with a tall chart, team, settings and analysis in one full-screen view, by keyboard — over SSH too |
 
 ```jsonc
 // ~/.claude/settings.json

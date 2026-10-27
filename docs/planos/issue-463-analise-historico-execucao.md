@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução (2026-10-27, Windows 11) — A00 a A06 concluídas; falta relatório de testes, PR e CI.`
+**Estado atual:** `Em execução (2026-10-27, Windows 11) — A00 a A08 concluídas; falta PR, CI e merge.`
 
 | Campo | Valor |
 | --- | --- |
@@ -51,6 +51,7 @@
 | A05 | `feat(cli)`: aba Análise (AI2) com a corrida esgotar × reiniciar (AI3), e o comando `usage-monitor analysis` com a mesma corrida (`--json` como contrato) |
 | A06 | `feat(cli)`: `status` e linha de status com a linha "tempo" da janela (AI5) |
 | A07 | `fix(cli)`: o que a verificação com os bancos reais achou na aba 3 — janela já esgotada na 1ª leitura do período e o nome do ritmo do gráfico |
+| A08 | `docs`: READMEs (aba 6, `analysis`, linha do tempo) e captura do Histórico; relatório de testes antes do PR |
 
 ## Pontos de situação
 
@@ -65,6 +66,7 @@
 | A06 | 2026-10-27 | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"` (Windows 11): 290 testes, 0 falhas. A primeira passada falhou em 9 testes que fixavam a saída antiga do `status`, da linha de status e da lista de campos do `--json`; os números novos conferidos à mão antes de atualizar (5h com reinício em 2h17 → 54% do tempo, 62% de cota → ▲ 8 pp; em 47 min → 84%; 7d → 31%). Um tipo só, `TerminalQuotaTime` (piso em aritmética inteira), serve `status`, linha de status, `--json` e o gráfico da A04 — o gráfico trocou `roundToInt` pelo piso. `--json` ganha `window_starts_at` e `time_elapsed_percent` sem subir a versão. `generateTerminalMedia` refeito; protótipo 1.1, 1.2 e 2.2 conferidos pelo script da página no Node |
 | A05 | 2026-10-27 | concluída | `gradlew.bat allTests` (Windows 11): 3 293 testes, 0 falhas. Antes, `desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"`: 5 testes antigos fixavam "1–5"/"1 a 5" (viraram 1–6) e o teste novo das abas compactas tinha um espaço a mais na expectativa. `TuiTab.ANALYSIS(6)` no fim (U3); `when` sobre `TuiTab` auditados (`TuiLabels`, `TuiScreen`, `TuiState`, `TuiReader`). O despejo das fixtures achou três defeitos, corrigidos antes do commit: a 80 colunas em PT a linha de abas cortava "6 Anál…" (agora as inativas ficam só com o número), a nota "the current pace is enough" cortava na coluna (virou "current pace fits") e o comando não separava as janelas. Verificado contra os bancos reais desta máquina (teste temporário, apagado): `analysis` e `--json` com a conta Anthropic (5h a 53 %/h esgota em 54 min, antes do reinício em 3h53), aba 6 e `status` coerentes entre si. `generateTerminalMedia`: 60 quadros por idioma, com a aba 6 |
 | A07 | 2026-10-27 | concluída | Despejo da aba 3 com os bancos reais (teste temporário da A05): a semanal que já estava em 100% na primeira leitura do período saía "ran out after 0 min", e o gráfico chamava de "ritmo médio" (por hora observada, 53 %/h) o mesmo nome que a aba 6 usa para outro número (desde o início nominal, 47 %/h). Agora `já esgotada na 1ª leitura` e `ritmo`, o nome do Histórico do app. `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.architecture.*"`: verde, com o teste novo da janela esgotada na 1ª leitura (`TuiHistoryViewTest`, 10 testes, 0 falhas) |
+| A08 | 2026-10-27 | concluída | Skill `usage-monitor-test-report` (Windows 11): `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4`, `koverXmlReport -Pcoverage`, `npm ci && npm run test:coverage` (server) e `build-test-report.mjs` — veredito **Pronto**: 3 593 testes (Kotlin 3 294 em 379 classes, servidor 299), 0 falhas, 7 portões ok, cobertura de linhas 83,6% (Kotlin 83,4%, servidor 92,7%), execução posterior ao commit `0af27db3`. `gradlew.bat generateScreenshots`: entra só `img/history.png` (o eixo 100/50/0% da A01); as outras 16 capturas mudaram só pela renderização desta máquina, sem código desta branch, e foram restauradas. READMEs: aba 6, `analysis`, a linha do tempo no `status` e na linha de status, "seis abas" no GIF |
 
 ## Problemas em aberto e riscos
 

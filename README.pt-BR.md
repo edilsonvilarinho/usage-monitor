@@ -40,7 +40,7 @@ tela. As contas do Claude Code e do Codex são encontradas sozinhas; as fontes q
 
 ```sh
 usage-monitor status                  # todas as cotas: barra, estado e quando reinicia
-usage-monitor tui                     # tela cheia por teclado: visão geral, sessões, histórico, time, configurações
+usage-monitor tui                     # tela cheia por teclado: visão geral, sessões, histórico, time, configurações, análise
 usage-monitor setup                   # primeira vez num servidor: contas, chaves, alertas e o serviço
 usage-monitor statusline claude-code  # uma linha embaixo do prompt do Claude Code
 ```
@@ -113,7 +113,7 @@ de uma chave de API, informada em **Configurações > APIs**; variáveis de ambi
 
 ## Linha de comando e modo terminal
 
-![O modo terminal: usage-monitor status e depois usage-monitor tui passando pelas cinco abas](img/terminal-pt.gif)
+![O modo terminal: usage-monitor status e depois usage-monitor tui passando pelas seis abas](img/terminal-pt.gif)
 
 <sub>Desenhado pelo próprio código de terminal do app, com dados sintéticos (`gradlew generateTerminalMedia`).</sub>
 
@@ -130,12 +130,13 @@ sendo o app. Eles seguem o idioma do app (`--locale` vale aqui também):
 
 | Comando | O que faz |
 |---|---|
-| `status [--json] [--max-age <tempo>]` | Mostra todas as cotas: barra, estado pelos seus limiares de alerta e quando reinicia. `--json` é um contrato estável para scripts |
+| `status [--json] [--max-age <tempo>]` | Mostra todas as cotas: barra, estado pelos seus limiares de alerta e quando reinicia, e embaixo de cada cota 5h e semanal quanto da janela já passou contra quanto da cota foi usado. `--json` é um contrato estável para scripts |
 | `check [--max <n>] [--max-age <tempo>] [--quiet]` | Sai com 0 em dia, 1 atenção, 2 crítico, 3 sem leitura |
 | `wait <cota> --below <n> [--timeout <tempo>]` | Espera a cota cair abaixo de n% (os ids estão no `status --json`), por exemplo `usage-monitor wait anthropic:trabalho:claude-5h --below 50 && claude -p "rode a suíte"` |
-| `statusline claude-code` | Uma linha embaixo do prompt do Claude Code: a conta que ele usa, 5h e 7d, custo e vazão da sessão |
+| `analysis [claude|codex|<conta>] [--json]` | Esgotar × reiniciar: quando cada janela reinicia e quando a cota acaba no ritmo da última hora e no médio, na mesma régua |
+| `statusline claude-code` | Uma linha embaixo do prompt do Claude Code: a conta que ele usa, 5h e 7d com o tempo que já passou (`5h 64%/97% ✓`), custo e vazão da sessão |
 | `statusline tmux` | Um segmento para a barra do tmux |
-| `tui` | O modo interativo: visão geral, sessões, histórico, time e configurações numa tela cheia, por teclado — pelo SSH também |
+| `tui` | O modo interativo: visão geral, sessões, as janelas de cada cota com um gráfico alto, time, configurações e análise numa tela cheia, por teclado — pelo SSH também |
 
 ```jsonc
 // ~/.claude/settings.json
