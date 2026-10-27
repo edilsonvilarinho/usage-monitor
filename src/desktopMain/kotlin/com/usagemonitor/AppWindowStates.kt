@@ -50,13 +50,13 @@ internal fun rememberAppWindowStates(
     workArea: ScreenWorkArea
 ): AppWindowStates {
     val scale = uiScaleFactor(uiScalePercent)
-    val persistedHistory = remember(settings) { readPersistedHistoryWindowState(settings) }
-    val persistedCliSessions = remember(settings) { readPersistedCliSessionsWindowState(settings) }
-    val persistedTeamUsage = remember(settings) { readPersistedTeamUsageWindowState(settings) }
-    val persistedTeamPresence = remember(settings) { readPersistedTeamPresenceWindowState(settings) }
+    val persistedHistory = remember(settings) { readPersistedWindowGeometry(settings, HISTORY_WINDOW_GEOMETRY) }
+    val persistedCliSessions = remember(settings) { readPersistedWindowGeometry(settings, CLI_SESSIONS_WINDOW_GEOMETRY) }
+    val persistedTeamUsage = remember(settings) { readPersistedWindowGeometry(settings, TEAM_USAGE_WINDOW_GEOMETRY) }
+    val persistedTeamPresence = remember(settings) { readPersistedWindowGeometry(settings, TEAM_PRESENCE_WINDOW_GEOMETRY) }
     return AppWindowStates(
-        history = rememberPersistedHistoryWindowState(persistedHistory, uiScalePercent, workArea),
-        cliSessions = rememberPersistedCliSessionsWindowState(persistedCliSessions, uiScalePercent, workArea),
+        history = rememberPersistedWindowGeometry(persistedHistory, HISTORY_WINDOW_GEOMETRY, uiScalePercent, workArea),
+        cliSessions = rememberPersistedWindowGeometry(persistedCliSessions, CLI_SESSIONS_WINDOW_GEOMETRY, uiScalePercent, workArea),
         codexCliSessions = rememberWindowState(
             size = fitWindowSize(DpSize(980.dp * scale, 640.dp * scale), workArea)
         ),
@@ -66,8 +66,8 @@ internal fun rememberAppWindowStates(
         analysis = rememberWindowState(
             size = fitWindowSize(DpSize(820.dp * scale, 620.dp * scale), workArea)
         ),
-        teamUsage = rememberPersistedTeamUsageWindowState(persistedTeamUsage, uiScalePercent, workArea),
-        teamPresence = rememberPersistedTeamPresenceWindowState(persistedTeamPresence, uiScalePercent, workArea),
+        teamUsage = rememberPersistedWindowGeometry(persistedTeamUsage, TEAM_USAGE_WINDOW_GEOMETRY, uiScalePercent, workArea),
+        teamPresence = rememberPersistedWindowGeometry(persistedTeamPresence, TEAM_PRESENCE_WINDOW_GEOMETRY, uiScalePercent, workArea),
         teamKeys = rememberDialogState(size = fitWindowSize(DpSize(760.dp * scale, 640.dp * scale), workArea)),
         // 820 de largura: as Configurações têm navegação lateral de 150dp, e em
         // 620 o conteúdo ficava com menos de 470 — estreito demais para as
@@ -87,70 +87,32 @@ internal fun PersistAppWindowStates(
     windows: AppWindowStates,
     settings: PreferencesSettings
 ) {
-    PersistWindowFrame(windows.history, settings) { frame ->
-        persistHistoryWindowState(
-            settings = settings,
-            snapshot = HistoryWindowSnapshot(
-                widthDp = frame.size.width.value,
-                heightDp = frame.size.height.value,
-                xDp = frame.xDp,
-                yDp = frame.yDp,
-                placement = frame.placement
-            )
-        )
-    }
-    PersistWindowFrame(windows.cliSessions, settings) { frame ->
-        persistCliSessionsWindowState(
-            settings = settings,
-            snapshot = CliSessionsWindowSnapshot(
-                widthDp = frame.size.width.value,
-                heightDp = frame.size.height.value,
-                xDp = frame.xDp,
-                yDp = frame.yDp,
-                placement = frame.placement
-            )
-        )
-    }
-    PersistWindowFrame(windows.teamUsage, settings) { frame ->
-        persistTeamUsageWindowState(
-            settings = settings,
-            snapshot = TeamUsageWindowSnapshot(
-                widthDp = frame.size.width.value,
-                heightDp = frame.size.height.value,
-                xDp = frame.xDp,
-                yDp = frame.yDp,
-                placement = frame.placement
-            )
-        )
-    }
-    PersistWindowFrame(windows.teamPresence, settings) { frame ->
-        persistTeamPresenceWindowState(
-            settings = settings,
-            snapshot = TeamPresenceWindowSnapshot(
-                widthDp = frame.size.width.value,
-                heightDp = frame.size.height.value,
-                xDp = frame.xDp,
-                yDp = frame.yDp,
-                placement = frame.placement
-            )
-        )
-    }
+    PersistWindowFrame(windows.history, settings, HISTORY_WINDOW_GEOMETRY)
+    PersistWindowFrame(windows.cliSessions, settings, CLI_SESSIONS_WINDOW_GEOMETRY)
+    PersistWindowFrame(windows.teamUsage, settings, TEAM_USAGE_WINDOW_GEOMETRY)
+    PersistWindowFrame(windows.teamPresence, settings, TEAM_PRESENCE_WINDOW_GEOMETRY)
 }
 
-private val WindowFrame.xDp: Float?
-    get() = if (position.isSpecified) position.x.value else null
-
-private val WindowFrame.yDp: Float?
-    get() = if (position.isSpecified) position.y.value else null
+/** A moldura da janela como a geometria gravada a descreve. */
+internal fun windowGeometrySnapshotOf(position: WindowPosition, size: DpSize, placement: WindowPlacement) =
+    WindowGeometrySnapshot(
+        widthDp = size.width.value,
+        heightDp = size.height.value,
+        xDp = if (position.isSpecified) position.x.value else null,
+        yDp = if (position.isSpecified) position.y.value else null,
+        placement = placement
+    )
 
 @OptIn(FlowPreview::class)
 @Composable
-private fun PersistWindowFrame(state: WindowState, settings: PreferencesSettings, persist: (WindowFrame) -> Unit) {
+private fun PersistWindowFrame(state: WindowState, settings: PreferencesSettings, spec: WindowGeometrySpec) {
     LaunchedEffect(state, settings) {
         snapshotFlow { WindowFrame(state.position, state.size, state.placement) }
             .distinctUntilChanged()
             .debounce(250.milliseconds)
-            .collect { frame -> persist(frame) }
+            .collect { frame ->
+                persistWindowGeometry(settings, spec, windowGeometrySnapshotOf(frame.position, frame.size, frame.placement))
+            }
     }
 }
 
