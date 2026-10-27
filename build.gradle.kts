@@ -283,6 +283,27 @@ kover {
                 // unidade que o exercite, e conta-lo como descoberto afunda o
                 // numero sem apontar lacuna nenhuma que se possa fechar.
                 classes("com.usagemonitor.MainKt", "com.usagemonitor.MainKt$*")
+                // Lista nominal do plano `cobertura-95-execucao.md` (rota hibrida),
+                // cada linha com o motivo. Nada entra aqui para fechar a conta.
+                // `AppGraph`/`AppViewModels`: so montam lendo as credenciais reais
+                // (`~/.claude`), o no de preferencias do sistema e abrindo HTTP de
+                // verdade -- teste que os monte leria segredo e iria a rede. So a
+                // classe sai: `codexProfileSources` (AppGraphKt) continua contada.
+                classes(
+                    "com.usagemonitor.AppGraph", "com.usagemonitor.AppGraph$*",
+                    "com.usagemonitor.AppViewModels", "com.usagemonitor.AppViewModels$*"
+                )
+                // Producao que so teste e captura chamam: o CLAUDE.md registra que o
+                // `DashboardScreen` "so existe para testes e capturas", e a grade
+                // responsiva so e usada por ele. Cobri-los nao protege o produto.
+                classes(
+                    "com.usagemonitor.presentation.ui.DashboardScreenKt",
+                    "com.usagemonitor.presentation.ui.DashboardScreenKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$DashboardScreenKt*",
+                    "com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGridKt",
+                    "com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGridKt$*",
+                    "com.usagemonitor.presentation.ui.components.ComposableSingletons\$ResponsiveDashboardCardGridKt*"
+                )
             }
         }
 

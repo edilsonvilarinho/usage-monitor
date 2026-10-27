@@ -544,9 +544,9 @@ const BLIND_SPOTS = [
         source: 'src/commonTest e src/desktopTest, uso de MockEngine',
     },
     {
-        title: 'Main.kt fora da cobertura',
-        detail: 'Arranque e composição dos hosts são excluídos do Kover: nenhum teste de unidade os exercita.',
-        source: 'build.gradle.kts, bloco kover',
+        title: 'Excluídos do Kover por nome',
+        detail: 'Main.kt (arranque); AppGraph e AppViewModels (só montam com credenciais reais e HTTP de verdade); DashboardScreen e a grade responsiva (só testes e capturas os chamam). Nenhum deles conta no percentual.',
+        source: 'build.gradle.kts, bloco kover; docs/planos/cobertura-95-execucao.md',
     },
 ]
 

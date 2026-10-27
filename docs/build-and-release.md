@@ -474,7 +474,9 @@ recorte por path). O plano com as medições está em
   inclusive, desde a issue #299 —, e a mesma passada serve suíte e relatório. Sem `koverVerify` e sem piso: limiar calibrado antes de a linha de base existir é
   limiar calibrado no escuro. Linha de base de 2026-08-25: **82,7% de linhas**, 52,3% de ramos.
   `MainKt` fica fora do relatório por filtro — é o grafo de DI mais a janela, e contá-lo afunda o
-  número sem apontar lacuna que se possa fechar.
+  número sem apontar lacuna que se possa fechar. Desde a onda 6 do plano `cobertura-95-execucao.md`, a mesma
+  lista nominal tira `AppGraph`/`AppViewModels` (só montam com credenciais reais e HTTP de verdade) e o
+  `DashboardScreen` com a grade responsiva (só teste e captura os chamam), cada um com o motivo no `build.gradle.kts`.
 - **O push na `main` roda a suíte de novo, e isso é aceito** (#344, revertendo a decisão da #299).
   A #299 pulava a suíte na `main` quando a árvore do squash batia com a de um PR verde (jobs `gate` e
   `verified-tree`, artifact `ci-verified-tree-<tree>`), e o release esperava um marcador do CI da
