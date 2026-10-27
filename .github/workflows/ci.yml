@@ -192,14 +192,23 @@ jobs:
         shell: pwsh
         run: node tools/ci/test-summary.mjs --title "Desktop no Windows (allTests)" --glob "build/test-results/**/*.xml" --require
 
-      # Sem `koverVerify` e sem piso: relatorio, nao trava. `:desktopTest` ja
-      # rodou instrumentado acima e aqui sai UP-TO-DATE.
+      # `:desktopTest` ja rodou instrumentado acima e aqui sai UP-TO-DATE. O
+      # relatorio sai antes da catraca para o resumo existir mesmo quando ela
+      # reprova.
       - name: Coverage report
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           .\gradlew.bat koverXmlReport koverHtmlReport --build-cache -Pcoverage
           node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
+
+      # Catraca de linhas (plano `cobertura-95-execucao.md`): piso em
+      # `coverageLineFloorPercent` no `build.gradle.kts`, meta 95%.
+      - name: Coverage floor
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat koverVerify --build-cache -Pcoverage
 
       - name: Upload coverage report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

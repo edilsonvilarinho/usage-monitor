@@ -461,7 +461,14 @@ recorte por path). O plano com as medições está em
   carregado depois de anos passando (run `32855876748`), e era assim que um `delay(100)` escrito para
   provar que *nada* aconteceu passava sem esperar nada. Espera de estado de view model usa
   `yield()` + `Thread.sleep`, como `pauseForBackgroundWork` em `DashboardViewModelTestSupport`.
-- **Cobertura é relatório, não trava.** O Kover estava aplicado desde sempre instrumentando toda
+- **Cobertura tem meta de 95% de linhas e catraca** (2026-10-27, plano
+  [`cobertura-95-execucao.md`](planos/cobertura-95-execucao.md)), revertendo o "sem piso" abaixo por decisão do
+  dono do repositório: com o ciclo inteiro delegado ao agente, a suíte é a única rede. A linha de base existe
+  (83,4% no Kotlin, 92,7% no servidor), então o limiar já não é calibrado no escuro. O piso é o último valor
+  medido, arredondado para baixo, e só sobe: `coverageLineFloorPercent` no `build.gradle.kts`, aplicado pelo
+  passo `Coverage floor` (`koverVerify`) do `ci.yml`, e `thresholds.lines` no `server/vitest.config.ts`, que faz
+  o `npm run test:coverage` sair com erro.
+- **Histórico — cobertura era relatório, não trava.** O Kover estava aplicado desde sempre instrumentando toda
   passada — 6 a 7 s medidos — sem que nenhuma tarefa de relatório rodasse em lugar nenhum. Agora a
   instrumentação é **opt-in** por `-Pcoverage`, que o CI liga em todo run que executa a suíte — PR
   inclusive, desde a issue #299 —, e a mesma passada serve suíte e relatório. Sem `koverVerify` e sem piso: limiar calibrado antes de a linha de base existir é

@@ -28,18 +28,3 @@ export function openDatabase(dataDir: string): Db {
 
   return db;
 }
-
-/**
- * Micro-migracao aditiva: adiciona a coluna se ela ainda nao existir.
- *
- * SQLite nao tem `ADD COLUMN IF NOT EXISTS`, e recriar a tabela para cada
- * evolucao de schema nao se justifica aqui.
- */
-export function ensureColumn(db: Db, table: string, column: string, definition: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  const exists = columns.some((entry) => entry.name === column);
-  if (exists) {
-    return;
-  }
-  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-}

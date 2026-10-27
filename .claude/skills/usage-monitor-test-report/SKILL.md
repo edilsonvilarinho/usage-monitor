@@ -77,8 +77,12 @@ node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs
    - `Atenção` → pode seguir, mas a descrição do PR diz qual portão e por quê.
    - A seção **"O que a suíte não cobre"** vale sempre: mudança em host de janela, instalador ou
      integração externa precisa de verificação manual registrada no PR (CLAUDE.md, "CI e testes").
-   - Cobertura **não tem piso** (#299). Não invente meta nem trate queda pequena como bloqueio; aponte
-     arquivo novo que entra em "Arquivos sem cobertura".
+   - Cobertura de linhas tem **meta de 95%** por suíte e **catraca** (plano
+     [`cobertura-95-execucao.md`](../../../docs/planos/cobertura-95-execucao.md)): o piso é
+     `coverageLineFloorPercent` no `build.gradle.kts` (Kotlin, `koverVerify` no CI) e `thresholds.lines` no
+     `server/vitest.config.ts`. Abaixo do piso o portão "Meta de cobertura" é `crit` e o CI reprova; entre o
+     piso e a meta é `warn`. O piso só sobe, no mesmo commit dos testes que o elevam, para o valor medido
+     arredondado para baixo. Arquivo novo que entra em "Arquivos sem cobertura" é lacuna do próprio PR.
 
 ## O que o relatório mede, e como
 

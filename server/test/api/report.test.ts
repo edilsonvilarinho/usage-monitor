@@ -326,6 +326,35 @@ describe('GET /api/v1/report/usage', () => {
     expect(turns).toBe(6);
   });
 
+  it('responde 400 para janela invalida', async () => {
+    const { app } = start();
+
+    const response = await reportGet(app, '/api/v1/report/activity', { gapCutoffMs: -1 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/^Query invalida — gapCutoffMs:/);
+  });
+
+  it('responde 400 para cursor que nao e objeto', async () => {
+    const { app } = start();
+    const cursor = Buffer.from(JSON.stringify(42), 'utf8').toString('base64url');
+
+    const response = await reportGet(app, '/api/v1/report/usage', { cursor });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Cursor invalido.');
+  });
+
+  it('responde 400 para cursor sem a posicao completa', async () => {
+    const { app } = start();
+    const cursor = Buffer.from(JSON.stringify({ accountKey: 'a', deviceId: 'd' }), 'utf8').toString('base64url');
+
+    const response = await reportGet(app, '/api/v1/report/activity', { cursor });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Cursor invalido.');
+  });
+
   it('responde 400 para cursor ilegível', async () => {
     const { app } = start();
 

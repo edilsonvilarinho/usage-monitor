@@ -25,6 +25,25 @@ describe('rotas administrativas', () => {
     harness.cleanup();
   });
 
+  it('recusa a visao geral com janela invalida', async () => {
+    const response = await request(harness.app)
+      .get('/api/admin/v1/overview')
+      .query({ since: 'ontem' })
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/^Query invalida — since:/);
+  });
+
+  it('recusa remover sessao com identificador acima do teto', async () => {
+    const response = await request(harness.app)
+      .delete(`/api/admin/v1/accounts/${ACCOUNT_A}/members/device-1/sessions/${'s'.repeat(401)}`)
+      .set('x-admin-token', TEST_ADMIN_TOKEN);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/^Caminho invalido — sessionId:/);
+  });
+
   it('valida o token pelo ping', async () => {
     const response = await request(harness.app)
       .get('/api/admin/v1/ping')

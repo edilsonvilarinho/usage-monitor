@@ -145,4 +145,17 @@ describe('loadConfigFromEnv', () => {
       loadConfigFromEnv({ TEAM_API_KEY: VALID_KEY, TRUST_PROXY_HOPS: '-1' } as NodeJS.ProcessEnv),
     ).toThrow(/TRUST_PROXY_HOPS/);
   });
+
+  it.each([
+    ['PORT', '70000', /PORT/],
+    ['PORT', '3000abc', /PORT/],
+    ['DATA_DIR', '   ', /DATA_DIR/],
+    ['TEAM_RETENTION_DAYS', '0', /TEAM_RETENTION_DAYS/],
+    ['TEAM_MAX_TURNS_PER_REQUEST', '0', /TEAM_MAX_TURNS_PER_REQUEST/],
+    ['TEAM_METRICS_MAX_SERIES', '1.5', /TEAM_METRICS_MAX_SERIES/],
+  ])('falha com %s=%s', (name, value, message) => {
+    expect(() =>
+      loadConfigFromEnv({ TEAM_API_KEY: VALID_KEY, [name]: value } as NodeJS.ProcessEnv),
+    ).toThrow(message);
+  });
 });

@@ -1,0 +1,71 @@
+# Cobertura de linhas a 95% com catraca
+
+## Objetivo
+
+O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agente; a suíte é a única rede. Regra nova
+(2026-10-27): **95% de cobertura de linhas**, no Kotlin e no servidor de time, imposta por catraca no CI. Substitui o
+"sem piso" da #299 (`docs/build-and-release.md`, "CI e testes — decisões").
+
+## Fatos confirmados (medidos em 2026-10-27, `af450570`, Windows, skill `usage-monitor-test-report`)
+
+- `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport`: 3 296 testes, 0 falhas.
+  Kover: **38 607 de 46 302 linhas (83,4%)**, 7 695 descobertas; ramos 58,4%.
+- `npm run test:coverage` (`server/`): 299 testes, 0 falhas; v8: **920 de 992 linhas (92,7%)**, 72 descobertas,
+  30 delas em `src/main.ts` (arranque).
+- Para 95% no Kotlin, com o denominador de hoje, faltam **5 379 linhas cobertas** (70% de tudo o que está
+  descoberto). No servidor faltam 23.
+- Arquivos que importam `java.awt`, `javax.swing`, `com.sun.jna`, `androidx.compose.ui.window` ou
+  `androidx.compose.ui.awt` somam **1 661** das 7 695 linhas descobertas (`HudWindow.kt` 260, `AppDialogWindow.kt`
+  205, `SettingsWindowHost.kt` 129, `DesktopWindowFrame.kt` 94, `CompositorWindowDrag.kt` 94…). Nenhum teste
+  exercita o sistema de janelas (CLAUDE.md, "CI e testes"; `CONTRIBUTING.md`, "Platform reality").
+- Maiores lacunas fora de janela: `CodexCliSessionsScreen.kt` 239, `ModalWindowsHost.kt` 203, `CollectorEngine.kt`
+  197, `RemoteTeamDataSource.kt` 176, `AutoStartManager.kt` 175, `SettingsActions.kt` 143, `AppSettingsFeedback.kt`
+  107, `AppGraph.kt` 106, `DashboardScreen.kt` 104, `DashboardScreenWarnings.kt` 102, `TelegramBotWiring.kt` 101.
+
+## Decisões
+
+- **Métrica:** linhas (`LINE`, `COVERED_PERCENTAGE`), a mesma que o relatório mostra. Ramos ficam no relatório,
+  sem piso, até as linhas chegarem à meta.
+- **Catraca, não piso fixo.** 95% hoje deixaria o CI vermelho em todo PR. O piso é o último valor medido,
+  arredondado para baixo, e **só sobe**, no mesmo commit dos testes que o elevam: `coverageLineFloorPercent` no
+  `build.gradle.kts` (passo `Coverage floor` do `ci.yml`, `koverVerify`) e `thresholds.lines` no
+  `server/vitest.config.ts`. O relatório lê os dois pisos e mostra o portão "Meta de cobertura" (`crit` abaixo do
+  piso, `warn` entre piso e meta).
+- **Teste por contrato, nunca por linha.** Teste que só executa código sem afirmar comportamento não entra.
+  Cada teste novo afirma rota, corpo, estado publicado, texto ou decisão — o mesmo padrão dos testes vizinhos.
+- **Código de janela:** primeiro extrair a decisão para função pura e testá-la (precedente: `hudHitRegionMode`).
+  O que sobrar de chamada direta ao AWT/JNA é candidato a exclusão **nominal** no filtro do Kover, como
+  `MainKt`, com o motivo no `build.gradle.kts` e linha em "O que a suíte não cobre" do relatório. Exclusão é a
+  última onda e é medida antes: nenhuma entra para fechar a conta.
+
+## Ondas (uma PR cada)
+
+| Onda | Escopo | Linhas descobertas no escopo |
+|---|---|---|
+| 1 | Catraca; dados do time (`RemoteTeamDataSource`, repositórios, mapper) por `MockEngine`; servidor a ≥ 95% | ~400 + 23 |
+| 2 | Telas Compose de sessões CLI/Codex (`CodexCliSessions*`, `CliUsageBreakdown*`, `ActivityHeatmapGrid`, `TurnSeriesChart`) | ~680 |
+| 3 | Formatação e rótulos puros (`*Formatting.kt`, `*Labels.kt`, `*Messages.kt`, terminal) | ~500 |
+| 4 | Telas Compose restantes (`DashboardScreen*`, `TeamKeysAdminScreen`, `TeamUsageScreen`, cards) | ~600 |
+| 5 | Orquestração do `desktopMain` (`CollectorEngine`, `SettingsActions`, `AppSettingsFeedback`, `AutoStartManager`, Telegram, terminal) com costura testável | ~1 500 |
+| 6 | Janelas: extração de decisão pura; exclusão nominal do resto, medida | ~1 700 |
+
+## Atividades da onda 1
+
+| ID | Atividade | Commit esperado |
+|---|---|---|
+| A01 | Plano; catraca no Gradle, CI e vitest; portão no relatório; docs | `ci(coverage): ratchet line coverage toward 95%` |
+| A02 | `RemoteTeamDataSource` por `MockEngine`: rota, credencial, query, corpo, erro | `test(team): cover every team server route over MockEngine` |
+| A03 | Repositórios do time ponta a ponta por `MockEngine` | `test(team): cover team repositories end to end` |
+| A04 | Servidor a ≥ 95% de linhas | `test(server): raise line coverage to 95%` |
+| A05 | Piso do Kotlin sobe para o valor medido | `ci(coverage): raise the Kotlin line floor` |
+
+## Pontos de situação
+
+| Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
+|---|---|---|---|---|
+| A01 | 2026-10-27 | este commit | concluída | Medição acima. `node build-test-report.mjs --root <main>`: portões `coverage-goal-kotlin` e `coverage-goal-server` em `warn` (83,3% e 92,7%). Pisos: Kotlin 83, servidor 92. |
+| A02 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.RemoteTeamDataSourceHttpTest"`: 28 testes, 0 falhas (todas as 22 rotas, credencial por tipo, query opcional, `PATCH` sem campo nulo, erro com JSON, HTML truncado em 300, corpo vazio). |
+| A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.TeamRepositoriesHttpTest"`: 22 testes, 0 falhas (admin: chaves, bloqueio, visão, fallback 404; uso: leitura, detalhe, conexão, sem credencial não chama a rede). |
+| A04 | 2026-10-27 | este commit | concluída | `npm run test:coverage`: 313 testes, 0 falhas; linhas **95,84%** (946/987), antes 92,7%. `ensureColumn` removida (sem chamador desde `859c819c`). Testes novos: health 503 e 500 com banco fechado, 6 validações de config, query/caminho inválidos em admin e relatório, fusão de modelos nas métricas. Piso do vitest: 95. |
+| A05 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify -Pcoverage`: 3 346 testes, 0 falhas; Kotlin **84,1%** (antes 83,4%). Relatório da skill: servidor 95,8%, total 84,4%, sem `crit`. Piso do Kotlin: 84; `koverVerify` com 84 passa. |
+| Onda 1 | 2026-10-27 | este commit | PR #476 | Run `40560244229`: `ci-ok` verde, 0 incidências; job `desktop-windows` executou `koverVerify` (`> Task :koverVerify`, `BUILD SUCCESSFUL`); `server` com o `thresholds.lines: 95`. |

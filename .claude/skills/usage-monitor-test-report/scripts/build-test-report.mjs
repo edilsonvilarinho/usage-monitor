@@ -37,6 +37,9 @@ function parseArgs(argv) {
 
 // Areas por pacote. A primeira que casa vence; a ordem importa porque
 // `presentation.ui` tambem casa `presentation`.
+// Meta de cobertura de linhas, por suite (docs/planos/cobertura-95-execucao.md).
+const COVERAGE_GOAL_PERCENT = 95
+
 const KOTLIN_AREAS = [
     { id: 'architecture', label: 'Regras de arquitetura', test: (fqn) => fqn.includes('.architecture.') },
     { id: 'ui', label: 'Telas e componentes Compose', test: (fqn) => /\.(ui|help|onboarding|screenshots)\./.test(fqn) },
@@ -449,8 +452,29 @@ function evaluateGates(data) {
         [
             data.kover ? 'Kotlin pelo Kover' : 'Kotlin não medido (rode com -Pcoverage e koverXmlReport)',
             data.serverCoverage ? 'servidor pelo v8' : 'servidor não medido (npm run test:coverage)',
-        ].join(' · ') + '. Sem piso: nenhuma build falha pelo número.',
+        ].join(' · ') + '.',
     )
+
+    // Catraca de linhas (docs/planos/cobertura-95-execucao.md): abaixo do piso o CI
+    // reprova (`koverVerify`, `thresholds` do vitest); entre o piso e a meta, atencao.
+    for (const [id, name, coverage, floor] of [
+        ['coverage-goal-kotlin', 'Kotlin', data.kover, data.coverageFloors.kotlin],
+        ['coverage-goal-server', 'servidor', data.serverCoverage, data.coverageFloors.server],
+    ]) {
+        if (!coverage || coverage.totals.line.total === 0) continue
+        const percent = (coverage.totals.line.covered / coverage.totals.line.total) * 100
+        const shown = formatOneDecimal(percent)
+        const level = floor !== null && percent < floor ? 'crit' : percent < COVERAGE_GOAL_PERCENT ? 'warn' : 'ok'
+        const floorText = floor === null ? 'piso não encontrado' : `piso ${floor}%`
+        add(
+            id,
+            `Meta de cobertura do ${name}`,
+            level,
+            level === 'crit'
+                ? `${shown}% de linhas, abaixo do ${floorText}: o CI reprova.`
+                : `${shown}% de linhas · ${floorText} · meta ${COVERAGE_GOAL_PERCENT}%.`,
+        )
+    }
 
     // Suite vermelha faz o Gradle pular o `koverXmlReport` (e o vitest nao
     // reescreve o resumo): o XML da passada anterior continua no disco e
@@ -524,11 +548,6 @@ const BLIND_SPOTS = [
         detail: 'Arranque e composição dos hosts são excluídos do Kover: nenhum teste de unidade os exercita.',
         source: 'build.gradle.kts, bloco kover',
     },
-    {
-        title: 'Cobertura sem piso',
-        detail: 'O número é referência. Nenhum job falha se ele cair.',
-        source: '.github/workflows/ci.yml, passo Coverage report (#299)',
-    },
 ]
 
 // ── Utilitarios ────────────────────────────────────────────────────────────
@@ -571,6 +590,27 @@ function walk(dir, suffix) {
 }
 
 // Mesmo formato do HTML: milhar com espaco fino.
+// Os pisos vivem onde o CI os aplica; o relatorio so os le, para nao haver
+// segundo dono do numero.
+function readCoverageFloors(rootDir) {
+    const readNumber = (path, pattern) => {
+        try {
+            const match = readFileSync(join(rootDir, path), 'utf8').match(pattern)
+            return match ? Number(match[1]) : null
+        } catch {
+            return null
+        }
+    }
+    return {
+        kotlin: readNumber('build.gradle.kts', /val coverageLineFloorPercent = (\d+)/),
+        server: readNumber('server/vitest.config.ts', /thresholds:\s*\{\s*lines:\s*(\d+)/),
+    }
+}
+
+function formatOneDecimal(value) {
+    return (Math.floor(value * 10) / 10).toFixed(1).replace('.', ',')
+}
+
 function formatCount(value) {
     return value.toLocaleString('pt-BR').replaceAll('.', '\u2009')
 }
@@ -616,6 +656,7 @@ function main() {
         server: summarizeServer(serverSuites, serverFiles),
         kover: readKover(join(root, 'build/reports/kover/report.xml'), root),
         serverCoverage: readV8Summary(join(root, 'server/coverage/coverage-summary.json'), root),
+        coverageFloors: readCoverageFloors(root),
     }
     report.totals = combineTotals(report)
     report.gates = evaluateGates(report)

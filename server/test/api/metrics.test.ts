@@ -192,6 +192,30 @@ describe('GET /metrics — números', () => {
     expect(response.text).toContain('member="device-1"');
   });
 
+  it('sessão com dois modelos conta uma vez e, sem o rótulo de modelo, soma os tokens', async () => {
+    const twoModels = makePayload({
+      turns: [
+        makeTurn({ messageId: 'msg-1', ts: RECENT, model: 'claude-sonnet-5', inputTokens: 1_000 }),
+        makeTurn({ messageId: 'msg-2', ts: RECENT, model: 'claude-opus-4-20250514', inputTokens: 500 }),
+      ],
+    });
+
+    const labeled = start();
+    await ingest(labeled, twoModels);
+    const withModel = await request(labeled.app).get('/metrics').set('x-report-key', TEST_REPORT_TOKEN);
+    expect(sample(withModel.text, 'usage_monitor_sessions_window', 'window="24h"')).toContain(' 1');
+    labeled.cleanup();
+
+    // Teto de séries abaixo do necessário: o rótulo `model` cai e as linhas se fundem.
+    const merged = start({ metricsMaxSeries: 1 });
+    await ingest(merged, twoModels);
+    const withoutModel = await request(merged.app).get('/metrics').set('x-report-key', TEST_REPORT_TOKEN);
+    expect(withoutModel.text).not.toContain('model="');
+    expect(sample(withoutModel.text, 'usage_monitor_tokens_window', 'kind="input"')).toContain(' 1500');
+    expect(sample(withoutModel.text, 'usage_monitor_turns_window', 'window="24h"')).toContain(' 2');
+    expect(sample(withoutModel.text, 'usage_monitor_sessions_window', 'window="24h"')).toContain(' 1');
+  });
+
   /**
    * O custo é a conta do `ModelPricing.kt` aplicada no servidor. Sonnet 5 a
    * 2 USD/M de input: 1M de input = 2,000000 USD, exato.
