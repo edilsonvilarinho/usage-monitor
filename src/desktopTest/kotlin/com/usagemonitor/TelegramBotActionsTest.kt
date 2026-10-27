@@ -121,12 +121,13 @@ class TelegramBotActionsTest {
 
     @Test
     fun `a write failure still updates the screen`() {
-        // O "arquivo" é uma pasta: a gravação falha e a mudança vale até o reinício.
-        file.mkdirs()
+        // O "arquivo" é uma pasta não vazia: a troca atômica falha e a mudança vale até o reinício.
+        File(file, "keep").apply { parentFile.mkdirs() }.writeText("x")
 
         actions.setEnabled(true)
 
         assertTrue(flow.value.enabled)
+        assertFalse(dataSource.load().enabled)
     }
 
     @Test

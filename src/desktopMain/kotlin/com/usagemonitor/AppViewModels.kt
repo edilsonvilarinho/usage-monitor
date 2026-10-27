@@ -144,6 +144,15 @@ internal class AppViewModels(
     val validateAdminToken = ValidateAdminTokenUseCase(graph.teamAdminRepository)
     val claimTeamKeyForAccount = ClaimTeamKeyForAccountUseCase(graph.teamAdminRepository)
 
+    /** O que as Configurações pedem (`SettingsActions`). */
+    val settingsTargets: SettingsActionTargets = object : SettingsActionTargets {
+        override fun refreshSource(api: ApiSource) = dashboard.refresh(api)
+        override fun requestTeamSync() {
+            teamSync.requestImmediateSync()
+        }
+        override fun openTeamKeys() = teamKeys.open()
+    }
+
     /** O que as ações do rodapé e dos cards pedem (`buildShellActions`). */
     val shellTargets: ShellActionTargets = object : ShellActionTargets {
         override fun refreshAll() = dashboard.refresh()
