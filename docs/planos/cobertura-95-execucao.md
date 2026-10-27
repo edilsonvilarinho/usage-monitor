@@ -54,6 +54,11 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | 5 | Orquestração do `desktopMain` (`CollectorEngine`, `SettingsActions`, `AppSettingsFeedback`, `AutoStartManager`, Telegram, terminal) com costura testável | ~1 500 |
 | 6 | Janelas: extração de decisão pura; exclusão nominal do resto, medida | ~1 700 |
 
+- **Raiz de composição** (achado da onda 5, 2026-10-27): `AppGraph`, `CollectorEngine` e `AppViewModels` (~380 linhas)
+  só se montam lendo as credenciais reais (`~/.claude`), o nó de preferências do sistema e abrindo clientes HTTP de
+  verdade. Teste que os monte leria segredo do desenvolvedor e faria chamada de rede real — recusado. Ou ganham
+  costura (fábricas injetáveis), ou entram na exclusão nominal da onda 6, como o `MainKt`.
+
 ## Atividades da onda 1
 
 | ID | Atividade | Commit esperado |
@@ -99,3 +104,11 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | W4-A05 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComparisonScreenTest"`: 3 testes, 0 falhas (+2: carregando e erro com retry em inglês, recorte vazio e resultado da exportação salvo/falho). |
 | W4-A06 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.AlertSettingsSectionTest"`: 13 testes, 0 falhas (+4: limiar próprio por conta em ordem de rótulo e desfeito pelo botão, aviso sem limiar, lembrete grava os minutos padrão, validação de dólares com vírgula e `wrapHour`). |
 | W4-A07 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **86,8%** (40 193/46 309; antes 86,2%), ramos 61,6%. Piso continua 86 (valor medido arredondado para baixo). |
+| W5-A01 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.CollectorHealthReportTest"`: 5 testes, 0 falhas (contas coletadas com a falha e só-falha também listadas, estado do bot por palavra, falha do time só se mais nova que o sucesso, web sem token). `collectorHealthOf` estava em 0%. |
+| W5-A02 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ObservedUsageSummaryTest"`: 6 testes, 0 falhas (vazio por fonte com orientação própria, Gemini fala de tokens, uma linha por modelo, nota de cota separada no Gemini, linha compacta, trilha por janela). Bloco é usado pelo `ApiUsageCard` em produção. |
+| W5-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.TelegramBotApiTest"`: 18 testes, 0 falhas (+4: `answerCallbackQuery` com id e texto, `getMe`, 502 com corpo ilegível, `ok:false` com descrição). |
+| W5-A04 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.TeamKeyAdminUseCasesTest"`: 1 teste, 0 falhas (repasse de cada caso de uso com defaults e `trim` do rótulo). |
+| W5-A05 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.TerminalServiceViewTest"`: 5 testes, 0 falhas (cabeçalho por quem coleta e código 1 sem coletor, pid/memória só com processo vivo, linhas de fontes/histórico/bot/time/web, estados quietos, saúde antiga avisa). |
+| Onda 4 | 2026-10-27 | este commit | PR #481 (merge `18e97d51`) | Run `40576390227`: `ci-ok` verde, 0 incidências; `Coverage floor` executou `koverVerify` com piso 86. |
+| W5-A06 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.UsageAlertMessagesTest"`: 9 testes, 0 falhas (+2: limiar de 100% diz "esgotada" e reset só quando conhecido; lembrete de reinício em inglês e português). |
+| W5-A07 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **87,2%** (40 363/46 309; antes 86,8%), ramos 62,1%. Restam 5 946 linhas descobertas (teto para 95%: 2 315): `desktopMain` 2 778, janela 1 661, `commonMain` 1 326, só-teste 159, gerado 22. Piso do Kotlin: 87. |

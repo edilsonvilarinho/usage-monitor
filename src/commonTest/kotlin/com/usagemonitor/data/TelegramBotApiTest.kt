@@ -201,4 +201,38 @@ class TelegramBotApiTest {
             api(HttpStatusCode.Unauthorized, """{"ok":false,"error_code":401}""").deleteWebhook("bad")
         }
     }
+    @Test
+    fun `callback answer posts the id and the optional text`() = runTest {
+        var url = ""
+        var sent: String? = null
+        api(HttpStatusCode.OK, """{"ok":true}""") { u, body -> url = u; sent = body }.answerCallbackQuery("123:abc", "cb-1", "feito")
+
+        assertTrue(url.endsWith("/bot123:abc/answerCallbackQuery"))
+        assertEquals("""{"callback_query_id":"cb-1","text":"feito"}""", sent)
+    }
+
+    @Test
+    fun `get me returns the bot username`() = runTest {
+        val username = api(HttpStatusCode.OK, """{"ok":true,"result":{"username":"monitor_bot"}}""").getMe("123:abc")
+
+        assertEquals("monitor_bot", username)
+    }
+
+    @Test
+    fun `server failure with an unreadable body names the status`() = runTest {
+        val error = kotlin.test.assertFailsWith<IllegalStateException> {
+            api(HttpStatusCode.BadGateway, "<html>gateway</html>").getMe("123:abc")
+        }
+
+        assertEquals("Telegram respondeu HTTP 502: resposta ilegível", error.message)
+    }
+
+    @Test
+    fun `ok false with a description is a failure too`() = runTest {
+        val error = kotlin.test.assertFailsWith<IllegalStateException> {
+            api(HttpStatusCode.OK, """{"ok":false,"description":"bot bloqueado"}""").getMe("123:abc")
+        }
+
+        assertEquals("Telegram respondeu HTTP 200: bot bloqueado", error.message)
+    }
 }
