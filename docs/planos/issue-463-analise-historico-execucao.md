@@ -2,12 +2,12 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Pausado em 2026-10-27 — A00 a A03 commitadas e enviadas; A03 com um teste ajustado sem nova passada; A04 a A06 por fazer (ver "Como continuar").`
+**Estado atual:** `Em execução (2026-10-27, Windows 11) — A00 a A03 concluídas e verificadas; A04, A06 e A05 por fazer.`
 
 | Campo | Valor |
 | --- | --- |
 | Modelo | Claude Opus 5.5 (`claude-opus-5-5`) |
-| Ferramenta | Claude Code (CLI, Linux; a suíte roda aqui com `-Dorg.gradle.java.home` no JDK 17, porque o Gradle global aponta para um JDK 8) |
+| Ferramenta | Claude Code (CLI; A00–A03 no Linux, da verificação da A03 em diante no Windows 11; no Linux, a suíte roda aqui com `-Dorg.gradle.java.home` no JDK 17, porque o Gradle global aponta para um JDK 8) |
 | Data | 2026-10-23 |
 | Branch | `feat/analysis-history-clarity-463` (worktree `../usage-monitor-463`) |
 | Autor dos commits | identidade temporária `claude`, trailer `Co-Authored-By: Claude Opus 5.5` |
@@ -37,6 +37,7 @@
 | --- | --- | --- |
 | U1 | Direção do app (AH1–AH5, pode combinar) | **AH1 · Diagonal do ritmo** (2026-10-23) |
 | U2 | Direção do terminal (AI1–AI5, pode combinar) | **AI1 a AI5, todas** (2026-10-23): aba Histórico vira a tabela de janelas (AI4) e `enter` abre o gráfico alto (AI1); aba nova Análise (AI2) com a corrida (AI3); comando `analysis` com a corrida (AI3); `status` e linha de status com a linha "tempo" (AI5) |
+| U3 | A05: aba nova exige valor novo no enum `TuiTab` (exceção à regra "nenhum valor novo em enum") | **`ANALYSIS(6)` no fim** (2026-10-27): os números das abas 1–5 não mudam |
 
 ## Execução — uma atividade, um commit
 
@@ -58,6 +59,7 @@
 | A01 | 2026-10-23 | concluída | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.architecture.*"` (Linux): 1 470 testes, 0 falhas; testes novos de `buildValueLabels` (100/50/0) e `paceLabel` (0,3 %/h) |
 | A02 | 2026-10-23 | concluída | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest` (Linux): 3 273 testes, 0 falhas (a primeira passada falhou em 2: o teto de `== AppLanguage.PT` caiu para 706 e foi baixado; o teste de tela achava duas diagonais, uma por janela). `generateHelpMedia -PhelpMediaTopic=session-analysis` (26 quadros); quadros do GIF e captura da tela inteira conferidos — o ponto ficava na leitura antiga quando o percentual andava (o caminho agora termina na leitura de agora) e "1 pontos" virou singular; a frase e a projeção seguem o veredito do card (`projectedAtReset`) |
 | A03 | 2026-10-27 | concluída, **verificação pendente** | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest` (Linux): 3 275 testes, 1 falha (`HistoryAdequacyTest` › `expanded window readings remain complete in narrow modal`: a 320dp o botão do menu "Janela: … ▾" corta o rótulo). O teste foi ajustado para conferir a descrição do menu e a linha de fatos da janela (que quebra), **sem nova passada** — a sessão parou aqui. Antes: 2 testes de tela que liam o detalhe antigo (S9) foram atualizados. Captura de 5h e 7d lado a lado conferida. Desvio da galeria: chips viraram o menu de janelas (design system: chip liga/desliga restrição) |
+| A03 | 2026-10-27 | verificação concluída | `gradlew.bat allTests` (Windows 11): 3 275 testes, 1 falha — o mesmo `HistoryAdequacyTest` › `expanded window readings remain complete in narrow modal`, agora com `Expected exactly '1' node but found '2'` na tag `historyWindowMenu`: com 5h e 7d lado a lado há um menu por série. O teste passa a conferir os dois menus (`assertCountEquals(2)`) e ler o primeiro, o da série `first()`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HistoryAdequacyTest" --tests "com.usagemonitor.ui.HistoryLayoutRegressionTest"`: 12 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
@@ -106,9 +108,8 @@
 
 ### A05 — aba Análise (AI2) + corrida (AI3) + comando `usage-monitor analysis`
 
-- **Decisão pendente do usuário:** aba nova exige valor novo no enum `TuiTab` — exceção à regra "nenhum valor novo em enum".
-  Proposta: `ANALYSIS(6)` no fim (os números das outras abas não mudam). Alternativa sem exceção: a análise como vista da aba 1
-  (`enter` na conta). Perguntar antes de começar.
+- **Decidido (U3, 2026-10-27):** `ANALYSIS(6)` no fim do enum `TuiTab` — exceção à regra "nenhum valor novo em enum",
+  aprovada pelo usuário; os números das outras abas não mudam. Todo `when` sobre `TuiTab` é auditado no mesmo commit.
 - Conteúdo: as duas janelas lado a lado (barra, veredito em palavra, ritmo última hora/médio, "para caber"), 24 h numa
   escala só com tok/s em linha própria; corrida: barras "reinicia" e "esgota" (ritmo da última hora e médio) na mesma
   régua (`exhaustionTimeOf` do domínio). `usage-monitor analysis` imprime a corrida, com `--json` como contrato.
