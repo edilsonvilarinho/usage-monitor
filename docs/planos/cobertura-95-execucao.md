@@ -54,6 +54,11 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | 5 | Orquestração do `desktopMain` (`CollectorEngine`, `SettingsActions`, `AppSettingsFeedback`, `AutoStartManager`, Telegram, terminal) com costura testável | ~1 500 |
 | 6 | Janelas: extração de decisão pura; exclusão nominal do resto, medida | ~1 700 |
 
+- **Raiz de composição** (achado da onda 5, 2026-10-27): `AppGraph`, `CollectorEngine` e `AppViewModels` (~380 linhas)
+  só se montam lendo as credenciais reais (`~/.claude`), o nó de preferências do sistema e abrindo clientes HTTP de
+  verdade. Teste que os monte leria segredo do desenvolvedor e faria chamada de rede real — recusado. Ou ganham
+  costura (fábricas injetáveis), ou entram na exclusão nominal da onda 6, como o `MainKt`.
+
 ## Atividades da onda 1
 
 | ID | Atividade | Commit esperado |
@@ -99,3 +104,4 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | W4-A05 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComparisonScreenTest"`: 3 testes, 0 falhas (+2: carregando e erro com retry em inglês, recorte vazio e resultado da exportação salvo/falho). |
 | W4-A06 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.AlertSettingsSectionTest"`: 13 testes, 0 falhas (+4: limiar próprio por conta em ordem de rótulo e desfeito pelo botão, aviso sem limiar, lembrete grava os minutos padrão, validação de dólares com vírgula e `wrapHour`). |
 | W4-A07 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **86,8%** (40 193/46 309; antes 86,2%), ramos 61,6%. Piso continua 86 (valor medido arredondado para baixo). |
+| W5-A01 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.CollectorHealthReportTest"`: 5 testes, 0 falhas (contas coletadas com a falha e só-falha também listadas, estado do bot por palavra, falha do time só se mais nova que o sucesso, web sem token). `collectorHealthOf` estava em 0%. |
