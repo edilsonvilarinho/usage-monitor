@@ -13,6 +13,14 @@ import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_QUOTA_COVERAGE
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_SPIKE_FACTOR_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_SPIKE_SWITCH_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AlertSettingsSection
+import androidx.compose.ui.test.assertTextEquals
+import com.usagemonitor.domain.entity.QuotaThresholdOverride
+import com.usagemonitor.domain.entity.DEFAULT_RESET_REMINDER_MINUTES
+import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_ACCOUNT_THRESHOLDS_TEST_TAG
+import com.usagemonitor.presentation.ui.components.ALERT_SETTINGS_RESET_REMINDER_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.budgetValidationError
+import com.usagemonitor.presentation.ui.components.wrapHour
+import kotlin.test.assertNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -138,6 +146,52 @@ class AlertSettingsSectionTest {
 
         onNodeWithText("Warn when the day's usage departs from the usual").assertIsDisplayed()
         onNodeWithTag(ALERT_SETTINGS_SPIKE_FACTOR_TEST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `own thresholds per account are listed and can be dropped`() = runDesktopComposeUiTest {
+        var reported: UsageAlertSettings? = null
+        val settings = UsageAlertSettings(
+            quotaPercentsByTarget = mapOf(
+                "b" to QuotaThresholdOverride(label = "Pessoal", percents = listOf(90)),
+                "a" to QuotaThresholdOverride(label = "Empresa", percents = listOf(75, 95))
+            )
+        )
+        showSection(settings, language = AppLanguage.EN, onSettingsChange = { reported = it })
+
+        // Ordem por rótulo: a mesma lista nas duas leituras.
+        onNodeWithTag(ALERT_SETTINGS_ACCOUNT_THRESHOLDS_TEST_TAG)
+            .assertTextEquals("Own threshold: Empresa 75%, 95% · Pessoal 90%")
+        onNodeWithText("Use the general one everywhere").performClick()
+
+        assertEquals(emptyMap(), reported?.quotaPercentsByTarget)
+    }
+
+    @Test
+    fun `no threshold selected says no quota warning will be sent`() = runDesktopComposeUiTest {
+        showSection(UsageAlertSettings(quotaPercents = emptyList()), language = AppLanguage.EN)
+
+        onNodeWithText("No threshold selected: no quota warning will be sent.").assertIsDisplayed()
+    }
+
+    @Test
+    fun `reset reminder switch writes the default minutes and clears them`() = runDesktopComposeUiTest {
+        var reported: UsageAlertSettings? = null
+        showSection(UsageAlertSettings(resetReminderMinutes = null), onSettingsChange = { reported = it })
+
+        onNodeWithTag(ALERT_SETTINGS_RESET_REMINDER_SWITCH_TEST_TAG).performClick()
+
+        assertEquals(DEFAULT_RESET_REMINDER_MINUTES, reported?.resetReminderMinutes)
+    }
+
+    @Test
+    fun `budget text accepts comma and refuses what is not a dollar amount`() {
+        assertNull(budgetValidationError("", isPt = true))
+        assertNull(budgetValidationError(" 200,50 ", isPt = true))
+        assertEquals("Informe um valor em dólares, ex.: 200", budgetValidationError("abc", isPt = true))
+        assertEquals("Enter a dollar amount, e.g. 200", budgetValidationError("-5", isPt = false))
+        assertEquals(23, wrapHour(-1))
+        assertEquals(1, wrapHour(25))
     }
 
     private fun ComposeUiTest.showSection(
