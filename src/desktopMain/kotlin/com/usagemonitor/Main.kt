@@ -381,7 +381,7 @@ internal fun runUsageMonitor(
 
     // As ações do rodapé moram no balão da engrenagem da barra HUD.
     val shellActions = buildShellActions(
-        graph, viewModels, shell, modal, profileRecords, profileResolution, dashboardState, teamSettings
+        breadcrumbs, viewModels.shellTargets, graph.usageExportWriter, modal, profileRecords, profileResolution, dashboardState, teamSettings
     )
     val cliSessionPulses by viewModels.sessionPulse.cliPulses.collectAsState()
     val teamSessionPulses by viewModels.sessionPulse.teamPulses.collectAsState()

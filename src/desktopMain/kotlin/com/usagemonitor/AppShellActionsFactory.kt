@@ -1,15 +1,41 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.domain.entity.snapshotLabel
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.viewmodel.UiState
+import com.usagemonitor.presentation.viewmodel.UsageExportWriter
 import com.usagemonitor.presentation.viewmodel.recordFailure
 import kotlin.time.Clock
+
+/**
+ * O que as ações do app pedem aos view models. Porta e não os view models
+ * direto: a decisão de cada ação (o nome na trilha, a conta sem `accountUuid`
+ * que não abre nada, o que é só de admin) fica testável sem montar o
+ * `AppViewModels`, que sobe a coleta inteira. Quem implementa é o próprio
+ * `AppViewModels`.
+ */
+internal interface ShellActionTargets {
+    fun refreshAll()
+    fun openComparison()
+    fun openHistory(source: ApiSource, accountKey: UsageAccountKey?)
+    fun openCliSessions(profileId: String, profileLabel: String?, quotaWindows: CliQuotaWindows)
+    fun openCodexCliSessions()
+    fun openTeamUsageForAccount(accountKey: String, accountLabel: String, quotaWindows: CliQuotaWindows)
+    fun openTeamUsageForAllAccounts()
+    fun openTeamPresenceForAccount(accountKey: String, accountLabel: String)
+    fun openTeamPresenceForAllAccounts()
+    fun openAnalysis(targetKey: String, accountLabel: String)
+    fun requestTeamSync()
+}
 
 /**
  * As ações do rodapé e dos cards, montadas uma vez para as duas portas — o
@@ -20,18 +46,18 @@ import kotlin.time.Clock
  * pública.
  */
 internal fun buildShellActions(
-    graph: AppGraph,
-    viewModels: AppViewModels,
-    shell: AppShellState,
+    breadcrumbs: BreadcrumbRecorder,
+    targets: ShellActionTargets,
+    exportWriter: UsageExportWriter,
     modal: AppModalState,
     profileRecords: List<AnthropicProfileRecord>,
     profileResolution: AnthropicProfileResolution,
     dashboardState: UiState,
-    teamSettings: TeamIntegrationSettings
+    teamSettings: TeamIntegrationSettings,
+    clock: Clock = Clock.System
 ): AppShellActions {
-    val breadcrumbs = graph.breadcrumbs
     return AppShellActions(
-        refreshAll = { viewModels.dashboard.refresh() },
+        refreshAll = { targets.refreshAll() },
         openSettings = {
             breadcrumbs.recordScreenOpened("Configurações")
             modal.openSettings()
@@ -43,12 +69,12 @@ internal fun buildShellActions(
         openComparison = {
             breadcrumbs.recordScreenOpened("Comparar modelos e APIs")
             modal.openComparison()
-            viewModels.comparison.openWindow()
+            targets.openComparison()
         },
         // Retrato do Dashboard (issue #215): o mesmo writer das Sessões CLI e do
         // Time, um diálogo de arquivo só.
         exportSnapshot = { stats ->
-            graph.usageExportWriter.write(exportRequestForDashboard(DefaultUsageExportEncoder, stats, Clock.System.now()))
+            exportWriter.write(exportRequestForDashboard(DefaultUsageExportEncoder, stats, clock.now()))
         },
         onExportFailure = { error -> breadcrumbs.recordFailure("exportar retrato do dashboard", error) },
         // Só quem administra: a conta não entra na condição de propósito —
@@ -57,7 +83,7 @@ internal fun buildShellActions(
             {
                 breadcrumbs.recordScreenOpened("visão global do time (admin)")
                 modal.openTeamUsage(accountLabel = null, profileId = null, isAdminOverview = true)
-                viewModels.teamUsage.openForAllAccounts()
+                targets.openTeamUsageForAllAccounts()
             }
         } else {
             null
@@ -65,14 +91,14 @@ internal fun buildShellActions(
         openHistory = { source, accountKey ->
             breadcrumbs.recordScreenOpened("histórico de ${source.name}")
             modal.openHistory(source)
-            viewModels.history.openForSource(source, accountKey)
+            targets.openHistory(source, accountKey)
         },
         openCliSessions = { target ->
             breadcrumbs.recordScreenOpened("sessões CLI da máquina")
             val profileId = target.profileIdOrDefault()
             val label = profileRecords.firstOrNull { record -> record.id == profileId }?.label
             modal.openCliSessions(profileId = profileId, profileLabel = label)
-            viewModels.cliSessions.openForProfile(
+            targets.openCliSessions(
                 profileId = profileId,
                 profileLabel = label,
                 quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
@@ -81,7 +107,7 @@ internal fun buildShellActions(
         openCodexCliSessions = { _ ->
             breadcrumbs.recordScreenOpened("sessões Codex CLI")
             modal.openCodexCliSessions()
-            viewModels.codexCliSessions.openWindow()
+            targets.openCodexCliSessions()
         },
         openTeamUsage = { target ->
             val profileId = target.profileIdOrDefault()
@@ -93,14 +119,14 @@ internal fun buildShellActions(
             if (accountKey != null) {
                 breadcrumbs.recordScreenOpened("uso do time")
                 modal.openTeamUsage(accountLabel = accountContext.displayLabel, profileId = profileId, isAdminOverview = false)
-                viewModels.teamUsage.openForAccount(
+                targets.openTeamUsageForAccount(
                     accountKey = accountKey,
                     accountLabel = accountContext.displayLabel,
                     quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
                 )
                 // Antecipa o envio desta máquina: sem isso a janela abriria sem o
                 // que foi feito aqui desde o último tique de 30s.
-                viewModels.teamSync.requestImmediateSync()
+                targets.requestTeamSync()
             }
         },
         openTeamPresence = { target ->
@@ -110,10 +136,10 @@ internal fun buildShellActions(
             if (accountKey != null) {
                 breadcrumbs.recordScreenOpened("presença do time")
                 modal.openTeamPresence(accountLabel = accountContext.displayLabel, isAdminOverview = false)
-                viewModels.teamPresence.openForAccount(accountKey = accountKey, accountLabel = accountContext.displayLabel)
+                targets.openTeamPresenceForAccount(accountKey = accountKey, accountLabel = accountContext.displayLabel)
                 // Antecipa a batida desta máquina: sem isso a janela abriria com o
                 // próprio usuário aparecendo offline por até 30 segundos.
-                viewModels.teamSync.requestImmediateSync()
+                targets.requestTeamSync()
             }
         },
         openAnalysis = { target ->
@@ -121,13 +147,13 @@ internal fun buildShellActions(
             // O rótulo é o do retrato (fonte e apelido), o mesmo do bot; nunca o e-mail cru.
             val stats = (dashboardState as? UiState.Success)?.data?.firstOrNull { item -> item.targetKey == target }
             modal.openAnalysis()
-            viewModels.analysis.openForAccount(target.storageKey, stats?.snapshotLabel ?: target.source.displayName())
+            targets.openAnalysis(target.storageKey, stats?.snapshotLabel ?: target.source.displayName())
         },
         openTeamPresenceOverview = if (teamSettings.isAdminMode) {
             {
                 breadcrumbs.recordScreenOpened("presença global do time (admin)")
                 modal.openTeamPresence(accountLabel = null, isAdminOverview = true)
-                viewModels.teamPresence.openForAllAccounts()
+                targets.openTeamPresenceForAllAccounts()
             }
         } else {
             null

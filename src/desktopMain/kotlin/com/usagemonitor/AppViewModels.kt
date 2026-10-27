@@ -1,6 +1,9 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CollectorKind
+import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageSnapshot
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
@@ -140,6 +143,26 @@ internal class AppViewModels(
 
     val validateAdminToken = ValidateAdminTokenUseCase(graph.teamAdminRepository)
     val claimTeamKeyForAccount = ClaimTeamKeyForAccountUseCase(graph.teamAdminRepository)
+
+    /** O que as ações do rodapé e dos cards pedem (`buildShellActions`). */
+    val shellTargets: ShellActionTargets = object : ShellActionTargets {
+        override fun refreshAll() = dashboard.refresh()
+        override fun openComparison() = comparison.openWindow()
+        override fun openHistory(source: ApiSource, accountKey: UsageAccountKey?) = history.openForSource(source, accountKey)
+        override fun openCliSessions(profileId: String, profileLabel: String?, quotaWindows: CliQuotaWindows) =
+            cliSessions.openForProfile(profileId = profileId, profileLabel = profileLabel, quotaWindows = quotaWindows)
+        override fun openCodexCliSessions() = codexCliSessions.openWindow()
+        override fun openTeamUsageForAccount(accountKey: String, accountLabel: String, quotaWindows: CliQuotaWindows) =
+            teamUsage.openForAccount(accountKey = accountKey, accountLabel = accountLabel, quotaWindows = quotaWindows)
+        override fun openTeamUsageForAllAccounts() = teamUsage.openForAllAccounts()
+        override fun openTeamPresenceForAccount(accountKey: String, accountLabel: String) =
+            teamPresence.openForAccount(accountKey = accountKey, accountLabel = accountLabel)
+        override fun openTeamPresenceForAllAccounts() = teamPresence.openForAllAccounts()
+        override fun openAnalysis(targetKey: String, accountLabel: String) = analysis.openForAccount(targetKey, accountLabel)
+        override fun requestTeamSync() {
+            teamSync.requestImmediateSync()
+        }
+    }
 
     /**
      * Para as telas e depois o motor, que fecha bancos e clientes e só então
