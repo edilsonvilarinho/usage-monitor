@@ -34,6 +34,7 @@ internal class TuiHistoryLabels(val language: AppLanguage) {
     fun open(reset: String): String = localized(language, "aberta · reinicia $reset", "open · resets $reset")
     fun leftover(percent: Int): String = localized(language, "sobrou $percent%", "$percent% left")
     fun exhaustedAfter(duration: String): String = localized(language, "esgotou após $duration", "ran out after $duration")
+    val outAtFirstReading: String get() = localized(language, "já esgotada na 1ª leitura", "already out at the first reading")
     fun idleFor(duration: String): String = localized(language, "parado $duration", "idle $duration")
 
     /** O gráfico alto (AI1): de quando a quando, e quanto tempo cabe numa coluna. */
@@ -46,7 +47,11 @@ internal class TuiHistoryLabels(val language: AppLanguage) {
     fun used(percent: Int): String = localized(language, "$percent% usada", "$percent% used")
     fun peak(percent: Int): String = localized(language, "pico $percent%", "peak $percent%")
     fun active(span: String): String = localized(language, "ativa $span", "active $span")
-    fun averagePace(pace: String): String = localized(language, "ritmo médio $pace", "average pace $pace")
+    /**
+     * O ritmo da janela por hora observada, como o Histórico do app o chama ("ritmo"): "ritmo médio" é o
+     * da aba 6, desde o início nominal, e o mesmo nome para dois números confundia.
+     */
+    fun pace(pace: String): String = localized(language, "ritmo $pace", "pace $pace")
 
     val noReading: String get() = localized(language, "sem leitura nesta janela", "no reading in this window")
     val noQuotas: String get() = localized(language, "Nenhuma cota com percentual para mostrar.", "No quota with a percentage to show.")

@@ -158,5 +158,5 @@ internal object TuiHistoryChartView {
 
     /** `ativa 15:09–19:07 · ritmo médio 13 %/h`. */
     private fun facts(window: QuotaWindowSummary, labels: TuiHistoryLabels, glyphs: TerminalGlyphs): String =
-        labels.active(TuiHistoryView.activeSpan(window, labels)) + " ${glyphs.separator} " + labels.averagePace(paceLabel(window.averagePercentPerHour, labels.language))
+        labels.active(TuiHistoryView.activeSpan(window, labels)) + " ${glyphs.separator} " + labels.pace(paceLabel(window.averagePercentPerHour, labels.language))
 }

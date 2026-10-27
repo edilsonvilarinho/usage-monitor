@@ -189,7 +189,8 @@ nova primeiro e no máximo 8 (as outras viram `+N janelas mais antigas`), sob o 
 `20/10–21/10` quando atravessa dias, `—` sem subida), o pico numa barra de cota de 10 células e o
 número, e o fim — `aberta · reinicia 19:30` e `sobrou 4%` em muted, ou `▲ esgotou após 3 h 15 min ·
 parado 1 h 30 min` em `--term-crit`, contado da primeira leitura (o início nominal a API não informa);
-sem espaço, o "parado" sai inteiro. Cota sem janela (saldo, intervalar sem reinício conhecido) diz
+sem espaço, o "parado" sai inteiro. Janela que já chega esgotada na primeira leitura do período diz
+`▲ já esgotada na 1ª leitura`, nunca "esgotou após 0 min". Cota sem janela (saldo, intervalar sem reinício conhecido) diz
 `sem janela no período`. `↑ ↓` andam pelas janelas de todas as cotas, `← →` trocam o período (24 h, 7
 dias, 30 dias) e a tabela rola até a janela escolhida.
 
@@ -201,7 +202,8 @@ dia e mês na semanal). Do início nominal (reinício − 5 h ou 7 d; sem duraç
 leitura) ao reinício, até 60 colunas; a coluna é a última leitura até o fim dela, e na janela aberta nada
 depois de agora. Título `rótulo · janela de 23/10 15:09 a 20:09 · uma coluna = 5 min`. Frase: aberta,
 `64% usada com 97% da janela já passada · ✓ 33 pp atrás do tempo`; fechada, `pico 96% · sobrou 4%` ou o
-pico e como esgotou. Abaixo, em muted, a faixa ativa e o ritmo médio. `esc` volta à tabela.
+pico e como esgotou. Abaixo, em muted, a faixa ativa e o ritmo (`ritmo 13 %/h`, por hora observada, o nome do Histórico do
+app; "ritmo médio" é o da aba 6, desde o início nominal). `esc` volta à tabela.
 
 **Aba Análise** (3.6, #463 AI2). A janela "Análise" do app no terminal, para as contas com índice
 CLI (Claude Code e Codex), uma de cada vez (`← →`, com `conta 1 de 3` à direita). As duas janelas lado

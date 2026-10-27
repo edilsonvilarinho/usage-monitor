@@ -88,7 +88,7 @@ class TuiHistoryViewTest {
         assertTrue(lines[13].startsWith("│      ╰" + "─".repeat(60) + "┆"), lines[13])
         assertTrue(lines[14].startsWith("│       10:23") && lines[14].contains("12:53") && lines[14].trimEnd('│', ' ').endsWith("15:23"), lines[14])
         assertTrue(lines[16].startsWith("│ 91% usada com 80% da janela já passada · ▲ 11 pp à frente do tempo"), lines[16])
-        assertTrue(lines[17].startsWith("│ ativa 10:38–14:23 · ritmo médio "), lines[17])
+        assertTrue(lines[17].startsWith("│ ativa 10:38–14:23 · ritmo "), lines[17])
         assertTrue(lines[22].startsWith("│ esc lista  ↑↓ janela"), lines[22])
     }
 
@@ -121,6 +121,16 @@ class TuiHistoryViewTest {
                 assertTrue(lines.all { line -> line.length == size.columns }, "$size $state")
             }
         }
+    }
+
+    @Test
+    fun `janela que ja chega esgotada no periodo nao diz que esgotou apos 0 min`() {
+        // A janela fechada esgotou às 06:53 (seis horas e meia atrás); o período só começa às 08:23, já em 100%.
+        val row = TuiHistoryFixtures.row(team, team.quotas.single(), closedPeaks = listOf(100), length = 5.hours, now = now, since = 6.hours)
+        val closed = row.listedWindows[1]
+        assertEquals(closed.firstObservedAt, closed.exhaustedAt)
+        val text = TuiHistoryView.ending(closed, now, TuiHistoryLabels(AppLanguage.PT), TerminalLabels(AppLanguage.PT), color).single().text
+        assertEquals("▲ já esgotada na 1ª leitura · parado 1 h", text)
     }
 
     @Test

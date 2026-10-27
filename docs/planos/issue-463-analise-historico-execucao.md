@@ -50,6 +50,7 @@
 | A04 | `feat(cli)`: aba Histórico vira a tabela de janelas (AI4) e `enter` abre o gráfico alto da janela (AI1); design system do terminal e protótipo do CLI no mesmo commit |
 | A05 | `feat(cli)`: aba Análise (AI2) com a corrida esgotar × reiniciar (AI3), e o comando `usage-monitor analysis` com a mesma corrida (`--json` como contrato) |
 | A06 | `feat(cli)`: `status` e linha de status com a linha "tempo" da janela (AI5) |
+| A07 | `fix(cli)`: o que a verificação com os bancos reais achou na aba 3 — janela já esgotada na 1ª leitura do período e o nome do ritmo do gráfico |
 
 ## Pontos de situação
 
@@ -63,6 +64,7 @@
 | A04 | 2026-10-27 | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"` (Windows 11): 288 testes, 0 falhas. A primeira passada do `TuiHistoryViewTest` falhou em 3 asserções escritas antes da saída real (barra de 91% em 10 células é 9 cheias pelo piso; as colunas antes da 1ª leitura ficam vazias; a coluna que começa agora tem a leitura de agora) — corrigidas as expectativas, não o código. Tela despejada em PT/EN, Unicode/ASCII, 96 e 80 colunas: a 80 o "parado" cortava no meio e passou a sair inteiro. `generateTerminalMedia`: 55 quadros por idioma (a aba 3 abre o gráfico no GIF). Protótipo 3.3 e 3.3b conferidos pelo script da página no Node (o Chrome headless não gerou DOM nesta máquina). Desvio: a frase do gráfico usa "pp atrás/à frente do tempo" (AI5) em vez de "abaixo da linha", porque o terminal não desenha a diagonal |
 | A06 | 2026-10-27 | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"` (Windows 11): 290 testes, 0 falhas. A primeira passada falhou em 9 testes que fixavam a saída antiga do `status`, da linha de status e da lista de campos do `--json`; os números novos conferidos à mão antes de atualizar (5h com reinício em 2h17 → 54% do tempo, 62% de cota → ▲ 8 pp; em 47 min → 84%; 7d → 31%). Um tipo só, `TerminalQuotaTime` (piso em aritmética inteira), serve `status`, linha de status, `--json` e o gráfico da A04 — o gráfico trocou `roundToInt` pelo piso. `--json` ganha `window_starts_at` e `time_elapsed_percent` sem subir a versão. `generateTerminalMedia` refeito; protótipo 1.1, 1.2 e 2.2 conferidos pelo script da página no Node |
 | A05 | 2026-10-27 | concluída | `gradlew.bat allTests` (Windows 11): 3 293 testes, 0 falhas. Antes, `desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"`: 5 testes antigos fixavam "1–5"/"1 a 5" (viraram 1–6) e o teste novo das abas compactas tinha um espaço a mais na expectativa. `TuiTab.ANALYSIS(6)` no fim (U3); `when` sobre `TuiTab` auditados (`TuiLabels`, `TuiScreen`, `TuiState`, `TuiReader`). O despejo das fixtures achou três defeitos, corrigidos antes do commit: a 80 colunas em PT a linha de abas cortava "6 Anál…" (agora as inativas ficam só com o número), a nota "the current pace is enough" cortava na coluna (virou "current pace fits") e o comando não separava as janelas. Verificado contra os bancos reais desta máquina (teste temporário, apagado): `analysis` e `--json` com a conta Anthropic (5h a 53 %/h esgota em 54 min, antes do reinício em 3h53), aba 6 e `status` coerentes entre si. `generateTerminalMedia`: 60 quadros por idioma, com a aba 6 |
+| A07 | 2026-10-27 | concluída | Despejo da aba 3 com os bancos reais (teste temporário da A05): a semanal que já estava em 100% na primeira leitura do período saía "ran out after 0 min", e o gráfico chamava de "ritmo médio" (por hora observada, 53 %/h) o mesmo nome que a aba 6 usa para outro número (desde o início nominal, 47 %/h). Agora `já esgotada na 1ª leitura` e `ritmo`, o nome do Histórico do app. `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.architecture.*"`: verde, com o teste novo da janela esgotada na 1ª leitura (`TuiHistoryViewTest`, 10 testes, 0 falhas) |
 
 ## Problemas em aberto e riscos
 
@@ -72,9 +74,11 @@
   evitava o início nominal ("a API não informa"); a lista continua dizendo o início **observado**, e o eixo do gráfico
   diz "início" e "reinício".
 - `TeamUsageViewModel` e `DashboardViewModel` estão perto do teto de 800 linhas — a mudança não passa por eles.
-- **Aba 6 e comando `analysis` não foram rodados contra bancos reais nesta sessão**: a leitura (`TerminalAnalysisReader`)
-  é a mesma do `sessionAnalysisReader` do app sobre os `TuiStores` em somente leitura, testada por unidade e pelo despejo
-  das fixtures; um `usage-monitor analysis` e um `tui` → `6` numa máquina com histórico confirmam antes do merge.
+- **Aba 6 e `analysis` contra bancos reais**: verificados nesta máquina por um teste temporário (A05), com a leitura
+  real e uma conta Anthropic; o binário instalado (`usage-monitor analysis`, `tui` → `6`) não foi rodado — o caminho é o
+  mesmo `TerminalCommands.run`, mas o PR diz isso.
+- **OpenCode Go 5h** aparece com dezenas de janelas de 0% em 24 h na aba 3 (o reinício dela anda a cada leitura): é o
+  corte do domínio, o mesmo do Histórico do app, e não foi mexido.
 - **Régua da corrida**: vai até a duração da janela; com o ritmo médio baixo na semanal, a régua fica em 7 d e a barra
   do reinício encolhe. Escolha consciente (o que esgotaria depois da janela não se desenha mais longe), a rever com uso.
 - **Linux (X11)**: mudança em host de janela é aberta no Linux antes do merge, ou o PR diz o risco; a suíte só roda no

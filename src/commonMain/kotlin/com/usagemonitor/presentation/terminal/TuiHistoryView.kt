@@ -176,7 +176,9 @@ internal object TuiHistoryView {
         val exhaustedAt = window.exhaustedAt
         return when {
             exhaustedAt != null -> {
-                val after = labels.exhaustedAfter(PaceDiagonalModels.durationLabel((exhaustedAt - window.firstObservedAt).inWholeMilliseconds))
+                // Esgotada já na primeira leitura do período: "esgotou após 0 min" diria que foi instantâneo.
+                val after = if (exhaustedAt <= window.firstObservedAt) labels.outAtFirstReading
+                else labels.exhaustedAfter(PaceDiagonalModels.durationLabel((exhaustedAt - window.firstObservedAt).inWholeMilliseconds))
                 val idle = (window.resetsAt.coerceAtMost(if (window.isOpen) now else window.resetsAt) - exhaustedAt).inWholeMilliseconds
                 val short = profile.glyphs.warning + " " + after
                 val full = "$short ${profile.glyphs.separator} ${labels.idleFor(PaceDiagonalModels.durationLabel(idle))}"
