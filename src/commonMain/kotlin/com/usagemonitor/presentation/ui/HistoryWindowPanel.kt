@@ -150,7 +150,7 @@ private fun HistoryWindowListItem(
 }
 
 @Composable
-private fun HistoryWindowMenu(
+internal fun HistoryWindowMenu(
     listed: List<QuotaWindowSummary>,
     selected: QuotaWindowSummary,
     onSelect: (QuotaWindowSummary) -> Unit,

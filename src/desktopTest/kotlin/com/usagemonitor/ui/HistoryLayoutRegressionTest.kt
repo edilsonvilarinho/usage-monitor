@@ -103,4 +103,53 @@ class HistoryLayoutRegressionTest {
             waitUntil(timeoutMillis = 5000) { (vm.uiState.value as? HistoryUiState.Success)?.selectedAccount == accounts.last() }
         } finally { vm.onDestroy() }
     }
+
+    /** 5h com uma leitura no início e outra no pico de cada janela sintética, para a diagonal (#463). */
+    private fun paceSeries(label: String = "Claude 5h", periodType: com.usagemonitor.domain.entity.PeriodType = com.usagemonitor.domain.entity.PeriodType.INTERVAL): com.usagemonitor.domain.entity.UsageHistorySeries {
+        val base = issue383ManyWindowsSeries()
+        val points = base.windows.flatMap { window ->
+            listOf(
+                com.usagemonitor.domain.entity.UsageHistoryPoint(window.firstObservedAt, 0L, 100L, 0L, 0L, window.resetsAt),
+                com.usagemonitor.domain.entity.UsageHistoryPoint(window.lastObservedAt, window.peakPercent.toLong(), 100L, 0L, 0L, window.resetsAt)
+            )
+        }
+        return base.copy(quotaLabel = label, periodType = periodType, points = points)
+    }
+
+    @Test
+    fun `pace panel draws the windows on the diagonal and switches the chosen one by the menu`() = runDesktopComposeUiTest(width = 1030, height = 900) {
+        val series = paceSeries()
+        val newestFirst = windowRowsNewestFirst(series.windows)
+        setContent { ScreenTestTheme(isDark = true) { HistoryPaceWindowsPanel(series, Color.Cyan, AppLanguage.PT) } }
+        onNodeWithTag(PACE_DIAGONAL_TAG).assertIsDisplayed()
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).assertContentDescriptionEquals("Janela: ${windowStartLabel(newestFirst.first(), AppLanguage.PT)}")
+        onNodeWithText(paceWindowFacts(newestFirst.first(), AppLanguage.PT)).assertExists()
+
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).performClick()
+        onNodeWithTag(historyWindowItemTag(newestFirst[2])).performClick()
+
+        onNodeWithTag(HISTORY_WINDOW_MENU_TAG).assertContentDescriptionEquals("Janela: ${windowStartLabel(newestFirst[2], AppLanguage.PT)}")
+        onNodeWithText(paceWindowFacts(newestFirst[2], AppLanguage.PT)).assertExists()
+        onNodeWithTag(PACE_DIAGONAL_TAG).assertContentDescriptionContains(windowStartLabel(newestFirst[2], AppLanguage.PT), substring = true)
+    }
+
+    @Test
+    fun `5h and 7d windows sit side by side on a wide window and stack on a narrow one`() {
+        val fiveHour = paceSeries()
+        val weekly = paceSeries("Claude 7d", com.usagemonitor.domain.entity.PeriodType.WEEKLY)
+        fun bounds(width: Int): Pair<androidx.compose.ui.unit.DpRect, androidx.compose.ui.unit.DpRect> {
+            var result: Pair<androidx.compose.ui.unit.DpRect, androidx.compose.ui.unit.DpRect>? = null
+            runDesktopComposeUiTest(width = width, height = 2400) {
+                setContent { ScreenTestTheme(isDark = true) { HistoryPaceWindowsRow(listOf(fiveHour, weekly), { Color.Cyan }, AppLanguage.PT) } }
+                result = onNodeWithTag(HISTORY_PACE_PANEL_TAG_PREFIX + "Claude 5h").getUnclippedBoundsInRoot() to
+                    onNodeWithTag(HISTORY_PACE_PANEL_TAG_PREFIX + "Claude 7d").getUnclippedBoundsInRoot()
+            }
+            return result!!
+        }
+        val (wideFive, wideWeek) = bounds(1030)
+        assertEquals(wideFive.top, wideWeek.top, "Lado a lado: mesma altura de topo")
+        assertTrue(wideFive.right <= wideWeek.left, "Lado a lado: 5h à esquerda da 7d")
+        val (narrowFive, narrowWeek) = bounds(600)
+        assertTrue(narrowFive.bottom <= narrowWeek.top, "Empilhadas: 7d abaixo da 5h")
+    }
 }

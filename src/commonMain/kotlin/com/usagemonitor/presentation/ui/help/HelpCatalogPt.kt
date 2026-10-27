@@ -67,6 +67,7 @@ private val PT_HISTORY = HelpEntry(
         "Escolha o intervalo na barra superior; sem ponto no período anterior não há " +
             "comparativo, porque zero ali significaria \"não consumiu\".",
         "O resumo precede o gráfico. Expanda \"Resumo das cotas\" e \"Janelas e distribuição horária\" para consultar os detalhes.",
+        "Em \"Janelas e distribuição horária\", as janelas 5h e 7d ficam lado a lado na diagonal do ritmo: escolha uma no menu \"Janela\" e ela fica em destaque, com as outras atrás.",
         "Abra \"Conta\" para selecionar outra conta. Clique em \"PDF\" para salvar fonte, conta, intervalo e cotas selecionadas. Zoom e seções recolhidas não retiram dados do relatório.",
         "Nada é enviado para lugar nenhum: o histórico fica em ~/.usage-monitor/usage-history.db."
     ),

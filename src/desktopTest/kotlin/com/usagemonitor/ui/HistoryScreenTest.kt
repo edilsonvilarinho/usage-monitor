@@ -1107,8 +1107,9 @@ class HistoryScreenTest {
         // #392 (S9): a análise nasce aberta, com a janela escolhida no detalhe.
 
         onNodeWithText("Janelas 5h").assertIsDisplayed()
-        onNodeWithText("3h 30min").assertIsDisplayed()
-        onNodeWithText("24 %/h").assertIsDisplayed()
+        // #463 (AH1): os fatos da janela escolhida numa linha, abaixo da diagonal.
+        onNodeWithText("esgotou em 3h 30min", substring = true).assertIsDisplayed()
+        onNodeWithText("ritmo 24 %/h", substring = true).assertIsDisplayed()
         onNodeWithText("Pico às 8h BRT · 100% do consumo").assertIsDisplayed()
         // A semanal sem janelas nem distribuição não ganha painel vazio.
         onAllNodesWithText("Janelas 7d").assertCountEquals(0)

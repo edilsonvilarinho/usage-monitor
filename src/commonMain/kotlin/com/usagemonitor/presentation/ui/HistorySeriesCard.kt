@@ -81,14 +81,24 @@ internal fun HistorySeriesCard(
                 if (language == AppLanguage.PT) "Janelas e distribuição horária" else "Windows and hourly distribution",
                 "historyAnalysis:$chartSelectionKey", analysisExpanded, { analysisExpanded = !analysisExpanded }, language
             ) {
+                val outputColor = AppAccents.current.output
+                val savingsColor = AppAccents.current.savings
+                val colorOf: (UsageHistorySeries) -> Color = { item ->
+                    when (item) {
+                        weeklySummary -> outputColor
+                        monthlySummary -> savingsColor
+                        else -> accentColor
+                    }
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                    visibleSeries.forEach { item ->
-                        val itemColor = when (item) {
-                            weeklySummary -> AppAccents.current.output
-                            monthlySummary -> AppAccents.current.savings
-                            else -> accentColor
-                        }
-                        HistoryWindowAnalysisPanel(item, itemColor, language)
+                    // 5h e 7d na diagonal do ritmo, lado a lado (#463, AH1); série sem duração
+                    // nominal conhecida (MiniMax intervalar, mensal) fica com a lista e o detalhe.
+                    val onDiagonal = visibleSeries.filter(::hasPaceDiagonal)
+                    if (onDiagonal.isNotEmpty()) {
+                        HistoryPaceWindowsRow(onDiagonal, colorOf, language)
+                    }
+                    visibleSeries.filterNot(::hasPaceDiagonal).forEach { item ->
+                        HistoryWindowAnalysisPanel(item, colorOf(item), language)
                     }
                 }
             }

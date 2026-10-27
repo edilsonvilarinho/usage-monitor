@@ -24,7 +24,10 @@ class HistoryAdequacyTest {
             waitUntil(timeoutMillis = 5000) { vm.uiState.value is HistoryUiState.Success }
             onNodeWithText("▾ Janelas e distribuição horária").performScrollTo()
             val window = (vm.uiState.value as HistoryUiState.Success).report.series.first().windows.last()
-            val value = onNodeWithText(windowStartLabel(window, AppLanguage.PT)).performScrollTo().assertIsDisplayed()
+            // #463: o menu "Janela: … ▾" diz qual é a janela (o nome inteiro vai na descrição, o botão
+            // pode cortar a 320dp); a leitura dela é a linha de fatos, que quebra e não corta.
+            onNodeWithTag(HISTORY_WINDOW_MENU_TAG).assertContentDescriptionEquals("Janela: ${windowStartLabel(window, AppLanguage.PT)}")
+            val value = onNodeWithText(paceWindowFacts(window, AppLanguage.PT)).performScrollTo().assertIsDisplayed()
             val layouts = mutableListOf<TextLayoutResult>()
             value.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertFalse(layouts.single().hasVisualOverflow)

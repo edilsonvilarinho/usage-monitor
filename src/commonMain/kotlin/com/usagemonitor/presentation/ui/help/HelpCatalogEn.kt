@@ -61,6 +61,7 @@ private val EN_HISTORY = HelpEntry(
         "Pick the range in the top bar; with no data point in the previous period there is " +
             "no comparison, because zero there would mean \"consumed nothing\".",
         "The summary precedes the chart. Expand \"Quota summary\" and \"Windows and hourly distribution\" to read the details.",
+        "In \"Windows and hourly distribution\", the 5h and 7d windows sit side by side on the pace diagonal: pick one in the \"Window\" menu and it is highlighted, with the others behind it.",
         "Open \"Account\" to select another account. Click \"PDF\" to save the selected source, account, range and quotas. Zoom and collapsed sections do not remove report data.",
         "Nothing is sent anywhere: the history lives in ~/.usage-monitor/usage-history.db."
     ),
