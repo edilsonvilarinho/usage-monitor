@@ -54,19 +54,20 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 
 ## Ondas (uma PR cada)
 
-| Onda | Escopo | Linhas descobertas no escopo |
-|---|---|---|
-| 1 | Catraca; dados do time (`RemoteTeamDataSource`, repositórios, mapper) por `MockEngine`; servidor a ≥ 95% | ~400 + 23 |
-| 2 | Telas Compose de sessões CLI/Codex (`CodexCliSessions*`, `CliUsageBreakdown*`, `ActivityHeatmapGrid`, `TurnSeriesChart`) | ~680 |
-| 3 | Formatação e rótulos puros (`*Formatting.kt`, `*Labels.kt`, `*Messages.kt`, terminal) | ~500 |
-| 4 | Telas Compose restantes (`DashboardScreen*`, `TeamKeysAdminScreen`, `TeamUsageScreen`, cards) | ~600 |
-| 5 | Orquestração do `desktopMain` (`CollectorEngine`, `SettingsActions`, `AppSettingsFeedback`, `AutoStartManager`, Telegram, terminal) com costura testável | ~1 500 |
-| 6 | Janelas: extração de decisão pura; exclusão nominal do resto, medida | ~1 700 |
+| Onda | Escopo | Estado | Kotlin depois |
+|---|---|---|---|
+| 1 | Catraca; dados do time por `MockEngine`; servidor a ≥ 95% | PR #476, mesclada | 84,1% (servidor 95,8%) |
+| 2 | Telas de sessões CLI/Codex, rótulos do Resumo, gráfico por resposta | PR #479, mesclada | 85,6% |
+| 3 | Textos, rótulos e construtores puros; paridade de cores com `terminal.css` | PR #480, mesclada | 86,2% |
+| 4 | Telas e view models com uso real (avisos, chaves, card, time, comparação, alertas) | PR #481, mesclada | 86,8% |
+| 5 | Serviço/terminal/time testáveis sem a raiz de composição | PR #482, mesclada | 87,2% |
+| 6.1 | Rota híbrida: exclusão nominal; geometria de janela numa implementação só | PR #483, mesclada | 88,1% |
+| 6.2 | Costura em `AutoStartManager` (plataforma, `HOME`, executor injetáveis) e no `desktopMain` com lógica (`SettingsActions`, `AppSettingsFeedback`, `TelegramBotWiring`/`Actions`, `AppShellActionsFactory`, `AppModalState`) | pendente | — |
+| 6.3 | Janelas: extrair decisão de `HudWindow*`, `AppDialogWindow`, `DesktopWindowFrame`, `CompositorWindowDrag` para função pura; excluir só a chamada AWT/JNA que sobrar, por nome | pendente | — |
+| 6.4 | `commonMain` restante (~1 300 linhas: telas de sessões, presença, histórico, Telegram) | pendente | — |
 
-- **Raiz de composição** (achado da onda 5, 2026-10-27): `AppGraph`, `CollectorEngine` e `AppViewModels` (~380 linhas)
-  só se montam lendo as credenciais reais (`~/.claude`), o nó de preferências do sistema e abrindo clientes HTTP de
-  verdade. Teste que os monte leria segredo do desenvolvedor e faria chamada de rede real — recusado. Ou ganham
-  costura (fábricas injetáveis), ou entram na exclusão nominal da onda 6, como o `MainKt`.
+Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o teto para 95% é 2 268, faltam
+**3 139**. Distribuição: `desktopMain` 2 598, janela 1 453, `commonMain` 1 327, gerado 22, só-teste 7.
 
 ## Atividades da onda 1
 
@@ -125,3 +126,4 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | W6-A01 | 2026-10-27 | este commit | concluída | Exclusão nominal aprovada pelo dono (rota híbrida): `AppGraph`, `AppViewModels`, `DashboardScreenKt`, `ResponsiveDashboardCardGridKt` (+ lambdas e `ComposableSingletons`). `codexProfileSources` (`AppGraphKt`) e 3 classes privadas da grade seguem contadas. `gradlew.bat koverXmlReport -Pcoverage` sobre a passada da onda 5: **87,7%** (40 003/45 617; antes 87,2%). Relatório lista os excluídos em "O que a suíte não cobre". |
 | W6-A02 | 2026-10-27 | este commit | concluída | As 4 cópias de `*WindowPreferences.kt` (671 linhas, ~230 descobertas) viram `WindowGeometryPreferences.kt` (uma implementação, `WindowGeometrySpec` por janela, chaves gravadas idênticas) e o `PersistAppWindowStates` perde os 4 blocos repetidos. `gradlew.bat desktopTest --tests WindowGeometryPreferencesTest --tests ArchitectureRulesTest --tests TeamPresenceScreenTest`: 8 + 17 + 31 testes, 0 falhas. Chaves e tamanhos padrão travados por teste. Testado só no Windows; o comportamento de janela não muda (só a persistência foi unificada). |
 | W6-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **88,1%** (39 955/45 362; antes 87,2%), ramos 62,9%. Restam 5 407 descobertas (teto para 95%: 2 268): `desktopMain` 2 598, janela 1 453, `commonMain` 1 327. Piso do Kotlin: 88. |
+| Onda 6.1 | 2026-10-27 | este commit | PR #483 (merge `f7f6ae58`) | Run `40583073069`: `ci-ok` verde (inclui `desktop-linux`), 0 incidências; `Coverage floor` executou `koverVerify` com piso 88. |
