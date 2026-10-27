@@ -10,11 +10,15 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -394,21 +398,87 @@ class TeamKeysAdminScreenTest {
             assertEquals(listOf(ACCOUNT_UUID), unblocked)
         }
 
+    @Test
+    fun `renomear abre o campo, salva o rotulo novo e cancelar descarta`() = runDesktopComposeUiTest {
+        val renamed = mutableListOf<Pair<String, String>>()
+        renderKeys(
+            TeamKeysUiState.Success(keys = listOf(entry("key-1", "fulano@empresa.com"))),
+            onRename = { id, label -> renamed += id to label }
+        )
+
+        onNodeWithText("Renomear").performClick()
+        onNodeWithText("Cancelar").performClick()
+        onNodeWithText("Renomear").assertIsDisplayed()
+
+        onNodeWithText("Renomear").performClick()
+        // O campo de renomear nasce com o rótulo atual; o de emitir nasce vazio.
+        onNode(hasSetTextAction() and hasText("fulano@empresa.com")).performTextReplacement("ciclano@empresa.com")
+        onNodeWithText("Salvar").performClick()
+
+        assertEquals(listOf("key-1" to "ciclano@empresa.com"), renamed)
+        onNodeWithText("Renomear").assertIsDisplayed()
+    }
+
+    @Test
+    fun `chave revogada e marcada e nao revoga de novo`() = runDesktopComposeUiTest {
+        val revoked = mutableListOf<String>()
+        renderKeys(
+            TeamKeysUiState.Success(
+                keys = listOf(entry("key-1", "fulano@empresa.com").copy(revokedAt = kotlin.time.Instant.parse("2026-10-01T00:00:00Z")))
+            ),
+            onRevoke = { id -> revoked += id }
+        )
+
+        onNodeWithText("revogada").assertIsDisplayed()
+        onNodeWithText("Revogar").assertIsNotEnabled()
+        assertEquals(emptyList(), revoked)
+    }
+
+    @Test
+    fun `falha de leitura mostra a causa e tenta de novo`() = runDesktopComposeUiTest {
+        var retries = 0
+        renderKeys(TeamKeysUiState.Error("servidor fora"), onRetry = { retries += 1 })
+
+        onNodeWithTag(TEAM_KEYS_ERROR_TAG).assertTextEquals("servidor fora")
+        onNodeWithText("Tentar de novo").performClick()
+
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun `rotulos em ingles`() = runDesktopComposeUiTest {
+        renderKeys(
+            TeamKeysUiState.Success(keys = listOf(entry("key-1", "fulano@empresa.com"))),
+            language = AppLanguage.EN
+        )
+
+        onNodeWithText("Rename").assertIsDisplayed()
+        onNodeWithText("Show").assertExists()
+        onAllNodesWithText("Renomear").assertCountEquals(0)
+    }
+
     private fun ComposeUiTest.renderKeys(
         state: TeamKeysUiState,
         onCreate: (String, Int) -> Unit = { _, _ -> },
         onRemoveAccount: (String) -> Unit = {},
-        onUnblockAccount: (String) -> Unit = {}
+        onUnblockAccount: (String) -> Unit = {},
+        onRename: (String, String) -> Unit = { _, _ -> },
+        onRevoke: (String) -> Unit = {},
+        onRetry: () -> Unit = {},
+        language: AppLanguage = AppLanguage.PT
     ) {
         setContent {
             ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(900.dp).height(700.dp)) {
                     TeamKeysAdminContent(
                         state = state,
-                        language = AppLanguage.PT,
+                        language = language,
                         onCreate = onCreate,
+                        onRename = onRename,
+                        onRevoke = onRevoke,
                         onRemoveAccount = onRemoveAccount,
-                        onUnblockAccount = onUnblockAccount
+                        onUnblockAccount = onUnblockAccount,
+                        onRetry = onRetry
                     )
                 }
             }
