@@ -111,7 +111,12 @@ abreviada: os rótulos são chave de série e variam por fonte, e só o rótulo 
 o bot (decisão da A05 da #439, que corrigiu o "JAN." do protótipo). A fonte e a conta só na primeira
 cota da conta; a porcentagem em negrito; o "em X" em muted. O reinício segue o bot até 6 dias
 ("15:10", "qui 21:00"); mais longe, a data ("05/11 15:47"). Janela já vencida diz "reiniciando".
-Cota sem percentual (saldo) mostra o valor no lugar da barra.
+Cota sem percentual (saldo) mostra o valor no lugar da barra. Logo abaixo da cota com duração
+conhecida (5 h, 7 d) e reinício futuro, a sublinha do **tempo** (#463, AI5): `tempo` em muted na
+coluna de cota, a barra do tempo da janela que já passou em muted (pelo piso, como a de cota), o
+número e, na coluna de estado, a primitiva Tempo × cota seguida de `· 4h51 de 5h`. O início é o
+nominal (reinício − duração), a mesma regra da diagonal do app; a intervalar do MiniMax e a mensal
+não têm sublinha.
 
 **Rodapé de leitura** (2.2). Origem e idade da leitura, seguidas da contagem por estado, com cada
 estado na sua cor: "lido há 38 s pelo app aberto · 9 cotas: 1 crítica, 2 em atenção, 6 em dia".
@@ -128,7 +133,9 @@ links resolvidos; sem perfil que aponte para ele, a linha não mostra cota nenhu
 outra conta). Acima do limiar: estado escrito e "reinicia em" no lugar da hora. O custo vem do
 índice da #381, no formato da janela de Sessões do app (`$1.84`, com `+` quando há modelo sem
 tarifa); sem a sessão no índice, sem custo. Leitura com mais de 10 min mostra "leitura de HH:MM".
-A linha sempre sai com código 0: outro código faria o Claude Code escondê-la.
+A linha sempre sai com código 0: outro código faria o Claude Code escondê-la. Depois do percentual de
+cada janela, `/97%` em muted (o tempo dela que já passou) e `✓` verde ou `▲` em `--term-warn`: a cota
+atrás ou à frente do tempo (#463, AI5) — `5h 64%/97% ✓`.
 
 **Segmento do tmux** (1.3). Uma entrada por conta: sigla de duas letras na cor da fonte (as
 iniciais das duas primeiras palavras do apelido ou do nome, ou as duas primeiras letras de um nome de
@@ -143,14 +150,18 @@ esquerda, `usage monitor` em ouro e negrito; à direita, o status ("14:23 BRT ·
 separador e o corpo; no fim, outro separador e o rodapé de atalhos.
 
 **Abas** (3.1). Numeradas e fixas: `1 Visão geral`, `2 Sessões`, `3 Histórico`, `4 Time`,
-`5 Configurações`. A ativa vai em ouro e negrito sobre `--term-selection`, as outras em muted. Sem
+`5 Configurações`, `6 Análise`. A 6 (#463) entrou **no fim**, exceção aprovada à regra "nenhum valor
+novo em enum" (decisão U3 do plano da #463), para nenhuma aba mudar de tecla. A ativa vai em ouro e
+negrito sobre `--term-selection`, as outras em muted. Sem
 time configurado, a aba 4 não aparece e as outras **mantêm o número**: atalho não muda de tecla.
+Quando a linha inteira não cabe (a 80 colunas, em português), as inativas ficam só com o número
+(`1   2   3   4   5  [6 Análise]`) e a ativa mantém o nome: nenhuma aba some nem é cortada no meio.
 Sem cor não há fundo de seleção: a ativa troca os espaços que a cercam por colchetes
 (`[1 Visão geral]`), com a mesma largura, para a linha não andar entre os modos.
 
 **Rodapé de atalhos** (3.1). A tecla em negrito, o rótulo em muted, dois espaços entre pares. Os
-atalhos da aba vêm primeiro, os comuns depois (`1–5 aba`, `r atualizar`, `? ajuda`, `q sair`).
-Quando não cabem, saem **pares inteiros**, nunca meio par: primeiro `r atualizar` e `1–5 aba` (a
+atalhos da aba vêm primeiro, os comuns depois (`1–6 aba`, `r atualizar`, `? ajuda`, `q sair`).
+Quando não cabem, saem **pares inteiros**, nunca meio par: primeiro `r atualizar` e `1–6 aba` (a
 ajuda lista todos), depois os da aba, do último para o primeiro; `? ajuda` e `q sair` ficam sempre.
 Com um campo de texto aberto (4.2), só `enter grava` e `esc desiste`: ali `q`, `r`, `?` e os
 dígitos são texto.
@@ -163,12 +174,59 @@ custo em negrito. A linha selecionada leva `▸` e fundo de seleção. Modelo se
 custo, com nota de rodapé. Na 3.4, a marca de presença vem logo depois do `▸` e a palavra do estado
 está sempre escrita ao lado ("trabalhando · 1 sessão", "app aberto", "ausente · há 2 h").
 
-**Sparkline** (3.3). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
-reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado. A célula leva o
+**Sparkline** (3.1). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
+reinício da janela: as últimas 24 h da primeira cota no detalhe da Visão geral. A célula leva o
 maior uso lido nela, pelo piso; sem leitura fica em branco. Reinício é a leitura em que a janela
 anterior já tinha acabado (o fim mudou e ficou para trás), comparada com a última leitura que
 conhecia o fim: numa janela corrida o fim anda a cada leitura, e a leitura ociosa vem sem fim.
-Em tela estreita a trilha perde o começo, nunca o agora.
+Em tela estreita a trilha perde o começo, nunca o agora. Até a #463 era também a aba 3.
+
+**Tabela de janelas** (3.3, #463 AI4). A aba 3 lista as janelas de cada cota com percentual, na ordem
+do painel, cortadas pelo mesmo domínio do Histórico do app (`QuotaWindowSummary`). Bloco por cota:
+`● trabalho Claude 5h  91% crítico · 7 janelas no período · 1 esgotou`. Uma linha por janela, a mais
+nova primeiro e no máximo 8 (as outras viram `+N janelas mais antigas`), sob o cabeçalho fixo `INÍCIO
+· ATIVA · PICO · COMO TERMINOU`: a primeira leitura (`23/10 15:09`), a faixa ativa (`15:09–19:07`, ou
+`20/10–21/10` quando atravessa dias, `—` sem subida), o pico numa barra de cota de 10 células e o
+número, e o fim — `aberta · reinicia 19:30` e `sobrou 4%` em muted, ou `▲ esgotou após 3 h 15 min ·
+parado 1 h 30 min` em `--term-crit`, contado da primeira leitura (o início nominal a API não informa);
+sem espaço, o "parado" sai inteiro. Janela que já chega esgotada na primeira leitura do período diz
+`▲ já esgotada na 1ª leitura`, nunca "esgotou após 0 min". Cota sem janela (saldo, intervalar sem reinício conhecido) diz
+`sem janela no período`. `↑ ↓` andam pelas janelas de todas as cotas, `← →` trocam o período (24 h, 7
+dias, 30 dias) e a tabela rola até a janela escolhida.
+
+**Gráfico alto** (3.3b, #463 AI1). `enter` numa janela troca a tabela por oito linhas de colunas, de
+`--term-*` da fonte: a coluna cheia em `█` e o topo nos oitavos `▁…▇` (64 degraus); zero medido no
+degrau mais baixo em muted, sem leitura em branco. Eixo Y escrito `100% ┤`, `50% ┤`, `0% ┤` (glifos da
+moldura), base `╰───┆` com o reinício no fim, e embaixo início, meio e reinício (hora numa janela curta,
+dia e mês na semanal). Do início nominal (reinício − 5 h ou 7 d; sem duração conhecida, a primeira
+leitura) ao reinício, até 60 colunas; a coluna é a última leitura até o fim dela, e na janela aberta nada
+depois de agora. Título `rótulo · janela de 23/10 15:09 a 20:09 · uma coluna = 5 min`. Frase: aberta,
+`64% usada com 97% da janela já passada · ✓ 33 pp atrás do tempo`; fechada, `pico 96% · sobrou 4%` ou o
+pico e como esgotou. Abaixo, em muted, a faixa ativa e o ritmo (`ritmo 13 %/h`, por hora observada, o nome do Histórico do
+app; "ritmo médio" é o da aba 6, desde o início nominal). `esc` volta à tabela.
+
+**Aba Análise** (3.6, #463 AI2). A janela "Análise" do app no terminal, para as contas com índice
+CLI (Claude Code e Codex), uma de cada vez (`← →`, com `conta 1 de 3` à direita). As duas janelas lado
+a lado a partir de 80 colunas (abaixo, uma embaixo da outra): título `JANELA 5H` na cor da fonte, o
+veredito do card do app (`✓ cabe até o reinício` verde, `▲ esgota antes do reinício` em
+`--term-crit`), a barra de cota de até 30 células, o reinício e três linhas — ritmo na última hora,
+ritmo médio e "para caber", que só dá um número quando a janela esgota antes (`no máximo 17 %/h`;
+senão `o ritmo de agora basta`). Depois, a corrida de cada janela e as últimas 24 h numa escala só
+(% da cota 5h, quatro linhas com o eixo escrito até a hora de maior consumo) com a vazão numa linha
+própria, `tok/s`, na escala dela: duas grandezas nunca dividem o mesmo eixo. O corpo passa da tela:
+`↑ ↓` rolam. Os mesmos dados da janela do app e do `/analise` do bot (`SessionAnalysis`), lidos dos
+bancos em somente leitura; sem o índice CLI, a vazão fica não medida.
+
+**Corrida** (2.5, 3.6, #463 AI3). Esgotar × reiniciar de uma janela, na mesma régua: título
+`5h · 62% usada · ▲ esgota antes do reinício` e, à direita, `régua: agora até +2 h 17 min`; uma barra de
+cota para `reinicia` (muted) e uma para `esgota` em cada ritmo medido (última hora e médio). A régua vai
+até o mais longe que se desenha, sem passar da duração da janela: o que esgotaria depois dela diz
+`mais de 7 d no ritmo médio`. Esgotar antes do reinício vai em `--term-crit`; ritmo parado diz
+`parado: não esgota neste ritmo`, sem barra. É o bloco do comando `analysis` e da aba 6.
+
+**Tempo × cota** (#463 AI5). A cota usada menos o tempo da janela que já passou, em pontos percentuais:
+`✓ 33 pp atrás do tempo` em verde (cabe no ritmo de até aqui) ou `▲ 40 pp à frente do tempo` em
+`--term-warn` (esgota antes). Zero é `no compasso do tempo`.
 
 **Composição de tokens** (3.2). Segmentos `█` nas cores da série (`--term-input`, `--term-output`,
 `--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série. Sem Unicode, o
@@ -230,7 +288,11 @@ sem glifo. Não há animação: a tela só diz que está trabalhando.
   `--max <n>`, 2 quando alguma cota chegou a n%, senão 0. O 2 coincide com o de uso incorreto do
   #418; script que precise separar os dois lê o `status --json`.
 - `--json` é contrato: campos em inglês e `snake_case` (o estilo do `/api/snapshot`), versão no
-  campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Campo novo pode
+  campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Desde a #463, cada
+  cota traz `window_starts_at` (início nominal) e `time_elapsed_percent` (0–100, pelo piso), `null`
+  sem duração conhecida ou sem reinício; a versão não subiu. O `analysis --json` (#463) segue a mesma
+  regra, com versão própria: contas (`source`, `source_name`, `account`) e, em cada uma, as janelas com
+  ritmos, projeção, `verdict` (`fits`/`runs_out`) e quando esgota em cada ritmo, mesmo depois do reinício. Campo novo pode
   entrar; campo existente não muda sem subir a versão. Em saída que não é UTF-8, o que não é ASCII
   sai como `\uXXXX`, e nunca como `?`.
 - Cada cota tem um **id estável** para scripts: `fonte[:conta]:cota`, em minúsculas, sem acento,

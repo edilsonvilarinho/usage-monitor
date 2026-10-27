@@ -1,0 +1,453 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AH e AI Análise e Histórico</title>
+<style>
+body{margin:0;background:#101010}
+.ux{--bg:#131010;--surface:#1B1818;--raised:#211E1E;--border:#3D3838;--fg:#F2EDED;--muted:#B8B2B2;--dim:#857d7d;--ok:#4CAF50;--warn:#FFA726;--crit:#E86A6A;--a5:#4F8CFF;--a7:#A78BFA;--gold:#E8AE63;
+  background:#101010;color:#ddd;font:12px/1.45 "IBM Plex Mono",Consolas,monospace;padding:16px;max-width:680px;margin:0 auto;box-sizing:border-box}
+.ux *{box-sizing:border-box}
+.ux h1{font-size:15px;color:#fff;margin:0 0 4px;font-weight:500}
+.ux h2{font-size:13.5px;color:var(--gold);margin:22px 0 8px;font-weight:500;border-bottom:1px solid #3a3020;padding-bottom:4px}
+.ux .sub{color:#8a8a8a;margin:0 0 12px;font-size:11.5px}
+.ux .fix{border:1px solid #4a3a20;background:#1d1710;border-radius:8px;padding:10px 12px;margin:0 0 14px;color:#e9d6b8;font-size:11px}
+.ux .fix b{color:var(--gold)}
+.ux .fix ul{margin:4px 0 0;padding-left:16px}
+.ux code{color:#d8c39f;font-size:10.5px}
+.ux .opt{background:#181818;border:1px solid #2c2c2c;border-radius:10px;padding:12px;margin-bottom:14px}
+.ux .opt.ref{border-style:dashed;border-color:#5a5a5a}
+.ux .opt h3{margin:0 0 4px;font-size:13px;color:#fff;font-weight:500}
+.ux .opt>p{margin:0 0 8px;color:#9a9a9a;font-size:11px}
+.ux .lbl{font-size:10px;color:var(--gold);margin:10px 0 4px;letter-spacing:.04em;text-transform:uppercase}
+.ux .tags{font-size:10.5px;color:#8a8a8a;margin-top:8px;border-top:1px solid #262626;padding-top:6px}
+.ux .tags b{color:#c9a46e;font-weight:500}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shots img{width:100%;border:1px solid #333;border-radius:6px;display:block}
+.shots figcaption{font-size:10px;color:var(--dim);margin-top:3px}
+/* janela do app */
+.win{background:var(--bg);border:1px solid #2e2828;border-radius:10px;overflow:hidden;color:var(--fg);font-size:10.5px}
+.win .tb{height:22px;display:flex;align-items:center;gap:6px;padding:0 10px;background:#1a1416;border-bottom:1px solid #2a2424;font-size:9.5px;color:#ddd}
+.win .tb .lg{background:var(--gold);color:#000;font-weight:700;font-size:7px;padding:1px 2px;border-radius:2px}
+.win .tb .wc{margin-left:auto;color:#999;letter-spacing:10px}
+.win .tool{display:flex;align-items:center;gap:6px;padding:9px 12px 4px;flex-wrap:wrap}
+.win .tool b{font-size:12px;font-weight:600}
+.win .tool .sp{flex:1}
+.btn{border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:9.5px;color:var(--fg);background:var(--surface);white-space:nowrap}
+.live{font-size:9px;color:#8fd893;background:#4caf5014;border:1px solid #2e5e30;border-radius:9px;padding:1px 7px;white-space:nowrap}
+.wb{padding:4px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-width:0}
+.ct{font-size:10px;color:var(--fg);font-weight:600;margin-bottom:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ct .r{margin-left:auto;font-weight:400;color:var(--dim);font-size:9px}
+.pill{font-size:8.5px;padding:1px 6px;border-radius:9px;border:1px solid;font-weight:400;white-space:nowrap}
+.pill.ok{color:#8fd893;border-color:#2e5e30;background:#4caf5014}
+.pill.crit{color:#f29494;border-color:#6a2c2c;background:#e86a6a14}
+.pill.warn{color:#ffc06a;border-color:#6a4a1c;background:#ffa72614}
+.pill.n{color:var(--muted);border-color:var(--border)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ch{width:100%;height:auto;display:block}
+.say{font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;font-size:10.5px;color:var(--fg);line-height:1.4;margin-top:4px}
+.say b{font-weight:600}
+.say .ok{color:#8fd893} .say .crit{color:#f29494}
+.mut{color:var(--muted)} .dim{color:var(--dim)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:9.5px}
+.seg span{padding:2px 8px;color:var(--muted)}
+.seg span+span{border-left:1px solid var(--border)}
+.seg .on{background:var(--raised);color:var(--fg)}
+.sel{border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:9.5px;background:var(--surface);white-space:normal}
+.tbl{width:100%;border-collapse:collapse;font-size:9.5px}
+.tbl th{color:var(--dim);font-weight:400;text-align:right;padding:2px 4px;border-bottom:1px solid var(--border)}
+.tbl td{text-align:right;padding:3px 4px;border-bottom:1px solid #282424}
+.tbl td:first-child,.tbl th:first-child{text-align:left}
+.tbl tr:last-child td{border-bottom:none}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.chips span{border:1px solid var(--border);border-radius:12px;padding:1px 8px;font-size:9px;color:var(--muted)}
+.chips .on{background:#4F8CFF22;border-color:#4F8CFF88;color:var(--fg)}
+.chips .on7{background:#A78BFA22;border-color:#A78BFA88;color:var(--fg)}
+.facts{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:9.5px;color:var(--muted);margin-top:6px}
+.facts b{color:var(--fg);font-weight:600}
+.race{display:grid;grid-template-columns:62px 1fr;gap:3px 8px;align-items:center;font-size:9.5px;margin-top:6px}
+.race .k{color:var(--muted);text-align:right}
+.race .tr{position:relative;height:14px;background:#191515;border-radius:3px}
+.race .tr i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.race .tr em{position:absolute;top:0;font-style:normal;font-size:9px;line-height:14px;white-space:nowrap;padding-left:5px}
+.rows .row{display:grid;grid-template-columns:118px 1fr 120px;gap:8px;align-items:center;font-size:9.5px;padding:4px 0;border-bottom:1px solid #262222}
+.rows .row:last-child{border-bottom:none}
+.rows .row.on{background:var(--raised);border-radius:5px}
+.rows .tr{position:relative;height:12px;background:#191515;border-radius:3px;overflow:hidden}
+.rows .tr i{position:absolute;top:0;bottom:0}
+.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mini .m{background:var(--raised);border:1px solid var(--border);border-radius:6px;padding:4px 5px}
+.mini .m.on{border-color:#4F8CFF99}
+.mini .m b{font-size:9px;font-weight:600;display:block}
+.mini .m i{font-style:normal;font-size:8.5px;color:var(--muted)}
+.merge{display:grid;grid-template-columns:1fr 170px;gap:8px}
+/* terminal */
+.tw{background:#131010;border:1px solid #2e2828;border-radius:8px;overflow-x:auto}
+.term{margin:0;padding:10px 10px;font:400 9.6px/1.3 "IBM Plex Mono",Consolas,monospace;color:#F2EDED;white-space:pre;width:max-content;min-width:100%;font-variant-ligatures:none}
+.term .g{display:inline-block;width:1ch;text-align:center;overflow:hidden;vertical-align:bottom}
+.term .a{color:#4F8CFF} .term .w7{color:#A78BFA} .term .ok{color:#4CAF50} .term .wa{color:#FFA726} .term .cr{color:#E86A6A}
+.term .mu{color:#B8B2B2} .term .dim{color:#4A4444} .term .bd{color:#5A5353} .term .gd{color:#E8AE63}
+.term .b{font-weight:700} .term .sl{background:#2A2626}
+.new{outline:1px dashed #E8AE6399;outline-offset:2px;border-radius:4px}
+</style></head><body>
+<div class="ux">
+<h1>#463 · Análise e Histórico mais claros: rodadas AH (app) e AI (terminal)</h1>
+<p class="sub">Dados dos seus dois prints (Anthropic · Padrão, sex 23/10 19:21 BRT; idioma do app em EN, como no print). O modo terminal segue o protótipo dele, em PT. <b>Ilustrativo</b>: janelas anteriores às do print, a faixa do "habitual" e as semanas passadas, marcados com <i>(ilustr.)</i>. Contorno tracejado dourado = o que é novo no terminal. Telas estáticas: a mudança é de layout e de gráfico, não de animação.</p>
+<div class="fix"><b>Vale para qualquer opção escolhida</b> (defeitos de hoje, com evidência no código):
+<ul>
+<li><b>Gráfico sem escala.</b> A curva do Histórico desenha 3 linhas de grade e nenhum número no eixo Y (<code>UsageHistoryPlotDrawing.kt</code>): a 7d em 94% parece "cheia" sem dizer quanto. O gráfico de 24 h da Análise põe <b>duas grandezas com duas escalas</b> no mesmo espaço (barras pp até 32, linha tok/s até 196) e explica só na legenda. Proposta: <b>eixo Y escrito (0 · 50 · 100%) e uma escala por gráfico</b>.</li>
+<li><b>Número que não ajuda.</b> "safe 249.9 room left" (faltam 9 min: qualquer ritmo cabe) e "safe 0.1 above the safe pace"; "Pace 0 %/h" na 7d é arredondamento de ~0,3 (<code>paceLabel</code> usa <code>roundToLong</code>). Proposta: <b>frase em vez de número quando o número não decide nada</b>, uma casa decimal abaixo de 10, e "%/h" no lugar de "pp/h".</li>
+<li><b>A pergunta principal não tem gráfico.</b> "Vou estourar? Quando?" só aparece como um tique na barra e um texto pequeno; o resto são 30 números em duas tabelas.</li>
+<li><b>Histórico em duas rolagens.</b> 5h e 7d empilhados não cabem numa tela (os seus dois prints); rótulos cortados ("curre…", e-mail da conta).</li>
+<li>Cor sempre com palavra; <code>null</code> é lacuna, zero é traço rente; nenhum valor novo em enum.</li>
+</ul></div>
+<h2>App · janelas "Analysis" e "History" (rodada AH)</h2>
+<div id="app"></div>
+<h2>Modo terminal · <code>usage-monitor tui</code> e comandos (rodada AI)</h2>
+<p class="sub">Hoje o terminal não tem análise: ritmo e projeção só existem no app. As opções abaixo trazem isso para a TUI (96 colunas) dentro do design system do terminal: sem animação, fundo nunca pintado, estado sempre escrito, só glifos da tabela. Cada AI tem um par natural no app (dito no card), mas dá para escolher separado.</p>
+<div id="cli"></div>
+</div>
+<script>
+// ───────────── dados do print (sex 23/10 19:21 BRT) ─────────────
+const COL={fg:'#F2EDED',mu:'#B8B2B2',dim:'#857d7d',grid:'#2f2a2a',bd:'#3D3838',ok:'#4CAF50',warn:'#FFA726',crit:'#E86A6A',a5:'#4F8CFF',a7:'#A78BFA',gold:'#E8AE63',prev:'#6b6363'};
+// janela 5h atual: 14:30–19:30; pontos em fração do tempo da janela × % usado
+const CUR5=[[.13,0],[.3,2],[.5,5],[.7,27],[.9,61],[.97,64]];
+// semanal atual: ter 20/10 01:00 – ter 27/10 01:00
+const CUR7=[[0,0],[.143,15],[.286,47],[.395,80],[.429,86],[.538,94]];
+const PREV5=[ // 22/10 20:53 e 22/10 19:22 (print) + três ilustrativas
+  [[0,0],[.15,10],[.35,30],[.55,55],[.75,80],[.9,94],[1,96]],
+  [[.6,62],[.75,85],[.88,96],[1,96]],
+  [[0,0],[.2,30],[.4,62],[.55,88],[.62,100],[1,100]],
+  [[0,0],[.3,12],[.6,30],[1,41]],
+  [[0,0],[.25,20],[.5,48],[.75,71],[1,83]]];
+const PREV7=[[[0,0],[.3,35],[.6,70],[.85,90],[1,93]],[[0,0],[.4,30],[.7,60],[1,78]],[[0,0],[.25,40],[.5,82],[.62,100],[1,100]]];
+const H24=[['20',16],['21',2],['22',null],['23',null],['00',null],['01',null],['02',null],['03',null],['04',null],['05',null],['06',null],['07',null],['08',null],['09',null],['10',null],['11',null],['12',null],['13',null],['14',null],['15',2],['16',3],['17',22],['18',32],['19',3]];
+const TOK24={'20':91,'21':82,'15':152,'16':167,'17':140,'18':120,'19':103};
+
+// ───────────── SVG ─────────────
+const T=(x,y,s,o={})=>`<text x="${x}" y="${y}" fill="${o.c||COL.mu}" font-size="${o.s||8.5}" text-anchor="${o.a||'start'}" font-family="IBM Plex Mono,Consolas,monospace"${o.w?` font-weight="${o.w}"`:''}>${s}</text>`;
+const svg=(w,h,inner)=>`<svg class="ch" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+function frameXY(w,h,m){return {x0:m.l,x1:w-m.r,y0:h-m.b,y1:m.t,X(f){return this.x0+(this.x1-this.x0)*f},Y(u){return this.y0-(this.y0-this.y1)*u/100}}}
+function yAxis(F,ticks=[0,50,100],suf='%',max=100){
+  const y=v=>F.y0-(F.y0-F.y1)*v/max;
+  return ticks.map(v=>`<line x1="${F.x0}" x2="${F.x1}" y1="${y(v)}" y2="${y(v)}" stroke="${COL.grid}" stroke-width="1"/>`+T(F.x0-4,y(v)+3,v+suf,{a:'end'})).join('');
+}
+const pts=(F,p)=>p.map(([f,u])=>`${F.X(f).toFixed(1)},${F.Y(u).toFixed(1)}`).join(' ');
+
+// AH1: tempo decorrido × cota usada, com a diagonal do ritmo que chega a 100% no reinício
+function diag(o){
+  const w=o.w||300,h=o.h||200,F=frameXY(w,h,{l:30,r:10,t:10,b:24});
+  let s=`<polygon points="${F.x0},${F.y0} ${F.x0},${F.y1} ${F.x1},${F.y1}" fill="${COL.crit}" opacity=".07"/>`+
+        `<polygon points="${F.x0},${F.y0} ${F.x1},${F.y0} ${F.x1},${F.y1}" fill="${COL.ok}" opacity=".05"/>`+yAxis(F);
+  s+=T(F.X(.03),F.Y(90),'above the line: runs out first',{c:'#c98585',s:7.5})+T(F.X(.97),F.Y(5),'below: fits',{c:'#7fb882',s:7.5,a:'end'});
+  for(const p of o.prev) s+=`<polyline points="${pts(F,p)}" fill="none" stroke="${COL.prev}" stroke-width="1" opacity=".55"/>`;
+  s+=`<line x1="${F.x0}" y1="${F.y0}" x2="${F.x1}" y2="${F.y1}" stroke="${COL.gold}" stroke-dasharray="4 3" stroke-width="1.2"/>`;
+  s+=`<polyline points="${pts(F,o.cur)}" fill="none" stroke="${o.color}" stroke-width="2.2"/>`;
+  const [nf,nu]=o.cur[o.cur.length-1];
+  if(o.proj) s+=`<polyline points="${pts(F,[[nf,nu],...o.proj])}" fill="none" stroke="${o.projColor||o.color}" stroke-dasharray="2 2" stroke-width="1.5"/>`;
+  s+=`<circle cx="${F.X(nf)}" cy="${F.Y(nu)}" r="3.5" fill="${o.color}" stroke="#fff" stroke-width="1"/>`;
+  s+=T(F.X(nf)-6,F.Y(nu)+(o.lblBelow?14:-7),o.now,{c:COL.fg,a:'end',w:600});
+  o.xl.forEach((l,i)=>{s+=T(F.X(i/(o.xl.length-1)),h-10,l,{a:i==0?'start':i==o.xl.length-1?'end':'middle'})});
+  s+=T((F.x0+F.x1)/2,h-1,'time of the window that has passed →',{c:COL.dim,s:7.5,a:'middle'});
+  return svg(w,h,s);
+}
+// 24 h com uma escala só: barras = % da 5h por hora; tok/s fica numa linha própria embaixo
+function hours24(o={}){
+  const w=640,h=o.h||120,F=frameXY(w,h,{l:34,r:8,t:12,b:20});
+  let s=yAxis(F,[0,16,32],'%',32);
+  const bw=(F.x1-F.x0)/24;
+  H24.forEach(([hh,v],i)=>{
+    const x=F.x0+i*bw+2;
+    if(v==null){s+=`<line x1="${x}" x2="${x+bw-4}" y1="${F.y0-1}" y2="${F.y0-1}" stroke="${COL.dim}" stroke-dasharray="2 2"/>`;}
+    else{const y=F.y0-(F.y0-F.y1)*v/32;s+=`<rect x="${x}" y="${y}" width="${bw-4}" height="${F.y0-y}" rx="1.5" fill="${hh==='18'?'#6aa0ff':COL.a5}" opacity="${hh==='19'?.6:1}"/>`;if(v>=3)s+=T(x+(bw-4)/2,y-3,v,{a:'middle',c:COL.fg,s:7.5});}
+    if(i%3==0||i==23) s+=T(x+(bw-4)/2,h-6,hh+'h',{a:'middle'});
+  });
+  return svg(w,h,s);
+}
+function tokRow(){
+  const w=640,h=34,F=frameXY(w,h,{l:34,r:8,t:4,b:4});const bw=(F.x1-F.x0)/24;
+  let s=T(0,15,'tok/s',{c:COL.dim})+T(0,26,'0–200',{c:COL.dim,s:7});
+  let d='';
+  H24.forEach(([hh],i)=>{const v=TOK24[hh];const x=F.x0+i*bw+bw/2;
+    if(v==null){d+=' ';return;}
+    const y=F.y0-(F.y0-F.y1)*v/200;s+=`<circle cx="${x}" cy="${y}" r="2" fill="${COL.a7}"/>`+T(x,y-4,v,{a:'middle',s:7,c:COL.mu});});
+  return svg(w,h,s);
+}
+function hoursBlock(note){
+  return `<div class="card"><div class="ct">When you use it · last 24 h <span class="r">bars: % of the 5h quota spent in each hour · peak 18h · 32%</span></div>${hours24()}${tokRow()}<div class="say mut">${note||'Throughput (tok/s) gets its own row and scale: no two units sharing one axis. Dashed = no reading.'}</div></div>`;
+}
+// colunas por janela (AH2)
+function cols(o){
+  const w=o.w||640,h=o.h||170,F=frameXY(w,h,{l:34,r:8,t:16,b:30});
+  let s=yAxis(F,[0,50,100]);
+  const n=o.cols.length,bw=(F.x1-F.x0)/n;
+  o.cols.forEach((c,i)=>{
+    const x=F.x0+i*bw+bw*.18,cw=bw*.64,y=F.Y(c.v);
+    const fill=c.v>=100?COL.crit:c.cur?o.color:o.color;
+    s+=`<rect x="${x}" y="${y}" width="${cw}" height="${F.y0-y}" rx="2" fill="${fill}" opacity="${c.cur?1:.62}"/>`;
+    if(c.proj!=null){const yp=F.Y(c.proj);s+=`<rect x="${x}" y="${yp}" width="${cw}" height="${y-yp}" fill="url(#hatch${o.id})" stroke="${c.proj>=100?COL.crit:o.color}" stroke-dasharray="2 2"/>`;}
+    const top=c.proj!=null?F.Y(c.proj):y;
+    s+=T(x+cw/2,top-4,c.proj!=null?`${c.v}→${c.proj>=100?'out':'~'+c.proj}%`:(c.v>=100?'out':c.v+'%'),{a:'middle',c:c.v>=100||c.proj>=100?'#f29494':COL.fg,s:8,w:600});
+    if(c.out) s+=T(x+cw/2,F.Y(50),c.out,{a:'middle',c:'#fff',s:7.5});
+    s+=T(x+cw/2,h-17,c.l,{a:'middle',c:c.cur?COL.fg:COL.mu,s:7.5})+T(x+cw/2,h-7,c.l2||'',{a:'middle',c:COL.dim,s:7});
+    if(c.on) s+=`<rect x="${x-3}" y="${F.y1-12}" width="${cw+6}" height="${F.y0-F.y1+12}" fill="none" stroke="${COL.gold}" stroke-width="1" rx="3"/>`;
+  });
+  const defs=`<defs><pattern id="hatch${o.id}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="${o.color}" stroke-width="1.5" opacity=".7"/></pattern></defs>`;
+  return svg(w,h,defs+s);
+}
+// faixa do habitual (AH3)
+function band(o){
+  const w=o.w||300,h=o.h||190,F=frameXY(w,h,{l:30,r:10,t:10,b:24});
+  const n=o.lo.length,X=i=>F.X(i/(n-1));
+  let s=yAxis(F);
+  const up=o.hi.map((v,i)=>`${X(i)},${F.Y(v)}`).join(' '),dn=o.lo.map((v,i)=>`${X(i)},${F.Y(v)}`).reverse().join(' ');
+  s+=`<polygon points="${up} ${dn}" fill="${COL.mu}" opacity=".14"/>`;
+  s+=`<polyline points="${o.med.map((v,i)=>`${X(i)},${F.Y(v)}`).join(' ')}" fill="none" stroke="${COL.mu}" stroke-dasharray="3 3" stroke-width="1"/>`;
+  s+=`<polyline points="${o.cur.map(([f,u])=>`${F.X(f)},${F.Y(u)}`).join(' ')}" fill="none" stroke="${o.color}" stroke-width="2.2"/>`;
+  const [nf,nu]=o.cur[o.cur.length-1];
+  s+=`<circle cx="${F.X(nf)}" cy="${F.Y(nu)}" r="3.5" fill="${o.color}" stroke="#fff"/>`;
+  if(o.mark){const mu=o.mark;s+=`<line x1="${F.X(nf)}" x2="${F.X(nf)}" y1="${F.Y(nu)}" y2="${F.Y(mu)}" stroke="${COL.gold}" stroke-width="1"/>`+T(F.X(nf)-5,(F.Y(nu)+F.Y(mu))/2+3,o.markLbl,{a:'end',c:COL.gold,s:8,w:600});}
+  o.xl.forEach((l,i)=>{s+=T(F.X(i/(o.xl.length-1)),h-10,l,{a:i==0?'start':i==o.xl.length-1?'end':'middle'})});
+  s+=T(F.x1,F.y1+8,'grey band = your usual (ilustr.)',{a:'end',c:COL.dim,s:7.5});
+  return svg(w,h,s);
+}
+function miniCurve(p,color,on){
+  const w=130,h=56,F=frameXY(w,h,{l:2,r:2,t:3,b:3});
+  const lo=[0,3,8,14,21,29,38,46,54,60,64],hi=[0,10,22,34,46,57,68,78,86,92,95];
+  const X=i=>F.X(i/10);
+  let s=`<rect x="${F.x0}" y="${F.y1}" width="${F.x1-F.x0}" height="${F.y0-F.y1}" fill="none" stroke="${COL.grid}"/>`+
+    `<line x1="${F.x0}" x2="${F.x1}" y1="${F.Y(100)}" y2="${F.Y(100)}" stroke="${COL.crit}" stroke-dasharray="2 2" opacity=".6"/>`;
+  s+=`<polygon points="${hi.map((v,i)=>`${X(i)},${F.Y(v)}`).join(' ')} ${lo.map((v,i)=>`${X(i)},${F.Y(v)}`).reverse().join(' ')}" fill="${COL.mu}" opacity=".12"/>`;
+  s+=`<polyline points="${pts(F,p)}" fill="none" stroke="${color}" stroke-width="${on?2:1.5}"/>`;
+  return svg(w,h,s);
+}
+// linha do tempo em dente de serra (AH4): 5h por janela + semanal no mesmo eixo 0–100%
+function saw(){
+  const w=470,h=200,F=frameXY(w,h,{l:30,r:6,t:14,b:26});
+  const H0=0,H1=91.35,X=hh=>F.X((hh-H0)/(H1-H0));
+  let s=yAxis(F);
+  ['Tue 20','Wed 21','Thu 22','Fri 23'].forEach((d,i)=>{const x=X(i*24);s+=`<line x1="${x}" x2="${x}" y1="${F.y1}" y2="${F.y0}" stroke="${COL.grid}"/>`+T(x+3,h-12,d)});
+  // [início h, pico, horas até o pico, rótulo, esgotou]
+  const win=[[9,35,4],[14.5,22,3],[33.5,58,4],[39,83,4.5],[44.67,100,3.1,'out 3h06'],[58.25,58,4],[63.9,96,4.5],[68.9,96,3.7,null,1],[86.5,64,4.85,null,0,1]];
+  win.forEach(([st,pk,rise,lbl,on,cur])=>{
+    const end=cur?st+4.85:st+5;
+    const p=[[st,0],[st+rise,pk],[end,pk]];if(!cur)p.push([end,0]);
+    const col=pk>=100?COL.crit:COL.a5;
+    s+=`<polygon points="${p.map(([x,u])=>`${X(x)},${F.Y(u)}`).join(' ')}${cur?` ${X(end)},${F.Y(0)}`:''}" fill="${col}" opacity="${on||cur?.55:.28}" stroke="${on?COL.gold:col}" stroke-width="${on?1.5:1}"/>`;
+    if(pk>=58) s+=T(X(st+rise),F.Y(pk)-3,(pk>=100?'out':pk+'%'),{a:'middle',c:pk>=100?'#f29494':COL.fg,s:7.5,w:600});
+  });
+  const wk=[[1,0],[25,15],[49,47],[67.4,80],[73,86],[91.35,94]];
+  s+=`<polyline points="${wk.map(([x,u])=>`${X(x)},${F.Y(u)}`).join(' ')}" fill="none" stroke="${COL.a7}" stroke-width="2"/>`;
+  s+=`<circle cx="${X(91.35)}" cy="${F.Y(94)}" r="3" fill="${COL.a7}" stroke="#fff"/>`+T(X(91.35)-4,F.Y(94)-6,'weekly 94%',{a:'end',c:COL.a7,s:8,w:600});
+  s+=T(F.x0,h-1,'blue = each 5h window · purple = weekly · click a window to see it on the right',{c:COL.dim,s:7.5});
+  return svg(w,h,s);
+}
+function bar(p,color,mark){
+  return `<div style="position:relative;height:8px;background:#2a2525;border-radius:4px;margin:4px 0"><i style="position:absolute;left:0;top:0;bottom:0;width:${p}%;background:${color};border-radius:4px"></i>${mark!=null?`<i style="position:absolute;left:${mark}%;top:-3px;bottom:-3px;width:2px;background:#fff"></i>`:''}</div>`;
+}
+const winFrame=(title,tool,body)=>`<div class="win"><div class="tb"><span class="lg">UM</span>${title}<span class="wc">▢ ✕</span></div><div class="tool">${tool}</div><div class="wb">${body}</div></div>`;
+const anaTool=`<b>Analysis · Anthropic · Padrão</b><span class="sp"></span><span class="live">● Live · 19:21:21</span><span class="btn">PDF report</span>`;
+const histTool=(seg)=>`<span class="sel">Account: edilson.vilarinho.messias@gmail.com</span><span class="sp"></span><span class="seg"><span>24h</span><span class="on">7 days</span><span>30 days</span><span>All</span></span>${seg||''}<span class="btn">PDF</span>`;
+
+// ───────────── opções do app ─────────────
+const APP=[
+{ref:1,name:'Hoje (referência)',p:'Os seus dois prints. Análise: três cards de ritmo por janela, 24 h com duas escalas, duas tabelas de 15 números. Histórico: 5h e 7d empilhados (duas rolagens), curva sem eixo Y, lista e detalhe.',
+ html:()=>`<div class="shots"><figure style="margin:0"><img src="hoje-analise.png" alt="Janela Analysis hoje"><figcaption>Analysis (print 1)</figcaption></figure><figure style="margin:0"><img src="hoje-historico.png" alt="Janela History hoje"><figcaption>History (print 2)</figcaption></figure></div>`},
+{id:'AH1',name:'AH1 · Diagonal do ritmo',p:'Um gráfico responde "vou estourar?" para cada janela: no eixo X o tempo da janela que já passou, no Y a cota usada. A diagonal dourada é o ritmo que chega a 100% exatamente no reinício. Acima dela, esgota antes; abaixo, cabe. A sua janela é a linha colorida; as anteriores, cinza atrás — o "antes × agora" vira desenho. No Histórico, o mesmo gráfico com todas as janelas do período, 5h e 7d lado a lado (sem rolagem).',
+ html:()=>`<div class="lbl">Analysis</div>`+winFrame('Analysis',anaTool,
+  `<div class="g2"><div class="card"><div class="ct">5h window <span class="pill ok">● fits until the reset</span><span class="r">14:30 → 19:30</span></div>${diag({cur:CUR5,prev:PREV5.slice(0,2),color:COL.a5,proj:[[1,66]],now:'64% · 97% of time',xl:['14:30','17:00','19:30'],lblBelow:1})}<div class="say">64% used with 97% of the window gone: <b class="ok">33 points under the line</b>. Reaches <b>~66%</b> at 19:30.</div></div>
+   <div class="card"><div class="ct">Weekly <span class="pill crit">● runs out before the reset</span><span class="r">Tue 01:00 → Tue 01:00</span></div>${diag({cur:CUR7,prev:PREV7,color:COL.a7,proj:[[.55,100],[1,100]],projColor:COL.crit,now:'94% · 54% of time',xl:['Tue','Fri','Tue']})}<div class="say">94% used with 54% of the week gone: <b class="crit">40 points over the line</b>. At the last hour's pace (3%/h) it runs out <b>~21:20 today</b>, 3 days before the reset.</div></div></div>
+   ${hoursBlock()}
+   <div class="card"><div class="ct">Pace by interval <span class="r">%/h of the 5h quota · tok/s · vs. your 7-day average</span></div><table class="tbl"><tr><th></th><th>%/h</th><th>tok/s</th><th>vs 7 d</th></tr><tr><td>last hour</td><td>20</td><td>103</td><td style="color:#ffc06a">4.8× faster</td></tr><tr><td>3 h</td><td>19</td><td>133</td><td style="color:#ffc06a">4.6× faster</td></tr><tr><td>24 h</td><td>3.2</td><td>137</td><td style="color:#8fd893">0.8× (slower)</td></tr></table></div>`)
+  +`<div class="lbl">History</div>`+winFrame('History · Anthropic',histTool(),
+  `<div class="g2"><div class="card"><div class="ct">5h windows <span class="r">7 in the range</span></div>${diag({cur:CUR5,prev:PREV5,color:COL.a5,proj:null,now:'now 64%',xl:['start','2h30','reset'],lblBelow:1})}<div class="chips"><span class="on">23/10 15:09 · now · 64%</span><span>22/10 20:53 · 96%</span><span>22/10 19:22 · 96%</span><span>21/10 20:40 · out after 3h06</span><span>+3</span></div></div>
+   <div class="card"><div class="ct">7d windows <span class="r">1 in the range</span></div>${diag({cur:CUR7,prev:[],color:COL.a7,proj:null,now:'now 94%',xl:['start','3.5 d','reset']})}<div class="chips"><span class="on7">20/10 01:00 · now · 94%</span></div></div></div>
+   <div class="card"><div class="ct">Selected · 23/10 15:09 (5h, open)</div><div class="facts"><span>active <b>15:09 → 19:07</b> (3h57)</span><span>peak <b>64%</b></span><span>ran out <b>no</b></span><span>pace <b>13 %/h</b></span></div></div>`),
+ tags:'<b>Muda:</b> Canvas novo (<code>AnalysisPaceDiagonal</code>) reaproveitado nas duas janelas; o seletor 5h | 7d | Both sai do Histórico (as duas lado a lado). <b>Dado:</b> tudo já existe (pontos da janela + início e reinício). <b>Esforço:</b> médio. <b>Par no terminal:</b> AI5.'},
+
+{id:'AH2',name:'AH2 · Colunas por janela',p:'Cada janela vira uma coluna com o pico escrito em cima: dá para ver de relance quantas estouraram (vermelho, "out" e em quanto tempo). A coluna de agora tem a parte sólida (usado) e a hachurada (aonde chega no reinício). A Análise compara a janela atual com as últimas; o Histórico é o mesmo gráfico no período, e clicar numa coluna abre a curva dela embaixo, com eixo escrito.',
+ html:()=>`<div class="lbl">Analysis</div>`+winFrame('Analysis',anaTool,
+  `<div class="card"><div class="ct">5h windows · last 7 <span class="pill ok">● now fits: ~66% at 19:30</span><span class="r">hatched = until the reset</span></div>${cols({id:'a',color:COL.a5,cols:[{l:'21 10:05',l2:'ilustr.',v:41},{l:'21 15:20',l2:'ilustr.',v:83},{l:'21 20:40',l2:'ilustr.',v:100,out:'3h06'},{l:'22 10:15',l2:'ilustr.',v:58},{l:'22 19:22',v:96},{l:'22 20:53',v:96},{l:'now',l2:'15:09',v:64,proj:66,cur:1}]})}<div class="say">Now <b>64%</b>, reaching <b>~66%</b> — lower than the last two windows (96%). <b>1 of the last 7</b> ran out.</div></div>
+   <div class="g2"><div class="card"><div class="ct">Weekly · last 4 <span class="pill crit">● runs out ~21:20</span></div>${cols({id:'b',w:300,h:170,color:COL.a7,cols:[{l:'29/09',l2:'ilustr.',v:78},{l:'06/10',l2:'ilustr.',v:93},{l:'13/10',l2:'ilustr.',v:100,out:'5d 2h'},{l:'now',l2:'20/10',v:94,proj:100,cur:1}]})}</div>
+   <div class="card"><div class="ct">Pace now</div><table class="tbl"><tr><th></th><th>5h</th><th>weekly</th></tr><tr><td>last hour</td><td>20 %/h</td><td>3.0 %/h</td></tr><tr><td>window avg</td><td>13 %/h</td><td>1.0 %/h</td></tr><tr><td>to last until reset</td><td style="color:#8fd893">any</td><td style="color:#f29494">≤ 0.08 %/h</td></tr><tr><td>tok/s last hour</td><td colspan="2">103 (claude-opus-5-5)</td></tr></table></div></div>
+   ${hoursBlock()}`)
+  +`<div class="lbl">History</div>`+winFrame('History · Anthropic',histTool(),
+  `<div class="card"><div class="ct">5h windows · 7 days <span class="r">click a column</span></div>${cols({id:'c',color:COL.a5,h:160,cols:[{l:'20 09:00',l2:'ilustr.',v:35},{l:'20 14:30',l2:'ilustr.',v:22},{l:'21 10:05',l2:'ilustr.',v:41},{l:'21 15:20',l2:'ilustr.',v:83},{l:'21 20:40',l2:'ilustr.',v:100,out:'3h06'},{l:'22 10:15',l2:'ilustr.',v:58},{l:'22 19:22',v:96},{l:'22 20:53',v:96,on:1},{l:'23 15:09',l2:'now',v:64,cur:1}]})}</div>
+   <div class="card"><div class="ct">22/10 20:53 → 23/10 01:53 <span class="pill n">ended with 4% left</span></div>${diag({w:620,h:150,cur:PREV5[0],prev:[],color:COL.a5,now:'96%',xl:['20:53','23:23','01:53']}).replace('above the line: runs out first','').replace('below: fits','')}<div class="facts"><span>active <b>20:58 → 00:41</b> (3h43)</span><span>peak <b>96%</b></span><span>pace <b>26 %/h</b></span><span>busiest hour <b>22h</b></span></div></div>`),
+ tags:'<b>Muda:</b> a lista de janelas (S9) vira o gráfico de colunas; 7d ganha o mesmo gráfico com uma coluna por semana. <b>Dado:</b> já existe (<code>QuotaWindowSummary</code>: pico, esgotou após). <b>Esforço:</b> médio. <b>Par no terminal:</b> AI4.'},
+
+{id:'AH3',name:'AH3 · Faixa do seu habitual',p:'A curva da janela atual desenhada sobre uma faixa cinza: onde as suas janelas costumam estar a essa altura (do 25º ao 75º percentil das últimas 20). A pergunta vira "estou acima ou abaixo do meu normal?", com a diferença escrita em pontos. No Histórico, um minigráfico por janela, todos na mesma escala e com a mesma faixa atrás.',
+ html:()=>`<div class="lbl">Analysis</div>`+winFrame('Analysis',anaTool,
+  `<div class="g2"><div class="card"><div class="ct">5h window <span class="pill ok">● below your usual</span><span class="r">resets 19:30</span></div>${band({lo:[0,3,8,14,21,29,38,46,54,60,64],hi:[0,10,22,34,46,57,68,78,86,92,95],med:[0,6,15,24,33,43,53,62,70,76,80],cur:[[.13,0],[.3,2],[.5,5],[.7,27],[.9,61],[.97,64]],color:COL.a5,mark:79,markLbl:'−15',xl:['14:30','17:00','19:30']})}<div class="say">At this point your windows are usually at <b>79%</b>; this one is at <b>64%</b> (<b class="ok">15 points below</b>). Reaches ~66% at the reset.</div></div>
+   <div class="card"><div class="ct">Weekly <span class="pill crit">● above your usual</span><span class="r">resets Tue 01:00</span></div>${band({lo:[0,5,14,24,33,42,50,55],hi:[0,20,40,58,72,84,92,96],med:[0,12,27,41,53,63,71,76],cur:[[0,0],[.143,15],[.286,47],[.429,86],[.538,94]],color:COL.a7,mark:60,markLbl:'+34',xl:['Tue','Thu','Sat','Mon']})}<div class="say">On a Friday evening your weeks are usually at <b>60%</b>; this one is at <b>94%</b> (<b class="crit">34 points above</b>). Runs out ~21:20 today at the last hour's pace.</div></div></div>
+   ${hoursBlock('Grey tick on each bar (ilustr.) = your median for that hour over 30 days, so "18h is unusually high" is visible.')}`)
+  +`<div class="lbl">History</div>`+winFrame('History · Anthropic',histTool(),
+  `<div class="card"><div class="ct">5h windows · 7 days <span class="r">same scale 0–100% · red dash = 100% · grey = your usual</span></div><div class="mini">${[
+   ['23/10 15:09','now · 64%',CUR5,1],['22/10 20:53','96% · 4% left',PREV5[0]],['22/10 19:22','96% · 4% left',PREV5[1]],['21/10 20:40','out after 3h06',PREV5[2]],['21/10 15:20','83%',PREV5[4]],['21/10 10:05','41%',PREV5[3]],['20/10 14:30','22% (ilustr.)',[[0,0],[.6,15],[1,22]]],['20/10 09:00','35% (ilustr.)',[[0,0],[.5,25],[1,35]]]
+  ].map(([t,s,p,on])=>`<div class="m${on?' on':''}"><b>${t}</b><i style="${/out/.test(s)?'color:#f29494':''}">${s}</i>${miniCurve(p,/out/.test(s)?COL.crit:COL.a5,on)}</div>`).join('')}</div></div>
+   <div class="card"><div class="ct">7d windows · 30 days</div><div class="mini">${[['20/10 · now','94%',CUR7,1],['13/10','out after 5d 2h',PREV7[2]],['06/10','93%',PREV7[0]],['29/09','78%',PREV7[1]]].map(([t,s,p,on])=>`<div class="m${on?' on':''}"><b>${t}</b><i style="${/out/.test(s)?'color:#f29494':''}">${s}</i>${miniCurve(p,/out/.test(s)?COL.crit:COL.a7,on)}</div>`).join('')}</div></div>`),
+ tags:'<b>Muda:</b> faixa por tempo decorrido calculada no domain (função pura nova sobre as janelas anteriores; com menos de 5 janelas a faixa não aparece e a tela diz isso). <b>Dado:</b> derivado do histórico que já existe. <b>Esforço:</b> médio-alto. <b>Risco:</b> com pouco histórico a faixa engana — por isso o mínimo.'},
+
+{id:'AH4',name:'AH4 · Uma janela só: "Usage"',p:'Análise e Histórico viram uma janela. Em cima, o agora em duas linhas (5h e semanal, barra, veredito). No meio, a linha do tempo do período: cada janela de 5h é um "dente" que sobe e zera no reinício, com o pico escrito; a semanal é a linha roxa no mesmo eixo 0–100%. Clicar num dente mostra a janela à direita. Os botões "Analysis" e "History" do card continuam e abrem esta janela no agora ou no período.',
+ html:()=>winFrame('Usage · Anthropic · Padrão',`<b>Usage · Anthropic · Padrão</b><span class="sp"></span><span class="seg"><span>24h</span><span class="on">7 days</span><span>30 days</span></span><span class="live">● Live · 19:21</span><span class="btn">PDF</span>`,
+  `<div class="card"><div class="ct">Now</div>
+    <div style="display:grid;grid-template-columns:52px 1fr 210px;gap:6px;align-items:center;font-size:9.5px"><b>5h</b>${bar(64,COL.a5,66)}<span><b>64%</b> · <span style="color:#8fd893">fits</span>, ~66% at 19:30 (9 min)</span><b>weekly</b>${bar(94,COL.a7,100)}<span><b>94%</b> · <span style="color:#f29494">runs out ~21:20 today</span></span></div></div>
+   <div class="merge"><div class="card"><div class="ct">Last 7 days</div>${saw()}</div>
+   <div class="card"><div class="ct">22/10 20:53 → 01:53</div><div class="say" style="font-size:9.5px">5h window<br><b>peak 96%</b> · ended with 4% left<br>active 20:58 → 00:41 (3h43)<br>pace 26 %/h · busiest 22h</div>${miniCurve(PREV5[0],COL.a5,1)}<div class="say mut" style="font-size:9px">Pace by interval and this × previous window move here, for the selected window.</div></div></div>
+   ${hoursBlock()}`),
+ tags:'<b>Muda:</b> uma janela modal a menos (Analysis some como janela; <code>CardAction.ANALYSIS</code> e <code>HISTORY</code> abrem a mesma, sem valor novo no enum). O Histórico de fontes sem janela (DeepSeek, Cursor) continua com o card de série. <b>Esforço:</b> alto (junta dois view models). <b>Risco:</b> o maior das cinco; muda o caminho de navegação que você já usa.'},
+
+{id:'AH5',name:'AH5 · Corrida: esgotar × reiniciar',p:'Para cada janela, duas barras na mesma régua de tempo a partir de agora: quanto falta para reiniciar e quanto falta para esgotar (no ritmo da última hora e no ritmo médio). A que termina primeiro decide, e a frase diz quem venceu. No Histórico, uma linha por janela alinhada no início: até onde foi usada e, se esgotou, quanto tempo você ficou parado esperando o reinício (hachurado vermelho).',
+ html:()=>`<div class="lbl">Analysis</div>`+winFrame('Analysis',anaTool,
+  `<div class="card"><div class="ct">5h window · 64% used <span class="pill ok">● resets before it runs out</span><span class="r">scale: now → +3 h</span></div>
+    <div class="race"><span class="k">resets</span><div class="tr"><i style="width:5%;background:#8a8282"></i><em style="left:5%">9 min · 19:30</em></div>
+    <span class="k">runs out</span><div class="tr"><i style="width:60%;background:${COL.a5}"></i><em style="left:60%">1h48 at the last hour's pace (20 %/h)</em></div>
+    <span class="k"></span><div class="tr"><i style="width:91%;background:${COL.a5};opacity:.55"></i><em style="left:1%;color:#fff">2h44 at the window average (13 %/h)</em></div></div>
+    <div class="say">The window resets in 9 min, long before it would run out. <b class="ok">Any pace fits.</b></div></div>
+   <div class="card"><div class="ct">Weekly · 94% used <span class="pill crit">● runs out 3 days before the reset</span><span class="r">scale: now → +3 d 6 h</span></div>
+    <div class="race"><span class="k">resets</span><div class="tr"><i style="width:99.5%;background:#8a8282"></i><em style="left:2%;color:#fff">3 d 5 h 39 min · Tue 01:00</em></div>
+    <span class="k">runs out</span><div class="tr"><i style="width:2.6%;background:${COL.crit}"></i><em style="left:2.6%">2 h · ~21:20 today, at the last hour's pace (3 %/h)</em></div>
+    <span class="k"></span><div class="tr"><i style="width:7.7%;background:${COL.crit};opacity:.6"></i><em style="left:7.7%">6 h · ~01:20 Sat, at the window average (1 %/h)</em></div></div>
+    <div class="say">To last until Tue 01:00 the pace has to stay under <b>0.08 %/h</b> — in practice, <b class="crit">stop for 3 days</b>.</div></div>
+   ${hoursBlock()}`)
+  +`<div class="lbl">History</div>`+winFrame('History · Anthropic',histTool(),
+  `<div class="card"><div class="ct">5h windows · 7 days <span class="r">each row: start → +5 h · blue = used · red hatch = blocked</span></div><div class="rows">${[
+   ['23/10 15:09 · now',[13,97],null,'64% · open, 9 min left',1],['22/10 20:53',[2,76],null,'96% · 4% left'],['22/10 19:22',[60,88],null,'96% · 4% left'],['21/10 20:40 (ilustr.)',[0,62],62,'out after 3h06 · blocked 1h54'],['21/10 15:20 (ilustr.)',[5,90],null,'83% · 17% left'],['21/10 10:05 (ilustr.)',[10,70],null,'41% · 59% left']
+  ].map(([t,[a,b],out,s,on])=>`<div class="row${on?' on':''}"><span>${t}</span><div class="tr"><i style="left:${a}%;width:${b-a}%;background:${out?COL.crit:COL.a5};opacity:.85"></i>${out?`<i style="left:${out}%;width:${100-out}%;background:repeating-linear-gradient(45deg,#e86a6a55 0 3px,transparent 3px 6px)"></i>`:''}</div><span style="${out?'color:#f29494':''}">${s}</span></div>`).join('')}</div></div>
+   <div class="card"><div class="ct">7d windows · 30 days</div><div class="rows">${[['20/10 · now',[0,54],null,'94% · ▲ out ~21:20 today',1],['13/10 (ilustr.)',[0,72],72,'out after 5d 2h · blocked 1d 22h'],['06/10 (ilustr.)',[0,95],null,'93% · 7% left']].map(([t,[a,b],out,s,on])=>`<div class="row${on?' on':''}"><span>${t}</span><div class="tr"><i style="left:${a}%;width:${b-a}%;background:${out?COL.crit:COL.a7};opacity:.85"></i>${out?`<i style="left:${out}%;width:${100-out}%;background:repeating-linear-gradient(45deg,#e86a6a55 0 3px,transparent 3px 6px)"></i>`:''}</div><span style="${out||/out/.test(s)?'color:#f29494':''}">${s}</span></div>`).join('')}</div></div>`),
+ tags:'<b>Muda:</b> os três cards "now / average / safe" saem — viram as barras e a frase; "safe" só aparece quando decide algo. <b>Dado:</b> já existe (ritmos, reinício, faixa ativa e "esgotou após"); "tempo parado" = reinício − esgotou. <b>Esforço:</b> baixo-médio (barras, sem Canvas de curva). <b>Par no terminal:</b> AI3.'}
+];
+
+// ───────────── terminal: primitivas do protótipo do modo CLI ─────────────
+const SAFE=/[\x20-\x7EÀ-ÿ]/; // todo glifo fora do ASCII vai numa célula de 1ch: a fonte de fallback não desalinha a moldura
+const esc=ch=>ch==='&'?'&amp;':ch==='<'?'&lt;':ch==='>'?'&gt;':ch;
+function c(cls,t){let h='';for(const ch of String(t))h+=SAFE.test(ch)?esc(ch):`<span class="g">${esc(ch)}</span>`;return {h:cls?`<span class="${cls}">${h}</span>`:h,n:[...String(t)].length};}
+function L(...ps){let h='',n=0;for(const p of ps){const s=typeof p==='object'?p:c('',p);h+=s.h;n+=s.n;}return {h,n};}
+const wrap=(cls,l)=>({h:`<span class="${cls}">${l.h}</span>`,n:l.n});
+const fit=(l,w)=>l.n>=w?l:L(l,' '.repeat(w-l.n));
+const pad=(t,n)=>{t=String(t);const k=[...t].length;return k>=n?t:t+' '.repeat(n-k)};
+const lpad=(t,n)=>{t=String(t);const k=[...t].length;return k>=n?t:' '.repeat(n-k)+t};
+const rep=(ch,n)=>ch.repeat(Math.max(0,n));
+function tbar(p,w,k){const parts=['','▏','▎','▍','▌','▋','▊','▉'];const ex=p/100*w;let f=Math.floor(ex);let i=Math.round((ex-f)*8);if(i===8){f++;i=0;}const fl=rep('█',f)+parts[i];return L(c(k,fl),c('dim',rep('░',w-[...fl].length)));}
+function sbar(p,w,k){const parts=['','▏','▎','▍','▌','▋','▊','▉'];const ex=Math.min(1,p)*w;let f=Math.floor(ex);let i=Math.round((ex-f)*8);if(i===8){f++;i=0;}const fl=rep('█',f)+parts[i];return L(c(k,fl||'▏'),' '.repeat(Math.max(0,w-[...(fl||'▏')].length)));}
+const FW=94;
+function frame(tabs,active,body,keys,status='19:21 BRT · ao vivo'){
+  const tl=L(...tabs.flatMap((t,i)=>{const lab=` ${i+1} ${t} `;const isNew=/\*$/.test(t);const lb=` ${i+1} ${t.replace('*','')} `;return [i===active?wrap('sl',c('gd b',lb)):c(isNew?'gd':'mu',lb),' '];}));
+  const title=c('gd b',' usage monitor '),s=c('mu',' '+status+' ');
+  const out=[L(c('bd','╭─'),title,c('bd',rep('─',FW-title.n-s.n-2)),s,c('bd','─╮')),L(c('bd','│'),fit(tl,FW),c('bd','│')),L(c('bd','├'+rep('─',FW)+'┤'))];
+  for(const l of body) out.push(L(c('bd','│'),' ',fit(l,FW-1),c('bd','│')));
+  out.push(L(c('bd','├'+rep('─',FW)+'┤')),L(c('bd','│'),' ',fit(keys,FW-1),c('bd','│')),L(c('bd','╰'+rep('─',FW)+'╯')));
+  return out.map(l=>l.h).join('\n');
+}
+const key=(k,l)=>L(c('b',k),c('mu',' '+l+'  '));
+const TABS5=['Visão geral','Sessões','Histórico','Time','Configurações'];
+const TABS6=['Visão geral','Sessões','Histórico','Análise*','Time','Configurações'];
+const ck5=[key('1–5','aba'),key('r','atualizar'),key('?','ajuda'),key('q','sair')];
+const ck6=[key('1–6','aba'),key('r','atualizar'),key('?','ajuda'),key('q','sair')];
+function interp(path,f){if(f<=path[0][0])return path[0][0]>0?null:path[0][1];for(let i=1;i<path.length;i++){const[a,u]=path[i-1],[b,v]=path[i];if(f<=b)return u+(v-u)*(f-a)/(b-a);}return null;}
+function spark(vals,k){const ch=' ▁▂▃▄▅▆▇█';return L(...vals.map(x=>x==null?c('mu','·'):c(k,ch[Math.max(1,Math.round(x/100*8))])));}
+const term=(s,note)=>`<div class="tw"><pre class="term">${s}</pre></div>${note?`<div class="sub" style="margin:4px 0 0">${note}</div>`:''}`;
+
+// gráfico alto em blocos (AI1): colunas com oitavos, eixo Y escrito
+function tall(vals,rows,k,yl,cw=1){
+  const out=[];const blocks=' ▁▂▃▄▅▆▇█';
+  for(let r=rows-1;r>=0;r--){
+    const lab=yl[r]!=null?lpad(yl[r],5)+' ┤':rep(' ',5)+' │';
+    const cells=vals.map(v=>{let ch=' ',cls='';if(v!=null){const lvl=v/100*rows-r;if(lvl>=1){ch='█';cls=k;}else if(lvl>0){ch=blocks[Math.max(1,Math.round(lvl*8))];cls=k;}else if(r===0&&v===0){ch='▁';cls='mu';}}
+      return cw>1?L(c(cls,rep(ch,cw-1)),' '):c(cls,ch);});
+    out.push(L(c('mu',lab),...cells));
+  }
+  return out;
+}
+// linha de rótulos do eixo X: {índice da coluna: rótulo}, cada coluna com cw células
+function xLabels(n,cw,marks,indent){let s=rep(' ',n*cw+8);for(const [i,l] of Object.entries(marks)){const at=+i*cw;s=s.slice(0,at)+l+s.slice(at+l.length);}return L(c('mu',rep(' ',indent)+s.trimEnd()));}
+
+const CLI=[
+{ref:1,name:'Hoje (referência)',p:'A aba 3 · Histórico do <code>usage-monitor tui</code> (protótipo aprovado na rodada AG): uma sparkline de uma linha por cota, sem escala nem eixo; não há ritmo, projeção nem janelas. O <code>status</code> mostra só o percentual e o reinício.',
+ html:()=>{
+  const v5=[],v7=[];for(let i=0;i<48;i++){const f=i/47;v5.push(i<28?null:interp(CUR5,Math.max(.13,(i-28)/19*.97)));v7.push(interp(CUR7,f*.538));}
+  return term(frame(TABS5,2,[
+   L(c('mu','janela '),wrap('sl',c('b',' 24 h ')),c('mu','  7 dias  30 dias'),c('mu',lpad('uma célula = meia hora',55))),L(''),
+   L(c('gd','▸ '),c('a',pad('Padrão Claude 5h',20)),spark(v5,'a'),'  ',c('b','64%'),' ',c('ok','em dia')),
+   L('  ',c('w7',pad('Padrão Claude 7d',20)),spark(v7,'w7'),'  ',c('b','94%'),' ',c('cr','crítico')),
+   L(c('mu',rep(' ',24)+'20h   23h   02h   05h   08h   11h   14h   17h')),L(''),
+   L(c('mu','┆ reinício da janela · altura = uso da janela · cor = fonte'))],L(key('←→','janela'),key('↑↓','cota'),...ck5)));}},
+{id:'AI1',name:'AI1 · Gráfico alto no detalhe',p:'<b>enter</b> numa cota do Histórico abre um gráfico de 8 linhas com eixo Y escrito (0 · 50 · 100%), uma coluna por 10 min e o reinício marcado. Embaixo, uma frase com o veredito. A sparkline de uma linha continua na lista: o gráfico alto é o detalhe.',
+ html:()=>{
+  const vals=[];for(let i=0;i<30;i++){const f=(i+1)/30;vals.push(f>.975?null:f<.13?null:interp(CUR5,f));}
+  const body=[L(c('a b','Padrão Claude 5h'),c('mu','  ·  janela de 14:30 a 19:30  ·  uma coluna = 10 min')),L(''),
+   ...tall(vals,8,'a',{7:'100%',3:'50%',0:'0%'},2).map(l=>L('   ',l)),
+   L(c('mu','         ╰'+rep('─',60)+'┆')),xLabels(30,2,{0:'14:30',9:'16:00',18:'17:30',27:'19:00'},10),L(c('mu',rep(' ',61)+'┆ reinício 19:30')),L(''),
+   L(c('b','64% usada'),c('mu',' com '),c('b','97%'),c('mu',' da janela passada · '),c('ok','✓ cabe'),c('mu',': chega a ~66% no reinício das 19:30')),
+   L(c('mu','ritmo: '),c('b','20 %/h'),c('mu',' na última hora · '),c('b','13 %/h'),c('mu',' na média da janela')),L(''),
+   L(c('w7 b','Padrão Claude 7d'),c('mu','  ·  '),c('cr','▲ esgota ~21:20 hoje'),c('mu','  ·  enter para o gráfico da semana'))];
+  return term(frame(TABS5,2,body,L(key('esc','volta à lista'),key('←→','janela anterior'),...ck5)));},
+ tags:'<b>Glifos:</b> só os da tabela (▁…█ das sparklines, ┤ ╰ ─ das molduras). <b>Muda:</b> só a aba 3, sem aba nova. <b>Par no app:</b> AH1/AH2 (qualquer um).'},
+{id:'AI2',name:'AI2 · Aba Análise',p:'Aba nova "Análise" entre Histórico e Time, com o mesmo conteúdo da janela do app escrito para o terminal: as duas janelas lado a lado com barra, veredito em palavra e três ritmos; as 24 h com uma escala só (% da 5h), e tok/s numa linha própria. As abas passam a ser 1–6.',
+ html:()=>{
+  const cols24=H24.map(([,v])=>v==null?null:v/32*100);
+  const body=[L(c('b','Anthropic · Padrão'),c('mu',lpad('conta  ←→ troca',76))),L(''),
+   L(c('a b',pad('JANELA 5H',46)),c('w7 b','JANELA SEMANAL')),
+   L(c('ok',pad('✓ cabe até o reinício',46)),c('cr','▲ esgota antes do reinício')),
+   L(tbar(64,30,'a'),c('b','  64%'),rep(' ',11),tbar(94,30,'w7'),c('b','  94%')),
+   L(c('mu',pad('reinicia 19:30 (em 9 min) · chega a ~66%',46)),c('mu','reinicia ter 01:00 (em 3d 5h) · esgota ~21:20')),L(''),
+   L(c('mu',pad('ritmo na última hora',22)),c('b',pad('20 %/h',24)),c('mu',pad('ritmo na última hora',22)),c('b','3,0 %/h')),
+   L(c('mu',pad('ritmo médio',22)),c('b',pad('13 %/h',24)),c('mu',pad('ritmo médio',22)),c('b','1,0 %/h')),
+   L(c('mu',pad('para caber',22)),c('ok',pad('qualquer ritmo',24)),c('mu',pad('para caber',22)),c('cr','até 0,08 %/h ▲')),L(''),
+   L(c('b','ÚLTIMAS 24 H'),c('mu','  ·  % da cota 5h gasta em cada hora  ·  pico 18h · 32%')),
+   ...tall(cols24,4,'a',{3:'32%',1:'16%',0:'0%'},3).map(l=>L(' ',l)),
+   xLabels(24,3,{0:'20h',3:'23h',6:'02h',9:'05h',12:'08h',15:'11h',18:'14h',21:'17h',23:'19h'},8),
+   L(c('mu',pad('tok/s',8)),...H24.map(([hh])=>{const v=TOK24[hh];return v==null?c('mu',' · '):L(c('w7',rep(' ▁▂▃▄▅▆▇█'[Math.max(1,Math.round(v/200*8))],2)),' ');}),c('mu',' 0–200')),
+   L(c('mu','·  ponto = sem leitura  ·  tok/s na última hora: '),c('b','103'),c('mu',' (claude-opus-5-5)  ·  máximo 167 às 16h'))];
+  return term(frame(TABS6,3,body,L(key('←→','conta'),...ck6)),'tok/s tem linha e escala próprias (0–200), embaixo das barras de %: duas grandezas nunca dividem o mesmo eixo.');},
+ tags:'<b>Muda:</b> aba nova (as teclas viram 1–6; a Ajuda e o protótipo do modo CLI mudam junto). <b>Dado:</b> a mesma <code>SessionAnalysis</code> que o app e o bot já leem. <b>Par no app:</b> qualquer AH.'},
+{id:'AI3',name:'AI3 · Corrida no terminal',p:'O gesto da AH5 em texto: para cada janela, a barra até o reinício e as barras até esgotar (ritmo da última hora e médio), na mesma régua. Cabe na Visão geral (enter na conta) e num comando de uma tacada, <code>usage-monitor analysis</code>.',
+ html:()=>{
+  const W=48;
+  const body=[L(c('mu','$ '),'usage-monitor analysis claude'),L(''),
+   L(c('a b','5h'),c('mu',' · 64% usada · '),c('ok','✓ reinicia antes de esgotar'),c('mu',lpad('régua: agora até +3 h',40))),
+   L(c('mu',pad('  reinicia',12)),sbar(.05,W,'mu'),c('mu',' 9 min · 19:30')),
+   L(c('mu',pad('  esgota',12)),sbar(.6,W,'a'),c('mu',' 1h48 no ritmo da última hora')),
+   L(c('mu',pad('',12)),sbar(.91,W,'a'),c('mu',' 2h44 no ritmo médio')),L(''),
+   L(c('w7 b','semanal'),c('mu',' · 94% usada · '),c('cr','▲ esgota 3 dias antes do reinício'),c('mu',lpad('régua: agora até +3d 6h',24))),
+   L(c('mu',pad('  reinicia',12)),sbar(.995,W,'mu'),c('mu',' 3d 5h · ter 01:00')),
+   L(c('mu',pad('  esgota',12)),sbar(.026,W,'cr'),c('mu',' 2 h · ~21:20 hoje, ritmo da última hora')),
+   L(c('mu',pad('',12)),sbar(.077,W,'cr'),c('mu',' 6 h · ~01:20 sáb, ritmo médio')),L(''),
+   L(c('mu','para durar até ter 01:00: no máximo '),c('b','0,08 %/h'),c('mu',' (na prática, parar por 3 dias)')),
+   L(c('mu','lido há 38 s pelo app aberto'))];
+  return `<div class="new">${term(body.map(l=>l.h).join('\n'))}</div>`;},
+ tags:'<b>Muda:</b> comando novo <code>analysis</code> (com <code>--json</code> como contrato, igual ao <code>status</code>) e o mesmo bloco no detalhe da Visão geral. <b>Par no app:</b> AH5.'},
+{id:'AI4',name:'AI4 · Tabela de janelas',p:'O Histórico vira o que o terminal faz melhor: uma tabela, uma linha por janela, com início, faixa ativa, pico em barra de 10 células e como terminou ("sobrou 4%", "esgotou após 3h06"). A janela aberta fica no topo com o veredito; ↑↓ escolhe e enter abre o gráfico.',
+ html:()=>{
+  const row=(sel,ini,at,p,k,fim,fk)=>{const l=L(sel?c('gd','▸ '):'  ',pad(ini,15),c('mu',pad(at,16)),tbar(p,10,k),c('b',lpad(p+'%',5)),'   ',c(fk||'mu',fim));return sel?wrap('sl',fit(l,FW-1)):l;};
+  const body=[L(c('mu','período '),wrap('sl',c('b',' 7 dias ')),c('mu','  24 h  30 dias')),L(''),
+   L(c('a b','JANELAS 5H'),c('mu','  ·  7 no período  ·  1 esgotou')),
+   L(c('mu b','  '+pad('INÍCIO',15)+pad('ATIVA',16)+pad('PICO',18)+'COMO TERMINOU')),
+   row(1,'23/10 15:09','15:09–19:07',64,'a','aberta · ✓ cabe, ~66% às 19:30','ok'),
+   row(0,'22/10 20:53','20:58–00:41',96,'a','sobrou 4%'),
+   row(0,'22/10 19:22','19:22–20:50',96,'a','sobrou 4%'),
+   row(0,'21/10 20:40','20:40–23:46',100,'cr','▲ esgotou após 3h06 · parado 1h54','cr'),
+   row(0,'21/10 15:20','15:35–19:50',83,'a','sobrou 17%'),
+   L(c('mu','  +2 janelas  ·  pgdn')),L(''),
+   L(c('w7 b','JANELAS 7D'),c('mu','  ·  4 em 30 dias')),
+   row(0,'20/10 01:00','ter–hoje',94,'w7','aberta · ▲ esgota ~21:20 hoje','cr'),
+   row(0,'13/10 01:00','ter–dom',100,'cr','▲ esgotou após 5d 2h','cr'),
+   row(0,'06/10 01:00','ter–seg',93,'w7','sobrou 7%')];
+  return term(frame(TABS5,2,body,L(key('↑↓','janela'),key('enter','gráfico'),key('←→','período'),...ck5)),'Janelas de 21/10 e as semanas de 06 e 13/10 são ilustrativas.');},
+ tags:'<b>Muda:</b> aba 3 troca as sparklines pela tabela (a sparkline pode seguir na Visão geral). <b>Dado:</b> <code>QuotaWindowSummary</code>, o mesmo do Histórico do app. <b>Par no app:</b> AH2.'},
+{id:'AI5',name:'AI5 · Tempo × cota',p:'Duas barras por janela, uma embaixo da outra: quanto do <b>tempo</b> já passou e quanto da <b>cota</b> já foi. Se a cota está à frente do tempo, esgota antes; a diferença vem escrita em pontos. É a diagonal da AH1 sem precisar de gráfico, e cabe numa linha no <code>status</code> e na linha de status do Claude Code.',
+ html:()=>{
+  const body=[L(c('mu','$ '),'usage-monitor status'),L(''),
+   L(c('a b',pad('Padrão Claude 5h',18)),c('mu',pad('tempo',7)),tbar(97,24,'mu'),c('b',lpad('97%',5)),c('mu','  4h51 de 5h')),
+   L(rep(' ',18),c('mu',pad('cota',7)),tbar(64,24,'a'),c('b',lpad('64%',5)),'  ',c('ok','✓ 33 pp atrás do tempo · cabe')),L(''),
+   L(c('w7 b',pad('Padrão Claude 7d',18)),c('mu',pad('tempo',7)),tbar(54,24,'mu'),c('b',lpad('54%',5)),c('mu','  3d 18h de 7d')),
+   L(rep(' ',18),c('mu',pad('cota',7)),tbar(94,24,'w7'),c('b',lpad('94%',5)),'  ',c('cr','▲ 40 pp à frente do tempo · esgota antes')),L(''),
+   L(c('mu','lido há 38 s pelo app aberto')),L(''),
+   L(c('mu','# linha de status do Claude Code')),
+   L(c('a','5h'),' 64%',c('mu','/97% '),c('ok','✓'),c('mu','  ·  '),c('w7','7d'),' 94%',c('mu','/54% '),c('cr','▲ esgota ~21:20'))];
+  return `<div class="new">${term(body.map(l=>l.h).join('\n'))}</div>`;},
+ tags:'<b>Muda:</b> <code>status</code> ganha a linha "tempo" (o <code>--json</code> ganha campo, sem mudar os que existem) e a statusline ganha "/97%". <b>Dado:</b> só início e reinício da janela, que o <code>status</code> já tem. <b>Esforço:</b> o menor. <b>Par no app:</b> AH1.'}
+];
+
+function card(o){return `<div class="opt${o.ref?' ref':''}"><h3>${o.name}</h3><p>${o.p}</p>${o.html()}${o.tags?`<div class="tags">${o.tags}</div>`:''}</div>`;}
+document.getElementById('app').innerHTML=APP.map(card).join('');
+document.getElementById('cli').innerHTML=CLI.map(card).join('');
+</script>
+</body></html>

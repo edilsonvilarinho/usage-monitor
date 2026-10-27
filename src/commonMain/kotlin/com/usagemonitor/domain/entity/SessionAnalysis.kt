@@ -62,8 +62,15 @@ data class AnalysisWindowView(
     /** O ritmo que levaria a cota a 100% exatamente no reinício. */
     val safePace: Double?,
     /** Onde a cota chega no reinício mantendo [paceNow] (ou, sem ele, [paceAverage]); estimativa. */
-    val projectedAtReset: Int?
+    val projectedAtReset: Int?,
+    /** A janela aberta na diagonal do ritmo (#463, AH1); `null` sem reinício conhecido. */
+    val path: QuotaWindowPacePath? = null,
+    /** As janelas anteriores lidas, da mais velha à mais nova, até [ANALYSIS_PREVIOUS_PATHS]. */
+    val previousPaths: List<QuotaWindowPacePath> = emptyList()
 )
+
+/** Quantas janelas anteriores a diagonal da "Análise" desenha atrás da aberta. */
+const val ANALYSIS_PREVIOUS_PATHS = 3
 
 enum class AnalysisSpan(val millis: Long) {
     HOUR_1(1.hours.inWholeMilliseconds),
@@ -198,7 +205,11 @@ private fun windowView(series: UsageHistorySeries, points: List<UsageHistoryPoin
     val safePace = hoursLeft?.let { hours -> (100 - percent).coerceAtLeast(0) / hours }
     val pace = paceNow ?: paceAverage
     val projected = if (hoursLeft != null && pace != null) (percent + pace * hoursLeft).toInt().coerceAtMost(100) else null
-    return AnalysisWindowView(series.quotaLabel, series.periodType, percent, startsAt, resetsAt, paceNow, paceAverage, safePace, projected)
+    // A aberta é a última janela lida, se for a do reinício de agora; as outras ficam atrás.
+    val paths = quotaWindowPacePathsOf(points, series.unit, lengthMillis)
+    val open = paths.lastOrNull()?.takeIf { path -> resetsAt != null && isSamePeriod(path.resetsAt, resetsAt) }
+    val previous = (if (open != null) paths.dropLast(1) else paths).takeLast(ANALYSIS_PREVIOUS_PATHS)
+    return AnalysisWindowView(series.quotaLabel, series.periodType, percent, startsAt, resetsAt, paceNow, paceAverage, safePace, projected, open, previous)
 }
 
 private fun compareWithPrevious(

@@ -8,6 +8,7 @@ import com.usagemonitor.data.repository.CodexCliSessionRepositoryImpl
 import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.usecase.GetCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
@@ -53,6 +54,13 @@ internal class TuiStores(
 
     suspend fun codexSessions(sinceEpochMillis: Long?): Result<List<CodexCliSessionSummary>> =
         codexRepository.getSessions(sinceEpochMillis)
+
+    /** A vazão por modelo "desde" um recorte, para a análise (#463): o mesmo que a janela do app lê. */
+    suspend fun cliModelThroughputs(profileId: String?, sinceEpochMillis: Long): Result<Map<String, OutputThroughput>> =
+        cliRepository.getModelThroughputs(profileId, sinceEpochMillis)
+
+    suspend fun codexModelThroughputs(sinceEpochMillis: Long): Result<Map<String, OutputThroughput>> =
+        codexRepository.getModelUsage(sinceEpochMillis).map { usages -> usages.mapNotNull { usage -> usage.throughput?.let { value -> usage.model to value } }.toMap() }
 
     override fun close() {
         runCatching { cliDataSource.close() }

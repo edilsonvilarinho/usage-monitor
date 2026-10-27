@@ -2,6 +2,9 @@ package com.usagemonitor.screenshots
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.ConfigReadSource
+import com.usagemonitor.domain.entity.AnalysisBucket
+import com.usagemonitor.domain.entity.AnalysisModelSpeed
+import com.usagemonitor.domain.entity.AnalysisWindowView
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
@@ -9,6 +12,7 @@ import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.ProxySettings
+import com.usagemonitor.domain.entity.SessionAnalysis
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
@@ -20,9 +24,10 @@ import com.usagemonitor.presentation.terminal.TerminalGlyphs
 import com.usagemonitor.presentation.terminal.TerminalSourceRow
 import com.usagemonitor.presentation.terminal.TuiAccount
 import com.usagemonitor.presentation.terminal.TuiActiveSession
+import com.usagemonitor.presentation.terminal.TuiAnalysis
 import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiHistory
-import com.usagemonitor.presentation.terminal.TuiHistoryRow
+import com.usagemonitor.presentation.terminal.TuiHistoryFixtures
 import com.usagemonitor.presentation.terminal.TuiSession
 import com.usagemonitor.presentation.terminal.TuiSessionPeriod
 import com.usagemonitor.presentation.terminal.TuiSessions
@@ -107,14 +112,15 @@ internal class TerminalMediaFixtures(private val language: AppLanguage) {
         )
     )
 
+    // A aba 3 (#463, AI4): janelas sintéticas cortadas pelo mesmo domínio do app.
     private val history = TuiHistory(
         HistoryRange.LAST_24_HOURS,
         listOf(
-            TuiHistoryRow(work, work.quotas[0], spark(62, setOf(10, 20, 34))),
-            TuiHistoryRow(work, work.quotas[1], spark(41, emptySet())),
-            TuiHistoryRow(personal, personal.quotas[0], spark(18, setOf(8, 30))),
-            TuiHistoryRow(codex, codex.quotas[0], spark(33, setOf(12, 26, 40))),
-            TuiHistoryRow(go, go.quotas[0], spark(12, setOf(24)))
+            TuiHistoryFixtures.row(work, work.quotas[0], listOf(100, 96, 83), 5.hours, now),
+            TuiHistoryFixtures.row(work, work.quotas[1], emptyList(), (7 * 24).hours, now),
+            TuiHistoryFixtures.row(personal, personal.quotas[0], listOf(41), 5.hours, now),
+            TuiHistoryFixtures.row(codex, codex.quotas[0], listOf(70, 100), 5.hours, now),
+            TuiHistoryFixtures.row(go, go.quotas[0], emptyList(), 5.hours, now)
         )
     )
 
@@ -168,6 +174,26 @@ internal class TerminalMediaFixtures(private val language: AppLanguage) {
         }
     }
 
+    /**
+     * A aba 6 (#463): a análise da conta "trabalho" — a 5h em 62% com 2h17 para o reinício e a
+     * semanal em 41% —, com as 24 h e a vazão inventadas.
+     */
+    private val analysis: TuiAnalysis
+        get() {
+            val fiveHour = AnalysisWindowView(work.quotas[0].label, PeriodType.INTERVAL, 62, now + 137.minutes - 5.hours, now + 137.minutes, 24.0, 22.8, 16.6, 100)
+            val weekly = AnalysisWindowView(work.quotas[1].label, PeriodType.WEEKLY, 41, now + 51.hours - (7 * 24).hours, now + 51.hours, 0.6, 0.35, 1.16, 71)
+            val start = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() / 3_600_000 * 3_600_000) - 23.hours
+            val hours = (0 until 24).map { index ->
+                val points = listOf(0.0, 0.0, 2.0, 6.0, 9.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 11.0, 18.0, 14.0, 21.0, 26.0, 12.0, 0.0, 8.0, 19.0, 24.0, 16.0)[index]
+                AnalysisBucket(start + index.hours, points, if (points > 0.0) 60.0 + points * 4 else null)
+            }
+            val result = SessionAnalysis(
+                "Anthropic · " + text("trabalho", "work"), ApiSource.ANTHROPIC, now, fiveHour, weekly, emptyList(), hours, emptyList(), emptyList(), emptyList(), emptyList(), null,
+                listOf(AnalysisModelSpeed("claude-opus-5-5", 131.0))
+            )
+            return TuiAnalysis(listOf(work, personal, codex), 0, result)
+        }
+
     fun data(resetAlerts: Boolean = true) = TuiData(
         now = now,
         collector = CollectorKind.SERVICE,
@@ -183,6 +209,7 @@ internal class TerminalMediaFixtures(private val language: AppLanguage) {
         sessions = sessions,
         history = history,
         team = team,
-        settings = settings(resetAlerts)
+        settings = settings(resetAlerts),
+        analysis = analysis
     )
 }

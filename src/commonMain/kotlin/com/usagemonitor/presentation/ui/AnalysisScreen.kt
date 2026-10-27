@@ -38,23 +38,10 @@ internal object AnalysisLabels {
         "No history for this account yet. The analysis shows up after a few collections."
     )
 
-    // Os três blocos de ritmo dividem o card: a 640dp cada um tem ~85dp, por isso rótulo
-    // curto e o que cada um mede numa linha só abaixo deles.
-    fun paceNow(language: AppLanguage): String = localized(language, "agora", "now")
-    fun paceAverage(language: AppLanguage): String = localized(language, "média", "average")
-    fun paceSafe(language: AppLanguage): String = localized(language, "seguro", "safe")
-    fun paceLegend(language: AppLanguage): String = localized(
-        language,
-        "agora: última 1 h · média: desde o início da janela · seguro: chega a 100% no reinício",
-        "now: last 1 h · average: since the window start · safe: reaches 100% at the reset"
-    )
     fun hoursTitle(language: AppLanguage): String = localized(language, "Últimas 24 h", "Last 24 h")
     fun intervalsTitle(language: AppLanguage): String = localized(language, "Ritmo por intervalo", "Pace by interval")
     fun versusWeek(language: AppLanguage): String = localized(language, "vs 7 d", "vs 7 d")
-    fun versusTitle(language: AppLanguage): String = localized(language, "Esta janela × anterior", "This window × previous")
-    fun now(language: AppLanguage): String = localized(language, "agora", "now")
-    fun before(language: AppLanguage): String = localized(language, "antes", "before")
-    fun noPreviousWindow(language: AppLanguage): String = localized(language, "Sem janela 5h anterior no histórico.", "No previous 5h window in the history.")
+    fun paceColumn(language: AppLanguage): String = localized(language, "%/h da 5h", "%/h of 5h")
 }
 
 /**

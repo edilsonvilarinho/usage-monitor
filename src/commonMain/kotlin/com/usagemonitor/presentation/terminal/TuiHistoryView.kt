@@ -1,39 +1,52 @@
 package com.usagemonitor.presentation.terminal
 
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.QuotaWindowSummary
+import com.usagemonitor.presentation.ui.PaceDiagonalModels
+import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.displayQuotaLabel
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 /**
- * Aba 3, Histórico (3.3): uma trilha por cota com percentual, na ordem do painel, com os
- * reinícios marcados, e o uso de agora com a palavra de estado no fim. O eixo é em BRT.
+ * Aba 3, Histórico (3.3; #463, AI4): uma tabela de janelas, um bloco por cota com percentual na
+ * ordem do painel e uma linha por janela — início, faixa ativa, pico e como terminou. `enter` abre
+ * o gráfico alto da janela escolhida ([TuiHistoryChartView]). Horários em BRT.
  */
 internal object TuiHistoryView {
     private const val MARKER_WIDTH = 2
-    private const val PERCENT_WIDTH = 4
-    private const val MIN_LABEL_WIDTH = 10
-    private const val MAX_LABEL_WIDTH = 22
+    private const val START_WIDTH = 13
+    private const val ACTIVE_WIDTH = 14
+    private const val PEAK_BAR_WIDTH = 10
+    private const val PERCENT_WIDTH = 5
+    private const val PEAK_WIDTH = PEAK_BAR_WIDTH + PERCENT_WIDTH + 3
+
+    /** Linhas fixas do alto do corpo: o período, uma em branco e o cabeçalho da tabela. */
+    private const val HEADER_ROWS = 3
     private val SAO_PAULO = TimeZone.of("America/Sao_Paulo")
 
-    fun render(history: TuiHistory?, state: TuiHistoryState, size: TuiSize, labels: TuiHistoryLabels, terminalLabels: TerminalLabels, profile: TerminalProfile): TuiTabView {
-        val shortcuts = listOf(TuiShortcut("←→", labels.keyWindow), TuiShortcut("↑↓", labels.keyQuota))
+    fun render(history: TuiHistory?, state: TuiHistoryState, now: Instant, size: TuiSize, labels: TuiHistoryLabels, terminalLabels: TerminalLabels, profile: TerminalProfile): TuiTabView {
+        val rows = history?.rows.orEmpty()
+        val selected = state.resolve(rows.map { row -> row.listedWindows.size })
+        if (state.chartOpen && history?.failure == null && selected != null) {
+            val row = rows[selected.first]
+            return TuiHistoryChartView.render(row, row.listedWindows[selected.second], now, size, labels, terminalLabels, profile)
+        }
+        val shortcuts = listOf(TuiShortcut("↑↓", labels.keyWindow), TuiShortcut("enter", labels.keyChart), TuiShortcut("←→", labels.keyPeriod))
         val body = mutableListOf(rangeLine(state.range, size.bodyWidth, labels), TerminalLine.EMPTY)
         val failure = history?.failure
-        val rows = history?.rows.orEmpty()
         when {
             failure != null -> body += terminalLine(TerminalSpan(profile.glyphs.warning + " ", TerminalColor.Warn), TerminalSpan(failure))
             rows.isEmpty() -> body += terminalLine(TerminalSpan(labels.noQuotas, TerminalColor.Muted))
-            else -> body += trails(rows, state, size, labels, terminalLabels, profile)
+            else -> body += table(rows, selected, now, size, labels, terminalLabels, profile)
         }
         return TuiTabView(body, shortcuts)
     }
 
-    /** `janela  24 h   7 dias   30 dias`, a ativa no fundo de seleção, e o tamanho da célula à direita. */
+    /** `período  24 h   7 dias   30 dias`, o ativo no fundo de seleção, e "uma linha = uma janela" à direita. */
     private fun rangeLine(active: HistoryRange, width: Int, labels: TuiHistoryLabels): TerminalLine {
-        val spans = mutableListOf(TerminalSpan(labels.window + " ", TerminalColor.Muted))
+        val spans = mutableListOf(TerminalSpan(labels.period + " ", TerminalColor.Muted))
         TuiHistoryState.RANGES.forEachIndexed { index, range ->
             if (index > 0) {
                 spans += TerminalSpan("  ")
@@ -41,16 +54,16 @@ internal object TuiHistoryView {
             spans += if (range == active) TerminalSpan(" ${labels.range(range)} ", bold = true, selected = true) else TerminalSpan(" ${labels.range(range)} ", TerminalColor.Muted)
         }
         val left = TerminalLine(spans)
-        val cell = labels.cell(active)
-        val gap = width - 1 - left.width - cell.length
-        return if (gap >= 2) left + terminalLine(TerminalSpan(" ".repeat(gap) + cell, TerminalColor.Muted)) else left
+        val note = labels.oneLinePerWindow
+        val gap = width - 1 - left.width - note.length
+        return if (gap >= 2) left + terminalLine(TerminalSpan(" ".repeat(gap) + note, TerminalColor.Muted)) else left
     }
 
     /**
      * `trabalho Claude 5h`: o apelido e o rótulo do app. Conta sem apelido usa só o rótulo
      * quando ele já começa pelo nome da fonte ("Go 5h" de "OpenCode Go"), para não repetir.
      */
-    private fun rowLabel(row: TuiHistoryRow, pt: Boolean): String {
+    fun rowLabel(row: TuiHistoryRow, pt: Boolean): String {
         val quota = displayQuotaLabel(row.quota.label, pt)
         val profile = row.account.profile?.takeIf { label -> label.isNotBlank() }
         if (profile != null) {
@@ -61,56 +74,90 @@ internal object TuiHistoryView {
         return if (repeats) quota else "$name $quota"
     }
 
-    private fun trails(rows: List<TuiHistoryRow>, state: TuiHistoryState, size: TuiSize, labels: TuiHistoryLabels, terminalLabels: TerminalLabels, profile: TerminalProfile): List<TerminalLine> {
-        val pt = terminalLabels.pt
-        val labelWidth = (rows.maxOf { row -> rowLabel(row, pt).length } + 2).coerceIn(MIN_LABEL_WIDTH, MAX_LABEL_WIDTH)
-        val cellRoom = (size.bodyWidth - 1 - MARKER_WIDTH - labelWidth - 2 - PERCENT_WIDTH - 1 - terminalLabels.zoneColumnWidth).coerceAtLeast(8)
-        val cells = TuiHistoryState.cellCount(state.range).coerceAtMost(cellRoom)
-        // O corpo tem a linha da janela, a em branco, o eixo, outra em branco e a legenda.
-        val visible = (size.bodyHeight - 5).coerceAtLeast(1)
-        val selected = state.selected.coerceIn(0, rows.lastIndex)
-        val start = TuiFrame.scrollStart(selected, rows.size, visible)
+    /** O cabeçalho fixo e os blocos, rolados para a janela escolhida ficar à vista. */
+    private fun table(
+        rows: List<TuiHistoryRow>,
+        selected: Pair<Int, Int>?,
+        now: Instant,
+        size: TuiSize,
+        labels: TuiHistoryLabels,
+        terminalLabels: TerminalLabels,
+        profile: TerminalProfile
+    ): List<TerminalLine> {
+        val header = " ".repeat(MARKER_WIDTH) + labels.columnStart.padEnd(START_WIDTH) + labels.columnActive.padEnd(ACTIVE_WIDTH) + labels.columnPeak.padEnd(PEAK_WIDTH) + labels.columnEnd
         val lines = mutableListOf<TerminalLine>()
-        var axisSource: TuiSpark? = null
-        rows.subList(start, (start + visible).coerceAtMost(rows.size)).forEachIndexed { offset, row ->
-            val shown = row.spark?.let { spark -> lastCells(spark, cells) }
-            if (axisSource == null && shown != null) {
-                axisSource = shown
+        var selectedLine = 0
+        rows.forEachIndexed { rowIndex, row ->
+            if (rowIndex > 0) {
+                lines += TerminalLine.EMPTY
             }
-            lines += trail(row, shown, cells, labelWidth, start + offset == selected, size.bodyWidth, labels, terminalLabels, profile)
+            lines += blockHeader(row, labels, terminalLabels, profile)
+            val listed = row.listedWindows
+            if (listed.isEmpty()) {
+                lines += terminalLine(TerminalSpan(" ".repeat(MARKER_WIDTH) + labels.noWindow, TerminalColor.Muted))
+            }
+            listed.forEachIndexed { windowIndex, window ->
+                val isSelected = selected == rowIndex to windowIndex
+                if (isSelected) {
+                    selectedLine = lines.size
+                }
+                lines += windowLine(row, window, isSelected, now, size.bodyWidth, labels, terminalLabels, profile)
+            }
+            val older = row.windows.size - listed.size
+            if (older > 0) {
+                lines += terminalLine(TerminalSpan(" ".repeat(MARKER_WIDTH) + labels.olderWindows(older), TerminalColor.Muted))
+            }
         }
-        axisSource?.let { spark -> lines += terminalLine(TerminalSpan(" ".repeat(MARKER_WIDTH + labelWidth) + axis(spark, state.range, labels), TerminalColor.Muted)) }
-        lines += TerminalLine.EMPTY
-        lines += terminalLine(TerminalSpan(profile.glyphs.resetMark + " " + labels.legend, TerminalColor.Muted))
-        return lines
+        val visible = (size.bodyHeight - HEADER_ROWS).coerceAtLeast(1)
+        val start = TuiFrame.scrollStart(selectedLine, lines.size, visible)
+        return listOf(terminalLine(TerminalSpan(header, TerminalColor.Muted, bold = true))) + lines.drop(start).take(visible)
     }
 
-    private fun trail(
+    /** `● trabalho Claude 5h  91% crítico · 7 janelas no período · 1 esgotou`. */
+    private fun blockHeader(row: TuiHistoryRow, labels: TuiHistoryLabels, terminalLabels: TerminalLabels, profile: TerminalProfile): TerminalLine {
+        val color = TerminalColor.Source(row.account.source)
+        val zone = row.account.zoneOf(row.quota)
+        val spans = mutableListOf(
+            TerminalPrimitives.sourceMark(color, zone, profile.glyphs),
+            TerminalSpan(" " + rowLabel(row, terminalLabels.pt), color, bold = true)
+        )
+        row.quota.percent?.let { percent ->
+            spans += TerminalSpan("  $percent%", bold = true)
+            zone?.let { found ->
+                spans += TerminalSpan(" ")
+                spans += TerminalPrimitives.zoneWord(found, terminalLabels, profile)
+            }
+        }
+        if (row.windows.isNotEmpty()) {
+            val separator = " ${profile.glyphs.separator} "
+            spans += TerminalSpan(separator + labels.windowCount(row.windows.size), TerminalColor.Muted)
+            val exhausted = row.windows.count { window -> window.exhaustedAt != null }
+            if (exhausted > 0) {
+                spans += TerminalSpan(separator + labels.exhaustedCount(exhausted), TerminalColor.Muted)
+            }
+        }
+        return TerminalLine(spans)
+    }
+
+    private fun windowLine(
         row: TuiHistoryRow,
-        spark: TuiSpark?,
-        cells: Int,
-        labelWidth: Int,
+        window: QuotaWindowSummary,
         selected: Boolean,
+        now: Instant,
         width: Int,
         labels: TuiHistoryLabels,
         terminalLabels: TerminalLabels,
         profile: TerminalProfile
     ): TerminalLine {
         val color = TerminalColor.Source(row.account.source)
-        val spans = mutableListOf(TerminalSpan(rowLabel(row, terminalLabels.pt).take(labelWidth - 1).padEnd(labelWidth), color))
-        if (spark == null || spark.cells.all { cell -> cell == null }) {
-            spans += TerminalSpan(labels.noReading.take(cells).padEnd(cells), TerminalColor.Muted)
-        } else {
-            spans += TuiSparkline.render(spark, color, profile.glyphs)
-        }
-        val percent = row.quota.percent
-        if (percent != null) {
-            spans += TerminalSpan("  " + "$percent%".padStart(PERCENT_WIDTH), bold = true)
-            row.account.zoneOf(row.quota)?.let { zone ->
-                spans += TerminalSpan(" ")
-                spans += TerminalPrimitives.zoneWord(zone, terminalLabels, profile)
-            }
-        }
+        val spans = mutableListOf(
+            TerminalSpan(dateTime(window.firstObservedAt, labels).padEnd(START_WIDTH)),
+            TerminalSpan(activeSpan(window, labels).padEnd(ACTIVE_WIDTH), TerminalColor.Muted)
+        )
+        spans += TerminalPrimitives.quotaBar(window.peakPercent, PEAK_BAR_WIDTH, color, profile.glyphs)
+        spans += TerminalSpan("${window.peakPercent}%".padStart(PERCENT_WIDTH), bold = true)
+        spans += TerminalSpan("   ")
+        spans += ending(window, now, labels, terminalLabels, profile, room = width - 1 - MARKER_WIDTH - START_WIDTH - ACTIVE_WIDTH - PEAK_WIDTH)
         val content = TerminalLine(spans)
         return if (selected) {
             (terminalLine(TerminalSpan(profile.glyphs.selection + " ", TerminalColor.Gold)) + content).fit(width - 1).selected()
@@ -119,43 +166,50 @@ internal object TuiHistoryView {
         }
     }
 
-    /** As últimas [count] células: em tela estreita, a trilha perde o começo, nunca o agora. */
-    private fun lastCells(spark: TuiSpark, count: Int): TuiSpark {
-        if (spark.cells.size <= count) {
-            return spark
+    /**
+     * Como a janela terminou: aberta e quando reinicia, quanto sobrou, ou `▲ esgotou após 3 h
+     * 6 min · parado 1 h 54 min` — contado da primeira leitura, como o Histórico do app, porque o
+     * início nominal a API não informa. Em [room] células: sem espaço, o "parado" sai inteiro,
+     * nunca pela metade.
+     */
+    fun ending(window: QuotaWindowSummary, now: Instant, labels: TuiHistoryLabels, terminalLabels: TerminalLabels, profile: TerminalProfile, room: Int = Int.MAX_VALUE): List<TerminalSpan> {
+        val exhaustedAt = window.exhaustedAt
+        return when {
+            exhaustedAt != null -> {
+                // Esgotada já na primeira leitura do período: "esgotou após 0 min" diria que foi instantâneo.
+                val after = if (exhaustedAt <= window.firstObservedAt) labels.outAtFirstReading
+                else labels.exhaustedAfter(PaceDiagonalModels.durationLabel((exhaustedAt - window.firstObservedAt).inWholeMilliseconds))
+                val idle = (window.resetsAt.coerceAtMost(if (window.isOpen) now else window.resetsAt) - exhaustedAt).inWholeMilliseconds
+                val short = profile.glyphs.warning + " " + after
+                val full = "$short ${profile.glyphs.separator} ${labels.idleFor(PaceDiagonalModels.durationLabel(idle))}"
+                listOf(TerminalSpan(if (idle > 0L && full.length <= room) full else short, TerminalColor.Crit))
+            }
+            window.isOpen -> listOf(TerminalSpan(labels.open(terminalLabels.resetAt(window.resetsAt, now)), TerminalColor.Muted))
+            else -> listOf(TerminalSpan(labels.leftover((100 - window.peakPercent).coerceAtLeast(0)), TerminalColor.Muted))
         }
-        val dropped = spark.cells.size - count
-        return TuiSpark(
-            cells = spark.cells.takeLast(count),
-            resets = spark.resets.map { index -> index - dropped }.filter { index -> index >= 0 }.toSet(),
-            startsAt = spark.startsAt + (spark.cellMillis * dropped).milliseconds,
-            cellMillis = spark.cellMillis
-        )
+    }
+
+    /** `23/10 15:09`, em BRT, na ordem de dia e mês do app. */
+    fun dateTime(at: Instant, labels: TuiHistoryLabels): String {
+        val local = at.toLocalDateTime(SAO_PAULO)
+        return labels.dayMonth(local.dayOfMonth, local.monthNumber) + " " + TelegramBotMessages.clock(at)
     }
 
     /**
-     * O eixo em BRT, alinhado às células: a cada 3 h cheias em 24 h ("15h"), na virada do dia
-     * em 7 dias ("qua") e a cada 5 dias em 30 dias ("05/11"). Rótulo que encostaria no anterior
-     * fica de fora.
+     * A faixa ativa (#382): `15:09–19:07` no mesmo dia, `20/10–23/10` quando atravessa dias, e
+     * `—` quando o uso não subiu na janela.
      */
-    private fun axis(spark: TuiSpark, range: HistoryRange, labels: TuiHistoryLabels): String {
-        val axis = CharArray(spark.cells.size) { ' ' }
-        var nextFree = 0
-        for (index in spark.cells.indices) {
-            val at = (spark.startsAt + (spark.cellMillis * index).milliseconds).toLocalDateTime(SAO_PAULO)
-            val cellMinutes = spark.cellMillis / 60_000L
-            val minuteOfDay = at.hour * 60 + at.minute
-            val text = when (range) {
-                HistoryRange.LAST_7_DAYS -> if (minuteOfDay < cellMinutes) labels.weekday(at.dayOfWeek.isoDayNumber) else null
-                HistoryRange.LAST_30_DAYS -> if (minuteOfDay < cellMinutes && (at.dayOfMonth - 1) % 5 == 0) labels.dayMonth(at.dayOfMonth, at.monthNumber) else null
-                else -> if (at.hour % 3 == 0 && at.minute < cellMinutes) "${at.hour.toString().padStart(2, '0')}h" else null
-            } ?: continue
-            if (index < nextFree || index + text.length > axis.size) {
-                continue
-            }
-            text.forEachIndexed { offset, char -> axis[index + offset] = char }
-            nextFree = index + text.length + 1
+    fun activeSpan(window: QuotaWindowSummary, labels: TuiHistoryLabels): String {
+        val from = window.activeFrom
+        val until = window.activeUntil
+        if (from == null || until == null || from == until) {
+            return "—"
         }
-        return axis.concatToString().trimEnd()
+        val fromDate = from.toLocalDateTime(SAO_PAULO)
+        val untilDate = until.toLocalDateTime(SAO_PAULO)
+        if (fromDate.date == untilDate.date) {
+            return TelegramBotMessages.clock(from) + "–" + TelegramBotMessages.clock(until)
+        }
+        return labels.dayMonth(fromDate.dayOfMonth, fromDate.monthNumber) + "–" + labels.dayMonth(untilDate.dayOfMonth, untilDate.monthNumber)
     }
 }

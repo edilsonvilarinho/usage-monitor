@@ -78,6 +78,7 @@ internal object TerminalCommands {
                 console.print(TerminalAnsi.render(output.lines, console.profile))
                 output.exitCode
             }
+            is TerminalCommand.Analysis -> TerminalAnalysisCommand.run(command, languageOverride, reader, console)
             is TerminalCommand.Reading -> runReading(command, languageOverride, reader, console, pause, statusLineInput, sessionMetrics, environment, home)
             is ServiceCommand -> TerminalServiceCommands.run(command, languageOverride, console)
             is ConfigCommand -> TerminalConfigRunner().run(command, languageOverride, console)
@@ -114,8 +115,8 @@ internal object TerminalCommands {
                 val line = TerminalStatusLineView.claudeCode(account, input.sessionId?.let(sessionMetrics), input.model, reading.now, labels, console.profile)
                 TerminalOutput(listOf(line), EXIT_STATUS_LINE)
             }
-            // Atendido antes, em `run`: não lê o cache de cotas.
-            is TerminalCommand.Alerts -> return 0
+            // Atendidos antes, em `run`: o `alerts` não lê o cache de cotas, e o `analysis` lê os bancos.
+            is TerminalCommand.Alerts, is TerminalCommand.Analysis -> return 0
             TerminalCommand.TmuxStatusLine -> {
                 // Formato do tmux, e não ANSI: sai direto, sem passar pelo renderizador de linhas.
                 console.print(TerminalTmux.render(reading.accounts, reading.now, labels, console.profile))

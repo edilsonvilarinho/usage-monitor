@@ -584,7 +584,17 @@ private fun formatCentsLabel(cents: Long): String {
     return "\$${dollars}.${remainder.toString().padStart(2, '0')}"
 }
 
+/**
+ * Rótulos do eixo Y, de cima para baixo, nas três linhas da grade (topo, meio, base).
+ *
+ * Percentual e tokens são desenhados pela fração usada da cota (`normalizedUsage`), então a
+ * grade é sempre 100% · 50% · 0% (#463): antes o eixo ficava sem número, e uma semanal em 94%
+ * parecia cheia sem dizer quanto.
+ */
 internal fun buildValueLabels(axis: ValueAxis?, unit: UsageUnit): List<String> {
+    if (unit != UsageUnit.CURRENCY_USD && unit != UsageUnit.REQUESTS) {
+        return NORMALIZED_VALUE_LABELS
+    }
     if (axis == null) {
         return emptyList()
     }
@@ -606,6 +616,8 @@ internal fun buildValueLabels(axis: ValueAxis?, unit: UsageUnit): List<String> {
         else -> emptyList()
     }
 }
+
+private val NORMALIZED_VALUE_LABELS = listOf("100%", "50%", "0%")
 
 private fun formatCurrencyValue(cents: Long): String {
     val sign = if (cents < 0L) "-" else ""

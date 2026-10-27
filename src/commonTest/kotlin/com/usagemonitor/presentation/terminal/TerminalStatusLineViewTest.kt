@@ -35,13 +35,13 @@ class TerminalStatusLineViewTest {
     @Test
     fun `em dia, a linha so informa a hora do reinicio`() {
         val line = TerminalStatusLineView.claudeCode(account(62, 38), session, "Opus 5.5", now, pt, color)
-        assertEquals("◑ pessoal · 5h 62% ███████▍░░░░ 15:10 · 7d 38% · sessão $1.84 · 31 tok/s · Opus 5.5", line.plainText)
+        assertEquals("◑ pessoal · 5h 62%/84% ✓ ███████▍░░░░ 15:10 · 7d 38%/42% ✓ · sessão $1.84 · 31 tok/s · Opus 5.5", line.plainText)
     }
 
     @Test
     fun `acima do limiar escreve o estado e quanto falta`() {
         val line = TerminalStatusLineView.claudeCode(account(91, 74), session, null, now, pt, color)
-        assertEquals("● pessoal · 5h 91% crítico ██████████▉░ reinicia em 47 min · 7d 74% atenção · sessão $1.84 · 31 tok/s", line.plainText)
+        assertEquals("● pessoal · 5h 91%/84% ▲ crítico ██████████▉░ reinicia em 47 min · 7d 74%/42% ▲ atenção · sessão $1.84 · 31 tok/s", line.plainText)
     }
 
     @Test
@@ -60,12 +60,12 @@ class TerminalStatusLineViewTest {
     @Test
     fun `leitura velha aparece com a hora dela`() {
         val line = TerminalStatusLineView.claudeCode(account(62, 38, fetchedAt = now - 2.hours), null, null, now, pt, color)
-        assertEquals("◑ pessoal · 5h 62% ███████▍░░░░ 15:10 · 7d 38% · leitura de 12:23", line.plainText)
+        assertEquals("◑ pessoal · 5h 62%/84% ✓ ███████▍░░░░ 15:10 · 7d 38%/42% ✓ · leitura de 12:23", line.plainText)
     }
 
     @Test
     fun `sem Unicode nao ha anel e as barras e separadores viram ASCII`() {
         val line = TerminalStatusLineView.claudeCode(account(91, 38), null, null, now, pt, ascii)
-        assertEquals("pessoal - 5h 91% crítico [#########-] reinicia em 47 min - 7d 38%", TerminalAnsi.render(line, ascii).replace("critico", "crítico").replace("CRITICO", "crítico"))
+        assertEquals("pessoal - 5h 91%/84% ! crítico [#########-] reinicia em 47 min - 7d 38%/42% ok", TerminalAnsi.render(line, ascii).replace("critico", "crítico").replace("CRITICO", "crítico"))
     }
 }

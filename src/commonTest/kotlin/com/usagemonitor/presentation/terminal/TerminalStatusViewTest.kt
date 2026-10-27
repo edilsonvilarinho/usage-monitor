@@ -52,8 +52,11 @@ class TerminalStatusViewTest {
             listOf(
                 " FONTE        CONTA     COTA       USO                        ESTADO   REINICIA",
                 " ● Anthropic  pessoal   Claude 5h  ████████████▍░░░░░░░  62%  em dia   16:40 BRT · em 2h17",
+                "                        tempo      ██████████▊░░░░░░░░░  54%  ▲ 8 pp à frente do tempo · 2h43 de 5h",
                 "                        Claude 7d  ███████▌░░░░░░░░░░░░  38%  em dia   seg 09:00 BRT · em 4d18h",
+                "                        tempo      ██████▏░░░░░░░░░░░░░  31%  ▲ 7 pp à frente do tempo · 2d05h de 7d",
                 " ● Anthropic  trabalho  Claude 5h  ██████████████████▏░  91%  crítico  15:10 BRT · em 47 min",
+                "                        tempo      ████████████████▊░░░  84%  ▲ 7 pp à frente do tempo · 4h13 de 5h",
                 " ● DeepSeek             Saldo      saldo US$ 7,82",
                 "",
                 " lido há 38 s pelo app aberto · 4 cotas: 1 crítica, 2 em dia"
@@ -67,16 +70,18 @@ class TerminalStatusViewTest {
         val output = TerminalStatusView.render(accounts, now, collector = CollectorKind.APP, maxAge = null, labels = pt, profile = ascii)
         val rendered = TerminalAnsi.render(output.lines, ascii).lines()
         assertEquals("   Anthropic  pessoal   Claude 5h  [###########-------]  62%  em dia   16:40 BRT - em 2h17", rendered[1])
-        assertEquals(" * Anthropic  trabalho  Claude 5h  [################--]  91%  CRITICO  15:10 BRT - em 47 min", rendered[3])
+        assertEquals(" * Anthropic  trabalho  Claude 5h  [################--]  91%  CRITICO  15:10 BRT - em 47 min", rendered[5])
+        assertEquals("                        tempo      [###############---]  84%  ! 7 pp a frente do tempo - 4h13 de 5h", rendered[6])
     }
 
     @Test
     fun `em ingles os cabecalhos e as palavras mudam`() {
         val output = TerminalStatusView.render(accounts, now, collector = CollectorKind.APP, maxAge = null, labels = en, profile = color)
         assertTrue(text(output).first().startsWith(" SOURCE"))
-        assertTrue(text(output)[3].contains("critical"))
+        assertTrue(text(output)[5].contains("critical"))
+        assertTrue(text(output)[6].contains("time  ") && text(output)[6].endsWith("▲ 7 pp ahead of time · 4h13 of 5h"), text(output)[6])
         // O saldo segue o idioma: em inglês, ponto decimal (antes saía `US$ 7,82`).
-        assertTrue(text(output)[4].trimEnd().endsWith("balance US$ 7.82"), text(output)[4])
+        assertTrue(text(output)[7].trimEnd().endsWith("balance US$ 7.82"), text(output)[7])
         assertEquals(" read 38 s ago by the open app · 4 quotas: 1 critical, 2 on track", text(output).last())
     }
 

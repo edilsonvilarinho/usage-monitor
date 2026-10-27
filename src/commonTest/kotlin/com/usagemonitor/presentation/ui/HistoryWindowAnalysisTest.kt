@@ -40,8 +40,16 @@ class HistoryWindowAnalysisTest {
 
     @Test
     fun `pace without two readings is a dash, not zero`() {
-        assertEquals("12 %/h", paceLabel(12.4))
-        assertEquals("—", paceLabel(null))
+        assertEquals("12 %/h", paceLabel(12.4, AppLanguage.EN))
+        assertEquals("—", paceLabel(null, AppLanguage.EN))
+    }
+
+    @Test
+    fun `slow pace keeps one decimal instead of rounding to zero`() {
+        assertEquals("0.3 %/h", paceLabel(0.26, AppLanguage.EN))
+        assertEquals("0,3 %/h", paceLabel(0.26, AppLanguage.PT))
+        assertEquals("0.0 %/h", paceLabel(0.0, AppLanguage.EN))
+        assertEquals("9.9 %/h", paceLabel(9.94, AppLanguage.EN))
     }
 
     @Test

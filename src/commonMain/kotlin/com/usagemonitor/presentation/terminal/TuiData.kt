@@ -25,14 +25,16 @@ data class TuiData(
     /** A aba 4; `null` enquanto ela não foi aberta, ou sem time. */
     val team: TuiTeam? = null,
     /** A aba 5; `null` enquanto ela não foi aberta. */
-    val settings: TuiSettings? = null
+    val settings: TuiSettings? = null,
+    /** A aba 6; `null` enquanto ela não foi aberta. */
+    val analysis: TuiAnalysis? = null
 ) {
     /** A última tentativa de coleta falhou em alguma conta (6.2). */
     val lastFailed: Boolean
         get() = accounts.any { account -> account.failure != null }
 
     /**
-     * A primeira trilha de cada conta na aba 3, que lista as cotas com percentual na ordem do
+     * A primeira cota de cada conta na aba 3, que lista as cotas com percentual na ordem do
      * painel; `null` para a conta sem nenhuma.
      */
     val historyRowOfAccount: List<Int?>

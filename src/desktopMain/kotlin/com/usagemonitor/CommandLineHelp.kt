@@ -35,6 +35,9 @@ private val HELP_PT = """
     |                     Uma linha de uso para o Claude Code ou para o tmux.
     |  alerts [--since <tempo>]
     |                     Os avisos de hoje, quando e para onde foram.
+    |  analysis [claude|codex|<conta>] [--json]
+    |                     Esgotar x reiniciar: quando cada janela reinicia e
+    |                     quando a cota acaba no ritmo da última hora e no médio.
     |  tui                O modo interativo: tela cheia, por teclado.
     |
     |Configurar (os mesmos arquivos do app; com ele ou o serviço coletando,
@@ -99,6 +102,9 @@ private val HELP_EN = """
     |                     One usage line for Claude Code or for tmux.
     |  alerts [--since <time>]
     |                     Today's alerts, when and where they went.
+    |  analysis [claude|codex|<account>] [--json]
+    |                     Run out x reset: when each window resets and when the
+    |                     quota runs out at the last hour's and the average pace.
     |  tui                The interactive mode: full screen, by keyboard.
     |
     |Configure (the app's own files; with it or the service collecting, it is

@@ -18,6 +18,7 @@ internal class TuiLabels(val language: AppLanguage) {
             TuiTab.HISTORY -> localized(language, "Histórico", "History")
             TuiTab.TEAM -> localized(language, "Time", "Team")
             TuiTab.SETTINGS -> localized(language, "Configurações", "Settings")
+            TuiTab.ANALYSIS -> localized(language, "Análise", "Analysis")
         }
 
     /** "14:23 BRT · ao vivo": a coleta está de pé e a última leitura deu certo. */
@@ -28,7 +29,7 @@ internal class TuiLabels(val language: AppLanguage) {
 
     val statusNoReading: String get() = localized(language, "sem leitura", "no reading")
 
-    val keyTabs: String get() = "1–5"
+    val keyTabs: String get() = "1–6"
     val keyTabsLabel: String get() = localized(language, "aba", "tab")
     val keyRefreshLabel: String get() = localized(language, "atualizar", "refresh")
     val keyHelpLabel: String get() = localized(language, "ajuda", "help")
@@ -48,7 +49,7 @@ internal class TuiLabels(val language: AppLanguage) {
     val helpTitle: String get() = localized(language, "Ajuda", "Help")
     val helpAnyTab: String get() = localized(language, "Em qualquer aba", "On any tab")
     val helpInLists: String get() = localized(language, "Dentro das listas", "Inside the lists")
-    val helpTabsKey: String get() = localized(language, "1 a 5", "1 to 5")
+    val helpTabsKey: String get() = localized(language, "1 a 6", "1 to 6")
     val helpTabs: String get() = localized(language, "troca de aba", "switches tab")
     val helpRefresh: String get() = localized(language, "lê de novo agora", "reads again now")
     val helpHelp: String get() = localized(language, "esta ajuda", "this help")

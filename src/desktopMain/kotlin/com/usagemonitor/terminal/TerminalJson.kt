@@ -1,6 +1,7 @@
 package com.usagemonitor.terminal
 
 import com.usagemonitor.domain.entity.QuotaZone
+import com.usagemonitor.presentation.terminal.TerminalQuotaTime
 import com.usagemonitor.presentation.terminal.terminalQuotaId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -43,6 +44,7 @@ internal object TerminalJson {
     private fun encodeUtf8(reading: TerminalReading): String {
         val quotas = reading.accounts.flatMap { account ->
             account.quotas.map { quota ->
+                val time = TerminalQuotaTime.of(quota, reading.now)
                 QuotaDto(
                     id = terminalQuotaId(account, quota),
                     source = account.source.name.lowercase(),
@@ -58,7 +60,9 @@ internal object TerminalJson {
                     thresholds = account.thresholds,
                     resetsAt = quota.resetsAt?.toString(),
                     currency = quota.currencyCode,
-                    fetchedAt = account.fetchedAt?.toString()
+                    fetchedAt = account.fetchedAt?.toString(),
+                    windowStartsAt = time?.startsAt?.toString(),
+                    timeElapsedPercent = time?.elapsedPercent
                 )
             }
         }
@@ -108,6 +112,13 @@ internal object TerminalJson {
         @SerialName("thresholds") val thresholds: List<Int>,
         @SerialName("resets_at") val resetsAt: String?,
         @SerialName("currency") val currency: String,
-        @SerialName("fetched_at") val fetchedAt: String?
+        @SerialName("fetched_at") val fetchedAt: String?,
+        /**
+         * #463 (AI5), campos novos sem subir a versão: o início nominal da janela (reinício − 5 h ou
+         * 7 d) e quanto do tempo dela já passou, de 0 a 100. `null` sem duração conhecida ou sem
+         * reinício. Comparado com `percent`, diz se a cota está à frente do tempo.
+         */
+        @SerialName("window_starts_at") val windowStartsAt: String?,
+        @SerialName("time_elapsed_percent") val timeElapsedPercent: Int?
     )
 }

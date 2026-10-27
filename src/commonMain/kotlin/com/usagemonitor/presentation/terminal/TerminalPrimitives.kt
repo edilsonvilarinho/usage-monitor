@@ -65,6 +65,17 @@ internal object TerminalPrimitives {
     }
 
     /**
+     * Tempo × cota (#463, AI5): `✓ 33 pp atrás do tempo` em verde, ou `▲ 40 pp à frente do
+     * tempo` em `--term-warn`. [gap] é a cota usada menos o tempo da janela que já passou.
+     */
+    fun timeGap(gap: Int, labels: TerminalLabels, glyphs: TerminalGlyphs): TerminalSpan =
+        if (gap > 0) {
+            TerminalSpan(glyphs.warning + " " + labels.timeGap(gap), TerminalColor.Warn)
+        } else {
+            TerminalSpan(glyphs.done + " " + labels.timeGap(gap), TerminalColor.Ok)
+        }
+
+    /**
      * Rodapé de leitura: de onde e de quando é a leitura, e a contagem por estado, cada
      * estado na sua cor. Estado com contagem zero não aparece.
      */

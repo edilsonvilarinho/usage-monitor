@@ -26,7 +26,7 @@ internal object TuiFrame {
         val inner = size.frameWidth - 2
         val lines = mutableListOf<TerminalLine>()
         lines += topBorder(inner, status, labels, box)
-        lines += bordered(tabLine(tabs, active, labels, profile).fit(inner), box)
+        lines += bordered(tabLine(tabs, active, labels, profile, inner).fit(inner), box)
         lines += separator(inner, box)
         val bodyLines = body.take(size.bodyHeight.coerceAtLeast(0))
         for (line in bodyLines) {
@@ -75,12 +75,19 @@ internal object TuiFrame {
     /**
      * As abas numeradas: a ativa em ouro e negrito sobre o fundo de seleção, as outras em
      * muted. Sem cor não há fundo, e a ativa ganha colchetes no lugar dos espaços que a
-     * cercam, com a mesma largura: a linha não anda entre os modos.
+     * cercam, com a mesma largura: a linha não anda entre os modos. Quando as seis não cabem em
+     * [width] (a 80 colunas, em português), as inativas ficam só com o número e a ativa mantém o
+     * nome: nenhuma aba some da linha nem é cortada no meio.
      */
-    fun tabLine(tabs: List<TuiTab>, active: TuiTab, labels: TuiLabels, profile: TerminalProfile): TerminalLine {
+    fun tabLine(tabs: List<TuiTab>, active: TuiTab, labels: TuiLabels, profile: TerminalProfile, width: Int = Int.MAX_VALUE): TerminalLine {
+        val full = tabLine(tabs, active, labels, profile, compact = false)
+        return if (full.width <= width) full else tabLine(tabs, active, labels, profile, compact = true)
+    }
+
+    private fun tabLine(tabs: List<TuiTab>, active: TuiTab, labels: TuiLabels, profile: TerminalProfile, compact: Boolean): TerminalLine {
         val spans = mutableListOf<TerminalSpan>()
         for (tab in tabs) {
-            val name = "${tab.number} ${labels.tab(tab)}"
+            val name = if (compact && tab != active) "${tab.number}" else "${tab.number} ${labels.tab(tab)}"
             spans += if (tab == active) {
                 val text = if (profile.palette == TerminalPalette.NONE) "[$name]" else " $name "
                 TerminalSpan(text, TerminalColor.Gold, bold = true, selected = true)

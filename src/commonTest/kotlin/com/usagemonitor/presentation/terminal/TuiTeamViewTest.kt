@@ -41,7 +41,7 @@ class TuiTeamViewTest {
         assertTrue(lines[8].startsWith("│   ○ Diego ") && lines[8].contains("ausente · há 2 h"), lines[8])
         assertTrue(lines[10].startsWith("│ ● trabalhando · ◑ app aberto · ○ ausente "), lines[10])
         assertTrue(lines[11].startsWith("│ custo calculado no seu computador · nunca prompt nem resposta "), lines[11])
-        assertTrue(lines[lines.size - 2].startsWith("│ ↑↓ pessoa  t troca de conta  1–5 aba"))
+        assertTrue(lines[lines.size - 2].startsWith("│ ↑↓ pessoa  t troca de conta  1–6 aba"))
     }
 
     @Test

@@ -8,7 +8,9 @@ import com.usagemonitor.domain.entity.AnalysisSpan
 import com.usagemonitor.domain.entity.AnalysisWindowComparison
 import com.usagemonitor.domain.entity.AnalysisWindowView
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.PacePathPoint
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaWindowPacePath
 import com.usagemonitor.domain.entity.SessionAnalysis
 import kotlinx.datetime.LocalDate
 import kotlin.time.Duration.Companion.hours
@@ -17,17 +19,29 @@ import kotlin.time.Instant
 
 /**
  * Análise de exemplo para os testes das vistas (rodada AB): 12:30 BRT, 5h em 62% reiniciando
- * 14:00 BRT, semanal em 41%; os números da galeria AB.
+ * 14:00 BRT, semanal em 41%; os números da galeria AB. Com o caminho de cada janela na diagonal
+ * do ritmo (#463) e a 5h anterior atrás.
  */
 internal object AnalysisFixture {
     val now: Instant = Instant.parse("2026-10-06T15:30:00Z")
+
+    /** A janela na diagonal do ritmo (#463): (fração do tempo, % usado). */
+    private fun path(startsAt: Instant, resetsAt: Instant, vararg points: Pair<Double, Double>) =
+        QuotaWindowPacePath(startsAt, resetsAt, points.map { (fraction, percent) -> PacePathPoint(fraction, percent) })
 
     val analysis = SessionAnalysis(
         accountLabel = "Anthropic · <Padrão>",
         source = ApiSource.ANTHROPIC,
         generatedAt = now,
-        fiveHour = AnalysisWindowView("Claude 5h", PeriodType.INTERVAL, 62, now - 3.5.hours, now + 1.5.hours, 14.0, 17.7, 25.3, 83),
-        weekly = AnalysisWindowView("Claude 7d", PeriodType.WEEKLY, 41, null, Instant.parse("2026-10-09T22:44:00Z"), 0.9, 0.8, 1.5, 55),
+        fiveHour = AnalysisWindowView(
+            "Claude 5h", PeriodType.INTERVAL, 62, now - 3.5.hours, now + 1.5.hours, 14.0, 17.7, 25.3, 83,
+            path = path(now - 3.5.hours, now + 1.5.hours, 0.05 to 0.0, 0.2 to 9.0, 0.35 to 21.0, 0.5 to 36.0, 0.6 to 49.0, 0.7 to 62.0),
+            previousPaths = listOf(path(now - 8.5.hours, now - 3.5.hours, 0.1 to 0.0, 0.3 to 20.0, 0.5 to 44.0, 0.7 to 71.0, 0.9 to 88.0, 1.0 to 90.0))
+        ),
+        weekly = AnalysisWindowView(
+            "Claude 7d", PeriodType.WEEKLY, 41, Instant.parse("2026-10-02T22:44:00Z"), Instant.parse("2026-10-09T22:44:00Z"), 0.9, 0.8, 1.5, 55,
+            path = path(Instant.parse("2026-10-02T22:44:00Z"), Instant.parse("2026-10-09T22:44:00Z"), 0.0 to 0.0, 0.14 to 8.0, 0.28 to 19.0, 0.42 to 30.0, 0.528 to 41.0)
+        ),
         intervals = listOf(
             AnalysisIntervalRow(AnalysisSpan.HOUR_1, 14.0, 48.0),
             AnalysisIntervalRow(AnalysisSpan.HOURS_3, 16.3, 51.0),

@@ -232,7 +232,7 @@ Arranque e segunda instância (`SingleInstanceGuard`, `FocusRequestChannel`, `St
 - **Pacote** (D4): o mesmo `.deb`/`.rpm` serve ao servidor. Medido: o `.deb` puxa 151 pacotes de bibliotecas gráficas, mas nenhum servidor gráfico; sem `libGL`, `libX11` e `fontconfig` o motor roda e o bot manda texto no lugar da imagem (`TelegramImageSupport`). O app sem tela diz o que fazer e sai, em vez de ficar parado.
 - **Registro de avisos** (`alerts.jsonl`): o coletor grava cada aviso que sai, com o destino (bandeja só no app, Telegram com conversa pareada).
 
-**Modo terminal: modo interativo** (issue #441; plano [`modo-terminal-tui-441-execucao.md`](planos/modo-terminal-tui-441-execucao.md)): `usage-monitor tui`, cinco abas.
+**Modo terminal: modo interativo** (issue #441; plano [`modo-terminal-tui-441-execucao.md`](planos/modo-terminal-tui-441-execucao.md)): `usage-monitor tui`, seis abas (a 6, Análise, veio com a #463; o comando `analysis` também).
 - **Desenho é função pura** (`TuiScreen`); JLine só para o terminal. Bancos em somente leitura (`SqliteConnectionManager(readOnly = true)`), nunca o view model.
 - **Rede só em dois lugares:** a aba Time (o `GET` do time; presença e desvio de relógio vêm do coletor) e a aba 5, que roda os comandos da 4.3 por `TerminalConfigRunner.output` — nunca regra própria de gravação.
 

@@ -14,6 +14,14 @@ import kotlin.test.assertTrue
 class UsageHistoryLineChartTest {
 
     @Test
+    fun `percent quota writes 100 50 and 0 on the value axis`() {
+        // #463: a curva desenha a fração usada; sem número no eixo, 94% parecia cheia.
+        assertEquals(listOf("100%", "50%", "0%"), buildValueLabels(null, UsageUnit.PERCENTAGE))
+        assertEquals(listOf("100%", "50%", "0%"), buildValueLabels(null, UsageUnit.TOKENS))
+        assertEquals(emptyList(), buildValueLabels(null, UsageUnit.CURRENCY_USD))
+    }
+
+    @Test
     fun `buildTimelineFractions uses real timestamp spacing`() {
         val points = listOf(
             historyPoint("2026-05-06T18:00:00Z", 469),
