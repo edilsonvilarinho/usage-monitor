@@ -38,6 +38,11 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
   `MainKt`, com o motivo no `build.gradle.kts` e linha em "O que a suíte não cobre" do relatório. Exclusão é a
   última onda e é medida antes: nenhuma entra para fechar a conta.
 
+- **Código de produção sem chamador de produção** (achado da onda 4, 2026-10-27): `DashboardScreen.kt` (104 linhas
+  descobertas) e `ResponsiveDashboardCardGrid.kt` (55) só são chamados por testes e pelo gerador de capturas — o
+  CLAUDE.md já registra que o `DashboardScreen` "só existe para testes e capturas". Cobri-los não protege o produto.
+  Decisão adiada para a onda 6, com medição: exclusão nominal no Kover (como `MainKt`) ou mudança para `desktopTest`.
+
 ## Ondas (uma PR cada)
 
 | Onda | Escopo | Linhas descobertas no escopo |
@@ -86,3 +91,11 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | W3-A08 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.GetTeamUsageTrendUseCaseTest"`: 3 testes, 0 falhas (eixo de dias termina hoje em BRT e inclui dias sem atividade, servidor sem a rota dá `null`, falha continua falha). Use case estava em 0%. |
 | W3-A09 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ComparisonReportBuilderTest"`: 2 testes, 0 falhas (PDF da comparação com a mesma célula da tela, custo incompleto com `+`, Codex "sem tarifa", uma coluna por métrica). Builder estava em 0%. |
 | W3-A10 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 3 428 testes Kotlin, 0 falhas; Kotlin **86,2%** (39 939/46 309; antes 85,6%), ramos 61,2%. Relatório: 3 741 testes, sem `crit` (o `warn` de resultado atual é o JUnit do servidor, sem mudança desde a onda 1). Piso do Kotlin: 86. |
+| W4-A01 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.DashboardWarningsLanguageTest"`: 4 testes, 0 falhas (12 banners com título em inglês e português distintos e o mesmo botão nos dois idiomas, retry universal só na conectividade, prazo do 429 em inglês, falha comum sem banner). |
+| W4-A02 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.TeamKeysAdminScreenTest"`: 13 testes, 0 falhas (+4: renomear salva e cancelar descarta, chave revogada marcada e sem novo "Revogar", falha de leitura com retry, rótulos em inglês). |
+| W4-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ApiUsageCardTextsTest"`: 5 testes, 0 falhas (reset em inglês por janela, reset curto omitido sem dado, risco e explicações, tooltip por unidade, símbolos de moeda). |
+| Onda 3 | 2026-10-27 | este commit | PR #480 (merge `05e2aefa`) | Run `40574945536`: `ci-ok` verde, 0 incidências; `Coverage floor` executou `koverVerify` com piso 86. |
+| W4-A04 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.TeamUsageViewModelTest"`: 52 testes, 0 falhas (+6: tendência entra no estado, falha da tendência sem erro na tela, PDF sai do estado sem recarregar, falha de gravação, sem gravador nada acontece, janela de quota repetida não recarrega). |
+| W4-A05 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.ComparisonScreenTest"`: 3 testes, 0 falhas (+2: carregando e erro com retry em inglês, recorte vazio e resultado da exportação salvo/falho). |
+| W4-A06 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.AlertSettingsSectionTest"`: 13 testes, 0 falhas (+4: limiar próprio por conta em ordem de rótulo e desfeito pelo botão, aviso sem limiar, lembrete grava os minutos padrão, validação de dólares com vírgula e `wrapHour`). |
+| W4-A07 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **86,8%** (40 193/46 309; antes 86,2%), ramos 61,6%. Piso continua 86 (valor medido arredondado para baixo). |
