@@ -12,6 +12,7 @@ import com.usagemonitor.presentation.ui.components.formatCurrencyAmount
 import com.usagemonitor.presentation.ui.components.orderQuotasForCard
 import com.usagemonitor.presentation.ui.components.quotaDetailText
 import com.usagemonitor.presentation.ui.components.resetLabel
+import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.presentation.ui.components.riskDotTooltipSubtitle
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.UsageRiskLevel
@@ -105,6 +106,20 @@ class ApiUsageCardFormattingTest {
             "Reinício: Ter 11/08 17h00 BRT",
             resetLabel(monthlyQuota, AppLanguage.PT, Instant.parse("2026-08-01T00:00:00Z"))
         )
+    }
+
+    /** Issue #474: na HUD, "Qui 15h47" na mensal podia ser qualquer quinta do mês. */
+    @Test
+    fun `short reset shows the date instead of the weekday for weekly and monthly windows`() {
+        val before = Instant.parse("2026-08-01T00:00:00Z")
+        val reportedQuota = fiveHourQuota.copy(label = "Codex atual", periodType = PeriodType.REPORTED)
+
+        assertEquals("11/08 17h00", resetShortLabel(sevenDayQuota, AppLanguage.PT, before))
+        assertEquals("08/11 17:00", resetShortLabel(sevenDayQuota, AppLanguage.EN, before))
+        assertEquals("11/08 17h00", resetShortLabel(monthlyQuota, AppLanguage.PT, before))
+        assertEquals("08/11 17:00", resetShortLabel(monthlyQuota, AppLanguage.EN, before))
+        assertEquals("17h00", resetShortLabel(fiveHourQuota, AppLanguage.PT, before))
+        assertEquals("Ter 17h00", resetShortLabel(reportedQuota, AppLanguage.PT, before))
     }
 
     @Test

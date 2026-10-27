@@ -14,7 +14,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_DETAIL_LINES
 import com.usagemonitor.HUD_APP_BALLOON_UPDATE_TEXT_WIDTH
+import com.usagemonitor.HUD_BALLOON_GROUP_PADDING
 import com.usagemonitor.HUD_BALLOON_PADDING
+import androidx.compose.ui.text.font.FontWeight
+import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.RING_LEGEND_SIZE
+import com.usagemonitor.presentation.ui.hudQuotaTitle
+import com.usagemonitor.presentation.ui.hudResetCaption
+import com.usagemonitor.presentation.ui.components.resetShortLabel
 import com.usagemonitor.HUD_BALLOON_WIDTH
 import com.usagemonitor.HUD_COUNTDOWN_GAP
 import com.usagemonitor.HUD_COUNTDOWN_ICON
@@ -312,6 +321,62 @@ class HudNotchTextFitTest {
             scale = next
             waitForIdle()
         }
+        assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
+    }
+
+    /**
+     * Com a data no reinício da semanal e da mensal (issue #474) a legenda cresceu, e
+     * quem cede é o título, `weight(1f)` com reticências. Título e legenda saem dos
+     * produtores reais, com o glifo do anel e dentro da caixa de grupo (Antigravity,
+     * Cursor), o pior caso de largura; hora 23h59 é a mais larga. Dia, data e hora
+     * juntos ("Reinicia Sex 30/10 23h59", 161dp) deixavam 33dp para "Mensal" (43dp).
+     */
+    @Test
+    fun `o titulo e o reinicio com data cabem na linha da cota em qualquer escala`() = runDesktopComposeUiTest {
+        val failures = mutableSetOf<String>()
+        var scale by mutableStateOf(scales.first())
+        val resetAt = Instant.parse("2026-10-31T02:59:00Z")
+        val now = Instant.parse("2026-10-27T12:00:00Z")
+        val quotas = listOf(PeriodType.WEEKLY, PeriodType.MONTHLY).map { period ->
+            QuotaInfo(
+                label = "Antigravity Gemini Pro 7d", used = 41L, total = 100L, periodEndAt = resetAt,
+                periodType = period, unit = UsageUnit.PERCENTAGE
+            )
+        }
+        val rows = AppLanguage.entries.flatMap { language ->
+            quotas.map { quota ->
+                hudQuotaTitle(quota, language) to hudResetCaption(requireNotNull(resetShortLabel(quota, language, now)), language)
+            }
+        }
+        val column = HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2 - HUD_BALLOON_GROUP_PADDING * 2
+        setContent {
+            AppTheme(isDark = true, uiScalePercent = scale) {
+                val measurer = rememberTextMeasurer()
+                val density = LocalDensity.current
+                val typography = MaterialTheme.typography
+                rows.forEach { (title, caption) ->
+                    val captionWidth = with(density) {
+                        measurer.measure(caption, typography.labelSmall, maxLines = 1).size.width.toDp()
+                    }
+                    // Glifo, título e legenda com os dois vãos de 8dp da `Row` do balão.
+                    val titleRoom = column - RING_LEGEND_SIZE - 8.dp * 2 - captionWidth
+                    val result = measurer.measure(
+                        text = title,
+                        style = typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        constraints = Constraints(maxWidth = with(density) { titleRoom.roundToPx().coerceAtLeast(0) })
+                    )
+                    if (result.hasVisualOverflow) {
+                        failures += "$scale%: \"$title\" não cabe ao lado de \"$caption\" ($captionWidth, sobram $titleRoom)"
+                    }
+                }
+            }
+        }
+        for (next in scales) {
+            scale = next
+            waitForIdle()
+        }
+        assertTrue(rows.any { (_, caption) -> caption == "Reinicia 30/10 23h59" }, "legendas: $rows")
         assertTrue(failures.isEmpty(), failures.sorted().joinToString("\n"))
     }
 }

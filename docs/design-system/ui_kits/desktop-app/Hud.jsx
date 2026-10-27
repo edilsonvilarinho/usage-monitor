@@ -9,14 +9,14 @@ const ACCOUNTS = [
     detail: 'Max 20x · via Claude Code',
     quotas: [
       { short: '5h', period: 'interval', title: 'Sessão 5h', percent: '68%', fraction: 0.68, level: 'warn', reset: '22h59', usedLeft: '68% usado · 32% restante' },
-      { short: '7d', period: 'weekly', title: 'Semanal', percent: '41%', fraction: 0.41, level: 'ok', reset: 'Ter 21h00', usedLeft: '41% usado · 59% restante' }
+      { short: '7d', period: 'weekly', title: 'Semanal', percent: '41%', fraction: 0.41, level: 'ok', reset: '27/10 21h00', usedLeft: '41% usado · 59% restante' }
     ]
   },
   {
     label: 'Anthropic — Sandbox', provider: 'anthropic', color: '#E2A5E9', statusLabel: 'Normal', level: 'ok',
     quotas: [
       { short: '5h', period: 'interval', percent: '12%', fraction: 0.12, level: 'ok', reset: '1h30' },
-      { short: '7d', period: 'weekly', percent: '7%', fraction: 0.07, level: 'ok', reset: 'Qui 9h00' }
+      { short: '7d', period: 'weekly', percent: '7%', fraction: 0.07, level: 'ok', reset: '29/10 9h00' }
     ]
   },
   {

@@ -82,7 +82,7 @@ internal object GargantuaPreviewFixtures {
         tone = tone,
         resetText = when (period) {
             PeriodType.INTERVAL -> "21h30"
-            PeriodType.WEEKLY -> "Ter 1h00"
+            PeriodType.WEEKLY -> "27/10 1h00"
             else -> "01/10"
         },
         hasForecast = true,

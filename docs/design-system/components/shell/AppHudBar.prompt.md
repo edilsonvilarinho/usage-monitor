@@ -50,9 +50,10 @@ Skia's whole-pixel rounding, or the last item of the strip breaks at fractional 
 **Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon
 for **that account only** — Codenotch's card, not a panel of every account. Header with the provider
 mark in the source accent, the card title and the state; per quota the card's title and
-"Reinicia 22h59", an `AppProgressTrack` and, since F10, **"32% restante"** on the left in the text
-colour with **"68% usado"** dimmed on the right (used truncated like the ring, left derived from it,
-"<1%" at both ends, nothing for balances; screen readers still get one line, "68% usado · 32%
+"Reinicia 22h59" (weekly and monthly: the date in place of the weekday, "Reinicia 27/10 21h00",
+issue #474 — weekday, date and time together left 33dp for the title inside a group box), an
+`AppProgressTrack` and, since F10, **"32% restante"** on the left in the text colour with
+**"68% usado"** dimmed on the right (used truncated like the ring, left derived from it, "<1%" at both ends, nothing for balances; screen readers still get one line, "68% usado · 32%
 restante"); quotas of one group (Antigravity models, Cursor allowances) in a box under the group
 name; a **"Sessões CLI"** `AppBanner` when the account has CLI sessions with a growing or saturated
 context or no reply since the last request (issue #265) — the worst signal's tone only on the 2dp

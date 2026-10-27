@@ -227,6 +227,11 @@ internal fun resetLabel(quota: QuotaInfo, language: AppLanguage, now: Instant): 
  * dia quando a janela é intradiária e o reset é hoje de qualquer forma. Fuso,
  * nome de dia e ordem de campos continuam com um dono só.
  *
+ * Semanal e mensal levam a data **no lugar** do dia da semana (issue #474): "Qui
+ * 15h47" na mensal podia ser qualquer quinta do mês. Dia, data e hora juntos não
+ * cabem: dentro da caixa de grupo, com o glifo do anel, sobravam 33dp para o
+ * título e "Mensal" mede 43dp (`HudNotchTextFitTest`). `REPORTED` não muda.
+ *
  * `null` é "não há reset a mostrar" — saldo que não expira, janela sem reset
  * conhecido. Quem chama omite a coluna, em vez de imprimir um traço que não
  * informa nada.
@@ -248,11 +253,12 @@ internal fun resetShortLabel(quota: QuotaInfo, language: AppLanguage, now: Insta
         return null
     }
 
-    val (dayFormatted, _, timeFormatted) = formatBrtDateTimeParts(quota.periodEndAt, language)
+    val (dayFormatted, dateFormatted, timeFormatted) = formatBrtDateTimeParts(quota.periodEndAt, language)
 
     return when (quota.periodType) {
         PeriodType.INTERVAL -> timeFormatted
-        PeriodType.WEEKLY, PeriodType.MONTHLY, PeriodType.REPORTED -> "$dayFormatted $timeFormatted"
+        PeriodType.WEEKLY, PeriodType.MONTHLY -> "$dateFormatted $timeFormatted"
+        PeriodType.REPORTED -> "$dayFormatted $timeFormatted"
     }
 }
 
