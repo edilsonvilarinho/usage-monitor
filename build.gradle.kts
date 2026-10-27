@@ -261,6 +261,9 @@ tasks.withType<Test>().configureEach {
     maxHeapSize = "1g"
 }
 
+// Piso da catraca de cobertura de linhas do Kotlin. Meta: 95. Nunca desce.
+val coverageLineFloorPercent = 83
+
 // O plugin do Kover estava aplicado desde sempre e NENHUMA tarefa de relatorio
 // era executada em lugar nenhum: o agente instrumentava toda passada de
 // `:desktopTest` -- 6 a 7 s medidos -- para produzir um numero que ninguem lia.
@@ -288,6 +291,17 @@ kover {
             // amarra-lo ao `check` faria toda build local pagar por ele.
             html { onCheck.set(false) }
             xml { onCheck.set(false) }
+
+            // Catraca de cobertura de linhas (plano `cobertura-95-execucao.md`): o
+            // piso e o ultimo valor medido, arredondado para baixo, e so sobe -- no
+            // mesmo commit dos testes que o elevam -- ate a meta de 95%. O CI roda
+            // `koverVerify` depois da suite; localmente, com `-Pcoverage`.
+            verify {
+                onCheck.set(false)
+                rule("Cobertura de linhas do Kotlin") {
+                    minBound(coverageLineFloorPercent)
+                }
+            }
         }
     }
 }

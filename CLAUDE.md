@@ -338,7 +338,9 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - **`delay` em `runTest` é tempo virtual**: espera de estado de view model usa `yield()` +
   `Thread.sleep` (`pauseForBackgroundWork`). `awaitSettledState` espera a coleta inteira
   (`refreshingTargets` vazio), não o primeiro `Success`.
-- Cobertura opt-in por `-Pcoverage`, sem piso.
+- Cobertura opt-in por `-Pcoverage`; **meta de 95% de linhas** (Kotlin e servidor) com catraca: piso em
+  `coverageLineFloorPercent` (`koverVerify` no CI) e `thresholds.lines` do vitest, só sobe, no commit que o eleva
+  (plano [`cobertura-95-execucao.md`](docs/planos/cobertura-95-execucao.md)).
 - Job `test-report` (skill `usage-monitor-test-report`): HTML de testes e cobertura no artefato `test-report` a cada
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
