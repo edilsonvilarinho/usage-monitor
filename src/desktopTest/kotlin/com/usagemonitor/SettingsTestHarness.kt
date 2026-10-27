@@ -23,6 +23,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.UUID
 import java.util.prefs.Preferences
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,6 +63,18 @@ internal class SettingsTestHarness(
     val shell = AppShellState(store.settings, initialTargets = emptyList(), languageSelection = store.languageSelection)
     val modal = AppModalState(bugReportOpenAtStart = false)
 
+    /**
+     * Trava das respostas falsas: elas só saem no [settle]. Sem ela a corrotina
+     * terminava antes de o teste ler o estado "verificando" — corrida que só
+     * apareceu no runner Linux do CI.
+     */
+    @Volatile
+    private var gate = CompletableDeferred<Unit>()
+
+    private suspend fun released() {
+        gate.await()
+    }
+
     var health: Result<Unit> = Result.success(Unit)
     val claims = mutableListOf<Pair<String, String?>>()
     var claimResult: (String) -> Result<TeamKeyVerification> = { Result.success(TeamKeyVerification(authorized = true, claimed = true)) }
@@ -76,7 +89,10 @@ internal class SettingsTestHarness(
         override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> = error("sem tendência")
         override suspend fun fetchSessionDetail(accountKey: String, deviceId: String, sessionId: String): Result<CliSessionDetail?> =
             error("sem detalhe")
-        override suspend fun checkConnection(): Result<Unit> = health
+        override suspend fun checkConnection(): Result<Unit> {
+            released()
+            return health
+        }
     }
 
     val feedback = AppSettingsFeedback(
@@ -85,14 +101,23 @@ internal class SettingsTestHarness(
         teamUsageRepository = teamRepository,
         claimTeamKey = { accountKey, email ->
             synchronized(claims) { claims += accountKey to email }
+            released()
             claimResult(accountKey)
         },
-        validateAdminTokenWithServer = { adminTokenResult },
+        validateAdminTokenWithServer = {
+            released()
+            adminTokenResult
+        },
         scope = scope,
         language = { language },
         profileLabel = { profileId -> if (profileId == "default") "Pessoal" else null },
         httpClientFactory = {
-            HttpClient(MockEngine { request -> httpHandler(this, request) }) {
+            HttpClient(
+                MockEngine { request ->
+                    released()
+                    httpHandler(this, request)
+                }
+            ) {
                 install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             }
         }
@@ -115,9 +140,11 @@ internal class SettingsTestHarness(
 
     /** Espera o que as ações lançaram no escopo (testes de conexão, passagem ao relatório). */
     fun settle() {
+        gate.complete(Unit)
         runBlocking {
             job.children.toList().forEach { child -> child.join() }
         }
+        gate = CompletableDeferred()
     }
 
     override fun close() {
