@@ -6,6 +6,8 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import java.io.File
 import com.usagemonitor.presentation.ui.MODAL_CLOSE_SETTLE_MILLIS
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.SettingsField
@@ -27,6 +29,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 
 /**
+ * O que as Configurações pedem aos view models. Porta para as regras das
+ * Configurações rodarem em teste sem o `AppViewModels`, que sobe a coleta
+ * inteira; quem implementa é ele.
+ */
+internal interface SettingsActionTargets {
+    /** Recoleta a fonte agora: ligar, desligar ou trocar a chave não espera o próximo tique. */
+    fun refreshSource(api: ApiSource)
+    fun requestTeamSync()
+    fun openTeamKeys()
+}
+
+/**
  * O que cada controle das Configurações faz: grava, aplica e avisa.
  *
  * Eram ~400 linhas de lambdas escritas dentro da chamada a
@@ -35,16 +49,21 @@ import kotlinx.coroutines.flow.debounce
  * referências.
  */
 internal class SettingsActions(
-    private val graph: AppGraph,
-    private val viewModels: AppViewModels,
+    /** O que as Configurações gravam, sem rede (o mesmo do terminal, #440). */
+    private val store: AppSettingsStore,
+    private val breadcrumbs: BreadcrumbRecorder,
+    private val targets: SettingsActionTargets,
     private val shell: AppShellState,
     private val modal: AppModalState,
     private val feedback: AppSettingsFeedback,
     /** Escopo da composição, para a passagem das Configurações ao relatório de bug. */
-    private val handOffScope: CoroutineScope
+    private val handOffScope: CoroutineScope,
+    private val autoStartHost: () -> AutoStartHost = AutoStartHost::system,
+    private val isDefaultDataRoot: () -> Boolean = { AppDataDirectory.isDefault },
+    private val chooseAnthropicDirectory: () -> File? = ::chooseAnthropicConfigDirectory,
+    private val chooseCodexDirectory: () -> File? = ::chooseCodexHomeDirectory
 ) {
-    private val settings = graph.settings
-    private val breadcrumbs = graph.breadcrumbs
+    private val settings = store.settings
 
     fun changeTheme(preset: AppThemePreset) {
         shell.changeTheme(preset)
@@ -81,12 +100,13 @@ internal class SettingsActions(
     fun changeAutoStart(enabled: Boolean) {
         // O interruptor já vem desligado com `--user-data-dir` (#419); isto é a
         // segunda trava, para nenhum caminho gravar a chave `Run` sem a pasta.
-        if (!AppDataDirectory.isDefault) {
+        if (!isDefaultDataRoot()) {
             return
         }
-        val result = AutoStartManager.setAutoStart(enabled)
+        val host = autoStartHost()
+        val result = AutoStartManager.setAutoStart(enabled, host)
         val applied = result.isSuccess
-        shell.recordAutoStart(if (applied) enabled else AutoStartManager.isAutoStartEnabled())
+        shell.recordAutoStart(if (applied) enabled else AutoStartManager.isAutoStartEnabled(host))
         feedback.reportSave(
             SettingsField.AUTO_START,
             applied,
@@ -111,7 +131,7 @@ internal class SettingsActions(
     }
 
     fun changeAlertSettings(updated: UsageAlertSettings) {
-        graph.alertSettingsFlow.value = updated
+        store.alertSettingsFlow.value = updated
         persistAlertSettings(settings, updated)
         feedback.showToast(SettingsToast.Saved(SettingsField.ALERTS))
     }
@@ -127,16 +147,16 @@ internal class SettingsActions(
     }
 
     fun toggleApi(api: ApiSource, checked: Boolean) {
-        val current = graph.enabledApis.value
+        val current = store.enabledApis.value
         setEnabledApis(if (checked) current + api else current - api)
-        viewModels.dashboard.refresh(api)
+        targets.refreshSource(api)
         feedback.showToast(SettingsToast.Saved(SettingsField.MONITORED_APIS))
     }
 
     fun saveApiKey(api: ApiSource, apiKey: String): Boolean {
         return runCatching {
-            graph.apiKeyDataSource.save(api, apiKey)
-            graph.apiKeySettings.value = graph.apiKeySettings.value.withKey(api, apiKey.trim())
+            store.apiKeyDataSource.save(api, apiKey)
+            store.apiKeySettings.value = store.apiKeySettings.value.withKey(api, apiKey.trim())
         }.fold(
             onSuccess = {
                 feedback.showToast(SettingsToast.Saved(SettingsField.API_KEY))
@@ -158,10 +178,10 @@ internal class SettingsActions(
      */
     fun removeApiKey(api: ApiSource): Boolean {
         return runCatching {
-            graph.apiKeyDataSource.clear(api)
-            graph.apiKeySettings.value = graph.apiKeySettings.value.withoutKey(api)
-            setEnabledApis(graph.enabledApis.value - api)
-            viewModels.dashboard.refresh(api)
+            store.apiKeyDataSource.clear(api)
+            store.apiKeySettings.value = store.apiKeySettings.value.withoutKey(api)
+            setEnabledApis(store.enabledApis.value - api)
+            targets.refreshSource(api)
         }.fold(
             onSuccess = {
                 feedback.showToast(SettingsToast.Saved(SettingsField.API_KEY))
@@ -176,68 +196,68 @@ internal class SettingsActions(
     }
 
     fun toggleAnthropicProfile(profileId: String, checked: Boolean) {
-        graph.profileRegistry.setEnabled(profileId, checked)
+        store.profileRegistry.setEnabled(profileId, checked)
         refreshEnabledProfiles()
-        viewModels.dashboard.refresh(ApiSource.ANTHROPIC)
+        targets.refreshSource(ApiSource.ANTHROPIC)
         feedback.showToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
     }
 
     fun renameAnthropicProfile(profileId: String, label: String) {
-        graph.profileRegistry.updateLabel(profileId, label)
+        store.profileRegistry.updateLabel(profileId, label)
         feedback.showToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILE_LABEL))
     }
 
     fun changeAnthropicProfileColor(profileId: String, color: AccountAccent?) {
-        graph.profileRegistry.setColor(profileId, color?.name)
+        store.profileRegistry.setColor(profileId, color?.name)
         feedback.showToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
     }
 
     fun changeAnthropicProfileEmoji(profileId: String, emoji: AccountEmoji?) {
-        graph.profileRegistry.setEmoji(profileId, emoji?.name)
+        store.profileRegistry.setEmoji(profileId, emoji?.name)
         feedback.showToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
     }
 
     fun addAnthropicProfile() {
-        val selectedDirectory = chooseAnthropicConfigDirectory() ?: return
-        graph.profileRegistry.addManual(selectedDirectory)
+        val selectedDirectory = chooseAnthropicDirectory() ?: return
+        store.profileRegistry.addManual(selectedDirectory)
         refreshEnabledProfiles()
     }
 
     fun removeAnthropicProfile(profileId: String) {
-        graph.profileRegistry.removeFromMonitor(profileId)
+        store.profileRegistry.removeFromMonitor(profileId)
         refreshEnabledProfiles()
-        viewModels.dashboard.refresh(ApiSource.ANTHROPIC)
+        targets.refreshSource(ApiSource.ANTHROPIC)
         feedback.showToast(SettingsToast.Saved(SettingsField.ANTHROPIC_PROFILES))
     }
 
     /** Issue #329: o diretório vira conta extra já habilitada, e a coleta dela sai na hora. */
     fun addCodexProfile() {
-        val selectedDirectory = chooseCodexHomeDirectory() ?: return
-        graph.codexProfileRegistry.add(selectedDirectory)
+        val selectedDirectory = chooseCodexDirectory() ?: return
+        store.codexProfileRegistry.add(selectedDirectory)
             .onSuccess { modal.codexProfileError = null }
             .onFailure { failure -> modal.codexProfileError = failure.message }
         refreshCodexProfiles()
     }
 
     fun toggleCodexProfile(profileId: String, checked: Boolean) {
-        graph.codexProfileRegistry.setEnabled(profileId, checked)
+        store.codexProfileRegistry.setEnabled(profileId, checked)
         refreshCodexProfiles()
     }
 
     fun removeCodexProfile(profileId: String) {
-        graph.codexProfileRegistry.remove(profileId)
+        store.codexProfileRegistry.remove(profileId)
         refreshCodexProfiles()
     }
 
     private fun refreshCodexProfiles() {
-        graph.enabledCodexProfiles.value = graph.codexProfileRegistry.enabledProfiles
-        viewModels.dashboard.refresh(ApiSource.CODEX)
+        store.enabledCodexProfiles.value = store.codexProfileRegistry.enabledProfiles
+        targets.refreshSource(ApiSource.CODEX)
     }
 
     fun rescanAnthropicProfiles() {
-        graph.profileRegistry.rescan(restoreRemoved = true)
+        store.profileRegistry.rescan(restoreRemoved = true)
         refreshEnabledProfiles()
-        viewModels.dashboard.refresh(ApiSource.ANTHROPIC)
+        targets.refreshSource(ApiSource.ANTHROPIC)
     }
 
     fun toggleProfileExpanded(profileId: String) {
@@ -268,7 +288,7 @@ internal class SettingsActions(
         feedback.reportSave(SettingsField.TEAM_KEY, saved)
         if (saved) {
             feedback.checkTeamConnection()
-            viewModels.teamSync.requestImmediateSync()
+            targets.requestTeamSync()
         } else {
             feedback.teamConnection = TeamConnectionUiState()
         }
@@ -280,14 +300,14 @@ internal class SettingsActions(
      * o nome novo esperaria o tique de 30s para aparecer ao time.
      */
     fun changeTeamAlias(alias: String) {
-        if (alias.isBlank() && graph.teamSettingsFlow.value.alias.isNotBlank()) {
+        if (alias.isBlank() && store.teamSettingsFlow.value.alias.isNotBlank()) {
             feedback.showToast(SettingsToast.TeamAliasRequired)
             return
         }
         val saved = updateTeam { current -> current.copy(alias = alias) }
         feedback.reportSave(SettingsField.TEAM_ALIAS, saved)
         if (saved) {
-            viewModels.teamSync.requestImmediateSync()
+            targets.requestTeamSync()
         }
     }
 
@@ -316,7 +336,7 @@ internal class SettingsActions(
     fun openTeamKeysManager() {
         breadcrumbs.recordScreenOpened("chaves das contas (admin)")
         modal.isTeamKeysOpen = true
-        viewModels.teamKeys.open()
+        targets.openTeamKeys()
     }
 
     fun exitTeamAdminMode() {
@@ -346,21 +366,21 @@ internal class SettingsActions(
         updateProxy(resetConnection = false) { current -> current.copy(password = password) }
     }
 
-    private fun setEnabledApis(updated: Set<ApiSource>) = persistEnabledApis(graph.store, updated)
+    private fun setEnabledApis(updated: Set<ApiSource>) = persistEnabledApis(store, updated)
 
     private fun refreshEnabledProfiles() {
-        graph.enabledAnthropicProfiles.value = resolveAnthropicProfiles(
-            graph.profileRegistry,
-            graph.profileRegistry.profiles.value
+        store.enabledAnthropicProfiles.value = resolveAnthropicProfiles(
+            store.profileRegistry,
+            store.profileRegistry.profiles.value
         ).enabledProfiles
     }
 
     private fun updateTeam(transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): Boolean {
-        return updateTeamSettings(graph.teamSettingsFlow, graph.teamSettingsDataSource, transform)
+        return updateTeamSettings(store.teamSettingsFlow, store.teamSettingsDataSource, transform)
     }
 
     private fun updateProxy(resetConnection: Boolean, transform: (ProxySettings) -> ProxySettings) {
-        val saved = updateProxySettings(graph.proxySettingsFlow, graph.proxySettingsDataSource, transform)
+        val saved = updateProxySettings(store.proxySettingsFlow, store.proxySettingsDataSource, transform)
         if (resetConnection) {
             feedback.proxyConnection = ProxyConnectionUiState()
         }

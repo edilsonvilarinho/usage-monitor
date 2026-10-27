@@ -8,6 +8,10 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.ProxyEnvironmentConfig
+import com.usagemonitor.domain.entity.TeamKeyVerification
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckStatus
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
@@ -19,6 +23,7 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.apiKeyCheckResult
 import com.usagemonitor.presentation.viewmodel.recordFailure
+import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CoroutineScope
@@ -35,14 +40,21 @@ import kotlinx.coroutines.launch
  */
 @Stable
 internal class AppSettingsFeedback(
-    private val graph: AppGraph,
-    private val viewModels: AppViewModels,
+    /** O que as Configurações gravam: proxy, chaves, time e contas. */
+    private val store: AppSettingsStore,
+    private val breadcrumbs: BreadcrumbRecorder,
+    private val teamUsageRepository: TeamUsageRepository,
+    /** `ClaimTeamKeyForAccountUseCase`: vincula a chave do time à conta. */
+    private val claimTeamKey: suspend (accountKey: String, accountEmail: String?) -> Result<TeamKeyVerification>,
+    /** `ValidateAdminTokenUseCase`. */
+    private val validateAdminTokenWithServer: suspend () -> Result<Unit>,
     private val scope: CoroutineScope,
     private val language: () -> AppLanguage,
     /** Rótulo do perfil para a mensagem de erro do teste do time. */
-    private val profileLabel: (profileId: String) -> String?
+    private val profileLabel: (profileId: String) -> String?,
+    /** Cliente efêmero de cada teste de conexão; a suíte passa um `MockEngine`. */
+    private val httpClientFactory: (ProxyEnvironmentConfig?) -> HttpClient = { proxy -> buildHttpClient(proxy) }
 ) {
-    private val breadcrumbs = graph.breadcrumbs
 
     // Cada emissão precisa de um id próprio: dois avisos iguais em sequência —
     // salvar o mesmo campo duas vezes — seriam o mesmo valor e o diálogo não
@@ -80,11 +92,11 @@ internal class AppSettingsFeedback(
      * in-flight de outro consumidor (issue #174).
      */
     fun checkProxyConnection() {
-        val manualProxy = resolveEffectiveProxy(graph.proxySettingsFlow.value.copy(useEnvironmentProxy = false))
+        val manualProxy = resolveEffectiveProxy(store.proxySettingsFlow.value.copy(useEnvironmentProxy = false))
         proxyConnection = ProxyConnectionUiState(ProxyConnectionUiStatus.CHECKING)
         scope.launch {
             val result = Result.runCatching {
-                val testClient = buildHttpClient(manualProxy)
+                val testClient = httpClientFactory(manualProxy)
                 try {
                     testClient.get("https://api.github.com/zen")
                 } finally {
@@ -134,12 +146,12 @@ internal class AppSettingsFeedback(
      */
     fun checkApiKey(source: ApiSource, candidateKey: String) {
         val apiKey = candidateKey.takeIf { key -> key.isNotBlank() }
-            ?: graph.apiKeySettings.value.forSource(source).orEmpty()
-        val proxy = resolveEffectiveProxy(graph.proxySettingsFlow.value)
+            ?: store.apiKeySettings.value.forSource(source).orEmpty()
+        val proxy = resolveEffectiveProxy(store.proxySettingsFlow.value)
         apiKeyCheck = ApiKeyCheckUiState(status = ApiKeyCheckStatus.CHECKING)
         scope.launch {
             val result = runCatching {
-                val testClient = buildHttpClient(proxy)
+                val testClient = httpClientFactory(proxy)
                 try {
                     testApiKeyUsage(source, RemoteApiDataSource(httpClient = testClient)) { apiKey }
                 } finally {
@@ -172,7 +184,7 @@ internal class AppSettingsFeedback(
     fun checkTeamConnection() {
         teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
         scope.launch {
-            val healthError = graph.teamUsageRepository.checkConnection().exceptionOrNull()
+            val healthError = teamUsageRepository.checkConnection().exceptionOrNull()
             if (healthError != null) {
                 breadcrumbs.recordFailure("testar conexão do time", healthError)
                 teamConnection = TeamConnectionUiState(
@@ -182,8 +194,8 @@ internal class AppSettingsFeedback(
                 return@launch
             }
 
-            val current = graph.teamSettingsFlow.value
-            val targets = buildTeamSyncTargets(graph.profileRegistry)
+            val current = store.teamSettingsFlow.value
+            val targets = buildTeamSyncTargets(store.profileRegistry)
                 .filter { target -> current.participates(target.profileId) }
             if (targets.isEmpty()) {
                 teamConnection = TeamConnectionUiState(
@@ -202,7 +214,7 @@ internal class AppSettingsFeedback(
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
                 // de um envio de turnos, então numa máquina já sincronizada ele
                 // nunca acontecia e a leitura ficava recusada indefinidamente.
-                val result = viewModels.claimTeamKeyForAccount(target.accountKey, target.accountEmail)
+                val result = claimTeamKey(target.accountKey, target.accountEmail)
                 val error = result.exceptionOrNull()
                 if (error != null) {
                     breadcrumbs.recordFailure("validar vínculo de conta com a chave do time", error)
@@ -233,7 +245,7 @@ internal class AppSettingsFeedback(
     fun validateAdminToken() {
         teamAdminConnection = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
         scope.launch {
-            val error = viewModels.validateAdminToken().exceptionOrNull()
+            val error = validateAdminTokenWithServer().exceptionOrNull()
             teamAdminConnection = if (error == null) {
                 TeamConnectionUiState(status = TeamConnectionUiStatus.OK, message = pick("Token válido.", "Token is valid."))
             } else {

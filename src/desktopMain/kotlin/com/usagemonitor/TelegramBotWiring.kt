@@ -25,6 +25,8 @@ import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.domain.usecase.GetTeamPresenceUseCase
+import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
+import com.usagemonitor.domain.usecase.TeamPresenceResult
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.TelegramChart
 import com.usagemonitor.presentation.ui.buildTelegramChart
@@ -89,23 +91,33 @@ private fun createTelegramBotService(
             TelegramDailySpend(totals.costMicros, totals.sessionCount, totals.unpricedTurnCount)
         }
     },
-    chartProvider = { range -> telegramChartOf(graph, range) },
+    chartProvider = { range ->
+        telegramChartOf(graph.getUsageHistory, graph.enabledApis.value, graph.languageSelection.current(), range, Clock.System.now())
+    },
     readings = TelegramBotReadings(
         ping = { TelegramPing(CURRENT_APP_VERSION, startedAt, dashboard.nextRefreshAt.value) },
         spikes = { dashboard.spikes.value },
-        comparison = comparisonReader(graph, dashboard),
-        accountHistory = accountHistoryReader(graph, dashboard),
+        comparison = comparisonReader(
+            BuildModelComparisonUseCase(graph.cliSessionRepository, graph.codexCliSessionRepository)::invoke,
+            stats = { dashboard.lastStats() }
+        ),
+        accountHistory = accountHistoryReader(graph.getUsageHistory, stats = { dashboard.lastStats() }),
         // O mesmo pedido da segunda instância: um arquivo que o laço do `Main` atende.
         focusHud = { FocusRequestChannel().request() },
         machineName = machineName,
-        teamPresence = teamPresenceReader(graph),
+        teamPresence = teamPresenceReader(
+            GetTeamPresenceUseCase(graph.teamUsageRepository, graph.teamServerClockOffset)::invoke,
+            accountKeys = {
+                buildSessionPulseTargets(graph.profileRegistry, graph.teamSettingsFlow.value).map { target -> target.accountKey }
+            }
+        ),
         teamClockOffsetMillis = { graph.teamServerClockOffset.offsetMillis },
         // Só a pronta (baixada e com SHA-256 conferido): a só "disponível" não tem o que instalar.
         readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Ready)?.update?.version },
         applyUpdate = { dashboard.restartAndUpdateNow() },
         appReady = { graph.appAnchored.first { anchored -> anchored } },
         releaseNotes = { version, previous -> GetReleaseNotesUseCase(graph.appUpdateRepository)(version, previous) },
-        sourceHealth = { sourceHealthOf(dashboard.uiState.value, graph.languageSelection.current()) },
+        sourceHealth = { sourceHealthOf(dashboard.uiState.value) },
         sessionAnalysis = sessionAnalysisReader(graph, dashboard),
         exportUsage = { since, format ->
             graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
@@ -124,10 +136,12 @@ private fun createTelegramBotService(
  * (`buildSessionPulseTargets`: integração ligada e perfil participando). Uma pessoa em
  * duas contas aparece uma vez. Todas as leituras falhando é falha; algumas, não.
  */
-private fun teamPresenceReader(graph: AppGraph): suspend () -> Result<List<TeamMemberPresence>>? {
-    val presence = GetTeamPresenceUseCase(graph.teamUsageRepository, graph.teamServerClockOffset)
+internal fun teamPresenceReader(
+    presence: suspend (accountKey: String) -> Result<TeamPresenceResult>,
+    accountKeys: () -> List<String>
+): suspend () -> Result<List<TeamMemberPresence>>? {
     return reader@{
-        val keys = buildSessionPulseTargets(graph.profileRegistry, graph.teamSettingsFlow.value).map { target -> target.accountKey }.distinct()
+        val keys = accountKeys().distinct()
         if (keys.isEmpty()) return@reader null
         val results = keys.map { key -> presence(key) }
         val failure = results.firstOrNull { result -> result.isFailure }?.exceptionOrNull()
@@ -141,7 +155,7 @@ private fun teamPresenceReader(graph: AppGraph): suspend () -> Result<List<TeamM
  * mensagem que a tela mostra (já saneada) e a hora dos números mantidos na tela; o 429 entra
  * como falha — a fonte de fato parou de atualizar, e a mensagem diz que é limite.
  */
-private fun sourceHealthOf(state: UiState, language: AppLanguage): List<SourceHealthObservation>? {
+internal fun sourceHealthOf(state: UiState): List<SourceHealthObservation>? {
     val data: List<ApiUsageStats>
     val errors: List<UiApiError>
     when (state) {
@@ -171,25 +185,30 @@ private fun sourceHealthOf(state: UiState, language: AppLanguage): List<SourceHe
 }
 
 /** A comparação entre modelos (#386) desde um instante, com as cotas da última coleta. */
-private fun comparisonReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (Long) -> List<ComparisonRow>? {
-    val buildComparison = BuildModelComparisonUseCase(graph.cliSessionRepository, graph.codexCliSessionRepository)
-    return { since ->
-        val stats = (dashboard.uiState.value as? UiState.Success)?.data.orEmpty()
-        buildComparison(since, stats).getOrNull()
-    }
+internal fun comparisonReader(
+    buildComparison: suspend (sinceEpochMillis: Long, stats: List<ApiUsageStats>) -> Result<List<ComparisonRow>>,
+    stats: () -> List<ApiUsageStats>
+): suspend (Long) -> List<ComparisonRow>? = { since ->
+    buildComparison(since, stats()).getOrNull()
 }
 
 /**
  * O histórico de cada conta da última coleta, pela mesma chave que o painel usa
  * para a projeção (`accountContext.key`). Conta cujo SQLite falha fica fora.
  */
-private fun accountHistoryReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (HistoryRange) -> List<TelegramAccountHistory> = { range ->
-    val now = Clock.System.now()
-    val stats = (dashboard.uiState.value as? UiState.Success)?.data.orEmpty()
-    stats.mapNotNull { item ->
-        runCatching { TelegramAccountHistory(item.snapshotLabel, graph.getUsageHistory(item.source, range, item.accountContext?.key, now)) }.getOrNull()
+internal fun accountHistoryReader(
+    history: GetUsageHistoryUseCase,
+    stats: () -> List<ApiUsageStats>,
+    clock: Clock = Clock.System
+): suspend (HistoryRange) -> List<TelegramAccountHistory> = { range ->
+    val now = clock.now()
+    stats().mapNotNull { item ->
+        runCatching { TelegramAccountHistory(item.snapshotLabel, history(item.source, range, item.accountContext?.key, now)) }.getOrNull()
     }
 }
+
+/** Os cards da última coleta; antes da primeira, ou com erro geral, nenhum. */
+private fun DashboardViewModel.lastStats(): List<ApiUsageStats> = (uiState.value as? UiState.Success)?.data.orEmpty()
 
 /** Janela do gasto no resumo diário do bot (#398, Y1). */
 private const val DAILY_SPEND_WINDOW_MILLIS = 24 * 60 * 60 * 1_000L
@@ -199,17 +218,21 @@ private const val DAILY_SPEND_WINDOW_MILLIS = 24 * 60 * 60 * 1_000L
  * sem `listAccounts`, a fonte tem uma conta só e vai sem chave. O nome é o da fonte,
  * numerado quando há mais de uma conta — nunca o e-mail da conta.
  */
-private suspend fun telegramChartOf(graph: AppGraph, range: HistoryRange): TelegramChart? {
-    val now = Clock.System.now()
-    val language = graph.languageSelection.current()
-    val reports = graph.enabledApis.value.sortedBy { source -> source.ordinal }.flatMap { source ->
-        val accounts = runCatching { graph.getUsageHistory.listAccounts(source) }.getOrDefault(emptyList())
+internal suspend fun telegramChartOf(
+    history: GetUsageHistoryUseCase,
+    enabledSources: Set<ApiSource>,
+    language: AppLanguage,
+    range: HistoryRange,
+    now: Instant
+): TelegramChart? {
+    val reports = enabledSources.sortedBy { source -> source.ordinal }.flatMap { source ->
+        val accounts = runCatching { history.listAccounts(source) }.getOrDefault(emptyList())
         if (accounts.isEmpty()) {
-            listOfNotNull(runCatching { source.displayName() to graph.getUsageHistory(source, range, null, now) }.getOrNull())
+            listOfNotNull(runCatching { source.displayName() to history(source, range, null, now) }.getOrNull())
         } else {
             accounts.mapIndexedNotNull { index, account ->
                 val name = if (accounts.size > 1) "${source.displayName()} ${index + 1}" else source.displayName()
-                runCatching { name to graph.getUsageHistory(source, range, account.key, now) }.getOrNull()
+                runCatching { name to history(source, range, account.key, now) }.getOrNull()
             }
         }
     }

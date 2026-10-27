@@ -334,8 +334,11 @@ internal fun runUsageMonitor(
     val compositionScope = rememberCoroutineScope()
     val feedback = remember {
         AppSettingsFeedback(
-            graph = graph,
-            viewModels = viewModels,
+            store = graph.store,
+            breadcrumbs = breadcrumbs,
+            teamUsageRepository = graph.teamUsageRepository,
+            claimTeamKey = { accountKey, accountEmail -> viewModels.claimTeamKeyForAccount(accountKey, accountEmail) },
+            validateAdminTokenWithServer = { viewModels.validateAdminToken() },
             scope = compositionScope,
             language = { shell.language },
             profileLabel = { profileId ->
@@ -343,7 +346,7 @@ internal fun runUsageMonitor(
             }
         )
     }
-    val settingsActions = remember { SettingsActions(graph, viewModels, shell, modal, feedback, compositionScope) }
+    val settingsActions = remember { SettingsActions(graph.store, breadcrumbs, viewModels.settingsTargets, shell, modal, feedback, compositionScope) }
 
     val iconImage = remember { loadWindowIcon() }
     val windowIconImage = remember { loadWindowIconImage() }
@@ -381,7 +384,7 @@ internal fun runUsageMonitor(
 
     // As ações do rodapé moram no balão da engrenagem da barra HUD.
     val shellActions = buildShellActions(
-        graph, viewModels, shell, modal, profileRecords, profileResolution, dashboardState, teamSettings
+        breadcrumbs, viewModels.shellTargets, graph.usageExportWriter, modal, profileRecords, profileResolution, dashboardState, teamSettings
     )
     val cliSessionPulses by viewModels.sessionPulse.cliPulses.collectAsState()
     val teamSessionPulses by viewModels.sessionPulse.teamPulses.collectAsState()
