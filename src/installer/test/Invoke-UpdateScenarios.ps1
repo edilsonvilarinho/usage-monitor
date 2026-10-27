@@ -522,29 +522,58 @@ Assert-UserPathExactly 'desinstalacao devolve o formato original' 'C:\scenario\a
 
 # ------------------------------------------------------------------ S13
 
-Write-Host "`n== S13: PATH maior do que o NSIS guarda nao e tocado =="
+Write-Host "`n== S13: PATH maior do que uma string do NSIS recebe a pasta inteiro =="
 # ~9800 caracteres: acima do NSIS_MAX_STRLEN do build oficial (1024) e do especial
 # (8192). Ate a revisao do #456, o ReadRegStr devolvia vazio aqui e a instalacao
-# gravava so a pasta, apagando o PATH inteiro.
-$longPath = (1..100 | ForEach-Object { 'C:\scenario\long\' + ('x' * 80) + $_ }) -join ';'
+# gravava so a pasta, apagando o PATH inteiro; ate a #464, o valor era recusado e a
+# pasta nao entrava (o PATH do relato tinha 1051 caracteres). O valor tem de voltar
+# byte a byte, com %VAR% sem expandir.
+$longPath = '%SystemRoot%\scenario;' + ((1..100 | ForEach-Object { 'C:\scenario\long\' + ('x' * 80) + $_ }) -join ';')
 Set-UserPathRaw $longPath
 Reset-Target -TargetDirectory $target
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'exit code' 0 $code
-Assert-UserPathExactly 'instalacao nao altera PATH longo' $longPath
+Assert-UserPathExactly 'instalacao acrescenta a pasta ao PATH longo' "$longPath;$target"
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-UserPathExactly 'reinstalacao nao repete a entrada no PATH longo' "$longPath;$target"
 $code = Invoke-Uninstaller -TargetDirectory $target
 Assert-Equal 'exit code da desinstalacao' 0 $code
-Assert-UserPathExactly 'desinstalacao nao altera PATH longo' $longPath
+Assert-UserPathExactly 'desinstalacao devolve o PATH longo' $longPath
 
-# A pasta ja esta no PATH longo: a desinstalacao tambem nao pode regravar um valor
-# que nao consegue ler inteiro. A entrada que sobra e inofensiva.
-Set-UserPathRaw "$longPath;$target"
+# A pasta no meio do PATH longo, em outra caixa, com `;` final: a instalacao nao a
+# repete, e a desinstalacao a tira de onde estiver e preserva o resto.
+$seeded = "C:\scenario\a;$($target.ToUpperInvariant());$longPath;"
+Set-UserPathRaw $seeded
 Reset-Target -TargetDirectory $target
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'pasta no meio do PATH longo nao e duplicada' $seeded
 $code = Invoke-Uninstaller -TargetDirectory $target
 Assert-Equal 'exit code da desinstalacao' 0 $code
-Assert-UserPathExactly 'desinstalacao nao trunca PATH longo com a pasta' "$longPath;$target"
+Assert-UserPathExactly 'desinstalacao tira a pasta do meio do PATH longo' "C:\scenario\a;$longPath;"
+
+# ------------------------------------------------------------------ S15
+
+Write-Host "`n== S15: teto de 32767 caracteres de uma variavel de ambiente =="
+# Valor com exatamente o espaco da pasta e do separador recebe a entrada; um
+# caractere a mais e o valor final passaria do teto do Windows, e nao e tocado.
+$filler = ((1..500 | ForEach-Object { 'C:\scenario\full\' + ('z' * 60) + $_ }) -join ';')
+$fits = $filler.Substring(0, 32767 - $target.Length - 1)
+Set-UserPathRaw $fits
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'valor que cabe no teto recebe a pasta' "$fits;$target"
+$code = Invoke-Uninstaller -TargetDirectory $target
+Assert-Equal 'exit code da desinstalacao' 0 $code
+Assert-UserPathExactly 'desinstalacao devolve o valor no teto' $fits
+
+$overflows = $filler.Substring(0, 32767 - $target.Length)
+Set-UserPathRaw $overflows
+Reset-Target -TargetDirectory $target
+$code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
+Assert-Equal 'exit code' 0 $code
+Assert-UserPathExactly 'valor que passaria do teto nao e tocado' $overflows
 
 # ------------------------------------------------------------------ S14
 

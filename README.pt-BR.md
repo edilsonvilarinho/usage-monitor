@@ -187,8 +187,8 @@ Sem opção, abre o app ou traz para a frente o que já está aberto. No Windows
 `usage-monitor.exe`: o `Usage Monitor.exe` é um programa de janela, e a saída dele nunca chega ao
 terminal. O instalador põe a pasta de instalação no `PATH` do usuário (`HKCU\Environment`), então um terminal
 aberto depois da instalação roda `usage-monitor --help`. Terminais já abertos só veem a mudança depois de
-reabertos. Se o seu `PATH` de usuário passa de uns 1.000 caracteres, o instalador não mexe nele, porque regravá-lo
-poderia truncá-lo. Nesse caso, use o caminho completo:
+reabertos. Se o `PATH` de usuário ficaria acima de 32.767 caracteres (o teto do Windows para uma variável de
+ambiente), o instalador não mexe nele. Nesse caso, use o caminho completo:
 
 ```powershell
 & "$env:LOCALAPPDATA\Usage Monitor\usage-monitor.exe" --help

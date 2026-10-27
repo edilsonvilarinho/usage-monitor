@@ -58,6 +58,7 @@ sem reabrir o risco de apagar ou truncar o `PATH` que a revisão do PR #456 fech
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
 |---|---|---|---|---|
 | A01 | 2026-10-27 | este commit | concluída | `git worktree add ../usage-monitor-path-464 -b fix/installer-long-user-path-464 origin/main`. Medição do `PATH` por `Get-Item HKCU:\Environment` (1051 caracteres) e `makensis -HDRINFO` (`NSIS_MAX_STRLEN=1024`). Sem código. |
+| A02 | 2026-10-27 | este commit | concluída localmente | `makensis` 3.12 sobre o `.nsi` da branch e o da `main`: exit 0 nos dois, os mesmos dois warnings 6030 pré-existentes (linhas 148/149). `pwsh -File src/installer/test/Invoke-UpdateScenarios.ps1` (Windows 11, sem WiX: S7 pulado): `Verificacoes: 77   Falhas: 0`; S13 (PATH de ~9800 caracteres com `%SystemRoot%`) recebe a pasta, não a repete, desinstala de volta byte a byte, e tira a pasta em caixa alta do meio com `;` final; S15 aceita o valor de 32767 exatos e não toca o de 32768. PATH real restaurado: `-ceq` contra a cópia do scratchpad = `True`, `ExpandString`. |
 
 ## Riscos
 

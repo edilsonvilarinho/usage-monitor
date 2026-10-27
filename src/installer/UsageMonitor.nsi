@@ -412,25 +412,30 @@ Function WriteUpdateReceipt
 receiptDone:
 FunctionEnd
 
-; PATH do usuario para o comando de linha (#418): sem a pasta no PATH, o
+; PATH do usuario para o comando de linha (#418, #464): sem a pasta no PATH, o
 ; `usage-monitor` so roda pelo caminho completo do exe. A instalacao acrescenta a
 ; pasta ao fim de HKCU\Environment\Path quando ela nao esta em nenhuma posicao; a
 ; desinstalacao tira toda entrada igual a ela. So o valor do usuario e tocado -- o
 ; do sistema exige administrador, e este instalador roda como usuario.
 ;
-; Regra de seguranca: o NSIS guarda strings de ate NSIS_MAX_STRLEN caracteres (1024
-; no build oficial, o que o CI e a release instalam). Valor maior faz o ReadRegStr
-; devolver vazio, e regravar a partir disso APAGARIA o PATH do usuario. Por isso o
-; tamanho sai antes, do RegGetValueW, e valor que nao cabe inteiro nao e tocado nem
-; na instalacao nem na desinstalacao. Revisao do PR #456 em
-; docs/planos/instalador-path-cli-execucao.md.
+; Regra de seguranca: o valor NUNCA passa por uma string do NSIS. O build oficial
+; (o que o CI e a release instalam) guarda ate NSIS_MAX_STRLEN = 1024 caracteres;
+; valor maior volta vazio ou cortado, e regrava-lo apagaria o PATH do usuario (D1
+; da revisao do PR #456). Ate a #464 a saida era recusar o valor acima disso, e um
+; PATH comum de 1051 caracteres ficava sem a entrada. Agora o valor e lido para um
+; buffer do plugin System, varrido e recomposto ali, e gravado por RegSetKeyValueW.
+; Plano em docs/planos/path-usuario-longo-464-execucao.md.
 ;
-; Registradores: as funcoes abaixo usam $R0-$R8 livremente. Quem chama nao guarda
+; Registradores: as funcoes abaixo usam $R0-$R9 livremente. Quem chama nao guarda
 ; nada neles (a Section so le $R5/$R6 depois de grava-los).
 
 !define HKCU_ROOT 0x80000001
 ; RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ | RRF_NOEXPAND: valor bruto, %VAR% sem expandir.
 !define RRF_RAW_STRING 0x10000006
+!define REG_EXPAND_SZ 2
+!define CSTR_EQUAL 2
+; Teto do Windows para o valor de uma variavel de ambiente, sem o terminador.
+!define USER_PATH_MAX_CHARS 32767
 
 ; WM_SETTINGCHANGE avisa as janelas abertas; um terminal ja aberto so ve a mudanca
 ; depois de reaberto. HWND_BROADCAST = 0xFFFF, WM_SETTINGCHANGE = 0x1A,
@@ -440,10 +445,13 @@ FunctionEnd
 !macroend
 
 !macro USER_PATH_FUNCTIONS UN
-; Le o Path bruto em $R7. $R6 = "ok", "missing" (valor ausente) ou "unsafe" (nao
-; cabe inteiro numa string do NSIS, tipo inesperado ou erro de leitura).
+; Le o Path bruto para um buffer nativo: $R7 = endereco (0 sem buffer) e $R9 =
+; capacidade em bytes, com folga para ";<pasta>;". $R6 = "ok", "missing" (valor
+; ausente) ou "unsafe" (tipo inesperado, erro de leitura ou valor que cresceu
+; entre as duas leituras). So com "ok" ha buffer, e quem chama o libera.
 Function ${UN}ReadUserPath
-    StrCpy $R7 ""
+    StrCpy $R7 0
+    StrCpy $R9 0
     System::Call 'advapi32::RegGetValueW(p ${HKCU_ROOT}, w "Environment", w "Path", i ${RRF_RAW_STRING}, p 0, p 0, *i .R1) i .R0'
     ${If} $R0 = 2
         ; ERROR_FILE_NOT_FOUND
@@ -454,54 +462,82 @@ Function ${UN}ReadUserPath
         StrCpy $R6 "unsafe"
         Return
     ${EndIf}
-    ; $R1 = bytes em UTF-16 com o terminador; dividido por 2, caracteres com o
-    ; terminador -- a mesma conta do buffer do ReadRegStr.
-    IntOp $R1 $R1 / 2
-    ${If} $R1 > ${NSIS_MAX_STRLEN}
+    ; $R1 = bytes em UTF-16 com o terminador. Folga: separador, pasta, `;` final e
+    ; um terminador a mais.
+    StrLen $R2 $INSTDIR
+    IntOp $R2 $R2 + 3
+    IntOp $R2 $R2 * 2
+    IntOp $R9 $R1 + $R2
+    System::Alloc $R9
+    Pop $R7
+    ${If} $R7 = 0
+        StrCpy $R9 0
         StrCpy $R6 "unsafe"
         Return
     ${EndIf}
-    ClearErrors
-    ReadRegStr $R7 HKCU "Environment" "Path"
-    ${If} ${Errors}
-        StrCpy $R7 ""
+    ; Segunda leitura limitada ao tamanho medido: valor que cresceu entre as duas
+    ; chamadas devolve ERROR_MORE_DATA, e nada e tocado. A folga fica livre para a
+    ; composicao.
+    System::Call 'advapi32::RegGetValueW(p ${HKCU_ROOT}, w "Environment", w "Path", i ${RRF_RAW_STRING}, p 0, p R7, *i R1) i .R0'
+    ${If} $R0 <> 0
+        System::Free $R7
+        StrCpy $R7 0
+        StrCpy $R9 0
         StrCpy $R6 "unsafe"
         Return
     ${EndIf}
     StrCpy $R6 "ok"
 FunctionEnd
 
-; Copia $R7 para $R8 sem as entradas iguais a $INSTDIR (comparacao sem caixa, como
-; o Windows compara caminhos); $R5 = quantas sairam. As demais entradas, vazias
-; inclusive, ficam byte a byte e na mesma ordem.
+; Varre o buffer $R7 entrada a entrada (separador `;`) e conta em $R5 as entradas
+; iguais a $INSTDIR (CompareStringOrdinal sem caixa, como o Windows compara
+; caminhos). Com $R8 <> 0, copia para $R8 -- buffer de $R9 bytes -- as demais
+; entradas, vazias inclusive, byte a byte e na mesma ordem.
 Function ${UN}UserPathWithoutInstallDir
-    StrCpy $R8 ""
     StrCpy $R5 0
+    ; $R6 = 1 depois da primeira entrada copiada; $R4 = inicio da entrada; $R0 =
+    ; ponto de escrita em $R8.
+    StrCpy $R6 0
     StrCpy $R4 $R7
-    StrCpy $R3 0
+    StrCpy $R0 $R8
 nextEntry:
-    StrCpy $R2 0
-findSeparator:
-    StrCpy $R1 $R4 1 $R2
-    StrCmp $R1 "" entryFound
-    StrCmp $R1 ";" entryFound
-    IntOp $R2 $R2 + 1
-    Goto findSeparator
-entryFound:
-    StrCpy $R0 $R4 $R2
-    ${If} $R0 == $INSTDIR
-        IntOp $R5 $R5 + 1
-    ${ElseIf} $R3 = 1
-        StrCpy $R8 "$R8;$R0"
+    ; 59 = `;`. $R1 = separador da entrada, ou 0 na ultima; $R2 = caracteres dela.
+    System::Call 'shlwapi::StrChrW(p R4, i 59) p .R1'
+    ${If} $R1 = 0
+        System::Call 'kernel32::lstrlenW(p R4) i .R2'
     ${Else}
-        StrCpy $R8 $R0
-        StrCpy $R3 1
+        IntPtrOp $R2 $R1 - $R4
+        IntOp $R2 $R2 / 2
     ${EndIf}
-    StrCmp $R1 "" entriesDone
-    IntOp $R2 $R2 + 1
-    StrCpy $R4 $R4 "" $R2
-    Goto nextEntry
-entriesDone:
+    System::Call 'kernel32::CompareStringOrdinal(p R4, i R2, w "$INSTDIR", i -1, i 1) i .R3'
+    ${If} $R3 = ${CSTR_EQUAL}
+        IntOp $R5 $R5 + 1
+    ${ElseIf} $R8 <> 0
+        ${If} $R6 = 1
+            System::Call '*$R0(&i2 59)'
+            IntPtrOp $R0 $R0 + 2
+        ${EndIf}
+        IntOp $R3 $R2 * 2
+        System::Call 'kernel32::RtlMoveMemory(p R0, p R4, i R3)'
+        IntPtrOp $R0 $R0 + $R3
+        StrCpy $R6 1
+    ${EndIf}
+    ${If} $R1 <> 0
+        IntPtrOp $R4 $R1 + 2
+        Goto nextEntry
+    ${EndIf}
+    ${If} $R8 <> 0
+        System::Call '*$R0(&i2 0)'
+    ${EndIf}
+FunctionEnd
+
+; Grava o buffer $R7 como o Path do usuario, REG_EXPAND_SZ como o Windows o cria.
+; $R0 = codigo do RegSetKeyValueW (0 = gravado).
+Function ${UN}WriteUserPath
+    System::Call 'kernel32::lstrlenW(p R7) i .R1'
+    IntOp $R1 $R1 + 1
+    IntOp $R1 $R1 * 2
+    System::Call 'advapi32::RegSetKeyValueW(p ${HKCU_ROOT}, w "Environment", w "Path", i ${REG_EXPAND_SZ}, p R7, i R1) i .R0'
 FunctionEnd
 !macroend
 
@@ -511,57 +547,88 @@ FunctionEnd
 Function AddInstallDirToUserPath
     Call ReadUserPath
     ${If} $R6 == "unsafe"
-        DetailPrint "PATH do usuario grande demais para regravar inteiro: nao alterado."
+        DetailPrint "PATH do usuario ilegivel: nao alterado."
         Return
     ${EndIf}
+    ${If} $R6 == "missing"
+        WriteRegExpandStr HKCU "Environment" "Path" $INSTDIR
+        !insertmacro BROADCAST_ENVIRONMENT_CHANGE
+        DetailPrint "Pasta de instalacao adicionada ao PATH do usuario."
+        Return
+    ${EndIf}
+    StrCpy $R8 0
     Call UserPathWithoutInstallDir
     ${If} $R5 > 0
+        System::Free $R7
         DetailPrint "PATH do usuario ja contem a pasta de instalacao."
         Return
     ${EndIf}
-    ; Tamanho final contado ANTES de compor: a string composta ja sairia cortada.
-    ; +2 cobre o separador e o ponto e virgula final do pior caso.
-    StrLen $R1 $R7
+    ; Tamanho final contado antes de compor: valor, pasta e um separador.
+    System::Call 'kernel32::lstrlenW(p R7) i .R1'
     StrLen $R2 $INSTDIR
-    IntOp $R1 $R1 + $R2
-    IntOp $R1 $R1 + 2
-    ${If} $R1 >= ${NSIS_MAX_STRLEN}
+    IntOp $R3 $R1 + $R2
+    IntOp $R3 $R3 + 1
+    ${If} $R3 > ${USER_PATH_MAX_CHARS}
+        System::Free $R7
         DetailPrint "PATH do usuario cheio: a pasta de instalacao nao foi adicionada."
         Return
     ${EndIf}
-    StrCpy $R1 $R7 "" -1
-    ${If} $R7 == ""
-        StrCpy $R8 "$INSTDIR"
-    ${ElseIf} $R1 == ";"
+    ; $R4 = ultimo caractere do valor (0 com o valor vazio).
+    StrCpy $R4 0
+    ${If} $R1 > 0
+        IntOp $R3 $R1 - 1
+        IntOp $R3 $R3 * 2
+        IntPtrOp $R3 $R7 + $R3
+        System::Call '*$R3(&i2 .R4)'
+    ${EndIf}
+    ${If} $R1 = 0
+        System::Call 'kernel32::lstrcpyW(p R7, w "$INSTDIR")'
+    ${ElseIf} $R4 = 59
         ; Quem termina com `;` continua assim: `A;` vira `A;<pasta>;`, e a
         ; desinstalacao devolve `A;`. Sem entrada vazia no meio, que ferramentas
         ; do MSYS leem como diretorio corrente.
-        StrCpy $R8 "$R7$INSTDIR;"
+        System::Call 'kernel32::lstrcatW(p R7, w "$INSTDIR;")'
     ${Else}
-        StrCpy $R8 "$R7;$INSTDIR"
+        System::Call 'kernel32::lstrcatW(p R7, w ";$INSTDIR")'
     ${EndIf}
-    WriteRegExpandStr HKCU "Environment" "Path" $R8
+    Call WriteUserPath
+    System::Free $R7
+    ${If} $R0 <> 0
+        DetailPrint "PATH do usuario nao gravado (erro $R0)."
+        Return
+    ${EndIf}
     !insertmacro BROADCAST_ENVIRONMENT_CHANGE
     DetailPrint "Pasta de instalacao adicionada ao PATH do usuario."
 FunctionEnd
 
 ; Desfaz o que AddInstallDirToUserPath gravou, em qualquer posicao. Valor que nao
-; cabe inteiro fica como esta: a entrada que sobrar aponta para uma pasta que nao
+; se le inteiro fica como esta: a entrada que sobrar aponta para uma pasta que nao
 ; existe mais, o que e inofensivo; regravar um valor cortado nao seria.
 Function un.RemoveInstallDirFromUserPath
     Call un.ReadUserPath
     ${If} $R6 != "ok"
         Return
     ${EndIf}
-    Call un.UserPathWithoutInstallDir
-    ${If} $R5 = 0
+    System::Alloc $R9
+    Pop $R8
+    ${If} $R8 = 0
+        System::Free $R7
         Return
     ${EndIf}
-    ${If} $R8 == ""
+    Call un.UserPathWithoutInstallDir
+    System::Free $R7
+    ${If} $R5 = 0
+        System::Free $R8
+        Return
+    ${EndIf}
+    System::Call 'kernel32::lstrlenW(p R8) i .R1'
+    ${If} $R1 = 0
         DeleteRegValue HKCU "Environment" "Path"
     ${Else}
-        WriteRegExpandStr HKCU "Environment" "Path" $R8
+        StrCpy $R7 $R8
+        Call un.WriteUserPath
     ${EndIf}
+    System::Free $R8
     !insertmacro BROADCAST_ENVIRONMENT_CHANGE
 FunctionEnd
 
