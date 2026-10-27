@@ -79,6 +79,21 @@ Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o t
 | A04 | Servidor a ≥ 95% de linhas | `test(server): raise line coverage to 95%` |
 | A05 | Piso do Kotlin sobe para o valor medido | `ci(coverage): raise the Kotlin line floor` |
 
+## Atividades da onda 6.2
+
+Lacunas de partida (Kover, arquivos sem mudança desde `af450570`): `AutoStartManager` 175, `SettingsActions` 143,
+`AppSettingsFeedback` 107, `TelegramBotWiring` 101, `TelegramBotActions` 72, `AppShellActionsFactory` 72,
+`AppModalState` 58 — 728 linhas. Nenhuma atividade monta `AppGraph` nem `AppViewModels` em teste.
+
+| ID | Atividade | Commit esperado |
+|---|---|---|
+| W62-A01 | `AutoStartHost`: plataforma, pasta pessoal, `XDG_CONFIG_HOME`, executor e executável injetáveis; gravar, apagar e migrar nos três sistemas | `test(autostart): drive every platform through an injectable host` |
+| W62-A02 | `AppModalState`, `TelegramBotActions` e `telegramBotSectionModel` por teste direto (já não dependem do grafo) | `test(shell): cover modal state and telegram bot actions` |
+| W62-A03 | `buildShellActions` sobre uma porta (`ShellActionTargets`) em vez de `AppGraph`/`AppViewModels` | `test(shell): cover shell actions through a port` |
+| W62-A04 | `SettingsActions` e `AppSettingsFeedback` sobre `AppSettingsStore` + portas; cliente HTTP de teste injetável | `test(settings): cover settings actions and feedback without the graph` |
+| W62-A05 | Leitores do bot (`sourceHealthOf`, presença, gráfico) fora do `AppGraph` | `test(telegram): cover the bot readers without the graph` |
+| W62-A06 | Medição e piso | `ci(coverage): raise the Kotlin line floor` |
+
 ## Pontos de situação
 
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
@@ -127,3 +142,4 @@ Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o t
 | W6-A02 | 2026-10-27 | este commit | concluída | As 4 cópias de `*WindowPreferences.kt` (671 linhas, ~230 descobertas) viram `WindowGeometryPreferences.kt` (uma implementação, `WindowGeometrySpec` por janela, chaves gravadas idênticas) e o `PersistAppWindowStates` perde os 4 blocos repetidos. `gradlew.bat desktopTest --tests WindowGeometryPreferencesTest --tests ArchitectureRulesTest --tests TeamPresenceScreenTest`: 8 + 17 + 31 testes, 0 falhas. Chaves e tamanhos padrão travados por teste. Testado só no Windows; o comportamento de janela não muda (só a persistência foi unificada). |
 | W6-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **88,1%** (39 955/45 362; antes 87,2%), ramos 62,9%. Restam 5 407 descobertas (teto para 95%: 2 268): `desktopMain` 2 598, janela 1 453, `commonMain` 1 327. Piso do Kotlin: 88. |
 | Onda 6.1 | 2026-10-27 | este commit | PR #483 (merge `f7f6ae58`) | Run `40583073069`: `ci-ok` verde (inclui `desktop-linux`), 0 incidências; `Coverage floor` executou `koverVerify` com piso 88. |
+| W62-A01 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.AutoStartManager*" --tests "com.usagemonitor.architecture.*"`: 26 + 32 + 17 testes, 0 falhas. Linux grava/apaga `.desktop` (XDG e pasta pessoal), migra argumento, árvore versionada e entrada quebrada; macOS grava plist com `launchctl load`/`unload`; Windows `query`/`import`/`delete`; `OTHER` recusa. Achado: `currentPlatform` testava `win` antes de `darwin` (que contém `win`), ramo `darwin` inalcançável; ordem trocada, sem efeito em OpenJDK (`Mac OS X`). Leitura de `reg query` unificada em `parseRegistryQueryValue`. |

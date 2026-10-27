@@ -1,8 +1,6 @@
 package com.usagemonitor
 
 import com.usagemonitor.update.normalizePosixPath
-import com.usagemonitor.update.resolveLinuxInstallRoot
-import com.usagemonitor.update.resolveLinuxStableLauncherPath
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -19,24 +17,37 @@ object AutoStartManager {
     private const val MACOS_LAUNCH_AGENT_FILE = "$MACOS_LAUNCH_AGENT_LABEL.plist"
     internal const val APP_DISPLAY_NAME = "Usage Monitor"
 
-    fun isAutoStartSupported(): Boolean {
-        return currentPlatform() != Platform.OTHER
+    // As formas sem `host` são as do app; as com `host` existem para a suíte, que só
+    // roda no Windows, exercitar os três sistemas contra pasta e executor falsos.
+    fun isAutoStartSupported(): Boolean = isAutoStartSupported(AutoStartHost.system())
+
+    internal fun isAutoStartSupported(host: AutoStartHost): Boolean {
+        return host.platform != Platform.OTHER
     }
 
-    fun isAutoStartEnabled(): Boolean {
-        return when (currentPlatform()) {
-            Platform.WINDOWS -> isWindowsAutoStartEnabled()
-            Platform.LINUX -> linuxAutostartFile().exists()
-            Platform.MACOS -> macAutostartFile().exists()
+    fun isAutoStartEnabled(): Boolean = isAutoStartEnabled(AutoStartHost.system())
+
+    internal fun isAutoStartEnabled(host: AutoStartHost): Boolean {
+        return when (host.platform) {
+            Platform.WINDOWS -> isWindowsAutoStartEnabled(host.runCommand)
+            Platform.LINUX -> linuxAutostartFile(host).exists()
+            Platform.MACOS -> macAutostartFile(host).exists()
             Platform.OTHER -> false
         }
     }
 
-    fun setAutoStart(enabled: Boolean): AutoStartResult {
-        return when (currentPlatform()) {
-            Platform.WINDOWS -> setWindowsAutoStart(enabled)
-            Platform.LINUX -> setLinuxAutoStart(enabled)
-            Platform.MACOS -> setMacAutoStart(enabled)
+    fun setAutoStart(enabled: Boolean): AutoStartResult = setAutoStart(enabled, AutoStartHost.system())
+
+    internal fun setAutoStart(enabled: Boolean, host: AutoStartHost): AutoStartResult {
+        return when (host.platform) {
+            Platform.WINDOWS -> setWindowsAutoStart(
+                enabled = enabled,
+                executablePathProvider = host.executablePath,
+                commandRunner = host.runCommand,
+                enabledNow = { isWindowsAutoStartEnabled(host.runCommand) }
+            )
+            Platform.LINUX -> setLinuxAutoStart(enabled, host)
+            Platform.MACOS -> setMacAutoStart(enabled, host)
             Platform.OTHER -> AutoStartResult.Failure("plataforma não compatível")
         }
     }
@@ -58,24 +69,26 @@ object AutoStartManager {
      * já estava; `null` significa que a preferência está desligada e não há nada
      * a migrar. `Failure` preserva o motivo seguro da falha.
      */
-    fun ensureAutoStartCommandCurrent(): AutoStartResult? {
-        if (!isAutoStartEnabled()) {
+    fun ensureAutoStartCommandCurrent(): AutoStartResult? = ensureAutoStartCommandCurrent(AutoStartHost.system())
+
+    internal fun ensureAutoStartCommandCurrent(host: AutoStartHost): AutoStartResult? {
+        if (!isAutoStartEnabled(host)) {
             return null
         }
 
-        val currentCommand = readAutoStartCommand()
+        val currentCommand = readAutoStartCommand(host)
         // Os dois motivos do Linux so valem no Linux: `inspectLinuxAutostartEntry`
         // le `~/.config/autostart`, e no Windows e no macOS a resposta dela nao
         // significa nada.
-        val isLinux = currentPlatform() == Platform.LINUX
+        val isLinux = host.platform == Platform.LINUX
         val needsMigration = autoStartCommandNeedsMigration(currentCommand) ||
-            (isLinux && linuxEntryPointsIntoVersionedTree(currentCommand)) ||
-            (isLinux && linuxAutoStartNeedsRepair(currentCommand))
+            (isLinux && linuxEntryPointsIntoVersionedTree(currentCommand, host)) ||
+            (isLinux && linuxAutoStartNeedsRepair(currentCommand, host.isExecutable))
         if (!needsMigration) {
             return AutoStartResult.Success
         }
 
-        return setAutoStart(enabled = true)
+        return setAutoStart(enabled = true, host = host)
     }
 
     /**
@@ -90,11 +103,11 @@ object AutoStartManager {
      * Entrada **ausente nao migra**, pelo mesmo motivo do argumento `--autostart`:
      * ligaria a inicializacao de quem a desligou.
      */
-    private fun linuxEntryPointsIntoVersionedTree(currentCommand: String?): Boolean {
+    private fun linuxEntryPointsIntoVersionedTree(currentCommand: String?, host: AutoStartHost): Boolean {
         return linuxAutoStartNeedsLauncherMigration(
             currentCommand = currentCommand,
-            stableLauncherPath = resolveLinuxStableLauncherPath(),
-            versionsPrefix = resolveLinuxInstallRoot()?.let { root -> "$root/versions/" }
+            stableLauncherPath = host.stableLauncherPath(),
+            versionsPrefix = host.installRoot()?.let { root -> "$root/versions/" }
         )
     }
 
@@ -120,7 +133,7 @@ object AutoStartManager {
      */
     internal fun linuxAutoStartNeedsRepair(
         currentCommand: String?,
-        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } }
+        isExecutable: (String) -> Boolean = ::isExecutableFile
     ): Boolean {
         val state = inspectLinuxAutostartEntry(
             readEntry = { currentCommand },
@@ -129,11 +142,11 @@ object AutoStartManager {
         return state.present && !state.valid
     }
 
-    private fun readAutoStartCommand(): String? {
-        return when (currentPlatform()) {
-            Platform.WINDOWS -> readWindowsAutoStartCommand()
-            Platform.LINUX -> readFileOrNull(linuxAutostartFile())
-            Platform.MACOS -> readFileOrNull(macAutostartFile())
+    private fun readAutoStartCommand(host: AutoStartHost): String? {
+        return when (host.platform) {
+            Platform.WINDOWS -> readRegistryValue(WINDOWS_RUN_KEY, WINDOWS_VALUE_NAME, host.runCommand)
+            Platform.LINUX -> readFileOrNull(linuxAutostartFile(host))
+            Platform.MACOS -> readFileOrNull(macAutostartFile(host))
             Platform.OTHER -> null
         }
     }
@@ -142,19 +155,30 @@ object AutoStartManager {
         return runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull()
     }
 
-    private fun readWindowsAutoStartCommand(): String? {
-        val result = runCommand(
-            listOf("reg", "query", WINDOWS_RUN_KEY, "/v", WINDOWS_VALUE_NAME)
-        )
+    /** `reg query` com saída diferente de zero é valor ausente, não falha. */
+    private fun readRegistryValue(
+        key: String,
+        valueName: String,
+        commandRunner: (List<String>) -> AutoStartCommandResult
+    ): String? {
+        val result = commandRunner(listOf("reg", "query", key, "/v", valueName))
         if (result.exitCode != 0) {
             return null
         }
+        return parseRegistryQueryValue(result.output, valueName)
+    }
 
-        return result.output.lineSequence()
+    /**
+     * O dado de `reg query`: a linha `<nome>  REG_<tipo>  <dado>`. Uma leitura só
+     * para a chave `Run` e para o `InstallLocation` -- duas cópias da expressão
+     * divergiriam no dia em que uma mudasse.
+     */
+    internal fun parseRegistryQueryValue(output: String, valueName: String): String? {
+        val line = Regex("""^${Regex.escape(valueName)}\s+REG_\w+\s+(.+)$""")
+        return output.lineSequence()
             .map(String::trim)
-            .firstNotNullOfOrNull { line ->
-                Regex("""^$WINDOWS_VALUE_NAME\s+REG_\w+\s+(.+)$""")
-                    .find(line)
+            .firstNotNullOfOrNull { candidate ->
+                line.find(candidate)
                     ?.groupValues
                     ?.getOrNull(1)
                     ?.trim()
@@ -257,18 +281,20 @@ object AutoStartManager {
      * medir: ambiente grafico e entrada de autostart so existem no Linux. Uma
      * segunda leitura de `os.name` seria um segundo dono da mesma decisao.
      */
-    internal fun currentPlatform(): Platform {
-        val osName = System.getProperty("os.name").lowercase()
+    internal fun currentPlatform(osNameProperty: String = System.getProperty("os.name")): Platform {
+        val osName = osNameProperty.lowercase()
+        // macOS antes do Windows: "darwin" contém "win", e na ordem inversa o ramo
+        // `darwin` nunca era alcançado (achado ao testar esta função, onda 6.2).
         return when {
+            osName.contains("mac") || osName.contains("darwin") -> Platform.MACOS
             osName.contains("win") -> Platform.WINDOWS
             osName.contains("linux") -> Platform.LINUX
-            osName.contains("mac") || osName.contains("darwin") -> Platform.MACOS
             else -> Platform.OTHER
         }
     }
 
-    private fun isWindowsAutoStartEnabled(): Boolean {
-        val result = runCommand(
+    private fun isWindowsAutoStartEnabled(commandRunner: (List<String>) -> AutoStartCommandResult): Boolean {
+        val result = commandRunner(
             listOf("reg", "query", WINDOWS_RUN_KEY, "/v", WINDOWS_VALUE_NAME)
         )
         return result.exitCode == 0
@@ -278,7 +304,7 @@ object AutoStartManager {
         enabled: Boolean,
         executablePathProvider: () -> String? = ::resolveExecutablePath,
         commandRunner: (List<String>) -> AutoStartCommandResult = ::runCommand,
-        enabledNow: () -> Boolean = ::isWindowsAutoStartEnabled
+        enabledNow: () -> Boolean = { isWindowsAutoStartEnabled(::runCommand) }
     ): AutoStartResult {
         if (enabled) {
             val executablePath = executablePathProvider()
@@ -295,8 +321,8 @@ object AutoStartManager {
         return result.toAutoStartResult("reg.exe delete")
     }
 
-    private fun setLinuxAutoStart(enabled: Boolean): AutoStartResult {
-        val autostartFile = linuxAutostartFile()
+    private fun setLinuxAutoStart(enabled: Boolean, host: AutoStartHost): AutoStartResult {
+        val autostartFile = linuxAutostartFile(host)
 
         if (!enabled) {
             if (!autostartFile.exists() || autostartFile.delete()) {
@@ -306,8 +332,9 @@ object AutoStartManager {
         }
 
         val executablePath = linuxAutoStartExecutablePath(
-            stableLauncherPath = resolveLinuxStableLauncherPath(),
-            fallback = ::resolveExecutablePath
+            stableLauncherPath = host.stableLauncherPath(),
+            isExecutable = host.isExecutable,
+            fallback = host.executablePath
         ) ?: return AutoStartResult.Failure("executável do aplicativo não localizado")
         val parentDir = File(executablePath).parentFile?.absolutePath
             ?: return AutoStartResult.Failure("diretório do executável não localizado")
@@ -320,15 +347,15 @@ object AutoStartManager {
         return if (failure == null) AutoStartResult.Success else failure.toAutoStartFailure("gravação do autostart")
     }
 
-    private fun setMacAutoStart(enabled: Boolean): AutoStartResult {
-        val launchAgentFile = macAutostartFile()
+    private fun setMacAutoStart(enabled: Boolean, host: AutoStartHost): AutoStartResult {
+        val launchAgentFile = macAutostartFile(host)
 
         if (!enabled) {
             if (!launchAgentFile.exists()) {
                 return AutoStartResult.Success
             }
             // O unload é best effort: o que define o estado é a presença do plist.
-            runCommand(listOf("launchctl", "unload", "-w", launchAgentFile.absolutePath))
+            host.runCommand(listOf("launchctl", "unload", "-w", launchAgentFile.absolutePath))
             return if (launchAgentFile.delete()) {
                 AutoStartResult.Success
             } else {
@@ -336,7 +363,7 @@ object AutoStartManager {
             }
         }
 
-        val executablePath = resolveExecutablePath()
+        val executablePath = host.executablePath()
             ?: return AutoStartResult.Failure("executável do aplicativo não localizado")
 
         val writeFailure = runCatching {
@@ -348,7 +375,7 @@ object AutoStartManager {
             return writeFailure.toAutoStartFailure("gravação do autostart")
         }
 
-        runCommand(listOf("launchctl", "load", "-w", launchAgentFile.absolutePath))
+        host.runCommand(listOf("launchctl", "load", "-w", launchAgentFile.absolutePath))
         return AutoStartResult.Success
     }
 
@@ -366,7 +393,7 @@ object AutoStartManager {
      */
     internal fun linuxAutoStartExecutablePath(
         stableLauncherPath: String?,
-        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } },
+        isExecutable: (String) -> Boolean = ::isExecutableFile,
         fallback: () -> String?
     ): String? {
         val launcher = stableLauncherPath?.trim()?.takeIf { it.isNotBlank() }
@@ -423,8 +450,8 @@ object AutoStartManager {
      * ali nao existe `~/.config/autostart` nem bit de execucao.
      */
     internal fun inspectLinuxAutostartEntry(
-        readEntry: () -> String? = { readFileOrNull(linuxAutostartFile()) },
-        isExecutable: (String) -> Boolean = { path -> File(path).let { it.isFile && it.canExecute() } }
+        readEntry: () -> String? = { readFileOrNull(linuxAutostartFile(AutoStartHost.system())) },
+        isExecutable: (String) -> Boolean = ::isExecutableFile
     ): LinuxAutostartEntryState {
         val entry = runCatching { readEntry() }
             .getOrNull()
@@ -445,16 +472,20 @@ object AutoStartManager {
         return LinuxAutostartEntryState(present = true, valid = valid)
     }
 
-    private fun macAutostartFile(): File {
-        val homeDir = System.getProperty("user.home")
-        return File(homeDir, "Library/LaunchAgents/$MACOS_LAUNCH_AGENT_FILE")
+    private fun macAutostartFile(host: AutoStartHost): File {
+        return File(host.homeDirectory, "Library/LaunchAgents/$MACOS_LAUNCH_AGENT_FILE")
     }
 
-    private fun linuxAutostartFile(): File {
-        val configHome = System.getenv("XDG_CONFIG_HOME")
+    private fun linuxAutostartFile(host: AutoStartHost): File {
+        val configHome = host.xdgConfigHome
             ?.takeIf { it.isNotBlank() }
-            ?: File(System.getProperty("user.home"), ".config").absolutePath
+            ?: File(host.homeDirectory, ".config").absolutePath
         return File(configHome, "autostart/$LINUX_AUTOSTART_FILE")
+    }
+
+    internal fun isExecutableFile(path: String): Boolean {
+        val file = File(path)
+        return file.isFile && file.canExecute()
     }
 
     internal fun resolveExecutablePath(
@@ -548,34 +579,14 @@ object AutoStartManager {
      */
     internal fun readWindowsInstallLocationOrNull(): String? = readWindowsInstallLocation()
 
-    private fun readWindowsInstallLocation(): String? {
-        if (currentPlatform() != Platform.WINDOWS) {
+    private fun readWindowsInstallLocation(
+        platform: Platform = currentPlatform(),
+        commandRunner: (List<String>) -> AutoStartCommandResult = ::runCommand
+    ): String? {
+        if (platform != Platform.WINDOWS) {
             return null
         }
-
-        val result = runCommand(
-            listOf(
-                "reg",
-                "query",
-                WINDOWS_UNINSTALL_KEY,
-                "/v",
-                WINDOWS_INSTALL_LOCATION_VALUE
-            )
-        )
-        if (result.exitCode != 0) {
-            return null
-        }
-
-        return result.output.lineSequence()
-            .map(String::trim)
-            .firstNotNullOfOrNull { line ->
-                Regex("""^InstallLocation\s+REG_\w+\s+(.+)$""")
-                    .find(line)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.trim()
-                    ?.takeIf { it.isNotBlank() }
-            }
+        return readRegistryValue(WINDOWS_UNINSTALL_KEY, WINDOWS_INSTALL_LOCATION_VALUE, commandRunner)
     }
 
     private fun isJavaLauncher(fileName: String): Boolean {
@@ -585,7 +596,7 @@ object AutoStartManager {
             normalized == "javaw.exe"
     }
 
-    private fun runCommand(command: List<String>): AutoStartCommandResult {
+    internal fun runCommand(command: List<String>): AutoStartCommandResult {
         return runCatching {
             val process = ProcessBuilder(command)
                 .redirectErrorStream(true)
