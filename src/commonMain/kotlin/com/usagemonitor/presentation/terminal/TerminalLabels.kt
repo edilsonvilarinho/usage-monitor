@@ -95,6 +95,17 @@ internal class TerminalLabels(val language: AppLanguage) {
         return localized(language, "$day/$month", "$month/$day") + " " + TelegramBotMessages.clock(at)
     }
 
+    /**
+     * A cota contra o tempo da janela (#463, AI5), em pontos percentuais: atrás do tempo cabe
+     * até o reinício no ritmo de até aqui; à frente, esgota antes.
+     */
+    fun timeGap(gap: Int): String =
+        when {
+            gap < 0 -> localized(language, "${-gap} pp atrás do tempo", "${-gap} pp behind time")
+            gap > 0 -> localized(language, "$gap pp à frente do tempo", "$gap pp ahead of time")
+            else -> localized(language, "no compasso do tempo", "level with time")
+        }
+
     fun nothingCollecting(at: String, age: Duration): String =
         localized(
             language,

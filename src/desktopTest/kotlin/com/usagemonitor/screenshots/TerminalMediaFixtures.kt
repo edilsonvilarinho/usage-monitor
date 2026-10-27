@@ -22,7 +22,7 @@ import com.usagemonitor.presentation.terminal.TuiAccount
 import com.usagemonitor.presentation.terminal.TuiActiveSession
 import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiHistory
-import com.usagemonitor.presentation.terminal.TuiHistoryRow
+import com.usagemonitor.presentation.terminal.TuiHistoryFixtures
 import com.usagemonitor.presentation.terminal.TuiSession
 import com.usagemonitor.presentation.terminal.TuiSessionPeriod
 import com.usagemonitor.presentation.terminal.TuiSessions
@@ -107,14 +107,15 @@ internal class TerminalMediaFixtures(private val language: AppLanguage) {
         )
     )
 
+    // A aba 3 (#463, AI4): janelas sintéticas cortadas pelo mesmo domínio do app.
     private val history = TuiHistory(
         HistoryRange.LAST_24_HOURS,
         listOf(
-            TuiHistoryRow(work, work.quotas[0], spark(62, setOf(10, 20, 34))),
-            TuiHistoryRow(work, work.quotas[1], spark(41, emptySet())),
-            TuiHistoryRow(personal, personal.quotas[0], spark(18, setOf(8, 30))),
-            TuiHistoryRow(codex, codex.quotas[0], spark(33, setOf(12, 26, 40))),
-            TuiHistoryRow(go, go.quotas[0], spark(12, setOf(24)))
+            TuiHistoryFixtures.row(work, work.quotas[0], listOf(100, 96, 83), 5.hours, now),
+            TuiHistoryFixtures.row(work, work.quotas[1], emptyList(), (7 * 24).hours, now),
+            TuiHistoryFixtures.row(personal, personal.quotas[0], listOf(41), 5.hours, now),
+            TuiHistoryFixtures.row(codex, codex.quotas[0], listOf(70, 100), 5.hours, now),
+            TuiHistoryFixtures.row(go, go.quotas[0], emptyList(), 5.hours, now)
         )
     )
 

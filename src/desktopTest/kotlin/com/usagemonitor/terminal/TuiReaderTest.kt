@@ -14,6 +14,7 @@ import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.presentation.terminal.TuiState
+import com.usagemonitor.presentation.terminal.TuiTab
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
@@ -157,6 +158,10 @@ class TuiReaderTest {
                 // Sem índice do Codex, a sessão ativa fica sem medida, e nenhum banco nasce.
                 assertNull(data.accounts.single().activeSession)
                 assertFalse(File(dir, "sem-codex.db").exists())
+                // A aba 3 (#463, AI4): as janelas e as leituras da cota, pelo mesmo caso de uso do app.
+                val row = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), stores).load(TuiState(tab = TuiTab.HISTORY)).history?.rows?.single()
+                assertEquals(2, row?.points?.size)
+                assertEquals(listOf(24), row?.windows?.map { window -> window.peakPercent })
             }
         } finally {
             runCatching { node.removeNode() }

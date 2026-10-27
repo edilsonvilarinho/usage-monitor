@@ -32,7 +32,7 @@ data class TuiData(
         get() = accounts.any { account -> account.failure != null }
 
     /**
-     * A primeira trilha de cada conta na aba 3, que lista as cotas com percentual na ordem do
+     * A primeira cota de cada conta na aba 3, que lista as cotas com percentual na ordem do
      * painel; `null` para a conta sem nenhuma.
      */
     val historyRowOfAccount: List<Int?>

@@ -18,7 +18,7 @@ internal object TuiScreen {
             accountCount = data.accounts.size,
             sessionCount = data.sessions?.sessions?.size ?: 0,
             turnCount = data.sessions?.turns?.size ?: 0,
-            historyRowCount = data.history?.rows?.size ?: 0,
+            historyWindowCounts = data.history?.rows?.map { row -> row.listedWindows.size }.orEmpty(),
             historyRowOfAccount = data.historyRowOfAccount,
             teamMemberCount = data.team?.members?.size ?: 0,
             teamAccountCount = data.team?.accounts?.size ?: 0,
@@ -70,7 +70,7 @@ internal object TuiScreen {
         when (state.tab) {
             TuiTab.OVERVIEW -> TuiOverviewView.render(data, state.overview, size, TuiOverviewLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.SESSIONS -> TuiSessionsView.render(data.sessions, state.sessions, size, TuiSessionsLabels(labels.language), profile)
-            TuiTab.HISTORY -> TuiHistoryView.render(data.history, state.history, size, TuiHistoryLabels(labels.language), TerminalLabels(labels.language), profile)
+            TuiTab.HISTORY -> TuiHistoryView.render(data.history, state.history, data.now, size, TuiHistoryLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.TEAM -> TuiTeamView.render(data.team, state.team, size, TuiTeamLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.SETTINGS -> TuiSettingsView.render(data.settings, state.settings, data.collector, size, TuiSettingsLabels(labels.language), profile)
         }

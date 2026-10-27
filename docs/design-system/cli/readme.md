@@ -163,12 +163,38 @@ custo em negrito. A linha selecionada leva `▸` e fundo de seleção. Modelo se
 custo, com nota de rodapé. Na 3.4, a marca de presença vem logo depois do `▸` e a palavra do estado
 está sempre escrita ao lado ("trabalhando · 1 sessão", "app aberto", "ausente · há 2 h").
 
-**Sparkline** (3.3). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
-reinício da janela. O eixo é em BRT, e a última coluna repete o número e o estado. A célula leva o
+**Sparkline** (3.1). Uma célula por meia hora em `▁▂▃▄▅▆▇█`, na cor da fonte, com `┆` muted no
+reinício da janela: as últimas 24 h da primeira cota no detalhe da Visão geral. A célula leva o
 maior uso lido nela, pelo piso; sem leitura fica em branco. Reinício é a leitura em que a janela
 anterior já tinha acabado (o fim mudou e ficou para trás), comparada com a última leitura que
 conhecia o fim: numa janela corrida o fim anda a cada leitura, e a leitura ociosa vem sem fim.
-Em tela estreita a trilha perde o começo, nunca o agora.
+Em tela estreita a trilha perde o começo, nunca o agora. Até a #463 era também a aba 3.
+
+**Tabela de janelas** (3.3, #463 AI4). A aba 3 lista as janelas de cada cota com percentual, na ordem
+do painel, cortadas pelo mesmo domínio do Histórico do app (`QuotaWindowSummary`). Bloco por cota:
+`● trabalho Claude 5h  91% crítico · 7 janelas no período · 1 esgotou`. Uma linha por janela, a mais
+nova primeiro e no máximo 8 (as outras viram `+N janelas mais antigas`), sob o cabeçalho fixo `INÍCIO
+· ATIVA · PICO · COMO TERMINOU`: a primeira leitura (`23/10 15:09`), a faixa ativa (`15:09–19:07`, ou
+`20/10–21/10` quando atravessa dias, `—` sem subida), o pico numa barra de cota de 10 células e o
+número, e o fim — `aberta · reinicia 19:30` e `sobrou 4%` em muted, ou `▲ esgotou após 3 h 15 min ·
+parado 1 h 30 min` em `--term-crit`, contado da primeira leitura (o início nominal a API não informa);
+sem espaço, o "parado" sai inteiro. Cota sem janela (saldo, intervalar sem reinício conhecido) diz
+`sem janela no período`. `↑ ↓` andam pelas janelas de todas as cotas, `← →` trocam o período (24 h, 7
+dias, 30 dias) e a tabela rola até a janela escolhida.
+
+**Gráfico alto** (3.3b, #463 AI1). `enter` numa janela troca a tabela por oito linhas de colunas, de
+`--term-*` da fonte: a coluna cheia em `█` e o topo nos oitavos `▁…▇` (64 degraus); zero medido no
+degrau mais baixo em muted, sem leitura em branco. Eixo Y escrito `100% ┤`, `50% ┤`, `0% ┤` (glifos da
+moldura), base `╰───┆` com o reinício no fim, e embaixo início, meio e reinício (hora numa janela curta,
+dia e mês na semanal). Do início nominal (reinício − 5 h ou 7 d; sem duração conhecida, a primeira
+leitura) ao reinício, até 60 colunas; a coluna é a última leitura até o fim dela, e na janela aberta nada
+depois de agora. Título `rótulo · janela de 23/10 15:09 a 20:09 · uma coluna = 5 min`. Frase: aberta,
+`64% usada com 97% da janela já passada · ✓ 33 pp atrás do tempo`; fechada, `pico 96% · sobrou 4%` ou o
+pico e como esgotou. Abaixo, em muted, a faixa ativa e o ritmo médio. `esc` volta à tabela.
+
+**Tempo × cota** (#463 AI5). A cota usada menos o tempo da janela que já passou, em pontos percentuais:
+`✓ 33 pp atrás do tempo` em verde (cabe no ritmo de até aqui) ou `▲ 40 pp à frente do tempo` em
+`--term-warn` (esgota antes). Zero é `no compasso do tempo`.
 
 **Composição de tokens** (3.2). Segmentos `█` nas cores da série (`--term-input`, `--term-output`,
 `--term-cread`, `--term-cwrite`), com legenda `■` e a porcentagem de cada série. Sem Unicode, o

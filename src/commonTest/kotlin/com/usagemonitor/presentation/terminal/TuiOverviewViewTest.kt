@@ -113,13 +113,13 @@ class TuiOverviewViewTest {
     }
 
     @Test
-    fun `lado a lado, enter abre o historico na primeira trilha da conta`() {
+    fun `lado a lado, enter abre o historico na primeira cota da conta`() {
         val data = data()
         val context = TuiScreen.context(data, TuiSize(96, 24))
         assertEquals(listOf<Int?>(0, 1, null), context.historyRowOfAccount)
         val step = TuiReducer.reduce(TuiState(overview = TuiListState(selected = 1)), TuiKey.Enter, context)
         assertEquals(TuiTab.HISTORY, step.state.tab)
-        assertEquals(1, step.state.history.selected)
+        assertEquals(1, step.state.history.row)
         assertEquals(listOf<TuiEffect>(TuiEffect.Refresh), step.effects)
         // Conta sem percentual (saldo) não tem trilha: o enter não faz nada.
         assertEquals(TuiTab.OVERVIEW, TuiReducer.reduce(TuiState(overview = TuiListState(selected = 2)), TuiKey.Enter, context).state.tab)

@@ -13,7 +13,6 @@ import com.usagemonitor.presentation.terminal.TuiActiveSession
 import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiHistory
 import com.usagemonitor.presentation.terminal.TuiHistoryRow
-import com.usagemonitor.presentation.terminal.TuiHistoryState
 import com.usagemonitor.presentation.terminal.TuiReadFailure
 import com.usagemonitor.presentation.terminal.TuiSpark
 import com.usagemonitor.presentation.terminal.TuiSparkline
@@ -133,12 +132,11 @@ internal class TuiReader(
     }
 
     /**
-     * A aba 3: uma trilha por cota com percentual, na ordem do painel, pelo mesmo caso de uso
-     * do Histórico do app. Uma consulta por conta; conta sem histórico fica com a trilha vazia.
+     * A aba 3: as janelas de cada cota com percentual, na ordem do painel, pelo mesmo caso de uso
+     * do Histórico do app (#463, AI4). Uma consulta por conta; conta sem histórico fica sem janela.
      */
     private fun history(accounts: List<TerminalAccount>, range: HistoryRange, now: Instant): TuiHistory? {
         val stores = stores ?: return null
-        val start = range.windowStart(now)
         val rows = accounts.flatMap { account ->
             val quotas = account.quotas.filter { quota -> quota.percent != null }
             if (quotas.isEmpty()) {
@@ -147,7 +145,7 @@ internal class TuiReader(
             val report = runCatching { runBlocking { stores.getUsageHistory(account.source, range, account.accountKey, now) } }.getOrNull()
             quotas.map { quota ->
                 val series = report?.series?.firstOrNull { item -> item.quotaLabel == quota.label && item.periodType == quota.periodType }
-                TuiHistoryRow(account, quota, series?.let { found -> TuiSparkline.build(found.points, start, now, TuiHistoryState.cellCount(range)) })
+                TuiHistoryRow(account, quota, series?.windows.orEmpty(), series?.points.orEmpty())
             }
         }
         return TuiHistory(range, rows)

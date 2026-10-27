@@ -1,51 +1,99 @@
 package com.usagemonitor.presentation.terminal
 
 import com.usagemonitor.domain.entity.HistoryRange
+import com.usagemonitor.domain.entity.QuotaWindowSummary
+import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageSnapshotQuota
 
-/** Uma trilha da aba 3: a cota de uma conta, o uso atual dela e a sparkline da janela. */
+/**
+ * Uma cota da aba 3 (#463, AI4): a conta, o uso atual, as janelas do período e as leituras de
+ * onde o gráfico alto (AI1) sai.
+ */
 data class TuiHistoryRow(
     val account: TerminalAccount,
     val quota: UsageSnapshotQuota,
-    /** `null` sem leitura no histórico para esta cota. */
-    val spark: TuiSpark?
-)
+    /** As janelas do período, da mais velha à mais nova, como o histórico do app as corta. */
+    val windows: List<QuotaWindowSummary> = emptyList(),
+    /** As leituras do período, em ordem; vazias sem histórico. */
+    val points: List<UsageHistoryPoint> = emptyList()
+) {
+    /** As janelas que a tabela lista: a mais nova primeiro, até [TuiHistoryState.MAX_WINDOWS]. */
+    val listedWindows: List<QuotaWindowSummary>
+        get() = windows.asReversed().take(TuiHistoryState.MAX_WINDOWS)
+}
 
-/** O que a aba 3 leu: uma trilha por cota com percentual, na ordem do painel. */
+/** O que a aba 3 leu: uma cota com percentual por bloco, na ordem do painel. */
 data class TuiHistory(
     val range: HistoryRange,
     val rows: List<TuiHistoryRow>,
     val failure: String? = null
 )
 
-/** A janela e a trilha escolhidas na aba 3. */
+/**
+ * O período, a janela escolhida e o gráfico aberto na aba 3. [row] é a cota e [window] a janela
+ * dela (0 = a mais nova); a escolha pode apontar para cota sem janela (o `enter` da aba 1 abre na
+ * primeira cota da conta), e quem acha a janela de verdade é [resolve].
+ */
 data class TuiHistoryState(
     val range: HistoryRange = HistoryRange.LAST_24_HOURS,
-    val selected: Int = 0
+    val row: Int = 0,
+    val window: Int = 0,
+    val chartOpen: Boolean = false
 ) {
-    /** `← →` trocam a janela (e pedem releitura), `↑ ↓` a trilha. */
-    fun reduce(key: TuiKey, rowCount: Int): Pair<TuiHistoryState, List<TuiEffect>>? =
-        when (key) {
-            TuiKey.Up -> copy(selected = (selected - 1).coerceAtLeast(0)) to emptyList()
-            TuiKey.Down -> copy(selected = (selected + 1).coerceAtMost((rowCount - 1).coerceAtLeast(0))) to emptyList()
+    /**
+     * `↑ ↓` andam pelas janelas de todas as cotas, pulando cota sem janela; `enter` abre o
+     * gráfico e `esc` fecha. `← →` trocam o período (e pedem releitura) só com a tabela.
+     */
+    fun reduce(key: TuiKey, windowCounts: List<Int>): Pair<TuiHistoryState, List<TuiEffect>>? {
+        val positions = positions(windowCounts)
+        val current = resolve(windowCounts)
+        return when (key) {
+            TuiKey.Up, TuiKey.Down -> {
+                current ?: return null
+                val index = positions.indexOf(current) + if (key == TuiKey.Up) -1 else 1
+                val (row, window) = positions[index.coerceIn(0, positions.lastIndex)]
+                copy(row = row, window = window) to emptyList()
+            }
+            TuiKey.Enter -> if (chartOpen || current == null) null else copy(row = current.first, window = current.second, chartOpen = true) to emptyList()
+            TuiKey.Escape -> if (chartOpen) copy(chartOpen = false) to emptyList() else null
             TuiKey.Left, TuiKey.Right -> {
+                if (chartOpen) {
+                    return null
+                }
                 val step = if (key == TuiKey.Left) -1 else 1
                 val next = RANGES[(RANGES.indexOf(range) + step).coerceIn(0, RANGES.lastIndex)]
-                if (next == range) null else copy(range = next) to listOf(TuiEffect.Refresh)
+                // O período novo tem outras janelas: a escolha volta para a mais nova da mesma cota.
+                if (next == range) null else copy(range = next, window = 0) to listOf(TuiEffect.Refresh)
             }
             else -> null
         }
+    }
+
+    /**
+     * A janela que a escolha aponta, como `(cota, janela)`: a própria quando existe; senão a mais
+     * nova da primeira cota com janela a partir de [row], ou a última da lista. `null` sem janela.
+     */
+    fun resolve(windowCounts: List<Int>): Pair<Int, Int>? {
+        val positions = positions(windowCounts)
+        if (positions.isEmpty()) {
+            return null
+        }
+        val count = windowCounts.getOrNull(row) ?: 0
+        if (window in 0 until count) {
+            return row to window
+        }
+        return positions.firstOrNull { (candidate, _) -> candidate >= row } ?: positions.last()
+    }
 
     companion object {
-        /** As três janelas da aba, na ordem das setas. O "Total" do app não cabe numa trilha. */
+        /** Os três períodos da aba, na ordem das setas. O "Total" do app não cabe numa tabela de janelas. */
         val RANGES: List<HistoryRange> = listOf(HistoryRange.LAST_24_HOURS, HistoryRange.LAST_7_DAYS, HistoryRange.LAST_30_DAYS)
 
-        /** Células por janela: meia hora em 24 h, 3 h em 7 dias, 12 h em 30 dias. */
-        fun cellCount(range: HistoryRange): Int =
-            when (range) {
-                HistoryRange.LAST_7_DAYS -> 56
-                HistoryRange.LAST_30_DAYS -> 60
-                else -> 48
-            }
+        /** Janelas por cota na tabela; as mais velhas viram uma linha "+N janelas". */
+        const val MAX_WINDOWS = 8
+
+        /** Toda janela listada, cota por cota, na ordem da tela. */
+        private fun positions(windowCounts: List<Int>): List<Pair<Int, Int>> =
+            windowCounts.flatMapIndexed { row, count -> (0 until count).map { window -> row to window } }
     }
 }

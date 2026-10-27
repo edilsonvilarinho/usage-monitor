@@ -2,7 +2,7 @@
 
 ## Ponto de situação
 
-**Estado atual:** `Em execução (2026-10-27, Windows 11) — A00 a A03 concluídas e verificadas; A04, A06 e A05 por fazer.`
+**Estado atual:** `Em execução (2026-10-27, Windows 11) — A00 a A04 concluídas; A06 e A05 por fazer.`
 
 | Campo | Valor |
 | --- | --- |
@@ -60,6 +60,7 @@
 | A02 | 2026-10-23 | concluída | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest` (Linux): 3 273 testes, 0 falhas (a primeira passada falhou em 2: o teto de `== AppLanguage.PT` caiu para 706 e foi baixado; o teste de tela achava duas diagonais, uma por janela). `generateHelpMedia -PhelpMediaTopic=session-analysis` (26 quadros); quadros do GIF e captura da tela inteira conferidos — o ponto ficava na leitura antiga quando o percentual andava (o caminho agora termina na leitura de agora) e "1 pontos" virou singular; a frase e a projeção seguem o veredito do card (`projectedAtReset`) |
 | A03 | 2026-10-27 | concluída, **verificação pendente** | `./gradlew -Dorg.gradle.java.home=<jdk17> desktopTest` (Linux): 3 275 testes, 1 falha (`HistoryAdequacyTest` › `expanded window readings remain complete in narrow modal`: a 320dp o botão do menu "Janela: … ▾" corta o rótulo). O teste foi ajustado para conferir a descrição do menu e a linha de fatos da janela (que quebra), **sem nova passada** — a sessão parou aqui. Antes: 2 testes de tela que liam o detalhe antigo (S9) foram atualizados. Captura de 5h e 7d lado a lado conferida. Desvio da galeria: chips viraram o menu de janelas (design system: chip liga/desliga restrição) |
 | A03 | 2026-10-27 | verificação concluída | `gradlew.bat allTests` (Windows 11): 3 275 testes, 1 falha — o mesmo `HistoryAdequacyTest` › `expanded window readings remain complete in narrow modal`, agora com `Expected exactly '1' node but found '2'` na tag `historyWindowMenu`: com 5h e 7d lado a lado há um menu por série. O teste passa a conferir os dois menus (`assertCountEquals(2)`) e ler o primeiro, o da série `first()`; `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HistoryAdequacyTest" --tests "com.usagemonitor.ui.HistoryLayoutRegressionTest"`: 12 testes, 0 falhas |
+| A04 | 2026-10-27 | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.terminal.*" --tests "com.usagemonitor.terminal.*" --tests "com.usagemonitor.architecture.*"` (Windows 11): 288 testes, 0 falhas. A primeira passada do `TuiHistoryViewTest` falhou em 3 asserções escritas antes da saída real (barra de 91% em 10 células é 9 cheias pelo piso; as colunas antes da 1ª leitura ficam vazias; a coluna que começa agora tem a leitura de agora) — corrigidas as expectativas, não o código. Tela despejada em PT/EN, Unicode/ASCII, 96 e 80 colunas: a 80 o "parado" cortava no meio e passou a sair inteiro. `generateTerminalMedia`: 55 quadros por idioma (a aba 3 abre o gráfico no GIF). Protótipo 3.3 e 3.3b conferidos pelo script da página no Node (o Chrome headless não gerou DOM nesta máquina). Desvio: a frase do gráfico usa "pp atrás/à frente do tempo" (AI5) em vez de "abaixo da linha", porque o terminal não desenha a diagonal |
 
 ## Problemas em aberto e riscos
 

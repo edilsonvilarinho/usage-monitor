@@ -70,6 +70,9 @@ private class TerminalMediaStoryboard(private val language: AppLanguage) {
         press(TuiKey.Down, 1_300)
         press(TuiKey.Text('2'), 2_400)
         press(TuiKey.Text('3'), 2_200)
+        // A tabela de janelas e, no `enter`, o gráfico alto da janela aberta (#463).
+        press(TuiKey.Enter, 2_600)
+        press(TuiKey.Escape, 300)
         press(TuiKey.Text('4'), 2_200)
         press(TuiKey.Text('5'), 900)
         press(TuiKey.Down, 350)

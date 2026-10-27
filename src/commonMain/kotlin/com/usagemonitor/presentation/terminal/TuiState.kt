@@ -11,7 +11,7 @@ data class TuiState(
     val overview: TuiListState = TuiListState(),
     /** O corte e a sessão da aba 2. */
     val sessions: TuiSessionsState = TuiSessionsState(),
-    /** A janela e a trilha da aba 3. */
+    /** O período, a janela escolhida e o gráfico aberto da aba 3. */
     val history: TuiHistoryState = TuiHistoryState(),
     /** A conta do time e a pessoa da aba 4. */
     val team: TuiTeamState = TuiTeamState(),
@@ -36,9 +36,9 @@ data class TuiContext(
     /** Quantas sessões a aba 2 lista, e quantos turnos tem a aberta. */
     val sessionCount: Int = 0,
     val turnCount: Int = 0,
-    /** Quantas trilhas a aba 3 mostra. */
-    val historyRowCount: Int = 0,
-    /** A primeira trilha de cada conta da aba 1 na aba 3; `null` para conta sem percentual. */
+    /** Quantas janelas a aba 3 lista em cada cota, na ordem da tela. */
+    val historyWindowCounts: List<Int> = emptyList(),
+    /** A primeira cota de cada conta da aba 1 na aba 3; `null` para conta sem percentual. */
     val historyRowOfAccount: List<Int?> = emptyList(),
     /** Quantas pessoas a aba 4 lista, e em quantas contas do time `t` anda. */
     val teamMemberCount: Int = 0,
@@ -86,13 +86,13 @@ object TuiReducer {
             TuiTab.OVERVIEW -> openHistory(state, key, context)
                 ?: state.overview.reduce(key, context.accountCount, context.stacked)?.let { overview -> TuiStep(state.copy(overview = overview)) }
             TuiTab.SESSIONS -> state.sessions.reduce(key, context.sessionCount, context.turnCount)?.let { (sessions, effects) -> TuiStep(state.copy(sessions = sessions), effects) }
-            TuiTab.HISTORY -> state.history.reduce(key, context.historyRowCount)?.let { (history, effects) -> TuiStep(state.copy(history = history), effects) }
+            TuiTab.HISTORY -> state.history.reduce(key, context.historyWindowCounts)?.let { (history, effects) -> TuiStep(state.copy(history = history), effects) }
             TuiTab.TEAM -> state.team.reduce(key, context.teamMemberCount, context.teamAccountCount)?.let { (team, effects) -> TuiStep(state.copy(team = team), effects) }
             TuiTab.SETTINGS -> state.settings.reduce(key, context.settingsSections)?.let { (settings, effects) -> TuiStep(state.copy(settings = settings), effects) }
         }
 
     /**
-     * `enter` na aba 1, lado a lado: abre o histórico da conta, na primeira trilha dela.
+     * `enter` na aba 1, lado a lado: abre o histórico da conta, na janela mais nova da primeira cota dela.
      * Empilhado, o `enter` é o do detalhe, e quem decide é a lista.
      */
     private fun openHistory(state: TuiState, key: TuiKey, context: TuiContext): TuiStep? {
@@ -100,7 +100,7 @@ object TuiReducer {
             return null
         }
         val row = context.historyRowOfAccount.getOrNull(state.overview.selected) ?: return null
-        return TuiStep(state.copy(tab = TuiTab.HISTORY, history = state.history.copy(selected = row)), listOf(TuiEffect.Refresh))
+        return TuiStep(state.copy(tab = TuiTab.HISTORY, history = state.history.copy(row = row, window = 0, chartOpen = false)), listOf(TuiEffect.Refresh))
     }
 
     private fun reduceHelp(state: TuiState, key: TuiKey): TuiStep =
