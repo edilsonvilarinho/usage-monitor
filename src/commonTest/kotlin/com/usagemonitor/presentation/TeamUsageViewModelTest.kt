@@ -1,6 +1,13 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.presentation.viewmodel.UsageExportWriter
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
+import com.usagemonitor.presentation.ui.UsageExportRequest
+import com.usagemonitor.presentation.ui.UsageExportPayload
+import com.usagemonitor.domain.usecase.GetTeamUsageTrendUseCase
+import com.usagemonitor.domain.entity.TeamTrendRow
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
@@ -101,8 +108,11 @@ private class FakeTeamRepository(
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
 
+    /** `success(null)` é servidor sem a rota de tendência. */
+    var trendResult: Result<TeamUsageTrendData?> = Result.success(null)
+
     override suspend fun fetchTrend(accountKey: String, days: Int): Result<TeamUsageTrendData?> {
-        return Result.success(null)
+        return trendResult
     }
 }
 
@@ -898,7 +908,9 @@ class TeamUsageViewModelTest {
         // O corte da janela é resolvido dentro do caso de uso; separá-lo do
         // relógio do carimbo permite mover o tempo só onde interessa.
         useCaseClock: Clock = TeamFixedClock(TEAM_FIXED_NOW),
-        adminRepository: FakeAdminOverviewRepository? = null
+        adminRepository: FakeAdminOverviewRepository? = null,
+        withTrend: Boolean = false,
+        exportWriter: UsageExportWriter? = null
     ): TeamUsageViewModel {
         return TeamUsageViewModel(
             getTeamUsage = GetTeamUsageUseCase(repository, useCaseClock),
@@ -915,10 +927,132 @@ class TeamUsageViewModelTest {
             removeAdminTeamSession = adminRepository?.let { admin ->
                 RemoveAdminTeamSessionUseCase(admin)
             },
+            getTeamUsageTrend = if (withTrend) GetTeamUsageTrendUseCase(repository, useCaseClock) else null,
+            exportWriter = exportWriter,
             dispatcher = UnconfinedTestDispatcher(testScheduler),
             liveIntervalMillis = TEAM_LIVE_INTERVAL_MILLIS,
             clock = TeamFixedClock(TEAM_FIXED_NOW)
         )
+    }
+
+    @Test
+    fun `a tendencia chega uma vez por abertura e entra no estado`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson", listOf(session("s1")))))
+        )
+        repository.trendResult = Result.success(
+            TeamUsageTrendData(
+                members = listOf(TeamMemberIdentity(deviceId = "device-1", alias = "edilson")),
+                rows = listOf(TeamTrendRow(deviceId = "device-1", dayStartMillis = TEAM_FIXED_NOW.toEpochMilliseconds(), turnCount = 3))
+            )
+        )
+        val viewModel = buildViewModel(repository, withTrend = true)
+
+        viewModel.openForAccount(ACCOUNT_KEY, "empresa@x.com")
+        runCurrent()
+
+        val trend = assertNotNull(assertIs<TeamUsageUiState.Success>(viewModel.uiState.value).trend)
+        assertEquals(listOf("edilson"), trend.members.map { it.alias })
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `falha da tendencia deixa o grafico de fora sem erro na tela`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson", listOf(session("s1")))))
+        )
+        repository.trendResult = Result.failure(IllegalStateException("offline"))
+        val viewModel = buildViewModel(repository, withTrend = true)
+
+        viewModel.openForAccount(ACCOUNT_KEY, "empresa@x.com")
+        runCurrent()
+
+        val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+        assertNull(state.trend)
+        assertEquals(listOf("edilson"), state.members.map { it.alias })
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `o relatorio pdf sai do estado da tela e publica o caminho`() = runTest {
+        val requests = mutableListOf<UsageExportRequest>()
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson", listOf(session("s1")))))
+        )
+        val viewModel = buildViewModel(repository, exportWriter = { request -> requests += request; "C:/relatorio.pdf" })
+        viewModel.openForAccount(ACCOUNT_KEY, "empresa@x.com")
+        runCurrent()
+        val fetchesBefore = repository.fetchCalls
+
+        viewModel.exportReport(AppLanguage.PT)
+        runCurrent()
+
+        assertEquals(1, requests.size)
+        assertIs<UsageExportPayload.Report>(requests.single().payload)
+        assertTrue(requests.single().suggestedFileName.startsWith("usage-monitor-report-5h-"))
+        // Não recarrega: o resumo do time já está no estado.
+        assertEquals(fetchesBefore, repository.fetchCalls)
+        assertEquals(
+            CliExportOutcome.Saved("C:/relatorio.pdf"),
+            assertIs<TeamUsageUiState.Success>(viewModel.uiState.value).exportOutcome
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `falha ao gravar o relatorio vira resultado de erro`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson", listOf(session("s1")))))
+        )
+        val viewModel = buildViewModel(repository, exportWriter = { error("disco cheio") })
+        viewModel.openForAccount(ACCOUNT_KEY, "empresa@x.com")
+        runCurrent()
+
+        viewModel.exportReport(AppLanguage.EN)
+        runCurrent()
+
+        assertEquals(
+            CliExportOutcome.Failed("disco cheio"),
+            assertIs<TeamUsageUiState.Success>(viewModel.uiState.value).exportOutcome
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `sem gravador o relatorio nao faz nada`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson", listOf(session("s1")))))
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, "empresa@x.com")
+        runCurrent()
+
+        viewModel.exportReport(AppLanguage.PT)
+        runCurrent()
+
+        assertNull(assertIs<TeamUsageUiState.Success>(viewModel.uiState.value).exportOutcome)
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `janela de quota nova recarrega o 5h e a repetida nao`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", "edilson", listOf(session("s1")))))
+        )
+        val viewModel = buildViewModel(repository)
+        viewModel.openForAccount(ACCOUNT_KEY, "empresa@x.com")
+        runCurrent()
+        val windows = CliQuotaWindows(fiveHourEndsAt = TEAM_FIXED_NOW + 2.minutes)
+
+        viewModel.setQuotaWindows(windows)
+        runCurrent()
+        val afterFirst = repository.fetchCalls
+        viewModel.setQuotaWindows(windows)
+        runCurrent()
+
+        assertEquals(afterFirst, repository.fetchCalls)
+        assertTrue(afterFirst >= 2)
+        viewModel.onDestroy()
     }
 
     @Test
