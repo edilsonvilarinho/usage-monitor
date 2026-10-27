@@ -38,6 +38,11 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
   `MainKt`, com o motivo no `build.gradle.kts` e linha em "O que a suíte não cobre" do relatório. Exclusão é a
   última onda e é medida antes: nenhuma entra para fechar a conta.
 
+- **Código de produção sem chamador de produção** (achado da onda 4, 2026-10-27): `DashboardScreen.kt` (104 linhas
+  descobertas) e `ResponsiveDashboardCardGrid.kt` (55) só são chamados por testes e pelo gerador de capturas — o
+  CLAUDE.md já registra que o `DashboardScreen` "só existe para testes e capturas". Cobri-los não protege o produto.
+  Decisão adiada para a onda 6, com medição: exclusão nominal no Kover (como `MainKt`) ou mudança para `desktopTest`.
+
 ## Ondas (uma PR cada)
 
 | Onda | Escopo | Linhas descobertas no escopo |
@@ -89,3 +94,4 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | W4-A01 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.DashboardWarningsLanguageTest"`: 4 testes, 0 falhas (12 banners com título em inglês e português distintos e o mesmo botão nos dois idiomas, retry universal só na conectividade, prazo do 429 em inglês, falha comum sem banner). |
 | W4-A02 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.TeamKeysAdminScreenTest"`: 13 testes, 0 falhas (+4: renomear salva e cancelar descarta, chave revogada marcada e sem novo "Revogar", falha de leitura com retry, rótulos em inglês). |
 | W4-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ApiUsageCardTextsTest"`: 5 testes, 0 falhas (reset em inglês por janela, reset curto omitido sem dado, risco e explicações, tooltip por unidade, símbolos de moeda). |
+| Onda 3 | 2026-10-27 | este commit | PR #480 (merge `05e2aefa`) | Run `40574945536`: `ci-ok` verde, 0 incidências; `Coverage floor` executou `koverVerify` com piso 86. |
