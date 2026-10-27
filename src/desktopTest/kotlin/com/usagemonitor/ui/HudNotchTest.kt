@@ -152,7 +152,7 @@ class HudNotchTest {
         account(
             "INFORMATA2", "Crítico", AppTone.CRITICAL,
             HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = "22h59", hasForecast = true, title = "Sessão 5h", usedLeft = HudUsedLeft("28% usado", "72% restante"), periodType = PeriodType.INTERVAL),
-            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "Ter 21h00", hasForecast = true, title = "Semanal", usedLeft = HudUsedLeft("9% usado", "91% restante"), periodType = PeriodType.WEEKLY)
+            HudQuota("7d", "9%", 0.09f, AppTone.CRITICAL, resetText = "27/10 21h00", hasForecast = true, title = "Semanal", usedLeft = HudUsedLeft("9% usado", "91% restante"), periodType = PeriodType.WEEKLY)
         ).copy(
             // O emoji da conta (#287) no fixture principal: o teste de geometria
             // que percorre as quatro bordas afirma que o selo não muda o notch
@@ -259,7 +259,7 @@ class HudNotchTest {
         // O plano no rodapé, e o reinício de cada cota com a palavra.
         onNodeWithText("Max 20x").assertIsDisplayed()
         onNodeWithText("Reinicia 22h59").assertIsDisplayed()
-        onNodeWithText("Reinicia Ter 21h00").assertIsDisplayed()
+        onNodeWithText("Reinicia 27/10 21h00").assertIsDisplayed()
         // F10 adaptado: o usado e o restante em dois textos, lidos como uma linha só.
         onNodeWithContentDescription("28% usado · 72% restante").assertIsDisplayed()
         onNodeWithText("DeepSeek").assertDoesNotExist()
@@ -1465,8 +1465,8 @@ class HudNotchTest {
         val grouped = account(
             "Antigravity", "Normal", AppTone.OK,
             HudQuota("5h", "12%", 0.12f, AppTone.OK, resetText = "18h00", hasForecast = false, title = "Sessão 5h", periodType = PeriodType.INTERVAL),
-            HudQuota("7d", "40%", 0.4f, AppTone.OK, resetText = "Ter 21h00", hasForecast = false, title = "Gemini Pro", group = "Modelos Gemini", periodType = PeriodType.WEEKLY),
-            HudQuota("7d", "8%", 0.08f, AppTone.OK, resetText = "Ter 21h00", hasForecast = false, title = "Gemini Flash", group = "Modelos Gemini", periodType = PeriodType.WEEKLY)
+            HudQuota("7d", "40%", 0.4f, AppTone.OK, resetText = "27/10 21h00", hasForecast = false, title = "Gemini Pro", group = "Modelos Gemini", periodType = PeriodType.WEEKLY),
+            HudQuota("7d", "8%", 0.08f, AppTone.OK, resetText = "27/10 21h00", hasForecast = false, title = "Gemini Flash", group = "Modelos Gemini", periodType = PeriodType.WEEKLY)
         )
         setContent {
             AppTheme(isDark = true) {

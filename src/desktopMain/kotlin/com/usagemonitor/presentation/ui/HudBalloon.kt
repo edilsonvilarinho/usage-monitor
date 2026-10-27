@@ -614,6 +614,6 @@ private fun HudRingLegendGlyph(position: Int, count: Int) {
 }
 
 // 14dp: com três anéis em 12 o de dentro sobrava com 0,75dp de raio, um ponto.
-private val RING_LEGEND_SIZE = 14.dp
+internal val RING_LEGEND_SIZE = 14.dp
 private val RING_LEGEND_STROKE = 1.5.dp
 private val RING_LEGEND_GAP = 0.75.dp

@@ -69,7 +69,10 @@ linhas que ele substituiu. `HudEdge` é enum novo.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
-  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189), barra e,
+  título e estado; por cota o título do card ("Sessão 5h") e "Reinicia 22h59" (#189) — semanal e
+  mensal com a data no lugar do dia da semana, "Reinicia 27/10 21h00" (#474: "Qui 15h47" na mensal era
+  qualquer quinta do mês; dia, data e hora juntos deixavam 33dp para o título na caixa de grupo, e
+  "Mensal" mede 43dp, `HudNotchTextFitTest`) —, barra e,
   desde o F10, **"32% restante"** à esquerda na cor do texto e **"68% usado"** à direita, apagado
   (`HudUsedLeft` por `hudUsedLeft`: usado truncado como o anel, restante derivado do usado exibido,
   "<1%" nas duas pontas, nada para saldo e atividade observada; para o leitor de tela a linha continua
