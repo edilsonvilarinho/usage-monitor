@@ -45,7 +45,7 @@ qualquer quinta das próximas quatro. A issue pede a data nessas duas janelas.
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
 |---|---|---|---|---|
 | A01 | 2026-10-27 | `c2f08846` | concluída | `git worktree add -b fix/hud-reset-date-474 ../usage-monitor-474 origin/main`. Leitura de `resetShortLabel`, `HudModel.kt`, `HudBalloon.kt`. Sem código. |
-| A02 | 2026-10-27 | este commit | concluída localmente | 1ª rodada com dia+data+hora: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTextFitTest"` falhou em todas as escalas ("Mensal" 43dp > 33dp de sobra) — formato trocado para data no lugar do dia. 2ª rodada: `desktopTest --tests "*ApiUsageCardFormattingTest" --tests "*HudNotchTextFitTest"` exit 0. `gradlew.bat allTests`: exit 0, 3296 testes, 0 falhas. `build-test-report.mjs`: 17 regras de arquitetura ok, 3296 `@Test` declarados = executados; servidor não medido (sem mudança em `server/`). Windows 11; sem mudança em host de janela. |
+| A02 | 2026-10-27 | `9fa6a8ad` | concluída: PR #475, run `40553425679` verde (`desktop-windows`, `desktop-linux`, `pricing-parity`, `test-report`; `ci-ok` verde), 0 incidências | 1ª rodada com dia+data+hora: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTextFitTest"` falhou em todas as escalas ("Mensal" 43dp > 33dp de sobra) — formato trocado para data no lugar do dia. 2ª rodada: `desktopTest --tests "*ApiUsageCardFormattingTest" --tests "*HudNotchTextFitTest"` exit 0. `gradlew.bat allTests`: exit 0, 3296 testes, 0 falhas. `build-test-report.mjs`: 17 regras de arquitetura ok, 3296 `@Test` declarados = executados; servidor não medido (sem mudança em `server/`). Windows 11; sem mudança em host de janela. |
 
 ## Riscos
 
