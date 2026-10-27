@@ -3,6 +3,7 @@ package com.usagemonitor.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
@@ -20,10 +22,12 @@ import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.presentation.ui.COMPARISON_TABLE_TAG
 import com.usagemonitor.presentation.ui.ComparisonContent
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.ComparisonUiState
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Instant
 
 private val READ_AT = Instant.parse("2026-10-06T14:42:00Z")
@@ -62,5 +66,45 @@ class ComparisonScreenTest {
         // Evidência visual do mapa de calor para a revisão do plano (#386).
         val output = File("build/issue386-screenshots").also { it.mkdirs() }
         ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(output, "comparison-heatmap.png"))
+    }
+    @Test
+    fun `loading and error states, with retry`() = runDesktopComposeUiTest {
+        var retries = 0
+        val state = mutableStateOf<ComparisonUiState>(ComparisonUiState.Loading)
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.width(1000.dp).height(620.dp)) {
+                    ComparisonContent(state.value, AppLanguage.EN, onSelectRange = {}, onExportReport = {}, onRetry = { retries += 1 })
+                }
+            }
+        }
+
+        onNodeWithText("Reading local usage…").assertExists()
+        state.value = ComparisonUiState.Error("índice ilegível")
+        waitForIdle()
+        onNodeWithText("índice ilegível").assertIsDisplayed()
+        onNodeWithText("Retry").performClick()
+
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun `empty range and export outcome`() = runDesktopComposeUiTest {
+        val state = mutableStateOf<ComparisonUiState>(
+            ComparisonUiState.Success(emptyList(), CliSessionRange.LAST_7D, READ_AT, exportOutcome = CliExportOutcome.Saved("C:/comparacao.pdf"))
+        )
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.width(1000.dp).height(620.dp)) {
+                    ComparisonContent(state.value, AppLanguage.PT, onSelectRange = {}, onExportReport = {}, onRetry = {})
+                }
+            }
+        }
+
+        onNodeWithText("Nenhum uso no recorte.").assertIsDisplayed()
+        onNodeWithText("C:/comparacao.pdf").assertIsDisplayed()
+        state.value = ComparisonUiState.Success(ROWS, CliSessionRange.LAST_7D, READ_AT, exportOutcome = CliExportOutcome.Failed("disco cheio"))
+        waitForIdle()
+        onNodeWithText("disco cheio").assertIsDisplayed()
     }
 }
