@@ -43,6 +43,15 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
   CLAUDE.md já registra que o `DashboardScreen` "só existe para testes e capturas". Cobri-los não protege o produto.
   Decisão adiada para a onda 6, com medição: exclusão nominal no Kover (como `MainKt`) ou mudança para `desktopTest`.
 
+- **Rota escolhida pelo dono (2026-10-27): híbrido.** Lógica de decisão das janelas e hosts sai para função pura
+  testada (precedente `hudHitRegionMode`) e host com lógica real ganha costura. Exclusão do Kover só por **lista
+  nominal com motivo** no `build.gradle.kts` (como `MainKt`), e só para cola fina: `AppGraph`, `AppViewModels`,
+  chamada direta a AWT/JNA sem decisão, e código de produção que só teste chama. O relatório lista o excluído em
+  "O que a suíte não cobre".
+- **Conta medida antes de excluir** (`build/cov/excl.py` sobre o relatório da onda 5): mesmo excluindo todo arquivo que
+  importa janela, `AppGraph`, `AppViewModels` e o código só-teste, o Kotlin iria a **90,8%** — 1 790 linhas abaixo de
+  95%. Exclusão não fecha a meta: o resto vem de teste.
+
 ## Ondas (uma PR cada)
 
 | Onda | Escopo | Linhas descobertas no escopo |
@@ -112,3 +121,7 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | Onda 4 | 2026-10-27 | este commit | PR #481 (merge `18e97d51`) | Run `40576390227`: `ci-ok` verde, 0 incidências; `Coverage floor` executou `koverVerify` com piso 86. |
 | W5-A06 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.UsageAlertMessagesTest"`: 9 testes, 0 falhas (+2: limiar de 100% diz "esgotada" e reset só quando conhecido; lembrete de reinício em inglês e português). |
 | W5-A07 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **87,2%** (40 363/46 309; antes 86,8%), ramos 62,1%. Restam 5 946 linhas descobertas (teto para 95%: 2 315): `desktopMain` 2 778, janela 1 661, `commonMain` 1 326, só-teste 159, gerado 22. Piso do Kotlin: 87. |
+| Onda 5 | 2026-10-27 | este commit | PR #482 (merge `6140a0ee`) | Run `40577863115`: `ci-ok` verde, 0 incidências; `Coverage floor` executou `koverVerify` com piso 87. |
+| W6-A01 | 2026-10-27 | este commit | concluída | Exclusão nominal aprovada pelo dono (rota híbrida): `AppGraph`, `AppViewModels`, `DashboardScreenKt`, `ResponsiveDashboardCardGridKt` (+ lambdas e `ComposableSingletons`). `codexProfileSources` (`AppGraphKt`) e 3 classes privadas da grade seguem contadas. `gradlew.bat koverXmlReport -Pcoverage` sobre a passada da onda 5: **87,7%** (40 003/45 617; antes 87,2%). Relatório lista os excluídos em "O que a suíte não cobre". |
+| W6-A02 | 2026-10-27 | este commit | concluída | As 4 cópias de `*WindowPreferences.kt` (671 linhas, ~230 descobertas) viram `WindowGeometryPreferences.kt` (uma implementação, `WindowGeometrySpec` por janela, chaves gravadas idênticas) e o `PersistAppWindowStates` perde os 4 blocos repetidos. `gradlew.bat desktopTest --tests WindowGeometryPreferencesTest --tests ArchitectureRulesTest --tests TeamPresenceScreenTest`: 8 + 17 + 31 testes, 0 falhas. Chaves e tamanhos padrão travados por teste. Testado só no Windows; o comportamento de janela não muda (só a persistência foi unificada). |
+| W6-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4` + `koverXmlReport koverVerify`: 0 falhas; Kotlin **88,1%** (39 955/45 362; antes 87,2%), ramos 62,9%. Restam 5 407 descobertas (teto para 95%: 2 268): `desktopMain` 2 598, janela 1 453, `commonMain` 1 327. Piso do Kotlin: 88. |
