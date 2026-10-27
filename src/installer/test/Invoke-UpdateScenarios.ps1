@@ -447,6 +447,13 @@ function Set-UserPathRaw {
     }
 }
 
+# Desfecho que o instalador gravou no install.log (#464): ultima linha `User PATH: ...`.
+function Get-UserPathOutcome {
+    param([string] $TargetDirectory)
+    $line = Get-Content (Join-Path $TargetDirectory 'install.log') | Where-Object { $_ -like 'User PATH: *' } | Select-Object -Last 1
+    return [string]$line
+}
+
 function Invoke-Uninstaller {
     param([string] $TargetDirectory)
     $process = Start-Process -FilePath (Join-Path $TargetDirectory 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
@@ -491,6 +498,7 @@ Reset-Target -TargetDirectory $target
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'exit code' 0 $code
 Assert-UserPathExactly 'entradas intactas, pasta no fim' "$seeded;$target"
+Assert-Equal 'install.log diz que a pasta entrou' 'User PATH: added' (Get-UserPathOutcome $target)
 $code = Invoke-Uninstaller -TargetDirectory $target
 Assert-Equal 'exit code da desinstalacao' 0 $code
 Assert-UserPathExactly 'desinstalacao devolve o valor semeado' $seeded
@@ -506,6 +514,7 @@ Reset-Target -TargetDirectory $target
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'exit code' 0 $code
 Assert-UserPathExactly 'pasta no meio nao e duplicada' $seeded
+Assert-Equal 'install.log diz que a pasta ja estava' 'User PATH: already present' (Get-UserPathOutcome $target)
 $code = Invoke-Uninstaller -TargetDirectory $target
 Assert-Equal 'exit code da desinstalacao' 0 $code
 Assert-UserPathExactly 'desinstalacao tira a pasta do meio e preserva o resto' 'C:\scenario\a;C:\scenario\b;'
@@ -574,6 +583,7 @@ Reset-Target -TargetDirectory $target
 $code = Invoke-Installer -Setup $setupV1 -Arguments @('/S') -TargetDirectory $target
 Assert-Equal 'exit code' 0 $code
 Assert-UserPathExactly 'valor que passaria do teto nao e tocado' $overflows
+Assert-Equal 'install.log diz por que a pasta nao entrou' 'User PATH: unchanged (over 32767 characters)' (Get-UserPathOutcome $target)
 
 # ------------------------------------------------------------------ S14
 

@@ -77,6 +77,9 @@ Var UpdatePid         ; pid do processo que esta saindo; so vai para o recibo
 Var UpdateStaging     ; $INSTDIR.new -- arvore nova antes da troca
 Var UpdateBackup      ; $INSTDIR.old -- instalacao anterior durante a troca
 Var PreviousVersion   ; DisplayVersion lido antes de o registro ser sobrescrito
+; Desfecho do PATH do usuario para o install.log (#464): o DetailPrint nao fica
+; em lugar nenhum, e o relato chegou com um log que nao dizia por que faltou a entrada.
+Var UserPathOutcome
 
 ; Parametrizavel pela mesma razao de APP_FILES_DIR, e com um motivo mais forte: a
 ; chave HKCU de desinstalacao, o atalho do Menu Iniciar e o do desktop derivam
@@ -547,12 +550,14 @@ FunctionEnd
 Function AddInstallDirToUserPath
     Call ReadUserPath
     ${If} $R6 == "unsafe"
+        StrCpy $UserPathOutcome "unchanged (unreadable)"
         DetailPrint "PATH do usuario ilegivel: nao alterado."
         Return
     ${EndIf}
     ${If} $R6 == "missing"
         WriteRegExpandStr HKCU "Environment" "Path" $INSTDIR
         !insertmacro BROADCAST_ENVIRONMENT_CHANGE
+        StrCpy $UserPathOutcome "added"
         DetailPrint "Pasta de instalacao adicionada ao PATH do usuario."
         Return
     ${EndIf}
@@ -560,6 +565,7 @@ Function AddInstallDirToUserPath
     Call UserPathWithoutInstallDir
     ${If} $R5 > 0
         System::Free $R7
+        StrCpy $UserPathOutcome "already present"
         DetailPrint "PATH do usuario ja contem a pasta de instalacao."
         Return
     ${EndIf}
@@ -570,6 +576,7 @@ Function AddInstallDirToUserPath
     IntOp $R3 $R3 + 1
     ${If} $R3 > ${USER_PATH_MAX_CHARS}
         System::Free $R7
+        StrCpy $UserPathOutcome "unchanged (over 32767 characters)"
         DetailPrint "PATH do usuario cheio: a pasta de instalacao nao foi adicionada."
         Return
     ${EndIf}
@@ -594,10 +601,12 @@ Function AddInstallDirToUserPath
     Call WriteUserPath
     System::Free $R7
     ${If} $R0 <> 0
+        StrCpy $UserPathOutcome "unchanged (write error $R0)"
         DetailPrint "PATH do usuario nao gravado (erro $R0)."
         Return
     ${EndIf}
     !insertmacro BROADCAST_ENVIRONMENT_CHANGE
+    StrCpy $UserPathOutcome "added"
     DetailPrint "Pasta de instalacao adicionada ao PATH do usuario."
 FunctionEnd
 
@@ -774,6 +783,7 @@ updateDone:
 
     ; Finalize log
     FileOpen $0 "${LOG_FILE}" a
+    FileWrite $0 "User PATH: $UserPathOutcome$\r$\n"
     FileWrite $0 "Installation completed successfully!$\r$\n"
     FileClose $0
 
