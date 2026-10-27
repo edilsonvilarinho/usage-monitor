@@ -262,7 +262,7 @@ tasks.withType<Test>().configureEach {
 }
 
 // Piso da catraca de cobertura de linhas do Kotlin. Meta: 95. Nunca desce.
-val coverageLineFloorPercent = 87
+val coverageLineFloorPercent = 88
 
 // O plugin do Kover estava aplicado desde sempre e NENHUMA tarefa de relatorio
 // era executada em lugar nenhum: o agente instrumentava toda passada de
