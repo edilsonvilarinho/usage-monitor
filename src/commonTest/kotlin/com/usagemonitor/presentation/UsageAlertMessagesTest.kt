@@ -110,6 +110,49 @@ class UsageAlertMessagesTest {
 
     /** O separador decimal vem do idioma, não do `Locale` da máquina que roda. */
     @Test
+    fun `threshold message says exhausted at 100 and names the reset only when known`() {
+        val periodEnd = Instant.parse("2026-10-30T18:30:00Z")
+        fun threshold(threshold: Int, actual: Int, knownReset: Boolean) = UsageAlert.QuotaThreshold(
+            target = UsageTargetKey.forSource(ApiSource.ANTHROPIC),
+            targetLabel = "Claude",
+            quotaLabel = "Claude 5h",
+            thresholdPercent = threshold,
+            actualPercent = actual,
+            periodEndAt = periodEnd,
+            hasKnownResetAt = knownReset
+        )
+
+        val exhaustedEn = usageAlertMessage(threshold(100, 100, knownReset = false), AppLanguage.EN)
+        val aboveEn = usageAlertMessage(threshold(75, 81, knownReset = true), AppLanguage.EN)
+        val exhaustedPt = usageAlertMessage(threshold(100, 100, knownReset = false), AppLanguage.PT)
+
+        assertEquals("Quota exhausted (100%).", exhaustedEn.body)
+        assertEquals("Cota esgotada (100%).", exhaustedPt.body)
+        assertTrue(aboveEn.body.startsWith("Usage at 81%, above the 75% threshold. Reset: "), aboveEn.body)
+        assertTrue(aboveEn.body.endsWith(" BRT."), aboveEn.body)
+    }
+
+    @Test
+    fun `reset reminder says how long is left and when work can resume`() {
+        val reminder = UsageAlert.ResetSoon(
+            target = UsageTargetKey.forSource(ApiSource.CODEX),
+            targetLabel = "Codex",
+            quotaLabel = "Codex 5h",
+            actualPercent = 92,
+            resetAt = Instant.parse("2026-10-27T18:00:00Z"),
+            minutesLeft = 15
+        )
+
+        val en = usageAlertMessage(reminder, AppLanguage.EN)
+        val pt = usageAlertMessage(reminder, AppLanguage.PT)
+
+        assertTrue(en.title.endsWith(" resets in 15 min"), en.title)
+        assertTrue(en.body.startsWith("At 92%. You can resume at "), en.body)
+        assertTrue(pt.title.endsWith(" reinicia em 15 min"), pt.title)
+        assertTrue(pt.body.startsWith("Está em 92%. Dá para retomar em "), pt.body)
+    }
+
+    @Test
     fun `the factor is formatted without depending on the jvm locale`() {
         assertTrue(usageAlertMessage(spike(factor = 2.55), AppLanguage.PT).body.contains("2,6×"))
         assertTrue(usageAlertMessage(spike(factor = 2.55), AppLanguage.EN).body.contains("2.6×"))
