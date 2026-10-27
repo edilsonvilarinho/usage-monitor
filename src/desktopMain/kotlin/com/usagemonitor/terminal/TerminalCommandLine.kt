@@ -34,6 +34,12 @@ internal sealed interface TerminalCommand {
 
     /** `alerts [--since <tempo>]`: o registro do que foi avisado (#440, 5.2). Sem `--since`, hoje. */
     data class Alerts(val since: Duration? = null) : Reading
+
+    /**
+     * `analysis [conta] [--json]` (#463, AI3): a corrida esgotar × reiniciar das contas com análise.
+     * [filter] é a fonte (`claude`, `codex`) ou o apelido da conta; sem ele, todas.
+     */
+    data class Analysis(val filter: String? = null, val json: Boolean = false) : Reading
 }
 
 internal object TerminalCommandNames {
@@ -55,9 +61,10 @@ internal object TerminalCommandNames {
     const val TODAY = "--today"
     const val WATCH = "--watch"
     const val INTERVAL = "--interval"
+    const val ANALYSIS = "analysis"
 
     /** Os nomes que fazem de um argumento solto um comando. */
-    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, ALERTS, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB, SetupCommandNames.SETUP, SetupCommandNames.UPDATE, TuiCommandNames.TUI)
+    val ALL: Set<String> = setOf(STATUS, CHECK, WAIT, STATUS_LINE, SERVICE, ALERTS, ANALYSIS, SourcesCommandNames.SOURCES, SettingCommandNames.CONFIG, KeysCommandNames.KEYS, AccountsCommandNames.ACCOUNTS, TelegramCommandNames.TELEGRAM, TeamCommandNames.TEAM, TeamCommandNames.WEB, SetupCommandNames.SETUP, SetupCommandNames.UPDATE, TuiCommandNames.TUI)
 
     /** Os alvos da linha de status. */
     val STATUS_LINE_TARGETS: List<String> = listOf(CLAUDE_CODE, TMUX)
@@ -81,6 +88,7 @@ internal fun parseTerminalCommand(name: String, arguments: List<String>): Termin
         TerminalCommandNames.STATUS_LINE -> parseStatusLine(arguments)
         TerminalCommandNames.SERVICE -> parseServiceCommand(arguments)
         TerminalCommandNames.ALERTS -> parseAlerts(arguments)
+        TerminalCommandNames.ANALYSIS -> parseAnalysis(arguments)
         SourcesCommandNames.SOURCES -> parseSourcesCommand(arguments)
         SettingCommandNames.CONFIG -> parseSettingCommand(arguments)
         KeysCommandNames.KEYS -> parseKeysCommand(arguments)
@@ -196,6 +204,19 @@ private fun parseAlerts(arguments: List<String>): TerminalCommandParse {
         }
     }
     return TerminalCommandParse.Parsed(TerminalCommand.Alerts(since))
+}
+
+private fun parseAnalysis(arguments: List<String>): TerminalCommandParse {
+    var filter: String? = null
+    var json = false
+    for (argument in arguments) {
+        when {
+            argument == TerminalCommandNames.JSON -> json = true
+            !argument.startsWith("-") && filter == null -> filter = argument
+            else -> return unknownOption(TerminalCommandNames.ANALYSIS, argument)
+        }
+    }
+    return TerminalCommandParse.Parsed(TerminalCommand.Analysis(filter, json))
 }
 
 private fun invalidMaxAge(): TerminalCommandParse =

@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.displayName
 import com.usagemonitor.presentation.terminal.TerminalAccount
 import com.usagemonitor.presentation.terminal.TuiAccount
 import com.usagemonitor.presentation.terminal.TuiActiveSession
+import com.usagemonitor.presentation.terminal.TuiAnalysis
 import com.usagemonitor.presentation.terminal.TuiData
 import com.usagemonitor.presentation.terminal.TuiHistory
 import com.usagemonitor.presentation.terminal.TuiHistoryRow
@@ -69,7 +70,8 @@ internal class TuiReader(
             sessions = if (state.tab == TuiTab.SESSIONS) sessionsReader?.load(state.sessions, reading.now) else null,
             history = if (state.tab == TuiTab.HISTORY) history(reading.accounts, state.history.range, reading.now) else null,
             team = if (state.tab == TuiTab.TEAM) team?.load(state.team, reading.now) else null,
-            settings = if (state.tab == TuiTab.SETTINGS) settings?.load(reading.language, glyphs) else null
+            settings = if (state.tab == TuiTab.SETTINGS) settings?.load(reading.language, glyphs) else null,
+            analysis = if (state.tab == TuiTab.ANALYSIS) analysis(reading.accounts, state.analysis.account, reading.now) else null
         )
     }
 
@@ -149,6 +151,14 @@ internal class TuiReader(
             }
         }
         return TuiHistory(range, rows)
+    }
+
+    /** A aba 6 (#463): as contas com análise e a análise da escolhida. Sem os bancos, sem análise. */
+    private fun analysis(accounts: List<TerminalAccount>, selected: Int, now: Instant): TuiAnalysis {
+        val eligible = TerminalAnalysisReader.eligible(accounts)
+        val index = selected.coerceIn(0, (eligible.size - 1).coerceAtLeast(0))
+        val chosen = eligible.getOrNull(index)
+        return TuiAnalysis(eligible, index, chosen?.let { account -> stores?.let { found -> TerminalAnalysisReader.read(account, found, now) } })
     }
 
     /** As últimas 24 h da primeira cota com percentual, em células de meia hora. */

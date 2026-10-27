@@ -17,6 +17,8 @@ data class TuiState(
     val team: TuiTeamState = TuiTeamState(),
     /** A seção, o campo e a edição da aba 5. */
     val settings: TuiSettingsState = TuiSettingsState(),
+    /** A conta e a rolagem da aba 6. */
+    val analysis: TuiAnalysisState = TuiAnalysisState(),
     /** O resultado da última ação (o CSV, uma mudança da aba 5), até a próxima tecla. */
     val notice: TuiNotice? = null
 ) {
@@ -44,7 +46,10 @@ data class TuiContext(
     val teamMemberCount: Int = 0,
     val teamAccountCount: Int = 0,
     /** As seções da aba 5, com os campos que a seleção visita. */
-    val settingsSections: List<TuiSettingsSection> = emptyList()
+    val settingsSections: List<TuiSettingsSection> = emptyList(),
+    /** Quantas contas a aba 6 percorre, e quantas linhas do corpo dela passam da tela. */
+    val analysisAccountCount: Int = 0,
+    val analysisScrollMax: Int = 0
 ) {
     /** As abas visíveis, na ordem e com o número fixo de cada uma. */
     val tabs: List<TuiTab>
@@ -55,7 +60,7 @@ data class TuiContext(
 data class TuiStep(val state: TuiState, val effects: List<TuiEffect> = emptyList())
 
 /**
- * As teclas comuns a todas as abas (`1–5 aba`, `r atualizar`, `? ajuda`, `q sair`) e a ajuda.
+ * As teclas comuns a todas as abas (`1–6 aba`, `r atualizar`, `? ajuda`, `q sair`) e a ajuda.
  * O que sobra vai para a aba ativa.
  */
 object TuiReducer {
@@ -89,6 +94,7 @@ object TuiReducer {
             TuiTab.HISTORY -> state.history.reduce(key, context.historyWindowCounts)?.let { (history, effects) -> TuiStep(state.copy(history = history), effects) }
             TuiTab.TEAM -> state.team.reduce(key, context.teamMemberCount, context.teamAccountCount)?.let { (team, effects) -> TuiStep(state.copy(team = team), effects) }
             TuiTab.SETTINGS -> state.settings.reduce(key, context.settingsSections)?.let { (settings, effects) -> TuiStep(state.copy(settings = settings), effects) }
+            TuiTab.ANALYSIS -> state.analysis.reduce(key, context.analysisAccountCount, context.analysisScrollMax)?.let { (analysis, effects) -> TuiStep(state.copy(analysis = analysis), effects) }
         }
 
     /**

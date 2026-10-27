@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 
 /** O corpo e os atalhos de uma aba; a moldura é a mesma para todas. */
@@ -22,7 +23,12 @@ internal object TuiScreen {
             historyRowOfAccount = data.historyRowOfAccount,
             teamMemberCount = data.team?.members?.size ?: 0,
             teamAccountCount = data.team?.accounts?.size ?: 0,
-            settingsSections = data.settings?.sections.orEmpty()
+            settingsSections = data.settings?.sections.orEmpty(),
+            analysisAccountCount = data.analysis?.accounts?.size ?: 0,
+            // A contagem de linhas não depende do idioma nem dos glifos: a rolagem sai do mesmo corpo.
+            analysisScrollMax = data.analysis?.let { analysis ->
+                TuiAnalysisView.scrollMax(TuiAnalysisView.body(analysis, data.now, size.bodyWidth - 1, TerminalAnalysisLabels(AppLanguage.PT), TerminalLabels(AppLanguage.PT), COUNTING_PROFILE).size, size)
+            } ?: 0
         )
 
     fun render(state: TuiState, data: TuiData, size: TuiSize, labels: TuiLabels, profile: TerminalProfile): List<TerminalLine> {
@@ -73,6 +79,7 @@ internal object TuiScreen {
             TuiTab.HISTORY -> TuiHistoryView.render(data.history, state.history, data.now, size, TuiHistoryLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.TEAM -> TuiTeamView.render(data.team, state.team, size, TuiTeamLabels(labels.language), TerminalLabels(labels.language), profile)
             TuiTab.SETTINGS -> TuiSettingsView.render(data.settings, state.settings, data.collector, size, TuiSettingsLabels(labels.language), profile)
+            TuiTab.ANALYSIS -> TuiAnalysisView.render(data.analysis, state.analysis, data.now, size, TerminalAnalysisLabels(labels.language), TerminalLabels(labels.language), profile)
         }
 
     /**
@@ -121,7 +128,7 @@ internal object TuiScreen {
 
     /**
      * Os atalhos que cabem inteiros em [width]: cortado no meio, o último par ("r atu") não diz
-     * nada. Saem primeiro `r` e `1–5` (a ajuda lista todos), depois os da aba pelo fim; `?` e
+     * nada. Saem primeiro `r` e `1–6` (a ajuda lista todos), depois os da aba pelo fim; `?` e
      * `q` ficam sempre.
      */
     internal fun fittingShortcuts(tab: List<TuiShortcut>, common: List<TuiShortcut>, width: Int): List<TuiShortcut> {
@@ -165,4 +172,7 @@ internal object TuiScreen {
     }
 
     private const val HELP_INNER_WIDTH = 60
+
+    /** Só para contar as linhas da aba 6: a contagem é a mesma em qualquer perfil. */
+    private val COUNTING_PROFILE = TerminalProfile(TerminalPalette.NONE, unicode = true)
 }

@@ -57,6 +57,16 @@ class TuiFrameTest {
     }
 
     @Test
+    fun `quando as seis abas nao cabem, as inativas ficam so com o numero`() {
+        // #463: em português a linha inteira tem 81 células, e a 80 colunas a aba 6 era cortada.
+        assertTrue(frame(TuiSize(96, 20))[1].plainText.contains("5 Configurações   6 Análise "))
+        val narrow = frame(TuiSize(80, 20))[1].plainText
+        assertTrue(narrow.startsWith("│ 1 Visão geral   2   3   4   5   6 "), narrow)
+        val active = TuiFrame.render(TuiSize(80, 20), allTabs, TuiTab.ANALYSIS, TerminalSpan(""), emptyList(), emptyList(), pt, color)[1].plainText
+        assertTrue(active.startsWith("│ 1   2   3   4   5   6 Análise "), active)
+    }
+
+    @Test
     fun `sem time a aba 4 some e as outras mantem o numero`() {
         val tabs = frame(TuiSize(96, 20), tabs = TuiContext(teamAvailable = false, stacked = false).tabs)[1].plainText
         assertTrue("4 Time" !in tabs)
@@ -75,7 +85,7 @@ class TuiFrameTest {
     @Test
     fun `rodape de atalhos tem a tecla em negrito e o rotulo em muted`() {
         val keys = frame(TuiSize(96, 20)).let { lines -> lines[lines.size - 2] }
-        assertTrue(keys.plainText.startsWith("│ 1–5 aba  r atualizar  ? ajuda  q sair"))
+        assertTrue(keys.plainText.startsWith("│ 1–6 aba  r atualizar  ? ajuda  q sair"))
         assertTrue(keys.spans.first { span -> span.text == "q" }.bold)
         assertEquals(TerminalColor.Muted, keys.spans.first { span -> span.text.contains("sair") }.color)
     }
@@ -144,9 +154,9 @@ class TuiFrameTest {
         val lines = TuiScreen.render(TuiState(helpOpen = true), data(), TuiSize(96, 24), pt, color)
         val text = lines.joinToString("\n") { line -> line.plainText }
         assertTrue("╭─ Ajuda ─" in text)
-        assertTrue("1 a 5    troca de aba        ↑ ↓      move a seleção" in text)
+        assertTrue("1 a 6    troca de aba        ↑ ↓      move a seleção" in text)
         assertTrue("q        sai                 espaço   liga e desliga" in text)
-        assertTrue("esc fecha a ajuda  1–5 aba" in text)
+        assertTrue("esc fecha a ajuda  1–6 aba" in text)
         assertTrue(lines.all { line -> line.width == 96 })
         val boxTop = lines.first { line -> "Ajuda" in line.plainText }.plainText
         assertEquals("│ " + " ".repeat(15) + "╭─ Ajuda ", boxTop.take(26))

@@ -60,7 +60,7 @@ class TuiOverviewViewTest {
         assertTrue(lines.any { line -> "Claude 7d  " in line && "74%  atenção" in line })
         assertTrue(lines.any { line -> "SESSÃO ATIVA  usage-monitor · opus-5-5 · 1h12 · \$9.40 · 38 tok/s" in line })
         assertTrue(lines.any { line -> "24 H          sem leitura nas últimas 24 h" in line })
-        assertTrue(lines[lines.size - 2].startsWith("│ ↑↓ fonte  enter abre a conta  1–5 aba"))
+        assertTrue(lines[lines.size - 2].startsWith("│ ↑↓ fonte  enter abre a conta  1–6 aba"))
     }
 
     @Test

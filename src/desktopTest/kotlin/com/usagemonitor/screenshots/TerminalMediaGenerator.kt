@@ -74,6 +74,12 @@ private class TerminalMediaStoryboard(private val language: AppLanguage) {
         press(TuiKey.Enter, 2_600)
         press(TuiKey.Escape, 300)
         press(TuiKey.Text('4'), 2_200)
+        // A aba 6 (#463): as janelas, a corrida esgotar × reiniciar e as 24 h.
+        press(TuiKey.Text('6'), 2_800)
+        press(TuiKey.Down, 250)
+        press(TuiKey.Down, 250)
+        press(TuiKey.Down, 250)
+        press(TuiKey.Down, 1_600)
         press(TuiKey.Text('5'), 900)
         press(TuiKey.Down, 350)
         press(TuiKey.Down, 600)

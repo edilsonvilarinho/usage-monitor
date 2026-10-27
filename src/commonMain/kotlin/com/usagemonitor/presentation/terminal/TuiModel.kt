@@ -4,13 +4,17 @@ package com.usagemonitor.presentation.terminal
  * As abas do modo interativo (`usage-monitor tui`, #441), numeradas e fixas: sem time
  * configurado, a aba 4 some e as outras **mantêm o número**, para o atalho não mudar de
  * tecla (`cli/readme.md`, "Abas").
+ *
+ * [ANALYSIS] (#463, AI2) é exceção declarada à regra "nenhum valor novo em enum", aprovada pelo
+ * dono (decisão U3 do plano): entra no **fim**, com o número 6, para nenhuma aba mudar de tecla.
  */
 enum class TuiTab(val number: Int) {
     OVERVIEW(1),
     SESSIONS(2),
     HISTORY(3),
     TEAM(4),
-    SETTINGS(5);
+    SETTINGS(5),
+    ANALYSIS(6);
 
     companion object {
         fun ofNumber(number: Int): TuiTab? = entries.firstOrNull { tab -> tab.number == number }

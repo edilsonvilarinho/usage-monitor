@@ -31,11 +31,15 @@ internal data class TerminalQuotaTime(
          */
         fun of(quota: UsageSnapshotQuota, now: Instant): TerminalQuotaTime? {
             val lengthMillis = quotaWindowLengthMillis(quota.label, quota.periodType) ?: return null
-            val resetsAt = quota.resetsAt?.takeIf { at -> at > now } ?: return null
-            val length = lengthMillis.milliseconds
-            val startsAt = resetsAt - length
-            val elapsed = (now - startsAt).coerceIn(Duration.ZERO, length)
-            return TerminalQuotaTime(startsAt, resetsAt, length, elapsed)
+            val resetsAt = quota.resetsAt ?: return null
+            return between(resetsAt - lengthMillis.milliseconds, resetsAt, now)
+        }
+
+        /** A janela que a análise já resolveu (`AnalysisWindowView.startsAt`/`resetsAt`). */
+        fun between(startsAt: Instant?, resetsAt: Instant?, now: Instant): TerminalQuotaTime? {
+            if (startsAt == null || resetsAt == null || resetsAt <= now || resetsAt <= startsAt) return null
+            val length = resetsAt - startsAt
+            return TerminalQuotaTime(startsAt, resetsAt, length, (now - startsAt).coerceIn(Duration.ZERO, length))
         }
     }
 }

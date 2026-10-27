@@ -150,14 +150,18 @@ esquerda, `usage monitor` em ouro e negrito; à direita, o status ("14:23 BRT ·
 separador e o corpo; no fim, outro separador e o rodapé de atalhos.
 
 **Abas** (3.1). Numeradas e fixas: `1 Visão geral`, `2 Sessões`, `3 Histórico`, `4 Time`,
-`5 Configurações`. A ativa vai em ouro e negrito sobre `--term-selection`, as outras em muted. Sem
+`5 Configurações`, `6 Análise`. A 6 (#463) entrou **no fim**, exceção aprovada à regra "nenhum valor
+novo em enum" (decisão U3 do plano da #463), para nenhuma aba mudar de tecla. A ativa vai em ouro e
+negrito sobre `--term-selection`, as outras em muted. Sem
 time configurado, a aba 4 não aparece e as outras **mantêm o número**: atalho não muda de tecla.
+Quando a linha inteira não cabe (a 80 colunas, em português), as inativas ficam só com o número
+(`1   2   3   4   5  [6 Análise]`) e a ativa mantém o nome: nenhuma aba some nem é cortada no meio.
 Sem cor não há fundo de seleção: a ativa troca os espaços que a cercam por colchetes
 (`[1 Visão geral]`), com a mesma largura, para a linha não andar entre os modos.
 
 **Rodapé de atalhos** (3.1). A tecla em negrito, o rótulo em muted, dois espaços entre pares. Os
-atalhos da aba vêm primeiro, os comuns depois (`1–5 aba`, `r atualizar`, `? ajuda`, `q sair`).
-Quando não cabem, saem **pares inteiros**, nunca meio par: primeiro `r atualizar` e `1–5 aba` (a
+atalhos da aba vêm primeiro, os comuns depois (`1–6 aba`, `r atualizar`, `? ajuda`, `q sair`).
+Quando não cabem, saem **pares inteiros**, nunca meio par: primeiro `r atualizar` e `1–6 aba` (a
 ajuda lista todos), depois os da aba, do último para o primeiro; `? ajuda` e `q sair` ficam sempre.
 Com um campo de texto aberto (4.2), só `enter grava` e `esc desiste`: ali `q`, `r`, `?` e os
 dígitos são texto.
@@ -198,6 +202,25 @@ leitura) ao reinício, até 60 colunas; a coluna é a última leitura até o fim
 depois de agora. Título `rótulo · janela de 23/10 15:09 a 20:09 · uma coluna = 5 min`. Frase: aberta,
 `64% usada com 97% da janela já passada · ✓ 33 pp atrás do tempo`; fechada, `pico 96% · sobrou 4%` ou o
 pico e como esgotou. Abaixo, em muted, a faixa ativa e o ritmo médio. `esc` volta à tabela.
+
+**Aba Análise** (3.6, #463 AI2). A janela "Análise" do app no terminal, para as contas com índice
+CLI (Claude Code e Codex), uma de cada vez (`← →`, com `conta 1 de 3` à direita). As duas janelas lado
+a lado a partir de 80 colunas (abaixo, uma embaixo da outra): título `JANELA 5H` na cor da fonte, o
+veredito do card do app (`✓ cabe até o reinício` verde, `▲ esgota antes do reinício` em
+`--term-crit`), a barra de cota de até 30 células, o reinício e três linhas — ritmo na última hora,
+ritmo médio e "para caber", que só dá um número quando a janela esgota antes (`no máximo 17 %/h`;
+senão `o ritmo de agora basta`). Depois, a corrida de cada janela e as últimas 24 h numa escala só
+(% da cota 5h, quatro linhas com o eixo escrito até a hora de maior consumo) com a vazão numa linha
+própria, `tok/s`, na escala dela: duas grandezas nunca dividem o mesmo eixo. O corpo passa da tela:
+`↑ ↓` rolam. Os mesmos dados da janela do app e do `/analise` do bot (`SessionAnalysis`), lidos dos
+bancos em somente leitura; sem o índice CLI, a vazão fica não medida.
+
+**Corrida** (2.5, 3.6, #463 AI3). Esgotar × reiniciar de uma janela, na mesma régua: título
+`5h · 62% usada · ▲ esgota antes do reinício` e, à direita, `régua: agora até +2 h 17 min`; uma barra de
+cota para `reinicia` (muted) e uma para `esgota` em cada ritmo medido (última hora e médio). A régua vai
+até o mais longe que se desenha, sem passar da duração da janela: o que esgotaria depois dela diz
+`mais de 7 d no ritmo médio`. Esgotar antes do reinício vai em `--term-crit`; ritmo parado diz
+`parado: não esgota neste ritmo`, sem barra. É o bloco do comando `analysis` e da aba 6.
 
 **Tempo × cota** (#463 AI5). A cota usada menos o tempo da janela que já passou, em pontos percentuais:
 `✓ 33 pp atrás do tempo` em verde (cabe no ritmo de até aqui) ou `▲ 40 pp à frente do tempo` em
@@ -265,7 +288,9 @@ sem glifo. Não há animação: a tela só diz que está trabalhando.
 - `--json` é contrato: campos em inglês e `snake_case` (o estilo do `/api/snapshot`), versão no
   campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Desde a #463, cada
   cota traz `window_starts_at` (início nominal) e `time_elapsed_percent` (0–100, pelo piso), `null`
-  sem duração conhecida ou sem reinício; a versão não subiu. Campo novo pode
+  sem duração conhecida ou sem reinício; a versão não subiu. O `analysis --json` (#463) segue a mesma
+  regra, com versão própria: contas (`source`, `source_name`, `account`) e, em cada uma, as janelas com
+  ritmos, projeção, `verdict` (`fits`/`runs_out`) e quando esgota em cada ritmo, mesmo depois do reinício. Campo novo pode
   entrar; campo existente não muda sem subir a versão. Em saída que não é UTF-8, o que não é ASCII
   sai como `\uXXXX`, e nunca como `?`.
 - Cada cota tem um **id estável** para scripts: `fonte[:conta]:cota`, em minúsculas, sem acento,

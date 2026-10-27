@@ -149,7 +149,7 @@ code { font-family: var(--font-label); font-size: .88em; background: var(--raise
     <nav class="map" aria-label="Partes da proposta">
       <a href="#parte1"><b>1 · Sem abrir nada</b><span>Uma linha de uso no Claude Code e no tmux</span></a>
       <a href="#parte2"><b>2 · Comandos</b><span>Perguntar pelo terminal e receber a resposta</span></a>
-      <a href="#parte3"><b>3 · Modo interativo</b><span>Uma tela cheia com cinco abas</span></a>
+      <a href="#parte3"><b>3 · Modo interativo</b><span>Uma tela cheia com seis abas</span></a>
       <a href="#parte4"><b>4 · Configuração</b><span>Primeira vez, aba Configurações e comandos</span></a>
       <a href="#parte5"><b>5 · Servidor sem tela</b><span>Serviço em segundo plano e avisos sem bandeja</span></a>
       <a href="#parte6"><b>6 · Quando algo falha</b><span>Nada coletando e leitura que falhou</span></a>
@@ -271,7 +271,8 @@ function spark(vals, k, resets){
 
 // ── a moldura única do modo interativo: título, quatro abas, corpo e atalhos ──
 const FW = 94;
-const TABS = ['Visão geral', 'Sessões', 'Histórico', 'Time', 'Configurações'];
+// #463: a aba 6, Análise, entra no fim — nenhuma aba muda de número.
+const TABS = ['Visão geral', 'Sessões', 'Histórico', 'Time', 'Configurações', 'Análise'];
 function frame(active, body, keys, status = '14:23 BRT · ao vivo', statusCls = 'mu'){
   const tabs = L(...TABS.flatMap((t, i) => {
     const lab = ` ${i + 1} ${t} `;
@@ -289,7 +290,7 @@ function frame(active, body, keys, status = '14:23 BRT · ao vivo', statusCls = 
   return render(out);
 }
 const key = (k, label) => L(c('b', k), c('mu', ' ' + label + '  '));
-const commonKeys = [key('1–5', 'aba'), key('r', 'atualizar'), key('?', 'ajuda'), key('q', 'sair')];
+const commonKeys = [key('1–6', 'aba'), key('r', 'atualizar'), key('?', 'ajuda'), key('q', 'sair')];
 
 // ── as telas ──
 const S = {};
@@ -384,6 +385,62 @@ function statusTable(){
   return out;
 }
 S.status = () => render([sh('usage-monitor status'), L(''), ...statusTable()]);
+
+// #463 (AI3): esgotar × reiniciar na mesma régua; o esgotar antes do reinício vai em vermelho.
+function raceBlocks(W, B){
+  return {
+    five: [
+      L(c('a b', '5h'), c('mu', ' · '), '62% usada', c('mu', ' · '), c('cr', '▲ esgota antes do reinício'), c('mu', lpad('régua: agora até +2 h 17 min', W - 43))),
+      L(c('mu', '  reinicia  '), bar(100, B, 'mu'), c('mu', '  2 h 17 min · 16:40')),
+      L(c('mu', '  esgota    '), bar(69, B, 'cr'), c('cr', '  1 h 35 min · ~15:58 no ritmo da última hora')),
+      L(c('mu', '            '), bar(72, B, 'cr'), c('cr', '  1 h 39 min · ~16:02 no ritmo médio')),
+    ],
+    weekly: [
+      L(c('a b', 'semanal'), c('mu', ' · '), '41% usada', c('mu', ' · '), c('ok', '✓ cabe até o reinício'), c('mu', lpad('régua: agora até +7 d', W - 43))),
+      L(c('mu', '  reinicia  '), bar(30, B, 'mu'), c('mu', '  2 d 3 h · sex 17:23')),
+      L(c('mu', '  esgota    '), bar(58, B, 'a'), c('mu', '  4 d 2 h · ~dom 16:43 no ritmo da última hora')),
+      L(c('mu', '            '), bar(100, B, 'a'), c('mu', '  mais de 7 d no ritmo médio')),
+    ],
+  };
+}
+
+S.analysisCmd = () => {
+  const r = raceBlocks(100, 40);
+  return render([sh('usage-monitor analysis claude'), L(''), L(c('a', '●'), ' ', c('a b', 'Anthropic · trabalho')), ...r.five, L(''), ...r.weekly, L(''), L(c('mu', 'lido há 38 s pelo serviço'))]);
+};
+
+// #463 (AI2): a janela "Análise" do app escrita para o terminal; o corpo passa da tela e rola.
+S.analysis = () => {
+  const r = raceBlocks(92, 34);
+  const col = (a, b) => L(fit(a, 46), ' ', b);
+  const pts = [0, 0, 2, 6, 9, 4, 0, 0, 0, 0, 0, 0, 3, 11, 18, 14, 21, 26, 12, 0, 8, 19, 24, 16];
+  const lv = ' ▁▂▃▄▅▆▇';
+  const axis = { 3: ' 26% ┤', 1: ' 13% ┤', 0: '  0% ┤' };
+  const rows = [3, 2, 1, 0].map(row => L(c('mu', axis[row] || '     │'),
+    ...pts.map(v => {
+      const e = Math.max(0, Math.min(8, Math.floor(v / 26 * 32) - row * 8));
+      const ch = e >= 8 ? '██' : e > 0 ? lv[e].repeat(2) : row === 0 ? '▁▁' : '  ';
+      return L(c(row === 0 && v === 0 ? 'mu' : 'a', ch), ' ');
+    })));
+  const body = [
+    L(c('a', '●'), ' ', c('a b', 'Anthropic · trabalho'), c('mu', lpad('conta 1 de 3', 70))),
+    L(''),
+    col(c('a b', 'JANELA 5H'), c('a b', 'JANELA SEMANAL')),
+    col(c('cr', '▲ esgota antes do reinício'), c('ok', '✓ cabe até o reinício')),
+    col(L(bar(62, 30, 'a'), c('b', '  62%')), L(bar(41, 30, 'a'), c('b', '  41%'))),
+    col(c('mu', 'reinicia 16:40 · em 2h17'), c('mu', 'reinicia sex 17:23 · em 2d03h')),
+    L(''),
+    col(L(c('mu', pad('ritmo na última hora', 22)), c('b', '24 %/h')), L(c('mu', pad('ritmo na última hora', 22)), c('b', '0,6 %/h'))),
+    col(L(c('mu', pad('ritmo médio', 22)), c('b', '23 %/h')), L(c('mu', pad('ritmo médio', 22)), c('b', '0,4 %/h'))),
+    col(L(c('mu', pad('para caber', 22)), c('cr', 'no máximo 17 %/h')), L(c('mu', pad('para caber', 22)), c('ok', 'o ritmo de agora basta'))),
+    L(''), ...r.five, L(''), ...r.weekly, L(''),
+    L(c('b', 'ÚLTIMAS 24 H'), c('mu', ' · % da cota 5h gasta em cada hora · pico 08h · 26%')),
+    ...rows,
+    L(c('mu', '      15h      18h      21h      00h      03h      06h      09h      12h')),
+  ];
+  return frame(5, body, L(key('←→', 'conta'), key('↑↓', 'rolar'), ...commonKeys));
+};
+
 S.watch = () => render([
   L(c('gd b', ' usage monitor'), c('mu', '  14:23 BRT · relê a cada 15 s · Ctrl+C sai')),
   L(''),
@@ -555,7 +612,7 @@ S.keys = () => {
   const lines = [
     L(c('b', 'Em qualquer aba'), rep(' ', 14), c('b', 'Dentro das listas')),
     L(''),
-    L(c('gd', pad('1 a 5', 9)), pad('troca de aba', 20), c('gd', pad('↑ ↓', 9)), 'move a seleção'),
+    L(c('gd', pad('1 a 6', 9)), pad('troca de aba', 20), c('gd', pad('↑ ↓', 9)), 'move a seleção'),
     L(c('gd', pad('r', 9)), pad('lê de novo agora', 20), c('gd', pad('enter', 9)), 'abre o detalhe'),
     L(c('gd', pad('?', 9)), pad('esta ajuda', 20), c('gd', pad('← →', 9)), 'período ou valor'),
     L(c('gd', pad('q', 9)), pad('sai', 20), c('gd', pad('espaço', 9)), 'liga e desliga'),
@@ -846,12 +903,14 @@ const PARTS = [
         text: 'Uma linha por cota, na mesma ordem do app, com barra na cor da fonte, estado e reinício. O rodapé diz de quando é a leitura e resume os estados.' },
       { id: 's23', num: '2.3', title: 'Usar em scripts', win: 'bash', body: S.scripts,
         text: '<b>--json</b> para filtrar, <b>check</b> para decidir pelo código de saída, e <b>wait</b> para segurar uma tarefa longa até a janela reiniciar.' },
+      { id: 's25', num: '2.5', title: 'Esgotar × reiniciar', win: 'bash', body: S.analysisCmd,
+        text: 'O <b>analysis</b> (#463, AI3) imprime a corrida de cada janela das contas com análise, de uma tacada: quando reinicia e quando a cota acaba no ritmo da última hora e no médio, na mesma régua. <b>claude</b>, <b>codex</b> ou o apelido escolhem a conta; <b>--json</b> é contrato, como o do <b>status</b>. Lê os bancos do app em somente leitura, sem requisição.' },
       { id: 's24', num: '2.4', title: 'Aberto num painel do tmux', win: 'tmux — usage-monitor status --watch', body: S.watch,
         text: 'O <b>status --watch</b> deixa a tabela da 2.2 aberta, como um <code>btop</code> num painel, e a redesenha no lugar a cada 15 s (<b>--interval</b>, de 5 s para cima) até o Ctrl+C. Só relê a última coleta: quem muda o número é o app ou o serviço, e o rodapé continua dizendo de quando ela é. A linha do alto não diz "ao vivo", porque com nada coletando a tabela avisa que os números não mudam. Num painel estreito a linha é cortada na borda, em vez de quebrar; sem terminal, diz o que usar e sai com 1, como o <b>tui</b>.',
         snippet: '<span class="k"># um painel à direita, com 100 colunas</span>\ntmux split-window -h -l 100 \'usage-monitor status --watch\'' },
     ] },
   { id: 'parte3', step: 'Parte 3', title: 'Modo interativo',
-    text: 'usage-monitor tui abre uma tela cheia com cinco abas, sempre na mesma moldura: o título, as abas no alto e os atalhos no rodapé. Muda a aba, a moldura fica, e ocupa o terminal inteiro: as telas abaixo estão em 96 colunas, e num terminal mais largo a coluna de detalhe e as tabelas ganham o espaço. Em tela estreita o rodapé tira atalhos inteiros (primeiro <b>r</b> e <b>1–5</b>), e <b>? ajuda</b> e <b>q sair</b> ficam sempre. A aba 5, Configurações, está na parte 4.',
+    text: 'usage-monitor tui abre uma tela cheia com seis abas, sempre na mesma moldura: o título, as abas no alto e os atalhos no rodapé. Muda a aba, a moldura fica, e ocupa o terminal inteiro: as telas abaixo estão em 96 colunas, e num terminal mais largo a coluna de detalhe e as tabelas ganham o espaço. Em tela estreita o rodapé tira atalhos inteiros (primeiro <b>r</b> e <b>1–5</b>), e <b>? ajuda</b> e <b>q sair</b> ficam sempre. A aba 5, Configurações, está na parte 4.',
     screens: [
       { id: 's31', num: '3.1', title: 'Aba 1 · Visão geral', win: 'usage-monitor tui', body: S.overview,
         text: 'As contas à esquerda, com o maior uso de cada uma, e o detalhe da escolhida à direita: uma linha de cota por cota do app (os créditos inclusive), a sessão ativa (a mais recente com atividade nos últimos 10 min, com o custo no formato da janela de Sessões) e as últimas 24 h da primeira cota. Abaixo de 80 colunas a lista ocupa a tela e <b>enter</b> abre a conta.' },
@@ -863,6 +922,8 @@ const PARTS = [
         text: 'O <b>enter</b> numa janela (#463, AI1): oito linhas com eixo escrito (100/50/0%), do início nominal ao reinício, marcado no fim do eixo; uma coluna é a última leitura até o fim dela, e na janela aberta nada depois de agora. Embaixo, a frase: na aberta, a cota contra o tempo da janela (<b>✓ atrás</b> cabe, <b>▲ à frente</b> esgota antes); na fechada, o pico e como terminou. <b>esc</b> volta à tabela.' },
       { id: 's34', num: '3.4', title: 'Aba 4 · Time', win: 'usage-monitor tui', body: S.team,
         text: 'Só aparece para quem usa a integração com time (ligada e com ao menos uma conta participando). O mesmo <code>GET</code> da janela de time do app, com o corte do dia em BRT: quem está trabalhando (turno na janela ativa), com o app aberto ou ausente, sempre escrito, e as sessões, os tokens e o custo do dia, calculado aqui pela tabela de preços (o servidor não precifica). O servidor não guarda cota por pessoa, então a tela não mostra nenhuma: as cotas da conta estão na aba 1. Ordem e presença as da janela do app, no relógio do servidor que o coletor mediu (a TUI não bate presença); <b>t</b> troca entre as contas do time. Leitura que falha mantém os números anteriores, com a faixa da 6.2. Pessoas e valores de exemplo.' },
+      { id: 's36', num: '3.6', title: 'Aba 6 · Análise', win: 'usage-monitor tui', body: S.analysis,
+        text: 'A janela Análise do app no terminal (#463, AI2), para as contas com índice CLI (Claude Code e Codex); <b>← →</b> trocam a conta. As duas janelas lado a lado, com o veredito da janela do app, os dois ritmos e o que cabe (só decide algo quando a janela esgota antes: aí, o ritmo máximo). Embaixo, a corrida de cada janela (AI3): o reinício e o esgotar no ritmo da última hora e no médio, na mesma régua, que vai até a duração da janela; o esgotar antes do reinício vai em vermelho. Por fim, as 24 h numa escala só (% da cota 5h) e a vazão numa linha própria. O corpo passa da tela: <b>↑ ↓</b> rolam. A aba 6 entrou no fim e nenhuma outra mudou de número; quando as seis não cabem na linha (a 80 colunas, em português), as inativas ficam só com o número.' },
       { id: 's35', num: '3.5', title: 'Ajuda (tecla ?)', win: 'usage-monitor tui', body: S.keys,
         text: 'Todos os atalhos numa caixa só, e o que a aba 5 não faz (adicionar conta, entrar num servidor de time novo), que fica nos comandos da 4.3.' },
     ] },

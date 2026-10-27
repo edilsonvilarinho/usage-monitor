@@ -57,7 +57,7 @@ class TuiSettingsViewTest {
         assertTrue(lines[6].contains("│     Limiares (%)  [ 70,90 ]"), lines[6])
         assertTrue(lines[7].contains("│     Lembrar antes de a cota reiniciar  ‹ 15 min antes ›"), lines[7])
         assertTrue(lines[9].contains("Senha (opcional)  [ vazio ]"), lines[9])
-        assertTrue(lines[lines.size - 2].startsWith("│ ↑↓ campo  espaço liga/desliga  tab seção  esc volta  1–5 aba"), lines[lines.size - 2])
+        assertTrue(lines[lines.size - 2].startsWith("│ ↑↓ campo  espaço liga/desliga  tab seção  esc volta  1–6 aba"), lines[lines.size - 2])
     }
 
     @Test
