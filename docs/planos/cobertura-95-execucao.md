@@ -64,3 +64,4 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
 |---|---|---|---|---|
 | A01 | 2026-10-27 | este commit | concluída | Medição acima. `node build-test-report.mjs --root <main>`: portões `coverage-goal-kotlin` e `coverage-goal-server` em `warn` (83,3% e 92,7%). Pisos: Kotlin 83, servidor 92. |
+| A02 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.data.RemoteTeamDataSourceHttpTest"`: 28 testes, 0 falhas (todas as 22 rotas, credencial por tipo, query opcional, `PATCH` sem campo nulo, erro com JSON, HTML truncado em 300, corpo vazio). |
