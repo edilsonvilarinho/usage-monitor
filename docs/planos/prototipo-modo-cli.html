@@ -302,13 +302,13 @@ S.statusline = () => {
     L(c('bd', '╭' + rep('─', w) + '╮')),
     L(c('bd', '│'), fit(L(' ', c('mu', '>'), ' agora rode o allTests', c('cursor', ' ')), w), c('bd', '│')),
     L(c('bd', '╰' + rep('─', w) + '╯')),
-    L('  ', c('a', '◑ Claude Max'), c('mu', ' · '), '5h ', c('b', x.p + '%'), ' ', bar(x.p, 12, 'a'), ' ', c('mu', '16:40'),
-      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', ' · '), 'sessão ', c('b', '$1.84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
+    L('  ', c('a', '◑ Claude Max'), c('mu', ' · '), '5h ', c('b', x.p + '%'), c('mu', '/' + timeOf(x).p + '%'), ' ', timeMark(timeOf(x)), ' ', bar(x.p, 12, 'a'), ' ', c('mu', '16:40'),
+      c('mu', ' · '), '7d ', c('b', y.p + '%'), c('mu', '/' + timeOf(y).p + '%'), ' ', timeMark(timeOf(y)), c('mu', ' · '), 'sessão ', c('b', '$1.84'), c('mu', ' · '), '31 tok/s', c('mu', ' · Opus 5.5')),
     L(c('mu', '  ? for shortcuts')),
   ]);
 };
 S.statuslineCrit = () => render([
-  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', '$9.40')),
+  L('  ', c('a', '● Claude Team'), c('mu', ' · '), '5h ', c('b', '91%'), c('mu', '/84%'), ' ', c('wa', '▲'), ' ', c('cr', 'crítico'), ' ', bar(91, 12, 'a'), ' ', c('mu', 'reinicia em 47 min'), c('mu', ' · '), '7d ', c('b', '74%'), c('mu', '/82%'), ' ', c('ok', '✓'), ' ', c('wa', 'atenção'), c('mu', ' · '), 'sessão ', c('b', '$9.40')),
 ]);
 
 S.tmux = () => {
@@ -355,6 +355,17 @@ S.help = () => render([
   L(c('mu', '  (as mesmas de hoje, sem mudança)')),
 ]);
 
+// #463 (AI5): o tempo da janela que já passou, pelo piso; só onde a duração é conhecida (5 h, 7 d).
+function remMin(t){ let m = t.match(/(\d+)d(\d+)h/); if (m) return (+m[1] * 24 + +m[2]) * 60; m = t.match(/(\d+)h(\d+)/); if (m) return +m[1] * 60 + +m[2]; return +t.match(/(\d+) min/)[1]; }
+function countdown(m){ return m < 60 ? m + ' min' : m < 1440 ? Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0') : Math.floor(m / 1440) + 'd' + String(Math.floor(m % 1440 / 60)).padStart(2, '0') + 'h'; }
+function timeOf(x){
+  if (!(x.src.startsWith('Claude') || x.src === 'Codex') || !['5h', '7d'].includes(x.win)) return null;
+  const len = x.win === '5h' ? 300 : 10080, el = len - remMin(x.inn);
+  return { p: Math.floor(el * 100 / len), el, gap: x.p - Math.floor(el * 100 / len) };
+}
+const timeMark = t => t.gap > 0 ? c('wa', '▲') : c('ok', '✓');
+const timeGap = t => t.gap > 0 ? c('wa', '▲ ' + t.gap + ' pp à frente do tempo') : t.gap < 0 ? c('ok', '✓ ' + (-t.gap) + ' pp atrás do tempo') : c('ok', '✓ no compasso do tempo');
+
 // A tabela do `status`, que o `status --watch` (2.4) redesenha no lugar.
 function statusTable(){
   const out = [];
@@ -364,6 +375,8 @@ function statusTable(){
     const [sc, sw] = st(x.p); const first = x.src + x.acct !== prev; prev = x.src + x.acct;
     out.push(L(' ', first ? c(x.k, pad('● ' + x.src, 14)) : pad('', 14), ' ', c('mu', pad(first ? x.acct : '', 9)), ' ',
       pad(quotaLabel(x), 15), ' ', bar(x.p, 20, x.k), ' ', c('b', lpad(x.p + '%', 4)), '  ', c(sc, pad(sw, 8)), '  ', x.reset + ' BRT', c('mu', ' · em ' + x.inn)));
+    const t = timeOf(x);
+    if (t) out.push(L(' ', pad('', 14), ' ', pad('', 9), ' ', c('mu', pad('tempo', 15)), ' ', bar(t.p, 20, 'mu'), ' ', c('mu', lpad(t.p + '%', 4)), '  ', timeGap(t), c('mu', ' · ' + countdown(t.el) + ' de ' + x.win)));
   }
   out.push(L(' ', c('ds', pad('● DeepSeek', 14)), ' ', pad('', 9), ' ', pad('Saldo', 15), ' ', c('b', 'saldo US$ 7,82')));
   out.push(L(''));

@@ -111,7 +111,12 @@ abreviada: os rótulos são chave de série e variam por fonte, e só o rótulo 
 o bot (decisão da A05 da #439, que corrigiu o "JAN." do protótipo). A fonte e a conta só na primeira
 cota da conta; a porcentagem em negrito; o "em X" em muted. O reinício segue o bot até 6 dias
 ("15:10", "qui 21:00"); mais longe, a data ("05/11 15:47"). Janela já vencida diz "reiniciando".
-Cota sem percentual (saldo) mostra o valor no lugar da barra.
+Cota sem percentual (saldo) mostra o valor no lugar da barra. Logo abaixo da cota com duração
+conhecida (5 h, 7 d) e reinício futuro, a sublinha do **tempo** (#463, AI5): `tempo` em muted na
+coluna de cota, a barra do tempo da janela que já passou em muted (pelo piso, como a de cota), o
+número e, na coluna de estado, a primitiva Tempo × cota seguida de `· 4h51 de 5h`. O início é o
+nominal (reinício − duração), a mesma regra da diagonal do app; a intervalar do MiniMax e a mensal
+não têm sublinha.
 
 **Rodapé de leitura** (2.2). Origem e idade da leitura, seguidas da contagem por estado, com cada
 estado na sua cor: "lido há 38 s pelo app aberto · 9 cotas: 1 crítica, 2 em atenção, 6 em dia".
@@ -128,7 +133,9 @@ links resolvidos; sem perfil que aponte para ele, a linha não mostra cota nenhu
 outra conta). Acima do limiar: estado escrito e "reinicia em" no lugar da hora. O custo vem do
 índice da #381, no formato da janela de Sessões do app (`$1.84`, com `+` quando há modelo sem
 tarifa); sem a sessão no índice, sem custo. Leitura com mais de 10 min mostra "leitura de HH:MM".
-A linha sempre sai com código 0: outro código faria o Claude Code escondê-la.
+A linha sempre sai com código 0: outro código faria o Claude Code escondê-la. Depois do percentual de
+cada janela, `/97%` em muted (o tempo dela que já passou) e `✓` verde ou `▲` em `--term-warn`: a cota
+atrás ou à frente do tempo (#463, AI5) — `5h 64%/97% ✓`.
 
 **Segmento do tmux** (1.3). Uma entrada por conta: sigla de duas letras na cor da fonte (as
 iniciais das duas primeiras palavras do apelido ou do nome, ou as duas primeiras letras de um nome de
@@ -256,7 +263,9 @@ sem glifo. Não há animação: a tela só diz que está trabalhando.
   `--max <n>`, 2 quando alguma cota chegou a n%, senão 0. O 2 coincide com o de uso incorreto do
   #418; script que precise separar os dois lê o `status --json`.
 - `--json` é contrato: campos em inglês e `snake_case` (o estilo do `/api/snapshot`), versão no
-  campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Campo novo pode
+  campo `version`, uma lista plana `quotas`, nenhum segredo, caminho ou e-mail. Desde a #463, cada
+  cota traz `window_starts_at` (início nominal) e `time_elapsed_percent` (0–100, pelo piso), `null`
+  sem duração conhecida ou sem reinício; a versão não subiu. Campo novo pode
   entrar; campo existente não muda sem subir a versão. Em saída que não é UTF-8, o que não é ASCII
   sai como `\uXXXX`, e nunca como `?`.
 - Cada cota tem um **id estável** para scripts: `fonte[:conta]:cota`, em minúsculas, sem acento,

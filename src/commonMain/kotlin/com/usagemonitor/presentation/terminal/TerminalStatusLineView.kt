@@ -74,6 +74,11 @@ internal object TerminalStatusLineView {
         val zone = account.zoneOf(quota)
         val pressing = zone == QuotaZone.ATTENTION || zone == QuotaZone.CRITICAL
         val spans = mutableListOf(TerminalSpan("$name "), TerminalSpan("$percent%", bold = true))
+        // #463 (AI5): `/97%` é o tempo da janela que já passou; `✓` cabe, `▲` esgota antes do reinício.
+        TerminalQuotaTime.of(quota, now)?.let { time ->
+            spans += TerminalSpan("/${time.elapsedPercent}%", TerminalColor.Muted)
+            spans += if (time.gap(percent) > 0) TerminalSpan(" " + profile.glyphs.warning, TerminalColor.Warn) else TerminalSpan(" " + profile.glyphs.done, TerminalColor.Ok)
+        }
         if (pressing) {
             spans += TerminalSpan(" ")
             spans += TerminalPrimitives.zoneWord(zone!!, labels, profile)

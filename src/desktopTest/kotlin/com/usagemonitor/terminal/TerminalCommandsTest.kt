@@ -111,7 +111,7 @@ class TerminalCommandsTest {
                 home = dir
             )
             assertEquals(0, code)
-            assertEquals("◑ trabalho · 5h 62% ███████▍░░░░ 16:23 · sessão $1.84 · Opus 5.5", buffer.toString(Charsets.UTF_8).trim())
+            assertEquals("◑ trabalho · 5h 62%/60% ▲ ███████▍░░░░ 16:23 · sessão $1.84 · Opus 5.5", buffer.toString(Charsets.UTF_8).trim())
         } finally {
             runCatching {
                 node.removeNode()

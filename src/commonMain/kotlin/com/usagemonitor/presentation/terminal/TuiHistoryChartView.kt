@@ -2,14 +2,12 @@ package com.usagemonitor.presentation.terminal
 
 import com.usagemonitor.domain.entity.QuotaWindowSummary
 import com.usagemonitor.domain.entity.UsageHistoryPoint
-import com.usagemonitor.domain.entity.elapsedFractionOf
 import com.usagemonitor.domain.entity.quotaWindowLengthMillis
 import com.usagemonitor.presentation.ui.PaceDiagonalModels
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.paceLabel
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
@@ -52,7 +50,7 @@ internal object TuiHistoryChartView {
             body += terminalLine(TerminalSpan(" ".repeat(AXIS_WIDTH) + xLabels(PaceDiagonalModels.axisLabels(startsAt, window.resetsAt), columns + 1), TerminalColor.Muted))
         }
         body += TerminalLine.EMPTY
-        body += verdict(row, window, startsAt, lengthMillis != null, now, labels, terminalLabels, profile)
+        body += verdict(row, window, now, labels, terminalLabels, profile)
         body += terminalLine(TerminalSpan(facts(window, labels, glyphs), TerminalColor.Muted))
         return TuiTabView(body, shortcuts)
     }
@@ -136,8 +134,6 @@ internal object TuiHistoryChartView {
     private fun verdict(
         row: TuiHistoryRow,
         window: QuotaWindowSummary,
-        startsAt: Instant,
-        nominal: Boolean,
         now: Instant,
         labels: TuiHistoryLabels,
         terminalLabels: TerminalLabels,
@@ -148,15 +144,15 @@ internal object TuiHistoryChartView {
             return TerminalLine(listOf(TerminalSpan(labels.peak(window.peakPercent), bold = true), separator) + TuiHistoryView.ending(window, now, labels, terminalLabels, profile))
         }
         val percent = row.quota.percent ?: window.peakPercent
-        val elapsed = if (nominal) elapsedFractionOf(startsAt, window.resetsAt, now) else null
-        if (elapsed == null) {
+        // O mesmo tempo do `status` e da linha de status (#463, AI5).
+        val time = TerminalQuotaTime.of(row.quota, now)
+        if (time == null) {
             return terminalLine(TerminalSpan(labels.used(percent), bold = true), separator, TerminalSpan(labels.open(terminalLabels.resetAt(window.resetsAt, now)), TerminalColor.Muted))
         }
-        val elapsedPercent = (elapsed * 100).roundToInt()
         return terminalLine(
-            TerminalSpan(labels.usedWithElapsed(percent, elapsedPercent), bold = true),
+            TerminalSpan(labels.usedWithElapsed(percent, time.elapsedPercent), bold = true),
             separator,
-            TerminalPrimitives.timeGap(percent - elapsedPercent, terminalLabels, profile.glyphs)
+            TerminalPrimitives.timeGap(time.gap(percent), terminalLabels, profile.glyphs)
         )
     }
 

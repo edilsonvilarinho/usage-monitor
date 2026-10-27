@@ -48,7 +48,7 @@ class TerminalJsonTest {
         assertEquals(1, root.getValue("version").jsonPrimitive.int)
         val quota = root.getValue("quotas").jsonArray.first().jsonObject
         assertEquals(
-            setOf("id", "source", "source_name", "account", "label", "period", "unit", "used", "total", "percent", "state", "thresholds", "resets_at", "currency", "fetched_at"),
+            setOf("id", "source", "source_name", "account", "label", "period", "unit", "used", "total", "percent", "state", "thresholds", "resets_at", "currency", "fetched_at", "window_starts_at", "time_elapsed_percent"),
             quota.keys
         )
         assertEquals("anthropic:padrao:claude-5h", quota.getValue("id").jsonPrimitive.content)

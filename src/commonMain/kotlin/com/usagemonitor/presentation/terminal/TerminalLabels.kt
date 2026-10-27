@@ -106,6 +106,15 @@ internal class TerminalLabels(val language: AppLanguage) {
             else -> localized(language, "no compasso do tempo", "level with time")
         }
 
+    /** A sublinha do tempo no `status` (#463, AI5). */
+    val timeRow: String get() = localized(language, "tempo", "time")
+
+    /** `4h51 de 5h`, `3d18h de 7d`: quanto da janela passou, sobre a duração dela. */
+    fun elapsedOf(elapsed: Duration, length: Duration): String {
+        val total = if (length.inWholeDays > 0) "${length.inWholeDays}d" else "${length.inWholeHours}h"
+        return localized(language, "${countdown(elapsed)} de $total", "${countdown(elapsed)} of $total")
+    }
+
     fun nothingCollecting(at: String, age: Duration): String =
         localized(
             language,

@@ -79,9 +79,10 @@ internal object TerminalStatusView {
             labels.headerState.padEnd(stateWidth),
             labels.headerResets
         ).joinToString(GAP)
+        val widths = intArrayOf(sourceWidth, accountWidth, quotaWidth, usageWidth, stateWidth)
         val rows = accounts.flatMap { account ->
-            account.quotas.mapIndexed { index, quota ->
-                row(account, quota, first = index == 0, widths = intArrayOf(sourceWidth, accountWidth, quotaWidth, usageWidth, stateWidth), now, labels, profile)
+            account.quotas.flatMapIndexed { index, quota ->
+                listOfNotNull(row(account, quota, first = index == 0, widths = widths, now, labels, profile), timeRow(quota, widths, now, labels, profile))
             }
         }
         return listOf(terminalLine(TerminalSpan(header, TerminalColor.Muted, bold = true))) + rows
@@ -124,6 +125,24 @@ internal object TerminalStatusView {
         }
         spans += resetSpans(quota.resetsAt, now, labels)
         return TerminalLine(spans).let { line -> TerminalLine(trimTrailingBlank(line.spans)) }
+    }
+
+    /**
+     * Tempo × cota (#463, AI5), logo abaixo da cota com duração conhecida: `tempo  ███░ 97%  ✓ 33 pp
+     * atrás do tempo · 4h51 de 5h`. A barra do tempo é muted, para não competir com a da cota.
+     */
+    private fun timeRow(quota: UsageSnapshotQuota, widths: IntArray, now: Instant, labels: TerminalLabels, profile: TerminalProfile): TerminalLine? {
+        val percent = quota.percent ?: return null
+        val time = TerminalQuotaTime.of(quota, now) ?: return null
+        val (sourceWidth, accountWidth, quotaWidth) = widths.toList()
+        val spans = mutableListOf(TerminalSpan(" " + " ".repeat(sourceWidth) + GAP + " ".repeat(accountWidth) + GAP))
+        spans += TerminalSpan(labels.timeRow.padEnd(quotaWidth) + GAP, TerminalColor.Muted)
+        spans += TerminalPrimitives.quotaBar(time.elapsedPercent, BAR_WIDTH, TerminalColor.Muted, profile.glyphs)
+        spans += TerminalSpan(" " + "${time.elapsedPercent}%".padStart(PERCENT_WIDTH), TerminalColor.Muted)
+        spans += TerminalSpan(GAP)
+        spans += TerminalPrimitives.timeGap(time.gap(percent), labels, profile.glyphs)
+        spans += TerminalSpan(" ${profile.glyphs.separator} " + labels.elapsedOf(time.elapsed, time.length), TerminalColor.Muted)
+        return TerminalLine(spans)
     }
 
     private fun resetSpans(resetsAt: Instant?, now: Instant, labels: TerminalLabels): List<TerminalSpan> {
