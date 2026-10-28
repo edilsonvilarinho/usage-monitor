@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Instala, uma vez por máquina, o que o vídeo precisa e o repositório não versiona: Piper num venv,
-// as duas vozes e o puppeteer-core. Fica fora de build/, que o `gradlew clean` apaga — foi assim
+// as duas vozes, o puppeteer-core e, para o tour, o Kokoro e o scipy da trilha. Fica fora de build/, que o `gradlew clean` apaga — foi assim
 // que o pipeline da 41.11 se perdeu.
 // Uso: node setup-tools.mjs   (idempotente: o que já existe não é baixado de novo)
 import { execFileSync } from 'node:child_process'
@@ -12,6 +12,9 @@ import { pathToFileURL } from 'node:url'
 const VOICE_BASE = 'https://huggingface.co/rhasspy/piper-voices/resolve/main'
 const VOICE_PATHS = ['en/en_US/ryan/high/en_US-ryan-high', 'pt/pt_BR/faber/medium/pt_BR-faber-medium']
 const PUPPETEER = 'puppeteer-core@24'
+// Kokoro 82M (tour em vídeo, #505): ~350 MB, só baixado quando o roteiro pede `voice.engine: "kokoro"`.
+const KOKORO_BASE = 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0'
+const KOKORO_FILES = ['kokoro-v1.0.onnx', 'voices-v1.0.bin']
 
 export function toolPaths() {
     const base = process.env.LOCALAPPDATA
@@ -46,7 +49,7 @@ async function download(url, target) {
     writeFileSync(target, Buffer.from(await response.arrayBuffer()))
 }
 
-export async function setupTools() {
+export async function setupTools({ kokoro = false } = {}) {
     const paths = toolPaths()
     mkdirSync(paths.voices, { recursive: true })
     if (!existsSync(paths.python)) {
@@ -60,6 +63,17 @@ export async function setupTools() {
         for (const suffix of ['.onnx', '.onnx.json']) {
             const target = join(paths.voices, `${name}${suffix}`)
             if (!existsSync(target)) await download(`${VOICE_BASE}/${voice}${suffix}`, target)
+        }
+    }
+    if (kokoro) {
+        try {
+            execFileSync(paths.python, ['-c', 'import kokoro_onnx, scipy'], { stdio: 'ignore' })
+        } catch {
+            execFileSync(paths.python, ['-m', 'pip', 'install', '-q', 'kokoro-onnx', 'scipy'], { stdio: 'inherit' })
+        }
+        for (const file of KOKORO_FILES) {
+            const target = join(paths.voices, file)
+            if (!existsSync(target)) await download(`${KOKORO_BASE}/${file}`, target)
         }
     }
     if (!existsSync(join(paths.nodeModules, 'puppeteer-core'))) {
