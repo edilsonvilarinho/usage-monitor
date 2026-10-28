@@ -21,7 +21,12 @@
 <script type="text/babel" data-presets="react">
 let DS = {};
 function Demo() {
-  const { AppBanner, AppButton, AppEmptyState, AppLoadingState, AppErrorState, AppPanel } = DS;
+  const { AppBanner, AppButton, AppEmptyState, AppLoadingState, AppErrorState, AppPanel, AppStepTrail, AppStepList } = DS;
+  const steps = [
+    { label: 'Address', status: 'done', detail: 'ok' }, { label: 'Connection', status: 'done', detail: 'ok' },
+    { label: 'Certificate', status: 'failed', detail: 'expired Oct 27, 12:21 BRT' },
+    { label: 'Server', status: 'notReached', detail: 'not reached' }, { label: 'Key', status: 'notReached', detail: 'not reached' },
+  ];
   return (
     <div className="grid">
       <AppBanner level="warn" title="Anthropic — Padrão" action={<AppButton variant="ghost">Tentar de novo</AppButton>}>
@@ -35,6 +40,10 @@ function Demo() {
         <AppPanel><AppEmptyState message="Nenhum turno nesta janela." /></AppPanel>
         <AppPanel><AppLoadingState /></AppPanel>
         <AppPanel><AppErrorState message="Erro ao carregar histórico" action={<AppButton>Tentar novamente</AppButton>} /></AppPanel>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <AppPanel><AppErrorState message="Stopped at Certificate — expired Oct 27, 12:21 BRT" detail="The server's certificate expired: whoever runs the server has to renew it. Your key was not tested." action={<AppButton>Try again</AppButton>}><AppStepTrail steps={steps} /></AppErrorState></AppPanel>
+        <AppPanel><div style={{ padding: 16 }}><AppStepList steps={steps} /></div></AppPanel>
       </div>
     </div>
   );

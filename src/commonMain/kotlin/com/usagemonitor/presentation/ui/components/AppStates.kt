@@ -387,17 +387,29 @@ fun AppLoadingState(
     }
 }
 
-/** Erro: a mensagem, o detalhe quando existe, e o caminho de volta. */
+/**
+ * Erro: a mensagem, o detalhe quando existe, e o caminho de volta.
+ *
+ * [content] entra entre a mensagem e o detalhe — é onde o caminho da conexão do
+ * time (#494) mostra a etapa que parou. [secondaryLabel] é uma segunda ação,
+ * fantasma, ao lado da de tentar de novo ("Copiar detalhe técnico").
+ */
 @Composable
 fun AppErrorState(
     message: String,
     modifier: Modifier = Modifier,
     detail: String? = null,
     retryLabel: String? = null,
-    onRetry: (() -> Unit)? = null
+    onRetry: (() -> Unit)? = null,
+    secondaryLabel: String? = null,
+    onSecondary: (() -> Unit)? = null,
+    content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     AppCenteredState(modifier = modifier) {
         AppStatusIndicator(label = message, tone = AppTone.CRITICAL)
+        if (content != null) {
+            content()
+        }
         if (detail != null) {
             Text(
                 text = detail,
@@ -406,8 +418,18 @@ fun AppErrorState(
                 textAlign = TextAlign.Center
             )
         }
-        if (retryLabel != null && onRetry != null) {
-            AppButton(label = retryLabel, onClick = onRetry)
+        val hasRetry = retryLabel != null && onRetry != null
+        val hasSecondary = secondaryLabel != null && onSecondary != null
+        // Sem ação, nenhuma linha: o `spacedBy` da coluna somaria o vão de uma linha vazia.
+        if (hasRetry || hasSecondary) {
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                if (retryLabel != null && onRetry != null) {
+                    AppButton(label = retryLabel, onClick = onRetry)
+                }
+                if (secondaryLabel != null && onSecondary != null) {
+                    AppButton(label = secondaryLabel, onClick = onSecondary, tone = AppButtonTone.GHOST)
+                }
+            }
         }
     }
 }
