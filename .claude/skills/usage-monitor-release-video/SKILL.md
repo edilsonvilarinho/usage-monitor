@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-release-video
-description: Make the usage-monitor release video for Instagram, TikTok and X — vertical 1080×1920, PT and EN, synthetic voice (Piper), burned-in captions plus .srt, the app's design system, unhurried pace, every change of the version — and the post text for X, Instagram and TikTok. Also the 16:9 video tour of the whole app (5–10 min, Kokoro voice, space soundtrack, sound effects, themed transitions). Use for "vídeo da release/versão", "vídeo de lançamento", "vídeo para o insta/tiktok", "descrição para X/Instagram/TikTok", "tour em vídeo", "vídeo do app inteiro".
+description: Release video (vertical, PT/EN, voice, captions) and post text for X/Instagram/TikTok, plus the 16:9 tour of the whole app. Use for "vídeo da release", "vídeo de lançamento", "vídeo para o insta/tiktok", "descrição para X/Instagram/TikTok", "tour em vídeo".
 ---
 
 # Usage Monitor — vídeo de lançamento

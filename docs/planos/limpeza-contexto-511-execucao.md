@@ -29,6 +29,7 @@ Itens aprovados pelo dono na skill `usage-monitor-token-cleanup` que tocam o rep
 | Atividade | Estado | Validação |
 |---|---|---|
 | A01 | feito | sem harness de teste (documentação); `git diff --stat` mostra só este arquivo |
+| A02 | feito | sem harness de teste (texto); `measure_context.ps1`: descrição 556 → 257 caracteres; `CLAUDE.md` −2 linhas |
 
 ## Problemas em aberto e riscos
 
