@@ -1,0 +1,14 @@
+{
+  "x": {
+    "pt": "Usage Monitor 42 chegou ao terminal: todas as cotas num comando, JSON para scripts, linha de status no Claude Code e no tmux, serviço para servidor sem tela e um modo interativo com seis abas, até por SSH. Open source (MIT).\nhttps://github.com/edilsonvilarinho/usage-monitor/releases/tag/v42.0.0",
+    "en": "Usage Monitor 42 lands in your terminal: every quota in one command, JSON for scripts, a status line for Claude Code and tmux, a headless service, and an interactive mode with six tabs, even over SSH. Open source (MIT).\nhttps://github.com/edilsonvilarinho/usage-monitor/releases/tag/v42.0.0"
+  },
+  "instagram": {
+    "pt": "Usage Monitor 42: agora também no seu terminal.\n\nO que chegou:\n• usage-monitor status — todas as cotas e o ritmo de cada uma\n• JSON, check e wait para scripts\n• Linha de status para o Claude Code e o tmux, e status --watch\n• Serviço para servidor sem tela (systemd no Linux)\n• Configuração inicial, chaves, contas, Telegram e time pelo terminal\n• Modo interativo com seis abas, até por SSH\n• Sessões divididas por modelo\n• Cada janela da cota na diagonal de ritmo\n• No time, a etapa exata em que a conexão parou\n• E mais: comando no PATH do Windows, data de reinício na HUD, escala do sistema\n\nWindows, Linux e macOS. Open source (MIT). Link na bio.\n\n#ClaudeCode #Codex #OpenSource #DevTools #Terminal",
+    "en": "Usage Monitor 42: now in your terminal, too.\n\nWhat's new:\n• usage-monitor status — every quota and its pace\n• JSON, check and wait for scripts\n• A status line for Claude Code and tmux, plus status --watch\n• A service for headless servers (systemd on Linux)\n• Setup, API keys, accounts, Telegram and team from the terminal\n• An interactive mode with six tabs, even over SSH\n• Sessions split by model\n• Each quota window on the pace diagonal\n• Team: the exact step where the connection stopped\n• Plus: the command on your Windows PATH, reset dates on the HUD, system scale\n\nWindows, Linux and macOS. Open source (MIT). Link in bio.\n\n#ClaudeCode #Codex #OpenSource #DevTools #Terminal"
+  },
+  "tiktok": {
+    "pt": "Usage Monitor 42 chegou ao terminal: cotas num comando, linha de status no Claude Code e no tmux, servidor sem tela e modo interativo com seis abas. Open source. Link no perfil.\n\n#ClaudeCode #Codex #OpenSource #DevTools #Terminal",
+    "en": "Usage Monitor 42 lands in your terminal: quotas in one command, a status line for Claude Code and tmux, headless servers and an interactive mode with six tabs. Open source. Link in bio.\n\n#ClaudeCode #Codex #OpenSource #DevTools #Terminal"
+  }
+}

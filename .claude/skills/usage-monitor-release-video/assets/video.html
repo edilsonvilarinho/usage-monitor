@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Release video</title>
+<!--
+  Renderizador do vídeo de lançamento, 1080×1920. renderFrame(t) é pura: o mesmo t desenha
+  sempre o mesmo quadro, e o render.mjs captura um quadro por vez. Nada aqui usa relógio,
+  requestAnimationFrame ou transição CSS — tudo sai de t.
+  Cores, raios e fontes: docs/design-system/tokens/ (colors.css, terminal.css, shape.css).
+-->
+<style>
+@font-face { font-family: "Plex Mono"; font-weight: 400; src: url("fonts/IBMPlexMono-Regular.ttf"); }
+@font-face { font-family: "Plex Mono"; font-weight: 500; src: url("fonts/IBMPlexMono-Medium.ttf"); }
+@font-face { font-family: "Plex Mono"; font-weight: 600; src: url("fonts/IBMPlexMono-SemiBold.ttf"); }
+@font-face { font-family: "Plex Sans"; font-weight: 400; src: url("fonts/IBMPlexSans-Regular.ttf"); }
+@font-face { font-family: "Plex Sans"; font-weight: 500; src: url("fonts/IBMPlexSans-Medium.ttf"); }
+@font-face { font-family: "Plex Sans"; font-weight: 600; src: url("fonts/IBMPlexSans-SemiBold.ttf"); }
+:root {
+  --bg: #131010; --surface: #1B1818; --raised: #211E1E; --border: #3D3838;
+  --fg: #F2EDED; --muted: #B8B2B2; --ok: #4CAF50; --warn: #FFA726; --crit: #E86A6A; --info: #4C8DFF;
+  --term-dim: #4A4444; --term-border: #5A5353; --term-gold: #E8AE63;
+  --gold: #E8AE63; --hot: #FFF0CB; --ember: #B4501E; --night: #080B12; --core: #030508;
+  --left: 64px; --width: 876px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); color: var(--fg); }
+body { font-family: "Plex Sans", sans-serif; }
+#stage { position: absolute; inset: 0; }
+.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+.mono { font-family: "Plex Mono", monospace; }
+
+/* Cabeçalho fixo: marca, versão e progresso. Fica abaixo dos 250 px que as redes cobrem. */
+#header { position: absolute; left: var(--left); top: 262px; width: var(--width); display: flex;
+  align-items: baseline; justify-content: space-between; font-family: "Plex Mono"; font-size: 30px; }
+#header .brand { color: var(--gold); font-weight: 600; letter-spacing: .5px; }
+#header .count { color: var(--muted); font-weight: 500; }
+#progress { position: absolute; left: var(--left); top: 318px; width: var(--width); height: 4px; display: flex; gap: 6px; }
+#progress span { flex: 1; background: var(--raised); border-radius: 2px; overflow: hidden; }
+#progress span i { display: block; height: 100%; background: var(--gold); width: 0; }
+
+.kicker { position: absolute; left: var(--left); top: 380px; width: var(--width); font-family: "Plex Mono";
+  font-size: 30px; font-weight: 500; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+.kicker b { color: var(--gold); font-weight: 600; }
+.headline { position: absolute; left: var(--left); top: 432px; width: var(--width); font-family: "Plex Mono";
+  font-size: 64px; font-weight: 600; line-height: 1.16; color: var(--fg); }
+.visual { position: absolute; left: var(--left); top: 712px; width: var(--width); height: 590px;
+  display: flex; align-items: center; justify-content: center; }
+
+/* Superfície única de dados: --surface, borda 1px acesa em cima, raio 8–10 (teto 10). */
+.panel { background: var(--surface); border: 1px solid var(--border); border-top-color: #4A4444; border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 18px 48px rgba(0,0,0,.45); overflow: hidden; }
+.panel .bar { height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--border);
+  font-family: "Plex Mono"; font-size: 22px; color: var(--muted); background: var(--raised); }
+.panel .bar i { width: 12px; height: 12px; border-radius: 6px; background: var(--term-dim); display: inline-block; }
+.shot { position: relative; overflow: hidden; background: #0F0D0D; }
+.shot img { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: auto; }
+
+.term { width: 100%; padding: 28px 30px; font-family: "Plex Mono"; font-size: 33px; line-height: 1.5; background: #0F0D0D; }
+.term .line { white-space: pre; color: var(--fg); min-height: 50px; }
+.term .line .p { color: var(--term-gold); }
+.term .out { white-space: pre-wrap; color: var(--muted); font-size: 27px; line-height: 1.4; margin: 2px 0 18px 0; }
+.term .caret { display: inline-block; width: 18px; height: 36px; background: var(--fg); vertical-align: -6px; }
+
+.steps { width: 100%; padding: 22px 30px; }
+.step { display: grid; grid-template-columns: 64px 1fr; align-items: center; min-height: 92px; border-bottom: 1px solid var(--border); }
+.step:last-child { border-bottom: 0; }
+.step .icon { font-family: "Plex Mono"; font-size: 40px; font-weight: 600; }
+.step .name { font-family: "Plex Mono"; font-size: 38px; font-weight: 600; }
+.step .why { grid-column: 2; font-size: 28px; color: var(--muted); margin-top: -6px; padding-bottom: 14px; }
+.step.ok .icon { color: var(--ok); } .step.fail .icon, .step.fail .why { color: var(--crit); }
+.step.pending .icon, .step.pending .name { color: var(--term-dim); }
+
+.items { width: 100%; padding: 14px 30px; }
+.item { display: grid; grid-template-columns: 56px 1fr; padding: 22px 0; border-bottom: 1px solid var(--border);
+  font-size: 39px; line-height: 1.25; font-weight: 500; }
+.item:last-child { border-bottom: 0; }
+.item .mark { font-family: "Plex Mono"; color: var(--gold); font-weight: 600; }
+
+.chips { position: absolute; left: var(--left); top: 1268px; width: var(--width); display: flex; flex-wrap: wrap; gap: 12px; }
+.chip { font-family: "Plex Mono"; font-size: 26px; font-weight: 500; color: var(--fg); background: var(--raised);
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; }
+
+.hero { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+.hero canvas { position: absolute; left: 220px; top: 380px; width: 640px; height: 640px; }
+.hero .name { position: absolute; left: 0; width: 1080px; top: 1040px; text-align: center; font-family: "Plex Mono";
+  font-size: 36px; font-weight: 600; letter-spacing: 6px; color: var(--gold); text-transform: uppercase; }
+.hero .version { position: absolute; left: 0; width: 1080px; top: 1080px; text-align: center; font-family: "Plex Mono";
+  font-size: 132px; font-weight: 600; color: var(--fg); }
+.hero .tagline { position: absolute; left: 90px; width: 900px; top: 280px; text-align: center; font-family: "Plex Mono";
+  font-size: 50px; font-weight: 600; line-height: 1.2; color: var(--fg); }
+.hero .link { position: absolute; left: 0; width: 1080px; top: 1262px; text-align: center; font-family: "Plex Mono";
+  font-size: 28px; line-height: 1.4; color: var(--muted); }
+/* No fechamento não há título acima do anel: o conjunto sobe para o link não encostar na legenda. */
+.hero.closing { transform: translateY(-90px); }
+
+/* Legenda: no máximo 2 linhas, dentro da área segura (acaba antes dos 420 px de baixo). */
+#caption { position: absolute; left: var(--left); width: var(--width); bottom: 430px; display: flex; justify-content: center; }
+#caption div { background: rgba(8, 11, 18, .86); border: 1px solid rgba(232, 174, 99, .28); border-radius: 10px;
+  padding: 14px 26px; text-align: center; font-family: "Plex Sans"; font-weight: 600; font-size: 50px; line-height: 1.24;
+  color: var(--fg); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="header"><span class="brand">usage monitor</span><span class="count"></span></div>
+<div id="progress"></div>
+<div id="caption"><div></div></div>
+<script>
+'use strict'
+const ENTER = 0.6
+const EXIT = 0.35
+const clamp = (value) => Math.max(0, Math.min(1, value))
+const easeOut = (value) => 1 - Math.pow(1 - clamp(value), 3)
+const easeIn = (value) => Math.pow(clamp(value), 3)
+const escape = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+let video = null
+const nodes = []
+
+function pick(value) {
+  if (value == null) return ''
+  return typeof value === 'object' && !Array.isArray(value) ? (value[video.lang] ?? value.en) : value
+}
+
+function kickerHtml(scene) {
+  const tag = scene.tag ? `<b>${escape(scene.tag)}</b> · ` : ''
+  return `<div class="kicker">${tag}${escape(pick(scene.kicker))}</div>`
+}
+
+function buildScene(scene) {
+  const element = document.createElement('div')
+  element.className = 'scene'
+  const parts = {}
+  if (scene.kind === 'title' || scene.kind === 'closing') {
+    element.innerHTML = `<div class="hero ${scene.kind}"><canvas width="800" height="800"></canvas>
+      ${scene.kind === 'title' ? `<div class="tagline">${escape(pick(scene.headline))}</div>` : ''}
+      <div class="name">usage monitor</div><div class="version">${escape(video.label)}</div>
+      ${scene.kind === 'closing' ? `<div class="link">${escape(pick(scene.headline))}<br>${escape(scene.link ?? '')}</div>` : ''}</div>`
+    parts.canvas = element.querySelector('canvas')
+  } else {
+    let visual = ''
+    if (scene.kind === 'screen') {
+      const [, , cropW, cropH] = scene.crop
+      const scale = Math.min(876 / cropW, 544 / cropH)
+      const width = Math.round(cropW * scale)
+      const height = Math.round(cropH * scale)
+      visual = `<div class="panel" style="width:${width}px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
+        <div class="shot" style="width:${width}px;height:${height}px"><img src="${escape(pick(scene.image))}"></div></div>`
+      parts.scale = scale
+    } else if (scene.kind === 'commands') {
+      visual = `<div class="panel" style="width:876px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'terminal')}</div><div class="term">${
+        scene.commands.map(() => `<div class="line"></div><div class="out"></div>`).join('')}</div></div>`
+    } else if (scene.kind === 'steps') {
+      visual = `<div class="panel" style="width:876px"><div class="steps">${scene.steps.map((step) => {
+        const icon = { ok: '✓', fail: '✕', pending: '·' }[step.state]
+        const why = step.why ? `<div class="why">${escape(pick(step.why))}</div>` : ''
+        return `<div class="step ${step.state}"><span class="icon">${icon}</span><span class="name">${escape(pick(step.label))}</span>${why}</div>`
+      }).join('')}</div></div>`
+    } else if (scene.kind === 'list') {
+      visual = `<div class="panel" style="width:876px"><div class="items">${scene.items.map((item) =>
+        `<div class="item"><span class="mark">+</span><span>${escape(pick(item))}</span></div>`).join('')}</div></div>`
+    }
+    const chips = scene.chips ? `<div class="chips">${scene.chips.map((chip) => `<span class="chip">${escape(chip)}</span>`).join('')}</div>` : ''
+    element.innerHTML = `${kickerHtml(scene)}<div class="headline">${escape(pick(scene.headline))}</div><div class="visual">${visual}</div>${chips}`
+    parts.panel = element.querySelector('.panel')
+    parts.img = element.querySelector('.shot img')
+    parts.lines = [...element.querySelectorAll('.term .line')]
+    parts.outs = [...element.querySelectorAll('.term .out')]
+    parts.rows = [...element.querySelectorAll('.step, .item')]
+    parts.chips = [...element.querySelectorAll('.chip')]
+  }
+  document.getElementById('stage').appendChild(element)
+  return { scene, element, parts }
+}
+
+// Anel Gargantua: núcleo escuro, disco de acreção inclinado com Doppler (ouro de um lado, brasa
+// do outro), anel de fótons e até três arcos de cota que entram uma vez a partir das 12 h, sem
+// passar do valor. Cenário, nunca dado: os arcos não levam número.
+function drawRing(canvas, local) {
+  const context = canvas.getContext('2d')
+  const size = canvas.width
+  const center = size / 2
+  context.clearRect(0, 0, size, size)
+  const glow = context.createRadialGradient(center, center, 90, center, center, 390)
+  glow.addColorStop(0, 'rgba(232,174,99,0.20)')
+  glow.addColorStop(1, 'rgba(232,174,99,0)')
+  context.fillStyle = glow
+  context.fillRect(0, 0, size, size)
+  const lit = easeOut(local / 1.2)
+  const disc = (front) => {
+    context.save()
+    context.translate(center, center)
+    context.rotate(-0.22)
+    context.scale(1, 0.26)
+    const gradient = context.createLinearGradient(-260, 0, 260, 0)
+    gradient.addColorStop(0, `rgba(255,240,203,${0.95 * lit})`)
+    gradient.addColorStop(0.5, `rgba(232,174,99,${0.85 * lit})`)
+    gradient.addColorStop(1, `rgba(180,80,30,${0.75 * lit})`)
+    context.strokeStyle = gradient
+    for (let band = 0; band < 5; band += 1) {
+      context.lineWidth = 16 - band * 2.5
+      context.beginPath()
+      context.ellipse(0, 0, 175 + band * 20, 175 + band * 20, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2)
+      context.stroke()
+    }
+    context.restore()
+  }
+  disc(false)
+  context.fillStyle = '#030508'
+  context.beginPath()
+  context.arc(center, center, 128, 0, Math.PI * 2)
+  context.fill()
+  const photon = context.createLinearGradient(center - 140, center + 140, center + 140, center - 140)
+  photon.addColorStop(0, `rgba(180,80,30,${0.6 * lit})`)
+  photon.addColorStop(0.5, `rgba(232,174,99,${0.8 * lit})`)
+  photon.addColorStop(1, `rgba(255,240,203,${lit})`)
+  context.strokeStyle = photon
+  context.lineWidth = 5
+  context.beginPath()
+  context.arc(center, center, 134, 0, Math.PI * 2)
+  context.stroke()
+  disc(true)
+  // Filamentos decorativos: órbita de 14 s, como no app.
+  context.lineWidth = 2
+  for (let index = 0; index < 3; index += 1) {
+    const angle = (local / 14) * Math.PI * 2 + index * 2.1
+    context.strokeStyle = `rgba(255,240,203,${0.22 * lit})`
+    context.beginPath()
+    context.arc(center, center, 150 + index * 6, angle, angle + 0.9)
+    context.stroke()
+  }
+  const arcs = [['#4CAF50', 0.72], ['#FFA726', 0.48], ['#4C8DFF', 0.3]]
+  arcs.forEach(([color, value], index) => {
+    const radius = 290 + index * 34
+    context.lineCap = 'round'
+    context.lineWidth = 16
+    context.strokeStyle = '#211E1E'
+    context.beginPath()
+    context.arc(center, center, radius, 0, Math.PI * 2)
+    context.stroke()
+    const progress = easeOut((local - 0.5 - index * 0.2) / 1.4) * value
+    if (progress > 0.001) {
+      context.strokeStyle = color
+      context.beginPath()
+      context.arc(center, center, radius, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2)
+      context.stroke()
+    }
+  })
+}
+
+function setStyle(element, opacity, offset) {
+  element.style.opacity = String(opacity)
+  element.style.transform = `translateY(${offset}px)`
+}
+
+function renderScene(node, index, t) {
+  const timing = video.timeline.scenes[index]
+  const last = index === video.timeline.scenes.length - 1
+  const end = last ? video.timeline.total : timing.end
+  if (t < timing.start || t >= end) {
+    node.element.style.opacity = '0'
+    return false
+  }
+  const local = t - timing.start
+  const enter = easeOut(local / ENTER)
+  const exit = last ? 1 : 1 - easeIn((t - (end - EXIT)) / EXIT)
+  setStyle(node.element, Math.min(enter, exit), (1 - enter) * 40)
+  const scene = node.scene
+  const speaking = t - timing.voiceAt
+  if (node.parts.canvas) drawRing(node.parts.canvas, local)
+  if (node.parts.img) {
+    const [cropX, cropY] = scene.crop
+    const zoom = 1 + 0.05 * clamp(local / (end - timing.start))
+    node.parts.img.style.transform = `scale(${node.parts.scale * zoom}) translate(${-cropX}px, ${-cropY}px)`
+  }
+  // Comandos digitados a 30 caracteres/s, um depois do outro, a partir da fala.
+  if (node.parts.lines?.length > 0) {
+    let cursor = Math.max(0, speaking)
+    scene.commands.forEach((command, position) => {
+      const text = pick(command.cmd)
+      const typed = Math.max(0, Math.min(text.length, Math.floor(cursor * 30)))
+      const caret = typed < text.length && cursor > 0 ? '<span class="caret"></span>' : ''
+      node.parts.lines[position].innerHTML = typed > 0 || cursor > 0 ? `<span class="p">$ </span>${escape(text.slice(0, typed))}${caret}` : ''
+      const outputShown = cursor > text.length / 30 + 0.2
+      node.parts.outs[position].textContent = outputShown ? pick(command.out) : ''
+      cursor -= text.length / 30 + 0.2 + (scene.pause ?? 0.5)
+    })
+  }
+  const stagger = scene.stagger ?? 0.45
+  node.parts.rows?.forEach((row, position) => {
+    const shown = easeOut((speaking - position * stagger) / 0.4)
+    setStyle(row, scene.kind === 'steps' || scene.kind === 'list' ? shown : 1, (1 - shown) * 18)
+  })
+  node.parts.chips?.forEach((chip, position) => {
+    const shown = easeOut((speaking - 0.3 - position * 0.25) / 0.4)
+    setStyle(chip, shown, (1 - shown) * 12)
+  })
+  return true
+}
+
+function renderFrame(t) {
+  let current = 0
+  nodes.forEach((node, index) => {
+    if (renderScene(node, index, t)) current = index
+  })
+  const kind = video.scenes[current].kind
+  const chrome = kind === 'title' || kind === 'closing' ? 0 : 1
+  document.getElementById('header').style.opacity = String(chrome)
+  document.getElementById('progress').style.opacity = String(chrome)
+  document.querySelector('#header .count').textContent = `${video.label}`
+  const bars = document.querySelectorAll('#progress span i')
+  video.timeline.scenes.forEach((timing, index) => {
+    const end = index === video.timeline.scenes.length - 1 ? video.timeline.total : timing.end
+    bars[index].style.width = `${clamp((t - timing.start) / (end - timing.start)) * 100}%`
+  })
+  const cue = video.cues.find((item) => t >= item.start && t < item.end)
+  const box = document.querySelector('#caption div')
+  if (cue) {
+    box.innerHTML = cue.lines.map(escape).join('<br>')
+    const fade = Math.min(clamp((t - cue.start) / 0.12), clamp((cue.end - t) / 0.12))
+    box.parentElement.style.opacity = String(fade)
+  } else {
+    box.parentElement.style.opacity = '0'
+  }
+}
+
+async function setup(data) {
+  video = data
+  document.documentElement.lang = data.lang === 'pt' ? 'pt-BR' : 'en'
+  document.getElementById('progress').innerHTML = data.timeline.scenes.map(() => '<span><i></i></span>').join('')
+  data.scenes.forEach((scene) => nodes.push(buildScene(scene)))
+  // fonts.ready sozinho resolve antes de a fonte ser pedida; o primeiro quadro sairia na fonte de reserva.
+  await Promise.all([...document.fonts].map((face) => face.load()))
+  await document.fonts.ready
+  await Promise.all([...document.images].map((image) => image.decode()))
+  return true
+}
+
+window.setup = setup
+window.renderFrame = renderFrame
+</script>
+</body>
+</html>
