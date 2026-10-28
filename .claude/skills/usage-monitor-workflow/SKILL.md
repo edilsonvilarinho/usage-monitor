@@ -131,7 +131,11 @@ gh pr view <pr> --json state,mergedAt,mergeCommit
 git -c core.longpaths=true worktree remove .claude/worktrees/<slug>
 git branch -D <branch>
 git fetch --prune
+git pull --ff-only                # local main, always (#509)
 ```
+
+The local `main` is always brought up to the merge: without the pull it stays behind `origin/main` (11 commits after
+PR #508, measured). `--ff-only` never creates a local merge; if it fails, report why instead of forcing.
 
 `core.longpaths` is mandatory on Windows: `server/node_modules` (after `npm ci`) passes 260 characters, and without it
 `git worktree remove` exits 255 with `Filename too long`, drops the registration and leaves the folder half deleted

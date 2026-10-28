@@ -29,6 +29,7 @@ mas não atualiza a `main` local; o usuário fica com o checkout atrás da `orig
 | Atividade | Estado | Validação |
 |---|---|---|
 | A01 | feito | sem harness de teste (documentação); `git diff --stat` mostra só este arquivo |
+| A02 | feito | sem harness de teste (texto de regra e skill); `git diff` revisado; validação real no encerramento deste PR (`git status -sb` sem `behind`) |
 
 ## Problemas em aberto e riscos
 
