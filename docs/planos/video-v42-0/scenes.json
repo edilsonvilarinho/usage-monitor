@@ -1,0 +1,465 @@
+{
+  "version": "v42.0.0",
+  "label": "42.0",
+  "sources": {
+    "terminal-en": {
+      "gif": "img/terminal.gif"
+    },
+    "terminal-pt": {
+      "gif": "img/terminal-pt.gif"
+    }
+  },
+  "scenes": [
+    {
+      "id": "title",
+      "kind": "title",
+      "headline": {
+        "en": "Now in your terminal",
+        "pt": "Agora no seu terminal"
+      },
+      "lines": {
+        "en": {
+          "text": "Usage Monitor 42 is here. Now in your terminal, too.",
+          "say": "Usage Monitor forty-two is here. Now in your terminal, too."
+        },
+        "pt": {
+          "text": "Usage Monitor 42: agora também no seu terminal.",
+          "say": "Usage Monitor quarenta e dois: agora também no seu terminal."
+        }
+      }
+    },
+    {
+      "id": "status",
+      "kind": "screen",
+      "tag": "#439",
+      "kicker": {
+        "en": "terminal",
+        "pt": "terminal"
+      },
+      "headline": {
+        "en": "Every quota, one command",
+        "pt": "Todas as cotas, um comando"
+      },
+      "image": {
+        "en": "terminal-en/022.png",
+        "pt": "terminal-pt/022.png"
+      },
+      "crop": [
+        0,
+        0,
+        720,
+        300
+      ],
+      "chips": [
+        "usage-monitor status"
+      ],
+      "lines": {
+        "en": {
+          "text": "One command shows every quota and its pace."
+        },
+        "pt": {
+          "text": "Um comando mostra todas as cotas e o ritmo de cada uma."
+        }
+      }
+    },
+    {
+      "id": "scripts",
+      "kind": "commands",
+      "tag": "#439",
+      "kicker": {
+        "en": "terminal",
+        "pt": "terminal"
+      },
+      "headline": {
+        "en": "Made for scripts",
+        "pt": "Feito para scripts"
+      },
+      "commands": [
+        {
+          "cmd": "usage-monitor status --json",
+          "out": {
+            "en": "Every quota as JSON",
+            "pt": "Todas as cotas em JSON"
+          }
+        },
+        {
+          "cmd": "usage-monitor check --max 80",
+          "out": {
+            "en": "Exit 0 on track, 1 warning, 2 critical",
+            "pt": "Sai com 0 em dia, 1 atenção, 2 crítico"
+          }
+        },
+        {
+          "cmd": {
+            "en": "usage-monitor wait <quota> --below 50",
+            "pt": "usage-monitor wait <cota> --below 50"
+          },
+          "out": {
+            "en": "Wait until the quota drops below 50%",
+            "pt": "Espera a cota cair abaixo de 50%"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "JSON output, a check that exits by state, and a wait until a quota drops."
+        },
+        "pt": {
+          "text": "Saída em JSON, um check que sai pelo estado, e uma espera até a cota baixar."
+        }
+      }
+    },
+    {
+      "id": "statusline",
+      "kind": "commands",
+      "tag": "#439 · #453",
+      "kicker": {
+        "en": "terminal",
+        "pt": "terminal"
+      },
+      "headline": {
+        "en": "In your status line",
+        "pt": "Na sua linha de status"
+      },
+      "commands": [
+        {
+          "cmd": "usage-monitor statusline claude-code",
+          "out": {
+            "en": "One usage line for Claude Code",
+            "pt": "Uma linha de uso para o Claude Code"
+          }
+        },
+        {
+          "cmd": "usage-monitor statusline tmux",
+          "out": {
+            "en": "…or for tmux",
+            "pt": "…ou para o tmux"
+          }
+        },
+        {
+          "cmd": "usage-monitor status --watch",
+          "out": {
+            "en": "The same table, redrawn every 15 s",
+            "pt": "A mesma tabela, redesenhada a cada 15 s"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "A status line for Claude Code and tmux, or a live pane."
+        },
+        "pt": {
+          "text": "Uma linha de status para o Claude Code e o tmux, ou um painel ao vivo."
+        }
+      }
+    },
+    {
+      "id": "service",
+      "kind": "commands",
+      "tag": "#440",
+      "kicker": {
+        "en": "headless server",
+        "pt": "servidor sem tela"
+      },
+      "headline": {
+        "en": "Runs on a server with no screen",
+        "pt": "Roda em servidor sem tela"
+      },
+      "commands": [
+        {
+          "cmd": "usage-monitor service install",
+          "out": {
+            "en": "The systemd user service (Linux only)",
+            "pt": "O serviço do usuário no systemd (só no Linux)"
+          }
+        },
+        {
+          "cmd": "usage-monitor service run",
+          "out": {
+            "en": "The collection in the foreground, without a window",
+            "pt": "A coleta em primeiro plano, sem janela"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "No screen needed. The service collects on its own."
+        },
+        "pt": {
+          "text": "Sem tela, o serviço faz a coleta sozinho."
+        }
+      }
+    },
+    {
+      "id": "config",
+      "kind": "commands",
+      "tag": "#440",
+      "kicker": {
+        "en": "configuration",
+        "pt": "configuração"
+      },
+      "headline": {
+        "en": "Set it all up from the terminal",
+        "pt": "Configure tudo pelo terminal"
+      },
+      "commands": [
+        {
+          "cmd": "usage-monitor setup",
+          "out": {
+            "en": "First-time setup, step by step",
+            "pt": "Configuração inicial, passo a passo"
+          }
+        },
+        {
+          "cmd": {
+            "en": "usage-monitor keys set <source>",
+            "pt": "usage-monitor keys set <fonte>"
+          },
+          "out": {
+            "en": "Read from the input, never from the command",
+            "pt": "Lida da entrada, nunca do comando"
+          }
+        },
+        {
+          "cmd": "usage-monitor telegram pair",
+          "out": {
+            "en": "The Telegram bot",
+            "pt": "O bot do Telegram"
+          }
+        },
+        {
+          "cmd": "usage-monitor team join",
+          "out": {
+            "en": "The team integration",
+            "pt": "A integração com o time"
+          }
+        }
+      ],
+      "pause": 0.3,
+      "lines": {
+        "en": {
+          "text": "Setup, API keys, accounts, Telegram and team: all from the terminal."
+        },
+        "pt": {
+          "text": "Configuração inicial, chaves, contas, Telegram e time: tudo pelo terminal."
+        }
+      }
+    },
+    {
+      "id": "tui",
+      "kind": "screen",
+      "tag": "#441",
+      "kicker": {
+        "en": "interactive mode",
+        "pt": "modo interativo"
+      },
+      "headline": {
+        "en": "Six tabs, one screen",
+        "pt": "Seis abas, uma tela"
+      },
+      "image": {
+        "en": "terminal-en/041.png",
+        "pt": "terminal-pt/041.png"
+      },
+      "crop": [
+        0,
+        0,
+        620,
+        330
+      ],
+      "chips": [
+        "usage-monitor tui"
+      ],
+      "lines": {
+        "en": {
+          "text": "Interactive mode puts six tabs on one screen, even over SSH."
+        },
+        "pt": {
+          "text": "O modo interativo reúne seis abas numa tela, até por SSH."
+        }
+      }
+    },
+    {
+      "id": "sessions",
+      "kind": "screen",
+      "tag": "#445",
+      "kicker": {
+        "en": "sessions",
+        "pt": "sessões"
+      },
+      "headline": {
+        "en": "Each session, by model",
+        "pt": "Cada sessão, por modelo"
+      },
+      "image": {
+        "en": "terminal-en/043.png",
+        "pt": "terminal-pt/043.png"
+      },
+      "crop": [
+        0,
+        58,
+        620,
+        322
+      ],
+      "lines": {
+        "en": {
+          "text": "Each session now splits by model."
+        },
+        "pt": {
+          "text": "Cada sessão agora se divide por modelo."
+        }
+      }
+    },
+    {
+      "id": "pace",
+      "kind": "screen",
+      "tag": "#463",
+      "kicker": {
+        "en": "analysis · history",
+        "pt": "análise · histórico"
+      },
+      "headline": {
+        "en": "Usage against the clock",
+        "pt": "Uso contra o relógio"
+      },
+      "image": {
+        "en": "terminal-en/045.png",
+        "pt": "terminal-pt/045.png"
+      },
+      "crop": [
+        0,
+        40,
+        620,
+        340
+      ],
+      "lines": {
+        "en": {
+          "text": "Analysis and History put each quota window on the pace diagonal."
+        },
+        "pt": {
+          "text": "Análise e Histórico mostram cada janela da cota na diagonal de ritmo."
+        }
+      }
+    },
+    {
+      "id": "team",
+      "kind": "steps",
+      "tag": "#494",
+      "kicker": {
+        "en": "team",
+        "pt": "time"
+      },
+      "headline": {
+        "en": "Where the connection stopped",
+        "pt": "Onde a conexão parou"
+      },
+      "steps": [
+        {
+          "label": {
+            "en": "Address",
+            "pt": "Endereço"
+          },
+          "state": "ok"
+        },
+        {
+          "label": {
+            "en": "Connection",
+            "pt": "Conexão"
+          },
+          "state": "fail",
+          "why": {
+            "en": "nothing answers",
+            "pt": "nada responde"
+          }
+        },
+        {
+          "label": {
+            "en": "Certificate",
+            "pt": "Certificado"
+          },
+          "state": "pending"
+        },
+        {
+          "label": {
+            "en": "Server",
+            "pt": "Servidor"
+          },
+          "state": "pending"
+        },
+        {
+          "label": {
+            "en": "Key",
+            "pt": "Chave"
+          },
+          "state": "pending"
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Team server down? Now you see, step by step, where it stopped."
+        },
+        "pt": {
+          "text": "Servidor do time fora? Você vê a etapa em que parou."
+        }
+      }
+    },
+    {
+      "id": "more",
+      "kind": "list",
+      "kicker": {
+        "en": "also in 42",
+        "pt": "também na 42"
+      },
+      "headline": {
+        "en": "And more",
+        "pt": "E mais"
+      },
+      "items": [
+        {
+          "en": "The Windows installer puts the command on your PATH",
+          "pt": "O instalador do Windows põe o comando no PATH"
+        },
+        {
+          "en": "The HUD shows the reset date of weekly and monthly quotas",
+          "pt": "A HUD mostra a data de reinício das cotas semanal e mensal"
+        },
+        {
+          "en": "Interface scale starts at the system scale",
+          "pt": "A escala da interface começa na do sistema"
+        },
+        {
+          "en": "A quota on the move is read every minute",
+          "pt": "Cota em movimento é lida a cada minuto"
+        }
+      ],
+      "stagger": 1.2,
+      "lines": {
+        "en": {
+          "text": "Plus: the command on your PATH, reset dates on the HUD, the system scale, and faster reads while a quota moves."
+        },
+        "pt": {
+          "text": "E mais: o comando no PATH, a data de reinício na HUD, a escala do sistema e leitura a cada minuto quando a cota se mexe."
+        }
+      }
+    },
+    {
+      "id": "closing",
+      "kind": "closing",
+      "headline": {
+        "en": "Get it on GitHub",
+        "pt": "Baixe no GitHub"
+      },
+      "link": "github.com/edilsonvilarinho/usage-monitor",
+      "lines": {
+        "en": {
+          "text": "Usage Monitor 42. Get it on GitHub.",
+          "say": "Usage Monitor forty-two. Get it on GitHub."
+        },
+        "pt": {
+          "text": "Usage Monitor 42. Baixe no GitHub.",
+          "say": "Usage Monitor quarenta e dois. Baixe no GitHub."
+        }
+      }
+    }
+  ]
+}
