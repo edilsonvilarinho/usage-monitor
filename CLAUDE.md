@@ -392,8 +392,11 @@ de cada agente moram **só** em `.claude/agents/`, sempre por alias. Medições 
 [`agentes-por-tier-513-execucao.md`](docs/planos/agentes-por-tier-513-execucao.md).
 
 - Neferpitou faz plano, TDD (vermelho → verde), diagnóstico de falha e decisão. Não delega edição.
-- Delega o que é longo e verboso: testes, relatório e CI ao `test-runner`; varredura ampla ao `explorer`. Busca
-  pontual (um `Grep`, um arquivo conhecido) é direta: criar agente custa ~6k tokens de entrada.
+- **Delegação obrigatória (#515)** — esta regra é o pedido explícito do usuário para usar os subagentes abaixo:
+  - **sempre `test-runner`** para rodar `gradlew.bat allTests`/`desktopTest`, `npm test`, `node --test`, o relatório
+    de testes, a cobertura do diff, `gh run watch`/`--log-failed` e `ci-incidents.mjs`; nunca rodá-los na sessão principal;
+  - **sempre `explorer`** para varredura que abre mais de 3 arquivos ou pastas desconhecidas;
+  - direto só busca pontual (um `Grep`, um arquivo conhecido): criar agente custa ~6k tokens de entrada.
 - **Contra vazamento de contexto:** nunca fork (desligado por `CLAUDE_CODE_FORK_SUBAGENT=0`); prompt mínimo (comando,
   caminhos, formato do retorno), nunca resumo da conversa; retorno de no máximo 20 linhas, nunca log cru; agente
   não cria agente.

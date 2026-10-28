@@ -32,6 +32,7 @@ essa instrução; regra imperativa no `CLAUDE.md`, que o próprio Claude Code de
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano | `gh issue create` → #515 |
+| A02 | `CLAUDE.md` "Delegação obrigatória" e skill com a tabela obrigatória, nomeando `test-runner`/`explorer` | Sem harness. CI desta issue acompanhado pelo `test-runner` (resultado no comentário da issue) |
 
 ## Problemas em aberto e riscos
 
