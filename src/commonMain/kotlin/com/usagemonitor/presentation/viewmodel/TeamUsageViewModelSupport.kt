@@ -123,3 +123,27 @@ private fun findTeamSessionSummary(
     } ?: return null
     return member.sessions.firstOrNull { session -> session.sessionId == sessionId }
 }
+
+/**
+ * O estado com [detailState] no painel aberto, ou nulo quando o usuário já voltou
+ * à lista ou abriu outra sessão — a resposta atrasada é descartada.
+ *
+ * A conta entra na comparação porque a visão global pode ter a mesma máquina em
+ * duas contas: sem ela a resposta de uma seria publicada no painel da outra.
+ */
+internal fun withOpenDetail(
+    current: TeamUsageUiState,
+    deviceId: String,
+    sessionId: String,
+    scopedAccountKey: String?,
+    detailState: TeamSessionDetailUiState
+): TeamUsageUiState.Success? {
+    if (current !is TeamUsageUiState.Success) {
+        return null
+    }
+    val open = current.detail ?: return null
+    if (open.deviceId != deviceId || open.sessionId != sessionId || open.accountKey != scopedAccountKey) {
+        return null
+    }
+    return current.copy(detail = detailState)
+}

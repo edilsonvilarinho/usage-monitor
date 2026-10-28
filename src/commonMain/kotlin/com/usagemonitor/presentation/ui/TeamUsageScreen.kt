@@ -305,78 +305,6 @@ internal fun TeamUsageContent(
     }
 }
 
-private data class PendingSessionRemoval(
-    val member: TeamMemberUsage,
-    val session: CliSessionSummary
-)
-
-/** Confirmação obrigatória: a remoção apaga dados e não tem desfazer. */
-@Composable
-private fun RemoveMemberConfirmation(
-    member: TeamMemberUsage,
-    language: AppLanguage,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AppDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
-        text = { ModalDialogText(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
-        confirmButton = {
-            AppButton(
-                label = TeamUsageLabels.confirmRemoval(language),
-                onClick = onConfirm,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag(TEAM_REMOVE_CONFIRM_TAG)
-            )
-        },
-        dismissButton = {
-            AppButton(
-                label = TeamUsageLabels.cancel(language),
-                onClick = onDismiss,
-                tone = AppButtonTone.GHOST
-            )
-        }
-    )
-}
-
-@Composable
-private fun RemoveSessionConfirmation(
-    target: PendingSessionRemoval,
-    language: AppLanguage,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AppDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(TeamUsageLabels.removeSessionTitle(language)) },
-        text = {
-            ModalDialogText(
-                TeamUsageLabels.removeSessionWarning(
-                    sessionId = target.session.sessionId,
-                    projectName = target.session.projectName,
-                    language = language
-                )
-            )
-        },
-        confirmButton = {
-            AppButton(
-                label = TeamUsageLabels.confirmSessionRemoval(language),
-                onClick = onConfirm,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag(TEAM_SESSION_REMOVE_CONFIRM_TAG)
-            )
-        },
-        dismissButton = {
-            AppButton(
-                label = TeamUsageLabels.cancel(language),
-                onClick = onDismiss,
-                tone = AppButtonTone.GHOST
-            )
-        }
-    )
-}
-
 @Composable
 private fun TeamUsageList(
     state: TeamUsageUiState.Success,
@@ -612,27 +540,6 @@ private fun TeamUsageList(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun TeamActionErrorRow(text: String, language: AppLanguage, onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.weight(1f)
-        )
-        AppButton(
-            label = TeamUsageLabels.cancel(language),
-            onClick = onDismiss,
-            tone = AppButtonTone.GHOST
-        )
     }
 }
 

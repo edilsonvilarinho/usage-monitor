@@ -727,22 +727,7 @@ class TeamUsageViewModel(
         scopedAccountKey: String?,
         detailState: TeamSessionDetailUiState
     ) {
-        val current = _uiState.value
-        if (current !is TeamUsageUiState.Success) {
-            return
-        }
-        val open = current.detail
-        // A conta entra na comparação porque a visão global pode ter a mesma
-        // máquina em duas contas: sem ela a resposta de uma seria publicada no
-        // painel da outra.
-        if (open == null ||
-            open.deviceId != deviceId ||
-            open.sessionId != sessionId ||
-            open.accountKey != scopedAccountKey
-        ) {
-            return
-        }
-        _uiState.value = current.copy(detail = detailState)
+        _uiState.value = withOpenDetail(_uiState.value, deviceId, sessionId, scopedAccountKey, detailState) ?: return
     }
 
     companion object {

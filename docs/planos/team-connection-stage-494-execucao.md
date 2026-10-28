@@ -54,7 +54,8 @@ a mesma classificação em todas as superfícies.
 | A03 | Classificador `teamConnectionFailureOf(Throwable)`, com exceção real do `CertPathValidator` no teste |
 | A04 | Rótulos PT/EN: nome da etapa, frase do que parou e do que fazer |
 | A05 | Primitiva de trilha (compacta e completa) + contrato em `docs/design-system/` |
-| A06 | Sessões do time: erro da lista, do detalhe e das remoções, com "Tentar de novo" |
+| A06 | Extração antes de crescer: diálogos de remoção e linha de erro de ação saem de `TeamUsageScreen.kt` (749 linhas); `publishDetail` vira função pura `withOpenDetail` (VM com 752) |
+| A06b | Sessões do time: erro da lista, do detalhe e das remoções, com "Tentar de novo" |
 | A07 | Conectados agora: erro da carga e das ações |
 | A08 | Chaves de conta: erro da carga e das ações |
 | A09 | Configurações › Time: testar conexão, vínculo das contas, token admin e falha de envio |
@@ -71,6 +72,7 @@ a mesma classificação em todas as superfícies.
 | A03 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.TeamConnectionFailureClassifierTest"` | vermelho: 12 testes, 10 falharam com o stub `null` (`AssertionError: expected:`; os 2 que esperam `null` passam); verde: 12 testes, 0 falhas — o caso do certificado vencido usa a falha real do `CertPathValidator` PKIX (motivo `EXPIRED`, `notAfter` 2020-01-02T14:02:17Z lido do caminho). `HOSTNAME_MISMATCH` entrou no enum novo do A02 (`SSLPeerUnverifiedException` do OkHttp) |
 | A04 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.TeamConnectionLabelsTest"` | vermelho: 7 testes, 7 falharam com os stubs vazios; verde: 7 testes, 0 falhas (data em BRT: 15:21 UTC → "27/10 12:21 BRT" / "Oct 27, 12:21 BRT") |
 | A05 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.AppStepTrailTest" --tests "com.usagemonitor.ui.AppStatesTest" --tests "*ArchitectureRulesTest"` | vermelho: 6 de 6 com os stubs (`AssertionError: Failed to perform isDisplayed check … could not find any node`); verde: `AppStepTrailTest` 6/6, `AppStatesTest` 13/13, `ArchitectureRulesTest` 17/17. `AppErrorState` ganhou `content` e ação secundária fantasma (sem ação, nenhuma linha de botões). Design system: `AppStepTrail.{jsx,d.ts,prompt.md}`, card de feedback, `_ds_local.js`, `readme.md` — sem harness, conferido por leitura |
+| A06 | `gradlew.bat desktopTest --tests "*TeamUsage*" --tests "*ArchitectureRulesTest"` | refatoração sem comportamento novo (sem vermelho); verde: `TeamUsageViewModelTest` 52/52, `TeamUsageScreenTest` 52/52, `ArchitectureRulesTest` 17/17 e demais `*TeamUsage*`. `TeamUsageScreen.kt` 749 → 656 linhas (`TeamUsageRemovalViews.kt`, 114), `TeamUsageViewModel.kt` 752 → 737 |
 
 ## Problemas em aberto e riscos
 
