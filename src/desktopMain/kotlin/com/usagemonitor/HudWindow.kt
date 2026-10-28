@@ -12,6 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpOffset
@@ -301,7 +303,7 @@ internal fun HudWindowHost(
         iconImage = windowIconImage,
         onCloseRequest = onCloseRequest,
         onKeyEvent = { event ->
-            handleHudWindowKey(event = event, onOpenHelp = actions.openHelp)
+            handleHudWindowKey(type = event.type, key = event.key, onOpenHelp = actions.openHelp)
         },
         dragging = drag.dragging
     ) {

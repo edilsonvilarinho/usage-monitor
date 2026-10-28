@@ -1,10 +1,7 @@
 package com.usagemonitor
 
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
@@ -43,8 +40,8 @@ internal fun hudUpdateIndicatorOf(state: AppUpdateUiState, language: AppLanguage
 }
 
 /** `F1` abre a ajuda, a tecla que o sistema reserva para ela. */
-internal fun handleHudWindowKey(event: KeyEvent, onOpenHelp: () -> Unit): Boolean {
-    val help = event.type == KeyEventType.KeyDown && event.key == Key.F1
+internal fun handleHudWindowKey(type: KeyEventType, key: Key, onOpenHelp: () -> Unit): Boolean {
+    val help = type == KeyEventType.KeyDown && key == Key.F1
     if (help) {
         onOpenHelp()
     }

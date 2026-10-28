@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.dp
 import java.awt.Rectangle
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,5 +80,19 @@ class HudHitRegionTargetTest {
         assertNull(hudHitRegionTarget(null, hasApplied = true, clearWithFullBounds = true, 0, 541).shape)
         assertNull(hudHitRegionTarget(null, hasApplied = true, clearWithFullBounds = true, 434, 0).shape)
         assertTrue(hudHitRegionTarget(null, hasApplied = true, clearWithFullBounds = true, 0, 0).touch)
+    }
+
+    /**
+     * O recorte em pixels da AWT nunca fica menor que o notch: a borda de cima e a
+     * da esquerda descem (`floor`), a de baixo e a da direita sobem (`ceil`). Com
+     * 125%, a esquerda 10 vira 12,5 e desce a 12; a direita 30 vira 37,5 e sobe a
+     * 38: o pixel cortado ao meio entra.
+     */
+    @Test
+    fun `the AWT rectangle covers every pixel the notch touches`() {
+        val notch = DpRect(left = 10.dp, top = 10.dp, right = 30.dp, bottom = 20.dp)
+
+        assertEquals(Rectangle(10, 10, 20, 10), notch.toAwtRectangle(1f))
+        assertEquals(Rectangle(12, 12, 26, 13), notch.toAwtRectangle(1.25f))
     }
 }

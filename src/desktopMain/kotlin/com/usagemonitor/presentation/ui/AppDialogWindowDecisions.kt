@@ -5,10 +5,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogModalityType
 import com.usagemonitor.AutoStartManager
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
@@ -124,8 +121,8 @@ internal fun modalOpenedBreadcrumb(diagnosticName: String, elapsedMillis: Long, 
 }
 
 /** Esc fecha a janela. Só chega aqui o que nenhum elemento focado consumiu. */
-internal fun closesModal(event: KeyEvent, onCloseRequest: () -> Unit): Boolean {
-    if (event.type != KeyEventType.KeyDown || event.key != Key.Escape) {
+internal fun closesModal(type: KeyEventType, key: Key, onCloseRequest: () -> Unit): Boolean {
+    if (type != KeyEventType.KeyDown || key != Key.Escape) {
         return false
     }
     onCloseRequest()

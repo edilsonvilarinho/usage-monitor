@@ -1,5 +1,7 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.AnthropicProfileOrigin
+import com.usagemonitor.AnthropicProfileRecord
 import com.usagemonitor.AnthropicProfileRegistry
 import com.usagemonitor.data.datasource.LocalApiKeyDataSource
 import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
@@ -247,5 +249,17 @@ class TuiSettingsTest {
         assertEquals("", after.apiKey)
         assertEquals("edi", after.alias)
         assertTrue(harness.settings().sections.single { section -> section.title == "Time" }.fields.none { field -> field.label == "Sair do time" })
+    }
+
+    /** A aba Time lista só as contas marcadas para o time e visíveis, na ordem gravada. */
+    @Test
+    fun `the team tab lists only the visible participating accounts in stored order`() {
+        fun record(id: String, label: String, hidden: Boolean = false) =
+            AnthropicProfileRecord(id = id, label = label, configDirectory = "/$id", enabled = true, origin = AnthropicProfileOrigin.MANUAL, hidden = hidden)
+        val records = listOf(record("p1", "pessoal"), record("w1", "trabalho"), record("old", "antiga", hidden = true), record("x1", "cliente"))
+        val settings = TeamIntegrationSettings(participatingProfileIds = setOf("x1", "w1", "old"))
+
+        assertEquals(listOf("trabalho", "cliente"), tuiTeamAccountLabels(records, settings))
+        assertEquals(emptyList(), tuiTeamAccountLabels(records, null))
     }
 }

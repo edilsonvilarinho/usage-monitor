@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogState
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.Window
@@ -139,7 +141,7 @@ internal fun AppDialogWindow(
         visible = host.onScreen,
         resizable = true,
         undecorated = true,
-        onKeyEvent = { event -> closesModal(event, onCloseRequest) }
+        onKeyEvent = { event -> closesModal(event.type, event.key, onCloseRequest) }
     ) {
         ModalWindowBody(
             host = host,
@@ -187,7 +189,7 @@ internal fun AppDialogWindow(
         decoration = WindowDecoration.Undecorated(),
         resizable = true,
         modalityType = dialogModality(dragsWindowsByCompositor),
-        onKeyEvent = { event -> closesModal(event, onCloseRequest) }
+        onKeyEvent = { event -> closesModal(event.type, event.key, onCloseRequest) }
     ) {
         ModalWindowBody(
             host = host,
