@@ -18,7 +18,7 @@ import kotlin.math.sin
 private const val DISK_STREAKS = 3
 
 /**
- * AL1 · Gargantua de Interstellar (#517): horizonte, anel de fótons, o disco de
+ * AL1 · Gargantua de Interstellar (#517), da marca para trás: horizonte, anel de fótons, o disco de
  * trás dobrado por cima do horizonte e o disco em duas metades — a de trás mais
  * fraca, a da frente mais larga e clara. Camadas geométricas, sem bitmap, blur
  * de GPU ou partículas aleatórias; quem informa continuam sendo os arcos e o
@@ -38,9 +38,17 @@ internal fun DrawScope.drawGargantuaCore(room: Float, phase: Float, scene: Garga
     )
     drawGargantuaLens(room, horizon, scene)
     drawAccretionDisk(room, phase, front = false, scene)
-    // O horizonte oculta o lado de trás do disco. A marca é composta depois.
+    // O horizonte oculta o lado de trás do disco. A marca vem depois, e por cima dela a frente.
     drawCircle(Space.core, radius = horizon)
     drawCircle(Space.hot.copy(alpha = 0.8f), horizon + room * 0.01f, style = Stroke(room * 0.022f))
+}
+
+/**
+ * A metade da frente do disco, desenhada **depois** da marca da API (#517): é
+ * ela que põe a marca dentro da cena, entre o horizonte e quem olha.
+ */
+internal fun DrawScope.drawGargantuaCoreFront(room: Float, phase: Float, scene: GargantuaScene = GargantuaScene.Dark) {
+    if (room <= 0f) return
     drawAccretionDisk(room, phase, front = true, scene)
 }
 

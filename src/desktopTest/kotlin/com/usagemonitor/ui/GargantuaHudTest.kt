@@ -250,6 +250,39 @@ class GargantuaHudTest {
         assertTrue(lit >= 2, "o arco de lente deveria ter ao menos 2dp acesos, tem $lit")
     }
 
+    /**
+     * AL1 (#517): a marca mora dentro da cena. O horizonte fica atrás dela, e a
+     * metade da frente do disco passa por cima — com uma marca branca chapada,
+     * o ponto do disco a 90° (embaixo do centro) deixa de ser branco puro e o
+     * topo da marca, longe do disco, continua branco.
+     */
+    @Test
+    fun `AL1 a metade da frente do disco passa por cima da marca`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        setContent {
+            AppTheme(isDark = true, motion = AppMotionPolicy.Static) {
+                Box(Modifier.testTag(FRAME).background(Color.Black).padding(8.dp)) {
+                    AppGargantuaRing(
+                        arcs = listOf(AppRingArc(0f, AppTone.OK), AppRingArc(0f, AppTone.OK)),
+                        description = "Conta · 7d · 5h",
+                        size = HUD_RING_SIZE,
+                        stroke = HUD_RING_STROKE,
+                        gap = HUD_RING_GAP,
+                        centerContent = { Box(Modifier.size(hudRingMarkSize(2)).background(Color.White)) }
+                    )
+                }
+            }
+        }
+        mainClock.advanceTimeBy(1_000)
+        val map = onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        val scale = map.width / (HUD_RING_SIZE.value + 16f)
+        val (dx, dy) = diskPoint(90.0)
+        val crossing = map[(dx * scale).toInt(), (dy * scale).toInt()]
+        val clear = map[(RING_CENTER * scale).toInt(), ((RING_CENTER - 6f) * scale).toInt()]
+        assertTrue(crossing.blue < 0.92f, "o disco da frente deveria cobrir a marca embaixo do centro, azul ${crossing.blue}")
+        assertEquals(Color.White, clear, "o topo da marca, longe do disco, deveria continuar branco")
+    }
+
     /** Ponto do disco no ângulo [degrees], em dp do quadro: elipse 0,95 × 0,152 do `room`, girada −12°. */
     private fun diskPoint(degrees: Double): Pair<Float, Float> {
         val theta = Math.toRadians(degrees)
