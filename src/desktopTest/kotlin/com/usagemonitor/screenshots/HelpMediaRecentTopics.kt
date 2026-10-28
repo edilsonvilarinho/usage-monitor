@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.ComparisonRow
 import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.presentation.AnalysisFixture
+import com.usagemonitor.presentation.ui.localized
 import com.usagemonitor.presentation.ui.AnalysisContent
 import com.usagemonitor.presentation.ui.ComparisonContent
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -45,16 +46,16 @@ import kotlin.time.Duration.Companion.minutes
  */
 
 /** Integrações: a aba "APIs" das Configurações, com uma integração sendo ligada. */
-internal fun recordIntegrations(outputDir: File) {
+internal fun recordIntegrations(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 420.dp)
     var enabled by mutableStateOf(ScreenshotFixtures.enabledApis)
 
-    record(outputDir, HelpTopic.DASHBOARD, state) { recorder ->
+    record(options, HelpTopic.DASHBOARD, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
+                    currentLanguage = options.language,
                     enabledApis = enabled,
                     autoStartEnabled = true,
                     windowOpacityPercent = 92,
@@ -78,16 +79,16 @@ internal fun recordIntegrations(outputDir: File) {
 }
 
 /** Contas: a aba "Contas", com o editor de um perfil aberto por "Editar". */
-internal fun recordAccounts(outputDir: File) {
+internal fun recordAccounts(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 420.dp)
     var expanded by mutableStateOf<String?>(null)
 
-    record(outputDir, HelpTopic.ACCOUNTS, state) { recorder ->
+    record(options, HelpTopic.ACCOUNTS, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 SettingsDialogContent(
                     currentTheme = AppThemePreset.OBSIDIANA_DARK,
-                    currentLanguage = AppLanguage.PT,
+                    currentLanguage = options.language,
                     enabledApis = ScreenshotFixtures.enabledApis,
                     autoStartEnabled = true,
                     windowOpacityPercent = 92,
@@ -112,17 +113,17 @@ internal fun recordAccounts(outputDir: File) {
 }
 
 /** Análise da sessão: o painel único ao vivo (rodada AD) e a leitura seguinte chegando sozinha. */
-internal fun recordSessionAnalysis(outputDir: File) {
+internal fun recordSessionAnalysis(options: HelpMediaOptions) {
     val state = DemoState()
     var analysis by mutableStateOf(AnalysisFixture.analysis)
 
-    record(outputDir, HelpTopic.SESSION_ANALYSIS, state) { recorder ->
+    record(options, HelpTopic.SESSION_ANALYSIS, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 AnalysisContent(
                     state = AnalysisUiState.Success(analysis),
                     accountLabel = "Anthropic · Padrão",
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onExportPdf = {}
                 )
             }
@@ -144,16 +145,16 @@ internal fun recordSessionAnalysis(outputDir: File) {
 }
 
 /** Comparação: o mapa de calor e a troca de recorte. */
-internal fun recordComparison(outputDir: File) {
+internal fun recordComparison(options: HelpMediaOptions) {
     val state = DemoState()
     var range by mutableStateOf(CliSessionRange.LAST_7D)
 
-    record(outputDir, HelpTopic.COMPARISON, state) { recorder ->
+    record(options, HelpTopic.COMPARISON, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 ComparisonContent(
                     state = ComparisonUiState.Success(comparisonRows(range), range, ScreenshotFixtures.NOW),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onSelectRange = {},
                     onExportReport = {},
                     onRetry = {}
@@ -171,15 +172,15 @@ internal fun recordComparison(outputDir: File) {
 }
 
 /** Bot do Telegram: os três passos, com o pareamento gerando o código. */
-internal fun recordTelegramBot(outputDir: File) {
+internal fun recordTelegramBot(options: HelpMediaOptions) {
     val state = DemoState()
     var code by mutableStateOf<String?>(null)
 
-    record(outputDir, HelpTopic.TELEGRAM_BOT, state) { recorder ->
+    record(options, HelpTopic.TELEGRAM_BOT, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 Box(modifier = Modifier.fillMaxSize().padding(AppSpacing.lg)) {
-                    TelegramBotSection(telegramModel(code), AppLanguage.PT)
+                    TelegramBotSection(telegramModel(code, options.language), options.language)
                 }
             }
         }
@@ -194,15 +195,15 @@ internal fun recordTelegramBot(outputDir: File) {
 }
 
 /** HUD no navegador: o interruptor ligado e o endereço aparecendo. */
-internal fun recordWebAccess(outputDir: File) {
+internal fun recordWebAccess(options: HelpMediaOptions) {
     val state = DemoState()
     var enabled by mutableStateOf(false)
 
-    record(outputDir, HelpTopic.WEB_ACCESS, state) { recorder ->
+    record(options, HelpTopic.WEB_ACCESS, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 Box(modifier = Modifier.fillMaxSize().padding(AppSpacing.lg)) {
-                    WebAccessSection(webAccessModel(enabled), AppLanguage.PT)
+                    WebAccessSection(webAccessModel(enabled), options.language)
                 }
             }
         }
@@ -229,14 +230,15 @@ private fun comparisonRows(range: CliSessionRange): List<ComparisonRow> {
     )
 }
 
-private fun telegramModel(code: String?) = TelegramBotSectionModel(
+// Os textos de status são os do `TelegramBotActions`, em cada idioma.
+private fun telegramModel(code: String?, language: AppLanguage) = TelegramBotSectionModel(
     enabled = true,
     token = "123:abc",
-    statusLabel = "Conectado como @usage_monitor_bot · 1 conversa(s)",
+    statusLabel = localized(language, "Conectado como @usage_monitor_bot · 1 conversa(s)", "Connected as @usage_monitor_bot · 1 chat(s)"),
     statusTone = AppTone.OK,
     chats = listOf(TelegramChat(51L, "@edilson")),
     pairingCode = code,
-    pairingHint = code?.let { "Vale por mais 10 min." },
+    pairingHint = code?.let { localized(language, "Vale por mais 10 min.", "Valid for 10 more min.") },
     statusPreview = "Usage Monitor\ncoleta 11:42 BRT · há 1 min\n\nAnthropic · Padrão — Crítico\nClaude 5h · reinicia 13:05\n▰▰▰▰▰▰▱▱▱▱  68%",
     onEnabledChange = {},
     onTokenChange = {},

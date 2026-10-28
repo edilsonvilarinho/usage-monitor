@@ -54,9 +54,13 @@ menos robótica que a do vídeo de release, trilha espacial, efeitos sonoros e t
 | # | Estado | Execução |
 |---|---|---|
 | A01 | feito | plano criado; sem teste (documento) |
+| A02 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.screenshots.HelpMediaOptionsTest"` → 7 testes, 6 falhas na asserção (`expected:<[history, budget]> but was:<null>`, `expected:<build/video-media> but was:<src/desktopMain/resources/help>`, `expected:<[000.png, 001.png, frames.json]> but was:<[]>`…); o caso do padrão já passava (é o comportamento atual). Verde: mesmo comando, 7/7. `generateVideoMedia -PvideoMediaLanguage=en`: 17 pastas, quadros 2000×840; folha de contato conferida, textos em inglês (HUD e bot do Telegram localizados nas fixtures). Recorte `screenshots.*`, `help.*`, `SettingsDialogContentTest`, `architecture.*`: 53 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
+- Os GIFs versionados da ajuda estão defasados do código: `generateHelpMedia -PhelpMediaTopic=budget,window-modes`
+  regerou `window-modes.gif` com o balão atual (botão de análise, linha "usado · restante" em duas colunas), diferente
+  do arquivo de 2026-09-29. Não é efeito desta mudança e fica fora do escopo; os dois arquivos foram restaurados.
 - Duração real só sai da fala medida; com Kokoro a 0,9 a estimativa do protótipo (≈ 9 min) pode passar de 10 min. O
   conserto é cortar texto, nunca acelerar.
 - Render estimado em ~1 h para os dois idiomas (≈ 9 quadros/s medidos no vídeo de release, 1080×1920).

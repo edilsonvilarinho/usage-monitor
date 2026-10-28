@@ -470,6 +470,19 @@ tasks.register<JavaExec>("generateHelpMedia") {
     if (helpMediaTopic == "history") args("--history") else if (helpMediaTopic != null) args("--topic=$helpMediaTopic")
 }
 
+// Tour em video (#505): as mesmas demos da ajuda, em sequencia de PNG a 2x e no idioma pedido.
+// `-PvideoMediaLanguage=en` (padrao pt); saida em build/video-media/<idioma>/<mediaId>/.
+tasks.register<JavaExec>("generateVideoMedia") {
+    group = "documentation"
+    description = "Renderiza offscreen as demos da ajuda em PNG a 2x para o tour em video."
+
+    mainClass.set("com.usagemonitor.screenshots.HelpMediaGeneratorKt")
+    classpath = files(desktopTestCompilation.output.allOutputs, desktopTestCompilation.runtimeDependencyFiles)
+    val language = providers.gradleProperty("videoMediaLanguage").orElse("pt").get()
+    args(layout.buildDirectory.dir("video-media").get().asFile.absolutePath, "--frames", "--language=$language")
+    providers.gradleProperty("helpMediaTopic").orNull?.let { topic -> args("--topic=$topic") }
+}
+
 // Pre-extracao da nativa do Skiko antes dos forks paralelos -- ver o comentario
 // de `testForks` acima. Sem forks nao ha corrida, e a tarefa nao entra no grafo.
 val extractSkikoNative = tasks.register<JavaExec>("extractSkikoNative") {
