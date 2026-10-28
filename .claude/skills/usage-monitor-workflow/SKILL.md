@@ -23,6 +23,9 @@ the agent, never the model. Rules against context leakage: `CLAUDE.md`, "Orquest
 | 8 cleanup, issue comment | Neferpitou |
 | broad search in any step | `explorer` |
 
+The table is mandatory, not advice (#515): it is the user's explicit request to use these subagents. Never run the
+step 5 or step 7 commands in the main session; call the `test-runner` agent with them.
+
 Delegation prompt: the exact command, the directory (the worktree path) and the expected return. Never the
 conversation, never a fork. A red verdict comes back as the failing assertion lines; Neferpitou decides the fix.
 
