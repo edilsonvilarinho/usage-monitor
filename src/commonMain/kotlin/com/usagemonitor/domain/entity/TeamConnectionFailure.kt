@@ -12,7 +12,7 @@ import kotlin.time.Instant
 enum class TeamConnectionStage { ADDRESS, CONNECTION, CERTIFICATE, SERVER, CREDENTIAL }
 
 /** Por que o certificado do servidor foi recusado, quando o tipo da causa diz. */
-enum class TeamCertificateProblem { EXPIRED, NOT_YET_VALID, UNTRUSTED, OTHER }
+enum class TeamCertificateProblem { EXPIRED, NOT_YET_VALID, UNTRUSTED, HOSTNAME_MISMATCH, OTHER }
 
 enum class TeamStageStatus { PASSED, FAILED, NOT_REACHED, UNKNOWN }
 

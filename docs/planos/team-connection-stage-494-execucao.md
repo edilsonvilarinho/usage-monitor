@@ -68,6 +68,7 @@ a mesma classificação em todas as superfícies.
 |---|---|---|
 | A01 | sem harness de teste (documento) | plano revisado contra os fatos acima |
 | A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.TeamConnectionFailureTest"` | vermelho: 4 de 4 falharam com o stub vazio (`AssertionError: expected:` em 3, `List is empty` em 1); verde: 4 testes, 0 falhas |
+| A03 | `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.TeamConnectionFailureClassifierTest"` | vermelho: 12 testes, 10 falharam com o stub `null` (`AssertionError: expected:`; os 2 que esperam `null` passam); verde: 12 testes, 0 falhas — o caso do certificado vencido usa a falha real do `CertPathValidator` PKIX (motivo `EXPIRED`, `notAfter` 2020-01-02T14:02:17Z lido do caminho). `HOSTNAME_MISMATCH` entrou no enum novo do A02 (`SSLPeerUnverifiedException` do OkHttp) |
 
 ## Problemas em aberto e riscos
 
