@@ -1,5 +1,8 @@
 package com.usagemonitor.update
 
+import java.io.File
+import kotlin.io.path.createTempDirectory
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,6 +12,98 @@ import kotlin.test.assertTrue
 class LinuxMenuIconTest {
 
     private val stableIconPath = "/home/edils/.local/share/usage-monitor/icon-0123456789ab.png"
+
+    private val tempDir = createTempDirectory("linux-menu-icon").toFile()
+    private val rootPath = File(tempDir, "share/usage-monitor").also { root -> root.mkdirs() }.absolutePath.replace('\\', '/')
+    private val layout = LinuxInstallLayout(rootPath)
+    private val iconBytes = byteArrayOf(1, 2, 3, 4)
+    private val iconName = linuxMenuIconFileName(iconBytes)
+    private val menuEntry = File(tempDir, "applications/usage-monitor.desktop")
+    private val versionedIcon = "$rootPath/versions/38.0.2/Usage Monitor/lib/Usage Monitor.png"
+
+    @AfterTest
+    fun cleanUp() {
+        tempDir.deleteRecursively()
+    }
+
+    private fun writeMenuEntry(icon: String) {
+        menuEntry.parentFile.mkdirs()
+        menuEntry.writeText("[Desktop Entry]\nName=Usage Monitor\nIcon=$icon\nExec=usage-monitor\n")
+    }
+
+    private fun writeStaleCopies() {
+        File(layout.root, "icon.png").writeBytes(byteArrayOf(9))
+        File(layout.root, "icon-ffffffffffff.png").writeBytes(byteArrayOf(8))
+    }
+
+    private fun rootNames() = layout.root.list().orEmpty().sorted()
+
+    @Test
+    fun `repair writes the stable copy, points the menu at it and only then removes old copies`() {
+        writeStaleCopies()
+        File(layout.root, "meu-icone.png").writeBytes(byteArrayOf(7))
+        writeMenuEntry(versionedIcon)
+
+        repairLinuxMenuIcon(layout, iconBytes, menuEntry.absolutePath)
+
+        assertTrue(File(layout.root, iconName).readBytes().contentEquals(iconBytes))
+        assertEquals(
+            "[Desktop Entry]\nName=Usage Monitor\nExec=usage-monitor\nIcon=${layout.iconPath(iconName)}\n",
+            menuEntry.readText()
+        )
+        assertEquals(listOf(iconName, "meu-icone.png"), rootNames(), "só as cópias do app saem")
+    }
+
+    @Test
+    fun `an entry already pointing at the copy is left as it is and old copies still go`() {
+        File(layout.root, iconName).writeBytes(iconBytes)
+        File(layout.root, iconName).setLastModified(1_000_000L)
+        writeStaleCopies()
+        writeMenuEntry(layout.iconPath(iconName))
+        val before = menuEntry.readText()
+
+        repairLinuxMenuIcon(layout, iconBytes, menuEntry.absolutePath)
+
+        assertEquals(before, menuEntry.readText())
+        assertEquals(1_000_000L, File(layout.root, iconName).lastModified(), "cópia presente não é regravada")
+        assertEquals(listOf(iconName), rootNames())
+    }
+
+    @Test
+    fun `without a menu entry nothing is created and old copies stay`() {
+        writeStaleCopies()
+
+        repairLinuxMenuIcon(layout, iconBytes, menuEntry.absolutePath)
+        repairLinuxMenuIcon(layout, iconBytes, menuDesktopFilePath = null)
+
+        assertFalse(menuEntry.exists(), "criar a entrada é trabalho do instalador")
+        assertEquals(listOf("icon-ffffffffffff.png", iconName, "icon.png").sorted(), rootNames())
+    }
+
+    @Test
+    fun `a menu entry that cannot be rewritten keeps the copy it points at`() {
+        writeStaleCopies()
+        writeMenuEntry("$rootPath/icon.png")
+        // Pasta não vazia no lugar do temporário: a escrita atômica falha.
+        File(menuEntry.parentFile, "${menuEntry.name}.next").also { blocker -> blocker.mkdirs() }.resolve("x").writeText("x")
+
+        repairLinuxMenuIcon(layout, iconBytes, menuEntry.absolutePath)
+
+        assertTrue(menuEntry.readText().contains("Icon=$rootPath/icon.png"))
+        assertTrue(File(layout.root, "icon.png").isFile, "o menu ainda mostra a cópia antiga")
+    }
+
+    @Test
+    fun `a copy that cannot be written stops before touching the menu`() {
+        // Pasta não vazia com o nome da cópia: `isFile` é falso e o rename falha.
+        File(layout.root, iconName).also { blocker -> blocker.mkdirs() }.resolve("x").writeText("x")
+        File(layout.root, "$iconName.next").also { blocker -> blocker.mkdirs() }.resolve("x").writeText("x")
+        writeMenuEntry(versionedIcon)
+
+        repairLinuxMenuIcon(layout, iconBytes, menuEntry.absolutePath)
+
+        assertTrue(menuEntry.readText().contains("Icon=$versionedIcon"))
+    }
 
     @Test
     fun `an absent entry does not need repair`() {

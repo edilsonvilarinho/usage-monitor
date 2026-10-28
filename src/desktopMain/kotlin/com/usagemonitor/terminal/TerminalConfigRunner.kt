@@ -57,7 +57,7 @@ internal class TerminalConfigRunner(
         TelegramBotApi(buildHttpClient(resolveEffectiveProxy(LocalProxySettingsDataSource(dataFile("proxy.json")).load())))
     },
     private val teamCheck: (TeamIntegrationSettings, List<TeamCheckAccount>) -> List<String> =
-        TerminalTeamRunner.realCheck { LocalProxySettingsDataSource(dataFile("proxy.json")).load() },
+        TerminalTeamRunner.realCheck(proxy = { LocalProxySettingsDataSource(dataFile("proxy.json")).load() }),
     private val webAddresses: () -> List<String> = ::siteLocalIpv4Addresses,
     private val keyProbe: (ApiSource, String) -> Throwable? =
         TerminalKeysRunner.realProbe { LocalProxySettingsDataSource(dataFile("proxy.json")).load() }

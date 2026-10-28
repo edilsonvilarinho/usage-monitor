@@ -8,6 +8,7 @@ import com.usagemonitor.data.repository.TeamAdminRepositoryImpl
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
 import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
+import com.usagemonitor.domain.entity.ProxyEnvironmentConfig
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.WebAccessSettings
@@ -19,6 +20,7 @@ import com.usagemonitor.presentation.terminal.TerminalSettingRow
 import com.usagemonitor.presentation.terminal.TerminalSpan
 import com.usagemonitor.presentation.terminal.TerminalTeamLabels
 import com.usagemonitor.presentation.terminal.terminalLine
+import io.ktor.client.HttpClient
 import java.io.File
 import java.net.URI
 import java.util.prefs.Preferences
@@ -179,9 +181,12 @@ internal class TerminalTeamRunner(
          * o servidor de pé e, para cada conta, o vínculo da chave — que vincula, e não só
          * confere, como lá.
          */
-        fun realCheck(proxy: () -> ProxySettings): (TeamIntegrationSettings, List<TeamCheckAccount>) -> List<String> = { settings, accounts ->
+        fun realCheck(
+            proxy: () -> ProxySettings,
+            httpClientFactory: (ProxyEnvironmentConfig?) -> HttpClient = { effectiveProxy -> buildHttpClient(effectiveProxy) }
+        ): (TeamIntegrationSettings, List<TeamCheckAccount>) -> List<String> = { settings, accounts ->
             runBlocking {
-                val httpClient = buildHttpClient(resolveEffectiveProxy(proxy()))
+                val httpClient = httpClientFactory(resolveEffectiveProxy(proxy()))
                 try {
                     val remote = RemoteTeamDataSource(httpClient)
                     val health = TeamUsageRepositoryImpl(remote, settingsProvider = { settings }).checkConnection().exceptionOrNull()

@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.AppLanguage
 import java.io.File
 import java.util.zip.ZipFile
 import kotlin.test.Test
@@ -143,6 +144,47 @@ class DiagnosticsExportTest {
                 assertEquals("app", file.getInputStream(file.getEntry("app.log")).reader().readText().trim())
             }
         }
+    }
+
+    @Test
+    fun `run prints where the package is and that it holds metadata only, in the app language`() {
+        val zip = File("usage-monitor-diagnostics-2026-10-28T120000.zip")
+        for ((language, expected) in listOf(
+            AppLanguage.PT to listOf(
+                "Diagnóstico salvo em: ${zip.absolutePath}",
+                "Anexe este arquivo à issue do GitHub. Só tem metadados: nenhum prompt, resposta ou credencial."
+            ),
+            AppLanguage.EN to listOf(
+                "Diagnostics saved to: ${zip.absolutePath}",
+                "Attach this file to the GitHub issue. It holds metadata only: no prompt, response or credential."
+            )
+        )) {
+            val out = mutableListOf<String>()
+            val err = mutableListOf<String>()
+
+            val code = DiagnosticsExport.run(language, out = { line -> out += line }, err = { line -> err += line }, exportPackage = { zip })
+
+            assertEquals(0, code)
+            assertEquals(expected, out)
+            assertEquals(emptyList<String>(), err)
+        }
+    }
+
+    @Test
+    fun `run reports a package that cannot be written on the error stream with exit code 1`() {
+        val out = mutableListOf<String>()
+        val err = mutableListOf<String>()
+
+        val code = DiagnosticsExport.run(
+            AppLanguage.EN,
+            out = { line -> out += line },
+            err = { line -> err += line },
+            exportPackage = { throw java.io.IOException("disk full") }
+        )
+
+        assertEquals(1, code)
+        assertEquals(emptyList<String>(), out)
+        assertEquals(listOf("Could not write the diagnostics package: IOException: disk full"), err)
     }
 
     private fun withDirs(block: (File, File) -> Unit) {
