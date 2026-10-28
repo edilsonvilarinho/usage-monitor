@@ -2,6 +2,9 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.BotButton
+import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.QuietHours
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageSnapshot
@@ -206,5 +209,61 @@ class TelegramBotMessagesTest {
         assertEquals("Saldo", com.usagemonitor.presentation.ui.displayQuotaLabel("Saldo", AppLanguage.PT))
         val status = TelegramBotMessages.status(snapshot, AppLanguage.EN)
         assertTrue("Balance" in status && "Saldo" !in status, status)
+    }
+
+    @Test
+    fun `thresholds list the general ones, say when quota alerts are off and add each account in label order`() {
+        val settings = UsageAlertSettings(quotaAlertsEnabled = false, quotaPercents = listOf(75, 90))
+            .withAccountThreshold("ANTHROPIC:z", "Zeta", listOf(60))
+            .withAccountThreshold("ANTHROPIC:a", "Alfa <1>", listOf(50, 80))
+
+        assertEquals(
+            "⚙ Quota thresholds: <b>75%</b>, <b>90%</b> (quota alerts off)\n• Alfa &lt;1&gt;: <b>50%</b>, <b>80%</b>\n• Zeta: <b>60%</b>\n" +
+                "Change with <code>/threshold 75,90</code> or, per account, <code>/threshold</code>",
+            TelegramBotMessages.thresholds(settings, AppLanguage.EN)
+        )
+        assertTrue(
+            TelegramBotMessages.thresholds(UsageAlertSettings(quotaPercents = emptyList()), AppLanguage.PT).startsWith("⚙ Limiares de cota: nenhum\n"),
+            TelegramBotMessages.thresholds(UsageAlertSettings(quotaPercents = emptyList()), AppLanguage.PT)
+        )
+    }
+
+    @Test
+    fun `each applied command confirms what changed, in both languages`() {
+        assertEquals("🔕 Silêncio 22:00 → 07:00 aplicado.", TelegramBotMessages.applied(BotCommand.Quiet(QuietHours(22, 7)), AppLanguage.PT))
+        assertEquals("🔕 Quiet hours 09:00 → 17:00 set.", TelegramBotMessages.applied(BotCommand.Quiet(QuietHours(9, 17)), AppLanguage.EN))
+        assertEquals("🔔 Quiet hours off.", TelegramBotMessages.applied(BotCommand.Quiet(null), AppLanguage.EN))
+        assertEquals("Quota thresholds: <b>50%</b>, <b>80%</b>", TelegramBotMessages.applied(BotCommand.Threshold(listOf(50, 80)), AppLanguage.EN))
+        assertEquals(
+            "⏰ Combinado: aviso <b>15 min</b> antes de reiniciar qualquer cota acima de um limiar.",
+            TelegramBotMessages.applied(BotCommand.Remind(15), AppLanguage.PT)
+        )
+        assertEquals("⏰ Done: I'll warn <b>30 min</b> before any quota above a threshold resets.", TelegramBotMessages.applied(BotCommand.Remind(30), AppLanguage.EN))
+        assertEquals("⏰ Reminder before resets off.", TelegramBotMessages.applied(BotCommand.Remind(null), AppLanguage.EN))
+        assertEquals("🔔 Alerts on.", TelegramBotMessages.applied(BotCommand.Alerts(true), AppLanguage.EN))
+        // Comando que não muda nada responde com a ajuda.
+        assertEquals(TelegramBotMessages.help(AppLanguage.EN), TelegramBotMessages.applied(BotCommand.Status, AppLanguage.EN))
+    }
+
+    @Test
+    fun `the English keyboard, mute and pairing texts`() {
+        assertEquals(
+            listOf("🔄 Refresh" to BotButton.REFRESH, "🔕 Mute 1h" to BotButton.SNOOZE, "⚙ Thresholds" to BotButton.THRESHOLDS),
+            TelegramBotMessages.statusButtons(AppLanguage.EN)
+        )
+        assertEquals(
+            "🔕 Alerts muted until <b>23:30</b>.\nTo resume earlier: <code>/alerts on</code>",
+            TelegramBotMessages.snoozed(Instant.parse("2026-10-07T02:30:00Z").toEpochMilliseconds(), AppLanguage.EN)
+        )
+        assertTrue(TelegramBotMessages.paired(AppLanguage.EN).startsWith("✅ <b>Chat paired.</b>\n"))
+    }
+
+    @Test
+    fun `a quota without percent shows the balance, the used of total, or the used alone`() {
+        val balance = quota("Saldo", null, null, UsageUnit.CURRENCY_USD)
+        assertTrue(TelegramBotMessages.quotaValue(balance, pt = false).startsWith("balance "), TelegramBotMessages.quotaValue(balance, pt = false))
+        assertEquals("1234 / 100", TelegramBotMessages.quotaValue(quota("Requisições", null, null, UsageUnit.REQUESTS), pt = true))
+        assertEquals("1234", TelegramBotMessages.quotaValue(quota("Requisições", null, null, UsageUnit.REQUESTS).copy(total = 0), pt = true))
+        assertEquals("<code>1234 / 100</code>", TelegramBotMessages.quotaLine(quota("Requisições", null, null, UsageUnit.REQUESTS), pt = true, thresholds = listOf(75)))
     }
 }

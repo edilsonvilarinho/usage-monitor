@@ -28,6 +28,8 @@ import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.UsageAlert
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.domain.entity.BotCommand
+import com.usagemonitor.domain.entity.BotTap
+import com.usagemonitor.domain.entity.data
 import com.usagemonitor.domain.entity.parseBotCommand
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -973,13 +975,161 @@ class TelegramBotServiceTest {
     @Test
     fun `without Skia the chart and the status image answer in text`() {
         imagesAvailable = false
+        snapshot = percentSnapshot()
         paired()
         service.start()
         api.pending += message(1, chat = 51, text = "/grafico")
-        api.pending += message(2, chat = 51, text = "/img")
+        // `/status img`, e não `/img`: este cairia no "Não entendi" e não exercitaria a imagem.
+        api.pending += message(2, chat = 51, text = "/status img")
 
         waitUntil { api.sent.count { it.first == 51L } >= 2 }
         assertTrue(api.photos.isEmpty())
         assertTrue(api.sent.any { it.second.startsWith("Este computador não desenha imagens") })
+        // Sem Skia, a imagem do status vira o próprio `/status` em texto.
+        assertTrue(api.sent.any { it.second.startsWith("<b>📊 Usage Monitor</b>") }, api.sent.toString())
+        assertTrue(api.sent.none { it.second.startsWith("Não entendi") }, api.sent.toString())
+    }
+
+    /** Uma conta com cota em percentual: o que o `/status img` desenha. */
+    private fun percentSnapshot() = UsageSnapshot(
+        generatedAt = Instant.parse("2026-10-06T12:00:00Z"),
+        accounts = listOf(
+            UsageSnapshotAccount(
+                ApiSource.ANTHROPIC, "Claude — Edi", active = true, fetchedAt = Instant.parse("2026-10-06T11:59:00Z"),
+                quotas = listOf(UsageSnapshotQuota("Claude 5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 42, 100, 42, Instant.parse("2026-10-06T15:00:00Z"), "USD", null))
+            )
+        )
+    )
+
+    /** O `/status img` (#396): sem cota em percentual responde em texto; com Skia sai a foto. */
+    @Test
+    fun `status image answers in text without a percent quota and as a photo with one`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/status img")
+        waitUntil { api.sent.any { it.second == "Nenhuma conta com cota em percentual para desenhar. Use /status." } }
+
+        snapshot = percentSnapshot()
+        api.pending += message(2, chat = 51, text = "/status img")
+        waitUntil { api.photos.isNotEmpty() }
+        assertTrue(api.photos.single().second > 0)
+    }
+
+    /** Sem índice legível, a vazão e a comparação dizem que não leram, em vez de desenhar vazio. */
+    @Test
+    fun `throughput and compare without a readable index say so`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/vazao")
+        api.pending += message(2, chat = 51, text = "/comparar 30d")
+
+        waitUntil { api.sent.count { it.second == "Não deu para ler o índice das sessões CLI agora." } == 2 }
+        assertTrue(api.photos.isEmpty())
+    }
+
+    /** O botão "Limiares" do `/status` responde com os limiares; dado desconhecido só fecha o relógio do toque. */
+    @Test
+    fun `thresholds button shows the thresholds and an unknown button only answers the tap`() {
+        paired()
+        service.start()
+        api.pending += tap(1, chat = 51, data = "thresholds")
+        api.pending += tap(2, chat = 51, data = "botao-de-outra-versao")
+
+        waitUntil { api.answered.containsAll(listOf("cb1", "cb2")) }
+        waitUntil { api.sent.any { it.second.startsWith("⚙ Limiares de cota: <b>75%</b>, <b>90%</b>, <b>100%</b>") } }
+        assertEquals(1, api.sent.size)
+    }
+
+    /** #408, AA10: resposta que não é número pede o formato e mantém a pergunta aberta. */
+    @Test
+    fun `a threshold reply that is not a number asks again and the next one is taken`() {
+        paired()
+        service.start()
+        api.pending += tap(1, chat = 51, data = BotTap.ThresholdAccount(null).data())
+        waitUntil { api.sent.any { it.second.startsWith("Limiar <b>geral</b>") } }
+
+        api.pending += message(2, chat = 51, text = "muito")
+        waitUntil { api.sent.any { it.second.contains("<code>50,80</code>") && it.second.startsWith("Não entendi") } }
+        api.pending += message(3, chat = 51, text = "60,85")
+
+        waitUntil { alertSettings.value.quotaPercents == listOf(60, 85) }
+        waitUntil { api.sent.any { it.second == "Limiar geral: <b>60%, 85%</b>." } }
+    }
+
+    /** A conta saiu do retrato entre o teclado e o toque: o bot mostra o que sabe dela, sem abrir pergunta. */
+    @Test
+    fun `a threshold tap on an account that left the reading answers without asking`() {
+        paired()
+        service.start()
+        api.pending += tap(1, chat = 51, data = BotTap.ThresholdAccount("ANTHROPIC:sumiu").data())
+
+        waitUntil { api.answered.contains("cb1") && api.sent.isNotEmpty() }
+        assertTrue(api.sent.none { it.second.startsWith("Limiar de ") }, api.sent.toString())
+    }
+
+    /** Duas contas analisáveis: Anthropic com histórico (`ANTHROPIC:work`) e Codex sem. */
+    private fun twoAnalyzableAccounts() = UsageSnapshot(
+        generatedAt = Instant.parse("2026-10-06T12:00:00Z"),
+        accounts = listOf(
+            UsageSnapshotAccount(
+                ApiSource.ANTHROPIC, "Anthropic · Trabalho", active = false,
+                quotas = listOf(UsageSnapshotQuota("Claude 5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 62, 100, 62, null, "USD")),
+                targetKey = "ANTHROPIC:work"
+            ),
+            UsageSnapshotAccount(
+                ApiSource.CODEX, "Codex", active = false,
+                quotas = listOf(UsageSnapshotQuota("Codex 5h", PeriodType.INTERVAL, UsageUnit.PERCENTAGE, 20, 100, 20, null, "USD")),
+                targetKey = "CODEX"
+            )
+        )
+    )
+
+    /** AB13: com mais de uma conta o bot pergunta qual, e "Todas" monta o placar só com quem tem histórico. */
+    @Test
+    fun `analysis with two accounts asks which one and the scoreboard keeps only those with history`() {
+        snapshot = twoAnalyzableAccounts()
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/analise")
+
+        waitUntil { api.sent.any { it.second == "<b>📐 Análise de qual conta?</b>" } }
+        val buttons = api.keyboards.last { it.isNotEmpty() }
+        assertEquals(listOf("Anthropic · Trabalho", "Codex", "📊 Todas (placar)"), buttons.map { it.text })
+
+        api.pending += tap(2, chat = 51, data = buttons.last().data)
+        waitUntil { api.answered.contains("cb2") && api.sent.size >= 2 }
+        assertTrue(api.sent.last().second.contains("ritmo 5h"), api.sent.last().second)
+    }
+
+    @Test
+    fun `analysis says when the account has no history yet or when no account can be analyzed`() {
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/analise")
+        waitUntil { api.sent.any { it.second == "📐 A análise cobre contas Anthropic e Codex, e nenhuma está com leitura agora." } }
+
+        snapshot = twoAnalyzableAccounts()
+        api.pending += message(2, chat = 51, text = "/analise codex")
+        waitUntil { api.sent.any { it.second == "📐 Sem histórico desta conta ainda. A análise aparece depois de algumas coletas." } }
+
+        // Toque numa conta que saiu do retrato depois do teclado.
+        api.pending += tap(3, chat = 51, data = BotTap.AnalysisAccount("ANTHROPIC:sumiu").data())
+        waitUntil { api.answered.contains("cb3") && api.sent.count { it.second.startsWith("📐 A análise cobre") } == 2 }
+    }
+
+    /** #440: sem Skia a vista de imagem vira o painel em texto; o relatório sai em PDF. */
+    @Test
+    fun `analysis image falls back to the text panel without Skia and the report goes out as a pdf`() {
+        imagesAvailable = false
+        snapshot = twoAnalyzableAccounts()
+        paired()
+        service.start()
+        api.pending += message(1, chat = 51, text = "/analise claude img")
+        api.pending += message(2, chat = 51, text = "/analise claude pdf")
+
+        waitUntil { api.documents.isNotEmpty() && api.sent.any { it.second.startsWith("<b>📐 Anthropic · &lt;Padrão&gt;</b>") } }
+        assertTrue(api.photos.isEmpty())
+        assertTrue(api.documents.single().first.endsWith(".pdf"), api.documents.single().first)
+        assertTrue(api.documents.single().second.startsWith("%PDF"))
     }
 }
