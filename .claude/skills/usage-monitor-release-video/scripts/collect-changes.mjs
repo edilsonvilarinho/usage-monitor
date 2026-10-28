@@ -68,4 +68,4 @@ function main() {
     process.stdout.write(`${JSON.stringify({ ...range, ...groupChanges(commits) }, null, 2)}\n`)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

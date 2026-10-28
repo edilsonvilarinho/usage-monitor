@@ -70,4 +70,4 @@ function main() {
     process.stdout.write(`${outputPath}\n`)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
