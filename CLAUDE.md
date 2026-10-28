@@ -378,7 +378,7 @@ Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workf
    `node tools/ci/ci-incidents.mjs` (runs vermelhos do `ci.yml`, tentativas reexecutadas inclusive; falha local
    registrada com `--local "<o que falhou>"`), nunca de memória: saída 3 é o limite.
 6. **Merge e encerramento.** O auto-merge mescla com o `ci-ok` verde e apaga a branch remota; nunca `--admin`. Claude
-   apaga a branch local e a worktree, comenta na issue **os casos de teste criados em no máximo 20 linhas** (o que
+   apaga a branch local e a worktree, **atualiza a `main` local** (`git pull --ff-only` no checkout principal), comenta na issue **os casos de teste criados em no máximo 20 linhas** (o que
    cada um afirma, vermelho → verde, totais, cobertura do diff, o que ficou sem teste e por quê) e avisa o usuário.
 
 Pergunta que só pede explicação é respondida no chat, fora do fluxo.
