@@ -39,6 +39,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com a falha do #499 e a reprodução | `gh issue create` → #500; reprodução descrita em "Fatos confirmados" |
+| A02 | Passo 8 da skill `usage-monitor-workflow`: tirar o diretório das sessões PowerShell e Bash da worktree, cada uma na sua ferramenta, antes do `git worktree remove`; recuperação com `git worktree prune` e remoção só de pasta vazia ou com ignorados da branch. Sem harness de teste (texto de skill) | Reprodução do plano (exit 255 `Permission denied` com processo dentro; removida após encerrá-lo). Validação final: limpeza deste PR seguindo o passo novo, registrada no comentário da issue |
 
 ## Problemas em aberto e riscos
 
