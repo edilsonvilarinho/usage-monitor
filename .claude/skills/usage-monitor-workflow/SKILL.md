@@ -115,9 +115,19 @@ what was tried and the branch state.
 
 ## 8. After the merge
 
+First take **every** session's working directory out of the worktree, each in its own tool: the PowerShell tool keeps
+its directory between calls, and a process whose current directory is inside the folder makes the removal exit 255 with
+`Permission denied`, after dropping the registration and the content, leaving the empty folder (#500, measured: PR #499
+cleanup, and reproduced with `Start-Process pwsh -WorkingDirectory <wt>`). A `cd` inside the same Bash command does
+not release the PowerShell session.
+
+```powershell
+Set-Location <repo root>          # PowerShell tool, in its own call
+```
+
 ```bash
+cd <repo root>                    # Bash tool, in its own call
 gh pr view <pr> --json state,mergedAt,mergeCommit
-cd <repo root>
 git -c core.longpaths=true worktree remove .claude/worktrees/<slug>
 git branch -D <branch>
 git fetch --prune
@@ -126,6 +136,11 @@ git fetch --prune
 `core.longpaths` is mandatory on Windows: `server/node_modules` (after `npm ci`) passes 260 characters, and without it
 `git worktree remove` exits 255 with `Filename too long`, drops the registration and leaves the folder half deleted
 (#498, measured). It goes per command, never into the user's config.
+
+If the removal still fails and `git worktree list` no longer shows the worktree, run `git worktree prune`, list what is
+left in the folder, and delete it only if it is empty or holds nothing but this branch's ignored files
+(`node_modules`, `build`): `Remove-Item -LiteralPath '\\?\<absolute path>' -Recurse -Force`. Another process holding the
+folder (editor, file explorer) gives the same `Permission denied`; close it first.
 
 Then comment on the issue with the test cases created — **at most 20 lines**, first line
 `🤖 Escrito por Claude Code, a pedido de @edilsonvilarinho`:
