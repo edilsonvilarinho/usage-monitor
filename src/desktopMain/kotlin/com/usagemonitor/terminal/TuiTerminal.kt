@@ -32,8 +32,11 @@ internal interface TuiIo {
  * O terminal pelo JLine (decisão D1 do plano da #441): modo cru, teclas, tamanho e a tela
  * alternativa, que devolve o terminal como estava ao sair. O desenho não passa pelo JLine:
  * as linhas já chegam em ANSI, pelas quatro paletas da #439.
+ *
+ * O construtor é `internal` para o teste montar sobre um terminal JLine em memória; o app
+ * só entra por [open], que recusa o terminal burro.
  */
-internal class JLineTuiIo private constructor(private val terminal: Terminal) : TuiIo, AutoCloseable {
+internal class JLineTuiIo internal constructor(private val terminal: Terminal) : TuiIo, AutoCloseable {
     private val reader: NonBlockingReader = terminal.reader()
     private val resized = AtomicBoolean(false)
     private val interrupted = AtomicBoolean(false)
