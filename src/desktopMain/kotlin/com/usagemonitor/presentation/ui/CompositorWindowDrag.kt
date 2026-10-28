@@ -228,32 +228,26 @@ internal object X11CompositorMove {
      * `WM_STATE` no caminho, vale o filho da raiz, como num gerenciador que não
      * reparenta.
      */
-    private fun clientWindowOf(link: Connection, start: NativeLong): NativeLong? {
-        if (start.toLong() == 0L) {
-            return null
-        }
-        var current = start
-        var client: NativeLong? = null
-        repeat(MAX_TREE_DEPTH) {
-            if (client == null && hasWmState(link, current)) {
-                client = current
-            }
+    private fun clientWindowOf(link: Connection, start: NativeLong): NativeLong? =
+        compositorClientWindow(start.toLong(), JnaWindowTree(link))?.let { id -> NativeLong(id) }
+
+    /** As duas consultas da subida, pela conexão X real. */
+    private class JnaWindowTree(private val link: Connection) : X11WindowTree {
+        override fun parentAndRoot(window: Long): Pair<Long, Long>? {
             val root = NativeLongByReference()
             val parent = NativeLongByReference()
             val children = PointerByReference()
-            if (link.xlib.XQueryTree(link.display, current, root, parent, children, IntByReference()) == 0) {
+            if (link.xlib.XQueryTree(link.display, NativeLong(window), root, parent, children, IntByReference()) == 0) {
                 return null
             }
             children.value?.let { list -> link.xlib.XFree(list) }
-            if (parent.value.toLong() == 0L || parent.value == root.value) {
-                return client ?: current
-            }
-            current = parent.value
+            return parent.value.toLong() to root.value.toLong()
         }
-        return null
+
+        override fun hasWmState(window: Long): Boolean = wmStatePresent(link, NativeLong(window))
     }
 
-    private fun hasWmState(link: Connection, window: NativeLong): Boolean {
+    private fun wmStatePresent(link: Connection, window: NativeLong): Boolean {
         val actualType = NativeLongByReference()
         val value = PointerByReference()
         val status = link.xlib.XGetWindowProperty(
@@ -263,6 +257,40 @@ internal object X11CompositorMove {
         value.value?.let { data -> link.xlib.XFree(data) }
         return status == 0 && actualType.value.toLong() != 0L
     }
-
-    private const val MAX_TREE_DEPTH = 16
 }
+
+/** As consultas que a subida até a janela cliente precisa; a implementação real fala com o X. */
+internal interface X11WindowTree {
+    /** `(pai, raiz)` de [window]; `null` se a consulta falhar. */
+    fun parentAndRoot(window: Long): Pair<Long, Long>?
+
+    /** Se [window] tem `WM_STATE` (ICCCM). */
+    fun hasWmState(window: Long): Boolean
+}
+
+/**
+ * A janela cliente que o compositor gerencia, subindo de [start] pela árvore: a
+ * primeira com `WM_STATE` que estiver no caminho, ou o filho da raiz se nenhuma
+ * tiver. `null` sem caminho, se uma consulta falhar ou se a árvore for mais funda
+ * que [maxDepth].
+ */
+internal fun compositorClientWindow(start: Long, tree: X11WindowTree, maxDepth: Int = X11_MAX_TREE_DEPTH): Long? {
+    if (start == 0L) {
+        return null
+    }
+    var current = start
+    var client: Long? = null
+    repeat(maxDepth) {
+        if (client == null && tree.hasWmState(current)) {
+            client = current
+        }
+        val (parent, root) = tree.parentAndRoot(current) ?: return null
+        if (parent == 0L || parent == root) {
+            return client ?: current
+        }
+        current = parent
+    }
+    return null
+}
+
+private const val X11_MAX_TREE_DEPTH = 16

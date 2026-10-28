@@ -195,14 +195,8 @@ private fun WindowScope.DesktopDialogTitleBar(
             ) {
                 if (windowState != null) {
                     TitleBarButton(
-                        label = if (windowState.placement == WindowPlacement.Maximized) "❐" else "□",
-                        onClick = {
-                            windowState.placement = if (windowState.placement == WindowPlacement.Maximized) {
-                                WindowPlacement.Floating
-                            } else {
-                                WindowPlacement.Maximized
-                            }
-                        }
+                        label = maximizeButtonLabel(windowState.placement),
+                        onClick = { windowState.placement = maximizeToggled(windowState.placement) }
                     )
                 }
 
@@ -217,6 +211,14 @@ private fun WindowScope.DesktopDialogTitleBar(
 
     AppDivider()
 }
+
+/** O que o botão de maximizar faz: restaura se a janela já está maximizada, senão maximiza. */
+internal fun maximizeToggled(current: WindowPlacement): WindowPlacement =
+    if (current == WindowPlacement.Maximized) WindowPlacement.Floating else WindowPlacement.Maximized
+
+/** O glifo do botão de maximizar: `❐` quando a janela já está maximizada (restaura), `□` quando não. */
+internal fun maximizeButtonLabel(placement: WindowPlacement): String =
+    if (placement == WindowPlacement.Maximized) "❐" else "□"
 
 /**
  * Onde a barra de título arrasta a janela. No COSMIC quem arrasta é o

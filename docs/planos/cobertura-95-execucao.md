@@ -63,7 +63,7 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | 5 | Serviço/terminal/time testáveis sem a raiz de composição | PR #482, mesclada | 87,2% |
 | 6.1 | Rota híbrida: exclusão nominal; geometria de janela numa implementação só | PR #483, mesclada | 88,1% |
 | 6.2 | Costura em `AutoStartManager` (`AutoStartHost`), `SettingsActions`, `AppSettingsFeedback`, `buildShellActions` e leitores do bot; testes de `AppModalState` e `TelegramBotActions` | PR #485 | 89,5% |
-| 6.3 | Janelas: extrair decisão de `HudWindow*`, `AppDialogWindow`, `DesktopWindowFrame`, `CompositorWindowDrag` para função pura; excluir só a chamada AWT/JNA que sobrar, por nome | pendente | — |
+| 6.3 | Janelas: extrair decisão de `HudWindow*`, `AppDialogWindow`, `DesktopWindowFrame`, `CompositorWindowDrag` para função pura; excluir só a chamada AWT/JNA que sobrar, por nome | em execução (W63-A01…A05) | — |
 | 6.4 | `commonMain` restante (~1 300 linhas: telas de sessões, presença, histórico, Telegram) | pendente | — |
 
 Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o teto para 95% é 2 268, faltam
@@ -98,6 +98,27 @@ Lacunas de partida (Kover, arquivos sem mudança desde `af450570`): `AutoStartMa
 | W62-A04 | `SettingsActions` e `AppSettingsFeedback` sobre `AppSettingsStore` + portas; cliente HTTP de teste injetável | `test(settings): cover settings actions and feedback without the graph` |
 | W62-A05 | Leitores do bot (`sourceHealthOf`, presença, gráfico) fora do `AppGraph` | `test(telegram): cover the bot readers without the graph` |
 | W62-A06 | Medição e piso | `ci(coverage): raise the Kotlin line floor` |
+
+## Atividades da onda 6.3
+
+Partida medida em `origin/main` (`d8d6068e`), `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport`:
+89,54% (40 635/45 380), 4 745 descobertas, bate com a 6.2. Janelas (linhas descobertas): `HudWindow` 260,
+`AppDialogWindow` 205, `ModalWindowsHost` 195, `SettingsWindowHost` 129, `DesktopWindowFrame` 94,
+`CompositorWindowDrag` 94, `HudWindowFrame` 67, `AppWindowStates` 57, `AppProfiles` 54, `AppPreferenceEffects` 54,
+`HudWindowEffects` 52, `AppWindowAnchor` 52, `HudWindowTranslucency` 40.
+
+Limite desta onda, medido antes de escrever código: a maior parte dessas linhas é corpo de `@Composable` e chamada
+direta a `java.awt.Window`/JNA, que não tem decisão para extrair. Esta onda extrai só o que tem decisão testável;
+o que sobra nas janelas não é excluído nesta onda — exclusão nominal exige a medição da onda seguinte e aprovação
+do dono (regra do plano, "Decisões").
+
+| ID | Atividade | Commit esperado |
+|---|---|---|
+| W63-A01 | Caminho até a janela cliente (`WM_STATE`) do `X11CompositorMove` sai do JNA para `compositorClientWindow`, sobre uma porta `X11WindowTree`; testado com árvore falsa (reparentagem, sem `WM_STATE`, consulta falha, profundidade, janela 0) | `test(window): cover the compositor client-window walk` |
+| W63-A02 | Tamanho e posição pedidos à janela AWT da HUD viram `hudWindowTargetSize`/`hudWindowTargetLocation`, funções puras; `applyHudWindowBounds` só aplica o resultado | `test(hud): decide window bounds apart from the AWT call` |
+| W63-A03 | Alternância maximizar/restaurar e rótulo do botão da barra saem de `DesktopDialogTitleBar` para funções puras | `test(window): decide the maximize toggle apart from the frame` |
+| W63-A04 | Decisão de pedido de `ModalWindowBody` (`modalRequestAction`) e de pré-aquecimento (`modalPrewarmRequested`) como funções puras | `test(window): decide modal requests apart from the window` |
+| W63-A05 | Medição, relatório e piso (sobe só se o valor medido chegar a 90) | `ci(coverage): raise the Kotlin line floor` |
 
 ## Pontos de situação
 
@@ -155,3 +176,8 @@ Lacunas de partida (Kover, arquivos sem mudança desde `af450570`): `AutoStartMa
 | W62-A06 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport` + `koverVerify -Pcoverage`: 3 566 testes, 0 falhas; Kotlin **89,5%** (40 635/45 380; antes 88,1%), ramos 63,8%. Relatório da skill: 17 regras de arquitetura ok, sem `crit` (servidor não medido nesta passada: não mudou). Piso do Kotlin: 89. Testado só no Windows; nenhum host de janela mudou (só a fiação em `Main.kt` e `AppViewModels.kt`). |
 | Onda 6.2 | 2026-10-27 | este commit | PR #485 | Run `40587994103`: `ci-ok` verde (inclui `desktop-linux`), 0 incidências; `Coverage floor` executou `koverVerify -Pcoverage` com piso 89. |
 | W62-A07 | 2026-10-27 | este commit | concluída | Incidência 1 (run `40588953915`): `desktop-linux` (consultivo, fora do `ci-ok`) falhou em 2 testes do `AppSettingsFeedbackTest` (linhas 145 e 199): o fake respondia na hora e a corrotina no `Dispatchers.Default` terminava antes de o teste ler `CHECKING`. Correção no `SettingsTestHarness`: as respostas falsas (servidor, vínculo, token, `MockEngine`) esperam uma trava liberada pelo `settle()`. `gradlew.bat desktopTest --rerun --tests "com.usagemonitor.AppSettingsFeedbackTest" --tests "com.usagemonitor.SettingsActionsTest"` 3×: 10 + 23 testes, 0 falhas em cada. |
+| W63-A01 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.CompositorClientWindowTest" --tests "com.usagemonitor.architecture.*"` (rodada combinada com as suítes vizinhas de janela): `CompositorClientWindowTest` 9 testes, 0 falhas; `BUILD SUCCESSFUL`. A subida pela árvore X11 saiu do JNA para `compositorClientWindow`, sobre a porta `X11WindowTree`. Testado só no Windows. |
+| W63-A02 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.HudWindowBoundsTargetTest"` (rodada combinada, ver W63-A01): 7 testes, 0 falhas. `hudWindowTargetSize` e `hudWindowTargetLocation` são puras; `applyHudWindowBounds` só aplica o que elas devolvem, com a mesma ordem de `moveProbe.requested` e a mesma checagem de igualdade. Testado só no Windows; janela da HUD não é aberta em teste. |
+| W63-A03 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.MaximizeToggleTest"` (rodada combinada, ver W63-A01): 2 testes, 0 falhas. `maximizeToggled` e `maximizeButtonLabel` saíram de `DesktopDialogTitleBar`; o clique e o glifo leem as mesmas funções. Testado só no Windows. |
+| W63-A04 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ModalRequestActionTest" --tests "com.usagemonitor.AppDialogWindowTest"` (rodada combinada, ver W63-A01): `ModalRequestActionTest` 5 testes, `AppDialogWindowTest` 7 testes, 0 falhas. `modalRequestAction` e `modalPrewarmRequested` são puras; `ModalWindowBody` troca o `if` pelo `when` sobre a decisão, sem mudar a ordem das chamadas em cada ramo. Testado só no Windows; a janela modal não é aberta em teste. |
+| W63-A05 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport koverVerify`: `BUILD SUCCESSFUL`, 3 589 testes, 0 falhas; Kotlin **89,58%** (40 668/45 400; antes 89,54%). Piso continua 89 (valor medido arredondado para baixo, não sobe). Ganho da 6.3: 33 linhas. Resto nas janelas (`AppDialogWindow` 203, `DesktopWindowFrame` 91, `CompositorWindowDrag` 86, `HudWindowFrame` 67) é corpo de `@Composable` e chamada direta a AWT/JNA, sem decisão nova para extrair. Alavancas que faltam exigem decisão do dono: exclusão nominal do AWT/JNA residual (medir antes) ou teste de composable por `runDesktopComposeUiTest`. |

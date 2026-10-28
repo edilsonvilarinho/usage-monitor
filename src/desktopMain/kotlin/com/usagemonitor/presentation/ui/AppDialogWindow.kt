@@ -317,8 +317,8 @@ private fun WindowScope.ModalWindowBody(
             val animated = shouldAnimateModalWindow(motion, opacitySupported, platform)
             // Aba, faixa e dado novo só repetem o E9 numa janela que abriu com ele.
             reveal.replayEnabled = animated
-            if (request.visible) {
-                if (host.onScreen) {
+            when (modalRequestAction(request.visible, host.onScreen)) {
+                ModalRequestAction.REFOCUS -> {
                     // Já na tela, ou saindo: volta à opacidade cheia e vem para a
                     // frente, sem refazer a entrada.
                     host.contentOnScreen = true
@@ -330,55 +330,57 @@ private fun WindowScope.ModalWindowBody(
                     }
                     awaitAwtEventTurn()
                     activateWindow(window)
-                    return@collectLatest
                 }
-
-                val requestedAt = System.nanoTime()
-                if (animated) {
-                    setWindowOpacity(window, 0f)
-                    reveal.begin(ModalRevealPhase.OPENING)
-                } else {
-                    setWindowOpacity(window, 1f)
-                    reveal.settle()
-                }
-                host.onScreen = true
-                // Dois quadros: o primeiro recompõe o que mudou com a janela
-                // escondida, o segundo garante pixel pintado. O teto existe para
-                // janela minimizada, que não recebe quadro e ficaria transparente
-                // para sempre.
-                withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
-                    withFrameNanos { }
-                    withFrameNanos { }
-                }
-                awaitAwtEventTurn()
-                host.contentOnScreen = true
-                host.opens += 1
-                currentEnvironment.breadcrumbs.record(
-                    BreadcrumbCategory.NAVIGATION,
-                    modalOpenedBreadcrumb(
-                        diagnosticName = currentDiagnosticName,
-                        elapsedMillis = (System.nanoTime() - requestedAt) / 1_000_000,
-                        firstOpen = host.opens == 1
+                ModalRequestAction.OPEN -> {
+                    val requestedAt = System.nanoTime()
+                    if (animated) {
+                        setWindowOpacity(window, 0f)
+                        reveal.begin(ModalRevealPhase.OPENING)
+                    } else {
+                        setWindowOpacity(window, 1f)
+                        reveal.settle()
+                    }
+                    host.onScreen = true
+                    // Dois quadros: o primeiro recompõe o que mudou com a janela
+                    // escondida, o segundo garante pixel pintado. O teto existe para
+                    // janela minimizada, que não recebe quadro e ficaria transparente
+                    // para sempre.
+                    withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
+                        withFrameNanos { }
+                        withFrameNanos { }
+                    }
+                    awaitAwtEventTurn()
+                    host.contentOnScreen = true
+                    host.opens += 1
+                    currentEnvironment.breadcrumbs.record(
+                        BreadcrumbCategory.NAVIGATION,
+                        modalOpenedBreadcrumb(
+                            diagnosticName = currentDiagnosticName,
+                            elapsedMillis = (System.nanoTime() - requestedAt) / 1_000_000,
+                            firstOpen = host.opens == 1
+                        )
                     )
-                )
-                activateWindow(window)
-                if (animated) {
-                    playFilaments(window, reveal, ModalRevealPhase.OPENING, AppGargantuaTokens.filamentOpenMillis, motion)
+                    activateWindow(window)
+                    if (animated) {
+                        playFilaments(window, reveal, ModalRevealPhase.OPENING, AppGargantuaTokens.filamentOpenMillis, motion)
+                    }
                 }
-            } else if (host.onScreen) {
-                if (animated) {
-                    playFilaments(window, reveal, ModalRevealPhase.CLOSING, AppGargantuaTokens.filamentCloseMillis, motion)
+                ModalRequestAction.CLOSE -> {
+                    if (animated) {
+                        playFilaments(window, reveal, ModalRevealPhase.CLOSING, AppGargantuaTokens.filamentCloseMillis, motion)
+                    }
+                    // O conteúdo larga os laços próprios enquanto a janela ainda
+                    // recompõe: escondida, a recomposição que os desligaria não vem.
+                    host.contentOnScreen = false
+                    withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
+                        withFrameNanos { }
+                    }
+                    // A opacidade fica onde parou: a próxima abertura a define antes
+                    // de mostrar a janela. Restaurá-la aqui, antes de o esconder
+                    // chegar à janela AWT, pintaria um quadro cheio no meio da saída.
+                    host.onScreen = false
                 }
-                // O conteúdo larga os laços próprios enquanto a janela ainda
-                // recompõe: escondida, a recomposição que os desligaria não vem.
-                host.contentOnScreen = false
-                withTimeoutOrNull(FIRST_FRAME_TIMEOUT_MILLIS) {
-                    withFrameNanos { }
-                }
-                // A opacidade fica onde parou: a próxima abertura a define antes
-                // de mostrar a janela. Restaurá-la aqui, antes de o esconder
-                // chegar à janela AWT, pintaria um quadro cheio no meio da saída.
-                host.onScreen = false
+                ModalRequestAction.IGNORE -> Unit
             }
         }
     }
@@ -443,12 +445,47 @@ internal fun shouldPrewarmModalWindow(opacitySupported: Boolean, platform: AutoS
     return platform == AutoStartManager.Platform.WINDOWS && opacitySupported
 }
 
+/** O que um pedido de [AppDialogWindow] faz com a janela, dado se ela já está na tela. */
+internal enum class ModalRequestAction {
+    /** Já na tela, ou saindo: volta à opacidade cheia e vem para a frente. */
+    REFOCUS,
+
+    /** Escondida e pedida: mostra, com a entrada animada se a plataforma a anima. */
+    OPEN,
+
+    /** Na tela e não pedida: recolhe os filamentos e esconde. */
+    CLOSE,
+
+    /** Escondida e não pedida: nada a fazer. */
+    IGNORE
+}
+
+/**
+ * A decisão de um pedido de abertura ou fechamento. Função pura, sem janela: a
+ * regra de que pedir uma janela já na tela só a traz para a frente, e de que
+ * pedir o fechamento de uma janela escondida não faz nada, fica testável.
+ */
+internal fun modalRequestAction(visible: Boolean, onScreen: Boolean): ModalRequestAction = when {
+    visible && onScreen -> ModalRequestAction.REFOCUS
+    visible -> ModalRequestAction.OPEN
+    onScreen -> ModalRequestAction.CLOSE
+    else -> ModalRequestAction.IGNORE
+}
+
+/**
+ * Se o pré-aquecimento acontece: pedido por quem abre, permitido pela plataforma
+ * e com o arranque já assentado. Qualquer um dos três falso adia a janela para a
+ * primeira abertura de verdade.
+ */
+internal fun modalPrewarmRequested(requested: Boolean, allowed: Boolean, ready: Boolean): Boolean =
+    requested && allowed && ready
+
 @Composable
 private fun prewarmNow(requested: Boolean, environment: ModalWindowEnvironment): Boolean {
     val allowed = remember {
         shouldPrewarmModalWindow(isWindowOpacitySupported(), AutoStartManager.currentPlatform())
     }
-    return requested && allowed && environment.prewarmReady
+    return modalPrewarmRequested(requested, allowed, environment.prewarmReady)
 }
 
 /** Um pré-aquecimento por vez: juntos, eles disputariam a mesma thread de interface. */
