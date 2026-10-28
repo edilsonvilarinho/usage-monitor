@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamBlockedAccount
 import com.usagemonitor.domain.entity.TeamKeyEntry
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -30,7 +31,11 @@ sealed interface TeamKeysUiState {
 
     data object Loading : TeamKeysUiState
 
-    data class Error(val message: String) : TeamKeysUiState
+    data class Error(
+        val message: String,
+        /** Onde a conexão parou (#494); nulo quando o tipo da falha não diz. */
+        val failure: TeamConnectionFailure? = null
+    ) : TeamKeysUiState
 
     data class Success(
         val keys: List<TeamKeyEntry> = emptyList(),
@@ -51,6 +56,8 @@ sealed interface TeamKeysUiState {
          * pontual numa tela vazia.
          */
         val actionError: String? = null,
+        /** Etapa em que a última ação parou, quando classificada (#494). */
+        val actionFailure: TeamConnectionFailure? = null,
         /** Ação em andamento; a tela desabilita os botões enquanto isso. */
         val busy: Boolean = false
     ) : TeamKeysUiState
@@ -148,7 +155,7 @@ class TeamKeysAdminViewModel(
     fun clearActionError() {
         val current = _uiState.value
         if (current is TeamKeysUiState.Success) {
-            _uiState.value = current.copy(actionError = null)
+            _uiState.value = current.copy(actionError = null, actionFailure = null)
         }
     }
 
@@ -166,7 +173,7 @@ class TeamKeysAdminViewModel(
             return
         }
         if (current != null) {
-            _uiState.value = current.copy(busy = true, actionError = null)
+            _uiState.value = current.copy(busy = true, actionError = null, actionFailure = null)
         }
 
         viewModelScope.launch {
@@ -174,12 +181,14 @@ class TeamKeysAdminViewModel(
             if (error != null) {
                 breadcrumbs.recordFailure("executar ação administrativa de chave do time", error)
                 val latest = _uiState.value as? TeamKeysUiState.Success
+                val failure = teamConnectionFailureOf(error)
                 if (latest == null) {
-                    _uiState.value = TeamKeysUiState.Error(error.message ?: UNKNOWN_ERROR_MESSAGE)
+                    _uiState.value = TeamKeysUiState.Error(error.message ?: UNKNOWN_ERROR_MESSAGE, failure)
                 } else {
                     _uiState.value = latest.copy(
                         busy = false,
-                        actionError = error.message ?: UNKNOWN_ERROR_MESSAGE
+                        actionError = error.message ?: UNKNOWN_ERROR_MESSAGE,
+                        actionFailure = failure
                     )
                 }
                 return@launch
@@ -201,13 +210,14 @@ class TeamKeysAdminViewModel(
             onFailure = { error ->
                 breadcrumbs.recordFailure("carregar chaves administrativas do time", error)
                 val message = error.message ?: UNKNOWN_ERROR_MESSAGE
+                val failure = teamConnectionFailureOf(error)
                 val current = _uiState.value as? TeamKeysUiState.Success
                 // Com lista na tela a falha vira aviso: o admin continua vendo as
                 // chaves que já leu em vez de perder tudo por uma intermitência.
                 _uiState.value = if (current == null) {
-                    TeamKeysUiState.Error(message)
+                    TeamKeysUiState.Error(message, failure)
                 } else {
-                    current.copy(busy = false, actionError = message, blockedAccounts = blocked)
+                    current.copy(busy = false, actionError = message, actionFailure = failure, blockedAccounts = blocked)
                 }
             }
         )

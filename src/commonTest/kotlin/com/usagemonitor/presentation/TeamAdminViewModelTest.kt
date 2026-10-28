@@ -1,6 +1,11 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.data.datasource.TeamServerException
+import com.usagemonitor.domain.entity.TeamCertificateProblem
+import com.usagemonitor.domain.entity.TeamConnectionStage
+import java.security.cert.CertificateExpiredException
+import javax.net.ssl.SSLHandshakeException
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamAccountDeletion
@@ -203,6 +208,39 @@ class TeamKeysAdminViewModelTest {
 
         val state = assertIs<TeamKeysUiState.Error>(viewModel.uiState.value)
         assertEquals("servidor fora", state.message)
+    }
+
+    @Test
+    fun `certificado vencido na primeira carga publica a etapa`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        val handshake = SSLHandshakeException("(certificate_expired) PKIX path validation failed")
+        handshake.initCause(CertificateExpiredException("NotAfter"))
+        repository.listResult = Result.failure(handshake)
+        val viewModel = buildViewModel(repository)
+
+        viewModel.open()
+        runCurrent()
+
+        val state = assertIs<TeamKeysUiState.Error>(viewModel.uiState.value)
+        assertEquals(TeamCertificateProblem.EXPIRED, state.failure?.certificateProblem)
+    }
+
+    @Test
+    fun `acao recusada pelo token publica a etapa da credencial`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        val viewModel = buildViewModel(repository)
+        viewModel.open()
+        runCurrent()
+
+        repository.actionResult = Result.failure(TeamServerException(statusCode = 401, message = "HTTP 401"))
+        viewModel.setMaxAccounts("key-1", 1)
+        runCurrent()
+
+        val state = assertIs<TeamKeysUiState.Success>(viewModel.uiState.value)
+        assertEquals(TeamConnectionStage.CREDENTIAL, state.actionFailure?.stage)
+        viewModel.clearActionError()
+        assertNull(assertIs<TeamKeysUiState.Success>(viewModel.uiState.value).actionFailure)
     }
 
     @Test
