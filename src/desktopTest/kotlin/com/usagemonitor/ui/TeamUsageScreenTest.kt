@@ -62,6 +62,9 @@ import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.TeamUsageLabels
 import com.usagemonitor.presentation.ui.components.TEAM_TREND_CHART_TAG
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
+import com.usagemonitor.domain.entity.TeamCertificateProblem
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.domain.entity.TeamConnectionStage
 import com.usagemonitor.presentation.viewmodel.TeamUsageUiState
 import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import kotlin.time.Instant
@@ -496,6 +499,107 @@ class TeamUsageScreenTest {
             assertEquals(member.memberKey to "session-12345678", removed)
             assertEquals(null, opened)
         }
+
+    @Test
+    fun `erro classificado mostra onde parou e tenta de novo`() = runDesktopComposeUiTest {
+        var retries = 0
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Error(
+                            message = "(certificate_expired) PKIX path validation failed",
+                            failure = TeamConnectionFailure(
+                                stage = TeamConnectionStage.CERTIFICATE,
+                                certificateProblem = TeamCertificateProblem.EXPIRED,
+                                certificateNotAfter = Instant.parse("2026-10-27T15:21:43Z")
+                            )
+                        ),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        onRetry = { retries += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Stopped at Certificate — expired Oct 27, 12:21 BRT").assertIsDisplayed()
+        onNodeWithText("– Key").assertIsDisplayed()
+        onNodeWithText("Try again").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun `erro da visao global nomeia o token admin`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Error(
+                            message = "x",
+                            failure = TeamConnectionFailure(stage = TeamConnectionStage.ADDRESS),
+                            isAdminOverview = true
+                        ),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onToggleMember = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("– Admin token").assertIsDisplayed()
+    }
+
+    @Test
+    fun `falha classificada ao remover diz onde parou`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(members = emptyList()),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onToggleMember = {},
+                        removalError = "Connection refused",
+                        removalFailure = TeamConnectionFailure(stage = TeamConnectionStage.CONNECTION),
+                        sessionRemovalError = "HTTP 500",
+                        sessionRemovalFailure = TeamConnectionFailure(stage = TeamConnectionStage.SERVER, httpStatus = 500)
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Could not remove the member: Stopped at Connection — nothing answers").assertIsDisplayed()
+        onNodeWithText("Could not delete the session: Stopped at Server — error (HTTP 500)").assertIsDisplayed()
+    }
+
+    @Test
+    fun `erro classificado no detalhe mostra onde parou`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    TeamUsageContent(
+                        state = TeamUsageUiState.Success(
+                            members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1")))),
+                            detail = TeamSessionDetailUiState.Error(
+                                deviceId = "device-1",
+                                sessionId = "s1",
+                                message = "lab.example",
+                                failure = TeamConnectionFailure(stage = TeamConnectionStage.ADDRESS)
+                            )
+                        ),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onToggleMember = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Stopped at Address — name does not resolve").assertIsDisplayed()
+    }
 
     @Test
     fun `falha ao excluir sessao aparece com mensagem especifica`() = runDesktopComposeUiTest {

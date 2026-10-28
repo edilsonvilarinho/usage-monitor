@@ -117,7 +117,9 @@ internal fun TeamSessionDetailPane(
     glossaryExpanded: Boolean,
     onCloseDetail: () -> Unit,
     onToggleAdvanced: () -> Unit,
-    onToggleGlossary: () -> Unit
+    onToggleGlossary: () -> Unit,
+    /** Visão global lê o detalhe com o token admin; o modal de uma conta, com a chave. */
+    credentialKind: TeamCredentialKind = TeamCredentialKind.ACCOUNT_KEY
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -154,8 +156,15 @@ internal fun TeamSessionDetailPane(
                 TeamUsageLabels.detailLoading(language)
             )
 
-            is TeamSessionDetailUiState.Error -> AppErrorState(
-                TeamUsageLabels.serverError(detail.message, language)
+            is TeamSessionDetailUiState.Error -> TeamConnectionErrorState(
+                failure = detail.failure,
+                fallbackMessage = TeamUsageLabels.serverError(detail.message, language),
+                technicalDetail = detail.message,
+                kind = credentialKind,
+                language = language,
+                // Sem "Tentar de novo" aqui: o laço ao vivo só relê detalhe pronto, e o
+                // caminho é o "Voltar" do painel: abrir a sessão de novo refaz a leitura.
+                onRetry = null
             )
 
             is TeamSessionDetailUiState.Ready -> TeamSessionDetailBody(

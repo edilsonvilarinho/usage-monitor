@@ -417,6 +417,12 @@ code { font-family: var(--mono); font-size: .92em; background: var(--raised);
 .st.ok { color: var(--ok); } .st.warn { color: var(--warn); }
 .st.crit { color: var(--crit); } .st.off { color: var(--muted); }
 .st.off::before { background: transparent; border: 1px solid currentColor; }
+/* Caminho da conexão (AJ4, #494): glifo escrito por etapa, a que falhou com borda crítica */
+.steptrail { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--s1); font-family: var(--mono); font-size: var(--t11); }
+.steptrail .s { border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+.steptrail .s.fail { border-color: var(--crit); color: var(--crit); }
+.steptrail .s.skip { color: var(--muted); }
+.steptrail .sep { color: var(--muted); }
 
 /* Botões */
 .btn { font-family: var(--mono); font-size: var(--t12); line-height: 1; padding: 7px 11px;
@@ -1918,6 +1924,18 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 <p class="note"><b>A máquina continua na segunda linha da coluna de identidade.</b> Ela não é uma medida ao lado de custo e tokens — é quem é a pessoa —, e por isso deixou de ser coluna. A coluna de identidade tem três linhas e não quatro: numa lista de vinte máquinas, cada linha a mais é rolagem.</p>
 <p class="note"><b>O botão de copiar existe só na sessão desta máquina.</b> O integrante desenhado acima é a instalação local — <code>deviceId</code> igual ao do <code>team.json</code> —, e por isso a linha de sessão dele traz o botão: o transcript está no disco e o <code>claude --resume</code> abre a conversa. Nas sessões dos outros integrantes ele <b>não é desenhado</b> (issue #102): a linha continua clicável e o detalhe segue abrindo, porque é ele que permite diagnosticar a sessão saturada de um colega. Sem <code>deviceId</code> local — integração desligada, instalação só de administração — nenhuma linha tem botão, que é o resultado seguro.</p>
 <p class="note"><b>A ordem das contas é alfabética pelo e-mail</b>, e o consumo ordena de novo dentro de cada uma. Ordenar as contas por consumo fazia a mesma conta subir e descer a lista entre dois tiques do laço de 5s. Conta sem chave emitida vai para o fim: sem e-mail não há o que comparar, e abrir a lista com um uuid cru seria pior que fechá-la com ele.</p>
+
+<h3 id="time-falha">Falha de conexão com o servidor de time — AJ4 · Caminho da conexão (#494)</h3>
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões do time — todas as contas</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body"><div class="state">
+    <span class="st crit">Parou em Certificado — venceu em 27/10 12:21 BRT</span>
+    <div class="steptrail"><span class="s">✓ Endereço</span><span class="sep">›</span><span class="s">✓ Conexão</span><span class="sep">›</span><span class="s fail">× Certificado</span><span class="sep">›</span><span class="s skip">– Servidor</span><span class="sep">›</span><span class="s skip">– Token admin</span></div>
+    <span class="msg">O certificado do servidor venceu: quem administra o servidor precisa renová-lo. O token admin não chegou a ser testado.</span>
+    <div class="hstack"><button class="btn" type="button">Tentar de novo</button><button class="btn ghost" type="button">Copiar detalhe técnico</button></div>
+  </div></div>
+</div>
+<p class="note"><b>A falha diz onde a conexão parou, não a exceção.</b> Classificada pelo tipo (<code>UnknownHostException</code> → Endereço, <code>ConnectException</code> → Conexão, <code>SSLHandshakeException</code> → Certificado com o motivo pela causa, HTTP 401/403 → Chave ou Token admin, outro status → Servidor). Etapa anterior só ganha ✓ quando a falha seguinte a prova; a data de vencimento sai do certificado recusado. O texto técnico vai para "Copiar detalhe técnico". Vale para as Sessões do time (lista e detalhe), Conectados agora, Chaves de conta, Configurações › Time (caminho completo, uma etapa por linha), erros de ação ("Não foi possível remover o integrante: Parou em …"), o <code>/team</code> do bot e o modo terminal. Falha sem tipo conhecido mostra a mensagem de antes, com "Tentar de novo".</p>
 
 <h2 id="tendencia">9b · Tendência do time</h2>
 <div class="win mid" style="max-width:none">

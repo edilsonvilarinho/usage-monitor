@@ -2,6 +2,7 @@ package com.usagemonitor.presentation.ui
 
 import kotlin.time.Instant
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
 import com.usagemonitor.domain.entity.CliSessionRange
@@ -429,20 +430,25 @@ internal object TeamUsageLabels {
         }
     }
 
-    fun removalError(message: String, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
-            "Não foi possível remover o integrante: $message"
-        } else {
-            "Could not remove the member: $message"
-        }
+    /**
+     * Remoção só existe na visão global, então a credencial é o token admin. Com a
+     * etapa classificada (#494) ela entra no lugar da mensagem crua.
+     */
+    fun removalError(message: String, language: AppLanguage, failure: TeamConnectionFailure? = null): String {
+        val reason = actionReason(message, language, failure)
+        return localized(language, "Não foi possível remover o integrante: $reason", "Could not remove the member: $reason")
     }
 
-    fun sessionRemovalError(message: String, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
-            "Não foi possível excluir a sessão: $message"
-        } else {
-            "Could not delete the session: $message"
+    fun sessionRemovalError(message: String, language: AppLanguage, failure: TeamConnectionFailure? = null): String {
+        val reason = actionReason(message, language, failure)
+        return localized(language, "Não foi possível excluir a sessão: $reason", "Could not delete the session: $reason")
+    }
+
+    private fun actionReason(message: String, language: AppLanguage, failure: TeamConnectionFailure?): String {
+        if (failure == null) {
+            return message
         }
+        return TeamConnectionLabels.headline(failure, TeamCredentialKind.ADMIN_TOKEN, language)
     }
 
     /** Mesma contagem do modal local: "1 saturada · 2 em atenção". */
