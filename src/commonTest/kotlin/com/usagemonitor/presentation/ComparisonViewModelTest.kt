@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliHourlyUsageRow
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionIndexReport
@@ -15,9 +16,13 @@ import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.repository.CliSessionRepository
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.BuildModelComparisonUseCase
+import com.usagemonitor.presentation.ui.UsageExportPayload
+import com.usagemonitor.presentation.ui.UsageExportRequest
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.ComparisonUiState
 import com.usagemonitor.presentation.viewmodel.ComparisonViewModel
 import com.usagemonitor.presentation.viewmodel.UiState
+import com.usagemonitor.presentation.viewmodel.UsageExportWriter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -28,6 +33,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -43,12 +49,17 @@ class ComparisonViewModelTest {
         viewModel?.onDestroy()
     }
 
-    private fun TestScope.create(): ComparisonViewModel {
+    private fun TestScope.create(
+        exportWriter: UsageExportWriter? = null,
+        breadcrumbs: RecordingBreadcrumbRecorder = RecordingBreadcrumbRecorder()
+    ): ComparisonViewModel {
         val created = ComparisonViewModel(
             buildComparison = BuildModelComparisonUseCase(repository, EmptyCodexRepository),
             dashboardState = MutableStateFlow<UiState>(UiState.Loading),
+            exportWriter = exportWriter,
             dispatcher = StandardTestDispatcher(testScheduler),
-            clock = object : Clock { override fun now() = this@ComparisonViewModelTest.now }
+            clock = object : Clock { override fun now() = this@ComparisonViewModelTest.now },
+            breadcrumbs = breadcrumbs
         )
         viewModel = created
         return created
@@ -110,6 +121,62 @@ class ComparisonViewModelTest {
         advanceUntilIdle()
         assertEquals(reads + 1, repository.calls)
         assertEquals(CliSessionRange.LAST_30D, assertIs<ComparisonUiState.Success>(model.uiState.value).range)
+    }
+
+    /** #386: o PDF sai do recorte da tela, com o nome do recorte e do dia. */
+    @Test
+    fun `exporting writes the comparison pdf and publishes where it went`() = runTest {
+        val requests = mutableListOf<UsageExportRequest>()
+        val model = create(exportWriter = { request -> requests += request; "C:/relatorios/" + request.suggestedFileName })
+        model.openWindow()
+        advanceUntilIdle()
+
+        model.exportReport(AppLanguage.PT)
+        advanceUntilIdle()
+
+        assertEquals("usage-monitor-comparison-7d-2026-10-14.pdf", requests.single().suggestedFileName)
+        assertIs<UsageExportPayload.Report>(requests.single().payload)
+        assertEquals(
+            CliExportOutcome.Saved("C:/relatorios/usage-monitor-comparison-7d-2026-10-14.pdf"),
+            assertIs<ComparisonUiState.Success>(model.uiState.value).exportOutcome
+        )
+    }
+
+    @Test
+    fun `a cancelled export publishes nothing and a failed one says why and leaves a breadcrumb`() = runTest {
+        var failure: Throwable? = null
+        val breadcrumbs = RecordingBreadcrumbRecorder()
+        val model = create(exportWriter = { _ -> failure?.let { error -> throw error }; null }, breadcrumbs = breadcrumbs)
+        model.openWindow()
+        advanceUntilIdle()
+
+        model.exportReport(AppLanguage.EN)
+        advanceUntilIdle()
+        assertEquals(null, assertIs<ComparisonUiState.Success>(model.uiState.value).exportOutcome)
+
+        failure = IllegalStateException("disco cheio")
+        model.exportReport(AppLanguage.EN)
+        advanceUntilIdle()
+        assertEquals(CliExportOutcome.Failed("disco cheio"), assertIs<ComparisonUiState.Success>(model.uiState.value).exportOutcome)
+        assertTrue(breadcrumbs.messages.any { message -> message.contains("exportar comparação entre modelos") }, breadcrumbs.messages.toString())
+    }
+
+    @Test
+    fun `without a writer or before the first reading nothing is exported`() = runTest {
+        val requests = mutableListOf<UsageExportRequest>()
+        val loading = create(exportWriter = { request -> requests += request; "x.pdf" })
+        loading.exportReport(AppLanguage.PT)
+        advanceUntilIdle()
+        assertTrue(requests.isEmpty())
+        assertEquals(ComparisonUiState.Loading, loading.uiState.value)
+        loading.onDestroy()
+
+        val noWriter = create(exportWriter = null)
+        noWriter.openWindow()
+        advanceUntilIdle()
+        noWriter.exportReport(AppLanguage.PT)
+        advanceUntilIdle()
+        assertEquals(null, assertIs<ComparisonUiState.Success>(noWriter.uiState.value).exportOutcome)
     }
 }
 

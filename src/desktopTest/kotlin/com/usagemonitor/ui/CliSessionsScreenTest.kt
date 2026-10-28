@@ -35,6 +35,7 @@ import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.CliUsageGroupRow
 import com.usagemonitor.domain.entity.MICROS_PER_USD
 import com.usagemonitor.domain.entity.MonthlyBudgetStatus
+import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.toUsageBreakdown
 import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
@@ -58,6 +59,7 @@ import com.usagemonitor.presentation.ui.BREAKDOWN_SORT_TAG_PREFIX
 import com.usagemonitor.presentation.ui.REFRESHING_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TAB_BREAKDOWN_TAG
 import com.usagemonitor.presentation.ui.TAB_SESSIONS_TAG
+import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.viewmodel.CliSessionDetailUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
@@ -1539,6 +1541,78 @@ class CliSessionsScreenTest {
             turnCount = 1,
             inputTokens = inputTokens
         )
+    }
+
+    /**
+     * Blocos que só aparecem com medida: tempo ativo e vazão. O custo com turno sem tarifa
+     * leva o `+`, e o aviso do índice e a falha da exportação ficam escritos.
+     */
+    @Test
+    fun `the totals show the partial cost, the measured blocks, the index warning and a failed export`() = runDesktopComposeUiTest {
+        val sessions = listOf(
+            summary("session-a", costMicros = 2L * MICROS_PER_USD).copy(
+                unpricedTurnCount = 1,
+                activeMillis = 90L * 60 * 1_000,
+                throughput = OutputThroughput(outputTokens = 4_000L, generationMillis = 100_000L)
+            ),
+            summary("session-b", costMicros = 1L * MICROS_PER_USD).copy(
+                activeMillis = 30L * 60 * 1_000,
+                throughput = OutputThroughput(outputTokens = 1_000L, generationMillis = 100_000L)
+            )
+        )
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_000.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = sessions,
+                            indexWarning = "Índice parcial: 2 arquivos ilegíveis",
+                            exportOutcome = CliExportOutcome.Failed("disco cheio")
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("\$3.00+").assertIsDisplayed()
+        // "Tempo ativo" também é cabeçalho de coluna da lista: o bloco é o segundo nó.
+        onAllNodesWithText("Tempo ativo").assertCountEquals(2)
+        onNodeWithText("2h00").assertIsDisplayed()
+        onNodeWithText("saída · ponta a ponta").assertIsDisplayed()
+        // Total sobre total (#381): 5 000 tokens em 200 s, não a média de 40 e 10.
+        onNodeWithText("25 tok/s").assertIsDisplayed()
+        onNodeWithText("Índice parcial: 2 arquivos ilegíveis").assertIsDisplayed()
+        onNodeWithText("Falha ao exportar: disco cheio").assertIsDisplayed()
+    }
+
+    /** Sem sessão com medida, os blocos de tempo e vazão não ocupam espaço para dizer "—". */
+    @Test
+    fun `without a measured session the active time and throughput blocks stay out`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_000.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary("session-a")),
+                            exportOutcome = CliExportOutcome.Saved("/tmp/sessoes.csv")
+                        ),
+                        language = AppLanguage.EN,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // Só o cabeçalho da coluna da lista: o bloco do total não entrou.
+        onAllNodesWithText("Active time").assertCountEquals(1)
+        onAllNodesWithText("output · end to end").assertCountEquals(0)
+        onNodeWithText("Exported to /tmp/sessoes.csv").assertIsDisplayed()
     }
 
     private fun summary(

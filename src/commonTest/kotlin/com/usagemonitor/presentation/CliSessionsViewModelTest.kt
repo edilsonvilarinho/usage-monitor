@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.AccountCreditUsage
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.CliSessionDetail
@@ -47,6 +48,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
@@ -936,6 +938,70 @@ class CliSessionsViewModelTest {
         viewModel.onDestroy()
     }
 
+    /** Da aba do resumo sai o resumo, não a lista: o nome do arquivo diz qual. */
+    @Test
+    fun `exporting from the breakdown tab writes the breakdown and needs it loaded`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        repository.breakdownResult = Result.success(
+            listOf(CliUsageGroupRow(sessionId = "a", cwd = "/home/dev/alpha", model = "claude-opus-5", turnCount = 1)).toUsageBreakdown()
+        )
+        val writer = RecordingExportWriter()
+        val viewModel = buildViewModel(repository, exportWriter = writer)
+
+        viewModel.setView(CliSessionsView.BREAKDOWN)
+        runCurrent()
+        viewModel.exportCurrentView(UsageExportFormat.CSV)
+        runCurrent()
+
+        val request = writer.requests.single()
+        assertTrue(request.suggestedFileName.startsWith("usage-monitor-breakdown-5h-"), request.suggestedFileName)
+        assertTrue(assertIs<UsageExportPayload.Text>(request.payload).content.contains("alpha"))
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `account credits from the dashboard enter the state and the same value does not republish`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val viewModel = buildViewModel(repository)
+        val credits = AccountCreditUsage(usedMinorUnits = 1_250L, limitMinorUnits = 5_000L, currencyCode = "BRL")
+
+        viewModel.setAccountCredits(credits)
+        val published = viewModel.uiState.value
+        viewModel.setAccountCredits(credits.copy())
+
+        assertEquals(credits, assertIs<CliSessionsUiState.Success>(published).accountCredits)
+        assertSame(published, viewModel.uiState.value)
+        viewModel.setAccountCredits(null)
+        assertNull(assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).accountCredits)
+        viewModel.onDestroy()
+    }
+
+    /** A mesma falha do orçamento entra uma vez na trilha; depois de um sucesso, entra de novo. */
+    @Test
+    fun `a repeated budget failure is recorded once until a reading succeeds`() = runTest {
+        val repository = FakeCliSessionRepository(sessions = listOf(summary("a")))
+        val breadcrumbs = RecordingBreadcrumbRecorder()
+        val viewModel = buildViewModel(repository, breadcrumbs = breadcrumbs)
+        fun failures() = breadcrumbs.messages.count { message -> message.contains("carregar orçamento mensal de sessões CLI") }
+
+        repository.breakdownResult = Result.failure(IllegalStateException("banco travado"))
+        viewModel.setBudgetLimitMicros(200L * MICROS_PER_USD)
+        runCurrent()
+        viewModel.setBudgetLimitMicros(300L * MICROS_PER_USD)
+        runCurrent()
+        assertEquals(1, failures())
+
+        repository.breakdownResult = Result.success(CliUsageBreakdown())
+        viewModel.setBudgetLimitMicros(400L * MICROS_PER_USD)
+        runCurrent()
+        repository.breakdownResult = Result.failure(IllegalStateException("banco travado"))
+        viewModel.setBudgetLimitMicros(500L * MICROS_PER_USD)
+        runCurrent()
+
+        assertEquals(2, failures())
+        viewModel.onDestroy()
+    }
+
     private fun kotlinx.coroutines.test.TestScope.buildViewModel(
         repository: FakeCliSessionRepository,
         exportWriter: UsageExportWriter? = null,
@@ -945,7 +1011,8 @@ class CliSessionsViewModelTest {
         // O corte da janela é resolvido dentro do caso de uso; separá-lo do
         // relógio do carimbo permite mover o tempo só onde interessa.
         useCaseClock: Clock = FixedClock(FIXED_NOW),
-        detectStalled: Boolean = false
+        detectStalled: Boolean = false,
+        breadcrumbs: RecordingBreadcrumbRecorder = RecordingBreadcrumbRecorder()
     ): CliSessionsViewModel {
         return CliSessionsViewModel(
             getCliSessions = GetCliSessionsUseCase(repository, useCaseClock),
@@ -964,7 +1031,8 @@ class CliSessionsViewModelTest {
             autoLoad = autoLoad,
             backgroundIndexIntervalMillis = backgroundIndexIntervalMillis,
             liveIntervalMillis = LIVE_INTERVAL_MILLIS,
-            clock = clock
+            clock = clock,
+            breadcrumbs = breadcrumbs
         )
     }
 

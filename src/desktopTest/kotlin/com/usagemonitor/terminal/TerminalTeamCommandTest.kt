@@ -107,4 +107,39 @@ class TerminalTeamCommandTest {
         harness.run("web", "disable")
         assertEquals(1, harness.run("web", "token", "--show").first)
     }
+
+    @Test
+    fun `join asks for the server, then the alias, then the key, and saves nothing on the way`() = TerminalConfigHarness().use { harness ->
+        harness.loggedIn()
+
+        assertEquals(
+            1 to "▲ Falta o endereço do servidor do time. Informe com:\n    usage-monitor team join --server https://time.exemplo.com --alias <nome>\n",
+            harness.run("team", "join", secret = teamKey)
+        )
+        assertEquals(
+            1 to "▲ Falta o seu apelido no time. Informe com:\n    usage-monitor team join --alias <nome>\n",
+            harness.run("team", "join", "--server", "https://t.example", secret = teamKey)
+        )
+        assertEquals(
+            1 to "▲ Nada foi digitado, e nada mudou.\n",
+            harness.run("team", "join", "--server", "https://t.example", "--alias", "edi", secret = " ")
+        )
+        assertEquals("", LocalTeamSettingsDataSource(harness.file("team.json")).load().apiKey)
+    }
+
+    @Test
+    fun `join without the check says it was not checked, and a second join reuses the saved server and alias`() =
+        TerminalConfigHarness(teamCheck = { _, _ -> error("--skip-check não confere") }).use { harness ->
+            harness.loggedIn()
+            val (code, output) = harness.run("team", "join", "--server", "https://t.example", "--alias", "edi", "--skip-check", secret = teamKey)
+            assertEquals(0, code, output)
+            assertTrue(output.trimEnd().endsWith("entrou sem conferência"), output)
+
+            val (again, againOutput) = harness.run("team", "join", "--skip-check", secret = "outra-chave")
+            assertEquals(0, again, againOutput)
+            val saved = LocalTeamSettingsDataSource(harness.file("team.json")).load()
+            assertEquals("https://t.example", saved.normalizedServerUrl)
+            assertEquals("edi", saved.alias)
+            assertEquals("outra-chave", saved.apiKey)
+        }
 }

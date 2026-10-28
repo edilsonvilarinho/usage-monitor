@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.QuotaWindowStats
 import com.usagemonitor.domain.entity.UsageForecast
 import com.usagemonitor.domain.entity.UsageHistoryPoint
 import com.usagemonitor.domain.entity.UsageHistorySeries
+import com.usagemonitor.domain.entity.UsagePeriodComparison
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
@@ -161,6 +162,64 @@ class HistoryMetricEntriesTest {
 
         assertEquals("40 %", entries.valueOf("Consumido no período"))
         assertNull(entries.valueOf("Janelas no intervalo"))
+    }
+
+    /** Saldo (DeepSeek): o que sobrou, o que saiu no recorte e o ritmo, em dinheiro. */
+    @Test
+    fun `a balance series is read in money`() {
+        val series = seriesWithBaseline(todayDelta = 400L).copy(
+            unit = UsageUnit.CURRENCY_USD,
+            currentDisplayUsed = 1_234L,
+            deltaDisplayUsed = 250L,
+            averageDisplayConsumptionPerHour = 12.9
+        )
+
+        val entries = historyMetricEntries(ApiSource.DEEPSEEK, series, AppLanguage.EN, referenceAt = null)
+
+        assertEquals("\$12.34", entries.valueOf("Current balance"))
+        assertEquals("\$2.50", entries.valueOf("Consumed in range"))
+        assertEquals("\$0.12/h", entries.valueOf("Average per hour"))
+    }
+
+    /** Requisições sem limite conhecido: contagem crua, e a previsão diz que não há teto para prever. */
+    @Test
+    fun `requests without a known limit count raw and have no forecast`() {
+        val series = seriesWithBaseline(todayDelta = 400L).copy(
+            unit = UsageUnit.REQUESTS,
+            // Milhar inteiro: `formatQuantity` usa o `Locale` da JVM para a casa decimal ("1,5K" × "1.5K").
+            currentDisplayUsed = 2_000L,
+            currentDisplayTotal = 0L,
+            deltaDisplayUsed = 300L,
+            averageDisplayConsumptionPerHour = 12.6
+        )
+
+        val entries = historyMetricEntries(ApiSource.MINIMAX, series, AppLanguage.PT, referenceAt = null)
+
+        assertEquals("2K req", entries.valueOf("Requisições na janela"))
+        assertEquals("300 req", entries.valueOf("Variação observada"))
+        assertEquals("13 req/h", entries.valueOf("Média por hora"))
+        assertEquals("Limite indisponível", entries.valueOf("Previsão"))
+        assertEquals("Limit unavailable", historyMetricEntries(ApiSource.MINIMAX, series, AppLanguage.EN, referenceAt = null).valueOf("Forecast"))
+    }
+
+    /** A comparação com a janela anterior tem sinal; sem consumo anterior, diz isso em vez de "infinito". */
+    @Test
+    fun `the previous period comparison carries the sign or says there was nothing before`() {
+        val growing = seriesWithBaseline(todayDelta = 400L).copy(comparison = UsagePeriodComparison(currentDelta = 150L, previousDelta = 100L))
+        val fromNothing = seriesWithBaseline(todayDelta = 400L).copy(comparison = UsagePeriodComparison(currentDelta = 150L, previousDelta = 0L))
+
+        assertEquals("+50%", historyMetricEntries(ApiSource.ANTHROPIC, growing, AppLanguage.PT, referenceAt = null).valueOf("vs. período anterior"))
+        assertEquals(
+            "No previous consumption",
+            historyMetricEntries(ApiSource.ANTHROPIC, fromNothing, AppLanguage.EN, referenceAt = null).valueOf("vs. previous period")
+        )
+    }
+
+    @Test
+    fun `the window count names the exhausted ones in both languages`() {
+        assertEquals("5", windowCountLabel(5, 0, AppLanguage.EN))
+        assertEquals("5 · 2 esgotaram", windowCountLabel(5, 2, AppLanguage.PT))
+        assertEquals("5 · 2 exhausted", windowCountLabel(5, 2, AppLanguage.EN))
     }
 
     private fun List<HistoryMetricEntry>.valueOf(label: String): String? {

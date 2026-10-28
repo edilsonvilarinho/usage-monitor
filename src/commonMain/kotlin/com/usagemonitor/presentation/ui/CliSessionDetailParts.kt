@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionAnalytics
@@ -43,15 +42,6 @@ import com.usagemonitor.presentation.ui.theme.AppShapes
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 /**
- * "1 saturada · 2 em atenção" no cabeçalho, ou nada quando não há o que alertar.
- *
- * A cor é a do pior caso presente: um "em atenção" laranja ao lado de um
- * "saturada" vermelho diluiria o segundo.
- *
- * `internal` porque os dois modais têm o mesmo problema — o do time ainda pior,
- * já que lá o veredito vive dois níveis abaixo, dentro de um integrante recolhido.
- */
-/**
  * Cor do resumo de vereditos: a do pior estado presente.
  *
  * `null` quando não há aviso nenhum — aí o texto também não existe, e devolver
@@ -67,24 +57,6 @@ internal fun healthTallyColor(tally: CliSessionHealthTally): Color? {
     } else {
         healthColor(CliSessionHealth.ATTENTION, AppAccents.current)
     }
-}
-
-@Composable
-internal fun HealthTallyText(tally: CliSessionHealthTally, language: AppLanguage) {
-    val label = CliSessionsLabels.healthTally(tally, language) ?: return
-    val accents = AppAccents.current
-    val accent = if (tally.saturated > 0) {
-        healthColor(CliSessionHealth.SATURATED, accents)
-    } else {
-        healthColor(CliSessionHealth.ATTENTION, accents)
-    }
-
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = accent
-    )
 }
 
 /**
@@ -185,31 +157,6 @@ internal fun MetricCard(
         labelTrailing = help?.let { term ->
             { HelpDot(terms = listOf(term), language = language) }
         }
-    )
-}
-
-/**
- * Só o valor, sem a legenda.
- *
- * Existe para listas que carregam as legendas numa faixa de cabeçalho: repeti-las
- * dentro de cada linha dobra o texto da lista sem acrescentar informação. Fica ao
- * lado de [MetricText] e com a mesma tipografia de valor de propósito — as duas
- * anatomias têm de cair na mesma linha de base quando aparecem lado a lado.
- */
-@Composable
-internal fun MetricValue(
-    value: String,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    modifier: Modifier = Modifier
-) {
-    Text(
-        text = value,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = valueColor,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
     )
 }
 

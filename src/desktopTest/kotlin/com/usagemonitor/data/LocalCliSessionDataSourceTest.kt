@@ -1051,6 +1051,36 @@ class LocalCliSessionDataSourceTest {
     }
 
     /** Abre o índice sobre um banco já existente, para exercitar a migração da abertura. */
+    /** #463: a vazão por modelo soma tokens e tempo ponta a ponta, no corte e na conta pedidos. */
+    @Test
+    fun `model throughput sums per model from the cut on and only measured turns`() = runTest {
+        withFixture { root, dataSource ->
+            writeTranscript(
+                root,
+                "session-a",
+                userLine("session-a", "2026-08-01T10:00:00Z"),
+                assistantLine("session-a", "msg-1", "2026-08-01T10:00:10Z", outputTokens = 400L),
+                userLine("session-a", "2026-08-01T11:00:00Z"),
+                assistantLine("session-a", "msg-2", "2026-08-01T11:00:05Z", outputTokens = 100L),
+                userLine("session-a", "2026-08-01T12:00:00Z"),
+                assistantLine("session-a", "msg-3", "2026-08-01T12:00:04Z", model = "claude-sonnet-5", outputTokens = 80L),
+                // Sem pedido conhecido: não entra na vazão.
+                assistantLine("session-a", "msg-4", "2026-08-01T12:30:00Z", model = "claude-haiku-5", outputTokens = 999L)
+            )
+            dataSource.syncIndex()
+
+            val all = dataSource.readModelThroughputs(profileId = null, sinceEpochMillis = epochMillis("2026-08-01T00:00:00Z"))
+            assertEquals(setOf("claude-opus-5", "claude-sonnet-5"), all.keys)
+            assertEquals(500L, all.getValue("claude-opus-5").outputTokens)
+            assertEquals(15_000L, all.getValue("claude-opus-5").generationMillis)
+            assertEquals(4_000L, all.getValue("claude-sonnet-5").generationMillis)
+
+            val late = dataSource.readModelThroughputs(profileId = PROFILE_A, sinceEpochMillis = epochMillis("2026-08-01T10:30:00Z"))
+            assertEquals(100L, late.getValue("claude-opus-5").outputTokens)
+            assertTrue(dataSource.readModelThroughputs(profileId = PROFILE_B, sinceEpochMillis = 0L).isEmpty())
+        }
+    }
+
     private suspend fun withDataSource(
         root: File,
         databaseFile: File,

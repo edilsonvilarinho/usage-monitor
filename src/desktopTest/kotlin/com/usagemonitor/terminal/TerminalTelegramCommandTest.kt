@@ -12,7 +12,11 @@ import com.usagemonitor.parseCommandLine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.terminal.TerminalPalette
+import com.usagemonitor.presentation.terminal.TerminalProfile
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,11 +25,16 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 /** O Telegram de mentira: o token "ruim" é recusado; [onGetMe] faz o papel de quem pareia. */
-private class FakeTerminalTelegramApi(private val onGetMe: () -> Unit = {}) : TelegramBotApi(HttpClient(MockEngine { respond("") })) {
+private class FakeTerminalTelegramApi(
+    private val onGetMe: () -> Unit = {},
+    /** A falha do `sendMessage`; `null` entrega. */
+    private val sendFailure: Throwable? = null
+) : TelegramBotApi(HttpClient(MockEngine { respond("") })) {
     val sent = CopyOnWriteArrayList<Pair<Long, String>>()
 
     override suspend fun getMe(token: String): String? {
         if (token == "ruim") throw TelegramUnauthorizedException()
+        if (token == "sem-rede") throw IOException("api.telegram.org inacessível")
         onGetMe()
         return "uso_bot"
     }
@@ -39,6 +48,7 @@ private class FakeTerminalTelegramApi(private val onGetMe: () -> Unit = {}) : Te
         silent: Boolean,
         replyKeyboard: TelegramReplyKeyboard?
     ): Long {
+        sendFailure?.let { failure -> throw failure }
         sent += chatId to text
         return 1L
     }
@@ -130,6 +140,82 @@ class TerminalTelegramCommandTest {
             assertEquals(0 to "✓ @ed não é mais atendida · vale quando o app ou o serviço abrir\n", harness.run("telegram", "remove", "51"))
             assertTrue(harness.telegram().load().authorizedChats.isEmpty())
             assertEquals(1, harness.run("telegram", "remove", "@ninguem").first)
+        }
+    }
+
+    @Test
+    fun `setup with nothing typed or with Telegram out of reach changes nothing`() {
+        val api = FakeTerminalTelegramApi()
+        TerminalConfigHarness(telegramApi = { api }).use { harness ->
+            assertEquals(1 to "▲ Nada foi digitado, e nada mudou.\n", harness.run("telegram", "setup", secret = "   "))
+
+            val (code, output) = harness.run("telegram", "setup", secret = "sem-rede")
+            assertEquals(1, code)
+            assertEquals("▲ Não deu para conferir o token agora, e nada mudou: api.telegram.org inacessível\n", output)
+            assertEquals("", harness.telegram().load().botToken)
+        }
+    }
+
+    @Test
+    fun `test refuses without a token or a paired chat and repeats why the message did not go`() {
+        val failing = FakeTerminalTelegramApi(sendFailure = IOException("chat not found"))
+        TerminalConfigHarness(telegramApi = { failing }).use { harness ->
+            assertEquals(
+                1 to "▲ O bot ainda não tem token. Configure com:\n    usage-monitor telegram setup\n",
+                harness.run("telegram", "test")
+            )
+
+            harness.telegram().save(harness.telegram().load().copy(botToken = token, enabled = true))
+            assertEquals(
+                1 to "▲ Nenhuma conversa pareada. Pareie com:\n    usage-monitor telegram pair\n",
+                harness.run("telegram", "test")
+            )
+
+            harness.telegram().save(harness.telegram().load().copy(authorizedChats = listOf(TelegramChat(51L, "@ed"))))
+            assertEquals(1 to "▲ A mensagem de teste não saiu: chat not found\n", harness.run("telegram", "test"))
+        }
+    }
+
+    @Test
+    fun `pairing with a collector but no token points to setup`() = TerminalConfigHarness(collector = CollectorKind.SERVICE).use { harness ->
+        val (code, output) = harness.run("telegram", "pair")
+
+        assertEquals(1, code)
+        assertEquals("▲ O bot ainda não tem token. Configure com:\n    usage-monitor telegram setup\n", output)
+    }
+
+    @Test
+    fun `pairing stops at the timeout when no chat shows up`() {
+        val api = FakeTerminalTelegramApi()
+        TerminalConfigHarness(collector = CollectorKind.SERVICE, telegramApi = { api }).use { harness ->
+            assertEquals(0, harness.run("telegram", "setup", secret = token).first)
+
+            val (code, output) = harness.run("telegram", "pair", "--timeout", "1s")
+
+            assertEquals(1, code, output)
+            assertTrue(output.contains("aguardando… (o código vale até "), output)
+            assertTrue(output.trimEnd().endsWith("▲ O código venceu sem nenhuma conversa pareada. Rode de novo para um código novo."), output)
+        }
+    }
+
+    @Test
+    fun `the interactive mode opens the code without waiting for the chat`() {
+        val api = FakeTerminalTelegramApi()
+        val profile = TerminalProfile(TerminalPalette.NONE, unicode = true)
+        TerminalConfigHarness(telegramApi = { api }).use { harness ->
+            val refused = harness.runner().output(TelegramCommand.Pair(), AppLanguage.PT, profile)
+            assertEquals(1, refused.exitCode)
+            assertTrue(refused.lines.joinToString("\n") { line -> line.plainText }.endsWith("usage-monitor service run"))
+        }
+        TerminalConfigHarness(collector = CollectorKind.SERVICE, telegramApi = { api }).use { harness ->
+            assertEquals(0, harness.run("telegram", "setup", secret = token).first)
+
+            val opened = harness.runner().output(TelegramCommand.Pair(), AppLanguage.PT, profile)
+
+            assertEquals(0, opened.exitCode)
+            val text = opened.lines.map { line -> line.plainText }
+            assertTrue(text.first().startsWith("No Telegram, abra o seu bot (@uso_bot) e envie: /start "), text.toString())
+            assertTrue(text.any { line -> line.contains("https://t.me/uso_bot?start=") }, text.toString())
         }
     }
 }

@@ -12,6 +12,18 @@ import com.usagemonitor.presentation.terminal.TerminalAnalysisView
 import com.usagemonitor.presentation.terminal.TerminalLabels
 import com.usagemonitor.presentation.terminal.TerminalPalette
 import com.usagemonitor.presentation.terminal.TerminalProfile
+import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
+import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.QuotaInfo
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.domain.entity.UsageUnit
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.PrintStream
+import java.nio.file.Files
+import java.util.UUID
+import java.util.prefs.Preferences
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -20,6 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -86,5 +99,68 @@ class TerminalAnalysisCommandTest {
         val empty = TerminalAnalysisView.render(emptyList(), now, CollectorKind.APP, 38.seconds, labels, TerminalLabels(AppLanguage.PT), color, filter = "pessoal")
         assertEquals(3, empty.exitCode)
         assertEquals("▲ Nenhuma conta com análise corresponde a 'pessoal'.", empty.lines.single().plainText)
+    }
+
+    /** Uma leitura de verdade: o cache do painel numa pasta temporária, sem índice nem histórico. */
+    private fun runCommand(command: TerminalCommand.Analysis, unicode: Boolean = true, onStores: () -> Unit = {}): Pair<Int, String> {
+        val dir = Files.createTempDirectory("usage-monitor-analysis").toFile()
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        val cache = File(dir, "dashboard-cache.json")
+        val stats = ApiUsageStats(
+            source = ApiSource.ANTHROPIC, targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "work"), apiName = "Anthropic", profileLabel = "trabalho",
+            quotas = listOf(QuotaInfo(label = "Claude 5h", used = 64, total = 100, periodEndAt = now + 9.minutes, unit = UsageUnit.PERCENTAGE)),
+            fetchedAt = now - 38.seconds
+        )
+        runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats), now - 38.seconds) }
+        val clock = object : Clock {
+            override fun now(): Instant = now
+        }
+        val buffer = ByteArrayOutputStream()
+        val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = unicode), PrintStream(buffer, true, "UTF-8"))
+        try {
+            val code = TerminalAnalysisCommand.run(command, AppLanguage.PT, TerminalReader(cache, File(dir, "app.lock"), node, clock), console) {
+                onStores()
+                TuiStores(cliIndex = File(dir, "sem-indice.db"), codexIndex = File(dir, "sem-codex.db"), history = File(dir, "sem-historico.db"))
+            }
+            return code to buffer.toString(Charsets.UTF_8).replace("\r\n", "\n")
+        } finally {
+            runCatching { node.removeNode() }
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `run reads the cached accounts and prints the json with one entry per account`() {
+        val (code, output) = runCommand(TerminalCommand.Analysis(json = true))
+
+        assertEquals(0, code, output)
+        val accounts = Json.parseToJsonElement(output).jsonObject.getValue("accounts").jsonArray
+        assertEquals("anthropic", accounts.single().jsonObject.getValue("source").jsonPrimitive.content)
+        assertEquals("trabalho", accounts.single().jsonObject.getValue("account").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `run with a filter that matches nothing opens no database and exits with 3`() {
+        var opened = false
+
+        val (jsonCode, json) = runCommand(TerminalCommand.Analysis("codex", json = true)) { opened = true }
+        val (textCode, text) = runCommand(TerminalCommand.Analysis("codex")) { opened = true }
+
+        assertEquals(3, jsonCode)
+        assertEquals(0, Json.parseToJsonElement(json).jsonObject.getValue("accounts").jsonArray.size)
+        assertEquals(3, textCode)
+        assertEquals("▲ Nenhuma conta com análise corresponde a 'codex'.\n", text)
+        assertFalse(opened)
+    }
+
+    @Test
+    fun `run prints the race as text, and the json escapes accents on an ascii console`() {
+        val (code, text) = runCommand(TerminalCommand.Analysis("trabalho"))
+        assertEquals(0, code, text)
+        assertTrue(text.startsWith("● Anthropic · trabalho\n"), text)
+
+        val ascii = TerminalAnalysisJson.encode(listOf(work.copy(name = "Anthropic · trabalho") to analysis), now, asciiOnly = true)
+        assertTrue(ascii.all { char -> char.code < 128 }, ascii)
+        assertTrue(ascii.contains("Anthropic \\u00b7 trabalho"), ascii)
     }
 }
