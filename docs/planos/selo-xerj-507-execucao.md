@@ -29,6 +29,7 @@ O repositório foi incluído no XERJ Corpus Hub; a página de colaborador
 | Atividade | Estado | Validação |
 |---|---|---|
 | A01 | feito | sem harness de teste (documentação); `git diff --stat` mostra só este arquivo |
+| A02 | feito | sem harness de teste (README); `curl …/badge.svg` → `200 image/svg+xml`; `git diff` = 1 linha em cada README |
 
 ## Problemas em aberto e riscos
 

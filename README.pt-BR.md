@@ -8,6 +8,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational" alt="Plataformas">
   <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/edilsonvilarinho/usage-monitor" alt="Licença: MIT"></a>
+  <a href="https://hub.xerj.org/contributors/edilsonvilarinho"><img src="https://hub.xerj.org/contributors/edilsonvilarinho/badge.svg" alt="Colaborador do XERJ Corpus Hub"></a>
 </p>
 
 <p align="center"><a href="README.md">English</a> · Português (Brasil)</p>
