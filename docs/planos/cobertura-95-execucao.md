@@ -64,7 +64,7 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | 6.1 | Rota híbrida: exclusão nominal; geometria de janela numa implementação só | PR #483, mesclada | 88,1% |
 | 6.2 | Costura em `AutoStartManager` (`AutoStartHost`), `SettingsActions`, `AppSettingsFeedback`, `buildShellActions` e leitores do bot; testes de `AppModalState` e `TelegramBotActions` | PR #485 | 89,5% |
 | 6.3 | Janelas: extrair decisão de `HudWindow*`, `AppDialogWindow`, `DesktopWindowFrame`, `CompositorWindowDrag` para função pura; excluir só a chamada AWT/JNA que sobrar, por nome | PR #486 mesclada | 89,58% |
-| 6.4 | `commonMain` restante (~1 300 linhas: telas de sessões, presença, histórico, Telegram) | pendente | — |
+| 6.4 | Alavanca B da #488: teste de código com decisão fora de janela (terminal, TUI, bot, leitores locais, view models, telas) | em andamento | — |
 
 Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o teto para 95% é 2 268, faltam
 **3 139**. Distribuição: `desktopMain` 2 598, janela 1 453, `commonMain` 1 327, gerado 22, só-teste 7.
@@ -119,6 +119,29 @@ do dono (regra do plano, "Decisões").
 | W63-A03 | Alternância maximizar/restaurar e rótulo do botão da barra saem de `DesktopDialogTitleBar` para funções puras | `test(window): decide the maximize toggle apart from the frame` |
 | W63-A04 | Decisão de pedido de `ModalWindowBody` (`modalRequestAction`) e de pré-aquecimento (`modalPrewarmRequested`) como funções puras | `test(window): decide modal requests apart from the window` |
 | W63-A05 | Medição, relatório e piso (sobe só se o valor medido chegar a 90) | `ci(coverage): raise the Kotlin line floor` |
+
+## Atividades da onda 6.4 (issue #488, alavanca B)
+
+Partida medida em `origin/main` (`7f379975`), `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport`:
+3 598 testes, 0 falhas; **89,58%** (40 734/45 472), 4 738 descobertas; teto para 95%: 2 273, faltam **2 465**.
+Distribuição (arquivo com import de janela = janela; com `@Composable` = composição; resto = lógica):
+`desktopMain` lógica 1 531, janela 1 431, `commonMain` composição 669, `commonMain` lógica 658, `desktopMain`
+composição 427, gerado 22. Dos 1 531 de lógica do `desktopMain`, `CollectorEngine` (204) é raiz de composição sobre
+`AppGraph` (nunca montado em teste) e fica para a alavanca A, com os hosts de janela.
+
+Cada atividade testa só linha com decisão (ramo, recusa, texto, mapeamento, estado publicado), lida no Kover XML antes
+de escrever o teste; chamada direta a `System.console`, `systemctl` real ou cliente HTTP real fica de fora.
+
+| ID | Atividade | Commit esperado |
+|---|---|---|
+| W64-A01 | `JLineTuiIo` sobre terminal JLine em memória: quadro desenhado (`CSI H`, `CSI K` por linha, `CSI J`), tecla com prazo, Ctrl+C como `Interrupt`, tamanho padrão quando o terminal diz 0, `close` idempotente devolve a tela | `test(tui): cover the JLine terminal over in-memory streams` |
+| W64-A02 | Comandos do terminal: `service` (desinstalar sem unidade, controle com e sem falha, `logs --lines`), `analysis` (JSON e texto, sem conta), recusas do `telegram` e do `team`, `alerts`/`tmux`/JSON do `TerminalCommands` | `test(terminal): cover service, analysis, telegram and team refusals` |
+| W64-A03 | Leitores da TUI: sessão ativa Claude e Codex, análise com índice fora da faixa, mapeamento da sessão Codex, períodos e exportação vazia | `test(tui): cover the active-session and Codex session readers` |
+| W64-A04 | Bot do Telegram: limiares, confirmações, silêncio e lembrete nos dois idiomas; anéis/comparação sem dado e sem imagem; toques de botão | `test(telegram): cover thresholds, confirmations and image fallbacks` |
+| W64-A05 | Leitores locais: recibo de atualização (ausente, ilegível, sem versão, status), uso por modelo do índice Codex, demais datasources com ramo descoberto | `test(data): cover update receipts and local index readers` |
+| W64-A06 | View models: exportação da comparação (salva, falha, sem gravador), exportação do breakdown, créditos repetidos, falha de orçamento registrada uma vez; suportes do painel com ramo descoberto | `test(viewmodel): cover comparison export and session budget failures` |
+| W64-A07 | Telas com ramo descoberto: `TeamUsageScreen`, `CliSessionsScreen`, `CliSessionDetailParts`, `TeamPresenceScreen`, `HistoryScreen`/`HistoryMetrics` | `test(ui): cover the remaining session, team and history screen states` |
+| W64-A08 | Medição, relatório e piso (sobe para o valor medido arredondado para baixo) | `ci(coverage): raise the Kotlin line floor` |
 
 ## Pontos de situação
 
