@@ -61,6 +61,8 @@ marca (relevo AK1 em todo lugar onde a marca aparece).
 | A03 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.GargantuaHudTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.architecture.*"` | 92 testes, 0 falhas (11 + 64 + 17) |
 | A04 | vermelho (stub com cores chapadas e espessura 0): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.AppProviderMarkReliefTest" --tests "com.usagemonitor.ui.AppProviderMarkReliefScreenTest"` | 3 falhas na asserção: `expected:<1.0> but was:<0.0>`; `topo de Color(0.30980393, 0.54901963, 1.0, …) não clareou`; `borda de cima 0.5019608 deveria passar a de baixo 0.5019608 em 0,3` |
 | A04 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.*" --tests "com.usagemonitor.ui.AppProviderMarkReliefScreenTest" --tests "com.usagemonitor.ui.GargantuaHudTest" --tests "com.usagemonitor.ui.HudNotchTest"` | 165 testes, 0 falhas |
+| A05 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.WebHudPageTest"` | 1 falha na asserção: `ANTHROPIC sem marca`, `MINIMAX sem marca`, `CODEX sem marca`… (as 11 fontes) |
+| A05 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.WebHudPageTest" --tests "com.usagemonitor.LocalWebAccessServiceTest" --tests "com.usagemonitor.WebAccessActionsTest"` | 12 testes, 0 falhas. O desenho AL1 da página não tem harness: conferido no Chrome com `hud.html` servido por um mock local de `/api/snapshot` (Claude, OpenCode Go, Codex, MiniMax), console sem erro, marca em relevo com o disco da frente por cima |
 
 ## Problemas em aberto e riscos
 
