@@ -62,31 +62,47 @@ internal fun AppPreferenceEffects(
 @Composable
 private fun AutoStartResolution(shell: AppShellState, settings: PreferencesSettings, breadcrumbs: BreadcrumbRecorder) {
     LaunchedEffect(settings) {
-        // Com `--user-data-dir` (#419), a entrada de inicialização e o ícone de
-        // menu são da instância padrão: esta não lê nem reescreve nenhum dos dois.
-        if (!AppDataDirectory.isDefault) {
-            return@LaunchedEffect
-        }
-        if (AutoStartManager.isAutoStartSupported()) {
-            val resolved = withContext(Dispatchers.IO) { AutoStartManager.isAutoStartEnabled() }
-            shell.applyResolvedAutoStart(resolved)
-            // Migração por baixo: instalação anterior tem a entrada de
-            // inicialização sem o argumento de origem, e sem ele todo arranque por
-            // autostart seria registrado como manual.
-            val migrationResult = runCatching {
-                withContext(Dispatchers.IO) { AutoStartManager.ensureAutoStartCommandCurrent() }
-            }.onFailure { error ->
-                breadcrumbs.recordFailure("atualizar comando de inicialização", error)
-            }.getOrNull()
-            if (migrationResult is AutoStartResult.Failure) {
-                breadcrumbs.recordFailure("atualizar comando de inicialização", migrationResult.reason)
-            }
-        }
-        // Mesmo motivo, para a entrada de MENU (issue #133): fora do `if` porque
-        // a checagem é sobre autostart e esta é sobre Linux, e
-        // `ensureLinuxMenuIconCurrent()` se protege sozinha nas outras plataformas.
-        withContext(Dispatchers.IO) { ensureLinuxMenuIconCurrent() }
+        resolveAutoStartAtLaunch(
+            isDefaultDataRoot = AppDataDirectory.isDefault,
+            host = AutoStartHost.system(),
+            applyResolved = shell::applyResolvedAutoStart,
+            breadcrumbs = breadcrumbs
+        )
     }
+}
+
+/** A leitura e a migração do autostart no arranque, fora da composição para o teste. */
+internal suspend fun resolveAutoStartAtLaunch(
+    isDefaultDataRoot: Boolean,
+    host: AutoStartHost,
+    applyResolved: (Boolean) -> Unit,
+    breadcrumbs: BreadcrumbRecorder,
+    ensureMenuIcon: () -> Unit = ::ensureLinuxMenuIconCurrent
+) {
+    // Com `--user-data-dir` (#419), a entrada de inicialização e o ícone de
+    // menu são da instância padrão: esta não lê nem reescreve nenhum dos dois.
+    if (!isDefaultDataRoot) {
+        return
+    }
+    if (AutoStartManager.isAutoStartSupported(host)) {
+        val resolved = withContext(Dispatchers.IO) { AutoStartManager.isAutoStartEnabled(host) }
+        applyResolved(resolved)
+        // Migração por baixo: instalação anterior tem a entrada de
+        // inicialização sem o argumento de origem, e sem ele todo arranque por
+        // autostart seria registrado como manual.
+        val migrationResult = runCatching {
+            withContext(Dispatchers.IO) { AutoStartManager.ensureAutoStartCommandCurrent(host) }
+        }.onFailure { error ->
+            breadcrumbs.recordFailure("atualizar comando de inicialização", error)
+        }.getOrNull()
+        if (migrationResult is AutoStartResult.Failure) {
+            breadcrumbs.recordFailure("atualizar comando de inicialização", migrationResult.reason)
+        }
+    }
+    // Mesmo motivo, para a entrada de MENU (issue #133): fora do `if` porque
+    // a checagem é sobre autostart e esta é sobre Linux, e
+    // `ensureLinuxMenuIconCurrent()` se protege sozinha nas outras plataformas.
+    withContext(Dispatchers.IO) { ensureMenuIcon() }
 }
 
 @OptIn(FlowPreview::class)
