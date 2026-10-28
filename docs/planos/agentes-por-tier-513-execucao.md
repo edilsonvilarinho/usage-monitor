@@ -66,6 +66,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | A02 | Agentes `neferpitou` (corpo vazio, `opus`), `test-runner` (`sonnet`, medium) e `explorer` (`haiku`), ambos com `omitClaudeMd`, sem `Agent`/`Edit`/`Write` | Sem harness. `claude -p` pedindo `explorer` achar `CodexQuotaLabels` → 1 definição + 5 arquivos, `haiku` 11.758 tokens de entrada, US$ 0,0017; `test-runner` com `node --test "tools/ci/test/*.test.mjs"` → `VERDE` 14/14 em 1 linha, `sonnet` 14.682 tokens |
 | A03 | `.claude/settings.json`: `agent: neferpitou`, `effortLevel: high`, `CLAUDE_CODE_FORK_SUBAGENT=0` | Sem harness. `JSON.parse` → ok; `claude -p` sem flag com o agente em `haiku` (temporário) → `claude-haiku-5-5`; lista de `subagent_type` sem `fork` |
 | A04 | `CLAUDE.md`: seção "Orquestração e agentes" (papéis, quando delegar, regras contra vazamento), apontando para `.claude/agents/` sem repetir modelo | Sem harness. `git diff --stat` → `CLAUDE.md` +13 linhas; nenhum alias nem ID de modelo na seção |
+| A05 | Skill `usage-monitor-workflow`: tabela "Who runs each step" (agente por passo, sem modelo) e regra do prompt de delegação | Sem harness. Execução real dos dois agentes nos papéis da tabela (A02): passo 5/7 → `test-runner` `VERDE` 14/14; busca ampla → `explorer` |
 
 ## Problemas em aberto e riscos
 

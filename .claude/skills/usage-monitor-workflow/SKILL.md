@@ -9,6 +9,23 @@ The "Fluxo de trabalho" section of `CLAUDE.md` is the rule; this skill is how to
 that changes a versioned file. A question that only asks for an explanation is answered in chat, outside the flow.
 No step waits for approval: the `CLAUDE.md` rule is the authorization for commit, push, PR and merge.
 
+## Who runs each step (#513)
+
+The session is the Neferpitou orchestrator. Models, effort and tools live only in `.claude/agents/`; this table names
+the agent, never the model. Rules against context leakage: `CLAUDE.md`, "Orquestração e agentes".
+
+| Step | Runs it |
+|---|---|
+| 1–4 issue, plan, worktree, TDD red → green | Neferpitou (main session) |
+| 5 local tests, test report, diff coverage | `test-runner` |
+| 6 push, PR, auto-merge | Neferpitou |
+| 7 watch the CI run, `--log-failed`, `ci-incidents.mjs` | `test-runner`; the fix (TDD) is Neferpitou's |
+| 8 cleanup, issue comment | Neferpitou |
+| broad search in any step | `explorer` |
+
+Delegation prompt: the exact command, the directory (the worktree path) and the expected return. Never the
+conversation, never a fork. A red verdict comes back as the failing assertion lines; Neferpitou decides the fix.
+
 ## 1. Issue (always)
 
 Use the issue the user gave. Without one, create it — the first line is mandatory (`CLAUDE.md`, "Convenções"):
