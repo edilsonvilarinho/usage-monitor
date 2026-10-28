@@ -65,6 +65,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | A03 | `tools/ci/ci-incidents.mjs` (runs vermelhos + tentativas anteriores reexecutadas + falhas locais no diretÃ³rio comum do git; saÃ­da 3 no limite) com 6 testes `node:test`; job `ci-scripts` e saÃ­da `ci_scripts` no `changes`, no `ci-ok`; passo 5 do `CLAUDE.md` e seÃ§Ã£o CI do `build-and-release.md` | `node --test "tools/ci/test/*.test.mjs"`: 6 testes, 0 falhas. Dados reais: `--branch feat/issue-440-terminal-config-service` â†’ 2 de 4, saÃ­da 0; com `--limit 2` â†’ saÃ­da 3; `--branch feat/398-399-settings-telegram` (run reexecutado, tentativa 2 verde) â†’ 1 incidÃªncia da tentativa 1. `node --test tools/ci/test/` (diretÃ³rio) falha no Node 22 local: trocado por glob e `setup-node` 22 no job |
 | A04 | `tools/ci/diff-coverage.mjs` (diff `--unified=0` Ã— Kover `<line>` / lcov `DA:`; resolvedor por formato com `owns`/`lookup`) com 8 testes; passos `Diff coverage` informativos em `desktop-windows` e `server`, `fetch-depth: 2`; `lcovonly` no `server/vitest.config.ts`; `CLAUDE.md` e `build-and-release.md`. Defeito achado na validaÃ§Ã£o e corrigido em TDD: na mediÃ§Ã£o do servidor, arquivo Kotlin do diff contava como "fora do relatÃ³rio" | Vermelho: teste "cada formato sÃ³ conta os prÃ³prios arquivos" â†’ `expected 0, actual 4`. Verde: `node --test "tools/ci/test/*.test.mjs"` 14 testes, 0 falhas. Dados reais: `gradlew.bat allTests koverXmlReport -Pcoverage` (`desktopTest FROM-CACHE`, BUILD SUCCESSFUL); `--base e3e24a5a --kover â€¦` (= PR #495) â†’ 48 de 80 (60,0%), saÃ­da 1; `--base 524009ef~12` â†’ 529 de 585 (90,4%), saÃ­da 0; `npm run test:coverage` 313 testes, linhas 95,84%, `--base 7f379975~1 --lcov â€¦` â†’ sem linha instrumentada, 0 fora do relatÃ³rio, saÃ­da 0. Piso nasce informativo por decisÃ£o do dono (2026-10-28) |
 | A05 | `.github/workflows/dependabot-automerge.yml`: `fetch-metadata` v3.1.0 pinado por SHA, condiÃ§Ã£o positiva (`gradle`/`npm_and_yarn` e `semver-minor`/`semver-patch`), permissÃµes sÃ³ no job; linha na tabela de workflows e parÃ¡grafo no `build-and-release.md`; regra no `CLAUDE.md`. Sem teste automatizado possÃ­vel (YAML de Actions, sem `actionlint` na mÃ¡quina): a validaÃ§Ã£o de sintaxe Ã© o run deste PR (job pulado, autor nÃ£o Ã© o Dependabot) | `python -c "yaml.safe_load(...)"` â†’ ok. ClassificaÃ§Ã£o pelos 5 Ãºltimos PRs reais: #470 (grupo Gradle minor/patch) â†’ auto; #471 jline 3â†’4, #467 zod 3â†’4, #468 express â†’ major, manual; #469 (`github_actions`) â†’ manual |
+| A06 | Skill `usage-monitor-workflow` (issue â‰¤ 15 linhas, plano, worktree, identidade por `git -c`, **TDD com vermelho na asserÃ§Ã£o registrado**, recortes locais, cobertura do diff, PR com `--auto`, `ci-incidents.mjs`, limpeza, comentÃ¡rio de testes na issue â‰¤ 20 linhas); `CLAUDE.md` passos 2 (TDD), 4 (auto-merge), 6 (encerramento e comentÃ¡rio) e ponteiro para a skill. Pedidos do dono durante a execuÃ§Ã£o (2026-10-28): TDD na skill; comentÃ¡rio de casos de teste na issue depois do merge | Sem harness de teste (texto de skill). Flags conferidos: `gh pr checks --help` (`--watch`, `--fail-fast`), `gh pr merge --help` (`--auto`, `--disable-auto`, `--admin`) no `gh` 2.88.1 |
 
 ## Problemas em aberto e riscos
 
@@ -72,3 +73,15 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|
 | Merge feito pelo auto-merge do Dependabot (ativado com `GITHUB_TOKEN`) não dispara o `ci.yml` nem o CodeQL no push da `main`: evento de `GITHUB_TOKEN` não cria run. O PR já rodou a suíte no merge commit; o CodeQL semanal continua | aceito |
 | Piso de 90% no diff: o PR #495 mediu 60% (48 de 80, cola de janela). Decisão do dono (2026-10-28): nasce **informativo**. Vira bloqueante quando 10 PRs seguidos com Kotlin alterado medirem ≥ 90%, ou por decisão do dono; a troca é tirar o `exit 0` do aviso nos dois passos | aberto |
+
+## Desvios do plano e achados da execução
+
+- **TDD pedido no meio da execução.** A03 e A04 escreveram teste e código juntos, não teste primeiro. A partir do
+  pedido, a correção achada no A04 (arquivo Kotlin contado como "fora do relatório" do lcov) seguiu vermelho → verde,
+  registrado na linha do A04.
+- **Script da skill `usage-monitor-commit-push` não roda em worktree:** `error: could not lock config file .git/config:
+  No such file or directory` (em worktree o `.git` é arquivo). Os commits desta issue usam `git -c user.name=claude -c
+  user.email=claude@anthropic.com`, mesma identidade, sem tocar a config; a skill `usage-monitor-workflow` documenta isso.
+  O script não foi alterado (fora do escopo).
+- **Piso do diff virou informativo** por decisão do dono, depois da medição do #495 (60%).
+

@@ -356,21 +356,25 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 **Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
 "corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
 passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
+Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**.
 
 1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
    máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
    atividades A01, A02… e tabela de pontos de situação. O do usuário, no chat: **no máximo um parágrafo**.
-2. **Desenvolvimento** em worktree/branch própria, nunca na `main`; uma atividade, um commit.
+2. **Desenvolvimento em TDD**, em worktree/branch própria, nunca na `main`; uma atividade, um commit. Teste primeiro e
+   vermelho **na asserção** (erro de compilação não conta), depois o código mínimo, depois a refatoração; a linha da
+   atividade no plano registra a execução vermelha e a verde. Correção de bug começa pelo teste que a reproduz.
 3. **Testes locais** antes do PR: os recortes de "Commands" e o relatório da skill `usage-monitor-test-report`.
-4. **PR** aberto por Claude, dizendo em que plataformas foi testado; Claude acompanha o CI até o `ci-ok` e corrige
-   o que ficar vermelho.
+4. **PR** aberto por Claude, dizendo em que plataformas foi testado, com `gh pr merge --auto --merge` na abertura: o
+   ruleset da `main` exige o `ci-ok` e o GitHub mescla sozinho. Claude acompanha o CI e corrige o que ficar vermelho.
 5. **Parada de segurança:** cada run de CI vermelho, ou rodada de testes locais falhando depois de aberto o PR, é uma
    incidência. Até a 3ª, Claude ajusta e tenta de novo; **na 4ª**, para de desenvolver, não mexe mais na branch e
    devolve ao usuário com o diagnóstico de cada falha, o que tentou e o estado da branch. A conta é do
    `node tools/ci/ci-incidents.mjs` (runs vermelhos do `ci.yml`, tentativas reexecutadas inclusive; falha local
    registrada com `--local "<o que falhou>"`), nunca de memória: saída 3 é o limite.
-6. **Merge por Claude.** Com o PR verde (`ci-ok`) e abaixo de 4 incidências, Claude faz o merge, apaga a branch
-   remota, a local e a worktree, e avisa o usuário.
+6. **Merge e encerramento.** O auto-merge mescla com o `ci-ok` verde e apaga a branch remota; nunca `--admin`. Claude
+   apaga a branch local e a worktree, comenta na issue **os casos de teste criados em no máximo 20 linhas** (o que
+   cada um afirma, vermelho → verde, totais, cobertura do diff, o que ficou sem teste e por quê) e avisa o usuário.
 
 Pergunta que só pede explicação é respondida no chat, fora do fluxo.
 
