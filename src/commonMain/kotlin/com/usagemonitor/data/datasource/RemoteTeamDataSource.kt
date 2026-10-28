@@ -17,6 +17,7 @@ import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
 import com.usagemonitor.data.dto.TeamVerificationDto
 import com.usagemonitor.data.dto.UpdateTeamKeyRequestDto
+import com.usagemonitor.domain.entity.HttpStatusFailure
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -531,7 +532,7 @@ open class RemoteTeamDataSource(
 
 /** Falha vinda do servidor de time, com o status para a UI diferenciar 401 de 500. */
 class TeamServerException(
-    val statusCode: Int,
+    override val statusCode: Int,
     override val message: String,
     /**
      * A frase do servidor, sem o prefixo que diz qual operação falhou.
@@ -542,4 +543,4 @@ class TeamServerException(
      * onde não há conta para apontar.
      */
     val detail: String = message
-) : Exception(message)
+) : Exception(message), HttpStatusFailure

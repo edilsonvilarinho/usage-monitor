@@ -67,6 +67,7 @@ a mesma classificação em todas as superfícies.
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (documento) | plano revisado contra os fatos acima |
+| A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.TeamConnectionFailureTest"` | vermelho: 4 de 4 falharam com o stub vazio (`AssertionError: expected:` em 3, `List is empty` em 1); verde: 4 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
