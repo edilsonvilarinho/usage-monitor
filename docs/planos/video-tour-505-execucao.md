@@ -59,14 +59,16 @@ menos robótica que a do vídeo de release, trilha espacial, efeitos sonoros e t
 | A04 | feito | sem harness de teste em Python; validado por execução real: `synthesize.py` com `voice.engine: "kokoro"` na fala da HUD → PT 9,13 s (13,3 car/s) e EN 9,38 s (12,5 car/s). A 0,9 para os dois a dora deu 14,4 car/s (acima do teto): velocidade por idioma, PT 0,82 e EN 0,9. Assinatura do Piper inalterada (`<escala>\|<silêncio>\|<texto>`), o WAV do release continua reaproveitado. `setupTools({ kokoro: true })` instalou `kokoro-onnx`, `scipy` e o modelo |
 | A05 | feito | sem harness de teste em Python; validado por execução real: `soundtrack.py 560 <5 eventos> <saída>` → `music.wav` e `effects.wav` de 560 s (107 MB cada, 48 kHz estéreo) em 30 s. Mesma síntese do protótipo aprovado, com acordes de 10 s e sinos a 72 bpm (metade da densidade), semente 505; reverb por `oaconvolve` para caber em memória num vídeo de 10 min |
 | A06 | feito | sem harness de teste para o renderizador (HTML no Chrome sem tela); validado por `node .claude/skills/usage-monitor-release-video/scripts/make-tour.mjs --stills` → linha do tempo de 352,4 s, 22 cenas, fala mais rápida 13,8 car/s; 23 quadros por idioma conferidos em folha. Corrigido o que a folha mostrou: chips das fontes encostando na legenda (área da captura encolhe para 548 px com chips) e capturas pequenas (área de 643 px de altura; recorte da HUD e da rede local). A primeira rodada recusou 14,5 car/s em 8 falas com dora 0,82: fala mais lenta (PT 0,78, EN 0,86) e pausa de 0,5 s entre frases (`voice.pause`); a de orçamento em EN ainda deu 15,1 e teve o texto cortado |
+| A07 | feito | sem harness de teste (roteiro e render); `make-tour.mjs --only en` e `--only pt` → `usage-monitor-tour-{en,pt}.mp4`, `ffprobe`: h264 1920×1080 + aac, 352,37 s. Quadros do MP4 conferidos (abertura, HUD com foco, terminal digitando). A primeira mixagem deixou a trilha no nível da fala (`volumedetect`: −22,3 dB no respiro contra −21,4 dB com fala): o `loudnorm` de uma passada é dinâmico e levantava a trilha nos respiros. Corrigido com ganhos fixos (voz +8 dB, trilha −12 dB) e `loudnorm` linear em duas passadas, refeito por `--remix` sobre o vídeo mudo → fala −19 dB, respiro −30 dB, EN −16,1 LUFS, PT −16,0 LUFS, pico −1,2/−1,3 dBFS |
 
 ## Problemas em aberto e riscos
 
 - Os GIFs versionados da ajuda estão defasados do código: `generateHelpMedia -PhelpMediaTopic=budget,window-modes`
   regerou `window-modes.gif` com o balão atual (botão de análise, linha "usado · restante" em duas colunas), diferente
   do arquivo de 2026-09-29. Não é efeito desta mudança e fica fora do escopo; os dois arquivos foram restaurados.
-- Duração real só sai da fala medida; com Kokoro a 0,9 a estimativa do protótipo (≈ 9 min) pode passar de 10 min. O
-  conserto é cortar texto, nunca acelerar.
-- Render estimado em ~1 h para os dois idiomas (≈ 9 quadros/s medidos no vídeo de release, 1080×1920).
+- Duração medida: 5:52, perto do piso de 5 min. Cortar fala de novo pode derrubar o vídeo abaixo de 300 s; o
+  `buildTimeline` recusa, e o conserto é capítulo novo com captura real, não fala mais lenta.
+- Render medido: ~19 min por idioma (10 572 quadros 1920×1080).
+- O áudio foi conferido por medição (níveis, loudness, espectrograma), não por escuta: a aprovação de ouvido é do dono.
 - O texto das demos traz rótulos de dados sintéticos em português ("Padrão") também na versão EN: é nome de conta,
   conteúdo do usuário, não texto da interface.

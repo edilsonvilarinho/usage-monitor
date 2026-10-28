@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Gera o tour em vídeo 16:9 (#505) a partir de docs/planos/video-tour/scenes.json.
-// Uso: node make-tour.mjs [--stills] [--only en|pt] [--refresh-media]
+// Uso: node make-tour.mjs [--stills] [--only en|pt] [--refresh-media] [--remix]
 //   --stills         só os quadros de conferência (um por captura e por cena)
 //   --only           um idioma só (dá para rodar os dois idiomas em paralelo, um processo cada)
 //   --refresh-media  regrava as capturas (gradlew generateVideoMedia) mesmo se já existirem em build/video-media
+//   --remix          refaz só o áudio, sobre o vídeo mudo do último render
 // Saída: build/release-video/tour/ (intermediários e conferência) e ~/Videos/usage-monitor/tour/ (MP4 e .srt).
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -19,7 +20,20 @@ const args = process.argv.slice(2)
 const stillsOnly = args.includes('--stills')
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null
 const languages = only ? [only] : LANGUAGES
+const remix = args.includes('--remix')
 const FRAME = { width: 1920, height: 1080, page: 'tour.html' }
+const VOICE_GAIN_DB = 8
+const MUSIC_GAIN_DB = -12
+const LOUDNESS = 'I=-16:TP=-1.5:LRA=11'
+
+// Primeira passada do loudnorm: o relatório JSON sai no stderr, depois do log do filtro.
+function loudnessReport(file) {
+    const result = spawnSync('ffmpeg', [
+        '-hide_banner', '-nostats', '-i', file, '-af', `loudnorm=${LOUDNESS}:print_format=json`, '-f', 'null', '-',
+    ], { encoding: 'utf8' })
+    const text = result.stderr
+    return text.slice(text.lastIndexOf('{'), text.lastIndexOf('}') + 1)
+}
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const docsDir = join(root, 'docs', 'planos', 'video-tour')
@@ -124,37 +138,51 @@ for (const language of languages) {
         stdio: ['ignore', 'ignore', 'inherit'],
     })
 
-    log(`Renderizando ${language}…`)
+    // --remix refaz só o áudio sobre o vídeo mudo já renderizado (o render leva ~20 min por idioma).
     const silent = join(work, `${language}-silent.mp4`)
-    await renderVideo({
-        nodeModules: tools.nodeModules,
-        stageDir: stage,
-        data,
-        frame: FRAME,
-        output: silent,
-        onProgress: (frame, frames) => log(`  ${language}: ${Math.round((frame / frames) * 100)}%`),
-    })
+    if (!(remix && existsSync(silent))) {
+        log(`Renderizando ${language}…`)
+        await renderVideo({
+            nodeModules: tools.nodeModules,
+            stageDir: stage,
+            data,
+            frame: FRAME,
+            output: silent,
+            onProgress: (frame, frames) => log(`  ${language}: ${Math.round((frame / frames) * 100)}%`),
+        })
+    }
 
-    // Mixagem: falas no instante de cada cena; a trilha abaixa sozinha sob a fala (sidechain) e volta nos respiros.
-    const inputs = ['-i', silent]
+    // Mixagem: falas no instante de cada cena; a trilha abaixa sob a fala (sidechain) e volta nos respiros.
+    // Ganhos fixos (a voz do Kokoro sai ~ -24 dB de média, a trilha ~ -18): a trilha fica ~14 dB abaixo da fala.
+    // O loudnorm de uma passada é dinâmico e levantava a trilha nos respiros até o nível da fala (medido: -22,3 dB
+    // no respiro contra -21,4 dB com fala); por isso duas passadas, a segunda linear, só com o ganho medido.
+    const inputs = []
     const filters = []
     project.scenes.forEach((scene, index) => {
         inputs.push('-i', join(voiceDir, language, `${scene.id}.wav`))
         const delay = Math.round(timeline.scenes[index].voiceAt * 1000)
-        filters.push(`[${index + 1}:a]aresample=48000,aformat=channel_layouts=stereo,adelay=${delay}:all=1[v${index}]`)
+        filters.push(`[${index}:a]aresample=48000,aformat=channel_layouts=stereo,adelay=${delay}:all=1[v${index}]`)
     })
-    const music = project.scenes.length + 1
+    const music = project.scenes.length
     inputs.push('-i', join(soundDir, 'music.wav'), '-i', join(soundDir, 'effects.wav'))
     const voices = project.scenes.map((_, index) => `[v${index}]`).join('')
-    filters.push(`${voices}amix=inputs=${project.scenes.length}:normalize=0,apad[speech]`)
+    filters.push(`${voices}amix=inputs=${project.scenes.length}:normalize=0,volume=${VOICE_GAIN_DB}dB,apad[speech]`)
     filters.push('[speech]asplit=2[voice][key]')
-    filters.push(`[${music}:a]volume=-11dB[bed]`)
-    filters.push('[bed][key]sidechaincompress=threshold=0.015:ratio=6:attack=40:release=900[ducked]')
-    filters.push(`[voice][ducked][${music + 1}:a]amix=inputs=3:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[audio]`)
+    filters.push(`[${music}:a]volume=${MUSIC_GAIN_DB}dB[bed]`)
+    filters.push('[bed][key]sidechaincompress=threshold=0.02:ratio=4:attack=40:release=900[ducked]')
+    filters.push(`[voice][ducked][${music + 1}:a]amix=inputs=3:normalize=0,alimiter=limit=0.9:level=disabled[audio]`)
     const total = timeline.total.toFixed(3)
+    const mixed = join(soundDir, 'mix.wav')
+    execFileSync('ffmpeg', [
+        '-v', 'error', '-y', ...inputs, '-filter_complex', filters.join(';'), '-map', '[audio]', '-t', total,
+        '-c:a', 'pcm_s16le', mixed,
+    ], { stdio: 'inherit' })
+    const measured = JSON.parse(loudnessReport(mixed))
+    const linear = `loudnorm=${LOUDNESS}:measured_I=${measured.input_i}:measured_TP=${measured.input_tp}:` +
+        `measured_LRA=${measured.input_lra}:measured_thresh=${measured.input_thresh}:offset=${measured.target_offset}:linear=true`
     const video = join(outDir, `usage-monitor-tour-${language}.mp4`)
     execFileSync('ffmpeg', [
-        '-v', 'error', '-y', ...inputs, '-filter_complex', filters.join(';'), '-map', '0:v', '-map', '[audio]',
+        '-v', 'error', '-y', '-i', silent, '-i', mixed, '-map', '0:v', '-map', '1:a', '-af', `${linear},aresample=48000`,
         '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', total, '-movflags', '+faststart', video,
     ], { stdio: 'inherit' })
     writeFileSync(join(outDir, `usage-monitor-tour-${language}.srt`), toSrt(cues))

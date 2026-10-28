@@ -1,0 +1,828 @@
+{
+  "label": "tour",
+  "voice": {
+    "engine": "kokoro",
+    "voices": {
+      "en": "am_michael",
+      "pt": "pf_dora"
+    },
+    "speed": {
+      "en": 0.86,
+      "pt": 0.78
+    },
+    "pause": 0.5
+  },
+  "scenes": [
+    {
+      "id": "title",
+      "kind": "title",
+      "headline": {
+        "en": "Every quota, in one place",
+        "pt": "Todas as cotas, num só lugar"
+      },
+      "lines": {
+        "en": {
+          "text": "This is Usage Monitor. Every quota from all your AI tools, in one place, without opening a single dashboard."
+        },
+        "pt": {
+          "text": "Este é o Usage Monitor. As cotas de todas as suas ferramentas de IA, num só lugar, sem abrir nenhum painel."
+        }
+      }
+    },
+    {
+      "id": "sources",
+      "kind": "screen",
+      "title": {
+        "en": "Eleven sources",
+        "pt": "Onze fontes"
+      },
+      "kicker": {
+        "en": "integrations",
+        "pt": "integrações"
+      },
+      "headline": {
+        "en": "One app, eleven sources",
+        "pt": "Um app, onze fontes"
+      },
+      "media": [
+        {
+          "media": "dashboard",
+          "bar": {
+            "en": "Settings · APIs",
+            "pt": "Configurações · APIs"
+          }
+        }
+      ],
+      "chips": [
+        {
+          "label": "Anthropic",
+          "accent": "#4F8CFF"
+        },
+        {
+          "label": "Codex",
+          "accent": "#27BFA3"
+        },
+        {
+          "label": "MiniMax",
+          "accent": "#FF8A3D"
+        },
+        {
+          "label": "DeepSeek",
+          "accent": "#C084FC"
+        },
+        {
+          "label": "OpenCode Zen",
+          "accent": "#7BD389"
+        },
+        {
+          "label": "OpenCode Go",
+          "accent": "#7BD389"
+        },
+        {
+          "label": "Kilo",
+          "accent": "#E6D84E"
+        },
+        {
+          "label": "OpenRouter",
+          "accent": "#FF6FA8"
+        },
+        {
+          "label": "Gemini CLI",
+          "accent": "#E2A5E9"
+        },
+        {
+          "label": "Antigravity",
+          "accent": "#E2A5E9"
+        },
+        {
+          "label": "Cursor",
+          "accent": "#C7E9A5"
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "It reads eleven sources: Anthropic, Codex, MiniMax, DeepSeek, OpenCode, Kilo, OpenRouter, Gemini, Antigravity and Cursor. Turn on only the ones you use. API keys stay on your computer."
+        },
+        "pt": {
+          "text": "São onze fontes: Anthropic, Codex, MiniMax, DeepSeek, OpenCode, Kilo, OpenRouter, Gemini, Antigravity e Cursor. Você liga só as que usa. As chaves de API ficam no seu computador."
+        }
+      }
+    },
+    {
+      "id": "hud",
+      "kind": "screen",
+      "title": {
+        "en": "HUD bar",
+        "pt": "Barra HUD"
+      },
+      "kicker": {
+        "en": "hud",
+        "pt": "hud"
+      },
+      "headline": {
+        "en": "One ring per account, one arc per quota",
+        "pt": "Um anel por conta, um arco por cota"
+      },
+      "media": [
+        {
+          "media": "window-modes",
+          "bar": "HUD",
+          "focus": [
+            184,
+            88,
+            268,
+            278
+          ],
+          "crop": [
+            170,
+            0,
+            640,
+            372
+          ]
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "The HUD bar sits on the edge of your screen. One ring per account, one arc per quota: weekly outside, five hours inside. Hover a ring, and the balloon shows what was used, what is left and when it resets."
+        },
+        "pt": {
+          "text": "A barra HUD fica na borda da tela. Um anel por conta, um arco por cota: semanal por fora, cinco horas por dentro. Passe o mouse num anel, e o balão mostra quanto foi usado, quanto resta e quando reinicia."
+        }
+      }
+    },
+    {
+      "id": "accounts",
+      "kind": "screen",
+      "title": {
+        "en": "Several accounts",
+        "pt": "Várias contas"
+      },
+      "kicker": {
+        "en": "accounts",
+        "pt": "contas"
+      },
+      "headline": {
+        "en": "Each account, its own colour",
+        "pt": "Cada conta com sua cor"
+      },
+      "media": [
+        {
+          "media": "accounts",
+          "bar": {
+            "en": "Settings · Accounts",
+            "pt": "Configurações · Contas"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Several Claude and Codex accounts on the same computer. Each one gets a name, a colour and an emoji, so the ring tells them apart at a glance."
+        },
+        "pt": {
+          "text": "Várias contas Claude e Codex no mesmo computador. Cada uma ganha um nome, uma cor e um emoji, e o anel diz qual é qual num relance."
+        }
+      }
+    },
+    {
+      "id": "sessions",
+      "kind": "screen",
+      "title": {
+        "en": "CLI sessions",
+        "pt": "Sessões CLI"
+      },
+      "kicker": {
+        "en": "cli sessions",
+        "pt": "sessões cli"
+      },
+      "headline": {
+        "en": "What each session cost",
+        "pt": "Quanto cada sessão custou"
+      },
+      "media": [
+        {
+          "media": "cli-sessions",
+          "bar": {
+            "en": "CLI sessions",
+            "pt": "Sessões CLI"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Claude Code sessions are read from the local logs: tokens, cache, active time and an estimated cost at list price. Each session gets a context verdict: healthy, attention or saturated."
+        },
+        "pt": {
+          "text": "As sessões do Claude Code são lidas dos registros locais: tokens, cache, tempo ativo e um custo estimado a preço de tabela. Cada sessão recebe um veredito de contexto: saudável, atenção ou saturada."
+        }
+      }
+    },
+    {
+      "id": "breakdown",
+      "kind": "screen",
+      "title": {
+        "en": "Breakdown",
+        "pt": "Detalhamento"
+      },
+      "kicker": {
+        "en": "cli sessions",
+        "pt": "sessões cli"
+      },
+      "headline": {
+        "en": "By project, model and branch",
+        "pt": "Por projeto, modelo e branch"
+      },
+      "media": [
+        {
+          "media": "breakdown",
+          "bar": {
+            "en": "CLI sessions · Breakdown",
+            "pt": "Sessões CLI · Resumo"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "The breakdown splits the same usage by project, by model and by branch, with a filter, sorting and how much the cache saved."
+        },
+        "pt": {
+          "text": "O resumo separa o mesmo uso por projeto, por modelo e por branch, com filtro, ordenação e quanto o cache economizou."
+        }
+      }
+    },
+    {
+      "id": "analysis",
+      "kind": "screen",
+      "title": {
+        "en": "Session analysis",
+        "pt": "Análise da sessão"
+      },
+      "kicker": {
+        "en": "analysis",
+        "pt": "análise"
+      },
+      "headline": {
+        "en": "Will it last until the reset?",
+        "pt": "Cabe até o reinício?"
+      },
+      "media": [
+        {
+          "media": "session-analysis",
+          "bar": {
+            "en": "Analysis",
+            "pt": "Análise"
+          },
+          "focus": [
+            4,
+            64,
+            490,
+            316
+          ]
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "The analysis compares your usage with how much of the window has already passed. Above the line, the quota runs out before the reset. Below it, it lasts."
+        },
+        "pt": {
+          "text": "A análise compara o uso com o tempo que já passou da janela. Acima da linha, a cota acaba antes do reinício. Abaixo dela, a cota chega até lá."
+        }
+      }
+    },
+    {
+      "id": "history",
+      "kind": "screen",
+      "title": {
+        "en": "History",
+        "pt": "Histórico"
+      },
+      "kicker": {
+        "en": "history",
+        "pt": "histórico"
+      },
+      "headline": {
+        "en": "Every reading kept",
+        "pt": "Cada leitura guardada"
+      },
+      "media": [
+        {
+          "media": "history",
+          "bar": {
+            "en": "History",
+            "pt": "Histórico"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "History keeps every reading and draws the curve of each window, from five hours to thirty days. The summary comes before the chart, and the report comes out as a PDF."
+        },
+        "pt": {
+          "text": "O histórico guarda cada leitura e desenha a curva de cada janela, de cinco horas a trinta dias. O resumo vem antes do gráfico, e o relatório sai em PDF."
+        }
+      }
+    },
+    {
+      "id": "comparison",
+      "kind": "screen",
+      "title": {
+        "en": "Comparison",
+        "pt": "Comparação"
+      },
+      "kicker": {
+        "en": "comparison",
+        "pt": "comparação"
+      },
+      "headline": {
+        "en": "Models and sources, side by side",
+        "pt": "Modelos e fontes, lado a lado"
+      },
+      "media": [
+        {
+          "media": "comparison",
+          "bar": {
+            "en": "Compare models and APIs",
+            "pt": "Comparar modelos e APIs"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "The comparison puts models and sources side by side: tokens, cost, cache, throughput and the quota of each source. Colour marks the column maximum, and the number is always written."
+        },
+        "pt": {
+          "text": "A comparação põe modelos e fontes lado a lado: tokens, custo, cache, vazão e a cota de cada fonte. A cor marca o máximo da coluna, e o número está sempre escrito."
+        }
+      }
+    },
+    {
+      "id": "budget",
+      "kind": "screen",
+      "title": {
+        "en": "Budget",
+        "pt": "Orçamento"
+      },
+      "kicker": {
+        "en": "budget",
+        "pt": "orçamento"
+      },
+      "headline": {
+        "en": "A monthly budget",
+        "pt": "Orçamento do mês"
+      },
+      "media": [
+        {
+          "media": "budget",
+          "bar": {
+            "en": "CLI sessions · Breakdown",
+            "pt": "Sessões CLI · Resumo"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Set a monthly budget in dollars. See where the current pace ends the month."
+        },
+        "pt": {
+          "text": "Defina um orçamento do mês em dólares e veja onde o ritmo atual vai fechar o mês."
+        }
+      }
+    },
+    {
+      "id": "alerts",
+      "kind": "screen",
+      "title": {
+        "en": "Alerts",
+        "pt": "Alertas"
+      },
+      "kicker": {
+        "en": "alerts",
+        "pt": "alertas"
+      },
+      "headline": {
+        "en": "Warned before it runs out",
+        "pt": "Avisa antes de acabar"
+      },
+      "media": [
+        {
+          "media": "alerts",
+          "bar": {
+            "en": "Settings · Alerts",
+            "pt": "Configurações · Alertas"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Tray alerts when a quota crosses a threshold, before and after a reset, and when a session saturates or stops answering. And quiet hours, so nothing rings at night."
+        },
+        "pt": {
+          "text": "Alertas na bandeja quando a cota cruza um limiar, antes e depois do reinício, e quando uma sessão satura ou para de responder. E um período de silêncio, para nada tocar à noite."
+        }
+      }
+    },
+    {
+      "id": "export",
+      "kind": "screen",
+      "title": {
+        "en": "Export",
+        "pt": "Exportar"
+      },
+      "kicker": {
+        "en": "export",
+        "pt": "exportação"
+      },
+      "headline": {
+        "en": "CSV, JSON and PDF",
+        "pt": "CSV, JSON e PDF"
+      },
+      "media": [
+        {
+          "media": "export",
+          "bar": {
+            "en": "CLI sessions",
+            "pt": "Sessões CLI"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Sessions and summaries export to CSV or JSON, and the report comes out as a PDF."
+        },
+        "pt": {
+          "text": "Sessões e resumos saem em CSV ou JSON, e o relatório sai em PDF."
+        }
+      }
+    },
+    {
+      "id": "terminal",
+      "kind": "commands",
+      "title": {
+        "en": "Terminal mode",
+        "pt": "Modo terminal"
+      },
+      "kicker": {
+        "en": "terminal",
+        "pt": "terminal"
+      },
+      "headline": {
+        "en": "The same app, in your terminal",
+        "pt": "O mesmo app, no terminal"
+      },
+      "commands": [
+        {
+          "cmd": "usage-monitor status --json",
+          "out": {
+            "en": "Every quota as JSON",
+            "pt": "Todas as cotas em JSON"
+          }
+        },
+        {
+          "cmd": "usage-monitor check --max 80",
+          "out": {
+            "en": "Exit 0 on track, 1 warning, 2 critical",
+            "pt": "Sai com 0 em dia, 1 atenção, 2 crítico"
+          }
+        },
+        {
+          "cmd": "usage-monitor statusline tmux",
+          "out": {
+            "en": "One usage line for tmux",
+            "pt": "Uma linha de uso para o tmux"
+          }
+        }
+      ],
+      "pause": 1.2,
+      "lines": {
+        "en": {
+          "text": "The same app runs in the terminal. Status, check and wait for your scripts, a status line for Claude Code and tmux, and a full-screen interactive mode."
+        },
+        "pt": {
+          "text": "O mesmo app roda no terminal. Status, check e wait para os seus scripts, uma linha de status para o Claude Code e o tmux, e um modo interativo em tela cheia."
+        }
+      }
+    },
+    {
+      "id": "team",
+      "kind": "screen",
+      "title": {
+        "en": "Team",
+        "pt": "Time"
+      },
+      "kicker": {
+        "en": "team · optional",
+        "pt": "time · opcional"
+      },
+      "headline": {
+        "en": "Your team, on your own server",
+        "pt": "O time, num servidor seu"
+      },
+      "media": [
+        {
+          "media": "team",
+          "bar": {
+            "en": "Team usage",
+            "pt": "Uso do time"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "With a server you host, which is optional, the team sees the usage of each member: sessions, tokens, cost and each share. And a thirty-day trend."
+        },
+        "pt": {
+          "text": "Com um servidor seu, que é opcional, o time vê o uso de cada integrante: sessões, tokens, custo e a participação de cada um. E a tendência de trinta dias."
+        }
+      }
+    },
+    {
+      "id": "presence",
+      "kind": "screen",
+      "title": {
+        "en": "Presence",
+        "pt": "Presença"
+      },
+      "kicker": {
+        "en": "team · optional",
+        "pt": "time · opcional"
+      },
+      "headline": {
+        "en": "Who is working right now",
+        "pt": "Quem está trabalhando agora"
+      },
+      "media": [
+        {
+          "media": "presence",
+          "bar": {
+            "en": "Connected now",
+            "pt": "Conectados agora"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Presence shows who is working now and who is only connected. And the last signal of each machine."
+        },
+        "pt": {
+          "text": "A presença mostra quem está trabalhando agora, quem está só conectado, e o último sinal de cada máquina."
+        }
+      }
+    },
+    {
+      "id": "network",
+      "kind": "screen",
+      "title": {
+        "en": "Local network",
+        "pt": "Rede local"
+      },
+      "kicker": {
+        "en": "remote access",
+        "pt": "acesso remoto"
+      },
+      "headline": {
+        "en": "The HUD on your phone",
+        "pt": "A barra no celular"
+      },
+      "media": [
+        {
+          "media": "web-access",
+          "bar": {
+            "en": "Settings · Network",
+            "pt": "Configurações · Rede"
+          },
+          "crop": [
+            0,
+            0,
+            1000,
+            215
+          ]
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Turn on local network access, and open the HUD in your phone browser. Anyone on the network with the full address sees usage data, and nothing more."
+        },
+        "pt": {
+          "text": "Ligue o acesso pela rede local, e abra a barra no navegador do celular. Quem está na rede com o endereço completo vê os dados de uso, e nada além disso."
+        }
+      }
+    },
+    {
+      "id": "telegram",
+      "kind": "screen",
+      "title": {
+        "en": "Telegram bot",
+        "pt": "Bot do Telegram"
+      },
+      "kicker": {
+        "en": "remote access",
+        "pt": "acesso remoto"
+      },
+      "headline": {
+        "en": "Alerts in your chat",
+        "pt": "Alertas na conversa"
+      },
+      "media": [
+        {
+          "media": "telegram-bot",
+          "bar": {
+            "en": "Settings · Telegram",
+            "pt": "Configurações · Telegram"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Or pair a Telegram bot. It sends the alerts and answers commands, with usage metadata only."
+        },
+        "pt": {
+          "text": "Ou pareie um bot do Telegram. Ele manda os alertas e responde a comandos, só com metadados de uso."
+        }
+      }
+    },
+    {
+      "id": "appearance",
+      "kind": "screen",
+      "title": {
+        "en": "Appearance",
+        "pt": "Aparência"
+      },
+      "kicker": {
+        "en": "appearance",
+        "pt": "aparência"
+      },
+      "headline": {
+        "en": "Thirteen dark and thirteen light palettes",
+        "pt": "Treze paletas escuras e treze claras"
+      },
+      "media": [
+        {
+          "media": "appearance",
+          "bar": {
+            "en": "Settings · Appearance",
+            "pt": "Configurações · Aparência"
+          }
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Thirteen dark palettes and thirteen light ones, English and Portuguese, and an interface scale for every window."
+        },
+        "pt": {
+          "text": "Treze paletas escuras e treze claras, português e inglês, e uma escala de interface para todas as janelas."
+        }
+      }
+    },
+    {
+      "id": "updates",
+      "kind": "screen",
+      "title": {
+        "en": "Updates",
+        "pt": "Atualizações"
+      },
+      "kicker": {
+        "en": "updates",
+        "pt": "atualizações"
+      },
+      "headline": {
+        "en": "It updates itself",
+        "pt": "Ele se atualiza sozinho"
+      },
+      "media": [
+        {
+          "media": "updates",
+          "bar": "usage-monitor"
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "On Windows and Linux, the app updates itself. It downloads the new version, checks the file, and applies it when you close it."
+        },
+        "pt": {
+          "text": "No Windows e no Linux, o app se atualiza sozinho. Ele baixa a versão nova, confere o arquivo e aplica quando você fecha."
+        }
+      }
+    },
+    {
+      "id": "trust",
+      "kind": "steps",
+      "title": {
+        "en": "Trust",
+        "pt": "Confiança"
+      },
+      "kicker": {
+        "en": "privacy",
+        "pt": "privacidade"
+      },
+      "headline": {
+        "en": "Your usage stays yours",
+        "pt": "Seu uso fica com você"
+      },
+      "steps": [
+        {
+          "label": {
+            "en": "Each source fails on its own",
+            "pt": "Cada fonte falha sozinha"
+          },
+          "why": {
+            "en": "and keeps its last reading",
+            "pt": "e mantém a última leitura"
+          }
+        },
+        {
+          "label": {
+            "en": "Rate limits back off",
+            "pt": "Limite de requisições espera"
+          },
+          "why": {
+            "en": "the next read waits instead of insisting",
+            "pt": "a próxima leitura aguarda em vez de insistir"
+          }
+        },
+        {
+          "label": {
+            "en": "Never a prompt or a reply",
+            "pt": "Nunca prompt nem resposta"
+          },
+          "why": {
+            "en": "only usage metadata leaves the app",
+            "pt": "só metadados de uso saem do app"
+          }
+        }
+      ],
+      "stagger": 2.6,
+      "lines": {
+        "en": {
+          "text": "Each source fails on its own and keeps its last reading. Rate limits back off instead of insisting. And no prompt or reply ever leaves the app: only usage metadata."
+        },
+        "pt": {
+          "text": "Cada fonte falha sozinha e mantém a última leitura. O limite de requisições faz a leitura esperar em vez de insistir. E nenhum prompt ou resposta sai do app: só metadados de uso."
+        }
+      }
+    },
+    {
+      "id": "install",
+      "kind": "steps",
+      "title": {
+        "en": "Install",
+        "pt": "Instalação"
+      },
+      "kicker": {
+        "en": "install",
+        "pt": "instalação"
+      },
+      "headline": {
+        "en": "Windows, Linux and macOS",
+        "pt": "Windows, Linux e macOS"
+      },
+      "steps": [
+        {
+          "label": "Windows",
+          "why": {
+            "en": "installer, per user",
+            "pt": "instalador, por usuário"
+          }
+        },
+        {
+          "label": "Linux",
+          "why": {
+            "en": ".deb, .rpm or an install script",
+            "pt": ".deb, .rpm ou um script de instalação"
+          }
+        },
+        {
+          "label": "macOS",
+          "why": {
+            "en": "DMG for Apple silicon and Intel",
+            "pt": "DMG para Apple silicon e Intel"
+          }
+        }
+      ],
+      "stagger": 2.2,
+      "lines": {
+        "en": {
+          "text": "There is an installer for Windows, deb and rpm packages and a script for Linux, and a DMG for macOS. It can also start with your system."
+        },
+        "pt": {
+          "text": "Tem instalador para Windows, pacotes deb e rpm e um script para Linux, e DMG para macOS. Ele também pode abrir junto com o sistema."
+        }
+      }
+    },
+    {
+      "id": "closing",
+      "kind": "closing",
+      "headline": {
+        "en": "Free and open source · MIT",
+        "pt": "Grátis e de código aberto · MIT"
+      },
+      "link": "github.com/edilsonvilarinho/usage-monitor",
+      "lines": {
+        "en": {
+          "text": "Usage Monitor is free and open source. For Windows, Linux and macOS. Get it on GitHub."
+        },
+        "pt": {
+          "text": "O Usage Monitor é grátis e de código aberto. Para Windows, Linux e macOS. Baixe no GitHub."
+        }
+      }
+    }
+  ]
+}
