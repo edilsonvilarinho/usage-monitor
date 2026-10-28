@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppUpdateInfo
 import com.usagemonitor.domain.repository.AnthropicRepository
@@ -416,12 +418,81 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
         }
     }
 
+    /** A20: sem recibo do instalador, o recibo de falha é o único rastro de uma entrega que não saiu. */
+    @Test
+    fun `a failed hand-off at exit leaves the version and the reason for the receipt`() = runTest {
+        val failures = mutableListOf<Pair<String, String>>()
+        val breadcrumbs = RecordingBreadcrumbRecorder()
+        val viewModel = autoUpdateViewModel(
+            installer = FakeInstaller(scheduleFailure = IllegalStateException("instalador em uso")),
+            onScheduleFailure = { version, reason -> failures += version to reason },
+            breadcrumbs = breadcrumbs
+        )
+
+        try {
+            runCurrent()
+            viewModel.scheduleUpdateOnExit()
+
+            assertEquals(listOf("7.1.0" to "instalador em uso"), failures)
+            assertTrue(breadcrumbs.messages.any { message -> message.contains("agendar instalação da atualização") }, breadcrumbs.messages.toString())
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `a hand-off failure without a message is named by its type`() = runTest {
+        val failures = mutableListOf<Pair<String, String>>()
+        val viewModel = autoUpdateViewModel(
+            installer = FakeInstaller(scheduleFailure = IllegalStateException(" ")),
+            onScheduleFailure = { version, reason -> failures += version to reason }
+        )
+
+        try {
+            runCurrent()
+            viewModel.scheduleUpdateOnExit()
+
+            assertEquals(listOf("7.1.0" to "IllegalStateException"), failures)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    /** A consulta roda a cada poll: a mesma falha seguida entra uma vez na trilha. */
+    @Test
+    fun `the same update check failure is recorded once until a check succeeds`() = runTest {
+        var failure: Throwable? = IllegalStateException("HTTP 503")
+        val breadcrumbs = RecordingBreadcrumbRecorder()
+        val viewModel = autoUpdateViewModel(installer = null, checkFailure = { failure }, breadcrumbs = breadcrumbs)
+        fun failures() = breadcrumbs.messages.count { message -> message.contains("consultar atualização do app") }
+
+        try {
+            runCurrent()
+            viewModel.refresh()
+            runCurrent()
+            assertEquals(1, failures())
+
+            failure = null
+            viewModel.refresh()
+            runCurrent()
+            failure = IllegalStateException("HTTP 503")
+            viewModel.refresh()
+            runCurrent()
+
+            assertEquals(2, failures())
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
     // --- infraestrutura ------------------------------------------------------
 
     private class FakeInstaller(
         private val support: AppUpdateSupport = AppUpdateSupport.SUPPORTED,
         var failWith: Throwable? = null,
-        private val gate: CompletableDeferred<Unit>? = null
+        private val gate: CompletableDeferred<Unit>? = null,
+        /** A falha da entrega ao sistema no encerramento; `null` entrega. */
+        private val scheduleFailure: Throwable? = null
     ) : AppUpdateInstaller {
 
         var prepareCalls = 0
@@ -454,7 +525,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
         override fun schedule(preparation: AppUpdatePreparation): Result<Unit> {
             scheduleCalls += 1
             scheduledVersions += preparation.version
-            return Result.success(Unit)
+            return scheduleFailure?.let { failure -> Result.failure(failure) } ?: Result.success(Unit)
         }
 
         fun emitProgress(downloaded: Long, total: Long?) {
@@ -484,7 +555,11 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
         clock: Clock = MutableClock(NOW),
         backoff: List<Duration> = listOf(30.minutes, 2.hours, 6.hours),
         announcedVersion: () -> String = { "7.1.0" },
-        onRestart: () -> Unit = {}
+        onRestart: () -> Unit = {},
+        /** A falha da consulta ao GitHub; `null` anuncia [announcedVersion]. */
+        checkFailure: () -> Throwable? = { null },
+        onScheduleFailure: (String, String) -> Unit = { _, _ -> },
+        breadcrumbs: BreadcrumbRecorder = NoOpBreadcrumbRecorder
     ): DashboardViewModel {
         val failing = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
         return DashboardViewModel(
@@ -503,6 +578,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             MutableStateFlow(emptySet()),
             historyUseCase(mutableListOf()),
             checkForAppUpdate = updateUseCase {
+                checkFailure()?.let { failure -> return@updateUseCase Result.failure(failure) }
                 val version = announcedVersion()
                 Result.success(
                     AppUpdateInfo(
@@ -514,9 +590,11 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             appUpdateInstaller = installer,
             autoUpdateEnabled = enabledFlow,
             onRestartAndUpdateRequested = onRestart,
+            onUpdateScheduleFailure = onScheduleFailure,
             currentAppVersion = "7.0.0",
             clock = clock,
-            config = autoUpdateConfig(testScheduler, backoff)
+            config = autoUpdateConfig(testScheduler, backoff),
+            breadcrumbs = breadcrumbs
         ).also { it.cancelCountdown() }
     }
 

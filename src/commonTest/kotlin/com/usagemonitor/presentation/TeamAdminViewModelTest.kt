@@ -380,6 +380,71 @@ class TeamKeysAdminViewModelTest {
         assertTrue(state.blockedAccounts.isEmpty())
     }
 
+    @Test
+    fun `renomear grava o rotulo e rotulo vazio nao chama o servidor`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        val viewModel = buildViewModel(repository)
+        viewModel.open()
+        runCurrent()
+        val callsAfterOpen = repository.listCalls
+
+        viewModel.rename("key-1", "  ")
+        runCurrent()
+        assertEquals(callsAfterOpen, repository.listCalls)
+
+        viewModel.rename("key-1", "beltrano@empresa.com")
+        runCurrent()
+        assertEquals("beltrano@empresa.com", assertIs<TeamKeysUiState.Success>(viewModel.uiState.value).keys.single().label)
+    }
+
+    @Test
+    fun `revogar marca a chave revogada na lista relida`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        val viewModel = buildViewModel(repository)
+        viewModel.open()
+        runCurrent()
+
+        viewModel.revoke("key-1")
+        runCurrent()
+
+        assertEquals(ADMIN_FIXED_NOW, assertIs<TeamKeysUiState.Success>(viewModel.uiState.value).keys.single().revokedAt)
+    }
+
+    /** Sem lista na tela, a ação recusada não tem onde virar aviso: vira o erro da tela. */
+    @Test
+    fun `acao recusada antes da primeira carga vira erro de tela`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        repository.actionResult = Result.failure(IllegalStateException("token recusado"))
+        val viewModel = buildViewModel(repository)
+
+        viewModel.setMaxAccounts("key-1", 3)
+        runCurrent()
+
+        assertEquals(TeamKeysUiState.Error("token recusado"), viewModel.uiState.value)
+    }
+
+    /** A ação gravou, mas a releitura falhou: a lista fica, com o aviso, e a tela sai do ocupado. */
+    @Test
+    fun `releitura que falha depois da acao mantem a lista com o aviso`() = runTest {
+        val repository = FakeTeamAdminRepository()
+        repository.keys += entry(id = "key-1", label = "fulano@empresa.com")
+        val viewModel = buildViewModel(repository)
+        viewModel.open()
+        runCurrent()
+
+        repository.listResult = Result.failure(IllegalStateException("servidor fora"))
+        viewModel.regenerate("key-1")
+        runCurrent()
+
+        val state = assertIs<TeamKeysUiState.Success>(viewModel.uiState.value)
+        assertEquals("raw-key", state.keys.single().key)
+        assertEquals("servidor fora", state.actionError)
+        assertEquals(false, state.busy)
+    }
+
     private fun buildViewModel(repository: FakeTeamAdminRepository): TeamKeysAdminViewModel {
         return TeamKeysAdminViewModel(
             listKeys = ListTeamKeysUseCase(repository),
