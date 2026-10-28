@@ -38,6 +38,7 @@ first launch.
 | `.github/workflows/ci.yml` | Everything on pull request and push to `main`: desktop suite (Windows, plus Linux as advisory), installer and Linux updater scenarios, team server, pricing parity — each only when its paths changed; `ci-ok` aggregates; `test-report` builds the HTML test report |
 | `.github/workflows/release-linux.yml` | on `v*` tags: publishes Windows, Linux and macOS artifacts |
 | `.github/workflows/codeql.yml` | CodeQL on push to `main`, weekly and manually |
+| `.github/workflows/dependabot-automerge.yml` | Dependabot pull requests: turns on auto-merge for minor/patch of `gradle` and `npm_and_yarn` (#496) |
 
 The `changes` job decides which areas the diff touches (`HEAD^1..HEAD` on a pull request, whose
 checkout is the merge commit; `before..sha` on push; any git failure means "run everything") and
@@ -53,6 +54,12 @@ earlier red attempts of a re-run (read from `actions/runs/{id}/attempts/{n}`, si
 last attempt), plus local failures recorded with `--local`, kept in `<git-common-dir>/ci-incidents/` so every
 worktree of the branch sees them. `cancelled` does not count (it is `concurrency` replacing a run). Exit 3 means the
 limit (default 4) was reached.
+
+`dependabot-automerge.yml` (#496) reads `dependabot/fetch-metadata` and runs `gh pr merge --auto --merge` only when
+the ecosystem is `gradle` or `npm_and_yarn` **and** the update type is `semver-minor` or `semver-patch` (positive
+condition: an unclassified update stays manual). Majors and `github_actions` stay manual, as `dependabot.yml` already
+says. GitHub merges once the `main` ruleset sees `ci-ok` green. A merge made with `GITHUB_TOKEN` triggers no `CI` or
+`CodeQL` run on `main`; the pull request already ran the suite on its merge commit.
 
 The release is tag-only (#344). The version comes from the tag: `build.gradle.kts` reads
 `-PappVersion`, which the release workflow passes, and falls back to

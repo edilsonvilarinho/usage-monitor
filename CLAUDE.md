@@ -345,6 +345,8 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - **Cobertura do diff** (#496, `tools/ci/diff-coverage.mjs`): linhas de produção que o PR altera, piso 90%, nos jobs
   `desktop-windows` (Kover) e `server` (`lcovonly`). Nasce **informativa** (aviso, fora do `ci-ok`) — o #495 mediu 60%;
   vira bloqueante pelo critério do plano [`fluxo-automatizado-496-execucao.md`](docs/planos/fluxo-automatizado-496-execucao.md).
+- Dependabot (#496): auto-merge só de minor/patch de `gradle`/`npm_and_yarn` (`dependabot-automerge.yml`); major e
+  `github_actions` continuam manuais.
 - Job `test-report` (skill `usage-monitor-test-report`): HTML de testes e cobertura no artefato `test-report` a cada
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.

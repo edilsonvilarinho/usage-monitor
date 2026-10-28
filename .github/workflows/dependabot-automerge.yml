@@ -1,0 +1,56 @@
+name: Dependabot auto-merge
+
+# Liga o auto-merge nos PRs do Dependabot que so trazem minor ou patch de
+# Gradle ou npm (#496). Quem mescla e o GitHub, quando o ruleset da `main` ve o
+# `ci-ok` verde: a suite (95% de linhas) e o portao, nao este workflow.
+#
+# Fora, de proposito: major (pode quebrar, merece revisao e revert proprios --
+# o mesmo motivo do `groups` no `dependabot.yml`) e `github_actions`, que o
+# `dependabot.yml` manda revisar e pinar por SHA a mao. O valor do ecossistema
+# vem do nome do branch (`dependabot/<ecossistema>/...`), conferido nos branches
+# deste repositorio: `gradle`, `npm_and_yarn`, `github_actions`.
+#
+# Merge feito com o `GITHUB_TOKEN` nao dispara `CI` nem `CodeQL` no push da
+# `main` (evento de `GITHUB_TOKEN` nao cria run); o PR ja rodou a suite no merge
+# commit e o CodeQL semanal continua. Risco aceito no plano da #496.
+on: pull_request
+
+permissions: {}
+
+jobs:
+  enable-auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Read Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      # Condicao positiva: `update-type` vazio (versao que o Dependabot nao
+      # classificou) nao pode cair no auto-merge.
+      - name: Enable auto-merge
+        if: >-
+          (steps.metadata.outputs.package-ecosystem == 'gradle' || steps.metadata.outputs.package-ecosystem == 'npm_and_yarn') &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.update-type == 'version-update:semver-patch')
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --merge "$PR_URL"
+
+      - name: Summary
+        env:
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCIES: ${{ steps.metadata.outputs.dependency-names }}
+        run: |
+          {
+            echo "## Dependabot auto-merge"
+            echo
+            echo "| Ecossistema | Tipo | Dependencias |"
+            echo "|---|---|---|"
+            echo "| $ECOSYSTEM | $UPDATE_TYPE | $DEPENDENCIES |"
+          } >> "$GITHUB_STEP_SUMMARY"
