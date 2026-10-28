@@ -67,6 +67,7 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | Atividade | Data | Commit | Situação | Execução |
 |---|---|---|---|---|
 | A01 | 2026-10-28 | `docs(video): plan the release video skill (#503)` | concluída | Plano, sem código |
+| A02 | 2026-10-28 | `feat(skills): collect the release changes by issue for the video (#503)` | concluída | Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com stubs: 4 testes, 4 falhas na asserção (`expected` × `actual`). Verde: 4/4. Execução real: `v41.11.0..v42.0.0`, 215 commits sem merge; issues #439, #440, #441, #445, #453, #460, #463, #489, #494 e 15 feat/fix sem issue (instalador, cadência, escala, HUD) |
 
 ## Problemas em aberto e riscos
 
