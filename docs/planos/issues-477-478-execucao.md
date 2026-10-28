@@ -6,7 +6,8 @@ Branch `fix/issues-477-478`, worktree `../usage-monitor-477-478`. Executor: Clau
 
 | # | Commit | Atividade | O que mudou | Verificação (comando → resultado) |
 |---|---|---|---|---|
-| 1 | (este) | A01 | Plano com diagnóstico, decisões do usuário e atividades | `git diff --cached --stat` → só este arquivo |
+| 1 | `5ed6bb77` | A01 | Plano com diagnóstico, decisões do usuário e atividades | `git diff --cached --stat` → só este arquivo |
+| 2 | (este) | A02 | `placePacePointLabel` (`PaceLabelPlacement.kt`) tira o rótulo do ponto de cima da legenda; legendas e rótulo desenhados por último sobre placa da superfície; protótipo (legendas depois das linhas, halo) e `docs/presentation.md` | `gradlew.bat desktopTest --tests "*.PaceLabelPlacementTest" --tests "*.AnalysisPanelModelTest" --tests "*.AnalysisScreenTest" --tests "com.usagemonitor.architecture.*"` → 4 + 7 + 5 + 17 testes, 0 falhas; render descartável EN/PT com 5h em 100% e semanal com projeção cruzando a legenda, conferido e removido |
 
 ## Diagnóstico (evidência)
 

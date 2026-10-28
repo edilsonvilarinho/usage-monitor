@@ -12,7 +12,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -41,6 +44,16 @@ private val AXIS_WIDTH = 36.dp
 private const val REGION_ALPHA_ABOVE = 0.08f
 private const val REGION_ALPHA_BELOW = 0.06f
 private const val PREVIOUS_ALPHA = 0.45f
+private val POINT_HALO_RADIUS = 5.5.dp
+
+/**
+ * Placa atrás dos textos do gráfico: a linha que passa por baixo continua visível, apagada, e a letra
+ * deixa de ser cortada por ela.
+ */
+private const val LABEL_PLATE_ALPHA = 0.8f
+private val LABEL_PLATE_PADDING_X = 3.dp
+private val LABEL_PLATE_PADDING_Y = 1.dp
+private val LABEL_PLATE_RADIUS = 4.dp
 
 /**
  * Diagonal do ritmo (#463, direção AH1): eixo X é o tempo da janela que já passou, eixo Y a
@@ -88,8 +101,8 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
                 listOf(0.0, 50.0, 100.0).forEach { value ->
                     drawLine(gridColor, Offset(left, y(value)), Offset(right, y(value)), 1.dp.toPx())
                 }
-                drawCaption(measurer, above, Offset(left + 6.dp.toPx(), top + 4.dp.toPx()), labelStyle.copy(color = criticalColor), alignEnd = false)
-                drawCaption(measurer, below, Offset(right - 6.dp.toPx(), bottom - 18.dp.toPx()), labelStyle.copy(color = okColor), alignEnd = true)
+                val aboveCaption = measureLabel(measurer, above, Offset(left + 6.dp.toPx(), top + 4.dp.toPx()), labelStyle.copy(color = criticalColor), alignEnd = false)
+                val belowCaption = measureLabel(measurer, below, Offset(right - 6.dp.toPx(), bottom - 18.dp.toPx()), labelStyle.copy(color = okColor), alignEnd = true)
 
                 model.previous.forEach { path -> drawPath(path, ::x, ::y, axisColor.copy(alpha = PREVIOUS_ALPHA), 1.dp.toPx(), dashed = false) }
                 drawLine(
@@ -103,12 +116,17 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
                     drawPath(model.projection, ::x, ::y, if (model.projectionCritical) criticalColor else lineColor, 1.5.dp.toPx(), dashed = true)
                 }
                 drawPath(model.current, ::x, ::y, lineColor, 2.25.dp.toPx(), dashed = false)
-                model.current.lastOrNull()?.let { last ->
+                val pointLabel = model.current.lastOrNull()?.let { last ->
                     val center = Offset(x(last.elapsedFraction), y(last.percent))
-                    drawCircle(haloColor, radius = 5.5.dp.toPx(), center = center)
+                    drawCircle(haloColor, radius = POINT_HALO_RADIUS.toPx(), center = center)
                     drawCircle(lineColor, radius = 3.5.dp.toPx(), center = center)
-                    model.pointLabel?.let { label -> drawPointLabel(measurer, label, center, pointStyle) }
+                    model.pointLabel?.let { label ->
+                        placePointLabel(measurer, label, center, pointStyle, avoid = listOf(aboveCaption.box, belowCaption.box))
+                    }
                 }
+                // Textos por último, sobre placa da superfície (#477): desenhados antes, a projeção e as
+                // janelas anteriores cortavam as letras.
+                listOfNotNull(aboveCaption, belowCaption, pointLabel).forEach { placed -> drawPlacedLabel(placed, haloColor) }
             }
         }
         Row(Modifier.fillMaxWidth()) {
@@ -172,17 +190,46 @@ private fun DrawScope.drawPath(
     drawPath(path, color, style = Stroke(width = width, pathEffect = effect))
 }
 
-private fun DrawScope.drawCaption(measurer: TextMeasurer, text: String, anchor: Offset, style: TextStyle, alignEnd: Boolean) {
+/** Um texto medido e a placa que o envolve; [box] é o que os outros textos evitam. */
+private class PlacedLabel(val layout: TextLayoutResult, val box: PaceLabelBox)
+
+private fun DrawScope.plateSize(layout: TextLayoutResult): Pair<Float, Float> =
+    layout.size.width + LABEL_PLATE_PADDING_X.toPx() * 2 to layout.size.height + LABEL_PLATE_PADDING_Y.toPx() * 2
+
+/** Legenda fixa: o texto no mesmo lugar de antes, a placa em volta dele. */
+private fun DrawScope.measureLabel(measurer: TextMeasurer, text: String, anchor: Offset, style: TextStyle, alignEnd: Boolean): PlacedLabel {
     val layout = measurer.measure(text, style)
-    val leftX = if (alignEnd) anchor.x - layout.size.width else anchor.x
-    drawText(layout, topLeft = Offset(leftX.coerceAtLeast(0f), anchor.y))
+    val (width, height) = plateSize(layout)
+    val textLeft = if (alignEnd) anchor.x - layout.size.width else anchor.x
+    val plateLeft = (textLeft - LABEL_PLATE_PADDING_X.toPx()).coerceAtLeast(0f)
+    return PlacedLabel(layout, PaceLabelBox(plateLeft, anchor.y - LABEL_PLATE_PADDING_Y.toPx(), width, height))
 }
 
-/** À esquerda do ponto; acima dele, ou abaixo quando o ponto está perto do topo. */
-private fun DrawScope.drawPointLabel(measurer: TextMeasurer, text: String, point: Offset, style: TextStyle) {
+/** Rótulo do ponto mais novo, posto onde não encosta nas legendas nem no ponto ([placePacePointLabel]). */
+private fun DrawScope.placePointLabel(measurer: TextMeasurer, text: String, point: Offset, style: TextStyle, avoid: List<PaceLabelBox>): PlacedLabel {
     val layout = measurer.measure(text, style)
-    val gap = 8.dp.toPx()
-    val leftX = (point.x - gap - layout.size.width).coerceAtLeast(0f)
-    val topY = if (point.y - gap - layout.size.height < 0f) point.y + gap else point.y - gap - layout.size.height
-    drawText(layout, topLeft = Offset(leftX, topY.coerceIn(0f, (size.height - layout.size.height).coerceAtLeast(0f))))
+    val (width, height) = plateSize(layout)
+    val box = placePacePointLabel(
+        pointX = point.x,
+        pointY = point.y,
+        labelWidth = width,
+        labelHeight = height,
+        gap = 8.dp.toPx(),
+        pointRadius = POINT_HALO_RADIUS.toPx(),
+        areaWidth = size.width,
+        areaHeight = size.height,
+        avoid = avoid
+    )
+    return PlacedLabel(layout, box)
+}
+
+private fun DrawScope.drawPlacedLabel(placed: PlacedLabel, plateColor: Color) {
+    val box = placed.box
+    drawRoundRect(
+        color = plateColor.copy(alpha = LABEL_PLATE_ALPHA),
+        topLeft = Offset(box.left, box.top),
+        size = Size(box.width, box.height),
+        cornerRadius = CornerRadius(LABEL_PLATE_RADIUS.toPx())
+    )
+    drawText(placed.layout, topLeft = Offset(box.left + LABEL_PLATE_PADDING_X.toPx(), box.top + LABEL_PLATE_PADDING_Y.toPx()))
 }

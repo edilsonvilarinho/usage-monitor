@@ -188,6 +188,12 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   **uma escala**: barras em % da cota 5h com eixo escrito (`analysisAxisMax`, topo par), e a vazão numa faixa própria com
   o máximo dela; "pp" virou "%". Nos intervalos, a razão contra 7 d vem com a palavra ("1,9× mais rápido"). A linha
   dourada usa `AppGargantuaTokens.gold`: é referência, não consumo nem estado.
+  - **Textos sem sobreposição** (#477): com a cota perto de 100% o rótulo do ponto ("100% · 87% do tempo") caía na faixa
+    da legenda "acima da linha: esgota antes", e as legendas eram desenhadas **antes** das linhas — projeção e janelas
+    anteriores cortavam as letras. O rótulo do ponto sai de `placePacePointLabel` (`PaceLabelPlacement.kt`, puro e
+    testado): acima-esquerda, abaixo-esquerda, acima-direita, abaixo-direita, a primeira que não encosta nas legendas nem
+    no ponto; sem vaga, a de menor sobreposição — o rótulo é dado e não some. Legendas e rótulo são desenhados por último,
+    sobre placa da cor da superfície (alfa 0,8, raio 4): a linha que passa por baixo fica apagada, não some.
 - **Ao vivo** (A01): o view model relê quando o `fetchedAt` da conta muda (coleta nova: 60 s com sessão CLI, 5 min sem)
   e a cada `LIVE_INTERVAL_MILLIS` (30 s, o ritmo do índice do Claude), porque ritmo da última hora, ritmo seguro e fatias
   andam com o relógio. `close()` no `onCloseRequest` para o laço — a janela só se esconde. Sem `drop(1)` no sinal: se a
