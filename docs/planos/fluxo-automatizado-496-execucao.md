@@ -84,5 +84,8 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
   No such file or directory` (em worktree o `.git` é arquivo). Os commits desta issue usam `git -c user.name=claude -c
   user.email=claude@anthropic.com`, mesma identidade, sem tocar a config; a skill `usage-monitor-workflow` documenta isso.
   O script não foi alterado (fora do escopo).
+- **`gh pr checks <pr> --watch` sai cedo** (PR #497): logo depois do push o run do `CI` fica na fila atrás do
+  cancelamento do `concurrency`, sem check registrado, e o comando terminou com só `enable-auto-merge skipping`
+  enquanto o run `40696217236` estava `pending`. A skill passou a acompanhar o run por `gh run watch <id> --exit-status`.
 - **Piso do diff virou informativo** por decisão do dono, depois da medição do #495 (60%).
 

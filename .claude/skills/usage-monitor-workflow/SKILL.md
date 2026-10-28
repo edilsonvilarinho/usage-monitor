@@ -97,8 +97,13 @@ Body: `Closes #<n>`, what changed, **platforms tested** (`CLAUDE.md`, "CI e test
 
 ## 7. CI and the incident stop
 
+Watch the `CI` run of the head commit, not `gh pr checks --watch`: right after a push the CI run sits queued behind
+the `concurrency` cancel with no check registered yet, and `gh pr checks --watch` returns as soon as the checks it
+sees (the skipped `Dependabot auto-merge` job) are done — measured on PR #497.
+
 ```bash
-gh pr checks <pr> --watch --fail-fast
+gh run list --branch <branch> --workflow ci.yml --limit 1 --json databaseId,headSha
+gh run watch <run-id> --exit-status
 gh run view <run-id> --log-failed        # on red
 node tools/ci/ci-incidents.mjs            # count after every red run
 node tools/ci/ci-incidents.mjs --local "<what failed>"   # local test failure after the PR is open
