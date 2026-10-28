@@ -517,6 +517,76 @@ class UsageHistoryLineChartTest {
     }
 
     @Test
+    fun `applyChartScroll pan clamps at the left edge without changing the width`() {
+        val panned = applyChartScroll(current = 0.1f..0.3f, scrollDeltaY = 0f, scrollDeltaX = -5f, pointerFraction = 0.2f, shiftPressed = false)
+
+        assertEquals(0f, panned.start)
+        assertTrue(kotlin.math.abs(panned.endInclusive - 0.2f) < 0.001f)
+    }
+
+    @Test
+    fun `applyChartScroll zoom out near the right edge slides the window back inside`() {
+        // Âncora à esquerda da janela: o zoom out empurra o fim para além de 1.
+        val zoomed = applyChartScroll(current = 0.8f..0.98f, scrollDeltaY = 1f, scrollDeltaX = 0f, pointerFraction = 0f, shiftPressed = false)
+
+        assertEquals(1f, zoomed.endInclusive)
+        assertTrue(zoomed.endInclusive - zoomed.start > 0.18f, "zoom out alarga a janela")
+    }
+
+    @Test
+    fun `applyChartScroll without movement on the active axis keeps the window`() {
+        val current = 0.2f..0.6f
+
+        assertEquals(current, applyChartScroll(current, scrollDeltaY = 0f, scrollDeltaX = 0f, pointerFraction = 0.5f, shiftPressed = true))
+        assertEquals(current, applyChartScroll(current, scrollDeltaY = 0f, scrollDeltaX = 0f, pointerFraction = 0.5f, shiftPressed = false))
+    }
+
+    @Test
+    fun `tooltip without a known total shows only the used value in the unit`() {
+        val requests = listOf(historyPoint("2026-05-06T18:00:00Z", 40, total = 0))
+        val tokens = listOf(historyPoint("2026-05-06T18:00:00Z", 1_500, total = 0))
+        val percent = listOf(percentageHistoryPoint("2026-05-06T18:00:00Z", used = 37, total = 0))
+
+        fun usage(points: List<UsageHistoryPoint>, unit: UsageUnit) = buildHistoryTooltipModel(
+            activePoint = ChartPlotPoint(index = 0, point = points[0], x = 0f, y = 0f),
+            points = points,
+            unit = unit,
+            language = AppLanguage.EN,
+            title = "t",
+            subtitle = null
+        )
+
+        assertEquals("40 req", usage(requests, UsageUnit.REQUESTS)?.metrics?.get(0)?.value)
+        assertTrue(usage(tokens, UsageUnit.TOKENS)?.metrics?.get(0)?.value.orEmpty().endsWith(" tok"))
+        assertEquals("37 %", usage(percent, UsageUnit.PERCENTAGE)?.metrics?.get(0)?.value)
+        // O primeiro ponto não tem com quem comparar.
+        assertEquals("No previous point", usage(requests, UsageUnit.REQUESTS)?.metrics?.get(1)?.value)
+    }
+
+    @Test
+    fun `an empty history has no axis, labels, annotations or nearest point`() {
+        assertEquals(emptyList(), buildTimelineFractions(emptyList()))
+        assertNull(buildValueAxis(emptyList(), UsageUnit.REQUESTS))
+        assertEquals(emptyList(), buildTimeReferenceLabels(emptyList()))
+        assertNull(detectHistoryRangeAnnotations(emptyList(), UsageUnit.REQUESTS))
+        assertNull(findClosestPlotPointIndex(emptyList(), pointerX = 10f))
+        assertNull(framePointerToPlotPointerX(framePointerX = 10f, plotStartX = 0f, plotWidth = 0f))
+        assertNull(coerceFramePointerToPlotPointerX(framePointerX = 10f, plotStartX = 0f, plotWidth = 0f))
+        assertEquals(HISTORY_TOOLTIP_PADDING_PX, clampTooltipLeft(desiredCenterX = 50f, tooltipWidth = 40f, containerWidth = 0f))
+    }
+
+    @Test
+    fun `points captured at the same instant are spread by index`() {
+        val points = listOf(
+            historyPoint("2026-05-06T18:00:00Z", 1),
+            historyPoint("2026-05-06T18:00:00Z", 2),
+            historyPoint("2026-05-06T18:00:00Z", 3)
+        )
+
+        assertEquals(listOf(0f, 0.5f, 1f), buildTimelineFractions(points))
+    }
+
+    @Test
     fun `clusterResetIndices returns empty list when there are no resets`() {
         assertEquals(emptyList(), clusterResetIndices(emptyList(), emptyList(), minPixelGap = 10f))
     }

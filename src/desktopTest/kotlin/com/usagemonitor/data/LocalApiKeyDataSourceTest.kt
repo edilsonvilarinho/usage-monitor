@@ -135,6 +135,32 @@ class LocalApiKeyDataSourceTest {
         }
     }
 
+    /** Segredo nunca no `toString`: ele vai para log, relatório de bug e mensagem de exceção. */
+    @Test
+    fun `the settings text never carries a key`() {
+        val settings = ApiKeySettings(
+            minimax = "minimax-secret",
+            deepSeek = "deepseek-secret",
+            openCodeGo = "opencode-secret",
+            openRouter = "openrouter-secret"
+        )
+
+        val text = settings.toString()
+
+        for (secret in listOf("minimax-secret", "deepseek-secret", "opencode-secret", "openrouter-secret")) {
+            assertFalse(text.contains(secret), text)
+        }
+        assertTrue(text.startsWith("ApiKeySettings(minimax="), text)
+    }
+
+    @Test
+    fun `withKey and withoutKey touch only sources that have a local key`() {
+        val settings = ApiKeySettings(openRouter = "openrouter-secret")
+
+        assertEquals(settings, settings.withKey(ApiSource.CURSOR, "x"))
+        assertEquals("", settings.withoutKey(ApiSource.OPENROUTER).openRouter)
+    }
+
     @Test
     fun `does not read environment when local file is absent`() {
         val loaded = LocalApiKeyDataSource(settingsFile).load()

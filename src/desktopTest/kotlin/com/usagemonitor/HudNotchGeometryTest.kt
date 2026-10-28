@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
@@ -538,6 +539,41 @@ class HudNotchGeometryTest {
     @Test
     fun `tela sem medida devolve a posicao de estreia`() {
         assertEquals(HudPlacement.Default, nearestHudPlacement(100.dp, 100.dp, ScreenWorkArea.Unknown))
+    }
+
+    @Test
+    fun `o teto da janela sai da tela do monitor na escala da interface`() {
+        val notebook = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(1366.dp, 768.dp))
+        val three = (1..3).map { index -> account("Conta $index", "Normal", listOf("7d" to "28%", "5h" to "22%")) }
+        val left = HudPlacement(HudEdge.LEFT, 0.5f)
+
+        val (atOne, _) = hudWindowSizes(three, left, notebook, scale = 1f, fallbackLabel = "", hasUpdateIndicator = false, hasUpdateAction = false)
+        // Na lateral o teto é a altura da tela; com a escala em 200% sobra metade dela.
+        val (atTwo, _) = hudWindowSizes(three, left, notebook, scale = 2f, fallbackLabel = "", hasUpdateIndicator = false, hasUpdateAction = false)
+        val top = hudWindowSizes(three, HudPlacement(HudEdge.TOP, 0.5f), notebook, 1f, "", false, false).first
+
+        assertTrue(!atOne.compact, "três contas cabem completas na lateral a 100%")
+        assertTrue(atTwo.compact, "a 200% a mesma lateral compacta")
+        assertTrue(!top.compact, "no topo o teto é a largura da tela")
+    }
+
+    @Test
+    fun `a janela mede quem esta saindo e o notch recolhe sem ele`() {
+        val staying = account("Fica", "Normal", listOf("5h" to "10%"))
+        val leaving = account("Sai", "Normal", listOf("5h" to "20%")).copy(presence = HudPresence.LEAVING)
+
+        val (window, after) = hudWindowSizes(listOf(staying, leaving), HudPlacement(HudEdge.TOP, 0.5f), screen, 1f, "", false, false)
+
+        assertTrue(after.collapsed.width < window.collapsed.width)
+    }
+
+    @Test
+    fun `arrastando a janela leva as alcas e parada fica encaixada`() {
+        val sizes = hudNotchSizes(listOf(account("Conta", "Normal", listOf("5h" to "10%"))), HudEdge.TOP, "", false)
+        val placement = HudPlacement(HudEdge.TOP, 0.7f)
+
+        assertEquals(hudDragWindowBounds(HudEdge.TOP, 0.7f, sizes, screen), hudHostWindowBounds(true, placement, sizes, screen))
+        assertEquals(hudDockedWindowBounds(HudEdge.TOP, 0.7f, sizes, screen), hudHostWindowBounds(false, placement, sizes, screen))
     }
 
     private fun account(label: String, word: String, quotas: List<Pair<String, String>>): HudAccount {

@@ -78,7 +78,10 @@ internal fun hudDragLanding(
  * mouse.
  */
 @Stable
-internal class HudDragState {
+internal class HudDragState(
+    /** O ponteiro na tela; `null` quando a leitura falha. Parâmetro para o teste. */
+    private val readPointer: () -> java.awt.Point? = { runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull() }
+) {
     /** Em curso: o notch sai da borda e anda livre. */
     var dragging by mutableStateOf(false)
         private set
@@ -119,7 +122,4 @@ internal class HudDragState {
         dragging = false
         return position
     }
-
-    private fun readPointer(): java.awt.Point? =
-        runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
 }

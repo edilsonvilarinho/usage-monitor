@@ -40,6 +40,67 @@ class LocalOpenCodeUsageDataSourceTest {
         Files.deleteIfExists(tempDir)
     }
 
+    @Test
+    fun `every free model gets a readable name and an unknown one is titled from its id`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val databaseFile = File(tempDir, "opencode.db")
+        val models = listOf(
+            "hy3-preview-free",
+            "ling-2.6-flash-free",
+            "nemotron-3-super-free",
+            "trinity-large-preview-free",
+            "glm_4-free"
+        )
+        DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute(
+                    "CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, time_created INTEGER NOT NULL, " +
+                        "time_updated INTEGER NOT NULL, data TEXT NOT NULL);"
+                )
+            }
+            connection.prepareStatement(
+                "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, 'session', ?, ?, ?);"
+            ).use { statement ->
+                models.forEachIndexed { index, model ->
+                    insertMessage(statement, "m$index", Instant.parse("2026-05-07T14:00:00Z").toEpochMilliseconds(), assistantPayload("opencode", model))
+                }
+            }
+        }
+        val dataSource = LocalOpenCodeUsageDataSource(databaseFile = databaseFile, nowProvider = { Instant.parse("2026-05-07T15:00:00Z") })
+        try {
+            assertTrue(dataSource.isAvailable())
+
+            val names = dataSource.loadFreeModelUsage().associate { snapshot -> snapshot.modelId to snapshot.modelName }
+
+            assertEquals(
+                mapOf(
+                    "hy3-preview-free" to "Hy3 Preview Free",
+                    "ling-2.6-flash-free" to "Ling 2.6 Flash Free",
+                    "nemotron-3-super-free" to "Nemotron 3 Super Free",
+                    "trinity-large-preview-free" to "Trinity Large Preview Free",
+                    // Sem nome conhecido: cada pedaço do id, com a inicial maiúscula.
+                    "glm_4-free" to "Glm 4 Free"
+                ),
+                names
+            )
+        } finally {
+            dataSource.close()
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `without the opencode database the source is unavailable`() = runTest {
+        val tempDir = createTempDirectory().toFile()
+        val dataSource = LocalOpenCodeUsageDataSource(databaseFile = File(tempDir, "opencode.db"))
+        try {
+            assertEquals(false, dataSource.isAvailable())
+        } finally {
+            dataSource.close()
+            tempDir.deleteRecursively()
+        }
+    }
+
     private fun seedDatabase(databaseFile: File) {
         DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
             connection.createStatement().use { statement ->

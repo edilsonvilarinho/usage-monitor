@@ -3,10 +3,13 @@ package com.usagemonitor
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.presentation.ui.windowDragSink
 import java.awt.Point
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * As duas contas do arrasto da HUD, que só viraram testáveis quando saíram das
@@ -102,5 +105,56 @@ class HudWindowDragTest {
         )
 
         assertEquals(HudEdge.RIGHT, landing.edge)
+    }
+
+    @Test
+    fun `the drag state follows the pointer tick by tick and returns where it was dropped`() {
+        val pointer = ArrayDeque(listOf(Point(1000, 500), Point(1030, 480), Point(1050, 470)))
+        val drag = HudDragState(readPointer = { pointer.removeFirst() })
+        val messages = mutableListOf<String>()
+        val previousSink = windowDragSink
+        windowDragSink = { message -> messages += message }
+        try {
+            drag.begin(DpOffset(1200.dp, 0.dp))
+            assertTrue(drag.dragging)
+            assertEquals(DpOffset(1200.dp, 0.dp), drag.windowPosition)
+
+            drag.moveTo(size, secondary)
+            assertEquals(DpOffset(1230.dp, 0.dp), drag.windowPosition, "presa à tela, a janela não sobe além do topo")
+            drag.moveTo(size, secondary)
+            assertEquals(DpOffset(1250.dp, 0.dp), drag.windowPosition)
+
+            val dropped = drag.finish()
+
+            assertEquals(DpOffset(1250.dp, 0.dp), dropped)
+            assertFalse(drag.dragging)
+            assertNull(drag.windowPosition)
+            // O arrasto visto de fora (#416): uma linha ao soltar, com a posição pedida.
+            assertEquals(1, messages.size)
+            assertTrue(messages.single().contains("pedido 1250,0"), messages.single())
+        } finally {
+            windowDragSink = previousSink
+        }
+    }
+
+    @Test
+    fun `a tick without a pointer reading keeps the window and the last pointer`() {
+        val pointer = ArrayDeque(listOf<Point?>(Point(1000, 500), null, Point(1010, 520)))
+        val drag = HudDragState(readPointer = { pointer.removeFirst() })
+
+        drag.begin(DpOffset(1200.dp, 300.dp))
+        drag.moveTo(size, secondary)
+        assertEquals(DpOffset(1200.dp, 300.dp), drag.windowPosition)
+        // O passo seguinte mede a partir do último ponteiro lido, não do que falhou.
+        drag.moveTo(size, secondary)
+        assertEquals(DpOffset(1210.dp, 320.dp), drag.windowPosition)
+    }
+
+    @Test
+    fun `finishing a gesture that never began returns no position`() {
+        val drag = HudDragState(readPointer = { Point(0, 0) })
+
+        assertNull(drag.finish())
+        assertFalse(drag.dragging)
     }
 }

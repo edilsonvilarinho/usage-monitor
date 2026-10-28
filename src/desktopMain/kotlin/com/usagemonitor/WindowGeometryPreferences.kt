@@ -149,7 +149,9 @@ internal fun rememberPersistedWindowGeometry(
     persisted: PersistedWindowGeometry,
     spec: WindowGeometrySpec,
     uiScalePercent: Int,
-    workArea: ScreenWorkArea
+    workArea: ScreenWorkArea,
+    /** Os monitores; parâmetro para o teste não perguntar ao sistema de janelas. */
+    screens: () -> List<ScreenInfo> = ::availableScreens
 ): WindowState {
     // Só o tamanho default acompanha a escala: tamanho persistido é escolha do
     // usuário. O ajuste à tela, esse, vale para os dois — janela salva num monitor
@@ -164,7 +166,7 @@ internal fun rememberPersistedWindowGeometry(
     // (issue #273): a posição salva num secundário era presa ao principal e a
     // janela voltava para ele a cada abertura. Sem posição salva vale o primário.
     val area = remember(persisted, workArea) {
-        workAreaForPosition(persisted.xDp?.dp, persisted.yDp?.dp, desiredSize, fallback = workArea)
+        workAreaForPosition(persisted.xDp?.dp, persisted.yDp?.dp, desiredSize, fallback = workArea, screens = screens())
     }
     val initialSize = fitWindowSize(desiredSize, area)
     val initialPosition = if (persisted.xDp != null && persisted.yDp != null) {

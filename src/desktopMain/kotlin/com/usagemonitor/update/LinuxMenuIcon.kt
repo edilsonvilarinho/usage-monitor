@@ -2,6 +2,8 @@ package com.usagemonitor.update
 
 import com.usagemonitor.APP_ICON_RESOURCE_PATH
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 private const val ICON_LINE_PREFIX = "Icon="
@@ -108,12 +110,11 @@ internal fun rewriteLinuxMenuIconLine(desktopEntryText: String, stableIconPath: 
  * tamanho em que os menus de aplicativos o mostram.
  *
  * Nunca lança: falha aqui é cosmética — o pior caso é o ícone do menu
- * continuar errado — e não pode derrubar o arranque do app. Pela mesma razão
- * de [com.usagemonitor.AutoStartManager.ensureAutoStartCommandCurrent], não
- * é unit-testada isoladamente: é IO de ponta a ponta sobre caminhos reais do
- * Linux, e a suíte roda no Windows. A prova é a verificação ao vivo na
- * Bazzite (planos das issues #133 e #432), como já é o caso para a migração irmã do
- * autostart.
+ * continuar errado — e não pode derrubar o arranque do app. A leitura da
+ * máquina (origem, raiz, bytes do classpath, `user.home`) fica aqui; o reparo
+ * sobre os arquivos é [repairLinuxMenuIcon], testado numa pasta temporária. A
+ * prova nos caminhos reais continua sendo a verificação ao vivo na Bazzite
+ * (planos das issues #133 e #432).
  */
 internal fun ensureLinuxMenuIconCurrent() {
     runCatching {
@@ -123,31 +124,39 @@ internal fun ensureLinuxMenuIconCurrent() {
 
         val layout = resolveLinuxInstallLayout() ?: return@runCatching
         val iconBytes = readBundledIconBytes() ?: return@runCatching
-        val iconFileName = linuxMenuIconFileName(iconBytes)
-        val iconPath = layout.iconPath(iconFileName)
-        if (!ensureStableIconFile(File(iconPath), iconBytes)) {
-            return@runCatching
-        }
-
-        val menuDesktopFile = resolveLinuxMenuDesktopFilePath()?.let(::File) ?: return@runCatching
-        // Entrada ausente não repara -- criá-la continua sendo trabalho
-        // exclusivo do instalador `.sh`.
-        if (!menuDesktopFile.isFile) {
-            return@runCatching
-        }
-
-        val currentText = runCatching { menuDesktopFile.readText() }.getOrNull() ?: return@runCatching
-        if (linuxMenuIconNeedsRepair(currentText, iconPath)) {
-            val rewritten = rewriteLinuxMenuIconLine(currentText, iconPath)
-            if (!writeAtomically(menuDesktopFile, rewritten)) {
-                // A cópia antiga ainda é a que o menu mostra: apagá-la agora
-                // deixaria o menu sem ícone nenhum.
-                return@runCatching
-            }
-        }
-
-        deleteStaleIconFiles(layout.root, iconFileName)
+        repairLinuxMenuIcon(layout, iconBytes, resolveLinuxMenuDesktopFilePath())
     }
+}
+
+/**
+ * Grava a cópia estável do ícone, aponta o `.desktop` de menu para ela e só
+ * então apaga as cópias antigas da raiz.
+ */
+internal fun repairLinuxMenuIcon(layout: LinuxInstallLayout, iconBytes: ByteArray, menuDesktopFilePath: String?) {
+    val iconFileName = linuxMenuIconFileName(iconBytes)
+    val iconPath = layout.iconPath(iconFileName)
+    if (!ensureStableIconFile(File(iconPath), iconBytes)) {
+        return
+    }
+
+    val menuDesktopFile = menuDesktopFilePath?.let(::File) ?: return
+    // Entrada ausente não repara -- criá-la continua sendo trabalho
+    // exclusivo do instalador `.sh`.
+    if (!menuDesktopFile.isFile) {
+        return
+    }
+
+    val currentText = runCatching { menuDesktopFile.readText() }.getOrNull() ?: return
+    if (linuxMenuIconNeedsRepair(currentText, iconPath)) {
+        val rewritten = rewriteLinuxMenuIconLine(currentText, iconPath)
+        if (!writeAtomically(menuDesktopFile, rewritten)) {
+            // A cópia antiga ainda é a que o menu mostra: apagá-la agora
+            // deixaria o menu sem ícone nenhum.
+            return
+        }
+    }
+
+    deleteStaleIconFiles(layout.root, iconFileName)
 }
 
 private fun readBundledIconBytes(): ByteArray? {
@@ -182,11 +191,18 @@ private fun deleteStaleIconFiles(root: File, currentFileName: String) {
     }
 }
 
-/** Escreve por arquivo temporário + rename, para nunca deixar o `.desktop` pela metade. */
+/**
+ * Escreve por arquivo temporário + rename, para nunca deixar o `.desktop` pela metade.
+ *
+ * `Files.move` com `ATOMIC_MOVE`, como os outros arquivos do app: no Linux é o
+ * mesmo `rename(2)` de `File.renameTo`, mas também substitui o destino no
+ * Windows, onde `renameTo` recusa destino existente — e é lá que a suíte roda.
+ */
 private fun writeAtomically(target: File, content: String): Boolean {
     return runCatching {
         val tempFile = File(target.parentFile, "${target.name}.next")
         tempFile.writeText(content)
-        tempFile.renameTo(target)
+        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        true
     }.getOrDefault(false)
 }

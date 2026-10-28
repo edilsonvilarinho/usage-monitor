@@ -95,8 +95,13 @@ internal object DiagnosticsExport {
      * o acento quando o console não é UTF-8 — o console do Windows decodifica com a
      * página de código dele, e acento saía corrompido (medido no #418).
      */
-    fun run(language: AppLanguage, out: (String) -> Unit, err: (String) -> Unit): Int {
-        return runCatching { export(installationDiagnosticsDir = AppDataDirectory.installationFile("diagnostics")) }
+    fun run(
+        language: AppLanguage,
+        out: (String) -> Unit,
+        err: (String) -> Unit,
+        exportPackage: () -> File = { export(installationDiagnosticsDir = AppDataDirectory.installationFile("diagnostics")) }
+    ): Int {
+        return runCatching { exportPackage() }
             .fold(
                 onSuccess = { zip ->
                     out(localized(language, "Diagnóstico salvo em: ${zip.absolutePath}", "Diagnostics saved to: ${zip.absolutePath}"))

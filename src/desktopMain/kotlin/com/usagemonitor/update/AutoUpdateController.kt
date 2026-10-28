@@ -154,20 +154,12 @@ internal fun rememberAutoUpdateController(
 ): AutoUpdateController {
     val controller = remember(settings, httpClient) {
         val platform = currentUpdatePlatform()
-        // Um instalador por plataforma, e nenhum onde o mecanismo não foi
-        // exercitado. O instalador do Windows respondia `UNSUPPORTED_PLATFORM`
-        // fora do Windows e por isso podia ser construído em qualquer lugar;
-        // manter isso com dois instaladores significaria construir o errado e
-        // depender de ele se recusar.
-        val installer = when (platform) {
-            AppUpdatePlatform.WINDOWS ->
-                if (AUTO_UPDATE_SHIPPED) WindowsAppUpdateInstaller(httpClient = httpClient) else null
-
-            AppUpdatePlatform.LINUX ->
-                if (LINUX_AUTO_UPDATE_SHIPPED) LinuxAppUpdateInstaller(httpClient = httpClient) else null
-
-            AppUpdatePlatform.MACOS, null -> null
-        }.takeUnless { isolatedDataRoot }
+        val installer = autoUpdateInstallerFor(
+            platform = platform,
+            isolatedDataRoot = isolatedDataRoot,
+            windows = { WindowsAppUpdateInstaller(httpClient = httpClient) },
+            linux = { LinuxAppUpdateInstaller(httpClient = httpClient) }
+        )
         AutoUpdateController(
             installer = installer,
             platform = platform,
@@ -201,6 +193,29 @@ internal fun rememberAutoUpdateController(
     }
 
     return controller
+}
+
+/**
+ * Um instalador por plataforma, e nenhum onde o mecanismo não foi
+ * exercitado. O instalador do Windows respondia `UNSUPPORTED_PLATFORM`
+ * fora do Windows e por isso podia ser construído em qualquer lugar;
+ * manter isso com dois instaladores significaria construir o errado e
+ * depender de ele se recusar. Com `--user-data-dir` (#419) nenhum.
+ */
+internal fun autoUpdateInstallerFor(
+    platform: AppUpdatePlatform?,
+    isolatedDataRoot: Boolean,
+    windows: () -> AppUpdateInstaller,
+    linux: () -> AppUpdateInstaller
+): AppUpdateInstaller? {
+    if (isolatedDataRoot) {
+        return null
+    }
+    return when (platform) {
+        AppUpdatePlatform.WINDOWS -> if (AUTO_UPDATE_SHIPPED) windows() else null
+        AppUpdatePlatform.LINUX -> if (LINUX_AUTO_UPDATE_SHIPPED) linux() else null
+        AppUpdatePlatform.MACOS, null -> null
+    }
 }
 
 /**
