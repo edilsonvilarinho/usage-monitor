@@ -237,9 +237,15 @@ anterior, e o rodapé continuaria pequeno ao lado de um texto maior; densidade �
 dp e sp crescem juntos e as proporções do protótipo permanecem. Só `density` é multiplicado:
 multiplicar `fontScale` junto aplicaria a escala duas vezes ao texto.
 
-- **O padrão persistido é 115 e o default do parâmetro é 100.** O neutro existe para o
-  `ScreenshotGenerator`, o `TourGifGenerator` e os testes de componente manterem a geometria de
-  referência — as capturas do README **não** são geradas na escala do app.
+- **O padrão é 100 — a escala do sistema** (#477). A escala do app **multiplica** a do sistema: com o
+  padrão antigo de 115 e o Windows em 225%, a densidade efetiva era ~259% e tudo saía 15% maior que nos
+  outros apps. Toda instalação anterior tem 115 gravado (o `UiScalePersistence` grava na primeira
+  execução), então `migrateLegacyDefaultUiScale` troca 115 por 100 **uma vez** (chave
+  `uiScaleSystemDefaultMigrated`); outro valor fica. Quem tinha escolhido 115 também volta: no registro
+  as duas coisas são iguais. Tamanho persistido de janela não muda e passa a mostrar mais conteúdo.
+- **O default do parâmetro de `AppTheme` é 100 por outro motivo**: o `ScreenshotGenerator`, o
+  `TourGifGenerator` e os testes de componente mantêm a geometria de referência — as capturas do
+  README **não** são geradas na escala do app.
 - **Cada janela precisa receber o valor.** `Window`/`DialogWindow` do Compose Desktop têm composição
   própria e a plataforma reprovisiona `LocalDensity` na raiz de cada uma: provisionar na janela pai
   não atravessa para a filha, e a janela esquecida renderiza a 100% sem erro nenhum.

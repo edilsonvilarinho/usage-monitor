@@ -12,7 +12,43 @@ class UiScalePreferencesTest {
     @Test
     fun `read persisted ui scale falls back to the default when preference is absent`() {
         withTestSettings { settings ->
+            assertEquals(100, readPersistedUiScalePercent(settings))
+        }
+    }
+
+    @Test
+    fun `the legacy factory default of 115 migrates once to the system scale`() {
+        withTestSettings { settings ->
+            persistUiScalePercent(settings, 115)
+
+            migrateLegacyDefaultUiScale(settings)
+            assertEquals(100, readPersistedUiScalePercent(settings))
+
+            // Depois da migração, 115 é escolha do usuário e fica.
+            persistUiScalePercent(settings, 115)
+            migrateLegacyDefaultUiScale(settings)
             assertEquals(115, readPersistedUiScalePercent(settings))
+        }
+    }
+
+    @Test
+    fun `the migration keeps a scale the user chose`() {
+        withTestSettings { settings ->
+            persistUiScalePercent(settings, 130)
+
+            migrateLegacyDefaultUiScale(settings)
+
+            assertEquals(130, readPersistedUiScalePercent(settings))
+        }
+    }
+
+    @Test
+    fun `the migration does not create the scale key on a fresh install`() {
+        withTestSettings { settings ->
+            migrateLegacyDefaultUiScale(settings)
+
+            assertEquals(false, hasPersistedUiScale(settings))
+            assertEquals(100, readPersistedUiScalePercent(settings))
         }
     }
 

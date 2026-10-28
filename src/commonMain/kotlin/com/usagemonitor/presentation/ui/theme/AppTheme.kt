@@ -638,9 +638,10 @@ private val rememberedTypography by lazy { appTypography(appFontFamilies) }
  * 26dp continuaria pequeno ao lado de um texto maior. Densidade é o único ponto
  * em que dp e sp crescem juntos e as proporções do protótipo permanecem.
  *
- * O default é **100 (neutro)**, e não [DEFAULT_UI_SCALE_PERCENT]: é o que mantém
- * a geometria de referência do `ScreenshotGenerator`, do `TourGifGenerator` e dos
- * testes de componente. Quem escolhe a escala do app é o `Main`, e **cada janela
+ * O default é **100 (neutro)** — hoje igual a [DEFAULT_UI_SCALE_PERCENT], mas por
+ * outro motivo: é o que mantém a geometria de referência do `ScreenshotGenerator`,
+ * do `TourGifGenerator` e dos testes de componente, e não muda se o padrão do app
+ * mudar. Quem escolhe a escala do app é o `Main`, e **cada janela
  * precisa receber o valor**: `Window`/`DialogWindow` do Compose Desktop têm
  * composição própria e a plataforma reprovisiona `LocalDensity` na raiz de cada
  * uma — provisionar na janela pai não atravessa para a filha.

@@ -116,8 +116,9 @@ private fun OpacityPersistence(shell: AppShellState, settings: PreferencesSettin
 @OptIn(FlowPreview::class)
 @Composable
 private fun UiScalePersistence(shell: AppShellState, settings: PreferencesSettings) {
-    // Primeira execução depois da atualização que subiu a escala default de 100
-    // para 115: gravar a escala fecha a porta, porque a chave passa a existir.
+    // Primeira execução: gravar a escala fecha a porta, porque a chave passa a
+    // existir — e é por isso que a migração de 115 para 100 (#477) não distingue
+    // quem escolheu 115 de quem só recebeu o padrão.
     LaunchedEffect(settings) {
         if (!hasPersistedUiScale(settings)) {
             persistUiScalePercent(settings, shell.uiScalePercent)

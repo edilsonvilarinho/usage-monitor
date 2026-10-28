@@ -28,6 +28,11 @@ internal class AppShellState(
     initialTargets: List<UsageTargetKey>,
     private val languageSelection: LanguageSelection = LanguageSelection(settings, initialOverride = null)
 ) {
+    init {
+        // Antes da leitura da escala: o 115 de fábrica gravado vira 100 uma vez (#477).
+        migrateLegacyDefaultUiScale(settings)
+    }
+
     /** Escala da interface; o valor persistido acompanha pelo coletor com debounce. */
     var uiScalePercent by mutableStateOf(readPersistedUiScalePercent(settings))
         private set

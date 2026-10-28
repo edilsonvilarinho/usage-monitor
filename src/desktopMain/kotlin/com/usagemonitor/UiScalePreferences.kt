@@ -2,12 +2,14 @@ package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.DEFAULT_UI_SCALE_PERCENT
+import com.usagemonitor.domain.entity.LEGACY_DEFAULT_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MAX_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MIN_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.UI_SCALE_STEP_PERCENT
 import kotlin.math.roundToInt
 
 private const val UI_SCALE_KEY = "uiScalePercent"
+private const val UI_SCALE_DEFAULT_MIGRATED_KEY = "uiScaleSystemDefaultMigrated"
 
 internal fun readPersistedUiScalePercent(settings: PreferencesSettings): Int {
     return clampUiScalePercent(
@@ -17,6 +19,25 @@ internal fun readPersistedUiScalePercent(settings: PreferencesSettings): Int {
 
 internal fun persistUiScalePercent(settings: PreferencesSettings, percent: Int) {
     settings.putInt(UI_SCALE_KEY, clampUiScalePercent(percent))
+}
+
+/**
+ * Migração única do padrão de 115 para 100 (#477).
+ *
+ * O `UiScalePersistence` grava a escala na primeira execução, então toda instalação
+ * anterior tem 115 no registro mesmo sem nunca ter mexido no slider — e continuaria
+ * 15% maior que os outros apps. Quem tem 115 vai para 100, uma vez; outro valor foi
+ * escolha e fica. Quem escolheu 115 de propósito também volta para 100: no registro
+ * as duas coisas são iguais.
+ */
+internal fun migrateLegacyDefaultUiScale(settings: PreferencesSettings) {
+    if (settings.getBoolean(UI_SCALE_DEFAULT_MIGRATED_KEY, false)) {
+        return
+    }
+    if (settings.getInt(UI_SCALE_KEY, DEFAULT_UI_SCALE_PERCENT) == LEGACY_DEFAULT_UI_SCALE_PERCENT) {
+        persistUiScalePercent(settings, DEFAULT_UI_SCALE_PERCENT)
+    }
+    settings.putBoolean(UI_SCALE_DEFAULT_MIGRATED_KEY, true)
 }
 
 /**
