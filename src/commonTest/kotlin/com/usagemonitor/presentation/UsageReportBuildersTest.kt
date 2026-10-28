@@ -5,10 +5,12 @@ import com.usagemonitor.domain.entity.CliActivityCell
 import com.usagemonitor.domain.entity.CliActivityHeatmap
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.domain.entity.CliToolUsage
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamAccountEmailSource
+import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.presentation.ui.report.UsageReportSection
 import com.usagemonitor.presentation.ui.report.reportForCliSessions
 import com.usagemonitor.presentation.ui.report.reportForTeam
@@ -277,6 +279,44 @@ class UsageReportBuildersTest {
             listOf("maior", "empate-a", "empate-b", "zero", "ausente"),
             tables.last().rows.map { row -> row.first() }
         )
+    }
+
+    @Test
+    fun `ferramentas entram como contagem de chamadas e a vazao soma os turnos medidos`() {
+        val base = successState()
+        val state = base.copy(
+            sessions = base.sessions.mapIndexed { index, session ->
+                session.copy(throughput = OutputThroughput(outputTokens = 2_000L * (index + 1), generationMillis = 50_000L))
+            },
+            breakdown = base.breakdown?.copy(
+                byTool = listOf(CliToolUsage("Bash", callCount = 12, turnCount = 5), CliToolUsage("Read", callCount = 4, turnCount = 3))
+            )
+        )
+
+        val document = reportForCliSessions(state = state, language = AppLanguage.EN, now = NOW)
+
+        val totals = assertIs<UsageReportSection.KeyValues>(document.sections.first())
+        // 6 000 tokens em 100 s: a soma dos turnos, nunca a média das razões.
+        assertEquals("60 tok/s", totals.entries.first { entry -> entry.label == "Throughput" }.value)
+        val tools = document.sections.filterIsInstance<UsageReportSection.Table>().first { table -> table.heading == "Tools" }
+        assertEquals(listOf("Tools", "Calls", "Turns"), tools.columns.map { column -> column.title })
+        assertEquals(listOf(listOf("Bash", "12", "5"), listOf("Read", "4", "3")), tools.rows)
+        assertEquals("Call counts, not cost — a turn calling two tools spent tokens only once.", tools.note)
+    }
+
+    @Test
+    fun `relatorio do time com custo parcial explica a estimativa e conta sem e-mail aparece como tal`() {
+        val member = teamMember("ana", session("a", "p", activeMillis = 1_000L, unpricedTurnCount = 1)).copy(accountKey = "uuid-a")
+
+        val document = reportForTeam(
+            state = TeamUsageUiState.Success(members = listOf(member), isAdminOverview = true),
+            language = AppLanguage.EN,
+            now = NOW
+        )
+
+        assertTrue(document.footnotes.contains("Estimated at list price. Not an invoice."), document.footnotes.toString())
+        val sessionsTable = document.sections.filterIsInstance<UsageReportSection.Table>().last { table -> table.heading == "Sessions" }
+        assertEquals("No email", sessionsTable.rows.single()[0])
     }
 
     @Test
