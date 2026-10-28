@@ -48,7 +48,14 @@ def main() -> None:
         for scene in scenes:
             line = scene["lines"][language]
             path = target / f"{scene['id']}.wav"
-            write_speech(voice, config, line.get("say", line["text"]), path)
+            text = line.get("say", line["text"])
+            # O Piper sorteia a duração: a mesma fala muda alguns décimos a cada síntese. Reaproveitar
+            # o WAV garante que o vídeo final tem a fala que o --stills conferiu e a linha do tempo aceitou.
+            stamp = path.with_suffix(".txt")
+            signature = f"{LENGTH_SCALE[language]}|{SENTENCE_SILENCE}|{text}"
+            if not (path.exists() and stamp.exists() and stamp.read_text(encoding="utf-8") == signature):
+                write_speech(voice, config, text, path)
+                stamp.write_text(signature, encoding="utf-8")
             with wave.open(str(path), "rb") as wav_file:
                 durations[language][scene["id"]] = round(wav_file.getnframes() / wav_file.getframerate(), 3)
     (output_dir / "durations.json").write_text(json.dumps(durations, indent=2), encoding="utf-8")

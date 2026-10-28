@@ -68,7 +68,8 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | A06 | Legenda em linhas equilibradas, sem palavra sozinha (achado do primeiro vídeo da v42.0.0) (TDD) |
 | A07 | `synthesize.py`, `setup-tools.mjs`, `render.mjs` + `assets/video.html`, mixagem e mux em `make-video.mjs` |
 | A08 | `SKILL.md`: o processo de ponta a ponta e as regras do roteiro |
-| A09 | Roteiro, `scenes.json` e `social.json` da v42.0.0; os dois vídeos gerados e conferidos |
+| A09 | Reaproveitar a fala sintetizada enquanto o texto não muda (achado do segundo render da v42.0.0) |
+| A10 | Roteiro, `scenes.json` e `social.json` da v42.0.0; os dois vídeos gerados e conferidos |
 
 ## Ponto de situação
 
@@ -82,6 +83,7 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | A06 | 2026-10-28 | `fix(skills): balance the caption lines (#503)` | concluída | Achado no SRT do primeiro vídeo PT: bloco 2 = `terminal.` sozinho por 1,2 s (enchimento guloso). Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs`: `blocos 46 × 9`; depois, com blocos equilibrados, `"tabs" em "Interactive mode puts six tabs…"` e `"uma." em "Um comando mostra…"`. Verde: 18/18 com partição de menor irregularidade, desconto após pontuação, multa para linha de uma palavra e total de linhas par. As 24 falas da v42.0.0 conferidas: nenhuma linha de uma palavra |
 | A07 | 2026-10-28 | `feat(skills): synthesize, render and mix the release video (#503)` | concluída | Sem harness de teste (Chrome, Piper, ffmpeg): validado pela geração real. `make-video.mjs v42.0.0 --stills` → 24 PNG de conferência; achados corrigidos antes do vídeo: cena de abertura sem `lines` (`TypeError … reading 'length'`), legenda cobrindo o `42.0` e o link do fechamento, capturas pequenas (recorte ≤ 720 px, escala ≥ 1,2). `make-video.mjs v42.0.0`: 8 min 01 s; `ffprobe`: `h264 1080x1920`, `aac`, `duration=89.033`; `ebur128` PT: `I: -16.2 LUFS`, `Peak: -1.5 dBFS`, `LRA: 7.0 LU`. `node --test …/test/*.test.mjs`: 18/18 |
 | A08 | 2026-10-28 | `docs(skills): add the release video skill (#503)` | concluída | Texto de skill, sem harness: conferido contra os scripts (`grep` de cada caminho e opção citados: `--stills`, `--only`, `sources.gif/files`, `crop`, `pause`, `stagger`, escalas 1,4/1,5). Uma linha no `CLAUDE.md` (Empacotamento) aponta para a skill |
+| A09 | 2026-10-28 | `fix(skills): reuse the checked speech in the final video (#503)` | concluída | Achado: o segundo render recusou `team (en): 56 caracteres em 3.72 s (15.1/s)` e o terceiro `Vídeo de 90.6 s passa de 90 s`, com o mesmo texto que o `--stills` aceitara (88,9 s) — o Piper sorteia a duração. Sem harness (Piper): validado por duas execuções seguidas de `make-video.mjs v42.0.0 --stills --only en`, ambas `90.6 s` (a segunda reaproveitou os WAV). Também: o exit 0 do segundo render vinha do `| tail` sem `pipefail`; a skill passa a pedir `set -o pipefail` |
 
 ## Problemas em aberto e riscos
 

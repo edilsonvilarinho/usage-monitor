@@ -92,5 +92,9 @@ legível no celular com escala ≥ 1,2 (recorte de até ~720 px). `commands`: di
 
 Testes: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs`.
 
-O Piper tem ruído no preditor de duração: duas sínteses do mesmo texto variam alguns décimos. Fala no limite de
-15 caracteres/s pode passar numa execução e falhar na outra — corte até sobrar folga.
+O Piper sorteia a duração: duas sínteses do mesmo texto variam alguns décimos por fala e até ~1,7 s no total (v42.0.0:
+88,9 s numa execução, 90,6 s na seguinte). Por isso o `synthesize.py` **reaproveita** o WAV enquanto texto, escala e
+pausa não mudam (assinatura em `<cena>.txt`): o vídeo final tem exatamente a fala que o `--stills` conferiu. Mudou o
+texto, a fala é sorteada de novo — deixe folga (≤ 14 caracteres/s, ≤ 88 s) em vez de parar no limite.
+
+Ao rodar com saída filtrada (`| tail`, `| grep`), use `set -o pipefail`: sem ele a recusa da linha do tempo sai com 0.
