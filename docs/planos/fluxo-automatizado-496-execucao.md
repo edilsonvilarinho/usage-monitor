@@ -62,6 +62,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue create` → #496; `gh api …/branches/main/protection` → 404; `gh api …/rulesets` → `[]` |
 | A02 | `CLAUDE.md`, "Fluxo de trabalho": gatilho "todo pedido que altera o repositÃ³rio, sem o usuÃ¡rio citar o fluxo"; passo 1 cria issue quando nÃ£o hÃ¡ e pÃµe nela o plano em â‰¤ 15 linhas; regra de resposta no chat â‰¤ 15 linhas | `git diff --stat CLAUDE.md` â†’ 10 inserÃ§Ãµes, 7 remoÃ§Ãµes; sem cÃ³digo, sem teste a rodar |
+| A03 | `tools/ci/ci-incidents.mjs` (runs vermelhos + tentativas anteriores reexecutadas + falhas locais no diretÃ³rio comum do git; saÃ­da 3 no limite) com 6 testes `node:test`; job `ci-scripts` e saÃ­da `ci_scripts` no `changes`, no `ci-ok`; passo 5 do `CLAUDE.md` e seÃ§Ã£o CI do `build-and-release.md` | `node --test "tools/ci/test/*.test.mjs"`: 6 testes, 0 falhas. Dados reais: `--branch feat/issue-440-terminal-config-service` â†’ 2 de 4, saÃ­da 0; com `--limit 2` â†’ saÃ­da 3; `--branch feat/398-399-settings-telegram` (run reexecutado, tentativa 2 verde) â†’ 1 incidÃªncia da tentativa 1. `node --test tools/ci/test/` (diretÃ³rio) falha no Node 22 local: trocado por glob e `setup-node` 22 no job |
 
 ## Problemas em aberto e riscos
 

@@ -361,7 +361,9 @@ passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pe
    o que ficar vermelho.
 5. **Parada de segurança:** cada run de CI vermelho, ou rodada de testes locais falhando depois de aberto o PR, é uma
    incidência. Até a 3ª, Claude ajusta e tenta de novo; **na 4ª**, para de desenvolver, não mexe mais na branch e
-   devolve ao usuário com o diagnóstico de cada falha, o que tentou e o estado da branch.
+   devolve ao usuário com o diagnóstico de cada falha, o que tentou e o estado da branch. A conta é do
+   `node tools/ci/ci-incidents.mjs` (runs vermelhos do `ci.yml`, tentativas reexecutadas inclusive; falha local
+   registrada com `--local "<o que falhou>"`), nunca de memória: saída 3 é o limite.
 6. **Merge por Claude.** Com o PR verde (`ci-ok`) e abaixo de 4 incidências, Claude faz o merge, apaga a branch
    remota, a local e a worktree, e avisa o usuário.
 

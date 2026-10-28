@@ -46,6 +46,14 @@ runner starts. `ci-ok` runs always, treats `skipped` as success and `failure`/`c
 and is the single check branch protection should require. Every test job that runs publishes counts
 and slowest classes to `$GITHUB_STEP_SUMMARY`, and `--require` fails it when no XML was produced.
 
+The scripts in `tools/ci/` have `node:test` tests in `tools/ci/test/`, run by the `ci-scripts` job whenever
+`tools/ci/` changes (`node --test "tools/ci/test/*.test.mjs"`, Node 22 for the glob). `tools/ci/ci-incidents.mjs`
+counts the incidents of step 5 of the workflow in `CLAUDE.md` (#496): red `ci.yml` runs of the branch, including
+earlier red attempts of a re-run (read from `actions/runs/{id}/attempts/{n}`, since `gh run list` only returns the
+last attempt), plus local failures recorded with `--local`, kept in `<git-common-dir>/ci-incidents/` so every
+worktree of the branch sees them. `cancelled` does not count (it is `concurrency` replacing a run). Exit 3 means the
+limit (default 4) was reached.
+
 The release is tag-only (#344). The version comes from the tag: `build.gradle.kts` reads
 `-PappVersion`, which the release workflow passes, and falls back to
 `git describe --tags --abbrev=0` for local builds (`1.0.0` without git or tags, since the Compose
