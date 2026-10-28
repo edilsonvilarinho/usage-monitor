@@ -61,6 +61,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue create` → #496; `gh api …/branches/main/protection` → 404; `gh api …/rulesets` → `[]` |
+| A02 | `CLAUDE.md`, "Fluxo de trabalho": gatilho "todo pedido que altera o repositÃ³rio, sem o usuÃ¡rio citar o fluxo"; passo 1 cria issue quando nÃ£o hÃ¡ e pÃµe nela o plano em â‰¤ 15 linhas; regra de resposta no chat â‰¤ 15 linhas | `git diff --stat CLAUDE.md` â†’ 10 inserÃ§Ãµes, 7 remoÃ§Ãµes; sem cÃ³digo, sem teste a rodar |
 
 ## Problemas em aberto e riscos
 

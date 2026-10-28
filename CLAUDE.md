@@ -346,15 +346,15 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
-## Fluxo de trabalho (desde 2026-10-22)
+## Fluxo de trabalho (desde 2026-10-22; sempre ativo desde 2026-10-28, #496)
 
-O usuário entrega a atividade (issue, tarefa ou pergunta que muda o repositório); Claude conduz o resto, nesta ordem
-e sem esperar aprovação entre os passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela
-skill `usage-monitor-commit-push`.
+**Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
+"corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
+passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
 
-1. **Dois planos.** O detalhado, que Claude segue: `docs/planos/` com atividades A01, A02… e tabela de pontos de
-   situação, publicado como comentário na issue quando houver uma. O do usuário, no chat: **no máximo um parágrafo**,
-   estruturado (o quê, onde, como valida).
+1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
+   máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
+   atividades A01, A02… e tabela de pontos de situação. O do usuário, no chat: **no máximo um parágrafo**.
 2. **Desenvolvimento** em worktree/branch própria, nunca na `main`; uma atividade, um commit.
 3. **Testes locais** antes do PR: os recortes de "Commands" e o relatório da skill `usage-monitor-test-report`.
 4. **PR** aberto por Claude, dizendo em que plataformas foi testado; Claude acompanha o CI até o `ci-ok` e corrige
@@ -366,6 +366,9 @@ skill `usage-monitor-commit-push`.
    remota, a local e a worktree, e avisa o usuário.
 
 Pergunta que só pede explicação é respondida no chat, fora do fluxo.
+
+**Respostas no chat têm no máximo 15 linhas** — relatório, explicação, resultado de pesquisa ou dúvida. O que não
+cabe vai para a issue ou para `docs/planos/`.
 
 ## Convenções de código
 
