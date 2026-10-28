@@ -38,6 +38,7 @@ jobs:
       installer: ${{ steps.filter.outputs.installer }}
       linux_updater: ${{ steps.filter.outputs.linux_updater }}
       server: ${{ steps.filter.outputs.server }}
+      ci_scripts: ${{ steps.filter.outputs.ci_scripts }}
 
     steps:
       - name: Checkout
@@ -55,7 +56,7 @@ jobs:
 
           all_true() {
             echo "$1; tudo relevante."
-            for key in desktop installer linux_updater server; do
+            for key in desktop installer linux_updater server ci_scripts; do
               echo "$key=true" >> "$GITHUB_OUTPUT"
             done
             echo "## Recorte do CI" >> "$GITHUB_STEP_SUMMARY"
@@ -81,7 +82,7 @@ jobs:
             all_true "git diff $range falhou"
           fi
 
-          desktop=false; installer=false; linux_updater=false; server=false
+          desktop=false; installer=false; linux_updater=false; server=false; ci_scripts=false
           changed=0
           while IFS= read -r file; do
             [ -z "$file" ] && continue
@@ -89,7 +90,7 @@ jobs:
             case "$file" in
               # Mudar o proprio workflow exercita tudo o que ele descreve.
               .github/workflows/ci.yml)
-                desktop=true; installer=true; linux_updater=true; server=true ;;
+                desktop=true; installer=true; linux_updater=true; server=true; ci_scripts=true ;;
             esac
             case "$file" in
               server/*|docs/*|*.md|Dockerfile.dokploy|.dockerignore) ;;
@@ -104,6 +105,9 @@ jobs:
             case "$file" in
               server/*|tools/ci/*|Dockerfile.dokploy|.dockerignore) server=true ;;
             esac
+            case "$file" in
+              tools/ci/*) ci_scripts=true ;;
+            esac
           done <<< "$files"
 
           {
@@ -111,6 +115,7 @@ jobs:
             echo "installer=$installer"
             echo "linux_updater=$linux_updater"
             echo "server=$server"
+            echo "ci_scripts=$ci_scripts"
           } | tee -a "$GITHUB_OUTPUT"
 
           {
@@ -124,6 +129,7 @@ jobs:
             echo "| Cenarios do instalador Windows | $installer |"
             echo "| Cenarios do updater Linux | $linux_updater |"
             echo "| Servidor de time | $server |"
+            echo "| Scripts de \`tools/ci\` | $ci_scripts |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Paridade entre a tabela de precos do Kotlin e a do servidor. Um job so, que
@@ -141,6 +147,26 @@ jobs:
       - name: Check pricing table parity
         run: node tools/ci/check-pricing-parity.mjs
 
+  # Testes `node:test` dos scripts de `tools/ci/` (#496): segundos de node, sem
+  # `npm ci`, pelo mesmo motivo de os scripts nao terem dependencia externa.
+  ci-scripts:
+    needs: changes
+    if: needs.changes.outputs.ci_scripts == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Node 22: o `--test` com glob nao existe no 20, e e a major do servidor.
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Test CI scripts
+        run: node --test "tools/ci/test/*.test.mjs"
+
   # windows-latest e a suite de referencia: os testes de componente usam
   # `runDesktopComposeUiTest`, e o Linux (`desktop-linux`) ainda nao e gate.
   desktop-windows:
@@ -152,8 +178,12 @@ jobs:
       test-reports-id: ${{ steps.upload-test-reports.outputs.artifact-id }}
 
     steps:
+      # Profundidade 2: a cobertura do diff compara o merge commit do PR com o
+      # primeiro pai (`HEAD^1`), a ponta da base.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Setup JDK
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -201,6 +231,21 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\gradlew.bat koverXmlReport koverHtmlReport --build-cache -Pcoverage
           node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
+
+      # Cobertura das linhas que o PR altera (#496), piso 90%. Nasce INFORMATIVA,
+      # como o `desktop-linux` (#342): o PR #495 mediu 60% (cola de janela) e o
+      # piso viraria incidencia antes de calibrado. Abaixo do piso (saida 1) vira
+      # aviso; outro codigo e o script quebrado, e esse continua vermelho.
+      - name: Diff coverage
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          node tools/ci/diff-coverage.mjs --base HEAD^1 --kover build/reports/kover/report.xml --title "Cobertura do diff (Kotlin)"
+          if ($LASTEXITCODE -eq 1) {
+            Write-Host '::warning::Cobertura do diff (Kotlin) abaixo de 90% -- informativa ate a calibragem (#496).'
+            exit 0
+          }
+          exit $LASTEXITCODE
 
       # Catraca de linhas (plano `cobertura-95-execucao.md`): piso em
       # `coverageLineFloorPercent` no `build.gradle.kts`, meta 95%.
@@ -466,6 +511,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -486,6 +533,21 @@ jobs:
       # alimenta o job `test-report`.
       - name: Run tests
         run: npm run test:coverage
+
+      # Mesma regra do passo do desktop-windows; o `lcovonly` do vitest e a
+      # cobertura por linha que o script le.
+      - name: Diff coverage
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        run: |
+          set -uo pipefail
+          status=0
+          node tools/ci/diff-coverage.mjs --base HEAD^1 --lcov server/coverage/lcov.info --title "Cobertura do diff (servidor)" || status=$?
+          if [ "$status" -eq 1 ]; then
+            echo '::warning::Cobertura do diff (servidor) abaixo de 90% -- informativa ate a calibragem (#496).'
+            exit 0
+          fi
+          exit "$status"
 
       # O deploy instala sem lockfile e com o Node da imagem; o `npm ci` acima
       # nao enxerga essa diferenca (#489: Node 20 + vitest 5 quebrou so no Dokploy).
@@ -603,6 +665,7 @@ jobs:
     needs:
       - changes
       - pricing-parity
+      - ci-scripts
       - desktop-windows
       - desktop-linux
       - installer-windows
@@ -616,6 +679,7 @@ jobs:
           RESULTS: |
             changes=${{ needs.changes.result }}
             pricing-parity=${{ needs.pricing-parity.result }}
+            ci-scripts=${{ needs.ci-scripts.result }}
             desktop-windows=${{ needs.desktop-windows.result }}
             installer-windows=${{ needs.installer-windows.result }}
             linux-updater=${{ needs.linux-updater.result }}

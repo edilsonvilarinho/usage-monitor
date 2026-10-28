@@ -38,6 +38,7 @@ first launch.
 | `.github/workflows/ci.yml` | Everything on pull request and push to `main`: desktop suite (Windows, plus Linux as advisory), installer and Linux updater scenarios, team server, pricing parity — each only when its paths changed; `ci-ok` aggregates; `test-report` builds the HTML test report |
 | `.github/workflows/release-linux.yml` | on `v*` tags: publishes Windows, Linux and macOS artifacts |
 | `.github/workflows/codeql.yml` | CodeQL on push to `main`, weekly and manually |
+| `.github/workflows/dependabot-automerge.yml` | Dependabot pull requests: turns on auto-merge for minor/patch of `gradle` and `npm_and_yarn` (#496) |
 
 The `changes` job decides which areas the diff touches (`HEAD^1..HEAD` on a pull request, whose
 checkout is the merge commit; `before..sha` on push; any git failure means "run everything") and
@@ -45,6 +46,34 @@ writes that table to the run summary. A job for an untouched area is skipped at 
 runner starts. `ci-ok` runs always, treats `skipped` as success and `failure`/`cancelled` as failure,
 and is the single check branch protection should require. Every test job that runs publishes counts
 and slowest classes to `$GITHUB_STEP_SUMMARY`, and `--require` fails it when no XML was produced.
+
+**`main` is guarded by a repository ruleset** (`main`, id 26043016, created 2026-10-28, #496): changes only through a
+pull request (no approval required), the `ci-ok` check from the GitHub Actions app (`integration_id` 15368, so a
+commit status with the same name from elsewhere does not count), no deletion, no force-push; `strict` off (no forced
+rebase on a stale base). The only bypass is the admin role in `pull_request` mode: an admin may merge a PR past the
+rules, but nobody pushes to `main` directly — the `gh` token is the owner's, so an agent with it would otherwise
+bypass everything. The repository has `allow_auto_merge` and `delete_branch_on_merge` on: a PR opened with
+`gh pr merge --auto --merge` merges when `ci-ok` passes and loses its remote branch. Before #496 nothing enforced
+`ci-ok` (`branches/main/protection` returned 404, no ruleset). To inspect or change:
+
+```bash
+gh api repos/edilsonvilarinho/usage-monitor/rulesets/26043016
+gh api repos/edilsonvilarinho/usage-monitor/rules/branches/main --jq '[.[].type]'
+```
+
+The scripts in `tools/ci/` have `node:test` tests in `tools/ci/test/`, run by the `ci-scripts` job whenever
+`tools/ci/` changes (`node --test "tools/ci/test/*.test.mjs"`, Node 22 for the glob). `tools/ci/ci-incidents.mjs`
+counts the incidents of step 5 of the workflow in `CLAUDE.md` (#496): red `ci.yml` runs of the branch, including
+earlier red attempts of a re-run (read from `actions/runs/{id}/attempts/{n}`, since `gh run list` only returns the
+last attempt), plus local failures recorded with `--local`, kept in `<git-common-dir>/ci-incidents/` so every
+worktree of the branch sees them. `cancelled` does not count (it is `concurrency` replacing a run). Exit 3 means the
+limit (default 4) was reached.
+
+`dependabot-automerge.yml` (#496) reads `dependabot/fetch-metadata` and runs `gh pr merge --auto --merge` only when
+the ecosystem is `gradle` or `npm_and_yarn` **and** the update type is `semver-minor` or `semver-patch` (positive
+condition: an unclassified update stays manual). Majors and `github_actions` stay manual, as `dependabot.yml` already
+says. GitHub merges once the `main` ruleset sees `ci-ok` green. A merge made with `GITHUB_TOKEN` triggers no `CI` or
+`CodeQL` run on `main`; the pull request already ran the suite on its merge commit.
 
 The release is tag-only (#344). The version comes from the tag: `build.gradle.kts` reads
 `-PappVersion`, which the release workflow passes, and falls back to
@@ -93,6 +122,20 @@ server, measured by v8 since then, at 92.7% of lines and 86.3% of branches.
 The team server measures coverage with `npm run test:coverage` (`@vitest/coverage-v8`, opt-in like
 `-Pcoverage`); the `server` job runs it instead of `test:ci` (the whole suite took 2.5 s with coverage, measured on a
 local Linux machine).
+
+**Diff coverage** (#496): on a pull request, `desktop-windows` and `server` run `tools/ci/diff-coverage.mjs` over
+`HEAD^1..HEAD` (the merge commit against the tip of the base, hence `fetch-depth: 2`). It counts the production lines
+the PR adds or changes that the report instruments — Kover's `<line nr mi ci>` per `<sourcefile>`, the server's
+`lcov.info` (`lcovonly` reporter) — and covered means `ci > 0` / hits > 0, the same criterion as the global `LINE`
+counter. Lines outside the report (comments, classes excluded by name) do not count; a PR with no instrumented line
+passes. The floor is 90% and the step is **advisory**: exit 1 becomes a `::warning::` and the summary table, any other
+exit code (broken script) stays red. Measured before wiring it: PR #495 covered 48 of 80 changed lines (60%), all of
+the gap window glue and effects, so a blocking floor would have failed the PR that brought Kotlin to 95%.
+
+```bat
+node tools/ci/diff-coverage.mjs --base origin/main --kover build/reports/kover/report.xml
+node tools/ci/diff-coverage.mjs --base origin/main --lcov server/coverage/lcov.info
+```
 
 ### Test report
 

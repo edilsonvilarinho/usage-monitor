@@ -328,7 +328,8 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
 
 - Workflows (#344): `ci.yml` único — job `changes` recorta por path, jobs em paralelo só do que
-  mudou, **`ci-ok` é o check único** (pulado conta como sucesso); `release-linux.yml` só por tag,
+  mudou, **`ci-ok` é o check único** (pulado conta como sucesso), exigido pelo ruleset `main` (#496: só por PR, sem
+  force-push, bypass de admin só por PR); `release-linux.yml` só por tag,
   **versão vem da tag** (`-PappVersion`), sem commit de bump. Cache do Gradle pela
   `gradle/actions/setup-gradle`, gravado só na `main` — tag e CodeQL só leem.
 - CI roda com `-PtestForks=3`; localmente 1. Com forks, `extractSkikoNative` roda antes. **Verde
@@ -342,30 +343,44 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - Cobertura opt-in por `-Pcoverage`; **meta de 95% de linhas** (Kotlin e servidor) com catraca: piso em
   `coverageLineFloorPercent` (`koverVerify` no CI) e `thresholds.lines` do vitest, só sobe, no commit que o eleva
   (plano [`cobertura-95-execucao.md`](docs/planos/cobertura-95-execucao.md)).
+- **Cobertura do diff** (#496, `tools/ci/diff-coverage.mjs`): linhas de produção que o PR altera, piso 90%, nos jobs
+  `desktop-windows` (Kover) e `server` (`lcovonly`). Nasce **informativa** (aviso, fora do `ci-ok`) — o #495 mediu 60%;
+  vira bloqueante pelo critério do plano [`fluxo-automatizado-496-execucao.md`](docs/planos/fluxo-automatizado-496-execucao.md).
+- Dependabot (#496): auto-merge só de minor/patch de `gradle`/`npm_and_yarn` (`dependabot-automerge.yml`); major e
+  `github_actions` continuam manuais.
 - Job `test-report` (skill `usage-monitor-test-report`): HTML de testes e cobertura no artefato `test-report` a cada
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.
 
-## Fluxo de trabalho (desde 2026-10-22)
+## Fluxo de trabalho (desde 2026-10-22; sempre ativo desde 2026-10-28, #496)
 
-O usuário entrega a atividade (issue, tarefa ou pergunta que muda o repositório); Claude conduz o resto, nesta ordem
-e sem esperar aprovação entre os passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela
-skill `usage-monitor-commit-push`.
+**Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
+"corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
+passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
+Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**.
 
-1. **Dois planos.** O detalhado, que Claude segue: `docs/planos/` com atividades A01, A02… e tabela de pontos de
-   situação, publicado como comentário na issue quando houver uma. O do usuário, no chat: **no máximo um parágrafo**,
-   estruturado (o quê, onde, como valida).
-2. **Desenvolvimento** em worktree/branch própria, nunca na `main`; uma atividade, um commit.
+1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
+   máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
+   atividades A01, A02… e tabela de pontos de situação. O do usuário, no chat: **no máximo um parágrafo**.
+2. **Desenvolvimento em TDD**, em worktree/branch própria, nunca na `main`; uma atividade, um commit. Teste primeiro e
+   vermelho **na asserção** (erro de compilação não conta), depois o código mínimo, depois a refatoração; a linha da
+   atividade no plano registra a execução vermelha e a verde. Correção de bug começa pelo teste que a reproduz.
 3. **Testes locais** antes do PR: os recortes de "Commands" e o relatório da skill `usage-monitor-test-report`.
-4. **PR** aberto por Claude, dizendo em que plataformas foi testado; Claude acompanha o CI até o `ci-ok` e corrige
-   o que ficar vermelho.
+4. **PR** aberto por Claude, dizendo em que plataformas foi testado, com `gh pr merge --auto --merge` na abertura: o
+   ruleset da `main` exige o `ci-ok` e o GitHub mescla sozinho. Claude acompanha o CI e corrige o que ficar vermelho.
 5. **Parada de segurança:** cada run de CI vermelho, ou rodada de testes locais falhando depois de aberto o PR, é uma
    incidência. Até a 3ª, Claude ajusta e tenta de novo; **na 4ª**, para de desenvolver, não mexe mais na branch e
-   devolve ao usuário com o diagnóstico de cada falha, o que tentou e o estado da branch.
-6. **Merge por Claude.** Com o PR verde (`ci-ok`) e abaixo de 4 incidências, Claude faz o merge, apaga a branch
-   remota, a local e a worktree, e avisa o usuário.
+   devolve ao usuário com o diagnóstico de cada falha, o que tentou e o estado da branch. A conta é do
+   `node tools/ci/ci-incidents.mjs` (runs vermelhos do `ci.yml`, tentativas reexecutadas inclusive; falha local
+   registrada com `--local "<o que falhou>"`), nunca de memória: saída 3 é o limite.
+6. **Merge e encerramento.** O auto-merge mescla com o `ci-ok` verde e apaga a branch remota; nunca `--admin`. Claude
+   apaga a branch local e a worktree, comenta na issue **os casos de teste criados em no máximo 20 linhas** (o que
+   cada um afirma, vermelho → verde, totais, cobertura do diff, o que ficou sem teste e por quê) e avisa o usuário.
 
 Pergunta que só pede explicação é respondida no chat, fora do fluxo.
+
+**Respostas no chat têm no máximo 15 linhas** — relatório, explicação, resultado de pesquisa ou dúvida. O que não
+cabe vai para a issue ou para `docs/planos/`.
 
 ## Convenções de código
 
