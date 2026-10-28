@@ -10,7 +10,8 @@ export const PACING = {
     // Silêncio depois de cada fala: o pedido do dono foi "não ficar muito rápido".
     breath: 1.2,
     lastExit: 1.8,
-    maxWordsPerSecond: 2.6,
+    // Normas de legenda para adulto aceitam até 17 caracteres/s; 15 fica abaixo, sem pressa.
+    maxCharsPerSecond: 15,
     maxTotal: 90,
     captionChars: 26,
     captionLines: 2,
@@ -20,8 +21,10 @@ export const PACING = {
 
 export const LANGUAGES = ['en', 'pt']
 
-export function wordCount(line) {
-    return (line.say ?? line.text).split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length
+// Caracteres, não palavras: o português tem muitas palavras curtas e passaria por rápido demais
+// numa contagem de palavras; caractere por segundo é também a medida das normas de legenda.
+export function spokenLength(line) {
+    return (line.say ?? line.text).length
 }
 
 export function buildTimeline(scenes, durations) {
@@ -30,9 +33,10 @@ export function buildTimeline(scenes, durations) {
     const timed = scenes.map((scene, index) => {
         for (const language of LANGUAGES) {
             const seconds = durations[language][scene.id]
-            const words = wordCount(scene.lines[language])
-            if (words / seconds > PACING.maxWordsPerSecond) {
-                problems.push(`${scene.id} (${language}): ${words} palavras em ${seconds.toFixed(2)} s`)
+            const characters = spokenLength(scene.lines[language])
+            if (characters / seconds > PACING.maxCharsPerSecond) {
+                const rate = (characters / seconds).toFixed(1)
+                problems.push(`${scene.id} (${language}): ${characters} caracteres em ${seconds.toFixed(2)} s (${rate}/s)`)
             }
         }
         const longest = Math.max(...LANGUAGES.map((language) => durations[language][scene.id]))
@@ -43,7 +47,7 @@ export function buildTimeline(scenes, durations) {
         return { id: scene.id, start, voiceAt, end }
     })
     if (problems.length > 0) {
-        throw new Error(`Fala acima de ${PACING.maxWordsPerSecond} palavras/s — corte texto:\n${problems.join('\n')}`)
+        throw new Error(`Fala acima de ${PACING.maxCharsPerSecond} caracteres/s — corte texto:\n${problems.join('\n')}`)
     }
     const total = cursor + PACING.lastExit
     if (total > PACING.maxTotal) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PACING, buildTimeline, captionBlocks, captionCues, toSrt, wordCount } from '../timeline.mjs'
+import { PACING, buildTimeline, captionBlocks, captionCues, spokenLength, toSrt } from '../timeline.mjs'
 
 const scene = (id, en, pt) => ({ id, lines: { en: { text: en }, pt: { text: pt } } })
 const scenes = [
@@ -22,7 +22,7 @@ test('cada cena dura a entrada, a fala mais longa entre os idiomas e o respiro',
 test('fala rapida demais falha em vez de acelerar o video', () => {
     assert.throws(
         () => buildTimeline(scenes, { en: { title: 2, status: 1 }, pt: { title: 2, status: 3 } }),
-        /status \(en\): 5 palavras em 1\.00 s/,
+        /status \(en\): 27 caracteres em 1\.00 s \(27\.0\/s\)/,
     )
 })
 
@@ -32,9 +32,10 @@ test('roteiro longo demais falha com a duracao medida', () => {
     assert.throws(() => buildTimeline(many, { en: durations, pt: durations }), /passa de 90 s/)
 })
 
-test('palavra conta o texto falado quando ele difere da legenda', () => {
-    assert.equal(wordCount({ text: 'usage-monitor status --watch', say: 'usage monitor status watch' }), 4)
-    assert.equal(wordCount({ text: 'Versão 42.' }), 2)
+test('o ritmo conta os caracteres do texto falado, nao palavras', () => {
+    assert.equal(spokenLength({ text: 'usage-monitor status --watch', say: 'usage monitor status watch' }), 26)
+    assert.equal(spokenLength({ text: 'Versão 42.' }), 10)
+    assert.equal(PACING.maxCharsPerSecond, 15)
 })
 
 test('legenda quebra em linhas de no maximo 26 caracteres e blocos de 2 linhas', () => {

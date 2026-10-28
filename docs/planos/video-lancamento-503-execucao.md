@@ -33,9 +33,15 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 ## Decisões
 
 - **Vertical 1080×1920, 30 fps, H.264 + AAC.** É o formato nativo de Reels e TikTok; o da 41.11 era 1920×1080.
-- **Ritmo medido, não lembrado** (pedido "não ficar muito rápido"): `length_scale 1.2` (a 41.11 usou 1,12), no máximo
-  2,6 palavras por segundo de fala por linha, 1,2 s de respiro depois de cada fala, e duração total até 90 s. A linha do
-  tempo **falha** em vez de acelerar quando o roteiro não cabe: corta-se texto, nunca velocidade.
+- **Ritmo medido, não lembrado** (pedido "não ficar muito rápido"): no máximo **15 caracteres por segundo** de fala
+  (normas de legenda para adulto aceitam 17), 1,2 s de respiro depois de cada fala, 0,35 s entre frases, e duração total
+  até 90 s. A linha do tempo **falha** em vez de acelerar quando o roteiro não cabe: corta-se texto, nunca velocidade.
+  A primeira regra, 2,6 palavras/s, foi trocada na A05: o português tem muitas palavras curtas e a contagem de palavras o
+  punia (medido na v42.0.0: `team` PT, 15 palavras em 3,71 s = 4,0 palavras/s, mas 19,9 caracteres/s — rápido de fato
+  pelas duas medidas; `tui` PT, 11 palavras em 4,23 s = 2,6/s e 13,5 caracteres/s — calmo, e a regra de palavras o
+  recusava no limite).
+- **Escala da voz por idioma:** EN 1,4 e PT 1,5. A 1,2, a faber chegou a 19,9 caracteres/s e a ryan a 15,8 na mesma
+  cena; a 1,3/1,45, frases curtas ainda passavam de 16/s (o Piper lê corrido o que é curto).
 - **Legenda:** queimada, no máximo 2 linhas de 26 caracteres, dentro da área segura das duas redes (fora dos 250 px de
   cima, dos 420 px de baixo e dos 140 px da direita); entra 150 ms antes da fala e sai 300 ms depois, como na 41.11.
   Também sai em `.srt`.
@@ -58,9 +64,10 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | A02 | `collect-changes.mjs`: commits entre tags agrupados por issue e por tipo (TDD) |
 | A03 | `timeline.mjs`: tempos das cenas a partir das durações medidas, regras de ritmo, blocos de legenda e SRT (TDD) |
 | A04 | `social.mjs`: checagem das descrições (limite de cada rede, hashtags, link) (TDD) |
-| A05 | `synthesize.py`, `render.mjs` + `assets/video.html`, mixagem e mux com ffmpeg, `make-video.mjs` |
-| A06 | `SKILL.md`: o processo de ponta a ponta e as regras do roteiro |
-| A07 | Roteiro, `scenes.json` e `social.md` da v42.0.0; os dois vídeos gerados e conferidos |
+| A05 | Ritmo por caracteres/s em vez de palavras/s (achado da primeira síntese da v42.0.0) (TDD) |
+| A06 | `synthesize.py`, `setup-tools.mjs`, `render.mjs` + `assets/video.html`, mixagem e mux em `make-video.mjs` |
+| A07 | `SKILL.md`: o processo de ponta a ponta e as regras do roteiro |
+| A08 | Roteiro, `scenes.json` e `social.json` da v42.0.0; os dois vídeos gerados e conferidos |
 
 ## Ponto de situação
 
@@ -70,6 +77,7 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | A02 | 2026-10-28 | `feat(skills): collect the release changes by issue for the video (#503)` | concluída | Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com stubs: 4 testes, 4 falhas na asserção (`expected` × `actual`). Verde: 4/4. Execução real: `v41.11.0..v42.0.0`, 215 commits sem merge; issues #439, #440, #441, #445, #453, #460, #463, #489, #494 e 15 feat/fix sem issue (instalador, cadência, escala, HUD) |
 | A03 | 2026-10-28 | `feat(skills): time the video scenes and captions from the measured speech (#503)` | concluída | Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com stubs: 7 testes novos, 7 falhas na asserção. Verde: 10/11 — `expected: 13.5, actual: 11.7`: a última cena recebia a saída no `end`; removido, `total` carrega a saída. Depois 11/11 |
 | A04 | 2026-10-28 | `feat(skills): check the social captions for X, Instagram and TikTok (#503)` | concluída | Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com stubs: 5 testes novos, 5 falhas na asserção. Verde: 16/16. Regras: X ≤ 280 com link = 23 e emoji = 2, link da release obrigatório no X; Instagram ≤ 2200 e TikTok ≤ 4000 sem URL (não é clicável); no máximo 5 hashtags |
+| A05 | 2026-10-28 | `fix(skills): pace the speech by characters per second (#503)` | concluída | Achado: `make-video.mjs v42.0.0 --stills` recusou 17 falas pela regra de palavras. Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com `spokenLength` vazio: 2 falhas na asserção (`expected: 26, actual: 0`; mensagem sem `27 caracteres em 1.00 s (27.0/s)`). Verde: 16/16 |
 
 ## Problemas em aberto e riscos
 
