@@ -92,7 +92,7 @@ jobs:
                 desktop=true; installer=true; linux_updater=true; server=true ;;
             esac
             case "$file" in
-              server/*|docs/*|*.md) ;;
+              server/*|docs/*|*.md|Dockerfile.dokploy|.dockerignore) ;;
               *) desktop=true ;;
             esac
             case "$file" in
@@ -102,7 +102,7 @@ jobs:
               src/desktopMain/resources/update/*|src/installer/linux/*|src/desktopMain/kotlin/com/usagemonitor/update/*) linux_updater=true ;;
             esac
             case "$file" in
-              server/*|tools/ci/*) server=true ;;
+              server/*|tools/ci/*|Dockerfile.dokploy|.dockerignore) server=true ;;
             esac
           done <<< "$files"
 
@@ -449,8 +449,8 @@ jobs:
           rm -f installer.sh
           echo "Template do instalador: sintaxe valida, sem placeholder sobrado."
 
-  # Servidor de time (`server/`): Node 20, typecheck e vitest com reporter JUnit
-  # -- o resumo sai do mesmo parser do desktop.
+  # Servidor de time (`server/`): Node 22, typecheck, vitest com reporter JUnit
+  # -- o resumo sai do mesmo parser do desktop -- e a imagem do Dokploy.
   server:
     needs: changes
     if: needs.changes.outputs.server == 'true'
@@ -470,8 +470,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # `server/package.json` declara engines.node >=20.
-          node-version: '20'
+          # Mesma major do `Dockerfile.dokploy`; `engines.node` e >=22.12.0 (#489).
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
 
@@ -486,6 +486,12 @@ jobs:
       # alimenta o job `test-report`.
       - name: Run tests
         run: npm run test:coverage
+
+      # O deploy instala sem lockfile e com o Node da imagem; o `npm ci` acima
+      # nao enxerga essa diferenca (#489: Node 20 + vitest 5 quebrou so no Dokploy).
+      - name: Build Dokploy image
+        working-directory: .
+        run: docker build --file Dockerfile.dokploy --tag usage-monitor-team-server:ci .
 
       - name: Publish test summary
         if: always()
