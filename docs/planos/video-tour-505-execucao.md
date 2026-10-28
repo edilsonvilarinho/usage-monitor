@@ -55,6 +55,7 @@ menos robótica que a do vídeo de release, trilha espacial, efeitos sonoros e t
 |---|---|---|
 | A01 | feito | plano criado; sem teste (documento) |
 | A02 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.screenshots.HelpMediaOptionsTest"` → 7 testes, 6 falhas na asserção (`expected:<[history, budget]> but was:<null>`, `expected:<build/video-media> but was:<src/desktopMain/resources/help>`, `expected:<[000.png, 001.png, frames.json]> but was:<[]>`…); o caso do padrão já passava (é o comportamento atual). Verde: mesmo comando, 7/7. `generateVideoMedia -PvideoMediaLanguage=en`: 17 pastas, quadros 2000×840; folha de contato conferida, textos em inglês (HUD e bot do Telegram localizados nas fixtures). Recorte `screenshots.*`, `help.*`, `SettingsDialogContentTest`, `architecture.*`: 53 testes, 0 falhas |
+| A03 | feito | vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` → 27 testes, 9 falhas (`expected: 300`, "Vídeo de 278.6 s passa de 90 s", "Missing expected exception", `expected: 1 actual: 2` na legenda): sem perfil do tour tudo caía no teto de 90 s. Verde: mesmo comando, 27/27 (18 antigos intactos) |
 
 ## Problemas em aberto e riscos
 
