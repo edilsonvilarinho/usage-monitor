@@ -385,6 +385,19 @@ Pergunta que só pede explicação é respondida no chat, fora do fluxo.
 **Respostas no chat têm no máximo 15 linhas** — relatório, explicação, resultado de pesquisa ou dúvida. O que não
 cabe vai para a issue ou para `docs/planos/`.
 
+## Orquestração e agentes (#513)
+
+A sessão principal é a orquestradora **Neferpitou** (`agent` do `.claude/settings.json`); modelo, effort e ferramentas
+de cada agente moram **só** em `.claude/agents/`, sempre por alias. Medições e decisões em
+[`agentes-por-tier-513-execucao.md`](docs/planos/agentes-por-tier-513-execucao.md).
+
+- Neferpitou faz plano, TDD (vermelho → verde), diagnóstico de falha e decisão. Não delega edição.
+- Delega o que é longo e verboso: testes, relatório e CI ao `test-runner`; varredura ampla ao `explorer`. Busca
+  pontual (um `Grep`, um arquivo conhecido) é direta: criar agente custa ~6k tokens de entrada.
+- **Contra vazamento de contexto:** nunca fork (desligado por `CLAUDE_CODE_FORK_SUBAGENT=0`); prompt mínimo (comando,
+  caminhos, formato do retorno), nunca resumo da conversa; retorno de no máximo 20 linhas, nunca log cru; agente
+  não cria agente.
+
 ## Convenções de código
 
 - **Nomes em inglês**, comentários em português.
