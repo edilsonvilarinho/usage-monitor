@@ -45,8 +45,8 @@ menos robótica que a do vídeo de release, trilha espacial, efeitos sonoros e t
 | A02 | `HelpMediaGenerator`: opções (`HelpMediaOptions`), idioma e saída em sequência de PNG (`FrameSequenceWriter`) |
 | A03 | `timeline.mjs`: perfil `TOUR_PACING` e `soundEvents` |
 | A04 | Voz por roteiro (`voice.engine`): Kokoro no tour, Piper no release |
-| A05 | Trilha e efeitos (`soundtrack.py`) e mixagem com ducking |
-| A06 | Renderizador 16:9 `assets/tour.html` e alvo `tour` no `make-video.mjs` |
+| A05 | Trilha e efeitos (`soundtrack.py`), determinísticos, na duração da linha do tempo |
+| A06 | Renderizador 16:9 `assets/tour.html` e alvo `tour` no `make-video.mjs`, com a mixagem (trilha abaixada sob a fala) |
 | A07 | Roteiro, quadros de conferência e render dos dois vídeos |
 
 ## Ponto de situação
@@ -57,6 +57,7 @@ menos robótica que a do vídeo de release, trilha espacial, efeitos sonoros e t
 | A02 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.screenshots.HelpMediaOptionsTest"` → 7 testes, 6 falhas na asserção (`expected:<[history, budget]> but was:<null>`, `expected:<build/video-media> but was:<src/desktopMain/resources/help>`, `expected:<[000.png, 001.png, frames.json]> but was:<[]>`…); o caso do padrão já passava (é o comportamento atual). Verde: mesmo comando, 7/7. `generateVideoMedia -PvideoMediaLanguage=en`: 17 pastas, quadros 2000×840; folha de contato conferida, textos em inglês (HUD e bot do Telegram localizados nas fixtures). Recorte `screenshots.*`, `help.*`, `SettingsDialogContentTest`, `architecture.*`: 53 testes, 0 falhas |
 | A03 | feito | vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` → 27 testes, 9 falhas (`expected: 300`, "Vídeo de 278.6 s passa de 90 s", "Missing expected exception", `expected: 1 actual: 2` na legenda): sem perfil do tour tudo caía no teto de 90 s. Verde: mesmo comando, 27/27 (18 antigos intactos) |
 | A04 | feito | sem harness de teste em Python; validado por execução real: `synthesize.py` com `voice.engine: "kokoro"` na fala da HUD → PT 9,13 s (13,3 car/s) e EN 9,38 s (12,5 car/s). A 0,9 para os dois a dora deu 14,4 car/s (acima do teto): velocidade por idioma, PT 0,82 e EN 0,9. Assinatura do Piper inalterada (`<escala>\|<silêncio>\|<texto>`), o WAV do release continua reaproveitado. `setupTools({ kokoro: true })` instalou `kokoro-onnx`, `scipy` e o modelo |
+| A05 | feito | sem harness de teste em Python; validado por execução real: `soundtrack.py 560 <5 eventos> <saída>` → `music.wav` e `effects.wav` de 560 s (107 MB cada, 48 kHz estéreo) em 30 s. Mesma síntese do protótipo aprovado, com acordes de 10 s e sinos a 72 bpm (metade da densidade), semente 505; reverb por `oaconvolve` para caber em memória num vídeo de 10 min |
 
 ## Problemas em aberto e riscos
 
