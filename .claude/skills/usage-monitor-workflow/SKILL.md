@@ -36,8 +36,8 @@ git fetch origin
 git worktree add .claude/worktrees/<slug> -b <type>/issue-<n>-<slug> origin/main
 ```
 
-Never commit on `main` (the ruleset rejects the push anyway). Commit identity, in a worktree too (the
-`usage-monitor-commit-push` script cannot lock `.git/config` there, because `.git` is a file):
+Never commit on `main` (the ruleset rejects the push anyway). Commit identity, passed per command and never written
+to the config — the same thing the `usage-monitor-commit-push` script does since #498:
 
 ```bash
 git -c user.name=claude -c user.email=claude@anthropic.com commit -F <message>
@@ -118,10 +118,14 @@ what was tried and the branch state.
 ```bash
 gh pr view <pr> --json state,mergedAt,mergeCommit
 cd <repo root>
-git worktree remove .claude/worktrees/<slug>
+git -c core.longpaths=true worktree remove .claude/worktrees/<slug>
 git branch -D <branch>
 git fetch --prune
 ```
+
+`core.longpaths` is mandatory on Windows: `server/node_modules` (after `npm ci`) passes 260 characters, and without it
+`git worktree remove` exits 255 with `Filename too long`, drops the registration and leaves the folder half deleted
+(#498, measured). It goes per command, never into the user's config.
 
 Then comment on the issue with the test cases created — **at most 20 lines**, first line
 `🤖 Escrito por Claude Code, a pedido de @edilsonvilarinho`:
