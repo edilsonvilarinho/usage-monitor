@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.ui
 
+import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
+import com.usagemonitor.domain.entity.stageStatuses
+import com.usagemonitor.domain.entity.TeamStageStatus
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TelegramKeyboardPage
 import com.usagemonitor.domain.entity.ReleaseNotes
@@ -38,6 +42,29 @@ internal object TelegramBotChatMessages {
         machine?.takeIf { name -> name.isNotBlank() }?.let { name -> "$text\n<i>💻 ${TelegramBotMessages.escape(name)}</i>" } ?: text
 
     /**
+     * Falha classificada do `/time` (#494): onde parou, a trilha em emoji — o bot usa
+     * emoji, o terminal não — e de quem é o conserto. Mesmas frases das janelas.
+     */
+    private fun teamFailure(failure: TeamConnectionFailure, language: AppLanguage): String {
+        val kind = TeamCredentialKind.ACCOUNT_KEY
+        val trail = failure.stageStatuses().joinToString(" › ") { (stage, status) ->
+            val mark = when (status) {
+                TeamStageStatus.PASSED -> "✅"
+                TeamStageStatus.FAILED -> "⛔"
+                TeamStageStatus.NOT_REACHED -> "▫️"
+                TeamStageStatus.UNKNOWN -> "❔"
+            }
+            "$mark ${TeamConnectionLabels.stage(stage, kind, language)}"
+        }
+        return listOf(
+            localized(language, "👥 O servidor do time não respondeu.", "👥 The team server did not answer."),
+            "<b>${TeamConnectionLabels.headline(failure, kind, language)}</b>",
+            trail,
+            TeamConnectionLabels.advice(failure, kind, language)
+        ).joinToString("\n")
+    }
+
+    /**
      * `/time` (AA16): por apelido — nunca e-mail nem máquina —, trabalhando agora,
      * online parado ou fora (com a última batida). Ordem total: trabalhando, online,
      * fora; depois apelido e dispositivo. [serverNow] é o agora do servidor
@@ -54,6 +81,10 @@ internal object TelegramBotChatMessages {
         }
         if (presence == null) {
             return if (pt) "👥 Nenhuma conta participa de um time neste app." else "👥 No account takes part in a team in this app."
+        }
+        val failure = presence.exceptionOrNull()?.let { error -> teamConnectionFailureOf(error) }
+        if (failure != null) {
+            return teamFailure(failure, language)
         }
         val members = presence.getOrNull()
             ?: return if (pt) "👥 O servidor do time não respondeu agora." else "👥 The team server did not answer right now."
