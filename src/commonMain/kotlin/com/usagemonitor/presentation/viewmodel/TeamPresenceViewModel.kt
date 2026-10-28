@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -79,8 +80,9 @@ class TeamPresenceViewModel(
     val uiState: StateFlow<TeamPresenceUiState> = _uiState.asStateFlow()
 
     /** Falha da última remoção. Fora do [uiState] para o laço de 5s não a apagar. */
-    private val _actionError = MutableStateFlow<String?>(null)
-    val actionError: StateFlow<String?> = _actionError.asStateFlow()
+    private val action = TeamActionErrorState()
+    val actionError: StateFlow<String?> = action.message
+    val actionFailure: StateFlow<TeamConnectionFailure?> = action.failure
 
     private var accountKey: String? = null
     private var accountLabel: String? = null
@@ -236,7 +238,7 @@ class TeamPresenceViewModel(
     }
 
     fun clearActionError() {
-        _actionError.value = null
+        action.clear()
     }
 
     fun onDestroy() {
@@ -269,10 +271,10 @@ class TeamPresenceViewModel(
         val error = block().exceptionOrNull()
         if (error != null) {
             breadcrumbs.recordFailure("executar ação administrativa de presença do time", error)
-            _actionError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
+            action.fail(error)
             return
         }
-        _actionError.value = null
+        action.clear()
         loadPresence()
     }
 
@@ -350,7 +352,9 @@ class TeamPresenceViewModel(
                     }
                     _uiState.value = TeamPresenceUiState.Error(
                         message = error.message ?: UNKNOWN_ERROR_MESSAGE,
-                        accountLabel = accountLabel
+                        accountLabel = accountLabel,
+                        failure = teamConnectionFailureOf(error),
+                        isAdminOverview = scopeOverview
                     )
                 }
             )
