@@ -1,7 +1,7 @@
 """Sintetiza a fala de cada cena nos dois idiomas e mede a duração de cada arquivo.
 
 O motor sai do roteiro: sem `voice`, o Piper com as vozes do vídeo de release; com
-`"voice": {"engine": "kokoro", "voices": {"en": "am_michael", "pt": "pf_dora"}, "speed": {"en": 0.9, "pt": 0.82}}`, o Kokoro
+`"voice": {"engine": "kokoro", "voices": {"en": "am_michael", "pt": "pf_dora"}, "speed": {"en": 0.86, "pt": 0.78}, "pause": 0.5}`, o Kokoro
 (tour em vídeo, #505: a faber do Piper soou robótica, e dora/michael foram escolhidas pelo dono ouvindo amostras).
 
 Uso: python synthesize.py <scenes.json> <voices-dir> <saida-dir>
@@ -45,7 +45,7 @@ def write_speech(voice, config, text: str, path: Path) -> None:
             wav_file.writeframes(chunk.audio_int16_bytes)
 
 
-def write_kokoro(engine, voice: str, language: str, speed: float, text: str, path: Path) -> None:
+def write_kokoro(engine, voice: str, language: str, speed: float, pause: float, text: str, path: Path) -> None:
     # Frase por frase, com o mesmo silêncio do Piper entre elas: o fôlego entre frases é o que tira a pressa.
     sentences = [part.strip() for part in re.split(r"(?<=[.!?:])\s+", text) if part.strip()]
     pieces = []
@@ -53,7 +53,7 @@ def write_kokoro(engine, voice: str, language: str, speed: float, text: str, pat
     for index, sentence in enumerate(sentences):
         samples, rate = engine.create(sentence, voice=voice, speed=speed, lang=KOKORO_LANG[language])
         if index > 0:
-            pieces.append(np.zeros(int(rate * SENTENCE_SILENCE), dtype=np.float32))
+            pieces.append(np.zeros(int(rate * pause), dtype=np.float32))
         pieces.append(np.asarray(samples, dtype=np.float32))
     audio = np.clip(np.concatenate(pieces), -1.0, 1.0)
     with wave.open(str(path), "wb") as wav_file:
@@ -75,8 +75,11 @@ def speakers(project: dict, voices_dir: Path):
             # Um número vale para os dois idiomas; um objeto por idioma. A dora fala mais depressa que o michael.
             speed = voice.get("speed", 1.0)
             speed = speed[language] if isinstance(speed, dict) else speed
-            yield language, f"kokoro|{name}|{speed}|{SENTENCE_SILENCE}", (
-                lambda text, path, name=name, language=language, speed=speed: write_kokoro(engine, name, language, speed, text, path))
+            # Pausa entre frases (s): mais fôlego é o outro jeito de tirar a pressa sem acelerar nada.
+            pause = voice.get("pause", SENTENCE_SILENCE)
+            yield language, f"kokoro|{name}|{speed}|{pause}", (
+                lambda text, path, name=name, language=language, speed=speed, pause=pause:
+                write_kokoro(engine, name, language, speed, pause, text, path))
         return
     from piper import PiperVoice, SynthesisConfig
 

@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Video tour</title>
+<!--
+  Renderizador do tour em vídeo (#505), 1920×1080. renderFrame(t) desenha o quadro do instante t a partir
+  da linha do tempo, sem relógio, requestAnimationFrame nem transição CSS; devolve uma promessa que só
+  resolve depois de decodificar a captura nova, para o render.mjs nunca fotografar um quadro pela metade.
+  Cores, raios e fontes: docs/design-system/tokens/. Movimento: mola sem rebote em dado (motion.css), o anel
+  Gargantua só na abertura, no fechamento e na lente entre capítulos.
+-->
+<style>
+@font-face { font-family: "Plex Mono"; font-weight: 400; src: url("fonts/IBMPlexMono-Regular.ttf"); }
+@font-face { font-family: "Plex Mono"; font-weight: 500; src: url("fonts/IBMPlexMono-Medium.ttf"); }
+@font-face { font-family: "Plex Mono"; font-weight: 600; src: url("fonts/IBMPlexMono-SemiBold.ttf"); }
+@font-face { font-family: "Plex Sans"; font-weight: 400; src: url("fonts/IBMPlexSans-Regular.ttf"); }
+@font-face { font-family: "Plex Sans"; font-weight: 500; src: url("fonts/IBMPlexSans-Medium.ttf"); }
+@font-face { font-family: "Plex Sans"; font-weight: 600; src: url("fonts/IBMPlexSans-SemiBold.ttf"); }
+:root {
+  --bg: #131010; --surface: #1B1818; --raised: #211E1E; --border: #3D3838; --border-lit: #4A4444;
+  --fg: #F2EDED; --muted: #B8B2B2; --ok: #4CAF50; --warn: #FFA726; --crit: #E86A6A; --info: #4C8DFF;
+  --gold: #E8AE63; --side: 120px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--fg); }
+body { font-family: "Plex Sans", sans-serif; }
+.layer { position: absolute; inset: 0; }
+.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+
+#header { position: absolute; left: var(--side); right: var(--side); top: 52px; display: flex; justify-content: space-between;
+  align-items: baseline; font-family: "Plex Mono"; font-size: 28px; }
+#header .brand { color: var(--gold); font-weight: 600; letter-spacing: .5px; }
+#header .count { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+#progress { position: absolute; left: var(--side); right: var(--side); top: 102px; height: 4px; display: flex; gap: 6px; }
+#progress span { flex: 1; background: var(--raised); border-radius: 2px; overflow: hidden; }
+#progress i { display: block; height: 100%; width: 0; background: var(--gold); }
+
+.kicker { position: absolute; left: var(--side); top: 150px; font-family: "Plex Mono"; font-size: 24px; font-weight: 500;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.kicker b { color: var(--gold); font-weight: 600; }
+.headline { position: absolute; left: var(--side); right: var(--side); top: 180px; font-family: "Plex Mono"; font-size: 50px;
+  font-weight: 600; line-height: 1.12; }
+.visual { position: absolute; left: var(--side); right: var(--side); top: 262px; height: 643px; display: flex;
+  align-items: center; justify-content: center; }
+
+/* Superfície única de dados: --surface, borda 1px acesa em cima, raio 10 (teto). */
+.panel { background: var(--surface); border: 1px solid var(--border); border-top-color: var(--border-lit); border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 24px 64px rgba(0,0,0,.5); overflow: hidden; }
+.panel .bar { height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--raised);
+  border-bottom: 1px solid var(--border); font-family: "Plex Mono"; font-size: 19px; color: var(--muted); }
+.panel .bar i { width: 11px; height: 11px; border-radius: 6px; background: #4A4444; display: inline-block; }
+.shotwin { position: absolute; opacity: 0; will-change: opacity, transform; }
+.shot { position: relative; overflow: hidden; background: #0F0D0D; }
+.zoom { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
+.zoom img { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+/* Foco: o mesmo contorno de 2 px azul do foco do app; o resto escurece. */
+.focus { position: absolute; border: 2px solid var(--info); border-radius: 6px; box-shadow: 0 0 0 4000px rgba(8, 11, 18, .5); opacity: 0; }
+
+.term { width: 1240px; padding: 26px 32px; font-family: "Plex Mono"; font-size: 34px; line-height: 1.5; background: #0F0D0D; }
+.term .ln { white-space: pre; min-height: 51px; }
+.term .ln .p { color: var(--gold); }
+.term .out { color: var(--muted); font-size: 27px; margin: 0 0 14px; min-height: 40px; white-space: pre-wrap; }
+.term .caret { display: inline-block; width: 17px; height: 36px; background: var(--fg); vertical-align: -6px; }
+
+.steps { width: 1160px; padding: 18px 34px; }
+.step { display: grid; grid-template-columns: 70px 1fr; align-items: center; min-height: 104px; border-bottom: 1px solid var(--border);
+  font-family: "Plex Mono"; font-size: 36px; font-weight: 600; opacity: 0; }
+.step:last-child { border-bottom: 0; }
+.step .ic { color: var(--ok); font-size: 40px; }
+.step .why { grid-column: 2; font-family: "Plex Sans"; font-size: 27px; font-weight: 400; color: var(--muted); margin-top: -10px; padding-bottom: 14px; }
+
+.visual.with-chips { height: 548px; }
+.chips { position: absolute; left: var(--side); right: var(--side); top: 832px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.chip { font-family: "Plex Mono"; font-size: 22px; font-weight: 500; background: var(--raised); border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 12px; display: inline-flex; align-items: center; gap: 10px; opacity: 0; }
+.chip s { width: 4px; height: 22px; border-radius: 1px; display: inline-block; }
+
+.card { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; opacity: 0; }
+.card .e { font-family: "Plex Mono"; font-size: 24px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.card .n { font-family: "Plex Mono"; font-size: 150px; font-weight: 600; color: var(--gold); line-height: 1; font-variant-numeric: tabular-nums; }
+.card .t { font-family: "Plex Mono"; font-size: 52px; font-weight: 600; }
+
+.hero canvas { position: absolute; left: 630px; top: 70px; width: 660px; height: 660px; }
+.hero .nm { position: absolute; left: 0; right: 0; top: 735px; text-align: center; font-family: "Plex Mono"; font-size: 34px; font-weight: 600;
+  letter-spacing: 8px; text-transform: uppercase; color: var(--gold); }
+.hero .tg { position: absolute; left: 0; right: 0; top: 790px; text-align: center; font-family: "Plex Mono"; font-size: 48px; font-weight: 600; }
+.hero .lk { position: absolute; left: 0; right: 0; top: 866px; text-align: center; font-family: "Plex Mono"; font-size: 28px; color: var(--muted); }
+#lens { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+
+#caption { position: absolute; left: 0; right: 0; bottom: 44px; display: flex; justify-content: center; opacity: 0; }
+#caption div { max-width: 1500px; background: rgba(8, 11, 18, .88); border: 1px solid rgba(232, 174, 99, .28); border-radius: 10px;
+  padding: 12px 30px; text-align: center; font-family: "Plex Sans"; font-weight: 600; font-size: 40px; line-height: 1.25; }
+</style>
+</head>
+<body>
+<div class="layer" id="stage"></div>
+<div id="header"><span class="brand">usage monitor</span><span class="count"></span></div>
+<div id="progress"></div>
+<canvas id="lens" width="1920" height="1080"></canvas>
+<div id="caption"><div></div></div>
+<script>
+'use strict'
+const LENS = 1.1
+const EXIT = 0.35
+const clamp = (value) => Math.max(0, Math.min(1, value))
+const easeOut = (value) => 1 - Math.pow(1 - clamp(value), 3)
+const escape = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const pad2 = (value) => String(value).padStart(2, '0')
+// Mesmo ritmo de digitação do soundEvents (timeline.mjs): 30 caracteres/s, 0,2 s até a saída.
+const TYPING_RATE = 30
+const OUTPUT_DELAY = 0.2
+// A área da captura vai do título até acima da legenda; com chips embaixo, ela encolhe para eles caberem.
+const MEDIA_BOX = { width: 1680, height: 643, heightWithChips: 548 }
+
+let video = null
+const nodes = []
+
+function pick(value) {
+  if (value == null) return ''
+  return typeof value === 'object' && !Array.isArray(value) ? (value[video.lang] ?? value.en) : value
+}
+
+// Quadro da sequência no instante `local` desde que a captura entrou: toca uma vez e para no último.
+function frameAt(manifest, local) {
+  let elapsed = 0
+  for (const frame of manifest) {
+    elapsed += frame.delayMillis / 1000
+    if (local < elapsed) return frame.file
+  }
+  return manifest[manifest.length - 1].file
+}
+
+function buildShot(shot, boxHeight) {
+  const manifest = video.media[shot.media]
+  if (!manifest) throw new Error(`Captura sem quadros: ${shot.media}`)
+  // A captura é 2× de uma cena de 1000×420 dp; `crop` recorta em dp para aumentar o que importa.
+  const [cropX, cropY, cropW, cropH] = shot.crop ?? [0, 0, 1000, 420]
+  const scale = Math.min(MEDIA_BOX.width / cropW, (boxHeight - 40) / cropH)
+  const width = Math.round(cropW * scale)
+  const height = Math.round(cropH * scale)
+  const focus = shot.focus
+    ? `<div class="focus" style="left:${(shot.focus[0] - cropX) * scale}px;top:${(shot.focus[1] - cropY) * scale}px;width:${shot.focus[2] * scale}px;height:${shot.focus[3] * scale}px"></div>`
+    : ''
+  const element = document.createElement('div')
+  element.className = 'panel shotwin'
+  element.style.width = `${width}px`
+  element.innerHTML = `<div class="bar"><i></i><i></i><i></i>&nbsp;${escape(pick(shot.bar) || 'usage-monitor')}</div>
+    <div class="shot" style="height:${height}px"><div class="zoom"><img alt="">${focus}</div></div>`
+  const img = element.querySelector('img')
+  img.style.transform = `scale(${scale / 2}) translate(${-cropX * 2}px, ${-cropY * 2}px)`
+  return { shot, element, img, zoom: element.querySelector('.zoom'), focus: element.querySelector('.focus'),
+    manifest, dir: `media/${video.lang}/${shot.media}/`, current: null, scale, cropX, cropY }
+}
+
+function buildScene(scene, index) {
+  const element = document.createElement('div')
+  element.className = 'scene'
+  const parts = {}
+  if (scene.kind === 'title' || scene.kind === 'closing') {
+    element.classList.add('hero')
+    element.innerHTML = `<canvas width="900" height="900"></canvas><div class="nm">usage monitor</div>
+      <div class="tg">${escape(pick(scene.headline))}</div>${scene.link ? `<div class="lk">${escape(scene.link)}</div>` : ''}`
+    parts.canvas = element.querySelector('canvas')
+    parts.texts = [...element.querySelectorAll('.nm, .tg, .lk')]
+  } else {
+    let visual = ''
+    if (scene.kind === 'commands') {
+      visual = `<div class="panel"><div class="bar"><i></i><i></i><i></i>&nbsp;terminal</div><div class="term">${
+        scene.commands.map(() => '<div class="ln"></div><div class="out"></div>').join('')}</div></div>`
+    } else if (scene.kind === 'steps') {
+      visual = `<div class="panel"><div class="steps">${scene.steps.map((step) =>
+        `<div class="step"><span class="ic">✓</span><span>${escape(pick(step.label))}</span><span class="why">${escape(pick(step.why))}</span></div>`).join('')}</div></div>`
+    }
+    const chips = scene.chips
+      ? `<div class="chips">${scene.chips.map((chip) => `<span class="chip">${chip.accent ? `<s style="background:${chip.accent}"></s>` : ''}${escape(pick(chip.label))}</span>`).join('')}</div>`
+      : ''
+    const number = pad2(index)
+    element.innerHTML = `<div class="content layer"><div class="kicker"><b>${number}</b> · ${escape(pick(scene.kicker))}</div>
+        <div class="headline">${escape(pick(scene.headline))}</div><div class="visual${scene.chips ? ' with-chips' : ''}">${visual}</div>${chips}</div>
+      <div class="card"><div class="e">${video.lang === 'pt' ? 'capítulo' : 'chapter'}</div><div class="n">${number}</div><div class="t">${escape(pick(scene.title))}</div></div>`
+    parts.content = element.querySelector('.content')
+    parts.card = element.querySelector('.card')
+    parts.lines = [...element.querySelectorAll('.term .ln')]
+    parts.outs = [...element.querySelectorAll('.term .out')]
+    parts.steps = [...element.querySelectorAll('.step')]
+    parts.chips = [...element.querySelectorAll('.chip')]
+    if (scene.media) {
+      const box = element.querySelector('.visual')
+      const boxHeight = scene.chips ? MEDIA_BOX.heightWithChips : MEDIA_BOX.height
+      parts.shots = scene.media.map((shot) => {
+        const built = buildShot(shot, boxHeight)
+        box.appendChild(built.element)
+        return built
+      })
+    }
+  }
+  document.getElementById('stage').appendChild(element)
+  return { scene, element, parts }
+}
+
+// Anel Gargantua (cenário, nunca dado): núcleo escuro, disco inclinado com Doppler, anel de fótons e três arcos que
+// nascem às 12 h sem passar do valor. `collapse` (s) apaga tudo no fechamento.
+function drawRing(canvas, local, collapse) {
+  const context = canvas.getContext('2d')
+  const size = canvas.width
+  const center = size / 2
+  context.clearRect(0, 0, size, size)
+  const lit = easeOut((local - 0.4) / 1.2) * (1 - easeOut(collapse / 0.85))
+  const glow = context.createRadialGradient(center, center, 90, center, center, 440)
+  glow.addColorStop(0, `rgba(232,174,99,${0.2 * lit})`)
+  glow.addColorStop(1, 'rgba(232,174,99,0)')
+  context.fillStyle = glow
+  context.fillRect(0, 0, size, size)
+  const disc = (front) => {
+    context.save()
+    context.translate(center, center)
+    context.rotate(-0.22)
+    context.scale(1, 0.26)
+    const gradient = context.createLinearGradient(-300, 0, 300, 0)
+    gradient.addColorStop(0, `rgba(255,240,203,${0.95 * lit})`)
+    gradient.addColorStop(0.5, `rgba(232,174,99,${0.85 * lit})`)
+    gradient.addColorStop(1, `rgba(180,80,30,${0.75 * lit})`)
+    context.strokeStyle = gradient
+    for (let band = 0; band < 5; band += 1) {
+      context.lineWidth = 16 - band * 2.5
+      context.beginPath()
+      context.ellipse(0, 0, 195 + band * 22, 195 + band * 22, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2)
+      context.stroke()
+    }
+    context.restore()
+  }
+  disc(false)
+  context.fillStyle = '#030508'
+  context.beginPath()
+  context.arc(center, center, 140, 0, Math.PI * 2)
+  context.fill()
+  const photon = context.createLinearGradient(center - 150, center + 150, center + 150, center - 150)
+  photon.addColorStop(0, `rgba(180,80,30,${0.6 * lit})`)
+  photon.addColorStop(0.5, `rgba(232,174,99,${0.8 * lit})`)
+  photon.addColorStop(1, `rgba(255,240,203,${lit})`)
+  context.strokeStyle = photon
+  context.lineWidth = 5
+  context.beginPath()
+  context.arc(center, center, 147, 0, Math.PI * 2)
+  context.stroke()
+  disc(true)
+  // Filamentos decorativos: órbita de 14 s, como no app.
+  context.lineWidth = 2
+  for (let index = 0; index < 3; index += 1) {
+    const angle = (local / 14) * Math.PI * 2 + index * 2.1
+    context.strokeStyle = `rgba(255,240,203,${0.22 * lit})`
+    context.beginPath()
+    context.arc(center, center, 163 + index * 6, angle, angle + 0.9)
+    context.stroke()
+  }
+  const fade = 1 - easeOut(collapse / 0.85)
+  ;[['#4CAF50', 0.72], ['#FFA726', 0.48], ['#4C8DFF', 0.3]].forEach(([color, value], index) => {
+    const radius = 330 + index * 34
+    context.lineCap = 'round'
+    context.lineWidth = 16
+    context.strokeStyle = `rgba(33,30,30,${fade})`
+    context.beginPath()
+    context.arc(center, center, radius, 0, Math.PI * 2)
+    context.stroke()
+    const progress = easeOut((local - 0.9 - index * 0.2) / 1.4) * value * fade
+    if (progress > 0.001) {
+      context.strokeStyle = color
+      context.beginPath()
+      context.arc(center, center, radius, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2)
+      context.stroke()
+    }
+  })
+}
+
+// Lente gravitacional: ondas douradas saindo do centro e um véu escuro que cobre a troca de capítulo.
+function drawLens(progress) {
+  const context = document.getElementById('lens').getContext('2d')
+  context.clearRect(0, 0, 1920, 1080)
+  if (progress <= 0 || progress >= 1) return
+  for (let wave = 0; wave < 3; wave += 1) {
+    const q = clamp(progress * 1.4 - wave * 0.18)
+    if (q <= 0 || q >= 1) continue
+    context.strokeStyle = `rgba(232,174,99,${0.55 * (1 - q)})`
+    context.lineWidth = 3 + 10 * (1 - q)
+    context.beginPath()
+    context.arc(960, 540, 40 + q * 1150, 0, Math.PI * 2)
+    context.stroke()
+  }
+  context.fillStyle = `rgba(8,11,18,${Math.sin(Math.PI * progress) * 0.6})`
+  context.fillRect(0, 0, 1920, 1080)
+}
+
+function setStyle(element, opacity, transform) {
+  element.style.opacity = String(opacity)
+  element.style.transform = transform
+}
+
+// Uma captura: entra subindo 24 px em 0,45 s (mola sem rebote), sai em 0,09 s, toca a sequência de quadros e,
+// com foco, aproxima 12% da região e acende o contorno.
+function renderShots(parts, timing, t, pending) {
+  parts.shots.forEach((built, index) => {
+    const from = timing.shots[index].at
+    const to = index + 1 < timing.shots.length ? timing.shots[index + 1].at : Infinity
+    const own = t - from
+    const enter = index === 0 ? 1 : easeOut(own / 0.45)
+    const leave = to === Infinity ? 0 : clamp((t - to) / 0.09)
+    const visible = t >= from - (index === 0 ? Infinity : 0) && leave < 1
+    setStyle(built.element, visible ? enter * (1 - leave) : 0, `translateY(${24 * (1 - enter)}px)`)
+    if (!visible) return
+    const file = built.dir + frameAt(built.manifest, Math.max(0, own))
+    if (built.current !== file) {
+      built.current = file
+      built.img.src = file
+      pending.push(built.img.decode())
+    }
+    const focusAt = timing.shots[index].focusAt
+    if (focusAt !== null && built.focus) {
+      const progress = easeOut((t - focusAt) / 0.9)
+      const [x, y, w, h] = built.shot.focus
+      built.zoom.style.transformOrigin = `${(x - built.cropX + w / 2) * built.scale}px ${(y - built.cropY + h / 2) * built.scale}px`
+      built.zoom.style.transform = `scale(${1 + 0.12 * progress})`
+      built.focus.style.opacity = String(progress)
+    } else {
+      built.zoom.style.transform = `scale(${1 + 0.02 * clamp(own / Math.max(1, (to === Infinity ? timing.end : to) - from))})`
+    }
+  })
+}
+
+function renderScene(node, index, t, pending) {
+  const timing = video.timeline.scenes[index]
+  const last = index === video.timeline.scenes.length - 1
+  const end = last ? video.timeline.total : timing.end
+  if (t < timing.start || t >= end) {
+    node.element.style.opacity = '0'
+    return false
+  }
+  const local = t - timing.start
+  const scene = node.scene
+  const parts = node.parts
+  node.element.style.opacity = '1'
+  if (parts.canvas) {
+    const collapse = scene.kind === 'closing' ? Math.max(0, t - (end - 1.6)) : 0
+    drawRing(parts.canvas, scene.kind === 'closing' ? local + 0.4 : local, collapse)
+    const textIn = easeOut((local - 1.6) / 0.6) * (1 - easeOut(collapse / 0.6))
+    parts.texts.forEach((text) => { text.style.opacity = String(textIn) })
+    return true
+  }
+  // Cartão do capítulo durante a lente; o conteúdo entra de 104% a 100% e sai antes da próxima lente.
+  const contentAt = timing.voiceAt - 0.5
+  const cardIn = easeOut((local - LENS * 0.45) / 0.35)
+  const cardOut = easeOut((t - (contentAt - 0.3)) / 0.3)
+  setStyle(parts.card, cardIn * (1 - cardOut), `scale(${1.04 - 0.04 * cardIn})`)
+  const enter = easeOut((t - contentAt) / 0.45)
+  const exit = last ? 0 : clamp((t - (end - EXIT)) / EXIT)
+  setStyle(parts.content, enter * (1 - exit), `scale(${1.04 - 0.04 * enter})`)
+  if (parts.shots) renderShots(parts, timing, t, pending)
+  const speaking = t - timing.voiceAt
+  if (parts.lines.length > 0) {
+    let cursor = speaking
+    scene.commands.forEach((command, position) => {
+      const text = pick(command.cmd)
+      const typed = Math.max(0, Math.min(text.length, Math.floor(cursor * TYPING_RATE)))
+      const caret = typed < text.length && cursor > 0 ? '<span class="caret"></span>' : ''
+      parts.lines[position].innerHTML = cursor > 0 ? `<span class="p">$ </span>${escape(text.slice(0, typed))}${caret}` : ''
+      parts.outs[position].textContent = cursor > text.length / TYPING_RATE + OUTPUT_DELAY ? pick(command.out) : ''
+      cursor -= text.length / TYPING_RATE + OUTPUT_DELAY + (scene.pause ?? 0.5)
+    })
+  }
+  parts.steps.forEach((row, position) => {
+    const shown = easeOut((speaking - position * (scene.stagger ?? 0.8)) / 0.45)
+    setStyle(row, shown, `translateY(${16 * (1 - shown)}px)`)
+  })
+  parts.chips.forEach((chip, position) => {
+    const shown = easeOut((speaking - 0.2 - position * 0.18) / 0.4)
+    setStyle(chip, shown, `translateY(${12 * (1 - shown)}px)`)
+  })
+  return true
+}
+
+function renderFrame(t) {
+  const pending = []
+  let current = 0
+  nodes.forEach((node, index) => {
+    if (renderScene(node, index, t, pending)) current = index
+  })
+  const timing = video.timeline.scenes[current]
+  drawLens(current === 0 ? 0 : (t - timing.start) / LENS)
+  const kind = video.scenes[current].kind
+  const chrome = kind === 'title' || kind === 'closing' ? 0 : 1
+  document.getElementById('header').style.opacity = String(chrome)
+  document.getElementById('progress').style.opacity = String(chrome)
+  const chapters = video.scenes.length - 2
+  document.querySelector('#header .count').textContent = `${pad2(Math.min(Math.max(current, 1), chapters))} / ${pad2(chapters)}`
+  const bars = document.querySelectorAll('#progress span i')
+  video.timeline.scenes.slice(1, -1).forEach((item, index) => {
+    bars[index].style.width = `${clamp((t - item.start) / (item.end - item.start)) * 100}%`
+  })
+  const cue = video.cues.find((item) => t >= item.start && t < item.end)
+  const caption = document.getElementById('caption')
+  if (cue) {
+    caption.firstElementChild.innerHTML = cue.lines.map(escape).join('<br>')
+    caption.style.opacity = String(Math.min(clamp((t - cue.start) / 0.12), clamp((cue.end - t) / 0.12)))
+  } else {
+    caption.style.opacity = '0'
+  }
+  return Promise.all(pending).then(() => true)
+}
+
+async function setup(data) {
+  video = data
+  document.documentElement.lang = data.lang === 'pt' ? 'pt-BR' : 'en'
+  document.getElementById('progress').innerHTML = data.scenes.slice(1, -1).map(() => '<span><i></i></span>').join('')
+  data.scenes.forEach((scene, index) => nodes.push(buildScene(scene, index)))
+  // fonts.ready sozinho resolve antes de a fonte ser pedida; o primeiro quadro sairia na fonte de reserva.
+  await Promise.all([...document.fonts].map((face) => face.load()))
+  await document.fonts.ready
+  return true
+}
+
+window.setup = setup
+window.renderFrame = renderFrame
+</script>
+</body>
+</html>
