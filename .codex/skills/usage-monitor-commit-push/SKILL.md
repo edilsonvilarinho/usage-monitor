@@ -1,11 +1,11 @@
 ---
 name: usage-monitor-commit-push
-description: Safely stage, commit, and push intended changes in the usage-monitor repository with the repo's required temporary git identity, narrow verification, and clean restoration of the original author config. Use when Codex needs to commit or push local changes for this project, especially when unrelated files may exist or the user explicitly asks to publish work.
+description: Safely stage, commit, and push intended changes in the usage-monitor repository with the repo's required temporary git identity, narrow verification, never touching the original author config. Use when Codex needs to commit or push local changes for this project, especially when unrelated files may exist or the user explicitly asks to publish work.
 ---
 
 # Usage Monitor Commit Push
 
-Commit only the intended files, use a temporary agent git identity, and restore the original local git author config before finishing.
+Commit only the intended files with a temporary agent git identity, passed per command and never written to the git config.
 
 ## Workflow
 
@@ -27,7 +27,7 @@ Commit only the intended files, use a temporary agent git identity, and restore 
 
 ## Script
 
-Use the bundled PowerShell helper to stage only the requested files, temporarily switch the git identity, restore the previous identity, and optionally skip the push.
+Use the bundled PowerShell helper to stage only the requested files, commit with the temporary git identity, and optionally skip the push. It works in the main checkout and in a worktree.
 
 Example:
 
@@ -43,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File `
 
 Use `-SkipPush` when the user asked only for a local commit. Use `-DryRun` to preview the staging plan without touching the index.
 
-The identity is restored in the script's `finally` block, so it is restored even when the commit or the push fails.
+The identity goes as `git -c user.name=… -c user.email=… commit` (#498): nothing is written to the config, so nothing is left behind if the commit, the push or the process fails, and a worktree (where `.git` is a file) works the same. Tests: `pwsh -NoProfile -Command "Invoke-Pester -Path .claude/skills/usage-monitor-commit-push/scripts -Output Detailed"`.
 
 ## Guardrails
 

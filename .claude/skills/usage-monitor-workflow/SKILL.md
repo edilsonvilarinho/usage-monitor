@@ -36,8 +36,8 @@ git fetch origin
 git worktree add .claude/worktrees/<slug> -b <type>/issue-<n>-<slug> origin/main
 ```
 
-Never commit on `main` (the ruleset rejects the push anyway). Commit identity, in a worktree too (the
-`usage-monitor-commit-push` script cannot lock `.git/config` there, because `.git` is a file):
+Never commit on `main` (the ruleset rejects the push anyway). Commit identity, passed per command and never written
+to the config — the same thing the `usage-monitor-commit-push` script does since #498:
 
 ```bash
 git -c user.name=claude -c user.email=claude@anthropic.com commit -F <message>

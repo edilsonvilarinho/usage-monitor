@@ -80,119 +80,73 @@ function Invoke-Git {
     }
 }
 
-function Get-LocalConfigValue {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Key
-    )
-
-    $result = Invoke-Git -Arguments @("config", "--file", ".git/config", "--get", $Key) -IgnoreErrors
-    if ($result.ExitCode -ne 0) {
-        return $null
-    }
-
-    $value = ($result.Output -join [Environment]::NewLine).Trim()
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        return $null
-    }
-
-    return $value
-}
-
-function Restore-LocalConfigValue {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Key,
-
-        [string]$Value
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        Invoke-Git -Arguments @("config", "--file", ".git/config", "--unset", $Key) -IgnoreErrors | Out-Null
-        return
-    }
-
-    Invoke-Git -Arguments @("config", "--file", ".git/config", $Key, $Value) | Out-Null
-}
-
 if ($Files.Count -eq 0) {
     throw "At least one file must be provided."
 }
 
-$originalName = Get-LocalConfigValue -Key "user.name"
-$originalEmail = Get-LocalConfigValue -Key "user.email"
-$tempIdentityWasSet = $false
-
-try {
-    Write-Host "== Git status =="
-    $status = Invoke-Git -Arguments @("status", "--short", "--branch")
-    $status.Output
-
-    Write-Host ""
-    Write-Host "== Staging files =="
-    foreach ($file in $Files) {
-        Write-Host $file
-    }
-
-    if ($DryRun) {
-        Write-Host ""
-        Write-Host "Dry run enabled. No changes were staged, committed, or pushed."
-        return
-    }
-
-    Invoke-Git -Arguments (@("add", "--") + $Files) | Out-Null
-
-    $cachedStat = Invoke-Git -Arguments @("diff", "--cached", "--stat")
-    $cachedText = ($cachedStat.Output -join [Environment]::NewLine).Trim()
-    if ([string]::IsNullOrWhiteSpace($cachedText)) {
-        throw "No staged changes found after staging the requested files."
-    }
-
-    Write-Host ""
-    Write-Host "== Staged diff stat =="
-    Write-Host $cachedText
-
-    if (-not [string]::IsNullOrWhiteSpace($TempUserName)) {
-        Invoke-Git -Arguments @("config", "--file", ".git/config", "user.name", $TempUserName) | Out-Null
-        $tempIdentityWasSet = $true
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($TempUserEmail)) {
-        Invoke-Git -Arguments @("config", "--file", ".git/config", "user.email", $TempUserEmail) | Out-Null
-        $tempIdentityWasSet = $true
-    }
-
-    Write-Host ""
-    Write-Host "== Creating commit =="
-    $commitResult = Invoke-Git -Arguments @("commit", "-m", $Message)
-    $commitResult.Output
-
-    $branchResult = Invoke-Git -Arguments @("rev-parse", "--abbrev-ref", "HEAD")
-    $branchName = ($branchResult.Output | Select-Object -Last 1).Trim()
-    if ([string]::IsNullOrWhiteSpace($branchName)) {
-        throw "Failed to determine current branch."
-    }
-
-    if (-not $SkipPush) {
-        Write-Host ""
-        Write-Host "== Pushing branch =="
-        $pushResult = Invoke-Git -Arguments @("push", $Remote, "HEAD:$branchName")
-        $pushResult.Output
-    }
-
-    Write-Host ""
-    Write-Host "== Final status =="
-    $finalStatus = Invoke-Git -Arguments @("status", "--short", "--branch")
-    $finalStatus.Output
-
-    Write-Host ""
-    Write-Host "== Latest commit =="
-    $latestCommit = Invoke-Git -Arguments @("log", "--oneline", "-1")
-    $latestCommit.Output
+# A identidade temporaria vai por `-c` no proprio commit, nunca gravada na
+# config (#498): numa worktree o `.git` e um arquivo e `--file .git/config` nao
+# existe, e uma config gravada sobra se o processo morrer antes do restauro.
+$identityArguments = @()
+if (-not [string]::IsNullOrWhiteSpace($TempUserName)) {
+    $identityArguments += @("-c", "user.name=$TempUserName")
 }
-finally {
-    if ($tempIdentityWasSet) {
-        Restore-LocalConfigValue -Key "user.name" -Value $originalName
-        Restore-LocalConfigValue -Key "user.email" -Value $originalEmail
-    }
+if (-not [string]::IsNullOrWhiteSpace($TempUserEmail)) {
+    $identityArguments += @("-c", "user.email=$TempUserEmail")
 }
+
+Write-Host "== Git status =="
+$status = Invoke-Git -Arguments @("status", "--short", "--branch")
+$status.Output
+
+Write-Host ""
+Write-Host "== Staging files =="
+foreach ($file in $Files) {
+    Write-Host $file
+}
+
+if ($DryRun) {
+    Write-Host ""
+    Write-Host "Dry run enabled. No changes were staged, committed, or pushed."
+    return
+}
+
+Invoke-Git -Arguments (@("add", "--") + $Files) | Out-Null
+
+$cachedStat = Invoke-Git -Arguments @("diff", "--cached", "--stat")
+$cachedText = ($cachedStat.Output -join [Environment]::NewLine).Trim()
+if ([string]::IsNullOrWhiteSpace($cachedText)) {
+    throw "No staged changes found after staging the requested files."
+}
+
+Write-Host ""
+Write-Host "== Staged diff stat =="
+Write-Host $cachedText
+
+Write-Host ""
+Write-Host "== Creating commit =="
+$commitResult = Invoke-Git -Arguments ($identityArguments + @("commit", "-m", $Message))
+$commitResult.Output
+
+$branchResult = Invoke-Git -Arguments @("rev-parse", "--abbrev-ref", "HEAD")
+$branchName = ($branchResult.Output | Select-Object -Last 1).Trim()
+if ([string]::IsNullOrWhiteSpace($branchName)) {
+    throw "Failed to determine current branch."
+}
+
+if (-not $SkipPush) {
+    Write-Host ""
+    Write-Host "== Pushing branch =="
+    $pushResult = Invoke-Git -Arguments @("push", $Remote, "HEAD:$branchName")
+    $pushResult.Output
+}
+
+Write-Host ""
+Write-Host "== Final status =="
+$finalStatus = Invoke-Git -Arguments @("status", "--short", "--branch")
+$finalStatus.Output
+
+Write-Host ""
+Write-Host "== Latest commit =="
+$latestCommit = Invoke-Git -Arguments @("log", "--oneline", "-1")
+$latestCommit.Output

@@ -43,6 +43,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com os fatos medidos na #496 | `gh issue create` → #498; `diff -rq .claude/skills/usage-monitor-commit-push .codex/skills/usage-monitor-commit-push` → só `SKILL.md` e `agents/` |
+| A02 | `commit_and_push.ps1`: identidade por `-c user.name/user.email` no `commit`; removidos `Get-LocalConfigValue`, `Restore-LocalConfigValue`, o `try/finally` e toda escrita em `--file .git/config`. Teste novo `commit_and_push.Tests.ps1` (Pester, repositório real em diretório temporário, 4 casos). `SKILL.md` das duas cópias sem "restaurar config"; script copiado para `.codex/` (idêntico); nota do passo 3 da skill `usage-monitor-workflow`. Commit desta atividade feito pelo próprio script, de dentro da worktree | Vermelho (script antigo): `Invoke-Pester -Path .claude/skills/usage-monitor-commit-push/scripts` → 2 passaram, 2 falharam, os dois de worktree com `could not lock config file .git/config: No such file or directory`. Verde: o mesmo comando → 4 passaram, 0 falharam |
 
 ## Problemas em aberto e riscos
 
