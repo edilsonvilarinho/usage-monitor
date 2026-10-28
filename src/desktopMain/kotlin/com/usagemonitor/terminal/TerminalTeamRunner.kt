@@ -1,5 +1,9 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.TeamConnectionLabels
+import com.usagemonitor.presentation.ui.TeamCredentialKind
+import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
 import com.usagemonitor.AnthropicProfileRegistry
 import com.usagemonitor.ConfigChange
 import com.usagemonitor.buildHttpClient
@@ -190,7 +194,13 @@ internal class TerminalTeamRunner(
                 try {
                     val remote = RemoteTeamDataSource(httpClient)
                     val health = TeamUsageRepositoryImpl(remote, settingsProvider = { settings }).checkConnection().exceptionOrNull()
-                    if (health != null) {
+                    val stage = health?.let { failure -> teamConnectionFailureOf(failure) }
+                    if (stage != null) {
+                        // #494: a etapa e o conselho, nas frases das janelas. Em português, como as
+                        // linhas vizinhas desta conferência ("sem login").
+                        val kind = TeamCredentialKind.ACCOUNT_KEY
+                        listOf(TeamConnectionLabels.headline(stage, kind, AppLanguage.PT) + ". " + TeamConnectionLabels.advice(stage, kind, AppLanguage.PT))
+                    } else if (health != null) {
                         listOf(health.message ?: health::class.simpleName.orEmpty())
                     } else {
                         val admin = TeamAdminRepositoryImpl(remote, settingsProvider = { settings })

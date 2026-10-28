@@ -603,6 +603,11 @@ S.team = () => {
     body.push(i === 0 ? wrap('sel', row) : row);
   });
   body.push(L(''));
+  // #494 (AJ4): leitura que falha por conexão diz a etapa e o caminho, no lugar da exceção.
+  body.push(L(c('wa', '▲ '), 'Parou em Certificado — venceu em 27/10 12:21 BRT'));
+  body.push(L('  ', c('ok', '✓ Endereço'), '  ', c('ok', '✓ Conexão'), '  ', c('wa', '▲ Certificado'), '  ', c('mu', '– Servidor'), '  ', c('mu', '– Chave')));
+  body.push(L(c('mu', '  Mostrando os números de 12:14; tenta de novo na próxima leitura.')));
+  body.push(L(''));
   body.push(L(c('mu', '● trabalhando · ◑ app aberto · ○ ausente')));
   body.push(L(c('mu', 'custo calculado no seu computador · nunca prompt nem resposta')));
   return frame(3, body, L(key('↑↓', 'pessoa'), key('t', 'troca de conta'), ...commonKeys));

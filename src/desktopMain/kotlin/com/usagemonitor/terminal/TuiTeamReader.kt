@@ -1,5 +1,6 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
 import com.usagemonitor.AnthropicProfileRegistry
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
@@ -59,6 +60,7 @@ internal class TuiTeamReader(
             referenceNow = referenceNow,
             failure = error?.let { failed -> failed.message ?: failed::class.simpleName ?: "?" },
             unreachable = error != null && isConnectivityFailure(error),
+            connectionFailure = error?.let { failed -> teamConnectionFailureOf(failed) },
             readAt = readAt
         )
     }

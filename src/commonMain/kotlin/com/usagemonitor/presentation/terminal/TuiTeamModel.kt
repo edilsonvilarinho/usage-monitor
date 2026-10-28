@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+
 import kotlin.time.Instant
 
 /** Uma pessoa na aba 4: a presença e o consumo do dia, como a janela de time do app mostra. */
@@ -31,6 +33,8 @@ data class TuiTeam(
     val failure: String? = null,
     /** A falha foi de conexão (classificada pelo tipo da exceção): a frase diz isso, não a do socket. */
     val unreachable: Boolean = false,
+    /** Etapa em que a leitura parou (#494); com ela a aba diz onde, não a exceção. */
+    val connectionFailure: TeamConnectionFailure? = null,
     /** Quando foram lidos os números da tela; `null` sem leitura nenhuma ainda. */
     val readAt: Instant? = null
 )
