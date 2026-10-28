@@ -64,6 +64,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|---|
 | A01 | Plano com fatos da documentação e medições | `gh issue create` → #513; `claude -p` com sondas `probe-with`/`probe-without` → 18.792 × 6.077 tokens de entrada (`haiku`) |
 | A02 | Agentes `neferpitou` (corpo vazio, `opus`), `test-runner` (`sonnet`, medium) e `explorer` (`haiku`), ambos com `omitClaudeMd`, sem `Agent`/`Edit`/`Write` | Sem harness. `claude -p` pedindo `explorer` achar `CodexQuotaLabels` → 1 definição + 5 arquivos, `haiku` 11.758 tokens de entrada, US$ 0,0017; `test-runner` com `node --test "tools/ci/test/*.test.mjs"` → `VERDE` 14/14 em 1 linha, `sonnet` 14.682 tokens |
+| A03 | `.claude/settings.json`: `agent: neferpitou`, `effortLevel: high`, `CLAUDE_CODE_FORK_SUBAGENT=0` | Sem harness. `JSON.parse` → ok; `claude -p` sem flag com o agente em `haiku` (temporário) → `claude-haiku-5-5`; lista de `subagent_type` sem `fork` |
 
 ## Problemas em aberto e riscos
 
