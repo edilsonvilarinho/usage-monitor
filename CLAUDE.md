@@ -342,6 +342,9 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - Cobertura opt-in por `-Pcoverage`; **meta de 95% de linhas** (Kotlin e servidor) com catraca: piso em
   `coverageLineFloorPercent` (`koverVerify` no CI) e `thresholds.lines` do vitest, só sobe, no commit que o eleva
   (plano [`cobertura-95-execucao.md`](docs/planos/cobertura-95-execucao.md)).
+- **Cobertura do diff** (#496, `tools/ci/diff-coverage.mjs`): linhas de produção que o PR altera, piso 90%, nos jobs
+  `desktop-windows` (Kover) e `server` (`lcovonly`). Nasce **informativa** (aviso, fora do `ci-ok`) — o #495 mediu 60%;
+  vira bloqueante pelo critério do plano [`fluxo-automatizado-496-execucao.md`](docs/planos/fluxo-automatizado-496-execucao.md).
 - Job `test-report` (skill `usage-monitor-test-report`): HTML de testes e cobertura no artefato `test-report` a cada
   run com a suíte do desktop; informativo, **fora** do `ci-ok`.
 - Classe `open` com todo método `open` sobrescrito no teste: cobertura alta sem costura testada.

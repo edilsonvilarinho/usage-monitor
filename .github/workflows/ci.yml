@@ -178,8 +178,12 @@ jobs:
       test-reports-id: ${{ steps.upload-test-reports.outputs.artifact-id }}
 
     steps:
+      # Profundidade 2: a cobertura do diff compara o merge commit do PR com o
+      # primeiro pai (`HEAD^1`), a ponta da base.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Setup JDK
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -227,6 +231,21 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\gradlew.bat koverXmlReport koverHtmlReport --build-cache -Pcoverage
           node tools/ci/coverage-summary.mjs build/reports/kover/report.xml
+
+      # Cobertura das linhas que o PR altera (#496), piso 90%. Nasce INFORMATIVA,
+      # como o `desktop-linux` (#342): o PR #495 mediu 60% (cola de janela) e o
+      # piso viraria incidencia antes de calibrado. Abaixo do piso (saida 1) vira
+      # aviso; outro codigo e o script quebrado, e esse continua vermelho.
+      - name: Diff coverage
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          node tools/ci/diff-coverage.mjs --base HEAD^1 --kover build/reports/kover/report.xml --title "Cobertura do diff (Kotlin)"
+          if ($LASTEXITCODE -eq 1) {
+            Write-Host '::warning::Cobertura do diff (Kotlin) abaixo de 90% -- informativa ate a calibragem (#496).'
+            exit 0
+          }
+          exit $LASTEXITCODE
 
       # Catraca de linhas (plano `cobertura-95-execucao.md`): piso em
       # `coverageLineFloorPercent` no `build.gradle.kts`, meta 95%.
@@ -492,6 +511,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -512,6 +533,21 @@ jobs:
       # alimenta o job `test-report`.
       - name: Run tests
         run: npm run test:coverage
+
+      # Mesma regra do passo do desktop-windows; o `lcovonly` do vitest e a
+      # cobertura por linha que o script le.
+      - name: Diff coverage
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        run: |
+          set -uo pipefail
+          status=0
+          node tools/ci/diff-coverage.mjs --base HEAD^1 --lcov server/coverage/lcov.info --title "Cobertura do diff (servidor)" || status=$?
+          if [ "$status" -eq 1 ]; then
+            echo '::warning::Cobertura do diff (servidor) abaixo de 90% -- informativa ate a calibragem (#496).'
+            exit 0
+          fi
+          exit "$status"
 
       # O deploy instala sem lockfile e com o Node da imagem; o `npm ci` acima
       # nao enxerga essa diferenca (#489: Node 20 + vitest 5 quebrou so no Dokploy).

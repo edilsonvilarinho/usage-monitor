@@ -102,6 +102,20 @@ The team server measures coverage with `npm run test:coverage` (`@vitest/coverag
 `-Pcoverage`); the `server` job runs it instead of `test:ci` (the whole suite took 2.5 s with coverage, measured on a
 local Linux machine).
 
+**Diff coverage** (#496): on a pull request, `desktop-windows` and `server` run `tools/ci/diff-coverage.mjs` over
+`HEAD^1..HEAD` (the merge commit against the tip of the base, hence `fetch-depth: 2`). It counts the production lines
+the PR adds or changes that the report instruments — Kover's `<line nr mi ci>` per `<sourcefile>`, the server's
+`lcov.info` (`lcovonly` reporter) — and covered means `ci > 0` / hits > 0, the same criterion as the global `LINE`
+counter. Lines outside the report (comments, classes excluded by name) do not count; a PR with no instrumented line
+passes. The floor is 90% and the step is **advisory**: exit 1 becomes a `::warning::` and the summary table, any other
+exit code (broken script) stays red. Measured before wiring it: PR #495 covered 48 of 80 changed lines (60%), all of
+the gap window glue and effects, so a blocking floor would have failed the PR that brought Kotlin to 95%.
+
+```bat
+node tools/ci/diff-coverage.mjs --base origin/main --kover build/reports/kover/report.xml
+node tools/ci/diff-coverage.mjs --base origin/main --lcov server/coverage/lcov.info
+```
+
 ### Test report
 
 The `test-report` job assembles the report of the `usage-monitor-test-report` skill from what
