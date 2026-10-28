@@ -1,6 +1,9 @@
 package com.usagemonitor
 
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
@@ -11,6 +14,7 @@ import java.util.prefs.Preferences
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * A geometria gravada das quatro janelas redimensionáveis, por uma implementação
@@ -106,6 +110,55 @@ class WindowGeometryPreferencesTest {
 
         assertEquals(WindowGeometrySnapshot(800f, 600f, 30f, 40f, WindowPlacement.Floating), placed)
         assertEquals(WindowGeometrySnapshot(800f, 600f, null, null, WindowPlacement.Maximized), centered)
+    }
+
+    private val primary = ScreenWorkArea(x = 0.dp, y = 0.dp, size = DpSize(1920.dp, 1040.dp))
+    private val secondary = ScreenWorkArea(x = 1920.dp, y = 0.dp, size = DpSize(2560.dp, 1400.dp))
+    private val screens = listOf(ScreenInfo(":0.0", primary, primary), ScreenInfo(":0.1", secondary, secondary))
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun stateFor(persisted: PersistedWindowGeometry, uiScalePercent: Int = 100): WindowState {
+        var state: WindowState? = null
+        runDesktopComposeUiTest {
+            setContent {
+                state = rememberPersistedWindowGeometry(persisted, HISTORY_WINDOW_GEOMETRY, uiScalePercent, primary, screens = { screens })
+            }
+            waitForIdle()
+        }
+        return checkNotNull(state)
+    }
+
+    @Test
+    fun `without a saved geometry the default size follows the ui scale and the window is centered`() {
+        val state = stateFor(PersistedWindowGeometry(), uiScalePercent = 125)
+
+        assertEquals(DpSize(1075.dp, 950.dp), state.size)
+        assertEquals(WindowPosition(Alignment.Center), state.position)
+        assertEquals(WindowPlacement.Floating, state.placement)
+    }
+
+    @Test
+    fun `a saved size is the user choice and does not follow the scale`() {
+        val state = stateFor(PersistedWindowGeometry(widthDp = 700, heightDp = 500), uiScalePercent = 150)
+
+        assertEquals(DpSize(700.dp, 500.dp), state.size)
+    }
+
+    /** Issue #273: a janela deixada no secundário volta para ele, e não presa ao primário. */
+    @Test
+    fun `a window left on the secondary monitor comes back there, fitted to it`() {
+        val state = stateFor(PersistedWindowGeometry(widthDp = 3000, heightDp = 600, xDp = 2400, yDp = 100))
+
+        assertEquals(DpSize(2560.dp - 24.dp, 600.dp), state.size, "maior que o monitor encolhe para a área útil dele")
+        assertTrue(state.position.x >= 1920.dp, "presa ao primário ela iria para x < 1920: ${state.position.x}")
+        assertEquals(100.dp, state.position.y)
+    }
+
+    @Test
+    fun `a maximized window comes back maximized`() {
+        val state = stateFor(PersistedWindowGeometry(placement = PersistedWindowPlacement.MAXIMIZED))
+
+        assertEquals(WindowPlacement.Maximized, state.placement)
     }
 
     private fun withTestSettings(block: (PreferencesSettings) -> Unit) {

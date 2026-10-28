@@ -1,6 +1,8 @@
 package com.usagemonitor
 
 import com.usagemonitor.data.datasource.TelegramBotApi
+import com.usagemonitor.data.datasource.TelegramRateLimitedException
+import com.usagemonitor.data.datasource.TelegramUnauthorizedException
 import com.usagemonitor.data.datasource.TelegramButton
 import com.usagemonitor.data.datasource.TelegramReplyKeyboard
 import com.usagemonitor.data.datasource.TelegramIncomingMessage
@@ -75,9 +77,13 @@ private class FakeTelegramApi : TelegramBotApi(HttpClient(MockEngine { respond("
 
     override suspend fun getMe(token: String): String = "usage_monitor_bot"
 
+    /** Falhas que o próximo long polling lança, uma por chamada. */
+    val failures = ConcurrentLinkedQueue<Exception>()
+
     override suspend fun getUpdates(token: String, offset: Long?, timeoutSeconds: Int): List<TelegramIncomingMessage> {
         if (offset == -1L) return emptyList()
         delay(20)
+        failures.poll()?.let { failure -> throw failure }
         return generateSequence { pending.poll() }.toList()
     }
 
@@ -1013,6 +1019,35 @@ class TelegramBotServiceTest {
         api.pending += message(2, chat = 51, text = "/status img")
         waitUntil { api.photos.isNotEmpty() }
         assertTrue(api.photos.single().second > 0)
+    }
+
+    @Test
+    fun `a rejected token is reported and polling stops asking with it`() {
+        paired()
+        api.failures += TelegramUnauthorizedException()
+        service.start()
+
+        waitUntil { service.status.value == TelegramBotStatus.TokenRejected }
+    }
+
+    @Test
+    fun `a network failure shows its cause on the status`() {
+        paired()
+        api.failures += java.io.IOException("rede caiu")
+        service.start()
+
+        waitUntil { service.status.value == TelegramBotStatus.Failed("rede caiu") }
+    }
+
+    @Test
+    fun `a rate limit waits the time asked and then keeps answering`() {
+        paired()
+        api.failures += TelegramRateLimitedException(retryAfterSeconds = 0)
+        service.start()
+        api.pending += message(1, chat = 51, text = "/status")
+
+        waitUntil { api.sent.any { (chat, _) -> chat == 51L } }
+        assertTrue(service.status.value is TelegramBotStatus.Connected)
     }
 
     /** Sem índice legível, a vazão e a comparação dizem que não leram, em vez de desenhar vazio. */
