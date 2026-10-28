@@ -1,5 +1,10 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.presentation.ui.TeamConnectionLabels
+import com.usagemonitor.presentation.ui.TeamCredentialKind
+import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.TeamServerException
@@ -93,6 +98,8 @@ data class TeamSyncStatus(
     val lastSuccessAt: Instant? = null,
     val lastFailureAt: Instant? = null,
     val lastFailureMessage: String? = null,
+    /** Etapa em que a última passada parou, quando o tipo da falha diz (#494). */
+    val lastFailure: TeamConnectionFailure? = null,
     /**
      * Contas que o servidor **recusou**, por `profileId`, com o motivo dele.
      *
@@ -114,6 +121,16 @@ data class TeamSyncStatus(
      */
     val isFailing: Boolean
         get() = lastFailureMessage != null
+
+    /**
+     * Texto do aviso de envio nas Configurações: a etapa quando classificada
+     * (#494), a mensagem crua quando não; nulo sem falha pendente.
+     */
+    fun failureText(language: AppLanguage): String? {
+        val message = lastFailureMessage ?: return null
+        val failure = lastFailure ?: return message
+        return TeamConnectionLabels.headline(failure, TeamCredentialKind.ACCOUNT_KEY, language)
+    }
 }
 
 /**
@@ -321,6 +338,7 @@ internal class TeamSyncService(
             current.copy(
                 lastFailureAt = now,
                 lastFailureMessage = failure.message ?: UNKNOWN_FAILURE_MESSAGE,
+                lastFailure = teamConnectionFailureOf(failure),
                 // Substitui, não acumula: a conta que deixou de ser recusada — o
                 // usuário a desmarcou, ou o admin corrigiu o rótulo — precisa
                 // sumir do aviso, e a passada corrente é quem sabe disso.

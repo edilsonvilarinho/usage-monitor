@@ -2,7 +2,11 @@ package com.usagemonitor
 
 import com.usagemonitor.data.datasource.LocalCliSessionDataSource
 import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.domain.entity.TeamConnectionStage
+import java.net.ConnectException
 import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
@@ -414,6 +418,29 @@ class TeamSyncServiceTest {
             assertTrue(status.isFailing)
             assertEquals("servidor fora", status.lastFailureMessage)
         }
+    }
+
+    @Test
+    fun `publica a etapa em que a passada parou`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(failure = ConnectException("Connection refused"))
+            val service = newService(syncState, repository)
+
+            service.syncOnce()
+
+            assertEquals(TeamConnectionStage.CONNECTION, service.syncStatus.value.lastFailure?.stage)
+        }
+    }
+
+    @Test
+    fun `o texto da falha de envio diz a etapa e cai na mensagem sem ela`() {
+        val classified = TeamSyncStatus(
+            lastFailureMessage = "Connection refused",
+            lastFailure = TeamConnectionFailure(stage = TeamConnectionStage.CONNECTION)
+        )
+        assertEquals("Parou em Conexão — nada responde", classified.failureText(AppLanguage.PT))
+        assertEquals("HTTP 500", TeamSyncStatus(lastFailureMessage = "HTTP 500").failureText(AppLanguage.EN))
+        assertEquals(null, TeamSyncStatus().failureText(AppLanguage.EN))
     }
 
     @Test

@@ -47,6 +47,8 @@ import com.usagemonitor.presentation.ui.components.TEAM_SYNC_STATUS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.viewmodel.TeamKeysUiState
+import com.usagemonitor.presentation.ui.TeamCredentialKind
+import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.domain.entity.TeamCertificateProblem
 import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamConnectionStage
@@ -132,6 +134,41 @@ class TeamAdminSectionTest {
     }
 
     @Test
+    fun `teste de conexao classificado mostra o caminho completo`() = runDesktopComposeUiTest {
+        renderSection(
+            settings = TeamIntegrationSettings(enabled = true, serverUrl = "https://time.local", apiKey = "chave"),
+            connection = TeamConnectionUiState(
+                status = TeamConnectionUiStatus.FAILED,
+                message = "(certificate_expired) PKIX path validation failed:",
+                failure = TeamConnectionFailure(stage = TeamConnectionStage.CERTIFICATE, certificateProblem = TeamCertificateProblem.EXPIRED)
+            )
+        )
+
+        // Uma etapa por linha, sem cortar: o print do #494 parava em "failed:".
+        onNodeWithText("Certificado").assertIsDisplayed()
+        onNodeWithText("venceu").assertIsDisplayed()
+        onNodeWithText("Chave").assertIsDisplayed()
+        onNodeWithText("O certificado do servidor venceu: quem administra o servidor precisa renová-lo. A chave não chegou a ser testada.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `validacao do token classificada nomeia o token admin`() = runDesktopComposeUiTest {
+        renderSection(
+            settings = TeamIntegrationSettings(enabled = true, serverUrl = "https://time.local", adminToken = "tok"),
+            adminConnection = TeamConnectionUiState(
+                status = TeamConnectionUiStatus.FAILED,
+                message = "lab.example",
+                failure = TeamConnectionFailure(stage = TeamConnectionStage.ADDRESS),
+                credentialKind = TeamCredentialKind.ADMIN_TOKEN
+            )
+        )
+
+        onNodeWithText("Token admin").assertIsDisplayed()
+        onNodeWithText("o nome não resolve").assertIsDisplayed()
+    }
+
+    @Test
     fun `sem falha nao ha aviso de envio`() = runDesktopComposeUiTest {
         renderSection(
             TeamIntegrationSettings(
@@ -204,7 +241,9 @@ class TeamAdminSectionTest {
         onExitAdminMode: () -> Unit = {},
         syncFailureMessage: String? = null,
         profiles: List<AnthropicProfileUiModel> = emptyList(),
-        rejectedProfiles: Map<String, String> = emptyMap()
+        rejectedProfiles: Map<String, String> = emptyMap(),
+        connection: TeamConnectionUiState = TeamConnectionUiState(),
+        adminConnection: TeamConnectionUiState = TeamConnectionUiState()
     ) {
         setContent {
             ScreenTestTheme(isDark = true) {
@@ -213,7 +252,7 @@ class TeamAdminSectionTest {
                         settings = settings,
                         language = AppLanguage.PT,
                         profiles = profiles,
-                        connection = TeamConnectionUiState(),
+                        connection = connection,
                         onEnabledChange = {},
                         onServerUrlChange = {},
                         onApiKeyChange = {},
@@ -222,6 +261,7 @@ class TeamAdminSectionTest {
                         onTestConnection = {},
                         syncFailureMessage = syncFailureMessage,
                         rejectedProfiles = rejectedProfiles,
+                        adminConnection = adminConnection,
                         onExitAdminMode = onExitAdminMode
                     )
                 }
