@@ -93,16 +93,6 @@ internal fun PersistAppWindowStates(
     PersistWindowFrame(windows.teamPresence, settings, TEAM_PRESENCE_WINDOW_GEOMETRY)
 }
 
-/** A moldura da janela como a geometria gravada a descreve. */
-internal fun windowGeometrySnapshotOf(position: WindowPosition, size: DpSize, placement: WindowPlacement) =
-    WindowGeometrySnapshot(
-        widthDp = size.width.value,
-        heightDp = size.height.value,
-        xDp = if (position.isSpecified) position.x.value else null,
-        yDp = if (position.isSpecified) position.y.value else null,
-        placement = placement
-    )
-
 @OptIn(FlowPreview::class)
 @Composable
 private fun PersistWindowFrame(state: WindowState, settings: PreferencesSettings, spec: WindowGeometrySpec) {
