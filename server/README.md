@@ -18,7 +18,7 @@ O `cwd` e o `gitBranch` revelam nomes de projeto e de branch. É o que permite o
 
 ## Stack
 
-Node 20 · Express 4 · TypeScript ESM · SQLite (`better-sqlite3`) · zod · pino · vitest + supertest.
+Node 22 · Express 4 · TypeScript ESM · SQLite (`better-sqlite3`) · zod · pino · vitest + supertest.
 
 Um arquivo SQLite em `${DATA_DIR}/team-usage.sqlite`. Sem serviço de banco separado.
 
