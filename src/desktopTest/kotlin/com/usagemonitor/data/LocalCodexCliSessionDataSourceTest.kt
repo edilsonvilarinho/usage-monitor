@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import kotlin.time.Instant
 
 class LocalCodexCliSessionDataSourceTest {
     @Test
@@ -124,6 +125,41 @@ class LocalCodexCliSessionDataSourceTest {
             assertEquals(128L, throughput?.outputTokens)
             assertEquals(4_000L, throughput?.generationMillis)
             assertEquals(32.0, throughput?.tokensPerSecond)
+        }
+    }
+
+    /** #386: uso por modelo somado no SQL; resposta sem duração medida não entra na vazão. */
+    @Test
+    fun `model usage sums per model and measures throughput only on timed responses`() = runTest {
+        withFixture { home, dataSource ->
+            rolloutFile(home).writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-a"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:04Z", 100, 40, 0, 128, 0, 228),
+                    contextLine("turn-2", "2026-09-08T12:01:00Z", "gpt-a"),
+                    usageLine("turn-2", "response-2", "2026-09-08T12:01:02Z", 10, 0, 0, 20, 0, 30),
+                    // Mesmo instante do contexto: sem duração, sem vazão.
+                    contextLine("turn-3", "2026-09-08T12:02:00Z", "gpt-b"),
+                    usageLine("turn-3", "response-3", "2026-09-08T12:02:00Z", 5, 0, 0, 50, 0, 55)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+
+            val byModel = dataSource.readModelUsage(sinceEpochMillis = null).associateBy { usage -> usage.model }
+
+            val a = byModel.getValue("gpt-a")
+            assertEquals(2, a.responseCount)
+            assertEquals(110L, a.inputTokens)
+            assertEquals(40L, a.cachedInputTokens)
+            assertEquals(148L, a.outputTokens)
+            assertEquals(258L, a.totalTokens)
+            assertEquals(148L, a.throughput?.outputTokens)
+            assertEquals(6_000L, a.throughput?.generationMillis)
+            assertEquals(null, byModel.getValue("gpt-b").throughput)
+
+            val since = Instant.parse("2026-09-08T12:01:30Z").toEpochMilliseconds()
+            assertEquals(listOf("gpt-b"), dataSource.readModelUsage(sinceEpochMillis = since).map { usage -> usage.model })
         }
     }
 
