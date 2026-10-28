@@ -3,6 +3,7 @@ package com.usagemonitor.presentation
 import com.usagemonitor.domain.entity.AnthropicProfileRef
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.AnthropicRepository
 import com.usagemonitor.domain.repository.CodexRepository
 import com.usagemonitor.domain.repository.DeepSeekRepository
@@ -45,7 +46,9 @@ class DashboardViewModelCadenceTest : DashboardViewModelTestSupport() {
         fetchTimes: MutableList<Long>,
         busy: MutableStateFlow<Boolean>,
         profiles: List<AnthropicProfileRef> = listOf(AnthropicProfileRef.DEFAULT),
-        clock: Clock = VirtualClock(startedAt, scheduler)
+        clock: Clock = VirtualClock(startedAt, scheduler),
+        quotaActive: MutableStateFlow<Set<UsageTargetKey>> = MutableStateFlow(emptySet()),
+        miniMaxFetchTimes: MutableList<Long>? = null
     ): DashboardViewModel {
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
@@ -54,15 +57,24 @@ class DashboardViewModelCadenceTest : DashboardViewModelTestSupport() {
             }
         }
         val unused = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
+        val miniMaxRepo = object : MiniMaxRepository {
+            override suspend fun getUsage(): Result<ApiUsageStats> {
+                val times = miniMaxFetchTimes ?: return unused
+                times += scheduler.currentTime
+                return Result.success(sampleMiniMaxStats)
+            }
+        }
+        val enabled = if (miniMaxFetchTimes == null) setOf(ApiSource.ANTHROPIC) else setOf(ApiSource.ANTHROPIC, ApiSource.MINIMAX)
         return DashboardViewModel(
             GetAnthropicUsageUseCase(anthropicRepo),
-            GetMiniMaxUsageUseCase(object : MiniMaxRepository { override suspend fun getUsage() = unused }),
+            GetMiniMaxUsageUseCase(miniMaxRepo),
             GetCodexUsageUseCase(object : CodexRepository { override suspend fun getUsage() = unused }),
             GetDeepSeekUsageUseCase(object : DeepSeekRepository { override suspend fun getUsage() = unused }),
-            MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            MutableStateFlow(enabled),
             historyUseCase(mutableListOf()),
             clock = clock,
             isBusy = busy,
+            quotaActiveTargets = quotaActive,
             anthropicProfiles = MutableStateFlow(profiles),
             config = DashboardViewModelConfig(
                 workerDispatcher = StandardTestDispatcher(scheduler),
@@ -122,6 +134,52 @@ class DashboardViewModelCadenceTest : DashboardViewModelTestSupport() {
         runCurrent()
 
         assertEquals(2, fetchTimes.size, "A sessão começando não antecipou a coleta")
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `usage detected by the quota drops only that target to one minute`() = runTest {
+        // #478: OpenCode Go, MiniMax e as outras fontes sem CLI só têm a cota como sinal.
+        val anthropicTimes = Collections.synchronizedList(mutableListOf<Long>())
+        val miniMaxTimes = Collections.synchronizedList(mutableListOf<Long>())
+        val quotaActive = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
+        val viewModel = cadenceViewModel(
+            testScheduler, anthropicTimes, MutableStateFlow(false),
+            quotaActive = quotaActive, miniMaxFetchTimes = miniMaxTimes
+        )
+
+        runCurrent()
+        assertEquals(1, miniMaxTimes.size, "A coleta inicial do MiniMax não aconteceu")
+        quotaActive.value = setOf(sampleMiniMaxStats.targetKey)
+        runCurrent()
+        assertEquals(1.minutes, viewModel.currentPollInterval.value)
+
+        advanceTimeBy(3.minutes + 1.seconds)
+        runCurrent()
+
+        assertEquals(4, miniMaxTimes.size, "Esperava a inicial e uma por minuto: $miniMaxTimes")
+        assertEquals(1, anthropicTimes.size, "A cota de outra fonte acelerou o Anthropic: $anthropicTimes")
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `a target returns to five minutes when its detected usage expires`() = runTest {
+        val anthropicTimes = Collections.synchronizedList(mutableListOf<Long>())
+        val quotaActive = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
+        val viewModel = cadenceViewModel(testScheduler, anthropicTimes, MutableStateFlow(false), quotaActive = quotaActive)
+
+        runCurrent()
+        quotaActive.value = setOf(sampleAnthropicStats.targetKey)
+        advanceTimeBy(2.minutes + 1.seconds)
+        runCurrent()
+        assertEquals(3, anthropicTimes.size, "Não acelerou com uso detectado: $anthropicTimes")
+
+        quotaActive.value = emptySet()
+        runCurrent()
+        assertEquals(5.minutes, viewModel.currentPollInterval.value)
+        advanceTimeBy(4.minutes)
+        runCurrent()
+        assertEquals(3, anthropicTimes.size, "Continuou a 60 s depois de o sinal vencer: $anthropicTimes")
         viewModel.onDestroy()
     }
 

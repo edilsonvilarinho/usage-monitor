@@ -134,7 +134,9 @@ class DashboardViewModel(
      * Há sessão CLI rodando (issue #269): a cadência cai de 5 min para 60 s. Global,
      * como no Codenotch.
      */
-    private val isBusy: StateFlow<Boolean> = MutableStateFlow(false),
+    isBusy: StateFlow<Boolean> = MutableStateFlow(false),
+    /** Alvos com a cota subindo (#478): só eles caem para 60 s; ver [DashboardCadence]. */
+    quotaActiveTargets: StateFlow<Set<UsageTargetKey>> = MutableStateFlow(emptySet()),
     private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
         MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
     /** Contas Codex extras (issue #329); a padrão (`~/.codex`) não entra aqui. */
@@ -170,13 +172,10 @@ class DashboardViewModel(
     private val lastPersistedNextRefreshAt = AtomicReference(persistedNextRefreshAt)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
-    private val _currentPollInterval = MutableStateFlow(pollIntervalFor(isBusy.value))
+    private val cadence = DashboardCadence(isBusy, quotaActiveTargets, config)
 
-    /**
-     * A cadência em vigor, 60 s ou 5 min (issue #269): é a volta inteira do
-     * relógio da contagem no balão da engrenagem (#293).
-     */
-    val currentPollInterval: StateFlow<Duration> = _currentPollInterval.asStateFlow()
+    /** A cadência em vigor (issue #269, #293); ver [DashboardCadence.currentPollInterval]. */
+    val currentPollInterval: StateFlow<Duration> = cadence.currentPollInterval
 
     private val _refreshingTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
     val refreshingTargets: StateFlow<Set<UsageTargetKey>> = _refreshingTargets.asStateFlow()
@@ -358,12 +357,7 @@ class DashboardViewModel(
     private fun startCountdown() {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
-            launch {
-                isBusy.collect { busy ->
-                    _currentPollInterval.value = pollIntervalFor(busy)
-                    nudgeCountdown()
-                }
-            }
+            launch { cadence.collectChanges(::nudgeCountdown) }
             launch { isAppVisible.collect { visible -> if (visible) nudgeCountdown() } }
             while (true) {
                 // Uma volta que lança não pode encerrar o laço (issue #326): o
@@ -385,7 +379,7 @@ class DashboardViewModel(
         val now = clock.now()
         val visible = isAppVisible.value
         val tick = stateMutex.withLock {
-            scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, isBusy.value, config)
+            scheduler.dueTargets(enabledTargets(), cachedStatsByTarget::get, now, cadence::isBusy, config)
         }
         val dispatch = if (visible) tick.due else tick.byReset
         if (dispatch.isNotEmpty()) {
@@ -405,17 +399,14 @@ class DashboardViewModel(
         }
     }
 
-    private fun pollIntervalFor(busy: Boolean): Duration =
-        if (busy) config.activePollInterval else config.idlePollInterval
-
     /**
      * Publica a próxima coleta por cadência — o instante que o rodapé e a HUD
      * contam — e a grava para o arranque seguinte. O reset não entra: é uma
      * antecipação, não um novo prazo a anunciar.
      */
     private fun publishNextPoll(now: Instant = clock.now()): Instant {
-        val next = scheduler.nextPollAt(enabledTargets(), now, isBusy.value, config)
-            ?: (now + pollIntervalFor(isBusy.value))
+        val next = scheduler.nextPollAt(enabledTargets(), now, cadence::isBusy, config)
+            ?: (now + cadence.fallbackInterval())
         _nextRefreshAt.value = next
         if (lastPersistedNextRefreshAt.getAndSet(next) != next) {
             onNextRefreshAtChanged(next)

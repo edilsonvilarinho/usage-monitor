@@ -65,7 +65,7 @@ internal class DashboardRefreshScheduler(
         targets: Set<UsageTargetKey>,
         statsOf: (UsageTargetKey) -> ApiUsageStats?,
         now: Instant,
-        busy: Boolean,
+        busy: (UsageTargetKey) -> Boolean,
         config: DashboardViewModelConfig
     ): DueTargets {
         return synchronized(lock) {
@@ -78,7 +78,7 @@ internal class DashboardRefreshScheduler(
                     now = now,
                     lastAttemptAt = attempt,
                     backoffUntil = backoffUntil[target],
-                    busy = busy,
+                    busy = busy(target),
                     resetRolledOver = rolledOver,
                     activeInterval = config.activePollInterval,
                     idleInterval = config.idlePollInterval
@@ -93,14 +93,14 @@ internal class DashboardRefreshScheduler(
     }
 
     /** A próxima coleta por cadência entre [targets] — o instante que o rodapé e a HUD contam. */
-    fun nextPollAt(targets: Set<UsageTargetKey>, now: Instant, busy: Boolean, config: DashboardViewModelConfig): Instant? {
+    fun nextPollAt(targets: Set<UsageTargetKey>, now: Instant, busy: (UsageTargetKey) -> Boolean, config: DashboardViewModelConfig): Instant? {
         return synchronized(lock) {
             targets.minOfOrNull { target ->
                 nextDueAt(
                     now = now,
                     lastAttemptAt = attemptOf(target),
                     backoffUntil = backoffUntil[target],
-                    busy = busy,
+                    busy = busy(target),
                     activeInterval = config.activePollInterval,
                     idleInterval = config.idlePollInterval
                 )
