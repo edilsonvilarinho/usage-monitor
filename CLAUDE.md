@@ -234,6 +234,8 @@ servidor do time.** Regras:
 - `until` é semiaberto. Métricas: BigInt, gauges de janela, sem `session_id`/`cwd` como rótulo.
 - Ordem das listas do time: total, determinística, sem carimbo de tempo no comparador.
 - Nunca trafega conteúdo de prompt ou resposta.
+- Falha com o servidor de time aparece pela **etapa** (`teamConnectionFailureOf`, #494), classificada por tipo; nunca a
+  exceção crua, nunca "confiar mesmo assim" no certificado.
 
 ## Sistema visual
 
