@@ -1,6 +1,6 @@
 ---
 name: usage-monitor-release-video
-description: Make the usage-monitor release video for Instagram, TikTok and X — vertical 1080×1920, PT and EN, synthetic voice (Piper), burned-in captions plus .srt, the app's design system, unhurried pace, every change of the version — and the post text for X, Instagram and TikTok. Use for "vídeo da release/versão", "vídeo de lançamento", "vídeo para o insta/tiktok", "descrição para X/Instagram/TikTok".
+description: Make the usage-monitor release video for Instagram, TikTok and X — vertical 1080×1920, PT and EN, synthetic voice (Piper), burned-in captions plus .srt, the app's design system, unhurried pace, every change of the version — and the post text for X, Instagram and TikTok. Also the 16:9 video tour of the whole app (5–10 min, Kokoro voice, space soundtrack, sound effects, themed transitions). Use for "vídeo da release/versão", "vídeo de lançamento", "vídeo para o insta/tiktok", "descrição para X/Instagram/TikTok", "tour em vídeo", "vídeo do app inteiro".
 ---
 
 # Usage Monitor — vídeo de lançamento
@@ -53,6 +53,32 @@ versionados em `docs/planos/video-v<maior>-<menor>/`.
    (duração, caracteres/s mais alto) e a tabela de cenas EN/PT — o mesmo formato de `video-v41-11/roteiro.md`.
 9. **Entrega ao dono** (≤ 15 linhas): caminho dos arquivos, duração, e o texto de cada rede está no `social.md`.
 
+## Tour em vídeo 16:9 (#505)
+
+O tour de todas as funcionalidades é outro alvo da mesma skill, com regras próprias: roteiro em
+`docs/planos/video-tour/scenes.json`, saída em `~/Videos/usage-monitor/tour/usage-monitor-tour-{en,pt}.mp4` + `.srt`.
+
+| Regra | Como é garantida |
+|---|---|
+| 1920×1080, 30 fps, **5 a 10 min** | `TOUR_PACING` (`timeline.mjs`) falha abaixo de 300 s ou acima de 600 s |
+| Sem pressa | ≤ 14 caracteres/s, 1,4 s de respiro; conserto é cortar texto ou baixar `voice.speed`, nunca acelerar |
+| Voz | Kokoro `pf_dora` (PT) e `am_michael` (EN), escolhidas pelo dono ouvindo amostras; `voice` no roteiro |
+| Capturas reais nos dois idiomas | as demos da ajuda a 2× em PNG: `gradlew.bat generateVideoMedia -PvideoMediaLanguage=en` (o `make-tour.mjs` roda sozinho se faltar `build/video-media/<idioma>`) |
+| Trilha e efeitos | `soundtrack.py`, sintetizados (sem amostra de terceiros), semente fixa; efeitos nos instantes de `soundEvents`; trilha abaixa sob a fala (sidechain) |
+| Transições do tema | lente gravitacional + cartão do capítulo, deslize de captura, foco com contorno azul, digitação; anel Gargantua só na abertura e no fechamento |
+
+```bash
+node .claude/skills/usage-monitor-release-video/scripts/make-tour.mjs --stills   # conferência (~2 min)
+node .claude/skills/usage-monitor-release-video/scripts/make-tour.mjs --only en  # um idioma (~20 min)
+node .claude/skills/usage-monitor-release-video/scripts/make-tour.mjs --remix     # só o áudio, sobre o vídeo mudo
+```
+
+Mixagem com ganhos fixos e `loudnorm` **linear** em duas passadas: o de uma passada é dinâmico e levantou a trilha nos
+respiros até o nível da fala (medido no #505). Roteiro e medições: `docs/planos/video-tour/roteiro.md`.
+
+Cena `screen` do tour: `media: [{ "media": "<mediaId da ajuda>", "bar", "focus": [x, y, l, a], "crop": [x, y, l, a] }]`, em dp da cena
+de 1000×420 da ajuda; várias capturas dividem o capítulo. `steps` e `commands` como no vídeo de release.
+
 ## Formato do `scenes.json`
 
 ```json
@@ -88,6 +114,9 @@ legível no celular com escala ≥ 1,2 (recorte de até ~720 px). `commands`: di
 | `assets/video.html` | renderizador: `renderFrame(t)` puro, sem relógio nem transição CSS |
 | `scripts/render.mjs` | Chrome sem tela → JPEG → ffmpeg; `--stills` |
 | `scripts/make-video.mjs` | orquestra; áudio: falas no instante da cena + drone 55/82 Hz a −16 dB, `loudnorm` −16 LUFS |
+| `scripts/make-tour.mjs` | orquestra o tour 16:9: capturas, falas, trilha, render e mixagem com ducking |
+| `assets/tour.html` | renderizador do tour: `renderFrame(t)` puro, espera decodificar a captura nova |
+| `scripts/soundtrack.py` | trilha espacial e efeitos sonoros do tour, sintetizados |
 | `scripts/setup-tools.mjs` | instala as ferramentas fora de `build/` (o `gradlew clean` apagou o pipeline da 41.11) |
 
 Testes: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs`.

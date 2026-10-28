@@ -1,6 +1,7 @@
 package com.usagemonitor.screenshots
 
 import com.usagemonitor.HUD_BALLOON_ACTIONS
+import com.usagemonitor.presentation.ui.localized
 import com.usagemonitor.presentation.ui.components.CardActionButton
 import com.usagemonitor.presentation.ui.components.CardIconActionButton
 import com.usagemonitor.presentation.ui.components.RefreshGlyph
@@ -79,14 +80,15 @@ private const val WIDTH_DP = 1_000
 private const val HEIGHT_DP = 420
 
 fun main(args: Array<String>) {
-    val outputDir = File(args.firstOrNull() ?: "src/desktopMain/resources/help")
-    outputDir.mkdirs()
+    val options = parseHelpMediaArgs(args)
+    options.outputDir.mkdirs()
 
     // Um roteiro por tópico, na ordem de leitura da ajuda. `-PhelpMediaTopic=<id>`
     // grava só aqueles, separados por vírgula (`history` continua valendo):
     // acertar a ponta do ponteiro pede várias passadas, e regravar as dezessete a
-    // cada uma é desperdício.
-    val recorders: List<Pair<HelpTopic, (File) -> Unit>> = listOf(
+    // cada uma é desperdício. `--frames --language=en` grava o mesmo roteiro para o
+    // tour em vídeo (#505), ver [HelpMediaOptions].
+    val recorders: List<Pair<HelpTopic, (HelpMediaOptions) -> Unit>> = listOf(
         HelpTopic.DASHBOARD to ::recordIntegrations,
         HelpTopic.ACCOUNTS to ::recordAccounts,
         HelpTopic.HISTORY to ::recordHistory,
@@ -105,32 +107,27 @@ fun main(args: Array<String>) {
         HelpTopic.APPEARANCE to ::recordAppearance,
         HelpTopic.UPDATES to ::recordUpdates
     )
-    val only = if ("--history" in args) {
-        HelpCatalog.mediaId(HelpTopic.HISTORY)
-    } else {
-        args.firstOrNull { arg -> arg.startsWith("--topic=") }?.removePrefix("--topic=")
-    }
     recorders
-        .filter { (topic, _) -> only == null || HelpCatalog.mediaId(topic) in only.split(",") }
-        .forEach { (_, recordTopic) -> recordTopic(outputDir) }
+        .filter { (topic, _) -> options.topics == null || HelpCatalog.mediaId(topic) in options.topics }
+        .forEach { (_, recordTopic) -> recordTopic(options) }
 
-    println("Demos geradas em ${outputDir.absolutePath}")
+    println("Demos geradas em ${options.outputDir.absolutePath}")
 }
 
 // --- Roteiros ----------------------------------------------------------------
 
 /** Histórico: resumo antes do gráfico, filtros e ação de relatório PDF. */
-private fun recordHistory(outputDir: File) {
+private fun recordHistory(options: HelpMediaOptions) {
     val state = DemoState()
     val historyViewModel = fixedHistoryViewModel(issue383HistoryReports().first())
 
     try {
-        record(outputDir, HelpTopic.HISTORY, state) { recorder ->
+        record(options, HelpTopic.HISTORY, state) { recorder ->
             recorder.setContent {
                 DemoScene(state) {
                     HistoryScreen(
                         viewModel = historyViewModel,
-                        language = AppLanguage.PT,
+                        language = options.language,
                         onBack = {},
                         focusedSource = ApiSource.ANTHROPIC,
                         showSourceSelector = false
@@ -149,15 +146,15 @@ private fun recordHistory(outputDir: File) {
 }
 
 /** Sessões CLI: o cabeçalho da janela e a lista, percorrida de cima a baixo. */
-private fun recordCliSessions(outputDir: File) {
+private fun recordCliSessions(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 520.dp)
 
-    record(outputDir, HelpTopic.CLI_SESSIONS, state) { recorder ->
+    record(options, HelpTopic.CLI_SESSIONS, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 CliSessionsContent(
                     state = sessionsState(),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onSelectRange = {},
                     onOpenSession = {},
                     onCloseDetail = {}
@@ -173,10 +170,10 @@ private fun recordCliSessions(outputDir: File) {
 }
 
 /** Resumo por eixo: os totais da janela e, deslocando, os baldes do eixo. */
-private fun recordBreakdown(outputDir: File) {
+private fun recordBreakdown(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 700.dp)
 
-    record(outputDir, HelpTopic.BREAKDOWN, state) { recorder ->
+    record(options, HelpTopic.BREAKDOWN, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 CliSessionsContent(
@@ -184,7 +181,7 @@ private fun recordBreakdown(outputDir: File) {
                         view = CliSessionsView.BREAKDOWN,
                         breakdown = ScreenshotFixtures.cliBreakdown
                     ),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onSelectRange = {},
                     onOpenSession = {},
                     onCloseDetail = {}
@@ -205,10 +202,10 @@ private fun recordBreakdown(outputDir: File) {
  * O painel vive no resumo e não numa tela própria, então a demo mostra onde ele
  * de fato aparece — o passo de ativação é que manda ao campo das Configurações.
  */
-private fun recordBudget(outputDir: File) {
+private fun recordBudget(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 700.dp)
 
-    record(outputDir, HelpTopic.BUDGET, state) { recorder ->
+    record(options, HelpTopic.BUDGET, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 CliSessionsContent(
@@ -218,7 +215,7 @@ private fun recordBudget(outputDir: File) {
                         budget = ScreenshotFixtures.monthlyBudget,
                         accountCredits = ScreenshotFixtures.accountCredits
                     ),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onSelectRange = {},
                     onOpenSession = {},
                     onCloseDetail = {}
@@ -241,19 +238,19 @@ private fun recordBudget(outputDir: File) {
  * É a única demo em que o clique muda o próprio controle apontado — nas demais o
  * ponteiro aciona e a tela reage em outro lugar.
  */
-private fun recordAlerts(outputDir: File) {
+private fun recordAlerts(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 620.dp)
     var settings by mutableStateOf(
         UsageAlertSettings.DEFAULT.copy(stalledSessionAlertsEnabled = false)
     )
 
-    record(outputDir, HelpTopic.ALERTS, state) { recorder ->
+    record(options, HelpTopic.ALERTS, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 Box(modifier = Modifier.fillMaxSize().padding(AppSpacing.lg)) {
                     AlertSettingsSection(
                         settings = settings,
-                        language = AppLanguage.PT,
+                        language = options.language,
                         onSettingsChange = {},
                         budgetText = "150.00"
                     )
@@ -279,16 +276,16 @@ private fun recordAlerts(outputDir: File) {
  * arquivo, que não existe numa cena offscreen. O que a demo mostra é o estado
  * seguinte, que é o que a tela realmente exibe quando a gravação termina.
  */
-private fun recordExport(outputDir: File) {
+private fun recordExport(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 460.dp)
     var outcome by mutableStateOf<CliExportOutcome?>(null)
 
-    record(outputDir, HelpTopic.EXPORT, state) { recorder ->
+    record(options, HelpTopic.EXPORT, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 CliSessionsContent(
                     state = sessionsState(exportOutcome = outcome),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onSelectRange = {},
                     onOpenSession = {},
                     onCloseDetail = {}
@@ -308,11 +305,11 @@ private fun recordExport(outputDir: File) {
 }
 
 /** Visão de time: o consumo por integrante, com um deles expandido. */
-private fun recordTeam(outputDir: File) {
+private fun recordTeam(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 560.dp)
     var expanded by mutableStateOf(emptySet<String>())
 
-    record(outputDir, HelpTopic.TEAM, state) { recorder ->
+    record(options, HelpTopic.TEAM, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 TeamUsageContent(
@@ -325,7 +322,7 @@ private fun recordTeam(outputDir: File) {
                         lastChangedAt = ScreenshotFixtures.NOW,
                         expandedMemberKeys = expanded
                     ),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     onSelectRange = {},
                     onToggleMember = {}
                 )
@@ -351,11 +348,11 @@ private fun recordTeam(outputDir: File) {
  * saíram idênticos, e `HelpMediaResourcesTest` reprovou: imagem parada vendida
  * como demo. O filtro é o movimento que a tela de fato tem.
  */
-private fun recordPresence(outputDir: File) {
+private fun recordPresence(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 430.dp)
     var onlyOnline by mutableStateOf(false)
 
-    record(outputDir, HelpTopic.PRESENCE, state) { recorder ->
+    record(options, HelpTopic.PRESENCE, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 TeamPresenceContent(
@@ -365,7 +362,7 @@ private fun recordPresence(outputDir: File) {
                         lastChangedAt = ScreenshotFixtures.NOW,
                         onlyOnline = onlyOnline
                     ),
-                    language = AppLanguage.PT,
+                    language = options.language,
                     localDeviceId = ScreenshotFixtures.LOCAL_DEVICE_ID,
                     canManage = true
                 )
@@ -387,10 +384,10 @@ private fun recordPresence(outputDir: File) {
  * Mostrava antes a janela padrão e depois a HUD, com fade; a janela padrão saiu
  * do app, e o vazio em volta do notch é o assunto — é a área de tela que ele deixa.
  */
-private fun recordWindowModes(outputDir: File) {
+private fun recordWindowModes(options: HelpMediaOptions) {
     val state = DemoState()
 
-    record(outputDir, HelpTopic.WINDOW_MODES, state) { recorder ->
+    record(options, HelpTopic.WINDOW_MODES, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 Box(
@@ -401,19 +398,20 @@ private fun recordWindowModes(outputDir: File) {
                     // anel: o balão daquela conta. Os tamanhos são os da
                     // geometria, a mesma que dimensiona a janela no app.
                     HudNotch(
-                        accounts = ScreenshotFixtures.hudAccounts,
+                        accounts = ScreenshotFixtures.hudAccountsIn(options.language),
                         edge = HudEdge.TOP,
                         sizes = HUD_DEMO_SIZES,
                         fallbackLabel = "Carregando",
                         expanded = true,
+                        language = options.language,
                         initialBalloonIndex = 0,
                         // Os botões do card da conta, pela mesma regra do card
                         // (conta do time marcada, como na captura do dashboard).
                         accountActions = { account ->
                             cardActionsFor(account.targetKey, setOf("padrao")).forEach { action ->
-                                CardActionButton(action, AppLanguage.PT, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
+                                CardActionButton(action, options.language, HUD_BALLOON_ACTIONS, 16.dp, onClick = {})
                             }
-                            CardIconActionButton(label = "Atualizar", onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
+                            CardIconActionButton(label = localized(options.language, "Atualizar", "Refresh"), onClick = {}, buttonSize = HUD_BALLOON_ACTIONS) { tint ->
                                 RefreshGlyph(refreshing = false, tint = tint, size = 16.dp)
                             }
                         }
@@ -428,16 +426,16 @@ private fun recordWindowModes(outputDir: File) {
 }
 
 /** Aparência: tema, idioma e escala, na aba Geral das Configurações. */
-private fun recordAppearance(outputDir: File) {
+private fun recordAppearance(options: HelpMediaOptions) {
     val state = DemoState(contentHeight = 700.dp)
     var theme by mutableStateOf(AppThemePreset.OBSIDIANA_DARK)
 
-    record(outputDir, HelpTopic.APPEARANCE, state) { recorder ->
+    record(options, HelpTopic.APPEARANCE, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 SettingsDialogContent(
                     currentTheme = theme,
-                    currentLanguage = AppLanguage.PT,
+                    currentLanguage = options.language,
                     enabledApis = ScreenshotFixtures.enabledApis,
                     autoStartEnabled = true,
                     windowOpacityPercent = 92,
@@ -466,19 +464,19 @@ private fun recordAppearance(outputDir: File) {
  * ativação, que o texto do tópico já descreve, e o que se quer mostrar é o que
  * acontece depois de ligá-lo.
  */
-private fun recordUpdates(outputDir: File) {
+private fun recordUpdates(options: HelpMediaOptions) {
     val state = DemoState()
     var update by mutableStateOf<AppUpdateUiState>(
         AppUpdateUiState.Downloading(DEMO_UPDATE, percent = 42)
     )
 
-    record(outputDir, HelpTopic.UPDATES, state) { recorder ->
+    record(options, HelpTopic.UPDATES, state) { recorder ->
         recorder.setContent {
             DemoScene(state) {
                 Column(modifier = Modifier.fillMaxSize().padding(AppSpacing.lg)) {
                     AppUpdateBanner(
                         state = update,
-                        language = AppLanguage.PT,
+                        language = options.language,
                         onOpenRelease = {},
                         onRestartAndUpdate = {}
                     )
@@ -491,7 +489,7 @@ private fun recordUpdates(outputDir: File) {
                             .weight(1f)
                             .padding(top = AppSpacing.md)
                     ) {
-                        DemoDashboardBackdrop(padding = 0.dp)
+                        DemoDashboardBackdrop(options.language, padding = 0.dp)
                     }
                 }
             }
@@ -516,7 +514,7 @@ private fun recordUpdates(outputDir: File) {
  * como saber do que elas são vizinhas.
  */
 @Composable
-private fun DemoDashboardBackdrop(padding: Dp = AppSpacing.lg) {
+private fun DemoDashboardBackdrop(language: AppLanguage, padding: Dp = AppSpacing.lg) {
     // Coluna rolável, como no dashboard de verdade — e não uma caixa qualquer.
     // A grade é um `Layout` próprio que devolve a altura do conteúdo inteiro:
     // fora de um contêiner rolável ela transborda a caixa, é ancorada pelo
@@ -534,7 +532,7 @@ private fun DemoDashboardBackdrop(padding: Dp = AppSpacing.lg) {
             refreshingTargets = emptySet(),
             minimizedCards = emptySet(),
             riskSummaries = ScreenshotFixtures.dashboardRiskSummaries,
-            language = AppLanguage.PT,
+            language = language,
             onRefreshCard = {},
             onMoveCardToIndex = { _, _ -> },
             onToggleCardMinimized = {},
@@ -607,24 +605,32 @@ internal fun SceneRecorder.panTo(state: DemoState, to: Dp, durationMillis: Long)
  * eventualmente divergiria — a demo simplesmente sumiria da tela, sem erro.
  */
 internal fun record(
-    outputDir: File,
+    options: HelpMediaOptions,
     topic: HelpTopic,
     state: DemoState,
     script: (SceneRecorder) -> Unit
 ) {
-    val recorder = SceneRecorder(widthDp = WIDTH_DP, heightDp = HEIGHT_DP)
+    // O vídeo guarda o quadro a 2×; o GIF da ajuda continua reduzido à metade.
+    val frames = options.format == HelpMediaFormat.FRAMES
+    val recorder = SceneRecorder(widthDp = WIDTH_DP, heightDp = HEIGHT_DP, downsample = !frames)
     try {
         state.cursor.pose = state.cursor.pose.copy(visible = false)
         script(recorder)
 
-        val file = File(outputDir, "${HelpCatalog.mediaId(topic)}.gif")
-        GifEncoder.write(file, recorder.frames)
-
+        val mediaId = HelpCatalog.mediaId(topic)
         val seconds = recorder.frames.sumOf { frame -> frame.delayMillis } / 1_000.0
-        println(
-            "  ${file.name} (${WIDTH_DP}x$HEIGHT_DP, ${recorder.frames.size} quadros, %.1fs, %.0f KB)"
-                .format(seconds, file.length() / 1_024.0)
-        )
+        if (frames) {
+            val dir = options.framesDir(mediaId)
+            FrameSequenceWriter.write(dir, recorder.frames)
+            println("  $dir (${recorder.frames.size} quadros, %.1fs)".format(seconds))
+        } else {
+            val file = File(options.outputDir, "$mediaId.gif")
+            GifEncoder.write(file, recorder.frames)
+            println(
+                "  ${file.name} (${WIDTH_DP}x$HEIGHT_DP, ${recorder.frames.size} quadros, %.1fs, %.0f KB)"
+                    .format(seconds, file.length() / 1_024.0)
+            )
+        }
     } finally {
         recorder.close()
     }

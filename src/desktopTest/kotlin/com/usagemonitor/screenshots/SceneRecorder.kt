@@ -38,7 +38,9 @@ import java.awt.image.BufferedImage
 internal class SceneRecorder(
     widthDp: Int,
     heightDp: Int,
-    private val frameMillis: Long = FRAME_MILLIS
+    private val frameMillis: Long = FRAME_MILLIS,
+    /** `false` guarda o quadro a 2×: é o que o tour em vídeo usa (#505). */
+    private val downsample: Boolean = true
 ) {
 
     val frames = mutableListOf<GifFrame>()
@@ -108,7 +110,8 @@ internal class SceneRecorder(
         // A mutação de estado veio de fora de qualquer snapshot; sem isto o
         // recompositor só a enxergaria no quadro seguinte, ou em nenhum.
         Snapshot.sendApplyNotifications()
-        return scene.render(sceneNanos).toBufferedImage().downsampleByTwo()
+        val image = scene.render(sceneNanos).toBufferedImage()
+        return if (downsample) image.downsampleByTwo() else image
     }
 
     companion object {
