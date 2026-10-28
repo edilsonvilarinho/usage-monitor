@@ -47,6 +47,20 @@ runner starts. `ci-ok` runs always, treats `skipped` as success and `failure`/`c
 and is the single check branch protection should require. Every test job that runs publishes counts
 and slowest classes to `$GITHUB_STEP_SUMMARY`, and `--require` fails it when no XML was produced.
 
+**`main` is guarded by a repository ruleset** (`main`, id 26043016, created 2026-10-28, #496): changes only through a
+pull request (no approval required), the `ci-ok` check from the GitHub Actions app (`integration_id` 15368, so a
+commit status with the same name from elsewhere does not count), no deletion, no force-push; `strict` off (no forced
+rebase on a stale base). The only bypass is the admin role in `pull_request` mode: an admin may merge a PR past the
+rules, but nobody pushes to `main` directly — the `gh` token is the owner's, so an agent with it would otherwise
+bypass everything. The repository has `allow_auto_merge` and `delete_branch_on_merge` on: a PR opened with
+`gh pr merge --auto --merge` merges when `ci-ok` passes and loses its remote branch. Before #496 nothing enforced
+`ci-ok` (`branches/main/protection` returned 404, no ruleset). To inspect or change:
+
+```bash
+gh api repos/edilsonvilarinho/usage-monitor/rulesets/26043016
+gh api repos/edilsonvilarinho/usage-monitor/rules/branches/main --jq '[.[].type]'
+```
+
 The scripts in `tools/ci/` have `node:test` tests in `tools/ci/test/`, run by the `ci-scripts` job whenever
 `tools/ci/` changes (`node --test "tools/ci/test/*.test.mjs"`, Node 22 for the glob). `tools/ci/ci-incidents.mjs`
 counts the incidents of step 5 of the workflow in `CLAUDE.md` (#496): red `ci.yml` runs of the branch, including

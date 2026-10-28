@@ -328,7 +328,8 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
   merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
 
 - Workflows (#344): `ci.yml` único — job `changes` recorta por path, jobs em paralelo só do que
-  mudou, **`ci-ok` é o check único** (pulado conta como sucesso); `release-linux.yml` só por tag,
+  mudou, **`ci-ok` é o check único** (pulado conta como sucesso), exigido pelo ruleset `main` (#496: só por PR, sem
+  force-push, bypass de admin só por PR); `release-linux.yml` só por tag,
   **versão vem da tag** (`-PappVersion`), sem commit de bump. Cache do Gradle pela
   `gradle/actions/setup-gradle`, gravado só na `main` — tag e CodeQL só leem.
 - CI roda com `-PtestForks=3`; localmente 1. Com forks, `extractSkikoNative` roda antes. **Verde
