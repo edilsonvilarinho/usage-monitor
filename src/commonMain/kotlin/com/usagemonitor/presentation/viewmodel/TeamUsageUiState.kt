@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CliSessionHealthTally
@@ -28,7 +29,11 @@ sealed interface TeamUsageUiState {
     data class Error(
         val message: String,
         val range: CliSessionRange = CliSessionRange.DEFAULT,
-        val accountLabel: String? = null
+        val accountLabel: String? = null,
+        /** Onde a conexão parou (#494); nulo quando o tipo da falha não diz. */
+        val failure: TeamConnectionFailure? = null,
+        /** Visão global: a credencial testada é o token admin, não a chave. */
+        val isAdminOverview: Boolean = false
     ) : TeamUsageUiState
 
     data class Success(
@@ -419,7 +424,8 @@ sealed interface TeamSessionDetailUiState {
         override val deviceId: String,
         override val sessionId: String,
         val message: String,
-        override val accountKey: String? = null
+        override val accountKey: String? = null,
+        val failure: TeamConnectionFailure? = null
     ) : TeamSessionDetailUiState
 
     data class Ready(

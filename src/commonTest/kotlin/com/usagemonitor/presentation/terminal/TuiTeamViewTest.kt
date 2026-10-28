@@ -1,5 +1,9 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.TeamCertificateProblem
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.domain.entity.TeamConnectionStage
+
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CollectorKind
 import kotlin.test.Test
@@ -63,6 +67,17 @@ class TuiTeamViewTest {
         val never = screen(team.copy(members = emptyList(), failure = "x", unreachable = true, readAt = null))
         assertTrue(never[3].startsWith("│ trabalho ") && "pessoas" !in never[3], never[3])
         assertTrue(never.any { line -> "Ainda sem números do time; tenta de novo na próxima leitura." in line })
+    }
+
+    @Test
+    fun `falha classificada diz onde parou e o caminho com os glifos da tabela`() {
+        val failure = TeamConnectionFailure(stage = TeamConnectionStage.CERTIFICATE, certificateProblem = TeamCertificateProblem.EXPIRED)
+        val lines = screen(team.copy(failure = "(certificate_expired) PKIX", unreachable = true, connectionFailure = failure, readAt = now - 15.minutes))
+
+        assertTrue(lines.any { line -> "│ ▲ Parou em Certificado — venceu" in line }, lines.joinToString("\n"))
+        // Sem glifo novo: ✓ feito, ▲ aviso, – pulado; entre etapas, espaço.
+        assertTrue(lines.any { line -> "✓ Endereço  ✓ Conexão  ▲ Certificado  – Servidor  – Chave" in line }, lines.joinToString("\n"))
+        assertTrue(lines.none { line -> "PKIX" in line })
     }
 
     @Test

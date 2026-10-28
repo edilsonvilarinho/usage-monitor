@@ -1,5 +1,9 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.domain.entity.TeamConnectionStage
+import com.usagemonitor.presentation.ui.TeamCredentialKind
+import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -189,7 +193,8 @@ internal class AppSettingsFeedback(
                 breadcrumbs.recordFailure("testar conexão do time", healthError)
                 teamConnection = TeamConnectionUiState(
                     status = TeamConnectionUiStatus.FAILED,
-                    message = healthError.message ?: pick("Falha desconhecida.", "Unknown failure.")
+                    message = healthError.message ?: pick("Falha desconhecida.", "Unknown failure."),
+                    failure = teamConnectionFailureOf(healthError)
                 )
                 return@launch
             }
@@ -209,6 +214,9 @@ internal class AppSettingsFeedback(
             }
 
             val failures = mutableListOf<String>()
+            // Falha que parou antes da credencial (rede, certificado, servidor) é a
+            // mesma para todas as contas: vira o caminho, não uma linha por conta.
+            var unreachable: TeamConnectionFailure? = null
             for (target in targets) {
                 val label = profileLabel(target.profileId) ?: target.profileId
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
@@ -219,6 +227,10 @@ internal class AppSettingsFeedback(
                 if (error != null) {
                     breadcrumbs.recordFailure("validar vínculo de conta com a chave do time", error)
                     failures += "$label: ${error.message.orEmpty()}"
+                    val stage = teamConnectionFailureOf(error)
+                    if (stage != null && stage.stage != TeamConnectionStage.CREDENTIAL) {
+                        unreachable = stage
+                    }
                 } else if (result.getOrNull()?.authorized != true) {
                     breadcrumbs.recordFailure(
                         "validar vínculo de conta com a chave do time",
@@ -237,7 +249,7 @@ internal class AppSettingsFeedback(
                     )
                 )
             } else {
-                TeamConnectionUiState(status = TeamConnectionUiStatus.FAILED, message = failures.joinToString(" • "))
+                TeamConnectionUiState(status = TeamConnectionUiStatus.FAILED, message = failures.joinToString(" • "), failure = unreachable)
             }
         }
     }
@@ -252,7 +264,9 @@ internal class AppSettingsFeedback(
                 breadcrumbs.recordFailure("validar token administrativo do time", error)
                 TeamConnectionUiState(
                     status = TeamConnectionUiStatus.FAILED,
-                    message = error.message ?: pick("Falha desconhecida.", "Unknown failure.")
+                    message = error.message ?: pick("Falha desconhecida.", "Unknown failure."),
+                    failure = teamConnectionFailureOf(error),
+                    credentialKind = TeamCredentialKind.ADMIN_TOKEN
                 )
             }
         }

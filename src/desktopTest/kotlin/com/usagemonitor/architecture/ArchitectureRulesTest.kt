@@ -388,7 +388,7 @@ class ArchitectureRulesTest {
         val SECRET_PROPERTY = Regex("""(?i)\w*token|\w*apikey|password|\w*secret|cookie|capsid""")
 
         /** Medido em 2026-10-14, depois de B1/B2 do plano `boas-praticas-377`. Só desce. */
-        const val INLINE_LANGUAGE_CHECKS_CEILING = 705
+        const val INLINE_LANGUAGE_CHECKS_CEILING = 702
 
         /** Tetos congelados em 2026-09-26. Só encolhem. */
         val FILE_CEILINGS: Map<String, Int> = emptyMap()

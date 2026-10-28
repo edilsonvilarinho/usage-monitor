@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.domain.entity.TeamAccountEmailSource
 import kotlin.time.Instant
@@ -10,7 +11,11 @@ sealed interface TeamPresenceUiState {
 
     data class Error(
         val message: String,
-        val accountLabel: String? = null
+        val accountLabel: String? = null,
+        /** Onde a conexão parou (#494); nulo quando o tipo da falha não diz. */
+        val failure: TeamConnectionFailure? = null,
+        /** Visão global: a credencial testada é o token admin, não a chave. */
+        val isAdminOverview: Boolean = false
     ) : TeamPresenceUiState
 
     /**

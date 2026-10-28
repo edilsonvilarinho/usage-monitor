@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamMemberUsage
@@ -167,6 +168,8 @@ fun TeamUsageScreen(
     val state by viewModel.uiState.collectAsState()
     val removalError by viewModel.removalError.collectAsState()
     val sessionRemovalError by viewModel.sessionRemovalError.collectAsState()
+    val removalFailure by viewModel.removalFailure.collectAsState()
+    val sessionRemovalFailure by viewModel.sessionRemovalFailure.collectAsState()
 
     TeamUsageContent(
         state = state,
@@ -174,6 +177,9 @@ fun TeamUsageScreen(
         localDeviceId = localDeviceId,
         removalError = removalError,
         sessionRemovalError = sessionRemovalError,
+        removalFailure = removalFailure,
+        sessionRemovalFailure = sessionRemovalFailure,
+        onRetry = { viewModel.refresh() },
         onSelectRange = { range -> viewModel.setRange(range) },
         onToggleMember = { memberKey -> viewModel.toggleMember(memberKey) },
         onToggleAccount = { groupKey -> viewModel.toggleAccount(groupKey) },
@@ -207,6 +213,9 @@ internal fun TeamUsageContent(
     onToggleAccount: (String) -> Unit = {},
     removalError: String? = null,
     sessionRemovalError: String? = null,
+    removalFailure: TeamConnectionFailure? = null,
+    sessionRemovalFailure: TeamConnectionFailure? = null,
+    onRetry: () -> Unit = {},
     onRemoveMember: (String) -> Unit = {},
     onDismissRemovalError: () -> Unit = {},
     onRemoveSession: (String, String) -> Unit = { _, _ -> },
@@ -232,8 +241,13 @@ internal fun TeamUsageContent(
                     if (language == AppLanguage.PT) "Consultando o servidor do time…" else "Querying the team server…"
                 )
 
-                is TeamUsageUiState.Error -> AppErrorState(
-                    TeamUsageLabels.serverError(state.message, language)
+                is TeamUsageUiState.Error -> TeamConnectionErrorState(
+                    failure = state.failure,
+                    fallbackMessage = TeamUsageLabels.serverError(state.message, language),
+                    technicalDetail = state.message,
+                    kind = if (state.isAdminOverview) TeamCredentialKind.ADMIN_TOKEN else TeamCredentialKind.ACCOUNT_KEY,
+                    language = language,
+                    onRetry = onRetry
                 )
 
                 is TeamUsageUiState.Success -> {
@@ -245,6 +259,8 @@ internal fun TeamUsageContent(
                             localDeviceId = localDeviceId,
                             removalError = removalError,
                             sessionRemovalError = sessionRemovalError,
+                            removalFailure = removalFailure,
+                            sessionRemovalFailure = sessionRemovalFailure,
                             onSelectRange = onSelectRange,
                             onToggleMember = onToggleMember,
                             onToggleAccount = onToggleAccount,
@@ -267,7 +283,8 @@ internal fun TeamUsageContent(
                             glossaryExpanded = state.glossaryExpanded,
                             onCloseDetail = onCloseDetail,
                             onToggleAdvanced = onToggleAdvanced,
-                            onToggleGlossary = onToggleGlossary
+                            onToggleGlossary = onToggleGlossary,
+                            credentialKind = if (state.isAdminOverview) TeamCredentialKind.ADMIN_TOKEN else TeamCredentialKind.ACCOUNT_KEY
                         )
                     }
                 }
@@ -305,78 +322,6 @@ internal fun TeamUsageContent(
     }
 }
 
-private data class PendingSessionRemoval(
-    val member: TeamMemberUsage,
-    val session: CliSessionSummary
-)
-
-/** Confirmação obrigatória: a remoção apaga dados e não tem desfazer. */
-@Composable
-private fun RemoveMemberConfirmation(
-    member: TeamMemberUsage,
-    language: AppLanguage,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AppDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(TeamUsageLabels.removeMemberTitle(language)) },
-        text = { ModalDialogText(TeamUsageLabels.removeMemberWarning(member.alias, language)) },
-        confirmButton = {
-            AppButton(
-                label = TeamUsageLabels.confirmRemoval(language),
-                onClick = onConfirm,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag(TEAM_REMOVE_CONFIRM_TAG)
-            )
-        },
-        dismissButton = {
-            AppButton(
-                label = TeamUsageLabels.cancel(language),
-                onClick = onDismiss,
-                tone = AppButtonTone.GHOST
-            )
-        }
-    )
-}
-
-@Composable
-private fun RemoveSessionConfirmation(
-    target: PendingSessionRemoval,
-    language: AppLanguage,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AppDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(TeamUsageLabels.removeSessionTitle(language)) },
-        text = {
-            ModalDialogText(
-                TeamUsageLabels.removeSessionWarning(
-                    sessionId = target.session.sessionId,
-                    projectName = target.session.projectName,
-                    language = language
-                )
-            )
-        },
-        confirmButton = {
-            AppButton(
-                label = TeamUsageLabels.confirmSessionRemoval(language),
-                onClick = onConfirm,
-                tone = AppButtonTone.DANGER,
-                modifier = Modifier.testTag(TEAM_SESSION_REMOVE_CONFIRM_TAG)
-            )
-        },
-        dismissButton = {
-            AppButton(
-                label = TeamUsageLabels.cancel(language),
-                onClick = onDismiss,
-                tone = AppButtonTone.GHOST
-            )
-        }
-    )
-}
-
 @Composable
 private fun TeamUsageList(
     state: TeamUsageUiState.Success,
@@ -384,6 +329,8 @@ private fun TeamUsageList(
     localDeviceId: String?,
     removalError: String?,
     sessionRemovalError: String?,
+    removalFailure: TeamConnectionFailure?,
+    sessionRemovalFailure: TeamConnectionFailure?,
     onSelectRange: (CliSessionRange) -> Unit,
     onToggleMember: (String) -> Unit,
     onToggleAccount: (String) -> Unit,
@@ -462,7 +409,7 @@ private fun TeamUsageList(
         // ser lido — o mesmo motivo pelo qual ele não mora no `uiState`.
         if (removalError != null) {
             TeamActionErrorRow(
-                text = TeamUsageLabels.removalError(removalError, language),
+                text = TeamUsageLabels.removalError(removalError, language, removalFailure),
                 language = language,
                 onDismiss = onDismissRemovalError
             )
@@ -470,7 +417,7 @@ private fun TeamUsageList(
 
         if (sessionRemovalError != null) {
             TeamActionErrorRow(
-                text = TeamUsageLabels.sessionRemovalError(sessionRemovalError, language),
+                text = TeamUsageLabels.sessionRemovalError(sessionRemovalError, language, sessionRemovalFailure),
                 language = language,
                 onDismiss = onDismissSessionRemovalError
             )
@@ -612,27 +559,6 @@ private fun TeamUsageList(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun TeamActionErrorRow(text: String, language: AppLanguage, onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.weight(1f)
-        )
-        AppButton(
-            label = TeamUsageLabels.cancel(language),
-            onClick = onDismiss,
-            tone = AppButtonTone.GHOST
-        )
     }
 }
 

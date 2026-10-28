@@ -1,6 +1,9 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliSessionDetail
+import com.usagemonitor.domain.entity.TeamConnectionStage
+import java.net.ConnectException
+import java.net.UnknownHostException
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.TeamAccountDeletion
 import com.usagemonitor.domain.entity.TeamBlockedAccount
@@ -159,8 +162,10 @@ private class FakePresenceAdminRepository(
         )
     }
 
+    var overviewResult: Result<List<TeamAccountUsage>>? = null
+
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> {
-        return Result.success(accounts)
+        return overviewResult ?: Result.success(accounts)
     }
 
     override suspend fun fetchSessionDetail(
@@ -335,6 +340,36 @@ class TeamPresenceViewModelTest {
 
             val state = assertIs<TeamPresenceUiState.Error>(viewModel.uiState.value)
             assertEquals("chave invalida", state.message)
+        }
+    }
+
+    @Test
+    fun `falha classificada sem nada na tela publica a etapa`() = runTest {
+        val repository = FakePresenceRepository()
+        repository.fetchResult = Result.failure(UnknownHostException("lab.example"))
+
+        withViewModel(repository) { viewModel ->
+            viewModel.openForAccount(ACCOUNT_KEY, "conta")
+            runCurrent()
+
+            val state = assertIs<TeamPresenceUiState.Error>(viewModel.uiState.value)
+            assertEquals(TeamConnectionStage.ADDRESS, state.failure?.stage)
+            assertFalse(state.isAdminOverview)
+        }
+    }
+
+    @Test
+    fun `falha da visao global marca o erro como do token admin`() = runTest {
+        val adminRepository = FakePresenceAdminRepository()
+        adminRepository.overviewResult = Result.failure(ConnectException("Connection refused"))
+
+        withViewModel(adminRepository = adminRepository) { viewModel ->
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            val state = assertIs<TeamPresenceUiState.Error>(viewModel.uiState.value)
+            assertEquals(TeamConnectionStage.CONNECTION, state.failure?.stage)
+            assertTrue(state.isAdminOverview)
         }
     }
 
@@ -635,6 +670,32 @@ class TeamPresenceViewModelTest {
 
             viewModel.clearActionError()
             assertNull(viewModel.actionError.value)
+        }
+    }
+
+    @Test
+    fun `falha classificada ao remover publica a etapa e limpar apaga`() = runTest {
+        val adminRepository = FakePresenceAdminRepository(
+            accounts = listOf(
+                TeamAccountUsage(
+                    accountKey = ACCOUNT_KEY,
+                    label = "conta",
+                    snapshot = TeamUsageSnapshot(members = listOf(member(deviceId = "device-1")))
+                )
+            )
+        )
+        adminRepository.removeResult = Result.failure(ConnectException("Connection refused"))
+
+        withViewModel(adminRepository = adminRepository, canManage = true) { viewModel ->
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            viewModel.removeMember("$ACCOUNT_KEY/device-1")
+            runCurrent()
+
+            assertEquals(TeamConnectionStage.CONNECTION, viewModel.actionFailure.value?.stage)
+            viewModel.clearActionError()
+            assertNull(viewModel.actionFailure.value)
         }
     }
 

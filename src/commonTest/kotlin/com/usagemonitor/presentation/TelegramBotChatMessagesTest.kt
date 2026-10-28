@@ -42,6 +42,20 @@ class TelegramBotChatMessagesTest {
         assertTrue(TelegramBotChatMessages.team(false, null, now, AppLanguage.PT).startsWith("🔒"))
         assertEquals("👥 Nenhuma conta participa de um time neste app.", TelegramBotChatMessages.team(true, null, now, AppLanguage.PT))
         assertEquals("👥 O servidor do time não respondeu agora.", TelegramBotChatMessages.team(true, Result.failure(IllegalStateException()), now, AppLanguage.PT))
+        // #494: falha classificada diz onde parou, com a trilha em emoji e de quem é o conserto.
+        val handshake = javax.net.ssl.SSLHandshakeException("(certificate_expired) PKIX path validation failed")
+        handshake.initCause(java.security.cert.CertificateExpiredException("NotAfter"))
+        assertEquals(
+            "👥 O servidor do time não respondeu.\n" +
+                "<b>Parou em Certificado — venceu</b>\n" +
+                "✅ Endereço › ✅ Conexão › ⛔ Certificado › ▫️ Servidor › ▫️ Chave\n" +
+                "O certificado do servidor venceu: quem administra o servidor precisa renová-lo. A chave não chegou a ser testada.",
+            TelegramBotChatMessages.team(true, Result.failure(handshake), now, AppLanguage.PT)
+        )
+        assertTrue(
+            TelegramBotChatMessages.team(true, Result.failure(java.net.SocketTimeoutException("timeout")), now, AppLanguage.EN)
+                .contains("❔ Address › ⛔ Connection")
+        )
     }
 
     @Test

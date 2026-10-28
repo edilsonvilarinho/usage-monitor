@@ -1,5 +1,10 @@
 package com.usagemonitor.presentation.terminal
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.domain.entity.TeamStageStatus
+import com.usagemonitor.domain.entity.stageStatuses
+import com.usagemonitor.presentation.ui.TeamConnectionLabels
+import com.usagemonitor.presentation.ui.TeamCredentialKind
 import com.usagemonitor.presentation.ui.TelegramBotMessages
 import com.usagemonitor.presentation.ui.formatMicrosUsdShort
 import kotlin.time.Instant
@@ -19,6 +24,27 @@ internal object TuiTeamView {
     private const val NUMBER_WIDTH = 9
     private const val COST_WIDTH = 11
 
+    /**
+     * As etapas numa linha, com os glifos da tabela: ✓ feito, aviso na que parou, pulado
+     * nas não alcançadas; a etapa que a falha não prova sai só com o nome, em muted.
+     */
+    private fun stageTrail(failure: TeamConnectionFailure, glyphs: TerminalGlyphs, labels: TuiTeamLabels): TerminalLine {
+        val spans = mutableListOf(TerminalSpan("  "))
+        failure.stageStatuses().forEachIndexed { index, (stage, status) ->
+            if (index > 0) {
+                spans += TerminalSpan("  ")
+            }
+            val name = TeamConnectionLabels.stage(stage, TeamCredentialKind.ACCOUNT_KEY, labels.language)
+            spans += when (status) {
+                TeamStageStatus.PASSED -> TerminalSpan(glyphs.done + " " + name, TerminalColor.Ok)
+                TeamStageStatus.FAILED -> TerminalSpan(glyphs.warning + " " + name, TerminalColor.Warn)
+                TeamStageStatus.NOT_REACHED -> TerminalSpan(glyphs.skipped + " " + name, TerminalColor.Muted)
+                TeamStageStatus.UNKNOWN -> TerminalSpan(name, TerminalColor.Muted)
+            }
+        }
+        return terminalLine(*spans.toTypedArray())
+    }
+
     fun render(team: TuiTeam?, state: TuiTeamState, size: TuiSize, labels: TuiTeamLabels, terminalLabels: TerminalLabels, profile: TerminalProfile): TuiTabView {
         val shortcuts = buildList {
             add(TuiShortcut("↑↓", labels.keyPerson))
@@ -30,7 +56,18 @@ internal object TuiTeamView {
         val glyphs = profile.glyphs
         val body = mutableListOf(header(team, size.bodyWidth, labels))
         body += TerminalLine.EMPTY
-        team.failure?.let { failure ->
+        val connectionFailure = team.connectionFailure
+        if (connectionFailure != null) {
+            // #494: onde a conexão parou e o caminho, no lugar da frase da exceção.
+            body += terminalLine(
+                TerminalSpan(glyphs.warning + " ", TerminalColor.Warn),
+                TerminalSpan(TeamConnectionLabels.headline(connectionFailure, TeamCredentialKind.ACCOUNT_KEY, labels.language))
+            )
+            body += stageTrail(connectionFailure, glyphs, labels)
+            body += terminalLine(TerminalSpan("  " + labels.showing(team.readAt?.let(TelegramBotMessages::clock)), TerminalColor.Muted))
+            body += TerminalLine.EMPTY
+        }
+        team.failure?.takeIf { connectionFailure == null }?.let { failure ->
             body += terminalLine(TerminalSpan(glyphs.warning + " ", TerminalColor.Warn), TerminalSpan(labels.failed(if (team.unreachable) labels.unreachable else failure)))
             body += terminalLine(TerminalSpan("  " + labels.showing(team.readAt?.let(TelegramBotMessages::clock)), TerminalColor.Muted))
             body += TerminalLine.EMPTY

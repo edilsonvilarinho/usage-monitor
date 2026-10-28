@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.NoOpBreadcrumbRecorder
@@ -105,11 +106,13 @@ class TeamUsageViewModel(
      * O laço ao vivo reescreve o `uiState` a cada 5s e apagaria a mensagem antes
      * de o usuário ler.
      */
-    private val _removalError = MutableStateFlow<String?>(null)
-    val removalError: StateFlow<String?> = _removalError.asStateFlow()
+    private val removal = TeamActionErrorState()
+    val removalError: StateFlow<String?> = removal.message
+    val removalFailure: StateFlow<TeamConnectionFailure?> = removal.failure
 
-    private val _sessionRemovalError = MutableStateFlow<String?>(null)
-    val sessionRemovalError: StateFlow<String?> = _sessionRemovalError.asStateFlow()
+    private val sessionRemoval = TeamActionErrorState()
+    val sessionRemovalError: StateFlow<String?> = sessionRemoval.message
+    val sessionRemovalFailure: StateFlow<TeamConnectionFailure?> = sessionRemoval.failure
 
     private var range: CliSessionRange = CliSessionRange.DEFAULT
     private var quotaWindows: CliQuotaWindows = CliQuotaWindows()
@@ -325,16 +328,16 @@ class TeamUsageViewModel(
             val error = result.exceptionOrNull()
             if (error != null) {
                 breadcrumbs.recordFailure("remover integrante do time", error)
-                _removalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
+                removal.fail(error)
                 return@launch
             }
-            _removalError.value = null
+            removal.clear()
             loadTeam()
         }
     }
 
     fun clearRemovalError() {
-        _removalError.value = null
+        removal.clear()
     }
 
     /**
@@ -363,16 +366,16 @@ class TeamUsageViewModel(
             val error = result.exceptionOrNull()
             if (error != null) {
                 breadcrumbs.recordFailure("remover sessão do time", error)
-                _sessionRemovalError.value = error.message ?: UNKNOWN_ERROR_MESSAGE
+                sessionRemoval.fail(error)
                 return@launch
             }
-            _sessionRemovalError.value = null
+            sessionRemoval.clear()
             loadTeam()
         }
     }
 
     fun clearSessionRemovalError() {
-        _sessionRemovalError.value = null
+        sessionRemoval.clear()
     }
 
     /**
@@ -627,7 +630,9 @@ class TeamUsageViewModel(
                     _uiState.value = TeamUsageUiState.Error(
                         message = error.message ?: UNKNOWN_ERROR_MESSAGE,
                         range = range,
-                        accountLabel = accountLabel
+                        accountLabel = accountLabel,
+                        failure = teamConnectionFailureOf(error),
+                        isAdminOverview = adminOverview
                     )
                 }
             )
@@ -714,7 +719,8 @@ class TeamUsageViewModel(
                     deviceId = deviceId,
                     sessionId = sessionId,
                     message = error.message ?: UNKNOWN_ERROR_MESSAGE,
-                    accountKey = scopedAccountKey
+                    accountKey = scopedAccountKey,
+                    failure = teamConnectionFailureOf(error)
                 )
             }
         )
@@ -727,22 +733,7 @@ class TeamUsageViewModel(
         scopedAccountKey: String?,
         detailState: TeamSessionDetailUiState
     ) {
-        val current = _uiState.value
-        if (current !is TeamUsageUiState.Success) {
-            return
-        }
-        val open = current.detail
-        // A conta entra na comparação porque a visão global pode ter a mesma
-        // máquina em duas contas: sem ela a resposta de uma seria publicada no
-        // painel da outra.
-        if (open == null ||
-            open.deviceId != deviceId ||
-            open.sessionId != sessionId ||
-            open.accountKey != scopedAccountKey
-        ) {
-            return
-        }
-        _uiState.value = current.copy(detail = detailState)
+        _uiState.value = withOpenDetail(_uiState.value, deviceId, sessionId, scopedAccountKey, detailState) ?: return
     }
 
     companion object {

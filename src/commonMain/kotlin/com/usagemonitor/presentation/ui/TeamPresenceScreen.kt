@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamMemberPresence
 import com.usagemonitor.presentation.ui.components.AppLoadingState
 import com.usagemonitor.presentation.ui.components.AppErrorState
@@ -181,6 +182,7 @@ fun TeamPresenceScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val actionError by viewModel.actionError.collectAsState()
+    val actionFailure by viewModel.actionFailure.collectAsState()
 
     TeamPresenceContent(
         state = state,
@@ -188,6 +190,8 @@ fun TeamPresenceScreen(
         localDeviceId = localDeviceId,
         canManage = canManage,
         actionError = actionError,
+        actionFailure = actionFailure,
+        onRetry = { viewModel.refresh() },
         onToggleAccount = { groupKey -> viewModel.toggleAccount(groupKey) },
         onSetOnlyOnline = { value -> viewModel.setOnlyOnline(value) },
         onQueryChange = { value -> viewModel.setQuery(value) },
@@ -206,6 +210,8 @@ internal fun TeamPresenceContent(
     localDeviceId: String? = null,
     canManage: Boolean = false,
     actionError: String? = null,
+    actionFailure: TeamConnectionFailure? = null,
+    onRetry: () -> Unit = {},
     onToggleAccount: (String) -> Unit = {},
     onSetOnlyOnline: (Boolean) -> Unit = {},
     onQueryChange: (String) -> Unit = {},
@@ -223,8 +229,13 @@ internal fun TeamPresenceContent(
     when (state) {
                 is TeamPresenceUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
 
-                is TeamPresenceUiState.Error -> AppErrorState(
-                    TeamPresenceLabels.error(state.message, language)
+                is TeamPresenceUiState.Error -> TeamConnectionErrorState(
+                    failure = state.failure,
+                    fallbackMessage = TeamPresenceLabels.error(state.message, language),
+                    technicalDetail = state.message,
+                    kind = if (state.isAdminOverview) TeamCredentialKind.ADMIN_TOKEN else TeamCredentialKind.ACCOUNT_KEY,
+                    language = language,
+                    onRetry = onRetry
                 )
 
                 is TeamPresenceUiState.Success -> TeamPresenceList(
@@ -233,6 +244,7 @@ internal fun TeamPresenceContent(
                     localDeviceId = localDeviceId,
                     canManage = canManage && state.isAdminOverview,
                     actionError = actionError,
+                    actionFailure = actionFailure,
                     onToggleAccount = onToggleAccount,
                     onSetOnlyOnline = onSetOnlyOnline,
                     onQueryChange = onQueryChange,
@@ -288,6 +300,7 @@ private fun TeamPresenceList(
     localDeviceId: String?,
     canManage: Boolean,
     actionError: String?,
+    actionFailure: TeamConnectionFailure?,
     onToggleAccount: (String) -> Unit,
     onSetOnlyOnline: (Boolean) -> Unit,
     onQueryChange: (String) -> Unit,
@@ -313,7 +326,7 @@ private fun TeamPresenceList(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = TeamPresenceLabels.actionError(actionError, language),
+                    text = TeamPresenceLabels.actionError(actionError, language, actionFailure),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f).testTag(PRESENCE_ACTION_ERROR_TAG)

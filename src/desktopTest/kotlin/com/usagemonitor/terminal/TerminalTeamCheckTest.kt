@@ -1,5 +1,7 @@
 package com.usagemonitor.terminal
 
+import java.net.ConnectException
+
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import io.ktor.client.HttpClient
@@ -99,6 +101,18 @@ class TerminalTeamCheckTest {
         assertEquals("Casa: sem login", problems[1])
         assertTrue(problems[2].startsWith("Outra: "), problems[2])
         assertTrue(problems[2].length > "Outra: ".length, "a causa do servidor aparece")
+    }
+
+    @Test
+    fun `a server that cannot be reached says where the connection stopped`() {
+        val problems = check(listOf(TeamCheckAccount("default", "Pessoal", "conta-1", "a@b.com"))) {
+            throw ConnectException("Connection refused")
+        }
+
+        assertEquals(
+            listOf("Parou em Conexão — nada responde. Nada responde no servidor: ele está fora do ar ou um firewall bloqueia. A chave não chegou a ser testada."),
+            problems
+        )
     }
 
     @Test

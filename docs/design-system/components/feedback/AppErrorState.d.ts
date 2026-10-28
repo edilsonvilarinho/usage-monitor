@@ -8,6 +8,8 @@ import type { ReactNode, CSSProperties } from 'react';
 export interface AppErrorStateProps {
   message: ReactNode;
   detail?: ReactNode;
+  /** Between the message and the detail: the team windows put an AppStepTrail here (#494). */
+  children?: ReactNode;
   /** A default <AppButton>: "Tentar novamente". */
   action?: ReactNode;
   style?: CSSProperties;

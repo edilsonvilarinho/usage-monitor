@@ -1,5 +1,8 @@
 package com.usagemonitor.presentation.ui.components
 
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.presentation.ui.TeamConnectionPath
+import com.usagemonitor.presentation.ui.TeamCredentialKind
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +31,11 @@ enum class TeamConnectionUiStatus { IDLE, CHECKING, OK, FAILED }
 
 data class TeamConnectionUiState(
     val status: TeamConnectionUiStatus = TeamConnectionUiStatus.IDLE,
-    val message: String? = null
+    val message: String? = null,
+    /** Onde a conexão parou (#494); com ela a seção mostra o caminho em vez de [message]. */
+    val failure: TeamConnectionFailure? = null,
+    /** Qual credencial a última etapa testa: a chave (teste de conexão) ou o token admin. */
+    val credentialKind: TeamCredentialKind = TeamCredentialKind.ACCOUNT_KEY
 )
 
 const val TEAM_SECTION_TEST_TAG = "teamIntegrationSection"
@@ -217,13 +224,20 @@ fun TeamIntegrationSection(
             // texto — vermelho para falha, azul para sucesso —, e azul neste
             // sistema é informação, não confirmação.
             val statusMessage = connection.message
-            if (statusMessage != null) {
+            if (statusMessage != null && connection.failure == null) {
                 AppStatusIndicator(
                     label = statusMessage,
                     tone = connectionTone(connection.status),
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+
+        // O caminho mora fora da linha do botão: `AppStatusIndicator` é uma linha só, e o
+        // texto da exceção cortava em "failed:" (#494).
+        val connectionFailure = connection.failure
+        if (connectionFailure != null) {
+            TeamConnectionPath(failure = connectionFailure, kind = connection.credentialKind, language = language)
         }
 
         // O envio roda em background e falhava calado: quem estava com a chave
@@ -245,6 +259,7 @@ fun TeamIntegrationSection(
         TeamAdminBlock(
             settings = settings,
             isPt = isPt,
+            language = language,
             connection = adminConnection,
             onAdminTokenChange = onAdminTokenChange,
             onValidateAdminToken = onValidateAdminToken,
@@ -271,6 +286,7 @@ fun TeamIntegrationSection(
 private fun TeamAdminBlock(
     settings: TeamIntegrationSettings,
     isPt: Boolean,
+    language: AppLanguage,
     connection: TeamConnectionUiState,
     onAdminTokenChange: (String) -> Unit,
     onValidateAdminToken: () -> Unit,
@@ -351,8 +367,11 @@ private fun TeamAdminBlock(
         }
     }
 
+    val adminFailure = connection.failure
     val adminMessage = connection.message
-    if (adminMessage != null) {
+    if (adminFailure != null) {
+        TeamConnectionPath(failure = adminFailure, kind = connection.credentialKind, language = language)
+    } else if (adminMessage != null) {
         AppStatusIndicator(label = adminMessage, tone = connectionTone(connection.status))
     }
 

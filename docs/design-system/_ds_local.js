@@ -28,6 +28,7 @@
     'components/feedback/AppEmptyState.jsx',
     'components/feedback/AppLoadingState.jsx',
     'components/feedback/AppErrorState.jsx',
+    'components/feedback/AppStepTrail.jsx',
     'components/shell/AppWindowFrame.jsx',
     'components/shell/AppStatusBar.jsx',
     'components/shell/AppToolbar.jsx',

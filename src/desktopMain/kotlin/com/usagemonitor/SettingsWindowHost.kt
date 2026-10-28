@@ -145,7 +145,7 @@ internal fun SettingsWindowHost(
             onTeamAliasChange = actions::changeTeamAlias,
             onTeamProfileParticipationChange = actions::changeTeamProfileParticipation,
             onTeamTestConnection = feedback::checkTeamConnection,
-            teamSyncFailureMessage = teamSyncStatus.takeIf { status -> status.isFailing }?.lastFailureMessage,
+            teamSyncFailureMessage = teamSyncStatus.takeIf { status -> status.isFailing }?.failureText(language),
             teamRejectedProfiles = teamSyncStatus.rejectedProfiles,
             teamAdminConnection = feedback.teamAdminConnection,
             onTeamAdminTokenChange = actions::changeTeamAdminToken,

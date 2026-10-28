@@ -87,6 +87,11 @@ aqui, na seção Primitivas.
 
 Sem emoji, em nenhuma tela. Glifo fora desta tabela precisa entrar aqui antes de ser usado.
 
+**Caminho da conexão com o servidor de time** (#494): na aba 4 e na conferência do `team`, a falha classificada diz
+a etapa ("Parou em Certificado — venceu em 27/10 12:21 BRT") e o caminho numa linha com os glifos acima — `✓` feito,
+`▲` a que parou, `–` não alcançada; a etapa que a falha não prova sai só com o nome, em muted. Entre etapas, dois
+espaços: nenhum glifo novo. Falha sem tipo conhecido mantém a frase de antes.
+
 ## Primitivas
 
 Cada primitiva é uma função pura de dados para linhas (texto mais estilos por trecho), testável sem

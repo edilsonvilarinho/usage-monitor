@@ -103,22 +103,33 @@ internal fun TeamKeysAdminContent(
     when (state) {
                 is TeamKeysUiState.Loading -> AppLoadingState(TeamKeysLabels.loading(language))
 
-                is TeamKeysUiState.Error -> Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = state.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(TEAM_KEYS_ERROR_TAG)
+                is TeamKeysUiState.Error -> if (state.failure != null) {
+                    TeamConnectionErrorState(
+                        failure = state.failure,
+                        fallbackMessage = state.message,
+                        technicalDetail = state.message,
+                        kind = TeamCredentialKind.ADMIN_TOKEN,
+                        language = language,
+                        onRetry = onRetry
                     )
-                    AppButton(
-                        label = TeamKeysLabels.retry(language),
-                        onClick = onRetry,
-                        tone = AppButtonTone.PRIMARY
-                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag(TEAM_KEYS_ERROR_TAG)
+                        )
+                        AppButton(
+                            label = TeamKeysLabels.retry(language),
+                            onClick = onRetry,
+                            tone = AppButtonTone.PRIMARY
+                        )
+                    }
                 }
 
                 is TeamKeysUiState.Success -> TeamKeysList(
@@ -177,8 +188,13 @@ private fun TeamKeysList(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val actionFailure = state.actionFailure
                 Text(
-                    text = actionError,
+                    text = if (actionFailure == null) {
+                        actionError
+                    } else {
+                        TeamConnectionLabels.headline(actionFailure, TeamCredentialKind.ADMIN_TOKEN, language)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f).testTag(TEAM_KEYS_ERROR_TAG)

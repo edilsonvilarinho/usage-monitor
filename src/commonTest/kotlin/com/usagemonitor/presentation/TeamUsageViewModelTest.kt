@@ -1,6 +1,13 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.CliQuotaWindows
+import com.usagemonitor.data.datasource.TeamServerException
+import com.usagemonitor.domain.entity.TeamCertificateProblem
+import com.usagemonitor.domain.entity.TeamConnectionStage
+import java.net.ConnectException
+import java.net.UnknownHostException
+import java.security.cert.CertificateExpiredException
+import javax.net.ssl.SSLHandshakeException
 import com.usagemonitor.presentation.viewmodel.UsageExportWriter
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
 import com.usagemonitor.presentation.ui.UsageExportRequest
@@ -634,6 +641,108 @@ class TeamUsageViewModelTest {
         val state = assertIs<TeamUsageUiState.Error>(viewModel.uiState.value)
         assertEquals("servidor fora do ar", state.message)
         viewModel.onDestroy()
+    }
+
+    @Test
+    fun `certificado vencido na primeira carga publica a etapa e o motivo`() = runTest {
+        val repository = FakeTeamRepository()
+        val handshake = SSLHandshakeException("(certificate_expired) PKIX path validation failed")
+        handshake.initCause(CertificateExpiredException("NotAfter"))
+        repository.fetchResult = Result.failure(handshake)
+        val viewModel = buildViewModel(repository)
+        try {
+            viewModel.openForAccount(ACCOUNT_KEY, null)
+            runCurrent()
+
+            val state = assertIs<TeamUsageUiState.Error>(viewModel.uiState.value)
+            assertEquals(TeamConnectionStage.CERTIFICATE, state.failure?.stage)
+            assertEquals(TeamCertificateProblem.EXPIRED, state.failure?.certificateProblem)
+            // O texto técnico continua no estado: é o que "Copiar detalhe técnico" leva.
+            assertEquals("(certificate_expired) PKIX path validation failed", state.message)
+            assertEquals(false, state.isAdminOverview)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `erro da visao global diz que a credencial e o token admin`() = runTest {
+        val admin = FakeAdminOverviewRepository(emptyList())
+        admin.overviewResult = Result.failure(UnknownHostException("lab.example"))
+        val viewModel = buildViewModel(FakeTeamRepository(), adminRepository = admin)
+        try {
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            val state = assertIs<TeamUsageUiState.Error>(viewModel.uiState.value)
+            assertEquals(TeamConnectionStage.ADDRESS, state.failure?.stage)
+            assertEquals(true, state.isAdminOverview)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `falha de rede no detalhe publica a etapa no painel`() = runTest {
+        val repository = FakeTeamRepository(
+            snapshot = TeamUsageSnapshot(members = listOf(member("device-1", sessions = listOf(session("s1")))))
+        )
+        repository.detailResult = Result.failure(UnknownHostException("lab.example"))
+        val viewModel = buildViewModel(repository)
+        try {
+            viewModel.openForAccount(ACCOUNT_KEY, null)
+            runCurrent()
+
+            viewModel.openSession(memberKey = "device-1", sessionId = "s1")
+            runCurrent()
+
+            val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
+            assertEquals(TeamConnectionStage.ADDRESS, assertIs<TeamSessionDetailUiState.Error>(state.detail).failure?.stage)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `falha ao remover publica a etapa e limpar apaga as duas`() = runTest {
+        val admin = FakeAdminOverviewRepository(listOf(overviewAccount(ACCOUNT_KEY, "time-a", "device-1")))
+        admin.removeMemberResult = Result.failure(ConnectException("Connection refused"))
+        val viewModel = buildViewModel(FakeTeamRepository(), adminRepository = admin)
+        try {
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            viewModel.removeMember("$ACCOUNT_KEY/device-1")
+            runCurrent()
+
+            assertEquals(TeamConnectionStage.CONNECTION, viewModel.removalFailure.value?.stage)
+            viewModel.clearRemovalError()
+            assertNull(viewModel.removalFailure.value)
+            assertNull(viewModel.removalError.value)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `falha ao excluir sessao publica a etapa do servidor`() = runTest {
+        val admin = FakeAdminOverviewRepository(listOf(overviewAccount(ACCOUNT_KEY, "time-a", "device-1", tokens = 10)))
+        admin.removeSessionResult = Result.failure(TeamServerException(statusCode = 500, message = "HTTP 500"))
+        val viewModel = buildViewModel(FakeTeamRepository(), adminRepository = admin)
+        try {
+            viewModel.openForAllAccounts()
+            runCurrent()
+
+            viewModel.removeSession("$ACCOUNT_KEY/device-1", "s1")
+            runCurrent()
+
+            assertEquals(TeamConnectionStage.SERVER, viewModel.sessionRemovalFailure.value?.stage)
+            assertEquals(500, viewModel.sessionRemovalFailure.value?.httpStatus)
+            viewModel.clearSessionRemovalError()
+            assertNull(viewModel.sessionRemovalFailure.value)
+        } finally {
+            viewModel.onDestroy()
+        }
     }
 
     @Test
@@ -1379,6 +1488,7 @@ private class FakeAdminOverviewRepository(
     val removedSessions = mutableListOf<Triple<String, String, String>>()
     var removeMemberResult: Result<Unit> = Result.success(Unit)
     var removeSessionResult: Result<Unit> = Result.success(Unit)
+    var overviewResult: Result<List<TeamAccountUsage>>? = null
     var detailResult: Result<CliSessionDetail?> = Result.success(null)
     var detailCalls = 0
     var lastDetailAccountKey: String? = null
@@ -1433,7 +1543,7 @@ private class FakeAdminOverviewRepository(
         Result.failure(UnsupportedOperationException())
 
     override suspend fun fetchOverview(cutoffMillis: Long?): Result<List<TeamAccountUsage>> =
-        Result.success(accounts)
+        overviewResult ?: Result.success(accounts)
 
     override suspend fun fetchSessionDetail(
         accountKey: String,

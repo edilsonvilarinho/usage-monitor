@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 
 /** Nome da janela de presença. */
 internal fun teamPresenceTitle(language: AppLanguage, isAdminOverview: Boolean = false): String {
@@ -254,12 +255,14 @@ internal object TeamPresenceLabels {
         }
     }
 
-    fun actionError(message: String, language: AppLanguage): String {
-        return if (language == AppLanguage.PT) {
-            "Não foi possível concluir a remoção: $message"
+    /** Ação só existe na visão global: a credencial é o token admin (#494). */
+    fun actionError(message: String, language: AppLanguage, failure: TeamConnectionFailure? = null): String {
+        val reason = if (failure == null) {
+            message
         } else {
-            "Could not complete the removal: $message"
+            TeamConnectionLabels.headline(failure, TeamCredentialKind.ADMIN_TOKEN, language)
         }
+        return localized(language, "Não foi possível concluir a remoção: $reason", "Could not complete the removal: $reason")
     }
 
     /**

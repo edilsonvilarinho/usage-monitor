@@ -42,6 +42,9 @@ import com.usagemonitor.presentation.ui.PRESENCE_STATE_TAG_PREFIX
 import com.usagemonitor.presentation.ui.PRESENCE_WORKING_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TeamPresenceContent
 import com.usagemonitor.presentation.viewmodel.TeamPresenceUiState
+import com.usagemonitor.domain.entity.TeamCertificateProblem
+import com.usagemonitor.domain.entity.TeamConnectionFailure
+import com.usagemonitor.domain.entity.TeamConnectionStage
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -239,6 +242,52 @@ class TeamPresenceScreenTest {
 
         onNodeWithText("Não foi possível ler a presença do time: chave invalida")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun `erro classificado mostra onde parou e tenta de novo`() = runDesktopComposeUiTest {
+        var retries = 0
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(820.dp).height(640.dp)) {
+                    TeamPresenceContent(
+                        state = TeamPresenceUiState.Error(
+                            message = "(certificate_expired) PKIX",
+                            failure = TeamConnectionFailure(
+                                stage = TeamConnectionStage.CERTIFICATE,
+                                certificateProblem = TeamCertificateProblem.EXPIRED
+                            ),
+                            isAdminOverview = true
+                        ),
+                        language = AppLanguage.EN,
+                        onRetry = { retries += 1 }
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Stopped at Certificate — expired").assertIsDisplayed()
+        onNodeWithText("– Admin token").assertIsDisplayed()
+        onNodeWithText("Try again").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun `falha classificada de acao diz onde parou`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(820.dp).height(640.dp)) {
+                    TeamPresenceContent(
+                        state = TeamPresenceUiState.Success(entries = emptyList()),
+                        language = AppLanguage.PT,
+                        actionError = "Connection refused",
+                        actionFailure = TeamConnectionFailure(stage = TeamConnectionStage.CONNECTION)
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Não foi possível concluir a remoção: Parou em Conexão — nada responde").assertIsDisplayed()
     }
 
     @Test

@@ -4,6 +4,13 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamKeyVerification
+import com.usagemonitor.domain.entity.TeamCertificateProblem
+import com.usagemonitor.domain.entity.TeamConnectionStage
+import com.usagemonitor.presentation.ui.TeamCredentialKind
+import java.net.ConnectException
+import java.net.UnknownHostException
+import java.security.cert.CertificateExpiredException
+import javax.net.ssl.SSLHandshakeException
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckStatus
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
@@ -148,6 +155,43 @@ class AppSettingsFeedbackTest {
         assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
         assertEquals("servidor fora", feedback.teamConnection.message)
         assertTrue(harness.claims.isEmpty())
+    }
+
+    @Test
+    fun `a refused server certificate is published as the stage, with the key as the credential`() {
+        val handshake = SSLHandshakeException("(certificate_expired) PKIX path validation failed")
+        handshake.initCause(CertificateExpiredException("NotAfter"))
+        harness.health = Result.failure(handshake)
+
+        feedback.checkTeamConnection()
+        harness.settle()
+
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
+        assertEquals(TeamCertificateProblem.EXPIRED, feedback.teamConnection.failure?.certificateProblem)
+        assertEquals(TeamCredentialKind.ACCOUNT_KEY, feedback.teamConnection.credentialKind)
+    }
+
+    @Test
+    fun `a claim that cannot reach the server shows the stage instead of the account line`() {
+        activeTeam(participating = setOf("default"))
+        harness.claimResult = { Result.failure<TeamKeyVerification>(ConnectException("Connection refused")) }
+
+        feedback.checkTeamConnection()
+        harness.settle()
+
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
+        assertEquals(TeamConnectionStage.CONNECTION, feedback.teamConnection.failure?.stage)
+    }
+
+    @Test
+    fun `the admin token check publishes the stage with the admin token as the credential`() {
+        harness.adminTokenResult = Result.failure(UnknownHostException("team.example"))
+
+        feedback.validateAdminToken()
+        harness.settle()
+
+        assertEquals(TeamConnectionStage.ADDRESS, feedback.teamAdminConnection.failure?.stage)
+        assertEquals(TeamCredentialKind.ADMIN_TOKEN, feedback.teamAdminConnection.credentialKind)
     }
 
     @Test
