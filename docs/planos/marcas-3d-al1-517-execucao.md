@@ -55,6 +55,8 @@ marca (relevo AK1 em todo lugar onde a marca aparece).
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness (documentação) | plano escrito a partir das leituras acima |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.GargantuaHudTest"` | 2 falhas na asserção: `frente 0.69803923 deveria passar de 1,3 × trás 0.5738562`; `topo do arco de lente 0.33202615 deveria passar de 0,5` (1ª medição, a 20°/340° com vizinhança de 1px, lia o antialiasing da frente na amostra de trás: ângulos e largura corrigidos e o vermelho refeito) |
+| A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.GargantuaHudTest" --tests "com.usagemonitor.ui.GargantuaSceneTest"` | 12 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

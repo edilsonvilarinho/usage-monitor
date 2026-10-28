@@ -28,10 +28,20 @@ internal class GargantuaScene(
     val reflectionScale: Float,
     /** Quanto o filete central do plasma clareia em direção ao branco. */
     val plasmaHighlight: Float,
-    val lens: Color,
+    /**
+     * AL1 (#517): o disco de trás dobrado por cima do horizonte, do lado que se
+     * afasta ([haloNear]) ao que se aproxima ([haloFar]). Cores opacas; quem dá
+     * a opacidade de cada trecho é o desenho.
+     */
+    val haloNear: Color,
+    val haloMiddle: Color,
+    val haloFar: Color,
+    /** A metade da frente do disco, do lado que se afasta ao que se aproxima (Doppler). */
     val diskNear: Color,
     val diskMiddle: Color,
     val diskFar: Color,
+    /** A metade de trás é a mesma luz mais longe: multiplica a opacidade da frente. */
+    val diskBackFade: Float,
     val streak: Color
 ) {
     companion object {
@@ -40,10 +50,13 @@ internal class GargantuaScene(
             wallAlpha = 0.06f,
             reflectionScale = 1f,
             plasmaHighlight = 0.6f,
-            lens = Color(0xFFFFE6BE),
-            diskNear = AppGargantuaTokens.ember.copy(alpha = 0.25f),
-            diskMiddle = AppGargantuaTokens.gold.copy(alpha = 0.55f),
-            diskFar = AppGargantuaTokens.hot.copy(alpha = 0.8f),
+            haloNear = AppGargantuaTokens.ember,
+            haloMiddle = Color(0xFFF4CF97),
+            haloFar = AppGargantuaTokens.hot,
+            diskNear = AppGargantuaTokens.ember.copy(alpha = 0.4f),
+            diskMiddle = AppGargantuaTokens.gold.copy(alpha = 0.65f),
+            diskFar = AppGargantuaTokens.hot.copy(alpha = 0.9f),
+            diskBackFade = 0.6f,
             streak = Color(0xFFFFF8E6).copy(alpha = 0.45f)
         )
 
@@ -52,10 +65,13 @@ internal class GargantuaScene(
             wallAlpha = 0.10f,
             reflectionScale = 0.55f,
             plasmaHighlight = 0.22f,
-            lens = AppGargantuaTokens.dust,
-            diskNear = AppGargantuaTokens.ember.copy(alpha = 0.35f),
-            diskMiddle = AppGargantuaTokens.gold.copy(alpha = 0.8f),
-            diskFar = AppGargantuaTokens.dust.copy(alpha = 0.85f),
+            haloNear = AppGargantuaTokens.ember,
+            haloMiddle = AppGargantuaTokens.gold,
+            haloFar = AppGargantuaTokens.dust,
+            diskNear = AppGargantuaTokens.ember.copy(alpha = 0.45f),
+            diskMiddle = AppGargantuaTokens.gold.copy(alpha = 0.85f),
+            diskFar = AppGargantuaTokens.dust.copy(alpha = 0.9f),
+            diskBackFade = 0.65f,
             streak = AppGargantuaTokens.ember.copy(alpha = 0.5f)
         )
     }
