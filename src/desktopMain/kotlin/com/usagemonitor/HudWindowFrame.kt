@@ -164,20 +164,41 @@ private fun applyHudWindowBounds(
     position: WindowPosition,
     moveProbe: HudSystemMoveProbe
 ) {
-    if (!floating) {
-        return
+    hudWindowTargetSize(floating, size)?.let { dimension ->
+        if (window.size != dimension) {
+            window.size = dimension
+        }
     }
-    val dimension = Dimension(size.width.value.roundToInt(), size.height.value.roundToInt())
-    if (dimension.width > 0 && dimension.height > 0 && window.size != dimension) {
-        window.size = dimension
-    }
-    if (position is WindowPosition.Absolute) {
-        val point = Point(position.x.value.roundToInt(), position.y.value.roundToInt())
+    hudWindowTargetLocation(floating, position)?.let { point ->
         moveProbe.requested(point)
         if (window.location != point) {
             window.location = point
         }
     }
+}
+
+/**
+ * O tamanho que a janela AWT deve ter, em pixels; `null` se a HUD não está
+ * flutuando ou se a medida não tem área. Função pura: a conta de arredondamento
+ * e a regra de "não aplicar zero" ficam fora da janela.
+ */
+internal fun hudWindowTargetSize(floating: Boolean, size: DpSize): Dimension? {
+    if (!floating) {
+        return null
+    }
+    val dimension = Dimension(size.width.value.roundToInt(), size.height.value.roundToInt())
+    return dimension.takeIf { it.width > 0 && it.height > 0 }
+}
+
+/**
+ * A posição que a janela AWT deve ter, em pixels; `null` fora de HUD flutuante ou
+ * se a posição não é absoluta — posição relativa não é pedida à janela.
+ */
+internal fun hudWindowTargetLocation(floating: Boolean, position: WindowPosition): Point? {
+    if (!floating || position !is WindowPosition.Absolute) {
+        return null
+    }
+    return Point(position.x.value.roundToInt(), position.y.value.roundToInt())
 }
 
 /**
