@@ -57,16 +57,9 @@ internal object TerminalSetupWiring {
             currentThresholds = { readPersistedAlertSettings(PreferencesSettings(preferences)).quotaPercents.joinToString(",") },
             currentLanguage = { storedLanguage(PreferencesSettings(preferences)).name.lowercase() },
             isLinux = System.getProperty("os.name").orEmpty().lowercase().contains("linux"),
-            dataRoot = shown(AppDataDirectory.root.path, home),
+            dataRoot = homeRelativePath(AppDataDirectory.root.path, home),
             version = CURRENT_APP_VERSION
         )
         return setup.run(TerminalSetupLabels(reader.language(languageOverride)), console)
-    }
-
-    private fun shown(path: String, home: File): String {
-        // Canônicos dos dois lados: no Windows um pode vir com o nome curto 8.3.
-        val homePath = runCatching { home.canonicalPath }.getOrDefault(home.path).trimEnd(File.separatorChar)
-        val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
-        return if (homePath.isNotEmpty() && canonical.startsWith(homePath + File.separator)) "~" + canonical.removePrefix(homePath) else path
     }
 }

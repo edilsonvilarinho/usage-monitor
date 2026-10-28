@@ -183,3 +183,13 @@ private fun Float.toPersistableDp(): Int? {
     }
     return roundToInt()
 }
+
+/** A moldura da janela como a geometria gravada a descreve. */
+internal fun windowGeometrySnapshotOf(position: WindowPosition, size: DpSize, placement: WindowPlacement) =
+    WindowGeometrySnapshot(
+        widthDp = size.width.value,
+        heightDp = size.height.value,
+        xDp = if (position.isSpecified) position.x.value else null,
+        yDp = if (position.isSpecified) position.y.value else null,
+        placement = placement
+    )

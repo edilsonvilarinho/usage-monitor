@@ -113,6 +113,26 @@ class HudWindowTranslucencyTest {
         }
     }
 
+    /** Só a mudança vira linha no `app.log`: a primeira medida, o alfa que cai ou o monitor que troca (#426). */
+    @Test
+    fun `only the first reading and a change of alpha or monitor are logged`() {
+        val first = state()
+
+        assertTrue(hudTranslucencyChanged(previous = null, state = first))
+        assertFalse(hudTranslucencyChanged(previous = first, state = state()))
+        assertTrue(hudTranslucencyChanged(previous = first, state = state(translucencyCapable = false)))
+        assertTrue(hudTranslucencyChanged(previous = first, state = state(deviceId = ":0.2")))
+    }
+
+    /** A posição e a profundidade sozinhas não são mudança: o arrasto não pode encher o log. */
+    @Test
+    fun `moving the window or a new depth alone is not logged`() {
+        val first = state()
+
+        assertFalse(hudTranslucencyChanged(previous = first, state = state(bounds = java.awt.Rectangle(400, 0, 592, 436))))
+        assertFalse(hudTranslucencyChanged(previous = first, state = state(pixelSize = 24, perPixelTranslucent = false)))
+    }
+
     private fun state(
         deviceId: String? = ":0.1",
         perPixelTranslucent: Boolean? = true,

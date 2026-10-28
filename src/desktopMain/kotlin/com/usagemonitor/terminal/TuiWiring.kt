@@ -68,10 +68,7 @@ internal fun tuiSettingsInputs(): TuiSettingsInputs {
         values = runner::readSource,
         telegram = { LocalTelegramSettingsDataSource().load() },
         team = { LocalTeamSettingsDataSource().peek() },
-        teamAccounts = { settings ->
-            val wanted = settings?.participatingProfileIds.orEmpty()
-            AnthropicProfileRegistry.readStored(preferences).filter { record -> !record.hidden && record.id in wanted }.map { record -> record.label }
-        },
+        teamAccounts = { settings -> tuiTeamAccountLabels(AnthropicProfileRegistry.readStored(preferences), settings) },
         web = { LocalWebAccessSettingsDataSource().load() },
         autostartAvailable = AppDataDirectory.isDefault
     )

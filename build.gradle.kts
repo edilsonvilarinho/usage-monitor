@@ -262,7 +262,7 @@ tasks.withType<Test>().configureEach {
 }
 
 // Piso da catraca de cobertura de linhas do Kotlin. Meta: 95. Nunca desce.
-val coverageLineFloorPercent = 90
+val coverageLineFloorPercent = 94
 
 // O plugin do Kover estava aplicado desde sempre e NENHUMA tarefa de relatorio
 // era executada em lugar nenhum: o agente instrumentava toda passada de
@@ -303,6 +303,69 @@ kover {
                     "com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGridKt",
                     "com.usagemonitor.presentation.ui.components.ResponsiveDashboardCardGridKt$*",
                     "com.usagemonitor.presentation.ui.components.ComposableSingletons\$ResponsiveDashboardCardGridKt*"
+                )
+                // Onda 6.5 (#488), lista aprovada pelo dono arquivo por arquivo. Cada
+                // arquivo daqui entregou antes a um arquivo irmao as funcoes com
+                // decisao (`*Decisions.kt`, `DesktopTitleBar.kt`, `TrayMenuLabels.kt`),
+                // que seguem contadas; so a cola sai.
+                // Raizes de composicao sobre `AppGraph`, mesmo motivo dele: montar le a
+                // credencial real e abre HTTP de verdade. As decisoes que recebem
+                // (`collectorHealthOf`, leitores do bot, `tuiTeamAccountLabels`) sao
+                // testadas onde moram.
+                classes(
+                    "com.usagemonitor.CollectorEngine", "com.usagemonitor.CollectorEngine$*",
+                    "com.usagemonitor.HeadlessService", "com.usagemonitor.HeadlessService$*",
+                    "com.usagemonitor.TelegramBotCompositionKt", "com.usagemonitor.TelegramBotCompositionKt$*",
+                    "com.usagemonitor.terminal.TuiWiring", "com.usagemonitor.terminal.TuiWiring$*",
+                    "com.usagemonitor.terminal.TuiTeamWiring", "com.usagemonitor.terminal.TuiTeamWiring$*",
+                    "com.usagemonitor.terminal.TuiWiringKt", "com.usagemonitor.terminal.TuiWiringKt$*",
+                    "com.usagemonitor.terminal.TerminalSetupWiring", "com.usagemonitor.terminal.TerminalSetupWiring$*"
+                )
+                // Hosts de janela: corpo `@Composable` que abre `Window`/`DialogWindow`
+                // e liga view model a ela, sem funcao com decisao. Nenhum teste abre o
+                // sistema de janelas (CLAUDE.md, "CI e testes").
+                classes(
+                    "com.usagemonitor.HudWindowKt", "com.usagemonitor.HudWindowKt$*",
+                    "com.usagemonitor.ComposableSingletons\$HudWindowKt*",
+                    "com.usagemonitor.ModalWindowsHostKt", "com.usagemonitor.ModalWindowsHostKt$*",
+                    "com.usagemonitor.ComposableSingletons\$ModalWindowsHostKt*",
+                    "com.usagemonitor.SettingsWindowHostKt", "com.usagemonitor.SettingsWindowHostKt$*",
+                    "com.usagemonitor.ComposableSingletons\$SettingsWindowHostKt*",
+                    "com.usagemonitor.AppTrayHostKt", "com.usagemonitor.AppTrayHostKt$*",
+                    "com.usagemonitor.ComposableSingletons\$AppTrayHostKt*",
+                    "com.usagemonitor.AppWindowStatesKt", "com.usagemonitor.AppWindowStatesKt$*",
+                    "com.usagemonitor.AppWindowStates", "com.usagemonitor.AppWindowStates$*",
+                    "com.usagemonitor.WindowFrame"
+                )
+                // Cascas de `AppDialogWindow`: o conteudo (Ajuda, dica, guia, novidades)
+                // e testado na tela dele; a casca so abre a janela.
+                classes(
+                    "com.usagemonitor.presentation.ui.HelpWindowKt", "com.usagemonitor.presentation.ui.HelpWindowKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$HelpWindowKt*",
+                    "com.usagemonitor.presentation.ui.StartupTipWindowKt", "com.usagemonitor.presentation.ui.StartupTipWindowKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$StartupTipWindowKt*",
+                    "com.usagemonitor.presentation.ui.OnboardingGuideWindowKt", "com.usagemonitor.presentation.ui.OnboardingGuideWindowKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$OnboardingGuideWindowKt*",
+                    "com.usagemonitor.presentation.ui.ReleaseNotesWindowKt", "com.usagemonitor.presentation.ui.ReleaseNotesWindowKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$ReleaseNotesWindowKt*"
+                )
+                // Chamada direta a AWT/JNA: opacidade, pre-aquecimento e esmaecimento da
+                // janela modal, moldura e `window.shape`, Xlib do COSMIC, janela AWT da
+                // HUD, recorte aplicado e leitura do alfa.
+                classes(
+                    "com.usagemonitor.presentation.ui.AppDialogWindowKt", "com.usagemonitor.presentation.ui.AppDialogWindowKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$AppDialogWindowKt*",
+                    "com.usagemonitor.presentation.ui.ModalWindowEnvironment",
+                    "com.usagemonitor.presentation.ui.ModalWindowHost", "com.usagemonitor.presentation.ui.ModalRequest",
+                    "com.usagemonitor.presentation.ui.DesktopWindowFrameKt", "com.usagemonitor.presentation.ui.DesktopWindowFrameKt$*",
+                    "com.usagemonitor.presentation.ui.ComposableSingletons\$DesktopWindowFrameKt*",
+                    "com.usagemonitor.presentation.ui.X11CompositorMove", "com.usagemonitor.presentation.ui.X11CompositorMove$*",
+                    "com.usagemonitor.presentation.ui.CompositorWindowDragKt\$compositorWindowDrag$*",
+                    "com.usagemonitor.HudWindowFrameKt", "com.usagemonitor.HudWindowFrameKt$*",
+                    "com.usagemonitor.ComposableSingletons\$HudWindowFrameKt*",
+                    "com.usagemonitor.HudWindowEffectsKt", "com.usagemonitor.HudWindowEffectsKt$*",
+                    "com.usagemonitor.HudHitRegionApplier",
+                    "com.usagemonitor.HudWindowAlphaKt", "com.usagemonitor.HudWindowAlphaKt$*"
                 )
             }
         }

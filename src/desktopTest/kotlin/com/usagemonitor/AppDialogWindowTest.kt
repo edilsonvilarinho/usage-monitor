@@ -1,8 +1,19 @@
 package com.usagemonitor
 
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.AutoStartManager.Platform
+import com.usagemonitor.presentation.ui.closesModal
 import com.usagemonitor.presentation.ui.modalOpenedBreadcrumb
 import com.usagemonitor.presentation.ui.modalPrewarmedBreadcrumb
+import com.usagemonitor.presentation.ui.rememberLastNonNull
 import com.usagemonitor.presentation.ui.shouldAnimateModalWindow
 import com.usagemonitor.presentation.ui.shouldPrewarmModalWindow
 import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
@@ -11,6 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalTestApi::class)
 class AppDialogWindowTest {
 
     @Test
@@ -78,5 +90,42 @@ class AppDialogWindowTest {
             "janela Configurações pré-aquecida em 310 ms",
             modalPrewarmedBreadcrumb("Configurações", elapsedMillis = 310)
         )
+    }
+
+    /** Esc fecha pelo mesmo caminho do ×: chama quem fecha e consome a tecla. */
+    @Test
+    fun `escape pressed closes the modal and is consumed`() {
+        var closed = 0
+
+        assertTrue(closesModal(KeyEventType.KeyDown, Key.Escape) { closed++ })
+        assertEquals(1, closed)
+    }
+
+    /** Soltar o Esc, ou outra tecla, segue para quem a quiser: a janela não fecha duas vezes. */
+    @Test
+    fun `releasing escape or pressing another key leaves the modal open`() {
+        var closed = 0
+
+        assertFalse(closesModal(KeyEventType.KeyUp, Key.Escape) { closed++ })
+        assertFalse(closesModal(KeyEventType.KeyDown, Key.Enter) { closed++ })
+        assertEquals(0, closed)
+    }
+
+    /** Ao fechar, quem abre zera o assunto no mesmo clique; a janela esmaece com o último. */
+    @Test
+    fun `the last non null value survives the subject going away`() = runDesktopComposeUiTest {
+        var subject by mutableStateOf<String?>(null)
+        setContent { Text(rememberLastNonNull(subject) ?: "vazio") }
+
+        onNodeWithText("vazio").assertExists()
+        subject = "Anthropic"
+        waitForIdle()
+        onNodeWithText("Anthropic").assertExists()
+        subject = null
+        waitForIdle()
+        onNodeWithText("Anthropic").assertExists()
+        subject = "Codex"
+        waitForIdle()
+        onNodeWithText("Codex").assertExists()
     }
 }

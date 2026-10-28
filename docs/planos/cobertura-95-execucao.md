@@ -64,7 +64,8 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | 6.1 | Rota híbrida: exclusão nominal; geometria de janela numa implementação só | PR #483, mesclada | 88,1% |
 | 6.2 | Costura em `AutoStartManager` (`AutoStartHost`), `SettingsActions`, `AppSettingsFeedback`, `buildShellActions` e leitores do bot; testes de `AppModalState` e `TelegramBotActions` | PR #485 | 89,5% |
 | 6.3 | Janelas: extrair decisão de `HudWindow*`, `AppDialogWindow`, `DesktopWindowFrame`, `CompositorWindowDrag` para função pura; excluir só a chamada AWT/JNA que sobrar, por nome | PR #486 mesclada | 89,58% |
-| 6.4 | Alavanca B da #488: teste de código com decisão fora de janela (terminal, TUI, bot, leitores locais, view models, telas) | em PR | 90,64% |
+| 6.4 | Alavanca B da #488: teste de código com decisão fora de janela (terminal, TUI, bot, leitores locais, view models, telas) | PR #492, mesclada | 90,64% |
+| 6.5 | Alavanca A da #488: exclusão nominal da cola de janela e das raízes de composição, com as decisões movidas para arquivo irmão e contadas | PR #493 | 94,23% |
 
 Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o teto para 95% é 2 268, faltam
 **3 139**. Distribuição: `desktopMain` 2 598, janela 1 453, `commonMain` 1 327, gerado 22, só-teste 7.
@@ -144,6 +145,64 @@ de escrever o teste; chamada direta a `System.console`, `systemctl` real ou clie
 | W64-A07b | Código morto em `CliSessionDetailParts.kt`: `MetricValue` e `HealthTallyText`, sem chamador | `refactor(ui): drop unused session detail helpers` |
 | W64-A08 | Medição, relatório e piso (sobe para o valor medido arredondado para baixo) | `ci(coverage): raise the Kotlin line floor` |
 
+## Atividades da onda 6.5 (issue #488, alavanca A)
+
+Partida medida em `origin/main` (`63d8bf1c`), `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport`:
+`BUILD SUCCESSFUL`, 3 681 testes, 0 falhas; **90,64%** (41 195/45 447), 4 252 descobertas; teto para 95%: 2 272,
+faltam **1 980**. Bate com o W64-A08.
+
+**Mecânica.** O filtro do Kover é por classe: excluir `HudWindowKt` tiraria também as funções puras do mesmo arquivo,
+que já são testadas (`hudWindowOpacityPercent`, `modalRequestAction`, `TitleBarButton`…). Por isso cada arquivo de
+janela perde para um arquivo irmão as funções com decisão — testadas ou a testar — e só a cola (corpo de `@Composable`
+de host, chamada direta a AWT/JNA, montagem sobre `AppGraph`) fica na classe excluída. As linhas movidas continuam no
+denominador. `X11CompositorMove` já é classe própria e sai sem mover nada. `annotatedBy` foi descartado: não está
+medido se o Kover 0.9.9 exclui os métodos sintéticos `$lambda$N` de uma função anotada.
+
+**Conta** (contadores `LINE` por classe e método do `report.xml` acima; "movidas" = linhas que trocam de arquivo e seguem contadas):
+
+| Grupo | Arquivo | Sai: descobertas | Sai: cobertas | Movidas (desc./cob.) | Motivo |
+|---|---|---|---|---|---|
+| 1 | `CollectorEngine.kt` | 204 | 0 | — | Raiz de composição sobre `AppGraph` (mesmo motivo de `AppGraph`/`AppViewModels`); as decisões já são testadas fora (`collectorHealthOf`, `alertDestinationsFor`, `serveConfigRequests`, `buildUsageSnapshot`) |
+| 1 | `SettingsWindowHost.kt` | 129 | 0 | — | Host de janela, um `@Composable` só, sem função com decisão |
+| 1 | `HudWindow.kt` | 244 | 0 | 16/7 | `HudWindowHost`, balão e ações da conta, `pointerScreen`, `applyHudWindowOpacity` (AWT); movidas: `hudPicksGraphicsConfiguration`, `hudWindowOpacityPercent`, `hudRepaintsAfterOpacityChange`, `hudUpdateIndicatorOf`, `hudGearDescription`, `handleHudWindowKey`, `inCompositionDp` |
+| 1 | `AppDialogWindow.kt` | 192 | 0 | 9/14 | `AppDialogWindow`, `ModalWindowBody`, pré-aquecimento, esmaecimento e opacidade da janela AWT, `ModalWindowHost`, `ModalWindowEnvironment` (portador montado só no `Main`); movidas: as decisões da 6.3, as linhas da trilha, `closesModal`, `rememberLastNonNull` |
+| 1 | `ModalWindowsHost.kt` | 178 | 0 | 17/8 | `ModalWindowsHost` e `SessionWindowBindings` (fiação de view model a janela); movidas: `quotaWindowsForProfile`, `quotaEndAt`, `accountCreditsForProfile`, `historyWindowTitle` |
+| 1 | `DesktopWindowFrame.kt` | 90 | 0 | 1/33 | Moldura, barra de título, arrasto e `window.shape`; movidos: `maximizeToggled`, `maximizeButtonLabel`, `TitleBarButton` (composable testado) |
+| 1 | `CompositorWindowDrag.kt` | 84 | 0 | — | `X11CompositorMove` (JNA/Xlib) e o modificador de arrasto; `compositorClientWindow`, `isCosmicDesktop` e `windowDragByCompositor` ficam onde estão |
+| 1 | `HudWindowFrame.kt` | 67 | 0 | 0/20 | `HudWindowFrame`, `applyHudWindowBounds`, `rememberHudWindowRebirth`, descarte da janela; `HudWindowRebirth` é classe própria e segue contada; movidas: as funções de tamanho, posição, tipo e monitor |
+| **Subtotal 1** | | **1 188** | **0** | 43/82 | **93,08%** (41 195/44 259), faltam **852** |
+| 2 | `HelpWindow.kt` | 43 | 0 | — | Casca de `AppDialogWindow`; o conteúdo da Ajuda é testado na tela dele |
+| 2 | `StartupTipWindow.kt` | 39 | 0 | — | Idem, dica de arranque |
+| 2 | `OnboardingGuideWindow.kt` | 36 | 0 | — | Idem, guia inicial |
+| 2 | `ReleaseNotesWindow.kt` | 26 | 0 | — | Idem, novidades |
+| 2 | `HudWindowEffects.kt` | 47 | 0 | 5/15 | `ApplyHudHitRegion`, `HudHitRegionApplier` (`window.shape`); movidas: `hudHitRegionMode`, `hudHitRegionActive`, `hudHitRegionTarget`, `toAwtRectangle` |
+| 2 | `AppWindowStates.kt` | 57 | 0 | 0/6 | `rememberAppWindowStates`, persistência e tamanho mínimo sobre `WindowState`; movida: `windowGeometrySnapshotOf` |
+| 2 | `HudWindowTranslucency.kt` | 37 | 0 | 3/17 | `readHudTranslucencyState` (lê `GraphicsConfiguration`), `rememberHudWindowAlpha`; movidas: as mensagens e os registros da trilha, `hudWindowHasAlpha` |
+| 2 | `AppTrayHost.kt` | 43 | 0 | 0/1 | Bandeja AWT; `trayUsageRingFraction` já mora fora; movida: `trayAppName` |
+| **Subtotal 1+2** | | **1 516** | **0** | | **93,77%** (41 195/43 931), faltam **540** |
+| 3 | `HeadlessService.kt` | 29 | 0 | — | Raiz de composição do serviço sobre `AppGraph` + `CollectorEngine` |
+| 3 | `TuiWiring.kt` | 42 | 0 | — | Raiz de composição da TUI sobre `AppGraph`, nó de preferências real |
+| 3 | `TerminalSetupWiring.kt` | 29 | 0 | 3/0 | Raiz do assistente de configuração; movida: `shown` (caminho com `~`) |
+| 3 | `TelegramBotWiring.kt` | 56 | 0 | 1/44 | `createTelegramBot`/`createTelegramBotService` sobre `AppGraph`; os leitores da 6.2 seguem contados |
+| **Total 1+2+3** | | **1 672** | **0** | | **94,11%** (41 195/43 775), faltam **392** |
+
+Fora da lista por terem decisão (vão para teste, alavanca B): `AppPreferenceEffects` 54 (resolução do autostart,
+migração que falha), `AppWindowAnchor` 52 (`anchorAppWindow`: ancorado, ACK de atualização), `AppProfiles` 54
+(`buildAnthropicProfileUiModels`, `availableUsageTargets`, `buildSessionPulseTargets`), `HudWindowDrag` 19 e
+`HudWindowFacts` 29 (`HudDragState`, `HudDragProbe`).
+
+Depois da A, as decisões movidas sem teste (~45 linhas) entram na própria onda; o resto (~350 com os três grupos,
+~810 só com o grupo 1) é alavanca B em onda própria. Se perto de 95% os testes ficarem artificiais, a onda para e a
+meta volta ao dono.
+
+| ID | Atividade | Commit esperado |
+|---|---|---|
+| W65-A01 | Medição e lista nominal, arquivo por arquivo (este ponto); **para até o dono aprovar** | `docs(coverage): measure and list the wave 6.5 exclusions` |
+| W65-A02 | Mover as funções com decisão dos arquivos aprovados para arquivos irmãos, sem mudar comportamento | `refactor(window): move window decisions out of the host files` |
+| W65-A03 | Testes das decisões movidas sem teste (`hudUpdateIndicatorOf`, `hudGearDescription`, `handleHudWindowKey`, `inCompositionDp`, `closesModal`, `rememberLastNonNull`, `accountCreditsForProfile`, `historyWindowTitle`, `shown`) | `test(window): cover the moved window decisions` |
+| W65-A04 | Exclusão nominal no `build.gradle.kts`, um motivo por linha; "O que a suíte não cobre" do relatório | `ci(coverage): exclude window glue and composition roots by name` |
+| W65-A05 | Medição, relatório e piso | `ci(coverage): raise the Kotlin line floor` |
+
 ## Pontos de situação
 
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
@@ -216,3 +275,10 @@ de escrever o teste; chamada direta a `System.console`, `systemctl` real ou clie
 | W64-A07b | 2026-10-27 | este commit | concluída | `MetricValue` e `HealthTallyText` (`CliSessionDetailParts.kt`, 52 linhas) não tinham chamador (`grep` em `src/`): `MetricValue` foi substituído por `AppCellValue` na refatoração visual (`refatoracao-visual-opencode-execucao.md`, linha 265) e `HealthTallyText` pelo rodapé do `AppMetricBlock` com `healthTallyColor`. Removidos, com o import órfão. `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CliSessionsScreenTest" --tests "com.usagemonitor.architecture.ArchitectureRulesTest" --tests "com.usagemonitor.ui.TeamUsage*"`: 51 + 17 + 52 testes, 0 falhas. Nenhuma mudança visível: nada chamava as duas funções. |
 | W64-A08 | 2026-10-27 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport koverVerify`: `BUILD SUCCESSFUL`, 3 681 testes, 0 falhas; Kotlin **90,64%** (41 195/45 447; antes 89,58%, 40 734/45 472). Ganho da 6.4: +461 linhas cobertas, −486 descobertas (25 saíram com o código morto da A07b). Restam 4 252 descobertas; teto para 95%: 2 272, faltam **1 980**. Piso do Kotlin: 90 (`koverVerify -Pcoverage` com 90 passa). `node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs`: 17 regras de arquitetura ok, sem `crit`; `warn` só no servidor não medido (sem mudança em `server/`) e na meta de 95%. Testado só no Windows; nenhum host de janela mudou. Sem a alavanca A, o caminho até 95% é de ~1 980 linhas, das quais ~1 430 são janela. |
 | Onda 6.4 | 2026-10-27 | este commit | PR #492 | Run `40621707133`: `ci-ok` verde (inclui `desktop-linux`, consultivo, e `desktop-windows` com `koverVerify -Pcoverage`, piso 90), 0 incidências. Testado no Linux só pelo CI. |
+| W65-A01 | 2026-10-28 | este commit | aguardando aprovação | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport` em `origin/main` (`63d8bf1c`): `BUILD SUCCESSFUL`, 3 681 testes, 0 falhas; Kotlin **90,64%** (41 195/45 447). Lista nominal na seção "Atividades da onda 6.5", com contadores `LINE` por classe e método: grupo 1 tira 1 188 descobertas e 0 cobertas (93,08%, faltam 852); 1+2 tiram 1 516 (93,77%, faltam 540); 1+2+3 tiram 1 672 (94,11%, faltam 392). Nenhuma exclusão aplicada. |
+| W65-A01b | 2026-10-28 | este commit | concluída | Dono aprovou os grupos 1+2+3, com o texto do menu da bandeja saindo para um objeto de rótulos antes de excluir o `AppTrayHost`. |
+| W65-A02 | 2026-10-28 | este commit | concluída | Decisões movidas, sem mudança de comportamento: `HudWindowDecisions.kt`, `AppDialogWindowDecisions.kt` (+ `closesModal`, `LastValue` internos), `ModalWindowsDecisions.kt`, `DesktopTitleBar.kt` (`TitleBarButton`, maximizar, `TITLE_BAR_HEIGHT`), `HudWindowFrameDecisions.kt`, `HudHitRegionDecisions.kt`, `windowGeometrySnapshotOf` em `WindowGeometryPreferences.kt`. Cola separada para excluir: `HudWindowAlpha.kt` (leitura AWT e sondagem do alfa; a decisão de registrar virou `hudTranslucencyChanged`), `TelegramBotComposition.kt` (montagem do bot sobre `AppGraph`). Bandeja: `TrayMenuLabels` por `localized`, teto `INLINE_LANGUAGE_CHECKS_CEILING` 706 → 705. Terminal: `homeRelativePath` (`TerminalPaths.kt`) substitui as duas cópias idênticas de `shown` (serviço e assistente); `tuiTeamAccountLabels` sai da montagem da TUI. `gradlew.bat desktopTest -PtestForks=4`: `BUILD SUCCESSFUL`, 3 681 testes, 0 falhas (inclui `ArchitectureRulesTest`). Testado só no Windows; nenhuma chamada de janela mudou de ordem. |
+| W65-A03 | 2026-10-28 | este commit | concluída | `gradlew.bat desktopTest --tests` nos 9 arquivos tocados: `AppDialogWindowTest` 10, `HudHitRegionTargetTest` 7, `HudWindowDecisionsTest` 5 (novo), `HudWindowTranslucencyTest` 11, `ModalWindowsDecisionsTest` 7 (novo), `TrayMenuLabelsTest` 1 (novo), `TerminalPathsTest` 4 (novo), `TerminalServiceCommandsTest` 14, `TuiSettingsTest` 16; 0 falhas. Afirmado: aviso de atualização da engrenagem igual à faixa nos dois idiomas; F1/Esc só no `KeyDown`; descrição da engrenagem; área do monitor na escala da composição; último não nulo sobrevive ao assunto zerado; janela de 5 h e créditos (unidade mínima, moeda real, recuo para o valor da cota, ausência = desligado); título do histórico; retângulo AWT cobre o pixel cortado; só a mudança de alfa/monitor vai ao log; menu da bandeja; `~` só dentro da pasta pessoal (canônico, irmã com o mesmo prefixo fica de fora); aba Time só com contas visíveis e participantes. `KeyEvent(key, type)` do Compose é `@InternalComposeUiApi`: `handleHudWindowKey` e `closesModal` passam a receber `type` e `key`, e o host passa `event.type`/`event.key`. |
+| W65-A04 | 2026-10-28 | este commit | concluída | Exclusão nominal no `build.gradle.kts` (bloco `kover`, quatro grupos com motivo: raízes de composição, hosts de janela, cascas de `AppDialogWindow`, chamada direta a AWT/JNA); "O que a suíte não cobre" do relatório lista os excluídos. `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport`: `BUILD SUCCESSFUL`, 3 705 testes, 0 falhas; Kotlin **94,23%** (41 252/43 780; antes 90,64%). Nenhuma linha coberta saiu (41 195 → 41 252, +57 dos testes da A03); `HudWindowFrame.kt` ficou só com `HudWindowRebirth` (0 descobertas), `CompositorWindowDrag.kt` com o corpo do modificador (2). Restam 2 528 descobertas; teto para 95%: 2 189, faltam **339**. |
+| W65-A05 | 2026-10-28 | este commit | concluída | Piso do Kotlin 90 → **94** (`coverageLineFloorPercent`). `gradlew.bat koverVerify -Pcoverage` sobre a passada da A04: `BUILD SUCCESSFUL`. `node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs`: 3 705 testes, 0 falhas, Kotlin 94,2%, 17 regras de arquitetura ok, sem `crit`; `warn` no servidor não medido (sem mudança em `server/`), na meta de 95% e no carimbo do resultado (a passada é anterior aos commits A04/A05, que só mexem em configuração e documentação). Testado só no Windows; nenhuma chamada de janela mudou de ordem, as teclas F1/Esc passam `event.type`/`event.key` às mesmas regras. Faltam 339 linhas para 95%: alavanca B em onda própria (`AppPreferenceEffects` 54, `AppWindowAnchor` 52, `AppProfiles` 54, `AutoStartManager` 56, cauda longa). |
+| Onda 6.5 | 2026-10-28 | este commit | PR #493 | Run `40626193667`: `ci-ok` verde (inclui `desktop-linux`, consultivo, e `desktop-windows` com `koverVerify -Pcoverage`, piso 94), 0 incidências. Testado no Linux só pelo CI. |

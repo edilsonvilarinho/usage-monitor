@@ -545,7 +545,7 @@ const BLIND_SPOTS = [
     },
     {
         title: 'Excluídos do Kover por nome',
-        detail: 'Main.kt (arranque); AppGraph e AppViewModels (só montam com credenciais reais e HTTP de verdade); DashboardScreen e a grade responsiva (só testes e capturas os chamam). Nenhum deles conta no percentual.',
+        detail: 'Main.kt (arranque); AppGraph, AppViewModels e as raízes de composição sobre eles — CollectorEngine, HeadlessService, montagem do bot, da TUI e do assistente (só montam com credenciais reais e HTTP de verdade); hosts e cascas de janela e a chamada direta a AWT/JNA — HudWindow, HudWindowFrame, HudWindowEffects, HudWindowAlpha, AppDialogWindow, ModalWindowsHost, SettingsWindowHost, DesktopWindowFrame, X11CompositorMove, AppWindowStates, AppTrayHost, Help/StartupTip/OnboardingGuide/ReleaseNotesWindow (onda 6.5, #488); DashboardScreen e a grade responsiva (só testes e capturas os chamam). As decisões desses arquivos moram em arquivos irmãos e contam. Nenhum excluído conta no percentual.',
         source: 'build.gradle.kts, bloco kover; docs/planos/cobertura-95-execucao.md',
     },
 ]

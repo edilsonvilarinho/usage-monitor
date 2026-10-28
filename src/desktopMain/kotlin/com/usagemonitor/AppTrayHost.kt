@@ -11,7 +11,6 @@ import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.rememberTrayState
 import com.usagemonitor.data.AppDataDirectory
-import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.hudTraySummary
 import com.usagemonitor.presentation.ui.trayUsageRingFraction
@@ -52,7 +51,6 @@ internal fun ApplicationScope.AppTrayHost(
         appName = trayAppName(isolatedDataRootName = AppDataDirectory.root.name.takeUnless { AppDataDirectory.isDefault }),
         accounts = buildHudAccounts(quotaRisks, shell.cardOrder, language, Clock.System.now())
     )
-    val pt = language == AppLanguage.PT
 
     Tray(
         icon = trayIcon,
@@ -60,19 +58,19 @@ internal fun ApplicationScope.AppTrayHost(
         tooltip = tooltip,
         onAction = onFocusHud,
         menu = {
-            Item(text = if (pt) "Abrir" else "Open", onClick = onFocusHud)
-            Item(text = if (pt) "Atualizar agora" else "Refresh now", onClick = { viewModels.dashboard.refresh() })
+            Item(text = TrayMenuLabels.open(language), onClick = onFocusHud)
+            Item(text = TrayMenuLabels.refreshNow(language), onClick = { viewModels.dashboard.refresh() })
             // Configurações e Ajuda também estão no balão da engrenagem; aqui
             // valem para a barra HUD coberta ou fora da tela.
             Item(
-                text = if (pt) "Configurações" else "Settings",
+                text = TrayMenuLabels.settings(language),
                 onClick = {
                     breadcrumbs.recordScreenOpened("Configurações (bandeja)")
                     modal.openSettings()
                 }
             )
             Item(
-                text = if (pt) "Ajuda" else "Help",
+                text = TrayMenuLabels.help(language),
                 onClick = {
                     breadcrumbs.recordScreenOpened("Ajuda (bandeja)")
                     modal.openHelp()
@@ -86,7 +84,7 @@ internal fun ApplicationScope.AppTrayHost(
                 }
             )
             Separator()
-            Item(text = if (pt) "Sair" else "Quit", onClick = onQuit)
+            Item(text = TrayMenuLabels.quit(language), onClick = onQuit)
         }
     )
 
@@ -101,11 +99,3 @@ internal fun ApplicationScope.AppTrayHost(
         }
     }
 }
-
-/**
- * Nome no começo do tooltip da bandeja. Com `--user-data-dir` (#419) leva a pasta:
- * duas instâncias abertas dariam dois ícones idênticos. Fica no começo porque o
- * corte de 127 caracteres do tooltip come o fim.
- */
-internal fun trayAppName(isolatedDataRootName: String?): String =
-    if (isolatedDataRootName == null) "Usage Monitor" else "Usage Monitor ($isolatedDataRootName)"

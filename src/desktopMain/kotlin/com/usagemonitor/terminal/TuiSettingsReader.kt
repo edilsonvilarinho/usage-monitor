@@ -1,5 +1,6 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.AnthropicProfileRecord
 import com.usagemonitor.ConfigKeys
 import com.usagemonitor.ConfigReadSource
 import com.usagemonitor.ConfigValues
@@ -32,6 +33,12 @@ internal class TuiSettingsInputs(
     /** Fora da raiz padrão (#419), iniciar com o sistema não existe. */
     val autostartAvailable: Boolean
 )
+
+/** Os apelidos das contas marcadas para o time, sem as escondidas, na ordem gravada. */
+internal fun tuiTeamAccountLabels(records: List<AnthropicProfileRecord>, settings: TeamIntegrationSettings?): List<String> {
+    val wanted = settings?.participatingProfileIds.orEmpty()
+    return records.filter { record -> !record.hidden && record.id in wanted }.map { record -> record.label }
+}
 
 /**
  * A aba 5 (#441, A08): as seções das Configurações com os valores gravados agora. Cada campo

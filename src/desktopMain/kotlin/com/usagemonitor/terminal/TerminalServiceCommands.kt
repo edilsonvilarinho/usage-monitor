@@ -172,12 +172,7 @@ internal class TerminalServiceCommands(
         )
     }
 
-    private fun shown(path: String): String {
-        // Canônicos dos dois lados: no Windows um pode vir com o nome curto 8.3.
-        val homePath = runCatching { home.canonicalPath }.getOrDefault(home.path).trimEnd(File.separatorChar)
-        val canonical = runCatching { File(path).canonicalPath }.getOrDefault(path)
-        return if (homePath.isNotEmpty() && canonical.startsWith(homePath + File.separator)) "~" + canonical.removePrefix(homePath) else path
-    }
+    private fun shown(path: String): String = homeRelativePath(path, home)
 
     companion object {
         private const val EXIT_REFUSED = 1
