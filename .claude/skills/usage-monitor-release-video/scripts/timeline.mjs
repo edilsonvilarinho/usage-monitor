@@ -56,10 +56,10 @@ export function buildTimeline(scenes, durations) {
     return { total, scenes: timed }
 }
 
-export function captionBlocks(text) {
+function wrapLines(words) {
     const lines = []
     let current = ''
-    for (const word of text.split(/\s+/).filter(Boolean)) {
+    for (const word of words) {
         const candidate = current ? `${current} ${word}` : word
         if (candidate.length > PACING.captionChars && current) {
             lines.push(current)
@@ -69,6 +69,51 @@ export function captionBlocks(text) {
         }
     }
     if (current) lines.push(current)
+    return lines
+}
+
+// Quebra em exatamente `count` linhas de no máximo captionChars, com a menor irregularidade
+// (soma dos quadrados da sobra), um desconto para terminar a linha em pontuação e uma multa
+// pesada para linha de uma palavra só. Nula se não cabe.
+function balancedLines(words, count) {
+    const size = (from, to) => words.slice(from, to).join(' ').length
+    const lineCost = (from, to) => (PACING.captionChars - size(from, to)) ** 2 + (to - from === 1 ? 10_000 : 0)
+    const memo = new Map()
+    const best = (from, left) => {
+        const key = `${from}:${left}`
+        if (memo.has(key)) return memo.get(key)
+        let result = null
+        if (left === 1) {
+            const length = size(from, words.length)
+            if (length <= PACING.captionChars) result = { cost: lineCost(from, words.length), breaks: [] }
+        } else {
+            for (let to = from + 1; to <= words.length - (left - 1); to += 1) {
+                const length = size(from, to)
+                if (length > PACING.captionChars) break
+                const rest = best(to, left - 1)
+                if (!rest) continue
+                const punctuation = /[,.:;?!]$/.test(words[to - 1]) ? 60 : 0
+                const cost = lineCost(from, to) - punctuation + rest.cost
+                if (!result || cost < result.cost) result = { cost, breaks: [to, ...rest.breaks] }
+            }
+        }
+        memo.set(key, result)
+        return result
+    }
+    const plan = best(0, count)
+    if (!plan) return null
+    const edges = [0, ...plan.breaks, words.length]
+    return edges.slice(1).map((edge, index) => words.slice(edges[index], edge).join(' '))
+}
+
+// Linhas equilibradas em blocos de 2: encher cada linha até o limite deixava palavra sozinha
+// na tela (v42.0.0, abertura PT: "terminal." por 1,2 s). Com mais de uma linha, o total é par,
+// para nenhum bloco sair com uma linha curta depois de um cheio.
+export function captionBlocks(text) {
+    const words = text.split(/\s+/).filter(Boolean)
+    const greedy = wrapLines(words)
+    const count = greedy.length > 1 && greedy.length % 2 === 1 ? greedy.length + 1 : greedy.length
+    const lines = (count <= words.length && balancedLines(words, count)) || balancedLines(words, greedy.length) || greedy
     const blocks = []
     for (let index = 0; index < lines.length; index += PACING.captionLines) {
         blocks.push(lines.slice(index, index + PACING.captionLines))

@@ -61,3 +61,23 @@ test('SRT numera os blocos e escreve o tempo com virgula', () => {
         '1\n00:00:01,250 --> 00:00:03,400\nUsage Monitor 42.\n\n2\n00:01:01,050 --> 00:01:02,000\na\nb\n',
     )
 })
+
+test('legenda divide a fala em blocos equilibrados, sem palavra orfa', () => {
+    const blocks = captionBlocks('Chegou o Usage Monitor 42. Agora também no seu terminal.')
+    assert.equal(blocks.length, 2)
+    const sizes = blocks.map((block) => block.join(' ').length)
+    assert.ok(Math.abs(sizes[0] - sizes[1]) <= 12, `blocos ${sizes.join(' × ')}`)
+    for (const block of blocks) for (const line of block) assert.ok(line.length <= PACING.captionChars, line)
+})
+
+test('nenhuma linha de legenda fica com uma palavra so', () => {
+    for (const text of [
+        'Interactive mode puts six tabs on one screen, even over SSH.',
+        'Um comando mostra todas as cotas e o ritmo de cada uma.',
+        'Team server down? Now you see the step where it stopped.',
+    ]) {
+        const lines = captionBlocks(text).flat()
+        assert.equal(lines.join(' '), text)
+        for (const line of lines) assert.ok(line.split(' ').length > 1, `"${line}" em "${text}"`)
+    }
+})

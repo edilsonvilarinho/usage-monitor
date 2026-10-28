@@ -65,9 +65,10 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | A03 | `timeline.mjs`: tempos das cenas a partir das durações medidas, regras de ritmo, blocos de legenda e SRT (TDD) |
 | A04 | `social.mjs`: checagem das descrições (limite de cada rede, hashtags, link) (TDD) |
 | A05 | Ritmo por caracteres/s em vez de palavras/s (achado da primeira síntese da v42.0.0) (TDD) |
-| A06 | `synthesize.py`, `setup-tools.mjs`, `render.mjs` + `assets/video.html`, mixagem e mux em `make-video.mjs` |
-| A07 | `SKILL.md`: o processo de ponta a ponta e as regras do roteiro |
-| A08 | Roteiro, `scenes.json` e `social.json` da v42.0.0; os dois vídeos gerados e conferidos |
+| A06 | Legenda em linhas equilibradas, sem palavra sozinha (achado do primeiro vídeo da v42.0.0) (TDD) |
+| A07 | `synthesize.py`, `setup-tools.mjs`, `render.mjs` + `assets/video.html`, mixagem e mux em `make-video.mjs` |
+| A08 | `SKILL.md`: o processo de ponta a ponta e as regras do roteiro |
+| A09 | Roteiro, `scenes.json` e `social.json` da v42.0.0; os dois vídeos gerados e conferidos |
 
 ## Ponto de situação
 
@@ -78,6 +79,7 @@ basta pedir, e ela gera os vídeos e as descrições para X, Instagram e TikTok.
 | A03 | 2026-10-28 | `feat(skills): time the video scenes and captions from the measured speech (#503)` | concluída | Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com stubs: 7 testes novos, 7 falhas na asserção. Verde: 10/11 — `expected: 13.5, actual: 11.7`: a última cena recebia a saída no `end`; removido, `total` carrega a saída. Depois 11/11 |
 | A04 | 2026-10-28 | `feat(skills): check the social captions for X, Instagram and TikTok (#503)` | concluída | Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com stubs: 5 testes novos, 5 falhas na asserção. Verde: 16/16. Regras: X ≤ 280 com link = 23 e emoji = 2, link da release obrigatório no X; Instagram ≤ 2200 e TikTok ≤ 4000 sem URL (não é clicável); no máximo 5 hashtags |
 | A05 | 2026-10-28 | `fix(skills): pace the speech by characters per second (#503)` | concluída | Achado: `make-video.mjs v42.0.0 --stills` recusou 17 falas pela regra de palavras. Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs` com `spokenLength` vazio: 2 falhas na asserção (`expected: 26, actual: 0`; mensagem sem `27 caracteres em 1.00 s (27.0/s)`). Verde: 16/16 |
+| A06 | 2026-10-28 | `fix(skills): balance the caption lines (#503)` | concluída | Achado no SRT do primeiro vídeo PT: bloco 2 = `terminal.` sozinho por 1,2 s (enchimento guloso). Vermelho: `node --test .claude/skills/usage-monitor-release-video/scripts/test/*.test.mjs`: `blocos 46 × 9`; depois, com blocos equilibrados, `"tabs" em "Interactive mode puts six tabs…"` e `"uma." em "Um comando mostra…"`. Verde: 18/18 com partição de menor irregularidade, desconto após pontuação, multa para linha de uma palavra e total de linhas par. As 24 falas da v42.0.0 conferidas: nenhuma linha de uma palavra |
 
 ## Problemas em aberto e riscos
 
