@@ -1,6 +1,10 @@
 package com.usagemonitor.terminal
 
+import com.usagemonitor.data.datasource.LocalAlertLogDataSource
 import com.usagemonitor.data.datasource.LocalDashboardCacheDataSource
+import com.usagemonitor.domain.entity.AlertDestination
+import com.usagemonitor.domain.entity.AlertLogEntry
+import com.usagemonitor.domain.entity.AlertLogKind
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.AppLanguage
@@ -17,10 +21,13 @@ import java.nio.file.Files
 import java.util.UUID
 import java.util.prefs.Preferences
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -33,10 +40,17 @@ class TerminalCommandsTest {
         override fun now(): Instant = now
     }
 
-    private fun run(command: TerminalCommand, collectedAt: Instant?): Pair<Int, String> {
+    private fun run(
+        command: TerminalCommand,
+        collectedAt: Instant?,
+        unicode: Boolean = true,
+        alerts: List<AlertLogEntry> = emptyList()
+    ): Pair<Int, String> {
         val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
         try {
             val dir = Files.createTempDirectory("usage-monitor-terminal").toFile()
+            val alertLog = LocalAlertLogDataSource(File(dir, "alerts.jsonl"))
+            alerts.forEach(alertLog::append)
             val cache = File(dir, "dashboard-cache.json")
             if (collectedAt != null) {
                 val stats = ApiUsageStats(
@@ -49,9 +63,9 @@ class TerminalCommandsTest {
                 runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats), collectedAt) }
             }
             val buffer = ByteArrayOutputStream()
-            val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = true), PrintStream(buffer, true, "UTF-8"))
+            val console = TerminalConsole(TerminalProfile(TerminalPalette.NONE, unicode = unicode), PrintStream(buffer, true, "UTF-8"))
             val reader = TerminalReader(cache, File(dir, "app.lock"), node, clock)
-            val code = TerminalCommands.run(command, AppLanguage.PT, reader, console)
+            val code = TerminalCommands.run(command, AppLanguage.PT, reader, console, alertLog = alertLog)
             return code to buffer.toString(Charsets.UTF_8)
         } finally {
             runCatching {
@@ -254,5 +268,49 @@ class TerminalCommandsTest {
         assertTrue(canRedrawInPlace(consolePresent = true, environment = emptyMap()))
         assertTrue(!canRedrawInPlace(consolePresent = false, environment = mapOf("TERM" to "xterm-256color")))
         assertTrue(!canRedrawInPlace(consolePresent = true, environment = mapOf("TERM" to "dumb")))
+    }
+
+    @Test
+    fun `alerts lists today by default and further back with since`() {
+        val alerts = listOf(
+            AlertLogEntry((now - 20.hours).toEpochMilliseconds(), AlertLogKind.RESET, "Claude Max · Claude 7d"),
+            AlertLogEntry((now - 2.hours).toEpochMilliseconds(), AlertLogKind.CRITICAL, "Claude Team · Claude 5h", 91, listOf(AlertDestination.TELEGRAM))
+        )
+
+        val (todayCode, today) = run(TerminalCommand.Alerts(), collectedAt = null, alerts = alerts)
+        val (sinceCode, since) = run(TerminalCommand.Alerts(1.days), collectedAt = null, alerts = alerts)
+
+        assertEquals(0, todayCode, today)
+        assertTrue(today.contains("Claude Team · Claude 5h 91%") && !today.contains("Claude 7d"), today)
+        assertEquals(0, sinceCode, since)
+        assertTrue(since.contains("Claude Team · Claude 5h 91%") && since.contains("Claude Max · Claude 7d"), since)
+    }
+
+    @Test
+    fun `the tmux line goes out in the tmux format and always exits with 0`() {
+        val (code, text) = run(TerminalCommand.TmuxStatusLine, now - 1.minutes)
+
+        assertEquals(0, code)
+        // Sigla da conta e o maior percentual, sem ANSI: o tmux não desenha escape na barra.
+        assertEquals("an 62", text.trimEnd())
+        assertEquals(0, run(TerminalCommand.TmuxStatusLine, collectedAt = null).first)
+    }
+
+    @Test
+    fun `status json goes out even without a reading, in ascii on an ascii console`() {
+        val (empty, emptyJson) = run(TerminalCommand.Status(json = true), collectedAt = null)
+        assertEquals(3, empty)
+        assertTrue(Json.parseToJsonElement(emptyJson).jsonObject.containsKey("version"), emptyJson)
+
+        val (code, json) = run(TerminalCommand.Status(json = true), now - 1.minutes, unicode = false)
+        assertEquals(0, code)
+        assertTrue(json.all { char -> char.code < 128 }, json)
+        assertTrue(json.contains("\"Claude 5h\""), json)
+    }
+
+    @Test
+    fun `check exits by the highest quota against the given ceiling`() {
+        assertEquals(0, run(TerminalCommand.Check(max = 90), now - 1.minutes).first)
+        assertTrue(run(TerminalCommand.Check(max = 50), now - 1.minutes).first != 0)
     }
 }

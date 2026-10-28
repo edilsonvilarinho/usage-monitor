@@ -61,9 +61,12 @@ class TerminalServiceCommandsTest {
     }
 
     /** O systemd de mentira: grava o que foi chamado e responde como um servidor com linger desligado. */
+    /** Resposta própria de um teste; `null` cai na resposta padrão abaixo. */
+    private var answer: (List<String>) -> ProcessResult? = { null }
+
     private val fakeSystem = ProcessRunner { command ->
         calls += command
-        when {
+        answer(command) ?: when {
             command.contains("show-environment") -> ProcessResult(0, "PATH=/usr/bin")
             command.contains("show") -> ProcessResult(0, "LoadState=loaded\nActiveState=active\nSubState=running\nMainPID=4121\nMemoryCurrent=190840832\n")
             command.first() == "loginctl" -> ProcessResult(0, "no\n")
@@ -188,5 +191,113 @@ class TerminalServiceCommandsTest {
         assertEquals(0, code)
         assertEquals(listOf("journalctl", "--user", "--unit", "usage-monitor.service", "--lines", "20", "--no-pager", "--follow"), calls.last())
         assertTrue(output.contains("~/.usage-monitor/diagnostics/app.log"), output)
+    }
+
+    @Test
+    fun `uninstall refuses without the unit and otherwise disables, deletes and reloads`() {
+        val (refused, hint) = run(ServiceCommand.Uninstall)
+        assertEquals(1, refused)
+        assertTrue(hint.contains("O serviço não está instalado") && hint.contains("usage-monitor service install"), hint)
+        assertTrue(calls.none { command -> command.contains("disable") })
+
+        run(ServiceCommand.Install)
+        calls.clear()
+        val (code, output) = run(ServiceCommand.Uninstall)
+
+        assertEquals(0, code, output)
+        assertEquals("✓ serviço removido\n", output)
+        assertEquals(
+            listOf(
+                listOf("systemctl", "--user", "disable", "--now", "usage-monitor.service"),
+                listOf("systemctl", "--user", "daemon-reload")
+            ),
+            calls
+        )
+        assertTrue(!File(dir, ".config/systemd/user/usage-monitor.service").exists())
+    }
+
+    @Test
+    fun `start stop and restart say what happened and repeat what systemd refused`() {
+        run(ServiceCommand.Install)
+
+        val (stopped, stopOutput) = run(ServiceCommand.Control("stop"))
+        assertEquals(0, stopped)
+        assertEquals("✓ serviço parado\n", stopOutput)
+        assertEquals(listOf("systemctl", "--user", "stop", "usage-monitor.service"), calls.last())
+
+        answer = { command -> if (command.contains("restart")) ProcessResult(5, "Unit usage-monitor.service is masked.\n") else null }
+        val (failed, failOutput) = run(ServiceCommand.Control("restart"))
+        assertEquals(1, failed)
+        assertEquals("▲ O systemd recusou: Unit usage-monitor.service is masked.\n", failOutput)
+    }
+
+    @Test
+    fun `install stops when the user systemd does not answer and shows linger`() {
+        answer = { command -> if (command.contains("show-environment")) ProcessResult(1, "Failed to connect to bus: No medium found\nsecond line") else null }
+
+        val (code, output) = run(ServiceCommand.Install)
+
+        assertEquals(1, code)
+        assertTrue(output.startsWith("▲ O systemd do usuário não respondeu (systemctl --user: Failed to connect to bus: No medium found)"), output)
+        assertTrue(output.contains("sudo loginctl enable-linger dev"), output)
+        assertTrue(!File(dir, ".config/systemd/user/usage-monitor.service").exists())
+    }
+
+    @Test
+    fun `install keeps the written unit but reports when enabling fails`() {
+        answer = { command -> if (command.contains("enable")) ProcessResult(1, "Access denied\n") else null }
+
+        val (code, output) = run(ServiceCommand.Install)
+
+        assertEquals(1, code)
+        assertEquals(
+            "✓ serviço criado em ~/.config/systemd/user/usage-monitor.service\n" +
+                "▲ O systemd recusou: Access denied\n",
+            output
+        )
+    }
+
+    @Test
+    fun `install with the app collecting says the service takes over later and skips linger when on`() {
+        answer = { command -> if (command.first() == "loginctl") ProcessResult(0, "yes\n") else null }
+        LocalCollectorRegistrationDataSource(File(dir, "collector.json")).write(CollectorRegistration(CollectorKind.APP, 77L, now - 1.hours, "41.12.0"))
+        val lock = SingleInstanceGuard.tryAcquire(File(dir, "app.lock"))
+        try {
+            val (code, output) = run(ServiceCommand.Install)
+
+            assertEquals(0, code, output)
+            assertTrue(output.contains("▲ O app está aberto e coletando: o serviço assume quando ele fechar."), output)
+            assertTrue(!output.contains("enable-linger"), output)
+        } finally {
+            lock?.close()
+        }
+    }
+
+    @Test
+    fun `status names the script install and leaves the memory out of a stopped unit`() {
+        val tree = File(dir, ".local/share/usage-monitor/versions/41.12.0/Usage Monitor/bin/Usage Monitor").apply { parentFile.mkdirs(); writeText("") }
+        val commands = commands(appPath = tree.path)
+        run(ServiceCommand.Install, commands)
+        answer = { command -> if (command.contains("show")) ProcessResult(0, "LoadState=loaded\nActiveState=inactive\nMemoryCurrent=190840832\n") else null }
+
+        val (_, output) = run(ServiceCommand.Status, commands)
+
+        assertTrue(output.contains("instalado pelo script (atualize rodando o instalador da versão nova)"), output)
+        assertTrue(!output.contains("182 MB"), output)
+    }
+
+    @Test
+    fun `logs without follow asks the journal for the requested lines only`() {
+        val (code, _) = run(ServiceCommand.Logs(follow = false, lines = 5))
+
+        assertEquals(0, code)
+        assertEquals(listOf("journalctl", "--user", "--unit", "usage-monitor.service", "--lines", "5", "--no-pager"), calls.last())
+    }
+
+    @Test
+    fun `the unit folder follows XDG_CONFIG_HOME and falls back to the home config`() {
+        assertEquals(File("/xdg"), TerminalServiceCommands.configHome(mapOf("XDG_CONFIG_HOME" to "/xdg"), "/home/dev"))
+        assertEquals(File("/home/dev", ".config"), TerminalServiceCommands.configHome(mapOf("XDG_CONFIG_HOME" to " "), "/home/dev"))
+        assertEquals(File("/home/dev", ".config"), TerminalServiceCommands.configHome(emptyMap(), "/home/dev"))
     }
 }
