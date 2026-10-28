@@ -59,6 +59,8 @@ marca (relevo AK1 em todo lugar onde a marca aparece).
 | A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.GargantuaHudTest" --tests "com.usagemonitor.ui.GargantuaSceneTest"` | 12 testes, 0 falhas |
 | A03 | vermelho (stub do `centerContent` por cima): `gradlew.bat desktopTest --tests "com.usagemonitor.ui.GargantuaHudTest"` | 1 falha na asserção: `o disco da frente deveria cobrir a marca embaixo do centro, azul 1.0` |
 | A03 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.GargantuaHudTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.architecture.*"` | 92 testes, 0 falhas (11 + 64 + 17) |
+| A04 | vermelho (stub com cores chapadas e espessura 0): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.AppProviderMarkReliefTest" --tests "com.usagemonitor.ui.AppProviderMarkReliefScreenTest"` | 3 falhas na asserção: `expected:<1.0> but was:<0.0>`; `topo de Color(0.30980393, 0.54901963, 1.0, …) não clareou`; `borda de cima 0.5019608 deveria passar a de baixo 0.5019608 em 0,3` |
+| A04 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.ui.components.*" --tests "com.usagemonitor.ui.AppProviderMarkReliefScreenTest" --tests "com.usagemonitor.ui.GargantuaHudTest" --tests "com.usagemonitor.ui.HudNotchTest"` | 165 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

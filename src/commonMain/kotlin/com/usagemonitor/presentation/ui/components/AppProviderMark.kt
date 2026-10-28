@@ -1,12 +1,11 @@
 package com.usagemonitor.presentation.ui.components
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -31,6 +30,10 @@ import com.usagemonitor.domain.entity.ApiSource
  * da HUD. Nenhuma marca traz cor própria — as cores de marca dos fornecedores
  * não passariam o contraste AA nas duas superfícies, e o acento já é a
  * identidade medida por `AppAccentsContrastTest`.
+ *
+ * **Em relevo** (AK1, #517): a cor de quem usa vira volume — clara em cima,
+ * escura embaixo, borda acesa em cima e sombreada embaixo
+ * ([drawProviderMarkRelief]). A identidade continua sendo uma cor só.
  *
  * **Decorativa para a semântica**: o nome do fornecedor está sempre escrito ao
  * lado, e uma descrição aqui faria o leitor de tela ler o nome duas vezes.
@@ -59,14 +62,14 @@ fun AppProviderMark(
 ) {
     val mark = source.providerMark()
     val vector = remember(mark) { mark.toImageVector() }
-    Image(
-        painter = rememberVectorPainter(vector),
-        contentDescription = null,
-        colorFilter = ColorFilter.tint(tint),
+    val painter = rememberVectorPainter(vector)
+    Canvas(
         modifier = modifier
             .size(size)
             .clearAndSetSemantics { }
-    )
+    ) {
+        drawProviderMarkRelief(painter, tint)
+    }
 }
 
 /** As formas disponíveis. Várias fontes podem dividir uma (OpenCode Zen e Go). */
