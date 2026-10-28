@@ -13,6 +13,8 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.terminal.TuiActiveSession
+import com.usagemonitor.presentation.terminal.TuiAnalysisState
 import com.usagemonitor.presentation.terminal.TuiState
 import com.usagemonitor.presentation.terminal.TuiTab
 import java.io.File
@@ -180,6 +182,97 @@ class TuiReaderTest {
             // Dois `sync()` por leitura: o primeiro reconhece a gravação da outra JVM, o segundo relê.
             assertEquals(4, node.syncs)
         } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `the overview shows the Claude Code session active in the last 10 minutes and none when it is older`() {
+        val dir = Files.createTempDirectory("usage-monitor-tui").toFile()
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        val cache = File(dir, "dashboard-cache.json")
+        runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats(ApiSource.ANTHROPIC, "default", "Claude 5h", 40, "Anthropic")), now) }
+        val index = ClaudeTranscriptFixture.indexed(
+            dir,
+            mapOf(
+                "agora" to listOf(
+                    ClaudeTranscriptFixture.assistantLine("agora", "m-1", "2026-10-21T17:05:00Z", 2_000, 200),
+                    ClaudeTranscriptFixture.assistantLine("agora", "m-2", "2026-10-21T17:20:00Z", 1_000, 100)
+                )
+            )
+        )
+        try {
+            TuiStores(cliIndex = index, codexIndex = File(dir, "sem-codex.db"), history = File(dir, "sem-historico.db")).use { stores ->
+                val active = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), stores).load(TuiState()).accounts.single().activeSession
+                assertEquals("usage-monitor", active?.project)
+                assertEquals("claude-opus-5", active?.model)
+                assertTrue((active?.costMicros ?: 0L) > 0L, active.toString())
+                assertFalse(active?.costIncomplete ?: true)
+
+                val later = object : Clock {
+                    override fun now(): Instant = now + 30.minutes
+                }
+                val idle = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, later), stores).load(TuiState()).accounts.single().activeSession
+                assertEquals(TuiActiveSession.NONE, idle)
+            }
+        } finally {
+            runCatching { node.removeNode() }
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `the Codex default account reads its active session without a price, and other tabs skip it`() {
+        val dir = Files.createTempDirectory("usage-monitor-tui").toFile()
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        val cache = File(dir, "dashboard-cache.json")
+        runBlocking { LocalDashboardCacheDataSource(cache).save(listOf(stats(ApiSource.CODEX, null, "Codex 5h", 24, "Codex")), now) }
+        val codex = CodexRolloutFixture.indexed(
+            dir, "codex-1", "/workspace/usage-monitor",
+            listOf(CodexRolloutFixture.Response("t-1", "2026-10-21T17:15:00Z", "2026-10-21T17:18:00Z", input = 900, cached = 300, output = 90))
+        )
+        try {
+            TuiStores(cliIndex = File(dir, "sem-indice.db"), codexIndex = codex, history = File(dir, "sem-historico.db")).use { stores ->
+                val reader = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), stores)
+
+                val active = reader.load(TuiState()).accounts.single().activeSession
+                assertEquals("usage-monitor", active?.project)
+                assertEquals("gpt-5.5-codex", active?.model)
+                assertNull(active?.costMicros)
+                assertFalse(active?.costIncomplete ?: true)
+                assertNull(reader.load(TuiState(tab = TuiTab.SESSIONS)).accounts.single().activeSession)
+            }
+        } finally {
+            runCatching { node.removeNode() }
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `the analysis tab keeps the chosen account inside the eligible ones`() {
+        val dir = Files.createTempDirectory("usage-monitor-tui").toFile()
+        val node = Preferences.userRoot().node("com.usagemonitor.tests.${UUID.randomUUID()}")
+        val cache = File(dir, "dashboard-cache.json")
+        runBlocking {
+            LocalDashboardCacheDataSource(cache).save(
+                listOf(stats(ApiSource.ANTHROPIC, "work", "Claude 5h", 40, "Anthropic"), stats(ApiSource.CODEX, null, "Codex 5h", 24, "Codex")),
+                now
+            )
+        }
+        try {
+            val withoutStores = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock))
+            val past = withoutStores.load(TuiState(tab = TuiTab.ANALYSIS, analysis = TuiAnalysisState(account = 9))).analysis
+            assertEquals(listOf(ApiSource.ANTHROPIC, ApiSource.CODEX), past?.accounts?.map { account -> account.source })
+            assertEquals(1, past?.index)
+            // Sem os bancos, sem análise: a aba diz que não há histórico.
+            assertNull(past?.analysis)
+
+            TuiStores(cliIndex = File(dir, "sem-indice.db"), codexIndex = File(dir, "sem-codex.db"), history = File(dir, "sem-historico.db")).use { stores ->
+                val first = TuiReader(TerminalReader(cache, File(dir, "app.lock"), node, clock), stores).load(TuiState(tab = TuiTab.ANALYSIS, analysis = TuiAnalysisState(account = -3))).analysis
+                assertEquals(0, first?.index)
+            }
+        } finally {
+            runCatching { node.removeNode() }
             dir.deleteRecursively()
         }
     }
