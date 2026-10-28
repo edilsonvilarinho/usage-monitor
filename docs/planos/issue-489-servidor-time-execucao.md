@@ -56,3 +56,4 @@ independentes; só a primeira é código deste repositório.
 | A01 | 2026-10-27 | Claude Opus 5.5 | `npx -p node@20 -p npm@10.8.2 -c 'npm install --no-audit --no-fund'` (só `package.json`) | falha `edgesOut` — reproduz a issue |
 | A01 | 2026-10-27 | Claude Opus 5.5 | `npx -p node@22 -p npm@10.8.2 -c 'npm install … && npm run build && npm prune --omit=dev'` | passa; `better-sqlite3` carrega |
 | A01 | 2026-10-27 | Claude Opus 5.5 | `cd server && npm ci && npm run typecheck && npm test` (Node 22.22.1) | typecheck limpo; 24 arquivos, 313 testes passam |
+| A01 | 2026-10-27 | Claude Opus 5.5 | CI do PR #491, run `40615671222` | `ci-ok` verde; job `server`: `Build Dokploy image` (Node 22, sem lockfile, Linux) passa |
