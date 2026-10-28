@@ -65,7 +65,8 @@ O dono do repositório delegou o ciclo inteiro (código, PR, CI, merge) ao agent
 | 6.2 | Costura em `AutoStartManager` (`AutoStartHost`), `SettingsActions`, `AppSettingsFeedback`, `buildShellActions` e leitores do bot; testes de `AppModalState` e `TelegramBotActions` | PR #485 | 89,5% |
 | 6.3 | Janelas: extrair decisão de `HudWindow*`, `AppDialogWindow`, `DesktopWindowFrame`, `CompositorWindowDrag` para função pura; excluir só a chamada AWT/JNA que sobrar, por nome | PR #486 mesclada | 89,58% |
 | 6.4 | Alavanca B da #488: teste de código com decisão fora de janela (terminal, TUI, bot, leitores locais, view models, telas) | PR #492, mesclada | 90,64% |
-| 6.5 | Alavanca A da #488: exclusão nominal da cola de janela e das raízes de composição, com as decisões movidas para arquivo irmão e contadas | PR #493 | 94,23% |
+| 6.5 | Alavanca A da #488: exclusão nominal da cola de janela e das raízes de composição, com as decisões movidas para arquivo irmão e contadas | PR #493, mesclada | 94,23% |
+| 6.6 | Alavanca B da #488, só testes: decisão que sobrou fora de janela, com costura onde a decisão está presa ao grafo ou ao sistema; nenhuma exclusão nova | em andamento | — |
 
 Conta após a 6.1 (`build/cov/cats.py`): 5 407 linhas descobertas de 45 362; o teto para 95% é 2 268, faltam
 **3 139**. Distribuição: `desktopMain` 2 598, janela 1 453, `commonMain` 1 327, gerado 22, só-teste 7.
@@ -203,6 +204,39 @@ meta volta ao dono.
 | W65-A04 | Exclusão nominal no `build.gradle.kts`, um motivo por linha; "O que a suíte não cobre" do relatório | `ci(coverage): exclude window glue and composition roots by name` |
 | W65-A05 | Medição, relatório e piso | `ci(coverage): raise the Kotlin line floor` |
 
+## Atividades da onda 6.6 (issue #488, alavanca B, só testes)
+
+Partida medida em `origin/main` (`e3e24a5a`), `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport`:
+`BUILD SUCCESSFUL`, 3 705 testes, 0 falhas; Kotlin **94,23%** (41 252/43 780), 2 528 descobertas em 408 arquivos;
+teto para 95%: 2 189, faltam **339**.
+
+Leitura do Kover XML método a método (contador `LINE` por `method`), por tipo de método descoberto: lógica com 2+
+linhas 1 035, `@Composable`/`remember*`/lambdas de composição 693, métodos com 1 linha descoberta (ramo de erro, texto
+do outro idioma, `else` de `when`) 461, acessores/construtores 241, cola de sistema (`current`, `system`, `realCheck`)
+69, `JFileChooser` 29. A meta não sai só dos arquivos grandes: a cauda de 1–15 linhas por arquivo é metade da conta.
+
+Critério de entrada (o mesmo das ondas anteriores): o teste afirma rota, estado publicado, arquivo gravado, texto
+mostrado ou decisão. Fica de fora, sem teste: leitura de AWT/`MouseInfo`/`GraphicsDevice` (`readHudWindowFacts`,
+`HudDragProbe`, `HudScreenSelection`, `StartupMachineContext.current`, `RuntimeEnvironment.current`), `JFileChooser`
+(`choose*Directory`, `DesktopUsageExportWriter.chooseFile`) e composição que só repassa para função já testada
+(`rememberStartupGuideController`, `rememberAutoUpdateController` além da escolha do instalador).
+
+| ID | Atividade | Alvo (descobertas) | Commit esperado |
+|---|---|---|---|
+| W66-A01 | Medição, leitura por método e este plano | — | `docs(coverage): plan wave 6.6` |
+| W66-A02 | Contas e acesso web: `buildAnthropicProfileUiModels` (estado por inspeção, duplicada, removível), `availableUsageTargets` (ordem das fontes, Codex padrão antes das extras), `buildSessionPulseTargets` (integração desligada, perfil fora), cores/emojis/Codex; `WebAccessActions` (token nasce ao ligar, porta inválida ignorada, falha de gravação não trava) e `webAccessSectionModel` (URLs com token só rodando) | `AppProfiles` 40, `WebAccessActions` 26 | `test(shell): cover profile models and web access actions` |
+| W66-A03 | Costura e teste: autostart no arranque (fora da raiz padrão não lê; migração que falha vai à trilha) sai de `AppPreferenceEffects` para função suspensa; `anchorAppWindow` sobre porta (segunda âncora não repete registro nem ACK; ACK só com token); `sessionAnalysisReader` sobre funções (fonte sem análise, Codex com carimbo do índice) | `AppPreferenceEffects` ~15, `AppWindowAnchor` 13, `SessionAnalysisReader` 14 | `test(shell): cover launch autostart, window anchor and analysis reader` |
+| W66-A04 | Linux e terminal: `ensureLinuxMenuIconCurrent` com origem, layout e `.desktop` por parâmetro (ícone estável gravado, linha reescrita, sobra apagada, origem não gerenciada não toca nada); `TerminalTeamRunner.realCheck` com fábrica de cliente (`MockEngine`: saúde falha, conta sem login, chave que não cobre a conta); `DiagnosticsExport.run` (mensagens e código de saída) | `LinuxMenuIcon` ~30, `TerminalTeamRunner` 15, `DiagnosticsExport` 12 | `test(desktop): cover menu icon repair, team check and diagnostics run` |
+| W66-A05 | HUD: `HudDragState` com leitor de ponteiro injetável (passo nulo não move), `hudWindowSizes`/limites, `hudPresenceMillis`; `AutoUpdateController` (gravação das opções, instalador por plataforma e raiz isolada) | `HudWindowDrag` ~17, `HudWindowGeometry` 13, `HudPresenceMotion` 4, `AutoUpdateController` ~12 | `test(hud): cover drag state, window sizes and update controller choices` |
+| W66-A06 | Cauda do `commonMain`: rolagem do gráfico de histórico (pontas), valor por unidade no tooltip, `formatReadingAge` e avisos do card, `TuiText.wrap` com palavra maior que a largura, `mergePendingFetch`, roteamento do `DashboardTargetFetcher`, `parseTelegramCommand`, legendas da imagem de análise, tabela de ferramentas e vazão do relatório, `autoUpdateHint` por motivo | ~110 | `test(presentation): cover the remaining decision branches` |
+| W66-A07 | Cauda do `desktopMain`: `PageWriter.truncate`, `displayNameFor` do OpenCode, demais arquivos de 5–15 linhas com decisão | ~40 | `test(desktop): cover the remaining desktop decisions` |
+| W66-A08 | Telas com view model (`TeamUsageScreen` 27, `TeamPresenceScreen` 19), se o fake do repositório couber no `desktopTest` sem montar `AppGraph` | ~46 | `test(team): cover the team screen hosts` |
+| W66-A09 | Medição, relatório e piso | — | `ci(coverage): raise the Kotlin line floor` |
+
+Conta: os alvos somam ~430 linhas; nem toda linha de um alvo sai coberta. Se a soma medida na A09 ficar abaixo de 339
+e o que restar for só ramo de erro de E/S, texto já coberto no outro idioma ou cola de sistema, a onda para ali, sobe o
+piso para o medido e a decisão sobre a meta volta ao dono (regra combinada na #488).
+
 ## Pontos de situação
 
 | Ativ. | Data | Commit | Estado | Evidência (comando e resultado) |
@@ -282,3 +316,4 @@ meta volta ao dono.
 | W65-A04 | 2026-10-28 | este commit | concluída | Exclusão nominal no `build.gradle.kts` (bloco `kover`, quatro grupos com motivo: raízes de composição, hosts de janela, cascas de `AppDialogWindow`, chamada direta a AWT/JNA); "O que a suíte não cobre" do relatório lista os excluídos. `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport`: `BUILD SUCCESSFUL`, 3 705 testes, 0 falhas; Kotlin **94,23%** (41 252/43 780; antes 90,64%). Nenhuma linha coberta saiu (41 195 → 41 252, +57 dos testes da A03); `HudWindowFrame.kt` ficou só com `HudWindowRebirth` (0 descobertas), `CompositorWindowDrag.kt` com o corpo do modificador (2). Restam 2 528 descobertas; teto para 95%: 2 189, faltam **339**. |
 | W65-A05 | 2026-10-28 | este commit | concluída | Piso do Kotlin 90 → **94** (`coverageLineFloorPercent`). `gradlew.bat koverVerify -Pcoverage` sobre a passada da A04: `BUILD SUCCESSFUL`. `node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs`: 3 705 testes, 0 falhas, Kotlin 94,2%, 17 regras de arquitetura ok, sem `crit`; `warn` no servidor não medido (sem mudança em `server/`), na meta de 95% e no carimbo do resultado (a passada é anterior aos commits A04/A05, que só mexem em configuração e documentação). Testado só no Windows; nenhuma chamada de janela mudou de ordem, as teclas F1/Esc passam `event.type`/`event.key` às mesmas regras. Faltam 339 linhas para 95%: alavanca B em onda própria (`AppPreferenceEffects` 54, `AppWindowAnchor` 52, `AppProfiles` 54, `AutoStartManager` 56, cauda longa). |
 | Onda 6.5 | 2026-10-28 | este commit | PR #493 | Run `40626193667`: `ci-ok` verde (inclui `desktop-linux`, consultivo, e `desktop-windows` com `koverVerify -Pcoverage`, piso 94), 0 incidências. Testado no Linux só pelo CI. |
+| W66-A01 | 2026-10-28 | este commit | concluída | `gradlew.bat desktopTest --rerun -Pcoverage -PtestForks=4 koverXmlReport` em `origin/main` (`e3e24a5a`): `BUILD SUCCESSFUL`, 3 705 testes, 0 falhas; Kotlin **94,23%** (41 252/43 780), faltam 339. Leitura por método na seção "Atividades da onda 6.6". |
