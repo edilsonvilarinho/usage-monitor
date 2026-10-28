@@ -134,7 +134,9 @@ class DashboardViewModel(
      * Há sessão CLI rodando (issue #269): a cadência cai de 5 min para 60 s. Global,
      * como no Codenotch.
      */
-    private val isBusy: StateFlow<Boolean> = MutableStateFlow(false),
+    isBusy: StateFlow<Boolean> = MutableStateFlow(false),
+    /** Alvos com a cota subindo (#478): só eles caem para 60 s; ver [DashboardCadence]. */
+    quotaActiveTargets: StateFlow<Set<UsageTargetKey>> = MutableStateFlow(emptySet()),
     private val anthropicProfiles: StateFlow<List<AnthropicProfileRef>> =
         MutableStateFlow(listOf(AnthropicProfileRef.DEFAULT)),
     /** Contas Codex extras (issue #329); a padrão (`~/.codex`) não entra aqui. */
@@ -170,7 +172,7 @@ class DashboardViewModel(
     private val lastPersistedNextRefreshAt = AtomicReference(persistedNextRefreshAt)
     val nextRefreshAt: StateFlow<Instant> = _nextRefreshAt.asStateFlow()
 
-    private val cadence = DashboardCadence(isBusy, config)
+    private val cadence = DashboardCadence(isBusy, quotaActiveTargets, config)
 
     /** A cadência em vigor (issue #269, #293); ver [DashboardCadence.currentPollInterval]. */
     val currentPollInterval: StateFlow<Duration> = cadence.currentPollInterval

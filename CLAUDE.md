@@ -123,7 +123,8 @@ Decisões e histórico de cada funcionalidade em [`docs/presentation.md`](docs/p
 - **Ordem total e determinística** em toda lista publicada por `StateFlow`: duas leituras iguais têm
   de dar listas iguais, senão a tela recompõe a cada tique.
 - Leitura que falha **mantém** os números anteriores e publica só a mensagem.
-- Uso detectado pela cota (`QuotaActivityTracker`, #385) acende o arco da HUD e **nunca** entra no `cliBusy` (realimentaria o polling).
+- Uso detectado pela cota (`QuotaActivityTracker`, #385) acende o arco da HUD e, desde a #478, põe **só o próprio alvo** a 60 s
+  (`DashboardCadence`); **nunca** entra no `cliBusy`, que é global e aceleraria todas as fontes.
 - Nunca valor novo em `CliSessionRange` para cortes de tempo; use parâmetro (`sinceEpochMillis`).
 - Custo é recalculado dos tokens com `ModelPricingTable`, nunca rateado. Modelo sem tarifa não vira
   custo zero (`unpricedTurnCount`, `+` no valor). Ferramenta não entra em custo.

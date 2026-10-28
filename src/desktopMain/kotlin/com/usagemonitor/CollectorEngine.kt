@@ -102,6 +102,12 @@ internal class CollectorEngine(
      * ponte e o laço de [engineScope] a alimenta.
      */
     private val cliBusy = MutableStateFlow(false)
+
+    /**
+     * Alvos com a cota subindo (#478): cada um cai sozinho para 60 s. O rastreador nasce
+     * depois do painel, porque lê o estado dele — mesma ponte do [cliBusy].
+     */
+    private val quotaActiveTargets = MutableStateFlow<Set<UsageTargetKey>>(emptySet())
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val dashboard = DashboardViewModel(
@@ -131,6 +137,7 @@ internal class CollectorEngine(
         currentAppVersion = CURRENT_APP_VERSION,
         spikeFactorProvider = { graph.alertSettingsFlow.value.effectiveSpikeFactor },
         isBusy = cliBusy,
+        quotaActiveTargets = quotaActiveTargets,
         anthropicProfiles = graph.enabledAnthropicProfiles,
         codexProfiles = graph.enabledCodexProfiles,
         persistedNextRefreshAt = graph.persistedNextRefreshAt,
@@ -197,8 +204,15 @@ internal class CollectorEngine(
     }
 
     // Uso detectado pela variação da cota (#385): acende o arco das fontes sem
-    // CLI local. Fica fora do `cliBusy` de propósito — ver QuotaActivityTracker.
+    // CLI local e acelera só o próprio alvo (#478). Fica fora do `cliBusy`, que é
+    // global — ver DashboardCadence.
     val quotaActivity = QuotaActivityTracker(dashboardState = dashboard.uiState)
+
+    init {
+        engineScope.launch {
+            quotaActivity.detectedTargets.collect { detected -> quotaActiveTargets.value = detected }
+        }
+    }
 
     /** Arco de sessão ativa da HUD: CLI (Claude e Codex) mais uso detectado pela cota. */
     val hudActiveTargets: StateFlow<Set<UsageTargetKey>> =

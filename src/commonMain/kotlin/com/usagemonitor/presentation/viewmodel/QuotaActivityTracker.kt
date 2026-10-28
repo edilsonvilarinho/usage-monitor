@@ -28,9 +28,11 @@ import kotlin.time.Instant
  * consumo avançar entre duas coletas do dashboard ([usageProgressed]); o alvo
  * fica marcado por [USAGE_DETECTED_WINDOW_MILLIS] depois do último avanço.
  *
- * **Não alimenta o polling adaptativo**: polling mais rápido produziria mais
- * leituras, mais avanços detectados e mais polling — o sinal se realimentaria.
- * Quem acelera a coleta continua sendo só o CLI ([SessionPulseViewModel]).
+ * **Acelera só o próprio alvo** (#478, [DashboardCadence]): sem isso OpenCode Go e
+ * as outras fontes sem CLI ficavam em 5 min com uso acontecendo. Na #385 o sinal
+ * ficava fora do polling para não se realimentar, mas o laço é limitado — a cota só
+ * sobe com uso real, e parado o uso o alvo sai daqui em [USAGE_DETECTED_WINDOW_MILLIS].
+ * Nunca entra no sinal global do CLI ([SessionPulseViewModel]), que acelera todos.
  *
  * Leitura que falha mantém o último `Success` publicado (regra do dashboard),
  * então não gera avanço falso: os números não mudam.
