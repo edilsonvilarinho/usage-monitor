@@ -222,6 +222,91 @@ class GargantuaHudTest {
         }
     }
 
+    /**
+     * AL1 · Gargantua de Interstellar (#517): o volume vem da profundidade. A
+     * metade de trás do disco, mais longe, é mais fraca; a da frente, mais
+     * larga e clara. Mesmo ângulo do lado que se aproxima nas duas metades
+     * (30° na frente, 330° atrás), fora do horizonte e a 3,7dp uma da outra,
+     * para o antialiasing de uma não entrar na leitura da outra.
+     */
+    @Test
+    fun `AL1 a metade da frente do disco e mais clara que a de tras`() {
+        val (map, _) = frames(AppMotionPolicy.Static, 0f)
+        val front = brightest(map, diskPoint(30.0), spread = 0)
+        val back = brightest(map, diskPoint(330.0), spread = 0)
+        assertTrue(front > back * 1.3f, "frente $front deveria passar de 1,3 × trás $back")
+    }
+
+    /** AL1: o disco de trás aparece dobrado pela gravidade num arco largo e aceso por cima do horizonte. */
+    @Test
+    fun `AL1 o arco de lente por cima do horizonte e largo e aceso`() {
+        val (map, _) = frames(AppMotionPolicy.Static, 0f)
+        val horizon = RING_ROOM * 0.62f
+        val reach = horizon * 1.17f
+        val top = brightest(map, RING_CENTER to RING_CENTER - reach)
+        assertTrue(top > 0.5f, "topo do arco de lente $top deveria passar de 0,5")
+        // Largura: pixels acesos na vertical do centro, 3dp para cada lado da linha central do arco.
+        val lit = (-3..3).count { step -> brightest(map, RING_CENTER to RING_CENTER - reach + step, spread = 0) > 0.35f }
+        assertTrue(lit >= 2, "o arco de lente deveria ter ao menos 2dp acesos, tem $lit")
+    }
+
+    /**
+     * AL1 (#517): a marca mora dentro da cena. O horizonte fica atrás dela, e a
+     * metade da frente do disco passa por cima — com uma marca branca chapada,
+     * o ponto do disco a 90° (embaixo do centro) deixa de ser branco puro e o
+     * topo da marca, longe do disco, continua branco.
+     */
+    @Test
+    fun `AL1 a metade da frente do disco passa por cima da marca`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        setContent {
+            AppTheme(isDark = true, motion = AppMotionPolicy.Static) {
+                Box(Modifier.testTag(FRAME).background(Color.Black).padding(8.dp)) {
+                    AppGargantuaRing(
+                        arcs = listOf(AppRingArc(0f, AppTone.OK), AppRingArc(0f, AppTone.OK)),
+                        description = "Conta · 7d · 5h",
+                        size = HUD_RING_SIZE,
+                        stroke = HUD_RING_STROKE,
+                        gap = HUD_RING_GAP,
+                        centerContent = { Box(Modifier.size(hudRingMarkSize(2)).background(Color.White)) }
+                    )
+                }
+            }
+        }
+        mainClock.advanceTimeBy(1_000)
+        val map = onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        val scale = map.width / (HUD_RING_SIZE.value + 16f)
+        val (dx, dy) = diskPoint(90.0)
+        val crossing = map[(dx * scale).toInt(), (dy * scale).toInt()]
+        val clear = map[(RING_CENTER * scale).toInt(), ((RING_CENTER - 6f) * scale).toInt()]
+        assertTrue(crossing.blue < 0.92f, "o disco da frente deveria cobrir a marca embaixo do centro, azul ${crossing.blue}")
+        assertEquals(Color.White, clear, "o topo da marca, longe do disco, deveria continuar branco")
+    }
+
+    /** Ponto do disco no ângulo [degrees], em dp do quadro: elipse 0,95 × 0,152 do `room`, girada −12°. */
+    private fun diskPoint(degrees: Double): Pair<Float, Float> {
+        val theta = Math.toRadians(degrees)
+        val localX = RING_ROOM * 0.95f * kotlin.math.cos(theta).toFloat()
+        val localY = RING_ROOM * 0.95f * 0.16f * kotlin.math.sin(theta).toFloat() + RING_ROOM * 0.08f
+        val tilt = Math.toRadians(-12.0)
+        val x = localX * kotlin.math.cos(tilt).toFloat() - localY * kotlin.math.sin(tilt).toFloat()
+        val y = localX * kotlin.math.sin(tilt).toFloat() + localY * kotlin.math.cos(tilt).toFloat()
+        return RING_CENTER + x to RING_CENTER + y
+    }
+
+    /** O pixel mais claro (média dos canais) em volta de [point], em dp do quadro. */
+    private fun brightest(map: PixelMap, point: Pair<Float, Float>, spread: Int = 1): Float {
+        val scale = map.width / (HUD_RING_SIZE.value + 16f)
+        val cx = (point.first * scale).toInt()
+        val cy = (point.second * scale).toInt()
+        var best = 0f
+        for (y in cy - spread..cy + spread) for (x in cx - spread..cx + spread) {
+            val color = map[x, y]
+            best = maxOf(best, (color.red + color.green + color.blue) / 3f)
+        }
+        return best
+    }
+
     private fun frames(
         policy: AppMotionPolicy,
         fraction: Float,
@@ -272,5 +357,8 @@ class GargantuaHudTest {
 
     private companion object {
         const val FRAME = "gargantua-frame"
+        /** Centro do anel no quadro (8dp de borda) e o miolo livre com os dois arcos de `frames()`. */
+        val RING_CENTER = 8f + HUD_RING_SIZE.value / 2f
+        val RING_ROOM = HUD_RING_SIZE.value / 2f - 2 * (HUD_RING_STROKE.value + HUD_RING_GAP.value)
     }
 }

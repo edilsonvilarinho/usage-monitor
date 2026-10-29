@@ -222,17 +222,20 @@ private fun HudRingItem(
                 attention = account.needsAttention,
                 attentionIndex = account.attentionRingIndex,
                 refreshing = account.refreshing,
-                frame = frame
-            )
-            AppProviderMark(
-                source = account.source,
-                // O núcleo é sempre escuro, inclusive dentro de um preset claro.
-                tint = account.accountAccent?.dark ?: AppGargantuaTokens.mark,
-                size = hudRingMarkSize(account.rings.size),
-                modifier = Modifier.graphicsLayer {
-                    scaleX = frame.markScale * frame.scale
-                    scaleY = frame.markScale * frame.scale
-                    alpha = frame.mark
+                frame = frame,
+                // Dentro da cena (AL1, #517): a frente do disco passa por cima da marca.
+                centerContent = {
+                    AppProviderMark(
+                        source = account.source,
+                        // O núcleo é sempre escuro, inclusive dentro de um preset claro.
+                        tint = account.accountAccent?.dark ?: AppGargantuaTokens.mark,
+                        size = hudRingMarkSize(account.rings.size),
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = frame.markScale * frame.scale
+                            scaleY = frame.markScale * frame.scale
+                            alpha = frame.mark
+                        }
+                    )
                 }
             )
             // O emoji da conta (issue #287), selo no canto de cima à direita do

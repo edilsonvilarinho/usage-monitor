@@ -484,6 +484,16 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   translúcida com Doppler (token `ember`). Tudo cabe no miolo livre; o disco não atravessa os
   arcos. **Decisão:** a regra anterior era "arco imóvel pixel a pixel"; agora três pulsos de luz
   correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas.
+- **Cena 3D AL1 e marca em relevo** (#517, 2026-10-28). Pedido: "os ícones das APIs mais 3D, hoje muito 2D".
+  Duas rodadas de HTML (skill `usage-monitor-visual-options`): a AK mexia só no preenchimento da marca e não era o
+  pedido; na AL (a cena inteira, buraco negro e órbitas) o dono escolheu **AL1 · Gargantua de Interstellar**, e
+  relevo AK1 na marca "no anel e nos cards". **Decisões:** sem peça nova — a lente fina vira o disco de trás dobrado
+  por cima do horizonte (arco largo com Doppler, `GargantuaScene.halo*`), a metade de trás do disco fica mais fina e
+  a 60% da frente (`diskBackFade`), a da frente mais larga e clara; a marca deixou de ser irmã por cima do anel e
+  mora no encaixe `centerContent` do `AppGargantuaRing`, entre o horizonte e a frente do disco — é a frente
+  cruzando a marca que lê profundidade. Relevo sem blur (`AppProviderMarkRelief.kt`). A HUD no navegador
+  (`web/hud.html`) passou a desenhar a marca de **toda** fonte com os paths do app (antes só Claude e OpenAI, à mão);
+  `WebHudPageTest` cobra a paridade. Plano: [`marcas-3d-al1-517-execucao.md`](planos/marcas-3d-al1-517-execucao.md).
 - **Nascimento e colapso** (`HudPresence`, `mergeHudPresence`, `rememberHudPresence`,
   `GargantuaTransition.kt`; 2026-09-28). Pedido: ativar uma API mostra um buraco negro surgindo e
   desativar some com um colapso. Prototipados em HTML (3 nascimentos, 4 colapsos); escolhidos

@@ -31,9 +31,14 @@ the indicator, neighbour, notch or desktop window. The account emoji remains a s
 
 **Scene — quiet on purpose.** The scene must never compete with the quota arcs or the active-session
 comet. A faint warm glow, a large event-horizon shadow (62% of the free core) edged by a thin photon
-ring, a thin Einstein lens (upper arc, fainter lower arc) and one translucent flat disc band tilted
--12°: back half behind the shadow, front half across it, lighter on the approaching side (Doppler)
-and ember on the receding side. Three faint filaments cross it (integer turns per cycle, so the
+ring, the **back of the disc bent over the horizon** (AL1 · Gargantua de Interstellar, #517: a wide
+upper arc at 1.17 × the horizon radius, 8.5% of the free core thick, and a thin lower arc at 1.07 ×,
+45% as strong — both running ember on the receding side to `--gargantua-lens-far` on the approaching
+side, ends fading) and one translucent disc band tilted -12°: back half behind the shadow, **thinner
+(7.5%) and at 60% of the front's opacity**, front half wider (9%) across the shadow **and across the
+provider mark**, lighter on the approaching side (Doppler: ember 40% → gold 65% → hot 90%) and ember
+on the receding side. Depth order: glow, lens, back half, horizon, photon ring, **mark**, front half,
+quota arcs. Three faint filaments cross it (integer turns per cycle, so the
 loop never jumps). A stronger six-band disc was tried and rejected: it drew the eye away from the
 indicator. Gold `#E8AE63`, hot `#FFF0CB`, dust
 `#8C643F`, ember `#B4501E` are dedicated decorative tokens. They carry no provider, quota, status or active-session meaning.
@@ -45,13 +50,15 @@ surface — the track of an unused quota disappeared entirely, and the white cor
 light-theme accents read as a hollow tube. On a light surface (decided by the surface luminance,
 like the account accents — 26 presets) light becomes **ink**, same geometry: wall, reflections and
 white debris use the theme's `onSurface` (`--gargantua-glass-ink`; wall 10%, reflections at 55%
-of their dark opacity), the lens uses dust (`--gargantua-lens`), the disc runs ember 35% → gold
-80% → dust 85% with ember filaments, and the plasma core lightens only 22% towards white (60% on
-dark). The event horizon stays black in every theme. Compose: `GargantuaScene`. The dark render is
-pixel-identical to before. No star field, image,
+of their dark opacity), the lens runs ember → gold → dust (`--gargantua-lens`, `--gargantua-lens-far`), the disc front runs ember 45% → gold
+85% → dust 90% (back at 65% of that) with ember filaments, and the plasma core lightens only 22% towards white (60% on
+dark). The event horizon stays black in every theme. Compose: `GargantuaScene`. No star field, image,
 new window backdrop or per-provider palette: the scene is confined to the circular indicator.
 
-**Provider identity.** Reuse `AppProviderMark` in the foreground; its orientation stays fixed.
+**Provider identity.** Reuse `AppProviderMark` (in relief, see its contract) inside the scene, through
+the ring's centre slot (`centerContent` in Compose): above the horizon, below the front half of the
+disc (AL1, #517). Before #517 the mark sat on top of everything and the scene read flat. Its orientation
+stays fixed.
 Keep the account's chosen accent and emoji. On the scene's permanently dark core, use the dark
 account-accent variant so the mark remains legible even when the surrounding app uses a light
 theme. An unspecified colour uses a light mark. All eleven supported APIs use the same scene;

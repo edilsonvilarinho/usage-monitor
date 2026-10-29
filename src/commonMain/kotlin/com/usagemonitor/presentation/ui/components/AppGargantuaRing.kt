@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -54,7 +55,9 @@ fun AppGargantuaRing(
     attentionIndex: Int = 0,
     refreshing: Boolean = false,
     /** Nascimento ou colapso em andamento; parado por padrão. */
-    frame: GargantuaFrame = GargantuaFrame.Settled
+    frame: GargantuaFrame = GargantuaFrame.Settled,
+    /** A marca da API, no centro da cena (#517). */
+    centerContent: (@Composable () -> Unit)? = null
 ) {
     val policy = LocalAppMotionPolicy.current
     val moving = policy.continuous && !policy.reduced
@@ -98,18 +101,27 @@ fun AppGargantuaRing(
     val activeColor = AppTone.INFO.color()
     val scene = gargantuaScene()
     Box(modifier.size(size).semantics { contentDescription = description }) {
-        Canvas(
-            Modifier.matchParentSize().graphicsLayer {
-                scaleX = frame.scale
-                scaleY = frame.scale
-                alpha = frame.alpha
+        val sceneLayer = Modifier.matchParentSize().graphicsLayer {
+            scaleX = frame.scale
+            scaleY = frame.scale
+            alpha = frame.alpha
+        }
+        // Profundidade (AL1, #517): horizonte e disco de trás → marca → frente do disco e arcos.
+        Canvas(sceneLayer) {
+            val coreSpace = this.size.minDimension / 2f - arcs.size.coerceIn(1, MAX_RING_ARCS) * (stroke.toPx() + gap.toPx())
+            if (frame.core > 0f) {
+                scale(frame.core, pivot = center) { drawGargantuaCore(coreSpace, phase.value, scene) }
             }
-        ) {
+        }
+        if (centerContent != null) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { centerContent() }
+        }
+        Canvas(sceneLayer) {
             val strokePx = stroke.toPx()
             val gapPx = gap.toPx()
             val coreSpace = this.size.minDimension / 2f - arcs.size.coerceIn(1, MAX_RING_ARCS) * (strokePx + gapPx)
             if (frame.core > 0f) {
-                scale(frame.core, pivot = center) { drawGargantuaCore(coreSpace, phase.value, scene) }
+                scale(frame.core, pivot = center) { drawGargantuaCoreFront(coreSpace, phase.value, scene) }
             }
             arcs.take(MAX_RING_ARCS).forEachIndexed { index, arc ->
                 val radius = this.size.minDimension / 2f - strokePx / 2 - index * (strokePx + gapPx)

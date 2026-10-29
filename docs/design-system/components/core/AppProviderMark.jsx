@@ -17,12 +17,32 @@ const MARKS = {
 
 const BY_SOURCE = { anthropic: 'claude', codex: 'openai', cursor: 'cursor', antigravity: 'antigravity', gemini: 'gemini', kilo: 'kilo', oc: 'opencode', opencode: 'opencode', deepseek: 'deepseek', minimax: 'minimax', openrouter: 'openrouter' };
 
+// Relevo AK1 (#517), o mesmo do Compose: sombra curta, corpo em gradiente vertical (claro em cima,
+// escuro embaixo), borda de cima à esquerda acesa e a de baixo à direita na sombra. Sem blur.
+// Cada borda é a silhueta menos ela mesma deslocada, recortada pela própria silhueta.
 export function AppProviderMark({ source, size = 16, color = 'currentColor', style }) {
   const mark = MARKS[BY_SOURCE[source] || source];
+  const uid = React.useId().replace(/:/g, '');
   if (!mark) return null;
+  const rule = mark.evenOdd ? 'evenodd' : 'nonzero';
+  const shape = (props) => <path d={mark.d} fillRule={rule} {...props} />;
+  const d = Math.max(1, Math.round(size * .05)) * 24 / size;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ flex: 'none', ...style }}>
-      <path d={mark.d} fill={color} fillRule={mark.evenOdd ? 'evenodd' : 'nonzero'} />
+    <svg width={size} height={size} viewBox="0 0 24 24" overflow="visible" aria-hidden="true" style={{ flex: 'none', overflow: 'visible', ...style }}>
+      <defs>
+        <linearGradient id={`${uid}-body`} x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor={`color-mix(in srgb, ${color} 80%, white)`} /><stop offset="1" stopColor={`color-mix(in srgb, ${color} 70%, black)`} />
+        </linearGradient>
+        <clipPath id={`${uid}-clip`}>{shape({})}</clipPath>
+        <mask id={`${uid}-lit`}>{shape({ fill: '#fff' })}{shape({ fill: '#000', transform: `translate(${d} ${d})` })}</mask>
+        <mask id={`${uid}-shade`}>{shape({ fill: '#fff' })}{shape({ fill: '#000', transform: `translate(${-d} ${-d})` })}</mask>
+      </defs>
+      {shape({ fill: '#000', fillOpacity: .45, transform: `translate(${d * .6} ${d * 1.6})` })}
+      {shape({ fill: `url(#${uid}-body)` })}
+      <g clipPath={`url(#${uid}-clip)`}>
+        <rect x="-2" y="-2" width="28" height="28" fill="#FFF8E6" fillOpacity=".9" mask={`url(#${uid}-lit)`} />
+        <rect x="-2" y="-2" width="28" height="28" fill="#000" fillOpacity=".6" mask={`url(#${uid}-shade)`} />
+      </g>
     </svg>
   );
 }

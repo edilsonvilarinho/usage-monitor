@@ -18,10 +18,11 @@ import kotlin.math.sin
 private const val DISK_STREAKS = 3
 
 /**
- * Horizonte, anel de fótons, lente fina e um disco translúcido: camadas
- * geométricas, sem bitmap, blur de GPU ou partículas aleatórias. O cenário é
- * discreto de propósito — quem informa são os arcos e o cometa de sessão.
- * A fase é determinística para captura; tudo cabe em `room`.
+ * AL1 · Gargantua de Interstellar (#517), da marca para trás: horizonte, anel de fótons, o disco de
+ * trás dobrado por cima do horizonte e o disco em duas metades — a de trás mais
+ * fraca, a da frente mais larga e clara. Camadas geométricas, sem bitmap, blur
+ * de GPU ou partículas aleatórias; quem informa continuam sendo os arcos e o
+ * cometa de sessão. A fase é determinística para captura; tudo cabe em `room`.
  */
 internal fun DrawScope.drawGargantuaCore(room: Float, phase: Float, scene: GargantuaScene = GargantuaScene.Dark) {
     if (room <= 0f) return
@@ -35,27 +36,45 @@ internal fun DrawScope.drawGargantuaCore(room: Float, phase: Float, scene: Garga
         ),
         radius = room
     )
-    drawGargantuaLens(room, horizon, scene.lens)
+    drawGargantuaLens(room, horizon, scene)
     drawAccretionDisk(room, phase, front = false, scene)
-    // O horizonte oculta o lado de trás do disco. A marca é composta depois.
+    // O horizonte oculta o lado de trás do disco. A marca vem depois, e por cima dela a frente.
     drawCircle(Space.core, radius = horizon)
     drawCircle(Space.hot.copy(alpha = 0.8f), horizon + room * 0.01f, style = Stroke(room * 0.022f))
+}
+
+/**
+ * A metade da frente do disco, desenhada **depois** da marca da API (#517): é
+ * ela que põe a marca dentro da cena, entre o horizonte e quem olha.
+ */
+internal fun DrawScope.drawGargantuaCoreFront(room: Float, phase: Float, scene: GargantuaScene = GargantuaScene.Dark) {
+    if (room <= 0f) return
     drawAccretionDisk(room, phase, front = true, scene)
 }
 
-/** Anel de Einstein fino: o lado de trás do disco dobrado por cima e por baixo. */
-private fun DrawScope.drawGargantuaLens(room: Float, horizon: Float, light: Color) {
-    val upper = horizon + room * 0.10f
+/**
+ * A imagem do disco de trás que a gravidade dobra (AL1): um arco largo por cima
+ * do horizonte e um fino por baixo, com o Doppler do disco — brasa do lado que
+ * se afasta, quente do que se aproxima — e as pontas sumindo.
+ */
+private fun DrawScope.drawGargantuaLens(room: Float, horizon: Float, scene: GargantuaScene) {
+    drawLensArc(horizon * 1.17f, 184f, 172f, room * 0.085f, 1f, scene)
+    drawLensArc(horizon * 1.07f, 22f, 136f, room * 0.047f, 0.45f, scene)
+}
+
+private fun DrawScope.drawLensArc(radius: Float, start: Float, sweep: Float, width: Float, strength: Float, scene: GargantuaScene) {
     drawArc(
-        light.copy(alpha = 0.35f), 194f, 152f, false,
-        center - Offset(upper, upper), Size(upper * 2, upper * 2),
-        style = Stroke(room * 0.05f)
-    )
-    val lower = horizon + room * 0.08f
-    drawArc(
-        light.copy(alpha = 0.18f), 27f, 126f, false,
-        center - Offset(lower, lower), Size(lower * 2, lower * 2),
-        style = Stroke(room * 0.025f)
+        brush = Brush.horizontalGradient(
+            0f to scene.haloNear.copy(alpha = 0.08f * strength),
+            0.2f to scene.haloNear.copy(alpha = 0.4f * strength),
+            0.5f to scene.haloMiddle.copy(alpha = 0.65f * strength),
+            0.8f to scene.haloFar.copy(alpha = 0.75f * strength),
+            1f to scene.haloFar.copy(alpha = 0.15f * strength),
+            startX = center.x - radius, endX = center.x + radius
+        ),
+        startAngle = start, sweepAngle = sweep, useCenter = false,
+        topLeft = center - Offset(radius, radius), size = Size(radius * 2, radius * 2),
+        style = Stroke(width, cap = StrokeCap.Round)
     )
 }
 
@@ -70,16 +89,18 @@ private fun DrawScope.drawAccretionDisk(room: Float, phase: Float, front: Boolea
         val radiusY = radiusX * 0.16f
         val bounds = Size(radiusX * 2, radiusY * 2)
         val origin = diskCenter - Offset(radiusX, radiusY)
+        // A metade de trás é a mesma luz mais longe: mais fina e mais fraca (AL1).
+        val fade = if (front) 1f else scene.diskBackFade
         drawArc(
             brush = Brush.horizontalGradient(
-                0f to scene.diskNear,
-                0.5f to scene.diskMiddle,
-                1f to scene.diskFar,
+                0f to scene.diskNear.copy(alpha = scene.diskNear.alpha * fade),
+                0.5f to scene.diskMiddle.copy(alpha = scene.diskMiddle.alpha * fade),
+                1f to scene.diskFar.copy(alpha = scene.diskFar.alpha * fade),
                 startX = origin.x, endX = origin.x + bounds.width
             ),
             startAngle = if (front) 0f else 180f, sweepAngle = 180f, useCenter = false,
             topLeft = origin, size = bounds,
-            style = Stroke(room * 0.07f)
+            style = Stroke(room * if (front) 0.09f else 0.075f)
         )
         for (streak in 0 until DISK_STREAKS) {
             val turns = 1 + streak % 2

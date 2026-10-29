@@ -3,6 +3,8 @@
  * Mesmo desenho do app (AppGargantuaRing / GargantuaDrawing.kt), em Canvas 2D:
  *   drawRing(ctx, {arcs:[{f:0..1, t:'ok'|'warn'|'crit'}], mark:'claude'|'openai'}, phase, overrides)
  *   ctx já transladado por PAD; o anel ocupa S×S (64 px = anel do app a 100%).
+ * Cena AL1 (#517), a mesma de web/hud.html. A marca aqui é o desenho à mão de Claude/OpenAI; o app usa os paths
+ * do AppProviderMark em relevo (ver web/hud.html, markImage).
  * Efeitos: flashAt, ringAt (onda), rrPath (contorno do balão), perimeter (pontos do contorno).
  * Easing: seg(t,a,b), easeOut, easeIn, easeInOut. Nada aqui tem rebote: dado não passa do lugar.
  */
@@ -15,26 +17,34 @@ const easeOut=t=>1-Math.pow(1-t,3), easeIn=t=>t*t*t, easeInOut=t=>t<.5?4*t*t*t:1
 function hex(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16))}
 function rgba(c,a){const [r,g,b]=hex(c);return `rgba(${r},${g},${b},${a})`}
 function mix(c,w,k){const a=hex(c),b=hex(w);return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*k).toString(16).padStart(2,'0')).join('')}
-function drawCore(ctx,room,ph,o){
+function drawCore(ctx,room,ph,o){ // AL1 (#517), da marca para trás; a frente do disco vem em drawCoreFront
   const c=S/2,h=room*.62*o.core;
   ctx.globalAlpha=o.disk;
   let g=ctx.createRadialGradient(c,c,Math.max(0,h*.9),c,c,room);
   g.addColorStop(0,'rgba(232,174,99,.16)');g.addColorStop(1,'rgba(232,174,99,0)');
   ctx.fillStyle=g;ctx.beginPath();ctx.arc(c,c,room,0,7);ctx.fill();
-  ctx.lineWidth=room*.05;ctx.strokeStyle='rgba(255,230,190,.35)';ctx.beginPath();ctx.arc(c,c,h+room*.1,Math.PI*1.08,Math.PI*1.92);ctx.stroke();
-  ctx.lineWidth=room*.025;ctx.strokeStyle='rgba(255,230,190,.18)';ctx.beginPath();ctx.arc(c,c,h+room*.08,Math.PI*.15,Math.PI*.85);ctx.stroke();
-  const disk=front=>{ctx.save();ctx.translate(c,c+room*.08);ctx.rotate(-12*Math.PI/180);
-    const rx=room*.95*o.diskScale,ry=rx*.16;const lg=ctx.createLinearGradient(-rx,0,rx,0);
-    lg.addColorStop(0,'rgba(180,80,30,.25)');lg.addColorStop(.5,'rgba(232,174,99,.55)');lg.addColorStop(1,'rgba(255,240,203,.8)');
-    ctx.strokeStyle=lg;ctx.lineWidth=room*.07;ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:Math.PI*2);ctx.stroke();
-    for(let k=0;k<3;k++){const a=((ph*360*(1+k%2))+k*120)%360;if(front!==(a<180))continue;const r=a*Math.PI/180,e=Math.abs(Math.sin(r));
-      ctx.strokeStyle=`rgba(255,248,230,${.45*e})`;ctx.lineWidth=room*.035;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,r,r+Math.min(.35,(front?Math.PI:Math.PI*2)-r));ctx.stroke();}
-    ctx.restore();};
-  disk(false);ctx.globalAlpha=1;
+  lensArc(ctx,c,h*1.17,184,172,room*.085,1);lensArc(ctx,c,h*1.07,22,136,room*.047,.45);
+  disk(ctx,room,ph,o,false);ctx.globalAlpha=1;
   ctx.fillStyle='#030508';ctx.beginPath();ctx.arc(c,c,h,0,7);ctx.fill();
   ctx.globalAlpha=o.disk;ctx.strokeStyle='rgba(255,240,203,.8)';ctx.lineWidth=room*.022;ctx.beginPath();ctx.arc(c,c,h+room*.01,0,7);ctx.stroke();
-  disk(true);ctx.globalAlpha=1;
+  ctx.globalAlpha=1;
 }
+function drawCoreFront(ctx,room,ph,o){ctx.globalAlpha=o.disk;disk(ctx,room,ph,o,true);ctx.globalAlpha=1;}
+// O disco de trás dobrado pela gravidade: Doppler de brasa (afasta) a quente (aproxima), pontas sumindo.
+function lensArc(ctx,c,r,start,sweep,width,k){
+  const lg=ctx.createLinearGradient(c-r,0,c+r,0);
+  lg.addColorStop(0,`rgba(180,80,30,${.08*k})`);lg.addColorStop(.2,`rgba(180,80,30,${.4*k})`);lg.addColorStop(.5,`rgba(244,207,151,${.65*k})`);
+  lg.addColorStop(.8,`rgba(255,240,203,${.75*k})`);lg.addColorStop(1,`rgba(255,240,203,${.15*k})`);
+  ctx.strokeStyle=lg;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.arc(c,c,r,start*Math.PI/180,(start+sweep)*Math.PI/180);ctx.stroke();
+}
+// A metade de trás é a mesma luz mais longe: mais fina e mais fraca.
+function disk(ctx,room,ph,o,front){const c=S/2,fade=front?1:.6;ctx.save();ctx.translate(c,c+room*.08);ctx.rotate(-12*Math.PI/180);
+  const rx=room*.95*o.diskScale,ry=rx*.16;const lg=ctx.createLinearGradient(-rx,0,rx,0);
+  lg.addColorStop(0,`rgba(180,80,30,${.4*fade})`);lg.addColorStop(.5,`rgba(232,174,99,${.65*fade})`);lg.addColorStop(1,`rgba(255,240,203,${.9*fade})`);
+  ctx.strokeStyle=lg;ctx.lineWidth=room*(front?.09:.075);ctx.lineCap='butt';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:Math.PI*2);ctx.stroke();
+  for(let k=0;k<3;k++){const a=((ph*360*(1+k%2))+k*120)%360;if(front!==(a<180))continue;const r=a*Math.PI/180,e=Math.abs(Math.sin(r));
+    ctx.strokeStyle=`rgba(255,248,230,${.45*e})`;ctx.lineWidth=room*.035;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,r,r+Math.min(.35,(front?Math.PI:Math.PI*2)-r));ctx.stroke();}
+  ctx.restore();}
 function glassArc(ctx,r,tone,f,ph,o){
   const c=S/2,a0=-Math.PI/2,end=a0+f*Math.PI*2,step=Math.PI/60;
   ctx.globalAlpha=o.glass;ctx.lineCap='butt';
@@ -63,9 +73,11 @@ function drawRing(ctx,acc,ph,o){
   o={...BASE,...o};
   const room=S/2-acc.arcs.length*(STROKE+GAP);
   ctx.save();ctx.globalAlpha=o.alpha;
+  // Profundidade (AL1, #517): horizonte e disco de trás → marca → frente do disco e arcos.
   drawCore(ctx,room,ph/5,o);
-  acc.arcs.forEach((a,i)=>glassArc(ctx,S/2-STROKE/2-i*(STROKE+GAP),TONE[a.t],a.f*o.arcs,ph,o));
   mark(ctx,acc.mark,o.markAlpha,o.markScale);
+  drawCoreFront(ctx,room,ph/5,o);
+  acc.arcs.forEach((a,i)=>glassArc(ctx,S/2-STROKE/2-i*(STROKE+GAP),TONE[a.t],a.f*o.arcs,ph,o));
   ctx.restore();ctx.globalAlpha=1;
 }
 const ACC=[{arcs:[{f:.06,t:'ok'},{f:.44,t:'crit'}],mark:'claude'},{arcs:[{f:.25,t:'ok'},{f:0,t:'ok'}],mark:'openai'}];
