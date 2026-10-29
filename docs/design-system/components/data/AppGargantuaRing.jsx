@@ -51,8 +51,9 @@ export function AppGargantuaRing({
   const duration = refreshing ? 'var(--dur-gargantua-refresh)' : 'var(--dur-gargantua-orbit)';
   const filaments = moving ? { animation: `gargantua-filaments ${duration} linear infinite` } : {};
   const orbit = moving ? { animation: 'gargantua-comet var(--dur-gargantua-active) linear infinite', transformOrigin: '32px 32px' } : {};
-  const disk = (front) => <g transform="rotate(-12 32 32)">
-    <path d={halfEllipse(32, diskY, rx, rx * .16, front)} fill="none" stroke={`url(#${uid}-disc)`} strokeWidth={room * .07} />
+  // AL1 (#517): a metade de trás é a mesma luz mais longe — mais fina e 60% da opacidade.
+  const disk = (front) => <g transform="rotate(-12 32 32)" opacity={front ? 1 : .6}>
+    <path d={halfEllipse(32, diskY, rx, rx * .16, front)} fill="none" stroke={`url(#${uid}-disc)`} strokeWidth={room * (front ? .09 : .075)} />
     <path className="gargantua-motion" d={halfEllipse(32, diskY, rx, rx * .16, front)} fill="none" stroke="#FFF8E6" strokeOpacity=".45"
       strokeWidth={room * .035} strokeLinecap="round" strokeDasharray="4 30" style={filaments} />
   </g>;
@@ -79,8 +80,14 @@ export function AppGargantuaRing({
           </radialGradient>
           {/* Doppler: o lado que se aproxima é mais claro que o que se afasta. */}
           <linearGradient id={`${uid}-disc`} x1="0" y1="0" x2="1" y2="0">
-            <stop stopColor="var(--gargantua-ember)" stopOpacity=".25" /><stop offset=".5" stopColor="var(--gargantua-gold)" stopOpacity=".55" />
-            <stop offset="1" stopColor="var(--gargantua-hot)" stopOpacity=".8" />
+            <stop stopColor="var(--gargantua-ember)" stopOpacity=".4" /><stop offset=".5" stopColor="var(--gargantua-gold)" stopOpacity=".65" />
+            <stop offset="1" stopColor="var(--gargantua-hot)" stopOpacity=".9" />
+          </linearGradient>
+          {/* AL1: o disco de trás dobrado por cima do horizonte, com o mesmo Doppler e as pontas sumindo. */}
+          <linearGradient id={`${uid}-lens`} gradientUnits="userSpaceOnUse" x1={32 - horizon * 1.17} y1="0" x2={32 + horizon * 1.17} y2="0">
+            <stop stopColor="var(--gargantua-ember)" stopOpacity=".08" /><stop offset=".2" stopColor="var(--gargantua-ember)" stopOpacity=".4" />
+            <stop offset=".5" stopColor="var(--gargantua-lens)" stopOpacity=".65" /><stop offset=".8" stopColor="var(--gargantua-lens-far)" stopOpacity=".75" />
+            <stop offset="1" stopColor="var(--gargantua-lens-far)" stopOpacity=".15" />
           </linearGradient>
           {/* Reflexo do vidro: luz do alto à esquerda. */}
           <linearGradient id={`${uid}-glass`} x1="0" y1="0" x2="1" y2="1">
@@ -88,12 +95,11 @@ export function AppGargantuaRing({
           </linearGradient>
         </defs>
         <circle cx="32" cy="32" r={room} fill={`url(#${uid}-well)`} />
-        <path d={arc(194, 346, horizon + room * .1)} fill="none" stroke="var(--gargantua-lens)" strokeOpacity=".35" strokeWidth={room * .05} />
-        <path d={arc(27, 153, horizon + room * .08)} fill="none" stroke="var(--gargantua-lens)" strokeOpacity=".18" strokeWidth={room * .025} />
+        <path d={arc(184, 356, horizon * 1.17)} fill="none" stroke={`url(#${uid}-lens)`} strokeWidth={room * .085} strokeLinecap="round" />
+        <path d={arc(22, 158, horizon * 1.07)} fill="none" stroke={`url(#${uid}-lens)`} strokeOpacity=".45" strokeWidth={room * .047} strokeLinecap="round" />
         {disk(false)}
         <circle cx="32" cy="32" r={horizon} fill="var(--gargantua-core)" />
         <circle cx="32" cy="32" r={horizon + room * .01} fill="none" stroke={LIGHT} strokeOpacity=".8" strokeWidth={room * .022} />
-        {disk(true)}
         {rings.map((ring, index) => {
           const radius = 32 - stroke / 2 - index * (stroke + gap);
           const circumference = 2 * Math.PI * radius;
@@ -144,6 +150,20 @@ export function AppGargantuaRing({
       <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <AppProviderMark source={provider} size={Math.min(21, room * .88) * size / 64} color={providerColor || 'var(--gargantua-hot)'} />
       </span>
+      {/* Profundidade (AL1, #517): a metade da frente do disco passa por cima da marca. */}
+      <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
+        <defs>
+          <linearGradient id={`${uid}-disc-front`} x1="0" y1="0" x2="1" y2="0">
+            <stop stopColor="var(--gargantua-ember)" stopOpacity=".4" /><stop offset=".5" stopColor="var(--gargantua-gold)" stopOpacity=".65" />
+            <stop offset="1" stopColor="var(--gargantua-hot)" stopOpacity=".9" />
+          </linearGradient>
+        </defs>
+        <g transform="rotate(-12 32 32)">
+          <path d={halfEllipse(32, diskY, rx, rx * .16, true)} fill="none" stroke={`url(#${uid}-disc-front)`} strokeWidth={room * .09} />
+          <path className="gargantua-motion" d={halfEllipse(32, diskY, rx, rx * .16, true)} fill="none" stroke="#FFF8E6" strokeOpacity=".45"
+            strokeWidth={room * .035} strokeLinecap="round" strokeDasharray="4 30" style={filaments} />
+        </g>
+      </svg>
     </span>
   );
 }

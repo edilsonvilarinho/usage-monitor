@@ -15,6 +15,14 @@ already carries); the foreground in the middle of a HUD ring. A mark never bring
 color — brand colors would not clear AA on both surfaces, and the accent is the identity already
 measured by `AppAccentsContrastTest`.
 
+**In relief** (AK1, #517; the owner chose "relief in the ring and in the cards"). The one tint becomes
+volume, never a second colour: a short offset shadow (black 45%, `0.6d, 1.6d`), the body as a vertical
+gradient (20% towards white at the top, 30% towards black at the bottom), the top-left edge lit
+(`#FFF8E6` 90%) and the bottom-right edge shaded (black 60%). Each edge is the silhouette minus itself
+shifted by `d` = 5% of the size, never under 1px (`providerMarkReliefDepth`), clipped to the
+silhouette. No blur, like the Gargantua scene. Same treatment in the HUD ring, the card header (16dp),
+the balloon (14dp) and the browser HUD.
+
 **Decorative for semantics.** The provider name is always written next to it; a description here
 would make assistive tech read the name twice.
 
