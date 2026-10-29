@@ -42,6 +42,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com os fatos medidos na beta `v42.1.0-beta.1` | `gh issue create` → #519 |
+| A02 | `SymbolicLinks.kt` (`createSymbolicLinkOrSkip`, `Assume.assumeNoException`) e `SymbolicLinksTest` (4 casos); `ClaudeCodeStatusInputTest` usa o helper. Só código de teste: cobertura do diff não se aplica (nenhuma linha de produção) | Vermelho (stub que só chama `create`): `gradlew.bat desktopTest --tests "com.usagemonitor.terminal.SymbolicLinksTest"` → 2 de 4 falharam, `Expected an exception of class org.junit.AssumptionViolatedException to be thrown, but was java.nio.file.FileSystemException: usage-monitor-link: O cliente não tem o privilégio necessário` (e `... but was java.lang.UnsupportedOperationException`). Verde: o mesmo comando com `ClaudeCodeStatusInputTest` → 9 testes, 0 falhas, 1 ignorado (`symbolic link refused by the environment`). `gradlew.bat allTests` → 3868 testes, 0 falhas, 1 ignorado; relatório de testes: 17 regras de arquitetura ok, 3868 `@Test` executados |
 
 ## Problemas em aberto e riscos
 
