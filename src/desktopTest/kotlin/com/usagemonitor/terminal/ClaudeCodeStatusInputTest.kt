@@ -53,7 +53,7 @@ class ClaudeCodeStatusInputTest {
         val real = kotlin.io.path.createTempDirectory("usage-monitor-real").toFile()
         val link = File(real.parentFile, "usage-monitor-link-${System.nanoTime()}")
         try {
-            java.nio.file.Files.createSymbolicLink(link.toPath(), real.toPath())
+            createSymbolicLinkOrSkip(link.toPath(), real.toPath())
             val profiles = listOf(AnthropicProfileRecord("default", "pessoal", real.absolutePath, true, AnthropicProfileOrigin.DEFAULT))
             assertEquals(UsageTargetKey(ApiSource.ANTHROPIC, "default"), anthropicTargetFor(link, profiles))
         } finally {
