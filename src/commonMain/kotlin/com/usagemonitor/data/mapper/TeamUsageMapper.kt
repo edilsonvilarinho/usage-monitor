@@ -20,7 +20,9 @@ import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamMemberUsage
 import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
+import com.usagemonitor.domain.entity.UsageTokenCounts
 import com.usagemonitor.domain.entity.WindowedSessionAccumulator
+import com.usagemonitor.domain.entity.longPromptPartOfTurn
 import kotlin.time.Instant
 
 /**
@@ -91,6 +93,33 @@ fun TeamIngestResponseDto.toDomain(): TeamIngestReceipt {
 }
 
 /**
+ * Parte de prompt longo montada só quando os cinco campos chegam.
+ *
+ * Um campo faltando é servidor anterior à faixa ou resposta parcial: `null`, e o grupo
+ * com faixa fica sem preço (`groupCostMicros`) em vez de cair na tarifa base.
+ */
+private fun longPromptOf(
+    inputTokens: Long?,
+    outputTokens: Long?,
+    cacheReadTokens: Long?,
+    cacheWrite5mTokens: Long?,
+    cacheWrite1hTokens: Long?
+): UsageTokenCounts? {
+    if (inputTokens == null || outputTokens == null || cacheReadTokens == null ||
+        cacheWrite5mTokens == null || cacheWrite1hTokens == null
+    ) {
+        return null
+    }
+    return UsageTokenCounts(
+        inputTokens = inputTokens,
+        outputTokens = outputTokens,
+        cacheReadTokens = cacheReadTokens,
+        cacheWrite5mTokens = cacheWrite5mTokens,
+        cacheWrite1hTokens = cacheWrite1hTokens
+    )
+}
+
+/**
  * Dobra as linhas `(deviceId, sessionId, model)` do servidor em sessões e
  * agrupa por integrante.
  *
@@ -127,6 +156,13 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
                 liveContextModel = row.liveContextModel
             )
         }
+        val longPrompt = longPromptOf(
+            inputTokens = row.longPromptInputTokens,
+            outputTokens = row.longPromptOutputTokens,
+            cacheReadTokens = row.longPromptCacheReadTokens,
+            cacheWrite5mTokens = row.longPromptCacheWrite5mTokens,
+            cacheWrite1hTokens = row.longPromptCacheWrite1hTokens
+        )
         accumulator.addModelGroup(
             model = row.model,
             turnCount = row.turnCount,
@@ -136,7 +172,8 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
             outputTokens = row.outputTokens,
             cacheReadTokens = row.cacheReadTokens,
             cacheWrite5mTokens = row.cacheWrite5mTokens,
-            cacheWrite1hTokens = row.cacheWrite1hTokens
+            cacheWrite1hTokens = row.cacheWrite1hTokens,
+            longPrompt = longPrompt
         )
 
         groupRowsByDevice.getOrPut(row.deviceId) { mutableListOf() }.add(
@@ -150,7 +187,8 @@ fun TeamSnapshotDto.toDomain(): TeamUsageSnapshot {
                 outputTokens = row.outputTokens,
                 cacheReadTokens = row.cacheReadTokens,
                 cacheWrite5mTokens = row.cacheWrite5mTokens,
-                cacheWrite1hTokens = row.cacheWrite1hTokens
+                cacheWrite1hTokens = row.cacheWrite1hTokens,
+                longPrompt = longPrompt
             )
         )
     }
@@ -244,6 +282,14 @@ fun TeamSessionDetailResponseDto.toDomain(): CliSessionDetail {
     )
 
     for (turn in turns) {
+        // A faixa vale por requisição: a parte longa é decidida turno a turno, pelo prompt do próprio turno.
+        val turnCounts = UsageTokenCounts(
+            inputTokens = turn.inputTokens,
+            outputTokens = turn.outputTokens,
+            cacheReadTokens = turn.cacheReadTokens,
+            cacheWrite5mTokens = turn.cacheWrite5mTokens,
+            cacheWrite1hTokens = turn.cacheWrite1hTokens
+        )
         accumulator.addModelGroup(
             model = turn.model,
             turnCount = 1,
@@ -253,7 +299,8 @@ fun TeamSessionDetailResponseDto.toDomain(): CliSessionDetail {
             outputTokens = turn.outputTokens,
             cacheReadTokens = turn.cacheReadTokens,
             cacheWrite5mTokens = turn.cacheWrite5mTokens,
-            cacheWrite1hTokens = turn.cacheWrite1hTokens
+            cacheWrite1hTokens = turn.cacheWrite1hTokens,
+            longPrompt = longPromptPartOfTurn(turnCounts)
         )
     }
 
@@ -314,6 +361,13 @@ fun TeamTrendRowDto.toDomain(): TeamTrendRow {
         outputTokens = outputTokens,
         cacheReadTokens = cacheReadTokens,
         cacheWrite5mTokens = cacheWrite5mTokens,
-        cacheWrite1hTokens = cacheWrite1hTokens
+        cacheWrite1hTokens = cacheWrite1hTokens,
+        longPrompt = longPromptOf(
+            inputTokens = longPromptInputTokens,
+            outputTokens = longPromptOutputTokens,
+            cacheReadTokens = longPromptCacheReadTokens,
+            cacheWrite5mTokens = longPromptCacheWrite5mTokens,
+            cacheWrite1hTokens = longPromptCacheWrite1hTokens
+        )
     )
 }
