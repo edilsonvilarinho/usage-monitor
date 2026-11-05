@@ -114,7 +114,7 @@ agent's place. Returns (`devolvida`) and CI incidents are separate counts.
   first line is `<ID> devolvida: <defect>`. The message carries only the failed criterion, the evidence and the expected
   result. Never resend the briefing. Verdict and `SendMessage` go out in the same turn: each orchestrator turn resends
   the whole session context.
-- **`escalar para sonnet high`** (10th rejection on haiku): run `emit.mjs escalada` and open a new agent of the same type
+- **`escalar para sonnet high`** (3rd rejection on haiku): run `emit.mjs escalada` and open a new agent of the same type
   with `model: "sonnet"` and `effort: "high"`, because `SendMessage` cannot change the model. No `isolation`: the work
   continues in the path where haiku stopped, which the prompt points to with the open defect. Never paste haiku's
   history.
@@ -125,7 +125,7 @@ node .claude/skills/orchestrate/portal/emit.mjs escalada --sessao ${CLAUDE_SESSI
 ```
 
 `emit.mjs escalada` refuses a task below the limit. Limits live in `LIMITE_REPROVACOES` in
-`.claude/skills/orchestrate/portal/emit.mjs` (haiku 10, sonnet 3).
+`.claude/skills/orchestrate/portal/emit.mjs` (haiku 3, sonnet 3).
 
 ## Prototype gate (visual work)
 

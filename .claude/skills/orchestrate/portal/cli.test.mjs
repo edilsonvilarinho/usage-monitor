@@ -151,7 +151,7 @@ test('emit.mjs tarefa: título e dono só são obrigatórios na primeira vez; at
   } finally { amb.limpar(); }
 });
 
-test('emit.mjs conta reprovações pelo log: 10 no haiku pedem escalada, 3 no sonnet pedem parada', async () => {
+test('emit.mjs conta reprovações pelo log: 3 no haiku pedem escalada, 3 no sonnet pedem parada', async () => {
   const amb = criarAmbiente();
   try {
     const esc = path.join(amb.raiz, '.claude', 'escritorio');
@@ -160,16 +160,16 @@ test('emit.mjs conta reprovações pelo log: 10 no haiku pedem escalada, 3 no so
     assert.equal(rodar(amb, 'emit.mjs', ['tarefa', '--id', 'AG1', '--titulo', 'Portal', '--dono', 'prototype-dev', '--estado', 'andamento']).status, 0);
     const reprovar = () => rodar(amb, 'emit.mjs', ['veredito', '--tarefa', 'AG1', '--resultado', 'devolvida', '--texto', 'falhou']);
 
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 2; i++) {
       const r = reprovar();
       assert.equal(r.status, 0, r.stderr);
-      assert.match(r.stdout, new RegExp(`reprovação ${i}/10 no haiku.*devolver ao mesmo agente`));
+      assert.match(r.stdout, new RegExp(`reprovação ${i}/3 no haiku.*devolver ao mesmo agente`));
     }
     const cedo = rodar(amb, 'emit.mjs', ['escalada', '--tarefa', 'AG1']);
     assert.equal(cedo.status, 1);
-    assert.match(cedo.stderr, /9\/10/);
+    assert.match(cedo.stderr, /2\/3/);
 
-    assert.match(reprovar().stdout, /reprovação 10\/10 no haiku.*escalar para sonnet high/);
+    assert.match(reprovar().stdout, /reprovação 3\/3 no haiku.*escalar para sonnet high/);
     assert.equal(rodar(amb, 'emit.mjs', ['escalada', '--tarefa', 'AG1']).status, 0);
     assert.equal(rodar(amb, 'emit.mjs', ['escalada', '--tarefa', 'AG1']).status, 1);
 
@@ -180,13 +180,13 @@ test('emit.mjs conta reprovações pelo log: 10 no haiku pedem escalada, 3 no so
     // aprovação não conta, e outra tarefa tem contagem própria
     assert.equal(rodar(amb, 'emit.mjs', ['tarefa', '--id', 'AG2', '--titulo', 'Outra', '--dono', 'backend-dev', '--estado', 'andamento']).status, 0);
     assert.equal(rodar(amb, 'emit.mjs', ['veredito', '--tarefa', 'AG2', '--resultado', 'aprovada', '--texto', 'ok']).stdout, '');
-    assert.match(rodar(amb, 'emit.mjs', ['veredito', '--tarefa', 'AG2', '--resultado', 'devolvida', '--texto', 'x']).stdout, /reprovação 1\/10 no haiku/);
+    assert.match(rodar(amb, 'emit.mjs', ['veredito', '--tarefa', 'AG2', '--resultado', 'devolvida', '--texto', 'x']).stdout, /reprovação 1\/3 no haiku/);
 
     const { Coletor } = await import('./collector.mjs');
     const c = new Coletor({ sessao: SESSAO, raiz: amb.raiz, projetos: amb.projetos });
     c.poll();
     const ag1 = c.estado().tarefas.find((t) => t.id === 'AG1');
-    assert.equal(ag1.devolucoes, 13, 'o portal precisa contar o mesmo que o emit');
+    assert.equal(ag1.devolucoes, 6, 'o portal precisa contar o mesmo que o emit');
   } finally { amb.limpar(); }
 });
 
@@ -199,7 +199,7 @@ test('emit.mjs funciona sem portal: --sessao basta e a contagem de reprovações
     assert.equal(rodar(amb, 'emit.mjs', ['tarefa', ...base, '--id', 'NP1', '--titulo', 'Sem portal', '--dono', 'backend-dev', '--estado', 'andamento']).status, 0);
     const r = rodar(amb, 'emit.mjs', ['veredito', ...base, '--tarefa', 'NP1', '--resultado', 'devolvida', '--texto', 'falhou']);
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /reprovação 1\/10 no haiku\. Ação: devolver ao mesmo agente/);
+    assert.match(r.stdout, /reprovação 1\/3 no haiku\. Ação: devolver ao mesmo agente/);
     assert.equal(fs.existsSync(path.join(esc, 'portal.json')), false);
     assert.equal(rodar(amb, 'emit.mjs', ['fala', '--de', 'am', '--para', 'x', '--texto', 'y']).status, 1);
   } finally { amb.limpar(); }

@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Runs a request through a cheap-first multi-agent workflow. The main session plans and validates, subagents on haiku execute, failures go back to the same agent, and only 10 rejections escalate to sonnet. Starts a live visual office portal showing agents, tasks and messages (skippable with --no-portal), and gates visual work behind prototypes. Use when the user asks to orchestrate, delegate to agents, or use the office portal.
+description: Runs a request through a cheap-first multi-agent workflow. The main session plans and validates, subagents on haiku execute, failures go back to the same agent, and only 3 rejections escalate to sonnet. Starts a live visual office portal showing agents, tasks and messages (skippable with --no-portal), and gates visual work behind prototypes. Use when the user asks to orchestrate, delegate to agents, or use the office portal.
 argument-hint: "[--no-portal] [--design-system <path>] [--prototypes N] <request>"
 allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/portal/start.mjs *), Bash(node ${CLAUDE_SKILL_DIR}/portal/emit.mjs *), Bash(node ${CLAUDE_SKILL_DIR}/setup/agentes.mjs *)
 ---
@@ -141,7 +141,7 @@ it in the agent's place.
   context. The first line is `<ID> devolvida: <defect>`, because the portal classifies by it. The message carries
   only the failed criterion, the evidence and the expected result. Never resend the briefing. Verdict and
   `SendMessage` go out in the same turn: each orchestrator turn resends the whole session context.
-- **`escalar para sonnet high`** (10th rejection on haiku): run `emit.mjs escalada` and open a new agent of the same
+- **`escalar para sonnet high`** (3rd rejection on haiku): run `emit.mjs escalada` and open a new agent of the same
   type with `model: "sonnet"` and `effort: "high"`, because `SendMessage` cannot change the model. No `isolation`:
   the work continues in the path where haiku stopped, which the prompt points to with the open defect. Never paste
   haiku's history.
