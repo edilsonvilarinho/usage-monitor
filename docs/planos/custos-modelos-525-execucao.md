@@ -151,7 +151,8 @@ muda. Grupo de Haiku 5.5 lido do SQL com turnos nas duas faixas tem a parte long
 
 `teamRepository.ts`: fragmento único com as cinco colunas `longPromptInputTokens`, `longPromptOutputTokens`,
 `longPromptCacheReadTokens`, `longPromptCacheWrite5mTokens`, `longPromptCacheWrite1hTokens`, nos cinco `SELECT` agregados,
-tipos de linha atualizados. `report.ts` publica `longPromptThresholdTokens` no `/v1/pricing`.
+tipos de linha atualizados. Calculadas na leitura com `SUM(CASE WHEN …)` sobre `team_turns`, como no A05: sem coluna nova,
+migração ou mudança no ingest. `report.ts` publica `longPromptThresholdTokens` no `/v1/pricing`.
 
 `tools/ci/check-pricing-parity.mjs`: compara divisor de cache read por entrada, faixa por entrada e o limite. O multiplicador
 `read` passa a sair de `DEFAULT_CACHE_READ_DIVISOR`. Teste novo `tools/ci/test/check-pricing-parity.test.mjs`: roda o script
@@ -197,6 +198,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|---|
 | A01 | Plano | Sem harness: fatos medidos por `WebFetch` da página de preços e leitura do código em `f1309744`. |
 | A02 | Tarifas, `cacheReadDivisor`, `LongPromptPricing`, `forPrompt`, match por sufixo de data e janelas | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` com stub, 497 testes, 14 falhas por `AssertionError` em `ModelPricingTableTest.kt:195…337` e `ModelContextWindowTableTest.kt:16,26`; o log do Gradle não trouxe expected/actual. Verde: mesmo comando, 497 testes, 0 falhas; `ModelPricingTableTest` 35 testes, 0 falhas depois da devolução 1/3 (declaração de `HAIKU_5_5` em linha única). |
+| A03 | `turnCostMicros`, `turnCacheSavingsMicros`; turno, contexto vivo e breakdown da análise pela faixa do próprio prompt | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` com stub, `ModelPricingTurnTest.kt:44` `expected:<28751> but was:<0>`, `:93` `expected:<28751> but was:<5750>`, contexto em 100.001 `expected:<5000> but was:<1000>`, breakdown em 100.001 `expected:<20000> but was:<4000>`. Verde: mesmo comando, 507 testes, 0 falhas, depois da devolução 1/3 (breakdown da análise ficara de fora). |
 
 ## Problemas em aberto e riscos
 

@@ -60,7 +60,7 @@ fun computeContextStatus(
         nextInteractionCostMicros = if (pricing == null) {
             0L
         } else {
-            liveContextTokens * pricing.cacheReadMicrosPerMillion / MICROS_PER_USD
+            liveContextTokens * pricing.forPrompt(liveContextTokens).cacheReadMicrosPerMillion / MICROS_PER_USD
         }
     )
 }

@@ -85,6 +85,38 @@ data class ModelPricing(
         return if (promptTokens > tier.thresholdTokens) tier.pricing else this
     }
 
+    /**
+     * Custo de um turno com a faixa escolhida pelo prompt do próprio turno (input + cache
+     * read + cache write 5m e 1h). O output fica fora do prompt.
+     */
+    fun turnCostMicros(
+        inputTokens: Long = 0L,
+        outputTokens: Long = 0L,
+        cacheReadTokens: Long = 0L,
+        cacheWrite5mTokens: Long = 0L,
+        cacheWrite1hTokens: Long = 0L
+    ): Long {
+        val promptTokens = inputTokens + cacheReadTokens + cacheWrite5mTokens + cacheWrite1hTokens
+        return forPrompt(promptTokens).costMicros(
+            inputTokens = inputTokens,
+            outputTokens = outputTokens,
+            cacheReadTokens = cacheReadTokens,
+            cacheWrite5mTokens = cacheWrite5mTokens,
+            cacheWrite1hTokens = cacheWrite1hTokens
+        )
+    }
+
+    /** Economia do cache do turno com a faixa escolhida pelo prompt do próprio turno. */
+    fun turnCacheSavingsMicros(
+        inputTokens: Long = 0L,
+        cacheReadTokens: Long = 0L,
+        cacheWrite5mTokens: Long = 0L,
+        cacheWrite1hTokens: Long = 0L
+    ): Long {
+        val promptTokens = inputTokens + cacheReadTokens + cacheWrite5mTokens + cacheWrite1hTokens
+        return forPrompt(promptTokens).cacheSavingsMicros(cacheReadTokens)
+    }
+
     companion object {
         /**
          * Constrói um preço a partir de valores em USD por milhão de tokens. A faixa de prompt
