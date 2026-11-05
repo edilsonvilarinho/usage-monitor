@@ -360,12 +360,12 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 **Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
 "corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
 passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
-Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**; com `/orchestrate` ativa, o roteiro é a seção "Project delivery flow" da skill `orchestrate`.
+Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**.
 
 1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
    máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
    atividades A01, A02… e tabela de pontos de situação. O do usuário, no chat: **no máximo um parágrafo**.
-2. **Desenvolvimento em TDD**, em worktree/branch própria, nunca na `main`; uma atividade, um commit. Teste primeiro e
+2. **Desenvolvimento em TDD pelos agentes de implementação**, em worktree/branch própria, nunca na `main`; uma atividade, um commit. Teste primeiro e
    vermelho **na asserção** (erro de compilação não conta), depois o código mínimo, depois a refatoração; a linha da
    atividade no plano registra a execução vermelha e a verde. Correção de bug começa pelo teste que a reproduz.
 3. **Testes locais** antes do PR: os recortes de "Commands" e o relatório da skill `usage-monitor-test-report`.
@@ -391,11 +391,12 @@ A sessão principal é a orquestradora **Neferpitou** (`agent` do `.claude/setti
 de cada agente moram **só** em `.claude/agents/`, sempre por alias. Medições e decisões em
 [`agentes-por-tier-513-execucao.md`](docs/planos/agentes-por-tier-513-execucao.md).
 
-- Neferpitou faz plano, TDD (vermelho → verde), diagnóstico de falha e decisão. Não delega edição. Com `/orchestrate` ativa, vermelho → verde e edição são dos agentes da skill, e Neferpitou planeja, valida, decide e comita; fora dela, segue como está.
+- Neferpitou faz plano, diagnóstico de falha, decisão e commit. Vermelho → verde e edição são dos agentes de implementação (`backend-dev`, `frontend-dev`, `prototype-dev`).
 - **Delegação obrigatória (#515)** — esta regra é o pedido explícito do usuário para usar os subagentes abaixo:
   - **sempre `test-runner`** para rodar `gradlew.bat allTests`/`desktopTest`, `npm test`, `node --test`, o relatório
     de testes, a cobertura do diff, `gh run watch`/`--log-failed` e `ci-incidents.mjs`; nunca rodá-los na sessão principal;
   - **sempre `explorer`** para varredura que abre mais de 3 arquivos ou pastas desconhecidas;
+  - **sempre o agente de implementação** para código e teste; direto só ajuste pontual em arquivo conhecido
   - direto só busca pontual (um `Grep`, um arquivo conhecido): criar agente custa ~6k tokens de entrada.
 - **Contra vazamento de contexto:** nunca fork (desligado por `CLAUDE_CODE_FORK_SUBAGENT=0`); prompt mínimo (comando,
   caminhos, formato do retorno), nunca resumo da conversa; retorno de no máximo 20 linhas, nunca log cru; agente
