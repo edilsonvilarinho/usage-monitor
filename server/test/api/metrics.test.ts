@@ -249,6 +249,53 @@ describe('GET /metrics — números', () => {
   });
 
   /**
+   * Haiku 5.5: 0,10 USD/M de input na faixa curta; 0,50 USD/M acima de 100.000
+   * tokens de prompt, decidido por requisicao.
+   */
+  it('precifica o Haiku 5.5 na faixa curta com prompt de ate 100.000 tokens', async () => {
+    const started = start();
+    await ingest(
+      started,
+      makePayload({ turns: [makeTurn({ ts: RECENT, model: 'claude-haiku-5-5', inputTokens: 100_000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 })] }),
+    );
+
+    const response = await request(started.app).get('/metrics').set('x-report-key', TEST_REPORT_TOKEN);
+
+    expect(sample(response.text, 'usage_monitor_cost_usd_window', 'window="24h"')).toContain(' 0.010000');
+  });
+
+  it('precifica o Haiku 5.5 na faixa longa com prompt acima de 100.000 tokens', async () => {
+    const started = start();
+    await ingest(
+      started,
+      makePayload({ turns: [makeTurn({ ts: RECENT, model: 'claude-haiku-5-5', inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 })] }),
+    );
+
+    const response = await request(started.app).get('/metrics').set('x-report-key', TEST_REPORT_TOKEN);
+
+    expect(sample(response.text, 'usage_monitor_cost_usd_window', 'window="24h"')).toContain(' 0.500000');
+  });
+
+  // 100.000 curto (0,010 USD) + 200.000 longo (0,100 USD) = 0,110 USD. Sem a
+  // separacao por requisicao sairia 0,030 (tudo curto) ou 0,150 (tudo longo).
+  it('separa as requisicoes curtas e longas do mesmo modelo na mesma janela', async () => {
+    const started = start();
+    await ingest(
+      started,
+      makePayload({
+        turns: [
+          makeTurn({ messageId: 'curto', ts: RECENT, model: 'claude-haiku-5-5', inputTokens: 100_000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 }),
+          makeTurn({ messageId: 'longo', ts: RECENT, model: 'claude-haiku-5-5', inputTokens: 200_000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 }),
+        ],
+      }),
+    );
+
+    const response = await request(started.app).get('/metrics').set('x-report-key', TEST_REPORT_TOKEN);
+
+    expect(sample(response.text, 'usage_monitor_cost_usd_window', 'window="24h"')).toContain(' 0.110000');
+  });
+
+  /**
    * Modelo sem tarifa **não vira custo zero**: um painel mostraria queda de gasto
    * onde houve modelo novo. A série de turnos sem preço é o aviso.
    */

@@ -1,6 +1,20 @@
 import type { Db } from '../db/openDatabase.js';
 import { normalizeAccountEmail } from '../domain/accountEmail.js';
 
+import { LONG_PROMPT_THRESHOLD_TOKENS } from '../domain/modelPricing.js';
+
+/**
+ * Colunas de prompt longo de um agregado. A faixa vale por requisicao: o prompt de
+ * cada turno (entrada + cache) passa de ${LONG_PROMPT_THRESHOLD_TOKENS} -> a parte
+ * longa soma separada. Calculada na leitura, sobre as colunas que `team_turns` ja tem.
+ */
+const LONG_PROMPT_COLUMNS_SQL = `
+       SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > ${LONG_PROMPT_THRESHOLD_TOKENS} THEN t.input_tokens ELSE 0 END) AS longPromptInputTokens,
+       SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > ${LONG_PROMPT_THRESHOLD_TOKENS} THEN t.output_tokens ELSE 0 END) AS longPromptOutputTokens,
+       SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > ${LONG_PROMPT_THRESHOLD_TOKENS} THEN t.cache_read_tokens ELSE 0 END) AS longPromptCacheReadTokens,
+       SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > ${LONG_PROMPT_THRESHOLD_TOKENS} THEN t.cache_write_5m_tokens ELSE 0 END) AS longPromptCacheWrite5mTokens,
+       SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > ${LONG_PROMPT_THRESHOLD_TOKENS} THEN t.cache_write_1h_tokens ELSE 0 END) AS longPromptCacheWrite1hTokens`;
+
 export interface IngestMember {
   deviceId: string;
   alias: string;
@@ -71,6 +85,11 @@ export interface TeamUsageRow {
   cacheReadTokens: number;
   cacheWrite5mTokens: number;
   cacheWrite1hTokens: number;
+  longPromptInputTokens: number;
+  longPromptOutputTokens: number;
+  longPromptCacheReadTokens: number;
+  longPromptCacheWrite5mTokens: number;
+  longPromptCacheWrite1hTokens: number;
 }
 
 /**
@@ -90,6 +109,11 @@ export interface TeamTrendRow {
   cacheReadTokens: number;
   cacheWrite5mTokens: number;
   cacheWrite1hTokens: number;
+  longPromptInputTokens: number;
+  longPromptOutputTokens: number;
+  longPromptCacheReadTokens: number;
+  longPromptCacheWrite5mTokens: number;
+  longPromptCacheWrite1hTokens: number;
 }
 
 export interface TeamTrend {
@@ -179,6 +203,11 @@ export interface MetricsUsageRow {
   cacheReadTokens: number;
   cacheWrite5mTokens: number;
   cacheWrite1hTokens: number;
+  longPromptInputTokens: number;
+  longPromptOutputTokens: number;
+  longPromptCacheReadTokens: number;
+  longPromptCacheWrite5mTokens: number;
+  longPromptCacheWrite1hTokens: number;
 }
 
 /** Tempo de trabalho de uma maquina na janela. */
@@ -367,7 +396,8 @@ SELECT s.device_id AS deviceId,
        SUM(t.output_tokens) AS outputTokens,
        SUM(t.cache_read_tokens) AS cacheReadTokens,
        SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
-       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens,
+       ${LONG_PROMPT_COLUMNS_SQL}
 FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
@@ -393,7 +423,8 @@ SELECT s.device_id AS deviceId,
        SUM(t.output_tokens) AS outputTokens,
        SUM(t.cache_read_tokens) AS cacheReadTokens,
        SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
-       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens,
+       ${LONG_PROMPT_COLUMNS_SQL}
 FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
@@ -497,7 +528,8 @@ SELECT t.account_key AS accountKey,
        SUM(t.output_tokens) AS outputTokens,
        SUM(t.cache_read_tokens) AS cacheReadTokens,
        SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
-       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens,
+       ${LONG_PROMPT_COLUMNS_SQL}
 FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
@@ -537,7 +569,8 @@ SELECT t.account_key AS accountKey,
        SUM(t.output_tokens) AS outputTokens,
        SUM(t.cache_read_tokens) AS cacheReadTokens,
        SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
-       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens,
+       ${LONG_PROMPT_COLUMNS_SQL}
 FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id
@@ -606,7 +639,8 @@ SELECT t.account_key AS accountKey,
        SUM(t.output_tokens) AS outputTokens,
        SUM(t.cache_read_tokens) AS cacheReadTokens,
        SUM(t.cache_write_5m_tokens) AS cacheWrite5mTokens,
-       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens
+       SUM(t.cache_write_1h_tokens) AS cacheWrite1hTokens,
+       ${LONG_PROMPT_COLUMNS_SQL}
 FROM team_turns t
 JOIN team_sessions s
   ON s.account_key = t.account_key AND s.session_id = t.session_id

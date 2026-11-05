@@ -98,7 +98,8 @@ class ComputeCliSessionAnalyticsUseCase {
         var cacheWrite = 0L
 
         for (turn in turns) {
-            val pricing = ModelPricingTable.forModel(turn.model) ?: continue
+            val modelPricing = ModelPricingTable.forModel(turn.model) ?: continue
+            val pricing = modelPricing.forPrompt(turn.inputTokens + turn.cacheReadTokens + turn.cacheWriteTokens)
             input += turn.inputTokens * pricing.inputMicrosPerMillion / MICROS_PER_USD
             output += turn.outputTokens * pricing.outputMicrosPerMillion / MICROS_PER_USD
             cacheRead += turn.cacheReadTokens * pricing.cacheReadMicrosPerMillion / MICROS_PER_USD

@@ -219,7 +219,8 @@ class LocalCliSessionDataSource(
                                         outputTokens = rows.getLong("output_tokens"),
                                         cacheReadTokens = rows.getLong("cache_read_tokens"),
                                         cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
-                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens"),
+                                        longPrompt = readLongPromptCounts(rows)
                                     )
                                 )
                             }
@@ -509,7 +510,8 @@ class LocalCliSessionDataSource(
                         outputTokens = rows.getLong("output_tokens"),
                         cacheReadTokens = rows.getLong("cache_read_tokens"),
                         cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
-                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                        cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens"),
+                        longPrompt = readLongPromptCounts(rows)
                     )
                 }
             }

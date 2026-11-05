@@ -33,7 +33,7 @@ data class CliSessionTurn(
 
     /** Custo do turno em micros de USD, ou `null` quando o modelo não tem preço conhecido. */
     val costMicros: Long?
-        get() = pricing?.costMicros(
+        get() = pricing?.turnCostMicros(
             inputTokens = inputTokens,
             outputTokens = outputTokens,
             cacheReadTokens = cacheReadTokens,
@@ -43,10 +43,16 @@ data class CliSessionTurn(
 
     /**
      * Economia gerada pelo cache neste turno: o que os tokens lidos do cache
-     * teriam custado como input menos o que custaram como cache read.
+     * teriam custado como input menos o que custaram como cache read. A faixa de
+     * prompt longo sai do prompt deste turno.
      */
     val cacheSavingsMicros: Long?
-        get() = pricing?.cacheSavingsMicros(cacheReadTokens)
+        get() = pricing?.turnCacheSavingsMicros(
+            inputTokens = inputTokens,
+            cacheReadTokens = cacheReadTokens,
+            cacheWrite5mTokens = cacheWrite5mTokens,
+            cacheWrite1hTokens = cacheWrite1hTokens
+        )
 }
 
 /**

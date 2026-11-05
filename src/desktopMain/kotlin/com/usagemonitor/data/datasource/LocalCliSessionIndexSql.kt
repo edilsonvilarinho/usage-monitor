@@ -1,5 +1,7 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.LONG_PROMPT_THRESHOLD_TOKENS
+
 // SQL e constantes do índice de sessões do Claude CLI. Moravam no companion de
 // `LocalCliSessionDataSource` e saíram pelo limite de 800 linhas (#303); só a
 // fonte de dados os usa.
@@ -97,8 +99,14 @@ internal val CREATE_TURNS_TABLE_SQL = """
  * 2 = primeira versão com contador próprio (`cli_index_meta`) e com um
  *     reset que a varredura respeita. É a passada que finalmente preenche
  *     `cli_turn_tools` do histórico já indexado.
+ * 3 = `cli_turns` ganha `request_ts`/`last_line_ts` (vazão, #381).
+ * 4 = `cost_micros` de toda sessão é recalculado com a faixa de prompt longo
+ *     (Haiku 5.5). Sem a faixa, o custo já gravado está errado para turno acima de
+ *     100 mil tokens de prompt, e `syncIndex` não reprocessa arquivo inalterado.
+ *     Também entram as tarifas de cache read de Opus 5.5 e Sonnet 5.5 (divisor 20)
+ *     e de Fable 5.1 e Mythos 5.1 (divisor 40): o recálculo usa a tabela atual inteira.
  */
-internal const val INDEX_SCHEMA_VERSION = 3
+internal const val INDEX_SCHEMA_VERSION = 4
 
 /**
  * Metadados do índice CLI, hoje só a versão do schema.
@@ -340,7 +348,7 @@ internal val SELECT_SESSIONS_SINCE_SQL = """
            SUM(t.output_tokens) AS output_tokens,
            SUM(t.cache_read_tokens) AS cache_read_tokens,
            SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
-           SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+           SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens,$LONG_PROMPT_COLUMNS_SQL
     FROM cli_turns t
     JOIN cli_sessions s ON s.session_id = t.session_id
     WHERE t.ts >= ?
@@ -367,7 +375,7 @@ internal val SELECT_USAGE_GROUPS_SQL = """
            SUM(t.output_tokens) AS output_tokens,
            SUM(t.cache_read_tokens) AS cache_read_tokens,
            SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
-           SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+           SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens,$LONG_PROMPT_COLUMNS_SQL
     FROM cli_turns t
     JOIN cli_sessions s ON s.session_id = t.session_id
     WHERE t.ts >= ?
@@ -462,6 +470,18 @@ internal val SELECT_SESSION_ACTIVE_TIME_SQL = """
     GROUP BY session_id;
 """
 
+/**
+ * Soma da parte de prompt longo, colada nos três `SELECT` de grupo. Cada turno decide sozinho:
+ * o `CASE` compara o prompt do próprio turno (a mesma conta de `UsageTokenCounts.promptTokens`)
+ * com o limite, `>` estrito, igual a `longPromptPartOfTurn`. Turno abaixo do limite soma zero.
+ */
+internal const val LONG_PROMPT_COLUMNS_SQL = """
+           SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > $LONG_PROMPT_THRESHOLD_TOKENS THEN t.input_tokens ELSE 0 END) AS long_prompt_input_tokens,
+           SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > $LONG_PROMPT_THRESHOLD_TOKENS THEN t.output_tokens ELSE 0 END) AS long_prompt_output_tokens,
+           SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > $LONG_PROMPT_THRESHOLD_TOKENS THEN t.cache_read_tokens ELSE 0 END) AS long_prompt_cache_read_tokens,
+           SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > $LONG_PROMPT_THRESHOLD_TOKENS THEN t.cache_write_5m_tokens ELSE 0 END) AS long_prompt_cache_write_5m_tokens,
+           SUM(CASE WHEN (t.input_tokens + t.cache_read_tokens + t.cache_write_5m_tokens + t.cache_write_1h_tokens) > $LONG_PROMPT_THRESHOLD_TOKENS THEN t.cache_write_1h_tokens ELSE 0 END) AS long_prompt_cache_write_1h_tokens"""
+
 /** Uma hora em millis; o `hour_bucket` da grade é `ts` dividido por ela. */
 internal const val MILLIS_PER_HOUR = 3_600_000L
 
@@ -480,7 +500,7 @@ internal val SELECT_HOURLY_USAGE_SQL = """
            SUM(t.output_tokens) AS output_tokens,
            SUM(t.cache_read_tokens) AS cache_read_tokens,
            SUM(t.cache_write_5m_tokens) AS cache_write_5m_tokens,
-           SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens
+           SUM(t.cache_write_1h_tokens) AS cache_write_1h_tokens,$LONG_PROMPT_COLUMNS_SQL
     FROM cli_turns t
     JOIN cli_sessions s ON s.session_id = t.session_id
     WHERE t.ts >= ?

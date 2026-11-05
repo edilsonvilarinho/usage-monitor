@@ -12,15 +12,20 @@ object ModelContextWindowTable {
     private const val TWO_HUNDRED_THOUSAND_TOKENS = 200_000L
 
     private val entries: List<Pair<String, Long>> = listOf(
+        "claude-opus-5-5" to ONE_MILLION_TOKENS,
         "claude-opus-5" to ONE_MILLION_TOKENS,
         "claude-opus-4-8" to ONE_MILLION_TOKENS,
         "claude-opus-4-7" to ONE_MILLION_TOKENS,
         "claude-opus-4-6" to ONE_MILLION_TOKENS,
+        "claude-sonnet-5-5" to ONE_MILLION_TOKENS,
         "claude-sonnet-5" to ONE_MILLION_TOKENS,
         "claude-sonnet-4-6" to ONE_MILLION_TOKENS,
+        "claude-haiku-5-5" to ONE_MILLION_TOKENS,
+        "claude-haiku-4-5" to TWO_HUNDRED_THOUSAND_TOKENS,
+        "claude-fable-5-1" to ONE_MILLION_TOKENS,
+        "claude-mythos-5-1" to ONE_MILLION_TOKENS,
         "claude-fable-5" to ONE_MILLION_TOKENS,
-        "claude-mythos-5" to ONE_MILLION_TOKENS,
-        "claude-haiku-4-5" to TWO_HUNDRED_THOUSAND_TOKENS
+        "claude-mythos-5" to ONE_MILLION_TOKENS
     ).sortedByDescending { it.first.length }
 
     fun forModel(modelId: String?): Long? {

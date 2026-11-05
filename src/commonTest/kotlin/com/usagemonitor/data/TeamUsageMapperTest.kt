@@ -4,6 +4,7 @@ import com.usagemonitor.data.dto.TeamMemberRowDto
 import com.usagemonitor.data.dto.TeamSessionDetailResponseDto
 import com.usagemonitor.data.dto.TeamSessionRowDto
 import com.usagemonitor.data.dto.TeamSnapshotDto
+import com.usagemonitor.data.dto.TeamTrendRowDto
 import com.usagemonitor.data.dto.TeamTurnRowDto
 import com.usagemonitor.data.dto.TeamUsageRowDto
 import com.usagemonitor.data.mapper.toDomain
@@ -11,6 +12,7 @@ import com.usagemonitor.data.mapper.toDto
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TeamIngestPayload
+import com.usagemonitor.domain.entity.UsageTokenCounts
 import com.usagemonitor.domain.entity.TeamMemberIdentity
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -21,6 +23,8 @@ import kotlin.test.assertTrue
 
 private const val OPUS = "claude-opus-4-5-20251101"
 private const val HAIKU = "claude-haiku-4-5-20251001"
+private const val OPUS_5_5 = "claude-opus-5-5"
+private const val HAIKU_5_5 = "claude-haiku-5-5"
 private const val MILLION = 1_000_000L
 
 private fun row(
@@ -106,6 +110,15 @@ private fun detailResponse(
         liveContextModel = liveContextModel
     ),
     turns = turns
+)
+
+/** Linha com a parte de prompt longo que o servidor novo manda: os cinco campos presentes. */
+private fun TeamUsageRowDto.withLongPrompt(inputTokens: Long, outputTokens: Long = 0L) = copy(
+    longPromptInputTokens = inputTokens,
+    longPromptOutputTokens = outputTokens,
+    longPromptCacheReadTokens = 0L,
+    longPromptCacheWrite5mTokens = 0L,
+    longPromptCacheWrite1hTokens = 0L
 )
 
 class TeamUsageMapperTest {
@@ -411,6 +424,91 @@ class TeamUsageMapperTest {
         assertTrue(detail.turns.isEmpty())
         assertEquals(Instant.fromEpochMilliseconds(7_000L), detail.summary.firstTs)
         assertEquals(Instant.fromEpochMilliseconds(9_000L), detail.summary.lastTs)
+    }
+
+    @Test
+    fun `servidor antigo sem campos de prompt longo deixa haiku 5-5 sem preco e opus 5-5 precificado`() {
+        val snapshot = TeamSnapshotDto(
+            members = listOf(member()),
+            rows = listOf(
+                row(sessionId = "session-1", model = HAIKU_5_5, turnCount = 1, inputTokens = MILLION),
+                row(sessionId = "session-2", model = OPUS_5_5, turnCount = 1, inputTokens = MILLION)
+            )
+        ).toDomain()
+
+        val sessions = snapshot.members.single().sessions.associateBy { session -> session.sessionId }
+        // Haiku 5.5 tem faixa de prompt longo: sem a parte longa medida, o grupo não tem preço.
+        assertFalse(sessions.getValue("session-1").isCostComplete)
+        assertEquals(1, sessions.getValue("session-1").unpricedTurnCount)
+        // Opus 5.5 não tem faixa: 1 M de input a 4 USD/M.
+        assertTrue(sessions.getValue("session-2").isCostComplete)
+        assertEquals(4_000_000L, sessions.getValue("session-2").costMicros)
+    }
+
+    @Test
+    fun `resposta nova precifica as duas faixas do haiku 5-5 e repassa a parte longa ao grupo`() {
+        val snapshot = TeamSnapshotDto(
+            members = listOf(member()),
+            rows = listOf(
+                row(model = HAIKU_5_5, turnCount = 2, inputTokens = 2 * MILLION)
+                    .withLongPrompt(inputTokens = MILLION)
+            )
+        ).toDomain()
+
+        val session = snapshot.members.single().sessions.single()
+        // 1 M na faixa base a 0,10 USD/M mais 1 M na faixa longa a 0,50 USD/M.
+        assertEquals(600_000L, session.costMicros)
+        assertTrue(session.isCostComplete)
+
+        val groupRow = snapshot.members.single().groupRows.single()
+        assertEquals(UsageTokenCounts(inputTokens = MILLION), groupRow.longPrompt)
+    }
+
+    @Test
+    fun `detalhe com turnos nas duas faixas soma o custo de cada turno pela sua faixa`() {
+        val detail = detailResponse(
+            turns = listOf(
+                // Prompt de 1 M passa do limite: o turno inteiro cai na faixa longa, a 0,50 USD/M.
+                detailTurn(messageId = "a", ts = 1_000L, model = HAIKU_5_5, inputTokens = MILLION),
+                // Prompt de 50 mil fica na faixa base, a 0,10 USD/M.
+                detailTurn(messageId = "b", ts = 2_000L, model = HAIKU_5_5, inputTokens = 50_000L)
+            )
+        ).toDomain()
+
+        assertEquals(500_000L + 5_000L, detail.summary.costMicros)
+        assertTrue(detail.summary.isCostComplete)
+    }
+
+    @Test
+    fun `tendencia carrega a parte de prompt longo quando o servidor manda os cinco campos`() {
+        val trend = TeamTrendRowDto(
+            deviceId = "device-1",
+            dayStartMillis = 0L,
+            model = HAIKU_5_5,
+            turnCount = 2,
+            inputTokens = 2 * MILLION,
+            longPromptInputTokens = MILLION,
+            longPromptOutputTokens = 1L,
+            longPromptCacheReadTokens = 2L,
+            longPromptCacheWrite5mTokens = 3L,
+            longPromptCacheWrite1hTokens = 4L
+        ).toDomain()
+
+        assertEquals(UsageTokenCounts(MILLION, 1L, 2L, 3L, 4L), trend.longPrompt)
+    }
+
+    @Test
+    fun `tendencia de servidor antigo ou com campos parciais fica sem parte longa`() {
+        val antigo = TeamTrendRowDto(deviceId = "device-1", dayStartMillis = 0L, model = HAIKU_5_5).toDomain()
+        val parcial = TeamTrendRowDto(
+            deviceId = "device-1",
+            dayStartMillis = 0L,
+            model = HAIKU_5_5,
+            longPromptInputTokens = MILLION
+        ).toDomain()
+
+        assertNull(antigo.longPrompt)
+        assertNull(parcial.longPrompt)
     }
 
     @Test

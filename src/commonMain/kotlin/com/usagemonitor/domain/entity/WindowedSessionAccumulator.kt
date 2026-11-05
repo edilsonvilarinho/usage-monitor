@@ -7,9 +7,11 @@ import kotlin.time.Instant
  *
  * O agrupamento por modelo é o que torna o custo correto: uma sessão que trocou
  * de modelo no meio precisa ser precificada com a tarifa de cada trecho. O custo
- * é somado por grupo porque `ModelPricing.costMicros` soma os produtos e divide
- * uma única vez — agregar tokens antes de precificar é exato, não uma
- * aproximação.
+ * é somado por grupo. Para modelo sem faixa de prompt longo, `ModelPricing.costMicros`
+ * soma os produtos e divide uma única vez: agregar tokens antes de precificar é
+ * exato, não uma aproximação. Modelo com faixa vale turno a turno (prompt acima do
+ * limite usa outra tarifa), então a parte longa chega separada em
+ * `CliUsageGroupRow.longPrompt`.
  *
  * Vive no domain, e não no datasource local, porque a mesma agregação vale para
  * duas fontes: as linhas do índice SQLite da máquina e as linhas que o servidor
@@ -51,7 +53,8 @@ class WindowedSessionAccumulator(
         outputTokens: Long,
         cacheReadTokens: Long,
         cacheWrite5mTokens: Long,
-        cacheWrite1hTokens: Long
+        cacheWrite1hTokens: Long,
+        longPrompt: UsageTokenCounts? = null
     ) {
         this.turnCount += turnCount
         this.inputTokens += inputTokens
@@ -63,16 +66,20 @@ class WindowedSessionAccumulator(
         lastTs = maxOf(lastTs, lastTsMillis)
 
         val pricing = ModelPricingTable.forModel(model)
-        if (pricing == null) {
-            unpricedTurnCount += turnCount
-        } else {
-            costMicros += pricing.costMicros(
+        val cost = pricing?.groupCostMicros(
+            total = UsageTokenCounts(
                 inputTokens = inputTokens,
                 outputTokens = outputTokens,
                 cacheReadTokens = cacheReadTokens,
                 cacheWrite5mTokens = cacheWrite5mTokens,
                 cacheWrite1hTokens = cacheWrite1hTokens
-            )
+            ),
+            longPrompt = longPrompt
+        )
+        if (cost == null) {
+            unpricedTurnCount += turnCount
+        } else {
+            costMicros += cost
         }
 
         modelGroups += CliUsageGroupRow(
@@ -83,7 +90,8 @@ class WindowedSessionAccumulator(
             outputTokens = outputTokens,
             cacheReadTokens = cacheReadTokens,
             cacheWrite5mTokens = cacheWrite5mTokens,
-            cacheWrite1hTokens = cacheWrite1hTokens
+            cacheWrite1hTokens = cacheWrite1hTokens,
+            longPrompt = longPrompt
         )
 
         if (model != null && turnCount > primaryModelTurns) {

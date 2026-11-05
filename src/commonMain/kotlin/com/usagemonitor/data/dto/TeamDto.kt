@@ -117,7 +117,16 @@ data class TeamUsageRowDto(
     val outputTokens: Long = 0L,
     val cacheReadTokens: Long = 0L,
     val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    val cacheWrite1hTokens: Long = 0L,
+    /**
+     * Parte de prompt longo do grupo. `null` quando o servidor não manda os cinco campos
+     * (servidor anterior à faixa de prompt longo); o mapper só monta a parte com os cinco presentes.
+     */
+    val longPromptInputTokens: Long? = null,
+    val longPromptOutputTokens: Long? = null,
+    val longPromptCacheReadTokens: Long? = null,
+    val longPromptCacheWrite5mTokens: Long? = null,
+    val longPromptCacheWrite1hTokens: Long? = null
 )
 
 /**
@@ -337,7 +346,16 @@ data class TeamTrendRowDto(
     val outputTokens: Long = 0L,
     val cacheReadTokens: Long = 0L,
     val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    val cacheWrite1hTokens: Long = 0L,
+    /**
+     * Parte de prompt longo da linha. `null` quando o servidor não manda os cinco campos
+     * (servidor anterior à faixa de prompt longo); o mapper só monta a parte com os cinco presentes.
+     */
+    val longPromptInputTokens: Long? = null,
+    val longPromptOutputTokens: Long? = null,
+    val longPromptCacheReadTokens: Long? = null,
+    val longPromptCacheWrite5mTokens: Long? = null,
+    val longPromptCacheWrite1hTokens: Long? = null
 )
 
 @Serializable

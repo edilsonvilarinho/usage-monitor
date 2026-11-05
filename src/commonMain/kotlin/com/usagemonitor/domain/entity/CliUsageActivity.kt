@@ -15,7 +15,12 @@ data class CliHourlyUsageRow(
     val outputTokens: Long = 0L,
     val cacheReadTokens: Long = 0L,
     val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    val cacheWrite1hTokens: Long = 0L,
+    /**
+     * Parte da hora cujo prompt passou de `LONG_PROMPT_THRESHOLD_TOKENS` (turno a turno).
+     * `null` é "não medido": modelo com faixa de prompt longo sem essa parte fica sem preço.
+     */
+    val longPrompt: UsageTokenCounts? = null
 ) {
     val totalTokens: Long
         get() = inputTokens + outputTokens + cacheReadTokens + cacheWrite5mTokens + cacheWrite1hTokens
@@ -98,14 +103,18 @@ fun Iterable<CliHourlyUsageRow>.toActivityHeatmap(
         // Sem tarifa não entra custo; a célula continua contando turnos, que é o
         // que ela ainda sabe com certeza.
         val pricing = ModelPricingTable.forModel(row.model)
-        if (pricing != null) {
-            cell.costMicros += pricing.costMicros(
+        val cost = pricing?.groupCostMicros(
+            total = UsageTokenCounts(
                 inputTokens = row.inputTokens,
                 outputTokens = row.outputTokens,
                 cacheReadTokens = row.cacheReadTokens,
                 cacheWrite5mTokens = row.cacheWrite5mTokens,
                 cacheWrite1hTokens = row.cacheWrite1hTokens
-            )
+            ),
+            longPrompt = row.longPrompt
+        )
+        if (cost != null) {
+            cell.costMicros += cost
         }
     }
 
