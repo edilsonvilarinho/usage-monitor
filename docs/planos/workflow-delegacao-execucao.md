@@ -75,6 +75,7 @@ Passos 1, 2, 3, 5, 6 e 8 mantêm os comandos atuais. Nenhuma menção a `start.m
 |---|---|---|
 | A01 | sem suíte; revisão do texto | linhas e comandos conferidos contra a `main` |
 | A02 | sem suíte; diff lido item a item; `grep -c start.mjs` = 0, `grep -c "Project delivery flow"` = 0, `grep -c emit.mjs` = 8 | oito itens aplicados, 0 devoluções |
+| A03 | sem suíte; diff lido; `node --test` de `setup/agentes.test.mjs` e `portal/cli.test.mjs` pelo `test-runner` | quatro itens aplicados; 13 passam, 1 falha, a mesma CRLF da `main` |
 
 ## Problemas em aberto e riscos
 
