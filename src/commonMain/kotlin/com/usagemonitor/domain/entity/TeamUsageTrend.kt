@@ -15,7 +15,12 @@ data class TeamTrendRow(
     val outputTokens: Long = 0L,
     val cacheReadTokens: Long = 0L,
     val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    val cacheWrite1hTokens: Long = 0L,
+    /**
+     * Parte do dia cujo prompt passou de `LONG_PROMPT_THRESHOLD_TOKENS` (turno a turno).
+     * `null` é "não medido": modelo com faixa de prompt longo sem essa parte fica sem preço.
+     */
+    val longPrompt: UsageTokenCounts? = null
 ) {
     val totalTokens: Long
         get() = inputTokens + outputTokens + cacheReadTokens + cacheWrite5mTokens + cacheWrite1hTokens
@@ -106,17 +111,21 @@ fun buildTeamUsageTrend(
         point.totalTokens += row.totalTokens
 
         val pricing = ModelPricingTable.forModel(row.model)
-        if (pricing == null) {
+        val cost = pricing?.groupCostMicros(
+            total = UsageTokenCounts(
+                inputTokens = row.inputTokens,
+                outputTokens = row.outputTokens,
+                cacheReadTokens = row.cacheReadTokens,
+                cacheWrite5mTokens = row.cacheWrite5mTokens,
+                cacheWrite1hTokens = row.cacheWrite1hTokens
+            ),
+            longPrompt = row.longPrompt
+        )
+        if (cost == null) {
             point.unpricedTurnCount += row.turnCount
             continue
         }
-        point.costMicros += pricing.costMicros(
-            inputTokens = row.inputTokens,
-            outputTokens = row.outputTokens,
-            cacheReadTokens = row.cacheReadTokens,
-            cacheWrite5mTokens = row.cacheWrite5mTokens,
-            cacheWrite1hTokens = row.cacheWrite1hTokens
-        )
+        point.costMicros += cost
     }
 
     // Máquina que aparece nos turnos mas não na lista de integrantes ainda

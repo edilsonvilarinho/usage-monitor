@@ -18,7 +18,12 @@ data class CliUsageGroupRow(
     val outputTokens: Long = 0L,
     val cacheReadTokens: Long = 0L,
     val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    val cacheWrite1hTokens: Long = 0L,
+    /**
+     * Parte do grupo cujo prompt passou de `LONG_PROMPT_THRESHOLD_TOKENS` (turno a turno).
+     * `null` é "não medido": modelo com faixa de prompt longo sem essa parte fica sem preço.
+     */
+    val longPrompt: UsageTokenCounts? = null
 )
 
 /**
@@ -232,20 +237,23 @@ private class BucketAccumulator(
         }
 
         val pricing = ModelPricingTable.forModel(row.model)
-        if (pricing == null) {
-            // Sem tarifa não se inventa custo nem economia: o balde declara a
-            // lacuna em `unpricedTurnCount` e a tela avisa.
-            unpricedTurnCount += row.turnCount
-            return
-        }
-        costMicros += pricing.costMicros(
+        val total = UsageTokenCounts(
             inputTokens = row.inputTokens,
             outputTokens = row.outputTokens,
             cacheReadTokens = row.cacheReadTokens,
             cacheWrite5mTokens = row.cacheWrite5mTokens,
             cacheWrite1hTokens = row.cacheWrite1hTokens
         )
-        cacheSavingsMicros += pricing.cacheSavingsMicros(row.cacheReadTokens)
+        val cost = pricing?.groupCostMicros(total, row.longPrompt)
+        val savings = pricing?.groupCacheSavingsMicros(total, row.longPrompt)
+        if (cost == null || savings == null) {
+            // Sem tarifa, ou com faixa de prompt longo não medida, não se inventa custo
+            // nem economia: o balde declara a lacuna em `unpricedTurnCount` e a tela avisa.
+            unpricedTurnCount += row.turnCount
+            return
+        }
+        costMicros += cost
+        cacheSavingsMicros += savings
     }
 
     /**

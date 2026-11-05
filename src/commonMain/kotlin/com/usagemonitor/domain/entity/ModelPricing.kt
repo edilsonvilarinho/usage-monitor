@@ -12,6 +12,39 @@ const val DEFAULT_CACHE_READ_DIVISOR = 10L
 /** Limite de prompt longo em tokens. Acima dele (`>` estrito) vale a faixa de prompt longo, por requisição. */
 const val LONG_PROMPT_THRESHOLD_TOKENS = 100_000L
 
+/** Contagem de tokens de um grupo ou turno, por tipo. */
+data class UsageTokenCounts(
+    val inputTokens: Long = 0L,
+    val outputTokens: Long = 0L,
+    val cacheReadTokens: Long = 0L,
+    val cacheWrite5mTokens: Long = 0L,
+    val cacheWrite1hTokens: Long = 0L
+) {
+    /** Tokens de prompt: tudo que entra na requisição. O output fica fora. */
+    val promptTokens: Long
+        get() = inputTokens + cacheReadTokens + cacheWrite5mTokens + cacheWrite1hTokens
+}
+
+/**
+ * Parte do turno que cai acima do limite de prompt longo. Inteira quando o prompt do turno
+ * passa de [LONG_PROMPT_THRESHOLD_TOKENS]; zero caso contrário. A decisão é por turno, porque
+ * a faixa vale por requisição.
+ */
+fun longPromptPartOfTurn(turn: UsageTokenCounts): UsageTokenCounts {
+    return if (turn.promptTokens > LONG_PROMPT_THRESHOLD_TOKENS) turn else UsageTokenCounts()
+}
+
+/** Parte curta de um grupo: total menos a parte longa, componente a componente. */
+private fun shortPartOf(total: UsageTokenCounts, longPrompt: UsageTokenCounts): UsageTokenCounts {
+    return UsageTokenCounts(
+        inputTokens = total.inputTokens - longPrompt.inputTokens,
+        outputTokens = total.outputTokens - longPrompt.outputTokens,
+        cacheReadTokens = total.cacheReadTokens - longPrompt.cacheReadTokens,
+        cacheWrite5mTokens = total.cacheWrite5mTokens - longPrompt.cacheWrite5mTokens,
+        cacheWrite1hTokens = total.cacheWrite1hTokens - longPrompt.cacheWrite1hTokens
+    )
+}
+
 /** Faixa de prompt longo: substitui a tarifa base quando o prompt da requisição passa de [thresholdTokens]. */
 data class LongPromptPricing(
     val thresholdTokens: Long,
@@ -115,6 +148,52 @@ data class ModelPricing(
     ): Long {
         val promptTokens = inputTokens + cacheReadTokens + cacheWrite5mTokens + cacheWrite1hTokens
         return forPrompt(promptTokens).cacheSavingsMicros(cacheReadTokens)
+    }
+
+    /**
+     * Custo de um grupo somado por tipo de turno. Sem faixa de prompt longo no modelo, o total
+     * é precificado direto e a parte longa é ignorada. Com faixa, a parte curta usa a tarifa
+     * base e a longa, a faixa; `null` quando há faixa e [longPrompt] não foi medido.
+     */
+    fun groupCostMicros(total: UsageTokenCounts, longPrompt: UsageTokenCounts?): Long? {
+        val tier = this.longPrompt ?: return costMicros(
+            inputTokens = total.inputTokens,
+            outputTokens = total.outputTokens,
+            cacheReadTokens = total.cacheReadTokens,
+            cacheWrite5mTokens = total.cacheWrite5mTokens,
+            cacheWrite1hTokens = total.cacheWrite1hTokens
+        )
+        if (longPrompt == null) {
+            return null
+        }
+        val short = shortPartOf(total, longPrompt)
+        return costMicros(
+            inputTokens = short.inputTokens,
+            outputTokens = short.outputTokens,
+            cacheReadTokens = short.cacheReadTokens,
+            cacheWrite5mTokens = short.cacheWrite5mTokens,
+            cacheWrite1hTokens = short.cacheWrite1hTokens
+        ) + tier.pricing.costMicros(
+            inputTokens = longPrompt.inputTokens,
+            outputTokens = longPrompt.outputTokens,
+            cacheReadTokens = longPrompt.cacheReadTokens,
+            cacheWrite5mTokens = longPrompt.cacheWrite5mTokens,
+            cacheWrite1hTokens = longPrompt.cacheWrite1hTokens
+        )
+    }
+
+    /**
+     * Economia de cache de um grupo, com a mesma divisão de [groupCostMicros]: a parte curta
+     * pela tarifa base e a longa pela faixa. `null` pelo mesmo motivo.
+     */
+    fun groupCacheSavingsMicros(total: UsageTokenCounts, longPrompt: UsageTokenCounts?): Long? {
+        val tier = this.longPrompt ?: return cacheSavingsMicros(total.cacheReadTokens)
+        if (longPrompt == null) {
+            return null
+        }
+        val short = shortPartOf(total, longPrompt)
+        return cacheSavingsMicros(short.cacheReadTokens) +
+            tier.pricing.cacheSavingsMicros(longPrompt.cacheReadTokens)
     }
 
     companion object {
