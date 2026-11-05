@@ -1,7 +1,9 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.CliUsageGroupRow
+import com.usagemonitor.domain.entity.UsageTokenCounts
 import java.sql.Connection
+import java.sql.ResultSet
 
 // Leitura das linhas `(sessão, modelo)` do índice CLI. Saiu de
 // `LocalCliSessionDataSource` porque agora tem dois consumidores — o Resumo e o
@@ -35,11 +37,23 @@ internal fun readUsageGroupRows(
                             outputTokens = rows.getLong("output_tokens"),
                             cacheReadTokens = rows.getLong("cache_read_tokens"),
                             cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
-                            cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                            cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens"),
+                            longPrompt = readLongPromptCounts(rows)
                         )
                     )
                 }
             }
         }
     }
+}
+
+/** Parte de prompt longo do grupo, lida das colunas `long_prompt_*` de [LONG_PROMPT_COLUMNS_SQL]. */
+internal fun readLongPromptCounts(rows: ResultSet): UsageTokenCounts {
+    return UsageTokenCounts(
+        inputTokens = rows.getLong("long_prompt_input_tokens"),
+        outputTokens = rows.getLong("long_prompt_output_tokens"),
+        cacheReadTokens = rows.getLong("long_prompt_cache_read_tokens"),
+        cacheWrite5mTokens = rows.getLong("long_prompt_cache_write_5m_tokens"),
+        cacheWrite1hTokens = rows.getLong("long_prompt_cache_write_1h_tokens")
+    )
 }

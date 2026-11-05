@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import com.usagemonitor.domain.entity.ModelPricingTable
 import java.sql.Connection
 
 // Schema, migração e registro de arquivos do índice de sessões do Claude CLI.
@@ -83,14 +84,89 @@ internal fun migrateSchemaVersion(connection: Connection) {
         return
     }
 
-    connection.createStatement().use { statement ->
-        statement.execute(RESET_INDEXED_FILES_SQL)
+    if (current < 3) {
+        connection.createStatement().use { statement ->
+            statement.execute(RESET_INDEXED_FILES_SQL)
+        }
+    }
+    if (current < 4) {
+        recomputeAllSessionCosts(connection)
     }
     connection.prepareStatement(UPSERT_INDEX_SCHEMA_VERSION_SQL).use { statement ->
         statement.setString(1, INDEX_SCHEMA_VERSION.toString())
         statement.executeUpdate()
     }
 }
+
+/**
+ * Recalcula `cost_micros` e `unpriced_turns` de toda sessão com a tarifa atual. Só a migração
+ * para a versão 4 chama: a faixa de prompt longo do Haiku 5.5 mudou o custo de turnos já
+ * gravados, e `syncIndex` pula arquivo inalterado. Os turnos já estão em `cli_turns`, então o
+ * custo sai deles sem reler transcript. Turno sem tarifa conta como não precificado, o mesmo
+ * critério de `CliSessionTurn.costMicros`. Roda numa transação: ou recalcula tudo ou nada, e o
+ * upsert da versão só acontece depois do commit. Cobre a faixa de prompt longo do Haiku 5.5 e as
+ * tarifas de cache read de Opus 5.5 e Sonnet 5.5 (divisor 20), Fable 5.1 e Mythos 5.1 (divisor 40).
+ */
+internal fun recomputeAllSessionCosts(connection: Connection) {
+    connection.autoCommit = false
+    try {
+        val sessionIds = connection.createStatement().use { statement ->
+            statement.executeQuery(SELECT_ALL_SESSION_IDS_SQL).use { rows ->
+                buildList {
+                    while (rows.next()) {
+                        add(rows.getString(1))
+                    }
+                }
+            }
+        }
+        for (sessionId in sessionIds) {
+            var costMicros = 0L
+            var unpricedTurns = 0
+            connection.prepareStatement(SELECT_TURN_TOKENS_SQL).use { statement ->
+                statement.setString(1, sessionId)
+                statement.executeQuery().use { rows ->
+                    while (rows.next()) {
+                        val pricing = ModelPricingTable.forModel(rows.getString("model"))
+                        if (pricing == null) {
+                            unpricedTurns++
+                        } else {
+                            costMicros += pricing.turnCostMicros(
+                                inputTokens = rows.getLong("input_tokens"),
+                                outputTokens = rows.getLong("output_tokens"),
+                                cacheReadTokens = rows.getLong("cache_read_tokens"),
+                                cacheWrite5mTokens = rows.getLong("cache_write_5m_tokens"),
+                                cacheWrite1hTokens = rows.getLong("cache_write_1h_tokens")
+                            )
+                        }
+                    }
+                }
+            }
+            connection.prepareStatement(UPDATE_SESSION_COST_SQL).use { statement ->
+                statement.setLong(1, costMicros)
+                statement.setInt(2, unpricedTurns)
+                statement.setString(3, sessionId)
+                statement.executeUpdate()
+            }
+        }
+        connection.commit()
+    } catch (error: Throwable) {
+        connection.rollback()
+        throw error
+    } finally {
+        connection.autoCommit = true
+    }
+}
+
+private const val SELECT_ALL_SESSION_IDS_SQL = "SELECT session_id FROM cli_sessions;"
+
+private const val SELECT_TURN_TOKENS_SQL = """
+    SELECT model, input_tokens, output_tokens, cache_read_tokens,
+           cache_write_5m_tokens, cache_write_1h_tokens
+    FROM cli_turns WHERE session_id = ?;
+"""
+
+private const val UPDATE_SESSION_COST_SQL =
+    "UPDATE cli_sessions SET cost_micros = ?, unpriced_turns = ? WHERE session_id = ?;"
 
 /** Versão gravada do índice; ausente ou ilegível conta como zero. */
 internal fun readIndexSchemaVersion(connection: Connection): Int {
