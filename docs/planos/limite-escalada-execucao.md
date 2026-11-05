@@ -43,6 +43,7 @@ TDD em `.claude/skills/orchestrate/portal/cli.test.mjs`: trocar as asserções p
 |---|---|---|
 | A01 | sem suíte; revisão do texto | linhas conferidas contra a `main` |
 | A02 | vermelho: `node --test .claude/skills/orchestrate/portal/cli.test.mjs` falha em `/reprovação 1/3 no haiku.*devolver ao mesmo agente/` (saída real `reprovação 1/10`); verde: mesmo comando; suíte do portal pelo `test-runner` | vermelho na asserção; 8 de 8 verdes; portal 35 de 35 |
+| A03 | sem suíte; diff lido; modelo real só no próximo uso do agente | `model: haiku`, `effort: high` |
 
 ## Problemas em aberto e riscos
 

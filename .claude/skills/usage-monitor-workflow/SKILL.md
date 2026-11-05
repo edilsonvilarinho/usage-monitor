@@ -50,8 +50,9 @@ step 5 or step 7 commands in the main session; call the `test-runner` agent with
 
 ## Route: work by agent
 
-Subagents run the model and effort set in their frontmatter in `.claude/agents/`: implementers on haiku with high
-effort, `test-runner` on sonnet, `explorer` without `effort` (#513). Delegate without `model` or `effort`, except the
+Subagents run the model and effort set in their frontmatter in `.claude/agents/`: implementers and `test-runner` on
+haiku with high effort (`test-runner` since #532), `explorer` without `effort` (#513). Delegate without `model` or
+`effort`, except the
 escalation in "Validate and send back".
 
 | Work | Agent |

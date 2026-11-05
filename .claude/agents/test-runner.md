@@ -2,8 +2,8 @@
 name: test-runner
 description: Runs a given test, report or CI-watch command in usage-monitor and returns only the verdict and the failures, at most 20 lines. Use for gradlew allTests/desktopTest, npm test, node --test, the test-report script, gh run watch and ci-incidents counts. Never for editing code.
 tools: Bash, Read, Grep, Glob
-model: sonnet
-effort: medium
+model: haiku
+effort: high
 omitClaudeMd: true
 maxTurns: 30
 ---
