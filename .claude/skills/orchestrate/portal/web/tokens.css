@@ -1,0 +1,37 @@
+/*
+ * Tokens do portal (system design: references/portal-system-design.md).
+ * Claro em :root; escuro via prefers-color-scheme (quando não há data-theme="light")
+ * e via :root[data-theme="dark"] (escolha explícita do usuário).
+ * .force-light / .force-dark forçam um tema num subtrecho (ex.: documentação, previews).
+ * Sem fontes externas: tudo é pilha do sistema.
+ */
+:root, .force-light {
+  --bg: #f3f5f8; --surface: #ffffff; --fg: #12161c; --muted: #5a6575; --line: #dde2e9; --accent: #2f6df6;
+  --plate: #e7ebf1; --plate-2: #d9dfe8; --edge: rgba(18, 22, 28, .26);
+  --sh-l: 11%; --sh-r: 24%; /* escurecimento das faces esquerda e direita dos volumes */
+  --c-ocioso: #aab4c2; --c-trabalhando: #3b82f6; --c-aguardando: #f0a23a; --c-concluido: #2fb27a; --c-erro: #e5484d;
+  --c-fila: #aab4c2; --c-andamento: #3b82f6; --c-validacao: #8b6cf0; --c-aprovada: #2fb27a; --c-devolvida: #f0a23a; --c-bloqueada: #e5484d;
+  --r: 14px; --r-sm: 8px;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0f14; --surface: #141920; --fg: #e8ecf2; --muted: #8b96a6; --line: #252c37; --accent: #6ea0ff;
+    --plate: #1b232d; --plate-2: #27313e; --edge: rgba(0, 0, 0, .55);
+    --sh-l: 24%; --sh-r: 42%;
+    --c-ocioso: #58667a; --c-trabalhando: #5b9bff; --c-aguardando: #f5b04c; --c-concluido: #3fcf8e; --c-erro: #ff6369;
+    --c-fila: #58667a; --c-andamento: #5b9bff; --c-validacao: #a18bff; --c-aprovada: #3fcf8e; --c-devolvida: #f5b04c; --c-bloqueada: #ff6369;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"], .force-dark {
+  --bg: #0c0f14; --surface: #141920; --fg: #e8ecf2; --muted: #8b96a6; --line: #252c37; --accent: #6ea0ff;
+  --plate: #1b232d; --plate-2: #27313e; --edge: rgba(0, 0, 0, .55);
+  --sh-l: 24%; --sh-r: 42%;
+  --c-ocioso: #58667a; --c-trabalhando: #5b9bff; --c-aguardando: #f5b04c; --c-concluido: #3fcf8e; --c-erro: #ff6369;
+  --c-fila: #58667a; --c-andamento: #5b9bff; --c-validacao: #a18bff; --c-aprovada: #3fcf8e; --c-devolvida: #f5b04c; --c-bloqueada: #ff6369;
+  color-scheme: dark;
+}
+.force-light, .force-dark { background: var(--bg); color: var(--fg); }

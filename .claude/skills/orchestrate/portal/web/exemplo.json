@@ -1,0 +1,1315 @@
+{
+ "aviso": "DADOS DE EXEMPLO. Nada aqui vem de uma sessão real.",
+ "intervaloMs": 3500,
+ "quadros": [
+  {
+   "sessao": "exemplo",
+   "atualizadoEm": "2026-11-04T12:00:00.000Z",
+   "modo": "ao-vivo",
+   "agentes": [
+    {
+     "id": "am",
+     "tipo": "am",
+     "tipoOriginal": "am",
+     "modelo": null,
+     "descricao": "(exemplo) Orquestradora",
+     "estado": "trabalhando",
+     "atividade": "planejando a tarefa",
+     "inicio": "2026-11-04T12:00:00.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 2,
+     "erros": 0,
+     "tokens": {
+      "entrada": 40,
+      "saida": 900,
+      "cache": 12000
+     }
+    },
+    {
+     "id": "ex-explorer-1",
+     "tipo": "explorer",
+     "tipoOriginal": "explorer",
+     "modelo": null,
+     "descricao": "(exemplo) Varredura de fontes",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-backend-1",
+     "tipo": "backend-dev",
+     "tipoOriginal": "backend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Ajuste de coleta",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-runner-1",
+     "tipo": "test-runner",
+     "tipoOriginal": "test-runner",
+     "modelo": null,
+     "descricao": "(exemplo) Portões da branch",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-proto-1",
+     "tipo": "prototype-dev",
+     "tipoOriginal": "prototype-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Protótipo da galeria",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-frontend-1",
+     "tipo": "frontend-dev",
+     "tipoOriginal": "frontend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Tela de exemplo",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    }
+   ],
+   "tarefas": [
+    {
+     "id": "EX1",
+     "titulo": "(exemplo) Ajustar a coleta",
+     "dono": "ex-backend-1",
+     "estado": "fila",
+     "devolucoes": 0,
+     "veredito": null,
+     "atualizadoEm": "2026-11-04T12:00:00.000Z"
+    }
+   ],
+   "falas": [],
+   "totais": {
+    "tokensEntrada": 40,
+    "tokensSaida": 900,
+    "tokensCache": 12000,
+    "agentesAtivos": 1
+   }
+  },
+  {
+   "sessao": "exemplo",
+   "atualizadoEm": "2026-11-04T12:00:10.000Z",
+   "modo": "ao-vivo",
+   "agentes": [
+    {
+     "id": "am",
+     "tipo": "am",
+     "tipoOriginal": "am",
+     "modelo": null,
+     "descricao": "(exemplo) Orquestradora",
+     "estado": "aguardando",
+     "atividade": "aguardando os agentes",
+     "inicio": "2026-11-04T12:00:00.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 3,
+     "erros": 0,
+     "tokens": {
+      "entrada": 55,
+      "saida": 1400,
+      "cache": 20000
+     }
+    },
+    {
+     "id": "ex-explorer-1",
+     "tipo": "explorer",
+     "tipoOriginal": "explorer",
+     "modelo": null,
+     "descricao": "(exemplo) Varredura de fontes",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-backend-1",
+     "tipo": "backend-dev",
+     "tipoOriginal": "backend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Ajuste de coleta",
+     "estado": "trabalhando",
+     "atividade": "lendo config.ts",
+     "inicio": "2026-11-04T12:00:10.000Z",
+     "fim": null,
+     "tarefa": "EX1",
+     "ferramentas": 1,
+     "erros": 0,
+     "tokens": {
+      "entrada": 5,
+      "saida": 120,
+      "cache": 3000
+     }
+    },
+    {
+     "id": "ex-runner-1",
+     "tipo": "test-runner",
+     "tipoOriginal": "test-runner",
+     "modelo": null,
+     "descricao": "(exemplo) Portões da branch",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-proto-1",
+     "tipo": "prototype-dev",
+     "tipoOriginal": "prototype-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Protótipo da galeria",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-frontend-1",
+     "tipo": "frontend-dev",
+     "tipoOriginal": "frontend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Tela de exemplo",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    }
+   ],
+   "tarefas": [
+    {
+     "id": "EX1",
+     "titulo": "(exemplo) Ajustar a coleta",
+     "dono": "ex-backend-1",
+     "estado": "andamento",
+     "devolucoes": 0,
+     "veredito": null,
+     "atualizadoEm": "2026-11-04T12:00:10.000Z"
+    }
+   ],
+   "falas": [
+    {
+     "id": "f1",
+     "ts": "2026-11-04T12:00:10.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: ajustar a coleta"
+    }
+   ],
+   "totais": {
+    "tokensEntrada": 60,
+    "tokensSaida": 1520,
+    "tokensCache": 23000,
+    "agentesAtivos": 2
+   }
+  },
+  {
+   "sessao": "exemplo",
+   "atualizadoEm": "2026-11-04T12:00:25.000Z",
+   "modo": "ao-vivo",
+   "agentes": [
+    {
+     "id": "am",
+     "tipo": "am",
+     "tipoOriginal": "am",
+     "modelo": null,
+     "descricao": "(exemplo) Orquestradora",
+     "estado": "aguardando",
+     "atividade": "aguardando os agentes",
+     "inicio": "2026-11-04T12:00:00.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 4,
+     "erros": 0,
+     "tokens": {
+      "entrada": 60,
+      "saida": 1500,
+      "cache": 22000
+     }
+    },
+    {
+     "id": "ex-explorer-1",
+     "tipo": "explorer",
+     "tipoOriginal": "explorer",
+     "modelo": null,
+     "descricao": "(exemplo) Varredura de fontes",
+     "estado": "trabalhando",
+     "atividade": "buscando \"flicker\"",
+     "inicio": "2026-11-04T12:00:20.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 3,
+     "erros": 0,
+     "tokens": {
+      "entrada": 9,
+      "saida": 200,
+      "cache": 5000
+     }
+    },
+    {
+     "id": "ex-backend-1",
+     "tipo": "backend-dev",
+     "tipoOriginal": "backend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Ajuste de coleta",
+     "estado": "trabalhando",
+     "atividade": "editando scheduler.ts",
+     "inicio": "2026-11-04T12:00:10.000Z",
+     "fim": null,
+     "tarefa": "EX1",
+     "ferramentas": 6,
+     "erros": 0,
+     "tokens": {
+      "entrada": 14,
+      "saida": 700,
+      "cache": 9000
+     }
+    },
+    {
+     "id": "ex-runner-1",
+     "tipo": "test-runner",
+     "tipoOriginal": "test-runner",
+     "modelo": null,
+     "descricao": "(exemplo) Portões da branch",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-proto-1",
+     "tipo": "prototype-dev",
+     "tipoOriginal": "prototype-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Protótipo da galeria",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-frontend-1",
+     "tipo": "frontend-dev",
+     "tipoOriginal": "frontend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Tela de exemplo",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    }
+   ],
+   "tarefas": [
+    {
+     "id": "EX1",
+     "titulo": "(exemplo) Ajustar a coleta",
+     "dono": "ex-backend-1",
+     "estado": "andamento",
+     "devolucoes": 0,
+     "veredito": null,
+     "atualizadoEm": "2026-11-04T12:00:10.000Z"
+    }
+   ],
+   "falas": [
+    {
+     "id": "f1",
+     "ts": "2026-11-04T12:00:10.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: ajustar a coleta"
+    },
+    {
+     "id": "f2",
+     "ts": "2026-11-04T12:00:20.000Z",
+     "de": "am",
+     "para": "ex-explorer-1",
+     "tarefa": null,
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: varredura das fontes"
+    }
+   ],
+   "totais": {
+    "tokensEntrada": 83,
+    "tokensSaida": 2400,
+    "tokensCache": 36000,
+    "agentesAtivos": 3
+   }
+  },
+  {
+   "sessao": "exemplo",
+   "atualizadoEm": "2026-11-04T12:00:45.000Z",
+   "modo": "ao-vivo",
+   "agentes": [
+    {
+     "id": "am",
+     "tipo": "am",
+     "tipoOriginal": "am",
+     "modelo": null,
+     "descricao": "(exemplo) Orquestradora",
+     "estado": "trabalhando",
+     "atividade": "validando o retorno",
+     "inicio": "2026-11-04T12:00:00.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 6,
+     "erros": 0,
+     "tokens": {
+      "entrada": 70,
+      "saida": 1900,
+      "cache": 27000
+     }
+    },
+    {
+     "id": "ex-explorer-1",
+     "tipo": "explorer",
+     "tipoOriginal": "explorer",
+     "modelo": null,
+     "descricao": "(exemplo) Varredura de fontes",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:20.000Z",
+     "fim": "2026-11-04T12:00:38.000Z",
+     "tarefa": null,
+     "ferramentas": 8,
+     "erros": 0,
+     "tokens": {
+      "entrada": 12,
+      "saida": 400,
+      "cache": 8000
+     }
+    },
+    {
+     "id": "ex-backend-1",
+     "tipo": "backend-dev",
+     "tipoOriginal": "backend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Ajuste de coleta",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:10.000Z",
+     "fim": "2026-11-04T12:00:40.000Z",
+     "tarefa": "EX1",
+     "ferramentas": 9,
+     "erros": 0,
+     "tokens": {
+      "entrada": 20,
+      "saida": 1100,
+      "cache": 14000
+     }
+    },
+    {
+     "id": "ex-runner-1",
+     "tipo": "test-runner",
+     "tipoOriginal": "test-runner",
+     "modelo": null,
+     "descricao": "(exemplo) Portões da branch",
+     "estado": "trabalhando",
+     "atividade": "rodando npm test",
+     "inicio": "2026-11-04T12:00:42.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 1,
+     "erros": 0,
+     "tokens": {
+      "entrada": 3,
+      "saida": 60,
+      "cache": 1500
+     }
+    },
+    {
+     "id": "ex-proto-1",
+     "tipo": "prototype-dev",
+     "tipoOriginal": "prototype-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Protótipo da galeria",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-frontend-1",
+     "tipo": "frontend-dev",
+     "tipoOriginal": "frontend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Tela de exemplo",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    }
+   ],
+   "tarefas": [
+    {
+     "id": "EX1",
+     "titulo": "(exemplo) Ajustar a coleta",
+     "dono": "ex-backend-1",
+     "estado": "validacao",
+     "devolucoes": 0,
+     "veredito": null,
+     "atualizadoEm": "2026-11-04T12:00:40.000Z"
+    }
+   ],
+   "falas": [
+    {
+     "id": "f1",
+     "ts": "2026-11-04T12:00:10.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: ajustar a coleta"
+    },
+    {
+     "id": "f2",
+     "ts": "2026-11-04T12:00:20.000Z",
+     "de": "am",
+     "para": "ex-explorer-1",
+     "tarefa": null,
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: varredura das fontes"
+    },
+    {
+     "id": "f3",
+     "ts": "2026-11-04T12:00:40.000Z",
+     "de": "ex-backend-1",
+     "para": "am",
+     "tarefa": "EX1",
+     "tipo": "retorno",
+     "texto": "(exemplo) Retornou: tarefa concluída"
+    },
+    {
+     "id": "f4",
+     "ts": "2026-11-04T12:00:42.000Z",
+     "de": "am",
+     "para": "ex-runner-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: rodar os portões"
+    }
+   ],
+   "totais": {
+    "tokensEntrada": 105,
+    "tokensSaida": 3460,
+    "tokensCache": 50500,
+    "agentesAtivos": 2
+   }
+  },
+  {
+   "sessao": "exemplo",
+   "atualizadoEm": "2026-11-04T12:01:10.000Z",
+   "modo": "ao-vivo",
+   "agentes": [
+    {
+     "id": "am",
+     "tipo": "am",
+     "tipoOriginal": "am",
+     "modelo": null,
+     "descricao": "(exemplo) Orquestradora",
+     "estado": "aguardando",
+     "atividade": "aguardando os agentes",
+     "inicio": "2026-11-04T12:00:00.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 9,
+     "erros": 0,
+     "tokens": {
+      "entrada": 90,
+      "saida": 2600,
+      "cache": 36000
+     }
+    },
+    {
+     "id": "ex-explorer-1",
+     "tipo": "explorer",
+     "tipoOriginal": "explorer",
+     "modelo": null,
+     "descricao": "(exemplo) Varredura de fontes",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:20.000Z",
+     "fim": "2026-11-04T12:00:38.000Z",
+     "tarefa": null,
+     "ferramentas": 8,
+     "erros": 0,
+     "tokens": {
+      "entrada": 12,
+      "saida": 400,
+      "cache": 8000
+     }
+    },
+    {
+     "id": "ex-backend-1",
+     "tipo": "backend-dev",
+     "tipoOriginal": "backend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Ajuste de coleta",
+     "estado": "trabalhando",
+     "atividade": "editando scheduler.test.ts",
+     "inicio": "2026-11-04T12:00:10.000Z",
+     "fim": null,
+     "tarefa": "EX1",
+     "ferramentas": 11,
+     "erros": 1,
+     "tokens": {
+      "entrada": 24,
+      "saida": 1300,
+      "cache": 16000
+     }
+    },
+    {
+     "id": "ex-runner-1",
+     "tipo": "test-runner",
+     "tipoOriginal": "test-runner",
+     "modelo": null,
+     "descricao": "(exemplo) Portões da branch",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:42.000Z",
+     "fim": "2026-11-04T12:01:00.000Z",
+     "tarefa": null,
+     "ferramentas": 3,
+     "erros": 1,
+     "tokens": {
+      "entrada": 7,
+      "saida": 300,
+      "cache": 4000
+     }
+    },
+    {
+     "id": "ex-proto-1",
+     "tipo": "prototype-dev",
+     "tipoOriginal": "prototype-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Protótipo da galeria",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-frontend-1",
+     "tipo": "frontend-dev",
+     "tipoOriginal": "frontend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Tela de exemplo",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    }
+   ],
+   "tarefas": [
+    {
+     "id": "EX1",
+     "titulo": "(exemplo) Ajustar a coleta",
+     "dono": "ex-backend-1",
+     "estado": "devolvida",
+     "devolucoes": 1,
+     "veredito": "(exemplo) um teste falha",
+     "atualizadoEm": "2026-11-04T12:01:04.000Z"
+    }
+   ],
+   "falas": [
+    {
+     "id": "f1",
+     "ts": "2026-11-04T12:00:10.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: ajustar a coleta"
+    },
+    {
+     "id": "f2",
+     "ts": "2026-11-04T12:00:20.000Z",
+     "de": "am",
+     "para": "ex-explorer-1",
+     "tarefa": null,
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: varredura das fontes"
+    },
+    {
+     "id": "f3",
+     "ts": "2026-11-04T12:00:40.000Z",
+     "de": "ex-backend-1",
+     "para": "am",
+     "tarefa": "EX1",
+     "tipo": "retorno",
+     "texto": "(exemplo) Retornou: tarefa concluída"
+    },
+    {
+     "id": "f4",
+     "ts": "2026-11-04T12:00:42.000Z",
+     "de": "am",
+     "para": "ex-runner-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: rodar os portões"
+    },
+    {
+     "id": "f5",
+     "ts": "2026-11-04T12:01:00.000Z",
+     "de": "ex-runner-1",
+     "para": "am",
+     "tarefa": "EX1",
+     "tipo": "retorno",
+     "texto": "(exemplo) Retornou: um teste falhou"
+    },
+    {
+     "id": "f6",
+     "ts": "2026-11-04T12:01:03.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "veredito",
+     "texto": "(exemplo) Veredito: devolvida, corrigir o teste"
+    },
+    {
+     "id": "f7",
+     "ts": "2026-11-04T12:01:04.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "devolucao",
+     "texto": "(exemplo) Devolveu: corrija o teste que falhou"
+    }
+   ],
+   "totais": {
+    "tokensEntrada": 133,
+    "tokensSaida": 4600,
+    "tokensCache": 64000,
+    "agentesAtivos": 2
+   }
+  },
+  {
+   "sessao": "exemplo",
+   "atualizadoEm": "2026-11-04T12:01:40.000Z",
+   "modo": "ao-vivo",
+   "agentes": [
+    {
+     "id": "am",
+     "tipo": "am",
+     "tipoOriginal": "am",
+     "modelo": null,
+     "descricao": "(exemplo) Orquestradora",
+     "estado": "trabalhando",
+     "atividade": "atualizando o plano",
+     "inicio": "2026-11-04T12:00:00.000Z",
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 11,
+     "erros": 0,
+     "tokens": {
+      "entrada": 105,
+      "saida": 3000,
+      "cache": 41000
+     }
+    },
+    {
+     "id": "ex-explorer-1",
+     "tipo": "explorer",
+     "tipoOriginal": "explorer",
+     "modelo": null,
+     "descricao": "(exemplo) Varredura de fontes",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:20.000Z",
+     "fim": "2026-11-04T12:00:38.000Z",
+     "tarefa": null,
+     "ferramentas": 8,
+     "erros": 0,
+     "tokens": {
+      "entrada": 12,
+      "saida": 400,
+      "cache": 8000
+     }
+    },
+    {
+     "id": "ex-backend-1",
+     "tipo": "backend-dev",
+     "tipoOriginal": "backend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Ajuste de coleta",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:10.000Z",
+     "fim": "2026-11-04T12:01:32.000Z",
+     "tarefa": "EX1",
+     "ferramentas": 13,
+     "erros": 1,
+     "tokens": {
+      "entrada": 26,
+      "saida": 1500,
+      "cache": 18000
+     }
+    },
+    {
+     "id": "ex-runner-1",
+     "tipo": "test-runner",
+     "tipoOriginal": "test-runner",
+     "modelo": null,
+     "descricao": "(exemplo) Portões da branch",
+     "estado": "concluido",
+     "atividade": "concluído",
+     "inicio": "2026-11-04T12:00:42.000Z",
+     "fim": "2026-11-04T12:01:00.000Z",
+     "tarefa": null,
+     "ferramentas": 3,
+     "erros": 1,
+     "tokens": {
+      "entrada": 7,
+      "saida": 300,
+      "cache": 4000
+     }
+    },
+    {
+     "id": "ex-proto-1",
+     "tipo": "prototype-dev",
+     "tipoOriginal": "prototype-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Protótipo da galeria",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    },
+    {
+     "id": "ex-frontend-1",
+     "tipo": "frontend-dev",
+     "tipoOriginal": "frontend-dev",
+     "modelo": null,
+     "descricao": "(exemplo) Tela de exemplo",
+     "estado": "ocioso",
+     "atividade": "sem atividade",
+     "inicio": null,
+     "fim": null,
+     "tarefa": null,
+     "ferramentas": 0,
+     "erros": 0,
+     "tokens": {
+      "entrada": 0,
+      "saida": 0,
+      "cache": 0
+     }
+    }
+   ],
+   "tarefas": [
+    {
+     "id": "EX1",
+     "titulo": "(exemplo) Ajustar a coleta",
+     "dono": "ex-backend-1",
+     "estado": "aprovada",
+     "devolucoes": 1,
+     "veredito": "(exemplo) aprovada",
+     "atualizadoEm": "2026-11-04T12:01:35.000Z"
+    },
+    {
+     "id": "EX2",
+     "titulo": "(exemplo) Protótipo da galeria",
+     "dono": "ex-proto-1",
+     "estado": "fila",
+     "devolucoes": 0,
+     "veredito": null,
+     "atualizadoEm": "2026-11-04T12:01:36.000Z"
+    }
+   ],
+   "falas": [
+    {
+     "id": "f1",
+     "ts": "2026-11-04T12:00:10.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: ajustar a coleta"
+    },
+    {
+     "id": "f2",
+     "ts": "2026-11-04T12:00:20.000Z",
+     "de": "am",
+     "para": "ex-explorer-1",
+     "tarefa": null,
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: varredura das fontes"
+    },
+    {
+     "id": "f3",
+     "ts": "2026-11-04T12:00:40.000Z",
+     "de": "ex-backend-1",
+     "para": "am",
+     "tarefa": "EX1",
+     "tipo": "retorno",
+     "texto": "(exemplo) Retornou: tarefa concluída"
+    },
+    {
+     "id": "f4",
+     "ts": "2026-11-04T12:00:42.000Z",
+     "de": "am",
+     "para": "ex-runner-1",
+     "tarefa": "EX1",
+     "tipo": "delegacao",
+     "texto": "(exemplo) Delegou: rodar os portões"
+    },
+    {
+     "id": "f5",
+     "ts": "2026-11-04T12:01:00.000Z",
+     "de": "ex-runner-1",
+     "para": "am",
+     "tarefa": "EX1",
+     "tipo": "retorno",
+     "texto": "(exemplo) Retornou: um teste falhou"
+    },
+    {
+     "id": "f6",
+     "ts": "2026-11-04T12:01:03.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "veredito",
+     "texto": "(exemplo) Veredito: devolvida, corrigir o teste"
+    },
+    {
+     "id": "f7",
+     "ts": "2026-11-04T12:01:04.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "devolucao",
+     "texto": "(exemplo) Devolveu: corrija o teste que falhou"
+    },
+    {
+     "id": "f8",
+     "ts": "2026-11-04T12:01:30.000Z",
+     "de": "ex-backend-1",
+     "para": "am",
+     "tarefa": "EX1",
+     "tipo": "retorno",
+     "texto": "(exemplo) Retornou: teste corrigido"
+    },
+    {
+     "id": "f9",
+     "ts": "2026-11-04T12:01:35.000Z",
+     "de": "am",
+     "para": "ex-backend-1",
+     "tarefa": "EX1",
+     "tipo": "veredito",
+     "texto": "(exemplo) Veredito: aprovada"
+    }
+   ],
+   "totais": {
+    "tokensEntrada": 150,
+    "tokensSaida": 5200,
+    "tokensCache": 71000,
+    "agentesAtivos": 1
+   }
+  }
+ ],
+ "detalhes": {
+  "am": {
+   "id": "am",
+   "prompt": null,
+   "passos": [
+    {
+     "ts": "2026-11-04T12:00:11.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) lendo um arquivo de configuração",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:12.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) conteúdo lido",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:14.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) rodando um comando",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:16.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) comando falhou",
+     "erro": true
+    },
+    {
+     "ts": "2026-11-04T12:00:18.000Z",
+     "tipo": "texto",
+     "ferramenta": null,
+     "resumo": "(exemplo) ajustando a abordagem",
+     "erro": false
+    }
+   ],
+   "retorno": null
+  },
+  "ex-explorer-1": {
+   "id": "ex-explorer-1",
+   "prompt": "(exemplo) texto integral do prompt recebido. Conteúdo ilustrativo, sem relação com uma sessão real.",
+   "passos": [
+    {
+     "ts": "2026-11-04T12:00:11.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) lendo um arquivo de configuração",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:12.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) conteúdo lido",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:14.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) rodando um comando",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:16.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) comando falhou",
+     "erro": true
+    },
+    {
+     "ts": "2026-11-04T12:00:18.000Z",
+     "tipo": "texto",
+     "ferramenta": null,
+     "resumo": "(exemplo) ajustando a abordagem",
+     "erro": false
+    }
+   ],
+   "retorno": "(exemplo) relatório final ilustrativo."
+  },
+  "ex-backend-1": {
+   "id": "ex-backend-1",
+   "prompt": "(exemplo) texto integral do prompt recebido. Conteúdo ilustrativo, sem relação com uma sessão real.",
+   "passos": [
+    {
+     "ts": "2026-11-04T12:00:11.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) lendo um arquivo de configuração",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:12.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) conteúdo lido",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:14.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) rodando um comando",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:16.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) comando falhou",
+     "erro": true
+    },
+    {
+     "ts": "2026-11-04T12:00:18.000Z",
+     "tipo": "texto",
+     "ferramenta": null,
+     "resumo": "(exemplo) ajustando a abordagem",
+     "erro": false
+    }
+   ],
+   "retorno": "(exemplo) relatório final ilustrativo."
+  },
+  "ex-runner-1": {
+   "id": "ex-runner-1",
+   "prompt": "(exemplo) texto integral do prompt recebido. Conteúdo ilustrativo, sem relação com uma sessão real.",
+   "passos": [
+    {
+     "ts": "2026-11-04T12:00:11.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) lendo um arquivo de configuração",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:12.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) conteúdo lido",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:14.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) rodando um comando",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:16.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) comando falhou",
+     "erro": true
+    },
+    {
+     "ts": "2026-11-04T12:00:18.000Z",
+     "tipo": "texto",
+     "ferramenta": null,
+     "resumo": "(exemplo) ajustando a abordagem",
+     "erro": false
+    }
+   ],
+   "retorno": "(exemplo) relatório final ilustrativo."
+  },
+  "ex-proto-1": {
+   "id": "ex-proto-1",
+   "prompt": "(exemplo) texto integral do prompt recebido. Conteúdo ilustrativo, sem relação com uma sessão real.",
+   "passos": [
+    {
+     "ts": "2026-11-04T12:00:11.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) lendo um arquivo de configuração",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:12.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) conteúdo lido",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:14.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) rodando um comando",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:16.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) comando falhou",
+     "erro": true
+    },
+    {
+     "ts": "2026-11-04T12:00:18.000Z",
+     "tipo": "texto",
+     "ferramenta": null,
+     "resumo": "(exemplo) ajustando a abordagem",
+     "erro": false
+    }
+   ],
+   "retorno": null
+  },
+  "ex-frontend-1": {
+   "id": "ex-frontend-1",
+   "prompt": "(exemplo) texto integral do prompt recebido. Conteúdo ilustrativo, sem relação com uma sessão real.",
+   "passos": [
+    {
+     "ts": "2026-11-04T12:00:11.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) lendo um arquivo de configuração",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:12.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Read",
+     "resumo": "(exemplo) conteúdo lido",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:14.000Z",
+     "tipo": "ferramenta",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) rodando um comando",
+     "erro": false
+    },
+    {
+     "ts": "2026-11-04T12:00:16.000Z",
+     "tipo": "resultado",
+     "ferramenta": "Bash",
+     "resumo": "(exemplo) comando falhou",
+     "erro": true
+    },
+    {
+     "ts": "2026-11-04T12:00:18.000Z",
+     "tipo": "texto",
+     "ferramenta": null,
+     "resumo": "(exemplo) ajustando a abordagem",
+     "erro": false
+    }
+   ],
+   "retorno": null
+  }
+ }
+}

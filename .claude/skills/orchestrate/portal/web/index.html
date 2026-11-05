@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="darkreader-lock">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Portal · orchestrate</title>
+<link rel="stylesheet" href="/portal/tokens.css">
+<style>
+/* Circuito. System design: references/portal-system-design.md. Cores só por token; faces dos volumes por color-mix. */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+button,select{font:inherit;color:inherit}
+.pc-btn,.pc-select{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 11px;cursor:pointer}
+.pc-btn:hover,.pc-select:hover{border-color:var(--muted)}
+button:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.pc-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pc-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--surface)}
+.pc-brand{margin:0;font-size:15px;font-weight:650}
+.pc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+.pc-chip{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid var(--line)}
+.pc-chip[data-modo="ao-vivo"]{color:var(--c-concluido);border-color:currentColor}
+.pc-chip[data-modo="replay"]{color:var(--c-aguardando);border-color:currentColor}
+.pc-chip[data-modo="exemplo"]{border-style:dashed;color:var(--muted)}
+.pc-totals{display:flex;gap:18px;margin:0 0 0 auto;flex-wrap:wrap}
+.pc-total{display:flex;flex-direction:column}
+.pc-total dt{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pc-total dd{margin:0;font:600 14px var(--mono)}
+.pc-main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;padding:16px 20px;align-items:start}
+.pc-stage,.pc-card-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.pc-stage{padding:8px}
+.pc-scene{display:block;width:100%;height:auto;max-height:calc(100vh - 200px)}
+.pc-legenda{display:flex;gap:14px;flex-wrap:wrap;padding:6px 12px 8px;color:var(--muted);font-size:12px}
+.pc-legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--fc)}
+.pc-side{display:grid;gap:16px;min-width:0}
+.pc-card-box{padding:14px 16px}
+.pc-h2{margin:0 0 10px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+.pc-h2 span{font-weight:400;letter-spacing:0;text-transform:none}
+/* quadro */
+.pc-board{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pc-col{min-width:0;background:var(--bg);border-radius:var(--r-sm);padding:8px}
+.pc-col__hd{margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;display:flex;justify-content:space-between;color:var(--fg)}
+.pc-col[data-col="fila"] .pc-col__hd{color:var(--c-fila)}.pc-col[data-col="andamento"] .pc-col__hd{color:var(--c-andamento)}
+.pc-col[data-col="validacao"] .pc-col__hd{color:var(--c-validacao)}.pc-col[data-col="devolvida"] .pc-col__hd{color:var(--c-devolvida)}.pc-col[data-col="bloqueada"] .pc-col__hd{color:var(--c-bloqueada)}
+.pc-col__n{font-family:var(--mono)}
+.pc-cards{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pc-card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px}
+.pc-card__top{display:flex;justify-content:space-between;font-family:var(--mono)}
+.pc-card__id{font-weight:600}.pc-card__dev{color:var(--muted)}.pc-card__dev[data-n="0"]{display:none}
+.pc-card__t,.pc-card__o{margin:2px 0 0}.pc-card__o{color:var(--muted)}
+.pc-empty{color:var(--muted);font-size:12px}
+.pc-aprov{margin-top:10px;font-size:13px}.pc-aprov summary{cursor:pointer;color:var(--c-aprovada)}.pc-aprov .pc-cards{margin-top:8px}
+/* registro */
+.pc-logtools{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.pc-select{flex:1;min-width:0;padding:4px 8px}
+.pc-loglist{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:340px;overflow:auto}
+li.pc-log{font-size:13px;border-left:2px solid var(--line);padding-left:8px}
+li.pc-log[data-tipo="devolucao"]{border-color:var(--c-devolvida)}li.pc-log[data-tipo="veredito"]{border-color:var(--c-validacao)}li.pc-log[data-tipo="delegacao"]{border-color:var(--c-andamento)}li.pc-log[data-tipo="retorno"]{border-color:var(--c-aprovada)}
+li.pc-log[hidden]{display:none}
+.pc-log__top{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.pc-log__top time,.pc-tid{font-family:var(--mono)}
+.pc-tag{font-weight:600;color:var(--fg)}.pc-log__quem{color:var(--fg)}.pc-tid{color:var(--accent)}
+.pc-log__rever{margin-left:auto;background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-size:12px}
+.pc-log__txt{width:100%;text-align:left;background:none;border:0;padding:2px 0 0;cursor:pointer;color:var(--fg);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pc-log__txt[aria-expanded="true"]{-webkit-line-clamp:unset;display:block}
+/* diálogo */
+dialog.pc-dlg{width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 40px);border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--fg);padding:0}
+dialog.pc-dlg::backdrop{background:rgba(0,0,0,.45)}
+.pc-dlg__hd{display:flex;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+.pc-dlg__tt{margin:0;font-size:16px}.pc-dlg__sub{color:var(--muted);font-size:12px}
+.pc-dlg__body{display:grid;gap:16px;padding:16px 18px}
+.pc-dlg__body h3{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pc-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:0}
+.pc-kv div{background:var(--bg);border-radius:var(--r-sm);padding:6px 10px;min-width:0}
+.pc-kv dt{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pc-kv dd{margin:0;font-family:var(--mono);font-size:13px;overflow-wrap:anywhere}
+.pc-note{margin:0;color:var(--muted)}
+.pc-pre{margin:0;padding:10px 12px;background:var(--bg);border-radius:var(--r-sm);font:12px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto}
+.pc-execs,.pc-steps,.pc-tools{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pc-tools{display:flex;flex-wrap:wrap}.pc-tools li{font:12px var(--mono);background:var(--bg);padding:3px 8px;border-radius:99px}
+.pc-exec{display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;cursor:pointer}
+.pc-exec:hover{border-color:var(--muted)}.pc-exec__d{display:block;font-weight:600}.pc-exec__m{display:block;font:12px var(--mono);color:var(--muted)}
+.pc-step{display:flex;gap:8px;font:12px var(--mono);flex-wrap:wrap}.pc-step time,.pc-step__k{color:var(--muted)}
+.pc-step__e{color:var(--c-erro);font-weight:700}.pc-step[data-erro="true"] .pc-step__r{color:var(--c-erro)}
+.pc-selo{position:fixed;right:12px;bottom:12px;z-index:50;padding:5px 10px;font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--bg);background:var(--fg);border-radius:6px;pointer-events:none}
+/* cena */
+.bx .t{fill:var(--fc,var(--plate))}
+.bx .l{fill:color-mix(in srgb,var(--fc,var(--plate)),#000 var(--sh-l))}
+.bx .r{fill:color-mix(in srgb,var(--fc,var(--plate)),#000 var(--sh-r))}
+.bx polygon{stroke:var(--edge);stroke-width:1;stroke-linejoin:round}
+.pl{--fc:var(--plate)}
+.a-ocioso{--fc:var(--c-ocioso)}.a-trabalhando{--fc:var(--c-trabalhando)}.a-aguardando{--fc:var(--c-aguardando)}.a-concluido{--fc:var(--c-concluido)}.a-erro{--fc:var(--c-erro)}
+.pc-o{cursor:pointer}
+.pc-o:hover .t{filter:brightness(1.07)}
+.pc-o:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.pc-o.sel .t{stroke:var(--accent);stroke-width:2.4}
+.lab{font:600 12.5px var(--sans);fill:var(--fg);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;pointer-events:none}
+.sub{font:11px var(--mono);fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;pointer-events:none}
+.pill{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.num{font:700 10.5px var(--mono);fill:var(--fg);pointer-events:none}
+.trk{fill:none;stroke:var(--plate-2);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+.cx{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:3 7;stroke-linecap:round;animation:fluxo 1.2s linear infinite}
+.pkt{fill:var(--accent)}
+.a-trabalhando .t{animation:pulso 1.8s ease-in-out infinite}
+@keyframes pulso{50%{filter:brightness(1.14)}}
+@keyframes fluxo{to{stroke-dashoffset:-20}}
+@media (prefers-reduced-motion:reduce){.a-trabalhando .t,.cx{animation:none}}
+@media (max-width:980px){.pc-main{grid-template-columns:minmax(0,1fr);padding:12px 14px}.pc-totals{margin-left:0;width:100%}.pc-head{padding:10px 14px}.pc-board{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header class="pc-head">
+  <h1 class="pc-brand" id="pc-brand">orchestrate · circuito dos agentes</h1>
+  <div class="pc-meta">
+    <span class="pc-chip" id="pc-modo" data-modo="conectando">conectando</span>
+    <span>sessão <span id="pc-sessao">—</span></span>
+    <span>atualizado <time id="pc-atualizado">—</time></span>
+  </div>
+  <dl class="pc-totals" aria-label="Totais da sessão">
+    <div class="pc-total"><dt>Ativos</dt><dd id="pc-t-ativos">—</dd></div>
+    <div class="pc-total"><dt>Execuções</dt><dd id="pc-t-exec">—</dd></div>
+    <div class="pc-total"><dt>Entrada</dt><dd id="pc-t-ent">—</dd></div>
+    <div class="pc-total"><dt>Saída</dt><dd id="pc-t-sai">—</dd></div>
+    <div class="pc-total"><dt>Cache</dt><dd id="pc-t-cac">—</dd></div>
+  </dl>
+  <button type="button" class="pc-btn" id="pc-tema" aria-label="Alternar tema: Sistema, Claro, Escuro">Tema: Sistema</button>
+</header>
+
+<main class="pc-main">
+  <section class="pc-stage" aria-labelledby="pc-h-cena">
+    <h2 class="pc-sr" id="pc-h-cena">Circuito dos agentes</h2>
+    <svg class="pc-scene" id="pc-scene" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" role="group" aria-label="Circuito: a orquestradora no centro e uma estação por tipo de agente"><g id="pc-fixa"></g><g id="pc-pacotes"></g></svg>
+    <div class="pc-legenda" id="pc-legenda"></div>
+  </section>
+
+  <div class="pc-side">
+    <section class="pc-card-box" aria-labelledby="pc-h-quadro">
+      <h2 class="pc-h2" id="pc-h-quadro">Quadro de tarefas<span id="pc-n-tarefas"></span></h2>
+      <div class="pc-board" id="pc-board"></div>
+      <details class="pc-aprov" id="pc-aprov">
+        <summary id="pc-aprov-n">Aprovadas · 0</summary>
+        <ul class="pc-cards" id="pc-aprov-list"></ul>
+      </details>
+    </section>
+    <section class="pc-card-box" aria-labelledby="pc-h-log">
+      <h2 class="pc-h2" id="pc-h-log">Registro de comunicação<span id="pc-n-falas"></span></h2>
+      <div class="pc-logtools">
+        <label for="pc-filtro">Filtrar</label>
+        <select class="pc-select" id="pc-filtro"><option value="">Todos os agentes</option></select>
+      </div>
+      <ol class="pc-loglist" id="pc-log" aria-live="polite" aria-relevant="additions" aria-label="Falas, da mais recente para a mais antiga"></ol>
+    </section>
+  </div>
+</main>
+
+<dialog class="pc-dlg" id="pc-dlg" aria-labelledby="pc-dlg-tt">
+  <div class="pc-dlg__hd">
+    <div><h2 class="pc-dlg__tt" id="pc-dlg-tt">Agente</h2><span class="pc-dlg__sub" id="pc-dlg-sub"></span></div>
+    <button type="button" class="pc-btn" id="pc-dlg-x">Fechar (Esc)</button>
+  </div>
+  <div class="pc-dlg__body" id="pc-dlg-body"></div>
+</dialog>
+
+<script type="module">
+/* ============================================================ utilidades */
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (s, r = document) => r.querySelector(s);
+function se(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function he(tag, cls, text, parent) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  if (parent) parent.appendChild(n);
+  return n;
+}
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (n) => Number(n || 0).toLocaleString('pt-BR');
+const fmtC = (n) => Number(n || 0).toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+function dataBR(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '—';
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+}
+function hora(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '—';
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+const dataHora = (iso) => (iso ? `${dataBR(iso)} ${hora(iso)}` : '—');
+const reduzMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const ESTADO_TXT = { ocioso: 'ocioso', trabalhando: 'trabalhando', aguardando: 'aguardando', concluido: 'concluído', erro: 'erro' };
+const TIPO_FALA = { delegacao: 'Delegação', retorno: 'Retorno', devolucao: 'Devolução', veredito: 'Veredito', fala: 'Fala', atividade: 'Atividade' };
+
+/* ============================================================ kit (com plano B para file://) */
+/* Módulos ES não carregam por file:// no Chrome (origem nula). Nesse caso o kit real nem é pedido
+   (evita erro de console) e entra uma cópia local mínima, sempre marcada como DADOS DE EXEMPLO. */
+function criarKitLocal() {
+  const CHAVE = 'portal:tema', MODOS = ['sistema', 'claro', 'escuro'], ATTR = { claro: 'light', escuro: 'dark' };
+  const ler = () => { try { const v = localStorage.getItem(CHAVE); return MODOS.includes(v) ? v : 'sistema'; } catch { return 'sistema'; } };
+  const aplicar = (m) => {
+    const r = document.documentElement;
+    if (ATTR[m]) r.setAttribute('data-theme', ATTR[m]); else r.removeAttribute('data-theme');
+    r.setAttribute('data-portal-tema', m);
+  };
+  aplicar(ler());
+  const z = () => ({ entrada: 0, saida: 0, cache: 0 });
+  const elenco = [
+    ['am', 'am', '(exemplo) Orquestradora'], ['ex-explorer-1', 'explorer', '(exemplo) Varredura de fontes'],
+    ['ex-backend-1', 'backend-dev', '(exemplo) Ajuste de coleta'], ['ex-runner-1', 'test-runner', '(exemplo) Portões da branch'],
+    ['ex-frontend-1', 'frontend-dev', '(exemplo) Tela de exemplo'], ['ex-proto-1', 'prototype-dev', '(exemplo) Protótipo da galeria'],
+    ['ex-proto-2', 'prototype-dev', '(exemplo) Segundo protótipo'], ['ex-apoio-1', 'outro', '(exemplo) Apoio geral'],
+  ];
+  const T = '2026-11-04T12:00:';
+  const falasTodas = [
+    ['f1', '10', 'am', 'ex-backend-1', 'EX1', 'delegacao', '(exemplo) Delegou: ajustar a coleta'],
+    ['f2', '20', 'am', 'ex-explorer-1', null, 'delegacao', '(exemplo) Delegou: varredura das fontes'],
+    ['f3', '40', 'ex-backend-1', 'am', 'EX1', 'retorno', '(exemplo) Retornou: tarefa concluída'],
+    ['f4', '42', 'am', 'ex-runner-1', 'EX1', 'delegacao', '(exemplo) Delegou: rodar os portões'],
+    ['f5', '50', 'ex-runner-1', 'am', 'EX1', 'retorno', '(exemplo) Retornou: um teste falhou'],
+    ['f6', '53', 'am', 'ex-backend-1', 'EX1', 'veredito', '(exemplo) Veredito: devolvida, corrigir o teste'],
+    ['f7', '54', 'am', 'ex-backend-1', 'EX1', 'devolucao', '(exemplo) Devolveu: corrija o teste que falhou'],
+    ['f8', '58', 'ex-backend-1', 'am', 'EX1', 'retorno', '(exemplo) Retornou: teste corrigido'],
+    ['f9', '59', 'am', 'ex-backend-1', 'EX1', 'veredito', '(exemplo) Veredito: aprovada'],
+  ].map(([id, s, de, para, tarefa, tipo, texto]) => ({ id, ts: `${T}${s}.000Z`, de, para, tarefa, tipo, texto }));
+  const E = (e, a) => ({ e, a });
+  const passos = [
+    { am: E('trabalhando', 'planejando a tarefa'), n: 0, t: [['EX1', '(exemplo) Ajustar a coleta', 'ex-backend-1', 'fila', 0]] },
+    { am: E('aguardando', 'aguardando os agentes'), 'ex-backend-1': E('trabalhando', 'lendo config.ts'), n: 1, t: [['EX1', '(exemplo) Ajustar a coleta', 'ex-backend-1', 'andamento', 0]] },
+    { am: E('aguardando', 'aguardando os agentes'), 'ex-backend-1': E('trabalhando', 'editando scheduler.ts'), 'ex-explorer-1': E('trabalhando', 'buscando "flicker"'), n: 2, t: [['EX1', '(exemplo) Ajustar a coleta', 'ex-backend-1', 'andamento', 0]] },
+    { am: E('trabalhando', 'validando o retorno'), 'ex-backend-1': E('concluido', 'concluído'), 'ex-explorer-1': E('concluido', 'concluído'), 'ex-runner-1': E('trabalhando', 'rodando npm test'), n: 4, t: [['EX1', '(exemplo) Ajustar a coleta', 'ex-backend-1', 'validacao', 0]] },
+    { am: E('aguardando', 'aguardando os agentes'), 'ex-backend-1': E('trabalhando', 'editando scheduler.test.ts'), 'ex-explorer-1': E('concluido', 'concluído'), 'ex-runner-1': E('erro', 'um teste falhou'), n: 7, t: [['EX1', '(exemplo) Ajustar a coleta', 'ex-backend-1', 'devolvida', 1, '(exemplo) um teste falha']] },
+    { am: E('trabalhando', 'atualizando o plano'), 'ex-backend-1': E('concluido', 'concluído'), 'ex-explorer-1': E('concluido', 'concluído'), 'ex-runner-1': E('concluido', 'concluído'), 'ex-proto-1': E('trabalhando', 'desenhando a mesa'), 'ex-proto-2': E('aguardando', 'aguardando o desenho'), n: 9, t: [['EX1', '(exemplo) Ajustar a coleta', 'ex-backend-1', 'aprovada', 1, '(exemplo) aprovada'], ['EX2', '(exemplo) Protótipo da galeria', 'ex-proto-1', 'andamento', 0]] },
+  ];
+  const quadros = passos.map((p, i) => {
+    const agentes = elenco.map(([id, tipo, descricao]) => {
+      const s = p[id] || E('ocioso', 'sem atividade');
+      const ativo = s.e !== 'ocioso';
+      return { id, tipo, tipoOriginal: tipo, modelo: null, descricao, estado: s.e, atividade: s.a, inicio: ativo ? `${T}00.000Z` : null, fim: s.e === 'concluido' ? `${T}40.000Z` : null, tarefa: null, ferramentas: ativo ? 2 + i : 0, erros: s.e === 'erro' ? 1 : 0, tokens: ativo ? { entrada: 10 * (i + 1), saida: 200 * (i + 1), cache: 1000 * (i + 1) } : z() };
+    });
+    const tot = agentes.reduce((t, a) => ({ e: t.e + a.tokens.entrada, s: t.s + a.tokens.saida, c: t.c + a.tokens.cache }), { e: 0, s: 0, c: 0 });
+    return {
+      sessao: 'exemplo', atualizadoEm: new Date().toISOString(), modo: 'ao-vivo', agentes,
+      tarefas: p.t.map(([id, titulo, dono, estado, devolucoes, veredito]) => ({ id, titulo, dono, estado, devolucoes, veredito: veredito || null, atualizadoEm: `${T}00.000Z` })),
+      falas: falasTodas.slice(0, p.n),
+      totais: { tokensEntrada: tot.e, tokensSaida: tot.s, tokensCache: tot.c, agentesAtivos: agentes.filter((a) => a.estado === 'trabalhando' || a.estado === 'aguardando').length },
+    };
+  });
+  function selo() {
+    document.documentElement.setAttribute('data-portal-dados', 'exemplo');
+    if ($('[data-portal-selo]')) return;
+    const s = he('div', 'pc-selo', 'DADOS DE EXEMPLO', document.body);
+    s.setAttribute('data-portal-selo', ''); s.setAttribute('role', 'status');
+  }
+  return {
+    local: true,
+    conectar(on) {
+      selo(); let i = 0, t = null, parado = false;
+      const passo = () => { if (parado) return; on({ ...quadros[i % quadros.length], atualizadoEm: new Date().toISOString() }, { exemplo: true }); i++; t = setTimeout(passo, 3500); };
+      passo();
+      return { fechar() { parado = true; clearTimeout(t); } };
+    },
+    async detalhe(id) {
+      const ps = [['ferramenta', 'Read', '(exemplo) lendo um arquivo de configuração', false], ['resultado', 'Read', '(exemplo) conteúdo lido', false], ['ferramenta', 'Bash', '(exemplo) rodando um comando', false], ['resultado', 'Bash', '(exemplo) comando falhou', true], ['texto', null, '(exemplo) ajustando a abordagem', false]];
+      return { id, prompt: id === 'am' ? null : '(exemplo) texto integral do prompt recebido. Conteúdo ilustrativo, sem relação com uma sessão real.', passos: ps.map(([tipo, ferramenta, resumo, erro], k) => ({ ts: `${T}${pad(11 + k)}.000Z`, tipo, ferramenta, resumo, erro })), retorno: id === 'am' ? null : '(exemplo) relatório final ilustrativo.' };
+    },
+    tema() { const p = MODOS[(MODOS.indexOf(ler()) + 1) % MODOS.length]; try { localStorage.setItem(CHAVE, p); } catch { /* sem armazenamento */ } aplicar(p); return p; },
+    temaAtual: ler,
+  };
+}
+let kit = null;
+if (location.protocol !== 'file:') { try { kit = await import('/portal/portal-dados.js'); } catch { kit = null; } }
+if (!kit) kit = criarKitLocal();
+
+/* ============================================================ postos: uma mesa por agente */
+const POSTOS = [
+  { tipo: 'am', nome: 'Direção', mono: 'AM' },
+  { tipo: 'explorer', nome: 'Exploração', mono: 'EX' },
+  { tipo: 'backend-dev', nome: 'Back-end', mono: 'BE' },
+  { tipo: 'frontend-dev', nome: 'Front-end', mono: 'FE' },
+  { tipo: 'prototype-dev', nome: 'Protótipos', mono: 'PR' },
+  { tipo: 'test-runner', nome: 'Testes', mono: 'TS' },
+];
+const APOIO = { tipo: 'outro', nome: 'Apoio', mono: 'AP' };
+const FIXOS = POSTOS.map((p) => p.tipo);
+const INFO = Object.fromEntries([...POSTOS, APOIO].map((p) => [p.tipo, p]));
+const PRIO = { erro: 4, trabalhando: 3, aguardando: 2, concluido: 1, ocioso: 0 };
+const ATIVO = new Set(['erro', 'trabalhando', 'aguardando']);
+const COLUNAS = [['fila', 'Fila'], ['andamento', 'Andamento'], ['validacao', 'Validação'], ['devolvida', 'Devolvida']];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const tipoDe = (a) => (FIXOS.includes(a.tipo) ? a.tipo : 'outro');
+const ultimo = (a) => String((a && (a.ultimoEvento || a.fim || a.inicio)) || '');
+
+function montarPostos(agentes) {
+  const grupos = new Map();
+  for (const a of agentes) {
+    const k = tipoDe(a);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(a);
+  }
+  const porInicio = (x, y) => String(x.inicio || '').localeCompare(String(y.inicio || ''));
+  const lista = POSTOS.map((p) => ({ ...p, execs: (grupos.get(p.tipo) || []).slice().sort(porInicio) }));
+  if (grupos.has('outro')) lista.push({ ...APOIO, execs: grupos.get('outro').slice().sort(porInicio) });
+  return lista;
+}
+/* resolve um agentId, tipo ou tipo original para o posto */
+function postoDeRef(ref) {
+  if (!ref) return 'am';
+  if (app.execPosto.has(ref)) return app.execPosto.get(ref);
+  if (FIXOS.includes(ref)) return ref;
+  if (app.porOriginal.has(ref)) return app.porOriginal.get(ref);
+  return null;
+}
+function nomeRef(ref) {
+  const t = postoDeRef(ref);
+  if (t) return INFO[t].nome;
+  return /^[0-9a-f-]{12,}$|^a[0-9a-f]{12,}$/i.test(String(ref)) ? 'agente' : String(ref || '—');
+}
+function resumir(p, est) {
+  let estado = 'ocioso', prio = -1, principal = null;
+  for (const a of p.execs) {
+    const q = PRIO[a.estado] ?? 0;
+    if (q > prio || (q === prio && ultimo(a) > ultimo(principal))) { prio = q; principal = a; estado = a.estado; }
+  }
+  const ativas = p.execs.filter((a) => ATIVO.has(a.estado));
+  const tok = p.execs.reduce((t, a) => ({ entrada: t.entrada + (a.tokens?.entrada || 0), saida: t.saida + (a.tokens?.saida || 0), cache: t.cache + (a.tokens?.cache || 0) }), { entrada: 0, saida: 0, cache: 0 });
+  const recentes = p.execs.slice().sort((x, y) => ultimo(y).localeCompare(ultimo(x)));
+  const modelo = (principal && principal.modelo) || (recentes.find((a) => a.modelo) || {}).modelo || null;
+  const tarefas = new Set();
+  for (const a of ativas) if (a.tarefa) tarefas.add(a.tarefa);
+  let devolvida = false;
+  for (const t of est.tarefas) {
+    if (t.estado === 'aprovada' || postoDeRef(t.dono) !== p.tipo) continue;
+    tarefas.add(t.id);
+    if (t.estado === 'devolvida') devolvida = true;
+  }
+  const n = ativas.length, tot = p.execs.length;
+  let contagem = 'sem execuções';
+  if (n) contagem = `${n} em andamento`;
+  else if (tot) contagem = p.execs.every((a) => a.estado === 'concluido') ? (tot === 1 ? '1 concluída' : `${tot} concluídas`) : `${tot} ${tot === 1 ? 'execução' : 'execuções'}`;
+  return {
+    estado, principal, ativas, tot, tok, modelo, tarefas: [...tarefas], devolvida, contagem,
+    modeloCurto: modelo ? modelo.replace(/^claude-/, '') : 'sem modelo',
+    atividade: principal ? (principal.atividade || '—') : 'sem atividade',
+  };
+}
+
+function atualizarTotais(est, postos) {
+  $('#pc-sessao').textContent = String(est.sessao || '—').slice(0, 8);
+  $('#pc-brand').title = 'sessão ' + (est.sessao || '—');
+  const chip = $('#pc-modo');
+  chip.textContent = app.exemplo ? 'dados de exemplo' : est.modo === 'replay' ? 'replay' : 'ao vivo';
+  chip.setAttribute('data-modo', app.exemplo ? 'exemplo' : est.modo || '');
+  $('#pc-atualizado').textContent = dataHora(est.atualizadoEm);
+  const t = est.totais || {};
+  const ativos = postos.filter((p) => p.execs.some((a) => ATIVO.has(a.estado))).length;
+  $('#pc-t-ativos').textContent = `${ativos} de ${postos.length}`;
+  $('#pc-t-exec').textContent = fmt(est.agentes.length);
+  const num = [['#pc-t-ent', t.tokensEntrada], ['#pc-t-sai', t.tokensSaida], ['#pc-t-cac', t.tokensCache]];
+  for (const [sel, v] of num) { const el = $(sel); el.textContent = fmtC(v); el.title = fmt(v); }
+}
+function nomeDono(dono) {
+  const t = postoDeRef(dono);
+  return t ? INFO[t].nome : 'sem dono';
+}
+function criarCard(t, pai) {
+  const li = he('li', 'pc-card', null, pai);
+  li.setAttribute('data-tarefa', t.id);
+  const top = he('div', 'pc-card__top', null, li);
+  he('span', 'pc-card__id', t.id, top);
+  const dv = he('span', 'pc-card__dev', `devol. ${t.devolucoes}`, top);
+  dv.setAttribute('data-n', String(t.devolucoes));
+  dv.setAttribute('aria-label', `devoluções: ${t.devolucoes}`);
+  dv.title = `devoluções: ${t.devolucoes}`;
+  he('p', 'pc-card__t', t.titulo, li);
+  he('p', 'pc-card__o', 'dono: ' + nomeDono(t.dono), li);
+  if (t.veredito) li.title = 'Veredito: ' + t.veredito;
+  return li;
+}
+let sigQuadro = '';
+function atualizarQuadro(est) {
+  const sig = JSON.stringify([est.tarefas, est.agentes.map((a) => [a.id, a.tipo])]);
+  if (sig === sigQuadro) return; sigQuadro = sig;
+  const cols = [...COLUNAS];
+  if (est.tarefas.some((t) => t.estado === 'bloqueada')) cols.push(['bloqueada', 'Bloqueada']);
+  const board = $('#pc-board'); board.replaceChildren();
+  for (const [chave, titulo] of cols) {
+    const lista = est.tarefas.filter((t) => t.estado === chave);
+    const col = he('section', 'pc-col', null, board);
+    col.setAttribute('data-col', chave);
+    const hd = he('h3', 'pc-col__hd', titulo, col);
+    he('span', 'pc-col__n', String(lista.length), hd);
+    const ul = he('ul', 'pc-cards', null, col);
+    if (!lista.length) he('li', 'pc-empty', 'nenhuma tarefa', ul);
+    for (const t of lista) criarCard(t, ul);
+  }
+  const apr = est.tarefas.filter((t) => t.estado === 'aprovada');
+  $('#pc-aprov-n').textContent = `Aprovadas · ${apr.length}`;
+  const al = $('#pc-aprov-list'); al.replaceChildren();
+  for (const t of apr) criarCard(t, al);
+  $('#pc-n-tarefas').textContent = `${est.tarefas.length} tarefas`;
+}
+let sigFiltro = '';
+function atualizarFiltro(postos) {
+  const sig = postos.map((p) => p.tipo).join('|');
+  if (sig === sigFiltro) return; sigFiltro = sig;
+  const sel = $('#pc-filtro'); const atual = sel.value;
+  sel.replaceChildren(he('option', null, 'Todos os agentes'));
+  sel.firstChild.value = '';
+  for (const p of postos) { const o = he('option', null, p.nome, sel); o.value = p.tipo; }
+  sel.value = postos.some((p) => p.tipo === atual) ? atual : '';
+  app.filtro = sel.value;
+  filtrarLog();
+}
+function envolve(f, tipo) {
+  if (!tipo) return true;
+  return postoDeRef(f.de) === tipo || postoDeRef(f.para) === tipo;
+}
+function filtrarLog() {
+  const falasPorId = new Map(app.estado.falas.map((f) => [f.id, f]));
+  for (const li of $('#pc-log').children) {
+    const f = falasPorId.get(li.getAttribute('data-fala'));
+    li.hidden = !(f && envolve(f, app.filtro));
+  }
+}
+function criarEntradaLog(f) {
+  const li = he('li', 'pc-log');
+  li.setAttribute('data-tipo', f.tipo); li.setAttribute('data-fala', f.id);
+  const top = he('div', 'pc-log__top', null, li);
+  li.setAttribute('data-ts', String(f.ts));
+  const tm = he('time', null, hora(f.ts), top); tm.setAttribute('datetime', f.ts); tm.title = dataHora(f.ts);
+  he('span', 'pc-tag', TIPO_FALA[f.tipo] || f.tipo, top);
+  const quem = he('span', 'pc-log__quem', `${nomeRef(f.de)} → ${nomeRef(f.para)}`, top);
+  quem.title = quem.textContent;
+  if (f.tarefa) he('span', 'pc-tid', f.tarefa, top);
+  const r = he('button', 'pc-log__rever', 'Rever', top);
+  r.type = 'button'; r.setAttribute('data-rever', f.id);
+  r.setAttribute('aria-label', `Rever animação: ${TIPO_FALA[f.tipo] || f.tipo}, ${nomeRef(f.de)} para ${nomeRef(f.para)}`);
+  const tx = he('button', 'pc-log__txt', f.texto, li);
+  tx.type = 'button'; tx.setAttribute('aria-expanded', 'false');
+  return li;
+}
+function atualizarLog(est) {
+  const ul = $('#pc-log');
+  const falas = [...est.falas].sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  const encolheu = falas.length < ul.children.length;
+  if (encolheu) { ul.replaceChildren(); app.vistas.clear(); }
+  // âncora: o primeiro item visível mantém a posição se o leitor rolou para baixo; no topo, acompanha o mais novo
+  const rolado = ul.scrollTop > 4;
+  let ancora = null, desvio = 0;
+  if (rolado) {
+    ancora = [...ul.children].find((li) => !li.hidden && li.offsetTop + li.offsetHeight > ul.scrollTop) || null;
+    if (ancora) desvio = ancora.offsetTop - ul.scrollTop;
+  }
+  const jaNaLista = new Set([...ul.children].map((li) => li.getAttribute('data-fala')));
+  const novas = [];
+  for (const f of falas) {
+    if (jaNaLista.has(f.id)) continue;
+    const li = criarEntradaLog(f);
+    // mais recente primeiro: entra antes do primeiro item com horário igual ou mais antigo
+    const ref = [...ul.children].find((x) => String(x.getAttribute('data-ts')) <= String(f.ts)) || null;
+    ul.insertBefore(li, ref);
+    novas.push(f);
+  }
+  while (ul.children.length > 300) ul.lastChild.remove();
+  filtrarLog();
+  if (encolheu) ul.scrollTop = 0;
+  else if (ancora && ancora.isConnected) ul.scrollTop = ancora.offsetTop - desvio;
+  $('#pc-n-falas').textContent = `${est.falas.length} falas`;
+  return { novas, encolheu };
+}
+
+/* ============================================================ painel do posto e detalhe da execução */
+const dlg = $('#pc-dlg');
+let opener = null;
+function focoDe(tipo) {
+  const c = [...document.querySelectorAll('[data-pc-posto]')].filter((b) => b.getAttribute('data-pc-posto') === tipo && b.getClientRects().length);
+  return c[0] || null;
+}
+function kv(pai, k, v) {
+  const d = he('div', null, null, pai);
+  he('dt', null, k, d); he('dd', null, v == null || v === '' ? '—' : String(v), d);
+}
+function secao(pai, titulo) {
+  const s = he('section', null, null, pai);
+  he('h3', null, titulo, s);
+  return s;
+}
+function postoAtual(tipo) { return montarPostos(app.estado.agentes).find((p) => p.tipo === tipo) || null; }
+
+function pintarPosto(tipo) {
+  const p = postoAtual(tipo); if (!p) return;
+  const R = resumir(p, app.estado);
+  $('#pc-dlg-tt').textContent = p.nome;
+  $('#pc-dlg-sub').textContent = `${ESTADO_TXT[R.estado] || R.estado} · ${R.contagem}`;
+  const body = $('#pc-dlg-body');
+  const foco = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-pc-exec');
+  const rolagem = dlg.scrollTop;
+  body.replaceChildren();
+  const s1 = secao(body, 'Resumo');
+  const l = he('dl', 'pc-kv', null, s1);
+  kv(l, 'Estado', ESTADO_TXT[R.estado] || R.estado);
+  kv(l, 'Modelo', R.modelo || 'não informado');
+  kv(l, 'Atividade', R.atividade);
+  kv(l, 'Em andamento', R.ativas.length);
+  kv(l, 'Execuções na sessão', R.tot);
+  kv(l, 'Tarefas ativas', R.tarefas.length ? R.tarefas.join(', ') : 'nenhuma');
+  const st = secao(body, 'Tokens do agente');
+  const lt = he('dl', 'pc-kv', null, st);
+  kv(lt, 'Entrada', fmt(R.tok.entrada));
+  kv(lt, 'Saída', fmt(R.tok.saida));
+  kv(lt, 'Cache', fmt(R.tok.cache));
+  const se1 = secao(body, `Execuções (${R.tot})`);
+  if (!p.execs.length) { he('p', 'pc-note', 'Este posto não teve execução nesta sessão.', se1); return; }
+  const ul = he('ul', 'pc-execs', null, se1);
+  for (const a of p.execs.slice().sort((x, y) => ultimo(y).localeCompare(ultimo(x)))) {
+    const li = he('li', null, null, ul);
+    const b = he('button', 'pc-exec', null, li);
+    b.type = 'button'; b.setAttribute('data-pc-exec', a.id); b.setAttribute('data-estado', a.estado);
+    he('span', 'pc-exec__d', a.descricao || 'execução', b);
+    const tk = a.tokens || {};
+    he('span', 'pc-exec__m', `${a.tarefa ? 'tarefa ' + a.tarefa + ' · ' : ''}${ESTADO_TXT[a.estado] || a.estado} · entrada ${fmt(tk.entrada)} · saída ${fmt(tk.saida)} · cache ${fmt(tk.cache)}`, b);
+    b.setAttribute('aria-label', `Abrir execução: ${a.descricao || ''}, ${ESTADO_TXT[a.estado] || a.estado}`);
+  }
+  if (foco) { const b = body.querySelector(`[data-pc-exec="${CSS.escape(foco)}"]`); if (b) b.focus(); }
+  dlg.scrollTop = rolagem;
+}
+function pintarExecucao(a, d, erro) {
+  const body = $('#pc-dlg-body'); const rolagem = dlg.scrollTop;
+  body.replaceChildren();
+  const voltar = he('button', 'pc-btn', '← Voltar à lista', body);
+  voltar.type = 'button'; voltar.id = 'pc-voltar'; voltar.style.justifySelf = 'start';
+  $('#pc-dlg-sub').textContent = `${a.descricao || 'execução'} · ${ESTADO_TXT[a.estado] || a.estado}`;
+  const s1 = secao(body, 'Resumo');
+  const l = he('dl', 'pc-kv', null, s1);
+  kv(l, 'Estado', ESTADO_TXT[a.estado] || a.estado);
+  kv(l, 'Atividade', a.atividade);
+  kv(l, 'Modelo', a.modelo || 'não informado');
+  kv(l, 'Tarefa', a.tarefa || 'sem tarefa');
+  kv(l, 'Ferramentas usadas', a.ferramentas);
+  kv(l, 'Erros', a.erros);
+  kv(l, 'Início', dataHora(a.inicio));
+  kv(l, 'Fim', dataHora(a.fim));
+  const st = secao(body, 'Tokens da execução');
+  const lt = he('dl', 'pc-kv', null, st);
+  kv(lt, 'Entrada', fmt(a.tokens.entrada));
+  kv(lt, 'Saída', fmt(a.tokens.saida));
+  kv(lt, 'Cache', fmt(a.tokens.cache));
+  if (erro) { he('p', 'pc-note', 'Detalhe indisponível agora: ' + erro, secao(body, 'Detalhe')); return; }
+  if (!d) { he('p', 'pc-note', 'Carregando o detalhe da execução…', secao(body, 'Detalhe')); return; }
+  const s2 = secao(body, 'Prompt recebido');
+  if (d.prompt) he('pre', 'pc-pre', d.prompt, s2);
+  else he('p', 'pc-note', a.tipo === 'am' ? 'A orquestradora não recebe prompt: ela abre a sessão.' : 'Prompt não registrado.', s2);
+  const passos = Array.isArray(d.passos) ? d.passos : [];
+  const usadas = new Map();
+  for (const p of passos) if (p.tipo === 'ferramenta' && p.ferramenta) usadas.set(p.ferramenta, (usadas.get(p.ferramenta) || 0) + 1);
+  const s3 = secao(body, 'Ferramentas');
+  if (usadas.size) { const ul = he('ul', 'pc-tools', null, s3); for (const [k, n] of usadas) he('li', null, `${k} ×${n}`, ul); }
+  else he('p', 'pc-note', 'Nenhuma chamada de ferramenta nos passos registrados.', s3);
+  const errs = passos.filter((p) => p.erro);
+  const s4 = secao(body, `Erros (${errs.length})`);
+  if (errs.length) { const ul = he('ul', 'pc-steps', null, s4); for (const p of errs) ul.appendChild(passoEl(p)); }
+  else he('p', 'pc-note', 'Sem erros nos passos registrados.', s4);
+  const s5 = secao(body, `Passos (${passos.length})`);
+  if (passos.length) { const ul = he('ul', 'pc-steps', null, s5); for (const p of passos) ul.appendChild(passoEl(p)); }
+  else he('p', 'pc-note', 'Nenhum passo registrado.', s5);
+  const s6 = secao(body, 'Retorno final');
+  if (d.retorno) he('pre', 'pc-pre', d.retorno, s6); else he('p', 'pc-note', 'Ainda sem retorno final.', s6);
+  dlg.scrollTop = rolagem;
+}
+function passoEl(p) {
+  const li = he('li', 'pc-step');
+  li.setAttribute('data-erro', p.erro ? 'true' : 'false');
+  he('time', null, hora(p.ts), li);
+  he('span', 'pc-step__k', p.tipo + (p.ferramenta ? ' · ' + p.ferramenta : ''), li);
+  if (p.erro) he('span', 'pc-step__e', 'ERRO', li);
+  he('span', 'pc-step__r', p.resumo || '', li);
+  return li;
+}
+function abrirPosto(tipo) {
+  app.aberto = { tipo, exec: null };
+  pintarPosto(tipo);
+  if (!dlg.open) dlg.showModal();
+  $('#pc-dlg-x').focus();
+}
+async function abrirExecucao(id) {
+  const a = app.execPorId.get(id); if (!a || !app.aberto) return;
+  app.aberto.exec = id;
+  pintarExecucao(a, null, null);
+  dlg.scrollTop = 0;
+  const voltar = $('#pc-voltar'); if (voltar) voltar.focus();
+  try {
+    const d = await kit.detalhe(id);
+    if (app.aberto && app.aberto.exec === id) { pintarExecucao(app.execPorId.get(id) || a, d, null); const v = $('#pc-voltar'); if (v && !dlg.contains(document.activeElement)) v.focus(); }
+  } catch (e) { if (app.aberto && app.aberto.exec === id) pintarExecucao(a, null, e && e.message ? e.message : 'erro'); }
+}
+function voltarLista() {
+  if (!app.aberto) return;
+  const id = app.aberto.exec; app.aberto.exec = null;
+  pintarPosto(app.aberto.tipo);
+  const b = id && $(`[data-pc-exec="${CSS.escape(id)}"]`);
+  (b || $('#pc-dlg-x')).focus();
+}
+dlg.addEventListener('close', () => {
+  const tipo = app.aberto && app.aberto.tipo; app.aberto = null;
+  const alvo = opener && opener.isConnected && opener.getClientRects().length ? opener : focoDe(tipo);
+  opener = null;
+  if (alvo) alvo.focus();
+});
+dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+$('#pc-dlg-x').addEventListener('click', () => dlg.close());
+
+
+/* ============================================================ estado do app */
+const app = {
+  estado: null, exemplo: false, execPosto: new Map(), porOriginal: new Map(), execPorId: new Map(),
+  vistas: new Set(), anteriorN: -1, aberto: null, filtro: '', sigCena: '', rotas: {}, selecionado: null,
+};
+
+/* ============================================================ geometria isométrica (projeção 2:1) */
+const TW = 80, TH = 40;
+const Pg = (x, y, z = 0) => [(x - y) * TW / 2, (x + y) * TH / 2 - z];
+const pts = (a) => a.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+const poly = (a, c) => `<polygon class="${c}" points="${pts(a)}"/>`;
+const escH = (s) => String(s ?? '—').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/* Caixa centrada em (cx,cy) da grade. Faces: l = y+d, r = x+w, t = topo. */
+function caixa(cx, cy, w, d, h, cls = '', z = 0) {
+  const x = cx - w / 2, y = cy - d / 2;
+  return `<g class="bx ${cls}">`
+    + poly([Pg(x, y + d, z + h), Pg(x + w, y + d, z + h), Pg(x + w, y + d, z), Pg(x, y + d, z)], 'l')
+    + poly([Pg(x + w, y, z + h), Pg(x + w, y + d, z + h), Pg(x + w, y + d, z), Pg(x + w, y, z)], 'r')
+    + poly([Pg(x, y, z + h), Pg(x + w, y, z + h), Pg(x + w, y + d, z + h), Pg(x, y + d, z + h)], 't')
+    + '</g>';
+}
+const texto = (x, y, linhas, ancora) => linhas.map((l, i) => `<text class="${i ? 'sub' : 'lab'}" x="${x}" y="${y + 14 * i}" text-anchor="${ancora}">${escH(l)}</text>`).join('');
+const pilula = (x, y, label) => { const w = 14 + String(label).length * 7; return `<rect class="pill" x="${x - w / 2}" y="${y - 9}" width="${w}" height="18" rx="9"/><text class="num" x="${x}" y="${y + 3.5}" text-anchor="middle">${escH(label)}</text>`; };
+
+const HUB = [1, 4];
+
+function desenharCena(postos) {
+  const est = app.estado;
+  const resumos = new Map(postos.map((p) => [p.tipo, resumir(p, est)]));
+  const ferr = (p) => p.execs.reduce((s, a) => s + (a.ferramentas || 0), 0);
+  const sig = JSON.stringify([app.selecionado, postos.map((p) => { const R = resumos.get(p.tipo); return [p.tipo, R.estado, R.contagem, R.tarefas, ferr(p)]; })]);
+  if (sig === app.sigCena) return;
+  app.sigCena = sig;
+  const foco = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-pc-posto');
+
+  const am = postos.find((p) => p.tipo === 'am');
+  const lista = postos.filter((p) => p.tipo !== 'am').map((p, i) => ({ p, R: resumos.get(p.tipo), x: 4 + 2.8 * i, up: i % 2 === 0, y: 4 + (i % 2 === 0 ? -2.6 : 2.6) }));
+  const xf = lista.length ? lista[lista.length - 1].x : 4;
+  const ponto = (g) => Pg(g[0], g[1]).map((v) => v.toFixed(1)).join(',');
+  app.rotas = {};
+  for (const e of lista) app.rotas[e.p.tipo] = [Pg(...HUB), Pg(e.x, 4), Pg(e.x, e.y)];
+
+  let s = `<path class="trk" d="M${ponto(HUB)} L${ponto([xf, 4])}"/>`;
+  for (const e of lista) s += `<path class="trk" d="M${ponto([e.x, 4])} L${ponto([e.x, e.y])}"/>`;
+  for (const e of lista) if (e.R.estado === 'trabalhando') s += `<path class="cx" d="M${ponto(HUB)} L${ponto([e.x, 4])} L${ponto([e.x, e.y])}"/>`;
+
+  const objs = [];
+  const obj = (p, R, inner) => `<g class="pc-o a-${R.estado}${app.selecionado === p.tipo ? ' sel' : ''}" data-obj="${p.tipo}" data-pc-posto="${p.tipo}" tabindex="0" role="button" aria-label="${escH(p.nome)}, ${ESTADO_TXT[R.estado] || R.estado}, ${escH(R.contagem)}">${inner}</g>`;
+  if (am) {
+    const R = resumos.get('am'), [hx, hy] = Pg(...HUB);
+    objs.push({ k: HUB[0] + HUB[1], s: obj(am, R, caixa(HUB[0], HUB[1], 2, 2, 16, 'pl') + caixa(HUB[0], HUB[1], 1.2, 1.2, 8, '', 16) + texto(hx, hy + 62, [am.nome, ESTADO_TXT[R.estado] || R.estado, R.contagem], 'middle')) });
+  }
+  for (const e of lista) {
+    const [sx, sy] = Pg(e.x, e.y), h = 8 + Math.min(ferr(e.p) * 3, 30);
+    const linhas = [e.p.nome, ESTADO_TXT[e.R.estado] || e.R.estado, e.R.contagem];
+    const rot = e.up ? texto(sx + 62, sy - 6, linhas, 'start') : texto(sx - 62, sy - 6, linhas, 'end');
+    const tag = e.R.tarefas.length ? pilula(sx, sy - h - 30, e.R.tarefas[0] + (e.R.tarefas.length > 1 ? ` +${e.R.tarefas.length - 1}` : '')) : '';
+    objs.push({ k: e.x + e.y, s: obj(e.p, e.R, caixa(e.x, e.y, 1.2, 1.2, 10, 'pl') + caixa(e.x, e.y, .7, .7, h - 4, '', 10) + rot + tag) });
+  }
+  s += objs.sort((a, b) => a.k - b.k).map((o) => o.s).join('');
+  const fixa = $('#pc-fixa');
+  fixa.innerHTML = s;
+  const b = fixa.getBBox();
+  if (b.width > 0) $('#pc-scene').setAttribute('viewBox', `${(b.x - 24).toFixed(0)} ${(b.y - 24).toFixed(0)} ${(b.width + 48).toFixed(0)} ${(b.height + 48).toFixed(0)}`);
+  if (foco) { const n = fixa.querySelector(`[data-pc-posto="${CSS.escape(foco)}"]`); if (n) n.focus(); }
+}
+
+/* Ponto que percorre a rota da fala. Só nasce para fala ainda não vista; sem animação com reduced-motion. */
+function rotaDaFala(f) {
+  const de = postoDeRef(f.de), para = postoDeRef(f.para), r = app.rotas;
+  let p = null;
+  if (de === 'am' && r[para]) p = r[para];
+  else if (para === 'am' && r[de]) p = r[de].slice().reverse();
+  else if (r[de] && r[para]) p = r[de].slice().reverse().concat(r[para].slice(1));
+  return p ? 'M' + p.map((q) => q.map((v) => v.toFixed(1)).join(',')).join(' L') : null;
+}
+function soltar(f) {
+  if (reduzMovimento()) return;
+  const d = rotaDaFala(f); if (!d) return;
+  const c = se('circle', { class: 'pkt', r: 4 }, $('#pc-pacotes'));
+  const an = se('animateMotion', { dur: '2.4s', path: d, begin: 'indefinite', fill: 'freeze' }, c);
+  an.beginElement();
+  setTimeout(() => c.remove(), 2600);
+}
+
+/* ============================================================ verificador de sobreposição (?checar) */
+function formas(g) {
+  const out = [];
+  g.querySelectorAll('polygon,text,rect').forEach((e) => {
+    if (e.tagName === 'polygon') out.push(e.getAttribute('points').trim().split(/\s+/).map((p) => p.split(',').map(Number)));
+    else { const b = e.getBBox(); out.push([[b.x, b.y], [b.x + b.width, b.y], [b.x + b.width, b.y + b.height], [b.x, b.y + b.height]]); }
+  });
+  return out;
+}
+const projecao = (p, ax) => { let mn = 1e9, mx = -1e9; for (const [x, y] of p) { const v = x * ax[0] + y * ax[1]; if (v < mn) mn = v; if (v > mx) mx = v; } return [mn, mx]; };
+function sat(a, b) {
+  for (const P_ of [a, b]) for (let i = 0; i < P_.length; i++) {
+    const [x1, y1] = P_[i], [x2, y2] = P_[(i + 1) % P_.length];
+    const l = Math.hypot(y1 - y2, x2 - x1) || 1, ax = [(y1 - y2) / l, (x2 - x1) / l];
+    const [a1, a2] = projecao(a, ax), [b1, b2] = projecao(b, ax);
+    if (a2 <= b1 + 1 || b2 <= a1 + 1) return false;
+  }
+  return true;
+}
+function checar() {
+  const falhas = [], vb = $('#pc-scene').viewBox.baseVal;
+  const os = [...$('#pc-fixa').querySelectorAll('[data-obj]')].map((g) => ({ id: g.getAttribute('data-obj'), f: formas(g) }));
+  for (const o of os) for (const f of o.f) for (const [x, y] of f) if (x < vb.x - 1 || y < vb.y - 1 || x > vb.x + vb.width + 1 || y > vb.y + vb.height + 1) { falhas.push(`${o.id} fora do viewBox`); break; }
+  for (let i = 0; i < os.length; i++) for (let j = i + 1; j < os.length; j++) if (os[i].f.some((a) => os[j].f.some((b) => sat(a, b)))) falhas.push(`${os[i].id} x ${os[j].id}`);
+  return [...new Set(falhas)];
+}
+
+/* ============================================================ eventos */
+document.addEventListener('click', (e) => {
+  const ex = e.target.closest('[data-pc-exec]');
+  if (ex) { abrirExecucao(ex.getAttribute('data-pc-exec')); return; }
+  if (e.target.closest('#pc-voltar')) { voltarLista(); return; }
+  const txt = e.target.closest('.pc-log__txt');
+  if (txt) { txt.setAttribute('aria-expanded', String(txt.getAttribute('aria-expanded') !== 'true')); return; }
+  const rev = e.target.closest('[data-rever]');
+  if (rev) { const f = app.estado && app.estado.falas.find((x) => x.id === rev.getAttribute('data-rever')); if (f) soltar(f); return; }
+  const alvo = e.target.closest('[data-pc-posto]');
+  if (!alvo || dlg.contains(alvo)) return;
+  opener = alvo;
+  app.selecionado = alvo.getAttribute('data-pc-posto');
+  abrirPosto(app.selecionado);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const t = e.target.closest && e.target.closest('g[data-pc-posto]');
+  if (t) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+});
+$('#pc-filtro').addEventListener('change', (e) => { app.filtro = e.target.value; filtrarLog(); });
+const botaoTema = $('#pc-tema');
+const NOME_TEMA = { sistema: 'Sistema', claro: 'Claro', escuro: 'Escuro' };
+function rotuloTema() { botaoTema.textContent = 'Tema: ' + NOME_TEMA[kit.temaAtual ? kit.temaAtual() : 'sistema']; }
+botaoTema.addEventListener('click', () => { kit.tema(); rotuloTema(); });
+rotuloTema();
+$('#pc-legenda').innerHTML = Object.entries(ESTADO_TXT).map(([k, v]) => `<span class="a-${k}"><i></i>${v}</span>`).join('');
+
+/* ============================================================ fluxo de dados */
+function aoEstado(est, info) {
+  app.exemplo = !!(info && info.exemplo);
+  app.estado = est;
+  app.execPorId = new Map(est.agentes.map((a) => [a.id, a]));
+  app.execPosto = new Map(est.agentes.map((a) => [a.id, tipoDe(a)]));
+  app.porOriginal = new Map(est.agentes.map((a) => [a.tipoOriginal || a.tipo, tipoDe(a)]));
+  const postos = montarPostos(est.agentes);
+  atualizarTotais(est, postos);
+  desenharCena(postos);
+  atualizarQuadro(est);
+  atualizarFiltro(postos);
+  const primeira = app.anteriorN < 0;
+  const { novas, encolheu } = atualizarLog(est);
+  if (primeira) novas.forEach((f) => app.vistas.add(f.id));
+  else for (const f of (encolheu ? est.falas : novas)) if (!app.vistas.has(f.id)) { app.vistas.add(f.id); soltar(f); }
+  app.anteriorN = est.falas.length;
+  if (app.aberto && dlg.open && !app.aberto.exec) pintarPosto(app.aberto.tipo);
+  if (new URLSearchParams(location.search).has('checar') && !$('#resultado-checar')) {
+    const pre = he('pre', null, JSON.stringify({ falhas: checar() }), document.body);
+    pre.id = 'resultado-checar';
+  }
+}
+kit.conectar(aoEstado);
+</script>
+</body>
+</html>
