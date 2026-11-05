@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class ModelPricingTableTest {
@@ -185,5 +186,157 @@ class ModelPricingTableTest {
 
         assertEquals(3_000_000L, pricing.inputMicrosPerMillion)
         assertEquals(15_000_000L, pricing.outputMicrosPerMillion)
+    }
+
+    @Test
+    fun `opus 5-5 has its own official prices`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-opus-5-5"))
+
+        assertEquals(4_000_000L, pricing.inputMicrosPerMillion)
+        assertEquals(20_000_000L, pricing.outputMicrosPerMillion)
+        assertEquals(200_000L, pricing.cacheReadMicrosPerMillion)
+        assertEquals(5_000_000L, pricing.cacheWrite5mMicrosPerMillion)
+        assertEquals(8_000_000L, pricing.cacheWrite1hMicrosPerMillion)
+    }
+
+    @Test
+    fun `sonnet 5-5 has its own official prices`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-sonnet-5-5"))
+
+        assertEquals(2_000_000L, pricing.inputMicrosPerMillion)
+        assertEquals(10_000_000L, pricing.outputMicrosPerMillion)
+        assertEquals(100_000L, pricing.cacheReadMicrosPerMillion)
+        assertEquals(2_500_000L, pricing.cacheWrite5mMicrosPerMillion)
+        assertEquals(4_000_000L, pricing.cacheWrite1hMicrosPerMillion)
+    }
+
+    @Test
+    fun `fable 5-1 has its own official prices`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-fable-5-1"))
+
+        assertEquals(10_000_000L, pricing.inputMicrosPerMillion)
+        assertEquals(50_000_000L, pricing.outputMicrosPerMillion)
+        assertEquals(250_000L, pricing.cacheReadMicrosPerMillion)
+        assertEquals(12_500_000L, pricing.cacheWrite5mMicrosPerMillion)
+        assertEquals(20_000_000L, pricing.cacheWrite1hMicrosPerMillion)
+    }
+
+    @Test
+    fun `mythos 5-1 shares fable 5-1 pricing`() {
+        assertEquals(
+            ModelPricingTable.forModel("claude-fable-5-1"),
+            ModelPricingTable.forModel("claude-mythos-5-1")
+        )
+    }
+
+    @Test
+    fun `haiku 5-5 has base prices and a long prompt tier`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-haiku-5-5"))
+
+        assertEquals(100_000L, pricing.inputMicrosPerMillion)
+        assertEquals(500_000L, pricing.outputMicrosPerMillion)
+        assertEquals(10_000L, pricing.cacheReadMicrosPerMillion)
+        assertEquals(125_000L, pricing.cacheWrite5mMicrosPerMillion)
+        assertEquals(200_000L, pricing.cacheWrite1hMicrosPerMillion)
+
+        val longPrompt = assertNotNull(pricing.longPrompt)
+        assertEquals(100_000L, longPrompt.thresholdTokens)
+        assertEquals(500_000L, longPrompt.pricing.inputMicrosPerMillion)
+        assertEquals(2_500_000L, longPrompt.pricing.outputMicrosPerMillion)
+        assertEquals(50_000L, longPrompt.pricing.cacheReadMicrosPerMillion)
+        assertEquals(625_000L, longPrompt.pricing.cacheWrite5mMicrosPerMillion)
+        assertEquals(1_000_000L, longPrompt.pricing.cacheWrite1hMicrosPerMillion)
+    }
+
+    @Test
+    fun `5-x versions do not inherit the previous minor pricing`() {
+        assertNotEquals(ModelPricingTable.forModel("claude-opus-5"), ModelPricingTable.forModel("claude-opus-5-5"))
+        assertNotEquals(ModelPricingTable.forModel("claude-sonnet-5"), ModelPricingTable.forModel("claude-sonnet-5-5"))
+        assertNotEquals(ModelPricingTable.forModel("claude-fable-5"), ModelPricingTable.forModel("claude-fable-5-1"))
+        assertNotEquals(ModelPricingTable.forModel("claude-fable-5"), ModelPricingTable.forModel("claude-mythos-5-1"))
+    }
+
+    @Test
+    fun `accepts an eight digit date suffix on a 5-5 model`() {
+        assertEquals(
+            ModelPricingTable.forModel("claude-opus-5-5"),
+            ModelPricingTable.forModel("claude-opus-5-5-20270101")
+        )
+    }
+
+    @Test
+    fun `rejects a later minor version and a non date suffix`() {
+        assertNull(ModelPricingTable.forModel("claude-opus-5-6"))
+        assertNull(ModelPricingTable.forModel("claude-opus-5-5-beta"))
+    }
+
+    @Test
+    fun `rejects date suffixes that are not exactly eight digits`() {
+        assertNull(ModelPricingTable.forModel("claude-opus-5-5-2027010"))
+        assertNull(ModelPricingTable.forModel("claude-opus-5-5-202701011"))
+    }
+
+    @Test
+    fun `keeps haiku 4-5 date suffix matching`() {
+        assertNotNull(ModelPricingTable.forModel("claude-haiku-4-5-20251001"))
+    }
+
+    @Test
+    fun `computes opus 5-5 cost of a long real turn`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-opus-5-5"))
+
+        // 100 in + 49.360 out + 8.405.121 cache read + 218.174 cache write 1h
+        val cost = pricing.costMicros(
+            inputTokens = 100L,
+            outputTokens = 49_360L,
+            cacheReadTokens = 8_405_121L,
+            cacheWrite1hTokens = 218_174L
+        )
+
+        assertEquals(4_414_016L, cost)
+    }
+
+    @Test
+    fun `haiku 5-5 long tier applies only above the threshold`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-haiku-5-5"))
+
+        assertEquals(100_000L, pricing.forPrompt(100_000L).inputMicrosPerMillion)
+        assertEquals(500_000L, pricing.forPrompt(100_001L).inputMicrosPerMillion)
+    }
+
+    @Test
+    fun `model without long tier keeps base pricing for any prompt`() {
+        val pricing = assertNotNull(ModelPricingTable.forModel("claude-opus-5-5"))
+
+        assertEquals(pricing, pricing.forPrompt(10_000_000L))
+    }
+
+    @Test
+    fun `cache read divisor overrides the default tenth`() {
+        val pricing = ModelPricing.ofUsdPerMillion(input = 4.00, output = 20.00, cacheReadDivisor = 20L)
+
+        assertEquals(200_000L, pricing.cacheReadMicrosPerMillion)
+    }
+
+    @Test
+    fun `cache read divisor must be positive`() {
+        assertFailsWith<IllegalArgumentException> {
+            ModelPricing(inputMicrosPerMillion = 1L, outputMicrosPerMillion = 1L, cacheReadDivisor = 0L)
+        }
+    }
+
+    @Test
+    fun `long tier needs both usd values`() {
+        val pricing = ModelPricing.ofUsdPerMillion(
+            input = 0.10,
+            output = 0.50,
+            longPromptInput = 0.50,
+            longPromptOutput = 2.50
+        )
+
+        assertNotNull(pricing.longPrompt)
+        assertFailsWith<IllegalArgumentException> {
+            ModelPricing.ofUsdPerMillion(input = 0.10, output = 0.50, longPromptInput = 0.50)
+        }
     }
 }

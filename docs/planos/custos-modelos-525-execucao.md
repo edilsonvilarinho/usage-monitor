@@ -196,6 +196,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano | Sem harness: fatos medidos por `WebFetch` da página de preços e leitura do código em `f1309744`. |
+| A02 | Tarifas, `cacheReadDivisor`, `LongPromptPricing`, `forPrompt`, match por sufixo de data e janelas | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` com stub, 497 testes, 14 falhas por `AssertionError` em `ModelPricingTableTest.kt:195…337` e `ModelContextWindowTableTest.kt:16,26`; o log do Gradle não trouxe expected/actual. Verde: mesmo comando, 497 testes, 0 falhas; `ModelPricingTableTest` 35 testes, 0 falhas depois da devolução 1/3 (declaração de `HAIKU_5_5` em linha única). |
 
 ## Problemas em aberto e riscos
 
@@ -206,4 +207,9 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 
 ## Desvios do plano e achados da execução
 
-Nenhum até aqui.
+- A02: o match passou a exigir sufixo de oito dígitos, e um ID com sufixo textual deixaria de casar. Medido nos transcripts
+  locais (`grep -rhoE '"model":"[^"]+"' ~/.claude/projects`, 2026-11-05): `claude-opus-5-5` 24.292, `claude-sonnet-5-5` 6.211,
+  `claude-haiku-5-5` 4.191, `claude-sonnet-5` 129, `<synthetic>` 39, `sonnet` 8. Nenhum sufixo textual; `sonnet` já não casava.
+  A amostra é desta máquina, não de toda instalação.
+- A02: `ofUsdPerMillion` recusa `longPromptInput` sem `longPromptOutput`, além do briefing; a tabela de janelas ganhou teste
+  próprio, `ModelContextWindowTableTest.kt`, que não existia.
