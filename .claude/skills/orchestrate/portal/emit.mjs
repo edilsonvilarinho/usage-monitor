@@ -14,7 +14,7 @@ const args = parseArgs(process.argv.slice(2));
 const comando = args._[0];
 
 // reprovações que cada modelo aguenta antes de escalar (haiku) ou parar (sonnet)
-const LIMITE_REPROVACOES = { haiku: 10, sonnet: 3 };
+const LIMITE_REPROVACOES = { haiku: 3, sonnet: 3 };
 
 function falha(msg) {
   console.error(`emit: ${msg}`);
