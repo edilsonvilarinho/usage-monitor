@@ -127,7 +127,8 @@ Decisões e histórico de cada funcionalidade em [`docs/presentation.md`](docs/p
   (`DashboardCadence`); **nunca** entra no `cliBusy`, que é global e aceleraria todas as fontes.
 - Nunca valor novo em `CliSessionRange` para cortes de tempo; use parâmetro (`sinceEpochMillis`).
 - Custo é recalculado dos tokens com `ModelPricingTable`, nunca rateado. Modelo sem tarifa não vira
-  custo zero (`unpricedTurnCount`, `+` no valor). Ferramenta não entra em custo.
+  custo zero (`unpricedTurnCount`, `+` no valor). Ferramenta não entra em custo. Faixa de prompt (#525) é por turno:
+  soma usa `groupCostMicros` com a parte longa, nunca `costMicros`; sufixo depois do prefixo é só data de 8 dígitos.
 - `null` é "não medido", zero é "medido e sem valor" — não colapsar.
 - `INDEX_SCHEMA_VERSION` vive em `cli_index_meta`, não em `PRAGMA user_version`; coluna nova em
   `cli_sessions` precisa de quem a preencha num arquivo que nunca mais muda.

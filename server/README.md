@@ -398,21 +398,28 @@ Publica a tabela de preços por modelo **como dado**. O servidor continua **não
 
 ```jsonc
 {
-  "version": "2026-08-25",
+  "version": "2026-11-05",
   "models": [
-    { "prefix": "claude-sonnet-5", "inputMicrosPerMillion": 2000000, "outputMicrosPerMillion": 10000000 }
+    { "prefix": "claude-sonnet-5", "inputMicrosPerMillion": 2000000, "outputMicrosPerMillion": 10000000 },
+    { "prefix": "claude-opus-5-5", "inputMicrosPerMillion": 4000000, "outputMicrosPerMillion": 20000000, "cacheReadDenominator": 20 },
+    { "prefix": "claude-haiku-5-5", "inputMicrosPerMillion": 100000, "outputMicrosPerMillion": 500000,
+      "longPrompt": { "inputMicrosPerMillion": 500000, "outputMicrosPerMillion": 2500000 } }
   ],
   "cacheMultipliers": {
     "read":    { "numerator": 1, "denominator": 10 },
     "write5m": { "numerator": 5, "denominator": 4 },
     "write1h": { "numerator": 2, "denominator": 1 }
   },
-  "matchRule": "prefixo com fronteira em '-', mais longo primeiro; nao reconhecido => custo indisponivel",
+  "longPromptThresholdTokens": 100000,
+  "matchRule": "prefixo exato ou prefixo + '-' + 8 digitos (data), mais longo primeiro; nao reconhecido => custo indisponivel",
   "syntheticModelId": "<synthetic>"
 }
 ```
 
 - **Os multiplicadores são razões inteiras, não decimais.** A aritmética do app é inteira em micros e não trunca nesses valores; publicar `0.1` e `1.25` convidaria o consumidor a introduzir erro de ponto flutuante que o original não tem.
+- **`cacheReadDenominator` substitui o `read` padrão na entrada que o declara.** Sem o campo, vale `cacheMultipliers.read`.
+- **`longPrompt` é uma segunda tarifa, escolhida por requisição.** O turno cujo prompt (`input + cache read + cache write 5m + cache write 1h`, sem o output) passa de `longPromptThresholdTokens` paga essa tarifa em todos os tokens dele; no limite exato, a base. Os preços de cache da faixa derivam dos multiplicadores padrão. Aplicar a faixa sobre uma soma de turnos dá resultado errado: as linhas de `/v1/report/usage`, `/v1/team` e `/v1/team/trend` trazem a parte longa separada, em `longPromptInputTokens`, `longPromptOutputTokens`, `longPromptCacheReadTokens`, `longPromptCacheWrite5mTokens` e `longPromptCacheWrite1hTokens`, já incluída nos cinco contadores totais.
+- **Versão menor nova não herda preço.** Depois do prefixo só vale sufixo de data de oito dígitos: `claude-opus-5-6` sai como não reconhecido, sem cair em `claude-opus-5`.
 - **`<synthetic>` é preço zero *conhecido*, não desconhecido.** É o marcador que o Claude Code usa em mensagens que ele próprio injeta no transcript. Tratá-lo como desconhecido marcaria sessões inteiras como custo incompleto.
 - **Modelo não reconhecido devolve custo indisponível, nunca zero.** Zero afirmaria que o turno não custou nada.
 - **`version` sobe a cada mudança de preço.** Guarde-a junto do custo calculado: sem ela, um número antigo e um novo do mesmo período são indistinguíveis.
@@ -427,7 +434,7 @@ Rotas **planas e paginadas**, para quem coleta períodos fechados. Não são uma
 
 | Rota | Devolve | Paginação |
 |---|---|---|
-| `GET /api/v1/report/usage` | Linhas por `(accountKey, deviceId, sessionId, model)` com os cinco contadores, `turnCount`, `firstTs`, `lastTs`, `cwd` e `gitBranch`. | cursor |
+| `GET /api/v1/report/usage` | Linhas por `(accountKey, deviceId, sessionId, model)` com os cinco contadores, a parte de prompt longo deles (`longPrompt*`), `turnCount`, `firstTs`, `lastTs`, `cwd` e `gitBranch`. | cursor |
 | `GET /api/v1/report/activity` | `(accountKey, deviceId, sessionId, activeMillis)`. | cursor |
 | `GET /api/v1/report/members` | `{ accounts: [{ accountKey, label, accountEmail, emailSource, members[] }] }`. | nenhuma |
 
