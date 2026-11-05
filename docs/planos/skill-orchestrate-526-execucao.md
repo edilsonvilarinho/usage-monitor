@@ -37,6 +37,7 @@ fluxo multiagente com portal local.
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (documento) | plano criado |
+| A02 | sem harness próprio (skill de terceiro, cópia fiel). `diff -r` contra a origem; `node --test ".claude/skills/orchestrate/**/*.test.mjs"`; `git check-ignore -v .claude/escritorio/x`; `agentes.mjs verificar` | `diff`: só a `LICENSE` a mais; 41 testes, 41 passaram; `.gitignore:23` casa; `AGENTES: PENDENTE`, faltam `backend-dev`, `frontend-dev`, `prototype-dev` |
 
 ## Problemas em aberto e riscos
 
