@@ -70,6 +70,7 @@ Pedido do dono (2026-11-05): "pegar a nossa skill workflow e ajustar a skill orc
 |---|---|---|
 | A01 | sem suíte; revisão do texto | citações conferidas contra os arquivos |
 | A02 | `git diff` lido item a item; `node --test .claude/skills/orchestrate/setup/agentes.test.mjs` | quatro itens aplicados; 5 passam, 1 falha, igual à `main` (CRLF do `autocrlf` no modelo) |
+| A03 | sem suíte; `git diff` lido; `grep -c "Project delivery flow"` = 2; `grep -ci roteiro` = 0 nas duas skills | cinco itens aplicados; 1 devolução por texto de sessão e palavra em português |
 
 ## Problemas em aberto e riscos
 

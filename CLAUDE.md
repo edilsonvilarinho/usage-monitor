@@ -360,7 +360,7 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 **Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
 "corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
 passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
-Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**.
+Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**; com `/orchestrate` ativa, o roteiro é a seção "Project delivery flow" da skill `orchestrate`.
 
 1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
    máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
