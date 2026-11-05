@@ -21,16 +21,28 @@
  * **O FORMATO DESTA LISTA E CONTRATO.** O parser de paridade le por regex: uma
  * entrada por linha, na forma
  * `{ prefix: '<id>', inputMicrosPerMillion: <n>, outputMicrosPerMillion: <n> },`
- * e na mesma ordem do arquivo Kotlin. Reformatar quebra o script -- de
- * proposito: falha ruidosa vale mais que divergencia silenciosa.
+ * com `cacheReadDenominator: <n>` e `longPrompt: { inputMicrosPerMillion: <n>,
+ * outputMicrosPerMillion: <n> }` opcionais, na mesma linha, e na mesma ordem do
+ * arquivo Kotlin. Reformatar quebra o script -- de proposito: falha ruidosa vale
+ * mais que divergencia silenciosa.
  */
+
+/** Tarifa de uma faixa de prompt longo, em micros por milhao. */
+export interface LongPromptRate {
+  readonly inputMicrosPerMillion: number;
+  readonly outputMicrosPerMillion: number;
+}
 
 /** Uma entrada da tabela: prefixo do identificador e as duas tarifas base. */
 export interface ModelPricingEntry {
-  /** Prefixo do identificador de modelo. Casa exato ou seguido de `-`. */
+  /** Prefixo do identificador de modelo. Casa exato ou seguido de `-` e oito digitos. */
   readonly prefix: string;
   readonly inputMicrosPerMillion: number;
   readonly outputMicrosPerMillion: number;
+  /** Divisor do cache read. Ausente = divisor padrao (`CACHE_MULTIPLIERS.read`). */
+  readonly cacheReadDenominator?: number;
+  /** Faixa de prompt longo. Ausente = o modelo nao tem faixa. */
+  readonly longPrompt?: LongPromptRate;
 }
 
 /** Razao inteira aplicada sobre a tarifa de input. */
@@ -45,7 +57,13 @@ export interface CacheMultiplier {
  * O consumidor guarda esta string com o que calculou: sem ela, um custo antigo e
  * um novo do mesmo periodo sao indistinguiveis. Sobe a cada mudanca de preco.
  */
-export const PRICING_VERSION = '2026-08-25';
+export const PRICING_VERSION = '2026-11-05';
+
+/**
+ * Limite de prompt longo em tokens. Acima dele (comparacao estrita) vale a faixa
+ * de prompt longo, decidida por requisicao, nunca pelo total do grupo.
+ */
+export const LONG_PROMPT_THRESHOLD_TOKENS = 100_000;
 
 /**
  * Marcador que o Claude Code usa em mensagens injetadas localmente.
@@ -58,11 +76,12 @@ export const SYNTHETIC_MODEL_ID = '<synthetic>';
 /**
  * Regra de match, publicada como texto porque ela nao e derivavel da lista.
  *
- * Modelo nao reconhecido devolve custo **indisponivel**, nunca zero: e o
- * `forModel() == null` do Kotlin virando contrato.
+ * Prefixo exato, ou prefixo seguido de `-` e exatamente oito digitos (data). Mais
+ * longo primeiro. Modelo nao reconhecido devolve custo **indisponivel**, nunca zero:
+ * e o `forModel() == null` do Kotlin virando contrato.
  */
 export const MODEL_MATCH_RULE =
-  "prefixo com fronteira em '-', mais longo primeiro; nao reconhecido => custo indisponivel";
+  "prefixo exato ou prefixo + '-' + 8 digitos (data), mais longo primeiro; nao reconhecido => custo indisponivel";
 
 /**
  * Uma linha por entrada de `ModelPricingTable.kt`, na mesma ordem.
@@ -73,15 +92,20 @@ export const MODEL_MATCH_RULE =
  * posicao em vez de tolerar reordenacao silenciosa.
  */
 export const MODEL_PRICING: ReadonlyArray<ModelPricingEntry> = [
+  { prefix: 'claude-opus-5-5', inputMicrosPerMillion: 4_000_000, outputMicrosPerMillion: 20_000_000, cacheReadDenominator: 20 },
   { prefix: 'claude-opus-5', inputMicrosPerMillion: 5_000_000, outputMicrosPerMillion: 25_000_000 },
   { prefix: 'claude-opus-4-8', inputMicrosPerMillion: 5_000_000, outputMicrosPerMillion: 25_000_000 },
   { prefix: 'claude-opus-4-7', inputMicrosPerMillion: 5_000_000, outputMicrosPerMillion: 25_000_000 },
   { prefix: 'claude-opus-4-6', inputMicrosPerMillion: 5_000_000, outputMicrosPerMillion: 25_000_000 },
   { prefix: 'claude-opus-4-5', inputMicrosPerMillion: 5_000_000, outputMicrosPerMillion: 25_000_000 },
+  { prefix: 'claude-sonnet-5-5', inputMicrosPerMillion: 2_000_000, outputMicrosPerMillion: 10_000_000, cacheReadDenominator: 20 },
   { prefix: 'claude-sonnet-5', inputMicrosPerMillion: 2_000_000, outputMicrosPerMillion: 10_000_000 },
   { prefix: 'claude-sonnet-4-6', inputMicrosPerMillion: 3_000_000, outputMicrosPerMillion: 15_000_000 },
   { prefix: 'claude-sonnet-4-5', inputMicrosPerMillion: 3_000_000, outputMicrosPerMillion: 15_000_000 },
+  { prefix: 'claude-haiku-5-5', inputMicrosPerMillion: 100_000, outputMicrosPerMillion: 500_000, longPrompt: { inputMicrosPerMillion: 500_000, outputMicrosPerMillion: 2_500_000 } },
   { prefix: 'claude-haiku-4-5', inputMicrosPerMillion: 1_000_000, outputMicrosPerMillion: 5_000_000 },
+  { prefix: 'claude-fable-5-1', inputMicrosPerMillion: 10_000_000, outputMicrosPerMillion: 50_000_000, cacheReadDenominator: 40 },
+  { prefix: 'claude-mythos-5-1', inputMicrosPerMillion: 10_000_000, outputMicrosPerMillion: 50_000_000, cacheReadDenominator: 40 },
   { prefix: 'claude-fable-5', inputMicrosPerMillion: 10_000_000, outputMicrosPerMillion: 50_000_000 },
   { prefix: 'claude-mythos-5', inputMicrosPerMillion: 10_000_000, outputMicrosPerMillion: 50_000_000 },
   { prefix: '<synthetic>', inputMicrosPerMillion: 0, outputMicrosPerMillion: 0 },
@@ -91,7 +115,7 @@ export const MODEL_PRICING: ReadonlyArray<ModelPricingEntry> = [
  * Os tres precos de cache derivam da tarifa de input.
  *
  * **Razoes inteiras, nao decimais.** A aritmetica do Kotlin
- * (`ModelPricing.kt:26-36`) e inteira em micros e nao trunca nesses valores;
+ * (`ModelPricing.kt`) e inteira em micros e nao trunca nesses valores;
  * publicar `0.1` e `1.25` como float convidaria o consumidor a introduzir erro
  * de ponto flutuante que o original nao tem.
  */

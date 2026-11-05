@@ -23,15 +23,23 @@ import {
  */
 
 const TOKENS_PER_MILLION = 1_000_000n;
+const DATE_SUFFIX = /^\d{8}$/;
+const DEFAULT_READ_DENOMINATOR = BigInt(CACHE_MULTIPLIERS.read.denominator);
 
-/** Tarifas derivadas de uma entrada da tabela, todas em micros por milhao. */
-export interface ResolvedPricing {
-  readonly prefix: string;
+/** As cinco tarifas de um preco, todas em micros por milhao. */
+export interface ResolvedRates {
   readonly inputMicrosPerMillion: bigint;
   readonly outputMicrosPerMillion: bigint;
   readonly cacheReadMicrosPerMillion: bigint;
   readonly cacheWrite5mMicrosPerMillion: bigint;
   readonly cacheWrite1hMicrosPerMillion: bigint;
+}
+
+/** Tarifas derivadas de uma entrada da tabela, com a faixa de prompt longo quando ha. */
+export interface ResolvedPricing extends ResolvedRates {
+  readonly prefix: string;
+  /** Faixa de prompt longo; `null` quando o modelo nao tem faixa. */
+  readonly longPrompt: ResolvedRates | null;
 }
 
 /** As cinco contagens de token de um turno, ou de um grupo deles ja somado. */
@@ -41,6 +49,16 @@ export interface TokenCounts {
   readonly cacheReadTokens: number;
   readonly cacheWrite5mTokens: number;
   readonly cacheWrite1hTokens: number;
+}
+
+/**
+ * Tokens de um grupo de requisicoes, separados pelo prompt de cada uma. A faixa de
+ * prompt longo vale por requisicao: a parte longa vem aqui ja separada.
+ */
+export interface TokenGroup {
+  readonly shortPrompt: TokenCounts;
+  /** Parte das requisicoes com prompt acima do limite; ausente = nenhuma. */
+  readonly longPrompt?: TokenCounts;
 }
 
 /**
@@ -56,15 +74,55 @@ const MATCH_ORDER: ReadonlyArray<ModelPricingEntry> = [...MODEL_PRICING].sort(
 );
 
 /**
- * Fronteira em `-`: `claude-sonnet-5` casa `claude-sonnet-5` e
- * `claude-sonnet-5-20260101`, e **nao** casa `claude-sonnet-5x`. Sem a fronteira,
- * um modelo novo com nome parecido herdaria a tarifa errada em silencio.
+ * Fronteira em `-` seguida de exatamente oito digitos: `claude-sonnet-5` casa
+ * `claude-sonnet-5` e `claude-sonnet-5-20260101`, e **nao** casa `claude-sonnet-5x`
+ * nem `claude-sonnet-5-6`. Sem a fronteira, um modelo novo com nome parecido
+ * herdaria a tarifa errada em silencio.
  */
 function matchesPrefix(model: string, prefix: string): boolean {
   if (model === prefix) {
     return true;
   }
-  return model.startsWith(`${prefix}-`);
+  if (!model.startsWith(`${prefix}-`)) {
+    return false;
+  }
+  return DATE_SUFFIX.test(model.slice(prefix.length + 1));
+}
+
+/** Deriva as tarifas de cache a partir do input, como o `ModelPricing.kt`. */
+function deriveRates(input: bigint, output: bigint, readDenominator: bigint): ResolvedRates {
+  return {
+    inputMicrosPerMillion: input,
+    outputMicrosPerMillion: output,
+    cacheReadMicrosPerMillion: input / readDenominator,
+    cacheWrite5mMicrosPerMillion: applyMultiplier(input, CACHE_MULTIPLIERS.write5m),
+    cacheWrite1hMicrosPerMillion: applyMultiplier(input, CACHE_MULTIPLIERS.write1h),
+  };
+}
+
+function toResolved(entry: ModelPricingEntry): ResolvedPricing {
+  const readDenominator =
+    entry.cacheReadDenominator === undefined
+      ? DEFAULT_READ_DENOMINATOR
+      : BigInt(entry.cacheReadDenominator);
+  const rates = deriveRates(
+    BigInt(entry.inputMicrosPerMillion),
+    BigInt(entry.outputMicrosPerMillion),
+    readDenominator,
+  );
+  return {
+    ...rates,
+    prefix: entry.prefix,
+    // Igual ao Kotlin: a faixa de prompt longo e construida com o divisor padrao.
+    longPrompt:
+      entry.longPrompt === undefined
+        ? null
+        : deriveRates(
+            BigInt(entry.longPrompt.inputMicrosPerMillion),
+            BigInt(entry.longPrompt.outputMicrosPerMillion),
+            DEFAULT_READ_DENOMINATOR,
+          ),
+  };
 }
 
 /**
@@ -83,16 +141,7 @@ export function resolvePricing(model: string | null | undefined): ResolvedPricin
   if (entry === undefined) {
     return null;
   }
-
-  const input = BigInt(entry.inputMicrosPerMillion);
-  return {
-    prefix: entry.prefix,
-    inputMicrosPerMillion: input,
-    outputMicrosPerMillion: BigInt(entry.outputMicrosPerMillion),
-    cacheReadMicrosPerMillion: applyMultiplier(input, CACHE_MULTIPLIERS.read),
-    cacheWrite5mMicrosPerMillion: applyMultiplier(input, CACHE_MULTIPLIERS.write5m),
-    cacheWrite1hMicrosPerMillion: applyMultiplier(input, CACHE_MULTIPLIERS.write1h),
-  };
+  return toResolved(entry);
 }
 
 function applyMultiplier(
@@ -113,7 +162,7 @@ function applyMultiplier(
  * Os produtos sao somados **antes** da divisao unica, como no original: dividir
  * por componente acumularia truncamento cinco vezes.
  */
-export function costMicros(pricing: ResolvedPricing, tokens: TokenCounts): bigint {
+export function costMicros(pricing: ResolvedRates, tokens: TokenCounts): bigint {
   const weighted =
     BigInt(tokens.inputTokens) * pricing.inputMicrosPerMillion +
     BigInt(tokens.outputTokens) * pricing.outputMicrosPerMillion +
@@ -121,6 +170,36 @@ export function costMicros(pricing: ResolvedPricing, tokens: TokenCounts): bigin
     BigInt(tokens.cacheWrite5mTokens) * pricing.cacheWrite5mMicrosPerMillion +
     BigInt(tokens.cacheWrite1hTokens) * pricing.cacheWrite1hMicrosPerMillion;
   return weighted / TOKENS_PER_MILLION;
+}
+
+function addCounts(a: TokenCounts, b: TokenCounts): TokenCounts {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
+    cacheWrite5mTokens: a.cacheWrite5mTokens + b.cacheWrite5mTokens,
+    cacheWrite1hTokens: a.cacheWrite1hTokens + b.cacheWrite1hTokens,
+  };
+}
+
+/**
+ * Custo de um grupo com a faixa de prompt longo aplicada por parte.
+ *
+ * Sem faixa no modelo, as duas partes somam na tarifa base. Com faixa, a parte curta
+ * usa a base e a longa usa a faixa; **faixa declarada e parte longa ausente devolve
+ * `null`**, nunca a tarifa baixa — o grupo nao tem como ser precificado sem ela.
+ * Cada parte divide uma vez, entao o truncamento e de no maximo 1 micro por parte.
+ */
+export function groupCostMicros(pricing: ResolvedPricing, group: TokenGroup): bigint | null {
+  if (pricing.longPrompt === null) {
+    const counts =
+      group.longPrompt === undefined ? group.shortPrompt : addCounts(group.shortPrompt, group.longPrompt);
+    return costMicros(pricing, counts);
+  }
+  if (group.longPrompt === undefined) {
+    return null;
+  }
+  return costMicros(pricing, group.shortPrompt) + costMicros(pricing.longPrompt, group.longPrompt);
 }
 
 /**

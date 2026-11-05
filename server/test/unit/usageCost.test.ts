@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   costMicros,
+  groupCostMicros,
   isSyntheticModel,
   microsToUsdString,
   resolvePricing,
 } from '../../src/domain/usageCost.js';
+
+const ZERO_TOKENS = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheWrite5mTokens: 0,
+  cacheWrite1hTokens: 0,
+};
 
 // Os numeros vem de `ModelPricingTableTest.kt`, e nao de uma conta refeita aqui:
 // este modulo espelha `ModelPricing.kt`, e a prova de que o espelho esta certo e
@@ -114,6 +123,45 @@ describe('aritmetica de preco no servidor', () => {
     // A mesma conta em ponto flutuante ja nao e representavel: o produto passa de
     // MAX_SAFE_INTEGER e o resultado deixa de ser confiavel.
     expect(cacheReadTokens * 200_000 > Number.MAX_SAFE_INTEGER).toBe(true);
+  });
+
+  it('aceita so sufixo de data de oito digitos', () => {
+    expect(resolvePricing('claude-opus-5-20260101')?.prefix).toBe('claude-opus-5');
+    // Versao numerica curta nao e data: nao herda a tarifa do prefixo.
+    expect(resolvePricing('claude-opus-5-6')).toBeNull();
+    expect(resolvePricing('claude-opus-5-202601011')).toBeNull();
+  });
+
+  it('usa divisor 20 no cache read do opus 5.5', () => {
+    expect(resolvePricing('claude-opus-5-5')?.cacheReadMicrosPerMillion).toBe(200_000n);
+  });
+
+  it('expoe a faixa de prompt longo do haiku 5.5 e nenhuma nos demais', () => {
+    const haiku = resolvePricing('claude-haiku-5-5');
+
+    expect(haiku?.inputMicrosPerMillion).toBe(100_000n);
+    expect(haiku?.longPrompt?.inputMicrosPerMillion).toBe(500_000n);
+    expect(haiku?.longPrompt?.outputMicrosPerMillion).toBe(2_500_000n);
+    expect(resolvePricing('claude-sonnet-5')?.longPrompt).toBeNull();
+  });
+
+  it('cobra a parte de prompt longo pela faixa e a curta pela tarifa base', () => {
+    const pricing = resolvePricing('claude-haiku-5-5')!;
+
+    const cost = groupCostMicros(pricing, {
+      shortPrompt: { ...ZERO_TOKENS, inputTokens: 1_000_000 },
+      longPrompt: { ...ZERO_TOKENS, inputTokens: 1_000_000 },
+    });
+
+    expect(cost).toBe(100_000n + 500_000n);
+  });
+
+  it('nao precifica grupo com faixa declarada e sem parte longa', () => {
+    const pricing = resolvePricing('claude-haiku-5-5')!;
+
+    expect(
+      groupCostMicros(pricing, { shortPrompt: { ...ZERO_TOKENS, inputTokens: 1_000_000 } }),
+    ).toBeNull();
   });
 
   it('formata micros em dolares com seis casas', () => {

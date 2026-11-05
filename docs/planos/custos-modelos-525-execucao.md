@@ -199,6 +199,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | A01 | Plano | Sem harness: fatos medidos por `WebFetch` da página de preços e leitura do código em `f1309744`. |
 | A02 | Tarifas, `cacheReadDivisor`, `LongPromptPricing`, `forPrompt`, match por sufixo de data e janelas | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` com stub, 497 testes, 14 falhas por `AssertionError` em `ModelPricingTableTest.kt:195…337` e `ModelContextWindowTableTest.kt:16,26`; o log do Gradle não trouxe expected/actual. Verde: mesmo comando, 497 testes, 0 falhas; `ModelPricingTableTest` 35 testes, 0 falhas depois da devolução 1/3 (declaração de `HAIKU_5_5` em linha única). |
 | A03 | `turnCostMicros`, `turnCacheSavingsMicros`; turno, contexto vivo e breakdown da análise pela faixa do próprio prompt | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` com stub, `ModelPricingTurnTest.kt:44` `expected:<28751> but was:<0>`, `:93` `expected:<28751> but was:<5750>`, contexto em 100.001 `expected:<5000> but was:<1000>`, breakdown em 100.001 `expected:<20000> but was:<4000>`. Verde: mesmo comando, 507 testes, 0 falhas, depois da devolução 1/3 (breakdown da análise ficara de fora). |
+| A06 | Tabela, `PRICING_VERSION` 2026-11-05, match por data, `groupCostMicros`, colunas `longPrompt*` nos cinco `SELECT`, `/metrics`, `/v1/pricing` e paridade | Vermelho: `npm test` com `expected '2026-08-25' to be '2026-11-05'`, `expected 500000n to be 200000n`, `expected undefined to be 100000`, `expected 'usage_monitor_cost_usd_window{account…' to contain ' 0.500000'`; paridade `actual: 1, expected: 0`. Verde: `node tools/ci/check-pricing-parity.mjs` saída 0, 17 modelos; `node --test "tools/ci/test/*.test.mjs"` 19 de 19; `cd server && npm test` 327 testes em 24 arquivos; `npx tsc --noEmit -p tsconfig.json` saída 0. Devolução 1/3: `metrics.ts`, `teamRepository.ts` e `report.ts` tinham ficado de fora. |
 
 ## Problemas em aberto e riscos
 
@@ -213,5 +214,8 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
   locais (`grep -rhoE '"model":"[^"]+"' ~/.claude/projects`, 2026-11-05): `claude-opus-5-5` 24.292, `claude-sonnet-5-5` 6.211,
   `claude-haiku-5-5` 4.191, `claude-sonnet-5` 129, `<synthetic>` 39, `sonnet` 8. Nenhum sufixo textual; `sonnet` já não casava.
   A amostra é desta máquina, não de toda instalação.
+- A06, defeito anterior a esta issue e fora dela: acima de `TEAM_METRICS_MAX_SERIES`, `mergeModels` (`metrics.ts`) grava
+  `model: null`, `resolvePricing(null)` devolve `null` e todo o custo da janela vai para a série de turnos sem preço. Confirmado
+  por leitura; `model: null` já está na `main` em `f1309744`. Sem teste nem correção aqui.
 - A02: `ofUsdPerMillion` recusa `longPromptInput` sem `longPromptOutput`, além do briefing; a tabela de janelas ganhou teste
   próprio, `ModelContextWindowTableTest.kt`, que não existia.

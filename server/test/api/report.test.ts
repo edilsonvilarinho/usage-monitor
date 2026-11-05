@@ -56,6 +56,14 @@ describe('GET /api/v1/pricing', () => {
     });
   });
 
+  it('publica o limiar da faixa de prompt longo', async () => {
+    const { app } = start();
+
+    const response = await request(app).get('/api/v1/pricing').set('x-report-key', TEST_REPORT_TOKEN);
+
+    expect(response.body.longPromptThresholdTokens).toBe(100_000);
+  });
+
   // Razoes inteiras: publicar 0.1 e 1.25 convidaria o consumidor a introduzir
   // erro de ponto flutuante que a aritmetica em micros do app nao tem.
   it('publica os multiplicadores de cache como razões inteiras', async () => {
@@ -306,6 +314,21 @@ describe('GET /api/v1/report/usage', () => {
     );
 
     expect(keys).toEqual([...keys].sort());
+  });
+
+  it('publica as colunas de prompt longo por linha', async () => {
+    const { app } = start();
+    await request(app)
+      .post('/api/v1/ingest')
+      .set('x-team-key', TEST_TEAM_KEY)
+      .send(makePayload({ turns: [makeTurn({ messageId: 'curto', model: 'claude-haiku-5-5', inputTokens: 100000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 }), makeTurn({ messageId: 'longo', model: 'claude-haiku-5-5', inputTokens: 200000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 })] }));
+
+    const response = await reportGet(app, '/api/v1/report/usage');
+    const row = response.body.rows[0];
+
+    expect(row.inputTokens).toBe(300_000);
+    expect(row.longPromptInputTokens).toBe(200_000);
+    expect(row.longPromptOutputTokens).toBe(0);
   });
 
   it('recorta pela janela semiaberta', async () => {

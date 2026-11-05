@@ -9,7 +9,12 @@ import {
   type MetricSample,
 } from '../../domain/openMetrics.js';
 import { PRICING_VERSION } from '../../domain/modelPricing.js';
-import { costMicros, microsToUsdString, resolvePricing } from '../../domain/usageCost.js';
+import {
+  groupCostMicros,
+  microsToUsdString,
+  resolvePricing,
+  type TokenGroup,
+} from '../../domain/usageCost.js';
 import { normalizeAccountEmail } from '../../domain/accountEmail.js';
 import type { TeamKeyRepository } from '../../repositories/teamKeyRepository.js';
 import type {
@@ -127,7 +132,9 @@ function buildFamilies(deps: MetricsRouterDeps, until: number): MetricFamily[] {
       turns.push({ labels: { ...withModel, window: window.label }, value: row.turnCount });
 
       const pricing = resolvePricing(row.model);
-      if (pricing === null) {
+      // `null` aqui = modelo sem tarifa, ou faixa de prompt longo sem parte longa: nao vira zero.
+      const usdMicros = pricing === null ? null : groupCostMicros(pricing, costGroupOf(row));
+      if (usdMicros === null) {
         // Modelo sem tarifa **nao vira custo zero**: zero afirmaria que os turnos
         // nao custaram nada, e um painel mostraria queda de gasto onde houve
         // modelo novo. A serie de turnos sem preco e o aviso.
@@ -135,7 +142,7 @@ function buildFamilies(deps: MetricsRouterDeps, until: number): MetricFamily[] {
       } else {
         cost.push({
           labels: { ...withModel, window: window.label },
-          value: microsToUsdString(costMicros(pricing, row)),
+          value: microsToUsdString(usdMicros),
         });
       }
     }
@@ -308,6 +315,11 @@ export function mergeModels(rows: ReadonlyArray<MetricsUsageRow>): MetricsUsageR
     existing.cacheReadTokens += row.cacheReadTokens;
     existing.cacheWrite5mTokens += row.cacheWrite5mTokens;
     existing.cacheWrite1hTokens += row.cacheWrite1hTokens;
+    existing.longPromptInputTokens += row.longPromptInputTokens;
+    existing.longPromptOutputTokens += row.longPromptOutputTokens;
+    existing.longPromptCacheReadTokens += row.longPromptCacheReadTokens;
+    existing.longPromptCacheWrite5mTokens += row.longPromptCacheWrite5mTokens;
+    existing.longPromptCacheWrite1hTokens += row.longPromptCacheWrite1hTokens;
   }
 
   return [...merged.values()];
@@ -339,6 +351,30 @@ function aggregateByMember(
   }
 
   return [...byMember.values()];
+}
+
+/**
+ * Grupo de custo de uma linha: a parte longa vem sempre definida, zeros inclusive.
+ *
+ * Ausente seria `null` para todo modelo com faixa, inclusive o Haiku sem requisicao longa —
+ * e a tarifa baixa nunca entra no lugar da faixa.
+ */
+function costGroupOf(row: MetricsUsageRow): TokenGroup {
+  const longPrompt = {
+    inputTokens: row.longPromptInputTokens,
+    outputTokens: row.longPromptOutputTokens,
+    cacheReadTokens: row.longPromptCacheReadTokens,
+    cacheWrite5mTokens: row.longPromptCacheWrite5mTokens,
+    cacheWrite1hTokens: row.longPromptCacheWrite1hTokens,
+  };
+  const shortPrompt = {
+    inputTokens: row.inputTokens - longPrompt.inputTokens,
+    outputTokens: row.outputTokens - longPrompt.outputTokens,
+    cacheReadTokens: row.cacheReadTokens - longPrompt.cacheReadTokens,
+    cacheWrite5mTokens: row.cacheWrite5mTokens - longPrompt.cacheWrite5mTokens,
+    cacheWrite1hTokens: row.cacheWrite1hTokens - longPrompt.cacheWrite1hTokens,
+  };
+  return { shortPrompt, longPrompt };
 }
 
 function millisToSeconds(row: MetricsActivityRow): number {

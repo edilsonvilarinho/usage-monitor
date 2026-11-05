@@ -63,6 +63,17 @@ describe('GET /api/v1/team', () => {
     expect(haiku.inputTokens).toBe(5);
   });
 
+  it('publica as colunas de prompt longo por linha', async () => {
+    await post(makePayload({ turns: [makeTurn({ messageId: 'curto', model: 'claude-haiku-5-5', inputTokens: 100000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 }), makeTurn({ messageId: 'longo', model: 'claude-haiku-5-5', inputTokens: 200000, outputTokens: 0, cacheReadTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 })] }));
+
+    const response = await get({ accountKey: ACCOUNT_A });
+    const row = response.body.rows.find((r: { model: string }) => r.model === 'claude-haiku-5-5');
+
+    expect(row.inputTokens).toBe(300_000);
+    expect(row.longPromptInputTokens).toBe(200_000);
+    expect(row.longPromptOutputTokens).toBe(0);
+  });
+
   it('recorta pelos turnos, nao pelas sessoes', async () => {
     // Sessao antiga com um unico turno recente: dentro da janela ela tem de
     // aparecer somente com os tokens desse turno.

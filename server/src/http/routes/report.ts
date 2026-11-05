@@ -3,6 +3,7 @@ import type { z } from 'zod';
 import type { Config } from '../../config.js';
 import {
   CACHE_MULTIPLIERS,
+  LONG_PROMPT_THRESHOLD_TOKENS,
   MODEL_MATCH_RULE,
   MODEL_PRICING,
   PRICING_VERSION,
@@ -64,6 +65,7 @@ export function createReportRouter(deps: ReportRouterDeps): Router {
           version: PRICING_VERSION,
           models: MODEL_PRICING,
           cacheMultipliers: CACHE_MULTIPLIERS,
+          longPromptThresholdTokens: LONG_PROMPT_THRESHOLD_TOKENS,
           matchRule: MODEL_MATCH_RULE,
           syntheticModelId: SYNTHETIC_MODEL_ID,
         });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CACHE_MULTIPLIERS,
+  LONG_PROMPT_THRESHOLD_TOKENS,
   MODEL_PRICING,
   PRICING_VERSION,
   SYNTHETIC_MODEL_ID,
@@ -51,5 +52,31 @@ describe('tabela de precos publicada', () => {
   // tornaria duas coletas incomparaveis.
   it('versiona a tabela por data ISO', () => {
     expect(PRICING_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('publica a revisao de 2026-11-05 com os modelos 5.5 e 5.1', () => {
+    const prefixes = MODEL_PRICING.map((entry) => entry.prefix);
+
+    expect(PRICING_VERSION).toBe('2026-11-05');
+    expect(prefixes).toContain('claude-opus-5-5');
+    expect(prefixes).toContain('claude-haiku-5-5');
+    expect(prefixes).toContain('claude-fable-5-1');
+    expect(prefixes).toContain('claude-mythos-5-1');
+  });
+
+  it('publica o divisor de cache read do opus 5.5', () => {
+    const opus = MODEL_PRICING.find((entry) => entry.prefix === 'claude-opus-5-5');
+
+    expect(opus?.cacheReadDenominator).toBe(20);
+  });
+
+  it('publica a faixa de prompt longo do haiku 5.5 e o limite', () => {
+    const haiku = MODEL_PRICING.find((entry) => entry.prefix === 'claude-haiku-5-5');
+
+    expect(LONG_PROMPT_THRESHOLD_TOKENS).toBe(100_000);
+    expect(haiku?.longPrompt).toEqual({
+      inputMicrosPerMillion: 500_000,
+      outputMicrosPerMillion: 2_500_000,
+    });
   });
 });
