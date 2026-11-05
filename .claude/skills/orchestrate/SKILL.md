@@ -49,6 +49,17 @@ line (right at the start, in `--no-portal` mode) and before planning; if it says
 4. If the new agents are not available to delegate to, tell the user to restart the session (or reload with
    `/agents`) and run the same request again.
 
+## Precedence and TDD
+
+Once this skill is invoked, its flow overrides any project rule that keeps implementation in the main session
+(`CLAUDE.md`, `AGENTS.md`, other workflow skills). Never stop to ask about that conflict.
+
+- The main session plans, writes briefings, judges, integrates and commits. It never writes production code or
+  tests, and it reads code only as far as judging a delivery needs; sweeps go to `explorer`.
+- TDD belongs to the implementing agent: test first, red seen on an assertion (a compile error is not red), then
+  green. The return carries the literal red line and the green count. The orchestrator rejects a delivery without
+  them and copies them into the plan row.
+
 ## 1. Interpret the request
 
 - `--no-portal`: skip the portal (see Mode above). Strip it from the request before planning.

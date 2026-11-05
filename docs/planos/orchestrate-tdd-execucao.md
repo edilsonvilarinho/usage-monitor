@@ -42,11 +42,34 @@ Este arquivo. Sem suíte.
    Neferpitou planeja, valida, decide e comita; fora dela, segue como está. Texto curto, mesma linha.
 4. `.claude/skills/usage-monitor-workflow/SKILL.md`: nota logo abaixo da tabela com a mesma exceção, sem mudar as linhas.
 
+### A03 — fluxo do projeto dentro da skill
+
+Pedido do dono (2026-11-05): "pegar a nossa skill workflow e ajustar a skill orchestrate adicionando a nossa skill".
+
+1. `.claude/skills/orchestrate/SKILL.md`, nova seção "## Project delivery flow" logo depois de "## Precedence and TDD", em
+   inglês. Traz os passos 1 a 8 de `.claude/skills/usage-monitor-workflow/SKILL.md` com os comandos literais (issue,
+   plano, worktree, TDD, testes locais, PR com auto-merge, CI e parada na 4ª incidência, limpeza e comentário), e troca a
+   tabela "Who runs each step" por esta divisão:
+   - orquestrador: issue, os dois planos, worktree, briefing, validação, commits, push, PR, merge, limpeza, comentário;
+   - agente que implementa: vermelho → verde e correção de CI vermelho, no worktree indicado no prompt;
+   - `test-runner`: testes locais, relatório, cobertura do diff, `gh run watch`, `--log-failed`, `ci-incidents.mjs`;
+   - `explorer`: varredura.
+   Dizer que incidência de CI (`ci-incidents.mjs`) e devolução de entrega (`emit.mjs`) são contagens separadas.
+2. Mesma seção: `emit.mjs` roda sempre a partir do checkout principal, nunca de um worktree. `dirEscritorio(raizRepo())`
+   usa o repositório do diretório atual: de um worktree, o evento vai para o `.claude/escritorio` dele e o portal não vê
+   (medido nesta sessão: tarefas A02 a A08 e T1 não apareceram no quadro).
+3. Seção "## 7. Wrap up": apontar para o passo final da nova seção.
+4. `.claude/skills/usage-monitor-workflow/SKILL.md`: a nota abaixo da tabela passa a dizer que, com `/orchestrate` ativa, o
+   roteiro é a seção "Project delivery flow" da skill `orchestrate`.
+5. `CLAUDE.md`, seção "Fluxo de trabalho", linha do "Roteiro executável": acrescentar que, com `/orchestrate`, o roteiro é
+   o da mesma seção. Só essa linha.
+
 ## Ponto de situação
 
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem suíte; revisão do texto | citações conferidas contra os arquivos |
+| A02 | `git diff` lido item a item; `node --test .claude/skills/orchestrate/setup/agentes.test.mjs` | quatro itens aplicados; 5 passam, 1 falha, igual à `main` (CRLF do `autocrlf` no modelo) |
 
 ## Problemas em aberto e riscos
 

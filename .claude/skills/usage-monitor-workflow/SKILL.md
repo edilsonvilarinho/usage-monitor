@@ -23,6 +23,9 @@ the agent, never the model. Rules against context leakage: `CLAUDE.md`, "Orquest
 | 8 cleanup, issue comment | Neferpitou |
 | broad search in any step | `explorer` |
 
+Exception while `/orchestrate` is active: red → green and editing belong to the skill's agents, and Neferpitou plans,
+validates, decides and commits. Outside it, the table stands as written.
+
 The table is mandatory, not advice (#515): it is the user's explicit request to use these subagents. Never run the
 step 5 or step 7 commands in the main session; call the `test-runner` agent with them.
 

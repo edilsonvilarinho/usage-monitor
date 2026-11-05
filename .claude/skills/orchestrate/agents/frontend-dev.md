@@ -19,6 +19,7 @@ Scope:
 - Never commit, push, merge or reset.
 
 Engineering:
+- Write the failing test first, then the implementation. A compile error is not red: the test must fail on an assertion.
 - Colours and spacing only through the project's design tokens, if it has them.
 - No content may depend on animation to appear; respect `prefers-reduced-motion`.
 - Content coming from an API is rendered as text, never as HTML.
@@ -29,5 +30,5 @@ Return before the 12th turn, even partial: the 15-turn limit cuts the agent off 
 Return, at most 20 lines, never a raw log:
 1. `DONE`, `PARTIAL` or `BLOCKED`, with the task ID.
 2. Files created or changed, one per line.
-3. Typecheck and test results (counts; on failure, file:line and the literal message).
+3. Red: the literal failing assertion line, seen before the implementation. Green: test count passing and the typecheck result (on failure, file:line and the literal message).
 4. Blockers or decisions left to the orchestrator.
