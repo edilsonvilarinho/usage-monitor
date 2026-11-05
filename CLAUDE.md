@@ -360,7 +360,7 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 **Vale para todo pedido que altera o repositório, sem o usuário citar o fluxo** — qualquer verbo ("ajusta",
 "corrige", "muda", "adiciona"), issue ou tarefa. Claude conduz o resto, nesta ordem e sem esperar aprovação entre os
 passos. Esta regra **é** a autorização de commit, push, PR e merge exigida pela skill `usage-monitor-commit-push`.
-Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**.
+Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workflow`**; com `/orchestrate` ativa, o roteiro é a seção "Project delivery flow" da skill `orchestrate`.
 
 1. **Issue sempre, e dois planos.** Sem issue, Claude cria uma (`gh issue create`). O plano vai na issue em **no
    máximo 15 linhas** (o quê, atividades, onde, como valida). O detalhado, que Claude segue: `docs/planos/` com
@@ -391,7 +391,7 @@ A sessão principal é a orquestradora **Neferpitou** (`agent` do `.claude/setti
 de cada agente moram **só** em `.claude/agents/`, sempre por alias. Medições e decisões em
 [`agentes-por-tier-513-execucao.md`](docs/planos/agentes-por-tier-513-execucao.md).
 
-- Neferpitou faz plano, TDD (vermelho → verde), diagnóstico de falha e decisão. Não delega edição.
+- Neferpitou faz plano, TDD (vermelho → verde), diagnóstico de falha e decisão. Não delega edição. Com `/orchestrate` ativa, vermelho → verde e edição são dos agentes da skill, e Neferpitou planeja, valida, decide e comita; fora dela, segue como está.
 - **Delegação obrigatória (#515)** — esta regra é o pedido explícito do usuário para usar os subagentes abaixo:
   - **sempre `test-runner`** para rodar `gradlew.bat allTests`/`desktopTest`, `npm test`, `node --test`, o relatório
     de testes, a cobertura do diff, `gh run watch`/`--log-failed` e `ci-incidents.mjs`; nunca rodá-los na sessão principal;
