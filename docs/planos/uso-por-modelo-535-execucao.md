@@ -45,9 +45,10 @@ A tabela "Modelos da sessão" mostrava `claude-haiku-5-5` com custo `—` e "sem
 | A01 | sem harness: documento | Plano criado; fatos medidos com os comandos citados acima |
 | A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CliSessionModelMixTest"` | Vermelho: 12 rodados, 3 falhas, `CliSessionModelMixTest.kt:143` `Expected value to be true.` em `isCostComplete`; verde: 12 testes, 0 falhas |
 | A03 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CliSessionModelMixTest"` | Vermelho: 16 rodados, 3 falhas, `CliSessionModelMixTest.kt:99` `expected:<0.6> but was:<null>`; verde: 16 testes, 0 falhas |
+| A04 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CliSessionsScreenTest" --tests "com.usagemonitor.ui.CodexCliSessionDetailTest"` | Vermelho: 57 testes, 2 falhas, `AssertionError` em `CliSessionsScreenTest.kt:1638` e `:1679` (`% de uso` ausente); verde: 57 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
-- Largura: as colunas fixas passam de 598dp (comentário antigo, defasado) para 708dp mais o mínimo de 150dp de Modelo;
-  conferir em janela de 960dp na atividade A04.
+- Largura: as colunas fixas passam de 598dp para 708dp, mais o mínimo de 150dp de Modelo; a tela real em janela de
+  960dp não foi aberta nesta issue, a medida veio do protótipo.
 - TUI, linha resumida da sessão, CSV, JSON e PDF ficam fora desta issue.

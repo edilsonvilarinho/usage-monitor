@@ -202,7 +202,17 @@ internal fun NoticeText(message: String, color: Color) {
  */
 @Composable
 internal fun HelpDot(terms: List<GlossaryTerm>, language: AppLanguage) {
-    val entries = terms.map { term -> CliSessionsGlossary.entry(term, language) }
+    HelpDotEntries(terms.map { term -> CliSessionsGlossary.entry(term, language) })
+}
+
+/** O `?` de uma definição avulsa, fora do glossário (#535); mesma caixa do termo. */
+@Composable
+internal fun HelpDot(entry: GlossaryEntry) {
+    HelpDotEntries(listOf(entry))
+}
+
+@Composable
+private fun HelpDotEntries(entries: List<GlossaryEntry>) {
     val first = entries.first()
 
     HoverTooltipBox(

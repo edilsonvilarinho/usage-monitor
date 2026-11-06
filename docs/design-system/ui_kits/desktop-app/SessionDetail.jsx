@@ -41,11 +41,11 @@ export function SessionDetail() {
       <AppPanel>
         <AppPanelHeader title="Modelos da sessão" subtitle="3 modelos · participação no custo estimado" />
         <AppDataTable
-          columns={[{ key: 'm', label: 'Modelo' }, { key: 't', label: 'Turnos', numeric: true }, { key: 'k', label: 'Tokens (com cache)', numeric: true }, { key: 'r', label: 'Cache lido', numeric: true }, { key: 'w', label: 'Cache gravado', numeric: true }, { key: 'c', label: 'Custo', numeric: true }, { key: 's', label: '% do custo', numeric: true }]}
+          columns={[{ key: 'm', label: 'Modelo' }, { key: 't', label: 'Turnos', numeric: true }, { key: 'k', label: 'Tokens (com cache)', numeric: true }, { key: 'r', label: 'Cache lido', numeric: true }, { key: 'w', label: 'Cache gravado', numeric: true }, { key: 'c', label: 'Custo', numeric: true }, { key: 's', label: '% do custo', numeric: true }, { key: 'u', label: '% de uso', numeric: true }]}
           rows={[
-            { id: 1, m: 'sonnet-4-5', t: 38, k: '1 012 000', r: '880 400', w: '96 200', c: 'US$ 2,4836', s: '78%' },
-            { id: 2, m: 'opus-4-1', t: 4, k: '182 600', r: '160 100', w: '18 700', c: 'US$ 0,6050', s: '19%' },
-            { id: 3, m: 'haiku-4-5', t: 6, k: '89 400', r: '81 300', w: '6 900', c: 'US$ 0,0955', s: '3%' }
+            { id: 1, m: 'sonnet-4-5', t: 38, k: '1 012 000', r: '880 400', w: '96 200', c: 'US$ 2,4836', s: '78%', u: '79%' },
+            { id: 2, m: 'opus-4-1', t: 4, k: '182 600', r: '160 100', w: '18 700', c: 'US$ 0,6050', s: '19%', u: '8%' },
+            { id: 3, m: 'haiku-4-5', t: 6, k: '89 400', r: '81 300', w: '6 900', c: 'US$ 0,0955', s: '3%', u: '13%' }
           ]}
         />
       </AppPanel>

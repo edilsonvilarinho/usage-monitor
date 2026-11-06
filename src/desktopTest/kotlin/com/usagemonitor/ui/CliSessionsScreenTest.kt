@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -1631,6 +1632,87 @@ class CliSessionsScreenTest {
             cacheReadTokens = 40_000L,
             costMicros = costMicros
         )
+    }
+
+    @Test
+    fun `detail shows the usage share column with the share of turns on a cost basis`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01", costMicros = 5_000_000L)
+        val detail = CliSessionDetail(
+            summary = summary,
+            turns = listOf(
+                turn(seq = 1, model = "claude-opus-5"),
+                turn(seq = 2, model = "claude-haiku-4-5"),
+                turn(seq = 3, model = "claude-opus-5")
+            )
+        )
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(1_400.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // Participação nos turnos: opus 2 de 3 (67%), haiku 1 de 3 (33%). Coluna só na base de custo (#535).
+        onNodeWithText("% de uso").assertExists()
+        onNode(hasText("67%") and hasAnyAncestor(hasTestTag("${SESSION_MODEL_ROW_TAG_PREFIX}claude-opus-5")), useUnmergedTree = true).assertExists()
+        onNode(hasText("33%") and hasAnyAncestor(hasTestTag("${SESSION_MODEL_ROW_TAG_PREFIX}claude-haiku-4-5")), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `unpriced model keeps no price and still shows its usage share`() = runDesktopComposeUiTest {
+        val summary = summary("session-abcdef01", costMicros = 5_000_000L)
+        val detail = CliSessionDetail(
+            summary = summary,
+            turns = listOf(
+                turn(seq = 1, model = "claude-opus-5"),
+                turn(seq = 2, model = "modelo-sem-tarifa"),
+                turn(seq = 3, model = "claude-opus-5")
+            )
+        )
+
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(1_200.dp).height(1_400.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(
+                            sessions = listOf(summary),
+                            detail = CliSessionDetailUiState.Ready(
+                                sessionId = summary.sessionId,
+                                result = CliSessionDetailResult(
+                                    detail = detail,
+                                    analytics = ComputeCliSessionAnalyticsUseCase().invoke(detail)
+                                )
+                            )
+                        ),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        // Sem tarifa continua sem custo ("sem tarifa"), mas a participação nos turnos (1 de 3 = 33%) aparece.
+        onNode(hasText("sem tarifa") and hasAnyAncestor(hasTestTag("${SESSION_MODEL_ROW_TAG_PREFIX}modelo-sem-tarifa")), useUnmergedTree = true).assertExists()
+        onNode(hasText("33%") and hasAnyAncestor(hasTestTag("${SESSION_MODEL_ROW_TAG_PREFIX}modelo-sem-tarifa")), useUnmergedTree = true).assertExists()
     }
 
     private fun turn(
