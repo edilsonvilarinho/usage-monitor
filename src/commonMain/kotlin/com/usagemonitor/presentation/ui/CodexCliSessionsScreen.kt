@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.presentation.codexCacheRateOf
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -421,10 +422,8 @@ internal fun codexApplicationLabel(session: CodexCliSessionSummary): String {
 }
 
 private fun codexCacheFraction(session: CodexCliSessionSummary): Float {
-    if (session.inputTokens <= 0L) return 0f
-    return (session.cachedInputTokens.toDouble() / session.inputTokens.toDouble())
-        .coerceIn(0.0, 1.0)
-        .toFloat()
+    val rate = codexCacheRateOf(session) ?: return 0f
+    return rate.coerceIn(0.0, 1.0).toFloat()
 }
 
 internal fun codexCachePercent(session: CodexCliSessionSummary): String {

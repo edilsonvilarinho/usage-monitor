@@ -89,6 +89,7 @@ histórico de `.claude/skills/usage-monitor-visual-options/SKILL.md`.
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | Concluída | Sem harness de teste: documento. Validado contra o código pelas leituras listadas em "Fatos confirmados". |
+| A02 | Concluída | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.CliSessionSortTest"`, 9/9 `java.lang.AssertionError` (ex.: `CliSessionSortTest.kt:65`, `:72`, `:111`), sem erro de compilação. O texto expected/actual não foi capturado: o log só traz arquivo e linha, e o XML foi sobrescrito pelo verde. Verde: mesmo comando, `tests="9" failures="0" errors="0"`. |
 
 ## Problemas em aberto e riscos
 
