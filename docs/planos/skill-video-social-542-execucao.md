@@ -46,6 +46,7 @@ descrições, sempre com o padrão aprovado.
 | Atividade | Estado | Comando e resultado |
 |---|---|---|
 | A01 | Feito | Sem harness de teste: documento conferido por leitura. |
+| A02 | Feito | Vermelho: `node --test scripts/test/spec.test.mjs`, stub, `0 !== 2` em ERR_ASSERTION, 19 testes, 17 falhas. Verde: 19 de 19. |
 
 ## Problemas em aberto e riscos
 
