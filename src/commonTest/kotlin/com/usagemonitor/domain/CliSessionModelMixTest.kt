@@ -71,6 +71,65 @@ class CliSessionModelMixTest {
     }
 
     @Test
+    fun `usage share is the fraction of the session turns per model`() {
+        val mix = sessionModelMixOf(
+            listOf(
+                group(model = OPUS, outputTokens = 1_000_000L, turnCount = 16),
+                group(model = HAIKU, outputTokens = 1_000_000L, turnCount = 30)
+            ).toUsageBreakdown().byModel
+        )
+
+        assertEquals(ModelShareBasis.COST, mix.basis)
+        assertEquals(16.0 / 46.0, mix.shares.single { share -> share.bucket.label == OPUS }.usageShare)
+        assertEquals(30.0 / 46.0, mix.shares.single { share -> share.bucket.label == HAIKU }.usageShare)
+    }
+
+    @Test
+    fun `unpriced model keeps a measured usage share while its cost share is null`() {
+        val mix = sessionModelMixOf(
+            listOf(
+                group(model = OPUS, outputTokens = 1_000L, turnCount = 2),
+                group(model = UNPRICED, outputTokens = 5_000_000L, turnCount = 3)
+            ).toUsageBreakdown().byModel
+        )
+
+        assertEquals(ModelShareBasis.COST, mix.basis)
+        val unpriced = mix.shares.single { share -> share.bucket.label == UNPRICED }
+        assertNull(unpriced.share)
+        assertEquals(3.0 / 5.0, unpriced.usageShare)
+    }
+
+    @Test
+    fun `usage share is null when the session has no turns`() {
+        val costBasis = sessionModelMixOf(
+            listOf(group(model = OPUS, outputTokens = 1_000L, turnCount = 0)).toUsageBreakdown().byModel
+        )
+        val tokenBasis = sessionModelMixOf(
+            listOf(group(model = UNPRICED, outputTokens = 300L, turnCount = 0)).toUsageBreakdown().byModel
+        )
+
+        assertEquals(ModelShareBasis.COST, costBasis.basis)
+        assertNull(costBasis.shares.single().usageShare)
+        assertEquals(ModelShareBasis.TOKENS, tokenBasis.basis)
+        assertNull(tokenBasis.shares.single().usageShare)
+    }
+
+    @Test
+    fun `usage share does not reorder the cost ranking`() {
+        val mix = sessionModelMixOf(
+            listOf(
+                group(model = HAIKU, outputTokens = 1_000L, turnCount = 30),
+                group(model = OPUS, outputTokens = 1_000_000L, turnCount = 1)
+            ).toUsageBreakdown().byModel
+        )
+
+        // O custo manda na ordem: Opus primeiro, mesmo com um turno só. A fração de turnos não reordena.
+        assertEquals(listOf(OPUS, HAIKU), mix.shares.map { share -> share.bucket.label })
+        assertEquals(1.0 / 31.0, mix.shares.first().usageShare)
+        assertEquals(30.0 / 31.0, mix.shares.last().usageShare)
+    }
+
+    @Test
     fun `token ties are broken by the label so two reads give the same list`() {
         val first = sessionModelMixOf(
             listOf(group(model = "b-model", outputTokens = 10L), group(model = "a-model", outputTokens = 10L)).toUsageBreakdown().byModel
