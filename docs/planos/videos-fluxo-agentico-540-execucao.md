@@ -53,9 +53,18 @@ para o dono escolher.
 | Atividade | Estado | Comando e resultado |
 |---|---|---|
 | A01 | Feito | Sem harness de teste: documento conferido por leitura. |
+| A02 | Feito | `node -e "require('./data/script.js')"`: 9 beats, 25 cues. Beats `pr`, `ci` e `stop` cortados depois da medição das vozes. |
+| A03 | Feito | `opencode run` com `audio/tts.mjs`: 16 vozes, 0 falhas. `pt-pedro` e `en-charon` retiradas (fala acima do beat), `pt-rafael` e `pt-kore` retiradas (sobreposição de 0,32 s e 0,04 s). Restam 5 PT e 7 EN, 60,0 s por `ffprobe`. |
+| A04 | Feito | `audio/music.py` e `audio/sfx.py`: 4 trilhas e efeitos, 60,0 s, cerca de -20 LUFS. Lyria: 1 faixa; a 2ª recebeu `403 PROHIBITED_CONTENT` e não foi refeita. |
+| A05 | Feito | Chrome real, `file://`: 10 modelos, 9:16 e EN sem erro; voz, trilha e efeitos com desvio de cerca de 20 ms; ducking 0,6 para 0,21; sem rolagem em 390 px. |
+| A06–A15 | Aprovados como direção | `render/stills.mjs`, 9 tempos, 2 formatos, saída 0. Conferidos por folha de contato em `qa/sheet-NN.jpg`. Ressalvas da versão final abaixo. |
+| A16 | Aguardando a escolha do dono | `render/render.mjs`: MP4 1280x720, 60,0 s, H.264 e AAC, -17,9 LUFS medido no modelo 01. |
 
 ## Problemas em aberto e riscos
 
+- Ressalvas da versão final: 01 lente fraca e lockup 9:16 na borda; 05 jobs apertados em 9:16; 06 sonda sobre `expected:` em t=24; 07 abertura 9:16 vazia e título fixo; 08 cometas fracos; 09 rótulos do topo pequenos; 10 URL quebra em 9:16.
+- Só `pt-caio` e `en-harper` mantêm o respiro de 1,2 s em todos os beats.
+- Agentes passaram de 4 simultâneos uma vez (6), ao devolver 01 e 03 com 05 e 06 já abertos.
 - Escuta humana é do dono: agente mede duração e loudness, não pronúncia nem beleza da voz.
 - Termos de uso de saída do Lyria não verificados; faixa de Lyria só vai ao vídeo final depois disso.
 - Ranking público de TTS não cobre PT-BR nem os modelos atuais do catálogo: a escolha de vozes é por disponibilidade.
