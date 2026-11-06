@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Usage Monitor · cena de vídeo</title>
+<style>
+  @font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url("../../../../src/desktopMain/resources/fonts/IBMPlexMono-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "IBM Plex Mono"; font-weight: 500; src: url("../../../../src/desktopMain/resources/fonts/IBMPlexMono-Medium.ttf") format("truetype"); }
+  @font-face { font-family: "IBM Plex Mono"; font-weight: 600; src: url("../../../../src/desktopMain/resources/fonts/IBMPlexMono-SemiBold.ttf") format("truetype"); }
+  @font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url("../../../../src/desktopMain/resources/fonts/IBMPlexSans-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "IBM Plex Sans"; font-weight: 500; src: url("../../../../src/desktopMain/resources/fonts/IBMPlexSans-Medium.ttf") format("truetype"); }
+  @font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url("../../../../src/desktopMain/resources/fonts/IBMPlexSans-SemiBold.ttf") format("truetype"); }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #stage { position: absolute; left: 0; top: 0; overflow: hidden; background: #080B12; transform-origin: 0 0; }
+  #cap {
+    position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-family: "IBM Plex Sans", sans-serif; font-weight: 500; color: #F2EDED;
+    text-shadow: 0 2px 10px #000, 0 0 3px #000; line-height: 1.25; padding: 0 6%; box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+// Página da cena de vídeo. Uso: index.html?data=<caminho relativo ao index.html, ex.: data/short-pt.js>&format=16:9|9:16
+// Escala 1 no tamanho lógico do formato. Expõe window.__ready, window.__error e window.renderAt(t).
+// A legenda vem de WF.captionAt(t) e entra por textContent. Imagens de beat.image são resolvidas em relação ao arquivo de dados.
+(async function () {
+  const q = new URLSearchParams(location.search)
+  const dataParam = q.get('data')
+  const format = q.get('format') || '16:9'
+  const vertical = format === '9:16'
+  const w = vertical ? 1080 : 1920
+  const h = vertical ? 1920 : 1080
+  const stage = document.getElementById('stage')
+  stage.style.width = w + 'px'
+  stage.style.height = h + 'px'
+  const fit = () => {
+    const s = Math.min(innerWidth / w, innerHeight / h)
+    stage.style.transform = `translate(${(innerWidth - w * s) / 2}px, ${(innerHeight - h * s) / 2}px) scale(${s})`
+  }
+  fit()
+  addEventListener('resize', fit)
+
+  const load = (src) => new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = resolve
+    s.onerror = () => reject(new Error('falha ao carregar ' + src))
+    document.head.append(s)
+  })
+  const loadImage = (src) => new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+  try {
+    if (!dataParam) throw new Error('parâmetro ?data=<caminho relativo> ausente')
+    const dataURL = new URL(dataParam, location.href)
+    await load(dataURL.href)
+    await load('wf.js')
+    await load('scene.js')
+    await Promise.all([
+      document.fonts.load('600 80px "IBM Plex Mono"'),
+      document.fonts.load('500 30px "IBM Plex Mono"'),
+      document.fonts.load('500 30px "IBM Plex Sans"'),
+    ])
+    // Imagens de beat (beat.image) são relativas ao arquivo de dados; ausentes ou com erro viram null.
+    const images = await Promise.all(WF.beats.map((b) => (b.image
+      ? loadImage(new URL(b.image, dataURL.href).href)
+      : Promise.resolve(null))))
+    const model = WF.models[0]
+    const handle = model.mount(stage, { format, lang: WF.lang, images })
+    // Faixa de legenda: 84% a 94% em 16:9; 74% a 82% em 9:16.
+    const cap = document.createElement('div')
+    cap.id = 'cap'
+    cap.style.top = (vertical ? 0.74 : 0.84) * h + 'px'
+    cap.style.height = (vertical ? 0.08 : 0.10) * h + 'px'
+    cap.style.fontSize = (vertical ? 40 : 36) + 'px'
+    stage.append(cap)
+    let shown = null
+    window.renderAt = (time) => {
+      const t = Math.min(Math.max(Number(time) || 0, 0), WF.duration)
+      handle.renderAt(t)
+      const c = WF.captionAt(t)
+      const str = c ? c.text : ''
+      if (str !== shown) {
+        shown = str
+        cap.textContent = str
+      }
+    }
+    window.__ready = true
+  } catch (err) {
+    window.__error = err.message
+    console.error(err.message)
+  }
+})()
+</script>
+</body>
+</html>

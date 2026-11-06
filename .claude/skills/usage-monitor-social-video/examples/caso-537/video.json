@@ -1,0 +1,122 @@
+{
+  "slug": "caso-537",
+  "link": "https://github.com/edilsonvilarinho/usage-monitor",
+  "facts": [
+    "issue #537",
+    "PR #539",
+    "24 testes novos",
+    "3961 testes",
+    "212/212 linhas do diff"
+  ],
+  "beats": [
+    {
+      "id": "abertura",
+      "kicker": {
+        "pt": "Caso real",
+        "en": "Real case"
+      },
+      "title": {
+        "pt": "Ordenar por coluna",
+        "en": "Sort by column"
+      },
+      "items": [
+        {
+          "pt": "issue #537",
+          "en": "issue #537",
+          "short": true
+        }
+      ],
+      "short": {
+        "pt": "Um pedido simples: ordenar as sessões por coluna.",
+        "en": "One simple request: sort the sessions by column."
+      },
+      "long": {
+        "pt": "Um pedido simples: ordenar as sessões por coluna, em todas as janelas de sessões.",
+        "en": "One simple request: sort the sessions by column, in every sessions window."
+      }
+    },
+    {
+      "id": "tela",
+      "kicker": {
+        "pt": "Resultado",
+        "en": "Result"
+      },
+      "title": {
+        "pt": "A tela entregue",
+        "en": "The delivered screen"
+      },
+      "image": "img/cli-sessions.png",
+      "items": [
+        {
+          "pt": "PR #539",
+          "en": "PR #539",
+          "short": true
+        }
+      ],
+      "short": {
+        "pt": "A entrega veio no PR quinhentos e trinta e nove, com merge automático.",
+        "en": "It shipped in pull request five thirty-nine, with auto-merge."
+      },
+      "long": {
+        "pt": "A entrega veio no pull request quinhentos e trinta e nove, com merge automático depois do check final.",
+        "en": "It shipped in pull request five thirty-nine, with auto-merge after the final check."
+      }
+    },
+    {
+      "id": "testes",
+      "kicker": {
+        "pt": "Evidência",
+        "en": "Evidence"
+      },
+      "title": {
+        "pt": "Testes na issue",
+        "en": "Tests on the issue"
+      },
+      "items": [
+        {
+          "pt": "24 testes novos",
+          "en": "24 new tests",
+          "short": true
+        },
+        {
+          "pt": "3961 testes · 0 falhas",
+          "en": "3961 tests · 0 failures",
+          "status": "ok",
+          "short": true
+        },
+        {
+          "pt": "212/212 linhas do diff",
+          "en": "212/212 diff lines",
+          "short": true
+        }
+      ],
+      "short": {
+        "pt": "Vinte e quatro testes novos, e tudo documentado na issue.",
+        "en": "Twenty-four new tests, all documented on the issue."
+      },
+      "long": {
+        "pt": "Vinte e quatro testes novos, zero falhas na suíte, e tudo documentado como comentário na issue.",
+        "en": "Twenty-four new tests, zero failures in the suite, all documented as a comment on the issue."
+      }
+    },
+    {
+      "id": "fim",
+      "kicker": {
+        "pt": "Usage Monitor",
+        "en": "Usage Monitor"
+      },
+      "title": {
+        "pt": "Do pedido ao merge",
+        "en": "From request to merge"
+      },
+      "short": {
+        "pt": "Usage Monitor. Do pedido ao merge.",
+        "en": "Usage Monitor. From request to merge."
+      },
+      "long": {
+        "pt": "Usage Monitor. Do pedido ao merge, com agentes de IA.",
+        "en": "Usage Monitor. From request to merge, with AI agents."
+      }
+    }
+  ]
+}
