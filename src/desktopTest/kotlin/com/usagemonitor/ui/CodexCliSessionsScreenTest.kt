@@ -1,7 +1,11 @@
 package com.usagemonitor.ui
 
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -12,9 +16,12 @@ import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.CodexCliSessionTurn
+import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
+import com.usagemonitor.presentation.ui.CODEX_SESSION_COLUMN_HEADER_TAG
+import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
 import com.usagemonitor.presentation.ui.ExportLabels
 import com.usagemonitor.presentation.ui.codexApplicationLabel
@@ -211,6 +218,57 @@ class CodexCliSessionsScreenTest {
     }
 
     @Test
+    fun `clicking responses sorts the shown list, a second click reverses it and a third returns to the published order`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(
+                FakeCodexRepository(
+                    sessions = listOf(
+                        rated("aaaa0001", responses = 2, throughput = OutputThroughput(1_000L, 100_000L)),
+                        rated("bbbb0002", responses = 5, throughput = OutputThroughput(3_000L, 100_000L)),
+                        rated("cccc0003", responses = 3)
+                    )
+                )
+            )
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+            val responses = CliSessionsLabels.responses(AppLanguage.PT)
+            val published = listOf("aaaa0001", "bbbb0002", "cccc0003")
+
+            assertEquals(published, rowOrder(published))
+            onNode(hasText(responses) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(listOf("bbbb0002", "cccc0003", "aaaa0001"), rowOrder(published))
+            onNode(hasText(responses) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(listOf("aaaa0001", "cccc0003", "bbbb0002"), rowOrder(published))
+            onNode(hasText(responses) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(published, rowOrder(published))
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `sessions without throughput stay last when sorting by throughput`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            // cccc0003 é a primeira publicada e não tem vazão: ordenar não pode deixá-la no topo.
+            val viewModel = viewModel(
+                FakeCodexRepository(
+                    sessions = listOf(
+                        rated("cccc0003", responses = 3),
+                        rated("aaaa0001", responses = 2, throughput = OutputThroughput(1_000L, 100_000L)),
+                        rated("bbbb0002", responses = 5, throughput = OutputThroughput(3_000L, 100_000L))
+                    )
+                )
+            )
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+            val throughput = CliSessionsLabels.throughput(AppLanguage.PT)
+            val published = listOf("cccc0003", "aaaa0001", "bbbb0002")
+
+            assertEquals(published, rowOrder(published))
+            onNode(hasText(throughput) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(listOf("bbbb0002", "aaaa0001", "cccc0003"), rowOrder(published))
+            onNode(hasText(throughput) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(listOf("aaaa0001", "bbbb0002", "cccc0003"), rowOrder(published))
+            viewModel.onDestroy()
+        }
+
+    @Test
     fun `application label normalizes the originator`() {
         val base = summary(LONG_SESSION_ID)
         assertEquals("Codex Desktop", codexApplicationLabel(base.copy(originator = " Codex Desktop ")))
@@ -222,6 +280,19 @@ class CodexCliSessionsScreenTest {
         assertEquals("abc", shortCodexId("abc"))
         assertEquals("12345678…", shortCodexId("1234567890"))
     }
+
+    /** Ids na ordem vertical em que aparecem na tela (ids curtos: o texto da célula é o próprio id). */
+    private fun ComposeUiTest.rowOrder(ids: List<String>): List<String> {
+        return ids.sortedBy { id ->
+            onNodeWithText(shortCodexId(id)).fetchSemanticsNode().positionInRoot.y
+        }
+    }
+
+    private fun rated(
+        sessionId: String,
+        responses: Int,
+        throughput: OutputThroughput? = null
+    ): CodexCliSessionSummary = summary(sessionId).copy(responseCount = responses, throughput = throughput)
 
     private fun viewModel(
         repository: FakeCodexRepository,
