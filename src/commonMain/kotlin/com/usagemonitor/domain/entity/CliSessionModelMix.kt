@@ -13,10 +13,18 @@ enum class ModelShareBasis {
     TOKENS
 }
 
-/** Um modelo da sessão e a fatia dele; `null` = sem tarifa numa base de custo. */
+/**
+ * Um modelo da sessão e a fatia dele; `null` = sem tarifa numa base de custo.
+ *
+ * `usageShare` é a fração dos turnos da sessão que foram desse modelo, na mesma
+ * base de todos os modelos. Não depende de tarifa: modelo sem preço continua com
+ * a sua fração medida. `null` só quando a sessão não tem turno nenhum, porque aí
+ * a fração não foi medida, e zero não serve para isso.
+ */
 data class ModelShare(
     val bucket: CliUsageBucket,
-    val share: Double?
+    val share: Double?,
+    val usageShare: Double? = null
 )
 
 /**
@@ -47,6 +55,7 @@ fun sessionModelMixOf(buckets: List<CliUsageBucket>): SessionModelMix {
     if (buckets.isEmpty()) {
         return SessionModelMix()
     }
+    val totalTurns = buckets.sumOf { bucket -> bucket.turnCount }
     val totalCost = buckets.sumOf { bucket -> bucket.costMicros }
     if (totalCost > 0L) {
         val shares = buckets.rankedByCost().map { bucket ->
@@ -56,7 +65,7 @@ fun sessionModelMixOf(buckets: List<CliUsageBucket>): SessionModelMix {
             } else {
                 null
             }
-            ModelShare(bucket = bucket, share = share)
+            ModelShare(bucket = bucket, share = share, usageShare = usageShareOf(bucket, totalTurns))
         }
         return SessionModelMix(basis = ModelShareBasis.COST, shares = shares)
     }
@@ -68,9 +77,17 @@ fun sessionModelMixOf(buckets: List<CliUsageBucket>): SessionModelMix {
         )
         .map { bucket ->
             val share = if (totalTokens > 0L) bucket.totalTokens.toDouble() / totalTokens.toDouble() else 0.0
-            ModelShare(bucket = bucket, share = share)
+            ModelShare(bucket = bucket, share = share, usageShare = usageShareOf(bucket, totalTurns))
         }
     return SessionModelMix(basis = ModelShareBasis.TOKENS, shares = shares)
+}
+
+/** Fração dos turnos da sessão que foram do modelo; `null` sem turno nenhum, nunca zero por falta de medida. */
+private fun usageShareOf(bucket: CliUsageBucket, totalTurns: Int): Double? {
+    if (totalTurns <= 0) {
+        return null
+    }
+    return bucket.turnCount.toDouble() / totalTurns.toDouble()
 }
 
 /**
@@ -87,15 +104,24 @@ fun Iterable<CliUsageGroupRow>.modelBreakdownBySession(): Map<String, List<CliUs
 /** Corte por modelo de uma sessão a partir dos turnos dela (detalhe). Subagente entra: o gasto é real. */
 fun Iterable<CliSessionTurn>.toModelBreakdown(): List<CliUsageBucket> {
     return map { turn ->
-        CliUsageGroupRow(
-            sessionId = turn.sessionId,
-            model = turn.model,
-            turnCount = 1,
+        val counts = UsageTokenCounts(
             inputTokens = turn.inputTokens,
             outputTokens = turn.outputTokens,
             cacheReadTokens = turn.cacheReadTokens,
             cacheWrite5mTokens = turn.cacheWrite5mTokens,
             cacheWrite1hTokens = turn.cacheWrite1hTokens
+        )
+        CliUsageGroupRow(
+            sessionId = turn.sessionId,
+            model = turn.model,
+            turnCount = 1,
+            inputTokens = counts.inputTokens,
+            outputTokens = counts.outputTokens,
+            cacheReadTokens = counts.cacheReadTokens,
+            cacheWrite5mTokens = counts.cacheWrite5mTokens,
+            cacheWrite1hTokens = counts.cacheWrite1hTokens,
+            // Faixa longa decidida turno a turno: somar prompts antes errava a faixa.
+            longPrompt = longPromptPartOfTurn(counts)
         )
     }.toUsageBreakdown().byModel
 }

@@ -1648,7 +1648,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
     tabela</b> (a mesma "Participação" do Resumo), porque o mesmo volume pesa muito mais num modelo caro, e é esse
     peso que aparece na cota. Sem custo nenhum na sessão, a base vira tokens e o rótulo diz <code>% dos tokens</code>.
     Modelo sem tarifa leva a palavra "sem tarifa", nunca 0%. Sem o corte lido (servidor de time antigo), a linha não
-    aparece. No Codex a mistura entra na segunda linha e só quando houve troca: a coluna Modelo já diz o modelo único.</p>
+    aparece. No Codex a mistura entra na segunda linha e só quando houve troca: a coluna Modelo já diz o modelo único. A coluna <b>% de uso</b> mostra a fatia dos turnos da sessão (<code>usageShare</code>) num trilho neutro, só na base de custo, nunca no Codex nem na base de tokens, e modelo sem tarifa mantém a sua fatia de turnos.</p>
 
     <div class="g2">
       <div><div class="cap">Lista vazia</div><div class="panel"><div class="state"><span class="msg">Nenhum turno nesta janela.</span></div></div></div>
@@ -1688,9 +1688,9 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 
     <div class="panel"><div class="phead"><span class="ptitle">Modelos da sessão</span><span class="k">2 modelos · participação no custo estimado</span></div><div class="pbody flush">
       <table class="dt">
-        <tr><td class="k">Modelo</td><td class="k">Turnos</td><td class="k">Tokens (com cache)</td><td class="k">Cache lido</td><td class="k">Cache gravado</td><td class="k">Custo</td><td class="k">% do custo</td></tr>
-        <tr><td>claude-opus-5</td><td class="num">18</td><td class="num">6,5M</td><td class="num">6,3M</td><td class="num">218,2K</td><td class="num">US$ 5,4792</td><td class="num">96% <div class="track info"><i style="width:96%"></i></div></td></tr>
-        <tr><td>claude-haiku-4-5</td><td class="num">3</td><td class="num">726,6K</td><td class="num">630K</td><td class="num">78K</td><td class="num">US$ 0,2247</td><td class="num">4% <div class="track info"><i style="width:4%"></i></div></td></tr>
+        <tr><td class="k">Modelo</td><td class="k">Turnos</td><td class="k">Tokens (com cache)</td><td class="k">Cache lido</td><td class="k">Cache gravado</td><td class="k">Custo</td><td class="k">% do custo</td><td class="k">% de uso <span class="k" title="Fatia dos turnos da sessão. Só aparece na base de custo.">?</span></td></tr>
+        <tr><td>claude-opus-5</td><td class="num">18</td><td class="num">6,5M</td><td class="num">6,3M</td><td class="num">218,2K</td><td class="num">US$ 5,4792</td><td class="num">96% <div class="track info"><i style="width:96%"></i></div></td><td class="num">86% <div class="track"><i style="width:86%"></i></div></td></tr>
+        <tr><td>claude-haiku-4-5</td><td class="num">3</td><td class="num">726,6K</td><td class="num">630K</td><td class="num">78K</td><td class="num">US$ 0,2247</td><td class="num">4% <div class="track info"><i style="width:4%"></i></div></td><td class="num">14% <div class="track"><i style="width:14%"></i></div></td></tr>
       </table>
     </div></div>
 

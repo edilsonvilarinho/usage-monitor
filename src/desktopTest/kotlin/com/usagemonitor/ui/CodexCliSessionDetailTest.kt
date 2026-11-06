@@ -54,5 +54,7 @@ class CodexCliSessionDetailTest {
         onNodeWithTag("${SESSION_MODEL_ROW_TAG_PREFIX}gpt-6.1-sol").assertExists()
         onNodeWithTag("${SESSION_MODEL_ROW_TAG_PREFIX}gpt-6.1-sol-mini").assertExists()
         onAllNodesWithText("Custo").assertCountEquals(0)
+        // Sem tarifa não há base de custo: a coluna de participação no uso some junto (#535).
+        onAllNodesWithText("% de uso").assertCountEquals(0)
     }
 }

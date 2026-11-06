@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -36,8 +38,8 @@ const val SESSION_MODEL_ROW_TAG_PREFIX = "sessionModelRow:"
 /** Tag da linha de modelos dentro da linha de uma sessão. */
 fun sessionModelMixLineTag(sessionId: String): String = "sessionModelMix:$sessionId"
 
-// Larguras da tabela de modelos da sessão. Somam 598dp mais o vão, abaixo do
-// que o detalhe deixa numa janela de 960dp: a linha não quebra.
+// Larguras da tabela de modelos da sessão. Na base de custo somam 708dp (598dp
+// mais 110dp da coluna de uso), com o Modelo no mínimo de 150dp.
 private val MODEL_COLUMN_MIN = 150.dp
 
 private val TURNS_COLUMN = 64.dp
@@ -48,6 +50,9 @@ private val VALUE_COLUMN = 96.dp
 private val TOKENS_COLUMN = 136.dp
 
 private val SHARE_COLUMN = 110.dp
+
+/** Participação nos turnos da sessão; só existe na base de custo (#535). */
+private val USAGE_COLUMN = 110.dp
 
 /** Os textos do corte por modelo da sessão (#445), PT/EN por [localized]. */
 internal object SessionModelMixLabels {
@@ -74,6 +79,15 @@ internal object SessionModelMixLabels {
     fun unknownModel(language: AppLanguage): String = localized(language, "modelo desconhecido", "unknown model")
 
     fun unpriced(language: AppLanguage): String = localized(language, "sem tarifa", "no price")
+
+    /** Participação nos turnos (#535). */
+    fun usage(language: AppLanguage): String = localized(language, "% de uso", "% of usage")
+
+    /** Dica do cabeçalho da coluna de uso; usa a caixa `?` de [HelpDot]. */
+    fun usageHint(language: AppLanguage): GlossaryEntry = GlossaryEntry(
+        title = usage(language),
+        explanation = localized(language, "Participação do modelo nos turnos da sessão.", "Model share of the session turns.")
+    )
 
     /** `Modelos (% do custo): claude-opus-5 82% · claude-haiku-4-5 18%`. */
     fun inline(mix: SessionModelMix, language: AppLanguage): String {
@@ -128,6 +142,7 @@ internal fun SessionModelTable(
     if (mix.isEmpty) {
         return
     }
+    val showUsage = mix.basis == ModelShareBasis.COST
     AppDataSurfaceFlush(
         modifier = Modifier.fillMaxWidth().testTag(SESSION_MODEL_TABLE_TAG),
         header = {
@@ -150,6 +165,12 @@ internal fun SessionModelTable(
                         AppColumnHeaderLabel(label = CliSessionsLabels.columnCost(language), modifier = Modifier.width(VALUE_COLUMN))
                     }
                     AppColumnHeaderLabel(label = SessionModelMixLabels.basis(mix.basis, language), modifier = Modifier.width(SHARE_COLUMN))
+                    if (showUsage) {
+                        Row(modifier = Modifier.width(USAGE_COLUMN), verticalAlignment = Alignment.CenterVertically) {
+                            AppColumnHeaderLabel(label = SessionModelMixLabels.usage(language), modifier = Modifier.weight(1f))
+                            HelpDot(entry = SessionModelMixLabels.usageHint(language))
+                        }
+                    }
                 }
             }
         }
@@ -159,6 +180,7 @@ internal fun SessionModelTable(
                 share = share,
                 language = language,
                 showCost = showCost,
+                showUsage = showUsage,
                 showDivider = index < mix.shares.lastIndex
             )
         }
@@ -170,6 +192,7 @@ private fun SessionModelRow(
     share: ModelShare,
     language: AppLanguage,
     showCost: Boolean,
+    showUsage: Boolean,
     showDivider: Boolean
 ) {
     val bucket = share.bucket
@@ -196,6 +219,15 @@ private fun SessionModelRow(
             AppCellValue(value = SessionModelMixLabels.shareText(share, language))
             Spacer(modifier = Modifier.height(AppSpacing.xs))
             AppProgressTrack(fraction = (share.share ?: 0.0).toFloat(), tone = AppTone.INFO)
+        }
+        if (showUsage) {
+            // Sem turno medido não há participação: travessão e trilha vazia, nunca 0%.
+            val usage = share.usageShare
+            Column(modifier = Modifier.width(USAGE_COLUMN)) {
+                AppCellValue(value = if (usage == null) "—" else formatPercent(usage))
+                Spacer(modifier = Modifier.height(AppSpacing.xs))
+                AppProgressTrack(fraction = (usage ?: 0.0).toFloat(), tone = AppTone.NEUTRAL)
+            }
         }
     }
 }
