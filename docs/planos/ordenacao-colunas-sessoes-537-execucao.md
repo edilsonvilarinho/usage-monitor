@@ -90,6 +90,7 @@ histórico de `.claude/skills/usage-monitor-visual-options/SKILL.md`.
 |---|---|---|
 | A01 | Concluída | Sem harness de teste: documento. Validado contra o código pelas leituras listadas em "Fatos confirmados". |
 | A02 | Concluída | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.CliSessionSortTest"`, 9/9 `java.lang.AssertionError` (ex.: `CliSessionSortTest.kt:65`, `:72`, `:111`), sem erro de compilação. O texto expected/actual não foi capturado: o log só traz arquivo e linha, e o XML foi sobrescrito pelo verde. Verde: mesmo comando, `tests="9" failures="0" errors="0"`. |
+| A03 | Concluída | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.AppSortableColumnHeaderTest"`. Vermelho da posição da seta, antes da correção: `seta começa antes do fim do rótulo: arrow.left=122.0 text.right=128.0`. Truncamento e movimento só ficaram vermelhos por mutação (seta no fluxo; `tween` cru), porque os testes foram reescritos depois do código: `rótulo 'Tokens (with cache)' trunca em 136dp (sortDescending=true): maxIntrinsicWidth=128.0, largura=120` e `expected:<Color(0.9490196, 0.92941177, 0.92941177, 1.0, sRGB IEC61966-2.1)> but was:<Color(0.72156864, 0.69803923, 0.69803923, 1.0, sRGB IEC61966-2.1)>`. `isLineEllipsized` foi descartado: seguiu verde sob a mutação. Medido sem mutação: 128 de 136dp, 74 de 84dp, 67 de 76dp. Verde após restaurar (`cmp` igual): `tests="10" failures="0" errors="0"`. `.jsx` conferido só por leitura. |
 
 ## Problemas em aberto e riscos
 
