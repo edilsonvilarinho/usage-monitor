@@ -51,6 +51,7 @@ descrições, sempre com o padrão aprovado.
 | A06 | Feito | Sem teste unitário: porte de código de áudio e navegador. Validado pela execução da A08; `grep` sem id de tema em `audio.py`. |
 | A05 | Feito | Sem harness de teste: cena conferida por quadro. Diff contra `final/scene.js`: 119 inserções, mesmas cores. Imagem reprovada uma vez em 16:9 (37% da largura) e corrigida para 58%, câmera recuada. |
 | A04 | Feito | Vermelho: `voice.test.mjs`, stub, `Expected values to be strictly deep-equal` em `speechRequest`. Verde: 8 de 8. `make.mjs`, defeito da prévia: `render --silent --to 2`, `exit=1`, `ENOENT short-en.srt`; verde `exit=0`. |
+| A07 | Feito | Sem harness de teste: texto de skill, conferido contra a execução da A08. |
 
 ## Problemas em aberto e riscos
 
