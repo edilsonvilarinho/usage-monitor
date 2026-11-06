@@ -52,9 +52,11 @@ descrições, sempre com o padrão aprovado.
 | A05 | Feito | Sem harness de teste: cena conferida por quadro. Diff contra `final/scene.js`: 119 inserções, mesmas cores. Imagem reprovada uma vez em 16:9 (37% da largura) e corrigida para 58%, câmera recuada. |
 | A04 | Feito | Vermelho: `voice.test.mjs`, stub, `Expected values to be strictly deep-equal` em `speechRequest`. Verde: 8 de 8. `make.mjs`, defeito da prévia: `render --silent --to 2`, `exit=1`, `ENOENT short-en.srt`; verde `exit=0`. |
 | A07 | Feito | Sem harness de teste: texto de skill, conferido contra a execução da A08. |
+| A08 | Feito | `make.mjs check`, `preview` e `render --silent --to 16` no exemplo `caso-537`: 6 MP4 e 6 SRT, H.264 e AAC, 1080x1920 e 1920x1080, quadros extraídos conferidos, imagem legível. Suíte pelo `test-runner`: 48 de 48 e, na skill de release, 27 de 27. |
 
 ## Problemas em aberto e riscos
 
-- A chamada real à API não é exercida neste trabalho: não há chave válida para isso. O teste cobre o pedido por `fetch` simulado.
+- A chamada real à API não foi exercida pelo `make.mjs voice`: o teste cobre o pedido por `fetch` simulado, e o formato é o mesmo que funcionou no #540. A primeira execução com chave é a prova.
+- `make.mjs` não tem teste automatizado; foi validado por execução real.
 - Testes da skill não rodam no CI, como os da skill de release.
 - Escuta humana continua sendo do dono.
