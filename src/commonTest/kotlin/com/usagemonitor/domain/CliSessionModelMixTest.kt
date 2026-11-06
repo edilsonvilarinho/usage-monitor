@@ -21,6 +21,7 @@ import kotlin.time.Instant
 private const val OPUS = "claude-opus-5"
 private const val HAIKU = "claude-haiku-4-5"
 private const val UNPRICED = "claude-unknown-9"
+private const val HAIKU_5_5 = "claude-haiku-5-5"
 
 class CliSessionModelMixTest {
 
@@ -133,6 +134,41 @@ class CliSessionModelMixTest {
     }
 
     @Test
+    fun `turn below the long prompt threshold is priced in the base tier`() {
+        // Prompt de 50.000 fica na faixa base: 50.000 x 0,10 + 1.000.000 x 0,50 = 505.000 micros.
+        val bucket = listOf(turn(seq = 1, model = HAIKU_5_5, inputTokens = 50_000L, outputTokens = 1_000_000L))
+            .toModelBreakdown()
+            .single()
+
+        assertTrue(bucket.isCostComplete)
+        assertEquals(505_000L, bucket.costMicros)
+    }
+
+    @Test
+    fun `turn above the long prompt threshold is priced in the long tier`() {
+        // Prompt de 150.000 passa de 100.000: 150.000 x 0,50 + 1.000.000 x 2,50 = 2.575.000 micros.
+        val bucket = listOf(turn(seq = 1, model = HAIKU_5_5, inputTokens = 150_000L, outputTokens = 1_000_000L))
+            .toModelBreakdown()
+            .single()
+
+        assertTrue(bucket.isCostComplete)
+        assertEquals(2_575_000L, bucket.costMicros)
+    }
+
+    @Test
+    fun `mixed turns sum the base and the long tier turn by turn`() {
+        // 505.000 (turno curto) + 2.575.000 (turno longo) = 3.080.000. Somar os prompts antes
+        // (200.000) jogaria os dois turnos na faixa longa e daria 5.100.000.
+        val bucket = listOf(
+            turn(seq = 1, model = HAIKU_5_5, inputTokens = 50_000L, outputTokens = 1_000_000L),
+            turn(seq = 2, model = HAIKU_5_5, inputTokens = 150_000L, outputTokens = 1_000_000L)
+        ).toModelBreakdown().single()
+
+        assertTrue(bucket.isCostComplete)
+        assertEquals(3_080_000L, bucket.costMicros)
+    }
+
+    @Test
     fun `codex turns fold by model with distinct turn ids and a token basis`() {
         val turns = listOf(
             codexTurn(turnId = "t1", responseId = "r1", model = "gpt-5", input = 1_000L, cached = 600L, output = 100L),
@@ -164,7 +200,8 @@ class CliSessionModelMixTest {
         model: String?,
         outputTokens: Long = 0L,
         cacheReadTokens: Long = 0L,
-        isSidechain: Boolean = false
+        isSidechain: Boolean = false,
+        inputTokens: Long = 0L
     ) = CliSessionTurn(
         sessionId = "s1",
         seq = seq,
@@ -172,6 +209,7 @@ class CliSessionModelMixTest {
         ts = Instant.fromEpochMilliseconds(seq * 1_000L),
         model = model,
         isSidechain = isSidechain,
+        inputTokens = inputTokens,
         outputTokens = outputTokens,
         cacheReadTokens = cacheReadTokens
     )

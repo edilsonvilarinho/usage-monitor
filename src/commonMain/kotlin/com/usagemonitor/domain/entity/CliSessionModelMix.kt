@@ -87,15 +87,24 @@ fun Iterable<CliUsageGroupRow>.modelBreakdownBySession(): Map<String, List<CliUs
 /** Corte por modelo de uma sessão a partir dos turnos dela (detalhe). Subagente entra: o gasto é real. */
 fun Iterable<CliSessionTurn>.toModelBreakdown(): List<CliUsageBucket> {
     return map { turn ->
-        CliUsageGroupRow(
-            sessionId = turn.sessionId,
-            model = turn.model,
-            turnCount = 1,
+        val counts = UsageTokenCounts(
             inputTokens = turn.inputTokens,
             outputTokens = turn.outputTokens,
             cacheReadTokens = turn.cacheReadTokens,
             cacheWrite5mTokens = turn.cacheWrite5mTokens,
             cacheWrite1hTokens = turn.cacheWrite1hTokens
+        )
+        CliUsageGroupRow(
+            sessionId = turn.sessionId,
+            model = turn.model,
+            turnCount = 1,
+            inputTokens = counts.inputTokens,
+            outputTokens = counts.outputTokens,
+            cacheReadTokens = counts.cacheReadTokens,
+            cacheWrite5mTokens = counts.cacheWrite5mTokens,
+            cacheWrite1hTokens = counts.cacheWrite1hTokens,
+            // Faixa longa decidida turno a turno: somar prompts antes errava a faixa.
+            longPrompt = longPromptPartOfTurn(counts)
         )
     }.toUsageBreakdown().byModel
 }

@@ -43,6 +43,7 @@ A tabela "Modelos da sessão" mostrava `claude-haiku-5-5` com custo `—` e "sem
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness: documento | Plano criado; fatos medidos com os comandos citados acima |
+| A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CliSessionModelMixTest"` | Vermelho: 12 rodados, 3 falhas, `CliSessionModelMixTest.kt:143` `Expected value to be true.` em `isCostComplete`; verde: 12 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
