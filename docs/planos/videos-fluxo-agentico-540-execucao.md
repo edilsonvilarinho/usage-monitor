@@ -58,13 +58,20 @@ para o dono escolher.
 | A04 | Feito | `audio/music.py` e `audio/sfx.py`: 4 trilhas e efeitos, 60,0 s, cerca de -20 LUFS. Lyria: 1 faixa; a 2ª recebeu `403 PROHIBITED_CONTENT` e não foi refeita. |
 | A05 | Feito | Chrome real, `file://`: 10 modelos, 9:16 e EN sem erro; voz, trilha e efeitos com desvio de cerca de 20 ms; ducking 0,6 para 0,21; sem rolagem em 390 px. |
 | A06–A15 | Aprovados como direção | `render/stills.mjs`, 9 tempos, 2 formatos, saída 0. Conferidos por folha de contato em `qa/sheet-NN.jpg`. Ressalvas da versão final abaixo. |
-| A16 | Aguardando a escolha do dono | `render/render.mjs`: MP4 1280x720, 60,0 s, H.264 e AAC, -17,9 LUFS medido no modelo 01. |
+| A16 | Feito | `render/render.mjs`: 10 MP4 1280x720, 60,0 s, H.264 e AAC. Escolha do dono: modelo 01, Matilda, George, Pulso de sonda. |
+| A17 | Feito | Roteiro refeito a pedido do dono (`video-fluxo-540/roteiro.md`). Vozes via `opencode run`, 0 falhas: 60 s com 51,8 s de fala em PT e 51,9 s em EN; longo com 255,2 s e 247,8 s. |
+| A18 | Feito | `node final/build.mjs`: short 60,000 s (pausas de 0,83 e 0,81 s); long-pt 299,996 s (2,914 s); long-en 293,760 s (3,000 s). SRT sem `C I OK`. |
+| A19 | Feito | `final/audio.py`: 4 variantes de trilha e efeitos com a duração exata, -20,0 LUFS medido em short-pt e long-pt. |
+| A20 | Feito | `final/stills.mjs` nos instantes densos, 9:16 e 16:9, saída 0. Itens em 9:16 viraram coluna depois de reprovação; horizonte ajustado para z 0,86. |
+| A21 | Feito | `final/render.mjs`: 5 renders, saída 0, cópia para Shorts. `ffprobe` e `ebur128`: 1080x1920 e 1920x1080, 30 fps, 60,0 s, 300,0 s e 293,8 s, -14,1 a -14,3 LUFS, pico -1,2 a -1,3 dBTP. Quadros extraídos dos MP4 conferidos. |
+| A22 | Feito | `video-fluxo-540/social.md`: X com 253 de 280 caracteres, capítulos pelos tempos reais de `final/data/long-*.js`. Sem harness de teste: conferido por leitura. |
 
 ## Problemas em aberto e riscos
 
-- Ressalvas da versão final: 01 lente fraca e lockup 9:16 na borda; 05 jobs apertados em 9:16; 06 sonda sobre `expected:` em t=24; 07 abertura 9:16 vazia e título fixo; 08 cometas fracos; 09 rótulos do topo pequenos; 10 URL quebra em 9:16.
+- O anel do modelo 01 ainda lembra uma esfera com anéis; a escolha do dono foi feita vendo essa aparência.
+- Fonte e mídia ficam em `prototipos/workflow-video-v3/` e `~/Videos/usage-monitor/workflow/`, fora do versionamento.
 - Só `pt-caio` e `en-harper` mantêm o respiro de 1,2 s em todos os beats.
 - Agentes passaram de 4 simultâneos uma vez (6), ao devolver 01 e 03 com 05 e 06 já abertos.
-- Escuta humana é do dono: agente mede duração e loudness, não pronúncia nem beleza da voz.
+- Escuta humana é do dono: agente mede duração e loudness, não pronúncia nem beleza da voz. Conferir "ci-ok", "Claude ponto M D" e "T D D" antes de publicar.
 - Termos de uso de saída do Lyria não verificados; faixa de Lyria só vai ao vídeo final depois disso.
 - Ranking público de TTS não cobre PT-BR nem os modelos atuais do catálogo: a escolha de vozes é por disponibilidade.
