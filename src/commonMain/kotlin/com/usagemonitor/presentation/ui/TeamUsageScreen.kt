@@ -2,6 +2,10 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.unit.Dp
+import com.usagemonitor.presentation.CliSessionSort
+import com.usagemonitor.presentation.CliSessionSortColumn
+import com.usagemonitor.presentation.nextCliSessionSort
+import com.usagemonitor.presentation.sortCliSessions
 import com.usagemonitor.presentation.ui.components.appItemMotion
 import com.usagemonitor.presentation.ui.components.AppStateCrossfade
 import com.usagemonitor.presentation.ui.components.AppModalRevealScope
@@ -233,6 +237,7 @@ internal fun TeamUsageContent(
     // diálogo debaixo do usuário.
     var pendingRemoval by remember { mutableStateOf<TeamMemberUsage?>(null) }
     var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
+    var sessionSort by remember { mutableStateOf<CliSessionSort?>(null) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         AppStateCrossfade(state, key = { current -> if (current is TeamUsageUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
@@ -254,6 +259,8 @@ internal fun TeamUsageContent(
                     val detail = state.detail
                     if (detail == null) {
                         TeamUsageList(
+                            sessionSort = sessionSort,
+                            onSessionSortChange = { column -> sessionSort = nextCliSessionSort(sessionSort, column) },
                             state = state,
                             language = language,
                             localDeviceId = localDeviceId,
@@ -340,7 +347,9 @@ private fun TeamUsageList(
     onRequestRemoveSession: (TeamMemberUsage, CliSessionSummary) -> Unit,
     onDismissSessionRemovalError: () -> Unit,
     onSelectView: (TeamUsageView) -> Unit,
-    onExportReport: () -> Unit
+    onExportReport: () -> Unit,
+    sessionSort: CliSessionSort?,
+    onSessionSortChange: (CliSessionSortColumn) -> Unit
 ) {
     val view = state.effectiveView
 
@@ -538,6 +547,8 @@ private fun TeamUsageList(
                                 language = language,
                                 memberIndent = memberIndent,
                                 sessionIndent = sessionIndent,
+                                sessionSort = sessionSort,
+                                onSessionSortChange = onSessionSortChange,
                                 hasStatusColumn = hasStatusColumn,
                                 localDeviceId = localDeviceId,
                                 onToggleMember = onToggleMember,
@@ -572,6 +583,8 @@ private fun LazyListScope.teamMemberItems(
     language: AppLanguage,
     memberIndent: Dp,
     sessionIndent: Dp,
+    sessionSort: CliSessionSort?,
+    onSessionSortChange: (CliSessionSortColumn) -> Unit,
     hasStatusColumn: Boolean,
     localDeviceId: String?,
     onToggleMember: (String) -> Unit,
@@ -610,7 +623,9 @@ private fun LazyListScope.teamMemberItems(
                 ) {
                     CliSessionColumnHeader(
                         language = language,
-                        hasActionColumn = state.isAdminOverview
+                        hasActionColumn = state.isAdminOverview,
+                        sort = sessionSort,
+                        onSortChange = onSessionSortChange
                     )
                 }
             }
@@ -619,10 +634,11 @@ private fun LazyListScope.teamMemberItems(
         // As sessões entram como itens irmãos, e não dentro da
         // linha: aninhar uma lista rolável em outra quebra a
         // rolagem e desliga o reaproveitamento de itens.
+        val sessions = sortCliSessions(member.sessions, sessionSort)
         items(
-            count = member.sessions.size,
+            count = sessions.size,
             key = { index ->
-                "${member.memberKey}:${member.sessions[index].sessionId}"
+                "${member.memberKey}:${sessions[index].sessionId}"
             }
         ) { index ->
             // Terceiro degrau da escada de superfícies: a faixa
@@ -641,7 +657,7 @@ private fun LazyListScope.teamMemberItems(
                     .appNestedGroupItem(indent = sessionIndent)
                     .testTag("$TEAM_MEMBER_SESSIONS_TAG_PREFIX${member.deviceId}")
             ) {
-                val session = member.sessions[index]
+                val session = sessions[index]
                 CliSessionRow(
                     session = session,
                     language = language,
