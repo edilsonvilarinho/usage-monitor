@@ -49,6 +49,7 @@ descrições, sempre com o padrão aprovado.
 | A02 | Feito | Vermelho: `node --test scripts/test/spec.test.mjs`, stub, `0 !== 2` em ERR_ASSERTION, 19 testes, 17 falhas. Verde: 19 de 19. |
 | A03 | Feito | Vermelho: `node --test scripts/test/timeline.test.mjs`, stub, `AssertionError: Expected values to be strictly equal` em `gap é limitado a 3,0 s`, 19 falhas. Verde: 19 de 19. |
 | A06 | Feito | Sem teste unitário: porte de código de áudio e navegador. Validado pela execução da A08; `grep` sem id de tema em `audio.py`. |
+| A05 | Feito | Sem harness de teste: cena conferida por quadro. Diff contra `final/scene.js`: 119 inserções, mesmas cores. Imagem reprovada uma vez em 16:9 (37% da largura) e corrigida para 58%, câmera recuada. |
 
 ## Problemas em aberto e riscos
 
