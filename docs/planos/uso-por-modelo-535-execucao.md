@@ -46,6 +46,7 @@ A tabela "Modelos da sessão" mostrava `claude-haiku-5-5` com custo `—` e "sem
 | A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CliSessionModelMixTest"` | Vermelho: 12 rodados, 3 falhas, `CliSessionModelMixTest.kt:143` `Expected value to be true.` em `isCostComplete`; verde: 12 testes, 0 falhas |
 | A03 | `gradlew.bat desktopTest --tests "com.usagemonitor.domain.CliSessionModelMixTest"` | Vermelho: 16 rodados, 3 falhas, `CliSessionModelMixTest.kt:99` `expected:<0.6> but was:<null>`; verde: 16 testes, 0 falhas |
 | A04 | `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CliSessionsScreenTest" --tests "com.usagemonitor.ui.CodexCliSessionDetailTest"` | Vermelho: 57 testes, 2 falhas, `AssertionError` em `CliSessionsScreenTest.kt:1638` e `:1679` (`% de uso` ausente); verde: 57 testes, 0 falhas |
+| Validação local | `gradlew.bat allTests koverXmlReport -Pcoverage`; `node tools/ci/diff-coverage.mjs --base origin/main --kover build/reports/kover/report.xml`; `node .claude/skills/usage-monitor-test-report/scripts/build-test-report.mjs` | 3937 testes, 0 falhas, 1 ignorado; cobertura do diff 100,0% (47 de 47); Kotlin 95,1%; regras de arquitetura ok |
 
 ## Problemas em aberto e riscos
 
