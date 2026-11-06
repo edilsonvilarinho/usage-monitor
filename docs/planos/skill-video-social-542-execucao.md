@@ -47,6 +47,7 @@ descrições, sempre com o padrão aprovado.
 |---|---|---|
 | A01 | Feito | Sem harness de teste: documento conferido por leitura. |
 | A02 | Feito | Vermelho: `node --test scripts/test/spec.test.mjs`, stub, `0 !== 2` em ERR_ASSERTION, 19 testes, 17 falhas. Verde: 19 de 19. |
+| A03 | Feito | Vermelho: `node --test scripts/test/timeline.test.mjs`, stub, `AssertionError: Expected values to be strictly equal` em `gap é limitado a 3,0 s`, 19 falhas. Verde: 19 de 19. |
 
 ## Problemas em aberto e riscos
 
