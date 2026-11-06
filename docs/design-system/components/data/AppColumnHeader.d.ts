@@ -20,3 +20,17 @@ export interface AppColumnHeaderProps {
 }
 
 export function AppColumnHeader(props: AppColumnHeaderProps): JSX.Element;
+
+/**
+ * Legenda ordenável (#537). `sortDescending` null = coluna inativa; true = descendente; false = ascendente.
+ * `aria-description` carrega a direção, porque a seta sozinha não informa.
+ */
+export interface AppSortableColumnHeaderLabelProps {
+  label: ReactNode;
+  /** null = inativa; true = maior primeiro; false = menor primeiro. */
+  sortDescending?: boolean | null;
+  onClick?: () => void;
+  style?: CSSProperties;
+}
+
+export function AppSortableColumnHeaderLabel(props: AppSortableColumnHeaderLabelProps): JSX.Element;

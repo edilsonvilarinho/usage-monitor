@@ -21,6 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionSummary
+import com.usagemonitor.presentation.CliSessionSort
+import com.usagemonitor.presentation.CliSessionSortColumn
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppCellValue
 import com.usagemonitor.presentation.ui.components.AppColumnHeaderLabel
@@ -28,6 +30,7 @@ import com.usagemonitor.presentation.ui.components.AppColumnHeaderRow
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppIconButton
 import com.usagemonitor.presentation.ui.components.AppProgressTrack
+import com.usagemonitor.presentation.ui.components.AppSortableColumnHeaderLabel
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
@@ -103,7 +106,9 @@ internal fun LiveBadge(language: AppLanguage) {
 internal fun CliSessionColumnHeader(
     language: AppLanguage,
     modifier: Modifier = Modifier,
-    hasActionColumn: Boolean = false
+    hasActionColumn: Boolean = false,
+    sort: CliSessionSort? = null,
+    onSortChange: (CliSessionSortColumn) -> Unit = {}
 ) {
     AppColumnHeaderRow(
         // Sem marcador na linha de sessão: a faixa começa onde a primeira célula
@@ -119,31 +124,70 @@ internal fun CliSessionColumnHeader(
             label = CliSessionsLabels.columnProject(language),
             modifier = Modifier.width(SESSION_COLUMN_PROJECT)
         )
-        AppColumnHeaderLabel(
+        SortableSessionHeader(
+            column = CliSessionSortColumn.TOKENS,
             label = CliSessionsLabels.columnTokens(language),
-            modifier = Modifier.width(SESSION_COLUMN_TOKENS)
+            modifier = Modifier.width(SESSION_COLUMN_TOKENS),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
-        AppColumnHeaderLabel(
+        SortableSessionHeader(
+            column = CliSessionSortColumn.CACHE,
             label = CliSessionsLabels.columnCache(language),
-            modifier = Modifier.width(SESSION_COLUMN_CACHE)
+            modifier = Modifier.width(SESSION_COLUMN_CACHE),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
-        AppColumnHeaderLabel(
+        SortableSessionHeader(
+            column = CliSessionSortColumn.COST,
             label = CliSessionsLabels.columnCost(language),
-            modifier = Modifier.width(SESSION_COLUMN_COST)
+            modifier = Modifier.width(SESSION_COLUMN_COST),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
-        AppColumnHeaderLabel(
+        SortableSessionHeader(
+            column = CliSessionSortColumn.ACTIVE_TIME,
             label = CliSessionsLabels.activeTime(language),
-            modifier = Modifier.width(SESSION_COLUMN_ACTIVE_TIME)
+            modifier = Modifier.width(SESSION_COLUMN_ACTIVE_TIME),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
-        AppColumnHeaderLabel(
+        SortableSessionHeader(
+            column = CliSessionSortColumn.THROUGHPUT,
             label = CliSessionsLabels.throughput(language),
-            modifier = Modifier.width(SESSION_COLUMN_THROUGHPUT)
+            modifier = Modifier.width(SESSION_COLUMN_THROUGHPUT),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
         if (hasActionColumn) {
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.width(SESSION_ACTION_SLOT))
         }
     }
+}
+
+@Composable
+private fun SortableSessionHeader(
+    column: CliSessionSortColumn,
+    label: String,
+    modifier: Modifier,
+    sort: CliSessionSort?,
+    language: AppLanguage,
+    onSortChange: (CliSessionSortColumn) -> Unit
+) {
+    AppSortableColumnHeaderLabel(
+        label = label,
+        sortDescending = sort?.takeIf { it.column == column }?.descending,
+        onClick = { onSortChange(column) },
+        descendingStateDescription = CliSessionsLabels.sortDescendingState(language),
+        ascendingStateDescription = CliSessionsLabels.sortAscendingState(language),
+        modifier = modifier
+    )
 }
 
 /**

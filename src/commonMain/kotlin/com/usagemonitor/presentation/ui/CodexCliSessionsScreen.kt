@@ -19,12 +19,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.presentation.CliSessionSort
+import com.usagemonitor.presentation.CliSessionSortColumn
+import com.usagemonitor.presentation.codexCacheRateOf
+import com.usagemonitor.presentation.nextCliSessionSort
+import com.usagemonitor.presentation.sortCodexCliSessions
 import com.usagemonitor.presentation.ui.components.AppBanner
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
@@ -44,6 +52,7 @@ import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSegment
 import com.usagemonitor.presentation.ui.components.AppSegmentedControl
+import com.usagemonitor.presentation.ui.components.AppSortableColumnHeaderLabel
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
 import com.usagemonitor.presentation.ui.components.AppTab
 import com.usagemonitor.presentation.ui.components.AppTabs
@@ -69,12 +78,17 @@ private val CODEX_SESSION_TOKENS_COLUMN = 130.dp
 private val CODEX_SESSION_CACHE_COLUMN = 90.dp
 internal val CODEX_METRIC_BLOCK_WIDTH = 168.dp
 
+/** Tag do cabeçalho da lista Codex; o teste seleciona a coluna por ele, não pelo rótulo repetido. */
+const val CODEX_SESSION_COLUMN_HEADER_TAG = "codexSessionColumnHeader"
+
 @Composable
 fun CodexCliSessionsScreen(
     viewModel: CodexCliSessionsViewModel,
     language: AppLanguage
 ) {
     val state by viewModel.uiState.collectAsState()
+    // Ordenação da lista de sessões; null é a ordem publicada pela consulta.
+    var sessionSort by remember { mutableStateOf<CliSessionSort?>(null) }
 
     AppWindowScaffold(
         modifier = Modifier.fillMaxSize(),
@@ -192,6 +206,8 @@ fun CodexCliSessionsScreen(
                     language = language,
                     onOpenSession = viewModel::openSession,
                     onCloseDetail = viewModel::closeDetail,
+                    sort = sessionSort,
+                    onSortChange = { column -> sessionSort = nextCliSessionSort(sessionSort, column) },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -205,6 +221,8 @@ private fun CodexCliSessionContent(
     language: AppLanguage,
     onOpenSession: (String) -> Unit,
     onCloseDetail: () -> Unit,
+    sort: CliSessionSort?,
+    onSortChange: (CliSessionSortColumn) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (state.exportOutcome != null) {
@@ -255,20 +273,43 @@ private fun CodexCliSessionContent(
         return
     }
 
+    CodexCliSessionTable(
+        sessions = state.sessions,
+        language = language,
+        sort = sort,
+        onSortChange = onSortChange,
+        onOpenSession = onOpenSession,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun CodexCliSessionTable(
+    sessions: List<CodexCliSessionSummary>,
+    language: AppLanguage,
+    sort: CliSessionSort?,
+    onSortChange: (CliSessionSortColumn) -> Unit,
+    onOpenSession: (String) -> Unit,
+    modifier: Modifier
+) {
+    // A ordenação só reordena a exibição; a lista publicada pelo view model não muda.
+    val ordered = remember(sessions, sort) { sortCodexCliSessions(sessions, sort) }
     AppDataSurfaceFlush(
         modifier = modifier,
-        header = { CodexSessionColumnHeader(language = language) }
+        header = {
+            CodexSessionColumnHeader(language = language, sort = sort, onSortChange = onSortChange)
+        }
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             itemsIndexed(
-                items = state.sessions,
+                items = ordered,
                 key = { _, session -> session.sessionId }
             ) { index, session ->
                 CodexCliSessionRow(
                     session = session,
                     language = language,
                     onClick = { onOpenSession(session.sessionId) },
-                    showDivider = index != state.sessions.lastIndex
+                    showDivider = index != ordered.lastIndex
                 )
             }
         }
@@ -276,10 +317,14 @@ private fun CodexCliSessionContent(
 }
 
 @Composable
-private fun CodexSessionColumnHeader(language: AppLanguage) {
+private fun CodexSessionColumnHeader(
+    language: AppLanguage,
+    sort: CliSessionSort?,
+    onSortChange: (CliSessionSortColumn) -> Unit
+) {
     AppColumnHeaderRow(
         startGutter = 0.dp,
-        modifier = Modifier.padding(vertical = AppSpacing.sm)
+        modifier = Modifier.padding(vertical = AppSpacing.sm).testTag(CODEX_SESSION_COLUMN_HEADER_TAG)
     ) {
         AppColumnHeaderLabel(
             label = if (language == AppLanguage.PT) "Sessão" else "Session",
@@ -289,27 +334,63 @@ private fun CodexSessionColumnHeader(language: AppLanguage) {
             label = CliSessionsLabels.columnProject(language),
             modifier = Modifier.width(CODEX_SESSION_PROJECT_COLUMN)
         )
-        AppColumnHeaderLabel(
+        SortableCodexSessionHeader(
+            column = CliSessionSortColumn.TOKENS,
             label = if (language == AppLanguage.PT) "Tokens (com cache)" else "Tokens (cached)",
-            modifier = Modifier.width(CODEX_SESSION_TOKENS_COLUMN)
+            modifier = Modifier.width(CODEX_SESSION_TOKENS_COLUMN),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
-        AppColumnHeaderLabel(
+        SortableCodexSessionHeader(
+            column = CliSessionSortColumn.CACHE,
             label = if (language == AppLanguage.PT) "Cache" else "Cache",
-            modifier = Modifier.width(CODEX_SESSION_CACHE_COLUMN)
+            modifier = Modifier.width(CODEX_SESSION_CACHE_COLUMN),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
-        AppColumnHeaderLabel(
+        SortableCodexSessionHeader(
+            column = CliSessionSortColumn.RESPONSES,
             label = CliSessionsLabels.responses(language),
-            modifier = Modifier.width(CODEX_SESSION_RESPONSES_COLUMN)
+            modifier = Modifier.width(CODEX_SESSION_RESPONSES_COLUMN),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
         AppColumnHeaderLabel(
             label = CliSessionsLabels.columnModel(language),
             modifier = Modifier.width(CODEX_SESSION_MODEL_COLUMN)
         )
-        AppColumnHeaderLabel(
+        SortableCodexSessionHeader(
+            column = CliSessionSortColumn.THROUGHPUT,
             label = CliSessionsLabels.throughput(language),
-            modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN)
+            modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN),
+            sort = sort,
+            language = language,
+            onSortChange = onSortChange
         )
     }
+}
+
+/** Cabeçalho ordenável da lista Codex; mesmo contrato do `SortableSessionHeader` da lista Anthropic. */
+@Composable
+private fun SortableCodexSessionHeader(
+    column: CliSessionSortColumn,
+    label: String,
+    modifier: Modifier,
+    sort: CliSessionSort?,
+    language: AppLanguage,
+    onSortChange: (CliSessionSortColumn) -> Unit
+) {
+    AppSortableColumnHeaderLabel(
+        label = label,
+        sortDescending = sort?.takeIf { it.column == column }?.descending,
+        onClick = { onSortChange(column) },
+        descendingStateDescription = CliSessionsLabels.sortDescendingState(language),
+        ascendingStateDescription = CliSessionsLabels.sortAscendingState(language),
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -421,10 +502,8 @@ internal fun codexApplicationLabel(session: CodexCliSessionSummary): String {
 }
 
 private fun codexCacheFraction(session: CodexCliSessionSummary): Float {
-    if (session.inputTokens <= 0L) return 0f
-    return (session.cachedInputTokens.toDouble() / session.inputTokens.toDouble())
-        .coerceIn(0.0, 1.0)
-        .toFloat()
+    val rate = codexCacheRateOf(session) ?: return 0f
+    return rate.coerceIn(0.0, 1.0).toFloat()
 }
 
 internal fun codexCachePercent(session: CodexCliSessionSummary): String {

@@ -1,4 +1,10 @@
 package com.usagemonitor.ui
+import com.usagemonitor.presentation.ui.CLI_SESSION_COLUMN_HEADER_TAG
+import androidx.compose.ui.test.hasAnyAncestor
+import com.usagemonitor.presentation.ui.CliSessionsLabels
+import com.usagemonitor.presentation.ui.cliSessionRowTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -1091,6 +1097,46 @@ class TeamUsageScreenTest {
         // A série é por conta; ali a janela mistura várias e ela nunca é lida.
         assertEquals(0, onAllNodesWithTag(TEAM_TAB_TREND_TAG).fetchSemanticsNodes(false).size)
         onNodeWithTag(TEAM_TAB_BREAKDOWN_TAG).assertIsDisplayed()
+    }
+
+    /**
+     * A ordem da coluna é uma só para todos os blocos de sessão do time (#537): clicar Custo num
+     * integrante reordena também os sessões do outro.
+     */
+    @Test
+    fun `the session blocks of every member follow the clicked column`() = runDesktopComposeUiTest {
+        renderSuccess(
+            state = TeamUsageUiState.Success(
+                members = listOf(
+                    member(
+                        "device-1",
+                        "edilson",
+                        "DESKTOP-A1",
+                        listOf(session("aaaa0001", cost = 1_000L), session("bbbb0002", cost = 3_000L))
+                    ),
+                    member(
+                        "device-2",
+                        "maria",
+                        "DESKTOP-B2",
+                        listOf(session("cccc0003", cost = 500L), session("dddd0004", cost = 2_000L))
+                    )
+                ),
+                expandedMemberKeys = setOf("device-1", "device-2")
+            ),
+            height = 900.dp
+        )
+
+        onAllNodes(hasText(CliSessionsLabels.columnCost(AppLanguage.PT)) and hasAnyAncestor(hasTestTag(CLI_SESSION_COLUMN_HEADER_TAG)))[0].performClick()
+
+        assertEquals(listOf("bbbb0002", "aaaa0001"), teamRowOrder(listOf("aaaa0001", "bbbb0002")))
+        assertEquals(listOf("dddd0004", "cccc0003"), teamRowOrder(listOf("cccc0003", "dddd0004")))
+    }
+
+    /** Ids na ordem vertical em que aparecem no bloco do time. */
+    private fun ComposeUiTest.teamRowOrder(ids: List<String>): List<String> {
+        return ids.sortedBy { id ->
+            onNodeWithTag(cliSessionRowTag(id), useUnmergedTree = true).fetchSemanticsNode().positionInRoot.y
+        }
     }
 
     private fun teamBreakdown(): CliUsageBreakdown {

@@ -302,6 +302,14 @@ internal object CliSessionsLabels {
         return if (language == AppLanguage.PT) "Custo" else "Cost"
     }
 
+    fun sortDescendingState(language: AppLanguage): String {
+        return localized(language, "ordenado do maior para o menor", "sorted from highest to lowest")
+    }
+
+    fun sortAscendingState(language: AppLanguage): String {
+        return localized(language, "ordenado do menor para o maior", "sorted from lowest to highest")
+    }
+
     fun input(language: AppLanguage): String = "Input"
 
     fun output(language: AppLanguage): String = "Output"

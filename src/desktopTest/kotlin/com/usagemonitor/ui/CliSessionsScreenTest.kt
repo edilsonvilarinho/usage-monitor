@@ -67,6 +67,15 @@ import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.usagemonitor.presentation.ui.CliSessionsLabels
+import com.usagemonitor.presentation.ui.CLI_SESSION_COLUMN_HEADER_TAG
+import com.usagemonitor.presentation.ui.cliSessionRowTag
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 
 @OptIn(ExperimentalTestApi::class)
 class CliSessionsScreenTest {
@@ -1614,6 +1623,83 @@ class CliSessionsScreenTest {
         onAllNodesWithText("Active time").assertCountEquals(1)
         onAllNodesWithText("output · end to end").assertCountEquals(0)
         onNodeWithText("Exported to /tmp/sessoes.csv").assertIsDisplayed()
+    }
+
+    /**
+     * Clique no cabeçalho ordena a lista pela coluna (#537): maior primeiro, depois menor, depois a
+     * ordem publicada pelo estado. A ordem mora na tela, não no estado publicado.
+     */
+    @Test
+    fun `clicking the cost header sorts the sessions, reverses them, then restores the published order`() =
+        runDesktopComposeUiTest {
+            setContent {
+                ScreenTestTheme(isDark = true) {
+                    Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                        CliSessionsContent(
+                            state = CliSessionsUiState.Success(sessions = costSessions()),
+                            language = AppLanguage.PT,
+                            onSelectRange = {},
+                            onOpenSession = {},
+                            onCloseDetail = {}
+                        )
+                    }
+                }
+            }
+            val cost = CliSessionsLabels.columnCost(AppLanguage.PT)
+            val published = listOf("aaaa0001", "bbbb0002", "cccc0003")
+
+            assertEquals(published, rowOrder(published))
+            onNode(hasText(cost) and hasAnyAncestor(hasTestTag(CLI_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(listOf("bbbb0002", "cccc0003", "aaaa0001"), rowOrder(published))
+            onNode(hasText(cost) and hasAnyAncestor(hasTestTag(CLI_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(listOf("aaaa0001", "cccc0003", "bbbb0002"), rowOrder(published))
+            onNode(hasText(cost) and hasAnyAncestor(hasTestTag(CLI_SESSION_COLUMN_HEADER_TAG))).performClick()
+            assertEquals(published, rowOrder(published))
+        }
+
+    /**
+     * A ordem da coluna vive na tela: uma nova emissão do estado com sessão nova entra na ordem ativa,
+     * em vez de voltar à ordem publicada.
+     */
+    @Test
+    fun `the cost order survives a new emission of the state`() = runDesktopComposeUiTest {
+        var sessions by mutableStateOf(costSessions())
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                    CliSessionsContent(
+                        state = CliSessionsUiState.Success(sessions = sessions),
+                        language = AppLanguage.PT,
+                        onSelectRange = {},
+                        onOpenSession = {},
+                        onCloseDetail = {}
+                    )
+                }
+            }
+        }
+
+        onNode(hasText(CliSessionsLabels.columnCost(AppLanguage.PT)) and hasAnyAncestor(hasTestTag(CLI_SESSION_COLUMN_HEADER_TAG))).performClick()
+        sessions = costSessions() + summary("dddd0004", costMicros = 2_500L)
+
+        assertEquals(
+            listOf("bbbb0002", "dddd0004", "cccc0003", "aaaa0001"),
+            rowOrder(listOf("aaaa0001", "bbbb0002", "cccc0003", "dddd0004"))
+        )
+    }
+
+    private fun costSessions(): List<CliSessionSummary> {
+        return listOf(
+            summary("aaaa0001", costMicros = 1_000L),
+            summary("bbbb0002", costMicros = 3_000L),
+            summary("cccc0003", costMicros = 2_000L)
+        )
+    }
+
+    /** Ids na ordem vertical em que aparecem na tela. */
+    private fun ComposeUiTest.rowOrder(ids: List<String>): List<String> {
+        return ids.sortedBy { id ->
+            onNodeWithTag(cliSessionRowTag(id), useUnmergedTree = true).fetchSemanticsNode().positionInRoot.y
+        }
     }
 
     private fun summary(

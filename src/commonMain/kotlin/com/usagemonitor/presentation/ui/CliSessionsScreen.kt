@@ -33,6 +33,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.usagemonitor.presentation.CliSessionSort
+import com.usagemonitor.presentation.CliSessionSortColumn
+import com.usagemonitor.presentation.nextCliSessionSort
+import com.usagemonitor.presentation.sortCliSessions
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliSessionRange
@@ -153,6 +160,7 @@ internal fun CliSessionsContent(
     onExportReport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var sessionSort by remember { mutableStateOf<CliSessionSort?>(null) }
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         AppStateCrossfade(state, key = { current -> if (current is CliSessionsUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
     when (state) {
@@ -164,6 +172,8 @@ internal fun CliSessionsContent(
                     val detail = state.detail
                     if (detail == null) {
                         CliSessionsList(
+                            sort = sessionSort,
+                            onSortChange = { column -> sessionSort = nextCliSessionSort(sessionSort, column) },
                             state = state,
                             language = language,
                             onSelectRange = onSelectRange,
@@ -197,6 +207,8 @@ internal fun CliSessionsContent(
 private fun CliSessionsList(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
+    sort: CliSessionSort?,
+    onSortChange: (CliSessionSortColumn) -> Unit,
     onSelectRange: (CliSessionRange) -> Unit,
     onOpenSession: (String) -> Unit,
     onSelectView: (CliSessionsView) -> Unit = {},
@@ -275,7 +287,7 @@ private fun CliSessionsList(
         // Voltar para a aba Sessões compõe a lista de novo: o escopo nasce e toca o
         // E9; a faixa nova toca quando a leitura dela chega.
         AppModalRevealScope(replayKey = revealKey) {
-            CliSessionsTable(state, language, onOpenSession, Modifier.weight(1f))
+            CliSessionsTable(state, language, onOpenSession, sort, onSortChange, Modifier.weight(1f))
         }
     }
 }
@@ -285,14 +297,20 @@ private fun CliSessionsTable(
     state: CliSessionsUiState.Success,
     language: AppLanguage,
     onOpenSession: (String) -> Unit,
+    sort: CliSessionSort?,
+    onSortChange: (CliSessionSortColumn) -> Unit,
     listModifier: Modifier
 ) {
     // Fora da `LazyColumn`, e não `stickyHeader`: a faixa é do painel, não da
     // rolagem, e é o mesmo desenho que a tela de presença já usa.
     CliSessionColumnHeader(
         language = language,
+        sort = sort,
+        onSortChange = onSortChange,
         modifier = Modifier.padding(end = SCROLLBAR_GUTTER)
     )
+
+    val sessions = remember(state.sessions, sort) { sortCliSessions(state.sessions, sort) }
 
     Box(modifier = listModifier.fillMaxWidth()) {
         val listState = rememberLazyListState()
@@ -306,7 +324,7 @@ private fun CliSessionsTable(
             // vão entre elas desfaria a leitura de tabela.
             modifier = Modifier.fillMaxSize().padding(end = SCROLLBAR_GUTTER)
         ) {
-            items(items = state.sessions, key = { session -> session.sessionId }) { session ->
+            items(items = sessions, key = { session -> session.sessionId }) { session ->
                 Box(modifier = appItemMotion()) {
                     CliSessionRow(
                         session = session,
