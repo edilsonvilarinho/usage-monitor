@@ -85,7 +85,7 @@ private fun Throwable.admissionRejection(): String? {
 }
 
 private fun TeamIntegrationSettings.confirmedIdentity(target: TeamSyncTarget): ConfirmedIdentity {
-    return ConfirmedIdentity(alias = alias, apiKey = apiKey, accountEmail = target.accountEmail)
+    return ConfirmedIdentity(alias = alias, apiKey = apiKeyFor(target.profileId), accountEmail = target.accountEmail)
 }
 
 /**
@@ -441,7 +441,7 @@ internal class TeamSyncService(
                 turns = batch.turns
             )
 
-            val pushResult = pushTeamUsageFor(settings.id)(payload)
+            val pushResult = pushTeamUsageFor(settings.id)(payload, profileId = target.profileId)
             val failure = pushResult.exceptionOrNull()
             if (failure != null) {
                 // Marcador não avança: o mesmo lote volta na próxima passada.
@@ -500,7 +500,8 @@ internal class TeamSyncService(
                 hostName = hostNameProvider(),
                 organizationUuid = target.organizationUuid,
                 organizationName = target.organizationName
-            )
+            ),
+            profileId = target.profileId
         ).exceptionOrNull()
     }
 
@@ -542,7 +543,7 @@ internal class TeamSyncService(
             turns = emptyList()
         )
 
-        val failure = pushTeamUsageFor(settings.id)(payload, force = true).exceptionOrNull()
+        val failure = pushTeamUsageFor(settings.id)(payload, force = true, profileId = target.profileId).exceptionOrNull()
         if (failure == null) {
             confirmedIdentityByTeamAccount[settings.id to target.accountKey] = settings.confirmedIdentity(target)
         }

@@ -18,13 +18,15 @@ import com.usagemonitor.domain.repository.TeamUsageRepository
 class PushTeamUsageUseCase(
     private val repository: TeamUsageRepository
 ) {
+    /** [profileId] escolhe a chave da conta; `null` usa a do time. */
     suspend operator fun invoke(
         payload: TeamIngestPayload,
-        force: Boolean = false
+        force: Boolean = false,
+        profileId: String? = null
     ): Result<TeamIngestReceipt> {
         if (payload.isEmpty && !force) {
             return Result.success(TeamIngestReceipt())
         }
-        return repository.push(payload)
+        return repository.push(payload, profileId)
     }
 }
