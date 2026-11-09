@@ -33,8 +33,30 @@ class RoutedTeamUsageRepository(
 
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> = current().push(payload)
 
+    override suspend fun push(payload: TeamIngestPayload, profileId: String?): Result<TeamIngestReceipt> =
+        current().push(payload, profileId)
+
     override suspend fun touchPresence(accountKey: String, member: TeamMemberIdentity): Result<TeamPresenceReceipt> =
         current().touchPresence(accountKey, member)
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> = current().touchPresence(accountKey, member, profileId)
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> = current().touchPresence(accountKey, accountEmail, member)
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> = current().touchPresence(accountKey, accountEmail, member, profileId)
 
     override suspend fun fetch(accountKey: String, cutoffMillis: Long?): Result<TeamUsageSnapshot> =
         current().fetch(accountKey, cutoffMillis)

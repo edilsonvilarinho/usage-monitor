@@ -7,6 +7,7 @@ import com.usagemonitor.data.dto.TeamIngestResponseDto
 import com.usagemonitor.data.dto.TeamPresenceRequestDto
 import com.usagemonitor.data.dto.TeamPresenceResponseDto
 import com.usagemonitor.data.repository.TeamUsageRepositoryImpl
+import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
@@ -39,6 +40,18 @@ private fun settings(serverUrl: String = SERVER_A) = TeamIntegrationSettings(
     deviceId = "device-1"
 )
 
+private const val PROFILE = "p1"
+
+private fun accountSettings() = TeamIntegrationSettings(
+    enabled = true,
+    serverUrl = SERVER_A,
+    apiKey = "chave-de-time-com-tamanho-suficiente",
+    alias = "edilson",
+    deviceId = "device-1",
+    participatingProfileIds = setOf(PROFILE),
+    accountApiKeys = mapOf(PROFILE to "chave-p1")
+)
+
 private class FixedClock(private val value: Instant) : Clock {
     override fun now(): Instant = value
 }
@@ -52,6 +65,7 @@ private class FakePresenceDataSource(
     val presenceUrls = mutableListOf<String>()
     var lastIngest: TeamIngestRequestDto? = null
     var lastPresence: TeamPresenceRequestDto? = null
+    var lastApiKey: String? = null
 
     override suspend fun touchPresence(
         baseUrl: String,
@@ -59,6 +73,7 @@ private class FakePresenceDataSource(
         request: TeamPresenceRequestDto
     ): TeamPresenceResponseDto {
         presenceCalls += 1
+        lastApiKey = apiKey
         presenceUrls += baseUrl
         lastPresence = request
         return presenceResult.getOrThrow()
@@ -70,6 +85,7 @@ private class FakePresenceDataSource(
         request: TeamIngestRequestDto
     ): TeamIngestResponseDto {
         ingestCalls += 1
+        lastApiKey = apiKey
         lastIngest = request
         return TeamIngestResponseDto()
     }
@@ -220,4 +236,52 @@ class TeamUsageRepositoryPresenceTest {
         assertNull(receipt.serverTimeAt)
         assertEquals(0L, offset.offsetMillis)
     }
+
+    @Test
+    fun `a presenca usa a chave da propria conta quando ela existe`() = runTest {
+        val remote = FakePresenceDataSource(Result.success(TeamPresenceResponseDto()))
+        val repository = TeamUsageRepositoryImpl(remote, { accountSettings() })
+
+        repository.touchPresence(ACCOUNT_KEY, MEMBER, profileId = PROFILE).getOrThrow()
+
+        assertEquals("chave-p1", remote.lastApiKey)
+    }
+
+    @Test
+    fun `o caminho de compatibilidade do 404 tambem usa a chave da conta`() = runTest {
+        val remote = FakePresenceDataSource(notFound())
+        val repository = TeamUsageRepositoryImpl(remote, { accountSettings() })
+
+        repository.touchPresence(ACCOUNT_KEY, MEMBER, profileId = PROFILE).getOrThrow()
+
+        assertEquals("chave-p1", remote.lastApiKey)
+    }
+
+    @Test
+    fun `o envio de turnos usa a chave da conta`() = runTest {
+        val remote = FakePresenceDataSource(Result.success(TeamPresenceResponseDto()))
+        val repository = TeamUsageRepositoryImpl(remote, { accountSettings() })
+        val payload = TeamIngestPayload(
+            accountKey = ACCOUNT_KEY,
+            accountEmail = null,
+            member = MEMBER,
+            sessions = emptyList(),
+            turns = emptyList()
+        )
+
+        repository.push(payload, profileId = PROFILE).getOrThrow()
+
+        assertEquals("chave-p1", remote.lastApiKey)
+    }
+
+    @Test
+    fun `sem profileId a chave do time continua valendo`() = runTest {
+        val remote = FakePresenceDataSource(Result.success(TeamPresenceResponseDto()))
+        val repository = TeamUsageRepositoryImpl(remote, { accountSettings() })
+
+        repository.touchPresence(ACCOUNT_KEY, MEMBER).getOrThrow()
+
+        assertEquals("chave-de-time-com-tamanho-suficiente", remote.lastApiKey)
+    }
+
 }

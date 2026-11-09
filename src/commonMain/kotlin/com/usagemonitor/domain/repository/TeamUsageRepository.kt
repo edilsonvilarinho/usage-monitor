@@ -20,6 +20,9 @@ interface TeamUsageRepository {
     /** Envia um lote de turnos. Idempotente: reenviar o mesmo lote é inofensivo. */
     suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt>
 
+    /** Envio com a chave da conta; `null` usa a do time. Implementações reais sobrescrevem. */
+    suspend fun push(payload: TeamIngestPayload, profileId: String?): Result<TeamIngestReceipt> = push(payload)
+
     /**
      * Carimba "esta máquina está com o app aberto" para uma conta.
      *
@@ -42,14 +45,27 @@ interface TeamUsageRepository {
         member: TeamMemberIdentity
     ): Result<TeamPresenceReceipt>
 
+    /** Batida com a chave da conta; `null` usa a do time. Implementações reais sobrescrevem. */
+    suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> = touchPresence(accountKey, member)
+
     /** Compatibilidade para implementações antigas do contrato em testes e clientes internos. */
     suspend fun touchPresence(
         accountKey: String,
         accountEmail: String?,
         member: TeamMemberIdentity
-    ): Result<TeamPresenceReceipt> {
-        return touchPresence(accountKey = accountKey, member = member)
-    }
+    ): Result<TeamPresenceReceipt> = touchPresence(accountKey, member)
+
+    /** Batida com e-mail e chave da conta; `null` usa a do time. Implementações reais sobrescrevem. */
+    suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> = touchPresence(accountKey, member, profileId)
 
     /**
      * Lê o consumo do time de uma conta.
