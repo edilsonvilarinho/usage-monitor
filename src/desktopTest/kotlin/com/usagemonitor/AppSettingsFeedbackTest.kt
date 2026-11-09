@@ -231,6 +231,35 @@ class AppSettingsFeedbackTest {
     }
 
     @Test
+    fun `a marked account without its own key is refused before the claim, with the reason`() {
+        harness.store.publishTeamIntegrations(
+            TeamIntegrations(
+                deviceId = "d",
+                enabled = true,
+                teams = listOf(
+                    TeamIntegrationSettings(
+                        id = teamId,
+                        enabled = true,
+                        serverUrl = "https://team.example",
+                        apiKey = "k",
+                        alias = "ana",
+                        deviceId = "d",
+                        participatingProfileIds = setOf("default", "outra"),
+                        accountApiKeys = mapOf("outra" to "chave-outra")
+                    )
+                )
+            )
+        )
+
+        feedback.checkTeamConnection(teamId)
+        harness.settle()
+
+        assertEquals(emptyList<Pair<String, String?>>(), harness.claims.toList())
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
+        assertEquals("Pessoal: falta a chave desta conta.", feedback.teamConnection(teamId).message)
+    }
+
+    @Test
     fun `the claim receives the profile id of the participant it checks`() {
         activeTeam(participating = setOf("default"))
 

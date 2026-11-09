@@ -126,7 +126,31 @@ class TerminalTeamCheckTest {
     }
 
     @Test
-    fun `each participant is claimed with its own key and one without a key uses the team key`() {
+    fun `a marked account without its own key is refused before the claim while the others are checked`() {
+        val withOneKey = TeamIntegrationSettings(
+            enabled = true,
+            serverUrl = "http://team.local/",
+            apiKey = "chave-de-time",
+            alias = "ana",
+            deviceId = "device-1",
+            participatingProfileIds = setOf("work", "home"),
+            accountApiKeys = mapOf("home" to "chave-casa")
+        )
+        val accounts = listOf(
+            TeamCheckAccount("work", "Trabalho", "conta-1", "a@b.com"),
+            TeamCheckAccount("home", "Casa", "conta-2", "b@b.com")
+        )
+
+        val problems = check(accounts, teamSettings = withOneKey) { request ->
+            if (request.url.encodedPath == "/api/health") json("{}") else json("""{"authorized":true,"claimed":true}""")
+        }
+
+        assertEquals(listOf("Trabalho: falta a chave desta conta."), problems)
+        assertEquals(listOf("GET /api/health", "POST /api/v1/claim"), paths())
+    }
+
+    @Test
+    fun `each participant is claimed with its own key and one without a key is refused, never sent with the team key`() {
         val withOwnKeys = TeamIntegrationSettings(
             enabled = true,
             serverUrl = "http://team.local/",
@@ -142,13 +166,14 @@ class TerminalTeamCheckTest {
             TeamCheckAccount("other", "Outra", "conta-3", "c@b.com")
         )
 
-        check(accounts, teamSettings = withOwnKeys) { request ->
+        val problems = check(accounts, teamSettings = withOwnKeys) { request ->
             if (request.url.encodedPath == "/api/health") json("{}") else json("""{"authorized":true,"claimed":true}""")
         }
 
         assertEquals(
-            listOf("chave-trabalho", "chave-casa", "chave-de-time"),
+            listOf("chave-trabalho", "chave-casa"),
             requests.filter { it.url.encodedPath == "/api/v1/claim" }.map { it.headers["x-team-key"] }
         )
+        assertEquals(listOf("Outra: falta a chave desta conta."), problems)
     }
 }
