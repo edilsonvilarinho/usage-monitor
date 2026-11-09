@@ -39,6 +39,7 @@ import com.usagemonitor.presentation.ui.TeamKeysAdminContent
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_EXIT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_KEYS_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_SWITCH_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TEAM_STEP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_VALIDATE_TEST_TAG
@@ -66,6 +67,7 @@ class TeamAdminSectionTest {
 
         onAllNodesWithTag(TEAM_ADMIN_VALIDATE_TEST_TAG).assertCountEquals(0)
 
+        onNodeWithTag("${TEAM_STEP_TAG_PREFIX}3").performClick()
         onNodeWithTag(TEAM_ADMIN_SWITCH_TEST_TAG).performClick()
 
         onNodeWithTag(TEAM_ADMIN_VALIDATE_TEST_TAG).assertIsDisplayed()
@@ -86,6 +88,7 @@ class TeamAdminSectionTest {
                 )
             )
 
+            onNodeWithTag("${TEAM_STEP_TAG_PREFIX}3").performClick()
             onNodeWithTag(TEAM_ADMIN_VALIDATE_TEST_TAG).assertIsEnabled()
             onNodeWithTag(TEAM_ADMIN_KEYS_TEST_TAG).assertIsEnabled()
         }
@@ -96,6 +99,7 @@ class TeamAdminSectionTest {
             TeamIntegrationSettings(enabled = true, serverUrl = "", adminToken = "token-de-admin")
         )
 
+        onNodeWithTag("${TEAM_STEP_TAG_PREFIX}3").performClick()
         onNodeWithTag(TEAM_ADMIN_VALIDATE_TEST_TAG).assertIsNotEnabled()
         onNodeWithTag(TEAM_ADMIN_KEYS_TEST_TAG).assertIsNotEnabled()
     }
@@ -112,6 +116,7 @@ class TeamAdminSectionTest {
             onExitAdminMode = { exits += 1 }
         )
 
+        onNodeWithTag("${TEAM_STEP_TAG_PREFIX}3").performClick()
         onNodeWithTag(TEAM_ADMIN_EXIT_TEST_TAG).performClick()
 
         assertEquals(1, exits)
@@ -164,6 +169,7 @@ class TeamAdminSectionTest {
             )
         )
 
+        onNodeWithTag("${TEAM_STEP_TAG_PREFIX}3").performClick()
         onNodeWithText("Token admin").assertIsDisplayed()
         onNodeWithText("o nome não resolve").assertIsDisplayed()
     }
@@ -255,7 +261,6 @@ class TeamAdminSectionTest {
                         connection = connection,
                         onEnabledChange = {},
                         onServerUrlChange = {},
-                        onApiKeyChange = {},
                         onAliasChange = {},
                         onProfileParticipationChange = { _, _ -> },
                         onTestConnection = {},

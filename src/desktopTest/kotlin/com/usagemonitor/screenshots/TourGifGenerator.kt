@@ -353,7 +353,6 @@ private fun TeamSettingsTourScreen() {
                 connection = ScreenshotFixtures.teamConnection,
                 onEnabledChange = {},
                 onServerUrlChange = {},
-                onApiKeyChange = {},
                 onAliasChange = {},
                 onProfileParticipationChange = { _, _ -> },
                 onTestConnection = {},

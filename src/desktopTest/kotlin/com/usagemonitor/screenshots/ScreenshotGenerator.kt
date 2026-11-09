@@ -418,7 +418,6 @@ private class ScreenshotGenerator(private val outputDir: File) {
                     connection = ScreenshotFixtures.teamConnection,
                     onEnabledChange = {},
                     onServerUrlChange = {},
-                    onApiKeyChange = {},
                     onAliasChange = {},
                     onProfileParticipationChange = { _, _ -> },
                     onTestConnection = {},
