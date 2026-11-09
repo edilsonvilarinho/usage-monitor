@@ -54,6 +54,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos, decisões e atividades | `gh issue create` → #551; galeria AN aprovada pelo dono (AN2) |
+| A02 | `apiKeyFor` cai na chave do time só no legado (mapa vazio); `withOwnKeysMaterialized()`; `missingKeyProfileIds()`; `isConfigured` = ao menos uma chave utilizável; `TeamSyncService` pula conta ligada sem chave (absorvido do A03 para o commit ficar verde); testes da #549 que afirmavam a queda com mapa não vazio reescritos para o contrato novo | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.TeamIntegrationSettingsTest"` → 7 de 19 na asserção (ex.: `:47` ComparisonFailure, conta sem entrada herdava a chave do time; `:153` materialização); `--tests TeamSyncServiceTest` → `:499` AssertionError (conta sem chave enviava); verde: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.TeamSyncServiceTest" --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.Routed*"` → 1285 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

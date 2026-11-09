@@ -358,7 +358,7 @@ class TeamAdminRepositoryImplTest {
     }
 
     @Test
-    fun `cada integrante vincula com a propria chave e, sem a propria, com a do time`() = runTest {
+    fun `integrante sem chave propria com mapa nao vazio falha sem requisicao e nao usa a do time`() = runTest {
         val remote = FakeRemoteTeamDataSource(
             claimResult = Result.success(TeamVerificationDto(authorized = true, claimed = true)),
             verifyResult = Result.failure(IllegalStateException("nao deveria chamar"))
@@ -369,10 +369,12 @@ class TeamAdminRepositoryImplTest {
         )
         val repository = TeamAdminRepositoryImpl(remote) { settings }
 
-        repository.claimKeyForAccount(ACCOUNT_KEY, ACCOUNT_EMAIL, profileId = "p1")
+        val own = repository.claimKeyForAccount(ACCOUNT_KEY, ACCOUNT_EMAIL, profileId = "p1")
+        assertTrue(own.isSuccess)
         assertEquals(TeamCredential.TeamKey("chave-p1-com-tamanho-suficiente"), remote.lastClaimCredential)
 
-        repository.claimKeyForAccount(ACCOUNT_KEY, ACCOUNT_EMAIL, profileId = "p2")
-        assertEquals(TeamCredential.TeamKey(CONFIGURED.apiKey), remote.lastClaimCredential)
+        val semPropria = repository.claimKeyForAccount(ACCOUNT_KEY, ACCOUNT_EMAIL, profileId = "p2")
+        assertTrue(semPropria.isFailure)
+        assertEquals(1, remote.claimCalls)
     }
 }
