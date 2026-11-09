@@ -314,6 +314,12 @@ internal class SettingsActions(
         feedback.reportSave(SettingsField.TEAM_INTEGRATION, saved)
     }
 
+    /** Só o nome muda: o id é a chave do time e não pode sair do lugar. */
+    fun changeTeamName(teamId: String, name: String) {
+        val saved = updateTeam(teamId) { current -> current.copy(name = name) }
+        feedback.reportSave(SettingsField.TEAM_INTEGRATION, saved)
+    }
+
     fun changeTeamServerUrl(teamId: String, url: String) {
         val saved = updateTeam(teamId) { current -> current.copy(serverUrl = url) }
         feedback.clearTeamConnection(teamId)

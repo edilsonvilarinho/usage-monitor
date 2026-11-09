@@ -493,6 +493,25 @@ class SettingsActionsTest {
     }
 
     @Test
+    fun `renaming a team keeps its id and leaves the other team untouched`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a", name = "Time A"),
+                    TeamIntegrationSettings(id = "team-b", name = "Time B")
+                )
+            )
+        )
+
+        actions.changeTeamName("team-a", "Renomeado")
+
+        assertEquals("Renomeado", store.teamIntegrationsFlow.value.team("team-a")?.name)
+        assertEquals("team-a", store.teamIntegrationsFlow.value.team("team-a")?.id)
+        assertEquals("Time B", store.teamIntegrationsFlow.value.team("team-b")?.name)
+        assertEquals(SettingsToast.Saved(SettingsField.TEAM_INTEGRATION), lastToast)
+    }
+
+    @Test
     fun `adding teams gives unique ids, numbered names and opens the last one`() {
         val first = actions.addTeam()
         val second = actions.addTeam()
