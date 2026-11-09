@@ -226,6 +226,8 @@ servidor do time.** Regras:
   `TEAM_REPORT_TOKEN` é leitura global sem poder destrutivo; nenhum dos dois escreve no ingest.
 - Apagar conta: ordem **dados → vínculo → bloqueio**; bloqueio checado antes da credencial na escrita.
 - Configuração do cliente em `~/.usage-monitor/team.json` (segredo), nunca em `PreferencesSettings`.
+- Vários times (#547): agregado `TeamIntegrations`, uma conta em no máximo um time, `enabled` só no agregado; `team.json` v2
+  espelha o 1º time nos campos planos (downgrade); time sem id é `LEGACY_TEAM_ID`, nunca vazio; repositório e offset por time.
 - Envio pelo `TeamSyncService` (30 s), indexa antes de enviar, conexão SQLite compartilhada;
   apelido viaja no ingest. Renomear nunca duplica: chave `(account_key, device_id)`.
 - Servidor **não precifica** (exceto `/metrics`); o cliente aplica `ModelPricingTable`.
