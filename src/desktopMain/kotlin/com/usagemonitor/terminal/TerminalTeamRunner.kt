@@ -15,6 +15,7 @@ import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
 import com.usagemonitor.domain.entity.ProxyEnvironmentConfig
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.WebAccessSettings
 import com.usagemonitor.presentation.terminal.TerminalConfigLabels
 import com.usagemonitor.presentation.terminal.TerminalConfigView
@@ -46,7 +47,7 @@ internal class TerminalTeamRunner(
     private val client: TerminalConfigClient,
     private val preferences: Preferences,
     private val home: File,
-    private val teamSettings: () -> TeamIntegrationSettings,
+    private val teamSettings: () -> TeamIntegrations,
     private val webSettings: () -> WebAccessSettings,
     private val secretInput: TerminalSecretInput,
     /** As falhas da conferência, uma por linha; vazia quando passou. */
@@ -58,14 +59,54 @@ internal class TerminalTeamRunner(
         val labels = TerminalTeamLabels(configLabels.language)
         return when (command) {
             is TeamCommand.Join -> join(command, labels, configLabels, profile)
-            TeamCommand.Status -> teamStatus(labels, configLabels, profile)
-            TeamCommand.Leave -> delivered(client.apply(ConfigChange.TeamLeave), configLabels, profile, labels.left) { null }
+            TeamCommand.Status -> teamStatus(null, labels, configLabels, profile)
+            is TeamCommand.StatusTeam -> teamStatus(command.teamName, labels, configLabels, profile)
+            TeamCommand.Leave -> leave(null, labels, configLabels, profile)
+            is TeamCommand.LeaveTeam -> leave(command.teamName, labels, configLabels, profile)
         }
+    }
+
+    /**
+     * O time da ação (#547): pelo nome (sem diferenciar caixa) ou, sem nome, o único. Com vários
+     * e sem `--team`, recusa listando os nomes. [creating]: `join` com nome novo cria o time.
+     */
+    private fun pick(
+        name: String?,
+        creating: Boolean,
+        action: String,
+        labels: TerminalTeamLabels,
+        glyphs: com.usagemonitor.presentation.terminal.TerminalGlyphs
+    ): Pair<TeamIntegrationSettings?, TerminalOutput?> {
+        val teams = teamSettings().teams
+        val names = teams.joinToString(", ") { team -> team.name.ifBlank { team.id } }
+        if (name != null) {
+            val found = teams.firstOrNull { team -> team.name.equals(name, ignoreCase = true) }
+            if (found == null && !creating) {
+                return null to refused(TerminalConfigView.warning(labels.unknownTeam(name, names), null, glyphs))
+            }
+            return found to null
+        }
+        if (teams.size > 1) {
+            return null to refused(TerminalConfigView.warning(labels.ambiguousTeam(names), "usage-monitor team $action --team <nome>", glyphs))
+        }
+        return teams.singleOrNull() to null
+    }
+
+    private fun leave(name: String?, labels: TerminalTeamLabels, configLabels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
+        val (_, refusal) = pick(name, false, "leave", labels, profile.glyphs)
+        if (refusal != null) {
+            return refusal
+        }
+        return delivered(client.apply(ConfigChange.TeamLeave(name)), configLabels, profile, labels.left) { null }
     }
 
     private fun join(command: TeamCommand.Join, labels: TerminalTeamLabels, configLabels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
         val glyphs = profile.glyphs
-        val current = teamSettings()
+        val (picked, refusal) = pick(command.teamName, true, "join", labels, glyphs)
+        if (refusal != null) {
+            return refusal
+        }
+        val current = picked ?: TeamIntegrationSettings()
         val server = command.server?.trim() ?: current.serverUrl.takeIf { url -> url.isNotBlank() }
             ?: return refused(TerminalConfigView.warning(labels.needsServer, "usage-monitor team join --server https://time.exemplo.com --alias <nome>", glyphs))
         val alias = command.alias?.trim() ?: current.alias.takeIf { name -> name.isNotBlank() }
@@ -92,15 +133,35 @@ internal class TerminalTeamRunner(
             }
         }
         val joined = delivered(
-            client.apply(ConfigChange.TeamJoin(server, apiKey, alias, candidate.participatingProfileIds)), configLabels, profile,
+            client.apply(ConfigChange.TeamJoin(server, apiKey, alias, candidate.participatingProfileIds, command.teamName)), configLabels, profile,
             labels.joined(hostOf(server), alias, accounts.size)
         ) { null }
         val note = TerminalConfigView.note(if (command.skipCheck) labels.notChecked else labels.checked)
         return if (joined.exitCode == TerminalConfigView.EXIT_OK) TerminalOutput(joined.lines + note, joined.exitCode) else joined
     }
 
-    private fun teamStatus(labels: TerminalTeamLabels, configLabels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
-        val current = teamSettings()
+    /** Sem `--team`, uma seção por time; com ele, só o pedido (#547). */
+    private fun teamStatus(name: String?, labels: TerminalTeamLabels, configLabels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
+        val all = teamSettings().teams
+        val selected = if (name == null) {
+            all.ifEmpty { listOf(TeamIntegrationSettings()) }
+        } else {
+            all.filter { team -> team.name.equals(name, ignoreCase = true) }
+        }
+        if (selected.isEmpty()) {
+            val names = all.joinToString(", ") { team -> team.name.ifBlank { team.id } }
+            return refused(TerminalConfigView.warning(labels.unknownTeam(name.orEmpty(), names), null, profile.glyphs))
+        }
+        if (selected.size == 1) {
+            return teamSection(selected.single(), labels, configLabels, profile)
+        }
+        val lines = selected.flatMap { team ->
+            listOf(terminalLine(TerminalSpan(team.name.ifBlank { team.id }))) + teamSection(team, labels, configLabels, profile).lines
+        }
+        return TerminalOutput(lines, TerminalConfigView.EXIT_OK)
+    }
+
+    private fun teamSection(current: TeamIntegrationSettings, labels: TerminalTeamLabels, configLabels: TerminalConfigLabels, profile: TerminalProfile): TerminalOutput {
         val accounts = anthropicAccounts().filter { account -> account.profileId in current.participatingProfileIds }
         val connection = if (current.isActive) {
             teamCheck(current, accounts.map { account -> account.check }).joinToString(" · ").ifEmpty { labels.connectionOk }

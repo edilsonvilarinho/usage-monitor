@@ -86,14 +86,25 @@ internal sealed interface ConfigChange {
     /** `team join`: servidor, chave (já conferida), apelido e as contas que participam. */
     @Serializable
     @SerialName("team_join")
-    data class TeamJoin(val serverUrl: String, val apiKey: String, val alias: String, val profileIds: Set<String>) : ConfigChange {
-        override fun toString(): String = "TeamJoin(serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, profileIds=$profileIds)"
+    data class TeamJoin(
+        val serverUrl: String,
+        val apiKey: String,
+        val alias: String,
+        val profileIds: Set<String>,
+        /** Time escolhido por `--team` (#547); `null`: o único time. */
+        val teamName: String? = null
+    ) : ConfigChange {
+        override fun toString(): String =
+            "TeamJoin(serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, profileIds=$profileIds, teamName=$teamName)"
     }
 
-    /** `team leave`: desliga a integração e apaga a chave; servidor e apelido ficam para voltar. */
+    /**
+     * `team leave`: apaga a chave e as contas de um time; servidor e apelido ficam para voltar.
+     * [teamName] ausente vale o único time; o JSON antigo, sem o campo, continua legível (#547).
+     */
     @Serializable
     @SerialName("team_leave")
-    data object TeamLeave : ConfigChange
+    data class TeamLeave(val teamName: String? = null) : ConfigChange
 
     /** `web enable [--port] | disable`: ligar pela primeira vez gera o token, como nas Configurações. */
     @Serializable
@@ -146,6 +157,8 @@ internal object ConfigRefusals {
     const val DEFAULT_ACCOUNT = "default_account"
     const val UNKNOWN_CHAT = "unknown_chat"
     const val NO_BOT_TOKEN = "no_bot_token"
+    const val AMBIGUOUS_TEAM = "ambiguous_team"
+    const val UNKNOWN_TEAM = "unknown_team"
     const val FAILED = "failed"
 }
 

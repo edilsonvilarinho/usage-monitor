@@ -5,6 +5,9 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
+import java.net.URI
+import java.util.UUID
 import com.usagemonitor.domain.entity.WebAccessSettings
 import com.usagemonitor.domain.entity.TELEGRAM_PAIRING_TTL_MILLIS
 import com.usagemonitor.domain.entity.TelegramBotSettings
@@ -49,10 +52,8 @@ internal class ConfigApplier(
                 is ConfigChange.AccountEnabled -> accounts.switch(change)
                 is ConfigChange.RemoveAccount -> accounts.remove(change)
                 ConfigChange.RescanAccounts -> accounts.rescan()
-                is ConfigChange.TeamJoin -> team { current ->
-                    current.copy(enabled = true, serverUrl = change.serverUrl.trim(), apiKey = change.apiKey.trim(), alias = change.alias.trim(), participatingProfileIds = change.profileIds)
-                }
-                ConfigChange.TeamLeave -> team { current -> current.copy(enabled = false, apiKey = "", participatingProfileIds = emptySet()) }
+                is ConfigChange.TeamJoin -> teamJoin(change)
+                is ConfigChange.TeamLeave -> teamLeave(change)
                 is ConfigChange.WebEnabled -> web { current ->
                     current.copy(
                         enabled = change.enabled,
@@ -101,13 +102,61 @@ internal class ConfigApplier(
         return ConfigOutcome.Applied()
     }
 
-    private fun team(transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): ConfigOutcome {
-        if (!updateTeamSettings(store, transform)) {
+    /**
+     * Entra num time (#547). Com nome, é o time desse nome (novo, se não existir); sem nome, o único
+     * time, ou `team-legacy` quando não há nenhum; com dois ou mais, recusa. As contas passam para
+     * este time (saem dos outros) e a integração liga.
+     */
+    private fun teamJoin(change: ConfigChange.TeamJoin): ConfigOutcome {
+        val all = store.teamIntegrationsFlow.value
+        val wanted = change.teamName?.trim()?.takeIf { name -> name.isNotEmpty() }
+        val existing = when {
+            wanted != null -> all.teams.firstOrNull { team -> team.name.equals(wanted, ignoreCase = true) }
+            all.teams.size > 1 -> return ConfigOutcome.Refused(ConfigRefusals.AMBIGUOUS_TEAM, teamNames(all))
+            else -> all.teams.singleOrNull()
+        }
+        val serverUrl = change.serverUrl.trim()
+        val base = existing ?: TeamIntegrationSettings(
+            id = if (wanted == null) TeamIntegrations.LEGACY_TEAM_ID else "team-" + UUID.randomUUID(),
+            name = wanted ?: hostOf(serverUrl)
+        )
+        val updated = base.copy(
+            enabled = true,
+            serverUrl = serverUrl,
+            apiKey = change.apiKey.trim(),
+            alias = change.alias.trim(),
+            participatingProfileIds = emptySet()
+        )
+        val aggregate = change.profileIds.fold(all.upsert(updated)) { current, profileId -> current.withParticipation(updated.id, profileId, true) }
+        return saveTeams(TeamIntegrations(aggregate.deviceId, true, aggregate.teams))
+    }
+
+    /** Sai de um time: só a chave e as contas dele se vão; a integração desliga se nenhum time ficar ativo. */
+    private fun teamLeave(change: ConfigChange.TeamLeave): ConfigOutcome {
+        val all = store.teamIntegrationsFlow.value
+        val wanted = change.teamName?.trim()?.takeIf { name -> name.isNotEmpty() }
+        val target = when {
+            wanted != null -> all.teams.firstOrNull { team -> team.name.equals(wanted, ignoreCase = true) }
+                ?: return ConfigOutcome.Refused(ConfigRefusals.UNKNOWN_TEAM, wanted)
+            all.teams.size > 1 -> return ConfigOutcome.Refused(ConfigRefusals.AMBIGUOUS_TEAM, teamNames(all))
+            else -> all.teams.singleOrNull()
+        } ?: return ConfigOutcome.Applied()
+        val aggregate = all.upsert(target.copy(apiKey = "", participatingProfileIds = emptySet()))
+        val stillActive = aggregate.teams.any { team -> team.id != target.id && team.isActive }
+        return saveTeams(TeamIntegrations(aggregate.deviceId, stillActive, aggregate.teams))
+    }
+
+    private fun saveTeams(aggregate: TeamIntegrations): ConfigOutcome {
+        if (!persistTeamIntegrations(store, aggregate)) {
             return ConfigOutcome.Refused(ConfigRefusals.FAILED, "team.json")
         }
         hooks.teamChanged()
         return ConfigOutcome.Applied()
     }
+
+    private fun teamNames(all: TeamIntegrations): String = all.teams.joinToString(", ") { team -> team.name.ifBlank { team.id } }
+
+    private fun hostOf(url: String): String = runCatching { URI(url).host }.getOrNull()?.takeIf { host -> host.isNotBlank() } ?: url
 
     /** O motor sobe, derruba ou reinicia o servidor ao ver o flow mudar. */
     private fun web(transform: (WebAccessSettings) -> WebAccessSettings): ConfigOutcome {

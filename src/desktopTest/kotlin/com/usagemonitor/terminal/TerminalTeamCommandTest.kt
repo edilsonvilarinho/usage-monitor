@@ -1,6 +1,10 @@
 package com.usagemonitor.terminal
 
 import com.usagemonitor.CommandLineRequest
+import com.usagemonitor.ConfigChange
+import com.usagemonitor.ConfigJson
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.data.datasource.LocalTeamSettingsDataSource
 import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
 import com.usagemonitor.domain.entity.CollectorKind
@@ -142,4 +146,86 @@ class TerminalTeamCommandTest {
             assertEquals("edi", saved.alias)
             assertEquals("outra-chave", saved.apiKey)
         }
+
+    private fun TerminalConfigHarness.twoTeams() {
+        LocalTeamSettingsDataSource(file("team.json")).saveAll(
+            TeamIntegrations(
+                "dev-1", true,
+                listOf(
+                    TeamIntegrationSettings(id = "team-a", name = "A", serverUrl = "https://a.example", apiKey = "ka", alias = "edi"),
+                    TeamIntegrationSettings(id = "team-b", name = "B", serverUrl = "https://b.example", apiKey = "kb", alias = "edi")
+                )
+            )
+        )
+    }
+
+    private fun TerminalConfigHarness.teams() = LocalTeamSettingsDataSource(file("team.json")).loadAll()
+
+    @Test
+    fun `team option parses on join, status and leave`() {
+        assertEquals(
+            CommandLineRequest.Terminal(TeamCommand.Join(server = "https://t.example", alias = "edi", teamName = "Novo")),
+            parseCommandLine(arrayOf("team", "join", "--server", "https://t.example", "--alias", "edi", "--team", "Novo"))
+        )
+        assertEquals(CommandLineRequest.Terminal(TeamCommand.StatusTeam("A")), parseCommandLine(arrayOf("team", "status", "--team=A")))
+        assertEquals(CommandLineRequest.Terminal(TeamCommand.LeaveTeam("A")), parseCommandLine(arrayOf("team", "leave", "--team", "A")))
+        assertTrue(parseCommandLine(arrayOf("team", "leave", "--team")) is CommandLineRequest.Invalid)
+    }
+
+    @Test
+    fun `old team_leave json still decodes and the name round trips`() {
+        assertEquals(ConfigChange.TeamLeave(), ConfigJson.decodeChange("""{"type":"team_leave"}"""))
+        val text = ConfigJson.json.encodeToString(ConfigChange.serializer(), ConfigChange.TeamLeave("A"))
+        assertEquals(ConfigChange.TeamLeave("A"), ConfigJson.decodeChange(text))
+    }
+
+    @Test
+    fun `join with a new team name creates a second team and leaves the first alone`() =
+        TerminalConfigHarness(teamCheck = { _, _ -> emptyList() }).use { harness ->
+            harness.loggedIn()
+            LocalTeamSettingsDataSource(harness.file("team.json")).saveAll(
+                TeamIntegrations("dev-1", true, listOf(TeamIntegrationSettings(id = "team-a", name = "A", serverUrl = "https://a.example", apiKey = "ka", alias = "edi")))
+            )
+            val (code, output) = harness.run("team", "join", "--team", "Novo", "--server", "https://n.example", "--alias", "edi", "--skip-check", secret = teamKey)
+            assertEquals(0, code, output)
+            val teams = harness.teams().teams
+            assertEquals(2, teams.size)
+            assertEquals("ka", teams.first { team -> team.id == "team-a" }.apiKey)
+            val created = teams.first { team -> team.id != "team-a" }
+            assertTrue(created.id.startsWith("team-"))
+            assertEquals("Novo", created.name)
+            assertEquals(teamKey, created.apiKey)
+        }
+
+    @Test
+    fun `leave with two teams and no name refuses and changes nothing`() = TerminalConfigHarness().use { harness ->
+        harness.twoTeams()
+        val (code, output) = harness.run("team", "leave")
+        assertEquals(1, code, output)
+        assertTrue(output.contains("A, B") && output.contains("--team"), output)
+        assertEquals(listOf("ka", "kb"), harness.teams().teams.map { team -> team.apiKey })
+    }
+
+    @Test
+    fun `leave with a name clears only that team, and the last one turns the aggregate off`() = TerminalConfigHarness().use { harness ->
+        harness.twoTeams()
+        assertEquals(0, harness.run("team", "leave", "--team", "a").first)
+        val after = harness.teams()
+        assertEquals("", after.team("team-a")!!.apiKey)
+        assertEquals("https://a.example", after.team("team-a")!!.serverUrl)
+        assertEquals("kb", after.team("team-b")!!.apiKey)
+        assertTrue(after.enabled)
+        assertEquals(1, harness.run("team", "leave", "--team", "nada").first)
+        assertEquals(0, harness.run("team", "leave", "--team", "B").first)
+        assertFalse(harness.teams().enabled)
+    }
+
+    @Test
+    fun `status lists every team, or only the one asked`() = TerminalConfigHarness(teamCheck = { _, _ -> emptyList() }).use { harness ->
+        harness.twoTeams()
+        val all = harness.run("team", "status").second
+        assertTrue(all.contains("a.example") && all.contains("b.example"), all)
+        val only = harness.run("team", "status", "--team", "B").second
+        assertTrue(only.contains("b.example") && !only.contains("a.example"), only)
+    }
 }

@@ -53,4 +53,10 @@ internal class TerminalTeamLabels(val language: AppLanguage) {
     val rowAddresses: String get() = localized(language, "endereços", "addresses")
     val rowToken: String get() = localized(language, "token", "token")
     val noAddress: String get() = localized(language, "nenhum endereço na rede local", "no address on the local network")
+
+    fun ambiguousTeam(names: String): String =
+        localized(language, "Há mais de um time ($names). Diga qual com --team. Por exemplo:", "There is more than one team ($names). Say which with --team. For example:")
+
+    fun unknownTeam(name: String, names: String): String =
+        localized(language, "Não existe o time $name. Times: $names.", "No team named $name. Teams: $names.")
 }

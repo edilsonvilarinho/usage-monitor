@@ -7,12 +7,20 @@ internal sealed interface TeamCommand : ConfigCommand {
         val alias: String? = null,
         /** Apelidos ou ids das contas Anthropic que participam; `null`: as monitoradas. */
         val accounts: kotlin.collections.List<String>? = null,
-        val skipCheck: Boolean = false
+        val skipCheck: Boolean = false,
+        /** Time escolhido por `--team` (nome, sem diferenciar caixa); `null`: o único time (#547). */
+        val teamName: String? = null
     ) : TeamCommand
 
     data object Status : TeamCommand
 
+    /** `team status --team <nome>`: só o time pedido. */
+    data class StatusTeam(val teamName: String) : TeamCommand
+
     data object Leave : TeamCommand
+
+    /** `team leave --team <nome>`: sai só desse time. */
+    data class LeaveTeam(val teamName: String) : TeamCommand
 }
 
 /** `web enable [--port]|disable|status|token --show|--regenerate` (acesso pela rede local, aba Rede). */
@@ -36,6 +44,7 @@ internal object TeamCommandNames {
     const val ALIAS = "--alias"
     const val ACCOUNTS = "--accounts"
     const val SKIP_CHECK = "--skip-check"
+    const val TEAM_OPTION = "--team"
 
     const val WEB = "web"
     const val ENABLE = "enable"
@@ -56,8 +65,8 @@ internal fun parseTeamCommand(arguments: List<String>): TerminalCommandParse {
     val rest = arguments.drop(1)
     val command = "${TeamCommandNames.TEAM} $action"
     return when (action) {
-        TeamCommandNames.STATUS -> rest.firstOrNull()?.let { extra -> unknownOption(command, extra) } ?: TerminalCommandParse.Parsed(TeamCommand.Status)
-        TeamCommandNames.LEAVE -> rest.firstOrNull()?.let { extra -> unknownOption(command, extra) } ?: TerminalCommandParse.Parsed(TeamCommand.Leave)
+        TeamCommandNames.STATUS -> parseTeamName(command, rest, TeamCommand.Status) { name -> TeamCommand.StatusTeam(name) }
+        TeamCommandNames.LEAVE -> parseTeamName(command, rest, TeamCommand.Leave) { name -> TeamCommand.LeaveTeam(name) }
         TeamCommandNames.JOIN -> {
             var join = TeamCommand.Join()
             var index = 0
@@ -74,6 +83,10 @@ internal fun parseTeamCommand(arguments: List<String>): TerminalCommandParse {
                             ?: return TerminalCommandParse.Invalid("Error: ${TeamCommandNames.ACCOUNTS} needs account labels or ids separated by commas.")
                     )
                     TeamCommandNames.SKIP_CHECK -> join.copy(skipCheck = true)
+                    TeamCommandNames.TEAM_OPTION -> join.copy(
+                        teamName = value()?.trim()?.takeIf { team -> team.isNotEmpty() }
+                            ?: return TerminalCommandParse.Invalid("Error: ${TeamCommandNames.TEAM_OPTION} needs a team name.")
+                    )
                     // A chave colada como argumento ficaria no histórico do shell.
                     else -> return if (argument.startsWith("-")) unknownOption(command, argument)
                         else TerminalCommandParse.Invalid("Error: the team key is read from the input, never from an argument. Run '$command' and paste it.")
@@ -84,6 +97,24 @@ internal fun parseTeamCommand(arguments: List<String>): TerminalCommandParse {
         }
         else -> TerminalCommandParse.Invalid("Error: '$action' is not a team action. Use $actions.")
     }
+}
+
+/** `status` e `leave` aceitam só `--team <nome>` (ou `--team=<nome>`); o resto é opção desconhecida. */
+private fun parseTeamName(
+    command: String,
+    rest: List<String>,
+    whole: TeamCommand,
+    named: (String) -> TeamCommand
+): TerminalCommandParse {
+    val first = rest.firstOrNull() ?: return TerminalCommandParse.Parsed(whole)
+    if (first.substringBefore('=') != TeamCommandNames.TEAM_OPTION) {
+        return unknownOption(command, first)
+    }
+    val inline = first.substringAfter('=', missingDelimiterValue = "").takeIf { first.contains('=') }
+    val consumed = if (inline != null) 1 else 2
+    val name = (inline ?: rest.getOrNull(1))?.trim()?.takeIf { team -> team.isNotEmpty() }
+        ?: return TerminalCommandParse.Invalid("Error: ${TeamCommandNames.TEAM_OPTION} needs a team name.")
+    return if (rest.size > consumed) unknownOption(command, rest[consumed]) else TerminalCommandParse.Parsed(named(name))
 }
 
 internal fun parseWebCommand(arguments: List<String>): TerminalCommandParse {

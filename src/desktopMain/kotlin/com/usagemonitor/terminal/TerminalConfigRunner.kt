@@ -127,7 +127,7 @@ internal class TerminalConfigRunner(
 
     private fun teamRunner() = TerminalTeamRunner(
         client, preferences, home,
-        teamSettings = { LocalTeamSettingsDataSource(dataFile("team.json")).load() },
+        teamSettings = { LocalTeamSettingsDataSource(dataFile("team.json")).loadAll() },
         webSettings = { LocalWebAccessSettingsDataSource(dataFile("web-access.json")).load() },
         secretInput = secretInput,
         teamCheck = teamCheck,
