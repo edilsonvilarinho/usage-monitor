@@ -5,6 +5,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
@@ -299,7 +300,7 @@ class SettingsActionsTest {
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_INTEGRATION), lastToast)
 
         harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
-        actions.changeTeamServerUrl("https://team.example")
+        actions.changeTeamServerUrl(TeamIntegrations.LEGACY_TEAM_ID, "https://team.example")
 
         assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
         assertEquals("https://team.example", store.teamSettingsDataSource.load().serverUrl)
@@ -307,8 +308,31 @@ class SettingsActionsTest {
     }
 
     @Test
+    fun `turning the team switch on turns the aggregate on and the team active in memory and on disk`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(enabled = false, serverUrl = "https://team.example", apiKey = "key-1", alias = "eu")
+        }
+
+        actions.changeTeamEnabled(true)
+
+        assertTrue(store.teamIntegrationsFlow.value.enabled)
+        assertTrue(store.teamSettingsDataSource.loadAll().enabled)
+        assertTrue(store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)?.isActive == true)
+    }
+
+    @Test
+    fun `the enabled flag of a team transform reaches the aggregate`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(enabled = true, serverUrl = "https://team.example", apiKey = "key-1")
+        }
+
+        assertTrue(store.teamIntegrationsFlow.value.enabled)
+        assertTrue(store.teamSettingsDataSource.loadAll().enabled)
+    }
+
+    @Test
     fun `a new team key is checked and the identity is sent at once`() {
-        actions.changeTeamApiKey("key-1")
+        actions.changeTeamApiKey(TeamIntegrations.LEGACY_TEAM_ID, "key-1")
         harness.settle()
 
         assertEquals("key-1", store.teamSettingsFlow.value.apiKey)
@@ -322,7 +346,7 @@ class SettingsActionsTest {
         blockWrites("team.json")
         harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
 
-        actions.changeTeamApiKey("key-1")
+        actions.changeTeamApiKey(TeamIntegrations.LEGACY_TEAM_ID, "key-1")
 
         assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
         assertEquals(0, harness.teamSyncs)
@@ -332,11 +356,11 @@ class SettingsActionsTest {
 
     @Test
     fun `a saved alias cannot be erased and a new one is sent at once`() {
-        actions.changeTeamAlias("ana")
+        actions.changeTeamAlias(TeamIntegrations.LEGACY_TEAM_ID, "ana")
         assertEquals(1, harness.teamSyncs)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ALIAS), lastToast)
 
-        actions.changeTeamAlias("  ")
+        actions.changeTeamAlias(TeamIntegrations.LEGACY_TEAM_ID, "  ")
 
         assertEquals("ana", store.teamSettingsFlow.value.alias)
         assertEquals(SettingsToast.TeamAliasRequired, lastToast)
@@ -345,13 +369,13 @@ class SettingsActionsTest {
 
     @Test
     fun `marking an account checks the key and unmarking does not`() {
-        actions.changeTeamProfileParticipation("default", participates = true)
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = true)
         harness.settle()
         assertEquals(setOf("default"), store.teamSettingsFlow.value.participatingProfileIds)
         assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection.status)
         harness.feedback.teamConnection = TeamConnectionUiState()
 
-        actions.changeTeamProfileParticipation("default", participates = false)
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = false)
 
         assertTrue(store.teamSettingsFlow.value.participatingProfileIds.isEmpty())
         assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
@@ -361,16 +385,16 @@ class SettingsActionsTest {
     @Test
     fun `admin mode is entered by token, opens the keys and exits clearing it`() {
         harness.feedback.teamAdminConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
-        actions.changeTeamAdminToken("adm")
+        actions.changeTeamAdminToken(TeamIntegrations.LEGACY_TEAM_ID, "adm")
         assertEquals("adm", store.teamSettingsFlow.value.adminToken)
         assertEquals(TeamConnectionUiState(), harness.feedback.teamAdminConnection)
 
-        actions.openTeamKeysManager()
+        actions.openTeamKeysManager(TeamIntegrations.LEGACY_TEAM_ID)
         assertTrue(harness.modal.isTeamKeysOpen)
         assertEquals(1, harness.teamKeysOpened)
         assertTrue(harness.breadcrumbs.messages.contains("abriu chaves das contas (admin)"))
 
-        actions.exitTeamAdminMode()
+        actions.exitTeamAdminMode(TeamIntegrations.LEGACY_TEAM_ID)
         assertEquals("", store.teamSettingsDataSource.load().adminToken)
         assertFalse(harness.modal.isTeamKeysOpen)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ADMIN_TOKEN), lastToast)
@@ -432,5 +456,63 @@ class SettingsActionsTest {
 
         assertEquals(SettingsToast.SaveFailed(SettingsField.NETWORK_PROXY), lastToast)
         assertNotNull(harness.breadcrumbs.messages.firstOrNull { message -> message.contains("NETWORK_PROXY") })
+    }
+
+    @Test
+    fun `moving an account to another team takes it off the previous one`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a", participatingProfileIds = setOf("default")),
+                    TeamIntegrationSettings(id = "team-b")
+                )
+            )
+        )
+
+        actions.changeTeamProfileParticipation("team-b", "default", participates = true)
+
+        assertEquals(emptySet(), store.teamIntegrationsFlow.value.team("team-a")?.participatingProfileIds)
+        assertEquals(setOf("default"), store.teamIntegrationsFlow.value.team("team-b")?.participatingProfileIds)
+    }
+
+    @Test
+    fun `changing one team leaves the other team untouched`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a", serverUrl = "https://a.example"),
+                    TeamIntegrationSettings(id = "team-b", serverUrl = "https://b.example")
+                )
+            )
+        )
+
+        actions.changeTeamServerUrl("team-a", "https://new.example")
+
+        assertEquals("https://new.example", store.teamIntegrationsFlow.value.team("team-a")?.serverUrl)
+        assertEquals("https://b.example", store.teamIntegrationsFlow.value.team("team-b")?.serverUrl)
+    }
+
+    @Test
+    fun `adding teams gives unique ids, numbered names and opens the last one`() {
+        val first = actions.addTeam()
+        val second = actions.addTeam()
+
+        assertTrue(first.startsWith("team-"))
+        assertFalse(first == second)
+        assertEquals(listOf("Time 1", "Time 2"), store.teamIntegrationsFlow.value.teams.map { it.name })
+        assertEquals(second, actions.selectedTeamId)
+    }
+
+    @Test
+    fun `removing the open team selects the first remaining one`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(teams = listOf(TeamIntegrationSettings(id = "team-a"), TeamIntegrationSettings(id = "team-b")))
+        )
+        actions.selectTeam("team-b")
+
+        actions.removeTeam("team-b")
+
+        assertEquals(listOf("team-a"), store.teamIntegrationsFlow.value.teams.map { it.id })
+        assertEquals("team-a", actions.selectedTeamId)
     }
 }
