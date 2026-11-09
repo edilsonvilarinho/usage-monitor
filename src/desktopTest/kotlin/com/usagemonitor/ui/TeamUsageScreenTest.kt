@@ -66,6 +66,9 @@ import com.usagemonitor.presentation.ui.BREAKDOWN_PANE_TAG
 import com.usagemonitor.presentation.ui.REFRESHING_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TeamUsageContent
 import com.usagemonitor.presentation.ui.TeamUsageLabels
+import com.usagemonitor.presentation.ui.TEAM_SELECTOR_TAG
+import com.usagemonitor.presentation.ui.TeamSelectorOption
+import com.usagemonitor.presentation.ui.TeamSelectorUi
 import com.usagemonitor.presentation.ui.components.TEAM_TREND_CHART_TAG
 import com.usagemonitor.presentation.viewmodel.TeamSessionDetailUiState
 import com.usagemonitor.domain.entity.TeamCertificateProblem
@@ -198,6 +201,60 @@ class TeamUsageScreenTest {
         onNodeWithText("30 dias").performClick()
 
         assertEquals(CliSessionRange.LAST_30D, selected)
+    }
+
+    @Test
+    fun `com dois times o gatilho mostra o time escolhido e outro item emite o id`() = runDesktopComposeUiTest {
+        var selectedId: String? = null
+
+        renderSuccess(
+            state = TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            ),
+            teamSelector = TeamSelectorUi(
+                options = listOf(
+                    TeamSelectorOption("team-a", "Empresa"),
+                    TeamSelectorOption("team-b", "Outra equipe")
+                ),
+                selectedId = "team-a",
+                onSelect = { selectedId = it }
+            )
+        )
+
+        onAllNodesWithTag(TEAM_SELECTOR_TAG).assertCountEquals(1)
+        onAllNodesWithText("Time: Empresa ▾").assertCountEquals(1)
+
+        onNodeWithTag(TEAM_SELECTOR_TAG).performClick()
+        onNodeWithText("Outra equipe").performClick()
+
+        assertEquals("team-b", selectedId)
+    }
+
+    @Test
+    fun `com um time so o gatilho de time nao aparece`() = runDesktopComposeUiTest {
+        renderSuccess(
+            state = TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            ),
+            teamSelector = TeamSelectorUi(
+                options = listOf(TeamSelectorOption("team-a", "Empresa")),
+                selectedId = "team-a",
+                onSelect = {}
+            )
+        )
+
+        onAllNodesWithTag(TEAM_SELECTOR_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun `sem seletor de time o gatilho nao aparece`() = runDesktopComposeUiTest {
+        renderSuccess(
+            state = TeamUsageUiState.Success(
+                members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(session("s1"))))
+            )
+        )
+
+        onAllNodesWithTag(TEAM_SELECTOR_TAG).assertCountEquals(0)
     }
 
     @Test
@@ -1211,7 +1268,8 @@ class TeamUsageScreenTest {
         onExportReport: () -> Unit = {},
         onRemoveMember: (String) -> Unit = {},
         onRemoveSession: (String, String) -> Unit = { _, _ -> },
-        localDeviceId: String? = null
+        localDeviceId: String? = null,
+        teamSelector: TeamSelectorUi? = null
     ) {
         setContent {
             ScreenTestTheme(isDark = true) {
@@ -1220,6 +1278,7 @@ class TeamUsageScreenTest {
                         state = state,
                         language = AppLanguage.PT,
                         localDeviceId = localDeviceId,
+                        teamSelector = teamSelector,
                         onSelectRange = {},
                         onToggleMember = {},
                         onToggleAccount = onToggleAccount,
