@@ -79,6 +79,9 @@ fun settingsToastMessage(toast: SettingsToast, language: AppLanguage): String {
 
 private fun savedMessage(field: SettingsField, isPt: Boolean): String {
     if (!isPt) {
+        if (field == SettingsField.TEAM_KEY) {
+            return "Key saved"
+        }
         return "${fieldLabel(field, isPt = false)} saved"
     }
     return when (field) {
@@ -94,7 +97,7 @@ private fun savedMessage(field: SettingsField, isPt: Boolean): String {
         SettingsField.ANTHROPIC_PROFILE_LABEL -> "Apelido da conta salvo"
         SettingsField.TEAM_INTEGRATION -> "Integração com time salva"
         SettingsField.TEAM_SERVER -> "Servidor do time salvo"
-        SettingsField.TEAM_KEY -> "Chave do time salva"
+        SettingsField.TEAM_KEY -> "Chave salva"
         SettingsField.TEAM_ALIAS -> "Apelido salvo"
         SettingsField.TEAM_ACCOUNTS -> "Contas do time salvas"
         SettingsField.TEAM_ADMIN_TOKEN -> "Token de administração salvo"
@@ -116,7 +119,7 @@ private fun fieldLabel(field: SettingsField, isPt: Boolean): String {
         SettingsField.ANTHROPIC_PROFILE_LABEL -> if (isPt) "apelido da conta" else "Account label"
         SettingsField.TEAM_INTEGRATION -> if (isPt) "integração com time" else "Team integration"
         SettingsField.TEAM_SERVER -> if (isPt) "servidor do time" else "Team server"
-        SettingsField.TEAM_KEY -> if (isPt) "chave do time" else "Team key"
+        SettingsField.TEAM_KEY -> if (isPt) "chave" else "Key"
         SettingsField.TEAM_ALIAS -> if (isPt) "apelido" else "Alias"
         SettingsField.TEAM_ACCOUNTS -> if (isPt) "contas do time" else "Team accounts"
         SettingsField.TEAM_ADMIN_TOKEN ->

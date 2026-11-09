@@ -327,7 +327,9 @@ internal class TeamSyncService(
         val rejections = mutableMapOf<String, String>()
 
         for (target in targets) {
-            if (!team.participates(target.profileId)) {
+            // Conta sem chave própria com mapa não vazio não herda a do time: fica de fora
+            // do envio e da presença, sem chamada ao servidor.
+            if (!team.participates(target.profileId) || team.apiKeyFor(target.profileId).isBlank()) {
                 continue
             }
 

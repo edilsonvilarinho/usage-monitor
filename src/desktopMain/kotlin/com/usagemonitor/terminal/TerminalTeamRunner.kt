@@ -267,6 +267,10 @@ internal class TerminalTeamRunner(
                         val admin = TeamAdminRepositoryImpl(remote, settingsProvider = { settings })
                         accounts.mapNotNull { account ->
                             val key = account.accountKey ?: return@mapNotNull "${account.label}: sem login"
+                            // Mesma recusa do Testar conexão: conta com mapa sem chave própria não herda a do time.
+                            if (settings.apiKeyFor(account.profileId).isBlank()) {
+                                return@mapNotNull "${account.label}: falta a chave desta conta."
+                            }
                             val result = admin.claimKeyForAccount(key, account.email, account.profileId)
                             when {
                                 result.isFailure -> "${account.label}: ${result.exceptionOrNull()?.message.orEmpty()}"

@@ -48,31 +48,59 @@ data class TeamIntegrationSettings(
         get() = serverUrl.trim().trimEnd('/')
 
     /**
-     * Configurada para a chamada de rede: tem a chave do time, ou toda conta participante tem chave própria.
+     * Configurada para a chamada de rede: servidor, apelido e deviceId, mais uma chave utilizável.
      *
-     * Sem chave de time, o time só funciona se nenhuma conta depender dele: cada participante precisa da sua.
+     * Modo legado (sem mapa de chaves próprias): a chave do time basta. Com mapa, a chave do time não é
+     * herdada: basta ao menos uma participante com chave própria; as sem chave ficam de fora do envio
+     * (ver [missingKeyProfileIds]).
      */
     val isConfigured: Boolean
         get() = normalizedServerUrl.isNotEmpty() &&
             alias.isNotBlank() &&
             deviceId.isNotBlank() &&
-            (apiKey.isNotBlank() || allParticipantsHaveOwnKey())
+            hasUsableKey()
 
-    /** Chave que a conta usa no servidor: a própria, aparada; sem chave própria, a do time. `null` usa a do time. */
+    /**
+     * Chave que a conta usa no servidor. `null` usa a do time.
+     *
+     * Modo legado (mapa vazio): a do time. Com mapa: a própria, aparada, sem herdar a do time;
+     * conta sem entrada no mapa fica com vazio.
+     */
     fun apiKeyFor(profileId: String?): String {
-        if (profileId == null) {
+        if (profileId == null || accountApiKeys.isEmpty()) {
             return apiKey
         }
-        val own = ownKeyOf(profileId)
-        return if (own.isNotEmpty()) own else apiKey
+        return ownKeyOf(profileId)
+    }
+
+    /** Participantes sem chave utilizável: `apiKeyFor` vazio. Não entram em presença, identidade nem envio. */
+    fun missingKeyProfileIds(): Set<String> = participatingProfileIds.filterTo(mutableSetOf()) { apiKeyFor(it).isBlank() }
+
+    /**
+     * Copia a chave do time para cada participante sem chave própria, para sair do modo legado sem
+     * perder a chave de ninguém. Não altera [apiKey]; sem chave do time, ou sem nada a copiar, devolve esta instância.
+     */
+    fun withOwnKeysMaterialized(): TeamIntegrationSettings {
+        if (apiKey.isBlank()) {
+            return this
+        }
+        val missing = participatingProfileIds.filter { ownKeyOf(it).isEmpty() }
+        if (missing.isEmpty()) {
+            return this
+        }
+        return copy(accountApiKeys = accountApiKeys + missing.associateWith { apiKey })
     }
 
     /** Chave própria da conta já aparada; vazio quando não há. */
     private fun ownKeyOf(profileId: String): String = accountApiKeys[profileId]?.trim().orEmpty()
 
-    /** `true` só com ao menos uma participante e todas com chave própria não vazia. */
-    private fun allParticipantsHaveOwnKey(): Boolean =
-        participatingProfileIds.isNotEmpty() && participatingProfileIds.all { ownKeyOf(it).isNotEmpty() }
+    /** Modo legado: a chave do time. Com mapa: ao menos uma participante com chave própria. */
+    private fun hasUsableKey(): Boolean =
+        if (accountApiKeys.isEmpty()) {
+            apiKey.isNotBlank()
+        } else {
+            participatingProfileIds.any { ownKeyOf(it).isNotEmpty() }
+        }
 
     /** Mapa com cada chave mascarada; o `profileId` (chave do mapa) continua visível, o valor não. */
     private fun redactedAccountKeys(): Map<String, String> = accountApiKeys.mapValues { redactedSecret(it.value) }

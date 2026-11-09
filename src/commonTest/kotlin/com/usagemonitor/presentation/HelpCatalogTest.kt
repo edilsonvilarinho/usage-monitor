@@ -147,4 +147,27 @@ class HelpCatalogTest {
             )
         }
     }
+
+    /**
+     * Issue #551: a chave é por conta e o campo fica no bloco "Contas" de Configurações › Time.
+     * O passo tem de citar esse rótulo e esse bloco, e nunca a "Chave do time" que saiu da tela.
+     */
+    @Test
+    fun `the team steps quote the account key inside the Accounts block`() {
+        val accountKeyLabel = mapOf(AppLanguage.PT to "Chave da conta", AppLanguage.EN to "Account key")
+        val accountsBlock = mapOf(AppLanguage.PT to "\"Contas\"", AppLanguage.EN to "\"Accounts\"")
+        for (language in AppLanguage.entries) {
+            val steps = HelpCatalog.entry(HelpTopic.TEAM, language).steps
+            val label = "\"${accountKeyLabel.getValue(language)}\""
+            val block = accountsBlock.getValue(language)
+            assertTrue(
+                steps.any { step -> label in step && block in step },
+                "passo sem $label no bloco $block em $language"
+            )
+            assertTrue(
+                steps.none { step -> "Chave do time" in step || "Team key" in step },
+                "passo cita a chave do time, que não existe mais, em $language"
+            )
+        }
+    }
 }

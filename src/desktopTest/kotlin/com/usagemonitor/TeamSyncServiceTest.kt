@@ -496,7 +496,7 @@ class TeamSyncServiceTest {
     }
 
     @Test
-    fun `conta sem chave propria envia e carimba com a chave do time`() = runTest {
+    fun `conta sem chave propria nao envia nem carimba presenca e a outra segue com a sua`() = runTest {
         withTwoProfilesFixture { rootA, rootB, indexer, syncState ->
             writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-a", "2026-08-01T10:00:00Z"))
             writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-b", "2026-08-01T11:00:00Z"))
@@ -510,17 +510,17 @@ class TeamSyncServiceTest {
 
             service.syncOnce()
 
-            // A conta B não tem chave própria: o servidor a recebe com a do time,
-            // e a A continua com a dela.
+            // A conta B não tem chave própria e o mapa não está vazio: não há herança
+            // da chave do time. Ela fica de fora do envio e da presença; a A segue com a dela.
             val ingestAccounts = repository.sends
                 .filter { send -> send.payload.turns.isNotEmpty() }
                 .map { send -> send.profileId to send.key }
             assertEquals(
-                setOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_DO_TIME),
+                setOf(PROFILE_ID to CHAVE_CONTA_A),
                 ingestAccounts.toSet()
             )
             assertEquals(
-                setOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_DO_TIME),
+                setOf(PROFILE_ID to CHAVE_CONTA_A),
                 repository.presenceAccounts.toSet()
             )
         }

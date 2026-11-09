@@ -88,6 +88,7 @@ import com.usagemonitor.presentation.ui.components.PersistentApiWarningBanner
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
 import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
+import com.usagemonitor.presentation.ui.components.TEAM_STEP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
@@ -2570,7 +2571,6 @@ class ComponentTest {
                     connection = TeamConnectionUiState(),
                     onEnabledChange = {},
                     onServerUrlChange = {},
-                    onApiKeyChange = {},
                     onAliasChange = { alias -> committed = alias },
                     onProfileParticipationChange = { _, _ -> },
                     onTestConnection = {}
@@ -2578,6 +2578,7 @@ class ComponentTest {
             }
         }
 
+        onNodeWithTag("${TEAM_STEP_TAG_PREFIX}1").performClick()
         onNodeWithTag(TEAM_ALIAS_FIELD_TEST_TAG).performTextReplacement("SUETONIO")
 
         // Gravar por tecla escreveria em disco a cada caractere e faria o aviso
@@ -2601,7 +2602,6 @@ class ComponentTest {
                     connection = TeamConnectionUiState(),
                     onEnabledChange = {},
                     onServerUrlChange = {},
-                    onApiKeyChange = {},
                     onAliasChange = { alias -> committed = alias },
                     onProfileParticipationChange = { _, _ -> },
                     onTestConnection = {}
@@ -2609,6 +2609,7 @@ class ComponentTest {
             }
         }
 
+        onNodeWithTag("${TEAM_STEP_TAG_PREFIX}1").performClick()
         onNodeWithTag(TEAM_ALIAS_FIELD_TEST_TAG).performTextClearance()
 
         // Apelido vazio derruba `isConfigured`, para o laço de envio e faz o

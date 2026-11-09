@@ -65,6 +65,19 @@ class SettingsToastMessageTest {
         )
     }
 
+    /** A chave agora é por conta: o aviso não pode voltar a falar em "chave do time". */
+    @Test
+    fun `chave salva tem frase propria nos dois idiomas`() {
+        assertEquals(
+            "Chave salva",
+            settingsToastMessage(SettingsToast.Saved(SettingsField.TEAM_KEY), AppLanguage.PT)
+        )
+        assertEquals(
+            "Key saved",
+            settingsToastMessage(SettingsToast.Saved(SettingsField.TEAM_KEY), AppLanguage.EN)
+        )
+    }
+
     @Test
     fun `todo campo tem texto nos dois idiomas`() {
         for (field in SettingsField.entries) {

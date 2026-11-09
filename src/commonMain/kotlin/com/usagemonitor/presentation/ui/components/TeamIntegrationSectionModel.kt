@@ -23,14 +23,13 @@ data class TeamSectionState(
 )
 
 /**
- * Os callbacks da seção Time. Classe comum, e não `data class`: os nomes `onApiKeyChange`
- * e `onAdminTokenChange` casam o padrão de segredo de `ArchitectureRulesTest`, que cobra
+ * Os callbacks da seção Time. Classe comum, e não `data class`: o nome
+ * `onAdminTokenChange` casa o padrão de segredo de `ArchitectureRulesTest`, que cobra
  * `toString` redigido em `data class` com esses campos.
  */
 class TeamSectionActions(
     val onEnabledChange: (Boolean) -> Unit = {},
     val onServerUrlChange: (String) -> Unit = {},
-    val onApiKeyChange: (String) -> Unit = {},
     val onAliasChange: (String) -> Unit = {},
     val onProfileParticipationChange: (String, Boolean) -> Unit = { _, _ -> },
     val onTestConnection: () -> Unit = {},
@@ -61,7 +60,6 @@ internal fun TeamSettingsSection(
         connection = state.connection,
         onEnabledChange = actions.onEnabledChange,
         onServerUrlChange = actions.onServerUrlChange,
-        onApiKeyChange = actions.onApiKeyChange,
         onAliasChange = actions.onAliasChange,
         onProfileParticipationChange = actions.onProfileParticipationChange,
         onTestConnection = actions.onTestConnection,

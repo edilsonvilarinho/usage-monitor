@@ -23,20 +23,35 @@ internal class TeamIntegrationLabels(private val language: AppLanguage) {
     val teamNameEmpty = localized(language, "O nome não pode ficar vazio.", "The name cannot be empty.")
 
     val serverLabel = localized(language, "Servidor", "Server")
-    val teamKeyLabel = localized(language, "Chave do time", "Team key")
     val showKey = localized(language, "Mostrar chave", "Show key")
     val hideKey = localized(language, "Ocultar chave", "Hide key")
 
-    /** Chave própria da conta no time; vazia, o servidor usa a chave do time. */
+    /** Chave própria da conta no time; o campo fica vazio quando a conta ainda não tem chave. */
     val accountKeyLabel = localized(language, "Chave da conta", "Account key")
-    val accountKeyPlaceholder = localized(language, "Usa a chave do time", "Uses team key")
+    val accountKeyPlaceholder = localized(language, "Cole a chave deste e-mail", "Paste this e-mail's key")
 
     val aliasLabel = localized(language, "Seu apelido", "Your alias")
     val aliasPlaceholder = localized(language, "como o time vai te ver", "how the team sees you")
     val aliasEmpty = localized(language, "O apelido não pode ficar vazio.", "The alias cannot be empty.")
 
-    val accountsTitle = localized(language, "Contas que fazem parte do time", "Accounts in the team")
     val noAccounts = localized(language, "Nenhuma conta Anthropic detectada.", "No Anthropic account detected.")
+
+    /** Títulos dos três blocos do detalhe do time, na ordem 1, 2, 3. */
+    val connectionStep = localized(language, "Conexão", "Connection")
+    val accountsStep = localized(language, "Contas", "Accounts")
+    val adminStep = localized(language, "Administração", "Administration")
+
+    /** Resumo do bloco Contas quando fechado: quantas contas estão ligadas. */
+    fun accountsSummary(on: Int, total: Int): String =
+        localized(language, "$on de $total ligadas", "$on of $total on")
+
+    val adminModeOn = localized(language, "Modo admin", "Admin mode")
+    val adminOff = localized(language, "Desligado", "Off")
+
+    /** Status escrito de cada linha de conta. */
+    val statusOn = localized(language, "ligada", "on")
+    val statusOff = localized(language, "desligada", "off")
+    val statusKeyMissing = localized(language, "falta a chave", "key missing")
 
     val testConnection = localized(language, "Testar conexão", "Test connection")
     val statusConnected = localized(language, "Conectado", "Connected")
@@ -96,5 +111,4 @@ internal class TeamIntegrationLabels(private val language: AppLanguage) {
     /** Motivo de recusa do servidor, mostrado na linha da conta. */
     fun rejected(reason: String): String =
         localized(language, "Recusada pelo servidor — $reason", "Refused by the server — $reason")
-
 }

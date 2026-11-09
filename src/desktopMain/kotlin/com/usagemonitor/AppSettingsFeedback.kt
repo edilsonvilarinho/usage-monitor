@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamConnectionStage
 import com.usagemonitor.presentation.ui.TeamCredentialKind
+import com.usagemonitor.presentation.ui.localized
 import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -256,6 +257,12 @@ internal class AppSettingsFeedback(
             var unreachable: TeamConnectionFailure? = null
             for (target in targets) {
                 val label = profileLabel(target.profileId) ?: target.profileId
+                // Conta ligada sem chave própria (mapa não vazio) não herda a do time: recusa
+                // antes de qualquer requisição, com o motivo na linha da conta.
+                if (current.apiKeyFor(target.profileId).isBlank()) {
+                    failures += localized(language(), "$label: falta a chave desta conta.", "$label: key missing for this account.")
+                    continue
+                }
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
                 // de um envio de turnos, então numa máquina já sincronizada ele
                 // nunca acontecia e a leitura ficava recusada indefinidamente.

@@ -148,3 +148,19 @@ Plano e medições: [`planos/chave-por-conta-549-execucao.md`](planos/chave-por-
 - `isConfigured` aceita time sem chave do time quando **toda** conta participante tem a sua.
 - Servidor não mudou. Chave por conta só pela tela (campo "Chave da conta" na conta ligada); CLI e TUI seguem com a
   chave do time.
+
+## Chave por e-mail e tela em etapas (#551)
+
+Plano e medições: [`planos/time-simplificado-551-execucao.md`](planos/time-simplificado-551-execucao.md). Corrige a #549
+pelo modelo mental do dono: **a chave é do e-mail**; um servidor tem N e-mails, cada um com a sua chave.
+
+- **Queda na chave do time só no legado:** com `accountApiKeys` vazio tudo funciona como antes (zero impacto). Assim que
+  existe uma chave por conta, conta ligada sem chave própria **fica sem chave**: não envia, não carimba presença e o
+  "Testar conexão" a recusa com "falta a chave desta conta" — herdar a chave de outra pessoa daria 403 pelo rótulo.
+- **Materialização:** ligar uma conta ou gravar/apagar uma chave pela tela copia antes a chave do time para cada conta já
+  participante sem chave própria (`withOwnKeysMaterialized`). A chave do time nunca é apagada (downgrade lê dela).
+- **Tela (rodada AN, escolhida AN2):** campo "Chave do time" saiu. Detalhe do time em 3 blocos numerados recolhíveis
+  (`TeamIntegrationSteps.kt`): 1 Conexão (nome, servidor, apelido, teste; resumo = status da lista), 2 Contas (nome,
+  e-mail, chave da conta com `apiKeyFor`, status escrito, interruptor), 3 Administração. Abre em Conexão com servidor
+  vazio ou última conexão falha; senão em Contas — nunca em Administração por haver token (o dono é admin).
+

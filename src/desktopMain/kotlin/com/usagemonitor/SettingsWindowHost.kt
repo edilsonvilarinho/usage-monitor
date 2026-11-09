@@ -153,7 +153,6 @@ internal fun SettingsWindowHost(
             teamActions = TeamSectionActions(
                 onEnabledChange = { value -> actions.changeTeamEnabled(value) },
                 onServerUrlChange = { value -> actions.changeTeamServerUrl(actions.openedTeamId(), value) },
-                onApiKeyChange = { value -> actions.changeTeamApiKey(actions.openedTeamId(), value) },
                 onAliasChange = { value -> actions.changeTeamAlias(actions.openedTeamId(), value) },
                 onProfileParticipationChange = { profileId, participates -> actions.changeTeamProfileParticipation(actions.openedTeamId(), profileId, participates) },
                 onTestConnection = { feedback.checkTeamConnection(actions.openedTeamId()) },
