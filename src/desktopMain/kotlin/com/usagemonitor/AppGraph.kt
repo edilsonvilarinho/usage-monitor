@@ -46,6 +46,9 @@ import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
+import com.usagemonitor.domain.repository.TeamAdminRepository
+import com.usagemonitor.domain.repository.TeamServerClockOffset
+import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
@@ -209,12 +212,13 @@ internal class AppGraph(
     // não de cada consumidor. Quem o mede é a batida de presença; quem o lê é a
     // classificação de quem está online.
     private val remoteTeamDataSource = RemoteTeamDataSource(httpClient)
-    // Repositórios e offset por time (#547, A04). Até o A07 a composição fala com um time só: o primeiro corrente.
+    // Repositórios e offset por time (#547, A04/A06): o painel segue o time do seletor; as Configurações, o time aberto.
     val teamRepositoryRegistry = TeamRepositoryRegistry(remoteTeamDataSource) { store.teamIntegrationsFlow.value }
-    private fun firstTeamId(): String = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id ?: TeamIntegrations.LEGACY_TEAM_ID
-    val teamServerClockOffset get() = teamRepositoryRegistry.serverClockOffset(firstTeamId())
-    val teamUsageRepository get() = teamRepositoryRegistry.usageRepository(firstTeamId())
-    val teamAdminRepository get() = teamRepositoryRegistry.adminRepository(firstTeamId())
+    val teamViewSelection = TeamViewSelection { store.teamIntegrationsFlow.value }
+    val teamUsageRepository: TeamUsageRepository = RoutedTeamUsageRepository(teamRepositoryRegistry) { teamViewSelection.dashboardTeam() }
+    val teamAdminRepository: TeamAdminRepository = RoutedTeamAdminRepository(teamRepositoryRegistry) { teamViewSelection.dashboardTeam() }
+    val settingsTeamAdminRepository: TeamAdminRepository = RoutedTeamAdminRepository(teamRepositoryRegistry) { teamViewSelection.settingsTeam() }
+    val teamServerClockOffset: TeamServerClockOffset = RoutedTeamServerClockOffset(teamRepositoryRegistry) { teamViewSelection.dashboardTeam() }
     val appUpdateRepository = AppUpdateRepositoryImpl(remoteApiDataSource)
     val appUpdateReleaseOpener = DesktopAppUpdateReleaseOpener()
 

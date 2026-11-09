@@ -352,7 +352,7 @@ internal fun runUsageMonitor(
             }
         )
     }
-    val settingsActions = remember { SettingsActions(graph.store, breadcrumbs, viewModels.settingsTargets, shell, modal, feedback, compositionScope) }
+    val settingsActions = remember { SettingsActions(graph.store, breadcrumbs, viewModels.settingsTargets, shell, modal, feedback, compositionScope, settingsTeamSelection = graph.teamViewSelection.settingsTeamId) }
 
     val iconImage = remember { loadWindowIcon() }
     val windowIconImage = remember { loadWindowIconImage() }

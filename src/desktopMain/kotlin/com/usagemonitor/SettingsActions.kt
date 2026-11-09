@@ -64,6 +64,8 @@ internal class SettingsActions(
     /** Escopo da composição, para a passagem das Configurações ao relatório de bug. */
     private val handOffScope: CoroutineScope,
     private val autoStartHost: () -> AutoStartHost = AutoStartHost::system,
+    /** Time aberto nas Configurações, lido pelo admin de chaves (A06). Sem ligação, não chega ao roteamento. */
+    private val settingsTeamSelection: MutableStateFlow<String?> = MutableStateFlow(null),
     private val isDefaultDataRoot: () -> Boolean = { AppDataDirectory.isDefault },
     private val chooseAnthropicDirectory: () -> File? = ::chooseAnthropicConfigDirectory,
     private val chooseCodexDirectory: () -> File? = ::chooseCodexHomeDirectory
@@ -285,6 +287,7 @@ internal class SettingsActions(
 
     fun selectTeam(teamId: String) {
         selectedTeamId = teamId
+        settingsTeamSelection.value = teamId
     }
 
     /** Remove o time; se era o aberto, abre o primeiro que sobrou. */
@@ -295,6 +298,7 @@ internal class SettingsActions(
         feedback.clearTeamAdminConnection(teamId)
         if (selectedTeamId == teamId) {
             selectedTeamId = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id
+            settingsTeamSelection.value = selectedTeamId
         }
     }
 
