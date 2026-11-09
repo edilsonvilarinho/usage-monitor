@@ -17,6 +17,7 @@ import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
+import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -38,19 +39,20 @@ class AppSettingsFeedbackTest {
     private val harness = SettingsTestHarness { home -> SettingsTestHarness.writeDefaultAccount(home) }
     private val feedback get() = harness.feedback
     private val requests = mutableListOf<Pair<String, String?>>()
+    private val teamId = TeamIntegrations.LEGACY_TEAM_ID
 
     @AfterTest
     fun cleanUp() {
         harness.close()
     }
 
-    private fun activeTeam(participating: Set<String>) {
+    private fun activeTeam(participating: Set<String>, id: String = teamId) {
         harness.store.publishTeamIntegrations(
             TeamIntegrations(
                 deviceId = "d",
                 enabled = true,
                 teams = listOf(
-                    TeamIntegrationSettings(
+                    TeamIntegrationSettings(id = id,
                         enabled = true,
                         serverUrl = "https://team.example",
                         apiKey = "k",
@@ -157,12 +159,12 @@ class AppSettingsFeedbackTest {
     fun `the team check stops at an unreachable server`() {
         harness.health = Result.failure(IOException("servidor fora"))
 
-        feedback.checkTeamConnection()
-        assertEquals(TeamConnectionUiStatus.CHECKING, feedback.teamConnection.status)
+        feedback.checkTeamConnection(teamId)
+        assertEquals(TeamConnectionUiStatus.CHECKING, feedback.teamConnection(teamId).status)
         harness.settle()
 
-        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
-        assertEquals("servidor fora", feedback.teamConnection.message)
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
+        assertEquals("servidor fora", feedback.teamConnection(teamId).message)
         assertTrue(harness.claims.isEmpty())
     }
 
@@ -172,12 +174,12 @@ class AppSettingsFeedbackTest {
         handshake.initCause(CertificateExpiredException("NotAfter"))
         harness.health = Result.failure(handshake)
 
-        feedback.checkTeamConnection()
+        feedback.checkTeamConnection(teamId)
         harness.settle()
 
-        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
-        assertEquals(TeamCertificateProblem.EXPIRED, feedback.teamConnection.failure?.certificateProblem)
-        assertEquals(TeamCredentialKind.ACCOUNT_KEY, feedback.teamConnection.credentialKind)
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
+        assertEquals(TeamCertificateProblem.EXPIRED, feedback.teamConnection(teamId).failure?.certificateProblem)
+        assertEquals(TeamCredentialKind.ACCOUNT_KEY, feedback.teamConnection(teamId).credentialKind)
     }
 
     @Test
@@ -185,22 +187,22 @@ class AppSettingsFeedbackTest {
         activeTeam(participating = setOf("default"))
         harness.claimResult = { Result.failure<TeamKeyVerification>(ConnectException("Connection refused")) }
 
-        feedback.checkTeamConnection()
+        feedback.checkTeamConnection(teamId)
         harness.settle()
 
-        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
-        assertEquals(TeamConnectionStage.CONNECTION, feedback.teamConnection.failure?.stage)
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
+        assertEquals(TeamConnectionStage.CONNECTION, feedback.teamConnection(teamId).failure?.stage)
     }
 
     @Test
     fun `the admin token check publishes the stage with the admin token as the credential`() {
         harness.adminTokenResult = Result.failure(UnknownHostException("team.example"))
 
-        feedback.validateAdminToken()
+        feedback.validateAdminToken(teamId)
         harness.settle()
 
-        assertEquals(TeamConnectionStage.ADDRESS, feedback.teamAdminConnection.failure?.stage)
-        assertEquals(TeamCredentialKind.ADMIN_TOKEN, feedback.teamAdminConnection.credentialKind)
+        assertEquals(TeamConnectionStage.ADDRESS, feedback.teamAdminConnection(teamId).failure?.stage)
+        assertEquals(TeamCredentialKind.ADMIN_TOKEN, feedback.teamAdminConnection(teamId).credentialKind)
     }
 
     @Test
@@ -208,11 +210,11 @@ class AppSettingsFeedbackTest {
         activeTeam(participating = emptySet())
         harness.language = AppLanguage.EN
 
-        feedback.checkTeamConnection()
+        feedback.checkTeamConnection(teamId)
         harness.settle()
 
-        assertEquals(TeamConnectionUiStatus.OK, feedback.teamConnection.status)
-        assertEquals("Server OK. Select an account to check the key.", feedback.teamConnection.message)
+        assertEquals(TeamConnectionUiStatus.OK, feedback.teamConnection(teamId).status)
+        assertEquals("Server OK. Select an account to check the key.", feedback.teamConnection(teamId).message)
         assertTrue(harness.claims.isEmpty())
     }
 
@@ -220,12 +222,12 @@ class AppSettingsFeedbackTest {
     fun `each marked account is claimed with its uuid and email`() {
         activeTeam(participating = setOf("default"))
 
-        feedback.checkTeamConnection()
+        feedback.checkTeamConnection(teamId)
         harness.settle()
 
         assertEquals(listOf<Pair<String, String?>>("uuid-1" to "me@example.com"), harness.claims.toList())
-        assertEquals(TeamConnectionUiStatus.OK, feedback.teamConnection.status)
-        assertEquals("Conexão OK e conta vinculada a esta chave.", feedback.teamConnection.message)
+        assertEquals(TeamConnectionUiStatus.OK, feedback.teamConnection(teamId).status)
+        assertEquals("Conexão OK e conta vinculada a esta chave.", feedback.teamConnection(teamId).message)
     }
 
     @Test
@@ -233,33 +235,70 @@ class AppSettingsFeedbackTest {
         activeTeam(participating = setOf("default"))
         harness.claimResult = { Result.failure<TeamKeyVerification>(IllegalStateException("HTTP 403")) }
 
-        feedback.checkTeamConnection()
+        feedback.checkTeamConnection(teamId)
         harness.settle()
-        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection.status)
-        assertEquals("Pessoal: HTTP 403", feedback.teamConnection.message)
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
+        assertEquals("Pessoal: HTTP 403", feedback.teamConnection(teamId).message)
 
         harness.claimResult = { Result.success(TeamKeyVerification(authorized = false, claimed = false)) }
-        feedback.checkTeamConnection()
+        feedback.checkTeamConnection(teamId)
         harness.settle()
-        assertEquals("Pessoal: a chave não cobre esta conta.", feedback.teamConnection.message)
+        assertEquals("Pessoal: a chave não cobre esta conta.", feedback.teamConnection(teamId).message)
         assertEquals(2, harness.breadcrumbs.messages.count { message -> message.contains("validar vínculo de conta") })
         assertTrue(harness.breadcrumbs.messages.none { message -> message.contains("me@example.com") })
     }
 
     @Test
     fun `the admin token check reports valid or the server message`() {
-        feedback.validateAdminToken()
-        assertEquals(TeamConnectionUiStatus.CHECKING, feedback.teamAdminConnection.status)
+        feedback.validateAdminToken(teamId)
+        assertEquals(TeamConnectionUiStatus.CHECKING, feedback.teamAdminConnection(teamId).status)
         harness.settle()
-        assertEquals(TeamConnectionUiStatus.OK, feedback.teamAdminConnection.status)
-        assertEquals("Token válido.", feedback.teamAdminConnection.message)
+        assertEquals(TeamConnectionUiStatus.OK, feedback.teamAdminConnection(teamId).status)
+        assertEquals("Token válido.", feedback.teamAdminConnection(teamId).message)
 
         harness.adminTokenResult = Result.failure(IllegalStateException())
         harness.language = AppLanguage.EN
-        feedback.validateAdminToken()
+        feedback.validateAdminToken(teamId)
         harness.settle()
-        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamAdminConnection.status)
-        assertEquals("Unknown failure.", feedback.teamAdminConnection.message)
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamAdminConnection(teamId).status)
+        assertEquals("Unknown failure.", feedback.teamAdminConnection(teamId).message)
         assertTrue(harness.breadcrumbs.messages.any { message -> message.contains("validar token administrativo do time") })
+    }
+
+    @Test
+    fun `a state written for one team leaves the other team as it was`() {
+        feedback.setTeamConnection("team-b", TeamConnectionUiState(TeamConnectionUiStatus.OK, "b"))
+        harness.health = Result.failure(IOException("servidor fora"))
+
+        feedback.checkTeamConnection(teamId)
+        assertEquals(TeamConnectionUiStatus.CHECKING, feedback.teamConnection(teamId).status)
+        harness.settle()
+
+        assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
+        assertEquals(TeamConnectionUiState(TeamConnectionUiStatus.OK, "b"), feedback.teamConnection("team-b"))
+        assertEquals(TeamConnectionUiState(), feedback.teamAdminConnection("team-b"))
+    }
+
+    @Test
+    fun `the server check and the claim go to the repository of the team asked`() {
+        activeTeam(participating = setOf("default"), id = "team-b")
+
+        feedback.checkTeamConnection("team-b")
+        harness.settle()
+
+        assertEquals(listOf("team-b"), harness.repositoryTeamIds)
+        assertEquals(listOf("team-b"), harness.claimTeamIds)
+        assertEquals(TeamConnectionUiStatus.OK, feedback.teamConnection("team-b").status)
+        assertEquals(TeamConnectionUiState(), feedback.teamConnection(teamId))
+    }
+
+    @Test
+    fun `the admin token check goes to the admin of the team asked`() {
+        feedback.validateAdminToken("team-b")
+        harness.settle()
+
+        assertEquals(listOf("team-b"), harness.adminTeamIds)
+        assertEquals(TeamConnectionUiStatus.OK, feedback.teamAdminConnection("team-b").status)
+        assertEquals(TeamConnectionUiState(), feedback.teamAdminConnection(teamId))
     }
 }

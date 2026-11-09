@@ -291,6 +291,8 @@ internal class SettingsActions(
     fun removeTeam(teamId: String) {
         val integrations = store.teamIntegrationsFlow.value
         persistTeamIntegrations(store, integrations.remove(teamId))
+        feedback.clearTeamConnection(teamId)
+        feedback.clearTeamAdminConnection(teamId)
         if (selectedTeamId == teamId) {
             selectedTeamId = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id
         }
@@ -304,13 +306,13 @@ internal class SettingsActions(
     fun changeTeamEnabled(enabled: Boolean) {
         val current = store.teamIntegrationsFlow.value
         val saved = persistTeamIntegrations(store, TeamIntegrations(current.deviceId, enabled, current.teams))
-        feedback.teamConnection = TeamConnectionUiState()
+        feedback.clearAllTeamConnections()
         feedback.reportSave(SettingsField.TEAM_INTEGRATION, saved)
     }
 
     fun changeTeamServerUrl(teamId: String, url: String) {
         val saved = updateTeam(teamId) { current -> current.copy(serverUrl = url) }
-        feedback.teamConnection = TeamConnectionUiState()
+        feedback.clearTeamConnection(teamId)
         feedback.reportSave(SettingsField.TEAM_SERVER, saved)
     }
 
@@ -324,10 +326,10 @@ internal class SettingsActions(
         val saved = updateTeam(teamId) { current -> current.copy(apiKey = key) }
         feedback.reportSave(SettingsField.TEAM_KEY, saved)
         if (saved) {
-            feedback.checkTeamConnection()
+            feedback.checkTeamConnection(teamId)
             targets.requestTeamSync()
         } else {
-            feedback.teamConnection = TeamConnectionUiState()
+            feedback.clearTeamConnection(teamId)
         }
     }
 
@@ -366,13 +368,13 @@ internal class SettingsActions(
         }
         feedback.reportSave(SettingsField.TEAM_ACCOUNTS, saved)
         if (saved && participates) {
-            feedback.checkTeamConnection()
+            feedback.checkTeamConnection(teamId)
         }
     }
 
     fun changeTeamAdminToken(teamId: String, token: String) {
         val saved = updateTeam(teamId) { current -> current.copy(adminToken = token) }
-        feedback.teamAdminConnection = TeamConnectionUiState()
+        feedback.clearTeamAdminConnection(teamId)
         feedback.reportSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
     }
 
@@ -384,7 +386,7 @@ internal class SettingsActions(
 
     fun exitTeamAdminMode(teamId: String) {
         val saved = updateTeam(teamId) { current -> current.copy(adminToken = "") }
-        feedback.teamAdminConnection = TeamConnectionUiState()
+        feedback.clearTeamAdminConnection(teamId)
         modal.isTeamKeysOpen = false
         feedback.reportSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
     }

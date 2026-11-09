@@ -20,7 +20,9 @@ import com.usagemonitor.presentation.ui.windowDragSink
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
+import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.update.ensureLinuxMenuIconCurrent
@@ -336,9 +338,13 @@ internal fun runUsageMonitor(
         AppSettingsFeedback(
             store = graph.store,
             breadcrumbs = breadcrumbs,
-            teamUsageRepository = graph.teamUsageRepository,
-            claimTeamKey = { accountKey, accountEmail -> viewModels.claimTeamKeyForAccount(accountKey, accountEmail) },
-            validateAdminTokenWithServer = { viewModels.validateAdminToken() },
+            teamUsageRepositoryFor = { teamId -> graph.teamRepositoryRegistry.usageRepository(teamId) },
+            claimTeamKey = { teamId, accountKey, accountEmail ->
+                ClaimTeamKeyForAccountUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))(accountKey, accountEmail)
+            },
+            validateAdminTokenWithServer = { teamId ->
+                ValidateAdminTokenUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))()
+            },
             scope = compositionScope,
             language = { shell.language },
             profileLabel = { profileId ->

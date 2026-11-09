@@ -293,16 +293,16 @@ class SettingsActionsTest {
 
     @Test
     fun `changing the server or turning the team on clears a stale check`() {
-        harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
 
         actions.changeTeamEnabled(true)
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_INTEGRATION), lastToast)
 
-        harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
         actions.changeTeamServerUrl(TeamIntegrations.LEGACY_TEAM_ID, "https://team.example")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals("https://team.example", store.teamSettingsDataSource.load().serverUrl)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_SERVER), lastToast)
     }
@@ -337,18 +337,18 @@ class SettingsActionsTest {
 
         assertEquals("key-1", store.teamSettingsFlow.value.apiKey)
         assertEquals(1, harness.teamSyncs)
-        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection.status)
+        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_KEY), lastToast)
     }
 
     @Test
     fun `a team key that cannot be written is not checked`() {
         blockWrites("team.json")
-        harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
 
         actions.changeTeamApiKey(TeamIntegrations.LEGACY_TEAM_ID, "key-1")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(0, harness.teamSyncs)
         assertEquals(SettingsToast.SaveFailed(SettingsField.TEAM_KEY), lastToast)
         assertTrue(harness.breadcrumbs.messages.any { message -> message.contains("salvar configuração TEAM_KEY") })
@@ -372,22 +372,22 @@ class SettingsActionsTest {
         actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = true)
         harness.settle()
         assertEquals(setOf("default"), store.teamSettingsFlow.value.participatingProfileIds)
-        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection.status)
-        harness.feedback.teamConnection = TeamConnectionUiState()
+        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState())
 
         actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = false)
 
         assertTrue(store.teamSettingsFlow.value.participatingProfileIds.isEmpty())
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ACCOUNTS), lastToast)
     }
 
     @Test
     fun `admin mode is entered by token, opens the keys and exits clearing it`() {
-        harness.feedback.teamAdminConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
+        harness.feedback.setTeamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
         actions.changeTeamAdminToken(TeamIntegrations.LEGACY_TEAM_ID, "adm")
         assertEquals("adm", store.teamSettingsFlow.value.adminToken)
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamAdminConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID))
 
         actions.openTeamKeysManager(TeamIntegrations.LEGACY_TEAM_ID)
         assertTrue(harness.modal.isTeamKeysOpen)
