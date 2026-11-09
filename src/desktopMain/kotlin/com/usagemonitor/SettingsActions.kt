@@ -344,6 +344,29 @@ internal class SettingsActions(
     }
 
     /**
+     * Chave própria de uma conta no time: só o time endereçado muda. Em branco remove a entrada,
+     * e a conta volta a usar a chave do time. Mesmo caminho de [changeTeamApiKey] depois de gravar.
+     */
+    fun changeTeamAccountKey(teamId: String, profileId: String, key: String) {
+        val trimmed = key.trim()
+        val saved = updateTeam(teamId) { current ->
+            val keys = if (trimmed.isEmpty()) {
+                current.accountApiKeys - profileId
+            } else {
+                current.accountApiKeys + (profileId to trimmed)
+            }
+            current.copy(accountApiKeys = keys)
+        }
+        feedback.reportSave(SettingsField.TEAM_KEY, saved)
+        if (saved) {
+            feedback.checkTeamConnection(teamId)
+            targets.requestTeamSync()
+        } else {
+            feedback.clearTeamConnection(teamId)
+        }
+    }
+
+    /**
      * O campo já barra apagar um apelido gravado; esta é a rede de baixo. O
      * apelido só chega ao servidor dentro de um ingest: sem antecipar a passada,
      * o nome novo esperaria o tique de 30s para aparecer ao time.

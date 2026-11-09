@@ -27,6 +27,10 @@ internal class TeamIntegrationLabels(private val language: AppLanguage) {
     val showKey = localized(language, "Mostrar chave", "Show key")
     val hideKey = localized(language, "Ocultar chave", "Hide key")
 
+    /** Chave própria da conta no time; vazia, o servidor usa a chave do time. */
+    val accountKeyLabel = localized(language, "Chave da conta", "Account key")
+    val accountKeyPlaceholder = localized(language, "Usa a chave do time", "Uses team key")
+
     val aliasLabel = localized(language, "Seu apelido", "Your alias")
     val aliasPlaceholder = localized(language, "como o time vai te ver", "how the team sees you")
     val aliasEmpty = localized(language, "O apelido não pode ficar vazio.", "The alias cannot be empty.")

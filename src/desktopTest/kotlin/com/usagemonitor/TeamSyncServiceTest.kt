@@ -36,6 +36,13 @@ private const val TEAM_A = "team-a"
 private const val TEAM_B = "team-b"
 private const val PROFILE_B = "outro"
 private const val ACCOUNT_B = "account-uuid-bbb"
+private const val CHAVE_DO_TIME = "chave-de-time-com-tamanho-suficiente"
+private const val CHAVE_CONTA_A = "chave-da-conta-a-com-tamanho-suficiente"
+private const val CHAVE_CONTA_B = "chave-da-conta-b-com-tamanho-suficiente"
+private const val CHAVE_CONTA_B_NOVA = "chave-da-conta-b-rotacionada-com-tamanho"
+
+/** Um envio com o perfil recebido e a chave que o repositório real usaria para ele. */
+private class AccountSend(val profileId: String?, val payload: TeamIngestPayload, val key: String)
 
 /** Captura os lotes enviados e permite forçar falha, sem tocar a rede. */
 private class RecordingTeamRepository(
@@ -43,13 +50,22 @@ private class RecordingTeamRepository(
     /** Recusa só o envio de identidade, para separá-lo do envio de lotes. */
     private val rejectIdentityPush: Boolean = false,
     /** Falha só a batida de presença, para provar que ela não trava o resto. */
-    var presenceFailure: Throwable? = null
+    var presenceFailure: Throwable? = null,
+    /** Mesma tabela que o repositório real consulta para escolher a chave de cada conta. */
+    private val settingsProvider: () -> TeamIntegrationSettings = { ACTIVE_SETTINGS }
 ) : TeamUsageRepository {
-    val pushed = mutableListOf<TeamIngestPayload>()
+    val sends = mutableListOf<AccountSend>()
+
+    /** Todo envio, lote ou identidade, na ordem em que chegou. */
+    val pushed: List<TeamIngestPayload>
+        get() = sends.map { send -> send.payload }
 
     /** Batidas de presença, na ordem em que chegaram. */
     val presenceTouches = mutableListOf<Pair<String, TeamMemberIdentity>>()
     val presenceEmails = mutableListOf<String?>()
+
+    /** Perfil e chave de cada batida, na mesma ordem de [presenceTouches]. */
+    val presenceAccounts = mutableListOf<Pair<String?, String>>()
 
     /** Lotes de verdade, sem os envios que só carregam a identidade. */
     val turnBatches: List<TeamIngestPayload>
@@ -59,7 +75,13 @@ private class RecordingTeamRepository(
     val identityPushes: List<TeamIngestPayload>
         get() = pushed.filter { payload -> payload.turns.isEmpty() }
 
-    override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
+    /** Envios de identidade com o perfil de cada conta. */
+    val identitySends: List<AccountSend>
+        get() = sends.filter { send -> send.payload.turns.isEmpty() }
+
+    override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> = push(payload, null)
+
+    override suspend fun push(payload: TeamIngestPayload, profileId: String?): Result<TeamIngestReceipt> {
         val current = failure
         if (current != null) {
             return Result.failure(current)
@@ -67,7 +89,7 @@ private class RecordingTeamRepository(
         if (rejectIdentityPush && payload.turns.isEmpty()) {
             return Result.failure(IllegalStateException("identidade recusada"))
         }
-        pushed += payload
+        sends += AccountSend(profileId, payload, settingsProvider().apiKeyFor(profileId))
         return Result.success(
             TeamIngestReceipt(
                 acceptedTurns = payload.turns.size,
@@ -91,14 +113,7 @@ private class RecordingTeamRepository(
     override suspend fun touchPresence(
         accountKey: String,
         member: TeamMemberIdentity
-    ): Result<TeamPresenceReceipt> {
-        val current = presenceFailure
-        if (current != null) {
-            return Result.failure(current)
-        }
-        presenceTouches += accountKey to member
-        return Result.success(TeamPresenceReceipt())
-    }
+    ): Result<TeamPresenceReceipt> = recordPresence(accountKey, member, profileId = null)
 
     override suspend fun touchPresence(
         accountKey: String,
@@ -106,7 +121,37 @@ private class RecordingTeamRepository(
         member: TeamMemberIdentity
     ): Result<TeamPresenceReceipt> {
         presenceEmails += accountEmail
-        return touchPresence(accountKey = accountKey, member = member)
+        return recordPresence(accountKey, member, profileId = null)
+    }
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> = recordPresence(accountKey, member, profileId)
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> {
+        presenceEmails += accountEmail
+        return recordPresence(accountKey, member, profileId)
+    }
+
+    private fun recordPresence(
+        accountKey: String,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> {
+        val current = presenceFailure
+        if (current != null) {
+            return Result.failure(current)
+        }
+        presenceTouches += accountKey to member
+        presenceAccounts += profileId to settingsProvider().apiKeyFor(profileId)
+        return Result.success(TeamPresenceReceipt())
     }
 
     override suspend fun checkConnection(): Result<Unit> = Result.success(Unit)
@@ -119,11 +164,17 @@ private class RecordingTeamRepository(
 private val ACTIVE_SETTINGS = TeamIntegrationSettings(
     enabled = true,
     serverUrl = "http://localhost:3000",
-    apiKey = "chave-de-time-com-tamanho-suficiente",
+    apiKey = CHAVE_DO_TIME,
     alias = "edilson",
     deviceId = "device-1",
     id = TEAM_A,
     participatingProfileIds = setOf(PROFILE_ID)
+)
+
+/** Duas contas do mesmo time, cada uma com a sua chave; a chave do time continua definida. */
+private val TWO_KEYED_ACCOUNTS_SETTINGS = ACTIVE_SETTINGS.copy(
+    participatingProfileIds = setOf(PROFILE_ID, PROFILE_B),
+    accountApiKeys = mapOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_CONTA_B)
 )
 
 class TeamSyncServiceTest {
@@ -410,6 +461,94 @@ class TeamSyncServiceTest {
 
             assertEquals(2, repository.identityPushes.size)
             assertEquals("edilson", repository.identityPushes.last().member.alias)
+        }
+    }
+
+    @Test
+    fun `cada conta envia lotes e carimba presenca com a chave da propria conta`() = runTest {
+        withTwoProfilesFixture { rootA, rootB, indexer, syncState ->
+            writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-a", "2026-08-01T10:00:00Z"))
+            writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-b", "2026-08-01T11:00:00Z"))
+            indexer.syncIndex()
+            val repository = RecordingTeamRepository(settingsProvider = { TWO_KEYED_ACCOUNTS_SETTINGS })
+            val service = newTeamsService(
+                syncState,
+                mapOf(TEAM_A to repository),
+                integrations = integrationsOf(TWO_KEYED_ACCOUNTS_SETTINGS)
+            )
+
+            service.syncOnce()
+
+            // Conta trocada na credencial é vínculo errado no servidor: cada lote e
+            // cada batida têm de sair com o perfil da conta e a chave dela.
+            val ingestAccounts = repository.sends
+                .filter { send -> send.payload.turns.isNotEmpty() }
+                .map { send -> send.profileId to send.key }
+            assertEquals(
+                setOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_CONTA_B),
+                ingestAccounts.toSet()
+            )
+            assertEquals(
+                setOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_CONTA_B),
+                repository.presenceAccounts.toSet()
+            )
+        }
+    }
+
+    @Test
+    fun `conta sem chave propria envia e carimba com a chave do time`() = runTest {
+        withTwoProfilesFixture { rootA, rootB, indexer, syncState ->
+            writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-a", "2026-08-01T10:00:00Z"))
+            writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-b", "2026-08-01T11:00:00Z"))
+            indexer.syncIndex()
+            val settings = ACTIVE_SETTINGS.copy(
+                participatingProfileIds = setOf(PROFILE_ID, PROFILE_B),
+                accountApiKeys = mapOf(PROFILE_ID to CHAVE_CONTA_A)
+            )
+            val repository = RecordingTeamRepository(settingsProvider = { settings })
+            val service = newTeamsService(syncState, mapOf(TEAM_A to repository), integrations = integrationsOf(settings))
+
+            service.syncOnce()
+
+            // A conta B não tem chave própria: o servidor a recebe com a do time,
+            // e a A continua com a dela.
+            val ingestAccounts = repository.sends
+                .filter { send -> send.payload.turns.isNotEmpty() }
+                .map { send -> send.profileId to send.key }
+            assertEquals(
+                setOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_DO_TIME),
+                ingestAccounts.toSet()
+            )
+            assertEquals(
+                setOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_DO_TIME),
+                repository.presenceAccounts.toSet()
+            )
+        }
+    }
+
+    @Test
+    fun `trocar a chave propria de uma conta reenvia a identidade so dela`() = runTest {
+        withTwoProfilesFixture { _, _, _, syncState ->
+            var settings = TWO_KEYED_ACCOUNTS_SETTINGS
+            val repository = RecordingTeamRepository(settingsProvider = { settings })
+            val service = newTeamsService(
+                syncState,
+                mapOf(TEAM_A to repository),
+                integrationsProvider = { integrationsOf(settings) }
+            )
+
+            service.syncOnce()
+            assertEquals(1, repository.identitySends.count { send -> send.profileId == PROFILE_ID })
+            assertEquals(1, repository.identitySends.count { send -> send.profileId == PROFILE_B })
+
+            settings = settings.copy(accountApiKeys = settings.accountApiKeys + (PROFILE_B to CHAVE_CONTA_B_NOVA))
+            service.syncOnce()
+
+            // A conta A não mudou de chave: não pode haver reenvio dela.
+            assertEquals(1, repository.identitySends.count { send -> send.profileId == PROFILE_ID })
+            // A conta B trocou de chave: o vínculo novo só nasce dentro de um envio.
+            assertEquals(2, repository.identitySends.count { send -> send.profileId == PROFILE_B })
+            assertEquals(CHAVE_CONTA_B_NOVA, repository.identitySends.last().key)
         }
     }
 
@@ -823,6 +962,7 @@ class TeamSyncServiceTest {
         syncState: LocalTeamSyncStateDataSource,
         repositories: Map<String, RecordingTeamRepository>,
         integrations: TeamIntegrations = twoTeams(),
+        integrationsProvider: () -> TeamIntegrations = { integrations },
         targets: List<TeamSyncTarget> = listOf(
             TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY, accountEmail = ACCOUNT_EMAIL),
             TeamSyncTarget(profileId = PROFILE_B, accountKey = ACCOUNT_B)
@@ -831,7 +971,7 @@ class TeamSyncServiceTest {
         return TeamSyncService(
             syncStateDataSource = syncState,
             pushTeamUsageFor = { teamId -> PushTeamUsageUseCase(repositories.getValue(teamId)) },
-            integrationsProvider = { integrations },
+            integrationsProvider = integrationsProvider,
             targetsProvider = { targets },
             touchTeamPresenceFor = { teamId -> TouchTeamPresenceUseCase(repositories.getValue(teamId)) },
             hostNameProvider = { "DESKTOP-TEST" }

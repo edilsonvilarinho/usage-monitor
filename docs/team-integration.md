@@ -132,3 +132,19 @@ Plano e medições: [`planos/times-multiplos-547-execucao.md`](planos/times-mult
   `leave` apaga a chave e as contas **só daquele time**, e o agregado desliga só quando nenhum time continua ativo.
   `ConfigChange.TeamLeave` virou classe com `teamName` opcional, mantendo `@SerialName("team_leave")`. A TUI ainda lê só o
   primeiro time (risco aberto no plano).
+
+## Chave por conta dentro do mesmo time (#549)
+
+Plano e medições: [`planos/chave-por-conta-549-execucao.md`](planos/chave-por-conta-549-execucao.md).
+
+- **Uma chave por pessoa, várias pessoas na mesma máquina.** O servidor emite chave por pessoa (e-mail no rótulo); duas
+  contas locais de pessoas diferentes no mesmo time precisam de duas chaves. `TeamIntegrationSettings.accountApiKeys`
+  (`profileId → chave`) guarda a chave própria; `apiKeyFor(profileId)` devolve a dela, ou a do time quando vazia.
+- **Zero impacto para quem já usa (opção A, dono):** conta sem chave própria usa a chave do time. `team.json` sem chave
+  por conta é regravado byte a byte igual (campo omitido quando vazio, `explicitNulls = false`); downgrade ignora o campo.
+- **Tudo o que fala em nome da conta usa a chave dela:** ingest, presença, marcador de identidade (trocar a chave de uma
+  conta reenvia só a identidade dela) e o `claim` do "Testar conexão" (app e `team join`). Leitura do painel: chave do
+  time; sem ela, a própria da primeira conta participante em ordem de `profileId`; senão o token de admin.
+- `isConfigured` aceita time sem chave do time quando **toda** conta participante tem a sua.
+- Servidor não mudou. Chave por conta só pela tela (campo "Chave da conta" na conta ligada); CLI e TUI seguem com a
+  chave do time.

@@ -89,7 +89,9 @@ fun DebouncedSecretField(
     onCommit: (String) -> Unit,
     modifier: Modifier = Modifier,
     validate: (String) -> String? = { null },
-    debounceMillis: Long = DEFAULT_COMMIT_DEBOUNCE_MILLIS
+    debounceMillis: Long = DEFAULT_COMMIT_DEBOUNCE_MILLIS,
+    /** Texto de apoio com o campo vazio; `null` não mostra nada. */
+    placeholder: String? = null
 ) {
     var revealed by remember { mutableStateOf(false) }
 
@@ -98,7 +100,7 @@ fun DebouncedSecretField(
         label = label,
         onCommit = onCommit,
         modifier = modifier,
-        placeholder = null,
+        placeholder = placeholder,
         validate = validate,
         debounceMillis = debounceMillis,
         visualTransformation = if (revealed) {

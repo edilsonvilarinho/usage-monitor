@@ -373,6 +373,61 @@ class LocalTeamSettingsDataSourceTest {
         }
     }
 
+    @Test
+    fun `arquivo v2 sem accountApiKeys sai byte a byte igual ao regravar`() {
+        withSettingsFile { file ->
+            val dataSource = LocalTeamSettingsDataSource(file)
+            dataSource.saveAll(
+                TeamIntegrations(
+                    deviceId = "device-1",
+                    enabled = true,
+                    teams = listOf(team(id = "team-a", serverUrl = "https://a.empresa.com", profiles = setOf("p1")))
+                )
+            )
+            val original = file.readText()
+
+            dataSource.saveAll(dataSource.loadAll())
+
+            assertFalse(original.contains("accountApiKeys"), original)
+            assertEquals(original, file.readText())
+        }
+    }
+
+    @Test
+    fun `mapa de chaves por conta sobrevive a ida e volta`() {
+        withSettingsFile { file ->
+            val dataSource = LocalTeamSettingsDataSource(file)
+            val aggregate = TeamIntegrations(
+                deviceId = "device-1",
+                enabled = true,
+                teams = listOf(
+                    team(id = "team-a", profiles = setOf("p1", "p2")).copy(accountApiKeys = mapOf("p1" to "chave-p1"))
+                )
+            )
+
+            dataSource.saveAll(aggregate)
+
+            assertEquals(mapOf("p1" to "chave-p1"), dataSource.loadAll().teams.single().accountApiKeys)
+            assertEquals(aggregate, dataSource.loadAll())
+        }
+    }
+
+    @Test
+    fun `campo desconhecido de versao futura nao quebra a leitura do time`() {
+        withSettingsFile { file ->
+            file.writeText(
+                """{"enabled":true,"deviceId":"device-1","teams":[{"id":"team-a","name":"Empresa",""" +
+                    """"serverUrl":"https://a.empresa.com","apiKey":"k","alias":"edilson",""" +
+                    """"participatingProfileIds":["p1"],"adminToken":"","campoFuturo":{"x":1}}],"outroCampo":2}"""
+            )
+
+            val loaded = LocalTeamSettingsDataSource(file).loadAll()
+
+            assertEquals(listOf("team-a"), loaded.teams.map { it.id })
+            assertEquals(setOf("p1"), loaded.teams.single().participatingProfileIds)
+        }
+    }
+
     private fun team(
         id: String,
         name: String = "",

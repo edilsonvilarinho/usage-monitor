@@ -61,7 +61,9 @@ class TeamUsageRepositoryImpl(
     /** Mesmo tratamento de [presenceRouteMissingFor], para `/v1/team/trend`. */
     private var trendRouteMissingFor: String? = null
 
-    override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> {
+    override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> = push(payload, null)
+
+    override suspend fun push(payload: TeamIngestPayload, profileId: String?): Result<TeamIngestReceipt> {
         val settings = settingsProvider()
         if (!settings.isActive) {
             return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
@@ -70,7 +72,7 @@ class TeamUsageRepositoryImpl(
         return runCatching {
             remoteDataSource.pushIngest(
                 baseUrl = settings.normalizedServerUrl,
-                apiKey = settings.apiKey,
+                apiKey = settings.apiKeyFor(profileId),
                 request = payload.toDto()
             ).toDomain()
         }
@@ -87,14 +89,25 @@ class TeamUsageRepositoryImpl(
     override suspend fun touchPresence(
         accountKey: String,
         member: TeamMemberIdentity
-    ): Result<TeamPresenceReceipt> {
-        return touchPresence(accountKey = accountKey, accountEmail = null, member = member)
-    }
+    ): Result<TeamPresenceReceipt> = touchPresence(accountKey, null, member, null)
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        member: TeamMemberIdentity,
+        profileId: String?
+    ): Result<TeamPresenceReceipt> = touchPresence(accountKey, null, member, profileId)
 
     override suspend fun touchPresence(
         accountKey: String,
         accountEmail: String?,
         member: TeamMemberIdentity
+    ): Result<TeamPresenceReceipt> = touchPresence(accountKey, accountEmail, member, null)
+
+    override suspend fun touchPresence(
+        accountKey: String,
+        accountEmail: String?,
+        member: TeamMemberIdentity,
+        profileId: String?
     ): Result<TeamPresenceReceipt> {
         val settings = settingsProvider()
         if (!settings.isActive) {
@@ -107,7 +120,7 @@ class TeamUsageRepositoryImpl(
             val result = runCatching {
                 remoteDataSource.touchPresence(
                     baseUrl = baseUrl,
-                    apiKey = settings.apiKey,
+                    apiKey = settings.apiKeyFor(profileId),
                     request = TeamPresenceRequestDto(
                         accountKey = accountKey,
                         accountEmail = accountEmail,
@@ -138,7 +151,8 @@ class TeamUsageRepositoryImpl(
                 member = member,
                 sessions = emptyList(),
                 turns = emptyList()
-            )
+            ),
+            profileId = profileId
         ).map { TeamPresenceReceipt() }
     }
 
@@ -260,12 +274,30 @@ class TeamUsageRepositoryImpl(
  * A chave de time vem primeiro: quem tem as duas é o admin que também participa
  * de um time, e nesse caso a leitura precisa ser a do time dele — usar o token
  * de admin mascararia um vínculo errado, que é justamente o que a tela quer
- * denunciar.
+ * denunciar. Sem chave de time, vale a chave própria de uma conta participante.
  */
 private fun TeamIntegrationSettings.readCredential(): TeamCredential? {
+    val teamOrAccountKey = readTeamOrAccountKey()
     return when {
-        isActive -> TeamCredential.TeamKey(apiKey)
+        teamOrAccountKey != null -> TeamCredential.TeamKey(teamOrAccountKey)
         isAdminMode -> TeamCredential.AdminToken(adminToken)
         else -> null
     }
+}
+
+/**
+ * Chave de leitura quando a integração está ativa: a do time, se informada; senão
+ * a própria da primeira conta participante, em ordem alfabética de `profileId`,
+ * para a escolha ser a mesma a cada leitura.
+ */
+private fun TeamIntegrationSettings.readTeamOrAccountKey(): String? {
+    if (!isActive) {
+        return null
+    }
+    if (apiKey.isNotBlank()) {
+        return apiKey
+    }
+    return participatingProfileIds.sorted()
+        .map { apiKeyFor(it) }
+        .firstOrNull { it.isNotBlank() }
 }

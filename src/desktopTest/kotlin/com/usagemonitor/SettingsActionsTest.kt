@@ -355,6 +355,69 @@ class SettingsActionsTest {
     }
 
     @Test
+    fun `an account key is stored trimmed in its own team only`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a"),
+                    TeamIntegrationSettings(id = "team-b", accountApiKeys = mapOf("default" to "chave-b"))
+                )
+            )
+        )
+
+        actions.changeTeamAccountKey("team-a", "default", "  chave-a  ")
+
+        assertEquals(mapOf("default" to "chave-a"), store.teamIntegrationsFlow.value.team("team-a")?.accountApiKeys)
+        assertEquals(mapOf("default" to "chave-a"), store.teamSettingsDataSource.loadAll().team("team-a")?.accountApiKeys)
+        assertEquals(mapOf("default" to "chave-b"), store.teamIntegrationsFlow.value.team("team-b")?.accountApiKeys)
+        assertEquals(SettingsToast.Saved(SettingsField.TEAM_KEY), lastToast)
+    }
+
+    @Test
+    fun `a blank account key removes its entry and keeps the other accounts`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(
+                        id = "team-a",
+                        accountApiKeys = mapOf("default" to "chave-a", "work" to "chave-w")
+                    )
+                )
+            )
+        )
+
+        actions.changeTeamAccountKey("team-a", "default", "   ")
+
+        assertEquals(mapOf("work" to "chave-w"), store.teamIntegrationsFlow.value.team("team-a")?.accountApiKeys)
+        assertEquals(SettingsToast.Saved(SettingsField.TEAM_KEY), lastToast)
+    }
+
+    @Test
+    fun `a saved account key is checked and the sync is requested at once`() {
+        actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-conta")
+        harness.settle()
+
+        assertEquals(
+            mapOf("default" to "chave-conta"),
+            store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)?.accountApiKeys
+        )
+        assertEquals(1, harness.teamSyncs)
+        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
+    }
+
+    @Test
+    fun `an account key that cannot be written is not checked`() {
+        blockWrites("team.json")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+
+        actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-conta")
+
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(0, harness.teamSyncs)
+        assertEquals(SettingsToast.SaveFailed(SettingsField.TEAM_KEY), lastToast)
+    }
+
+    @Test
     fun `a saved alias cannot be erased and a new one is sent at once`() {
         actions.changeTeamAlias(TeamIntegrations.LEGACY_TEAM_ID, "ana")
         assertEquals(1, harness.teamSyncs)

@@ -32,23 +32,50 @@ data class TeamIntegrationSettings(
     /** Identificador estável do time, gerado uma vez; sobrevive a renomear. */
     val id: String = "",
     /** Nome do time exibido ao usuário. */
-    val name: String = ""
+    val name: String = "",
+    /** Chave própria de cada conta participante (profileId → chave); conta sem entrada usa [apiKey]. */
+    val accountApiKeys: Map<String, String> = emptyMap()
 ) {
+
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =
         "TeamIntegrationSettings(enabled=$enabled, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
             "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)}, " +
-            "id=$id, name=$name)"
+            "id=$id, name=$name, accountApiKeys=${redactedAccountKeys()})"
 
     /** Sem a barra final, para concatenar o caminho sem gerar `//`. */
     val normalizedServerUrl: String
         get() = serverUrl.trim().trimEnd('/')
 
+    /**
+     * Configurada para a chamada de rede: tem a chave do time, ou toda conta participante tem chave própria.
+     *
+     * Sem chave de time, o time só funciona se nenhuma conta depender dele: cada participante precisa da sua.
+     */
     val isConfigured: Boolean
         get() = normalizedServerUrl.isNotEmpty() &&
-            apiKey.isNotBlank() &&
             alias.isNotBlank() &&
-            deviceId.isNotBlank()
+            deviceId.isNotBlank() &&
+            (apiKey.isNotBlank() || allParticipantsHaveOwnKey())
+
+    /** Chave que a conta usa no servidor: a própria, aparada; sem chave própria, a do time. `null` usa a do time. */
+    fun apiKeyFor(profileId: String?): String {
+        if (profileId == null) {
+            return apiKey
+        }
+        val own = ownKeyOf(profileId)
+        return if (own.isNotEmpty()) own else apiKey
+    }
+
+    /** Chave própria da conta já aparada; vazio quando não há. */
+    private fun ownKeyOf(profileId: String): String = accountApiKeys[profileId]?.trim().orEmpty()
+
+    /** `true` só com ao menos uma participante e todas com chave própria não vazia. */
+    private fun allParticipantsHaveOwnKey(): Boolean =
+        participatingProfileIds.isNotEmpty() && participatingProfileIds.all { ownKeyOf(it).isNotEmpty() }
+
+    /** Mapa com cada chave mascarada; o `profileId` (chave do mapa) continua visível, o valor não. */
+    private fun redactedAccountKeys(): Map<String, String> = accountApiKeys.mapValues { redactedSecret(it.value) }
 
     /** Ligada e com tudo o que a chamada de rede precisa. */
     val isActive: Boolean

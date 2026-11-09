@@ -55,6 +55,7 @@ const val TEAM_EMPTY_STATE_TEST_TAG = "teamIntegrationEmpty"
 const val TEAM_NAME_FIELD_TEST_TAG = "teamIntegrationNameField"
 const val TEAM_REMOVE_TEST_TAG = "teamIntegrationRemove"
 const val TEAM_REMOVE_CONFIRM_TEST_TAG = "teamIntegrationRemoveConfirm"
+const val TEAM_ACCOUNT_KEY_TAG_PREFIX = "teamIntegrationAccountKey:"
 
 /**
  * Seção "Integração com time" das Configurações, em mestre-detalhe (A08, direção B).
@@ -110,7 +111,9 @@ fun TeamIntegrationSection(
     onSelectTeam: (String) -> Unit = {},
     onAddTeam: () -> Unit = {},
     onRemoveTeam: (String) -> Unit = {},
-    onRenameTeam: (String) -> Unit = {}
+    onRenameTeam: (String) -> Unit = {},
+    /** Chave própria de uma conta do time; recebe o `profileId` e o valor digitado. */
+    onAccountApiKeyChange: (String, String) -> Unit = { _, _ -> }
 ) {
     val labels = TeamIntegrationLabels(language)
 
@@ -225,7 +228,9 @@ fun TeamIntegrationSection(
                         rejection = rejectedProfiles[profile.id],
                         labels = labels,
                         showDivider = profile !== profiles.last(),
-                        movedFromTeam = otherTeamNameFor(teams, settings.id, profile.id)
+                        movedFromTeam = otherTeamNameFor(teams, settings.id, profile.id),
+                        accountKey = settings.accountApiKeys[profile.id].orEmpty(),
+                        onAccountKeyChange = { value -> onAccountApiKeyChange(profile.id, value) }
                     )
                 }
             }
@@ -550,7 +555,10 @@ private fun TeamProfileCheckboxRow(
     rejection: String? = null,
     showDivider: Boolean = true,
     /** Outro time que já tem esta conta; ligar aqui move a conta para o time aberto. */
-    movedFromTeam: String? = null
+    movedFromTeam: String? = null,
+    /** Chave própria da conta no time; vazia, o servidor usa a chave do time. */
+    accountKey: String = "",
+    onAccountKeyChange: (String) -> Unit = {}
 ) {
     // Linha de dados como as opções da aba Sistema: rótulo em mono à esquerda,
     // controle à direita. O interruptor abria a linha, e a coluna de identidade
@@ -590,6 +598,20 @@ private fun TeamProfileCheckboxRow(
                         .padding(top = 4.dp)
                         .testTag("$TEAM_PROFILE_REJECTION_TAG_PREFIX${profile.id}")
                 )
+            }
+            // Campo só com a conta marcada: desligada, a chave própria não tem para onde ir.
+            if (checked) {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    DebouncedSecretField(
+                        value = accountKey,
+                        label = labels.accountKeyLabel,
+                        revealLabel = labels.showKey,
+                        hideLabel = labels.hideKey,
+                        onCommit = onAccountKeyChange,
+                        placeholder = labels.accountKeyPlaceholder,
+                        modifier = Modifier.testTag("$TEAM_ACCOUNT_KEY_TAG_PREFIX${profile.id}")
+                    )
+                }
             }
         }
         // Interruptor e não caixa de seleção: a linha diz se a conta participa do time.

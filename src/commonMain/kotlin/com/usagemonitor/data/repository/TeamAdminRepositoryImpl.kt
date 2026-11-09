@@ -273,15 +273,22 @@ class TeamAdminRepositoryImpl(
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
 
-        return runCatching {
-            remoteDataSource.verifyKey(
-                baseUrl = settings.normalizedServerUrl,
-                credential = credential,
-                accountKey = accountKey,
-                accountEmail = accountEmail
-            ).toDomain()
-        }.recoverIfMissingRoute()
+        return verifyWith(settings, credential, accountKey, accountEmail)
     }
+
+    private suspend fun verifyWith(
+        settings: TeamIntegrationSettings,
+        credential: TeamCredential,
+        accountKey: String,
+        accountEmail: String?
+    ): Result<TeamKeyVerification> = runCatching {
+        remoteDataSource.verifyKey(
+            baseUrl = settings.normalizedServerUrl,
+            credential = credential,
+            accountKey = accountKey,
+            accountEmail = accountEmail
+        ).toDomain()
+    }.recoverIfMissingRoute()
 
     /**
      * Amarra a conta à chave, e só cai na verificação se a rota não existir.
@@ -294,9 +301,15 @@ class TeamAdminRepositoryImpl(
     override suspend fun claimKeyForAccount(
         accountKey: String,
         accountEmail: String?
+    ): Result<TeamKeyVerification> = claimKeyForAccount(accountKey, accountEmail, profileId = null)
+
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?,
+        profileId: String?
     ): Result<TeamKeyVerification> {
         val settings = settingsProvider()
-        val credential = settings.readCredential()
+        val credential = settings.readCredential(profileId)
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
 
         val result = runCatching {
@@ -309,19 +322,23 @@ class TeamAdminRepositoryImpl(
         }
 
         if (result.isMissingRoute()) {
-            // Servidor 0.3.0: sem rota de vínculo, resta informar.
-            return verifyKeyForAccount(accountKey, accountEmail)
+            // Servidor 0.3.0: sem rota de vínculo, resta informar com a mesma credencial.
+            return verifyWith(settings, credential, accountKey, accountEmail)
         }
         return result
     }
 
-    /** Credencial para conferir a conta: a chave de time primeiro, senão o admin. */
-    private fun TeamIntegrationSettings.readCredential(): TeamCredential? {
+    /**
+     * Credencial para conferir a conta: a chave própria do integrante primeiro, senão a
+     * chave de time, senão o admin. Sem `profileId` vale a chave de time.
+     */
+    private fun TeamIntegrationSettings.readCredential(profileId: String? = null): TeamCredential? {
         if (normalizedServerUrl.isEmpty()) {
             return null
         }
+        val key = apiKeyFor(profileId)
         return when {
-            apiKey.isNotBlank() -> TeamCredential.TeamKey(apiKey)
+            key.isNotBlank() -> TeamCredential.TeamKey(key)
             isAdminMode -> TeamCredential.AdminToken(adminToken)
             else -> null
         }

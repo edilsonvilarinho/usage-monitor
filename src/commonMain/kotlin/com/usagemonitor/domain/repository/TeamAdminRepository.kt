@@ -131,4 +131,14 @@ interface TeamAdminRepository {
         accountKey: String,
         accountEmail: String? = null
     ): Result<TeamKeyVerification>
+
+    /**
+     * Mesma ação, usando a chave própria do integrante ([profileId]); sem ela, a do time.
+     * Quem não conhece o perfil cai no vínculo de duas posições.
+     */
+    suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?,
+        profileId: String?
+    ): Result<TeamKeyVerification> = claimKeyForAccount(accountKey, accountEmail)
 }

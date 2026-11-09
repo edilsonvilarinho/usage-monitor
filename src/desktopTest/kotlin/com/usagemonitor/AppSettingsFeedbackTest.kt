@@ -231,6 +231,16 @@ class AppSettingsFeedbackTest {
     }
 
     @Test
+    fun `the claim receives the profile id of the participant it checks`() {
+        activeTeam(participating = setOf("default"))
+
+        feedback.checkTeamConnection(teamId)
+        harness.settle()
+
+        assertEquals(listOf<String?>("default"), harness.claimProfileIds.toList())
+    }
+
+    @Test
     fun `a claim error or a refused claim names the account that failed`() {
         activeTeam(participating = setOf("default"))
         harness.claimResult = { Result.failure<TeamKeyVerification>(IllegalStateException("HTTP 403")) }
