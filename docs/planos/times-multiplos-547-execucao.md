@@ -46,6 +46,10 @@ configuração numa lista de times, cada um com servidor, chave, nome, apelido, 
   `settingsProvider` lendo o time do `id`. Offset de relógio de um servidor nunca corrige o de outro.
 - **Id do time:** gerado uma vez (`team-` + UUID), estável ao renomear; o migrado do formato plano também recebe um.
 - **Servidor sem mudança.**
+- **Direção visual B, mestre-detalhe (escolha do dono, 2026-11-09, `prototipos/times-547/b-mestre-detalhe/`):** lista
+  estreita de times com status e "Adicionar time" abaixo, formulário do time escolhido ao lado; no painel do time o
+  título é o seletor (`Sessões do time — Empresa ▾`, `AppMenu`) e só aparece com mais de um time ativo.
+- **Usuário já configurado não é afetado (exigência do dono):** o `team.json` atual vira um time sem ação nenhuma.
 
 ## Atividades
 
@@ -73,6 +77,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue comment 547` → comentário 6742060751; varredura do `explorer` (caminhos acima) |
 | A02 | `TeamIntegrations` (agregado, participação exclusiva, `enabled`/`deviceId` da instalação) e `id`/`name` no time | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` → `TeamIntegrationsTest` 10 de 17 falhando na asserção (ex.: `toString do agregado nao expoe chave nem token de admin FAILED`); verde: mesmo comando → 550 testes, 0 falhas |
+| A03 | `team.json` v2 (`teams[]`), migração do plano para `team-legacy` sem ação, espelho do 1º time nos campos planos, `loadAll`/`peekAll`/`saveAll` | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalTeamSettingsDataSourceTest"` → `expected:<1> but was:<0>`, `expected:<[team-a, team-b]> but was:<[]>`; verde: mesmo comando → 21 testes, 0 falhas (inclui "usuário já configurado segue ativo após migração e reabertura") |
 
 ## Problemas em aberto e riscos
 
