@@ -164,7 +164,8 @@ internal fun SettingsWindowHost(
                 onSelectTeam = actions::selectTeam,
                 onAddTeam = { actions.addTeam() },
                 onRemoveTeam = actions::removeTeam,
-                onRenameTeam = { value -> actions.changeTeamName(actions.openedTeamId(), value) }
+                onRenameTeam = { value -> actions.changeTeamName(actions.openedTeamId(), value) },
+                onAccountApiKeyChange = { profileId, value -> actions.changeTeamAccountKey(actions.openedTeamId(), profileId, value) }
             ),
             proxySettings = proxySettings,
             proxyConnection = feedback.proxyConnection,

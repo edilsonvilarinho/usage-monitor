@@ -1,19 +1,28 @@
 package com.usagemonitor.ui
 
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
+import com.usagemonitor.presentation.ui.components.DEFAULT_COMMIT_DEBOUNCE_MILLIS
 import com.usagemonitor.presentation.ui.components.TEAM_LIST_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
@@ -64,7 +73,8 @@ class TeamIntegrationSectionTest {
         teams: List<TeamIntegrationSettings>,
         onSelectTeam: (String) -> Unit = {},
         onAddTeam: () -> Unit = {},
-        onRemoveTeam: (String) -> Unit = {}
+        onRemoveTeam: (String) -> Unit = {},
+        onAccountKeyChange: (String, String) -> Unit = { _, _ -> }
     ) {
         ScreenTestTheme(isDark = true) {
             TeamIntegrationSection(
@@ -83,7 +93,8 @@ class TeamIntegrationSectionTest {
                 teamConnections = mapOf("pessoal" to TeamConnectionUiState(status = TeamConnectionUiStatus.OK)),
                 onSelectTeam = onSelectTeam,
                 onAddTeam = onAddTeam,
-                onRemoveTeam = onRemoveTeam
+                onRemoveTeam = onRemoveTeam,
+                onAccountApiKeyChange = onAccountKeyChange
             )
         }
     }
@@ -153,5 +164,51 @@ class TeamIntegrationSectionTest {
         setContent { Section(settings = pessoal, teams = emptyList()) }
 
         onNodeWithText("Nenhum time configurado").assertIsDisplayed()
+    }
+
+    private val prefixoCampoContaTrabalho = "teamIntegrationAccountKey:trabalho"
+    private val chaveContaTrabalho = "chave-conta-trabalho-com-tamanho-suficiente"
+
+    @Test
+    fun `conta ligada mostra o campo Chave da conta com o valor gravado`() = runDesktopComposeUiTest {
+        val comContaPropria = empresa.copy(
+            enabled = true,
+            participatingProfileIds = setOf("trabalho"),
+            accountApiKeys = mapOf("trabalho" to chaveContaTrabalho)
+        )
+        setContent { Section(settings = comContaPropria, teams = listOf(comContaPropria)) }
+
+        onNodeWithText("Chave da conta").assertIsDisplayed()
+        onNodeWithTag(prefixoCampoContaTrabalho).assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.InputText, AnnotatedString(chaveContaTrabalho))
+        )
+    }
+
+    @Test
+    fun `conta desligada nao mostra o campo Chave da conta`() = runDesktopComposeUiTest {
+        setContent { Section(settings = pessoal, teams = listOf(pessoal)) }
+
+        onNodeWithText("TRABALHO").assertIsDisplayed()
+        onAllNodesWithTag(prefixoCampoContaTrabalho).assertCountEquals(0)
+    }
+
+    @Test
+    fun `digitar na chave da conta chama o callback com profileId e valor`() = runDesktopComposeUiTest {
+        val gravados = mutableListOf<Pair<String, String>>()
+        val comContaLigada = empresa.copy(enabled = true, participatingProfileIds = setOf("trabalho"))
+        setContent {
+            Section(
+                settings = comContaLigada,
+                teams = listOf(comContaLigada),
+                onAccountKeyChange = { profileId, valor -> gravados += profileId to valor }
+            )
+        }
+
+        mainClock.autoAdvance = false
+        onNodeWithTag(prefixoCampoContaTrabalho).performTextInput(chaveContaTrabalho)
+        mainClock.advanceTimeBy(DEFAULT_COMMIT_DEBOUNCE_MILLIS + 100L)
+        waitForIdle()
+
+        assertEquals(listOf("trabalho" to chaveContaTrabalho), gravados)
     }
 }

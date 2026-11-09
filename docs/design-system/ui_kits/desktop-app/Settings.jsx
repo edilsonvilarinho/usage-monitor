@@ -219,6 +219,12 @@ export function Settings() {
               <AppKey>Contas que participam</AppKey>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
                 <AppSwitch checked={team} disabled={!team} reason="Ligue a integração com time primeiro." label="dev@example.com — Example Org" />
+                {team ? (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--s1)', marginLeft: 38 }}>
+                    <AppTextField label="Chave da conta" type="password" placeholder="Usa a chave do time" style={{ flex: 1 }} />
+                    <AppIconButton variant="ghost" glyph="◉" label="Mostrar chave" />
+                  </div>
+                ) : null}
                 <AppSwitch checked={false} disabled={!team} reason="Ligue a integração com time primeiro." label="qa@example.com — Example Org (Sandbox)" />
               </div>
             </React.Fragment>

@@ -41,7 +41,9 @@ class TeamSectionActions(
     val onSelectTeam: (String) -> Unit = {},
     val onAddTeam: () -> Unit = {},
     val onRemoveTeam: (String) -> Unit = {},
-    val onRenameTeam: (String) -> Unit = {}
+    val onRenameTeam: (String) -> Unit = {},
+    /** Chave própria de uma conta do time; recebe o `profileId` e o valor digitado. */
+    val onAccountApiKeyChange: (String, String) -> Unit = { _, _ -> }
 )
 
 /** Liga o estado e as ações à seção Time; `SettingsDialogContent` só repassa os dois objetos. */
@@ -76,6 +78,7 @@ internal fun TeamSettingsSection(
         onSelectTeam = actions.onSelectTeam,
         onAddTeam = actions.onAddTeam,
         onRemoveTeam = actions.onRemoveTeam,
-        onRenameTeam = actions.onRenameTeam
+        onRenameTeam = actions.onRenameTeam,
+        onAccountApiKeyChange = actions.onAccountApiKeyChange
     )
 }
