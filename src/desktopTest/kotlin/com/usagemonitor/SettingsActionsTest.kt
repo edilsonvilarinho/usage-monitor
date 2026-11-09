@@ -446,6 +446,77 @@ class SettingsActionsTest {
     }
 
     @Test
+    fun `turning on a second account in legacy mode gives the old team key to the first one only`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(
+                serverUrl = "https://team.example",
+                apiKey = "chave-antiga",
+                alias = "eu",
+                participatingProfileIds = setOf("default")
+            )
+        }
+
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "work", participates = true)
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertEquals(mapOf("default" to "chave-antiga"), team?.accountApiKeys)
+        assertEquals("", team?.apiKeyFor("work"))
+        assertEquals("chave-antiga", team?.apiKey)
+        assertEquals(setOf("default", "work"), team?.participatingProfileIds)
+    }
+
+    @Test
+    fun `turning on an account in a team without a legacy key changes only the participation`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(serverUrl = "https://team.example", alias = "eu", participatingProfileIds = setOf("default"))
+        }
+
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "work", participates = true)
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertTrue(team?.accountApiKeys?.isEmpty() == true)
+        assertEquals(setOf("default", "work"), team?.participatingProfileIds)
+    }
+
+    @Test
+    fun `turning on an account once keys exist does not hand it the team key`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(
+                serverUrl = "https://team.example",
+                apiKey = "chave-antiga",
+                alias = "eu",
+                participatingProfileIds = setOf("default"),
+                accountApiKeys = mapOf("default" to "chave-default")
+            )
+        }
+
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "work", participates = true)
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertEquals(mapOf("default" to "chave-default"), team?.accountApiKeys)
+        assertEquals("", team?.apiKeyFor("work"))
+    }
+
+    @Test
+    fun `the first own key in legacy mode keeps the team key for the other participants`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(
+                serverUrl = "https://team.example",
+                apiKey = "chave-antiga",
+                alias = "eu",
+                participatingProfileIds = setOf("default", "work")
+            )
+        }
+
+        actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-nova")
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertEquals(mapOf("default" to "chave-nova", "work" to "chave-antiga"), team?.accountApiKeys)
+        assertEquals("chave-antiga", team?.apiKey)
+        assertEquals("chave-antiga", store.teamSettingsDataSource.loadAll().team(TeamIntegrations.LEGACY_TEAM_ID)?.apiKey)
+    }
+
+    @Test
     fun `admin mode is entered by token, opens the keys and exits clearing it`() {
         harness.feedback.setTeamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
         actions.changeTeamAdminToken(TeamIntegrations.LEGACY_TEAM_ID, "adm")

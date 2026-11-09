@@ -344,18 +344,21 @@ internal class SettingsActions(
     }
 
     /**
-     * Chave própria de uma conta no time: só o time endereçado muda. Em branco remove a entrada,
-     * e a conta volta a usar a chave do time. Mesmo caminho de [changeTeamApiKey] depois de gravar.
+     * Chave própria de uma conta no time: só o time endereçado muda. Em branco remove a entrada, e a conta
+     * fica sem chave (sem herdar a do time). Antes da gravação, o time copia a chave antiga para as
+     * participantes sem chave própria ([TeamIntegrationSettings.withOwnKeysMaterialized]), para não perdê-la.
+     * Mesmo caminho de [changeTeamApiKey] depois de gravar.
      */
     fun changeTeamAccountKey(teamId: String, profileId: String, key: String) {
         val trimmed = key.trim()
         val saved = updateTeam(teamId) { current ->
+            val base = current.withOwnKeysMaterialized()
             val keys = if (trimmed.isEmpty()) {
-                current.accountApiKeys - profileId
+                base.accountApiKeys - profileId
             } else {
-                current.accountApiKeys + (profileId to trimmed)
+                base.accountApiKeys + (profileId to trimmed)
             }
-            current.copy(accountApiKeys = keys)
+            base.copy(accountApiKeys = keys)
         }
         feedback.reportSave(SettingsField.TEAM_KEY, saved)
         if (saved) {
@@ -383,20 +386,27 @@ internal class SettingsActions(
         }
     }
 
-    /** Marcar uma conta é justamente o momento em que o vínculo da chave passa a importar. */
+    /**
+     * Marcar uma conta é justamente o momento em que o vínculo da chave passa a importar. Ligar materializa
+     * antes a chave antiga do time nas participantes sem chave própria: a conta nova entra sem chave, e a
+     * chave do time nunca migra para ela.
+     */
     fun changeTeamProfileParticipation(teamId: String, profileId: String, participates: Boolean) {
         // Com time cadastrado, o agregado tira a conta dos outros times; sem ele, o time nasce com a conta.
         val integrations = store.teamIntegrationsFlow.value
-        val saved = if (participates && integrations.team(teamId) != null) {
-            persistTeamIntegrations(store, integrations.withParticipation(teamId, profileId, true))
+        val target = integrations.team(teamId)
+        val saved = if (participates && target != null) {
+            val materialized = integrations.upsert(target.withOwnKeysMaterialized())
+            persistTeamIntegrations(store, materialized.withParticipation(teamId, profileId, true))
         } else {
             updateTeam(teamId) { current ->
+                val base = if (participates) current.withOwnKeysMaterialized() else current
                 val updated = if (participates) {
-                    current.participatingProfileIds + profileId
+                    base.participatingProfileIds + profileId
                 } else {
-                    current.participatingProfileIds - profileId
+                    base.participatingProfileIds - profileId
                 }
-                current.copy(participatingProfileIds = updated)
+                base.copy(participatingProfileIds = updated)
             }
         }
         feedback.reportSave(SettingsField.TEAM_ACCOUNTS, saved)
