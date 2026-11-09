@@ -448,7 +448,7 @@ internal fun runUsageMonitor(
             },
             actions = shellActions,
             // O que o card de cada conta oferece, para os botões do balão.
-            teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
+            teamEnabledProfileIds = teamParticipatingProfileIds(teamIntegrations),
             cliSessionPulses = cliSessionPulses,
             teamSessionPulses = teamSessionPulses,
             accountColors = accountColors,

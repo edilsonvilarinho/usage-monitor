@@ -17,6 +17,10 @@ internal sealed interface TeamAccountSwitch {
 internal fun teamSelectorOptions(integrations: TeamIntegrations): List<TeamSelectorOption> =
     integrations.activeTeams.map { TeamSelectorOption(id = it.id, name = it.name) }
 
+/** Contas que participam de algum time ativo: as que ganham o botão de time nos cards. */
+internal fun teamParticipatingProfileIds(integrations: TeamIntegrations): Set<String> =
+    integrations.activeTeams.flatMapTo(linkedSetOf()) { it.participatingProfileIds }
+
 /** O seletor só aparece quando há escolha real (mais de um time ativo). */
 internal fun teamSelectorVisible(options: List<TeamSelectorOption>): Boolean = options.size > 1
 

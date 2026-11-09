@@ -66,6 +66,17 @@ class TeamDashboardSelectionTest {
     }
 
     @Test
+    fun `contas participantes sao a uniao dos times ativos`() {
+        val integrations = integrations(
+            team("t1", "Alfa", "p-a"),
+            team("t2", "Desligado", "p-d", enabled = false),
+            team("t3", "Beta", "p-b", "p-c")
+        )
+
+        assertEquals(setOf("p-a", "p-b", "p-c"), teamParticipatingProfileIds(integrations))
+    }
+
+    @Test
     fun `admin sem conta propria abre todas as contas`() {
         val admin = team("t1", "Alfa", admin = true)
         val targets = listOf(TeamSyncTarget(profileId = "p-x", accountKey = "acc-x", accountEmail = null))
