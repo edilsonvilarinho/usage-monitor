@@ -382,7 +382,7 @@ internal class TeamSyncService(
 
         repeat(maxBatchesPerPass) {
             val batch = runCatching {
-                syncStateDataSource.readPendingBatch(target.profileId, batchSize)
+                syncStateDataSource.readPendingBatch(settings.id, target.profileId, batchSize)
             }.getOrElse { error ->
                 return TeamSyncReport(pushedTurns, batches, failures + error)
             }
@@ -420,7 +420,7 @@ internal class TeamSyncService(
             // próxima passada quando o envio de identidade falhou mas este passou.
             confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity(target)
 
-            runCatching { syncStateDataSource.markPushed(batch.turns, clock.now()) }
+            runCatching { syncStateDataSource.markPushed(settings.id, batch.turns, clock.now()) }
                 .onFailure { error -> return TeamSyncReport(pushedTurns, batches, failures + error) }
 
             pushedTurns += batch.turns.size

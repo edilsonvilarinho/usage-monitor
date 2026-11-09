@@ -58,7 +58,7 @@ configuração numa lista de times, cada um com servidor, chave, nome, apelido, 
 | A01 | Este plano | Neferpitou |
 | A02 | Domain: `id`/`name` no time, agregado `TeamIntegrations`, participação exclusiva, busca do time de uma conta | backend-dev |
 | A03 | Data: `team.json` v2, migração do plano, espelho do 1º time, `peek` sem efeito | backend-dev |
-| A04 | Sync por time: `TeamSyncService` itera times; repositórios/offset/404 por `id` | backend-dev |
+| A04 | Sync por time, em três commits: A04a marcador por time; A04b registro de repositórios/offset/404 por `id` e store; A04c `TeamSyncService` itera times | backend-dev |
 | A05 | Configurações: `SettingsActions`/`AppSettingsFeedback`/`ConfigApplier` por time (adicionar, remover, editar, testar) | backend-dev |
 | A06 | Admin por time: `TeamAdminRepositoryImpl`/`TeamKeysAdminViewModel` recebem o time | backend-dev |
 | A07 | `TeamUsageViewModel`: extração (teto 800) e time selecionado | backend-dev |
@@ -78,6 +78,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue comment 547` → comentário 6742060751; varredura do `explorer` (caminhos acima) |
 | A02 | `TeamIntegrations` (agregado, participação exclusiva, `enabled`/`deviceId` da instalação) e `id`/`name` no time | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` → `TeamIntegrationsTest` 10 de 17 falhando na asserção (ex.: `toString do agregado nao expoe chave nem token de admin FAILED`); verde: mesmo comando → 550 testes, 0 falhas |
 | A03 | `team.json` v2 (`teams[]`), migração do plano para `team-legacy` sem ação, espelho do 1º time nos campos planos, `loadAll`/`peekAll`/`saveAll` | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalTeamSettingsDataSourceTest"` → `expected:<1> but was:<0>`, `expected:<[team-a, team-b]> but was:<[]>`; verde: mesmo comando → 21 testes, 0 falhas (inclui "usuário já configurado segue ativo após migração e reabertura") |
+| A04a | Marcador de envio por time (`team_sync_watermarks`, PK `team_id, session_id`); cópia única de `team_sync_state` para `team-legacy`, tabela antiga intacta | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalTeamSyncStateDataSourceTest"` → `:38 expected:<1> but was:<0>` (tabela antiga apagada) e, com a guarda desligada, `expected:<[1, 2]> but was:<[2]>`; verde: `--tests LocalTeamSyncStateDataSourceTest --tests TeamSyncServiceTest` → 5/5 e 29/29 |
 
 ## Problemas em aberto e riscos
 
