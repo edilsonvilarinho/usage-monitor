@@ -51,7 +51,7 @@ internal class AppSettingsFeedback(
     /** Repositório de uso do time pedido (`TeamRepositoryRegistry.usageRepository`). */
     private val teamUsageRepositoryFor: (teamId: String) -> TeamUsageRepository,
     /** `ClaimTeamKeyForAccountUseCase` do time pedido: vincula a chave à conta. */
-    private val claimTeamKey: suspend (teamId: String, accountKey: String, accountEmail: String?) -> Result<TeamKeyVerification>,
+    private val claimTeamKey: suspend (teamId: String, accountKey: String, accountEmail: String?, profileId: String?) -> Result<TeamKeyVerification>,
     /** `ValidateAdminTokenUseCase` do time pedido. */
     private val validateAdminTokenWithServer: suspend (teamId: String) -> Result<Unit>,
     private val scope: CoroutineScope,
@@ -259,7 +259,7 @@ internal class AppSettingsFeedback(
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
                 // de um envio de turnos, então numa máquina já sincronizada ele
                 // nunca acontecia e a leitura ficava recusada indefinidamente.
-                val result = claimTeamKey(teamId, target.accountKey, target.accountEmail)
+                val result = claimTeamKey(teamId, target.accountKey, target.accountEmail, target.profileId)
                 val error = result.exceptionOrNull()
                 if (error != null) {
                     breadcrumbs.recordFailure("validar vínculo de conta com a chave do time", error)

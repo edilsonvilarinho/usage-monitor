@@ -339,8 +339,8 @@ internal fun runUsageMonitor(
             store = graph.store,
             breadcrumbs = breadcrumbs,
             teamUsageRepositoryFor = { teamId -> graph.teamRepositoryRegistry.usageRepository(teamId) },
-            claimTeamKey = { teamId, accountKey, accountEmail ->
-                ClaimTeamKeyForAccountUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))(accountKey, accountEmail)
+            claimTeamKey = { teamId, accountKey, accountEmail, profileId ->
+                ClaimTeamKeyForAccountUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))(accountKey, accountEmail, profileId)
             },
             validateAdminTokenWithServer = { teamId ->
                 ValidateAdminTokenUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))()

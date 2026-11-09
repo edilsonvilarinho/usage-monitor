@@ -126,6 +126,12 @@ class RoutedTeamAdminRepository(
 
     override suspend fun claimKeyForAccount(accountKey: String, accountEmail: String?): Result<TeamKeyVerification> =
         current().claimKeyForAccount(accountKey, accountEmail)
+
+    override suspend fun claimKeyForAccount(
+        accountKey: String,
+        accountEmail: String?,
+        profileId: String?
+    ): Result<TeamKeyVerification> = current().claimKeyForAccount(accountKey, accountEmail, profileId)
 }
 
 /** Offset de relógio do time que [selectedTeamId] devolve; cada time mede o próprio servidor. */

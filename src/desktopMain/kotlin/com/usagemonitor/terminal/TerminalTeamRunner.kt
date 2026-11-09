@@ -267,7 +267,7 @@ internal class TerminalTeamRunner(
                         val admin = TeamAdminRepositoryImpl(remote, settingsProvider = { settings })
                         accounts.mapNotNull { account ->
                             val key = account.accountKey ?: return@mapNotNull "${account.label}: sem login"
-                            val result = admin.claimKeyForAccount(key, account.email)
+                            val result = admin.claimKeyForAccount(key, account.email, account.profileId)
                             when {
                                 result.isFailure -> "${account.label}: ${result.exceptionOrNull()?.message.orEmpty()}"
                                 result.getOrNull()?.authorized != true -> "${account.label}: a chave não cobre esta conta"

@@ -184,6 +184,7 @@ class ClaimTeamKeyForAccountUseCase(
 ) {
     suspend operator fun invoke(
         accountKey: String,
-        accountEmail: String? = null
-    ): Result<TeamKeyVerification> = repository.claimKeyForAccount(accountKey, accountEmail)
+        accountEmail: String? = null,
+        profileId: String? = null
+    ): Result<TeamKeyVerification> = repository.claimKeyForAccount(accountKey, accountEmail, profileId)
 }
