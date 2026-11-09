@@ -49,7 +49,20 @@ class TeamDashboardSelectionTest {
             TeamSyncTarget(profileId = "p-a", accountKey = "acc-a", accountEmail = "a@x.dev")
         )
 
-        assertEquals(TeamAccountSwitch.Account("acc-b", "b@x.dev"), teamAccountSwitchFor(alfa, targets))
+        assertEquals(TeamAccountSwitch.Account("acc-b", "b@x.dev", "p-b"), teamAccountSwitchFor(alfa, targets))
+    }
+
+    @Test
+    fun `overview admin mantem o time atual se for admin senao o primeiro admin`() {
+        val integrations = integrations(
+            team("t1", "Alfa", "p-a"),
+            team("t2", "Beta", "p-b", admin = true),
+            team("t3", "Gama", "p-g", admin = true)
+        )
+
+        assertEquals("t2", adminDashboardTeamIdFor("t1", integrations))
+        assertEquals("t3", adminDashboardTeamIdFor("t3", integrations))
+        assertEquals("t2", adminDashboardTeamIdFor(null, integrations))
     }
 
     @Test

@@ -8,7 +8,7 @@ internal data class TeamSelectorOption(val id: String, val name: String)
 
 /** O que a troca de time faz com a janela de uso. */
 internal sealed interface TeamAccountSwitch {
-    data class Account(val accountKey: String, val accountLabel: String?) : TeamAccountSwitch
+    data class Account(val accountKey: String, val accountLabel: String?, val profileId: String) : TeamAccountSwitch
     data object AllAccounts : TeamAccountSwitch
     data object None : TeamAccountSwitch
 }
@@ -31,9 +31,17 @@ internal fun dashboardTeamIdFor(profileId: String?, integrations: TeamIntegratio
 internal fun teamAccountSwitchFor(team: TeamIntegrationSettings, targets: List<TeamSyncTarget>): TeamAccountSwitch {
     val target = targets.firstOrNull { team.participates(it.profileId) }
     if (target != null) {
-        return TeamAccountSwitch.Account(target.accountKey, target.accountEmail)
+        return TeamAccountSwitch.Account(target.accountKey, target.accountEmail, target.profileId)
     }
     return if (team.isAdminMode) TeamAccountSwitch.AllAccounts else TeamAccountSwitch.None
+}
+
+/** Time do painel no modo admin: o atual se já administra, senão o primeiro admin. */
+internal fun adminDashboardTeamIdFor(selected: String?, integrations: TeamIntegrations): String? {
+    if (selected != null && integrations.adminTeams.any { team -> team.id == selected }) {
+        return selected
+    }
+    return integrations.adminTeams.firstOrNull()?.id
 }
 
 /**

@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -15,6 +16,7 @@ import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.ui.UsageExportRequest
 import com.usagemonitor.presentation.viewmodel.UsageExportWriter
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -83,13 +85,15 @@ class AppShellActionsFactoryTest {
         ),
         duplicateProfileIds = emptySet()
     )
-    private val adminTeam = TeamIntegrationSettings(enabled = true, serverUrl = "https://team.example", adminToken = "t")
+    private val selection = MutableStateFlow<String?>(null)
+    private val syncTargets = listOf(TeamSyncTarget(profileId = "work", accountKey = "uuid-1", accountEmail = "me@example.com"))
 
     private fun actions(
         state: UiState = UiState.Success(listOf(workStats)),
-        team: TeamIntegrationSettings = TeamIntegrationSettings()
+        teams: TeamIntegrations = aggregate()
     ) = buildShellActions(
-        breadcrumbs, targets, writer, modal, records, resolution, state, team,
+        breadcrumbs, targets, writer, modal, records, resolution, state,
+        teams, selection, syncTargets,
         clock = object : Clock { override fun now() = Instant.parse("2026-10-27T02:30:00Z") }
     )
 
@@ -112,19 +116,30 @@ class AppShellActionsFactoryTest {
     }
 
     @Test
-    fun `admin overviews exist only in admin mode`() {
-        val member = actions()
+    fun `admin overviews exist only in admin mode and write the admin team`() {
+        val member = actions(teams = aggregate(team("t1", "Alfa")))
         assertNull(member.openAdminOverview)
         assertNull(member.openTeamPresenceOverview)
 
-        val admin = actions(team = adminTeam)
+        val admin = actions(teams = aggregate(team("t1", "Alfa", admin = true)))
         assertNotNull(admin.openAdminOverview).invoke()
         assertNotNull(admin.openTeamPresenceOverview).invoke()
 
         assertEquals(listOf("teamUsage all", "presence all"), targets.calls)
+        assertEquals("t1", selection.value)
         assertTrue(modal.teamUsageIsAdminOverview)
         assertTrue(modal.teamPresenceIsAdminOverview)
         assertEquals(listOf("abriu visão global do time (admin)", "abriu presença global do time (admin)"), screens)
+    }
+
+    @Test
+    fun `admin overview exists with only the second team admin and writes that team`() {
+        val shell = actions(teams = aggregate(team("t1", "Alfa", "p-a"), team("t2", "Beta", admin = true)))
+
+        assertNotNull(shell.openAdminOverview).invoke()
+
+        assertEquals("t2", selection.value)
+        assertEquals(listOf("teamUsage all"), targets.calls)
     }
 
     @Test
@@ -154,6 +169,18 @@ class AppShellActionsFactoryTest {
     }
 
     @Test
+    fun `team usage and presence card write the team of the account in the selection`() {
+        val shell = actions(teams = aggregate(team("t1", "Alfa", "p-a"), team("t2", "Beta", "work")))
+
+        shell.openTeamUsage(work)
+        assertEquals("t2", selection.value)
+
+        selection.value = null
+        shell.openTeamPresence(work)
+        assertEquals("t2", selection.value)
+    }
+
+    @Test
     fun `an account without uuid opens nothing`() {
         val shell = actions()
 
@@ -164,6 +191,40 @@ class AppShellActionsFactoryTest {
         assertEquals(false, modal.isTeamUsageOpen)
         assertEquals(false, modal.isTeamPresenceOpen)
         assertTrue(breadcrumbs.steps.isEmpty())
+    }
+
+    @Test
+    fun `selecting a team with an account opens that account through the card path`() {
+        val shell = actions(teams = aggregate(team("t1", "Alfa", "p-a"), team("t2", "Beta", "work")))
+
+        shell.selectDashboardTeam("t2")
+
+        val label = "me@example.com — Acme"
+        assertEquals("t2", selection.value)
+        assertEquals(listOf("teamUsage uuid-1 $label $fiveHourEnd", "sync"), targets.calls)
+        assertEquals("work", modal.teamUsageProfileId)
+    }
+
+    @Test
+    fun `selecting an admin only team opens the global overview`() {
+        val shell = actions(teams = aggregate(team("t1", "Alfa", "p-a"), team("t2", "Beta", admin = true)))
+
+        shell.selectDashboardTeam("t2")
+
+        assertEquals("t2", selection.value)
+        assertEquals(listOf("teamUsage all"), targets.calls)
+        assertTrue(modal.teamUsageIsAdminOverview)
+    }
+
+    @Test
+    fun `selecting a team without account or admin only writes the id`() {
+        val shell = actions(teams = aggregate(team("t1", "Alfa", "p-a"), team("t3", "Gama")))
+
+        shell.selectDashboardTeam("t3")
+
+        assertEquals("t3", selection.value)
+        assertTrue(targets.calls.isEmpty())
+        assertEquals(false, modal.isTeamUsageOpen)
     }
 
     @Test
@@ -212,4 +273,24 @@ class AppShellActionsFactoryTest {
         assertEquals("usage-monitor-dashboard-2026-10-26.csv", written.single().suggestedFileName)
         assertTrue(breadcrumbs.steps.any { step -> step.second.contains("exportar retrato do dashboard") })
     }
+
+    private fun team(
+        id: String,
+        name: String,
+        vararg profiles: String,
+        admin: Boolean = false
+    ) = TeamIntegrationSettings(
+        enabled = true,
+        serverUrl = "https://team.example",
+        apiKey = "chave-$id",
+        alias = "apelido-$id",
+        deviceId = "dispositivo-$id",
+        participatingProfileIds = profiles.toSet(),
+        adminToken = if (admin) "admin-$id" else "",
+        id = id,
+        name = name
+    )
+
+    private fun aggregate(vararg teams: TeamIntegrationSettings) =
+        TeamIntegrations(deviceId = "dispositivo", enabled = true, teams = teams.toList())
 }

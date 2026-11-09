@@ -26,6 +26,8 @@ internal class AppShellActions(
     val onExportFailure: (Throwable) -> Unit,
     val openAdminOverview: (() -> Unit)?,
     val openTeamPresenceOverview: (() -> Unit)?,
+    /** Troca o time do painel: grava o id e abre a conta ou a visão global do time. */
+    val selectDashboardTeam: (String) -> Unit,
     /** Comparação entre modelos e APIs (#386), no balão da engrenagem. */
     val openComparison: () -> Unit,
     // As janelas que o card de uma conta abre — também do balão da conta na HUD.

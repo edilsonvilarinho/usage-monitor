@@ -320,6 +320,7 @@ internal fun runUsageMonitor(
         duplicateProfileIds = profileResolution.duplicateProfileIds
     )
     val teamSettings by graph.teamSettingsFlow.collectAsState()
+    val teamIntegrations by graph.store.teamIntegrationsFlow.collectAsState()
     val dashboardState by viewModels.dashboard.uiState.collectAsState()
 
     val shell = remember {
@@ -389,8 +390,10 @@ internal fun runUsageMonitor(
     }
 
     // As ações do rodapé moram no balão da engrenagem da barra HUD.
+    val syncTargets = remember(profileResolution) { buildTeamSyncTargets(graph.profileRegistry) }
     val shellActions = buildShellActions(
-        breadcrumbs, viewModels.shellTargets, graph.usageExportWriter, modal, profileRecords, profileResolution, dashboardState, teamSettings
+        breadcrumbs, viewModels.shellTargets, graph.usageExportWriter, modal, profileRecords, profileResolution, dashboardState,
+        teamIntegrations, graph.teamViewSelection.dashboardTeamId, syncTargets
     )
     val cliSessionPulses by viewModels.sessionPulse.cliPulses.collectAsState()
     val teamSessionPulses by viewModels.sessionPulse.teamPulses.collectAsState()
