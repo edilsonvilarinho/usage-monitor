@@ -15,7 +15,7 @@ class TeamViewSelection(private val integrations: () -> TeamIntegrations) {
     /** Time aberto nas Configurações (admin de chaves); escrito por `SettingsActions.selectTeam`. */
     val settingsTeamId = MutableStateFlow<String?>(null)
 
-    fun dashboardTeam(): String? = resolveTeamId(dashboardTeamId.value, integrations())
+    fun dashboardTeam(): String? = resolveDashboardTeamId(dashboardTeamId.value, integrations())
 
     // O admin de chaves não exige time ativo (`isAdminMode` independe da chave): a queda é o primeiro time,
     // o mesmo que as Configurações abrem, e não o primeiro ativo.
