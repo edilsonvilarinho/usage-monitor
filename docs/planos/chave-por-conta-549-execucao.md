@@ -63,6 +63,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue create` → #549; varredura do `explorer` (caminhos acima) |
 | A02 | `accountApiKeys` (profileId → chave), `apiKeyFor` (própria aparada, senão a do time), `isConfigured` aceita time sem chave quando toda participante tem a sua, `toString` mascara os valores | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.TeamIntegrationSettingsTest"` → 3 falhas na asserção (`:32 expected:<chave-[conta-1]> but was:<chave-[time]>`, `:65 Expected value to be true.`); verde: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` → 558 testes, 0 falhas |
+| A03 | `TeamEntryDto.accountApiKeys` opcional, omitido quando vazio (`explicitNulls = false`; o único outro anulável, `teams`, é sempre gravado no v2) | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalTeamSettingsDataSourceTest"` → `expected:<{p1=chave-p1}> but was:<{}>` (ida e volta); verde: `gradlew.bat desktopTest --tests "com.usagemonitor.data.*"` → 649 testes, 0 falhas. Guardas que já passavam: v2 sem o campo regravado byte a byte igual; campo desconhecido não quebra a leitura |
 
 ## Problemas em aberto e riscos
 

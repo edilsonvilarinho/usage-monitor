@@ -24,12 +24,18 @@ private data class TeamEntryDto(
     val apiKey: String = "",
     val alias: String = "",
     val participatingProfileIds: List<String> = emptyList(),
-    val adminToken: String = ""
+    val adminToken: String = "",
+    /**
+     * Chave própria de cada conta (profileId → chave). `null` quando vazio: com `explicitNulls = false`
+     * o campo some do arquivo, e um `team.json` sem chaves por conta fica byte a byte igual ao de antes.
+     */
+    val accountApiKeys: Map<String, String>? = null
 ) {
     /** Segredos nunca no `toString`, mesmo dentro da lista de times do DTO. */
     override fun toString(): String =
         "TeamEntryDto(id=$id, name=$name, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
-            "participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)})"
+            "participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)}, " +
+            "accountApiKeys=${accountApiKeys?.mapValues { redactedSecret(it.value) }})"
 }
 
 @Serializable
@@ -80,7 +86,8 @@ internal class LocalTeamSettingsDataSource(
     private val settingsFile: File = defaultSettingsFile()
 ) {
     // encodeDefaults: campos planos vazios precisam estar no arquivo para o downgrade ler o espelho sem ambiguidade.
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = true }
+    // explicitNulls = false: `accountApiKeys` nulo some do arquivo em vez de virar `"accountApiKeys": null`.
+    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = true; explicitNulls = false }
 
     /**
      * Lê o primeiro time, criando o `deviceId` se ainda não houver.
@@ -274,7 +281,8 @@ internal class LocalTeamSettingsDataSource(
             apiKey = apiKey,
             alias = alias,
             participatingProfileIds = participatingProfileIds.toSet(),
-            adminToken = adminToken
+            adminToken = adminToken,
+            accountApiKeys = accountApiKeys.orEmpty()
         )
     }
 
@@ -286,7 +294,8 @@ internal class LocalTeamSettingsDataSource(
             apiKey = apiKey,
             alias = alias,
             participatingProfileIds = participatingProfileIds.sorted(),
-            adminToken = adminToken
+            adminToken = adminToken,
+            accountApiKeys = accountApiKeys.takeIf { it.isNotEmpty() }
         )
     }
 
