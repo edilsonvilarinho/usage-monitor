@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.TeamIntegrations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -219,7 +220,7 @@ internal class LocalTeamSyncStateDataSource(
 
         const val WATERMARK_TABLE = "team_sync_watermarks"
         const val LEGACY_STATE_TABLE = "team_sync_state"
-        const val LEGACY_TEAM_ID = "team-legacy"
+        const val LEGACY_TEAM_ID = TeamIntegrations.LEGACY_TEAM_ID
 
         val CREATE_STATE_TABLE_SQL = """
             CREATE TABLE IF NOT EXISTS team_sync_watermarks (

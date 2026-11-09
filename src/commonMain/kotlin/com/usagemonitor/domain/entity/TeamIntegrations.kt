@@ -86,4 +86,8 @@ class TeamIntegrations(
         }
         return team.copy(participatingProfileIds = profiles)
     }
+    companion object {
+        /** Id do time legado: formato plano e primeiro time de instalacao nova. Constante unica. */
+        const val LEGACY_TEAM_ID = "team-legacy"
+    }
 }

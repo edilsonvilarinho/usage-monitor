@@ -3,6 +3,7 @@ package com.usagemonitor
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.TeamKeyVerification
 import com.usagemonitor.domain.entity.TeamCertificateProblem
 import com.usagemonitor.domain.entity.TeamConnectionStage
@@ -44,13 +45,21 @@ class AppSettingsFeedbackTest {
     }
 
     private fun activeTeam(participating: Set<String>) {
-        harness.store.teamSettingsFlow.value = TeamIntegrationSettings(
-            enabled = true,
-            serverUrl = "https://team.example",
-            apiKey = "k",
-            alias = "ana",
-            deviceId = "d",
-            participatingProfileIds = participating
+        harness.store.publishTeamIntegrations(
+            TeamIntegrations(
+                deviceId = "d",
+                enabled = true,
+                teams = listOf(
+                    TeamIntegrationSettings(
+                        enabled = true,
+                        serverUrl = "https://team.example",
+                        apiKey = "k",
+                        alias = "ana",
+                        deviceId = "d",
+                        participatingProfileIds = participating
+                    )
+                )
+            )
         )
     }
 

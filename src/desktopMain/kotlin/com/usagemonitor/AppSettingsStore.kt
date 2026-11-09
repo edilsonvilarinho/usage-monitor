@@ -9,10 +9,14 @@ import com.usagemonitor.data.datasource.LocalTelegramSettingsDataSource
 import com.usagemonitor.data.datasource.LocalWebAccessSettingsDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import java.io.File
 import java.util.prefs.Preferences
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * O que as Configurações gravam, sem rede: preferências, arquivos de segredo, contas e
@@ -69,7 +73,18 @@ internal class AppSettingsStore(
     // `StateFlow`: o repositório e o serviço de envio leem as credenciais de fora
     // da composição, e precisam sempre do valor corrente.
     val teamSettingsDataSource = LocalTeamSettingsDataSource(dataFile("team.json"))
-    val teamSettingsFlow = MutableStateFlow(teamSettingsDataSource.load())
+    // Fonte: o agregado de times. Toda gravação passa por `publishTeamIntegrations`, que atualiza agregado e derivado juntos.
+    val teamIntegrationsFlow = MutableStateFlow(teamSettingsDataSource.loadAll())
+    private val teamPrimarySettings = MutableStateFlow(teamIntegrationsFlow.value.teams.firstOrNull() ?: TeamIntegrationSettings())
+
+    /** Primeiro time (ou default), somente leitura: nunca gravado direto. */
+    val teamSettingsFlow: StateFlow<TeamIntegrationSettings> = teamPrimarySettings.asStateFlow()
+
+    /** Publica agregado e derivado juntos, para nenhum leitor ver um sem o outro. */
+    fun publishTeamIntegrations(integrations: TeamIntegrations) {
+        teamIntegrationsFlow.value = integrations
+        teamPrimarySettings.value = integrations.teams.firstOrNull() ?: TeamIntegrationSettings()
+    }
 
     // Acesso web local (#388): token em arquivo de segredo, nunca no registro.
     val webAccessSettingsDataSource = LocalWebAccessSettingsDataSource(dataFile("web-access.json"))

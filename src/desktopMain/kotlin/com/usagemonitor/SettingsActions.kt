@@ -6,6 +6,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import java.io.File
 import com.usagemonitor.presentation.ui.MODAL_CLOSE_SETTLE_MILLIS
@@ -376,7 +377,7 @@ internal class SettingsActions(
     }
 
     private fun updateTeam(transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): Boolean {
-        return updateTeamSettings(store.teamSettingsFlow, store.teamSettingsDataSource, transform)
+        return updateTeamSettings(store, transform)
     }
 
     private fun updateProxy(resetConnection: Boolean, transform: (ProxySettings) -> ProxySettings) {
@@ -389,27 +390,24 @@ internal class SettingsActions(
 }
 
 /**
- * Aplica uma mudança nas configurações de time e persiste.
+ * Aplica a alteração no agregado de times e no disco.
  *
- * O `StateFlow` é atualizado antes da gravação: a UI reflete a digitação na hora
- * e a escrita em disco vai atrás. Uma falha de gravação não pode derrubar o
- * diálogo de configurações — pior caso, a mudança não sobrevive ao reinício.
- */
-/**
- * Aplica a alteração em memória e no disco.
+ * O agregado é a fonte; o derivado do primeiro time é publicado junto, antes da
+ * gravação, para a UI refletir a digitação na hora. Uma falha de gravação não
+ * derruba o diálogo: pior caso, a mudança não sobrevive ao reinício.
  *
  * Devolve se a gravação passou: o aviso de "salvo" no diálogo não pode ser
  * emitido a partir da intenção, só do resultado — antes disto a falha era
  * engolida por um `runCatching` sem tratamento.
  */
 internal fun updateTeamSettings(
-    settingsFlow: MutableStateFlow<TeamIntegrationSettings>,
-    dataSource: LocalTeamSettingsDataSource,
+    store: AppSettingsStore,
     transform: (TeamIntegrationSettings) -> TeamIntegrationSettings
 ): Boolean {
-    val updated = transform(settingsFlow.value)
-    settingsFlow.value = updated
-    return runCatching { dataSource.save(updated) }.isSuccess
+    val current = store.teamIntegrationsFlow.value
+    val updated = current.upsert(transform(current.teams.firstOrNull() ?: TeamIntegrationSettings(id = TeamIntegrations.LEGACY_TEAM_ID)))
+    store.publishTeamIntegrations(updated)
+    return runCatching { store.teamSettingsDataSource.saveAll(updated) }.isSuccess
 }
 
 internal fun updateProxySettings(

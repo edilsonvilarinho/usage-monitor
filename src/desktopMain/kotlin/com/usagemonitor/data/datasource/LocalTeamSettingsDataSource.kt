@@ -12,9 +12,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 
-/** Id do time migrado do formato plano (v1): constante, para ser estável entre leituras. */
-private const val LEGACY_TEAM_ID = "team-legacy"
-
 /** Nome do time migrado quando o arquivo plano não tem servidor. */
 private const val LEGACY_TEAM_NAME = "Time"
 
@@ -141,7 +138,7 @@ internal class LocalTeamSettingsDataSource(
         val stored = readDto().toAggregate()
         val teamId = settings.id.takeIf { it.isNotBlank() }
             ?: stored.teams.firstOrNull()?.id
-            ?: LEGACY_TEAM_ID
+            ?: TeamIntegrations.LEGACY_TEAM_ID
         val merged = stored.upsert(settings.copy(id = teamId))
         saveAll(TeamIntegrations(deviceId = settings.deviceId, enabled = settings.enabled, teams = merged.teams))
     }
@@ -258,7 +255,7 @@ internal class LocalTeamSettingsDataSource(
         }
         return listOf(
             TeamEntryDto(
-                id = LEGACY_TEAM_ID,
+                id = TeamIntegrations.LEGACY_TEAM_ID,
                 name = hostOf(serverUrl),
                 serverUrl = serverUrl,
                 apiKey = apiKey,

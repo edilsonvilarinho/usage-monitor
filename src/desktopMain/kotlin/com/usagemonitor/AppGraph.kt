@@ -43,6 +43,7 @@ import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
@@ -207,17 +208,13 @@ internal class AppGraph(
     // Uma instância só: o desvio é entre o relógio desta máquina e o do servidor,
     // não de cada consumidor. Quem o mede é a batida de presença; quem o lê é a
     // classificação de quem está online.
-    val teamServerClockOffset = InMemoryTeamServerClockOffset()
     private val remoteTeamDataSource = RemoteTeamDataSource(httpClient)
-    val teamUsageRepository = TeamUsageRepositoryImpl(
-        remoteDataSource = remoteTeamDataSource,
-        settingsProvider = { teamSettingsFlow.value },
-        serverClockOffset = teamServerClockOffset
-    )
-    val teamAdminRepository = TeamAdminRepositoryImpl(
-        remoteDataSource = remoteTeamDataSource,
-        settingsProvider = { teamSettingsFlow.value }
-    )
+    // Repositórios e offset por time (#547, A04). Até o A07 a composição fala com um time só: o primeiro corrente.
+    val teamRepositoryRegistry = TeamRepositoryRegistry(remoteTeamDataSource) { store.teamIntegrationsFlow.value }
+    private fun firstTeamId(): String = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id ?: TeamIntegrations.LEGACY_TEAM_ID
+    val teamServerClockOffset get() = teamRepositoryRegistry.serverClockOffset(firstTeamId())
+    val teamUsageRepository get() = teamRepositoryRegistry.usageRepository(firstTeamId())
+    val teamAdminRepository get() = teamRepositoryRegistry.adminRepository(firstTeamId())
     val appUpdateRepository = AppUpdateRepositoryImpl(remoteApiDataSource)
     val appUpdateReleaseOpener = DesktopAppUpdateReleaseOpener()
 

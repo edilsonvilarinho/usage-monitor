@@ -102,7 +102,7 @@ internal class ConfigApplier(
     }
 
     private fun team(transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): ConfigOutcome {
-        if (!updateTeamSettings(store.teamSettingsFlow, store.teamSettingsDataSource, transform)) {
+        if (!updateTeamSettings(store, transform)) {
             return ConfigOutcome.Refused(ConfigRefusals.FAILED, "team.json")
         }
         hooks.teamChanged()

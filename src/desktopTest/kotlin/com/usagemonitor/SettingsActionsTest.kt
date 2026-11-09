@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ProxySettings
@@ -14,6 +15,10 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -21,6 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -394,13 +400,34 @@ class SettingsActionsTest {
     }
 
     @Test
+    fun `team write updates the aggregate and the derived flow together`() {
+        assertEquals(true, updateTeamSettings(store) { current -> current.copy(alias = "ana") })
+        assertEquals("ana", store.teamIntegrationsFlow.value.teams.first().alias)
+        assertEquals("ana", store.teamSettingsFlow.value.alias)
+        assertEquals("ana", store.teamSettingsDataSource.loadAll().teams.first().alias)
+    }
+
+    @Test
+    fun `write on an empty aggregate creates the legacy team and keeps its usage repository`() {
+        val registry = TeamRepositoryRegistry(
+            RemoteTeamDataSource(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        ) { store.teamIntegrationsFlow.value }
+        fun firstTeamId() = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id ?: "team-legacy"
+        val before = registry.usageRepository(firstTeamId())
+
+        assertTrue(updateTeamSettings(store) { current -> current.copy(alias = "ana") })
+
+        assertEquals("team-legacy", store.teamIntegrationsFlow.value.teams.single().id)
+        assertSame(before, registry.usageRepository(firstTeamId()))
+    }
+
+    @Test
     fun `team and proxy writes report a refused save`() {
-        val teamFlow = kotlinx.coroutines.flow.MutableStateFlow(TeamIntegrationSettings())
         blockWrites("team.json")
         blockWrites("proxy.json")
 
-        assertFalse(updateTeamSettings(teamFlow, store.teamSettingsDataSource) { current -> current.copy(alias = "x") })
-        assertEquals("x", teamFlow.value.alias, "a tela reflete a digitação mesmo sem gravar")
+        assertFalse(updateTeamSettings(store) { current -> current.copy(alias = "x") })
+        assertEquals("x", store.teamSettingsFlow.value.alias, "a tela reflete a digitação mesmo sem gravar")
         actions.changeProxyHost("proxy.local")
 
         assertEquals(SettingsToast.SaveFailed(SettingsField.NETWORK_PROXY), lastToast)
