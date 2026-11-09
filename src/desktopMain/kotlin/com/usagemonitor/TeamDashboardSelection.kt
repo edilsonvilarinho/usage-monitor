@@ -2,9 +2,7 @@ package com.usagemonitor
 
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamIntegrations
-
-/** Opção do seletor de time da janela de uso do time (A07). */
-internal data class TeamSelectorOption(val id: String, val name: String)
+import com.usagemonitor.presentation.ui.TeamSelectorOption
 
 /** O que a troca de time faz com a janela de uso. */
 internal sealed interface TeamAccountSwitch {

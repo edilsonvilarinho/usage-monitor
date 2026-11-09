@@ -319,7 +319,6 @@ internal fun runUsageMonitor(
         inspections = profileResolution.inspections,
         duplicateProfileIds = profileResolution.duplicateProfileIds
     )
-    val teamSettings by graph.teamSettingsFlow.collectAsState()
     val teamIntegrations by graph.store.teamIntegrationsFlow.collectAsState()
     val dashboardState by viewModels.dashboard.uiState.collectAsState()
 
@@ -425,7 +424,7 @@ internal fun runUsageMonitor(
         breadcrumbs = breadcrumbs,
         prewarmReady = modalPrewarmReady
     )
-    ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamSettings, releaseNotes, startupGuide)
+    ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamIntegrations, shellActions.selectDashboardTeam, releaseNotes, startupGuide)
     BugReportWindow(graph, shell, modal, pendingCrash, windows, modalEnvironment)
 
     // A barra HUD numa janela própria (`HudWindow.kt`): a única de visualização.
