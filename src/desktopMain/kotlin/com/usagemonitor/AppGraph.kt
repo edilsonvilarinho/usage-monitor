@@ -43,8 +43,12 @@ import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliProjectRoot
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
+import com.usagemonitor.domain.repository.TeamAdminRepository
+import com.usagemonitor.domain.repository.TeamServerClockOffset
+import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
 import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
@@ -207,17 +211,14 @@ internal class AppGraph(
     // Uma instância só: o desvio é entre o relógio desta máquina e o do servidor,
     // não de cada consumidor. Quem o mede é a batida de presença; quem o lê é a
     // classificação de quem está online.
-    val teamServerClockOffset = InMemoryTeamServerClockOffset()
     private val remoteTeamDataSource = RemoteTeamDataSource(httpClient)
-    val teamUsageRepository = TeamUsageRepositoryImpl(
-        remoteDataSource = remoteTeamDataSource,
-        settingsProvider = { teamSettingsFlow.value },
-        serverClockOffset = teamServerClockOffset
-    )
-    val teamAdminRepository = TeamAdminRepositoryImpl(
-        remoteDataSource = remoteTeamDataSource,
-        settingsProvider = { teamSettingsFlow.value }
-    )
+    // Repositórios e offset por time (#547, A04/A06): o painel segue o time do seletor; as Configurações, o time aberto.
+    val teamRepositoryRegistry = TeamRepositoryRegistry(remoteTeamDataSource) { store.teamIntegrationsFlow.value }
+    val teamViewSelection = TeamViewSelection { store.teamIntegrationsFlow.value }
+    val teamUsageRepository: TeamUsageRepository = RoutedTeamUsageRepository(teamRepositoryRegistry) { teamViewSelection.dashboardTeam() }
+    val teamAdminRepository: TeamAdminRepository = RoutedTeamAdminRepository(teamRepositoryRegistry) { teamViewSelection.dashboardTeam() }
+    val settingsTeamAdminRepository: TeamAdminRepository = RoutedTeamAdminRepository(teamRepositoryRegistry) { teamViewSelection.settingsTeam() }
+    val teamServerClockOffset: TeamServerClockOffset = RoutedTeamServerClockOffset(teamRepositoryRegistry) { teamViewSelection.dashboardTeam() }
     val appUpdateRepository = AppUpdateRepositoryImpl(remoteApiDataSource)
     val appUpdateReleaseOpener = DesktopAppUpdateReleaseOpener()
 

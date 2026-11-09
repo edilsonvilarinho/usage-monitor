@@ -38,7 +38,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.DEFAULT_UI_SCALE_PERCENT
 import com.usagemonitor.domain.entity.MAX_WINDOW_OPACITY_PERCENT
 import com.usagemonitor.domain.entity.ProxySettings
-import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
@@ -197,22 +196,10 @@ fun SettingsDialogContent(
     expandedProfileId: String? = null,
     codexAccounts: CodexAccountsSettings = CodexAccountsSettings(),
     onToggleProfileExpanded: (String) -> Unit = {},
-    teamSettings: TeamIntegrationSettings = TeamIntegrationSettings(),
-    teamConnection: TeamConnectionUiState = TeamConnectionUiState(),
-    onTeamEnabledChange: (Boolean) -> Unit = {},
-    onTeamServerUrlChange: (String) -> Unit = {},
-    onTeamApiKeyChange: (String) -> Unit = {},
-    onTeamAliasChange: (String) -> Unit = {},
-    onTeamProfileParticipationChange: (String, Boolean) -> Unit = { _, _ -> },
-    onTeamTestConnection: () -> Unit = {},
-    teamSyncFailureMessage: String? = null,
-    /** Contas recusadas pelo servidor, por `profileId`. Aponta a linha errada. */
-    teamRejectedProfiles: Map<String, String> = emptyMap(),
-    teamAdminConnection: TeamConnectionUiState = TeamConnectionUiState(),
-    onTeamAdminTokenChange: (String) -> Unit = {},
-    onTeamValidateAdminToken: () -> Unit = {},
-    onTeamOpenKeysManager: () -> Unit = {},
-    onTeamExitAdminMode: () -> Unit = {},
+    /** Estado da seção Time (#547): settings, conexões, times e recusas. */
+    teamState: TeamSectionState = TeamSectionState(),
+    /** Callbacks da seção Time; par de [teamState]. */
+    teamActions: TeamSectionActions = TeamSectionActions(),
     proxySettings: ProxySettings = ProxySettings(),
     proxyConnection: ProxyConnectionUiState = ProxyConnectionUiState(),
     onProxyUseEnvironmentChange: (Boolean) -> Unit = {},
@@ -361,24 +348,11 @@ fun SettingsDialogContent(
                             )
 
                             SettingsTab.TEAM -> {
-                                TeamIntegrationSection(
-                                    settings = teamSettings,
+                                TeamSettingsSection(
+                                    state = teamState,
+                                    actions = teamActions,
                                     language = currentLanguage,
-                                    profiles = anthropicProfiles,
-                                    connection = teamConnection,
-                                    onEnabledChange = onTeamEnabledChange,
-                                    onServerUrlChange = onTeamServerUrlChange,
-                                    onApiKeyChange = onTeamApiKeyChange,
-                                    onAliasChange = onTeamAliasChange,
-                                    onProfileParticipationChange = onTeamProfileParticipationChange,
-                                    onTestConnection = onTeamTestConnection,
-                                    syncFailureMessage = teamSyncFailureMessage,
-                                    rejectedProfiles = teamRejectedProfiles,
-                                    adminConnection = teamAdminConnection,
-                                    onAdminTokenChange = onTeamAdminTokenChange,
-                                    onValidateAdminToken = onTeamValidateAdminToken,
-                                    onOpenKeysManager = onTeamOpenKeysManager,
-                                    onExitAdminMode = onTeamExitAdminMode
+                                    profiles = anthropicProfiles
                                 )
                             }
 

@@ -167,6 +167,8 @@ fun TeamUsageScreen(
      * resultado seguro.
      */
     localDeviceId: String? = null,
+    /** Seletor de time do topo; nulo ou com uma opção, nada aparece. */
+    teamSelector: TeamSelectorUi? = null,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -179,6 +181,7 @@ fun TeamUsageScreen(
         state = state,
         language = language,
         localDeviceId = localDeviceId,
+        teamSelector = teamSelector,
         removalError = removalError,
         sessionRemovalError = sessionRemovalError,
         removalFailure = removalFailure,
@@ -212,6 +215,8 @@ internal fun TeamUsageContent(
     modifier: Modifier = Modifier,
     /** Ver `TeamUsageScreen`; default nulo para não arrastar quem não o exercita. */
     localDeviceId: String? = null,
+    /** Seletor de time do topo do painel; nulo ou com uma opção, nada aparece. */
+    teamSelector: TeamSelectorUi? = null,
     // Com default para não arrastar as chamadas que só exercitam o modal de uma
     // conta, onde não existe faixa a recolher.
     onToggleAccount: (String) -> Unit = {},
@@ -238,6 +243,7 @@ internal fun TeamUsageContent(
     var pendingRemoval by remember { mutableStateOf<TeamMemberUsage?>(null) }
     var pendingSessionRemoval by remember { mutableStateOf<PendingSessionRemoval?>(null) }
     var sessionSort by remember { mutableStateOf<CliSessionSort?>(null) }
+    var teamMenuExpanded by remember { mutableStateOf(false) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         AppStateCrossfade(state, key = { current -> if (current is TeamUsageUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
@@ -264,6 +270,9 @@ internal fun TeamUsageContent(
                             state = state,
                             language = language,
                             localDeviceId = localDeviceId,
+                            teamSelector = teamSelector,
+                            teamMenuExpanded = teamMenuExpanded,
+                            onTeamMenuExpandedChange = { expanded -> teamMenuExpanded = expanded },
                             removalError = removalError,
                             sessionRemovalError = sessionRemovalError,
                             removalFailure = removalFailure,
@@ -334,6 +343,9 @@ private fun TeamUsageList(
     state: TeamUsageUiState.Success,
     language: AppLanguage,
     localDeviceId: String?,
+    teamSelector: TeamSelectorUi?,
+    teamMenuExpanded: Boolean,
+    onTeamMenuExpandedChange: (Boolean) -> Unit,
     removalError: String?,
     sessionRemovalError: String?,
     removalFailure: TeamConnectionFailure?,
@@ -386,6 +398,15 @@ private fun TeamUsageList(
     ) {
         // Aba nova nasce num escopo que toca o E9; a janela troca a chave só
         // quando a leitura nova chega, e aí os totais do cabeçalho tocam junto.
+        // Seletor de time só com dois ou mais times; com um, o painel fica como antes.
+        if (teamSelector != null && teamSelector.options.size >= 2) {
+            TeamSelectorTrigger(
+                selector = teamSelector,
+                language = language,
+                expanded = teamMenuExpanded,
+                onExpandedChange = onTeamMenuExpandedChange
+            )
+        }
         val revealKey = rememberSettledRevealKey(state.range, settled = !state.isRefreshing)
         AppModalRevealScope(replayKey = revealKey) {
             TeamUsageHeader(

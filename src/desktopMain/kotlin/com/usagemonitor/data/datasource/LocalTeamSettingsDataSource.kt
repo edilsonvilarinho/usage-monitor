@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -10,6 +11,26 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.UUID
+
+/** Nome do time migrado quando o arquivo plano não tem servidor. */
+private const val LEGACY_TEAM_NAME = "Time"
+
+/** Um time no `team.json` v2. Mesmos campos do time único, mais `id` e `name`. */
+@Serializable
+private data class TeamEntryDto(
+    val id: String = "",
+    val name: String = "",
+    val serverUrl: String = "",
+    val apiKey: String = "",
+    val alias: String = "",
+    val participatingProfileIds: List<String> = emptyList(),
+    val adminToken: String = ""
+) {
+    /** Segredos nunca no `toString`, mesmo dentro da lista de times do DTO. */
+    override fun toString(): String =
+        "TeamEntryDto(id=$id, name=$name, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
+            "participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)})"
+}
 
 @Serializable
 private data class TeamSettingsDto(
@@ -25,12 +46,18 @@ private data class TeamSettingsDto(
      * Campo novo com default: um `team.json` gravado por versão anterior continua
      * legível, e o `ignoreUnknownKeys` cobre o caminho de volta.
      */
-    val adminToken: String = ""
+    val adminToken: String = "",
+    /**
+     * Times do formato v2. `null` é o arquivo plano da versão anterior: os campos planos
+     * viram um time só. Lista presente (mesmo vazia) manda e ignora os campos planos.
+     */
+    val teams: List<TeamEntryDto>? = null
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =
         "TeamSettingsDto(enabled=$enabled, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
-            "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)})"
+            "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)}, " +
+            "teams=$teams)"
 }
 
 /**
@@ -44,58 +71,90 @@ private data class TeamSettingsDto(
  *
  * O `deviceId` é gerado uma única vez, na primeira leitura, e persistido junto: é
  * o que separa duas máquinas do mesmo usuário no servidor.
+ *
+ * **Formato v2 (`teams`):** o arquivo guarda uma lista de times. Os campos planos
+ * espelham o primeiro time, para que uma versão anterior (downgrade, canal beta)
+ * continue sincronizando esse time em vez de perder a integração.
  */
 internal class LocalTeamSettingsDataSource(
     private val settingsFile: File = defaultSettingsFile()
 ) {
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    // encodeDefaults: campos planos vazios precisam estar no arquivo para o downgrade ler o espelho sem ambiguidade.
+    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = true }
 
     /**
-     * Lê a configuração, criando o `deviceId` se ainda não houver.
+     * Lê o primeiro time, criando o `deviceId` se ainda não houver.
      *
      * Um arquivo corrompido devolve o default em vez de derrubar o boot: perder a
      * configuração de time é ruim, mas não abrir o app é pior. A falha de
      * gravação aqui também não sobe pelo mesmo motivo — ela reaparece na
      * primeira edição das Configurações, que já reporta sucesso ou falha.
+     *
+     * Transição: enquanto a UI não lê a lista, quem chama vê um time só.
      */
-    fun load(): TeamIntegrationSettings {
+    fun load(): TeamIntegrationSettings = loadAll().firstTeamOrDefault()
+
+    /**
+     * Lê o agregado, criando o `deviceId` e regravando no formato v2 quando há
+     * `deviceId` faltando ou quando o arquivo plano foi migrado.
+     */
+    fun loadAll(): TeamIntegrations {
         val dto = readDto()
-        if (dto.deviceId.isNotBlank()) {
-            return dto.toDomain()
+        val integrations = dto.toAggregate()
+        if (dto.teams != null && integrations.deviceId.isNotBlank()) {
+            return integrations
         }
 
-        val withDeviceId = dto.copy(deviceId = UUID.randomUUID().toString())
-        runCatching { writeDto(withDeviceId) }
-        return withDeviceId.toDomain()
+        val migrated = TeamIntegrations(
+            deviceId = integrations.deviceId.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
+            enabled = integrations.enabled,
+            teams = integrations.teams
+        )
+        runCatching { writeAggregate(migrated) }
+        return migrated
     }
 
     /**
-     * Lê sem efeito nenhum (#441), para quem só olha o arquivo de fora, como o modo interativo:
+     * Lê o primeiro time sem efeito nenhum (#441), para quem só olha o arquivo de fora, como o modo interativo:
      * sem criar o `deviceId` e sem mover arquivo ilegível, que são decisões do dono da
      * configuração. `null` sem arquivo ou com arquivo ilegível.
      */
-    fun peek(): TeamIntegrationSettings? {
+    fun peek(): TeamIntegrationSettings? = peekAll()?.firstTeamOrDefault()
+
+    /** Lê o agregado sem efeito nenhum, com as mesmas regras de [peek]. */
+    fun peekAll(): TeamIntegrations? {
         if (!settingsFile.isFile) {
             return null
         }
-        return runCatching { json.decodeFromString(TeamSettingsDto.serializer(), settingsFile.readText()).toDomain() }.getOrNull()
+        return runCatching { json.decodeFromString(TeamSettingsDto.serializer(), settingsFile.readText()).toAggregate() }.getOrNull()
     }
 
+    /**
+     * Grava o time pelo `id` no agregado gravado: substitui o de mesmo id mantendo a
+     * posição, ou acrescenta. Id vazio aponta para o primeiro time, ou para o time
+     * migrado quando não há nenhum.
+     */
     fun save(settings: TeamIntegrationSettings) {
+        val stored = readDto().toAggregate()
+        val teamId = settings.id.takeIf { it.isNotBlank() }
+            ?: stored.teams.firstOrNull()?.id
+            ?: TeamIntegrations.LEGACY_TEAM_ID
+        val merged = stored.upsert(settings.copy(id = teamId))
+        saveAll(TeamIntegrations(deviceId = settings.deviceId, enabled = settings.enabled, teams = merged.teams))
+    }
+
+    /** Grava o agregado inteiro. O `deviceId` vazio preserva o gravado. */
+    fun saveAll(integrations: TeamIntegrations) {
         // O deviceId nunca é editável pela UI; se vier vazio, preserva o gravado.
-        val deviceId = settings.deviceId.takeIf { it.isNotBlank() }
+        val deviceId = integrations.deviceId.takeIf { it.isNotBlank() }
             ?: readDto().deviceId.takeIf { it.isNotBlank() }
             ?: UUID.randomUUID().toString()
 
-        writeDto(
-            TeamSettingsDto(
-                enabled = settings.enabled,
-                serverUrl = settings.serverUrl.trim(),
-                apiKey = settings.apiKey.trim(),
-                alias = settings.alias.trim(),
+        writeAggregate(
+            TeamIntegrations(
                 deviceId = deviceId,
-                participatingProfileIds = settings.participatingProfileIds.sorted(),
-                adminToken = settings.adminToken.trim()
+                enabled = integrations.enabled,
+                teams = integrations.teams.map { it.trimmed() }
             )
         )
     }
@@ -124,6 +183,23 @@ internal class LocalTeamSettingsDataSource(
             }
             TeamSettingsDto()
         }
+    }
+
+    /** Grava o agregado no formato v2, com os campos planos espelhando o primeiro time. */
+    private fun writeAggregate(integrations: TeamIntegrations) {
+        val first = integrations.teams.firstOrNull()
+        writeDto(
+            TeamSettingsDto(
+                enabled = integrations.enabled,
+                serverUrl = first?.serverUrl.orEmpty(),
+                apiKey = first?.apiKey.orEmpty(),
+                alias = first?.alias.orEmpty(),
+                deviceId = integrations.deviceId,
+                participatingProfileIds = first?.participatingProfileIds?.sorted().orEmpty(),
+                adminToken = first?.adminToken.orEmpty(),
+                teams = integrations.teams.map { it.toEntryDto() }
+            )
+        )
     }
 
     private fun writeDto(dto: TeamSettingsDto) {
@@ -161,16 +237,88 @@ internal class LocalTeamSettingsDataSource(
         }
     }
 
-    private fun TeamSettingsDto.toDomain(): TeamIntegrationSettings {
-        return TeamIntegrationSettings(
+    /** Com `teams` presente, ele manda; sem ele, os campos planos viram um time só. */
+    private fun TeamSettingsDto.toAggregate(): TeamIntegrations {
+        return TeamIntegrations(
+            deviceId = deviceId,
             enabled = enabled,
+            teams = (teams ?: legacyEntries()).map { it.toDomain() }
+        )
+    }
+
+    /** Time do formato plano, ou lista vazia quando nenhum campo plano tem valor. */
+    private fun TeamSettingsDto.legacyEntries(): List<TeamEntryDto> {
+        val hasFlatValue = serverUrl.isNotBlank() || apiKey.isNotBlank() || alias.isNotBlank() ||
+            adminToken.isNotBlank() || participatingProfileIds.isNotEmpty()
+        if (!hasFlatValue) {
+            return emptyList()
+        }
+        return listOf(
+            TeamEntryDto(
+                id = TeamIntegrations.LEGACY_TEAM_ID,
+                name = hostOf(serverUrl),
+                serverUrl = serverUrl,
+                apiKey = apiKey,
+                alias = alias,
+                participatingProfileIds = participatingProfileIds,
+                adminToken = adminToken
+            )
+        )
+    }
+
+    private fun TeamEntryDto.toDomain(): TeamIntegrationSettings {
+        return TeamIntegrationSettings(
+            id = id,
+            name = name,
             serverUrl = serverUrl,
             apiKey = apiKey,
             alias = alias,
-            deviceId = deviceId,
             participatingProfileIds = participatingProfileIds.toSet(),
             adminToken = adminToken
         )
+    }
+
+    private fun TeamIntegrationSettings.toEntryDto(): TeamEntryDto {
+        return TeamEntryDto(
+            id = id,
+            name = name,
+            serverUrl = serverUrl,
+            apiKey = apiKey,
+            alias = alias,
+            participatingProfileIds = participatingProfileIds.sorted(),
+            adminToken = adminToken
+        )
+    }
+
+    private fun TeamIntegrationSettings.trimmed(): TeamIntegrationSettings {
+        return copy(
+            id = id.trim(),
+            name = name.trim(),
+            serverUrl = serverUrl.trim(),
+            apiKey = apiKey.trim(),
+            alias = alias.trim(),
+            adminToken = adminToken.trim()
+        )
+    }
+
+    private fun TeamIntegrations.firstTeamOrDefault(): TeamIntegrationSettings {
+        return teams.firstOrNull() ?: TeamIntegrationSettings(enabled = enabled, deviceId = deviceId)
+    }
+
+    /** Host do servidor, sem esquema, porta, caminho nem credencial; `Time` quando não há servidor. */
+    private fun hostOf(serverUrl: String): String {
+        val trimmed = serverUrl.trim()
+        val authority = trimmed.substringAfter("://", trimmed)
+            .substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+            .substringAfterLast('@')
+        val host = if (authority.startsWith('[')) {
+            authority.substringAfter('[').substringBefore(']')
+        } else {
+            authority.substringBefore(':')
+        }
+        return host.ifBlank { LEGACY_TEAM_NAME }
     }
 
     private companion object {

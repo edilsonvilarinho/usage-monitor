@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIngestReceipt
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.TeamPresenceReceipt
 import com.usagemonitor.domain.entity.TeamUsageSnapshot
@@ -25,11 +26,16 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 private const val PROFILE_ID = "default"
 private const val ACCOUNT_KEY = "account-uuid-aaa"
 private const val ACCOUNT_EMAIL = "helio.sales@empresa.com"
+private const val TEAM_A = "team-a"
+private const val TEAM_B = "team-b"
+private const val PROFILE_B = "outro"
+private const val ACCOUNT_B = "account-uuid-bbb"
 
 /** Captura os lotes enviados e permite forçar falha, sem tocar a rede. */
 private class RecordingTeamRepository(
@@ -116,6 +122,7 @@ private val ACTIVE_SETTINGS = TeamIntegrationSettings(
     apiKey = "chave-de-time-com-tamanho-suficiente",
     alias = "edilson",
     deviceId = "device-1",
+    id = TEAM_A,
     participatingProfileIds = setOf(PROFILE_ID)
 )
 
@@ -692,6 +699,172 @@ class TeamSyncServiceTest {
         }
     }
 
+    @Test
+    fun `cada time recebe so o lote da sua conta e o marcador usa o id do time`() = runTest {
+        withTwoProfilesFixture { rootA, rootB, indexer, syncState ->
+            writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-2", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            val repositories = mapOf(TEAM_A to RecordingTeamRepository(), TEAM_B to RecordingTeamRepository())
+            val service = newTeamsService(syncState, repositories)
+
+            service.syncOnce()
+
+            assertEquals(listOf("msg-1"), messageIds(repositories.getValue(TEAM_A)))
+            assertEquals(listOf("msg-2"), messageIds(repositories.getValue(TEAM_B)))
+            // Marcador por (time, perfil): o envio do time B não pode avançar o do time A.
+            assertTrue(syncState.readPendingBatch(TEAM_A, PROFILE_ID, 10).isEmpty)
+            assertTrue(syncState.readPendingBatch(TEAM_B, PROFILE_B, 10).isEmpty)
+            assertFalse(syncState.readPendingBatch(TEAM_A, PROFILE_B, 10).isEmpty)
+        }
+    }
+
+    @Test
+    fun `falha de um time nao impede o envio do outro`() = runTest {
+        withTwoProfilesFixture { rootA, rootB, indexer, syncState ->
+            writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-2", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            val repositories = mapOf(
+                TEAM_A to RecordingTeamRepository(failure = IllegalStateException("time A fora")),
+                TEAM_B to RecordingTeamRepository()
+            )
+            val service = newTeamsService(syncState, repositories)
+
+            val report = service.syncOnce()
+
+            assertTrue(report.hasFailure)
+            assertEquals(listOf("msg-2"), messageIds(repositories.getValue(TEAM_B)))
+        }
+    }
+
+    @Test
+    fun `time sem chave de acesso nao recebe nenhum envio`() = runTest {
+        withTwoProfilesFixture { rootA, rootB, indexer, syncState ->
+            writeTranscript(rootA, "session-a", assistantLine("session-a", "msg-1", "2026-08-01T10:00:00Z"))
+            writeTranscript(rootB, "session-b", assistantLine("session-b", "msg-2", "2026-08-01T10:00:00Z"))
+            indexer.syncIndex()
+
+            val teams = twoTeams().teams
+            val integrations = TeamIntegrations(
+                deviceId = "device-1",
+                enabled = true,
+                teams = listOf(teams[0], teams[1].copy(apiKey = ""))
+            )
+            val repositories = mapOf(TEAM_A to RecordingTeamRepository(), TEAM_B to RecordingTeamRepository())
+            val service = newTeamsService(syncState, repositories, integrations)
+
+            service.syncOnce()
+
+            assertEquals(listOf("msg-1"), messageIds(repositories.getValue(TEAM_A)))
+            assertTrue(messageIds(repositories.getValue(TEAM_B)).isEmpty())
+            assertTrue(repositories.getValue(TEAM_B).presenceTouches.isEmpty())
+        }
+    }
+
+    @Test
+    fun `identidade confirmada num time nao suprime o envio de identidade ao outro`() = runTest {
+        withTwoProfilesFixture { _, _, _, syncState ->
+            // Mesma conta em dois times: o agregado do app não permite, mas a chave da
+            // confirmação precisa separar os times mesmo assim.
+            val repositories = mapOf(TEAM_A to RecordingTeamRepository(), TEAM_B to RecordingTeamRepository())
+            val shared = TeamIntegrations(
+                deviceId = "device-1",
+                enabled = true,
+                teams = listOf(
+                    ACTIVE_SETTINGS.copy(id = TEAM_A),
+                    ACTIVE_SETTINGS.copy(id = TEAM_B)
+                )
+            )
+            val service = newTeamsService(
+                syncState,
+                repositories,
+                shared,
+                targets = listOf(TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY))
+            )
+
+            service.syncOnce()
+
+            assertEquals(1, repositories.getValue(TEAM_A).identityPushes.size)
+            assertEquals(1, repositories.getValue(TEAM_B).identityPushes.size)
+        }
+    }
+
+    @Test
+    fun `status de cada time fica separado`() = runTest {
+        withTwoProfilesFixture { _, _, _, syncState ->
+            val repositories = mapOf(
+                TEAM_A to RecordingTeamRepository(failure = IllegalStateException("time A fora")),
+                TEAM_B to RecordingTeamRepository()
+            )
+            val service = newTeamsService(syncState, repositories)
+
+            service.syncOnce()
+
+            val statuses = service.syncStatusByTeam.value
+            assertNotNull(statuses[TEAM_B])
+            assertTrue(statuses.getValue(TEAM_A).isFailing)
+            assertFalse(statuses.getValue(TEAM_B).isFailing)
+        }
+    }
+
+    private fun twoTeams(): TeamIntegrations = TeamIntegrations(
+        deviceId = "device-1",
+        enabled = true,
+        teams = listOf(
+            ACTIVE_SETTINGS.copy(id = TEAM_A, participatingProfileIds = setOf(PROFILE_ID)),
+            ACTIVE_SETTINGS.copy(id = TEAM_B, participatingProfileIds = setOf(PROFILE_B))
+        )
+    )
+
+    private fun newTeamsService(
+        syncState: LocalTeamSyncStateDataSource,
+        repositories: Map<String, RecordingTeamRepository>,
+        integrations: TeamIntegrations = twoTeams(),
+        targets: List<TeamSyncTarget> = listOf(
+            TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY, accountEmail = ACCOUNT_EMAIL),
+            TeamSyncTarget(profileId = PROFILE_B, accountKey = ACCOUNT_B)
+        )
+    ): TeamSyncService {
+        return TeamSyncService(
+            syncStateDataSource = syncState,
+            pushTeamUsageFor = { teamId -> PushTeamUsageUseCase(repositories.getValue(teamId)) },
+            integrationsProvider = { integrations },
+            targetsProvider = { targets },
+            touchTeamPresenceFor = { teamId -> TouchTeamPresenceUseCase(repositories.getValue(teamId)) },
+            hostNameProvider = { "DESKTOP-TEST" }
+        )
+    }
+
+    private fun messageIds(repository: RecordingTeamRepository): List<String> =
+        repository.turnBatches.flatMap { payload -> payload.turns.map { turn -> turn.messageId } }
+
+    private fun integrationsOf(settings: TeamIntegrationSettings): TeamIntegrations =
+        TeamIntegrations(deviceId = settings.deviceId, enabled = settings.enabled, teams = listOf(settings))
+
+    private suspend fun withTwoProfilesFixture(
+        block: suspend (File, File, LocalCliSessionDataSource, LocalTeamSyncStateDataSource) -> Unit
+    ) {
+        val tempDir = createTempDirectory().toFile()
+        val rootA = File(tempDir, "projects-a").also { it.mkdirs() }
+        val rootB = File(tempDir, "projects-b").also { it.mkdirs() }
+        val indexer = LocalCliSessionDataSource(
+            projectRootsProvider = {
+                listOf(CliProjectRoot(PROFILE_ID, rootA.absolutePath), CliProjectRoot(PROFILE_B, rootB.absolutePath))
+            },
+            databaseFile = File(tempDir, "usage-history.db")
+        )
+        val syncState = LocalTeamSyncStateDataSource(indexer.sharedConnectionManager)
+        try {
+            block(rootA, rootB, indexer, syncState)
+        } finally {
+            indexer.close()
+            tempDir.deleteRecursively()
+        }
+    }
+
     private fun newService(
         syncState: LocalTeamSyncStateDataSource,
         repository: RecordingTeamRepository,
@@ -711,11 +884,11 @@ class TeamSyncServiceTest {
     ): TeamSyncService {
         return TeamSyncService(
             syncStateDataSource = syncState,
-            pushTeamUsage = PushTeamUsageUseCase(repository),
-            settingsProvider = settingsProvider,
+            pushTeamUsageFor = { PushTeamUsageUseCase(repository) },
+            integrationsProvider = { integrationsOf(settingsProvider()) },
             targetsProvider = { targets },
             ensureIndexFresh = ensureIndexFresh,
-            touchTeamPresence = touchTeamPresence,
+            touchTeamPresenceFor = { touchTeamPresence },
             hostNameProvider = { "DESKTOP-TEST" },
             batchSize = batchSize
         )

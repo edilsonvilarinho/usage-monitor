@@ -7,6 +7,7 @@ import com.usagemonitor.presentation.viewmodel.teamConnectionFailureOf
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.repository.resolveEffectiveProxy
@@ -47,11 +48,12 @@ internal class AppSettingsFeedback(
     /** O que as Configurações gravam: proxy, chaves, time e contas. */
     private val store: AppSettingsStore,
     private val breadcrumbs: BreadcrumbRecorder,
-    private val teamUsageRepository: TeamUsageRepository,
-    /** `ClaimTeamKeyForAccountUseCase`: vincula a chave do time à conta. */
-    private val claimTeamKey: suspend (accountKey: String, accountEmail: String?) -> Result<TeamKeyVerification>,
-    /** `ValidateAdminTokenUseCase`. */
-    private val validateAdminTokenWithServer: suspend () -> Result<Unit>,
+    /** Repositório de uso do time pedido (`TeamRepositoryRegistry.usageRepository`). */
+    private val teamUsageRepositoryFor: (teamId: String) -> TeamUsageRepository,
+    /** `ClaimTeamKeyForAccountUseCase` do time pedido: vincula a chave à conta. */
+    private val claimTeamKey: suspend (teamId: String, accountKey: String, accountEmail: String?) -> Result<TeamKeyVerification>,
+    /** `ValidateAdminTokenUseCase` do time pedido. */
+    private val validateAdminTokenWithServer: suspend (teamId: String) -> Result<Unit>,
     private val scope: CoroutineScope,
     private val language: () -> AppLanguage,
     /** Rótulo do perfil para a mensagem de erro do teste do time. */
@@ -67,8 +69,33 @@ internal class AppSettingsFeedback(
         private set
     private var toastGeneration = 0
 
-    var teamConnection by mutableStateOf(TeamConnectionUiState())
-    var teamAdminConnection by mutableStateOf(TeamConnectionUiState())
+    // Resultado por time: um time nunca apaga o retorno de outro.
+    private val teamConnections = mutableStateMapOf<String, TeamConnectionUiState>()
+    private val teamAdminConnections = mutableStateMapOf<String, TeamConnectionUiState>()
+
+    fun teamConnection(teamId: String): TeamConnectionUiState = teamConnections[teamId] ?: TeamConnectionUiState()
+
+    fun teamAdminConnection(teamId: String): TeamConnectionUiState = teamAdminConnections[teamId] ?: TeamConnectionUiState()
+
+    fun setTeamConnection(teamId: String, state: TeamConnectionUiState) {
+        teamConnections[teamId] = state
+    }
+
+    fun setTeamAdminConnection(teamId: String, state: TeamConnectionUiState) {
+        teamAdminConnections[teamId] = state
+    }
+
+    fun clearTeamConnection(teamId: String) {
+        teamConnections.remove(teamId)
+    }
+
+    fun clearAllTeamConnections() {
+        teamConnections.clear()
+    }
+
+    fun clearTeamAdminConnection(teamId: String) {
+        teamAdminConnections.remove(teamId)
+    }
     var proxyConnection by mutableStateOf(ProxyConnectionUiState())
     var apiKeyCheck by mutableStateOf(ApiKeyCheckUiState())
 
@@ -185,29 +212,39 @@ internal class AppSettingsFeedback(
      * por conta aquela consulta passaria a ser recusada e o botão reprovaria uma
      * configuração correta. Agora o alvo é real, e o erro aponta qual conta falhou.
      */
-    fun checkTeamConnection() {
-        teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
+    fun checkTeamConnection(teamId: String) {
+        setTeamConnection(teamId, TeamConnectionUiState(TeamConnectionUiStatus.CHECKING))
         scope.launch {
-            val healthError = teamUsageRepository.checkConnection().exceptionOrNull()
+            val healthError = teamUsageRepositoryFor(teamId).checkConnection().exceptionOrNull()
             if (healthError != null) {
                 breadcrumbs.recordFailure("testar conexão do time", healthError)
-                teamConnection = TeamConnectionUiState(
-                    status = TeamConnectionUiStatus.FAILED,
-                    message = healthError.message ?: pick("Falha desconhecida.", "Unknown failure."),
-                    failure = teamConnectionFailureOf(healthError)
+                setTeamConnection(
+                    teamId,
+                    TeamConnectionUiState(
+                        status = TeamConnectionUiStatus.FAILED,
+                        message = healthError.message ?: pick("Falha desconhecida.", "Unknown failure."),
+                        failure = teamConnectionFailureOf(healthError)
+                    )
                 )
                 return@launch
             }
 
-            val current = store.teamSettingsFlow.value
+            val current = store.teamIntegrationsFlow.value.team(teamId)
+            if (current == null) {
+                setTeamConnection(teamId, TeamConnectionUiState())
+                return@launch
+            }
             val targets = buildTeamSyncTargets(store.profileRegistry)
                 .filter { target -> current.participates(target.profileId) }
             if (targets.isEmpty()) {
-                teamConnection = TeamConnectionUiState(
-                    status = TeamConnectionUiStatus.OK,
-                    message = pick(
-                        "Servidor OK. Marque uma conta para conferir a chave.",
-                        "Server OK. Select an account to check the key."
+                setTeamConnection(
+                    teamId,
+                    TeamConnectionUiState(
+                        status = TeamConnectionUiStatus.OK,
+                        message = pick(
+                            "Servidor OK. Marque uma conta para conferir a chave.",
+                            "Server OK. Select an account to check the key."
+                        )
                     )
                 )
                 return@launch
@@ -222,7 +259,7 @@ internal class AppSettingsFeedback(
                 // Vincula, e não apenas confere: o vínculo antes só nascia dentro
                 // de um envio de turnos, então numa máquina já sincronizada ele
                 // nunca acontecia e a leitura ficava recusada indefinidamente.
-                val result = claimTeamKey(target.accountKey, target.accountEmail)
+                val result = claimTeamKey(teamId, target.accountKey, target.accountEmail)
                 val error = result.exceptionOrNull()
                 if (error != null) {
                     breadcrumbs.recordFailure("validar vínculo de conta com a chave do time", error)
@@ -240,35 +277,45 @@ internal class AppSettingsFeedback(
                 }
             }
 
-            teamConnection = if (failures.isEmpty()) {
-                TeamConnectionUiState(
-                    status = TeamConnectionUiStatus.OK,
-                    message = pick(
-                        "Conexão OK e conta vinculada a esta chave.",
-                        "Connection OK and account linked to this key."
+            setTeamConnection(
+                teamId,
+                if (failures.isEmpty()) {
+                    TeamConnectionUiState(
+                        status = TeamConnectionUiStatus.OK,
+                        message = pick(
+                            "Conexão OK e conta vinculada a esta chave.",
+                            "Connection OK and account linked to this key."
+                        )
                     )
-                )
-            } else {
-                TeamConnectionUiState(status = TeamConnectionUiStatus.FAILED, message = failures.joinToString(" • "), failure = unreachable)
-            }
+                } else {
+                    TeamConnectionUiState(
+                        status = TeamConnectionUiStatus.FAILED,
+                        message = failures.joinToString(" • "),
+                        failure = unreachable
+                    )
+                }
+            )
         }
     }
 
-    fun validateAdminToken() {
-        teamAdminConnection = TeamConnectionUiState(TeamConnectionUiStatus.CHECKING)
+    fun validateAdminToken(teamId: String) {
+        setTeamAdminConnection(teamId, TeamConnectionUiState(TeamConnectionUiStatus.CHECKING))
         scope.launch {
-            val error = validateAdminTokenWithServer().exceptionOrNull()
-            teamAdminConnection = if (error == null) {
-                TeamConnectionUiState(status = TeamConnectionUiStatus.OK, message = pick("Token válido.", "Token is valid."))
-            } else {
-                breadcrumbs.recordFailure("validar token administrativo do time", error)
-                TeamConnectionUiState(
-                    status = TeamConnectionUiStatus.FAILED,
-                    message = error.message ?: pick("Falha desconhecida.", "Unknown failure."),
-                    failure = teamConnectionFailureOf(error),
-                    credentialKind = TeamCredentialKind.ADMIN_TOKEN
-                )
-            }
+            val error = validateAdminTokenWithServer(teamId).exceptionOrNull()
+            setTeamAdminConnection(
+                teamId,
+                if (error == null) {
+                    TeamConnectionUiState(status = TeamConnectionUiStatus.OK, message = pick("Token válido.", "Token is valid."))
+                } else {
+                    breadcrumbs.recordFailure("validar token administrativo do time", error)
+                    TeamConnectionUiState(
+                        status = TeamConnectionUiStatus.FAILED,
+                        message = error.message ?: pick("Falha desconhecida.", "Unknown failure."),
+                        failure = teamConnectionFailureOf(error),
+                        credentialKind = TeamCredentialKind.ADMIN_TOKEN
+                    )
+                }
+            )
         }
     }
 

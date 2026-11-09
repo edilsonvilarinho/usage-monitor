@@ -4,7 +4,7 @@ import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CliQuotaWindows
 import com.usagemonitor.domain.entity.DEFAULT_ANTHROPIC_PROFILE_ID
-import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.entity.displayName
@@ -14,6 +14,7 @@ import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.presentation.viewmodel.UsageExportWriter
 import com.usagemonitor.presentation.viewmodel.recordFailure
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.time.Clock
 
 /**
@@ -44,6 +45,11 @@ internal interface ShellActionTargets {
  * Cada abertura grava na trilha **o nome da tela**, nunca a conta nem o apelido:
  * o apelido é digitado pelo usuário, costuma ser o e-mail, e a trilha vira issue
  * pública.
+ *
+ * O time do painel (`dashboardTeamId`) é gravado por quem abre: o card de uma
+ * conta grava o time que a tem como participante; a visão global de admin grava
+ * o time que administra; a troca de time grava o escolhido e abre a conta ou a
+ * visão global dele.
  */
 internal fun buildShellActions(
     breadcrumbs: BreadcrumbRecorder,
@@ -53,9 +59,94 @@ internal fun buildShellActions(
     profileRecords: List<AnthropicProfileRecord>,
     profileResolution: AnthropicProfileResolution,
     dashboardState: UiState,
-    teamSettings: TeamIntegrationSettings,
+    integrations: TeamIntegrations,
+    dashboardTeamId: MutableStateFlow<String?>,
+    syncTargets: List<TeamSyncTarget>,
     clock: Clock = Clock.System
 ): AppShellActions {
+    // Não grava o time do painel: quem chama decide (card, overview ou troca).
+    val openTeamUsageAccount: (UsageTargetKey) -> Unit = { target ->
+        val profileId = target.profileIdOrDefault()
+        val accountContext = profileResolution.inspections[profileId]?.accountContext
+        // Sem `accountUuid` não há como agrupar as máquinas — e o botão nem
+        // deveria ter aparecido. Abortar é melhor que consultar o servidor com
+        // uma chave inventada.
+        val accountKey = accountContext?.key?.providerAccountId
+        if (accountKey != null) {
+            breadcrumbs.recordScreenOpened("uso do time")
+            modal.openTeamUsage(accountLabel = accountContext.displayLabel, profileId = profileId, isAdminOverview = false)
+            targets.openTeamUsageForAccount(
+                accountKey = accountKey,
+                accountLabel = accountContext.displayLabel,
+                quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
+            )
+            // Antecipa o envio desta máquina: sem isso a janela abriria sem o
+            // que foi feito aqui desde o último tique de 30s.
+            targets.requestTeamSync()
+        }
+    }
+    val openTeamPresenceAccount: (UsageTargetKey) -> Unit = { target ->
+        val profileId = target.profileIdOrDefault()
+        val accountContext = profileResolution.inspections[profileId]?.accountContext
+        val accountKey = accountContext?.key?.providerAccountId
+        if (accountKey != null) {
+            breadcrumbs.recordScreenOpened("presença do time")
+            modal.openTeamPresence(accountLabel = accountContext.displayLabel, isAdminOverview = false)
+            targets.openTeamPresenceForAccount(accountKey = accountKey, accountLabel = accountContext.displayLabel)
+            // Antecipa a batida desta máquina: sem isso a janela abriria com o
+            // próprio usuário aparecendo offline por até 30 segundos.
+            targets.requestTeamSync()
+        }
+    }
+    val openAllAccountsUsage: () -> Unit = {
+        breadcrumbs.recordScreenOpened("visão global do time (admin)")
+        modal.openTeamUsage(accountLabel = null, profileId = null, isAdminOverview = true)
+        targets.openTeamUsageForAllAccounts()
+    }
+    val openAllAccountsPresence: () -> Unit = {
+        breadcrumbs.recordScreenOpened("presença global do time (admin)")
+        modal.openTeamPresence(accountLabel = null, isAdminOverview = true)
+        targets.openTeamPresenceForAllAccounts()
+    }
+    // Card: grava o time que tem a conta como participante, só se a conta abre.
+    val rememberTeamOfCard: (UsageTargetKey) -> Unit = { target ->
+        val profileId = target.profileIdOrDefault()
+        val teamId = dashboardTeamIdFor(profileId, integrations)
+        if (accountKeyOf(profileResolution, profileId) != null && teamId != null) {
+            dashboardTeamId.value = teamId
+        }
+    }
+    // Troca de time no seletor: grava o escolhido e abre a primeira conta dele,
+    // ou a visão global se só o admin tem o que mostrar.
+    val selectTeam: (String) -> Unit = { teamId ->
+        dashboardTeamId.value = teamId
+        val team = integrations.team(teamId)
+        if (team != null) {
+            when (val switch = teamAccountSwitchFor(team, syncTargets)) {
+                is TeamAccountSwitch.Account -> openTeamUsageAccount(UsageTargetKey(ApiSource.ANTHROPIC, switch.profileId))
+                TeamAccountSwitch.AllAccounts -> openAllAccountsUsage()
+                TeamAccountSwitch.None -> Unit
+            }
+        }
+    }
+    // Só quem administra: a conta não entra na condição de propósito —
+    // administrar o servidor não exige participar de nenhum time.
+    val openAdminOverviewAction: (() -> Unit)? = if (integrations.adminTeams.isNotEmpty()) {
+        {
+            dashboardTeamId.value = adminDashboardTeamIdFor(dashboardTeamId.value, integrations)
+            openAllAccountsUsage()
+        }
+    } else {
+        null
+    }
+    val openPresenceOverviewAction: (() -> Unit)? = if (integrations.adminTeams.isNotEmpty()) {
+        {
+            dashboardTeamId.value = adminDashboardTeamIdFor(dashboardTeamId.value, integrations)
+            openAllAccountsPresence()
+        }
+    } else {
+        null
+    }
     return AppShellActions(
         refreshAll = { targets.refreshAll() },
         openSettings = {
@@ -77,17 +168,7 @@ internal fun buildShellActions(
             exportWriter.write(exportRequestForDashboard(DefaultUsageExportEncoder, stats, clock.now()))
         },
         onExportFailure = { error -> breadcrumbs.recordFailure("exportar retrato do dashboard", error) },
-        // Só quem administra: a conta não entra na condição de propósito —
-        // administrar o servidor não exige participar de nenhum time.
-        openAdminOverview = if (teamSettings.isAdminMode) {
-            {
-                breadcrumbs.recordScreenOpened("visão global do time (admin)")
-                modal.openTeamUsage(accountLabel = null, profileId = null, isAdminOverview = true)
-                targets.openTeamUsageForAllAccounts()
-            }
-        } else {
-            null
-        },
+        openAdminOverview = openAdminOverviewAction,
         openHistory = { source, accountKey ->
             breadcrumbs.recordScreenOpened("histórico de ${source.name}")
             modal.openHistory(source)
@@ -110,37 +191,12 @@ internal fun buildShellActions(
             targets.openCodexCliSessions()
         },
         openTeamUsage = { target ->
-            val profileId = target.profileIdOrDefault()
-            val accountContext = profileResolution.inspections[profileId]?.accountContext
-            // Sem `accountUuid` não há como agrupar as máquinas — e o botão nem
-            // deveria ter aparecido. Abortar é melhor que consultar o servidor com
-            // uma chave inventada.
-            val accountKey = accountContext?.key?.providerAccountId
-            if (accountKey != null) {
-                breadcrumbs.recordScreenOpened("uso do time")
-                modal.openTeamUsage(accountLabel = accountContext.displayLabel, profileId = profileId, isAdminOverview = false)
-                targets.openTeamUsageForAccount(
-                    accountKey = accountKey,
-                    accountLabel = accountContext.displayLabel,
-                    quotaWindows = quotaWindowsForProfile(dashboardState, profileId)
-                )
-                // Antecipa o envio desta máquina: sem isso a janela abriria sem o
-                // que foi feito aqui desde o último tique de 30s.
-                targets.requestTeamSync()
-            }
+            rememberTeamOfCard(target)
+            openTeamUsageAccount(target)
         },
         openTeamPresence = { target ->
-            val profileId = target.profileIdOrDefault()
-            val accountContext = profileResolution.inspections[profileId]?.accountContext
-            val accountKey = accountContext?.key?.providerAccountId
-            if (accountKey != null) {
-                breadcrumbs.recordScreenOpened("presença do time")
-                modal.openTeamPresence(accountLabel = accountContext.displayLabel, isAdminOverview = false)
-                targets.openTeamPresenceForAccount(accountKey = accountKey, accountLabel = accountContext.displayLabel)
-                // Antecipa a batida desta máquina: sem isso a janela abriria com o
-                // próprio usuário aparecendo offline por até 30 segundos.
-                targets.requestTeamSync()
-            }
+            rememberTeamOfCard(target)
+            openTeamPresenceAccount(target)
         },
         openAnalysis = { target ->
             breadcrumbs.recordScreenOpened("análise da sessão de ${target.source.name}")
@@ -149,16 +205,12 @@ internal fun buildShellActions(
             modal.openAnalysis()
             targets.openAnalysis(target.storageKey, stats?.snapshotLabel ?: target.source.displayName())
         },
-        openTeamPresenceOverview = if (teamSettings.isAdminMode) {
-            {
-                breadcrumbs.recordScreenOpened("presença global do time (admin)")
-                modal.openTeamPresence(accountLabel = null, isAdminOverview = true)
-                targets.openTeamPresenceForAllAccounts()
-            }
-        } else {
-            null
-        }
+        openTeamPresenceOverview = openPresenceOverviewAction,
+        selectDashboardTeam = selectTeam
     )
 }
 
 private fun UsageTargetKey.profileIdOrDefault(): String = profileId ?: DEFAULT_ANTHROPIC_PROFILE_ID
+
+private fun accountKeyOf(resolution: AnthropicProfileResolution, profileId: String): String? =
+    resolution.inspections[profileId]?.accountContext?.key?.providerAccountId

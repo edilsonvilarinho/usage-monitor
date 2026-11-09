@@ -207,7 +207,11 @@ export function Settings() {
 
           {sec === 'Time' ? (
             <React.Fragment>
-              <AppSwitch checked={team} onChange={setTeam} label="Integração com time" hint="Recurso opcional, desligado por default. A empresa opera o servidor; não há serviço gerenciado." />
+              <AppKey>Times</AppKey>
+              <AppDataRow mark={<AppSourceMark source="anthropic" />} last>
+                <AppValue>Pessoal — {team ? 'ativo' : 'desligado'}</AppValue>
+              </AppDataRow>
+              <AppSwitch checked={team} onChange={setTeam} label="Integração com time" hint="Recurso opcional, desligado por default. A empresa opera o servidor; não há serviço gerenciado. Mestre-detalhe (#547): a lista acima escolhe o time aberto." />
               <AppTextField label="Servidor" placeholder="https://usage.example.com" disabled={!team} />
               <AppTextField label="Chave" type="password" value={team ? '••••••••••••' : ''} disabled={!team}
                 hint="Guardada em ~/.usage-monitor/team.json com permissão restrita ao dono — não vai para as preferências do registro." />

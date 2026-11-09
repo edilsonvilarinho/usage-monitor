@@ -48,6 +48,9 @@ export function TeamUsage() {
             <AppMetric label="Custo do time" value="US$ 15,6180" />
             <AppMetric label="Tempo ativo" value="15h 34m" hint="pausas > 5 min descartadas" />
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--s3)' }}>
+            <AppButton variant="ghost">Time: Empresa ▾</AppButton>
+          </div>
           <AppPanel>
             <AppPanelHeader title="Consumo por integrante" subtitle="ordem alfabética pelo apelido · o consumo ordena dentro de cada um" />
             <AppPanelBody style={{ paddingBottom: 0 }}>

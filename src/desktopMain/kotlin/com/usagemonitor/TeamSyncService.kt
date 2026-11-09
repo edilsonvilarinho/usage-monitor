@@ -10,6 +10,7 @@ import com.usagemonitor.data.datasource.LocalTeamSyncStateDataSource
 import com.usagemonitor.data.datasource.TeamServerException
 import com.usagemonitor.domain.entity.TeamIngestPayload
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.TeamMemberIdentity
 import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -162,8 +163,8 @@ data class TeamSyncStatus(
  */
 internal class TeamSyncService(
     private val syncStateDataSource: LocalTeamSyncStateDataSource,
-    private val pushTeamUsage: PushTeamUsageUseCase,
-    private val settingsProvider: () -> TeamIntegrationSettings,
+    private val pushTeamUsageFor: (String) -> PushTeamUsageUseCase,
+    private val integrationsProvider: () -> TeamIntegrations,
     private val targetsProvider: () -> List<TeamSyncTarget>,
     /**
      * Atualiza o índice antes de ler o lote. `null` desliga — a passada passa a
@@ -175,7 +176,7 @@ internal class TeamSyncService(
      * instalação sem a tela de presença teria, e o que os testes que não a
      * exercitam usam.
      */
-    private val touchTeamPresence: TouchTeamPresenceUseCase? = null,
+    private val touchTeamPresenceFor: (String) -> TouchTeamPresenceUseCase? = { null },
     private val hostNameProvider: () -> String? = { defaultHostName() },
     private val intervalMillis: Long = DEFAULT_INTERVAL_MILLIS,
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
@@ -207,13 +208,18 @@ internal class TeamSyncService(
      * enviado, e o vínculo da chave nova com a conta, que só nasce num ingest,
      * nunca acontecia. O time inteiro ficava sem conseguir ler.
      */
-    private val confirmedIdentityByAccount = mutableMapOf<String, ConfirmedIdentity>()
-    private var lastRecordedFailureKey: String? = null
+    private val confirmedIdentityByTeamAccount = mutableMapOf<Pair<String, String>, ConfirmedIdentity>()
+    private val lastRecordedFailureKeyByTeam = mutableMapOf<String, String?>()
 
     private val _syncStatus = MutableStateFlow(TeamSyncStatus())
 
-    /** Desfecho da última passada, para as Configurações mostrarem. */
+    /** Desfecho da última passada do primeiro time ativo, para as Configurações mostrarem. */
     val syncStatus: StateFlow<TeamSyncStatus> = _syncStatus.asStateFlow()
+
+    private val _syncStatusByTeam = MutableStateFlow<Map<String, TeamSyncStatus>>(emptyMap())
+
+    /** Desfecho da última passada de cada time, pelo id do time. */
+    val syncStatusByTeam: StateFlow<Map<String, TeamSyncStatus>> = _syncStatusByTeam.asStateFlow()
 
     /** Idempotente: chamar com o laço já rodando não abre um segundo. */
     fun start() {
@@ -265,57 +271,83 @@ internal class TeamSyncService(
      * próxima passada.
      */
     suspend fun syncOnce(): TeamSyncReport {
-        val settings = settingsProvider()
-        if (!settings.isActive) {
+        val teams = integrationsProvider().activeTeams
+        if (teams.isEmpty()) {
             return TeamSyncReport()
         }
 
         return passMutex.withLock {
+            // Uma indexação por passada, nunca por time: o índice é único e varrer
+            // os transcritos de novo a cada time seria trabalho repetido. Falhar
+            // aqui não cancela o envio — o que já está indexado ainda precisa sair.
+            val indexFailures = refreshIndex()
+            val targets = targetsProvider()
+            val failures = indexFailures.toMutableList()
             var pushedTurns = 0
             var batches = 0
-            val failures = mutableListOf<Throwable>()
 
-            // Uma indexação por passada, nunca por conta: o índice é único e
-            // varrer os transcritos de novo a cada alvo seria trabalho repetido.
-            // Falhar aqui não cancela o envio — o que já está indexado ainda
-            // precisa sair, e o erro viaja no relatório.
-            val indexRefresh = ensureIndexFresh
-            if (indexRefresh != null) {
-                runCatching { indexRefresh() }
-                    .onFailure { error -> failures += error }
+            // Falha de um time não impede o envio do outro: cada um tem o seu
+            // marcador, a sua identidade e o seu desfecho publicado.
+            for (team in teams) {
+                val pass = syncTeam(team, targets)
+                pushedTurns += pass.report.pushedTurns
+                batches += pass.report.batches
+                failures += pass.report.failures
+                publishStatus(
+                    teamId = team.id,
+                    report = TeamSyncReport(
+                        pushedTurns = pass.report.pushedTurns,
+                        batches = pass.report.batches,
+                        failures = indexFailures + pass.report.failures
+                    ),
+                    rejections = pass.rejections
+                )
             }
 
-            val rejections = mutableMapOf<String, String>()
-
-            for (target in targetsProvider()) {
-                if (!settings.participates(target.profileId)) {
-                    continue
-                }
-
-                val result = syncTarget(settings, target)
-                pushedTurns += result.pushedTurns
-                batches += result.batches
-                failures += result.failures
-
-                // A recusa fica presa na conta que a causou. A primeira basta:
-                // as seguintes na mesma passada são a mesma causa repetida em
-                // presença, identidade e lote.
-                val rejection = result.failures.firstNotNullOfOrNull { error ->
-                    error.admissionRejection()
-                }
-                if (rejection != null) {
-                    rejections[target.profileId] = rejection
-                }
-            }
-
-            val report = TeamSyncReport(
-                pushedTurns = pushedTurns,
-                batches = batches,
-                failures = failures
-            )
-            publishStatus(report, rejections)
-            report
+            _syncStatus.value = _syncStatusByTeam.value[teams.first().id] ?: TeamSyncStatus()
+            TeamSyncReport(pushedTurns = pushedTurns, batches = batches, failures = failures)
         }
+    }
+
+    /** Atualiza o índice uma vez por passada; a falha vira item do relatório, não aborta a passada. */
+    private suspend fun refreshIndex(): List<Throwable> {
+        val indexRefresh = ensureIndexFresh ?: return emptyList()
+        val failure = runCatching { indexRefresh() }.exceptionOrNull() ?: return emptyList()
+        return listOf(failure)
+    }
+
+    /** Resultado de um time numa passada: o relatório e as contas que o servidor recusou. */
+    private class TeamPass(val report: TeamSyncReport, val rejections: Map<String, String>)
+
+    /** Envia as contas participantes de um time; as contas de outros times ficam de fora. */
+    private suspend fun syncTeam(team: TeamIntegrationSettings, targets: List<TeamSyncTarget>): TeamPass {
+        var pushedTurns = 0
+        var batches = 0
+        val failures = mutableListOf<Throwable>()
+        val rejections = mutableMapOf<String, String>()
+
+        for (target in targets) {
+            if (!team.participates(target.profileId)) {
+                continue
+            }
+
+            val result = syncTarget(team, target)
+            pushedTurns += result.pushedTurns
+            batches += result.batches
+            failures += result.failures
+
+            // A recusa fica presa na conta que a causou. A primeira basta:
+            // as seguintes na mesma passada são a mesma causa repetida em
+            // presença, identidade e lote.
+            val rejection = result.failures.firstNotNullOfOrNull { error ->
+                error.admissionRejection()
+            }
+            if (rejection != null) {
+                rejections[target.profileId] = rejection
+            }
+        }
+
+        return TeamPass(TeamSyncReport(pushedTurns, batches, failures), rejections)
     }
 
     /**
@@ -325,14 +357,14 @@ internal class TeamSyncService(
      * trocar a mensagem a cada tique de 30s faria o aviso piscar sem informar
      * nada novo.
      */
-    private fun publishStatus(report: TeamSyncReport, rejections: Map<String, String>) {
+    private fun publishStatus(teamId: String, report: TeamSyncReport, rejections: Map<String, String>) {
         val now = clock.now()
-        val current = _syncStatus.value
-        _syncStatus.value = if (report.hasFailure) {
+        val current = _syncStatusByTeam.value[teamId] ?: TeamSyncStatus()
+        val next = if (report.hasFailure) {
             val failure = report.failures.first()
             val failureKey = breadcrumbFailureReasonOf(failure)
-            if (failureKey != lastRecordedFailureKey) {
-                lastRecordedFailureKey = failureKey
+            if (failureKey != lastRecordedFailureKeyByTeam[teamId]) {
+                lastRecordedFailureKeyByTeam[teamId] = failureKey
                 breadcrumbs.recordFailure("sincronizar uso com o servidor do time", failure)
             }
             current.copy(
@@ -345,12 +377,13 @@ internal class TeamSyncService(
                 rejectedProfiles = rejections
             )
         } else {
-            lastRecordedFailureKey = null
+            lastRecordedFailureKeyByTeam[teamId] = null
             // Passada limpa apaga a falha: o aviso é sobre o estado atual, e uma
             // mensagem que sobrevive ao conserto manda o usuário atrás de um
             // problema que já não existe.
             TeamSyncStatus(lastSuccessAt = now)
         }
+        _syncStatusByTeam.value = _syncStatusByTeam.value + (teamId to next)
     }
 
     private suspend fun syncTarget(
@@ -382,7 +415,7 @@ internal class TeamSyncService(
 
         repeat(maxBatchesPerPass) {
             val batch = runCatching {
-                syncStateDataSource.readPendingBatch(target.profileId, batchSize)
+                syncStateDataSource.readPendingBatch(settings.id, target.profileId, batchSize)
             }.getOrElse { error ->
                 return TeamSyncReport(pushedTurns, batches, failures + error)
             }
@@ -408,7 +441,7 @@ internal class TeamSyncService(
                 turns = batch.turns
             )
 
-            val pushResult = pushTeamUsage(payload)
+            val pushResult = pushTeamUsageFor(settings.id)(payload)
             val failure = pushResult.exceptionOrNull()
             if (failure != null) {
                 // Marcador não avança: o mesmo lote volta na próxima passada.
@@ -418,9 +451,9 @@ internal class TeamSyncService(
             // O lote carrega a mesma identidade e vai com a mesma chave, então
             // confirma tanto quanto o envio dedicado — e evita repeti-lo na
             // próxima passada quando o envio de identidade falhou mas este passou.
-            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity(target)
+            confirmedIdentityByTeamAccount[settings.id to target.accountKey] = settings.confirmedIdentity(target)
 
-            runCatching { syncStateDataSource.markPushed(batch.turns, clock.now()) }
+            runCatching { syncStateDataSource.markPushed(settings.id, batch.turns, clock.now()) }
                 .onFailure { error -> return TeamSyncReport(pushedTurns, batches, failures + error) }
 
             pushedTurns += batch.turns.size
@@ -455,7 +488,7 @@ internal class TeamSyncService(
         settings: TeamIntegrationSettings,
         target: TeamSyncTarget
     ): Throwable? {
-        val useCase = touchTeamPresence ?: return null
+        val useCase = touchTeamPresenceFor(settings.id) ?: return null
 
         return useCase(
             accountKey = target.accountKey,
@@ -490,7 +523,7 @@ internal class TeamSyncService(
         settings: TeamIntegrationSettings,
         target: TeamSyncTarget
     ): Throwable? {
-        if (confirmedIdentityByAccount[target.accountKey] == settings.confirmedIdentity(target)) {
+        if (confirmedIdentityByTeamAccount[settings.id to target.accountKey] == settings.confirmedIdentity(target)) {
             return null
         }
 
@@ -509,9 +542,9 @@ internal class TeamSyncService(
             turns = emptyList()
         )
 
-        val failure = pushTeamUsage(payload, force = true).exceptionOrNull()
+        val failure = pushTeamUsageFor(settings.id)(payload, force = true).exceptionOrNull()
         if (failure == null) {
-            confirmedIdentityByAccount[target.accountKey] = settings.confirmedIdentity(target)
+            confirmedIdentityByTeamAccount[settings.id to target.accountKey] = settings.confirmedIdentity(target)
         }
         return failure
     }

@@ -1847,6 +1847,10 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
       <div class="metric"><span class="k">Custo estimado</span><span class="v big">US$ 14,2092</span></div>
     </div>
 
+    <div class="hstack" style="margin:8px 0">
+      <button class="btn ghost" type="button">Time: Empresa ▾</button>
+      <span class="k">#547: o seletor só aparece com 2+ times ativos; cada time mostra só o seu servidor.</span>
+    </div>
     <div class="colhead">
       <span style="width:180px">Integrante</span><span style="width:60px">Sessões</span>
       <span style="width:136px">Tokens (com cache)</span><span style="width:96px">Custo</span>
@@ -2456,39 +2460,78 @@ o caso da chave que expirou, em que não há uma nova para digitar.</p>
 </div>
 <p class="note"><b>Contas Codex extras (issue #329).</b> Um card e um anel da HUD por conta, com o título "Codex — &lt;nome da pasta&gt;"; a conta padrão continua sendo o card "Codex" de sempre, sem perfil, e a ordem de cards, o backoff e o cache antigos continuam valendo. Escopo aprovado: sem apelido editável, cor, emoji, filtro de sessões CLI ou envio ao time por conta — isso é da Anthropic. Diretório sem <code>auth.json</code> ou igual ao da conta padrão é recusado com o motivo num aviso acima da lista.</p>
 <h2 id="cfg-time">12e · Configurações — Time</h2>
-<div class="g2">
-  <div>
-    <div class="cap">Integração ativa</div>
-    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
-      <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw on"></span></div>
-      <div class="pbody">
-        <div class="stack"><span class="k">Servidor</span><input class="field" value="https://usage.example.com"></div>
-        <div class="stack"><span class="k">Chave de time</span><input class="field" type="password" value="um_sk_exemplo_nao_use"></div>
-        <div class="stack"><span class="k">Apelido</span><input class="field" value="dev-01"></div>
-        <div class="hstack"><button class="btn" type="button">Testar conexão</button><span class="st ok">Conexão confirmada.</span></div>
-        <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)"><span class="v sm" style="flex:1">Padrão — dev@example.com</span><span class="k">participa</span><span class="sw on"></span></div>
-        <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)"><span class="v sm" style="flex:1">Sandbox — qa@example.com</span><span class="k">não participa</span><span class="sw"></span></div>
+<div class="win" style="max-width:none"><div class="titlebar"><span class="t">Configurações — Time</span></div><div class="body">
+  <div class="panel">
+    <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw on"></span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:var(--s3);align-items:start">
+    <div class="stack">
+      <div class="panel">
+        <div class="phead"><span class="ptitle">Times</span><span class="sp"></span><span class="k">2 configurados</span></div>
+        <div class="pbody flush">
+          <div class="row" aria-current="true" style="background:var(--raised)">
+            <div class="stack" style="gap:0;flex:1"><span class="v sm">Empresa</span><span class="dim v sm">usage.empresa.com.br</span></div>
+            <span class="st crit">Recusada</span>
+          </div>
+          <div class="row">
+            <div class="stack" style="gap:0;flex:1"><span class="v sm">Pessoal</span><span class="dim v sm">time.exemplo.com</span></div>
+            <span class="st ok">Conectado</span>
+          </div>
+        </div>
       </div>
-    </div></div></div>
-  </div>
-  <div>
-    <div class="cap">Integração inativa</div>
-    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
-      <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw"></span></div>
-      <div class="pbody"><div class="state" style="padding:32px var(--s4)">
-        <span class="msg">Recurso opcional, desligado por padrão.</span>
-        <span class="msg dim">Só metadados de uso são enviados — nunca conteúdo de prompt ou resposta.</span>
-      </div></div>
-    </div></div></div>
-    <div class="cap">Modo administrativo</div>
-    <div class="win mid" style="max-width:none"><div class="body"><div class="panel">
-      <div class="phead"><span class="ptitle">Administração</span><span class="sp"></span><span class="st ok">Token validado</span></div>
-      <div class="pbody"><div class="hstack"><input class="field" type="password" value="admin_token_exemplo"><button class="btn" type="button">Validar</button></div>
-      <div class="hstack"><button class="btn" type="button">Gerenciar chaves</button><button class="btn ghost" type="button">Sair do modo admin</button></div></div>
-    </div></div></div>
-  </div>
-</div>
+      <button class="btn" type="button" style="width:100%;justify-content:center">Adicionar time</button>
+    </div>
 
+    <div class="panel">
+      <div class="phead"><span class="ptitle">Time Empresa</span><span class="sp"></span><span class="k">apelido EDILSON</span></div>
+      <div class="pbody">
+        <div class="stack"><span class="k">Nome do time</span><input class="field" value="Empresa"></div>
+        <div class="stack"><span class="k">Servidor</span><input class="field" value="https://usage.empresa.com.br"></div>
+        <div class="stack"><span class="k">Chave do time</span>
+          <div class="hstack"><input class="field" type="password" value="um_sk_exemplo_nao_use" style="flex:1"><button class="btn" type="button" aria-pressed="false">Revelar</button></div>
+          <span class="dim v sm">A chave fica em ~/.usage-monitor/team.json, fora das preferências.</span>
+        </div>
+        <div class="stack"><span class="k">Seu apelido</span><input class="field" value="EDILSON"></div>
+
+        <div class="stack"><span class="k">Contas que participam</span>
+          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
+            <div class="stack" style="gap:0;flex:1"><span class="v sm">Padrão · pessoal@exemplo.com</span><span class="dim v sm">No time Pessoal — ligar aqui move para este time</span></div>
+            <span class="sw" role="switch" aria-checked="false" aria-label="Padrão participa do time Empresa"></span>
+          </div>
+          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
+            <span class="v sm" style="flex:1">INFORMATA · sem login</span>
+            <span class="sw" role="switch" aria-checked="false" aria-label="INFORMATA participa do time Empresa"></span>
+          </div>
+          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
+            <span class="v sm" style="flex:1">Lightshot · sem login</span>
+            <span class="sw" role="switch" aria-checked="false" aria-label="Lightshot participa do time Empresa"></span>
+          </div>
+          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
+            <span class="v sm" style="flex:1">TRABALHO · dev@empresa.com.br</span>
+            <span class="sw on" role="switch" aria-checked="true" aria-label="TRABALHO participa do time Empresa"></span>
+          </div>
+        </div>
+
+        <div class="stack" style="border-top:1px solid var(--border);padding-top:var(--s3)">
+          <div class="hstack"><button class="btn" type="button">Testar conexão</button></div>
+          <span class="st crit">Chave recusada: limite de contas da chave atingido (1).</span>
+        </div>
+
+        <div class="stack" style="border-top:1px solid var(--border);padding-top:var(--s3)">
+          <div class="hstack"><span class="v sm" style="flex:1">Eu administro este servidor</span><span class="st ok">Modo admin</span></div>
+          <div class="stack"><span class="k">Token de administrador</span>
+            <div class="hstack"><input class="field" type="password" value="adm_token_exemplo" style="flex:1"><button class="btn" type="button">Validar</button></div>
+          </div>
+          <div class="hstack"><button class="btn" type="button">Gerenciar chaves de conta</button><button class="btn ghost" type="button">Sair do modo admin</button></div>
+        </div>
+
+        <div class="hstack" style="justify-content:flex-end;border-top:1px solid var(--border);padding-top:var(--s3)"><button class="btn danger" type="button">Remover time</button></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<p class="note"><b>#547 — mestre-detalhe.</b> A seção Time lista os times configurados (nome e estado) e abre um deles no detalhe acima: servidor, chave, apelido, conexão e participação por conta. Times são criados, renomeados e removidos aqui; cada um tem a própria conexão e o próprio modo administrativo. Os cards do time na aba Uso abrem a janela de uso do time selecionado.</p>
 <h2 id="cfg-web">12g · Configurações — Acesso pela rede local e HUD no navegador</h2>
 <p class="note"><b>#388, direção R3 — grade de anéis.</b> Seção abaixo do Proxy na aba <b>Rede</b> (sem aba nova:
 <code>SettingsTab</code> não ganha valor). Interruptor no cabeçalho, nasce desligado. Ligado mostra estado (ponto e
