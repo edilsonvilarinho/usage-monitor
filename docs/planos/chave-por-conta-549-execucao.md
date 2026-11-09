@@ -62,6 +62,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue create` → #549; varredura do `explorer` (caminhos acima) |
+| A02 | `accountApiKeys` (profileId → chave), `apiKeyFor` (própria aparada, senão a do time), `isConfigured` aceita time sem chave quando toda participante tem a sua, `toString` mascara os valores | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.TeamIntegrationSettingsTest"` → 3 falhas na asserção (`:32 expected:<chave-[conta-1]> but was:<chave-[time]>`, `:65 Expected value to be true.`); verde: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` → 558 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
