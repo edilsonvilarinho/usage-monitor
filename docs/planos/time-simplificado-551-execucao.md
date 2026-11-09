@@ -1,0 +1,61 @@
+# Configurações › Time em etapas, chave por e-mail — issue #551
+
+Procedência: Claude Opus 5.5 (orquestradora), Claude Code CLI no Windows 11, 2026-11-09, branch
+`feat/issue-551-team-steps`, commits com a identidade `claude <claude@anthropic.com>`. Implementação pelos agentes
+`backend-dev`/`frontend-dev` (modelo no frontmatter de `.claude/agents/`).
+
+## Objetivo
+
+Depois da #549 a seção Time ficou um formulário longo (nome, servidor, chave do time, apelido, contas com campo de chave
+dentro da linha, teste, admin, remover) e o dono a achou complexa. Além disso o modelo mental certo, dito pelo dono, é
+**a chave é do e-mail**: um servidor tem N e-mails, cada um com a sua chave. A #551 reorganiza a seção na direção
+**AN2 · Etapas** (rodada AN, `prototipos/issue-551/index.html`) e tira o campo "Chave do time" da tela.
+
+## Fatos confirmados (2026-11-09, `cb72b244`)
+
+- `TeamIntegrationSettings.apiKeyFor` (#549) cai na chave do time sempre que a conta não tem a sua — uma conta recém-
+  ligada herdaria a chave de outra pessoa (o servidor recusa por rótulo de e-mail, 403).
+- `SettingsActions.changeTeamProfileParticipation` (`:386`) liga/desliga a conta; `changeTeamAccountKey` (#549) grava a
+  chave própria.
+- `TeamSyncService.kt:330` só filtra por `participates`; não há guarda para conta sem chave.
+- `TeamIntegrationSection.kt` 634 linhas; `AppExpandable` existe em `AppStates.kt:562` (bloco recolhível).
+- Escolha do dono: AN2 (2026-11-09), casos A/B/C no protótipo.
+
+## Decisões
+
+- **Modo legado preservado (zero impacto):** enquanto `accountApiKeys` está vazio, `apiKeyFor` cai na chave do time
+  como hoje. Assim que existe ao menos uma chave por conta, **não há mais queda**: conta sem chave própria fica sem chave.
+- **Materialização:** a primeira edição de chave ou a primeira conta ligada pela tela nova copia a chave do time para
+  cada conta já participante sem chave própria (`withOwnKeysMaterialized()`), e só então aplica a mudança. A chave do
+  time continua gravada (downgrade lê dela).
+- **Conta ligada sem chave não envia nada** (ingest, presença, `claim`): status escrito "falta a chave".
+- **Tela (AN2):** 1 Conexão (nome, servidor, apelido, Testar conexão, status), 2 Contas (nome, e-mail, chave mascarada
+  com olho, status escrito, interruptor; conta ligada sem chave mostra campo "Cole a chave deste e-mail"), 3
+  Administração (bloco admin atual). Bloco fechado mostra uma linha de resumo. Abre em Contas se o servidor está
+  preenchido, senão em Conexão. "Chave do time" some da tela; o campo da conta mostra `apiKeyFor` (no legado, a chave
+  antiga).
+- Sem token, primitiva ou valor de enum novo: blocos com `AppExpandable` e primitivas existentes.
+
+## Atividades
+
+| Id | O quê | Dono |
+|---|---|---|
+| A01 | Este plano | Neferpitou |
+| A02 | Domain: queda só no legado, `withOwnKeysMaterialized()`, `isConfigured` | backend-dev |
+| A03 | Envio, presença e `claim` pulam conta sem chave; status "falta a chave" | backend-dev |
+| A04 | `SettingsActions`: ligar conta e gravar chave materializam o legado antes | backend-dev |
+| A05 | Tela em etapas (AN2) + protótipo `#cfg-time`, `Settings.jsx` e tabela da rodada AN na skill | frontend-dev |
+| A06 | `docs/team-integration.md` e `docs/presentation.md` | Neferpitou |
+
+## Ponto de situação
+
+Cada linha é escrita no commit da atividade que descreve, com o comando executado e o resultado.
+
+| Atividade | Alteração | Comando e resultado |
+|---|---|---|
+| A01 | Plano com fatos, decisões e atividades | `gh issue create` → #551; galeria AN aprovada pelo dono (AN2) |
+
+## Problemas em aberto e riscos
+
+- Downgrade depois da materialização: a versão anterior usa a chave do time para todas as contas ligadas (o que já fazia).
+- CLI (`team join`) e TUI continuam com a chave do time.
