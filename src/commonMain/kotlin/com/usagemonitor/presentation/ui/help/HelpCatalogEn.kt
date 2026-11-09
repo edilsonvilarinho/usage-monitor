@@ -176,8 +176,8 @@ private val EN_TEAM = HelpEntry(
         "metadata travels — no prompt or reply content.",
     steps = listOf(
         "Open Settings → \"Team\" and turn the integration on.",
-        "Fill in \"Server\", \"Team key\" and \"Your alias\".",
-        "Tick the accounts under \"Accounts in the team\".",
+        "Fill in \"Server\" and \"Your alias\".",
+        "Under \"Accounts\", tick each account and enter its \"Account key\".",
         "Click \"Test connection\": that is what binds the account to the key.",
         "The account card gains the \"Team sessions in this account\" button."
     ),

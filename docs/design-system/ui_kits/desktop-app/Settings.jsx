@@ -11,6 +11,24 @@ function Slider({ label, value, min, max, unit, onChange }) {
   );
 }
 
+const TEAM_ACCOUNT_ROW = { display: 'flex', alignItems: 'center', gap: 'var(--s3)', padding: 'var(--s2) var(--s3)', border: '1px solid var(--border)', borderRadius: 'var(--r2)' };
+
+function TeamStep({ num, title, summary, open = false, children }) {
+  const [expanded, setExpanded] = React.useState(open);
+  return (
+    <div style={{ borderTop: '1px solid var(--border)' }}>
+      <div role="button" tabIndex={0} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', padding: 'var(--s2) 0', cursor: 'pointer' }}>
+        <span style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}>{expanded ? '▾' : '▸'}</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--t12)' }}>{num}</span>
+        <AppValue size="sm" style={{ flex: 1 }}>{title}</AppValue>
+        <AppValue size="sm" dim>{summary}</AppValue>
+      </div>
+      {expanded ? <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)', paddingBottom: 'var(--s3)' }}>{children}</div> : null}
+    </div>
+  );
+}
+
 const APIS = [
   { nome: 'Anthropic', source: 'anthropic', origem: 'GET api.anthropic.com/api/oauth/usage', req: '~/.claude/.credentials.json', on: true },
   { nome: 'Codex', source: 'codex', origem: 'GET chatgpt.com/backend-api/codex/usage', req: '~/.codex/auth.json + cap_sid', on: true },
@@ -212,20 +230,51 @@ export function Settings() {
                 <AppValue>Pessoal — {team ? 'ativo' : 'desligado'}</AppValue>
               </AppDataRow>
               <AppSwitch checked={team} onChange={setTeam} label="Integração com time" hint="Recurso opcional, desligado por default. A empresa opera o servidor; não há serviço gerenciado. Mestre-detalhe (#547): a lista acima escolhe o time aberto." />
-              <AppTextField label="Servidor" placeholder="https://usage.example.com" disabled={!team} />
-              <AppTextField label="Chave" type="password" value={team ? '••••••••••••' : ''} disabled={!team}
-                hint="Guardada em ~/.usage-monitor/team.json com permissão restrita ao dono — não vai para as preferências do registro." />
-              <AppTextField label="Apelido" placeholder="ana" disabled={!team} />
-              <AppKey>Contas que participam</AppKey>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
-                <AppSwitch checked={team} disabled={!team} reason="Ligue a integração com time primeiro." label="dev@example.com — Example Org" />
-                {team ? (
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--s1)', marginLeft: 38 }}>
-                    <AppTextField label="Chave da conta" type="password" placeholder="Usa a chave do time" style={{ flex: 1 }} />
-                    <AppIconButton variant="ghost" glyph="◉" label="Mostrar chave" />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <TeamStep num={1} title="Conexão" summary={team ? 'Não testado' : 'Desligado'}>
+                  <AppTextField label="Nome do time" placeholder="Empresa" disabled={!team} />
+                  <AppTextField label="Servidor" placeholder="https://usage.example.com" disabled={!team} />
+                  <AppTextField label="Seu apelido" placeholder="ana" disabled={!team} />
+                  <div><AppButton variant="ghost">Testar conexão</AppButton></div>
+                </TeamStep>
+                <TeamStep num={2} title="Contas" summary={team ? '2 de 3 ligadas' : 'Desligado'} open>
+                  <div style={TEAM_ACCOUNT_ROW}>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                      <AppValue size="sm">Padrão</AppValue>
+                      <AppKey>pessoal@exemplo.com</AppKey>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--s1)', flex: 1 }}>
+                      <AppTextField label="Chave da conta" type="password" value="um_sk_exemplo_nao_use" style={{ flex: 1 }} />
+                      <AppIconButton variant="ghost" glyph="◉" label="Mostrar chave" />
+                    </div>
+                    <AppStatusIndicator level="ok">ligada</AppStatusIndicator>
+                    <AppSwitch checked={true} disabled={!team} />
                   </div>
-                ) : null}
-                <AppSwitch checked={false} disabled={!team} reason="Ligue a integração com time primeiro." label="qa@example.com — Example Org (Sandbox)" />
+                  <div style={TEAM_ACCOUNT_ROW}>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                      <AppValue size="sm">TRABALHO</AppValue>
+                      <AppKey>dev@empresa.com.br</AppKey>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--s1)', flex: 1 }}>
+                      <AppTextField label="Chave da conta" placeholder="Cole a chave deste e-mail" style={{ flex: 1 }} />
+                      <AppIconButton variant="ghost" glyph="◉" label="Mostrar chave" />
+                    </div>
+                    <AppStatusIndicator level="warn">falta a chave</AppStatusIndicator>
+                    <AppSwitch checked={true} disabled={!team} />
+                  </div>
+                  <div style={TEAM_ACCOUNT_ROW}>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                      <AppValue size="sm">INFORMATA</AppValue>
+                      <AppKey>sem login</AppKey>
+                    </div>
+                    <AppStatusIndicator level="off">desligada</AppStatusIndicator>
+                    <AppSwitch checked={false} disabled={!team} />
+                  </div>
+                </TeamStep>
+                <TeamStep num={3} title="Administração" summary="Desligado">
+                  <AppSwitch checked={false} disabled={!team} reason="Ligue a integração com time primeiro." label="Eu administro este servidor" />
+                  <div><AppButton variant="ghost">Gerenciar chaves de conta</AppButton></div>
+                </TeamStep>
               </div>
             </React.Fragment>
           ) : null}

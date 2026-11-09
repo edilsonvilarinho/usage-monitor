@@ -401,7 +401,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
      * diálogo aqui devolveria de novo a captura de [settings], com a seção de
      * time fora do quadro.
      */
-    fun settingsTeam() = capture("settings-team", widthDp = 620, heightDp = 610) {
+    fun settingsTeam() = capture("settings-team", widthDp = 620, heightDp = 680) {
         // Sem envoltório: a seção ja monta o próprio painel com borda, e o
         // `Surface` com alpha que existia aqui era um quinto degrau de
         // superfície — inventado pela captura, ausente do app.

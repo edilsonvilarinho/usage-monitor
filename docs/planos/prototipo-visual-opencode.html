@@ -2462,7 +2462,7 @@ o caso da chave que expirou, em que não há uma nova para digitar.</p>
 <h2 id="cfg-time">12e · Configurações — Time</h2>
 <div class="win" style="max-width:none"><div class="titlebar"><span class="t">Configurações — Time</span></div><div class="body">
   <div class="panel">
-    <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw on"></span></div>
+    <div class="phead"><span class="ptitle">Integração com time</span><span class="sp"></span><span class="sw on" role="switch" aria-checked="true" aria-label="Integração com time"></span></div>
   </div>
   <div style="display:grid;grid-template-columns:280px 1fr;gap:var(--s3);align-items:start">
     <div class="stack">
@@ -2484,45 +2484,43 @@ o caso da chave que expirou, em que não há uma nova para digitar.</p>
 
     <div class="panel">
       <div class="phead"><span class="ptitle">Time Empresa</span><span class="sp"></span><span class="k">apelido EDILSON</span></div>
-      <div class="pbody">
-        <div class="stack"><span class="k">Nome do time</span><input class="field" value="Empresa"></div>
-        <div class="stack"><span class="k">Servidor</span><input class="field" value="https://usage.empresa.com.br"></div>
-        <div class="stack"><span class="k">Chave do time</span>
-          <div class="hstack"><input class="field" type="password" value="um_sk_exemplo_nao_use" style="flex:1"><button class="btn" type="button" aria-pressed="false">Revelar</button></div>
-          <span class="dim v sm">A chave fica em ~/.usage-monitor/team.json, fora das preferências.</span>
+      <div class="pbody flush">
+        <div class="row">
+          <span class="dim">▸</span>
+          <span class="k">1</span>
+          <span class="v sm" style="flex:1">Conexão</span>
+          <span class="st crit">Recusada</span>
         </div>
-        <div class="stack"><span class="k">Seu apelido</span><input class="field" value="EDILSON"></div>
-
-        <div class="stack"><span class="k">Contas que participam</span>
+        <div class="row" style="background:var(--raised)">
+          <span class="dim">▾</span>
+          <span class="k">2</span>
+          <span class="v sm" style="flex:1">Contas</span>
+          <span class="dim v sm">2 de 3 ligadas</span>
+        </div>
+        <div class="stack" style="padding:var(--s3);border-bottom:1px solid var(--border)">
           <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
-            <div class="stack" style="gap:0;flex:1"><span class="v sm">Padrão · pessoal@exemplo.com</span><span class="dim v sm">No time Pessoal — ligar aqui move para este time</span></div>
-            <span class="sw" role="switch" aria-checked="false" aria-label="Padrão participa do time Empresa"></span>
+            <div class="stack" style="gap:0;flex:1;min-width:0"><span class="v sm">Padrão</span><span class="dim v sm">pessoal@exemplo.com</span></div>
+            <div class="hstack" style="flex:1"><input class="field" type="password" value="um_sk_exemplo_nao_use" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div>
+            <span class="st ok">ligada</span>
+            <span class="sw on" role="switch" aria-checked="true" aria-label="Padrão participa do time Empresa"></span>
           </div>
           <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
-            <span class="v sm" style="flex:1">INFORMATA · sem login</span>
-            <span class="sw" role="switch" aria-checked="false" aria-label="INFORMATA participa do time Empresa"></span>
-          </div>
-          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
-            <span class="v sm" style="flex:1">Lightshot · sem login</span>
-            <span class="sw" role="switch" aria-checked="false" aria-label="Lightshot participa do time Empresa"></span>
-          </div>
-          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
-            <div class="stack" style="gap:0;flex:1"><span class="v sm">TRABALHO · dev@empresa.com.br</span><div class="stack" style="gap:var(--s1);padding-top:var(--s1)"><span class="k">Chave da conta</span><div class="hstack"><input class="field" type="password" placeholder="Usa a chave do time" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div></div></div>
+            <div class="stack" style="gap:0;flex:1;min-width:0"><span class="v sm">TRABALHO</span><span class="dim v sm">dev@empresa.com.br</span></div>
+            <div class="hstack" style="flex:1"><input class="field" placeholder="Cole a chave deste e-mail" style="flex:1"><button class="btn ghost icon" type="button" aria-label="Mostrar chave">◉</button></div>
+            <span class="st warn">falta a chave</span>
             <span class="sw on" role="switch" aria-checked="true" aria-label="TRABALHO participa do time Empresa"></span>
           </div>
-        </div>
-
-        <div class="stack" style="border-top:1px solid var(--border);padding-top:var(--s3)">
-          <div class="hstack"><button class="btn" type="button">Testar conexão</button></div>
-          <span class="st crit">Chave recusada: limite de contas da chave atingido (1).</span>
-        </div>
-
-        <div class="stack" style="border-top:1px solid var(--border);padding-top:var(--s3)">
-          <div class="hstack"><span class="v sm" style="flex:1">Eu administro este servidor</span><span class="st ok">Modo admin</span></div>
-          <div class="stack"><span class="k">Token de administrador</span>
-            <div class="hstack"><input class="field" type="password" value="adm_token_exemplo" style="flex:1"><button class="btn" type="button">Validar</button></div>
+          <div class="row" style="border:1px solid var(--border);border-radius:var(--r2)">
+            <div class="stack" style="gap:0;flex:1;min-width:0"><span class="v sm">INFORMATA</span><span class="dim v sm">sem login</span></div>
+            <span class="dim v sm">desligada</span>
+            <span class="sw" role="switch" aria-checked="false" aria-label="INFORMATA participa do time Empresa"></span>
           </div>
-          <div class="hstack"><button class="btn" type="button">Gerenciar chaves de conta</button><button class="btn ghost" type="button">Sair do modo admin</button></div>
+        </div>
+        <div class="row">
+          <span class="dim">▸</span>
+          <span class="k">3</span>
+          <span class="v sm" style="flex:1">Administração</span>
+          <span class="st ok">Modo admin</span>
         </div>
 
         <div class="hstack" style="justify-content:flex-end;border-top:1px solid var(--border);padding-top:var(--s3)"><button class="btn danger" type="button">Remover time</button></div>
@@ -2531,7 +2529,7 @@ o caso da chave que expirou, em que não há uma nova para digitar.</p>
   </div>
 </div></div>
 
-<p class="note"><b>#547 — mestre-detalhe.</b> A seção Time lista os times configurados (nome e estado) e abre um deles no detalhe acima: servidor, chave, apelido, conexão e participação por conta. Times são criados, renomeados e removidos aqui; cada um tem a própria conexão e o próprio modo administrativo. Os cards do time na aba Uso abrem a janela de uso do time selecionado.</p>
+<p class="note"><b>#551 — etapas.</b> O detalhe do time vira três blocos numerados e recolhíveis, com ▾ para aberto e ▸ para fechado; um bloco aberto por vez. 1 Conexão: nome do time, servidor, apelido e Testar conexão; o resumo mostra o último resultado. 2 Contas: uma linha por conta, com nome, e-mail, chave mascarada com olho, status escrito (ligada, falta a chave ou desligada) e interruptor; conta desligada não mostra campo de chave. 3 Administração: resumo Modo admin ou Desligado. Não há campo "Chave do time": cada conta tem a própria chave. <b>#547 — mestre-detalhe.</b> A seção Time lista os times configurados (nome e estado) e abre um deles no detalhe acima. Times são criados, renomeados e removidos aqui; cada um tem a própria conexão e o próprio modo administrativo. Os cards do time na aba Uso abrem a janela de uso do time selecionado.</p>
 <h2 id="cfg-web">12g · Configurações — Acesso pela rede local e HUD no navegador</h2>
 <p class="note"><b>#388, direção R3 — grade de anéis.</b> Seção abaixo do Proxy na aba <b>Rede</b> (sem aba nova:
 <code>SettingsTab</code> não ganha valor). Interruptor no cabeçalho, nasce desligado. Ligado mostra estado (ponto e
