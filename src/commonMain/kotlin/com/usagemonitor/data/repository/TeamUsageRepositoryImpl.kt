@@ -274,12 +274,30 @@ class TeamUsageRepositoryImpl(
  * A chave de time vem primeiro: quem tem as duas é o admin que também participa
  * de um time, e nesse caso a leitura precisa ser a do time dele — usar o token
  * de admin mascararia um vínculo errado, que é justamente o que a tela quer
- * denunciar.
+ * denunciar. Sem chave de time, vale a chave própria de uma conta participante.
  */
 private fun TeamIntegrationSettings.readCredential(): TeamCredential? {
+    val teamOrAccountKey = readTeamOrAccountKey()
     return when {
-        isActive -> TeamCredential.TeamKey(apiKey)
+        teamOrAccountKey != null -> TeamCredential.TeamKey(teamOrAccountKey)
         isAdminMode -> TeamCredential.AdminToken(adminToken)
         else -> null
     }
+}
+
+/**
+ * Chave de leitura quando a integração está ativa: a do time, se informada; senão
+ * a própria da primeira conta participante, em ordem alfabética de `profileId`,
+ * para a escolha ser a mesma a cada leitura.
+ */
+private fun TeamIntegrationSettings.readTeamOrAccountKey(): String? {
+    if (!isActive) {
+        return null
+    }
+    if (apiKey.isNotBlank()) {
+        return apiKey
+    }
+    return participatingProfileIds.sorted()
+        .map { apiKeyFor(it) }
+        .firstOrNull { it.isNotBlank() }
 }
