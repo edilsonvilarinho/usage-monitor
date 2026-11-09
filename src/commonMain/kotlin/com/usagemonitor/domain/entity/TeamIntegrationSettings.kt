@@ -28,12 +28,17 @@ data class TeamIntegrationSettings(
      * fora de [isConfigured] — exigir apelido e chave de time para administrar
      * obrigaria o admin a se inscrever num time do qual ele não participa.
      */
-    val adminToken: String = ""
+    val adminToken: String = "",
+    /** Identificador estável do time, gerado uma vez; sobrevive a renomear. */
+    val id: String = "",
+    /** Nome do time exibido ao usuário. */
+    val name: String = ""
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =
         "TeamIntegrationSettings(enabled=$enabled, serverUrl=$serverUrl, apiKey=${redactedSecret(apiKey)}, alias=$alias, " +
-            "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)})"
+            "deviceId=$deviceId, participatingProfileIds=$participatingProfileIds, adminToken=${redactedSecret(adminToken)}, " +
+            "id=$id, name=$name)"
 
     /** Sem a barra final, para concatenar o caminho sem gerar `//`. */
     val normalizedServerUrl: String

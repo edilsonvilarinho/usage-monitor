@@ -72,6 +72,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue comment 547` → comentário 6742060751; varredura do `explorer` (caminhos acima) |
+| A02 | `TeamIntegrations` (agregado, participação exclusiva, `enabled`/`deviceId` da instalação) e `id`/`name` no time | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*"` → `TeamIntegrationsTest` 10 de 17 falhando na asserção (ex.: `toString do agregado nao expoe chave nem token de admin FAILED`); verde: mesmo comando → 550 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
