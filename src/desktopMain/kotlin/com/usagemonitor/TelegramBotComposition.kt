@@ -5,6 +5,7 @@ import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.data.datasource.TelegramBotApi
 import com.usagemonitor.data.datasource.resolveLocalHostName
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
+import com.usagemonitor.domain.entity.AnalysisPeriod
 import com.usagemonitor.domain.entity.TelegramDailySpend
 import com.usagemonitor.domain.entity.TelegramPing
 import kotlin.time.Instant
@@ -108,7 +109,7 @@ private fun createTelegramBotService(
         appReady = { graph.appAnchored.first { anchored -> anchored } },
         releaseNotes = { version, previous -> GetReleaseNotesUseCase(graph.appUpdateRepository)(version, previous) },
         sourceHealth = { sourceHealthOf(dashboard.uiState.value) },
-        sessionAnalysis = sessionAnalysisReader(graph, dashboard),
+        sessionAnalysis = { key -> sessionAnalysisReader(graph, dashboard)(key, AnalysisPeriod.NOW) },
         exportUsage = { since, format ->
             graph.cliSessionRepository.getUsageBreakdown(profileId = null, sinceEpochMillis = since).getOrNull()?.let { breakdown ->
                 // Projeto, branch e integrante ficam fora: o arquivo sai do PC para o Telegram.

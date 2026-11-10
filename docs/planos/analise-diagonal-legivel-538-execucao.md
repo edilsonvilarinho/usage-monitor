@@ -28,8 +28,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 - Período é tipo novo do domain (`AnalysisPeriod`), não valor novo em `HistoryRange`; 90 d lê `HistoryRange.TOTAL`
   (a retenção corta em 90 d) e o domain recorta pelo início do período.
 - `buildSessionAnalysis` ganha `period` com default `NOW`: CLI/TUI e Telegram ficam como estão.
-- "Agora" mantém até 3 janelas anteriores (comportamento atual); nos outros períodos entram todas as janelas fechadas
-  dentro do período, com resumo: quantidade, quantas esgotaram, pico médio. Número que o histórico não tem não é derivado.
+- A diagonal desenha até 3 janelas anteriores em qualquer período (comportamento atual); os períodos longos acrescentam
+  o resumo das janelas fechadas no período: quantidade, quantas esgotaram, pico médio. Número que o histórico não tem não é derivado.
 - Barras seguem o período: 24 h por hora (atual), 7 d pico por dia, 30/90 d pico por semana.
 - Resumo e barras de 30/90 d contam janelas **fechadas cujo reinício** ≥ início do período (mais a aberta nas barras): em 7 d a semana anterior entra; corte de janelas pelo canônico `splitIntoQuotaWindows`, nunca por `groupBy(periodEndAt)` (reinício que oscila partiria a janela).
 - Tabela de ritmo: 5 linhas atuais em todo período + linha do período em 30/90 d (`AnalysisPeriodRate`); sem valor novo em `AnalysisSpan`.
@@ -41,8 +41,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 |---|---|---|
 | A01 | Este plano | Neferpitou |
 | A02 | Domain: `AnalysisPeriod`, janelas do período, resumo e barras por período em `buildSessionAnalysis` (TDD em commonTest) | backend-dev |
-| A03 | Leitor: `sessionAnalysisReader` recebe o período e escolhe a faixa de histórico (TDD em `SessionAnalysisReaderTest`) | backend-dev |
-| A04 | ViewModel + modelos: período no `AnalysisViewModel`; veredito com ritmo usado, legenda, rótulo "agora", valor no reinício em `PaceDiagonalModel`/`AnalysisPanelModel` | frontend-dev |
+| A03 | Leitor + `AnalysisViewModel`: `sessionAnalysisReader` recebe o período e escolhe a faixa; o view model guarda o período (juntos para o commit compilar) | backend-dev |
+| A04 | Modelos: veredito com ritmo usado, legenda, rótulo "agora", valor no reinício em `PaceDiagonalModel`/`AnalysisPanelModel` | frontend-dev |
 | A05 | Compose: seletor segmentado, legenda e rótulos no `PaceDiagonalChart`, resumo, barras por período (teste de tela) | frontend-dev |
 | A06 | Registro: seção 9d do `prototipo-visual-opencode.html`, `docs/design-system/` e `docs/presentation.md` | prototype-dev |
 
@@ -53,6 +53,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 | A01 | sem harness de teste (plano); validado por leitura dos ponteiros acima com `grep -n` | plano criado |
 | A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.SessionAnalysisPeriodTest"` | `SessionAnalysisPeriodTest.kt:105` `expected:<AnalysisPeriodSummary(windowCount=3, exhaustedCount=1, meanPeakPercent=83)> but was:<null>`; `:132` `expected:<[40, 100, 80, 100, 41]> but was:<[100, 80, 100, 41]>`; jitter de 30 s `expected:<1> but was:<2>` |
 | A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.architecture.*"` | BUILD SUCCESSFUL, 609 testes, 0 falhas (73 suítes) |
+| A03 | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.SessionAnalysisReaderTest --tests com.usagemonitor.presentation.* --tests com.usagemonitor.architecture.*` | 1122 testes, 5 falhas na asserção (`AssertionError`): `SessionAnalysisReaderTest.kt:142` faixa por período, `:153` recorte de 30 d, `:163` período na análise; `AnalysisViewModelTest.kt:141` troca de período relê, `:176` releitura ao vivo com o período |
+| A03 | verde: mesmo comando | BUILD SUCCESSFUL, 1122 testes, 0 falhas; `TelegramBotComposition.kt` passa `AnalysisPeriod.NOW` (bot inalterado) |
 
 ## Problemas em aberto e riscos
 
