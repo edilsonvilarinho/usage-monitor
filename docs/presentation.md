@@ -208,6 +208,18 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   arquivo, gravado pelo `UsageExportWriter` com o payload novo `UsageExportPayload.Binary` (bytes prontos; não é `data
   class`). Cancelar o diálogo não publica nada; salvo ou falha vira `AppBanner`, como na Comparação.
 
+## Análise: diagonal legível e período (#538)
+
+Plano em `docs/planos/analise-diagonal-legivel-538-execucao.md`; direção P1 em `prototipos/issue-538/p1-diagonal-legivel/index.html`.
+
+- **Período** é tipo de domínio novo (`AnalysisPeriod`: agora, 24 h, 7 d, 30 d, 90 d), não valor de `HistoryRange`: 90 d lê `HistoryRange.TOTAL`, 30 d lê `LAST_30_DAYS`. `buildSessionAnalysis` recebe `period` (padrão agora); o seletor vive no `AnalysisViewModel`.
+- **Diagonal**: a janela aberta é a linha cheia; até três janelas anteriores ficam atrás, em cinza. Legenda explícita, marcador "agora" rotulado e valor projetado no reinício.
+- **Veredito** numa frase que diz o ritmo usado (ex.: "No ritmo da última hora, esgota por volta de 21:20").
+- **Período longo** (30 d e 90 d): resumo das janelas fechadas (quantidade, esgotadas, pico médio) e linha do período na tabela (`AnalysisPeriodRate`).
+- **Barras** seguem o período: 24 h por hora, 7 d pico por dia, 30 d e 90 d pico por semana.
+- **Contagem**: resumo e barras contam janelas fechadas com reinício ≥ início do período, via `splitIntoQuotaWindows`, não `groupBy(periodEndAt)`.
+- **Texto** novo passa por `localized`.
+
 ## Guia de introdução e dica do dia (#411)
 
 Plano e pontos de situação em `docs/planos/issues-411-412-execucao.md`; galeria da rodada AC em
