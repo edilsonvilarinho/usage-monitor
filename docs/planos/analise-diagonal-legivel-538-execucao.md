@@ -60,6 +60,9 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 | A04 | verde: `gradlew.bat desktopTest --tests com.usagemonitor.presentation.* --tests com.usagemonitor.architecture.*` | BUILD SUCCESSFUL, 1118 testes, 0 falhas. Decisão: `verdict` curto continua (pílula, TUI, Telegram — `TuiAnalysisViewTest.kt:58` exige) e `verdictSentence` novo leva a frase longa |
 | A05a | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.ui.AnalysisScreenTest --tests com.usagemonitor.architecture.*` | `AnalysisScreenTest.kt:37` `Expected exactly '1' node ... 'Projeção de 83 % no reinício, abaixo dos 100 %.'` |
 | A05a | verde: mesmo comando | BUILD SUCCESSFUL, 22 testes (5 de tela + 17 de arquitetura), 0 falhas. A frase antiga ("62% used with 70%…") sai da tela e fica só na descrição do gráfico, como no protótipo |
+| A05b | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.ui.AnalysisScreenTest --tests com.usagemonitor.architecture.*` | 23 testes, 1 falha na asserção: `AnalysisScreenTest.kt:53` (`SemanticsNodeInteraction.kt:178`, clicar "30 d" não chamava `setPeriod` nem mostrava o título do período) |
+| A05b | verde: mesmo comando | BUILD SUCCESSFUL, 23 testes (6 de tela + 17 de arquitetura), 0 falhas. Em "Agora" não há barras (protótipo P1); os dois testes de tela que esperavam as barras de 24 h passam a abrir em `HOURS_24` |
+| A06 | sem harness de teste (documentação); seção 9d do protótipo aberta em Edge headless | `console_errors 0`, `scrollWidth 1265 = clientWidth 1265`, captura conferida pela orquestradora; `docs/presentation.md` ganhou a seção #538; `ui_kits/desktop-app/` não tem a Análise, sem mudança no design system. Entra no commit do A05b (tela e registro juntos) |
 
 ## Problemas em aberto e riscos
 
