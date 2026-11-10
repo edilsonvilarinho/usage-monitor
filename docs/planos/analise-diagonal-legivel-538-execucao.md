@@ -31,6 +31,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 - "Agora" mantém até 3 janelas anteriores (comportamento atual); nos outros períodos entram todas as janelas fechadas
   dentro do período, com resumo: quantidade, quantas esgotaram, pico médio. Número que o histórico não tem não é derivado.
 - Barras seguem o período: 24 h por hora (atual), 7 d pico por dia, 30/90 d pico por semana.
+- Resumo e barras de 30/90 d contam janelas **fechadas cujo reinício** ≥ início do período (mais a aberta nas barras): em 7 d a semana anterior entra; corte de janelas pelo canônico `splitIntoQuotaWindows`, nunca por `groupBy(periodEndAt)` (reinício que oscila partiria a janela).
+- Tabela de ritmo: 5 linhas atuais em todo período + linha do período em 30/90 d (`AnalysisPeriodRate`); sem valor novo em `AnalysisSpan`.
 - Texto novo por `localized`/objeto de rótulos; período escolhido vive no `AnalysisViewModel`, não na composable.
 
 ## Atividades
@@ -49,6 +51,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 | ID | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (plano); validado por leitura dos ponteiros acima com `grep -n` | plano criado |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.SessionAnalysisPeriodTest"` | `SessionAnalysisPeriodTest.kt:105` `expected:<AnalysisPeriodSummary(windowCount=3, exhaustedCount=1, meanPeakPercent=83)> but was:<null>`; `:132` `expected:<[40, 100, 80, 100, 41]> but was:<[100, 80, 100, 41]>`; jitter de 30 s `expected:<1> but was:<2>` |
+| A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.architecture.*"` | BUILD SUCCESSFUL, 609 testes, 0 falhas (73 suítes) |
 
 ## Problemas em aberto e riscos
 
