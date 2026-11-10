@@ -1,10 +1,12 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -85,12 +87,37 @@ private fun AnalysisWindowCard(model: AnalysisWindowCardModel, lineColor: Color,
             Text(model.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
             AppStatusPill(label = model.verdict, tone = model.verdictTone)
         }
+        // #538, A05a: a frase do veredito fica abaixo da pílula; a da diagonal é o contentDescription do Canvas.
+        Text(model.verdictSentence, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
         // O reinício em linha própria: a 640dp o cabeçalho não cabe com ele.
         model.resetLabel?.let { label ->
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         model.diagonal?.let { diagonal -> PaceDiagonalChart(diagonal, lineColor, language) }
-        Text(model.sentence, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        AnalysisFactsGrid(model.facts)
+    }
+}
+
+/** Fatos da janela em grade de duas colunas, com fio no topo (fundo, não borda). */
+@Composable
+private fun AnalysisFactsGrid(facts: List<AnalysisFact>) {
+    if (facts.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(top = AppSpacing.xs), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+        Spacer(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+        facts.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                pair.forEach { fact -> AnalysisFactCell(fact, Modifier.weight(1f)) }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisFactCell(fact: AnalysisFact, modifier: Modifier) {
+    Column(modifier) {
+        Text(fact.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(fact.value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

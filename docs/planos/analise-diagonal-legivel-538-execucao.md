@@ -43,7 +43,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 | A02 | Domain: `AnalysisPeriod`, janelas do período, resumo e barras por período em `buildSessionAnalysis` (TDD em commonTest) | backend-dev |
 | A03 | Leitor + `AnalysisViewModel`: `sessionAnalysisReader` recebe o período e escolhe a faixa; o view model guarda o período (juntos para o commit compilar) | backend-dev |
 | A04 | Modelos (inclui resumo, títulos de barras e linha do período da tabela): veredito com ritmo usado, legenda, rótulo "agora", valor no reinício em `PaceDiagonalModel`/`AnalysisPanelModel` | frontend-dev |
-| A05 | Compose: seletor segmentado, legenda e rótulos no `PaceDiagonalChart`, resumo, barras por período (teste de tela) | frontend-dev |
+| A05a | Compose: card desenha frase do veredito, rótulo "agora", valor/esgota no reinício, eixo até `yMax`, legenda e fatos | frontend-dev |
+| A05b | Compose: seletor segmentado de período, resumo, barras por período e linha do período na tabela | frontend-dev |
 | A06 | Registro: seção 9d do `prototipo-visual-opencode.html`, `docs/design-system/` e `docs/presentation.md` | prototype-dev |
 
 ## Ponto de situação
@@ -57,6 +58,8 @@ rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usad
 | A03 | verde: mesmo comando | BUILD SUCCESSFUL, 1122 testes, 0 falhas; `TelegramBotComposition.kt` passa `AnalysisPeriod.NOW` (bot inalterado) |
 | A04 | vermelho (pelo `test-runner`): `gradlew.bat desktopTest --tests com.usagemonitor.presentation.AnalysisPanelModelTest --tests com.usagemonitor.presentation.PaceDiagonalModelTest` | 10 testes, 5 falhas na asserção: `AnalysisPanelModelTest.kt:33` `expected:<Cabe até o reinício: usa o ritmo da última hora (14 %/h). Projeção de 83 % no reinício, abaixo dos 100 %.> but was:<cabe até o reinício>`; `:106` `expected:<6> but was:<5>`; `:115` resumo `but was:<null>`; `PaceDiagonalModelTest.kt:18` `expected:<agora 12:30> but was:<null>` |
 | A04 | verde: `gradlew.bat desktopTest --tests com.usagemonitor.presentation.* --tests com.usagemonitor.architecture.*` | BUILD SUCCESSFUL, 1118 testes, 0 falhas. Decisão: `verdict` curto continua (pílula, TUI, Telegram — `TuiAnalysisViewTest.kt:58` exige) e `verdictSentence` novo leva a frase longa |
+| A05a | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.ui.AnalysisScreenTest --tests com.usagemonitor.architecture.*` | `AnalysisScreenTest.kt:37` `Expected exactly '1' node ... 'Projeção de 83 % no reinício, abaixo dos 100 %.'` |
+| A05a | verde: mesmo comando | BUILD SUCCESSFUL, 22 testes (5 de tela + 17 de arquitetura), 0 falhas. A frase antiga ("62% used with 70%…") sai da tela e fica só na descrição do gráfico, como no protótipo |
 
 ## Problemas em aberto e riscos
 

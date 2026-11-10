@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -53,8 +54,12 @@ class AnalysisScreenTest {
         onNodeWithText("Atualizar").assertDoesNotExist()
         // #463, AH1: a diagonal da 5h com a frase; a semanal da fixture não tem início, só a frase.
         onAllNodesWithTag(PACE_DIAGONAL_TAG).assertCountEquals(2)
-        onNodeWithText("62% usada com 70% da janela já passada: 8 pontos abaixo da linha. Chega a ~83% no reinício (14:00).").assertIsDisplayed()
-        onNodeWithText("41% usada", substring = true).assertIsDisplayed()
+        // #538, A05a: a frase do veredito fica abaixo da pílula; a frase da diagonal é só o contentDescription.
+        onNodeWithText("Projeção de 83 % no reinício, abaixo dos 100 %.", substring = true).assertIsDisplayed()
+        onNodeWithText("Projeção de 55 % no reinício, abaixo dos 100 %.", substring = true).assertIsDisplayed()
+        // #538, A05a: o marcador "agora" e a legenda da diagonal, nas duas janelas.
+        onAllNodesWithText("agora 12:30").assertCountEquals(2)
+        onAllNodesWithText("seu uso até agora").assertCountEquals(2)
         onNodeWithText("acima da linha: esgota antes").assertDoesNotExist() // desenhado no Canvas, não é nó de texto
         onNodeWithText("Ritmo por intervalo").performScrollTo().assertIsDisplayed()
         // As anteriores ficam desenhadas atrás da aberta: a tabela "antes × agora" saiu.
@@ -97,7 +102,8 @@ class AnalysisScreenTest {
             }
         }
         onNodeWithText("Failed at 12:31:00 · reading from 12:30:00").assertIsDisplayed()
-        onNodeWithText("62% used with 70% of the window gone", substring = true).assertIsDisplayed()
+        // #538, A05a: a frase "X% used with Y% gone" saiu da tela (é só o contentDescription); a tela mostra o veredito.
+        onAllNodesWithText("Fits until the reset", substring = true).assertCountEquals(2)
     }
 
     /** B21b: com exportação, o botão "Relatório PDF" aparece e o resultado vira faixa com o caminho. */

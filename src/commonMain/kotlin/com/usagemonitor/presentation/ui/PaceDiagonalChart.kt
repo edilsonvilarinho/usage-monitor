@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import kotlin.math.roundToInt
 
 internal const val PACE_DIAGONAL_TAG = "paceDiagonal"
 
@@ -56,10 +58,12 @@ private val LABEL_PLATE_PADDING_Y = 1.dp
 private val LABEL_PLATE_RADIUS = 4.dp
 
 /**
- * Diagonal do ritmo (#463, direção AH1): eixo X é o tempo da janela que já passou, eixo Y a
- * cota usada, ambos escritos. A linha dourada tracejada chega a 100% exatamente no reinício —
- * acima dela a cota esgota antes, abaixo cabe —, e as duas regiões vêm com a frase, nunca só
- * com a cor. As outras janelas ficam atrás, em cinza; a projeção é tracejada.
+ * Diagonal do ritmo (#463, direção AH1; #538, A05a): eixo X é o tempo da janela que já passou, eixo Y a
+ * cota usada, escrita até [PaceDiagonalModel.yMax]. A linha dourada tracejada chega a 100% exatamente no
+ * reinício — acima dela a cota esgota antes, abaixo cabe —, e as duas regiões vêm com a frase, nunca só
+ * com a cor. O marcador "agora" e os rótulos de fim e de esgotamento são texto de tela, não desenho do
+ * Canvas, para o leitor de tela achar; a legenda vem embaixo. As outras janelas ficam atrás, em cinza;
+ * a projeção é tracejada.
  *
  * Estático: nada anima, porque o desenho é o dado. O leitor de tela lê a frase do modelo.
  */
@@ -75,11 +79,14 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
     val pointStyle = labelStyle.copy(color = MaterialTheme.colorScheme.onSurface)
     val above = PaceDiagonalLabels.above(language)
     val below = PaceDiagonalLabels.below(language)
+    val yMax = model.yMax.coerceAtLeast(100.0)
+    val nowFraction = model.current.lastOrNull()?.elapsedFraction?.coerceIn(0.0, 1.0)
+    val nowWeight = (nowFraction ?: 0.0).toFloat().coerceIn(0.01f, 0.99f)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
         Row(Modifier.fillMaxWidth()) {
             Column(Modifier.width(AXIS_WIDTH).height(PLOT_HEIGHT), verticalArrangement = Arrangement.SpaceBetween) {
-                listOf("100%", "50%", "0%").forEach { label ->
-                    Text(label, style = labelStyle, color = axisColor, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                listOf(yMax, yMax / 2.0, 0.0).forEach { value ->
+                    Text("${value.roundToInt()}%", style = labelStyle, color = axisColor, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
                 }
             }
             Canvas(
@@ -95,11 +102,21 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
                 val top = 0f
                 val bottom = size.height
                 fun x(fraction: Double) = left + (right - left) * fraction.toFloat()
-                fun y(percent: Double) = bottom - (bottom - top) * (percent / 100.0).toFloat()
+                fun y(percent: Double) = bottom - (bottom - top) * (percent / yMax).toFloat()
+                val hundredY = y(100.0)
 
-                drawRegions(left, right, top, bottom, criticalColor, okColor)
+                drawRegions(left, right, top, bottom, hundredY, criticalColor, okColor)
                 listOf(0.0, 50.0, 100.0).forEach { value ->
                     drawLine(gridColor, Offset(left, y(value)), Offset(right, y(value)), 1.dp.toPx())
+                }
+                if (nowFraction != null) {
+                    drawLine(
+                        color = axisColor,
+                        start = Offset(x(nowFraction), top),
+                        end = Offset(x(nowFraction), bottom),
+                        strokeWidth = 1.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()))
+                    )
                 }
                 val aboveCaption = measureLabel(measurer, above, Offset(left + 6.dp.toPx(), top + 4.dp.toPx()), labelStyle.copy(color = criticalColor), alignEnd = false)
                 val belowCaption = measureLabel(measurer, below, Offset(right - 6.dp.toPx(), bottom - 18.dp.toPx()), labelStyle.copy(color = okColor), alignEnd = true)
@@ -108,7 +125,7 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
                 drawLine(
                     color = AppGargantuaTokens.gold,
                     start = Offset(x(0.0), y(0.0)),
-                    end = Offset(x(1.0), y(100.0)),
+                    end = Offset(x(1.0), hundredY),
                     strokeWidth = 1.5.dp.toPx(),
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))
                 )
@@ -116,17 +133,42 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
                     drawPath(model.projection, ::x, ::y, if (model.projectionCritical) criticalColor else lineColor, 1.5.dp.toPx(), dashed = true)
                 }
                 drawPath(model.current, ::x, ::y, lineColor, 2.25.dp.toPx(), dashed = false)
-                val pointLabel = model.current.lastOrNull()?.let { last ->
+                val crossing = exhaustionFraction(model.projection)
+                if (model.exhaustionLabel != null && crossing != null) {
+                    drawCircle(criticalColor, radius = 3.5.dp.toPx(), center = Offset(x(crossing), hundredY))
+                }
+                val last = model.current.lastOrNull()
+                var pointLabel: PlacedLabel? = null
+                if (last != null) {
                     val center = Offset(x(last.elapsedFraction), y(last.percent))
                     drawCircle(haloColor, radius = POINT_HALO_RADIUS.toPx(), center = center)
                     drawCircle(lineColor, radius = 3.5.dp.toPx(), center = center)
-                    model.pointLabel?.let { label ->
-                        placePointLabel(measurer, label, center, pointStyle, avoid = listOf(aboveCaption.box, belowCaption.box))
+                    val text = model.pointLabel
+                    if (text != null) {
+                        pointLabel = placePointLabel(measurer, text, center, pointStyle, avoid = listOf(aboveCaption.box, belowCaption.box))
                     }
                 }
                 // Textos por último, sobre placa da superfície (#477): desenhados antes, a projeção e as
                 // janelas anteriores cortavam as letras.
                 listOfNotNull(aboveCaption, belowCaption, pointLabel).forEach { placed -> drawPlacedLabel(placed, haloColor) }
+            }
+        }
+        if (model.nowLabel != null) {
+            Row(Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(AXIS_WIDTH))
+                Spacer(Modifier.weight(nowWeight))
+                Text(model.nowLabel, style = labelStyle, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, modifier = Modifier.weight(1f - nowWeight))
+            }
+        }
+        if (model.exhaustionLabel != null || model.endLabel != null) {
+            Row(Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(AXIS_WIDTH))
+                if (model.exhaustionLabel != null) {
+                    Text(model.exhaustionLabel, style = labelStyle, color = criticalColor, maxLines = 1, modifier = Modifier.weight(1f))
+                }
+                if (model.endLabel != null) {
+                    Text(model.endLabel, style = labelStyle, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+                }
             }
         }
         Row(Modifier.fillMaxWidth()) {
@@ -153,20 +195,36 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
+        Column(Modifier.fillMaxWidth().padding(top = AppSpacing.xs), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+            model.legend.forEach { entry ->
+                Text(entry, style = labelStyle, color = axisColor, maxLines = 1)
+            }
+        }
     }
 }
 
-private fun DrawScope.drawRegions(left: Float, right: Float, top: Float, bottom: Float, aboveColor: Color, belowColor: Color) {
+/** Fração do tempo em que a projeção cruza os 100 %; nulo quando não cruza (cabe, ou já passou de 100 no agora). */
+private fun exhaustionFraction(projection: List<PacePathPoint>): Double? =
+    projection.zipWithNext().firstNotNullOfOrNull { (from, to) ->
+        if (from.percent < 100.0 && to.percent >= 100.0) {
+            from.elapsedFraction + (100.0 - from.percent) / (to.percent - from.percent) * (to.elapsedFraction - from.elapsedFraction)
+        } else {
+            null
+        }
+    }
+
+private fun DrawScope.drawRegions(left: Float, right: Float, top: Float, bottom: Float, hundredY: Float, aboveColor: Color, belowColor: Color) {
     val aboveRegion = Path().apply {
         moveTo(left, bottom)
         lineTo(left, top)
         lineTo(right, top)
+        lineTo(right, hundredY)
         close()
     }
     val belowRegion = Path().apply {
         moveTo(left, bottom)
         lineTo(right, bottom)
-        lineTo(right, top)
+        lineTo(right, hundredY)
         close()
     }
     drawPath(aboveRegion, aboveColor.copy(alpha = REGION_ALPHA_ABOVE))
