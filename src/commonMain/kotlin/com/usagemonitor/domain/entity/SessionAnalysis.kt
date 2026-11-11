@@ -86,11 +86,17 @@ data class AnalysisWindowView(
     val projectedAtReset: Int?,
     /** A janela aberta na diagonal do ritmo (#463, AH1); `null` sem reinício conhecido. */
     val path: QuotaWindowPacePath? = null,
-    /** As janelas anteriores lidas, da mais velha à mais nova, até [ANALYSIS_PREVIOUS_PATHS]. */
+    /**
+     * As janelas fechadas anteriores à aberta, da mais velha à mais nova: as que reiniciaram no período da
+     * análise (#556) e, no mínimo, as [ANALYSIS_PREVIOUS_PATHS] mais recentes. Sem período, só as mais recentes.
+     */
     val previousPaths: List<QuotaWindowPacePath> = emptyList()
 )
 
-/** Quantas janelas anteriores a diagonal da "Análise" desenha atrás da aberta. */
+/**
+ * Piso de janelas anteriores que a diagonal da "Análise" desenha atrás da aberta, mesmo as que caem fora do
+ * período. Não é teto: no período, desenha todas as janelas fechadas que reiniciaram nele.
+ */
 const val ANALYSIS_PREVIOUS_PATHS = 3
 
 enum class AnalysisSpan(val millis: Long) {
@@ -206,8 +212,8 @@ fun buildSessionAnalysis(
         accountLabel = accountLabel,
         source = source,
         generatedAt = now,
-        fiveHour = fiveHourSeries?.let { item -> windowView(item, fivePoints, now, FIVE_HOURS_MILLIS) },
-        weekly = weeklySeries?.let { item -> windowView(item, weeklyPoints, now, SEVEN_DAYS_MILLIS) },
+        fiveHour = fiveHourSeries?.let { item -> windowView(item, fivePoints, now, FIVE_HOURS_MILLIS, periodStart) },
+        weekly = weeklySeries?.let { item -> windowView(item, weeklyPoints, now, SEVEN_DAYS_MILLIS, periodStart) },
         intervals = intervals,
         hours = hours,
         heat = heat,
@@ -228,7 +234,13 @@ fun buildSessionAnalysis(
     )
 }
 
-private fun windowView(series: UsageHistorySeries, points: List<UsageHistoryPoint>, now: Instant, lengthMillis: Long): AnalysisWindowView? {
+private fun windowView(
+    series: UsageHistorySeries,
+    points: List<UsageHistoryPoint>,
+    now: Instant,
+    lengthMillis: Long,
+    periodStart: Instant?
+): AnalysisWindowView? {
     val last = points.lastOrNull() ?: return null
     val percent = percentOf(last)
     val resetsAt = last.periodEndAt.takeIf { last.hasKnownResetAt && it > now }
@@ -243,8 +255,20 @@ private fun windowView(series: UsageHistorySeries, points: List<UsageHistoryPoin
     // A aberta é a última janela lida, se for a do reinício de agora; as outras ficam atrás.
     val paths = quotaWindowPacePathsOf(points, series.unit, lengthMillis)
     val open = paths.lastOrNull()?.takeIf { path -> resetsAt != null && isSamePeriod(path.resetsAt, resetsAt) }
-    val previous = (if (open != null) paths.dropLast(1) else paths).takeLast(ANALYSIS_PREVIOUS_PATHS)
+    val previous = previousPathsOf(if (open != null) paths.dropLast(1) else paths, periodStart)
     return AnalysisWindowView(series.quotaLabel, series.periodType, percent, startsAt, resetsAt, paceNow, paceAverage, safePace, projected, open, previous)
+}
+
+/**
+ * Janelas anteriores da diagonal (#556): as que reiniciaram a partir de [periodStart] e, no mínimo, as
+ * [ANALYSIS_PREVIOUS_PATHS] mais recentes. Sem período ([periodStart] nulo), só as mais recentes. [paths] vem da
+ * mais velha à mais nova; o resultado mantém essa ordem e não repete janela.
+ */
+private fun previousPathsOf(paths: List<QuotaWindowPacePath>, periodStart: Instant?): List<QuotaWindowPacePath> {
+    val floorFrom = (paths.size - ANALYSIS_PREVIOUS_PATHS).coerceAtLeast(0)
+    return paths.filterIndexed { index, path ->
+        index >= floorFrom || (periodStart != null && path.resetsAt >= periodStart)
+    }
 }
 
 private fun compareWithPrevious(
