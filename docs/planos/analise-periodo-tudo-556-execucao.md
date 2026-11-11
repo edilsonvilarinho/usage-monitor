@@ -49,6 +49,8 @@ ganha "Tudo", como o Histórico (24 h | 7 dias | 30 dias | Tudo).
 | A02 | verde: mesmo comando | BUILD SUCCESSFUL, 1724 testes, 0 falhas; `grep -rn DAYS_90 src` vazio. `periodRateOf` ganhou guarda `hours > 0` (1ª leitura em agora não divide por zero) |
 | A03 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.architecture.*"` | falha na asserção `SessionAnalysisPeriodTest.kt:223` (30 d com 10 janelas fechadas) `expected:<[2026-09-21T05:00:00Z, ... 2026-10-05T20:00:00Z]> but was:<[2026-09-29T05:00:00Z, 2026-09-30T05:00:00Z, 2026-10-05T20:00:00Z]>`; os casos de 24 h, 7 d e agora (piso de 3) são guarda de regressão e já passavam |
 | A03 | verde: mesmo comando | BUILD SUCCESSFUL, 1715 testes, 0 falhas. `previousPathsOf` em `SessionAnalysis.kt`; `docs/presentation.md` atualizado nas seções #463 e #538 |
+| A04 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.PaceDiagonalModelTest"` | 3 falhas na asserção: `PaceDiagonalModelTest.kt:24` `expected:<[..., 1 janela anterior]> but was:<[..., janelas anteriores]>`; `:48` `Expected <0.225> ..., actual <0.45>`; `:57` `element <12 janelas anteriores>` ausente |
+| A04 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.architecture.*"` | BUILD SUCCESSFUL, 0 falhas. `PREVIOUS_ALPHA` sai; `previousPathAlpha` e legenda "N janelas anteriores" em `PaceDiagonalModel.kt`; nota 9d do protótipo e `presentation.md` |
 
 ## Problemas em aberto e riscos
 

@@ -213,7 +213,7 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
 Plano em `docs/planos/analise-diagonal-legivel-538-execucao.md`; direção P1 em `prototipos/issue-538/p1-diagonal-legivel/index.html`.
 
 - **Período** é tipo de domínio novo (`AnalysisPeriod`: agora, 24 h, 7 d, 30 d, tudo), não valor de `HistoryRange`: tudo lê `HistoryRange.TOTAL`, 30 d lê `LAST_30_DAYS`. "Tudo" (#556) começa na primeira leitura da série, não em agora menos um prazo; por isso o ritmo do período divide pelas horas desde essa leitura, nunca por 2160 h. `buildSessionAnalysis` recebe `period` (padrão agora); o seletor vive no `AnalysisViewModel`.
-- **Diagonal**: a janela aberta é a linha cheia; as janelas fechadas do período (no mínimo três) ficam atrás, em cinza (#556). Legenda explícita, marcador "agora" rotulado e valor projetado no reinício.
+- **Diagonal**: a janela aberta é a linha cheia; as janelas fechadas do período (no mínimo três) ficam atrás, em cinza (#556). A opacidade dessas linhas cai com a quantidade (`previousPathAlpha`: 0,45 até três, depois 0,45 × √(3/n), piso 0,12), e a legenda diz quantas foram desenhadas ("N janelas anteriores"). Legenda explícita, marcador "agora" rotulado e valor projetado no reinício.
 - **Veredito** numa frase que diz o ritmo usado (ex.: "No ritmo da última hora, esgota por volta de 21:20").
 - **Período longo** (30 d e tudo): resumo das janelas fechadas (quantidade, esgotadas, pico médio) e linha do período na tabela (`AnalysisPeriodRate`).
 - **Barras** seguem o período: 24 h por hora, 7 d pico por dia, 30 d e tudo pico por semana.
