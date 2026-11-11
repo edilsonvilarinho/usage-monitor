@@ -186,7 +186,7 @@ internal object AnalysisPanelModel {
         TelegramBotMessages.resetLabel(at, now, language == AppLanguage.PT)
 
     /**
-     * Resumo do período: a 5h só nas 24 h; a semanal em 7, 30 e 90 dias. `null` no "agora" e sem
+     * Resumo do período: a 5h só nas 24 h; a semanal em 7 dias, 30 dias e tudo. `null` no "agora" e sem
      * janela fechada no período.
      */
     fun periodSummary(analysis: SessionAnalysis, language: AppLanguage): String? = when (analysis.period) {
@@ -203,7 +203,7 @@ internal object AnalysisPanelModel {
         AnalysisPeriod.HOURS_24 -> localized(language, "Últimas 24 h", "Last 24 h")
         AnalysisPeriod.DAYS_7 -> localized(language, "Pico por dia · 7 d", "Peak per day · 7 d")
         AnalysisPeriod.DAYS_30 -> localized(language, "Pico por semana · 30 d", "Peak per week · 30 d")
-        AnalysisPeriod.DAYS_90 -> localized(language, "Pico por semana · 90 d", "Peak per week · 90 d")
+        AnalysisPeriod.ALL -> localized(language, "Pico por semana · tudo", "Peak per week · all")
     }
 
     fun intervalsTitle(period: AnalysisPeriod, language: AppLanguage): String {
@@ -213,7 +213,7 @@ internal object AnalysisPanelModel {
 
     /**
      * Uma linha por janela de 5 h, com a razão do ritmo contra o de 7 dias — a mesma conta do
-     * `/analise intervalos`. Em 30 e 90 dias, a linha do período entra no fim.
+     * `/analise intervalos`. Em 30 dias e tudo, a linha do período entra no fim.
      */
     fun intervals(analysis: SessionAnalysis, language: AppLanguage): List<AnalysisIntervalRowModel> {
         val pt = language == AppLanguage.PT
@@ -248,7 +248,7 @@ internal object AnalysisPanelModel {
         AnalysisPeriod.HOURS_24 -> "24 h"
         AnalysisPeriod.DAYS_7 -> "7 d"
         AnalysisPeriod.DAYS_30 -> "30 d"
-        AnalysisPeriod.DAYS_90 -> "90 d"
+        AnalysisPeriod.ALL -> localized(language, "tudo", "all")
     }
 
     fun hours(analysis: SessionAnalysis): List<AnalysisHourBar> =

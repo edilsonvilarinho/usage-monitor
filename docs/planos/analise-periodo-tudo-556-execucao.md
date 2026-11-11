@@ -45,6 +45,8 @@ ganha "Tudo", como o Histórico (24 h | 7 dias | 30 dias | Tudo).
 | ID | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (plano); fatos medidos com `grep -n`/`sed -n` citados acima | plano criado |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.SessionAnalysisReaderTest" --tests "com.usagemonitor.ui.AnalysisScreenTest" --tests "com.usagemonitor.architecture.*"` | 1724 testes, 5 falhas na asserção: `SessionAnalysisPeriodTest.kt:179` `expected:<[90, 40, 100, 80, 100, 41]> but was:<[41]>`; `:174` `Expected <0.3148247978436658> ... actual <NaN>`; `:195` corte na 1ª leitura `Expected value to be true`; `:141` resumo `but was:<null>`; `AnalysisPanelModelTest.kt:122` `expected:<Peak per week · [all]> but was:<Peak per week · [90 d]>` |
+| A02 | verde: mesmo comando | BUILD SUCCESSFUL, 1724 testes, 0 falhas; `grep -rn DAYS_90 src` vazio. `periodRateOf` ganhou guarda `hours > 0` (1ª leitura em agora não divide por zero) |
 
 ## Problemas em aberto e riscos
 

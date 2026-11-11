@@ -12,8 +12,9 @@ enum class AnalysisPeriod(val millis: Long?) {
     HOURS_24(24.hours.inWholeMilliseconds),
     DAYS_7(7 * 24.hours.inWholeMilliseconds),
     DAYS_30(30 * 24.hours.inWholeMilliseconds),
-    DAYS_90(90 * 24.hours.inWholeMilliseconds);
+    /** "Tudo" (#556): todo o histórico lido; começa na primeira leitura da série, não em agora menos um prazo. */
+    ALL(null);
 
-    /** Só 30 d e 90 d têm linha de ritmo e vazão do período. */
-    val usesPeriodRate: Boolean get() = this == DAYS_30 || this == DAYS_90
+    /** Só 30 d e tudo têm linha de ritmo e vazão do período. */
+    val usesPeriodRate: Boolean get() = this == DAYS_30 || this == ALL
 }

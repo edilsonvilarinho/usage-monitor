@@ -136,9 +136,9 @@ class SessionAnalysisPeriodTest {
     }
 
     @Test
-    fun `DAYS_90 reaches the weekly windows that DAYS_30 leaves out`() {
+    fun `ALL reaches the weekly windows that DAYS_30 leaves out`() {
         // Picos 90, 40, 100, 80, 100 → média 82.
-        assertEquals(AnalysisPeriodSummary(windowCount = 5, exhaustedCount = 2, meanPeakPercent = 82), analysis(AnalysisPeriod.DAYS_90).weeklySummary)
+        assertEquals(AnalysisPeriodSummary(windowCount = 5, exhaustedCount = 2, meanPeakPercent = 82), analysis(AnalysisPeriod.ALL).weeklySummary)
     }
 
     @Test
@@ -169,23 +169,30 @@ class SessionAnalysisPeriodTest {
     }
 
     @Test
-    fun `DAYS_90 rate divides the same 5h rise by the 2160 hours of the period`() {
-        assertEquals(292.0 / 2160.0, analysis(AnalysisPeriod.DAYS_90).periodRate!!.pacePerHour!!, 1e-6)
+    fun `ALL rate divides the 5h rise by the hours since the first reading, not by 2160`() {
+        // Primeira leitura da série semanal: 29/08 00:00Z → 927,5 h até agora (não 2160 h).
+        assertEquals(292.0 / 927.5, analysis(AnalysisPeriod.ALL).periodRate?.pacePerHour ?: Double.NaN, 1e-6)
     }
 
     @Test
-    fun `only the 30 and 90 day periods carry a period rate`() {
+    fun `ALL bars start at the first reading and include the weekly windows before the 30 day cut`() {
+        assertEquals(listOf(90, 40, 100, 80, 100, 41), analysis(AnalysisPeriod.ALL).periodBars.map { bar -> bar.peakPercent })
+    }
+
+    @Test
+    fun `only the 30 day and all periods carry a period rate`() {
         assertNull(analysis(AnalysisPeriod.HOURS_24).periodRate)
         assertNull(analysis(AnalysisPeriod.DAYS_7).periodRate)
     }
 
     @Test
-    fun `the period start is a throughput cut only for the 30 and 90 day periods`() {
+    fun `the period start is a throughput cut only for the 30 day and all periods`() {
         val cuts30 = analysisThroughputCuts(listOf(fiveHour, weekly), now, AnalysisPeriod.DAYS_30)
-        val cuts90 = analysisThroughputCuts(listOf(fiveHour, weekly), now, AnalysisPeriod.DAYS_90)
+        val cutsAll = analysisThroughputCuts(listOf(fiveHour, weekly), now, AnalysisPeriod.ALL)
         val cutsNow = analysisThroughputCuts(listOf(fiveHour, weekly), now)
         assertTrue((now - (30 * 24).hours).toEpochMilliseconds() in cuts30)
-        assertTrue((now - (90 * 24).hours).toEpochMilliseconds() in cuts90)
+        // Corte de ALL é a primeira leitura da série (29/08 00:00Z), não agora menos 90 d.
+        assertTrue(Instant.parse("2026-08-29T00:00:00Z").toEpochMilliseconds() in cutsAll)
         assertTrue((now - (30 * 24).hours).toEpochMilliseconds() !in cutsNow)
     }
 }

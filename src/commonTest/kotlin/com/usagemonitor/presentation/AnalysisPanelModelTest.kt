@@ -119,7 +119,7 @@ class AnalysisPanelModelTest {
         assertEquals("4 semanas anteriores · 0 de 4 esgotaram · pico médio 61 %", AnalysisPanelModel.periodSummary(month, AppLanguage.PT))
         assertNull(AnalysisPanelModel.periodSummary(analysis, AppLanguage.PT))
         assertEquals("Pico por dia · 7 d", AnalysisPanelModel.barsTitle(AnalysisPeriod.DAYS_7, AppLanguage.PT))
-        assertEquals("Peak per week · 90 d", AnalysisPanelModel.barsTitle(AnalysisPeriod.DAYS_90, AppLanguage.EN))
+        assertEquals("Peak per week · all", AnalysisPanelModel.barsTitle(AnalysisPeriod.ALL, AppLanguage.EN))
         assertNull(AnalysisPanelModel.barsTitle(AnalysisPeriod.NOW, AppLanguage.PT))
     }
 
