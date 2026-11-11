@@ -45,7 +45,6 @@ private val PLOT_HEIGHT = 168.dp
 private val AXIS_WIDTH = 36.dp
 private const val REGION_ALPHA_ABOVE = 0.08f
 private const val REGION_ALPHA_BELOW = 0.06f
-private const val PREVIOUS_ALPHA = 0.45f
 private val POINT_HALO_RADIUS = 5.5.dp
 
 /**
@@ -121,7 +120,8 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
                 val aboveCaption = measureLabel(measurer, above, Offset(left + 6.dp.toPx(), top + 4.dp.toPx()), labelStyle.copy(color = criticalColor), alignEnd = false)
                 val belowCaption = measureLabel(measurer, below, Offset(right - 6.dp.toPx(), bottom - 18.dp.toPx()), labelStyle.copy(color = okColor), alignEnd = true)
 
-                model.previous.forEach { path -> drawPath(path, ::x, ::y, axisColor.copy(alpha = PREVIOUS_ALPHA), 1.dp.toPx(), dashed = false) }
+                val previousAlpha = previousPathAlpha(model.previous.size)
+                model.previous.forEach { path -> drawPath(path, ::x, ::y, axisColor.copy(alpha = previousAlpha), 1.dp.toPx(), dashed = false) }
                 drawLine(
                     color = AppGargantuaTokens.gold,
                     start = Offset(x(0.0), y(0.0)),

@@ -54,7 +54,7 @@ internal object AnalysisLabels {
         AnalysisPeriod.HOURS_24 -> "24 h"
         AnalysisPeriod.DAYS_7 -> "7 d"
         AnalysisPeriod.DAYS_30 -> "30 d"
-        AnalysisPeriod.DAYS_90 -> "90 d"
+        AnalysisPeriod.ALL -> localized(language, "Tudo", "All")
     }
 }
 

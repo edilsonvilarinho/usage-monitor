@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -136,9 +137,9 @@ class SessionAnalysisPeriodTest {
     }
 
     @Test
-    fun `DAYS_90 reaches the weekly windows that DAYS_30 leaves out`() {
+    fun `ALL reaches the weekly windows that DAYS_30 leaves out`() {
         // Picos 90, 40, 100, 80, 100 → média 82.
-        assertEquals(AnalysisPeriodSummary(windowCount = 5, exhaustedCount = 2, meanPeakPercent = 82), analysis(AnalysisPeriod.DAYS_90).weeklySummary)
+        assertEquals(AnalysisPeriodSummary(windowCount = 5, exhaustedCount = 2, meanPeakPercent = 82), analysis(AnalysisPeriod.ALL).weeklySummary)
     }
 
     @Test
@@ -169,23 +170,71 @@ class SessionAnalysisPeriodTest {
     }
 
     @Test
-    fun `DAYS_90 rate divides the same 5h rise by the 2160 hours of the period`() {
-        assertEquals(292.0 / 2160.0, analysis(AnalysisPeriod.DAYS_90).periodRate!!.pacePerHour!!, 1e-6)
+    fun `ALL rate divides the 5h rise by the hours since the first reading, not by 2160`() {
+        // Primeira leitura da série semanal: 29/08 00:00Z → 927,5 h até agora (não 2160 h).
+        assertEquals(292.0 / 927.5, analysis(AnalysisPeriod.ALL).periodRate?.pacePerHour ?: Double.NaN, 1e-6)
     }
 
     @Test
-    fun `only the 30 and 90 day periods carry a period rate`() {
+    fun `ALL bars start at the first reading and include the weekly windows before the 30 day cut`() {
+        assertEquals(listOf(90, 40, 100, 80, 100, 41), analysis(AnalysisPeriod.ALL).periodBars.map { bar -> bar.peakPercent })
+    }
+
+    @Test
+    fun `only the 30 day and all periods carry a period rate`() {
         assertNull(analysis(AnalysisPeriod.HOURS_24).periodRate)
         assertNull(analysis(AnalysisPeriod.DAYS_7).periodRate)
     }
 
     @Test
-    fun `the period start is a throughput cut only for the 30 and 90 day periods`() {
+    fun `the period start is a throughput cut only for the 30 day and all periods`() {
         val cuts30 = analysisThroughputCuts(listOf(fiveHour, weekly), now, AnalysisPeriod.DAYS_30)
-        val cuts90 = analysisThroughputCuts(listOf(fiveHour, weekly), now, AnalysisPeriod.DAYS_90)
+        val cutsAll = analysisThroughputCuts(listOf(fiveHour, weekly), now, AnalysisPeriod.ALL)
         val cutsNow = analysisThroughputCuts(listOf(fiveHour, weekly), now)
         assertTrue((now - (30 * 24).hours).toEpochMilliseconds() in cuts30)
-        assertTrue((now - (90 * 24).hours).toEpochMilliseconds() in cuts90)
+        // Corte de ALL é a primeira leitura da série (29/08 00:00Z), não agora menos 90 d.
+        assertTrue(Instant.parse("2026-08-29T00:00:00Z").toEpochMilliseconds() in cutsAll)
         assertTrue((now - (30 * 24).hours).toEpochMilliseconds() !in cutsNow)
+    }
+
+    /** Dez janelas 5h fechadas de 21/09 a 30/09 (reinício às 05:00Z) e uma de 05/10 15:00Z (reinício 20:00Z). */
+    private val lateFiveHour = series(
+        "Claude 5h", PeriodType.INTERVAL,
+        (0 until 10).flatMap { index -> fiveHourWindow(Instant.parse("2026-09-21T00:00:00Z") + index.days, listOf(10, 50)) } +
+            fiveHourWindow(Instant.parse("2026-10-05T15:00:00Z"), listOf(20, 40))
+    )
+
+    /** Reinícios das janelas anteriores que a diagonal da janela 5h desenha, no período dado. */
+    private fun previousResetsOf(period: AnalysisPeriod): List<Instant> {
+        val list = listOf(lateFiveHour)
+        val analysis = buildSessionAnalysis(
+            "Anthropic · Padrão", ApiSource.ANTHROPIC, list, cumulative(analysisThroughputCuts(list, now, period)), now, period = period
+        )
+        return analysis.fiveHour?.previousPaths.orEmpty().map { path -> path.resetsAt }
+    }
+
+    private val threeMostRecentResets = listOf(
+        Instant.parse("2026-09-29T05:00:00Z"), Instant.parse("2026-09-30T05:00:00Z"), Instant.parse("2026-10-05T20:00:00Z")
+    )
+
+    @Test
+    fun `30 day period draws every closed 5h window that reset in it, not only the three most recent`() {
+        val tenResets = (0 until 10).map { index -> Instant.parse("2026-09-21T05:00:00Z") + index.days }
+        assertEquals(tenResets + Instant.parse("2026-10-05T20:00:00Z"), previousResetsOf(AnalysisPeriod.DAYS_30))
+    }
+
+    @Test
+    fun `24 hour period with only one window in it still draws the three most recent windows`() {
+        assertEquals(threeMostRecentResets, previousResetsOf(AnalysisPeriod.HOURS_24))
+    }
+
+    @Test
+    fun `7 day period drops the windows that reset before it and outside the three most recent`() {
+        assertEquals(threeMostRecentResets, previousResetsOf(AnalysisPeriod.DAYS_7))
+    }
+
+    @Test
+    fun `NOW draws the three most recent windows, as it did before the period`() {
+        assertEquals(threeMostRecentResets, previousResetsOf(AnalysisPeriod.NOW))
     }
 }

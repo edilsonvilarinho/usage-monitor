@@ -61,9 +61,9 @@ internal fun sessionAnalysisReader(
     if (stats.source == ApiSource.CODEX) analysis.copy(throughputIndexedAt = codexIndexedAt()) else analysis
 }
 
-/** Faixa do histórico que cobre o período: 90 d pede a retenção inteira; 24 h e 7 d cabem nos 7 d. */
+/** Faixa do histórico que cobre o período: tudo pede a retenção inteira; 24 h e 7 d cabem nos 7 d. */
 private fun historyRangeOf(period: AnalysisPeriod): HistoryRange = when (period) {
     AnalysisPeriod.NOW, AnalysisPeriod.HOURS_24, AnalysisPeriod.DAYS_7 -> HistoryRange.LAST_7_DAYS
     AnalysisPeriod.DAYS_30 -> HistoryRange.LAST_30_DAYS
-    AnalysisPeriod.DAYS_90 -> HistoryRange.TOTAL
+    AnalysisPeriod.ALL -> HistoryRange.TOTAL
 }

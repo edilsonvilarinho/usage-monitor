@@ -73,7 +73,7 @@ internal fun AnalysisPanel(analysis: SessionAnalysis, language: AppLanguage, mod
     }
 }
 
-/** Bloco de barras do período (#538, A05b): 24 h = horas atuais; 7/30/90 d = pico por dia ou semana. "Agora" não tem bloco. */
+/** Bloco de barras do período (#538, A05b): 24 h = horas atuais; 7 d, 30 d e tudo = pico por dia ou semana. "Agora" não tem bloco. */
 @Composable
 private fun AnalysisBarsBlock(analysis: SessionAnalysis, language: AppLanguage, lineColor: Color) {
     val title = AnalysisPanelModel.barsTitle(analysis.period, language) ?: return

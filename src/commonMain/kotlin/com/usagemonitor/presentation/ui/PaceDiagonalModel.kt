@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.exhaustionTimeOf
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
@@ -45,6 +46,22 @@ internal data class PaceDiagonalModel(
     /** Legenda na ordem de leitura. */
     val legend: List<String> = emptyList()
 )
+
+private const val PREVIOUS_BASE_ALPHA = 0.45f
+private const val PREVIOUS_MIN_ALPHA = 0.12f
+
+/** Até quantas linhas anteriores a opacidade fica cheia. */
+private const val PREVIOUS_FULL_OPACITY_COUNT = 3
+
+/**
+ * Opacidade de cada linha anterior atrás da aberta (#556). Até três linhas, 0,45; acima, cai com a
+ * raiz de 3/n, para muitas linhas não virarem borrão, com piso 0,12 para continuarem visíveis.
+ */
+internal fun previousPathAlpha(count: Int): Float {
+    if (count <= PREVIOUS_FULL_OPACITY_COUNT) return PREVIOUS_BASE_ALPHA
+    val faded = PREVIOUS_BASE_ALPHA * sqrt(PREVIOUS_FULL_OPACITY_COUNT.toFloat() / count)
+    return faded.coerceAtLeast(PREVIOUS_MIN_ALPHA)
+}
 
 internal object PaceDiagonalLabels {
     fun above(language: AppLanguage) = localized(language, "acima da linha: esgota antes", "above the line: runs out first")
@@ -83,7 +100,7 @@ internal object PaceDiagonalModels {
             add(localized(language, "seu uso até agora", "your use so far"))
             if (projection.isNotEmpty()) add(projectionLegend(window, language))
             add(localized(language, "agora (linha pontilhada)", "now (dotted line)"))
-            if (previous.isNotEmpty()) add(localized(language, "janelas anteriores", "previous windows"))
+            if (previous.isNotEmpty()) add(previousWindowsLegend(previous.size, language))
         }
         return PaceDiagonalModel(
             current = current,
@@ -154,6 +171,11 @@ internal object PaceDiagonalModels {
         val name = localized(language, TelegramBotMessages.weekday(day, true), TelegramBotMessages.weekday(day, false))
         return "$name ${TelegramBotMessages.clock(at)}"
     }
+
+    /** Quantas janelas anteriores a diagonal desenha de fato, para o leitor saber o que está atrás. */
+    private fun previousWindowsLegend(count: Int, language: AppLanguage): String =
+        if (count == 1) localized(language, "1 janela anterior", "1 previous window")
+        else localized(language, "$count janelas anteriores", "$count previous windows")
 
     private fun projectionLegend(window: AnalysisWindowView, language: AppLanguage): String =
         if (window.paceNow != null) localized(language, "projeção pelo ritmo da última hora", "projection at the last hour's pace")

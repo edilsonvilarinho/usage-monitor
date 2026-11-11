@@ -16,7 +16,7 @@ import com.usagemonitor.domain.entity.AnalysisPeriodBar
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 /**
- * Barras de pico por período (#538, A05b): uma por dia (7 d) ou por semana (30 d, 90 d). A escala
+ * Barras de pico por período (#538, A05b): uma por dia (7 d) ou por semana (30 d, tudo). A escala
  * começa em 100 % e cresce se algum pico passar; pico ausente (`null`) não desenha barra. A barra
  * do período corrente sai cheia; as anteriores, meio-tom.
  */

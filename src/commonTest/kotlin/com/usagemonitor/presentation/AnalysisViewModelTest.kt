@@ -169,11 +169,11 @@ class AnalysisViewModelTest {
         waitFor { viewModel.uiState.value is AnalysisUiState.Success }
         pauseForBackgroundWork()
 
-        viewModel.setPeriod(AnalysisPeriod.DAYS_90)
+        viewModel.setPeriod(AnalysisPeriod.ALL)
         pauseForBackgroundWork()
         readings.value = 2
         pauseForBackgroundWork()
-        assertEquals(AnalysisPeriod.DAYS_90, periods.last())
+        assertEquals(AnalysisPeriod.ALL, periods.last())
         viewModel.onDestroy()
     }
 }

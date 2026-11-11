@@ -135,7 +135,7 @@ class SessionAnalysisReaderTest {
             AnalysisPeriod.HOURS_24 to HistoryRange.LAST_7_DAYS,
             AnalysisPeriod.DAYS_7 to HistoryRange.LAST_7_DAYS,
             AnalysisPeriod.DAYS_30 to HistoryRange.LAST_30_DAYS,
-            AnalysisPeriod.DAYS_90 to HistoryRange.TOTAL
+            AnalysisPeriod.ALL to HistoryRange.TOTAL
         ).forEach { (period, range) ->
             historyRanges.clear()
             runBlocking { read(claude.targetKey.storageKey, period) }

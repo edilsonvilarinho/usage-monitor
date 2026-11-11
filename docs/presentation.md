@@ -180,7 +180,7 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
   `docs/planos/issue-463-visual/`): cada card de janela é `PaceDiagonalChart` — eixo X é o tempo da janela que passou, eixo
   Y a cota usada, ambos escritos, e a diagonal dourada tracejada chega a 100% no reinício (acima esgota antes, abaixo cabe;
   as regiões têm a frase). O caminho vem do domínio (`QuotaWindowPace.kt`: `AnalysisWindowView.path` e `previousPaths`,
-  até `ANALYSIS_PREVIOUS_PATHS` = 3, pelo mesmo corte de `splitIntoQuotaWindows`), e o eixo usa o início **nominal**
+  as do período, no mínimo `ANALYSIS_PREVIOUS_PATHS` = 3 (#556), pelo mesmo corte de `splitIntoQuotaWindows`), e o eixo usa o início **nominal**
   (reinício − 5 h ou 7 d), como o ritmo médio já fazia. A projeção usa o mesmo ritmo de `projectedAtReset` (última hora,
   senão média); quando esgota antes, vai até 100% no instante de `exhaustionTimeOf` e segue rente ao topo. A frase
   (`AnalysisPanelModel.windowSentence`) diz quanto da cota e do tempo já foi, quantos pontos acima ou abaixo da linha e
@@ -212,11 +212,11 @@ Plano e pontos de situação em `docs/planos/analise-sessao-execucao.md`; galeri
 
 Plano em `docs/planos/analise-diagonal-legivel-538-execucao.md`; direção P1 em `prototipos/issue-538/p1-diagonal-legivel/index.html`.
 
-- **Período** é tipo de domínio novo (`AnalysisPeriod`: agora, 24 h, 7 d, 30 d, 90 d), não valor de `HistoryRange`: 90 d lê `HistoryRange.TOTAL`, 30 d lê `LAST_30_DAYS`. `buildSessionAnalysis` recebe `period` (padrão agora); o seletor vive no `AnalysisViewModel`.
-- **Diagonal**: a janela aberta é a linha cheia; até três janelas anteriores ficam atrás, em cinza. Legenda explícita, marcador "agora" rotulado e valor projetado no reinício.
+- **Período** é tipo de domínio novo (`AnalysisPeriod`: agora, 24 h, 7 d, 30 d, tudo), não valor de `HistoryRange`: tudo lê `HistoryRange.TOTAL`, 30 d lê `LAST_30_DAYS`. "Tudo" (#556) começa na primeira leitura da série, não em agora menos um prazo; por isso o ritmo do período divide pelas horas desde essa leitura, nunca por 2160 h. `buildSessionAnalysis` recebe `period` (padrão agora); o seletor vive no `AnalysisViewModel`.
+- **Diagonal**: a janela aberta é a linha cheia; as janelas fechadas do período (no mínimo três) ficam atrás, em cinza (#556). A opacidade dessas linhas cai com a quantidade (`previousPathAlpha`: 0,45 até três, depois 0,45 × √(3/n), piso 0,12), e a legenda diz quantas foram desenhadas ("N janelas anteriores"). Legenda explícita, marcador "agora" rotulado e valor projetado no reinício.
 - **Veredito** numa frase que diz o ritmo usado (ex.: "No ritmo da última hora, esgota por volta de 21:20").
-- **Período longo** (30 d e 90 d): resumo das janelas fechadas (quantidade, esgotadas, pico médio) e linha do período na tabela (`AnalysisPeriodRate`).
-- **Barras** seguem o período: 24 h por hora, 7 d pico por dia, 30 d e 90 d pico por semana.
+- **Período longo** (30 d e tudo): resumo das janelas fechadas (quantidade, esgotadas, pico médio) e linha do período na tabela (`AnalysisPeriodRate`).
+- **Barras** seguem o período: 24 h por hora, 7 d pico por dia, 30 d e tudo pico por semana.
 - **Contagem**: resumo e barras contam janelas fechadas com reinício ≥ início do período, via `splitIntoQuotaWindows`, não `groupBy(periodEndAt)`.
 - **Texto** novo passa por `localized`.
 
