@@ -22,6 +22,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -1685,6 +1687,41 @@ class CliSessionsScreenTest {
             listOf("bbbb0002", "dddd0004", "cccc0003", "aaaa0001"),
             rowOrder(listOf("aaaa0001", "bbbb0002", "cccc0003", "dddd0004"))
         )
+    }
+
+    /**
+     * Ordenar troca a ordem inteira: a lista volta ao topo (#577). Sem isso, a posição de rolagem
+     * sobrevive à reordenação e a primeira linha da nova ordem fica fora da janela.
+     */
+    @Test
+    fun `sorting after scrolling down brings the first row of the new order into view`() =
+        runDesktopComposeUiTest {
+            setContent {
+                ScreenTestTheme(isDark = true) {
+                    Box(modifier = Modifier.width(900.dp).height(700.dp)) {
+                        CliSessionsContent(
+                            state = CliSessionsUiState.Success(sessions = manyCostSessions()),
+                            language = AppLanguage.PT,
+                            onSelectRange = {},
+                            onOpenSession = {},
+                            onCloseDetail = {}
+                        )
+                    }
+                }
+            }
+            val lastPublished = cliSessionRowTag("sess39")
+
+            onRoot().performMouseInput { moveTo(center); repeat(200) { scroll(1f) } }
+            onNodeWithTag(lastPublished, useUnmergedTree = true).assertIsDisplayed()
+            onNode(hasText(CliSessionsLabels.columnCost(AppLanguage.PT)) and hasAnyAncestor(hasTestTag(CLI_SESSION_COLUMN_HEADER_TAG))).performClick()
+
+            onNodeWithTag(lastPublished, useUnmergedTree = true).assertIsDisplayed()
+        }
+
+    private fun manyCostSessions(): List<CliSessionSummary> {
+        return (0 until 40).map { index ->
+            summary("sess" + index.toString().padStart(2, '0'), costMicros = (index + 1) * 1_000L)
+        }
     }
 
     private fun costSessions(): List<CliSessionSummary> {

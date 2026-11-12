@@ -59,6 +59,7 @@ import com.usagemonitor.presentation.viewmodel.TeamUsageView
 import com.usagemonitor.presentation.viewmodel.TeamUsageViewModel
 
 internal const val TEAM_LIST_SCROLLBAR_TAG = "teamUsageListScrollbar"
+internal const val TEAM_MEMBER_SESSION_HEADER_TAG_PREFIX = "teamUsageMemberSessionHeader:"
 internal const val TEAM_DETAIL_SCROLLBAR_TAG = "teamUsageDetailScrollbar"
 internal const val TEAM_MEMBER_ROW_TAG_PREFIX = "teamMemberRow:"
 internal const val TEAM_MEMBER_SESSIONS_TAG_PREFIX = "teamMemberSessions:"
@@ -503,6 +504,8 @@ private fun TeamUsageList(
 
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 val listState = rememberLazyListState()
+                var clickedHeaderIndex by remember { mutableStateOf<Int?>(null) }
+                ScrollToIndexOnSortChange(listState = listState, sort = sessionSort, targetIndex = clickedHeaderIndex)
 
                 // Sem espaço entre itens, como na lista da máquina: cada linha traz a
                 // própria divisória, e o vão de 8dp entre elas era justamente o que
@@ -569,7 +572,10 @@ private fun TeamUsageList(
                                 memberIndent = memberIndent,
                                 sessionIndent = sessionIndent,
                                 sessionSort = sessionSort,
-                                onSessionSortChange = onSessionSortChange,
+                                onSessionSortChange = { memberKey, column ->
+                                    clickedHeaderIndex = listState.visibleIndexOf("${memberKey}:sessionHeader")
+                                    onSessionSortChange(column)
+                                },
                                 hasStatusColumn = hasStatusColumn,
                                 localDeviceId = localDeviceId,
                                 onToggleMember = onToggleMember,
@@ -605,7 +611,7 @@ private fun LazyListScope.teamMemberItems(
     memberIndent: Dp,
     sessionIndent: Dp,
     sessionSort: CliSessionSort?,
-    onSessionSortChange: (CliSessionSortColumn) -> Unit,
+    onSessionSortChange: (String, CliSessionSortColumn) -> Unit,
     hasStatusColumn: Boolean,
     localDeviceId: String?,
     onToggleMember: (String) -> Unit,
@@ -641,12 +647,13 @@ private fun LazyListScope.teamMemberItems(
                     modifier = Modifier
                         .appNestedGroupItem(indent = sessionIndent)
                         .padding(top = AppSpacing.sm)
+                        .testTag(TEAM_MEMBER_SESSION_HEADER_TAG_PREFIX + member.memberKey)
                 ) {
                     CliSessionColumnHeader(
                         language = language,
                         hasActionColumn = state.isAdminOverview,
                         sort = sessionSort,
-                        onSortChange = onSessionSortChange
+                        onSortChange = { column -> onSessionSortChange(member.memberKey, column) }
                     )
                 }
             }

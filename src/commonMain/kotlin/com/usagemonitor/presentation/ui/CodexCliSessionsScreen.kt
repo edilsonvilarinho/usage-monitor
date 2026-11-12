@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -312,13 +313,15 @@ private fun CodexCliSessionTable(
 ) {
     // A ordenação só reordena a exibição; a lista publicada pelo view model não muda.
     val ordered = remember(sessions, sort) { sortCodexCliSessions(sessions, sort) }
+    val listState = rememberLazyListState()
+    ScrollToTopOnSortChange(listState = listState, sort = sort)
     AppDataSurfaceFlush(
         modifier = modifier,
         header = {
             CodexSessionColumnHeader(language = language, sort = sort, onSortChange = onSortChange)
         }
     ) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(
                 items = ordered,
                 key = { _, session -> session.sessionId }

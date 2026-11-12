@@ -314,6 +314,7 @@ private fun CliSessionsTable(
 
     Box(modifier = listModifier.fillMaxWidth()) {
         val listState = rememberLazyListState()
+        ScrollToTopOnSortChange(listState = listState, sort = sort)
 
         LazyColumn(
             state = listState,

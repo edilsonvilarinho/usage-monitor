@@ -4,10 +4,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.CliActivityCell
@@ -18,7 +22,9 @@ import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CliUsageBucket
 import com.usagemonitor.presentation.ui.components.ACTIVITY_HEATMAP_TAG
 import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TAB_TAG_PREFIX
+import com.usagemonitor.presentation.ui.BREAKDOWN_SORT_TAG_PREFIX
 import com.usagemonitor.presentation.ui.BreakdownLabels
+import com.usagemonitor.presentation.ui.BreakdownSort
 import com.usagemonitor.presentation.ui.CliUsageBreakdownPane
 import com.usagemonitor.presentation.ui.formatActiveTime
 import kotlinx.datetime.DayOfWeek
@@ -142,6 +148,32 @@ class CliUsageBreakdownPaneTest {
 
         assertAbsent("Custo")
         assertShown("Respostas")
+    }
+
+    @Test
+    fun `changing the sort order brings the list back to the top after scrolling down`() =
+        runDesktopComposeUiTest(width = 1_200, height = 700) {
+            setContent { ScreenTestTheme { CliUsageBreakdownPane(manyProjects(), errorMessage = null, language = AppLanguage.PT) } }
+            // Página de 50 linhas: com 40 projetos a lista cabe na cena e não há o que rolar.
+            onNodeWithText("50").performClick()
+            waitForIdle()
+
+            onRoot().performMouseInput { moveTo(center); repeat(200) { scroll(1f) } }
+            waitForIdle()
+            // Pré-condição: a linha que vai ao topo com a nova ordem já saiu da janela.
+            onNodeWithText("proj39").assertIsNotDisplayed()
+
+            onNodeWithTag("$BREAKDOWN_SORT_TAG_PREFIX${BreakdownSort.NAME.name}").performClick()
+            waitForIdle()
+
+            onNodeWithText("proj39").assertIsDisplayed()
+        }
+
+    private fun manyProjects(): CliUsageBreakdown {
+        val buckets = (0 until 40).map { index ->
+            CliUsageBucket(label = "proj%02d".format(index), turnCount = index + 1, costMicros = 1_000_000L)
+        }
+        return CliUsageBreakdown(byProject = buckets, totals = buckets.last())
     }
 
     private fun ComposeUiTest.assertShown(text: String) {

@@ -306,7 +306,8 @@ internal fun CliUsageBreakdownPane(
                 query = query,
                 language = language,
                 modifier = Modifier.weight(1f),
-                header = summary
+                header = summary,
+                scrollKey = listOf(sort, descending)
             ) {
                 rows()
             }
@@ -503,10 +504,12 @@ private fun BreakdownList(
     language: AppLanguage,
     modifier: Modifier = Modifier,
     header: (androidx.compose.foundation.lazy.LazyListScope.() -> Unit)? = null,
+    scrollKey: Any? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         val listState = rememberLazyListState()
+        ScrollToTopOnSortChange(listState = listState, sort = scrollKey)
 
         LazyColumn(
             state = listState,
