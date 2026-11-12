@@ -63,6 +63,40 @@ class AntigravityUsageMapperTest {
     }
 
     /**
+     * Caracterização do `agy` 1.4+: o grupo "Gemini 4 Argon" chega como terceiro grupo, com
+     * bucket próprio. Não pode sobrescrever o Gemini semanal nem colidir no rótulo.
+     */
+    @Test
+    fun `a third group with its own bucket keeps a distinct quota next to the shared gemini one`() {
+        val stats = AntigravityUsageMapper.parse(envelope(groups = THREE_GROUPS))
+
+        assertEquals(
+            listOf("Antigravity Gemini 7d", "Antigravity Claude/GPT 7d", "Antigravity Gemini 4 Argon 7d"),
+            stats.quotas.map { it.label }
+        )
+        assertEquals(stats.quotas.size, stats.quotas.map { it.label }.toSet().size)
+
+        val gemini = stats.quotas.single { it.label == "Antigravity Gemini 7d" }
+        // Fração 0,9758 restante → 2,42% usado, truncado. O Argon não mexe nisso.
+        assertEquals(2L, gemini.used)
+        assertEquals(Instant.parse("2026-09-30T21:57:08Z"), gemini.periodEndAt)
+        assertTrue(gemini.hasKnownResetAt)
+
+        val claude = stats.quotas.single { it.label == "Antigravity Claude/GPT 7d" }
+        assertEquals(0L, claude.used)
+        assertFalse(claude.hasKnownResetAt)
+
+        val argon = stats.quotas.single { it.label == "Antigravity Gemini 4 Argon 7d" }
+        assertEquals(UsageUnit.PERCENTAGE, argon.unit)
+        assertEquals(100L, argon.total)
+        // Fração 0 restante → pool esgotado.
+        assertEquals(100L, argon.used)
+        assertEquals(PeriodType.WEEKLY, argon.periodType)
+        assertTrue(argon.hasKnownResetAt)
+        assertEquals(Instant.parse("2026-10-24T01:10:47Z"), argon.periodEndAt)
+    }
+
+    /**
      * Medido: com a janela intacta o `reset_time` é "agora + 7 dias" e andou de
      * 00:38:35 para 00:45:04 entre chamadas. Tomado como reset real, cada coleta
      * pareceria um período novo.
@@ -155,6 +189,16 @@ class AntigravityUsageMapperTest {
                 {"id":"gemini-5h","name":"Five Hour Limit Remaining","window":"five_hour","remaining_fraction":0.78,"reset_time":"2026-09-24T06:12:31Z"}]},
             {"name":"Claude and GPT models","buckets":[
                 {"id":"3p-weekly","name":"Weekly Limit Remaining","window":"weekly","remaining_fraction":1,"reset_time":"2026-10-01T00:38:53Z"}]}
+        ]"""
+
+        /** Forma real de `agy` 1.5.7 (dois grupos) mais o grupo Argon de `agy` 1.4.0 (akitaonrails/ai-usagebar#450). */
+        const val THREE_GROUPS = """[
+            {"name":"Gemini Models","buckets":[
+                {"id":"gemini-weekly","window":"weekly","remaining_fraction":0.9758,"reset_time":"2026-09-30T21:57:08Z"}]},
+            {"name":"Claude and GPT models","buckets":[
+                {"id":"3p-weekly","window":"weekly","remaining_fraction":1}]},
+            {"name":"Gemini 4 Argon","buckets":[
+                {"id":"gemini-argon-wtu-weekly","window":"weekly","remaining_fraction":0,"reset_time":"2026-10-24T01:10:47Z"}]}
         ]"""
     }
 }
