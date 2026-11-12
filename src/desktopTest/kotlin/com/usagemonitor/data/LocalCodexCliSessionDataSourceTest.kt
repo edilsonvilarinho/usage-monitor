@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import java.sql.DriverManager
 import kotlin.time.Instant
 
 class LocalCodexCliSessionDataSourceTest {
@@ -186,6 +187,65 @@ class LocalCodexCliSessionDataSourceTest {
 
             // 12:00:01 -> 12:02:01 = 120 s; 12:02:01 -> 12:30:01 = 28 min, acima do corte.
             assertEquals(120_000L, dataSource.readSessions().single().activeMillis)
+        }
+    }
+
+    @Test
+    fun `turn context read in an earlier sync fills the model of a usage record appended later`() = runTest {
+        withFixture { home, dataSource ->
+            val file = rolloutFile(home)
+            file.writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test")
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+
+            file.appendText(usageLine("turn-1", "response-1", "2026-09-08T12:00:01Z", 100, 40, 5, 20, 7, 132) + "\n")
+            dataSource.syncIndex()
+
+            assertEquals("gpt-test", dataSource.readSession("session-1")?.turns?.single()?.model)
+        }
+    }
+
+    @Test
+    fun `index version bump refills a turn model stored as NULL`() = runTest {
+        withFixture { home, dataSource ->
+            val file = rolloutFile(home)
+            file.writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:01Z", 100, 40, 5, 20, 7, 132)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+            // Simula o índice gravado pela versão 1: modelo NULL e versão de índice 1.
+            rewriteIndexAsVersionOne(File(home.parentFile, "history.db"))
+            // A migração de versão roda ao abrir o banco: o reinício do coletor reabre a conexão.
+            dataSource.close()
+            val reopened = LocalCodexCliSessionDataSource(
+                codexHomeProvider = { home },
+                databaseFile = File(home.parentFile, "history.db")
+            )
+            try {
+                val report = reopened.syncIndex()
+
+                assertEquals("gpt-test", reopened.readSession("session-1")?.turns?.single()?.model)
+                assertEquals(1, report.updatedFiles)
+            } finally {
+                reopened.close()
+            }
+        }
+    }
+
+    private fun rewriteIndexAsVersionOne(databaseFile: File) {
+        DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate("UPDATE codex_cli_turns SET model = NULL")
+                statement.executeUpdate("UPDATE codex_cli_index_meta SET value = '1' WHERE key = 'schema_version'")
+            }
         }
     }
 
