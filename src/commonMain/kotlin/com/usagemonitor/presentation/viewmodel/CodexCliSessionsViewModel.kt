@@ -47,7 +47,9 @@ sealed interface CodexCliSessionsUiState {
         val isRefreshing: Boolean = false,
         val exportOutcome: CodexCliExportOutcome? = null,
         /** Lista ou Resumo (#384) — o mesmo par de abas do modal do Anthropic. */
-        val view: CliSessionsView = CliSessionsView.SESSIONS
+        val view: CliSessionsView = CliSessionsView.SESSIONS,
+        /** Última mudança do conteúdo da lista (não da leitura); nulo até a primeira leitura. */
+        val lastChangedAt: Instant? = null
     ) : CodexCliSessionsUiState
 }
 
@@ -122,6 +124,13 @@ class CodexCliSessionsViewModel(
                         }
                     }
                     val latest = _uiState.value as? CodexCliSessionsUiState.Success
+                    // Mesma regra do Anthropic: o carimbo anda só quando o conteúdo muda, não a cada leitura.
+                    val lastChangedAt = when {
+                        latest == null -> clock.now()
+                        latest.sessions != loaded.sessions ||
+                            latest.indexWarning != loaded.indexError?.message -> clock.now()
+                        else -> latest.lastChangedAt
+                    }
                     _uiState.value = CodexCliSessionsUiState.Success(
                         sessions = loaded.sessions,
                         range = requestedRange,
@@ -132,7 +141,8 @@ class CodexCliSessionsViewModel(
                         detailLoading = latest?.detailLoading ?: false,
                         exportOutcome = latest?.exportOutcome,
                         isRefreshing = false,
-                        view = latest?.view ?: CliSessionsView.SESSIONS
+                        view = latest?.view ?: CliSessionsView.SESSIONS,
+                        lastChangedAt = lastChangedAt
                     )
                 },
                 onFailure = { error ->

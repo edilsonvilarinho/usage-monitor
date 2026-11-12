@@ -34,6 +34,7 @@ import com.usagemonitor.presentation.codexCacheRateOf
 import com.usagemonitor.presentation.nextCliSessionSort
 import com.usagemonitor.presentation.sortCodexCliSessions
 import com.usagemonitor.presentation.ui.components.AppBanner
+import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppCellValue
@@ -111,11 +112,10 @@ fun CodexCliSessionsScreen(
                             )
                         } else {
                             Text(
-                                text = if (language == AppLanguage.PT) {
-                                    "Atualizado ${formatInstant(current.readAt)}"
-                                } else {
-                                    "Updated ${formatInstant(current.readAt)}"
-                                },
+                                text = CliSessionsLabels.lastChange(
+                                    current.lastChangedAt?.let { formatInstant(it) },
+                                    language
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -419,7 +419,17 @@ private fun CodexCliSessionRow(
                     modifier = Modifier.width(CODEX_SESSION_ID_COLUMN),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
                 ) {
-                    AppCellValue(shortCodexId(session.sessionId))
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                    ) {
+                        AppCellValue(shortCodexId(session.sessionId))
+                        CopySessionCommandButton(
+                            sessionId = session.sessionId,
+                            language = language,
+                            command = codexResumeSessionCommand(session.sessionId)
+                        )
+                    }
                     Text(
                         text = formatInstant(session.lastTs),
                         style = MaterialTheme.typography.labelSmall,

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,6 +38,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
@@ -54,7 +56,7 @@ class CodexCliSessionsScreenTest {
             setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
             onNodeWithText("Fonte local: Codex").assertExists()
-            onNodeWithText("Atualizado", substring = true).assertExists()
+            onNodeWithText("última alteração", substring = true).assertExists()
             onNodeWithText(shortCodexId(LONG_SESSION_ID)).assertExists()
             onNodeWithText("usage-monitor").assertExists()
             onNodeWithText("3 turno(s)").assertExists()
@@ -72,7 +74,7 @@ class CodexCliSessionsScreenTest {
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.EN) } }
 
         onNodeWithText("Local source: Codex").assertExists()
-        onNodeWithText("Updated", substring = true).assertExists()
+        onNodeWithText("last change", substring = true).assertExists()
         onNodeWithText("3 turn(s)").assertExists()
         onNodeWithText("All time").assertExists()
         viewModel.onDestroy()
@@ -92,6 +94,19 @@ class CodexCliSessionsScreenTest {
             assertEquals(
                 CliSessionsView.BREAKDOWN,
                 assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).view
+            )
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `each codex row offers the copy button for its resume command`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            assertTrue(
+                onAllNodesWithContentDescription("Copiar comando de retomada").fetchSemanticsNodes().isNotEmpty(),
+                "A linha do Codex precisa oferecer o botão de copiar comando de retomada"
             )
             viewModel.onDestroy()
         }

@@ -231,6 +231,32 @@ class CodexCliSessionsViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `last change moves only when the session list changes`() = runTest {
+        val repository = FakeRepository()
+        val clock = MovingClock(kotlin.time.Instant.parse("2026-09-08T12:00:00Z"))
+        val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler), clock = clock)
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        val firstChange = assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).lastChangedAt
+        assertEquals(kotlin.time.Instant.parse("2026-09-08T12:00:00Z"), firstChange)
+
+        clock.current = kotlin.time.Instant.parse("2026-09-08T12:05:00Z")
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        val unchanged = assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).lastChangedAt
+        assertEquals(firstChange, unchanged)
+
+        repository.listedSessionId = "session-2"
+        clock.current = kotlin.time.Instant.parse("2026-09-08T12:10:00Z")
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        val moved = assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).lastChangedAt
+        assertEquals(kotlin.time.Instant.parse("2026-09-08T12:10:00Z"), moved)
+        viewModel.onDestroy()
+    }
+
     private fun viewModel(
         repository: FakeRepository,
         dispatcher: CoroutineDispatcher,
@@ -247,6 +273,10 @@ class CodexCliSessionsViewModelTest {
         )
     }
 
+    private class MovingClock(var current: kotlin.time.Instant) : Clock {
+        override fun now(): kotlin.time.Instant = current
+    }
+
     private class FakeRepository(
         private val indexFailure: Throwable? = null,
         private val readFailure: Throwable? = null
@@ -254,6 +284,7 @@ class CodexCliSessionsViewModelTest {
         var lastSince: Long? = Long.MIN_VALUE
         var syncCalls: Int = 0
         var detailCalls: Int = 0
+        var listedSessionId: String = "session-1"
 
         override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> {
             syncCalls++
@@ -274,7 +305,7 @@ class CodexCliSessionsViewModelTest {
 
         private fun summary(): CodexCliSessionSummary {
             return CodexCliSessionSummary(
-                sessionId = "session-1",
+                sessionId = listedSessionId,
                 filePath = "rollout.jsonl",
                 firstTs = Instant.parse("2026-09-08T12:00:00Z"),
                 lastTs = Instant.parse("2026-09-08T12:00:01Z"),

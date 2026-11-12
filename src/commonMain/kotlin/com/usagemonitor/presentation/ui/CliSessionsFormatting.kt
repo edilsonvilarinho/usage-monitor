@@ -49,6 +49,11 @@ internal fun resumeSessionCommand(sessionId: String): String {
     return "claude --resume $sessionId"
 }
 
+/** Comando que retoma uma sessão do Codex CLI. */
+internal fun codexResumeSessionCommand(sessionId: String): String {
+    return "codex resume $sessionId"
+}
+
 internal fun cliSessionsTitle(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Sessões CLI" else "CLI Sessions"
 }
