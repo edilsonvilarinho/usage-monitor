@@ -1,0 +1,63 @@
+# Minimizar uma fonte na barra HUD sem desabilitá-la — issue #576
+
+Procedência: Claude Opus 5.5, Claude Code CLI no Windows 11, 2026-11-12, branch `feat/issue-576-hud-minimize`,
+commits com a identidade `claude <claude@anthropic.com>`. Implementação por agentes `frontend-dev` (TDD).
+
+## Objetivo
+
+O usuário quer encolher uma conta na HUD sem desabilitá-la: coleta, alertas, histórico e cadência continuam; só o
+espaço no notch cai. Direção escolhida na rodada AP (`prototipos/issue-576/`): **AP1 · Anã branca** — botão
+"Minimizar" no balão da conta; o anel contrai de 64 para 28 dp e a linha de foco (`focusLine`, ex. `5h 61%`) vai para
+a direita do anel; "Restaurar" no mesmo balão; 520 ms em cada sentido.
+
+## Fatos confirmados (2026-11-12, `0e77f163`)
+
+- Identidade de conta: `UsageTargetKey.storageKey` (`domain/entity/UsageTargetKey.kt:32`), ex. `ANTHROPIC:<perfil>`,
+  `CODEX`, `DEEPSEEK`; cobre todas as fontes (o `AnthropicProfileRegistry` só cobre perfis Anthropic).
+- Preferências da HUD: `HudWindowPreferences.kt` (`PreferencesSettings`; `hudEdge`, `hudAutoRetract`…), sem chave por
+  conta.
+- Geometria: `hudNotchSizes` (`HudNotchGeometry.kt:162`), altura por conta na lateral em `verticalCollapsed`
+  (`:419-453`); `HUD_RING_SIZE = AppGargantuaTokens.size` (64 dp, `:52`). Arquivo com 704 linhas: código novo de
+  geometria vai em arquivo próprio.
+- Célula: `HudRingItem` (`presentation/ui/HudRingStrip.kt:163`), `besideFrame` já põe texto ao lado do anel (`:335`).
+- Balão: `HudAccountActions` (`HudWindow.kt:454`) desenha `cardActionsFor(...)` (`CardActions.kt:26-37`).
+- Saída K1: janela só muda no fim, corpo desenhado (`hudNotchSizesWithDeparture`, `HudNotchGeometry.kt:218`;
+  `HudPresence.kt:72-79`).
+
+## Decisões
+
+- **Minimizar não é desabilitar:** nada em `enabledApis`, `DashboardTargetFetcher` ou alertas muda.
+- **Persistência:** conjunto de `storageKey` em `HudWindowPreferences` (chave `hudMinimizedAccounts`); chave de conta
+  que deixou de existir é ignorada na leitura, não apagada.
+- **Botão fora do `CardAction`:** a regra "nenhum valor novo em enum existente" proíbe `CardAction.MINIMIZE`, e o card
+  da grade não minimiza. O balão da HUD ganha um controle próprio depois das ações de `cardActionsFor`.
+- **Geometria:** conta minimizada mede `max(28 dp, linha de foco)` no eixo da faixa; o texto fica ao lado do anel nas
+  duas orientações. Token `AppGargantuaTokens.minimizedSize = 28.dp` e `minimizeMillis = 520`, espelhados em
+  `spacing.css`/`motion.css`.
+- **Transição:** mesma regra do K1 — janela muda só quando a área encolhe (no fim) ou antes de crescer; o corpo é
+  desenhado; sem overshoot; "reduzir animações" corta seco.
+
+## Atividades
+
+| Id | O quê |
+|---|---|
+| A01 | Este plano. |
+| A02 | Conjunto de contas minimizadas: funções puras (alternar, ler, gravar) + chave em `HudWindowPreferences`. |
+| A03 | `HudAccount.minimized` e geometria (`hudNotchSizes` nas duas orientações) com teste de tamanho. |
+| A04 | Célula minimizada (anel 28 dp + linha ao lado) e transição de 520 ms, corpo desenhado como no K1. |
+| A05 | Botão Minimizar/Restaurar no balão da conta, ligado à preferência. |
+| A06 | Docs: `docs/hud-notch.md`, design system (tokens e contrato), `prototipo-visual-opencode.html`, histórico AP na skill de opções visuais. |
+
+## Ponto de situação
+
+Cada linha é escrita no commit da atividade que descreve, com o comando executado e o resultado.
+
+| Atividade | Alteração | Comando e resultado |
+|---|---|---|
+| A01 | Plano criado. | Sem harness de teste (documento); validado por leitura dos pontos citados no código em `0e77f163`. |
+
+## Problemas em aberto e riscos
+
+- Host de janela (#342): mudança de tamanho da HUD só testada no Windows; abrir no Linux (X11) antes do merge ou
+  declarar o risco no PR.
+- HUD no navegador (#388) e modo terminal continuam mostrando a conta inteira (fora do escopo).
