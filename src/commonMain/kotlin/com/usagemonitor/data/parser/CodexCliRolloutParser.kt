@@ -24,11 +24,17 @@ data class CodexCliRolloutMetadata(
     val cliVersion: String? = null
 )
 
+data class CodexCliTurnContext(
+    val model: String? = null,
+    val cwd: String? = null
+)
+
 data class CodexCliParsedRollout(
     val metadata: CodexCliRolloutMetadata? = null,
     val turns: List<CodexCliSessionTurn> = emptyList(),
     val skippedLines: Int = 0,
-    val unknownLines: Int = 0
+    val unknownLines: Int = 0,
+    val turnContexts: Map<String, CodexCliTurnContext> = emptyMap()
 )
 
 /**
@@ -42,17 +48,24 @@ class CodexCliRolloutParser(
         isLenient = true
     }
 ) {
-    fun parse(lines: Iterable<String>, knownMetadata: CodexCliRolloutMetadata? = null): CodexCliParsedRollout {
+    fun parse(
+        lines: Iterable<String>,
+        knownMetadata: CodexCliRolloutMetadata? = null,
+        knownContexts: Map<String, CodexCliTurnContext> = emptyMap()
+    ): CodexCliParsedRollout {
         var metadata = knownMetadata
         var skippedLines = 0
         var unknownLines = 0
         var sequence = 0
-        val contexts = mutableMapOf<String, TurnContext>()
         val turns = mutableListOf<CodexCliSessionTurn>()
         // Última entrada que dispara um pedido ao modelo: contexto de turno,
         // saída de ferramenta ou mensagem do usuário. Medido em 2026-10-06:
         // `token_usage_record − essa entrada` dá 32 tok/s de mediana (#381).
         var lastRequestAt: Instant? = null
+        // Contextos conhecidos de trechos anteriores, mais os vistos neste trecho.
+        val contexts = knownContexts.toMutableMap()
+        // Só os `turn_context` deste trecho: é o que o chamador persiste para o próximo.
+        val seenContexts = linkedMapOf<String, CodexCliTurnContext>()
 
         for (rawLine in lines) {
             if (rawLine.isBlank()) {
@@ -102,10 +115,12 @@ class CodexCliRolloutParser(
                     val turnId = payload?.turnId?.takeIf { value -> value.isNotBlank() }
                     lastRequestAt = rawLine.requestTimestamp() ?: lastRequestAt
                     if (turnId != null) {
-                        contexts[turnId] = TurnContext(
+                        val context = CodexCliTurnContext(
                             model = payload.model,
                             cwd = payload.cwd
                         )
+                        contexts[turnId] = context
+                        seenContexts[turnId] = context
                     }
                 }
 
@@ -166,7 +181,8 @@ class CodexCliRolloutParser(
             metadata = metadata,
             turns = turns,
             skippedLines = skippedLines,
-            unknownLines = unknownLines
+            unknownLines = unknownLines,
+            turnContexts = seenContexts
         )
     }
 
@@ -197,11 +213,6 @@ class CodexCliRolloutParser(
         val value = (this as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: return null
         return value.takeIf { number -> number >= 0L }
     }
-
-    private data class TurnContext(
-        val model: String?,
-        val cwd: String?
-    )
 
     private companion object {
         const val SESSION_META_TYPE = "session_meta"

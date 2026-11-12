@@ -53,6 +53,7 @@ lenta. Corrigir a atribuição de modelo (causa medida) e medir a lentidão ante
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito com as medições acima | — |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.*"` → `CodexCliRolloutParserTest.kt:97`, `LocalCodexCliSessionDataSourceTest.kt:208` e `:229`: `expected:<gpt-test> but was:<null>`; verde: o mesmo comando → BUILD SUCCESSFUL, 666 testes, 0 falhas. Contextos em `codex_cli_turn_contexts` (`CodexCliTurnContextStore.kt`), `CODEX_INDEX_VERSION` 2, upsert com `COALESCE` em `model`/`cwd`; data source com 700 linhas | verde |
 
 ## Problemas em aberto e riscos
 
