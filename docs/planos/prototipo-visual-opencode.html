@@ -1737,7 +1737,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 <p class="note"><b>Grade 2×2 de gráficos por turno (#393, direção T3).</b> O detalhe deixa de ter um gráfico só no primeiro nível: contexto, acerto do cache, saída e custo × economia acumulados ficam lado a lado (uma coluna abaixo de 600dp). "Avançado" fica com a composição, a distribuição do custo, a economia e o cache gravado 5m/1h. O bloco "Taxa de acerto de cache" do resumo virou "Acerto do cache": com o <code>?</code> o rótulo longo cortava em 168dp.</p>
 
 <div class="win">
-  <div class="titlebar"><span class="t">Sessões Codex CLI</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="titlebar"><span class="t">Sessões Codex CLI — Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
   <div class="body">
     <div class="hstack"><button class="btn ghost" type="button">← Voltar</button><span class="v sm">01a111fa…</span></div>
     <div class="g4">
@@ -1771,6 +1771,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 <p class="note"><b>Período e exportação do Codex iguais aos do Claude (#558).</b> A lista do Codex usa o mesmo segmentado da janela "Sessões CLI" — 5h · 7 dias · 30 dias · Total — e os mesmos rótulos "Exportar CSV" e "Exportar JSON". O enum próprio do Codex (5h/7d/Tudo) saiu: o período é o <code>CliSessionRange</code> do Claude, com corte corrido.</p>
 <p class="note"><b>Resumo e linha do Codex com tempo ativo (#558).</b> O resumo ganha o bloco "Tempo ativo" (soma dos intervalos entre respostas abaixo do corte, a mesma regra do Claude; "—" quando nenhuma sessão foi medida) e, abaixo dos blocos, a linha <code>in · out · cache lido · cache gravado</code>, com <code>in</code> = entrada menos cache lido (o <code>input_tokens</code> do Codex inclui o cache). A linha ganha a coluna "Tempo ativo" (76dp); sessão e projeto cedem 10dp cada para caber em 960dp. Sem custo: o app não tem tarifa do Codex.</p>
 <p class="note"><b>Copiar e rodapé do Codex (#558).</b> A linha do Codex tem o mesmo botão de copiar do Claude, que copia <code>codex resume &lt;id&gt;</code> (o Claude copia <code>claude --resume &lt;id&gt;</code>). O rodapé diz "última alteração" e só anda quando a lista muda, não a cada leitura — o mesmo critério da janela "Sessões CLI".</p>
+<p class="note"><b>Conta no título do Codex (#558).</b> Como no Claude, o título diz de quem é a conta: o card e a HUD mostram "Codex — Padrão" para a conta padrão (<code>~/.codex</code>) e a janela "Sessões Codex CLI — Padrão". A janela lê só a conta padrão; contas extras ainda abrem a mesma janela.</p>
 
 <!-- ═══════════════════════════════ RESUMO ════════════════════════════ -->
 <h2 id="resumo">8 · Resumo por eixo</h2>

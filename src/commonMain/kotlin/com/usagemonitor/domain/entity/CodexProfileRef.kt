@@ -16,4 +16,9 @@ data class CodexProfileRef(
         require(id.isNotBlank()) { "O identificador do perfil Codex não pode ser vazio." }
         require(label.isNotBlank()) { "O nome do perfil Codex não pode ser vazio." }
     }
+
+    companion object {
+        /** Rótulo da conta padrão (`~/.codex`), espelho de `AnthropicProfileRef.DEFAULT`. */
+        const val DEFAULT_LABEL = "Padrão"
+    }
 }

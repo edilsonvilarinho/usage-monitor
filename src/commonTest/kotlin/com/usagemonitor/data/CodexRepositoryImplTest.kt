@@ -264,6 +264,15 @@ class CodexRepositoryImplTest {
     }
 
     @Test
+    fun `the default account is labelled Padrão so the card reads Codex — Padrão`() = runTest {
+        val repository = repositoryWith(FakeCodexDataSource())
+
+        val stats = repository.getUsage().getOrThrow()
+
+        assertEquals("Padrão", stats.profileLabel)
+    }
+
+    @Test
     fun `a profile no longer in the registry fails instead of reading the default account`() = runTest {
         val repository = repositoryWith(FakeCodexDataSource())
 

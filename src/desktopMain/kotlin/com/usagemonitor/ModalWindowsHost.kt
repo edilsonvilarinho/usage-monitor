@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CodexProfileRef
 import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.presentation.ui.AppDialogWindow
 import com.usagemonitor.presentation.ui.TeamSelectorUi
@@ -25,6 +26,7 @@ import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
 import com.usagemonitor.presentation.ui.TeamPresenceScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
+import com.usagemonitor.presentation.ui.codexCliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.rememberLastNonNull
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
@@ -98,7 +100,7 @@ internal fun ModalWindowsHost(
 
     AppDialogWindow(
         visible = modal.isCodexCliSessionsOpen,
-        title = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI sessions",
+        title = codexCliSessionsWindowTitle(language, CodexProfileRef.DEFAULT_LABEL),
         state = windows.codexCliSessions,
         environment = environment,
         diagnosticName = "sessões Codex CLI",

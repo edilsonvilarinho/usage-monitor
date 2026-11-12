@@ -67,6 +67,15 @@ internal fun cliSessionsWindowTitle(language: AppLanguage, profileLabel: String?
     return "$base — $profileLabel"
 }
 
+/** Título da janela de sessões do Codex CLI, nomeando a conta lida (ex.: "Padrão"). */
+internal fun codexCliSessionsWindowTitle(language: AppLanguage, profileLabel: String): String {
+    val base = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI Sessions"
+    if (profileLabel.isBlank()) {
+        return base
+    }
+    return "$base — $profileLabel"
+}
+
 internal object CliSessionsLabels {
 
     fun sessionCount(count: Int, language: AppLanguage): String {
