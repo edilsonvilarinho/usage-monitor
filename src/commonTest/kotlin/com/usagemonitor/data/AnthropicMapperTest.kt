@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import kotlinx.serialization.json.Json
@@ -367,6 +368,36 @@ class AnthropicMapperTest {
         assertEquals(55134L, credits.rawUsed)
         assertEquals(57000L, credits.rawTotal)
         assertEquals("BRL", credits.currencyCode)
+    }
+
+    @Test
+    fun `keeps the credits row when the server blocked extra_usage out of credits`() {
+        // Payload real da conta sem saldo (probe em 2026-11-12): a linha some hoje.
+        val response = sampleResponse.copy(
+            extraUsage = AnthropicExtraUsage(
+                isEnabled = false,
+                monthlyLimit = 57000L,
+                usedCredits = 0.0,
+                utilization = 0.0,
+                currency = "BRL",
+                decimalPlaces = 2,
+                disabledReason = "out_of_credits",
+                userDisabled = false,
+                spendLimitReached = false,
+                creditsEverEnabled = true
+            )
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(3, result.quotas.size)
+        val credits = result.quotas[2]
+        assertEquals(AnthropicQuotaLabels.EXTRA_CREDITS, credits.label)
+        assertEquals(QuotaBlockReason.OUT_OF_CREDITS, credits.blockReason)
+        assertEquals(57000L, credits.rawTotal)
+        assertEquals("BRL", credits.currencyCode)
+        // Bloqueio é estado da conta, não falha de leitura: nada a avisar.
+        assertEquals(emptySet(), result.notices)
     }
 
     @Test

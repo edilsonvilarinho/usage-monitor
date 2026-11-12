@@ -44,6 +44,7 @@ card. Mantê-la, com o gasto, o limite e o motivo por palavra.
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito com os fatos acima | — |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.*"` → 4 falhas de asserção (`AnthropicCreditsResolutionTest.kt:52` esperado `OUT_OF_CREDITS`, obtido `null`; `:81` `SPEND_LIMIT_REACHED`; `:106` precedência; `AnthropicMapperTest.kt:393` linha ausente) com `QuotaBlockReason`/`blockReason` em stub; cache: `DashboardCacheMapperTest.kt:412` `AssertionError` no ida-e-volta; verde: `desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.*"` → 1282 testes, 0 falhas. `out_of_credits` vence `spend_limit_reached` quando os dois vêm; nome desconhecido no cache vira `null` e a cota fica | verde |
 
 ## Problemas em aberto e riscos
 

@@ -47,5 +47,7 @@ data class QuotaInfoCacheDto(
     // Default mantém legível o cache gravado antes da leitura de créditos.
     val currencyCode: String = "USD",
     // Nulo no cache gravado antes da marca de ritmo (issue #327).
-    val periodStartAtEpochMillis: Long? = null
+    val periodStartAtEpochMillis: Long? = null,
+    // Nulo no cache gravado antes do bloqueio de créditos (issue #567).
+    val blockReason: String? = null
 )

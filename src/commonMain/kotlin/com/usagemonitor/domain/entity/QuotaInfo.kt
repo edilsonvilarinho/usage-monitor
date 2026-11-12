@@ -36,7 +36,12 @@ data class QuotaInfo(
      * Anthropic o dá pelo nome da janela (`five_hour`, `seven_day`), Codex por
      * `limit_window_seconds` e MiniMax por `start_time`.
      */
-    val periodStartAt: Instant? = null
+    val periodStartAt: Instant? = null,
+    /**
+     * Motivo do bloqueio pela fonte (issue #567), ou `null` quando a cota está
+     * liberada. Só os créditos de uso o preenchem; a linha continua visível com ele.
+     */
+    val blockReason: QuotaBlockReason? = null
 ) {
     /**
      * Percentual de uso no período atual (valor entre 0.0 e 1.0).
