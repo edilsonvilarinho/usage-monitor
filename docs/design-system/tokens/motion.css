@@ -48,6 +48,8 @@
   /* Finite, after the collapse: the slot closes, the notch retracts and the
      neighbours unfold their lines (K1). The window resizes once, at the end. */
   --dur-gargantua-departure-settle: 450ms;
+  /* Finite: minimize/restore an account in the HUD (#576): ring 64 -> 28 dp, text cross-fade. */
+  --dur-gargantua-minimize: 520ms;
   /* Finite: account/gear balloon opens and closes (B3, relativistic jet). */
   --dur-gargantua-jet-open: 520ms;
   --dur-gargantua-jet-close: 240ms;
