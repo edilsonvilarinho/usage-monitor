@@ -50,6 +50,7 @@ para de registrar um `warn` por requisição repetida da mesma recusa.
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | Concluída | Sem harness de teste: documento. Validado pelas leituras de "Fatos confirmados". |
+| A03 | Concluída | Vermelho: `npx vitest run test/unit/labelRefusalLog.test.ts test/unit/labelRefusalWarn.test.ts`, 7 falhas, ex.: `labelRefusalWarn.test.ts:47: expected [ … ] to have a length of 1 but got 3` e `labelRefusalLog.test.ts:18: expected { warn: true, suppressed: +0 } to deeply equal { warn: false }`. Verde: mesmo comando 10/10; `npm run test:coverage` 26 arquivos, 337/337, linhas 96,05%; `npm run typecheck` exit 0. Teto do mapa: 1024 entradas. |
 
 ## Problemas em aberto e riscos
 
