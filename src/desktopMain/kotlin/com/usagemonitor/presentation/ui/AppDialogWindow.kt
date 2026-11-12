@@ -41,6 +41,7 @@ import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.theme.AppTheme
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
 import com.usagemonitor.presentation.ui.theme.appTweenSpec
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Mutex
@@ -83,6 +84,12 @@ internal data class ModalWindowEnvironment(
  * Era essa espera que fazia os modais parecerem lentos. Os laços ao vivo não
  * dependem disso: quem os para é o `closeWindow()` de cada ViewModel, chamado
  * por quem fecha, como antes.
+ *
+ * **Mas não fica para sempre: escondida há [MODAL_IDLE_RELEASE_MILLIS] (60 s,
+ * #562), a janela sai da composição e o Compose descarta a janela nativa.**
+ * Cada janela aberta segurava 180 a 250 MB fora da JVM que não voltavam ao
+ * fechar. Só vale para janela já aberta ([shouldReleaseHiddenModalWindow]); a
+ * liberada não é pré-aquecida de novo — a próxima abertura paga a criação.
  *
  * **A entrada espera o primeiro quadro pintado.** A janela aparece
  * **transparente**, o host aguarda dois quadros e só então toca o E9
@@ -234,24 +241,51 @@ private class ModalWindowHost(initial: ModalRequest) {
      */
     var contentOnScreen by mutableStateOf(false)
 
-    var opens: Int = 0
+    /** Aberturas concluídas. Observável: a composição do app lê para agendar a liberação. */
+    var opens by mutableStateOf(0)
+}
+
+/**
+ * Quem guarda a janela entre composições. [host] é observável: ao ser liberada,
+ * a composição do app recompõe e a janela nativa sai dela. [createdBefore] lembra
+ * que a janela já existiu, para que a liberada não seja pré-aquecida de novo.
+ */
+private class ModalHostSlot {
+    var host by mutableStateOf<ModalWindowHost?>(null)
+
+    var createdBefore: Boolean = false
 }
 
 /**
  * `null` até o primeiro pedido de abertura — ou até o pré-aquecimento, quando a
  * janela o pede: janela que nunca foi aberta não existe. Daí em diante ela só se
- * esconde.
+ * esconde, até ficar [MODAL_IDLE_RELEASE_MILLIS] escondida já aberta (#562): aí
+ * sai da composição e volta a `null`. Só um pedido de abertura a recria.
+ *
+ * A contagem roda aqui, na composição do app, e não na janela: janela escondida
+ * não recompõe, então nela o relógio da liberação não andaria.
  */
 @Composable
 private fun rememberModalWindowHost(visible: Boolean, openGeneration: Int, prewarm: Boolean): ModalWindowHost? {
     val request = ModalRequest(visible, openGeneration)
-    val holder = remember { LastValue<ModalWindowHost>() }
-    if (holder.value == null && (visible || prewarm)) {
-        holder.value = ModalWindowHost(request)
+    val slot = remember { ModalHostSlot() }
+    if (slot.host == null && shouldCreateModalWindow(visible, prewarm, slot.createdBefore)) {
+        slot.host = ModalWindowHost(request)
+        slot.createdBefore = true
     }
-    val host = holder.value ?: return null
+    val host = slot.host ?: return null
     SideEffect {
         host.requests.value = request
+    }
+    val onScreen = host.onScreen
+    val opens = host.opens
+    // Reinicia a contagem a cada mudança de pedido, de tela ou de aberturas: reabrir
+    // no meio dos 60 s cancela a liberação, e a próxima fechada a agenda de novo.
+    LaunchedEffect(host, visible, onScreen, opens) {
+        if (shouldReleaseHiddenModalWindow(visible, onScreen, opens)) {
+            delay(MODAL_IDLE_RELEASE_MILLIS)
+            slot.host = null
+        }
     }
     return host
 }
