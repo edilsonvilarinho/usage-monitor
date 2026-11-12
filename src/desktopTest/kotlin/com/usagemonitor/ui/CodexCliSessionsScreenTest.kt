@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,9 +26,10 @@ import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
 import com.usagemonitor.presentation.ui.ExportLabels
 import com.usagemonitor.presentation.ui.codexApplicationLabel
+import com.usagemonitor.presentation.ui.formatActiveTime
 import com.usagemonitor.presentation.ui.shortCodexId
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.UsageExportWriter
@@ -36,6 +38,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 /**
@@ -53,7 +56,7 @@ class CodexCliSessionsScreenTest {
             setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
             onNodeWithText("Fonte local: Codex").assertExists()
-            onNodeWithText("Atualizado", substring = true).assertExists()
+            onNodeWithText("última alteração", substring = true).assertExists()
             onNodeWithText(shortCodexId(LONG_SESSION_ID)).assertExists()
             onNodeWithText("usage-monitor").assertExists()
             onNodeWithText("3 turno(s)").assertExists()
@@ -61,7 +64,7 @@ class CodexCliSessionsScreenTest {
             onNodeWithText("Codex Desktop").assertExists()
             onNodeWithText("Codex CLI").assertExists()
             // Sem modelo nem projeto, a célula diz "—" em vez de ficar vazia.
-            onAllNodesWithText("—").assertCountEquals(2)
+            onAllNodesWithText("—").assertCountEquals(3)
             viewModel.onDestroy()
         }
 
@@ -71,9 +74,9 @@ class CodexCliSessionsScreenTest {
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.EN) } }
 
         onNodeWithText("Local source: Codex").assertExists()
-        onNodeWithText("Updated", substring = true).assertExists()
+        onNodeWithText("last change", substring = true).assertExists()
         onNodeWithText("3 turn(s)").assertExists()
-        onNodeWithText("All").assertExists()
+        onNodeWithText("All time").assertExists()
         viewModel.onDestroy()
     }
 
@@ -96,17 +99,44 @@ class CodexCliSessionsScreenTest {
         }
 
     @Test
+    fun `each codex row offers the copy button for its resume command`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            assertTrue(
+                onAllNodesWithContentDescription("Copiar comando de retomada").fetchSemanticsNodes().isNotEmpty(),
+                "A linha do Codex precisa oferecer o botão de copiar comando de retomada"
+            )
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `range and export labels match the anthropic window`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(FakeCodexRepository())
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        onNodeWithText("5h").assertExists()
+        onNodeWithText("7 dias").assertExists()
+        onNodeWithText("30 dias").assertExists()
+        onNodeWithText("Total").assertExists()
+        onNodeWithText("Exportar CSV").assertExists()
+        onNodeWithText("Exportar JSON").assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `range segment reloads with the chosen cutoff`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
         val repository = FakeCodexRepository()
         val viewModel = viewModel(repository)
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
-        onNodeWithText("Tudo").performClick()
+        onNodeWithText("Total").performClick()
         waitForIdle()
 
         assertNull(repository.lastSince)
         assertEquals(
-            CodexCliSessionRange.ALL,
+            CliSessionRange.ALL,
             assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
         )
         viewModel.onDestroy()
@@ -125,7 +155,7 @@ class CodexCliSessionsScreenTest {
             assertEquals(LONG_SESSION_ID, state.detail?.summary?.sessionId)
             // Detalhe aberto: barra de status e abas da lista saem da tela.
             onAllNodesWithText("Fonte local: Codex").assertCountEquals(0)
-            onAllNodesWithText("CSV").assertCountEquals(0)
+            onAllNodesWithText("Exportar CSV").assertCountEquals(0)
             viewModel.onDestroy()
         }
 
@@ -134,7 +164,7 @@ class CodexCliSessionsScreenTest {
         val viewModel = viewModel(FakeCodexRepository(), writer = { "C:/exports/codex.csv" })
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
-        onNodeWithText("CSV").performClick()
+        onNodeWithText("Exportar CSV").performClick()
         waitForIdle()
 
         onNodeWithText("C:/exports/codex.csv").assertExists()
@@ -146,7 +176,7 @@ class CodexCliSessionsScreenTest {
         val viewModel = viewModel(FakeCodexRepository(), writer = { error("disco cheio") })
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
-        onNodeWithText("JSON").performClick()
+        onNodeWithText("Exportar JSON").performClick()
         waitForIdle()
 
         onNodeWithText("disco cheio").assertExists()
@@ -287,6 +317,83 @@ class CodexCliSessionsScreenTest {
             onNodeWithText(shortCodexId(id)).fetchSemanticsNode().positionInRoot.y
         }
     }
+
+    @Test
+    fun `summary tile sums the active time of the sessions`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(
+            FakeCodexRepository(
+                sessions = listOf(
+                    summary(LONG_SESSION_ID).copy(activeMillis = 120_000L),
+                    summary(SHORT_SESSION_ID).copy(activeMillis = 3_900_000L)
+                )
+            )
+        )
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        // 2 min + 65 min = 67 min; a linha de cada sessão mostra a sua parte.
+        onNodeWithText(formatActiveTime(4_020_000L)).assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `summary tile shows a dash when no session has active time measured`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            // Sem medida, o tile diz "—" e não zero: zero é "medido e sem intervalo".
+            // Os dois "—" do fake são modelo e projeto; o terceiro é o tile.
+            onAllNodesWithText("—").assertCountEquals(3)
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `each row shows the active time of its own session`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(
+            FakeCodexRepository(
+                sessions = listOf(
+                    summary(LONG_SESSION_ID).copy(activeMillis = 120_000L),
+                    summary(SHORT_SESSION_ID).copy(activeMillis = 3_900_000L)
+                )
+            )
+        )
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        onNodeWithText(formatActiveTime(120_000L)).assertExists()
+        onNodeWithText(formatActiveTime(3_900_000L)).assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `summary tile shows the token breakdown in, out, cache read and cache write`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            // input_tokens inclui o cache lido: a parte faturável é input − cache lido.
+            val viewModel = viewModel(
+                FakeCodexRepository(
+                    sessions = listOf(
+                        summary(LONG_SESSION_ID).copy(
+                            inputTokens = 10_000L,
+                            cachedInputTokens = 8_000L,
+                            cacheWriteInputTokens = 500L,
+                            outputTokens = 2_500L,
+                            totalTokens = 12_500L
+                        )
+                    )
+                )
+            )
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            onNodeWithText(
+                CliSessionsLabels.tokensBreakdown(
+                    inputTokens = 2_000L,
+                    outputTokens = 2_500L,
+                    cacheReadTokens = 8_000L,
+                    cacheWriteTokens = 500L,
+                    language = AppLanguage.PT
+                )
+            ).assertExists()
+            viewModel.onDestroy()
+        }
 
     private fun rated(
         sessionId: String,

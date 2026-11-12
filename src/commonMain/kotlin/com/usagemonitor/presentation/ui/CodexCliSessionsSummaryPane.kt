@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -34,30 +36,66 @@ private val CODEX_BUCKET_NUMBER_COLUMN = 96.dp
 @Composable
 internal fun CodexCliSessionMetrics(sessions: List<CodexCliSessionSummary>, language: AppLanguage) {
     val throughput = sessions.map { session -> session.throughput }.combinedThroughput()
-    FlowRow(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
     ) {
-        AppMetricBlock(
-            label = CliSessionsLabels.columnSessions(language),
-            value = sessions.size.toString(),
-            modifier = Modifier.width(CODEX_METRIC_WIDTH)
-        )
-        AppMetricBlock(
-            label = CliSessionsLabels.columnTokens(language),
-            value = formatQuantity(sessions.sumOf { session -> session.totalTokens }),
-            modifier = Modifier.width(CODEX_METRIC_WIDTH)
-        )
-        if (throughput?.tokensPerSecond != null) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
+        ) {
             AppMetricBlock(
-                label = CliSessionsLabels.throughput(language),
-                value = formatThroughput(throughput),
-                footer = CliSessionsLabels.throughputFooter(language),
+                label = CliSessionsLabels.columnSessions(language),
+                value = sessions.size.toString(),
                 modifier = Modifier.width(CODEX_METRIC_WIDTH)
             )
+            AppMetricBlock(
+                label = CliSessionsLabels.columnTokens(language),
+                value = formatQuantity(sessions.sumOf { session -> session.totalTokens }),
+                modifier = Modifier.width(CODEX_METRIC_WIDTH)
+            )
+            AppMetricBlock(
+                label = CliSessionsLabels.activeTime(language),
+                value = codexActiveTimeValue(sessions),
+                modifier = Modifier.width(CODEX_METRIC_WIDTH)
+            )
+            if (throughput?.tokensPerSecond != null) {
+                AppMetricBlock(
+                    label = CliSessionsLabels.throughput(language),
+                    value = formatThroughput(throughput),
+                    footer = CliSessionsLabels.throughputFooter(language),
+                    modifier = Modifier.width(CODEX_METRIC_WIDTH)
+                )
+            }
         }
+        // Composição do total, fora dos blocos pelo mesmo motivo do Anthropic (a fileira perdia o alinhamento).
+        Text(
+            text = codexTokensBreakdown(sessions, language),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
+}
+
+/** Tempo ativo somado; `null` em todas as sessões = não medido, mostrado como "—". */
+private fun codexActiveTimeValue(sessions: List<CodexCliSessionSummary>): String {
+    val measured = sessions.mapNotNull { session -> session.activeMillis }
+    return if (measured.isEmpty()) "—" else formatActiveTime(measured.sum())
+}
+
+/**
+ * `in` é a parte faturável (input − cache lido), porque `input_tokens` do Codex
+ * inclui o cache lido. Mesmo formato do Anthropic: `in · out · cache lido · cache gravado`.
+ */
+private fun codexTokensBreakdown(sessions: List<CodexCliSessionSummary>, language: AppLanguage): String {
+    return CliSessionsLabels.tokensBreakdown(
+        inputTokens = sessions.sumOf { session -> (session.inputTokens - session.cachedInputTokens).coerceAtLeast(0L) },
+        outputTokens = sessions.sumOf { session -> session.outputTokens },
+        cacheReadTokens = sessions.sumOf { session -> session.cachedInputTokens },
+        cacheWriteTokens = sessions.sumOf { session -> session.cacheWriteInputTokens },
+        language = language
+    )
 }
 
 /** Aba Resumo do Codex: por projeto e por modelo principal da sessão. */

@@ -233,12 +233,22 @@ data class CliSessionActiveTime(
 )
 
 fun activeTimeMillisOf(turns: List<CliSessionTurn>): Long {
-    if (turns.size < 2) {
+    return activeMillisOfTimestamps(turns.map { turn -> turn.ts.toEpochMilliseconds() })
+}
+
+/**
+ * Regra de tempo ativo sobre instantes em epoch millis, compartilhada pelo Claude e pelo Codex.
+ *
+ * Soma os intervalos entre instantes consecutivos que ficam em `1 until` [TURN_GAP_CUTOFF_MILLIS];
+ * intervalo zero e pausa não entram. Os instantes precisam vir em ordem cronológica.
+ */
+fun activeMillisOfTimestamps(epochMillis: List<Long>): Long {
+    if (epochMillis.size < 2) {
         return 0L
     }
     var total = 0L
-    for (index in 1 until turns.size) {
-        val gap = turns[index].ts.toEpochMilliseconds() - turns[index - 1].ts.toEpochMilliseconds()
+    for (index in 1 until epochMillis.size) {
+        val gap = epochMillis[index] - epochMillis[index - 1]
         if (gap in 1 until TURN_GAP_CUTOFF_MILLIS) {
             total += gap
         }

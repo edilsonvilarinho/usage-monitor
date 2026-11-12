@@ -46,7 +46,9 @@ internal fun CopySessionCommandButton(
     /** `false` deixa só o ícone; o texto fica na tooltip, para a lista densa. */
     showLabel: Boolean = false,
     modifier: Modifier = Modifier,
-    onCopy: (String) -> Unit = rememberClipboardWriter()
+    onCopy: (String) -> Unit = rememberClipboardWriter(),
+    /** Comando copiado; o padrão é o do Claude, e a linha do Codex passa o `codex resume`. */
+    command: String = resumeSessionCommand(sessionId)
 ) {
     // Chaveado pela sessão: a lista se republica a cada tique do laço ao vivo, e
     // sem a chave a confirmação de uma linha apareceria na linha seguinte.
@@ -66,7 +68,7 @@ internal fun CopySessionCommandButton(
         CliSessionsLabels.copyResumeCommand(language)
     }
     val onClick = {
-        onCopy(resumeSessionCommand(sessionId))
+        onCopy(command)
         copied = true
     }
 

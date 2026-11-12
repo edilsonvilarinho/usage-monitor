@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.cliSessionsTitle
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
+import com.usagemonitor.presentation.ui.codexCliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.formatInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +27,12 @@ class CliSessionsLabelsTest {
         assertEquals("1 session", CliSessionsLabels.sessionCount(1, EN))
         assertEquals("3 sessions", CliSessionsLabels.sessionCount(3, EN))
         assertEquals("1 sessão", CliSessionsLabels.sessionCount(1, PT))
+    }
+
+    @Test
+    fun `codex window title names the account it reads`() {
+        assertEquals("Codex CLI Sessions — Padrão", codexCliSessionsWindowTitle(EN, "Padrão"))
+        assertEquals("Sessões Codex CLI — Padrão", codexCliSessionsWindowTitle(PT, "Padrão"))
     }
 
     @Test

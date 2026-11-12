@@ -13,6 +13,7 @@ import com.usagemonitor.domain.entity.CodexCliModelUsage
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
 import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
+import com.usagemonitor.domain.entity.activeMillisOfTimestamps
 import com.usagemonitor.domain.entity.combinedThroughput
 import com.usagemonitor.domain.entity.toCodexModelBreakdown
 import kotlinx.coroutines.Dispatchers
@@ -647,6 +648,7 @@ class LocalCodexCliSessionDataSource(
             reasoningOutputTokens = usage.sumOf { value -> value.reasoningOutputTokens },
             totalTokens = usage.sumOf { value -> value.totalTokens },
             throughput = turns.map { turn -> turn.throughput }.combinedThroughput(),
+            activeMillis = activeMillisOfTimestamps(turns.map { turn -> turn.ts.toEpochMilliseconds() }),
             modelBreakdown = turns.toCodexModelBreakdown()
         )
     }

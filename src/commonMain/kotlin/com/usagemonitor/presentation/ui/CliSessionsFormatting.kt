@@ -49,6 +49,11 @@ internal fun resumeSessionCommand(sessionId: String): String {
     return "claude --resume $sessionId"
 }
 
+/** Comando que retoma uma sessão do Codex CLI. */
+internal fun codexResumeSessionCommand(sessionId: String): String {
+    return "codex resume $sessionId"
+}
+
 internal fun cliSessionsTitle(language: AppLanguage): String {
     return if (language == AppLanguage.PT) "Sessões CLI" else "CLI Sessions"
 }
@@ -57,6 +62,15 @@ internal fun cliSessionsTitle(language: AppLanguage): String {
 internal fun cliSessionsWindowTitle(language: AppLanguage, profileLabel: String?): String {
     val base = cliSessionsTitle(language)
     if (profileLabel.isNullOrBlank()) {
+        return base
+    }
+    return "$base — $profileLabel"
+}
+
+/** Título da janela de sessões do Codex CLI, nomeando a conta lida (ex.: "Padrão"). */
+internal fun codexCliSessionsWindowTitle(language: AppLanguage, profileLabel: String): String {
+    val base = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI Sessions"
+    if (profileLabel.isBlank()) {
         return base
     }
     return "$base — $profileLabel"

@@ -34,6 +34,7 @@ import com.usagemonitor.presentation.codexCacheRateOf
 import com.usagemonitor.presentation.nextCliSessionSort
 import com.usagemonitor.presentation.sortCodexCliSessions
 import com.usagemonitor.presentation.ui.components.AppBanner
+import com.usagemonitor.presentation.ui.components.CopySessionCommandButton
 import com.usagemonitor.presentation.ui.components.AppButton
 import com.usagemonitor.presentation.ui.components.AppButtonTone
 import com.usagemonitor.presentation.ui.components.AppCellValue
@@ -63,15 +64,16 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CodexCliExportOutcome
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 
 // Com a coluna de vazão (#384) as sete colunas somam 880dp com os vãos; ID e
 // projeto cederam 30dp cada para a linha continuar sem quebrar em 960dp.
-private val CODEX_SESSION_ID_COLUMN = 140.dp
-private val CODEX_SESSION_PROJECT_COLUMN = 150.dp
+private val CODEX_SESSION_ID_COLUMN = 130.dp
+private val CODEX_SESSION_PROJECT_COLUMN = 140.dp
 private val CODEX_SESSION_THROUGHPUT_COLUMN = 84.dp
+private val CODEX_SESSION_ACTIVE_COLUMN = 76.dp
 private val CODEX_SESSION_MODEL_COLUMN = 130.dp
 private val CODEX_SESSION_RESPONSES_COLUMN = 84.dp
 private val CODEX_SESSION_TOKENS_COLUMN = 130.dp
@@ -110,11 +112,10 @@ fun CodexCliSessionsScreen(
                             )
                         } else {
                             Text(
-                                text = if (language == AppLanguage.PT) {
-                                    "Atualizado ${formatInstant(current.readAt)}"
-                                } else {
-                                    "Updated ${formatInstant(current.readAt)}"
-                                },
+                                text = CliSessionsLabels.lastChange(
+                                    current.lastChangedAt?.let { formatInstant(it) },
+                                    language
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -152,26 +153,22 @@ fun CodexCliSessionsScreen(
                 )
                 LiveBadge(language = language)
                 AppSegmentedControl(
-                    options = listOf(
-                        AppSegment("5h"),
-                        AppSegment("7d"),
-                        AppSegment(if (language == AppLanguage.PT) "Tudo" else "All")
-                    ),
+                    options = CliSessionRange.entries.map { AppSegment(CliSessionsLabels.rangeLabel(it, language)) },
                     selectedIndex = when (state) {
-                        is CodexCliSessionsUiState.Success -> CodexCliSessionRange.entries.indexOf(
+                        is CodexCliSessionsUiState.Success -> CliSessionRange.entries.indexOf(
                             (state as CodexCliSessionsUiState.Success).range
                         )
                         else -> 0
                     },
-                    onSelect = { index -> viewModel.setRange(CodexCliSessionRange.entries[index]) }
+                    onSelect = { index -> viewModel.setRange(CliSessionRange.entries[index]) }
                 )
                 AppButton(
-                    label = "CSV",
+                    label = ExportLabels.exportCsv(language),
                     onClick = { viewModel.exportCurrent(UsageExportFormat.CSV) },
                     tone = AppButtonTone.GHOST
                 )
                 AppButton(
-                    label = "JSON",
+                    label = ExportLabels.exportJson(language),
                     onClick = { viewModel.exportCurrent(UsageExportFormat.JSON) },
                     tone = AppButtonTone.GHOST
                 )
@@ -370,6 +367,10 @@ private fun CodexSessionColumnHeader(
             language = language,
             onSortChange = onSortChange
         )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.activeTime(language),
+            modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
+        )
     }
 }
 
@@ -393,6 +394,10 @@ private fun SortableCodexSessionHeader(
     )
 }
 
+/** Tempo ativo da linha: `null` = não medido, mostrado como "—"; zero continua "0min". */
+private fun codexActiveCell(activeMillis: Long?): String =
+    if (activeMillis == null) "—" else formatActiveTime(activeMillis)
+
 @Composable
 private fun CodexCliSessionRow(
     session: CodexCliSessionSummary,
@@ -414,7 +419,17 @@ private fun CodexCliSessionRow(
                     modifier = Modifier.width(CODEX_SESSION_ID_COLUMN),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
                 ) {
-                    AppCellValue(shortCodexId(session.sessionId))
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                    ) {
+                        AppCellValue(shortCodexId(session.sessionId))
+                        CopySessionCommandButton(
+                            sessionId = session.sessionId,
+                            language = language,
+                            command = codexResumeSessionCommand(session.sessionId)
+                        )
+                    }
                     Text(
                         text = formatInstant(session.lastTs),
                         style = MaterialTheme.typography.labelSmall,
@@ -459,6 +474,10 @@ private fun CodexCliSessionRow(
                 AppCellValue(
                     value = formatThroughput(session.throughput),
                     modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN)
+                )
+                AppCellValue(
+                    value = codexActiveCell(session.activeMillis),
+                    modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
                 )
             }
             Row(

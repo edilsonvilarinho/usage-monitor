@@ -11,7 +11,7 @@ import com.usagemonitor.presentation.ui.codexBucketsBy
 import com.usagemonitor.presentation.ui.formatPercent
 import com.usagemonitor.presentation.ui.formatQuantity
 import com.usagemonitor.presentation.ui.formatThroughput
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 
@@ -24,7 +24,7 @@ import kotlinx.datetime.TimeZone
  */
 fun reportForCodexCliSessions(
     sessions: List<CodexCliSessionSummary>,
-    range: CodexCliSessionRange,
+    range: CliSessionRange,
     language: AppLanguage,
     now: Instant,
     timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
@@ -122,12 +122,13 @@ private fun bucketSection(
     )
 }
 
-private fun rangeLabel(range: CodexCliSessionRange, language: AppLanguage): String {
+private fun rangeLabel(range: CliSessionRange, language: AppLanguage): String {
     val pt = language == AppLanguage.PT
     return when (range) {
-        CodexCliSessionRange.LAST_5H -> if (pt) "últimas 5h" else "last 5h"
-        CodexCliSessionRange.LAST_7D -> if (pt) "últimos 7 dias" else "last 7 days"
-        CodexCliSessionRange.ALL -> if (pt) "todo o histórico" else "all history"
+        CliSessionRange.LAST_5H -> if (pt) "últimas 5h" else "last 5h"
+        CliSessionRange.LAST_7D -> if (pt) "últimos 7 dias" else "last 7 days"
+        CliSessionRange.LAST_30D -> if (pt) "últimos 30 dias" else "last 30 days"
+        CliSessionRange.ALL -> if (pt) "todo o histórico" else "all history"
     }
 }
 
