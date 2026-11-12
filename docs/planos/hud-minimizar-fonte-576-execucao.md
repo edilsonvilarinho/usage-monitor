@@ -44,9 +44,10 @@ a direita do anel; "Restaurar" no mesmo balão; 520 ms em cada sentido.
 | A01 | Este plano. |
 | A02 | Conjunto de contas minimizadas: funções puras (alternar, ler, gravar) + chave em `HudWindowPreferences`. |
 | A03 | `HudAccount.minimized` e geometria (`hudNotchSizes` nas duas orientações) com teste de tamanho. |
-| A04 | Célula minimizada (anel 28 dp + linha ao lado) e transição de 520 ms, corpo desenhado como no K1. |
-| A05 | Botão Minimizar/Restaurar no balão da conta, ligado à preferência. |
-| A06 | Docs: `docs/hud-notch.md`, design system (tokens e contrato), `prototipo-visual-opencode.html`, histórico AP na skill de opções visuais. |
+| A04 | Célula minimizada estática (anel 28 dp + linha de foco ao lado, sem pílula), medida igual à geometria. |
+| A05 | Transição de 520 ms entre 64 e 28 dp, corpo desenhado como no K1, corte seco com animação reduzida. |
+| A06 | Botão Minimizar/Restaurar no balão da conta, ligado à preferência e ao `buildHudAccounts`. |
+| A07 | Docs: `docs/hud-notch.md`, design system (tokens e contrato), `prototipo-visual-opencode.html`, histórico AP na skill de opções visuais. |
 
 ## Ponto de situação
 
@@ -57,6 +58,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | A01 | Plano criado. | Sem harness de teste (documento); validado por leitura dos pontos citados no código em `0e77f163`. |
 | A02 | `HudMinimizedAccounts.kt` (alternar, gravar na ordem de publicação, ler descartando entrada inválida) + `hudMinimizedAccounts` em `HudWindowPreferences`. | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudMinimizedAccountsTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` → 9 falhas por asserção, ex. `HudMinimizedAccountsTest.kt:20 expected:<[UsageTargetKey(source=CODEX, profileId=null)]> but was:<[]>`. Verde: mesmo comando → `BUILD SUCCESSFUL`, 25 testes, 0 falhas. |
 | A03 | `HudAccount.minimized`, `buildHudAccounts(minimizedTargets)`, `AppGargantuaTokens.minimizedSize = 28.dp`, ramos minimizados em `hudNotchSizes` (helpers em `HudNotchMinimized.kt`); minimizada não soma pílula de estado. | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.presentation.HudModelTest"` → 3 `AssertionError` (`HudNotchGeometryTest.kt:599`, `:614`, `HudModelTest.kt:542`). Verde: mesmo comando → `BUILD SUCCESSFUL`, 74 testes, 0 falhas. |
+| A04 | `HudRingItem` minimizada: anel em `minimizedSize` (traço, vão e marca na mesma razão), linha de foco ao lado nas duas orientações, sem pílula; largura mínima = reserva da janela (`minimizedRingWithFocusWidth`, a estimativa tem 1 dp de folga). | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTest"` → `HudNotchTest.kt:236 Did not expect any node but found '1' node … contains 'Crítico'`; medição: `HudNotchTest.kt:257 expected:<76.0.dp> but was:<75.0.dp>`. Verde: mesmo comando → `BUILD SUCCESSFUL`, 74 testes, 0 falhas. |
 
 ## Problemas em aberto e riscos
 

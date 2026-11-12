@@ -92,6 +92,10 @@ import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HUD_NOTCH_DESCRIPTION
+import com.usagemonitor.presentation.ui.HUD_RING_ITEM_TEST_TAG
+import com.usagemonitor.minimizedRingWithFocusWidth
+import com.usagemonitor.minimizedRingWithFocusHeight
+import com.usagemonitor.presentation.ui.HUD_STATUS_PILL_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_COUNTDOWN_CLOCK_TAG
 import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
@@ -226,6 +230,52 @@ class HudNotchTest {
                 )
             }
         }
+    }
+
+    // ------------------------------------------------------------ minimizada (#576)
+
+    /** Minimizada: anel de 28 dp e a cota em foco ao lado; a palavra e a pílula saem. */
+    @Test
+    fun `conta minimizada mostra so a cota em foco e anel de 28 dp`() = runDesktopComposeUiTest {
+        setContent { notch(list = listOf(accounts.first().copy(minimized = true))) }
+
+        onNodeWithText("5h 28%").assertIsDisplayed()
+        onNodeWithText("Crítico").assertDoesNotExist()
+        onNodeWithTag(HUD_STATUS_PILL_TEST_TAG).assertDoesNotExist()
+        val ring = onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(28.dp, ring.width, "largura do anel minimizado")
+        assertEquals(28.dp, ring.height, "altura do anel minimizado")
+    }
+
+    /** Célula minimizada na lateral: largura e altura são as da geometria (anel + vão + linha de foco). */
+    @Test
+    fun `celula minimizada na lateral mede o anel mais a linha de foco`() = runDesktopComposeUiTest {
+        val account = accounts.first().copy(minimized = true)
+        setContent { notch(edge = HudEdge.LEFT, list = listOf(account)) }
+
+        val cell = onNodeWithTag(HUD_RING_ITEM_TEST_TAG).getUnclippedBoundsInRoot()
+        assertEquals(minimizedRingWithFocusWidth(account), cell.width, "largura da célula minimizada, lateral")
+        assertEquals(minimizedRingWithFocusHeight(account), cell.height, "altura da célula minimizada, lateral")
+    }
+
+    /** Célula minimizada na borda de cima: a faixa é horizontal, então a largura é a da geometria. */
+    @Test
+    fun `celula minimizada na borda de cima mede a largura com a linha de foco`() = runDesktopComposeUiTest {
+        val account = accounts.first().copy(minimized = true)
+        setContent { notch(edge = HudEdge.TOP, list = listOf(account)) }
+
+        val cell = onNodeWithTag(HUD_RING_ITEM_TEST_TAG).getUnclippedBoundsInRoot()
+        assertEquals(minimizedRingWithFocusWidth(account), cell.width, "largura da célula minimizada, topo")
+    }
+
+    /** Controle: sem minimizar, o anel segue de 64 dp e a palavra segue na pílula. */
+    @Test
+    fun `conta sem minimizar mantem anel de 64 dp e palavra`() = runDesktopComposeUiTest {
+        setContent { notch(list = listOf(accounts.first())) }
+
+        onNodeWithText("Crítico").assertIsDisplayed()
+        val ring = onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(HUD_RING_SIZE, ring.width, "largura do anel")
     }
 
     // ------------------------------------------------------------ conteúdo

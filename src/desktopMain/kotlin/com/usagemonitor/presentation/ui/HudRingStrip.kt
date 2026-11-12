@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -53,6 +54,7 @@ import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.HUD_RING_TEXT_GAP
 import com.usagemonitor.HudEdge
+import com.usagemonitor.minimizedRingWithFocusWidth
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.gargantuaRoll
 import com.usagemonitor.presentation.ui.components.rememberGargantuaRoll
@@ -158,6 +160,7 @@ internal fun HudRingStrip(
 /** A pílula de estado de cada conta; os testes medem ela contra a geometria. */
 internal const val HUD_STATUS_PILL_TEST_TAG = "hud-status-pill"
 internal const val HUD_STRIP_LINE_TEST_TAG = "hud-strip-line"
+internal const val HUD_RING_ITEM_TEST_TAG = "hud-ring-item"
 
 @Composable
 private fun HudRingItem(
@@ -198,6 +201,9 @@ private fun HudRingItem(
         if (isHovered) currentOnHovered()
     }
     val description = hudRingDescription(account, language)
+    // Minimizada (#576): o anel vai a 28 dp; marca, arco e vão encolhem na mesma razão.
+    val ringSize = if (account.minimized) AppGargantuaTokens.minimizedSize else HUD_RING_SIZE
+    val ringScale = ringSize / HUD_RING_SIZE
     val ring: @Composable () -> Unit = {
         // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
         // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
@@ -215,9 +221,9 @@ private fun HudRingItem(
             AppGargantuaRing(
                 arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
                 description = description,
-                size = HUD_RING_SIZE,
-                stroke = HUD_RING_STROKE,
-                gap = HUD_RING_GAP,
+                size = ringSize,
+                stroke = HUD_RING_STROKE * ringScale,
+                gap = HUD_RING_GAP * ringScale,
                 active = account.sessionActive,
                 attention = account.needsAttention,
                 attentionIndex = account.attentionRingIndex,
@@ -229,7 +235,7 @@ private fun HudRingItem(
                         source = account.source,
                         // O núcleo é sempre escuro, inclusive dentro de um preset claro.
                         tint = account.accountAccent?.dark ?: AppGargantuaTokens.mark,
-                        size = hudRingMarkSize(account.rings.size),
+                        size = hudRingMarkSize(account.rings.size) * ringScale,
                         modifier = Modifier.graphicsLayer {
                             scaleX = frame.markScale * frame.scale
                             scaleY = frame.markScale * frame.scale
@@ -292,17 +298,23 @@ private fun HudRingItem(
     // Parado, só o texto do modo em vigor existe. Trocando de modo (K1) os dois
     // convivem por fade cruzado, e o anel continua o mesmo nó: um anel novo
     // animaria os arcos do zero, e dado nunca anima errado.
-    val fullWeight = toFull ?: if (compact) 0f else 1f
+    // Minimizada (#576): anel e cota em foco ao lado, nas duas orientações; sem palavra nem pílula.
+    val fullWeight = if (account.minimized) 1f else toFull ?: if (compact) 0f else 1f
     Layout(
-        modifier = itemModifier.hoverable(hover),
+        // Minimizada (#576): a célula ocupa a largura reservada pela janela (anel + vão + cota em foco), com a sobra do arredondamento à direita.
+        modifier = itemModifier.testTag(HUD_RING_ITEM_TEST_TAG).hoverable(hover)
+            .then(if (account.minimized) Modifier.defaultMinSize(minWidth = minimizedRingWithFocusWidth(account)) else Modifier),
         content = {
             Box(Modifier.layoutId(HudItemPart.RING)) { ring() }
-            if (toFull != null || compact) {
+            if (account.minimized) {
+                Column(modifier = Modifier.layoutId(HudItemPart.FULL)) { lines(true, 1f) }
+            }
+            if (!account.minimized && (toFull != null || compact)) {
                 Box(Modifier.layoutId(HudItemPart.COMPACT)) { lines(true, 1f - fullWeight) }
             }
             // Compacto, a palavra fica no balão e na descrição do anel: com
             // contas demais ela é o que fazia a faixa atravessar a tela.
-            if (toFull != null || !compact) {
+            if (!account.minimized && (toFull != null || !compact)) {
                 Column(
                     modifier = Modifier.layoutId(HudItemPart.FULL),
                     horizontalAlignment = if (vertical) Alignment.CenterHorizontally else Alignment.Start
@@ -312,7 +324,8 @@ private fun HudRingItem(
                 }
             }
         },
-        measurePolicy = hudRingItemMeasurePolicy(vertical, fullWeight)
+        // Minimizada: o texto fica ao lado do anel também na lateral.
+        measurePolicy = hudRingItemMeasurePolicy(vertical && !account.minimized, fullWeight)
     )
 }
 
