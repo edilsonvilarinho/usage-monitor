@@ -6,7 +6,7 @@ the main window is hidden with its geometry intact while it is shown.
 ```jsx
 <AppHudBar edge="right" balloon={0} countdown="02:05" version="38.2.0" accounts={[
   { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', active: true,
-    detail: 'Max 20x · via Claude Code',
+    detail: 'Ultra · via Claude Code',
     quotas: [{ short: '5h', title: 'Sessão 5h', percent: '68%', fraction: .68, level: 'warn',
                reset: '22h59', usedLeft: '68% usado · 32% restante' }] }
 ]} />

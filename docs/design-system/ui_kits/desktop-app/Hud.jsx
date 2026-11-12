@@ -6,7 +6,7 @@ const { AppHudBar, AppGargantuaRing } = DS;
 const ACCOUNTS = [
   {
     label: 'Anthropic — Padrão', provider: 'anthropic', statusLabel: 'Atenção', level: 'warn', active: true,
-    detail: 'Max 20x · via Claude Code',
+    detail: 'Ultra · via Claude Code',
     quotas: [
       { short: '5h', period: 'interval', title: 'Sessão 5h', percent: '68%', fraction: 0.68, level: 'warn', reset: '22h59', usedLeft: '68% usado · 32% restante' },
       { short: '7d', period: 'weekly', title: 'Semanal', percent: '41%', fraction: 0.41, level: 'ok', reset: '27/10 21h00', usedLeft: '41% usado · 59% restante' }
