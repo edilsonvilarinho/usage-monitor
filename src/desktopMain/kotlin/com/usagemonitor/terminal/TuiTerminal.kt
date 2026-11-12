@@ -54,7 +54,7 @@ internal class JLineTuiIo internal constructor(private val terminal: Terminal) :
     }
 
     val encoding: String
-        get() = terminal.stdoutEncoding().name()
+        get() = terminal.outputEncoding().name()
 
     override fun size(): TuiSize {
         val size = terminal.size
