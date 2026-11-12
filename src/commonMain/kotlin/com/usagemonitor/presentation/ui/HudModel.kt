@@ -105,7 +105,9 @@ data class HudAccount(
      */
     val presence: HudPresence = HudPresence.SHOWN,
     /** Contagens locais por modelo; não são cotas nem arcos percentuais. */
-    val observedModels: List<HudObservedModel> = emptyList()
+    val observedModels: List<HudObservedModel> = emptyList(),
+    /** Conta minimizada na HUD (#576): só o anel de 28 dp e a cota em foco. */
+    val minimized: Boolean = false
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
@@ -345,6 +347,8 @@ internal fun buildHudAccounts(
     now: Instant,
     activeTargets: Set<UsageTargetKey> = emptySet(),
     refreshingTargets: Set<UsageTargetKey> = emptySet(),
+    /** Alvos minimizados pelo usuário na HUD (#576). */
+    minimizedTargets: Set<UsageTargetKey> = emptySet(),
     /** A cor escolhida por conta Claude, por `profileId`. */
     accountColors: Map<String, AccountAccent> = emptyMap(),
     /** O emoji escolhido por conta Claude, por `profileId`. */
@@ -389,6 +393,7 @@ internal fun buildHudAccounts(
             ) ?: 0
             HudAccount(
                 targetKey = target,
+                minimized = target in minimizedTargets,
                 label = first.stats.displayTitle(),
                 statusLabel = if (observed) {
                     CommonLabels.localActivity(language)

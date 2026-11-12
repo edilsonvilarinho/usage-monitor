@@ -1,6 +1,9 @@
 package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.decodeHudMinimizedAccounts
+import com.usagemonitor.presentation.ui.encodeHudMinimizedAccounts
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -160,6 +163,16 @@ internal fun persistHudScreen(settings: PreferencesSettings, screen: ScreenInfo)
     }
     settings.putString(HUD_SCREEN_ID_KEY, screen.id)
     settings.putString(HUD_SCREEN_BOUNDS_KEY, values.joinToString(",") { value -> value.roundToInt().toString() })
+}
+
+/** Contas minimizadas na HUD (issue #576): uma preferência de texto, chaves `UsageTargetKey.storageKey`. */
+private const val HUD_MINIMIZED_ACCOUNTS_KEY = "hudMinimizedAccounts"
+
+internal fun readHudMinimizedAccounts(settings: PreferencesSettings): Set<UsageTargetKey> =
+    decodeHudMinimizedAccounts(settings.getStringOrNull(HUD_MINIMIZED_ACCOUNTS_KEY))
+
+internal fun persistHudMinimizedAccounts(settings: PreferencesSettings, minimized: Set<UsageTargetKey>) {
+    settings.putString(HUD_MINIMIZED_ACCOUNTS_KEY, encodeHudMinimizedAccounts(minimized))
 }
 
 private const val LEGACY_PILL_HALF_WIDTH_DP = 100

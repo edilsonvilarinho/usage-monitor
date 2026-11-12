@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.rememberHudMinimizeProgress
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -45,6 +47,8 @@ import com.usagemonitor.presentation.viewmodel.UiState
 import kotlinx.coroutines.launch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.buildHudAccounts
+import com.usagemonitor.presentation.ui.HudMinimizeButton
+import com.usagemonitor.presentation.ui.toggleHudMinimizedAccount
 import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.nextRefreshLabel
@@ -168,6 +172,14 @@ internal fun HudWindowHost(
             onRestartAndUpdate = { viewModel.restartAndUpdateNow() }
         )
     }
+    // Contas minimizadas (#576): lidas da preferência uma vez; cada alternância grava.
+    // Minimizar não desabilita a conta — só muda o que o notch desenha.
+    var minimizedTargets by remember { mutableStateOf(readHudMinimizedAccounts(settings)) }
+    val toggleMinimize: (UsageTargetKey) -> Unit = { target ->
+        val next = toggleHudMinimizedAccount(minimizedTargets, target)
+        minimizedTargets = next
+        persistHudMinimizedAccounts(settings, next)
+    }
     // Conta que nasce ou colapsa (API ativada/desativada, início do app) fica na
     // lista durante a transição; a geometria segue essa lista.
     val accounts = rememberHudPresence(buildHudAccounts(
@@ -180,7 +192,8 @@ internal fun HudWindowHost(
         accountColors = accountColors,
         accountEmojis = accountEmojis,
         sessionPulses = cliSessionPulses,
-        stalledSessions = stalled
+        stalledSessions = stalled,
+        minimizedTargets = minimizedTargets
     ), motion)
 
     // O monitor do notch: área de encaixe e id da configuração (#273, #426, #430).
@@ -221,7 +234,8 @@ internal fun HudWindowHost(
     }
 
     val scale = uiScaleFactor(uiScalePercent)
-    val (sizes, settledSizes) = hudWindowSizes(
+    val minimize = rememberHudMinimizeProgress(accounts)
+    val (sizesNow, settledNow) = hudWindowSizes(
         accounts = accounts,
         placement = placement,
         screenArea = screenArea,
@@ -230,6 +244,7 @@ internal fun HudWindowHost(
         hasUpdateIndicator = updateIndicator != null,
         hasUpdateAction = updateAction != null
     )
+    val (sizes, settledSizes) = rememberHudHeldWindowSizes(sizesNow, settledNow, minimize.moving)
     val composedArea = screenArea.inCompositionDp(scale)
     val bounds = hudHostWindowBounds(drag.dragging, placement, sizes, composedArea)
     val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
@@ -329,6 +344,7 @@ internal fun HudWindowHost(
                     edge = edge,
                     sizes = sizes,
                     settledSizes = settledSizes,
+                    minimize = minimize,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
                     expanded = expanded && !drag.dragging,
@@ -351,7 +367,8 @@ internal fun HudWindowHost(
                             cliSessionPulse = cliSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
                             teamSessionPulse = teamSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
                             actions = actions,
-                            onRefresh = { viewModel.refresh(account.targetKey) }
+                            onRefresh = { viewModel.refresh(account.targetKey) },
+                            onToggleMinimize = toggleMinimize
                         )
                     },
                     // A engrenagem da ponta de longe abre o balão com o que o
@@ -447,18 +464,20 @@ private fun HudWindowAppBalloon(
 
 /**
  * Os botões do card de uma conta, no balão dela: as janelas de
- * `cardActionsFor` — a mesma regra do card — e, por último, atualizar só esta
- * conta, com o glifo que gira enquanto coleta.
+ * `cardActionsFor` — a mesma regra do card —, depois Minimizar/Restaurar (#576,
+ * só na HUD) e, por último, atualizar só esta conta, com o glifo que gira
+ * enquanto coleta.
  */
 @Composable
-private fun HudAccountActions(
+internal fun HudAccountActions(
     account: HudAccount,
     language: AppLanguage,
     teamEnabledProfileIds: Set<String>,
     cliSessionPulse: SessionPulse,
     teamSessionPulse: SessionPulse,
     actions: AppShellActions,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onToggleMinimize: (UsageTargetKey) -> Unit
 ) {
     val target = account.targetKey
     cardActionsFor(target, teamEnabledProfileIds).forEach { action ->
@@ -481,6 +500,13 @@ private fun HudAccountActions(
             }
         )
     }
+    HudMinimizeButton(
+        targetKey = target,
+        minimized = account.minimized,
+        language = language,
+        buttonSize = HUD_BALLOON_ACTIONS,
+        onToggle = onToggleMinimize
+    )
     CardIconActionButton(
         label = refreshActionLabel(account.refreshing, language),
         onClick = onRefresh,

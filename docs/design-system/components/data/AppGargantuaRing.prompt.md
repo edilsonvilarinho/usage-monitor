@@ -29,6 +29,8 @@ legible at three quotas. Quota arcs sit outside the disc. The blue active-sessio
 outside the outer quota and retains its reserved reach in HUD sizing; it must not be clipped by
 the indicator, neighbour, notch or desktop window. The account emoji remains a separate badge.
 
+**Minimized (#576).** A ring for an account minimized in the HUD is drawn at `--gargantua-minimized-size: 28px` (`AppGargantuaTokens.minimizedSize`), with the same stroke, gap and mark proportions, its focus line (e.g. `5h 61%`) beside it and no state pill. Reduced motion cuts the 64px to 28px change (`--dur-gargantua-minimize`, 520ms) instantly. See `docs/hud-notch.md`.
+
 **Scene — quiet on purpose.** The scene must never compete with the quota arcs or the active-session
 comet. A faint warm glow, a large event-horizon shadow (62% of the free core) edged by a thin photon
 ring, the **back of the disc bent over the horizon** (AL1 · Gargantua de Interstellar, #517: a wide

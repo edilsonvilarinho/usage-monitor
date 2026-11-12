@@ -24,6 +24,7 @@
 
   /* Gargantua HUD indicator. Geometry and drawing share these dimensions. */
   --gargantua-size: 64px;
+  --gargantua-minimized-size: 28px;
   --gargantua-stroke: 2.5px;
   --gargantua-gap: 1.5px;
 }

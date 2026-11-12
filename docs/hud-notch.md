@@ -555,6 +555,33 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     Z11 mosaico do interferômetro, Z12 camadas da atmosfera, Z13 rolamento na órbita, Z14 vela solar, Z15
     telescópio que estende.
 
+## Minimizar uma conta (#576)
+
+Minimizar uma conta na HUD não a desabilita. A conta continua coletando, alertando e guardando histórico; só a
+célula dela no notch encolhe.
+
+- **Controle.** `HudMinimizeButton` (`presentation/ui/HudMinimizeButton.kt`, sobre `CardIconActionButton`) fica no
+  balão da conta, depois de `cardActionsFor`. Mostra `−` para minimizar e `+` para restaurar. O rótulo
+  "Minimizar" ou "Restaurar" vem de `hudMinimizeActionLabel` (`HudMinimizeAction.kt`, PT/EN).
+- **Célula minimizada.** Anel de 28 dp (`AppGargantuaTokens.minimizedSize`, `--gargantua-minimized-size`), com
+  traço, vão e marca na mesma razão do anel de 64 dp. A linha de foco (ex.: `5h 61%`) fica ao lado do anel, nas
+  duas orientações. Sem pílula de estado.
+- **Geometria.** `minimizedRingWithFocusWidth` e `minimizedRingWithFocusHeight` (`HudNotchMinimized.kt`) medem a
+  célula. `hudNotchSizes` (`HudNotchGeometry.kt`) tem o ramo minimizado nas duas orientações.
+- **Transição (520 ms).** `AppGargantuaTokens.minimizeMillis = 520` e `--dur-gargantua-minimize: 520ms`
+  (`motion.css`). `HudMinimizeMotion.kt`: `hudMinimizeFrame` leva o anel de 64 a 28 dp com ease-in-out, sem
+  overshoot, e troca a linha de foco por fade cruzado (alfas somam 1). `hudMinimizeWindowSize` mantém o maior
+  tamanho até o fim. Reduzir animações = corte seco: `hudMinimizeMillis` devolve 0 e o progresso vai a 1 no
+  primeiro quadro.
+- **Janela no maior tamanho.** Durante a transição, `rememberHudHeldWindowSizes` (`HudWindowHold.kt`) segura janela
+  e notch no maior dos dois tamanhos; o novo tamanho entra só no fim. `rememberHudMinimizeProgress`
+  (`presentation/ui/HudMinimizeTransition.kt`) dá um `Animatable` por conta e é içado ao `HudWindowHost`.
+- **Preferência `hudMinimizedAccounts`.** Chave `HUD_MINIMIZED_ACCOUNTS_KEY` em `HudWindowPreferences.kt`, com o
+  conjunto de `UsageTargetKey` codificado por `encodeHudMinimizedAccounts`, na ordem de publicação. Leitura com
+  `decodeHudMinimizedAccounts`, que descarta entrada inválida. `HudWindowHost` lê uma vez e passa as contas
+  minimizadas a `buildHudAccounts`. Alternar: `toggleHudMinimizedAccount` e persistir. Funções puras em
+  `presentation/ui/HudMinimizedAccounts.kt` (commonMain).
+
 ## Fora do alcance dos testes
 
 Os testes de componente desenham numa cena fora de tela, sem janela AWT e sem gerenciador de

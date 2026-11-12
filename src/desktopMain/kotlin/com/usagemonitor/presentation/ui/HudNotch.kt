@@ -144,6 +144,8 @@ internal fun HudNotch(
      * ajusta o tamanho no fim; `null` mantém [sizes] até a conta sair.
      */
     settledSizes: HudNotchSizes? = null,
+    /** O estado de minimizar vindo do host (uma instância por janela); `null` lê aqui. */
+    minimize: HudMinimizeProgress? = null,
     expanded: Boolean = false,
     dragging: Boolean = false,
     updateIndicator: HudUpdateIndicator? = null,
@@ -220,11 +222,16 @@ internal fun HudNotch(
     // lento manda, para o corpo nunca ficar menor que as contas dentro dele.
     val departures = rememberHudDepartures(accounts)
     val settle = departures.values.minOrNull()
-    val notchSize = if (settle != null && settledSizes != null) {
-        lerp(sizes.collapsed, settledSizes.collapsed, settle)
-    } else {
-        sizes.collapsed
-    }
+    val minimizeState = minimize ?: rememberHudMinimizeProgress(accounts)
+    // Minimizar (#576, A05b): o notch segura o maior tamanho até a transição acabar; sem AWT por quadro.
+    val notchSize = rememberHudMinimizeNotchSize(
+        moving = minimizeState.moving,
+        current = if (settle != null && settledSizes != null) {
+            lerp(sizes.collapsed, settledSizes.collapsed, settle)
+        } else {
+            sizes.collapsed
+        },
+    )
 
     // Ao longo da borda o balão segue o anel pela mola `GENTLE`. A primeira
     // posição de cada abertura é salto, senão ele entraria deslizando a partir
@@ -281,6 +288,7 @@ internal fun HudNotch(
                     settledCompact = settledSizes?.compact ?: sizes.compact,
                     departures = departures,
                     settle = settle,
+                    minimizeProgress = minimizeState.values,
                     onRingHovered = { index -> balloonIndex = index },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },

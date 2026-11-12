@@ -1,6 +1,8 @@
 package com.usagemonitor
 
 import com.russhwolf.settings.PreferencesSettings
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageTargetKey
 import java.util.UUID
 import java.util.prefs.Preferences
 import androidx.compose.ui.unit.DpSize
@@ -147,6 +149,31 @@ class HudWindowPreferencesTest {
             assertEquals(true, readHudAutoRetract(settings))
             persistHudAutoRetract(settings, false)
             assertEquals(false, readHudAutoRetract(settings))
+        }
+    }
+
+    /** Issue #576: contas minimizadas são um texto só, em ordem de publicação; nasce vazio. */
+    @Test
+    fun `minimized hud accounts start empty and round trip through one preference`() {
+        withTestSettings { settings ->
+            val codex = UsageTargetKey.forSource(ApiSource.CODEX)
+            val anthropicA = UsageTargetKey(ApiSource.ANTHROPIC, "profile-a")
+            assertEquals(emptySet(), readHudMinimizedAccounts(settings))
+
+            persistHudMinimizedAccounts(settings, setOf(codex, anthropicA))
+
+            assertEquals("ANTHROPIC:profile-a,CODEX", settings.getStringOrNull("hudMinimizedAccounts"))
+            assertEquals(setOf(codex, anthropicA), readHudMinimizedAccounts(settings))
+        }
+    }
+
+    /** Entrada que não é conta conhecida pelo formato é ignorada na leitura, sem derrubar as válidas. */
+    @Test
+    fun `unknown entries in the minimized hud accounts preference are ignored`() {
+        withTestSettings { settings ->
+            settings.putString("hudMinimizedAccounts", "FOO,CODEX,,")
+
+            assertEquals(setOf(UsageTargetKey.forSource(ApiSource.CODEX)), readHudMinimizedAccounts(settings))
         }
     }
 

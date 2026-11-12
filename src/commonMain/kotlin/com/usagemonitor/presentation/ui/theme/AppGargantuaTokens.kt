@@ -6,6 +6,8 @@ import androidx.compose.ui.unit.dp
 /** Paleta cenográfica da HUD; dourado não representa consumo nem estado. */
 object AppGargantuaTokens {
     val size = 64.dp
+    /** Anel da conta minimizada (#576): cabe ao lado da cota em foco. */
+    val minimizedSize = 28.dp
     val night = Color(0xFF080B12)
     val core = Color(0xFF030508)
     /**
@@ -38,6 +40,8 @@ object AppGargantuaTokens {
      * linhas (K1). Com 480 ms de colapso e o notch saltando no fim, a saída lia bruta.
      */
     const val departureSettleMillis = 450
+    /** Minimizar ou restaurar uma conta na HUD (#576): anel 64 → 28 dp, cross-fade do texto. */
+    const val minimizeMillis = 520
     /** Abertura do balão de uma conta ou da engrenagem (B3, jato relativístico). */
     const val jetOpenMillis = 520
     /** Fechamento do balão: dobra de volta e o feixe recolhe (B3). */

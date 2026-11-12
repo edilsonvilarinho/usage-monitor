@@ -135,7 +135,8 @@ Sem número no pedido, faça **5**. Com menos de 3, faça 3.
 | Ordenar colunas das sessões CLI (#537; galeria `prototipos/issue-537/index.html`) | AM1 · estrela-guia (seta só na coluna ativa, seta fraca no hover) | AM2 linha do horizonte, AM3 constelação fixa, AM4 coluna de luz, AM5 painel de bordo |
 | Configurações › Time mais simples, chave por e-mail (#551; estática, galeria `prototipos/issue-551/`) | AN2 · etapas (1 Conexão, 2 Contas com e-mail e chave por linha, 3 Administração; um bloco aberto) | AN1 resumo e editar, AN3 tabela de contas, AN4 abas dentro do time, AN5 mínimo + avançado |
 | Janela de sessões do Codex no padrão da Anthropic (#560; estática, galeria `prototipos/issue-560/`, cópia em `docs/planos/issue-560-visual/ao5.html`) | AO5 · espelho + eixo Agente (Respostas no lugar do Custo, Resumo pelo mesmo painel da Anthropic com o eixo sessão principal × subagentes) | AO1 espelho estrito (Custo em "—"), AO2 Respostas (virou a base da AO5), AO3 raciocínio, AO4 cota da janela (exigiria indexar `rate_limits`) |
+| Minimizar uma conta na HUD sem desabilitar (#576; galeria `prototipos/issue-576/`) | AP1 · anã branca (botão Minimizar no balão, anel 28 dp com a cota em foco ao lado, 520 ms) | AP2 estrela distante, AP3 cinturão de asteroides, AP4 eclipse parcial, AP5 pílula de horizonte, AP6 lua na borda, AP7 pulsar, AP8 hibernação com despertar, AP9 arco nu, AP10 doca por arrasto |
 
-Próxima rodada usa a próxima letra livre (letras duplas: AA, AB, AC…; U a Z e AA a AO já usadas). Trilha, fundo ou estado contínuo: as opções
+Próxima rodada usa a próxima letra livre (letras duplas: AA, AB, AC…; U a Z e AA a AP já usadas). Trilha, fundo ou estado contínuo: as opções
 já nascem animadas (laço atrás da política), nunca só o quadro parado. Ícone de sistema não anima: nessa rodada o
 card mostra os tamanhos reais (lupa ×4 no 16 px) sobre barra clara e escura, e não um laço.

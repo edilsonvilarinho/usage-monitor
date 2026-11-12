@@ -10,6 +10,7 @@ import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
 import com.usagemonitor.presentation.ui.hudRingMarkSize
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -585,6 +586,34 @@ class HudNotchGeometryTest {
         assertEquals(HUD_BALLOON_SECTION_GAP + HUD_BALLOON_QUOTA_TITLE, hudBalloonHeight(with) - hudBalloonHeight(without))
     }
 
+
+    @Test
+    fun `conta minimizada no topo cabe em anel de 28 dp com a cota de foco ao lado`() {
+        val normal = account("Claude", "Em dia", listOf("5h" to "40%"))
+        val minimized = normal.copy(minimized = true)
+        val focus = minimized.focusLine
+        val sizes = hudNotchSizes(listOf(minimized), HudEdge.TOP, "", false)
+        // Largura: anel minimizado, vão, cota de foco; altura continua a da conta comum.
+        val expectedWidth = AppGargantuaTokens.minimizedSize + HUD_RING_TEXT_GAP + stripLineWidth(focus) +
+            HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
+        assertEquals(expectedWidth, sizes.collapsed.width)
+        val normalHeight = hudNotchSizes(listOf(normal), HudEdge.TOP, "", false).collapsed.height
+        assertEquals(normalHeight, sizes.collapsed.height)
+    }
+
+    @Test
+    fun `conta minimizada na lateral soma anel de 28 dp e cota de foco, altura pelo maior dos dois`() {
+        val normal = account("Claude", "Em dia", listOf("5h" to "40%"))
+        val minimized = normal.copy(minimized = true)
+        val focus = minimized.focusLine
+        val sizes = hudNotchSizes(listOf(minimized), HudEdge.LEFT, "", false)
+        val expectedWidth = AppGargantuaTokens.minimizedSize + HUD_RING_TEXT_GAP + stripLineWidth(focus) +
+            HUD_NOTCH_PADDING_ACROSS * 2
+        val expectedHeight = maxOf(AppGargantuaTokens.minimizedSize, stripLineHeight(focus)) +
+            HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
+        assertEquals(expectedWidth, sizes.collapsed.width)
+        assertEquals(expectedHeight, sizes.collapsed.height)
+    }
 
     private fun account(label: String, word: String, quotas: List<Pair<String, String>>): HudAccount {
         return HudAccount(

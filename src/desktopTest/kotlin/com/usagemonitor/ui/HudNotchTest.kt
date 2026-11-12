@@ -2,6 +2,9 @@ package com.usagemonitor.ui
 
 import androidx.compose.ui.test.onAllNodesWithTag
 import com.usagemonitor.CURRENT_APP_VERSION
+import com.usagemonitor.AppShellActions
+import com.usagemonitor.HudAccountActions
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
@@ -20,6 +23,7 @@ import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudDockedWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
+import com.usagemonitor.presentation.ui.hudMinimizeMillis
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_QUIT_TAG
@@ -92,6 +96,10 @@ import com.usagemonitor.hudNotchSizes
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HUD_NOTCH_DESCRIPTION
+import com.usagemonitor.presentation.ui.HUD_RING_ITEM_TEST_TAG
+import com.usagemonitor.minimizedRingWithFocusWidth
+import com.usagemonitor.minimizedRingWithFocusHeight
+import com.usagemonitor.presentation.ui.HUD_STATUS_PILL_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_COUNTDOWN_CLOCK_TAG
 import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
@@ -184,6 +192,25 @@ class HudNotchTest {
         )
     )
 
+    /** Ações do app sem efeito: o balão da conta só precisa delas para montar as janelas do card. */
+    private fun inertShellActions() = AppShellActions(
+        refreshAll = {},
+        openSettings = {},
+        openHelp = {},
+        exportSnapshot = { null },
+        onExportFailure = {},
+        openAdminOverview = null,
+        openTeamPresenceOverview = null,
+        selectDashboardTeam = {},
+        openComparison = {},
+        openHistory = { _, _ -> },
+        openCliSessions = {},
+        openCodexCliSessions = {},
+        openTeamUsage = {},
+        openTeamPresence = {},
+        openAnalysis = {}
+    )
+
     @Composable
     private fun notch(
         expanded: Boolean = false,
@@ -226,6 +253,93 @@ class HudNotchTest {
                 )
             }
         }
+    }
+
+    // ------------------------------------------------------------ minimizada (#576)
+
+    /** Minimizada: anel de 28 dp e a cota em foco ao lado; a palavra e a pílula saem. */
+    @Test
+    fun `conta minimizada mostra so a cota em foco e anel de 28 dp`() = runDesktopComposeUiTest {
+        setContent { notch(list = listOf(accounts.first().copy(minimized = true))) }
+
+        onNodeWithText("5h 28%").assertIsDisplayed()
+        onNodeWithText("Crítico").assertDoesNotExist()
+        onNodeWithTag(HUD_STATUS_PILL_TEST_TAG).assertDoesNotExist()
+        val ring = onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(28.dp, ring.width, "largura do anel minimizado")
+        assertEquals(28.dp, ring.height, "altura do anel minimizado")
+    }
+
+    /** Célula minimizada na lateral: largura e altura são as da geometria (anel + vão + linha de foco). */
+    @Test
+    fun `celula minimizada na lateral mede o anel mais a linha de foco`() = runDesktopComposeUiTest {
+        val account = accounts.first().copy(minimized = true)
+        setContent { notch(edge = HudEdge.LEFT, list = listOf(account)) }
+
+        val cell = onNodeWithTag(HUD_RING_ITEM_TEST_TAG).getUnclippedBoundsInRoot()
+        assertEquals(minimizedRingWithFocusWidth(account), cell.width, "largura da célula minimizada, lateral")
+        assertEquals(minimizedRingWithFocusHeight(account), cell.height, "altura da célula minimizada, lateral")
+    }
+
+    /** Célula minimizada na borda de cima: a faixa é horizontal, então a largura é a da geometria. */
+    @Test
+    fun `celula minimizada na borda de cima mede a largura com a linha de foco`() = runDesktopComposeUiTest {
+        val account = accounts.first().copy(minimized = true)
+        setContent { notch(edge = HudEdge.TOP, list = listOf(account)) }
+
+        val cell = onNodeWithTag(HUD_RING_ITEM_TEST_TAG).getUnclippedBoundsInRoot()
+        assertEquals(minimizedRingWithFocusWidth(account), cell.width, "largura da célula minimizada, topo")
+    }
+
+    /** Transição (#576, A05b): o anel vai de 64 a 28 dp em `hudMinimizeMillis`; o notch segura o tamanho cheio até o fim. */
+    @Test
+    fun `minimizar anima o anel e o notch so encolhe no fim da transicao`() = runDesktopComposeUiTest {
+        var minimized by mutableStateOf(false)
+        val full = accounts.first()
+        val fullWidth = hudNotchSizes(listOf(full), HudEdge.TOP, "Carregando", false).collapsed.width
+        val minimizedWidth = hudNotchSizes(listOf(full.copy(minimized = true)), HudEdge.TOP, "Carregando", false).collapsed.width
+        assertTrue(minimizedWidth < fullWidth, "precondição: o notch minimizado é menor que o cheio")
+        mainClock.autoAdvance = false
+        setContent { notch(list = listOf(full.copy(minimized = minimized))) }
+        mainClock.advanceTimeByFrame()
+        minimized = true
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(hudMinimizeMillis(motionReduced = false) / 2L)
+        val midRing = ringWidthOf()
+        assertTrue(midRing > 28.dp && midRing < HUD_RING_SIZE, "anel no meio da transição: $midRing")
+        assertEquals(fullWidth, notchWidthOf(), "o notch segura o tamanho cheio no meio da transição")
+
+        mainClock.advanceTimeBy(hudMinimizeMillis(motionReduced = false).toLong())
+        assertEquals(28.dp, ringWidthOf(), "anel depois da transição")
+        assertEquals(minimizedWidth, notchWidthOf(), "notch depois da transição")
+    }
+
+    /** Com "reduzir animações" o corte é seco: o anel já está em 28 dp no primeiro quadro depois da troca. */
+    @Test
+    fun `minimizar com animacao reduzida corta para 28 dp no primeiro quadro`() = runDesktopComposeUiTest {
+        var minimized by mutableStateOf(false)
+        val full = accounts.first()
+        mainClock.autoAdvance = false
+        setContent { notch(list = listOf(full.copy(minimized = minimized)), motion = AppMotionPolicy.Reduced) }
+        mainClock.advanceTimeByFrame()
+        minimized = true
+        mainClock.advanceTimeByFrame()
+        assertEquals(28.dp, ringWidthOf(), "anel com animação reduzida")
+    }
+
+    private fun ComposeUiTest.ringWidthOf() =
+        onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot().width
+
+    private fun ComposeUiTest.notchWidthOf() = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot().width
+
+    /** Controle: sem minimizar, o anel segue de 64 dp e a palavra segue na pílula. */
+    @Test
+    fun `conta sem minimizar mantem anel de 64 dp e palavra`() = runDesktopComposeUiTest {
+        setContent { notch(list = listOf(accounts.first())) }
+
+        onNodeWithText("Crítico").assertIsDisplayed()
+        val ring = onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(HUD_RING_SIZE, ring.width, "largura do anel")
     }
 
     // ------------------------------------------------------------ conteúdo
@@ -452,6 +566,34 @@ class HudNotchTest {
 
         hoverRing(DEEPSEEK_RING)
         onNodeWithText("botões de DeepSeek").assertIsDisplayed()
+    }
+
+    /** O balão da conta traz Minimizar, e o clique devolve a chave daquela conta (#576). */
+    @Test
+    fun `o balao da conta traz Minimizar e o clique devolve a chave da conta`() = runDesktopComposeUiTest {
+        val toggled = mutableListOf<UsageTargetKey>()
+        setContent {
+            notch(
+                expanded = true,
+                accountActions = { account ->
+                    HudAccountActions(
+                        account = account,
+                        language = AppLanguage.PT,
+                        teamEnabledProfileIds = emptySet(),
+                        cliSessionPulse = SessionPulse.EMPTY,
+                        teamSessionPulse = SessionPulse.EMPTY,
+                        actions = inertShellActions(),
+                        onRefresh = {},
+                        onToggleMinimize = { target -> toggled += target }
+                    )
+                }
+            )
+        }
+
+        hoverRing(DEEPSEEK_RING)
+        onNodeWithContentDescription("Minimizar").assertIsDisplayed()
+        onNodeWithContentDescription("Minimizar").performClick()
+        assertEquals(listOf(accounts[1].targetKey), toggled)
     }
 
     /**
