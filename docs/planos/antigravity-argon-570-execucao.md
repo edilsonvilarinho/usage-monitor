@@ -42,6 +42,7 @@ nem derrubar a fonte — o defeito que o ai-usagebar teve.
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito com os fatos acima | — |
+| A02 | caracterização, sem vermelho: o mapper genérico já cobre o grupo. `gradlew.bat desktopTest --tests "com.usagemonitor.data.AntigravityUsageMapperTest"` → 9 testes, 0 falhas na primeira execução; três rótulos distintos, Gemini `used` 2, Argon `used` 100 com reset 2026-10-24T01:10:47Z. `AntigravityUsageMapper.kt` intocado | verde |
 
 ## Problemas em aberto e riscos
 
