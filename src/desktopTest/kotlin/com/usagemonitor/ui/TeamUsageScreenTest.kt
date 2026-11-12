@@ -27,6 +27,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
@@ -47,6 +49,7 @@ import com.usagemonitor.domain.usecase.CliSessionDetailResult
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import com.usagemonitor.presentation.ui.TEAM_ACCOUNT_GROUP_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_LIST_SCROLLBAR_TAG
+import com.usagemonitor.presentation.ui.TEAM_MEMBER_SESSION_HEADER_TAG_PREFIX
 import com.usagemonitor.presentation.ui.TEAM_SLIDING_WINDOW_NOTICE_TAG
 import com.usagemonitor.presentation.ui.TEAM_TOTAL_MEMBERS_BLOCK_TAG
 import com.usagemonitor.presentation.ui.TEAM_MEMBER_HEALTH_TAG_PREFIX
@@ -1187,6 +1190,74 @@ class TeamUsageScreenTest {
 
         assertEquals(listOf("bbbb0002", "aaaa0001"), teamRowOrder(listOf("aaaa0001", "bbbb0002")))
         assertEquals(listOf("dddd0004", "cccc0003"), teamRowOrder(listOf("cccc0003", "dddd0004")))
+    }
+
+    /**
+     * Ordenar o bloco de um integrante leva a lista ao cabeçalho dele (#577). A ordem é uma só para
+     * todos os blocos (#537), então rolar ao topo da lista tiraria o usuário do bloco que ele ordenou.
+     * Antes do clique, a primeira linha visível é a última sessão de A (a29), com o cabeçalho de B logo
+     * abaixo. Após a ordenação por custo, a29 vira a primeira de A e a âncora do Compose a mantém no topo,
+     * empurrando o cabeçalho de B para fora da janela se a lista não rolar.
+     */
+    @Test
+    fun `clicking a member's session header after scrolling brings that header to the top`() =
+        runDesktopComposeUiTest {
+            renderSuccess(
+                state = TeamUsageUiState.Success(
+                    members = listOf(
+                        member(
+                            "device-1",
+                            "edilson",
+                            "DESKTOP-A1",
+                            (0 until 30).map { index ->
+                                session("a" + index.toString().padStart(2, '0'), cost = (index + 1) * 1_000L)
+                            }
+                        ),
+                        member(
+                            "device-2",
+                            "maria",
+                            "DESKTOP-B2",
+                            (0 until 12).map { index ->
+                                session("b" + index.toString().padStart(2, '0'), cost = (index + 1) * 1_000L)
+                            }
+                        )
+                    ),
+                    expandedMemberKeys = setOf("device-1", "device-2")
+                ),
+                height = 700.dp
+            )
+            val headerTag = TEAM_MEMBER_SESSION_HEADER_TAG_PREFIX + "device-2"
+            scrollUntilRowAtTop(headerTag, cliSessionRowTag("a29"))
+
+            onNode(hasText(CliSessionsLabels.columnCost(AppLanguage.PT)) and hasAnyAncestor(hasTestTag(headerTag)))
+                .performClick()
+
+            // Ordem nova do bloco de maria: o maior custo (b11) primeiro, logo abaixo do cabeçalho.
+            onNodeWithTag(cliSessionRowTag("b11"), useUnmergedTree = true).assertIsDisplayed()
+        }
+
+    /**
+     * Rola para baixo até a última sessão de A ser a primeira linha visível, com o cabeçalho de B logo abaixo.
+     */
+    private fun ComposeUiTest.scrollUntilRowAtTop(headerTag: String, rowTag: String) {
+        repeat(600) {
+            if (rowAtTopEdge(headerTag, rowTag)) return
+            onRoot().performMouseInput { moveTo(center); scroll(1f) }
+        }
+        assertTrue(rowAtTopEdge(headerTag, rowTag), "a linha nunca chegou ao topo da lista")
+    }
+
+    /** Linha com o topo na borda de cima da lista (nenhuma linha acima dela visível) e cabeçalho logo abaixo. */
+    private fun ComposeUiTest.rowAtTopEdge(headerTag: String, rowTag: String): Boolean {
+        val headers = onAllNodesWithTag(headerTag, useUnmergedTree = true)
+            .fetchSemanticsNodes(atLeastOneRootRequired = false)
+        val rows = onAllNodesWithTag(rowTag, useUnmergedTree = true)
+            .fetchSemanticsNodes(atLeastOneRootRequired = false)
+        if (headers.isEmpty() || rows.isEmpty()) return false
+        val row = rows.single().boundsInRoot
+        val header = headers.single().boundsInRoot
+        val listTop = onNodeWithTag(TEAM_LIST_SCROLLBAR_TAG).fetchSemanticsNode().boundsInRoot.top
+        return row.top <= listTop && row.bottom > listTop && header.top > row.bottom
     }
 
     /** Ids na ordem vertical em que aparecem no bloco do time. */

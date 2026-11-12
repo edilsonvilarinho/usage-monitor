@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 
 /**
@@ -30,6 +31,43 @@ internal fun ScrollToTopOnSortChange(listState: LazyListState, sort: Any?) {
     var previous by remember { mutableStateOf(sort) }
     LaunchedEffect(sort) {
         val target = sortScrollTarget(hasComposed = composed, previous = previous, current = sort)
+        if (target != null) listState.scrollToItem(target)
+        composed = true
+        previous = sort
+    }
+}
+
+/**
+ * Índice para o qual a lista deve rolar depois de uma mudança de ordenação, ou `null` quando não deve
+ * rolar. Mesma regra de [sortScrollTarget], com o alvo vindo do cabeçalho clicado (#577, time).
+ */
+internal fun sortScrollIndexTarget(
+    hasComposed: Boolean,
+    previous: Any?,
+    current: Any?,
+    clickedIndex: Int?
+): Int? = if (!hasComposed || previous == current) null else clickedIndex
+
+/** Índice do item visível com a chave dada, ou `null` quando ele não está na janela. */
+internal fun LazyListState.visibleIndexOf(key: Any): Int? =
+    layoutInfo.visibleItemsInfo.firstOrNull { item -> item.key == key }?.index
+
+/**
+ * Rola até o item clicado (`targetIndex`) quando a ordenação muda, sem animação (#577, time). A
+ * primeira composição não rola.
+ */
+@Composable
+internal fun ScrollToIndexOnSortChange(listState: LazyListState, sort: Any?, targetIndex: Int?) {
+    var composed by remember { mutableStateOf(false) }
+    var previous by remember { mutableStateOf(sort) }
+    val clickedIndex by rememberUpdatedState(targetIndex)
+    LaunchedEffect(sort) {
+        val target = sortScrollIndexTarget(
+            hasComposed = composed,
+            previous = previous,
+            current = sort,
+            clickedIndex = clickedIndex
+        )
         if (target != null) listState.scrollToItem(target)
         composed = true
         previous = sort
