@@ -162,6 +162,13 @@ internal class DashboardUpdateCoordinator(
             return
         }
 
+        // Release recém-publicada pode não ter o instalador no ar ainda (#582): não é
+        // falha de download. Publica a oferta manual, sem backoff; o próximo ciclo reavalia.
+        if (appUpdateInstaller?.hasInstallableArtifact(update) != true) {
+            _state.value = AppUpdateUiState.Available(update)
+            return
+        }
+
         val backoff = updateBackoff
         if (backoff != null && backoff.version == update.version) {
             if (clock.now() < backoff.retryAfter) {

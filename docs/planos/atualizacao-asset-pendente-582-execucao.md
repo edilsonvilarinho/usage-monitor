@@ -51,6 +51,7 @@ falha entrou no backoff. Duas correções: o workflow só publica a release depo
 |---|---|---|
 | A01 | feito | Plano escrito; sem suíte (documento). |
 | A02 | feito | Sem suíte (YAML de Actions; nenhum teste em `tools/` lê o `release-linux.yml`). `python -c "yaml.safe_load(...)"`: passos finais `['Generate release notes', 'Upload to GitHub Release', 'Publish release after assets are verifiable']`, `draft: True`. Validação real: na próxima tag, `published_at` ≥ `updated_at` de todos os assets. |
+| A03 | feito (backend-dev, haiku; 1 devolução: KDoc do Linux deslocado) | Vermelho (instaladores com stub `false`, coordenador sem guarda): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.DashboardViewModelAutoUpdateTest" --tests "com.usagemonitor.update.*"`, 219 testes, 3 falhas na asserção: `DashboardViewModelAutoUpdateTest.kt:491`, `WindowsAppUpdateInstallerTest.kt:134` e `LinuxAppUpdateInstallerTest.kt:146` (`AssertionError`). O teste "próximo ciclo chega a Ready" já passava no vermelho (sem guarda, o download sai no 1º ciclo); fica como guarda de regressão. Verde: mesmo comando, 219 testes, 0 falhas. |
 
 ## Problemas em aberto e riscos
 

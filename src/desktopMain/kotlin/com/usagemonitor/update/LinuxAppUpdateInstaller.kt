@@ -232,6 +232,8 @@ internal class LinuxAppUpdateInstaller(
         return !isVersionNewer(minUpdatableTargetVersion, targetVersion)
     }
 
+    override fun hasInstallableArtifact(update: AppUpdateInfo): Boolean = selectArtifact(update) != null
+
     /**
      * `LINUX` + `X64` + `LINUX_TARBALL` + digest, e nada mais.
      *

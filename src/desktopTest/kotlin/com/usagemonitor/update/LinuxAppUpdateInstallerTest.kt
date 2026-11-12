@@ -128,6 +128,24 @@ class LinuxAppUpdateInstallerTest {
         assertNull(installer().selectArtifact(update))
     }
 
+    /** Release recém-publicada sem digest ainda não tem o que baixar (#582). */
+    @Test
+    fun `release whose tarball has no digest has no installable artifact yet`() {
+        val update = updateWith(
+            listOf(
+                artifact("usage-monitor_39.0.0_linux_x64.tar.gz", AppUpdateArtifactKind.LINUX_TARBALL)
+                    .copy(sha256 = null)
+            )
+        )
+
+        assertFalse(installer().hasInstallableArtifact(update))
+    }
+
+    @Test
+    fun `release whose tarball has a digest has an installable artifact`() {
+        assertTrue(installer().hasInstallableArtifact(updateWith(everyArtifact())))
+    }
+
     // --- piso de versão-alvo -------------------------------------------------
 
     /**
