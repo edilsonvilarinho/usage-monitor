@@ -112,7 +112,11 @@ internal fun ModalWindowsHost(
         },
         openGeneration = modal.codexCliSessionsOpenGeneration
     ) {
-        CodexCliSessionsScreen(viewModel = viewModels.codexCliSessions, language = language)
+        CodexCliSessionsScreen(
+            viewModel = viewModels.codexCliSessions,
+            language = language,
+            profileLabel = CodexProfileRef.DEFAULT_LABEL
+        )
     }
 
     AppDialogWindow(

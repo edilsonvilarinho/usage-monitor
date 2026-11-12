@@ -56,6 +56,11 @@ internal fun CodexCliSessionMetrics(sessions: List<CodexCliSessionSummary>, lang
                 modifier = Modifier.width(CODEX_METRIC_WIDTH)
             )
             AppMetricBlock(
+                label = CliSessionsLabels.responses(language),
+                value = sessions.sumOf { session -> session.responseCount }.toString(),
+                modifier = Modifier.width(CODEX_METRIC_WIDTH)
+            )
+            AppMetricBlock(
                 label = CliSessionsLabels.activeTime(language),
                 value = codexActiveTimeValue(sessions),
                 modifier = Modifier.width(CODEX_METRIC_WIDTH)
