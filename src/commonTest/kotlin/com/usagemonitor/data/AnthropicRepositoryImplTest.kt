@@ -45,7 +45,7 @@ class AnthropicRepositoryImplTest {
         assertEquals("account-a", stats.accountContext?.key?.providerAccountId)
         assertTrue(stats.quotas.isNotEmpty())
         // O plano sai do arquivo de credenciais, não do endpoint de uso.
-        assertEquals("Max 20x", stats.planLabel)
+        assertEquals("Ultra", stats.planLabel)
     }
 
     @Test

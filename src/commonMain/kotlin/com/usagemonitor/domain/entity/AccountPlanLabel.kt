@@ -1,7 +1,7 @@
 package com.usagemonitor.domain.entity
 
 /**
- * O plano da conta como o usuário o reconhece: "Max 20x", "ChatGPT Plus",
+ * O plano da conta como o usuário o reconhece: "Max 5x", "ChatGPT Plus",
  * "Ultra". Cada fornecedor informa o plano de um jeito, e estas funções são a
  * única tradução — o mesmo mapeamento do ai-usagebar, que já foi conferido
  * contra contas reais.
@@ -12,16 +12,21 @@ package com.usagemonitor.domain.entity
  */
 
 /**
- * Claude: `subscriptionType` ("max", "pro", "team") do `.credentials.json`, e a
- * multiplicação do `rateLimitTier` ("default_claude_max_20x") quando existe. O
- * plano não vem do endpoint de uso — só do arquivo de credenciais.
+ * Claude: `subscriptionType` ("max", "pro", "team") do `.credentials.json`, e o
+ * `rateLimitTier` ("default_claude_max_20x") quando existe. O plano não vem do
+ * endpoint de uso — só do arquivo de credenciais.
+ *
+ * `20x` vira "Ultra": a Anthropic renomeou o Max 20x para Ultra (artigo oficial
+ * support.claude.com/en/articles/17728952), e o rótulo não leva o nome do
+ * `subscriptionType`. `5x` segue "Max 5x" — não há fonte oficial de renomeação
+ * para ele. Sem `subscriptionType` não há rótulo, mesmo com o tier preenchido.
  */
 fun anthropicPlanLabel(subscriptionType: String?, rateLimitTier: String?): String? {
     val base = subscriptionType?.trim()?.takeIf { value -> value.isNotEmpty() } ?: return null
     val name = base.replaceFirstChar { char -> char.uppercaseChar() }
     val tier = rateLimitTier.orEmpty()
     return when {
-        tier.contains("20x") -> "$name 20x"
+        tier.contains("20x") -> "Ultra"
         tier.contains("5x") -> "$name 5x"
         else -> name
     }
