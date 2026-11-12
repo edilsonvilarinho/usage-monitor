@@ -50,6 +50,7 @@ para de registrar um `warn` por requisição repetida da mesma recusa.
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | Concluída | Sem harness de teste: documento. Validado pelas leituras de "Fatos confirmados". |
+| A02 | Concluída | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.TeamSyncServiceTest"`, falha na asserção em `TeamSyncServiceTest.kt:682` (suspensão após 403) e `:758` (prazo de 30 min); o texto expected/actual não foi capturado pelo agente. Verde: mesmo comando, 43/43. Teste antigo "desmarcar a conta recusada limpa o aviso" passou a desmarcar de fato (`participatingProfileIds`), porque zerar a falha com a mesma configuração agora mantém a suspensão (decisão 3). Passada só com contas suspensas publica `lastSuccessAt` com `rejectedProfiles` preenchido. |
 | A03 | Concluída | Vermelho: `npx vitest run test/unit/labelRefusalLog.test.ts test/unit/labelRefusalWarn.test.ts`, 7 falhas, ex.: `labelRefusalWarn.test.ts:47: expected [ … ] to have a length of 1 but got 3` e `labelRefusalLog.test.ts:18: expected { warn: true, suppressed: +0 } to deeply equal { warn: false }`. Verde: mesmo comando 10/10; `npm run test:coverage` 26 arquivos, 337/337, linhas 96,05%; `npm run typecheck` exit 0. Teto do mapa: 1024 entradas. |
 
 ## Problemas em aberto e riscos

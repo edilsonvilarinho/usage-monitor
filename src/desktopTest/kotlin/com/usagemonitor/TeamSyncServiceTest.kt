@@ -23,6 +23,9 @@ import com.usagemonitor.domain.usecase.TouchTeamPresenceUseCase
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.io.path.createTempDirectory
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,6 +59,9 @@ private class RecordingTeamRepository(
 ) : TeamUsageRepository {
     val sends = mutableListOf<AccountSend>()
 
+    /** Chamadas ao servidor, recusadas ou não: presença e envio contam. */
+    var attempts = 0
+
     /** Todo envio, lote ou identidade, na ordem em que chegou. */
     val pushed: List<TeamIngestPayload>
         get() = sends.map { send -> send.payload }
@@ -82,6 +88,7 @@ private class RecordingTeamRepository(
     override suspend fun push(payload: TeamIngestPayload): Result<TeamIngestReceipt> = push(payload, null)
 
     override suspend fun push(payload: TeamIngestPayload, profileId: String?): Result<TeamIngestReceipt> {
+        attempts++
         val current = failure
         if (current != null) {
             return Result.failure(current)
@@ -145,6 +152,7 @@ private class RecordingTeamRepository(
         member: TeamMemberIdentity,
         profileId: String?
     ): Result<TeamPresenceReceipt> {
+        attempts++
         val current = presenceFailure
         if (current != null) {
             return Result.failure(current)
@@ -176,6 +184,14 @@ private val TWO_KEYED_ACCOUNTS_SETTINGS = ACTIVE_SETTINGS.copy(
     participatingProfileIds = setOf(PROFILE_ID, PROFILE_B),
     accountApiKeys = mapOf(PROFILE_ID to CHAVE_CONTA_A, PROFILE_B to CHAVE_CONTA_B)
 )
+
+/** Relógio de teste: o tempo só anda quando o teste manda. */
+private class ManualClock(var current: Instant) : Clock {
+    override fun now(): Instant = current
+}
+
+/** Instante inicial dos testes de suspensão; o relógio falso anda a partir dele. */
+private val INSTANTE_INICIAL = Instant.parse("2026-11-12T10:00:00Z")
 
 class TeamSyncServiceTest {
 
@@ -635,6 +651,7 @@ class TeamSyncServiceTest {
     @Test
     fun `desmarcar a conta recusada limpa o aviso dela`() = runTest {
         withFixture { _, _, syncState ->
+            var settings = ACTIVE_SETTINGS
             val repository = RecordingTeamRepository(
                 failure = TeamServerException(
                     statusCode = 403,
@@ -642,16 +659,140 @@ class TeamSyncServiceTest {
                     detail = "recusada"
                 )
             )
-            val service = newService(syncState, repository)
+            val service = newService(syncState, repository, settingsProvider = { settings })
             service.syncOnce()
             assertTrue(service.syncStatus.value.rejectedProfiles.isNotEmpty())
 
-            repository.failure = null
+            // Desmarcar a conta muda a configuração: a suspensão cai com ela e o aviso some.
+            // Sem mudança de configuração a recusa segue suspensa por 30 min (ver os testes de suspensão).
+            settings = ACTIVE_SETTINGS.copy(participatingProfileIds = setOf("outra-conta"))
             service.syncOnce()
 
             // A passada corrente é quem sabe quais contas ainda são recusadas:
             // acumular deixaria o aviso preso numa conta já consertada.
             assertTrue(service.syncStatus.value.rejectedProfiles.isEmpty())
+        }
+    }
+
+    /** Recusa de admissão como o cliente a recebe: 403 com o motivo do servidor. */
+    private fun admissionRefusal(): TeamServerException = TeamServerException(
+        statusCode = 403,
+        message = "Servidor de time recusou a envio ao time (HTTP 403): fora do rótulo",
+        detail = "fora do rótulo"
+    )
+
+    @Test
+    fun `recusa 403 suspende a conta na passada seguinte`() = runTest {
+        withFixture { _, _, syncState ->
+            val repository = RecordingTeamRepository(failure = admissionRefusal())
+            val service = newService(syncState, repository, clock = ManualClock(INSTANTE_INICIAL))
+
+            service.syncOnce()
+            val afterRefusal = repository.attempts
+            assertTrue(afterRefusal > 0)
+
+            service.syncOnce()
+
+            // Presença, identidade e lotes da conta recusada ficam sem chamada ao servidor.
+            assertEquals(afterRefusal, repository.attempts)
+            // Suspensa não é resolvida: a recusa segue na tela com o motivo do servidor.
+            assertEquals(mapOf(PROFILE_ID to "fora do rótulo"), service.syncStatus.value.rejectedProfiles)
+        }
+    }
+
+    @Test
+    fun `trocar a chave da conta recusada libera a suspensao`() = runTest {
+        withFixture { _, _, syncState ->
+            var settings = ACTIVE_SETTINGS
+            val repository = RecordingTeamRepository(failure = admissionRefusal())
+            val service = newService(
+                syncState,
+                repository,
+                settingsProvider = { settings },
+                clock = ManualClock(INSTANTE_INICIAL)
+            )
+            service.syncOnce()
+            val afterRefusal = repository.attempts
+
+            settings = ACTIVE_SETTINGS.copy(apiKey = "chave-de-time-rotacionada-com-tamanho")
+            service.syncOnce()
+
+            assertTrue(repository.attempts > afterRefusal)
+        }
+    }
+
+    @Test
+    fun `trocar o e-mail da conta recusada libera a suspensao`() = runTest {
+        withFixture { _, _, syncState ->
+            val targets = mutableListOf(
+                TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY, accountEmail = ACCOUNT_EMAIL)
+            )
+            val repository = RecordingTeamRepository(failure = admissionRefusal())
+            val service = newService(syncState, repository, targets = targets, clock = ManualClock(INSTANTE_INICIAL))
+            service.syncOnce()
+            val afterRefusal = repository.attempts
+
+            targets[0] = targets[0].copy(accountEmail = "outro.email@empresa.com")
+            service.syncOnce()
+
+            assertTrue(repository.attempts > afterRefusal)
+        }
+    }
+
+    @Test
+    fun `trocar o accountKey da conta recusada libera a suspensao`() = runTest {
+        withFixture { _, _, syncState ->
+            val targets = mutableListOf(
+                TeamSyncTarget(profileId = PROFILE_ID, accountKey = ACCOUNT_KEY, accountEmail = ACCOUNT_EMAIL)
+            )
+            val repository = RecordingTeamRepository(failure = admissionRefusal())
+            val service = newService(syncState, repository, targets = targets, clock = ManualClock(INSTANTE_INICIAL))
+            service.syncOnce()
+            val afterRefusal = repository.attempts
+
+            targets[0] = targets[0].copy(accountKey = "account-uuid-novo")
+            service.syncOnce()
+
+            assertTrue(repository.attempts > afterRefusal)
+        }
+    }
+
+    @Test
+    fun `a suspensao vence em 30 minutos sem mudar a configuracao`() = runTest {
+        withFixture { _, _, syncState ->
+            val clock = ManualClock(INSTANTE_INICIAL)
+            val repository = RecordingTeamRepository(failure = admissionRefusal())
+            val service = newService(syncState, repository, clock = clock)
+            service.syncOnce()
+            val afterRefusal = repository.attempts
+
+            clock.current = INSTANTE_INICIAL + 29.minutes
+            service.syncOnce()
+            assertEquals(afterRefusal, repository.attempts)
+
+            clock.current = INSTANTE_INICIAL + 31.minutes
+            service.syncOnce()
+            assertTrue(repository.attempts > afterRefusal)
+        }
+    }
+
+    @Test
+    fun `401 e 5xx nao suspendem a conta`() = runTest {
+        withFixture { _, _, syncState ->
+            // 401 é chave errada e 5xx é o servidor: nenhum aponta para uma conta, então o
+            // envio segue na passada seguinte como antes.
+            for (statusCode in listOf(401, 503)) {
+                val repository = RecordingTeamRepository(
+                    failure = TeamServerException(statusCode = statusCode, message = "falha", detail = "falha")
+                )
+                val service = newService(syncState, repository, clock = ManualClock(INSTANTE_INICIAL))
+                service.syncOnce()
+                val afterFirst = repository.attempts
+
+                service.syncOnce()
+
+                assertTrue(repository.attempts > afterFirst, "HTTP $statusCode não pode suspender a conta")
+            }
         }
     }
 
@@ -1020,7 +1161,8 @@ class TeamSyncServiceTest {
         ),
         settingsProvider: () -> TeamIntegrationSettings = { settings },
         /** `null` reproduz uma instalação anterior à presença. */
-        touchTeamPresence: TouchTeamPresenceUseCase? = TouchTeamPresenceUseCase(repository)
+        touchTeamPresence: TouchTeamPresenceUseCase? = TouchTeamPresenceUseCase(repository),
+        clock: Clock = Clock.System
     ): TeamSyncService {
         return TeamSyncService(
             syncStateDataSource = syncState,
@@ -1030,7 +1172,8 @@ class TeamSyncServiceTest {
             ensureIndexFresh = ensureIndexFresh,
             touchTeamPresenceFor = { touchTeamPresence },
             hostNameProvider = { "DESKTOP-TEST" },
-            batchSize = batchSize
+            batchSize = batchSize,
+            clock = clock
         )
     }
 
