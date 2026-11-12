@@ -107,7 +107,7 @@ class AnthropicMapperTest {
 
         val response = json.decodeFromString<AnthropicUsageResponse>(payload)
 
-        assertEquals(null, response.fiveHour.resetsAt)
+        assertEquals(null, response.fiveHour?.resetsAt)
         assertEquals("2026-05-01T11:59:59.727703+00:00", response.sevenDay.resetsAt)
     }
 
@@ -375,6 +375,58 @@ class AnthropicMapperTest {
 
         assertEquals(Instant.parse("2025-01-01T00:00:00Z"), quotas[0].periodStartAt)
         assertEquals(Instant.parse("2024-12-31T00:00:00Z"), quotas[1].periodStartAt)
+    }
+
+    @Test
+    fun `omits five_hour quota when the response sends five_hour null`() {
+        // Conta Ultra verificada: a Anthropic não tem janela de 5h para ela.
+        val response = decodeUsage(
+            """
+            {
+              "five_hour": null,
+              "seven_day": { "utilization": 0.0, "resets_at": "2026-11-19T00:00:00Z" },
+              "seven_day_sonnet": null
+            }
+            """.trimIndent()
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(listOf(AnthropicQuotaLabels.SEVEN_DAY), result.quotas.map { quota -> quota.label })
+        assertEquals(emptySet(), result.notices)
+    }
+
+    @Test
+    fun `keeps seven_day and credits when five_hour is null`() {
+        val response = decodeUsage(
+            """
+            {
+              "five_hour": null,
+              "seven_day": { "utilization": 12.0, "resets_at": "2026-11-19T00:00:00Z" },
+              "extra_usage": {
+                "is_enabled": true,
+                "monthly_limit": 55000,
+                "used_credits": 6600.0,
+                "utilization": 12.0,
+                "currency": "BRL",
+                "decimal_places": 2
+              }
+            }
+            """.trimIndent()
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(
+            listOf(AnthropicQuotaLabels.SEVEN_DAY, AnthropicQuotaLabels.EXTRA_CREDITS),
+            result.quotas.map { quota -> quota.label }
+        )
+        assertEquals(12L, result.quotas[0].used)
+        assertEquals(12L, result.quotas[1].used)
+    }
+
+    private fun decodeUsage(payload: String): AnthropicUsageResponse {
+        return Json { ignoreUnknownKeys = true }.decodeFromString<AnthropicUsageResponse>(payload)
     }
 
     @Test

@@ -13,10 +13,13 @@ import kotlinx.serialization.Serializable
  *
  * A resposta traz outras janelas (`seven_day_opus`, `seven_day_cowork`, ...) e
  * a lista `limits[]`, ignoradas aqui — o `Json` do projeto usa `ignoreUnknownKeys`.
+ *
+ * `five_hour` vem `null` em conta Ultra verificada (sem janela de 5h). A chave continua
+ * obrigatória: ausência da chave é erro de contrato, não "sem 5h".
  */
 @Serializable
 data class AnthropicUsageResponse(
-    @SerialName("five_hour") val fiveHour: AnthropicUsageWindow,
+    @SerialName("five_hour") val fiveHour: AnthropicUsageWindow?,
     @SerialName("seven_day") val sevenDay: AnthropicUsageWindow,
     @SerialName("seven_day_sonnet") val sevenDaySonnet: AnthropicUsageWindow? = null,
     @SerialName("extra_usage") val extraUsage: AnthropicExtraUsage? = null,

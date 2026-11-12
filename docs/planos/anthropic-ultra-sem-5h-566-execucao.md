@@ -47,6 +47,7 @@ diz "Max 20x".
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito com os fatos acima | — |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.AnthropicMapperTest"` → `JsonDecodingException` em `AnthropicMapperTest.kt:457` (decodificar `five_hour: null`; é o defeito reproduzido, a fonte inteira cai); verde: o mesmo comando com `AccountPlanLabelTest` → 27 testes, 0 falhas; `desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.*"` → 1273 testes, 0 falhas. `fiveHour` anulável sem default (chave ausente segue erro de contrato) | verde |
 
 ## Problemas em aberto e riscos
 
