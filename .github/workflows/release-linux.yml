@@ -572,15 +572,53 @@ jobs:
           echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload to GitHub Release
+        id: gh_release
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ steps.release_notes.outputs.tag }}
           body_path: ${{ steps.release_notes.outputs.notes_path }}
           files: dist-build/*
           fail_on_unmatched_files: true
+          # Rascunho ate os assets subirem (issue #582): publicada antes, a v42.3.0-beta.2
+          # ficou 9 s visivel sem o `.exe`, e o app que a consultou nesse intervalo
+          # registrou "download falhou". O app e a API anonima ignoram rascunho; o passo
+          # seguinte publica.
+          draft: true
           # Beta sai como prerelease e nunca vira `latest` (issue #355): o app fora do
           # canal beta so le `/releases/latest`, que a API nunca responde com
           # prerelease -- e isso que protege quem nao optou, inclusive versoes
           # antigas do app, que nao conhecem o canal.
           prerelease: ${{ needs.verify-version.outputs.prerelease == 'true' }}
           make_latest: ${{ needs.verify-version.outputs.prerelease == 'true' && 'false' || 'true' }}
+
+      # Publica so depois de todo asset ter `digest`: e o sha256 que o app exige para
+      # instalar (`selectArtifact`), e o GitHub pode preenche-lo depois do upload. Rascunho
+      # nao responde em `/releases/tags/{tag}`, por isso a consulta vai pelo id.
+      - name: Publish release after assets are verifiable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.gh_release.outputs.id }}
+          RELEASE_TAG: ${{ steps.release_notes.outputs.tag }}
+          PRERELEASE: ${{ needs.verify-version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 30); do
+            pending="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+              --jq '[.assets[] | select(.state != "uploaded" or ((.digest // "") | startswith("sha256:") | not))] | length')"
+            if [ "$pending" = "0" ]; then
+              break
+            fi
+            if [ "$attempt" = "30" ]; then
+              echo "::error::${pending} asset(s) sem digest sha256 apos 150 s; a release fica em rascunho."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest
+          fi

@@ -50,6 +50,7 @@ falha entrou no backoff. Duas correções: o workflow só publica a release depo
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | feito | Plano escrito; sem suíte (documento). |
+| A02 | feito | Sem suíte (YAML de Actions; nenhum teste em `tools/` lê o `release-linux.yml`). `python -c "yaml.safe_load(...)"`: passos finais `['Generate release notes', 'Upload to GitHub Release', 'Publish release after assets are verifiable']`, `draft: True`. Validação real: na próxima tag, `published_at` ≥ `updated_at` de todos os assets. |
 
 ## Problemas em aberto e riscos
 
