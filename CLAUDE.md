@@ -283,7 +283,7 @@ Regras:
   **sem overshoot em dado**. `AppMotionPolicy` nasce `Static`; só o `Main` passa a preferência, e
   **a todas as janelas**.
 - Modais: todas por `AppDialogWindow`; a janela nasce na primeira abertura (ou no pré-aquecimento
-  opt-in, só Windows) e depois só se esconde;
+  opt-in, só Windows) e depois só se esconde; já aberta e escondida há 60 s, sai da composição (#562: ~200 MB nativos por janela);
   pedido por `StateFlow`; nome na trilha é fixo (`diagnosticName`). Diálogo interno é `AppDialog`,
   nunca `AlertDialog`.
 - Tipografia: Plex Mono em `label*`/`title*`/`headline*`/`display*`, Plex Sans em `body*`; carga do

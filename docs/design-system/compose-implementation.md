@@ -55,6 +55,10 @@ quadros, um percentual que não é verdade.
     parando pelo `closeWindow()` de cada ViewModel; conteúdo com laço próprio (a demo da Ajuda) lê
     `LocalModalWindowOnScreen` para não rodar escondido. Quem guarda o assunto num anulável (a
     fonte do histórico, as notas) usa `rememberLastNonNull`, senão a janela esmaeceria vazia.
+  - **Mas não para sempre (#562).** Cada janela viva segura 180–250 MB fora da JVM (Direct3D/Skia), que não voltavam
+    ao fechar. Janela já aberta e escondida há 60 s (`MODAL_IDLE_RELEASE_MILLIS`) sai da composição; a pré-aquecida
+    que nunca abriu fica, e a liberada não é pré-aquecida de novo (`shouldReleaseHiddenModalWindow`,
+    `shouldCreateModalWindow`). Medido com NMT: 6 janelas, 1.417–1.440 MB privados; liberadas, 1.098–1.105 MB.
   - **Pré-aquecimento (opt-in `prewarm = true`).** Mesmo viva, a primeira abertura seguia lenta: a
     trilha do 41.6.0-beta.2 mediu 230–515 ms do pedido ao quadro (fora a criação da janela e os
     680 ms do E9), contra 42–89 ms das reaberturas. Contado da HUD pintada — 0,8 s para as

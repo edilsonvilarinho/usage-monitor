@@ -54,6 +54,7 @@ e devolver a que as janelas modais fechadas seguram para sempre.
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito com as medições acima | — |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ModalRequestActionTest"` → 4 falhas de asserção (`ModalRequestActionTest.kt:47`, `:72`, `:77`, `:87`, `AssertionError`) com as funções em stub; verde: o mesmo comando → 14 testes, 0 falhas; `desktopTest --tests "com.usagemonitor.architecture.*"` → 17 testes, 0 falhas. `MODAL_IDLE_RELEASE_MILLIS`, `shouldReleaseHiddenModalWindow`, `shouldCreateModalWindow`; holder observável em `rememberModalWindowHost` | verde |
 
 ## Problemas em aberto e riscos
 
