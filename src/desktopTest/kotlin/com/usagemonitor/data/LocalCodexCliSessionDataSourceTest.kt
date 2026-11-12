@@ -164,6 +164,28 @@ class LocalCodexCliSessionDataSourceTest {
         }
     }
 
+    @Test
+    fun `turns since the cutoff come back in time order and drop older ones`() = runTest {
+        withFixture { home, dataSource ->
+            rolloutFile(home).writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-a"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:04Z", 100, 40, 0, 128, 0, 228),
+                    contextLine("turn-2", "2026-09-08T12:02:00Z", "gpt-a"),
+                    usageLine("turn-2", "response-2", "2026-09-08T12:02:04Z", 10, 0, 0, 20, 0, 30)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+
+            val since = Instant.parse("2026-09-08T12:01:00Z").toEpochMilliseconds()
+            val turns = dataSource.readTurnsSince(sinceEpochMillis = since)
+
+            assertEquals(listOf("turn-2"), turns.map { turn -> turn.turnId })
+            assertEquals(10L, turns.single().usage.inputTokens)
+        }
+    }
+
     /**
      * Tempo ativo pela regra do Claude: intervalo entre respostas consecutivas, somado só abaixo
      * do corte de 5 min. O salto de 12:02:01 a 12:30:01 é pausa e não entra.

@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliModelUsage
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.entity.CodexCliSessionTurn
 
 interface CodexCliSessionRepository {
     suspend fun syncIndex(): Result<CodexCliSessionIndexReport>
@@ -16,4 +17,7 @@ interface CodexCliSessionRepository {
 
     /** Uso por modelo (#386); vazio quando a fonte não mede. */
     suspend fun getModelUsage(sinceEpochMillis: Long? = null): Result<List<CodexCliModelUsage>> = Result.success(emptyList())
+
+    /** Turnos desde o corte, para o quadro de uso (#560); `null` lê todos. Vazio quando a fonte não mede. */
+    suspend fun getTurnsSince(sinceEpochMillis: Long? = null): Result<List<CodexCliSessionTurn>> = Result.success(emptyList())
 }

@@ -148,6 +148,27 @@ class LocalCodexCliSessionDataSource(
     }
 
     /**
+     * Turnos de todas as sessões desde o corte, em ordem de tempo (#560). Desempate por
+     * sessão e `seq` para a lista ser total: duas leituras iguais dão a mesma ordem.
+     */
+    override suspend fun readTurnsSince(sinceEpochMillis: Long?): List<CodexCliSessionTurn> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(
+                    "SELECT * FROM codex_cli_turns WHERE ts >= ? ORDER BY ts, session_id, seq"
+                ).use { statement ->
+                    statement.setLong(1, sinceEpochMillis ?: 0L)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) add(readTurn(rows))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Uso por modelo (#386), somado no SQL. A vazão usa o mesmo corte do índice
      * do Claude: resposta sem pedido, sem duração ou acima do corte não entra.
      */

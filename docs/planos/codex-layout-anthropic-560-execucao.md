@@ -58,6 +58,7 @@ peça por peça; **Respostas** ocupa o lugar do Custo (o Codex não tem tarifa) 
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito; protótipo AO5 copiado para `docs/planos/issue-560-visual/ao5.html` | — |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.presentation.*"` → `CodexCliUsageBreakdownTest.kt:20`, `:41` (`expected:<2> but was:<1>`, resposta por registro), `:58`; `LocalCodexCliSessionDataSourceTest.kt:183` `expected:<[turn-2]> but was:<[]>`; `CodexCliSessionsViewModelTest.kt:279` `expected:<2> but was:<0>`; verde: o mesmo comando → 2376 testes, 0 falhas. Mapeador `CodexCliUsageBreakdown.kt` (projeto, modelo, agente por `threadSource`, atividade em BRT; `turnCount` = respostas), `readTurnsSince` no data source, `usageBreakdown` no estado do view model | verde |
 | A04 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CodexCliSessionsScreenTest"` → `:404`, `:432`, `:445`, `:457` (`Expected exactly '1' node … 'Respostas'` e afins), `:58` (`… contains 'Padrão'`), `:72` (`… contains 'gpt-6.1-sol'`); verde: o mesmo comando com `--rerun-tasks` → 26 testes, 0 falhas. Cabeçalho com rótulo da conta e botões com contorno, cartão Respostas, colunas no padrão Anthropic, linha 2 com respostas/turnos/app/origem/versão, linha 3 com a mistura ou o modelo principal | verde |
 
 ## Problemas em aberto e riscos
