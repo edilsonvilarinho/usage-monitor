@@ -51,6 +51,7 @@ import com.usagemonitor.domain.entity.CliSessionHealth
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.OpenCodeGoQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.QuotaSeriesKey
@@ -934,6 +935,81 @@ class ComponentTest {
         onNodeWithText("Reinicia no início do mês").assertIsDisplayed()
         onAllNodesWithText("Uso atual").assertCountEquals(0)
     }
+
+    @Test
+    fun `ApiUsageCard replaces the credits reset line with the out of credits status`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(420.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = blockedCreditsCardQuotas(QuotaBlockReason.OUT_OF_CREDITS),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        language = AppLanguage.PT,
+                        animationDelayMillis = 0,
+                        onRefresh = {}
+                    )
+                }
+            }
+        }
+
+        // Valor e trilho continuam; o reinício vira o estado, com a palavra escrita.
+        onNodeWithText("60%").assertIsDisplayed()
+        onNodeWithTag(quotaProgressTrackTag("Créditos"), useUnmergedTree = true).assertExists()
+        onNodeWithText("Sem créditos · trabalho extra pausado").assertIsDisplayed()
+        onAllNodesWithText("Reinicia no início do mês").assertCountEquals(0)
+    }
+
+    @Test
+    fun `ApiUsageCard shows the monthly limit status in English when spend limit is reached`() = runDesktopComposeUiTest {
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                Box(modifier = Modifier.width(420.dp)) {
+                    ApiUsageCard(
+                        source = ApiSource.ANTHROPIC,
+                        apiName = "Anthropic",
+                        quotas = blockedCreditsCardQuotas(QuotaBlockReason.SPEND_LIMIT_REACHED),
+                        showUsageDetails = false,
+                        isRefreshing = false,
+                        language = AppLanguage.EN,
+                        animationDelayMillis = 0,
+                        onRefresh = {}
+                    )
+                }
+            }
+        }
+
+        onNodeWithText("Monthly limit reached").assertIsDisplayed()
+        onAllNodesWithText("Resets at the start of the month").assertCountEquals(0)
+    }
+
+    private fun blockedCreditsCardQuotas(reason: QuotaBlockReason): List<QuotaInfo> = listOf(
+    QuotaInfo(
+        label = "Claude 5h",
+        used = 21L,
+        total = 100L,
+        periodEndAt = Instant.parse("2026-04-28T20:00:00Z"),
+        periodType = PeriodType.INTERVAL,
+        unit = UsageUnit.PERCENTAGE,
+        rawUsed = 968L,
+        rawTotal = 4500L
+    ),
+    QuotaInfo(
+        label = "Créditos",
+        used = 60L,
+        total = 100L,
+        periodEndAt = Instant.parse("2100-01-01T00:00:00Z"),
+        hasKnownResetAt = false,
+        periodType = PeriodType.REPORTED,
+        unit = UsageUnit.PERCENTAGE,
+        rawUsed = 32784L,
+        rawTotal = 55000L,
+        currencyCode = "BRL",
+        blockReason = reason
+    )
+)
 
     @Test
     fun `ApiUsageCard opens history action`() = runDesktopComposeUiTest {

@@ -36,6 +36,7 @@ import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.FooterActionGroup
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.hudAppBalloonHeight
 import com.usagemonitor.HUD_BALLOON_WIDTH
 import androidx.compose.foundation.layout.width
@@ -128,6 +129,7 @@ class HudNotchTest {
         const val INFORMATA_RING = "INFORMATA2 (Max 20x) · Crítico · anel externo 7d 9% · anel interno 5h 28% · " +
             "Contexto saturado · 1 sessão · Sem resposta há 2h10"
         const val DEEPSEEK_RING = "DeepSeek · Sem projeção · Saldo \$2.27"
+        const val BLOCKED_RING = "Anthropic · Sem créditos · Créditos 60%"
         const val GEAR = "Configurações"
 
         /** O texto e o rótulo que `updateBannerContent` dá ao estado pronto. */
@@ -146,6 +148,17 @@ class HudNotchTest {
             detail = "42% concluído"
         )
     }
+    /** Crédito extra bloqueado (#567): valor e trilho ficam, o reinício vira o motivo. */
+    private val blockedAccounts = listOf(
+        account(
+            "Anthropic", "Sem créditos", AppTone.CRITICAL,
+            HudQuota(
+                "Créditos", "60%", 0.6f, AppTone.WARNING, resetText = "mensal", hasForecast = true,
+                title = "Créditos extras", periodType = PeriodType.REPORTED,
+                blockReason = QuotaBlockReason.OUT_OF_CREDITS
+            )
+        )
+    )
     private val countdown = "Próxima atualização automática"
 
     private val accounts = listOf(
@@ -291,6 +304,17 @@ class HudNotchTest {
         onNodeWithText("Reinicia", substring = true).assertDoesNotExist()
         onNodeWithText("—").assertDoesNotExist()
         onNodeWithText("-").assertDoesNotExist()
+    }
+
+    /** Cota bloqueada: o motivo aparece no balão e o reinício "mensal" some (#567). */
+    @Test
+    fun `balao de cota bloqueada mostra o motivo no lugar do reinicio`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true, list = blockedAccounts) }
+
+        hoverRing(BLOCKED_RING)
+        onNodeWithText("Sem créditos · trabalho extra pausado").assertIsDisplayed()
+        onNodeWithText("mensal", substring = true).assertDoesNotExist()
+        onNodeWithText("Reinicia", substring = true).assertDoesNotExist()
     }
 
     @Test

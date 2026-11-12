@@ -63,6 +63,8 @@ import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.quotaBlockReasonLabel
+import com.usagemonitor.presentation.ui.components.quotaBlockReasonTone
 import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
 import com.usagemonitor.presentation.ui.components.drawGargantuaJet
 import com.usagemonitor.presentation.ui.components.accentColorFor
@@ -405,13 +407,22 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
         )
         // Sem reset não se imprime nada no lugar, nem traço: saldo que não
         // expira é o caso comum.
-        quota.resetText?.let { reset ->
-            Text(
-                text = hudResetCaption(reset, language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+        // Cota bloqueada (#567): o motivo com palavra substitui o reinício.
+        val blockReason = quota.blockReason
+        if (blockReason != null) {
+            AppStatusIndicator(
+                label = quotaBlockReasonLabel(reason = blockReason, language = language),
+                tone = quotaBlockReasonTone(reason = blockReason)
             )
+        } else {
+            quota.resetText?.let { reset ->
+                Text(
+                    text = hudResetCaption(reset, language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
         }
     }
     Box(

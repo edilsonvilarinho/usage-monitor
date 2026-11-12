@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.CodexQuotaLabels
 import com.usagemonitor.domain.entity.CursorQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.StalledCliSession
@@ -228,7 +229,9 @@ data class HudQuota(
     /** "87% usado" e "13% restante"; `null` onde não há teto (saldo, atividade observada). */
     val usedLeft: HudUsedLeft? = null,
     /** A janela da cota; decide a posição do anel. `null` conta como `REPORTED`, por dentro. */
-    val periodType: PeriodType? = null
+    val periodType: PeriodType? = null,
+    /** Motivo de crédito bloqueado (#567): o balão mostra o indicador no lugar do reinício. `null` = sem bloqueio. */
+    val blockReason: QuotaBlockReason? = null
 ) {
     /** "87% usado · 13% restante": a linha inteira, para leitor de tela e trilha. */
     val usedLeftText: String?
@@ -372,7 +375,8 @@ internal fun buildHudAccounts(
                     title = hudQuotaTitle(entry.quota, language),
                     group = quotaGroupOf(entry.quota),
                     usedLeft = hudUsedLeft(entry.quota, language),
-                    periodType = entry.quota.periodType
+                    periodType = entry.quota.periodType,
+                    blockReason = entry.quota.blockReason
                 )
             }
             val focusIndex = entries.indices.maxWithOrNull(

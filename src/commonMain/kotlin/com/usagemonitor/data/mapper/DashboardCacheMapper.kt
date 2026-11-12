@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -45,7 +46,8 @@ private fun QuotaInfo.toCacheDto(): QuotaInfoCacheDto {
         rawUsed = rawUsed,
         rawTotal = rawTotal,
         currencyCode = currencyCode,
-        periodStartAtEpochMillis = periodStartAt?.toEpochMilliseconds()
+        periodStartAtEpochMillis = periodStartAt?.toEpochMilliseconds(),
+        blockReason = blockReason?.name
     )
 }
 
@@ -107,6 +109,8 @@ private fun QuotaInfoCacheDto.toDomainOrNull(): QuotaInfo? {
         rawUsed = rawUsed,
         rawTotal = rawTotal,
         currencyCode = currencyCode,
-        periodStartAt = periodStartAtEpochMillis?.let(Instant::fromEpochMilliseconds)
+        periodStartAt = periodStartAtEpochMillis?.let(Instant::fromEpochMilliseconds),
+        // Nome desconhecido vira nulo: a linha continua, só sem o motivo.
+        blockReason = blockReason?.let { name -> runCatching { QuotaBlockReason.valueOf(name) }.getOrNull() }
     )
 }

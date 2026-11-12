@@ -458,10 +458,7 @@ internal fun buildQuotaTooltipMetrics(
             label = if (language == AppLanguage.PT) "Percentual" else "Percentage",
             value = "${quota.used}%"
         )
-        metrics += TooltipMetric(
-            label = if (language == AppLanguage.PT) "Reset" else "Reset",
-            value = resetLabel(quota = quota, language = language, now = now)
-        )
+        metrics += resetOrBlockTooltipMetric(quota = quota, language = language, now = now)
         metrics.addProjectionMetric(risk = risk, language = language)
         return metrics
     }
@@ -495,13 +492,25 @@ internal fun buildQuotaTooltipMetrics(
         )
     }
 
-    metrics += TooltipMetric(
-        label = if (language == AppLanguage.PT) "Reset" else "Reset",
-        value = resetLabel(quota = quota, language = language, now = now)
-    )
+    metrics += resetOrBlockTooltipMetric(quota = quota, language = language, now = now)
     metrics.addElapsedWindowMetric(quota = quota, language = language, now = now)
     metrics.addProjectionMetric(risk = risk, language = language)
     return metrics
+}
+
+/** Linha de reinício da tooltip; cota bloqueada (#567) mostra o motivo no lugar dela. */
+internal fun resetOrBlockTooltipMetric(quota: QuotaInfo, language: AppLanguage, now: Instant): TooltipMetric {
+    val reason = quota.blockReason
+    if (reason != null) {
+        return TooltipMetric(
+            label = quotaBlockTooltipLabel(language),
+            value = quotaBlockReasonLabel(reason = reason, language = language)
+        )
+    }
+    return TooltipMetric(
+        label = "Reset",
+        value = resetLabel(quota = quota, language = language, now = now)
+    )
 }
 
 internal fun quotaTooltipUsageValue(quota: QuotaInfo, language: AppLanguage): String {
