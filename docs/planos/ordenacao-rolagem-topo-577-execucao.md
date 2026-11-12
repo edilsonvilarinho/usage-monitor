@@ -47,6 +47,7 @@ aparece logo abaixo do cabeçalho. Hoje ele fica escondido acima da área visív
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | Concluída | Sem harness de teste: documento. Validado pelas leituras de "Fatos confirmados". |
+| A02 | Concluída | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CliSessionsScreenTest" --tests "com.usagemonitor.ui.CodexCliSessionsScreenTest"`: `CliSessionsScreenTest.kt:1718: Assert failed: The component with TestTag = 'cliSessionRow:sess39' is not displayed!` e `CodexCliSessionsScreenTest.kt:323: Expected exactly '1' node but could not find any node that satisfies: (Text … contains 'cx39' …)`. Verde: mesmo comando, 56 + 27 = 83 testes, 0 falhas. Helper `ScrollToTopOnSortChange` em `SortScrollReset.kt`; a lista Codex ganhou `LazyListState` explícito. |
 
 ## Problemas em aberto e riscos
 

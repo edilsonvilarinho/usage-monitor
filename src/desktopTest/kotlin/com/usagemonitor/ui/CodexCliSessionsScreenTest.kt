@@ -3,6 +3,7 @@ package com.usagemonitor.ui
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -10,7 +11,9 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.AppLanguage
@@ -293,6 +296,31 @@ class CodexCliSessionsScreenTest {
             assertEquals(listOf("aaaa0001", "cccc0003", "bbbb0002"), rowOrder(published))
             onNode(hasText(responses) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
             assertEquals(published, rowOrder(published))
+            viewModel.onDestroy()
+        }
+
+    /**
+     * Ordenar por respostas troca a ordem inteira: a lista volta ao topo (#577). Sem isso, a posição
+     * de rolagem sobrevive à reordenação e a primeira linha da nova ordem fica fora da janela.
+     */
+    @Test
+    fun `sorting after scrolling down brings the first row of the new order into view`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(
+                FakeCodexRepository(
+                    sessions = (0 until 40).map { index ->
+                        rated("cx" + index.toString().padStart(2, '0'), responses = index + 1)
+                    }
+                )
+            )
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+            val lastPublished = shortCodexId("cx39")
+
+            onRoot().performMouseInput { moveTo(center); repeat(200) { scroll(1f) } }
+            onNodeWithText(lastPublished).assertIsDisplayed()
+            onNode(hasText(CliSessionsLabels.responses(AppLanguage.PT)) and hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))).performClick()
+
+            onNodeWithText(lastPublished).assertIsDisplayed()
             viewModel.onDestroy()
         }
 
