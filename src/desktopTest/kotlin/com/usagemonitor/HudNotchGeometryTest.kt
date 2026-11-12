@@ -576,6 +576,16 @@ class HudNotchGeometryTest {
         assertEquals(hudDockedWindowBounds(HudEdge.TOP, 0.7f, sizes, screen), hudHostWindowBounds(false, placement, sizes, screen))
     }
 
+    /** A linha de resets de limite (#571) soma a sua altura no balão, e só quando a API informa o bloco. */
+    @Test
+    fun `a linha de resets soma altura so quando a contagem existe`() {
+        val without = account("A", "Normal", listOf("5h" to "9%"))
+        val with = without.copy(bankedResetCount = 1)
+
+        assertEquals(HUD_BALLOON_SECTION_GAP + HUD_BALLOON_QUOTA_TITLE, hudBalloonHeight(with) - hudBalloonHeight(without))
+    }
+
+
     private fun account(label: String, word: String, quotas: List<Pair<String, String>>): HudAccount {
         return HudAccount(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, label),
