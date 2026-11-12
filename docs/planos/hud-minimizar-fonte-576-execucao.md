@@ -56,9 +56,12 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 |---|---|---|
 | A01 | Plano criado. | Sem harness de teste (documento); validado por leitura dos pontos citados no código em `0e77f163`. |
 | A02 | `HudMinimizedAccounts.kt` (alternar, gravar na ordem de publicação, ler descartando entrada inválida) + `hudMinimizedAccounts` em `HudWindowPreferences`. | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudMinimizedAccountsTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` → 9 falhas por asserção, ex. `HudMinimizedAccountsTest.kt:20 expected:<[UsageTargetKey(source=CODEX, profileId=null)]> but was:<[]>`. Verde: mesmo comando → `BUILD SUCCESSFUL`, 25 testes, 0 falhas. |
+| A03 | `HudAccount.minimized`, `buildHudAccounts(minimizedTargets)`, `AppGargantuaTokens.minimizedSize = 28.dp`, ramos minimizados em `hudNotchSizes` (helpers em `HudNotchMinimized.kt`); minimizada não soma pílula de estado. | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.presentation.HudModelTest"` → 3 `AssertionError` (`HudNotchGeometryTest.kt:599`, `:614`, `HudModelTest.kt:542`). Verde: mesmo comando → `BUILD SUCCESSFUL`, 74 testes, 0 falhas. |
 
 ## Problemas em aberto e riscos
 
 - Host de janela (#342): mudança de tamanho da HUD só testada no Windows; abrir no Linux (X11) antes do merge ou
   declarar o risco no PR.
+- Lateral: anel de 28 dp + vão + linha de foco (ex. `5h 61%`) pode passar de 64 dp e alargar a faixa em poucos dp;
+  aceito para manter a linha ao lado do anel, como na AP1.
 - HUD no navegador (#388) e modo terminal continuam mostrando a conta inteira (fora do escopo).

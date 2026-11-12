@@ -523,4 +523,22 @@ class HudModelTest {
         )
         return HudQuotaEntry(stats, quota, risk?.let { level -> QuotaRiskSummary(level, HUD_NOW + 1.hours) })
     }
+
+    @Test
+    fun `so a conta marcada como minimizada sai com o sinal`() {
+        val entries = listOf(
+            entry(PADRAO, "Sessão 5h", used = 10, risk = UsageRiskLevel.ON_TRACK),
+            entry(CODEX, "Codex 5h", used = 10, risk = UsageRiskLevel.ON_TRACK)
+        )
+
+        val accounts = buildHudAccounts(
+            entries,
+            cardOrder = listOf(PADRAO, CODEX),
+            language = AppLanguage.PT,
+            now = HUD_NOW,
+            minimizedTargets = setOf(CODEX)
+        )
+
+        assertEquals(listOf(false, true), accounts.map { account -> account.minimized })
+    }
 }

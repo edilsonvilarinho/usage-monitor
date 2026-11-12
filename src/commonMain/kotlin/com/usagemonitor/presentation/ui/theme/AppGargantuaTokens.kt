@@ -6,6 +6,8 @@ import androidx.compose.ui.unit.dp
 /** Paleta cenográfica da HUD; dourado não representa consumo nem estado. */
 object AppGargantuaTokens {
     val size = 64.dp
+    /** Anel da conta minimizada (#576): cabe ao lado da cota em foco. */
+    val minimizedSize = 28.dp
     val night = Color(0xFF080B12)
     val core = Color(0xFF030508)
     /**

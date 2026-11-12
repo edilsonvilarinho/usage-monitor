@@ -391,6 +391,7 @@ private fun horizontalCollapsed(
         listOf(HUD_RING_SIZE + HUD_RING_TEXT_GAP + wordWidth(fallbackLabel))
     } else {
         accounts.map { account ->
+            if (account.minimized) return@map minimizedRingWithFocusWidth(account)
             if (compact) {
                 // Compacta: a cota em foco embaixo do anel, sem a palavra.
                 maxOf(HUD_RING_SIZE, stripLineWidth(account.focusLine))
@@ -426,12 +427,13 @@ private fun verticalCollapsed(
     val wordWidths = when {
         accounts.isEmpty() -> listOf(verticalWordLineWidth(fallbackLabel))
         compact -> emptyList()
-        else -> accounts.map { account -> verticalStatusPillWidth(account.statusLabel) }
+        else -> accounts.filterNot { account -> account.minimized }.map { account -> verticalStatusPillWidth(account.statusLabel) }
     }
     val itemHeights = if (accounts.isEmpty()) {
         listOf(HUD_RING_SIZE + HUD_WORD_LINE * verticalWordLines(fallbackLabel))
     } else {
         accounts.map { account ->
+            if (account.minimized) return@map minimizedRingWithFocusHeight(account)
             if (compact) {
                 HUD_RING_SIZE + stripLineHeight(account.focusLine)
             } else {
@@ -443,9 +445,15 @@ private fun verticalCollapsed(
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
     val widestWord = wordWidths.maxOrNull() ?: 0.dp
     val widestPercent = accounts.maxOfOrNull { account ->
-        if (compact) stripLineWidth(account.focusLine) else account.stripLines.maxOf { line -> stripLineWidth(line) }
+        when {
+            account.minimized -> minimizedRingWithFocusWidth(account)
+            compact -> stripLineWidth(account.focusLine)
+            else -> account.stripLines.maxOf { line -> stripLineWidth(line) }
+        }
     } ?: 0.dp
-    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent)
+    // O piso de 64 dp é das contas comuns; só com minimizadas a lateral pode ficar no anel de 28 dp.
+    val ringFloor = if (accounts.isEmpty() || accounts.any { account -> !account.minimized }) HUD_RING_SIZE else 0.dp
+    val across = maxOf(ringFloor, widestWord, widestPercent)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
         height = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
