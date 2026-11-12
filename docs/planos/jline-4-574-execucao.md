@@ -35,6 +35,7 @@ O PR do Dependabot #546 (jline 3.30.17 → 4.5.0) falha no CI: `:compileKotlinDe
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness (plano) | revisado no diff |
+| A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.terminal.*"` | só o bump: `TuiTerminal.kt:57:26 Unresolved reference 'stdoutEncoding' on receiver of type 'Terminal'` (erro de compilação, não asserção, porque o bump não admite vermelho por asserção); com `outputEncoding()`: `BUILD SUCCESSFUL`, 189 testes em 27 suítes, 0 falhas, `JLineTuiIoTest` 8/8 (`encoding == "UTF-8"`) |
 
 ## Problemas em aberto e riscos
 
