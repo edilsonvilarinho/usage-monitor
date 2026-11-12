@@ -30,7 +30,8 @@ fun ApiUsageStats.toCacheDto(): ApiUsageStatsCacheDto {
         profileLabel = profileLabel,
         notices = notices.map { notice -> notice.name },
         planLabel = planLabel,
-        fetchedAtEpochMillis = fetchedAt?.toEpochMilliseconds()
+        fetchedAtEpochMillis = fetchedAt?.toEpochMilliseconds(),
+        bankedResetCount = bankedResetCount
     )
 }
 
@@ -90,7 +91,8 @@ private fun ApiUsageStatsCacheDto.toDomainOrNull(savedAtEpochMillis: Long): ApiU
             profileLabel = profileLabel,
             notices = notices.mapNotNull { name -> runCatching { ApiUsageNotice.valueOf(name) }.getOrNull() }.toSet(),
             planLabel = planLabel,
-            fetchedAt = Instant.fromEpochMilliseconds(fetchedAtEpochMillis ?: savedAtEpochMillis)
+            fetchedAt = Instant.fromEpochMilliseconds(fetchedAtEpochMillis ?: savedAtEpochMillis),
+            bankedResetCount = bankedResetCount
         )
     }.getOrNull()
 }

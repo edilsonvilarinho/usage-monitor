@@ -1458,6 +1458,52 @@ class HudNotchTest {
         onNodeWithTag(HUD_BALLOON_RING_LEGEND_TAG_PREFIX + 2).assertDoesNotExist()
     }
 
+    /** Linha "Resets de limite" do balão: a contagem com o tom dela, e some sem o bloco (#571). */
+    @Test
+    fun `o balao mostra a linha de resets com a contagem disponivel`() = runDesktopComposeUiTest {
+        setBankedResets(bankedResetCount = 1, language = AppLanguage.PT)
+        onNodeWithText("Resets de limite").assertIsDisplayed()
+        onNodeWithText("1 disponível").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o balao pluraliza os resets disponiveis`() = runDesktopComposeUiTest {
+        setBankedResets(bankedResetCount = 2, language = AppLanguage.PT)
+        onNodeWithText("2 disponíveis").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o balao mostra nenhum reset quando a contagem e zero`() = runDesktopComposeUiTest {
+        setBankedResets(bankedResetCount = 0, language = AppLanguage.PT)
+        onNodeWithText("nenhum").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o balao traduz a linha de resets para ingles`() = runDesktopComposeUiTest {
+        setBankedResets(bankedResetCount = 1, language = AppLanguage.EN)
+        onNodeWithText("Rate-limit resets").assertIsDisplayed()
+        onNodeWithText("1 available").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o balao esconde a linha de resets sem contagem`() = runDesktopComposeUiTest {
+        setBankedResets(bankedResetCount = null, language = AppLanguage.PT)
+        onNodeWithText("Resets de limite").assertDoesNotExist()
+    }
+
+    private fun ComposeUiTest.setBankedResets(bankedResetCount: Int?, language: AppLanguage) {
+        setContent {
+            AppTheme(isDark = true) {
+                Box(modifier = Modifier.width(HUD_BALLOON_WIDTH - HUD_BALLOON_PADDING * 2)) {
+                    HudAccountBalloonContent(
+                        account = accounts.first().copy(bankedResetCount = bankedResetCount),
+                        language = language
+                    )
+                }
+            }
+        }
+    }
+
     /** A seção de sessões CLI aparece com os sinais da conta, e some sem eles (#265). */
     @Test
     fun `o balao mostra os sinais de sessao da conta`() = runDesktopComposeUiTest {

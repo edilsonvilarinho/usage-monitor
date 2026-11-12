@@ -65,6 +65,8 @@ data class HudAccount(
     val focusIndex: Int,
     /** Há turno de sessão CLI nos últimos 5 min nesta conta. */
     val sessionActive: Boolean = false,
+    /** Resets de limite guardados (#571); `null` quando a API não informa o bloco. */
+    val bankedResetCount: Int? = null,
     /** A marca e o acento do fornecedor saem daqui. */
     val source: ApiSource = targetKey.source,
     /** "Max 20x", "ChatGPT Plus"; `null` quando o fornecedor não informa. */
@@ -403,6 +405,7 @@ internal fun buildHudAccounts(
                 accountAccent = target.anthropicProfileId?.let { profileId -> accountColors[profileId] },
                 accountEmoji = target.anthropicProfileId?.let { profileId -> accountEmojis[profileId] },
                 sessionSignals = hudSessionSignals(target, sessionPulses[target], stalledSessions, language),
+                bankedResetCount = first.stats.bankedResetCount,
                 observedModels = observedModels
             )
         }

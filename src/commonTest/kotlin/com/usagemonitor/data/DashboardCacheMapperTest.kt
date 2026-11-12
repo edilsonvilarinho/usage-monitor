@@ -24,6 +24,35 @@ class DashboardCacheMapperTest {
     private val fixedInstant = Instant.parse("2025-01-01T12:00:00Z")
 
     @Test
+    fun `round trip keeps the banked reset count, zero included and unknown as null`() {
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(codexStatsWithResets(0), codexStatsWithResets(1), codexStatsWithResets(null))
+                .map { stats -> stats.toCacheDto() }
+        ).toDomain()
+
+        assertEquals(listOf(0, 1, null), restored.map { stats -> stats.bankedResetCount })
+    }
+
+    private fun codexStatsWithResets(bankedResetCount: Int?): ApiUsageStats {
+        return ApiUsageStats(
+            source = ApiSource.CODEX,
+            apiName = "Codex",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Codex 5h",
+                    used = 8L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            ),
+            bankedResetCount = bankedResetCount
+        )
+    }
+
+    @Test
     fun `round trip preserves stats without account context`() {
         val original = ApiUsageStats(
             source = ApiSource.MINIMAX,

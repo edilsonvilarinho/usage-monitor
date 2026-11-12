@@ -38,7 +38,14 @@ data class ApiUsageStats(
     // Quando esta leitura foi coletada (issue #269). Nula nas leituras que ainda
     // não passaram pelo painel. É por ele que a leitura mantida depois de uma
     // falha diz a idade e é descartada passados `MAX_STALE_READING_AGE`.
-    val fetchedAt: Instant? = null
+    val fetchedAt: Instant? = null,
+
+    /**
+     * Resets guardados que a conta Codex ainda pode usar, lidos de `rate_limit_reset_credits`
+     * (issue #571). `null` = não informado, nada a mostrar; `0` = informado, nenhum disponível.
+     * Campo novo com default: as demais fontes continuam nulas.
+     */
+    val bankedResetCount: Int? = null
 )
 
 enum class ApiUsageNotice {

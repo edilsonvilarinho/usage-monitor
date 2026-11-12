@@ -290,6 +290,16 @@ class HudModelTest {
         assertTrue(hudRingDescription(accounts.first(), AppLanguage.PT).endsWith("· Contexto saturado · 1 sessão"))
     }
 
+    /** Resets de limite guardados da conta chegam à HUD; sem o bloco ficam nulos (#571). */
+    @Test
+    fun `os resets de limite guardados chegam a conta da hud`() {
+        val withResets = buildHudAccounts(listOf(entry(CODEX, "Codex 5h", used = 10, risk = null, bankedResetCount = 1)), listOf(CODEX), AppLanguage.PT, HUD_NOW)
+        val withoutResets = buildHudAccounts(listOf(entry(CODEX, "Codex 5h", used = 10, risk = null)), listOf(CODEX), AppLanguage.PT, HUD_NOW)
+
+        assertEquals(1, withResets.single().bankedResetCount)
+        assertEquals(null, withoutResets.single().bankedResetCount)
+    }
+
     /** Sem API habilitada o notch não pode prometer "Carregando" para sempre. */
     @Test
     fun `sem api habilitada o notch diz isso em vez de carregando`() {
@@ -491,6 +501,7 @@ class HudModelTest {
         risk: UsageRiskLevel?,
         profileLabel: String? = null,
         plan: String? = null,
+        bankedResetCount: Int? = null,
         period: PeriodType = PeriodType.INTERVAL
     ): HudQuotaEntry {
         val quota = QuotaInfo(
@@ -507,7 +518,8 @@ class HudModelTest {
             apiName = target.source.name,
             quotas = listOf(quota),
             profileLabel = profileLabel,
-            planLabel = plan
+            planLabel = plan,
+            bankedResetCount = bankedResetCount
         )
         return HudQuotaEntry(stats, quota, risk?.let { level -> QuotaRiskSummary(level, HUD_NOW + 1.hours) })
     }

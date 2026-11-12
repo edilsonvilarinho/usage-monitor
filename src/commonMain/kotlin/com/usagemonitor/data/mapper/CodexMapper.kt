@@ -57,7 +57,9 @@ object CodexMapper {
             apiName = "Codex",
             quotas = quotasByPeriod.values.sortedBy { quota -> periodRank(quota.periodType) },
             notices = notices,
-            planLabel = codexPlanLabel(response.planType)
+            planLabel = codexPlanLabel(response.planType),
+            // Bloco ausente vira `null`; `available_count` 0 segue como zero explícito.
+            bankedResetCount = response.resetCredits?.availableCount
         )
     }
 
