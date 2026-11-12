@@ -8,11 +8,13 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.data.export.DefaultUsageExportEncoder
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
@@ -21,9 +23,13 @@ import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
+import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TAB_TAG_PREFIX
 import com.usagemonitor.presentation.ui.CODEX_SESSION_COLUMN_HEADER_TAG
 import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
+import com.usagemonitor.presentation.ui.EXPORT_CSV_TAG
+import com.usagemonitor.presentation.ui.EXPORT_JSON_TAG
+import com.usagemonitor.presentation.ui.EXPORT_PDF_TAG
 import com.usagemonitor.presentation.ui.ExportLabels
 import com.usagemonitor.presentation.ui.codexApplicationLabel
 import com.usagemonitor.presentation.ui.formatActiveTime
@@ -50,6 +56,20 @@ import kotlin.time.Instant
 class CodexCliSessionsScreenTest {
 
     @Test
+    fun `profile label shows in the toolbar of the codex sessions window`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent {
+                ScreenTestTheme {
+                    CodexCliSessionsScreen(viewModel, AppLanguage.PT, profileLabel = "Padrão")
+                }
+            }
+
+            onNodeWithText("Padrão").assertExists()
+            viewModel.onDestroy()
+        }
+
+    @Test
     fun `list shows each session with project, tokens, model and application`() =
         runDesktopComposeUiTest(width = 1_200, height = 900) {
             val viewModel = viewModel(FakeCodexRepository())
@@ -60,9 +80,10 @@ class CodexCliSessionsScreenTest {
             onNodeWithText(shortCodexId(LONG_SESSION_ID)).assertExists()
             onNodeWithText("usage-monitor").assertExists()
             onNodeWithText("3 turno(s)").assertExists()
+            // Mistura vazia: a linha 3 mostra o modelo principal (fallback #560).
             onNodeWithText("gpt-6.1-sol").assertExists()
-            onNodeWithText("Codex Desktop").assertExists()
-            onNodeWithText("Codex CLI").assertExists()
+            onNodeWithText("Codex Desktop", substring = true).assertExists()
+            onNodeWithText("Codex CLI", substring = true).assertExists()
             // Sem modelo nem projeto, a célula diz "—" em vez de ficar vazia.
             onAllNodesWithText("—").assertCountEquals(3)
             viewModel.onDestroy()
@@ -81,20 +102,22 @@ class CodexCliSessionsScreenTest {
     }
 
     @Test
-    fun `summary tab groups sessions by project and by primary model`() =
-        runDesktopComposeUiTest(width = 1_200, height = 1_400) {
+    fun `summary tab names the codex axes, the main thread and drops the cost`() =
+        runDesktopComposeUiTest(width = 1_200, height = 1_600) {
             val viewModel = viewModel(FakeCodexRepository())
             setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
             onNodeWithText("Resumo").performClick()
             waitForIdle()
 
-            onNodeWithText("Por modelo").assertExists()
-            onNodeWithText("Modelo principal de cada sessão").assertExists()
-            assertEquals(
-                CliSessionsView.BREAKDOWN,
-                assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).view
-            )
+            for (tab in listOf("Projeto", "Modelo", "Agente", "Atividade")) {
+                assertTrue(onAllNodesWithText(tab).fetchSemanticsNodes().isNotEmpty(), "Falta a aba \"$tab\" no Resumo do Codex")
+            }
+            onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}MEMBER").performClick()
+            waitForIdle()
+            assertTrue(onAllNodesWithText("Sessão principal").fetchSemanticsNodes().isNotEmpty(), "Falta a linha \"Sessão principal\" no eixo Agente")
+            assertTrue(onAllNodesWithText("Respostas").fetchSemanticsNodes().isNotEmpty(), "Falta o cartão \"Respostas\" no Resumo sem tarifa")
+            assertTrue(onAllNodesWithText("Custo").fetchSemanticsNodes().isEmpty(), "Resumo do Codex mostra \"Custo\"")
             viewModel.onDestroy()
         }
 
@@ -395,6 +418,81 @@ class CodexCliSessionsScreenTest {
             viewModel.onDestroy()
         }
 
+    @Test
+    fun `column header drops the model column and lists the anthropic columns`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+            val header = hasAnyAncestor(hasTestTag(CODEX_SESSION_COLUMN_HEADER_TAG))
+
+            assertTrue(
+                onAllNodes(hasText(CliSessionsLabels.columnModel(AppLanguage.PT)) and header).fetchSemanticsNodes().isEmpty(),
+                "O cabeçalho do Codex não pode mais ter a coluna Modelo"
+            )
+            listOf(
+                CliSessionsLabels.columnSession(AppLanguage.PT),
+                CliSessionsLabels.columnProject(AppLanguage.PT),
+                CliSessionsLabels.columnTokens(AppLanguage.PT),
+                CliSessionsLabels.columnCache(AppLanguage.PT),
+                CliSessionsLabels.responses(AppLanguage.PT),
+                CliSessionsLabels.activeTime(AppLanguage.PT),
+                CliSessionsLabels.throughput(AppLanguage.PT)
+            ).forEach { label ->
+                assertTrue(
+                    onAllNodes(hasText(label) and header).fetchSemanticsNodes().isNotEmpty(),
+                    "Falta a coluna \"$label\" no cabeçalho do Codex"
+                )
+            }
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `summary pane has a responses card besides the column header`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+            val responses = CliSessionsLabels.responses(AppLanguage.PT)
+
+            // Um nó é o cabeçalho da coluna; o segundo tem de ser o cartão do resumo.
+            val nodes = onAllNodesWithText(responses).fetchSemanticsNodes().size
+            assertTrue(nodes >= 2, "Falta o cartão \"$responses\" no resumo: achei $nodes nó(s) com esse rótulo")
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `export buttons carry the same test tags as the anthropic window`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            onNode(hasTestTag(EXPORT_CSV_TAG)).assertExists()
+            onNode(hasTestTag(EXPORT_JSON_TAG)).assertExists()
+            onNode(hasTestTag(EXPORT_PDF_TAG)).assertExists()
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `second line of a row says responses, turns, application, source and version`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(
+                FakeCodexRepository(
+                    sessions = listOf(
+                        summary(LONG_SESSION_ID).copy(
+                            responseCount = 2,
+                            turnCount = 94,
+                            originator = "Codex CLI",
+                            source = CodexCliRolloutSource.CLI,
+                            cliVersion = "0.167.1"
+                        )
+                    )
+                )
+            )
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            onNodeWithText("● 2 respostas · 94 turnos · Codex CLI · cli · 0.167.1").assertExists()
+            viewModel.onDestroy()
+        }
+
     private fun rated(
         sessionId: String,
         responses: Int,
@@ -425,6 +523,17 @@ private fun summary(sessionId: String): CodexCliSessionSummary = CodexCliSession
     responseCount = 1
 )
 
+private fun codexTurn(threadSource: String): CodexCliSessionTurn = CodexCliSessionTurn(
+    sessionId = LONG_SESSION_ID,
+    turnId = "turn-$threadSource",
+    responseId = "resp-$threadSource",
+    seq = 0,
+    ts = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+    cwd = "C:\\workspace\\usage-monitor",
+    model = "gpt-6.1-sol",
+    threadSource = threadSource
+)
+
 private class FakeCodexRepository(
     private val sessions: List<CodexCliSessionSummary> = listOf(
         summary(LONG_SESSION_ID).copy(
@@ -446,6 +555,9 @@ private class FakeCodexRepository(
 ) : CodexCliSessionRepository {
     var lastSince: Long? = Long.MIN_VALUE
     var readCalls = 0
+
+    override suspend fun getTurnsSince(sinceEpochMillis: Long?): Result<List<CodexCliSessionTurn>> =
+        Result.success(listOf(codexTurn("user"), codexTurn("subagent")))
 
     override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> =
         indexFailure?.let { failure -> Result.failure(failure) }

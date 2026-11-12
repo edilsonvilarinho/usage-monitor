@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.CodexCliSessionTurn
+import com.usagemonitor.domain.entity.CodexCliUsageDelta
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
@@ -257,6 +258,55 @@ class CodexCliSessionsViewModelTest {
         viewModel.onDestroy()
     }
 
+    @Test
+    fun `usage breakdown follows the selected range`() = runTest {
+        val repository = FakeRepository()
+        val now = Instant.parse("2026-09-08T15:00:00Z")
+        repository.turns = listOf(
+            turnAt("turn-today", "2026-09-08T13:00:00Z"),
+            turnAt("turn-last-week", "2026-09-03T13:00:00Z"),
+            turnAt("turn-old", "2026-08-01T13:00:00Z")
+        )
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            clock = object : Clock {
+                override fun now(): Instant = now
+            }
+        )
+
+        // Faixa inicial da VM é LAST_5H: só o turno de hoje cabe.
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        assertEquals(1, breakdownTurnCount(viewModel))
+
+        viewModel.setRange(CliSessionRange.LAST_7D)
+        testScheduler.runCurrent()
+        assertEquals(2, breakdownTurnCount(viewModel))
+
+        viewModel.setRange(CliSessionRange.ALL)
+        testScheduler.runCurrent()
+        assertEquals(3, breakdownTurnCount(viewModel))
+        viewModel.onDestroy()
+    }
+
+    private fun breakdownTurnCount(viewModel: CodexCliSessionsViewModel): Int {
+        return assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).usageBreakdown.totals.turnCount
+    }
+
+    private fun turnAt(turnId: String, timestamp: String): CodexCliSessionTurn {
+        return CodexCliSessionTurn(
+            sessionId = "session-1",
+            turnId = turnId,
+            responseId = "response-$turnId",
+            seq = 1,
+            ts = Instant.parse(timestamp),
+            model = "gpt-test-a",
+            cwd = "/home/dev/alpha",
+            usage = CodexCliUsageDelta(inputTokens = 100, outputTokens = 10)
+        )
+    }
+
     private fun viewModel(
         repository: FakeRepository,
         dispatcher: CoroutineDispatcher,
@@ -285,6 +335,11 @@ class CodexCliSessionsViewModelTest {
         var syncCalls: Int = 0
         var detailCalls: Int = 0
         var listedSessionId: String = "session-1"
+        var turns: List<CodexCliSessionTurn> = emptyList()
+
+        override suspend fun getTurnsSince(sinceEpochMillis: Long?): Result<List<CodexCliSessionTurn>> {
+            return Result.success(turns.filter { turn -> sinceEpochMillis == null || turn.ts.toEpochMilliseconds() >= sinceEpochMillis })
+        }
 
         override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> {
             syncCalls++

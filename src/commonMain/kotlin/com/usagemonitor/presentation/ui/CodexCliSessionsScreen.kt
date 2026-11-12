@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.entity.AppLanguage
@@ -74,7 +75,6 @@ private val CODEX_SESSION_ID_COLUMN = 130.dp
 private val CODEX_SESSION_PROJECT_COLUMN = 140.dp
 private val CODEX_SESSION_THROUGHPUT_COLUMN = 84.dp
 private val CODEX_SESSION_ACTIVE_COLUMN = 76.dp
-private val CODEX_SESSION_MODEL_COLUMN = 130.dp
 private val CODEX_SESSION_RESPONSES_COLUMN = 84.dp
 private val CODEX_SESSION_TOKENS_COLUMN = 130.dp
 private val CODEX_SESSION_CACHE_COLUMN = 90.dp
@@ -86,7 +86,9 @@ const val CODEX_SESSION_COLUMN_HEADER_TAG = "codexSessionColumnHeader"
 @Composable
 fun CodexCliSessionsScreen(
     viewModel: CodexCliSessionsViewModel,
-    language: AppLanguage
+    language: AppLanguage,
+    // Rótulo do perfil da janela (#560); nulo quando o host não tem perfil para mostrar.
+    profileLabel: String? = null
 ) {
     val state by viewModel.uiState.collectAsState()
     // Ordenação da lista de sessões; null é a ordem publicada pela consulta.
@@ -151,6 +153,15 @@ fun CodexCliSessionsScreen(
                     },
                     modifier = Modifier.weight(1f)
                 )
+                if (profileLabel != null) {
+                    Text(
+                        text = profileLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 LiveBadge(language = language)
                 AppSegmentedControl(
                     options = CliSessionRange.entries.map { AppSegment(CliSessionsLabels.rangeLabel(it, language)) },
@@ -162,19 +173,21 @@ fun CodexCliSessionsScreen(
                     },
                     onSelect = { index -> viewModel.setRange(CliSessionRange.entries[index]) }
                 )
+                // Mesmos tons e tags da janela Anthropic (CliSessionsScreen): contorno, não fantasma.
                 AppButton(
                     label = ExportLabels.exportCsv(language),
                     onClick = { viewModel.exportCurrent(UsageExportFormat.CSV) },
-                    tone = AppButtonTone.GHOST
+                    modifier = Modifier.testTag(EXPORT_CSV_TAG)
                 )
                 AppButton(
                     label = ExportLabels.exportJson(language),
                     onClick = { viewModel.exportCurrent(UsageExportFormat.JSON) },
-                    tone = AppButtonTone.GHOST
+                    modifier = Modifier.testTag(EXPORT_JSON_TAG)
                 )
                 AppButton(
                     label = ExportLabels.exportPdf(language),
-                    onClick = { viewModel.exportReport(language) }
+                    onClick = { viewModel.exportReport(language) },
+                    modifier = Modifier.testTag(EXPORT_PDF_TAG)
                 )
             }
         }
@@ -266,7 +279,15 @@ private fun CodexCliSessionContent(
 
     CodexCliSessionMetrics(state.sessions, language)
     if (state.view == CliSessionsView.BREAKDOWN) {
-        CodexCliSessionBreakdown(state.sessions, language, modifier)
+        CliUsageBreakdownPane(
+            breakdown = state.usageBreakdown,
+            errorMessage = null,
+            language = language,
+            memberAxisLabel = BreakdownLabels.codexMemberAxis(language),
+            memberRowLabel = { bucketLabel -> BreakdownLabels.codexMemberRow(bucketLabel, language) },
+            unpricedMode = true,
+            modifier = modifier
+        )
         return
     }
 
@@ -324,7 +345,7 @@ private fun CodexSessionColumnHeader(
         modifier = Modifier.padding(vertical = AppSpacing.sm).testTag(CODEX_SESSION_COLUMN_HEADER_TAG)
     ) {
         AppColumnHeaderLabel(
-            label = if (language == AppLanguage.PT) "Sessão" else "Session",
+            label = CliSessionsLabels.columnSession(language),
             modifier = Modifier.width(CODEX_SESSION_ID_COLUMN)
         )
         AppColumnHeaderLabel(
@@ -333,7 +354,7 @@ private fun CodexSessionColumnHeader(
         )
         SortableCodexSessionHeader(
             column = CliSessionSortColumn.TOKENS,
-            label = if (language == AppLanguage.PT) "Tokens (com cache)" else "Tokens (cached)",
+            label = CliSessionsLabels.columnTokens(language),
             modifier = Modifier.width(CODEX_SESSION_TOKENS_COLUMN),
             sort = sort,
             language = language,
@@ -341,7 +362,7 @@ private fun CodexSessionColumnHeader(
         )
         SortableCodexSessionHeader(
             column = CliSessionSortColumn.CACHE,
-            label = if (language == AppLanguage.PT) "Cache" else "Cache",
+            label = CliSessionsLabels.columnCache(language),
             modifier = Modifier.width(CODEX_SESSION_CACHE_COLUMN),
             sort = sort,
             language = language,
@@ -356,8 +377,8 @@ private fun CodexSessionColumnHeader(
             onSortChange = onSortChange
         )
         AppColumnHeaderLabel(
-            label = CliSessionsLabels.columnModel(language),
-            modifier = Modifier.width(CODEX_SESSION_MODEL_COLUMN)
+            label = CliSessionsLabels.activeTime(language),
+            modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
         )
         SortableCodexSessionHeader(
             column = CliSessionSortColumn.THROUGHPUT,
@@ -366,10 +387,6 @@ private fun CodexSessionColumnHeader(
             sort = sort,
             language = language,
             onSortChange = onSortChange
-        )
-        AppColumnHeaderLabel(
-            label = CliSessionsLabels.activeTime(language),
-            modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
         )
     }
 }
@@ -467,44 +484,65 @@ private fun CodexCliSessionRow(
                     modifier = Modifier.width(CODEX_SESSION_RESPONSES_COLUMN)
                 )
                 AppCellValue(
-                    value = session.primaryModel ?: "—",
-                    modifier = Modifier.width(CODEX_SESSION_MODEL_COLUMN),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    value = codexActiveCell(session.activeMillis),
+                    modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
                 )
                 AppCellValue(
                     value = formatThroughput(session.throughput),
                     modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN)
                 )
-                AppCellValue(
-                    value = codexActiveCell(session.activeMillis),
-                    modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
-                )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                AppStatusIndicator(label = codexApplicationLabel(session), tone = AppTone.INFO)
+            // Segunda linha: contagens e origem da sessão, numa frase só (#560).
+            Text(
+                text = codexSessionDetailLine(session, language),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            // Terceira linha: a mistura de modelos, que saiu da grade (#445). Mistura
+            // vazia não desenha nada.
+            // Sem mistura (dado antigo ou sessão de modelo único sem contagem), o nome do
+            // modelo principal ocupa a linha, para o modelo não sumir da lista (#560).
+            val primaryModel = session.primaryModel
+            if (session.modelMix.isEmpty && primaryModel != null) {
                 Text(
-                    text = listOfNotNull(session.source.name.lowercase(), session.cliVersion).joinToString(" · "),
+                    text = primaryModel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag(sessionModelMixLineTag(session.sessionId))
                 )
-                // A coluna Modelo já diz o modelo de uma sessão de modelo único; a
-                // mistura só entra quando houve troca (#445).
-                val mix = session.modelMix
-                if (mix.shares.size > 1) {
-                    SessionModelMixLine(
-                        mix = mix,
-                        language = language,
-                        modifier = Modifier.testTag(sessionModelMixLineTag(session.sessionId))
-                    )
-                }
+            } else {
+                SessionModelMixLine(
+                    mix = session.modelMix,
+                    language = language,
+                    modifier = Modifier.testTag(sessionModelMixLineTag(session.sessionId))
+                )
             }
         }
     }
 }
+
+/** Segunda linha da sessão Codex: `● N respostas · M turnos · app · origem · versão`. */
+internal fun codexSessionDetailLine(session: CodexCliSessionSummary, language: AppLanguage): String {
+    val parts = listOfNotNull(
+        codexResponsesCountLabel(session.responseCount, language),
+        CliSessionsLabels.turnsLabel(session.turnCount, language),
+        codexApplicationLabel(session),
+        session.source.name.lowercase(),
+        session.cliVersion
+    )
+    return "● " + parts.joinToString(" · ")
+}
+
+private fun codexResponsesCountLabel(count: Int, language: AppLanguage): String =
+    localized(
+        language,
+        if (count == 1) "1 resposta" else "$count respostas",
+        if (count == 1) "1 response" else "$count responses"
+    )
 
 @OptIn(ExperimentalLayoutApi::class)
 internal fun shortCodexId(value: String, maxLength: Int = 8): String {

@@ -6,6 +6,7 @@ import com.usagemonitor.data.datasource.CodexCliSessionDataSource
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
 import com.usagemonitor.domain.entity.CodexCliSessionIndexReport
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
+import com.usagemonitor.domain.entity.CodexCliSessionTurn
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 
 class CodexCliSessionRepositoryImpl(
@@ -25,5 +26,9 @@ class CodexCliSessionRepositoryImpl(
 
     override suspend fun getModelUsage(sinceEpochMillis: Long?): Result<List<CodexCliModelUsage>> = runCatching {
         dataSource.readModelUsage(sinceEpochMillis)
+    }
+
+    override suspend fun getTurnsSince(sinceEpochMillis: Long?): Result<List<CodexCliSessionTurn>> = runCatching {
+        dataSource.readTurnsSince(sinceEpochMillis)
     }
 }

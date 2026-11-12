@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
 import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.repository.UsageExportEncoder
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
@@ -49,7 +50,9 @@ sealed interface CodexCliSessionsUiState {
         /** Lista ou Resumo (#384) — o mesmo par de abas do modal do Anthropic. */
         val view: CliSessionsView = CliSessionsView.SESSIONS,
         /** Última mudança do conteúdo da lista (não da leitura); nulo até a primeira leitura. */
-        val lastChangedAt: Instant? = null
+        val lastChangedAt: Instant? = null,
+        /** Quadro de uso do intervalo selecionado (#560); mesma base das abas de projeto, modelo e membro. */
+        val usageBreakdown: CliUsageBreakdown = CliUsageBreakdown()
     ) : CodexCliSessionsUiState
 }
 
@@ -142,7 +145,9 @@ class CodexCliSessionsViewModel(
                         exportOutcome = latest?.exportOutcome,
                         isRefreshing = false,
                         view = latest?.view ?: CliSessionsView.SESSIONS,
-                        lastChangedAt = lastChangedAt
+                        lastChangedAt = lastChangedAt,
+                        // Null = leitura de turnos falhou: mantém o quadro anterior, sem zerar.
+                        usageBreakdown = loaded.usageBreakdown ?: latest?.usageBreakdown ?: CliUsageBreakdown()
                     )
                 },
                 onFailure = { error ->

@@ -1,6 +1,7 @@
 package com.usagemonitor.ui
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
@@ -22,6 +23,7 @@ import com.usagemonitor.presentation.ui.CliUsageBreakdownPane
 import com.usagemonitor.presentation.ui.formatActiveTime
 import kotlinx.datetime.DayOfWeek
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * Abas de ferramenta e de atividade, estados sem dado e os avisos do card de
@@ -106,6 +108,50 @@ class CliUsageBreakdownPaneTest {
         onNodeWithText(formatActiveTime(5_400_000L)).assertExists()
         onNodeWithText("ana").assertExists()
         onNodeWithText("bia").assertExists()
+    }
+
+    @Test
+    fun `codex member axis takes the agent name and maps the main thread row`() = runDesktopComposeUiTest(width = 1_200, height = SCENE_HEIGHT) {
+        setContent {
+            ScreenTestTheme {
+                CliUsageBreakdownPane(
+                    breakdown(),
+                    errorMessage = null,
+                    language = AppLanguage.PT,
+                    memberAxisLabel = "Agente",
+                    memberRowLabel = { label -> if (label == "ana") "Sessão principal" else label }
+                )
+            }
+        }
+
+        onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}MEMBER").performClick()
+        waitForIdle()
+
+        assertShown("Agente")
+        assertShown("Sessão principal")
+        assertAbsent("Integrante")
+    }
+
+    @Test
+    fun `unpriced mode drops the cost cards and shows responses`() = runDesktopComposeUiTest(width = 1_200, height = SCENE_HEIGHT) {
+        setContent {
+            ScreenTestTheme {
+                CliUsageBreakdownPane(breakdown(), errorMessage = null, language = AppLanguage.PT, unpricedMode = true)
+            }
+        }
+
+        assertAbsent("Custo")
+        assertShown("Respostas")
+    }
+
+    private fun ComposeUiTest.assertShown(text: String) {
+        val nodes = onAllNodesWithText(text).fetchSemanticsNodes().size
+        assertTrue(nodes >= 1, "Falta \"$text\" na pane: achei $nodes nó(s)")
+    }
+
+    private fun ComposeUiTest.assertAbsent(text: String) {
+        val nodes = onAllNodesWithText(text).fetchSemanticsNodes().size
+        assertTrue(nodes == 0, "Esperava 0 nó(s) com \"$text\", achei $nodes")
     }
 
     private fun breakdown(): CliUsageBreakdown {
