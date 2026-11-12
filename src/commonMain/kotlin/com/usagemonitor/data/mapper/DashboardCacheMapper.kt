@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -29,7 +30,8 @@ fun ApiUsageStats.toCacheDto(): ApiUsageStatsCacheDto {
         profileLabel = profileLabel,
         notices = notices.map { notice -> notice.name },
         planLabel = planLabel,
-        fetchedAtEpochMillis = fetchedAt?.toEpochMilliseconds()
+        fetchedAtEpochMillis = fetchedAt?.toEpochMilliseconds(),
+        bankedResetCount = bankedResetCount
     )
 }
 
@@ -45,7 +47,8 @@ private fun QuotaInfo.toCacheDto(): QuotaInfoCacheDto {
         rawUsed = rawUsed,
         rawTotal = rawTotal,
         currencyCode = currencyCode,
-        periodStartAtEpochMillis = periodStartAt?.toEpochMilliseconds()
+        periodStartAtEpochMillis = periodStartAt?.toEpochMilliseconds(),
+        blockReason = blockReason?.name
     )
 }
 
@@ -88,7 +91,8 @@ private fun ApiUsageStatsCacheDto.toDomainOrNull(savedAtEpochMillis: Long): ApiU
             profileLabel = profileLabel,
             notices = notices.mapNotNull { name -> runCatching { ApiUsageNotice.valueOf(name) }.getOrNull() }.toSet(),
             planLabel = planLabel,
-            fetchedAt = Instant.fromEpochMilliseconds(fetchedAtEpochMillis ?: savedAtEpochMillis)
+            fetchedAt = Instant.fromEpochMilliseconds(fetchedAtEpochMillis ?: savedAtEpochMillis),
+            bankedResetCount = bankedResetCount
         )
     }.getOrNull()
 }
@@ -107,6 +111,8 @@ private fun QuotaInfoCacheDto.toDomainOrNull(): QuotaInfo? {
         rawUsed = rawUsed,
         rawTotal = rawTotal,
         currencyCode = currencyCode,
-        periodStartAt = periodStartAtEpochMillis?.let(Instant::fromEpochMilliseconds)
+        periodStartAt = periodStartAtEpochMillis?.let(Instant::fromEpochMilliseconds),
+        // Nome desconhecido vira nulo: a linha continua, só sem o motivo.
+        blockReason = blockReason?.let { name -> runCatching { QuotaBlockReason.valueOf(name) }.getOrNull() }
     )
 }

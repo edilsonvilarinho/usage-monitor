@@ -2,7 +2,9 @@ package com.usagemonitor.domain.entity
 
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -45,8 +47,27 @@ data class SessionAnalysis(
      * Fim da última sincronização do índice que deu a vazão, quando ele não acompanha a
      * janela ao vivo (Codex, 10 min; rodada AD). `null` = não informado.
      */
-    val throughputIndexedAt: Instant? = null
+    val throughputIndexedAt: Instant? = null,
+    /** Período escolhido na "Análise" (#538); `NOW` deixa os campos de período vazios. */
+    val period: AnalysisPeriod = AnalysisPeriod.NOW,
+    /** Janelas 5h fechadas no período: quantas, quantas esgotaram e o pico médio. */
+    val fiveHourSummary: AnalysisPeriodSummary? = null,
+    /** Janelas semanais fechadas no período, mesma regra de [fiveHourSummary]. */
+    val weeklySummary: AnalysisPeriodSummary? = null,
+    /** Barras do período: pico por dia (7 d) ou por janela semanal (30 d, tudo). */
+    val periodBars: List<AnalysisPeriodBar> = emptyList(),
+    /** Ritmo e vazão do período longo (30 d, tudo); nulo nos demais. */
+    val periodRate: AnalysisPeriodRate? = null
 )
+
+/** Resumo de janelas fechadas no período: quantas, quantas chegaram a 100 % e a média dos picos. */
+data class AnalysisPeriodSummary(val windowCount: Int, val exhaustedCount: Int, val meanPeakPercent: Int?)
+
+/** Uma barra do período: pico no dia ou na janela semanal; `null` = nenhum ponto. */
+data class AnalysisPeriodBar(val start: Instant, val peakPercent: Int?, val current: Boolean)
+
+/** Ritmo (pontos por hora) e vazão (tokens/s) do período longo; `null` = não medido. */
+data class AnalysisPeriodRate(val period: AnalysisPeriod, val pacePerHour: Double?, val tokensPerSecond: Double?)
 
 /** Uma janela (5h ou semanal) agora. */
 data class AnalysisWindowView(
@@ -65,11 +86,17 @@ data class AnalysisWindowView(
     val projectedAtReset: Int?,
     /** A janela aberta na diagonal do ritmo (#463, AH1); `null` sem reinício conhecido. */
     val path: QuotaWindowPacePath? = null,
-    /** As janelas anteriores lidas, da mais velha à mais nova, até [ANALYSIS_PREVIOUS_PATHS]. */
+    /**
+     * As janelas fechadas anteriores à aberta, da mais velha à mais nova: as que reiniciaram no período da
+     * análise (#556) e, no mínimo, as [ANALYSIS_PREVIOUS_PATHS] mais recentes. Sem período, só as mais recentes.
+     */
     val previousPaths: List<QuotaWindowPacePath> = emptyList()
 )
 
-/** Quantas janelas anteriores a diagonal da "Análise" desenha atrás da aberta. */
+/**
+ * Piso de janelas anteriores que a diagonal da "Análise" desenha atrás da aberta, mesmo as que caem fora do
+ * período. Não é teto: no período, desenha todas as janelas fechadas que reiniciaram nele.
+ */
 const val ANALYSIS_PREVIOUS_PATHS = 3
 
 enum class AnalysisSpan(val millis: Long) {
@@ -107,10 +134,15 @@ data class AnalysisWindowComparison(
 )
 
 /** Recortes "desde" de que [buildSessionAnalysis] precisa; quem lê o índice CLI pede só estes. */
-fun analysisThroughputCuts(series: List<UsageHistorySeries>, now: Instant): Set<Long> {
+fun analysisThroughputCuts(
+    series: List<UsageHistorySeries>,
+    now: Instant,
+    period: AnalysisPeriod = AnalysisPeriod.NOW
+): Set<Long> {
     val cuts = mutableSetOf<Long>()
     AnalysisSpan.entries.forEach { span -> cuts += now.toEpochMilliseconds() - span.millis }
     hourStarts(now).forEach { start -> cuts += start.toEpochMilliseconds() }
+    if (period.usesPeriodRate) periodStartOf(now, period, series)?.let { start -> cuts += start.toEpochMilliseconds() }
     val fiveHour = mainSeries(series, PeriodType.INTERVAL)
     val window = fiveHour?.let { item -> openWindowStart(item, now) }
     if (window != null) {
@@ -134,7 +166,8 @@ fun buildSessionAnalysis(
     series: List<UsageHistorySeries>,
     cumulative: Map<Long, Map<String, OutputThroughput>>,
     now: Instant,
-    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
+    timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID),
+    period: AnalysisPeriod = AnalysisPeriod.NOW
 ): SessionAnalysis {
     val fiveHourSeries = mainSeries(series, PeriodType.INTERVAL)
     val weeklySeries = mainSeries(series, PeriodType.WEEKLY)
@@ -142,6 +175,9 @@ fun buildSessionAnalysis(
     val fivePoints = fiveHourSeries?.points.orEmpty().sortedBy { point -> point.capturedAt }
     val weeklyPoints = weeklySeries?.points.orEmpty().sortedBy { point -> point.capturedAt }
     val windowStart = fiveHourSeries?.let { item -> openWindowStart(item, now) }
+    val periodStart = periodStartOf(now, period, series)
+    val fiveHourWindows = windowsOf(fivePoints, fiveHourSeries?.unit ?: UsageUnit.PERCENTAGE, FIVE_HOURS_MILLIS, now)
+    val weeklyWindows = windowsOf(weeklyPoints, weeklySeries?.unit ?: UsageUnit.PERCENTAGE, SEVEN_DAYS_MILLIS, now)
 
     val intervals = AnalysisSpan.entries.map { span ->
         val from = now - span.millis.milliseconds
@@ -176,8 +212,8 @@ fun buildSessionAnalysis(
         accountLabel = accountLabel,
         source = source,
         generatedAt = now,
-        fiveHour = fiveHourSeries?.let { item -> windowView(item, fivePoints, now, FIVE_HOURS_MILLIS) },
-        weekly = weeklySeries?.let { item -> windowView(item, weeklyPoints, now, SEVEN_DAYS_MILLIS) },
+        fiveHour = fiveHourSeries?.let { item -> windowView(item, fivePoints, now, FIVE_HOURS_MILLIS, periodStart) },
+        weekly = weeklySeries?.let { item -> windowView(item, weeklyPoints, now, SEVEN_DAYS_MILLIS, periodStart) },
         intervals = intervals,
         hours = hours,
         heat = heat,
@@ -189,11 +225,22 @@ fun buildSessionAnalysis(
         } else {
             null
         },
-        modelSpeeds = throughput.byModel(now - 1.hours, now)
+        modelSpeeds = throughput.byModel(now - 1.hours, now),
+        period = period,
+        fiveHourSummary = periodStart?.let { start -> summaryOf(fiveHourWindows, start) },
+        weeklySummary = periodStart?.let { start -> summaryOf(weeklyWindows, start) },
+        periodBars = periodBarsOf(period, periodStart, fivePoints, weeklyWindows, heatDays, timeZone),
+        periodRate = if (periodStart != null && period.usesPeriodRate) periodRateOf(period, periodStart, now, fivePoints, throughput) else null
     )
 }
 
-private fun windowView(series: UsageHistorySeries, points: List<UsageHistoryPoint>, now: Instant, lengthMillis: Long): AnalysisWindowView? {
+private fun windowView(
+    series: UsageHistorySeries,
+    points: List<UsageHistoryPoint>,
+    now: Instant,
+    lengthMillis: Long,
+    periodStart: Instant?
+): AnalysisWindowView? {
     val last = points.lastOrNull() ?: return null
     val percent = percentOf(last)
     val resetsAt = last.periodEndAt.takeIf { last.hasKnownResetAt && it > now }
@@ -208,8 +255,20 @@ private fun windowView(series: UsageHistorySeries, points: List<UsageHistoryPoin
     // A aberta é a última janela lida, se for a do reinício de agora; as outras ficam atrás.
     val paths = quotaWindowPacePathsOf(points, series.unit, lengthMillis)
     val open = paths.lastOrNull()?.takeIf { path -> resetsAt != null && isSamePeriod(path.resetsAt, resetsAt) }
-    val previous = (if (open != null) paths.dropLast(1) else paths).takeLast(ANALYSIS_PREVIOUS_PATHS)
+    val previous = previousPathsOf(if (open != null) paths.dropLast(1) else paths, periodStart)
     return AnalysisWindowView(series.quotaLabel, series.periodType, percent, startsAt, resetsAt, paceNow, paceAverage, safePace, projected, open, previous)
+}
+
+/**
+ * Janelas anteriores da diagonal (#556): as que reiniciaram a partir de [periodStart] e, no mínimo, as
+ * [ANALYSIS_PREVIOUS_PATHS] mais recentes. Sem período ([periodStart] nulo), só as mais recentes. [paths] vem da
+ * mais velha à mais nova; o resultado mantém essa ordem e não repete janela.
+ */
+private fun previousPathsOf(paths: List<QuotaWindowPacePath>, periodStart: Instant?): List<QuotaWindowPacePath> {
+    val floorFrom = (paths.size - ANALYSIS_PREVIOUS_PATHS).coerceAtLeast(0)
+    return paths.filterIndexed { index, path ->
+        index >= floorFrom || (periodStart != null && path.resetsAt >= periodStart)
+    }
 }
 
 private fun compareWithPrevious(
@@ -324,6 +383,82 @@ private class ThroughputCuts(private val cumulative: Map<Long, Map<String, Outpu
     fun byModel(from: Instant, until: Instant): List<AnalysisModelSpeed> =
         models(from, until).orEmpty().mapNotNull { (model, value) -> value.tokensPerSecond?.let { speed -> AnalysisModelSpeed(model, speed) } }
             .sortedWith(compareByDescending<AnalysisModelSpeed> { speed -> speed.tokensPerSecond }.thenBy { speed -> speed.model })
+}
+
+/**
+ * Início do período da análise: agora menos o prazo; em `ALL` (#556), a primeira leitura da série, não um prazo fixo.
+ * Nulo em `NOW`, ou em `ALL` sem nenhuma leitura.
+ */
+private fun periodStartOf(now: Instant, period: AnalysisPeriod, series: List<UsageHistorySeries>): Instant? = when (period) {
+    AnalysisPeriod.NOW -> null
+    AnalysisPeriod.ALL -> series.flatMap { item -> item.points }.minOfOrNull { point -> point.capturedAt }
+    AnalysisPeriod.HOURS_24, AnalysisPeriod.DAYS_7, AnalysisPeriod.DAYS_30 -> period.millis?.let { millis -> now - millis.milliseconds }
+}
+
+/** Uma janela de série: início (reinício menos a duração), fim (reinício), pico em % e se ainda está aberta. */
+private data class HistoryWindow(val start: Instant, val end: Instant, val peakPercent: Int, val open: Boolean)
+
+/**
+ * Janelas de uma série pelo mesmo corte canônico do histórico ([splitIntoQuotaWindows]), para que um
+ * reinício que oscila alguns segundos entre leituras não parta a janela. Fim = reinício da última leitura.
+ * Ordem total pelo início.
+ */
+private fun windowsOf(points: List<UsageHistoryPoint>, unit: UsageUnit, lengthMillis: Long, now: Instant): List<HistoryWindow> =
+    splitIntoQuotaWindows(points.filter { point -> point.hasKnownResetAt && point.displayTotal > 0 }, unit)
+        .filter { window -> window.isNotEmpty() }
+        .map { window ->
+            val end = window.last().periodEndAt
+            HistoryWindow(end - lengthMillis.milliseconds, end, window.maxOf { point -> percentOf(point) }, end > now)
+        }
+        .sortedBy { window -> window.start }
+
+/** Janelas fechadas com fim (reinício) em `[periodStart, ...)`: quantas, quantas esgotaram e a média dos picos. */
+private fun summaryOf(windows: List<HistoryWindow>, periodStart: Instant): AnalysisPeriodSummary? {
+    val closed = windows.filter { window -> !window.open && window.end >= periodStart }
+    if (closed.isEmpty()) return null
+    return AnalysisPeriodSummary(
+        windowCount = closed.size,
+        exhaustedCount = closed.count { window -> window.peakPercent >= 100 },
+        meanPeakPercent = closed.map { window -> window.peakPercent }.average().roundToInt()
+    )
+}
+
+/** Barras do período: pico por dia local (7 d) ou por janela semanal fechada no período mais a aberta (30 d, tudo). */
+private fun periodBarsOf(
+    period: AnalysisPeriod,
+    periodStart: Instant?,
+    fivePoints: List<UsageHistoryPoint>,
+    weeklyWindows: List<HistoryWindow>,
+    days: List<LocalDate>,
+    timeZone: TimeZone
+): List<AnalysisPeriodBar> = when (period) {
+    AnalysisPeriod.NOW, AnalysisPeriod.HOURS_24 -> emptyList()
+    AnalysisPeriod.DAYS_7 -> days.mapIndexed { index, day ->
+        val peaks = fivePoints.filter { point -> point.capturedAt.toLocalDateTime(timeZone).date == day }
+        AnalysisPeriodBar(day.atStartOfDayIn(timeZone), peaks.maxOfOrNull { point -> percentOf(point) }, index == days.lastIndex)
+    }
+    AnalysisPeriod.DAYS_30, AnalysisPeriod.ALL -> weeklyWindows
+        .filter { window -> window.open || (periodStart != null && window.end >= periodStart) }
+        .map { window -> AnalysisPeriodBar(window.start, window.peakPercent, window.open) }
+}
+
+/**
+ * Pontos da 5h subidos no período ÷ horas do período; vazão desde o início dele.
+ * Sem horas decorridas (a primeira leitura de `ALL` cai em agora) o ritmo fica nulo, nunca divide por zero.
+ */
+private fun periodRateOf(
+    period: AnalysisPeriod,
+    periodStart: Instant,
+    now: Instant,
+    points: List<UsageHistoryPoint>,
+    throughput: ThroughputCuts
+): AnalysisPeriodRate {
+    val hours = (now - periodStart).inWholeMilliseconds / MILLIS_PER_HOUR
+    return AnalysisPeriodRate(
+        period = period,
+        pacePerHour = if (hours > 0.0) risePoints(points, periodStart, now)?.let { rise -> rise / hours } else null,
+        tokensPerSecond = throughput.between(periodStart, now)
+    )
 }
 
 private const val MILLIS_PER_HOUR = 3_600_000.0

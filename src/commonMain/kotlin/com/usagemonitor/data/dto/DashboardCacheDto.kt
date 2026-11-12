@@ -30,7 +30,9 @@ data class ApiUsageStatsCacheDto(
     val planLabel: String? = null,
     // Default nulo mantém legível o cache anterior à #269; a leitura dele herda
     // o `savedAtEpochMillis` do arquivo.
-    val fetchedAtEpochMillis: Long? = null
+    val fetchedAtEpochMillis: Long? = null,
+    // Nulo no cache gravado antes dos resets guardados (issue #571); 0 é "nenhum", não ausência.
+    val bankedResetCount: Int? = null
 )
 
 @Serializable
@@ -47,5 +49,7 @@ data class QuotaInfoCacheDto(
     // Default mantém legível o cache gravado antes da leitura de créditos.
     val currencyCode: String = "USD",
     // Nulo no cache gravado antes da marca de ritmo (issue #327).
-    val periodStartAtEpochMillis: Long? = null
+    val periodStartAtEpochMillis: Long? = null,
+    // Nulo no cache gravado antes do bloqueio de créditos (issue #567).
+    val blockReason: String? = null
 )

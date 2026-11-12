@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
@@ -21,6 +22,35 @@ import kotlin.test.assertTrue
 class DashboardCacheMapperTest {
 
     private val fixedInstant = Instant.parse("2025-01-01T12:00:00Z")
+
+    @Test
+    fun `round trip keeps the banked reset count, zero included and unknown as null`() {
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(codexStatsWithResets(0), codexStatsWithResets(1), codexStatsWithResets(null))
+                .map { stats -> stats.toCacheDto() }
+        ).toDomain()
+
+        assertEquals(listOf(0, 1, null), restored.map { stats -> stats.bankedResetCount })
+    }
+
+    private fun codexStatsWithResets(bankedResetCount: Int?): ApiUsageStats {
+        return ApiUsageStats(
+            source = ApiSource.CODEX,
+            apiName = "Codex",
+            quotas = listOf(
+                QuotaInfo(
+                    label = "Codex 5h",
+                    used = 8L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    periodType = PeriodType.INTERVAL,
+                    unit = UsageUnit.PERCENTAGE
+                )
+            ),
+            bankedResetCount = bankedResetCount
+        )
+    }
 
     @Test
     fun `round trip preserves stats without account context`() {
@@ -378,5 +408,67 @@ class DashboardCacheMapperTest {
         ).toDomain()
 
         assertEquals(original.quotas.single().periodStartAt, restored.single().quotas.single().periodStartAt)
+    }
+
+    @Test
+    fun `round trip preserves the credits block reason`() {
+        val original = ApiUsageStats(
+            source = ApiSource.ANTHROPIC,
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "default"),
+            apiName = "Anthropic",
+            quotas = listOf(
+                QuotaInfo(
+                    label = AnthropicQuotaLabels.EXTRA_CREDITS,
+                    used = 0L,
+                    total = 100L,
+                    periodEndAt = fixedInstant,
+                    hasKnownResetAt = false,
+                    periodType = PeriodType.REPORTED,
+                    unit = UsageUnit.PERCENTAGE,
+                    rawUsed = 0L,
+                    rawTotal = 57000L,
+                    currencyCode = "BRL",
+                    blockReason = QuotaBlockReason.OUT_OF_CREDITS
+                )
+            )
+        )
+
+        val restored = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(original.toCacheDto())
+        ).toDomain()
+
+        assertEquals(QuotaBlockReason.OUT_OF_CREDITS, restored.single().quotas.single().blockReason)
+    }
+
+    @Test
+    fun `unknown block reason name drops only the reason and keeps the quota`() {
+        val dto = DashboardCacheDto(
+            savedAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+            entries = listOf(
+                com.usagemonitor.data.dto.ApiUsageStatsCacheDto(
+                    targetKey = "ANTHROPIC",
+                    source = "ANTHROPIC",
+                    apiName = "Anthropic",
+                    quotas = listOf(
+                        com.usagemonitor.data.dto.QuotaInfoCacheDto(
+                            label = AnthropicQuotaLabels.EXTRA_CREDITS,
+                            used = 0L,
+                            total = 100L,
+                            periodEndAtEpochMillis = fixedInstant.toEpochMilliseconds(),
+                            hasKnownResetAt = false,
+                            periodType = "REPORTED",
+                            unit = "PERCENTAGE",
+                            blockReason = "MOTIVO_FUTURO"
+                        )
+                    )
+                )
+            )
+        )
+
+        val restored = dto.toDomain().single().quotas
+
+        assertEquals(1, restored.size)
+        assertEquals(null, restored.single().blockReason)
     }
 }

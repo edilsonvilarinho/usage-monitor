@@ -11,7 +11,7 @@ class AccountPlanLabelTest {
 
     @Test
     fun `claude junta a assinatura e a multiplicacao do limite`() {
-        assertEquals("Max 20x", anthropicPlanLabel("max", "default_claude_max_20x"))
+        assertEquals("Ultra", anthropicPlanLabel("max", "default_claude_max_20x"))
         assertEquals("Max 5x", anthropicPlanLabel("max", "default_claude_max_5x"))
         assertEquals("Pro", anthropicPlanLabel("pro", null))
         assertEquals("Team", anthropicPlanLabel("team", ""))

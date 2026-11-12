@@ -117,6 +117,12 @@ internal fun CliUsageBreakdownPane(
      * integrantes, que descreve os mesmos turnos.
      */
     hint: String? = null,
+    /** Rotulo da aba de integrante; `null` mantem "Integrante" (Anthropic). */
+    memberAxisLabel: String? = null,
+    /** Texto de cada linha do eixo de integrante; `null` mantem o rotulo do indice. */
+    memberRowLabel: ((String) -> String)? = null,
+    /** Sem tarifa: cartoes de custo viram respostas; `false` mantem o custo. */
+    unpricedMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (breakdown == null) {
@@ -148,7 +154,9 @@ internal fun CliUsageBreakdownPane(
     // do laço ao vivo porque a pane não sai da composição entre elas.
     var axis by remember(axes) { mutableStateOf(axes.first()) }
     var query by remember(axis) { mutableStateOf("") }
-    var sort by remember(axis) { mutableStateOf(BreakdownSort.SHARE) }
+    // Sem tarifa a ordem por custo sai da lista: a pane começa pela ordem de tokens.
+    val sortChoices = breakdownSortChoices(axis, unpricedMode)
+    var sort by remember(axis, unpricedMode) { mutableStateOf(sortChoices.first()) }
     var descending by remember(axis) { mutableStateOf(true) }
     var pageSize by remember { mutableStateOf(BREAKDOWN_DEFAULT_PAGE_SIZE) }
 
@@ -161,7 +169,7 @@ internal fun CliUsageBreakdownPane(
     // fora da tela. Fica preso só o cromo pequeno: abas, filtro, ordem e página.
     val summary: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
         item(key = "totals") {
-            BreakdownTotals(breakdown = breakdown, hint = hint, language = language)
+            BreakdownTotals(breakdown = breakdown, hint = hint, language = language, unpricedMode = unpricedMode)
         }
         if (budget != null || accountCredits != null) {
             item(key = "budget") {
@@ -185,6 +193,7 @@ internal fun CliUsageBreakdownPane(
             axes = axes,
             selected = axis,
             language = language,
+            memberAxisLabel = memberAxisLabel,
             onSelect = { selected -> axis = selected }
         )
 
@@ -240,6 +249,10 @@ internal fun CliUsageBreakdownPane(
             }
         } else {
             val unknownLabel = BreakdownLabels.unknownLabel(axis, language)
+            val axisHeader = memberAxisLabel?.takeIf { axis == BreakdownAxis.MEMBER } ?: BreakdownLabels.columnAxis(axis, language)
+            val rowLabel: (String) -> String = { label ->
+                if (axis == BreakdownAxis.MEMBER) memberRowLabel?.invoke(label) ?: label else label
+            }
             val bucketPage = pageOfBuckets(
                 buckets = bucketsOf(breakdown, axis),
                 query = query,
@@ -258,9 +271,11 @@ internal fun CliUsageBreakdownPane(
                 item(key = "bucketTable") {
                     BucketTable(
                         page = bucketPage,
-                        axis = axis,
+                        axisHeader = axisHeader,
+                        rowLabel = rowLabel,
                         totals = breakdown.totals,
                         unknownLabel = unknownLabel,
+                        unpricedMode = unpricedMode,
                         language = language
                     )
                 }
@@ -272,6 +287,7 @@ internal fun CliUsageBreakdownPane(
             query = query,
             sort = sort,
             descending = descending,
+            sortChoices = sortChoices,
             page = page,
             pageSize = pageSize,
             language = language,
@@ -298,12 +314,25 @@ internal fun CliUsageBreakdownPane(
     }
 }
 
+/**
+ * Ordem oferecida no seletor. Sem tarifa, a ordem por custo some dos eixos de
+ * balde: a fatia por custo é zero em todo turno, e a ferramenta segue por chamadas.
+ */
+private fun breakdownSortChoices(axis: BreakdownAxis, unpricedMode: Boolean): List<BreakdownSort> {
+    return if (unpricedMode && axis != BreakdownAxis.TOOL) {
+        BreakdownSort.entries.filter { sort -> sort != BreakdownSort.SHARE }
+    } else {
+        BreakdownSort.entries
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BreakdownAxisTabs(
     axes: List<BreakdownAxis>,
     selected: BreakdownAxis,
     language: AppLanguage,
+    memberAxisLabel: String?,
     onSelect: (BreakdownAxis) -> Unit
 ) {
     // Aba, não pílula: o eixo troca **o que** a pane mostra. Filtro, ordem e
@@ -313,7 +342,11 @@ private fun BreakdownAxisTabs(
     AppTabs(
         tabs = axes.map { entry ->
             AppTab(
-                label = BreakdownLabels.axisTab(entry, language),
+                label = if (entry == BreakdownAxis.MEMBER && memberAxisLabel != null) {
+                    memberAxisLabel
+                } else {
+                    BreakdownLabels.axisTab(entry, language)
+                },
                 testTag = "$BREAKDOWN_AXIS_TAB_TAG_PREFIX${entry.name}"
             )
         },
@@ -338,6 +371,7 @@ private fun BreakdownControls(
     query: String,
     sort: BreakdownSort,
     descending: Boolean,
+    sortChoices: List<BreakdownSort>,
     page: BreakdownPage<*>,
     pageSize: Int,
     language: AppLanguage,
@@ -386,14 +420,14 @@ private fun BreakdownControls(
         )
 
         AppSegmentedControl(
-            options = BreakdownSort.entries.map { entry ->
+            options = sortChoices.map { entry ->
                 AppSegment(
                     label = BreakdownLabels.sortOption(entry, axis, language),
                     testTag = "$BREAKDOWN_SORT_TAG_PREFIX${entry.name}"
                 )
             },
-            selectedIndex = BreakdownSort.entries.indexOf(sort),
-            onSelect = { index -> onSortChange(BreakdownSort.entries[index]) }
+            selectedIndex = sortChoices.indexOf(sort).coerceAtLeast(0),
+            onSelect = { index -> onSortChange(sortChoices[index]) }
         )
 
         // Um botão que inverte, e não dois chips de "crescente/decrescente": a
@@ -526,7 +560,8 @@ private fun BreakdownList(
 private fun BreakdownTotals(
     breakdown: CliUsageBreakdown,
     hint: String?,
-    language: AppLanguage
+    language: AppLanguage,
+    unpricedMode: Boolean
 ) {
     val totals = breakdown.totals
     val burnRate = breakdown.burnRate
@@ -537,44 +572,68 @@ private fun BreakdownTotals(
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
         ) {
-            AppMetricBlock(
-                label = BreakdownLabels.estimatedCostLabel(language),
-                value = BreakdownLabels.bucketCost(totals),
-                modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(BREAKDOWN_TOTAL_COST_TAG)
-            )
+            if (unpricedMode) {
+                // Sem tarifa os três blocos de custo viram contagens: respostas, reuso
+                // de cache e respostas por sessão. Nenhum deles é valor monetário.
+                AppMetricBlock(
+                    label = BreakdownLabels.responses(language),
+                    value = totals.turnCount.toString(),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+                )
 
-            AppMetricBlock(
-                label = BreakdownLabels.cacheSavingsLabel(language),
-                value = formatMicrosUsdShort(totals.cacheSavingsMicros),
-                modifier = Modifier.width(METRIC_BLOCK_WIDTH)
-            )
+                AppMetricBlock(
+                    label = BreakdownLabels.cacheReuseLabel(language),
+                    value = formatPercent(totals.cacheHitRate),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+                )
 
-            AppMetricBlock(
-                label = BreakdownLabels.burnRateTitle(language),
-                value = burnRate
-                    ?.let { rate -> BreakdownLabels.burnRateCostPerHour(rate.costMicrosPerHour) }
-                    ?: "—",
-                // Rodapé curto, o mesmo do protótipo: ele qualifica o valor sem
-                // medir mais que o bloco.
-                footer = if (burnRate != null) BreakdownLabels.burnRateFooter(language) else null,
-                modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(BREAKDOWN_BURN_RATE_TAG)
-            )
+                AppMetricBlock(
+                    label = BreakdownLabels.responsesPerSessionLabel(language),
+                    value = BreakdownLabels.responsesPerSession(totals),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+                )
+            } else {
+                AppMetricBlock(
+                    label = BreakdownLabels.estimatedCostLabel(language),
+                    value = BreakdownLabels.bucketCost(totals),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(BREAKDOWN_TOTAL_COST_TAG)
+                )
+
+                AppMetricBlock(
+                    label = BreakdownLabels.cacheSavingsLabel(language),
+                    value = formatMicrosUsdShort(totals.cacheSavingsMicros),
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH)
+                )
+
+                AppMetricBlock(
+                    label = BreakdownLabels.burnRateTitle(language),
+                    value = burnRate
+                        ?.let { rate -> BreakdownLabels.burnRateCostPerHour(rate.costMicrosPerHour) }
+                        ?: "—",
+                    // Rodapé curto, o mesmo do protótipo: ele qualifica o valor sem
+                    // medir mais que o bloco.
+                    footer = if (burnRate != null) BreakdownLabels.burnRateFooter(language) else null,
+                    modifier = Modifier.width(METRIC_BLOCK_WIDTH).testTag(BREAKDOWN_BURN_RATE_TAG)
+                )
+            }
         }
 
         NoticeText(
             BreakdownLabels.totalSubtitle(totals, language),
             MaterialTheme.colorScheme.onSurfaceVariant
         )
-        NoticeText(
-            BreakdownLabels.cacheSavings(
-                savingsMicros = totals.cacheSavingsMicros,
-                share = breakdown.cacheSavingsShare,
-                hitRate = totals.cacheHitRate,
-                language = language
-            ),
-            MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (!totals.isCostComplete) {
+        if (!unpricedMode) {
+            NoticeText(
+                BreakdownLabels.cacheSavings(
+                    savingsMicros = totals.cacheSavingsMicros,
+                    share = breakdown.cacheSavingsShare,
+                    hitRate = totals.cacheHitRate,
+                    language = language
+                ),
+                MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (!totals.isCostComplete && !unpricedMode) {
             NoticeText(
                 BreakdownLabels.unpricedNotice(totals.unpricedTurnCount, language),
                 MaterialTheme.colorScheme.error
@@ -592,7 +651,7 @@ private fun BreakdownTotals(
                 MaterialTheme.colorScheme.onSurfaceVariant
             )
             val projected = burnRate.projectedCostMicros
-            if (projected != null) {
+            if (projected != null && !unpricedMode) {
                 NoticeText(
                     BreakdownLabels.burnRateProjection(projected, language),
                     MaterialTheme.colorScheme.onSurfaceVariant

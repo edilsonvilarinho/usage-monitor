@@ -15,7 +15,6 @@ import com.usagemonitor.presentation.ui.exportRequestForCodexCliSessions
 import com.usagemonitor.presentation.ui.exportRequestForDashboard
 import com.usagemonitor.presentation.ui.report.UsageReportDocument
 import com.usagemonitor.presentation.viewmodel.CliExportOutcome
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -42,7 +41,7 @@ class UsageExportRequestsTest {
 
     @Test
     fun `codex exports carry each range slug`() {
-        val names = CodexCliSessionRange.entries.map { range ->
+        val names = CliSessionRange.entries.map { range ->
             exportRequestForCodexCliSessions(DefaultUsageExportEncoder, emptyList(), range, UsageExportFormat.CSV, now)
                 .suggestedFileName
         }
@@ -50,6 +49,7 @@ class UsageExportRequestsTest {
             listOf(
                 "usage-monitor-codex-cli-5h-2026-10-27.csv",
                 "usage-monitor-codex-cli-7d-2026-10-27.csv",
+                "usage-monitor-codex-cli-30d-2026-10-27.csv",
                 "usage-monitor-codex-cli-total-2026-10-27.csv"
             ),
             names
@@ -58,9 +58,10 @@ class UsageExportRequestsTest {
             listOf(
                 "usage-monitor-codex-report-5h-2026-10-27.pdf",
                 "usage-monitor-codex-report-7d-2026-10-27.pdf",
+                "usage-monitor-codex-report-30d-2026-10-27.pdf",
                 "usage-monitor-codex-report-total-2026-10-27.pdf"
             ),
-            CodexCliSessionRange.entries.map { range -> codexReportRequest(document, range, now, AppLanguage.PT).suggestedFileName }
+            CliSessionRange.entries.map { range -> codexReportRequest(document, range, now, AppLanguage.PT).suggestedFileName }
         )
     }
 

@@ -2,6 +2,7 @@ package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
+import com.usagemonitor.domain.entity.TeamIntegrations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -19,8 +20,8 @@ internal data class PendingTeamBatch(
 /**
  * Decide o que ainda falta enviar ao servidor de time.
  *
- * O marcador é o maior `seq` já enviado por sessão, guardado em
- * `team_sync_state` no mesmo `usage-history.db` do índice. Usa a conexão
+ * O marcador é o maior `seq` já enviado por sessão e por time, guardado em
+ * `team_sync_watermarks` no mesmo `usage-history.db` do índice. Usa a conexão
  * compartilhada do [LocalCliSessionDataSource] — as duas leituras disputariam o
  * mesmo arquivo se abrissem conexões separadas.
  *
@@ -38,13 +39,13 @@ internal class LocalTeamSyncStateDataSource(
      * As sessões vêm junto porque o servidor rejeita turno órfão: a consulta de
      * leitura dele faz `JOIN` na sessão e um turno sem ela nunca apareceria.
      */
-    suspend fun readPendingBatch(profileId: String, limit: Int): PendingTeamBatch {
+    suspend fun readPendingBatch(teamId: String, profileId: String, limit: Int): PendingTeamBatch {
         return withContext(Dispatchers.IO) {
             connectionManager.useConnection { connection ->
                 ensureSchema(connection)
                 resetStaleWatermarks(connection)
 
-                val turns = readPendingTurns(connection, profileId, limit)
+                val turns = readPendingTurns(connection, teamId, profileId, limit)
                 if (turns.isEmpty()) {
                     return@useConnection PendingTeamBatch(emptyList(), emptyList())
                 }
@@ -59,7 +60,7 @@ internal class LocalTeamSyncStateDataSource(
     }
 
     /** Avança o marcador para o maior `seq` de cada sessão do lote confirmado. */
-    suspend fun markPushed(turns: List<CliSessionTurn>, pushedAt: Instant) {
+    suspend fun markPushed(teamId: String, turns: List<CliSessionTurn>, pushedAt: Instant) {
         if (turns.isEmpty()) {
             return
         }
@@ -72,9 +73,10 @@ internal class LocalTeamSyncStateDataSource(
                 ensureSchema(connection)
                 connection.prepareStatement(UPSERT_STATE_SQL).use { statement ->
                     for ((sessionId, maxSeq) in maxSeqBySession) {
-                        statement.setString(1, sessionId)
-                        statement.setInt(2, maxSeq)
-                        statement.setLong(3, pushedAt.toEpochMilliseconds())
+                        statement.setString(1, teamId)
+                        statement.setString(2, sessionId)
+                        statement.setInt(3, maxSeq)
+                        statement.setLong(4, pushedAt.toEpochMilliseconds())
                         statement.addBatch()
                     }
                     statement.executeBatch()
@@ -89,15 +91,36 @@ internal class LocalTeamSyncStateDataSource(
             connectionManager.useConnection { connection ->
                 ensureSchema(connection)
                 connection.createStatement().use { statement ->
-                    statement.execute("DELETE FROM team_sync_state;")
+                    statement.execute("DELETE FROM team_sync_watermarks;")
                 }
             }
         }
     }
 
+    /**
+     * Cria `team_sync_watermarks`. Só na abertura em que essa tabela ainda não
+     * existe é que os marcadores de `team_sync_state` (versão anterior) são copiados
+     * para o time legado. A tabela antiga não é apagada: a versão anterior a lê no
+     * downgrade. A checagem vem antes do `CREATE`, para que um `resetAll` posterior
+     * não ressuscite marcadores antigos a cada abertura.
+     */
     private fun ensureSchema(connection: Connection) {
         connection.createStatement().use { statement ->
+            val isFirstOpen = !hasTable(connection, WATERMARK_TABLE)
             statement.execute(CREATE_STATE_TABLE_SQL)
+            if (isFirstOpen && hasTable(connection, LEGACY_STATE_TABLE)) {
+                statement.execute(MIGRATE_LEGACY_STATE_SQL)
+            }
+        }
+    }
+
+    private fun hasTable(connection: Connection, tableName: String): Boolean {
+        return connection.createStatement().use { statement ->
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '$tableName';"
+            ).use { rows ->
+                rows.next() && rows.getInt(1) > 0
+            }
         }
     }
 
@@ -116,12 +139,14 @@ internal class LocalTeamSyncStateDataSource(
 
     private fun readPendingTurns(
         connection: Connection,
+        teamId: String,
         profileId: String,
         limit: Int
     ): List<CliSessionTurn> {
         return connection.prepareStatement(SELECT_PENDING_TURNS_SQL).use { statement ->
-            statement.setString(1, profileId)
-            statement.setInt(2, limit)
+            statement.setString(1, teamId)
+            statement.setString(2, profileId)
+            statement.setInt(3, limit)
             statement.executeQuery().use { rows ->
                 buildList {
                     while (rows.next()) {
@@ -193,28 +218,40 @@ internal class LocalTeamSyncStateDataSource(
     private companion object {
         const val SESSION_IDS_PLACEHOLDER = "{{SESSION_IDS}}"
 
+        const val WATERMARK_TABLE = "team_sync_watermarks"
+        const val LEGACY_STATE_TABLE = "team_sync_state"
+        const val LEGACY_TEAM_ID = TeamIntegrations.LEGACY_TEAM_ID
+
         val CREATE_STATE_TABLE_SQL = """
-            CREATE TABLE IF NOT EXISTS team_sync_state (
-              session_id TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS team_sync_watermarks (
+              team_id TEXT NOT NULL,
+              session_id TEXT NOT NULL,
               last_seq_sent INTEGER NOT NULL DEFAULT -1,
-              last_pushed_at INTEGER NOT NULL DEFAULT 0
+              last_pushed_at INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY (team_id, session_id)
             );
         """
 
+        val MIGRATE_LEGACY_STATE_SQL = """
+            INSERT OR IGNORE INTO team_sync_watermarks (team_id, session_id, last_seq_sent, last_pushed_at)
+            SELECT '$LEGACY_TEAM_ID', session_id, last_seq_sent, last_pushed_at
+            FROM team_sync_state;
+        """
+
         val RESET_STALE_STATE_SQL = """
-            DELETE FROM team_sync_state
+            DELETE FROM team_sync_watermarks
             WHERE last_seq_sent > (
               SELECT COALESCE(MAX(t.seq), -1)
               FROM cli_turns t
-              WHERE t.session_id = team_sync_state.session_id
+              WHERE t.session_id = team_sync_watermarks.session_id
             );
         """
 
         val UPSERT_STATE_SQL = """
-            INSERT INTO team_sync_state (session_id, last_seq_sent, last_pushed_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET
-              last_seq_sent = MAX(excluded.last_seq_sent, team_sync_state.last_seq_sent),
+            INSERT INTO team_sync_watermarks (team_id, session_id, last_seq_sent, last_pushed_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(team_id, session_id) DO UPDATE SET
+              last_seq_sent = MAX(excluded.last_seq_sent, team_sync_watermarks.last_seq_sent),
               last_pushed_at = excluded.last_pushed_at;
         """
 
@@ -237,7 +274,7 @@ internal class LocalTeamSyncStateDataSource(
                    t.cache_write_1h_tokens AS cache_write_1h_tokens
             FROM cli_turns t
             JOIN cli_sessions s ON s.session_id = t.session_id
-            LEFT JOIN team_sync_state st ON st.session_id = t.session_id
+            LEFT JOIN team_sync_watermarks st ON st.session_id = t.session_id AND st.team_id = ?
             WHERE s.profile_id = ?
               AND t.seq > COALESCE(st.last_seq_sent, -1)
             ORDER BY t.session_id ASC, t.seq ASC

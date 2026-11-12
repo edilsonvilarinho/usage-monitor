@@ -1,0 +1,71 @@
+# Análise: diagonal legível e período maior — issue #538
+
+Procedência: Claude Opus 5.5, Claude Code CLI no Windows 11, 2026-11-10, branch `feat/issue-538-diagonal-legivel`,
+commits com a identidade `claude <claude@anthropic.com>`. Implementação pelos agentes `backend-dev`/`frontend-dev`.
+
+## Objetivo
+
+A janela "Análise" mostra a diagonal do ritmo (5h e semanal), as barras das últimas 24 h e a tabela de ritmo, mas o
+leitor não sabe qual ritmo decidiu o veredito (semanal 7 pontos abaixo da linha e mesmo assim "esgota") e só vê a
+janela atual. O dono escolheu, entre 5 protótipos, a direção **P1 "Diagonal legível"**
+(`prototipos/issue-538/p1-diagonal-legivel/index.html`): mesma diagonal com legenda explícita, marcador "agora"
+rotulado, valor projetado no reinício, veredito numa frase que diz o ritmo usado, e seletor de período
+(Agora | 24 h | 7 d | 30 d | 90 d) que sobrepõe as janelas passadas com resumo e faz barras e tabela seguirem o período.
+
+## Fatos confirmados (2026-11-10, `92927c0f`)
+
+- `buildSessionAnalysis` (`domain/entity/SessionAnalysis.kt:131`) recebe a série e `now`; não tem período. Chamado
+  por `SessionAnalysisReader.kt:57` (janela) e `terminal/TerminalAnalysisReader.kt:36` (CLI/TUI).
+- `SessionAnalysisReader.kt:28` lê `HistoryRange.LAST_7_DAYS`. `HistoryRange` (`UsageHistoryModels.kt:8`) tem
+  `LAST_24_HOURS`, `LAST_7_DAYS`, `LAST_30_DAYS`, `TOTAL` — sem 90 d; o `CLAUDE.md` proíbe valor novo em enum existente.
+- Retenção do histórico local: 90 dias (`LocalUsageHistoryDataSource.kt:23`, `retentionPeriod = 90.days`).
+- Janelas anteriores na diagonal: no máximo `ANALYSIS_PREVIOUS_PATHS = 3` (`SessionAnalysis.kt:73`, uso em `:211`).
+- Estado da janela: `AnalysisViewModel` montado em `AppViewModels.kt:122`; tela em `AnalysisScreen.kt`, painel em
+  `AnalysisPanel.kt` (123 linhas), gráfico em `PaceDiagonalChart.kt` (235) e `PaceDiagonalModel.kt` (131).
+
+## Decisões
+
+- Período é tipo novo do domain (`AnalysisPeriod`), não valor novo em `HistoryRange`; 90 d lê `HistoryRange.TOTAL`
+  (a retenção corta em 90 d) e o domain recorta pelo início do período.
+- `buildSessionAnalysis` ganha `period` com default `NOW`: CLI/TUI e Telegram ficam como estão.
+- A diagonal desenha até 3 janelas anteriores em qualquer período (comportamento atual); os períodos longos acrescentam
+  o resumo das janelas fechadas no período: quantidade, quantas esgotaram, pico médio. Número que o histórico não tem não é derivado.
+- Barras seguem o período: 24 h por hora (atual), 7 d pico por dia, 30/90 d pico por semana.
+- Resumo e barras de 30/90 d contam janelas **fechadas cujo reinício** ≥ início do período (mais a aberta nas barras): em 7 d a semana anterior entra; corte de janelas pelo canônico `splitIntoQuotaWindows`, nunca por `groupBy(periodEndAt)` (reinício que oscila partiria a janela).
+- Tabela de ritmo: 5 linhas atuais em todo período + linha do período em 30/90 d (`AnalysisPeriodRate`); sem valor novo em `AnalysisSpan`.
+- Texto novo por `localized`/objeto de rótulos; período escolhido vive no `AnalysisViewModel`, não na composable.
+
+## Atividades
+
+| ID | O quê | Agente |
+|---|---|---|
+| A01 | Este plano | Neferpitou |
+| A02 | Domain: `AnalysisPeriod`, janelas do período, resumo e barras por período em `buildSessionAnalysis` (TDD em commonTest) | backend-dev |
+| A03 | Leitor + `AnalysisViewModel`: `sessionAnalysisReader` recebe o período e escolhe a faixa; o view model guarda o período (juntos para o commit compilar) | backend-dev |
+| A04 | Modelos (inclui resumo, títulos de barras e linha do período da tabela): veredito com ritmo usado, legenda, rótulo "agora", valor no reinício em `PaceDiagonalModel`/`AnalysisPanelModel` | frontend-dev |
+| A05a | Compose: card desenha frase do veredito, rótulo "agora", valor/esgota no reinício, eixo até `yMax`, legenda e fatos | frontend-dev |
+| A05b | Compose: seletor segmentado de período, resumo, barras por período e linha do período na tabela | frontend-dev |
+| A06 | Registro: seção 9d do `prototipo-visual-opencode.html`, `docs/design-system/` e `docs/presentation.md` | prototype-dev |
+
+## Ponto de situação
+
+| ID | Comando | Resultado |
+|---|---|---|
+| A01 | sem harness de teste (plano); validado por leitura dos ponteiros acima com `grep -n` | plano criado |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.SessionAnalysisPeriodTest"` | `SessionAnalysisPeriodTest.kt:105` `expected:<AnalysisPeriodSummary(windowCount=3, exhaustedCount=1, meanPeakPercent=83)> but was:<null>`; `:132` `expected:<[40, 100, 80, 100, 41]> but was:<[100, 80, 100, 41]>`; jitter de 30 s `expected:<1> but was:<2>` |
+| A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.domain.*" --tests "com.usagemonitor.architecture.*"` | BUILD SUCCESSFUL, 609 testes, 0 falhas (73 suítes) |
+| A03 | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.SessionAnalysisReaderTest --tests com.usagemonitor.presentation.* --tests com.usagemonitor.architecture.*` | 1122 testes, 5 falhas na asserção (`AssertionError`): `SessionAnalysisReaderTest.kt:142` faixa por período, `:153` recorte de 30 d, `:163` período na análise; `AnalysisViewModelTest.kt:141` troca de período relê, `:176` releitura ao vivo com o período |
+| A03 | verde: mesmo comando | BUILD SUCCESSFUL, 1122 testes, 0 falhas; `TelegramBotComposition.kt` passa `AnalysisPeriod.NOW` (bot inalterado) |
+| A04 | vermelho (pelo `test-runner`): `gradlew.bat desktopTest --tests com.usagemonitor.presentation.AnalysisPanelModelTest --tests com.usagemonitor.presentation.PaceDiagonalModelTest` | 10 testes, 5 falhas na asserção: `AnalysisPanelModelTest.kt:33` `expected:<Cabe até o reinício: usa o ritmo da última hora (14 %/h). Projeção de 83 % no reinício, abaixo dos 100 %.> but was:<cabe até o reinício>`; `:106` `expected:<6> but was:<5>`; `:115` resumo `but was:<null>`; `PaceDiagonalModelTest.kt:18` `expected:<agora 12:30> but was:<null>` |
+| A04 | verde: `gradlew.bat desktopTest --tests com.usagemonitor.presentation.* --tests com.usagemonitor.architecture.*` | BUILD SUCCESSFUL, 1118 testes, 0 falhas. Decisão: `verdict` curto continua (pílula, TUI, Telegram — `TuiAnalysisViewTest.kt:58` exige) e `verdictSentence` novo leva a frase longa |
+| A05a | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.ui.AnalysisScreenTest --tests com.usagemonitor.architecture.*` | `AnalysisScreenTest.kt:37` `Expected exactly '1' node ... 'Projeção de 83 % no reinício, abaixo dos 100 %.'` |
+| A05a | verde: mesmo comando | BUILD SUCCESSFUL, 22 testes (5 de tela + 17 de arquitetura), 0 falhas. A frase antiga ("62% used with 70%…") sai da tela e fica só na descrição do gráfico, como no protótipo |
+| A05b | vermelho: `gradlew.bat desktopTest --tests com.usagemonitor.ui.AnalysisScreenTest --tests com.usagemonitor.architecture.*` | 23 testes, 1 falha na asserção: `AnalysisScreenTest.kt:53` (`SemanticsNodeInteraction.kt:178`, clicar "30 d" não chamava `setPeriod` nem mostrava o título do período) |
+| A05b | verde: mesmo comando | BUILD SUCCESSFUL, 23 testes (6 de tela + 17 de arquitetura), 0 falhas. Em "Agora" não há barras (protótipo P1); os dois testes de tela que esperavam as barras de 24 h passam a abrir em `HOURS_24` |
+| A06 | sem harness de teste (documentação); seção 9d do protótipo aberta em Edge headless | `console_errors 0`, `scrollWidth 1265 = clientWidth 1265`, captura conferida pela orquestradora; `docs/presentation.md` ganhou a seção #538; `ui_kits/desktop-app/` não tem a Análise, sem mudança no design system. Entra no commit do A05b (tela e registro juntos) |
+
+## Problemas em aberto e riscos
+
+- 90 d com `TOTAL` lê até 90 d de pontos por passada ao vivo; custo de SQL não medido (hoje ~20 ms para 7 d).
+- Semanal sem 4 semanas de histórico mostra resumo com menos janelas; o texto diz quantas foram lidas.
+- Suíte só no Windows (#342); A05 não mexe em host de janela.

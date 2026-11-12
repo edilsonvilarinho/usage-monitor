@@ -6,8 +6,10 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import java.io.File
+import java.util.UUID
 import com.usagemonitor.presentation.ui.MODAL_CLOSE_SETTLE_MILLIS
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.SettingsField
@@ -27,6 +29,9 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 /**
  * O que as Configurações pedem aos view models. Porta para as regras das
@@ -59,6 +64,8 @@ internal class SettingsActions(
     /** Escopo da composição, para a passagem das Configurações ao relatório de bug. */
     private val handOffScope: CoroutineScope,
     private val autoStartHost: () -> AutoStartHost = AutoStartHost::system,
+    /** Time aberto nas Configurações, lido pelo admin de chaves (A06). Sem ligação, não chega ao roteamento. */
+    private val settingsTeamSelection: MutableStateFlow<String?> = MutableStateFlow(null),
     private val isDefaultDataRoot: () -> Boolean = { AppDataDirectory.isDefault },
     private val chooseAnthropicDirectory: () -> File? = ::chooseAnthropicConfigDirectory,
     private val chooseCodexDirectory: () -> File? = ::chooseCodexHomeDirectory
@@ -264,16 +271,58 @@ internal class SettingsActions(
         modal.expandedAnthropicProfileId = if (modal.expandedAnthropicProfileId == profileId) null else profileId
     }
 
+    /** Time aberto nas Configurações; `null` até a primeira escolha. */
+    var selectedTeamId by mutableStateOf<String?>(null)
+        private set
+
+    /** Cria um time vazio com id único e nome sequencial, e o deixa aberto. */
+    fun addTeam(): String {
+        val integrations = store.teamIntegrationsFlow.value
+        val id = "team-" + UUID.randomUUID().toString()
+        val name = "Time ${integrations.teams.size + 1}"
+        persistTeamIntegrations(store, integrations.upsert(TeamIntegrationSettings(id = id, name = name)))
+        selectTeam(id)
+        return id
+    }
+
+    fun selectTeam(teamId: String) {
+        selectedTeamId = teamId
+        settingsTeamSelection.value = teamId
+    }
+
+    /** Remove o time; se era o aberto, abre o primeiro que sobrou. */
+    fun removeTeam(teamId: String) {
+        val integrations = store.teamIntegrationsFlow.value
+        persistTeamIntegrations(store, integrations.remove(teamId))
+        feedback.clearTeamConnection(teamId)
+        feedback.clearTeamAdminConnection(teamId)
+        if (selectedTeamId == teamId) {
+            selectedTeamId = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id
+            settingsTeamSelection.value = selectedTeamId
+        }
+    }
+
+    /** Time que os controles sem id tocam: o aberto, ou o primeiro. */
+    fun openedTeamId(): String =
+        selectedTeamId ?: store.teamIntegrationsFlow.value.teams.firstOrNull()?.id ?: TeamIntegrations.LEGACY_TEAM_ID
+
     /** Mudar de servidor ou religar a integração não pode deixar um resultado antigo na tela. */
     fun changeTeamEnabled(enabled: Boolean) {
-        val saved = updateTeam { current -> current.copy(enabled = enabled) }
-        feedback.teamConnection = TeamConnectionUiState()
+        val current = store.teamIntegrationsFlow.value
+        val saved = persistTeamIntegrations(store, TeamIntegrations(current.deviceId, enabled, current.teams))
+        feedback.clearAllTeamConnections()
         feedback.reportSave(SettingsField.TEAM_INTEGRATION, saved)
     }
 
-    fun changeTeamServerUrl(url: String) {
-        val saved = updateTeam { current -> current.copy(serverUrl = url) }
-        feedback.teamConnection = TeamConnectionUiState()
+    /** Só o nome muda: o id é a chave do time e não pode sair do lugar. */
+    fun changeTeamName(teamId: String, name: String) {
+        val saved = updateTeam(teamId) { current -> current.copy(name = name) }
+        feedback.reportSave(SettingsField.TEAM_INTEGRATION, saved)
+    }
+
+    fun changeTeamServerUrl(teamId: String, url: String) {
+        val saved = updateTeam(teamId) { current -> current.copy(serverUrl = url) }
+        feedback.clearTeamConnection(teamId)
         feedback.reportSave(SettingsField.TEAM_SERVER, saved)
     }
 
@@ -283,14 +332,40 @@ internal class SettingsActions(
      * nova, senão o servidor continua sem saber a quem ela pertence até surgir
      * turno novo no Claude Code.
      */
-    fun changeTeamApiKey(key: String) {
-        val saved = updateTeam { current -> current.copy(apiKey = key) }
+    fun changeTeamApiKey(teamId: String, key: String) {
+        val saved = updateTeam(teamId) { current -> current.copy(apiKey = key) }
         feedback.reportSave(SettingsField.TEAM_KEY, saved)
         if (saved) {
-            feedback.checkTeamConnection()
+            feedback.checkTeamConnection(teamId)
             targets.requestTeamSync()
         } else {
-            feedback.teamConnection = TeamConnectionUiState()
+            feedback.clearTeamConnection(teamId)
+        }
+    }
+
+    /**
+     * Chave própria de uma conta no time: só o time endereçado muda. Em branco remove a entrada, e a conta
+     * fica sem chave (sem herdar a do time). Antes da gravação, o time copia a chave antiga para as
+     * participantes sem chave própria ([TeamIntegrationSettings.withOwnKeysMaterialized]), para não perdê-la.
+     * Mesmo caminho de [changeTeamApiKey] depois de gravar.
+     */
+    fun changeTeamAccountKey(teamId: String, profileId: String, key: String) {
+        val trimmed = key.trim()
+        val saved = updateTeam(teamId) { current ->
+            val base = current.withOwnKeysMaterialized()
+            val keys = if (trimmed.isEmpty()) {
+                base.accountApiKeys - profileId
+            } else {
+                base.accountApiKeys + (profileId to trimmed)
+            }
+            base.copy(accountApiKeys = keys)
+        }
+        feedback.reportSave(SettingsField.TEAM_KEY, saved)
+        if (saved) {
+            feedback.checkTeamConnection(teamId)
+            targets.requestTeamSync()
+        } else {
+            feedback.clearTeamConnection(teamId)
         }
     }
 
@@ -299,49 +374,62 @@ internal class SettingsActions(
      * apelido só chega ao servidor dentro de um ingest: sem antecipar a passada,
      * o nome novo esperaria o tique de 30s para aparecer ao time.
      */
-    fun changeTeamAlias(alias: String) {
+    fun changeTeamAlias(teamId: String, alias: String) {
         if (alias.isBlank() && store.teamSettingsFlow.value.alias.isNotBlank()) {
             feedback.showToast(SettingsToast.TeamAliasRequired)
             return
         }
-        val saved = updateTeam { current -> current.copy(alias = alias) }
+        val saved = updateTeam(teamId) { current -> current.copy(alias = alias) }
         feedback.reportSave(SettingsField.TEAM_ALIAS, saved)
         if (saved) {
             targets.requestTeamSync()
         }
     }
 
-    /** Marcar uma conta é justamente o momento em que o vínculo da chave passa a importar. */
-    fun changeTeamProfileParticipation(profileId: String, participates: Boolean) {
-        val saved = updateTeam { current ->
-            val updated = if (participates) {
-                current.participatingProfileIds + profileId
-            } else {
-                current.participatingProfileIds - profileId
+    /**
+     * Marcar uma conta é justamente o momento em que o vínculo da chave passa a importar. Ligar materializa
+     * antes a chave antiga do time nas participantes sem chave própria: a conta nova entra sem chave, e a
+     * chave do time nunca migra para ela.
+     */
+    fun changeTeamProfileParticipation(teamId: String, profileId: String, participates: Boolean) {
+        // Com time cadastrado, o agregado tira a conta dos outros times; sem ele, o time nasce com a conta.
+        val integrations = store.teamIntegrationsFlow.value
+        val target = integrations.team(teamId)
+        val saved = if (participates && target != null) {
+            val materialized = integrations.upsert(target.withOwnKeysMaterialized())
+            persistTeamIntegrations(store, materialized.withParticipation(teamId, profileId, true))
+        } else {
+            updateTeam(teamId) { current ->
+                val base = if (participates) current.withOwnKeysMaterialized() else current
+                val updated = if (participates) {
+                    base.participatingProfileIds + profileId
+                } else {
+                    base.participatingProfileIds - profileId
+                }
+                base.copy(participatingProfileIds = updated)
             }
-            current.copy(participatingProfileIds = updated)
         }
         feedback.reportSave(SettingsField.TEAM_ACCOUNTS, saved)
         if (saved && participates) {
-            feedback.checkTeamConnection()
+            feedback.checkTeamConnection(teamId)
         }
     }
 
-    fun changeTeamAdminToken(token: String) {
-        val saved = updateTeam { current -> current.copy(adminToken = token) }
-        feedback.teamAdminConnection = TeamConnectionUiState()
+    fun changeTeamAdminToken(teamId: String, token: String) {
+        val saved = updateTeam(teamId) { current -> current.copy(adminToken = token) }
+        feedback.clearTeamAdminConnection(teamId)
         feedback.reportSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
     }
 
-    fun openTeamKeysManager() {
+    fun openTeamKeysManager(teamId: String) {
         breadcrumbs.recordScreenOpened("chaves das contas (admin)")
         modal.isTeamKeysOpen = true
         targets.openTeamKeys()
     }
 
-    fun exitTeamAdminMode() {
-        val saved = updateTeam { current -> current.copy(adminToken = "") }
-        feedback.teamAdminConnection = TeamConnectionUiState()
+    fun exitTeamAdminMode(teamId: String) {
+        val saved = updateTeam(teamId) { current -> current.copy(adminToken = "") }
+        feedback.clearTeamAdminConnection(teamId)
         modal.isTeamKeysOpen = false
         feedback.reportSave(SettingsField.TEAM_ADMIN_TOKEN, saved)
     }
@@ -375,8 +463,8 @@ internal class SettingsActions(
         ).enabledProfiles
     }
 
-    private fun updateTeam(transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): Boolean {
-        return updateTeamSettings(store.teamSettingsFlow, store.teamSettingsDataSource, transform)
+    private fun updateTeam(teamId: String, transform: (TeamIntegrationSettings) -> TeamIntegrationSettings): Boolean {
+        return updateTeamSettings(store, teamId, transform)
     }
 
     private fun updateProxy(resetConnection: Boolean, transform: (ProxySettings) -> ProxySettings) {
@@ -389,27 +477,42 @@ internal class SettingsActions(
 }
 
 /**
- * Aplica uma mudança nas configurações de time e persiste.
+ * Aplica a alteração no agregado de times e no disco.
  *
- * O `StateFlow` é atualizado antes da gravação: a UI reflete a digitação na hora
- * e a escrita em disco vai atrás. Uma falha de gravação não pode derrubar o
- * diálogo de configurações — pior caso, a mudança não sobrevive ao reinício.
- */
-/**
- * Aplica a alteração em memória e no disco.
+ * O agregado é a fonte; o derivado do primeiro time é publicado junto, antes da
+ * gravação, para a UI refletir a digitação na hora. Uma falha de gravação não
+ * derruba o diálogo: pior caso, a mudança não sobrevive ao reinício.
  *
  * Devolve se a gravação passou: o aviso de "salvo" no diálogo não pode ser
  * emitido a partir da intenção, só do resultado — antes disto a falha era
  * engolida por um `runCatching` sem tratamento.
  */
 internal fun updateTeamSettings(
-    settingsFlow: MutableStateFlow<TeamIntegrationSettings>,
-    dataSource: LocalTeamSettingsDataSource,
+    store: AppSettingsStore,
     transform: (TeamIntegrationSettings) -> TeamIntegrationSettings
 ): Boolean {
-    val updated = transform(settingsFlow.value)
-    settingsFlow.value = updated
-    return runCatching { dataSource.save(updated) }.isSuccess
+    val first = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id ?: TeamIntegrations.LEGACY_TEAM_ID
+    return updateTeamSettings(store, first, transform)
+}
+
+/** Grava a alteração no time endereçado pelo id; time ausente nasce vazio com esse id. */
+internal fun updateTeamSettings(
+    store: AppSettingsStore,
+    teamId: String,
+    transform: (TeamIntegrationSettings) -> TeamIntegrationSettings
+): Boolean {
+    val current = store.teamIntegrationsFlow.value
+    val base = current.team(teamId) ?: TeamIntegrationSettings(id = teamId)
+    val updated = transform(base)
+    // O `enabled` do agregado é o do time alterado: o construtor de `TeamIntegrations` o aplica a todo time.
+    val aggregate = TeamIntegrations(current.deviceId, updated.enabled, current.teams)
+    return persistTeamIntegrations(store, aggregate.upsert(updated))
+}
+
+/** Publica o agregado e grava; devolve se a gravação passou. */
+internal fun persistTeamIntegrations(store: AppSettingsStore, updated: TeamIntegrations): Boolean {
+    store.publishTeamIntegrations(updated)
+    return runCatching { store.teamSettingsDataSource.saveAll(updated) }.isSuccess
 }
 
 internal fun updateProxySettings(

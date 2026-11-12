@@ -1,9 +1,11 @@
 package com.usagemonitor
 
+import com.usagemonitor.data.datasource.RemoteTeamDataSource
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.UsageAlertSettings
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
@@ -14,6 +16,10 @@ import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -21,6 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -286,51 +293,137 @@ class SettingsActionsTest {
 
     @Test
     fun `changing the server or turning the team on clears a stale check`() {
-        harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
 
         actions.changeTeamEnabled(true)
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_INTEGRATION), lastToast)
 
-        harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
-        actions.changeTeamServerUrl("https://team.example")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        actions.changeTeamServerUrl(TeamIntegrations.LEGACY_TEAM_ID, "https://team.example")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals("https://team.example", store.teamSettingsDataSource.load().serverUrl)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_SERVER), lastToast)
     }
 
     @Test
+    fun `turning the team switch on turns the aggregate on and the team active in memory and on disk`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(enabled = false, serverUrl = "https://team.example", apiKey = "key-1", alias = "eu")
+        }
+
+        actions.changeTeamEnabled(true)
+
+        assertTrue(store.teamIntegrationsFlow.value.enabled)
+        assertTrue(store.teamSettingsDataSource.loadAll().enabled)
+        assertTrue(store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)?.isActive == true)
+    }
+
+    @Test
+    fun `the enabled flag of a team transform reaches the aggregate`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(enabled = true, serverUrl = "https://team.example", apiKey = "key-1")
+        }
+
+        assertTrue(store.teamIntegrationsFlow.value.enabled)
+        assertTrue(store.teamSettingsDataSource.loadAll().enabled)
+    }
+
+    @Test
     fun `a new team key is checked and the identity is sent at once`() {
-        actions.changeTeamApiKey("key-1")
+        actions.changeTeamApiKey(TeamIntegrations.LEGACY_TEAM_ID, "key-1")
         harness.settle()
 
         assertEquals("key-1", store.teamSettingsFlow.value.apiKey)
         assertEquals(1, harness.teamSyncs)
-        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection.status)
+        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_KEY), lastToast)
     }
 
     @Test
     fun `a team key that cannot be written is not checked`() {
         blockWrites("team.json")
-        harness.feedback.teamConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
 
-        actions.changeTeamApiKey("key-1")
+        actions.changeTeamApiKey(TeamIntegrations.LEGACY_TEAM_ID, "key-1")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(0, harness.teamSyncs)
         assertEquals(SettingsToast.SaveFailed(SettingsField.TEAM_KEY), lastToast)
         assertTrue(harness.breadcrumbs.messages.any { message -> message.contains("salvar configuração TEAM_KEY") })
     }
 
     @Test
+    fun `an account key is stored trimmed in its own team only`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a"),
+                    TeamIntegrationSettings(id = "team-b", accountApiKeys = mapOf("default" to "chave-b"))
+                )
+            )
+        )
+
+        actions.changeTeamAccountKey("team-a", "default", "  chave-a  ")
+
+        assertEquals(mapOf("default" to "chave-a"), store.teamIntegrationsFlow.value.team("team-a")?.accountApiKeys)
+        assertEquals(mapOf("default" to "chave-a"), store.teamSettingsDataSource.loadAll().team("team-a")?.accountApiKeys)
+        assertEquals(mapOf("default" to "chave-b"), store.teamIntegrationsFlow.value.team("team-b")?.accountApiKeys)
+        assertEquals(SettingsToast.Saved(SettingsField.TEAM_KEY), lastToast)
+    }
+
+    @Test
+    fun `a blank account key removes its entry and keeps the other accounts`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(
+                        id = "team-a",
+                        accountApiKeys = mapOf("default" to "chave-a", "work" to "chave-w")
+                    )
+                )
+            )
+        )
+
+        actions.changeTeamAccountKey("team-a", "default", "   ")
+
+        assertEquals(mapOf("work" to "chave-w"), store.teamIntegrationsFlow.value.team("team-a")?.accountApiKeys)
+        assertEquals(SettingsToast.Saved(SettingsField.TEAM_KEY), lastToast)
+    }
+
+    @Test
+    fun `a saved account key is checked and the sync is requested at once`() {
+        actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-conta")
+        harness.settle()
+
+        assertEquals(
+            mapOf("default" to "chave-conta"),
+            store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)?.accountApiKeys
+        )
+        assertEquals(1, harness.teamSyncs)
+        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
+    }
+
+    @Test
+    fun `an account key that cannot be written is not checked`() {
+        blockWrites("team.json")
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+
+        actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-conta")
+
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(0, harness.teamSyncs)
+        assertEquals(SettingsToast.SaveFailed(SettingsField.TEAM_KEY), lastToast)
+    }
+
+    @Test
     fun `a saved alias cannot be erased and a new one is sent at once`() {
-        actions.changeTeamAlias("ana")
+        actions.changeTeamAlias(TeamIntegrations.LEGACY_TEAM_ID, "ana")
         assertEquals(1, harness.teamSyncs)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ALIAS), lastToast)
 
-        actions.changeTeamAlias("  ")
+        actions.changeTeamAlias(TeamIntegrations.LEGACY_TEAM_ID, "  ")
 
         assertEquals("ana", store.teamSettingsFlow.value.alias)
         assertEquals(SettingsToast.TeamAliasRequired, lastToast)
@@ -339,32 +432,103 @@ class SettingsActionsTest {
 
     @Test
     fun `marking an account checks the key and unmarking does not`() {
-        actions.changeTeamProfileParticipation("default", participates = true)
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = true)
         harness.settle()
         assertEquals(setOf("default"), store.teamSettingsFlow.value.participatingProfileIds)
-        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection.status)
-        harness.feedback.teamConnection = TeamConnectionUiState()
+        assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState())
 
-        actions.changeTeamProfileParticipation("default", participates = false)
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = false)
 
         assertTrue(store.teamSettingsFlow.value.participatingProfileIds.isEmpty())
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ACCOUNTS), lastToast)
     }
 
     @Test
-    fun `admin mode is entered by token, opens the keys and exits clearing it`() {
-        harness.feedback.teamAdminConnection = TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho")
-        actions.changeTeamAdminToken("adm")
-        assertEquals("adm", store.teamSettingsFlow.value.adminToken)
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamAdminConnection)
+    fun `turning on a second account in legacy mode gives the old team key to the first one only`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(
+                serverUrl = "https://team.example",
+                apiKey = "chave-antiga",
+                alias = "eu",
+                participatingProfileIds = setOf("default")
+            )
+        }
 
-        actions.openTeamKeysManager()
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "work", participates = true)
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertEquals(mapOf("default" to "chave-antiga"), team?.accountApiKeys)
+        assertEquals("", team?.apiKeyFor("work"))
+        assertEquals("chave-antiga", team?.apiKey)
+        assertEquals(setOf("default", "work"), team?.participatingProfileIds)
+    }
+
+    @Test
+    fun `turning on an account in a team without a legacy key changes only the participation`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(serverUrl = "https://team.example", alias = "eu", participatingProfileIds = setOf("default"))
+        }
+
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "work", participates = true)
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertTrue(team?.accountApiKeys?.isEmpty() == true)
+        assertEquals(setOf("default", "work"), team?.participatingProfileIds)
+    }
+
+    @Test
+    fun `turning on an account once keys exist does not hand it the team key`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(
+                serverUrl = "https://team.example",
+                apiKey = "chave-antiga",
+                alias = "eu",
+                participatingProfileIds = setOf("default"),
+                accountApiKeys = mapOf("default" to "chave-default")
+            )
+        }
+
+        actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "work", participates = true)
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertEquals(mapOf("default" to "chave-default"), team?.accountApiKeys)
+        assertEquals("", team?.apiKeyFor("work"))
+    }
+
+    @Test
+    fun `the first own key in legacy mode keeps the team key for the other participants`() {
+        updateTeamSettings(store, TeamIntegrations.LEGACY_TEAM_ID) { current ->
+            current.copy(
+                serverUrl = "https://team.example",
+                apiKey = "chave-antiga",
+                alias = "eu",
+                participatingProfileIds = setOf("default", "work")
+            )
+        }
+
+        actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-nova")
+
+        val team = store.teamIntegrationsFlow.value.team(TeamIntegrations.LEGACY_TEAM_ID)
+        assertEquals(mapOf("default" to "chave-nova", "work" to "chave-antiga"), team?.accountApiKeys)
+        assertEquals("chave-antiga", team?.apiKey)
+        assertEquals("chave-antiga", store.teamSettingsDataSource.loadAll().team(TeamIntegrations.LEGACY_TEAM_ID)?.apiKey)
+    }
+
+    @Test
+    fun `admin mode is entered by token, opens the keys and exits clearing it`() {
+        harness.feedback.setTeamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        actions.changeTeamAdminToken(TeamIntegrations.LEGACY_TEAM_ID, "adm")
+        assertEquals("adm", store.teamSettingsFlow.value.adminToken)
+        assertEquals(TeamConnectionUiState(), harness.feedback.teamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID))
+
+        actions.openTeamKeysManager(TeamIntegrations.LEGACY_TEAM_ID)
         assertTrue(harness.modal.isTeamKeysOpen)
         assertEquals(1, harness.teamKeysOpened)
         assertTrue(harness.breadcrumbs.messages.contains("abriu chaves das contas (admin)"))
 
-        actions.exitTeamAdminMode()
+        actions.exitTeamAdminMode(TeamIntegrations.LEGACY_TEAM_ID)
         assertEquals("", store.teamSettingsDataSource.load().adminToken)
         assertFalse(harness.modal.isTeamKeysOpen)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ADMIN_TOKEN), lastToast)
@@ -394,16 +558,114 @@ class SettingsActionsTest {
     }
 
     @Test
+    fun `team write updates the aggregate and the derived flow together`() {
+        assertEquals(true, updateTeamSettings(store) { current -> current.copy(alias = "ana") })
+        assertEquals("ana", store.teamIntegrationsFlow.value.teams.first().alias)
+        assertEquals("ana", store.teamSettingsFlow.value.alias)
+        assertEquals("ana", store.teamSettingsDataSource.loadAll().teams.first().alias)
+    }
+
+    @Test
+    fun `write on an empty aggregate creates the legacy team and keeps its usage repository`() {
+        val registry = TeamRepositoryRegistry(
+            RemoteTeamDataSource(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        ) { store.teamIntegrationsFlow.value }
+        fun firstTeamId() = store.teamIntegrationsFlow.value.teams.firstOrNull()?.id ?: "team-legacy"
+        val before = registry.usageRepository(firstTeamId())
+
+        assertTrue(updateTeamSettings(store) { current -> current.copy(alias = "ana") })
+
+        assertEquals("team-legacy", store.teamIntegrationsFlow.value.teams.single().id)
+        assertSame(before, registry.usageRepository(firstTeamId()))
+    }
+
+    @Test
     fun `team and proxy writes report a refused save`() {
-        val teamFlow = kotlinx.coroutines.flow.MutableStateFlow(TeamIntegrationSettings())
         blockWrites("team.json")
         blockWrites("proxy.json")
 
-        assertFalse(updateTeamSettings(teamFlow, store.teamSettingsDataSource) { current -> current.copy(alias = "x") })
-        assertEquals("x", teamFlow.value.alias, "a tela reflete a digitação mesmo sem gravar")
+        assertFalse(updateTeamSettings(store) { current -> current.copy(alias = "x") })
+        assertEquals("x", store.teamSettingsFlow.value.alias, "a tela reflete a digitação mesmo sem gravar")
         actions.changeProxyHost("proxy.local")
 
         assertEquals(SettingsToast.SaveFailed(SettingsField.NETWORK_PROXY), lastToast)
         assertNotNull(harness.breadcrumbs.messages.firstOrNull { message -> message.contains("NETWORK_PROXY") })
+    }
+
+    @Test
+    fun `moving an account to another team takes it off the previous one`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a", participatingProfileIds = setOf("default")),
+                    TeamIntegrationSettings(id = "team-b")
+                )
+            )
+        )
+
+        actions.changeTeamProfileParticipation("team-b", "default", participates = true)
+
+        assertEquals(emptySet(), store.teamIntegrationsFlow.value.team("team-a")?.participatingProfileIds)
+        assertEquals(setOf("default"), store.teamIntegrationsFlow.value.team("team-b")?.participatingProfileIds)
+    }
+
+    @Test
+    fun `changing one team leaves the other team untouched`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a", serverUrl = "https://a.example"),
+                    TeamIntegrationSettings(id = "team-b", serverUrl = "https://b.example")
+                )
+            )
+        )
+
+        actions.changeTeamServerUrl("team-a", "https://new.example")
+
+        assertEquals("https://new.example", store.teamIntegrationsFlow.value.team("team-a")?.serverUrl)
+        assertEquals("https://b.example", store.teamIntegrationsFlow.value.team("team-b")?.serverUrl)
+    }
+
+    @Test
+    fun `renaming a team keeps its id and leaves the other team untouched`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(
+                teams = listOf(
+                    TeamIntegrationSettings(id = "team-a", name = "Time A"),
+                    TeamIntegrationSettings(id = "team-b", name = "Time B")
+                )
+            )
+        )
+
+        actions.changeTeamName("team-a", "Renomeado")
+
+        assertEquals("Renomeado", store.teamIntegrationsFlow.value.team("team-a")?.name)
+        assertEquals("team-a", store.teamIntegrationsFlow.value.team("team-a")?.id)
+        assertEquals("Time B", store.teamIntegrationsFlow.value.team("team-b")?.name)
+        assertEquals(SettingsToast.Saved(SettingsField.TEAM_INTEGRATION), lastToast)
+    }
+
+    @Test
+    fun `adding teams gives unique ids, numbered names and opens the last one`() {
+        val first = actions.addTeam()
+        val second = actions.addTeam()
+
+        assertTrue(first.startsWith("team-"))
+        assertFalse(first == second)
+        assertEquals(listOf("Time 1", "Time 2"), store.teamIntegrationsFlow.value.teams.map { it.name })
+        assertEquals(second, actions.selectedTeamId)
+    }
+
+    @Test
+    fun `removing the open team selects the first remaining one`() {
+        store.publishTeamIntegrations(
+            TeamIntegrations(teams = listOf(TeamIntegrationSettings(id = "team-a"), TeamIntegrationSettings(id = "team-b")))
+        )
+        actions.selectTeam("team-b")
+
+        actions.removeTeam("team-b")
+
+        assertEquals(listOf("team-a"), store.teamIntegrationsFlow.value.teams.map { it.id })
+        assertEquals("team-a", actions.selectedTeamId)
     }
 }

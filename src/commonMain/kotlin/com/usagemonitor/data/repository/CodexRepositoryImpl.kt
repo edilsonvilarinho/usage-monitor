@@ -34,7 +34,10 @@ class CodexRepositoryImpl(
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
         return Result.runCatching {
-            fetchStableUsage(CodexProfileSources(authDataSource, rolloutRateLimits))
+            // A conta padrão também leva rótulo: sem ele o card mostra só "Codex", sem a conta.
+            fetchStableUsage(CodexProfileSources(authDataSource, rolloutRateLimits)).copy(
+                profileLabel = CodexProfileRef.DEFAULT_LABEL
+            )
         }
     }
 

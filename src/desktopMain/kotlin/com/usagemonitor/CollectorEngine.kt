@@ -274,8 +274,8 @@ internal class CollectorEngine(
     // quem nunca abre a tela nunca chegaria aos colegas.
     val teamSync = TeamSyncService(
         syncStateDataSource = graph.teamSyncStateDataSource,
-        pushTeamUsage = PushTeamUsageUseCase(graph.teamUsageRepository),
-        settingsProvider = { graph.teamSettingsFlow.value },
+        pushTeamUsageFor = { teamId -> PushTeamUsageUseCase(graph.teamRepositoryRegistry.usageRepository(teamId)) },
+        integrationsProvider = { graph.store.teamIntegrationsFlow.value },
         targetsProvider = { buildTeamSyncTargets(graph.profileRegistry) },
         // Sem indexar aqui, a latência do time não seria o intervalo deste
         // serviço e sim o do laço de background (10min): ele só envia o que
@@ -284,7 +284,7 @@ internal class CollectorEngine(
         // O heartbeat que alimenta a janela de presença. Sai em toda passada,
         // inclusive quando não há turno novo — é o que separa "app aberto" de
         // "houve consumo".
-        touchTeamPresence = TouchTeamPresenceUseCase(graph.teamUsageRepository),
+        touchTeamPresenceFor = { teamId -> TouchTeamPresenceUseCase(graph.teamRepositoryRegistry.usageRepository(teamId)) },
         breadcrumbs = breadcrumbs
     )
 

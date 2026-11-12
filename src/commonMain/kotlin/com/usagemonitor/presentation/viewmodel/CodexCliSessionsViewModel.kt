@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.CliSessionRange
+import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.repository.UsageExportEncoder
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
@@ -29,11 +31,6 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-enum class CodexCliSessionRange {
-    LAST_5H,
-    LAST_7D,
-    ALL
-}
 
 sealed interface CodexCliSessionsUiState {
     data object Loading : CodexCliSessionsUiState
@@ -42,7 +39,7 @@ sealed interface CodexCliSessionsUiState {
 
     data class Success(
         val sessions: List<CodexCliSessionSummary>,
-        val range: CodexCliSessionRange,
+        val range: CliSessionRange,
         val readAt: Instant,
         val indexReport: CodexCliSessionIndexReport? = null,
         val indexWarning: String? = null,
@@ -51,7 +48,11 @@ sealed interface CodexCliSessionsUiState {
         val isRefreshing: Boolean = false,
         val exportOutcome: CodexCliExportOutcome? = null,
         /** Lista ou Resumo (#384) — o mesmo par de abas do modal do Anthropic. */
-        val view: CliSessionsView = CliSessionsView.SESSIONS
+        val view: CliSessionsView = CliSessionsView.SESSIONS,
+        /** Última mudança do conteúdo da lista (não da leitura); nulo até a primeira leitura. */
+        val lastChangedAt: Instant? = null,
+        /** Quadro de uso do intervalo selecionado (#560); mesma base das abas de projeto, modelo e membro. */
+        val usageBreakdown: CliUsageBreakdown = CliUsageBreakdown()
     ) : CodexCliSessionsUiState
 }
 
@@ -77,7 +78,7 @@ class CodexCliSessionsViewModel(
     private var detailJob: Job? = null
     private var liveJob: Job? = null
     private var exportJob: Job? = null
-    private var range = CodexCliSessionRange.LAST_5H
+    private var range = CliSessionRange.LAST_5H
     private var lastSessionsFailureKey: String? = null
     private var lastIndexFailureKey: String? = null
     private var lastDetailFailureKey: String? = null
@@ -126,6 +127,13 @@ class CodexCliSessionsViewModel(
                         }
                     }
                     val latest = _uiState.value as? CodexCliSessionsUiState.Success
+                    // Mesma regra do Anthropic: o carimbo anda só quando o conteúdo muda, não a cada leitura.
+                    val lastChangedAt = when {
+                        latest == null -> clock.now()
+                        latest.sessions != loaded.sessions ||
+                            latest.indexWarning != loaded.indexError?.message -> clock.now()
+                        else -> latest.lastChangedAt
+                    }
                     _uiState.value = CodexCliSessionsUiState.Success(
                         sessions = loaded.sessions,
                         range = requestedRange,
@@ -136,7 +144,10 @@ class CodexCliSessionsViewModel(
                         detailLoading = latest?.detailLoading ?: false,
                         exportOutcome = latest?.exportOutcome,
                         isRefreshing = false,
-                        view = latest?.view ?: CliSessionsView.SESSIONS
+                        view = latest?.view ?: CliSessionsView.SESSIONS,
+                        lastChangedAt = lastChangedAt,
+                        // Null = leitura de turnos falhou: mantém o quadro anterior, sem zerar.
+                        usageBreakdown = loaded.usageBreakdown ?: latest?.usageBreakdown ?: CliUsageBreakdown()
                     )
                 },
                 onFailure = { error ->
@@ -152,7 +163,7 @@ class CodexCliSessionsViewModel(
         }
     }
 
-    fun setRange(range: CodexCliSessionRange) {
+    fun setRange(range: CliSessionRange) {
         if (this.range == range) return
         this.range = range
         val current = _uiState.value
@@ -244,11 +255,11 @@ class CodexCliSessionsViewModel(
     fun openWindow() {
         // A janela sempre começa no recorte operacional padrão, mesmo quando
         // o ViewModel foi reutilizado depois de uma seleção anterior.
-        range = CodexCliSessionRange.LAST_5H
+        range = CliSessionRange.LAST_5H
         val current = _uiState.value
         if (current is CodexCliSessionsUiState.Success) {
             _uiState.value = current.copy(
-                range = CodexCliSessionRange.LAST_5H,
+                range = CliSessionRange.LAST_5H,
                 isRefreshing = true,
                 detail = null
             )
@@ -290,12 +301,13 @@ class CodexCliSessionsViewModel(
         }
     }
 
-    private fun cutoffFor(range: CodexCliSessionRange): Long? {
+    private fun cutoffFor(range: CliSessionRange): Long? {
         val now = clock.now().toEpochMilliseconds()
         return when (range) {
-            CodexCliSessionRange.LAST_5H -> now - 5L * 60L * 60L * 1000L
-            CodexCliSessionRange.LAST_7D -> now - 7L * 24L * 60L * 60L * 1000L
-            CodexCliSessionRange.ALL -> null
+            CliSessionRange.LAST_5H -> now - 5L * 60L * 60L * 1000L
+            CliSessionRange.LAST_7D -> now - 7L * 24L * 60L * 60L * 1000L
+            CliSessionRange.LAST_30D -> now - 30L * 24L * 60L * 60L * 1000L
+            CliSessionRange.ALL -> null
         }
     }
 }

@@ -14,22 +14,27 @@ import com.usagemonitor.domain.repository.TeamUsageRepository
 class TouchTeamPresenceUseCase(
     private val repository: TeamUsageRepository
 ) {
+    /** [profileId] escolhe a chave da conta; `null` usa a do time. */
     suspend operator fun invoke(
         accountKey: String,
-        member: TeamMemberIdentity
+        member: TeamMemberIdentity,
+        profileId: String? = null
     ): Result<TeamPresenceReceipt> {
-        return repository.touchPresence(accountKey = accountKey, member = member)
+        return repository.touchPresence(accountKey = accountKey, member = member, profileId = profileId)
     }
 
+    /** [profileId] escolhe a chave da conta; `null` usa a do time. */
     suspend operator fun invoke(
         accountKey: String,
         accountEmail: String?,
-        member: TeamMemberIdentity
+        member: TeamMemberIdentity,
+        profileId: String? = null
     ): Result<TeamPresenceReceipt> {
         return repository.touchPresence(
             accountKey = accountKey,
             accountEmail = accountEmail,
-            member = member
+            member = member,
+            profileId = profileId
         )
     }
 }

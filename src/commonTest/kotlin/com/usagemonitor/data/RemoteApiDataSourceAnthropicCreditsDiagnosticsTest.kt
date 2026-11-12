@@ -39,7 +39,7 @@ class RemoteApiDataSourceAnthropicCreditsDiagnosticsTest {
         val response = dataSource.fetchAnthropicUsage("token")
 
         // O caminho instrumentado tem de devolver a mesma coisa que o normal.
-        assertEquals(21.5, response.fiveHour.utilization)
+        assertEquals(21.5, response.fiveHour?.utilization)
         assertEquals(55000L, response.extraUsage?.monthlyLimit)
 
         val event = recorder.events.single()

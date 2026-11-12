@@ -120,6 +120,30 @@ internal fun modalOpenedBreadcrumb(diagnosticName: String, elapsedMillis: Long, 
     return "janela $diagnosticName pintada em $elapsedMillis ms ($kind)"
 }
 
+/**
+ * Quanto tempo uma janela modal escondida fica viva antes de sair da composição
+ * (issue #562). Cada janela aberta pela primeira vez segurava 180 a 250 MB fora da
+ * JVM e não os devolvia ao fechar; 60 s é a escolha do usuário.
+ */
+internal const val MODAL_IDLE_RELEASE_MILLIS = 60_000L
+
+/**
+ * Se a janela modal escondida pode sair da composição: já foi aberta ao menos uma
+ * vez, está fechada e fora da tela. Janela pré-aquecida que nunca abriu (`opens` 0)
+ * fica: liberá-la anularia o pré-aquecimento. Quem chama aplica a espera de
+ * [MODAL_IDLE_RELEASE_MILLIS] antes de obedecer.
+ */
+internal fun shouldReleaseHiddenModalWindow(visible: Boolean, onScreen: Boolean, opens: Int): Boolean =
+    !visible && !onScreen && opens > 0
+
+/**
+ * Se a composição deve criar a janela AWT agora. Um pedido de abertura sempre cria;
+ * o pré-aquecimento só cria a primeira vez. `createdBefore` impede que uma janela
+ * liberada seja pré-aquecida de novo: só um pedido de abertura a recria.
+ */
+internal fun shouldCreateModalWindow(visible: Boolean, prewarm: Boolean, createdBefore: Boolean): Boolean =
+    visible || (prewarm && !createdBefore)
+
 /** Esc fecha a janela. Só chega aqui o que nenhum elemento focado consumiu. */
 internal fun closesModal(type: KeyEventType, key: Key, onCloseRequest: () -> Unit): Boolean {
     if (type != KeyEventType.KeyDown || key != Key.Escape) {

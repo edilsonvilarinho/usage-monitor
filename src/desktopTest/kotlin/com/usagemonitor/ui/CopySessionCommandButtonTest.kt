@@ -44,6 +44,25 @@ class CopySessionCommandButtonTest {
     }
 
     @Test
+    fun `copies the command it is given instead of the claude default`() = runDesktopComposeUiTest {
+        val copied = mutableListOf<String>()
+        setContent {
+            ScreenTestTheme(isDark = true) {
+                CopySessionCommandButton(
+                    sessionId = SESSION_ID,
+                    language = AppLanguage.PT,
+                    command = "codex resume $SESSION_ID",
+                    onCopy = { text -> copied += text }
+                )
+            }
+        }
+
+        onNodeWithContentDescription("Copiar comando de retomada").performClick()
+
+        assertEquals(listOf("codex resume $SESSION_ID"), copied)
+    }
+
+    @Test
     fun `the label confirms the copy and goes back on its own`() = runDesktopComposeUiTest {
         mainClock.autoAdvance = false
         setContent {

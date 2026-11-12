@@ -43,7 +43,7 @@ class RemoteApiDataSourceHttpTest {
 
         val response = dataSource.fetchAnthropicUsage("token")
 
-        assertEquals(21.5, response.fiveHour.utilization)
+        assertEquals(21.5, response.fiveHour?.utilization)
         assertEquals("2026-06-10T20:00:00Z", response.sevenDay.resetsAt)
     }
 

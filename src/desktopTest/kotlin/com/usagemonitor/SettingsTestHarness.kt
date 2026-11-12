@@ -95,16 +95,28 @@ internal class SettingsTestHarness(
         }
     }
 
+    /** Ids dos times que cada caminho recebeu: prova o roteamento por time. */
+    val repositoryTeamIds = mutableListOf<String>()
+    val claimTeamIds = mutableListOf<String>()
+    val claimProfileIds = mutableListOf<String?>()
+    val adminTeamIds = mutableListOf<String>()
+
     val feedback = AppSettingsFeedback(
         store = store,
         breadcrumbs = breadcrumbs,
-        teamUsageRepository = teamRepository,
-        claimTeamKey = { accountKey, email ->
+        teamUsageRepositoryFor = { teamId ->
+            repositoryTeamIds += teamId
+            teamRepository
+        },
+        claimTeamKey = { teamId, accountKey, email, profileId ->
+            claimTeamIds += teamId
+            claimProfileIds += profileId
             synchronized(claims) { claims += accountKey to email }
             released()
             claimResult(accountKey)
         },
-        validateAdminTokenWithServer = {
+        validateAdminTokenWithServer = { teamId ->
+            adminTeamIds += teamId
             released()
             adminTokenResult
         },

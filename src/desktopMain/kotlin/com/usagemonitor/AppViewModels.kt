@@ -129,15 +129,15 @@ internal class AppViewModels(
     )
 
     val teamKeys = TeamKeysAdminViewModel(
-        listKeys = ListTeamKeysUseCase(graph.teamAdminRepository),
-        createKey = CreateTeamKeyUseCase(graph.teamAdminRepository),
-        updateKey = UpdateTeamKeyUseCase(graph.teamAdminRepository),
-        regenerateKey = RegenerateTeamKeyUseCase(graph.teamAdminRepository),
-        revokeKey = RevokeTeamKeyUseCase(graph.teamAdminRepository),
-        unclaimAccount = UnclaimTeamKeyAccountUseCase(graph.teamAdminRepository),
-        deleteAccount = DeleteTeamAccountUseCase(graph.teamAdminRepository),
-        listBlockedAccounts = ListBlockedTeamAccountsUseCase(graph.teamAdminRepository),
-        unblockAccount = UnblockTeamAccountUseCase(graph.teamAdminRepository),
+        listKeys = ListTeamKeysUseCase(graph.settingsTeamAdminRepository),
+        createKey = CreateTeamKeyUseCase(graph.settingsTeamAdminRepository),
+        updateKey = UpdateTeamKeyUseCase(graph.settingsTeamAdminRepository),
+        regenerateKey = RegenerateTeamKeyUseCase(graph.settingsTeamAdminRepository),
+        revokeKey = RevokeTeamKeyUseCase(graph.settingsTeamAdminRepository),
+        unclaimAccount = UnclaimTeamKeyAccountUseCase(graph.settingsTeamAdminRepository),
+        deleteAccount = DeleteTeamAccountUseCase(graph.settingsTeamAdminRepository),
+        listBlockedAccounts = ListBlockedTeamAccountsUseCase(graph.settingsTeamAdminRepository),
+        unblockAccount = UnblockTeamAccountUseCase(graph.settingsTeamAdminRepository),
         breadcrumbs = breadcrumbs
     )
 

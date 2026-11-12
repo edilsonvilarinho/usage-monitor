@@ -27,17 +27,22 @@ internal fun teamUsageTitle(language: AppLanguage, isAdminOverview: Boolean = fa
  * [isAdminOverview] vem de quem abriu a janela e não é inferido de
  * [accountLabel] em branco: rótulo vazio numa conta só cairia no mesmo ramo e
  * daria o plural para um time só.
+ *
+ * [teamName] só vem preenchido quando o painel tem dois ou mais times ativos
+ * (o seletor aparece): aí o título diz qual time está aberto, antes da conta.
  */
 internal fun teamUsageWindowTitle(
     language: AppLanguage,
     accountLabel: String?,
-    isAdminOverview: Boolean = false
+    isAdminOverview: Boolean = false,
+    teamName: String? = null
 ): String {
     val base = teamUsageTitle(language, isAdminOverview)
-    if (accountLabel.isNullOrBlank()) {
+    val details = listOfNotNull(teamName, accountLabel).filter { detail -> detail.isNotBlank() }
+    if (details.isEmpty()) {
         return base
     }
-    return "$base — $accountLabel"
+    return "$base — ${details.joinToString(" · ")}"
 }
 
 /**

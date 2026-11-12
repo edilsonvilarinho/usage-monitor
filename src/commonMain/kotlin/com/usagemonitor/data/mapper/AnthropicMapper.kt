@@ -28,13 +28,17 @@ object AnthropicMapper {
         )
 
         val quotas = buildList {
-            add(createQuota(
-                label = AnthropicQuotaLabels.FIVE_HOUR,
-                periodType = PeriodType.INTERVAL,
-                window = response.fiveHour,
-                maxCapacity = MAX_CAPACITY_5H,
-                windowLength = 5.hours
-            ))
+            // Sem janela de 5h na resposta (conta Ultra): a cota some, não vira 0%.
+            val fiveHour = response.fiveHour
+            if (fiveHour != null) {
+                add(createQuota(
+                    label = AnthropicQuotaLabels.FIVE_HOUR,
+                    periodType = PeriodType.INTERVAL,
+                    window = fiveHour,
+                    maxCapacity = MAX_CAPACITY_5H,
+                    windowLength = 5.hours
+                ))
+            }
 
             add(createQuota(
                 label = AnthropicQuotaLabels.SEVEN_DAY,

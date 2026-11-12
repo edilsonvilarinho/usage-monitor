@@ -104,3 +104,63 @@ Recurso opcional, desligado por default. Servidor Node.js **self-hosted pela emp
 - **`last_seen_at` é o relógio do servidor**, e a rota o devolve na resposta justamente para o cliente medir o desvio (`TeamServerClockOffset`). Comparar o carimbo do servidor com `Clock.System.now()` local deixaria um cliente atrasado vendo o time inteiro online **para sempre** — falha silenciosa. `clockSkewSuspected` denuncia carimbo no futuro; sem medida (admin puro, servidor antigo) o offset fica em zero. Instalação em modo admin puro **não bate presença** e isso é intencional: admin não é integrante.
 - **A ordem de `toTeamPresence` é total, determinística e sem carimbo de tempo nenhum**: conta (rótulo, com a conta sem rótulo por último e o `accountKey` desempatando), depois trabalhando, depois online, e o alias como desempate. Não é estética: duas leituras iguais têm de produzir listas iguais, ou o `StateFlow` reemite e a tela recompõe a cada 5s. **A conta é a chave primária pelo mesmo motivo de `flattenTeamAccounts`** — `presenceGroups` agrupa por ordem de primeira aparição, então quem ordena os integrantes ordena as faixas de conta, e com o estado no topo as três contas trocavam de lugar entre dois tiques. **`lastSeenAt` e `lastActivityAt` saíram do comparador**: o primeiro é o heartbeat de 30s e entre dois online não informa nada — os dois estão dentro dos mesmos 90s —, e o segundo anda a cada turno de quem trabalha; qualquer um deles como critério reordena a lista sem nada ter mudado. As duas horas continuam impressas nas colunas. Pelo mesmo motivo o estado não guarda tempo decorrido — a tela mostra hora absoluta, e o desvio entra arredondado em minutos.
 - **O ponto de estado da linha não pisca.** Animação infinita numa lista trava o `waitForIdle` dos testes de componente, e o botão do card de presença também não recebe `pulse`: o pisca significa uma coisa só neste app — sessão em atenção — e o botão de time ao lado já a carrega.
+
+## Vários times ao mesmo tempo (#547)
+
+Plano e medições: [`planos/times-multiplos-547-execucao.md`](planos/times-multiplos-547-execucao.md).
+
+- **Um time é servidor + chave + apelido + contas + token de admin.** `TeamIntegrationSettings` descreve **um** time
+  (com `id` estável e `name`); o app guarda o agregado `TeamIntegrations` (`deviceId` e `enabled` da instalação, `teams`
+  em ordem de inserção). Não há pausa por time: o `enabled` do agregado é imposto a cada time, e quem grava `enabled`
+  grava no agregado.
+- **Cada conta participa de no máximo um time** (`withParticipation`): marcar a conta num time a tira dos outros. É a
+  mesma regra do servidor (uma conta, uma chave), agora do lado do cliente, entre servidores diferentes.
+- **`team.json` v2 sem ação do usuário.** Formato plano vira um time `team-legacy` na primeira leitura, e a gravação
+  **espelha o primeiro time nos campos planos** — versão anterior (downgrade, canal beta) continua sincronizando esse time.
+  `TeamIntegrations.LEGACY_TEAM_ID` é o id único de "time sem id" em todo caminho legado; nunca id vazio.
+- **Marcador de envio por time** (`team_sync_watermarks`, PK `team_id, session_id`). A cópia de `team_sync_state` para
+  `team-legacy` roda **uma vez**, quando a tabela nova nasce; a antiga nunca é escrita nem apagada (downgrade lê dela).
+  Reenvio é seguro: o servidor grava turno com `INSERT OR IGNORE`. Conta movida de time reenvia o histórico ao time novo.
+- **Repositório, offset de relógio e memória de 404 por time** (`TeamRepositoryRegistry`): o offset de um servidor nunca
+  corrige o de outro. Os view models de time não mudaram: recebem repositórios roteados (`RoutedTeam*Repository`) pelo
+  time do painel (`dashboardTeam()`, queda no primeiro **ativo**) ou pelo time aberto nas Configurações (admin de chaves,
+  queda no primeiro time — admin não exige time ativo).
+- **Painel:** seletor "Time: <nome> ▾" só com 2+ times ativos, sem soma entre servidores; o card abre o time da própria
+  conta; o overview admin existe se qualquer time tem token. **Configurações:** mestre-detalhe (direção B escolhida pelo
+  dono em `prototipos/times-547/`).
+- **CLI:** `team join|status|leave --team <nome>`. Sem `--team` com 2+ times, `join`/`leave` recusam e listam os nomes;
+  `leave` apaga a chave e as contas **só daquele time**, e o agregado desliga só quando nenhum time continua ativo.
+  `ConfigChange.TeamLeave` virou classe com `teamName` opcional, mantendo `@SerialName("team_leave")`. A TUI ainda lê só o
+  primeiro time (risco aberto no plano).
+
+## Chave por conta dentro do mesmo time (#549)
+
+Plano e medições: [`planos/chave-por-conta-549-execucao.md`](planos/chave-por-conta-549-execucao.md).
+
+- **Uma chave por pessoa, várias pessoas na mesma máquina.** O servidor emite chave por pessoa (e-mail no rótulo); duas
+  contas locais de pessoas diferentes no mesmo time precisam de duas chaves. `TeamIntegrationSettings.accountApiKeys`
+  (`profileId → chave`) guarda a chave própria; `apiKeyFor(profileId)` devolve a dela, ou a do time quando vazia.
+- **Zero impacto para quem já usa (opção A, dono):** conta sem chave própria usa a chave do time. `team.json` sem chave
+  por conta é regravado byte a byte igual (campo omitido quando vazio, `explicitNulls = false`); downgrade ignora o campo.
+- **Tudo o que fala em nome da conta usa a chave dela:** ingest, presença, marcador de identidade (trocar a chave de uma
+  conta reenvia só a identidade dela) e o `claim` do "Testar conexão" (app e `team join`). Leitura do painel: chave do
+  time; sem ela, a própria da primeira conta participante em ordem de `profileId`; senão o token de admin.
+- `isConfigured` aceita time sem chave do time quando **toda** conta participante tem a sua.
+- Servidor não mudou. Chave por conta só pela tela (campo "Chave da conta" na conta ligada); CLI e TUI seguem com a
+  chave do time.
+
+## Chave por e-mail e tela em etapas (#551)
+
+Plano e medições: [`planos/time-simplificado-551-execucao.md`](planos/time-simplificado-551-execucao.md). Corrige a #549
+pelo modelo mental do dono: **a chave é do e-mail**; um servidor tem N e-mails, cada um com a sua chave.
+
+- **Queda na chave do time só no legado:** com `accountApiKeys` vazio tudo funciona como antes (zero impacto). Assim que
+  existe uma chave por conta, conta ligada sem chave própria **fica sem chave**: não envia, não carimba presença e o
+  "Testar conexão" a recusa com "falta a chave desta conta" — herdar a chave de outra pessoa daria 403 pelo rótulo.
+- **Materialização:** ligar uma conta ou gravar/apagar uma chave pela tela copia antes a chave do time para cada conta já
+  participante sem chave própria (`withOwnKeysMaterialized`). A chave do time nunca é apagada (downgrade lê dela).
+- **Tela (rodada AN, escolhida AN2):** campo "Chave do time" saiu. Detalhe do time em 3 blocos numerados recolhíveis
+  (`TeamIntegrationSteps.kt`): 1 Conexão (nome, servidor, apelido, teste; resumo = status da lista), 2 Contas (nome,
+  e-mail, chave da conta com `apiKeyFor`, status escrito, interruptor), 3 Administração. Abre em Conexão com servidor
+  vazio ou última conexão falha; senão em Contas — nunca em Administração por haver token (o dono é admin).
+

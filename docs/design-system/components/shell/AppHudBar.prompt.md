@@ -6,7 +6,7 @@ the main window is hidden with its geometry intact while it is shown.
 ```jsx
 <AppHudBar edge="right" balloon={0} countdown="02:05" version="38.2.0" accounts={[
   { label: 'Anthropic — Padrão', statusLabel: 'Atenção', level: 'warn', active: true,
-    detail: 'Max 20x · via Claude Code',
+    detail: 'Ultra · via Claude Code',
     quotas: [{ short: '5h', title: 'Sessão 5h', percent: '68%', fraction: .68, level: 'warn',
                reset: '22h59', usedLeft: '68% usado · 32% restante' }] }
 ]} />
@@ -59,7 +59,7 @@ name; a **"Sessões CLI"** `AppBanner` when the account has CLI sessions with a 
 context or no reply since the last request (issue #265) — the worst signal's tone only on the 2dp
 bar, one detail line per signal, "Contexto saturado · 1 sessão", "Sem resposta há 2h10", in the
 words of the data and never "Atenção" (the quota risk word) nor "aguardando você" (the app sees
-transcripts, not processes); the plan and the origin of the reading, **"Plus · via Codex"**; and the **card's own buttons** (history, CLI sessions, team) plus a
+transcripts, not processes); the plan and the origin of the reading, **"Plus · via Codex"**; the **banked rate-limit resets** (#571) on their own line, after the quotas and before the session banner: **"Resets de limite"** label with **"1 disponível"** (or "N disponíveis") in the OK tone, or **"nenhum"** in the NEUTRAL tone when the count is zero, and no line at all when the API does not inform the block (`bankedResetCount` null); and the **card's own buttons** (history, CLI sessions, team) plus a
 refresh for that account. A curved tail — Codenotch's `TooltipTail` — points at the ring; moving to
 another ring (or to the gear) jumps the balloon there and replays the jet from the new ring. Enter and exit are the Gargantua
 **relativistic jet (B3)**, the same for the account and the gear balloon: a thin warm beam leaves the

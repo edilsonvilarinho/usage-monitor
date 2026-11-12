@@ -79,6 +79,26 @@ class CodexCliRolloutParserTest {
     }
 
     @Test
+    fun `usage record in a later chunk takes the model of the turn context from the earlier chunk`() {
+        val parser = CodexCliRolloutParser()
+        val firstChunk = parser.parse(
+            listOf(
+                """{"type":"session_meta","payload":{"session_id":"s","source":"cli"}}""",
+                """{"type":"turn_context","timestamp":"2026-09-08T12:00:00Z","payload":{"turn_id":"t-1","cwd":"C:/work","model":"gpt-test"}}"""
+            )
+        )
+        val secondChunk = parser.parse(
+            listOf(
+                """{"type":"token_usage_record","timestamp":"2026-09-08T12:00:01Z","payload":{"session_id":"s","turn_id":"t-1","response_id":"r-1","usage":{"input_tokens":10,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":20,"reasoning_output_tokens":0,"total_tokens":30}}}"""
+            ),
+            knownContexts = firstChunk.turnContexts
+        )
+
+        assertEquals("gpt-test", secondChunk.turns.single().model)
+        assertEquals("C:/work", secondChunk.turns.single().cwd)
+    }
+
+    @Test
     fun `response without a new request entry is not measured`() {
         val parsed = CodexCliRolloutParser().parse(
             listOf(

@@ -10,8 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.domain.entity.CodexProfileRef
+import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.presentation.ui.AppDialogWindow
+import com.usagemonitor.presentation.ui.TeamSelectorUi
 import com.usagemonitor.presentation.ui.CliSessionsScreen
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
 import com.usagemonitor.presentation.ui.HelpWindow
@@ -24,6 +26,7 @@ import com.usagemonitor.presentation.ui.TeamKeysAdminScreen
 import com.usagemonitor.presentation.ui.TeamPresenceScreen
 import com.usagemonitor.presentation.ui.TeamUsageScreen
 import com.usagemonitor.presentation.ui.cliSessionsWindowTitle
+import com.usagemonitor.presentation.ui.codexCliSessionsWindowTitle
 import com.usagemonitor.presentation.ui.rememberLastNonNull
 import com.usagemonitor.presentation.ui.teamPresenceWindowTitle
 import com.usagemonitor.presentation.ui.teamUsageWindowTitle
@@ -47,7 +50,8 @@ internal fun ModalWindowsHost(
     windows: AppWindowStates,
     environment: ModalWindowEnvironment,
     language: AppLanguage,
-    teamSettings: TeamIntegrationSettings,
+    teamIntegrations: TeamIntegrations,
+    selectDashboardTeam: (String) -> Unit,
     releaseNotes: ReleaseNotesController,
     startupGuide: StartupGuideController
 ) {
@@ -96,7 +100,7 @@ internal fun ModalWindowsHost(
 
     AppDialogWindow(
         visible = modal.isCodexCliSessionsOpen,
-        title = if (language == AppLanguage.PT) "Sessões Codex CLI" else "Codex CLI sessions",
+        title = codexCliSessionsWindowTitle(language, CodexProfileRef.DEFAULT_LABEL),
         state = windows.codexCliSessions,
         environment = environment,
         diagnosticName = "sessões Codex CLI",
@@ -108,7 +112,11 @@ internal fun ModalWindowsHost(
         },
         openGeneration = modal.codexCliSessionsOpenGeneration
     ) {
-        CodexCliSessionsScreen(viewModel = viewModels.codexCliSessions, language = language)
+        CodexCliSessionsScreen(
+            viewModel = viewModels.codexCliSessions,
+            language = language,
+            profileLabel = CodexProfileRef.DEFAULT_LABEL
+        )
     }
 
     AppDialogWindow(
@@ -145,13 +153,22 @@ internal fun ModalWindowsHost(
 
     // A mesma origem nas duas telas do time: é ela que separa a sessão desta
     // máquina da de um colega.
-    val localDeviceId = teamSettings.deviceId.takeIf { id -> id.isNotBlank() }
+    val localDeviceId = teamIntegrations.deviceId.takeIf { id -> id.isNotBlank() }
+    // O seletor de time só existe com dois ou mais times ativos; nesse caso o título
+    // nomeia o time aberto. O time do painel é o mesmo que o card abriu.
+    val teamOptions = teamSelectorOptions(teamIntegrations)
+    val dashboardTeamId = graph.teamViewSelection.dashboardTeam()
+    val teamSelectorShown = teamSelectorVisible(teamOptions)
+    val teamSelector = if (teamSelectorShown) TeamSelectorUi(teamOptions, dashboardTeamId, selectDashboardTeam) else null
+    val dashboardTeamName = if (teamSelectorShown) teamOptions.firstOrNull { option -> option.id == dashboardTeamId }?.name else null
+    val dashboardTeam = dashboardTeamId?.let { id -> teamIntegrations.team(id) }
     AppDialogWindow(
         visible = modal.isTeamUsageOpen,
         title = teamUsageWindowTitle(
             language = language,
             accountLabel = modal.teamUsageAccountLabel,
-            isAdminOverview = modal.teamUsageIsAdminOverview
+            isAdminOverview = modal.teamUsageIsAdminOverview,
+            teamName = dashboardTeamName
         ),
         state = windows.teamUsage,
         environment = environment,
@@ -164,7 +181,12 @@ internal fun ModalWindowsHost(
         },
         openGeneration = modal.teamUsageOpenGeneration
     ) {
-        TeamUsageScreen(viewModel = viewModels.teamUsage, language = language, localDeviceId = localDeviceId)
+        TeamUsageScreen(
+            viewModel = viewModels.teamUsage,
+            language = language,
+            localDeviceId = localDeviceId,
+            teamSelector = teamSelector
+        )
     }
 
     AppDialogWindow(
@@ -189,7 +211,7 @@ internal fun ModalWindowsHost(
             viewModel = viewModels.teamPresence,
             language = language,
             localDeviceId = localDeviceId,
-            canManage = teamSettings.isAdminMode
+            canManage = dashboardTeam?.isAdminMode == true
         )
     }
 

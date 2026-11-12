@@ -2,6 +2,7 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.CliSessionsLabels
+import com.usagemonitor.presentation.ui.codexResumeSessionCommand
 import com.usagemonitor.presentation.ui.resumeSessionCommand
 import com.usagemonitor.presentation.ui.shortSessionId
 import kotlin.test.Test
@@ -16,6 +17,12 @@ class ResumeSessionCommandTest {
     @Test
     fun `the command carries the whole session id`() {
         assertEquals("claude --resume $SESSION_ID", resumeSessionCommand(SESSION_ID))
+    }
+
+    /** O Codex também retoma pelo id inteiro; o comando é `codex resume`, não `claude --resume`. */
+    @Test
+    fun `the codex command carries the whole session id`() {
+        assertEquals("codex resume $SESSION_ID", codexResumeSessionCommand(SESSION_ID))
     }
 
     /**

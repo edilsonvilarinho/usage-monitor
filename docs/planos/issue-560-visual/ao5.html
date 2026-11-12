@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR" data-app-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AO5 · Espelho + eixo Agente · Sessões CLI do Codex</title>
+<style>
+/* Tokens copiados de docs/design-system/tokens/colors.css (escuro na raiz, claro por data-app-theme). */
+:root {
+  --bg:#131010; --surface:#1B1818; --raised:#211E1E; --border:#3D3838; --fg:#F2EDED; --muted:#B8B2B2;
+  --ok:#4CAF50; --warn:#FFA726; --crit:#E86A6A; --info:#4C8DFF; --codex:#27BFA3; --cread:#4CAF50;
+  --hover:color-mix(in srgb, var(--fg) 6%, transparent);
+  --shadow:0 8px 24px rgb(0 0 0 / .45);
+  --r2:6px; --r3:8px; --r4:10px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px;
+  --mono:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --sans:"IBM Plex Sans", ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+:root[data-app-theme="light"] {
+  --bg:#F6F3F3; --surface:#FFFCFC; --raised:#EFEAEA; --border:#D7D0D0; --fg:#171414; --muted:#686060;
+  --ok:#2E7D32; --warn:#8A5000; --crit:#B3261E; --info:#1565C0; --codex:#00695C; --cread:#2E7D32;
+  --shadow:0 8px 24px rgb(0 0 0 / .12);
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 var(--s2); }
+h2 { margin: 0; font-weight: 500; }
+p { margin: 0; }
+.page { max-width: 1100px; margin: 0 auto; padding: var(--s4) var(--s4) var(--s6); }
+
+/* Topo da página (fora do mock) */
+.top { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: flex-start; justify-content: space-between; margin-bottom: var(--s4); }
+.lede { font-size: 14px; color: var(--muted); line-height: 1.5; max-width: 760px; margin-bottom: var(--s2); }
+.lede b { color: var(--fg); font-weight: 600; }
+.ctl { display: flex; flex-direction: column; gap: var(--s1); align-items: flex-end; }
+.ctl .k { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+
+/* Primitivas do protótipo Sessões CLI (planos/prototipo-visual-opencode.html, seção 6) */
+.win { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r4);
+  box-shadow: var(--shadow); overflow: hidden; font-family: var(--sans); color: var(--fg); }
+.titlebar { display: flex; align-items: center; gap: var(--s2); height: 34px; padding: 0 0 0 var(--s3);
+  background: var(--surface); border-bottom: 1px solid var(--border); }
+.titlebar .t { font-family: var(--mono); font-size: 12px; font-weight: 500; flex: 1; }
+.titlebar .wbtn { width: 40px; height: 33px; display: grid; place-items: center; font-family: var(--mono);
+  font-size: 12px; color: var(--muted); }
+.titlebar .wbtn.close:hover { background: var(--crit); color: #fff; }
+.body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.hstack { display: flex; align-items: center; gap: var(--s2); }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1 1 auto; }
+.k { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.v { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.v.big { font-size: 20px; font-weight: 500; letter-spacing: -.01em; }
+.v.sm { font-size: 12px; }
+.dim { color: var(--muted); }
+.st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st.ok { color: var(--ok); }
+.acct { font-family: var(--mono); font-size: 12px; color: var(--fg); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 5px 9px; background: var(--surface); }
+
+.btn { font-family: var(--mono); font-size: 12px; line-height: 1; padding: 7px 11px; border: 1px solid var(--border);
+  border-radius: var(--r2); background: var(--surface); color: var(--fg); display: inline-flex; align-items: center; gap: 6px;
+  cursor: default; white-space: nowrap; }
+.btn:hover { background: var(--raised); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.icon { padding: 0; width: 26px; height: 26px; justify-content: center; flex: none; }
+.btn[disabled] { opacity: .42; }
+
+.tabs { display: flex; gap: var(--s3); border-bottom: 1px solid var(--border); }
+.tabs button { font-family: var(--mono); font-size: 12px; background: none; border: 0; color: var(--muted);
+  padding: 6px 2px; border-bottom: 2px solid transparent; cursor: default; }
+.tabs button.on { color: var(--fg); border-bottom-color: var(--fg); }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+.seg button { font-family: var(--mono); font-size: 12px; background: var(--surface); border: 0;
+  border-right: 1px solid var(--border); color: var(--muted); padding: 6px 10px; cursor: default; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--raised); color: var(--fg); }
+
+.field { font-family: var(--mono); font-size: 12px; background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 7px 9px; min-width: 0; }
+.field::placeholder { color: var(--muted); }
+
+.cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s3); }
+.cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.metric { border: 1px solid var(--border); border-radius: var(--r2); padding: var(--s2) var(--s3);
+  background: var(--surface); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.metric .k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.track { height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; border: 1px solid var(--border); margin-top: 4px; }
+.track > i { display: block; height: 100%; background: var(--fg); }
+.track.ok > i { background: var(--ok); }
+
+table.dt { width: 100%; table-layout: fixed; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+table.dt th { text-align: left; font-weight: 500; font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); padding: var(--s2) var(--s3); border-bottom: 1px solid var(--border); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+table.dt td { padding: var(--s2) var(--s3) var(--s1); vertical-align: top; font-variant-numeric: tabular-nums;
+  overflow: hidden; border-bottom: 0; }
+table.dt tr.sub td { padding: 0 var(--s3) var(--s3); border-bottom: 1px solid var(--border); }
+table.dt tr.main:hover td { background: var(--hover); }
+.sortable { font: inherit; letter-spacing: inherit; text-transform: inherit; background: none; border: 0; padding: 0;
+  color: var(--muted); cursor: default; position: relative; white-space: nowrap; }
+.sortable.active { color: var(--fg); }
+.sortable .sa { margin-left: var(--s1); font-style: normal; opacity: 0; }
+.sortable.active .sa { opacity: 1; }
+.sess { display: flex; align-items: center; gap: var(--s2); }
+.sub-id { display: block; font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.l2 { font-family: var(--mono); font-size: 12px; color: var(--fg); line-height: 1.5; }
+.l2 .dot { color: var(--codex); }
+.l3 { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.note { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.5; }
+.sentence { font-size: 13px; color: var(--fg); line-height: 1.5; }
+.cap { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--fg); margin: var(--s2) 0 0; }
+.cap .k { margin-left: var(--s2); }
+.filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.pager .sp { flex: 1; }
+.statusbar { display: flex; align-items: center; gap: var(--s3); height: 30px; padding: 0 var(--s3);
+  border-top: 1px solid var(--border); background: var(--surface);
+  font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.statusbar .sp { flex: 1; }
+.ag-table td, .ag-table th { white-space: nowrap; }
+.theme-seg button { font-size: 12px; }
+</style>
+</head>
+<body>
+<main class="page">
+
+<header class="top">
+  <div>
+    <h1>AO5 · Espelho + eixo Agente</h1>
+    <p class="lede">Igual à AO2: o lugar do Custo vira <b>Respostas</b> (cartão, coluna, linha 2 e ordenação), sem tarifa e sem modelo desconhecido.
+    O Resumo ganha o eixo <b>Agente</b> (sessão principal × subagentes), depois de Atividade, aberto no bloco B.</p>
+    <p class="lede">Página ilustrativa: as linhas da sessão o modelo principal de cada linha vem do print; a mistura por sessão não foi medida, e "—" marca o que o print não mediu.</p>
+  </div>
+  <div class="ctl">
+    <span class="k">Tema (controle fora do mock)</span>
+    <div class="seg theme-seg" role="group" aria-label="Tema">
+      <button type="button" id="t-dark" class="on" aria-pressed="true">Escuro</button><button type="button" id="t-light" aria-pressed="false">Claro</button>
+    </div>
+  </div>
+</header>
+
+<!-- ═════════════════════════ A · ABA SESSÕES ═════════════════════════ -->
+<section aria-labelledby="blk-a">
+  <h2 id="blk-a" class="cap">A. aba Sessões</h2>
+  <div class="win" style="margin-top: var(--s2)">
+    <div class="titlebar">
+      <span class="t">Sessões CLI do Codex — Padrão</span><span class="wbtn" aria-hidden="true">□</span><span class="wbtn close" aria-hidden="true">×</span>
+    </div>
+    <div class="body">
+      <div class="hstack wrap">
+        <div class="tabs grow"><button class="on" type="button">Sessões</button><button type="button">Resumo</button></div>
+        <span class="acct">Padrão</span>
+        <span class="st ok">LIVE</span>
+        <div class="seg"><button type="button">5h</button><button class="on" type="button" aria-pressed="true">7 dias</button><button type="button">30 dias</button><button type="button">Tudo</button></div>
+        <button class="btn" type="button">Exportar CSV</button>
+        <button class="btn" type="button">Exportar JSON</button>
+        <button class="btn" type="button">Relatório PDF</button>
+        <button class="btn ghost" type="button" title="Como ler esta tela" aria-label="Como ler esta tela">?</button>
+      </div>
+
+      <div class="cards">
+        <div class="metric"><span class="k">Sessões</span><span class="v big">6</span></div>
+        <div class="metric"><span class="k">Tokens (com cache)</span><span class="v big">494,9M</span></div>
+        <div class="metric"><span class="k">Respostas</span><span class="v big">—</span><span class="k">7 dias · sem total no print</span></div>
+        <div class="metric"><span class="k">Tempo ativo</span><span class="v big">16h39</span></div>
+        <div class="metric"><span class="k">Vazão</span><span class="v big">35 tok/s</span><span class="k">saída · ponta a ponta</span></div>
+      </div>
+      <p class="note">entrada 6,8M · saída 1,3M · cache lido 486,7M · cache gravado 0</p>
+
+      <table class="dt">
+        <colgroup>
+          <col style="width:19%"><col style="width:17%"><col style="width:16%"><col style="width:14%">
+          <col style="width:14%"><col style="width:10%"><col style="width:10%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Sessão</th>
+            <th>Projeto</th>
+            <th>Tokens (com cache)</th>
+            <th>Cache</th>
+            <th><button class="sortable active" type="button" aria-description="maior primeiro">Respostas<i class="sa" aria-hidden="true">↓</i></button></th>
+            <th>Tempo ativo</th>
+            <th>Vazão</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="main">
+            <td><div class="sess"><span class="v sm">01a1c80e…</span><button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button></div><span class="sub-id">11/11 17:49 BRT</span></td>
+            <td><span class="v sm">monolith-feed</span><span class="sub-id">94 turnos</span></td>
+            <td><span class="v sm">263,1M</span></td>
+            <td><span class="v sm">98%</span><div class="track ok"><i style="width:98%"></i></div></td>
+            <td><span class="v sm">2188</span></td>
+            <td><span class="v sm">9h43</span></td>
+            <td><span class="v sm">31 tok/s</span></td>
+          </tr>
+          <tr class="sub">
+            <td colspan="7">
+              <div class="l2"><span class="dot">●</span> 2188 respostas · 94 turnos · <span class="dim">Codex CLI · cli · 0.167.1</span></div>
+              <div class="l3">Modelos (% dos tokens): — · modelo principal do print: gpt-6.1-sol</div>
+            </td>
+          </tr>
+
+          <tr class="main">
+            <td><div class="sess"><span class="v sm">01a1c1a2…</span><button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button></div><span class="sub-id">10/11 14:46 BRT</span></td>
+            <td><span class="v sm">raio-x-brasil</span><span class="sub-id">12 turnos</span></td>
+            <td><span class="v sm">138,5M</span></td>
+            <td><span class="v sm">99%</span><div class="track ok"><i style="width:99%"></i></div></td>
+            <td><span class="v sm">646</span></td>
+            <td><span class="v sm">2h33</span></td>
+            <td><span class="v sm">45 tok/s</span></td>
+          </tr>
+          <tr class="sub">
+            <td colspan="7">
+              <div class="l2"><span class="dot">●</span> 646 respostas · 12 turnos · <span class="dim">Codex CLI · cli · 0.167.0</span></div>
+              <div class="l3">Modelos (% dos tokens): — · modelo principal do print: gpt-6.1-terra</div>
+            </td>
+          </tr>
+
+          <tr class="main">
+            <td><div class="sess"><span class="v sm">01a1bdb0…</span><button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button></div><span class="sub-id">08/11 23:21 BRT</span></td>
+            <td><span class="v sm">monolith-feed</span><span class="sub-id">39 turnos</span></td>
+            <td><span class="v sm">39,8M</span></td>
+            <td><span class="v sm">99%</span><div class="track ok"><i style="width:99%"></i></div></td>
+            <td><span class="v sm">231</span></td>
+            <td><span class="v sm">1h17</span></td>
+            <td><span class="v sm">39 tok/s</span></td>
+          </tr>
+          <tr class="sub">
+            <td colspan="7">
+              <div class="l2"><span class="dot">●</span> 231 respostas · 39 turnos · <span class="dim">Codex CLI · cli · 0.167.0</span></div>
+              <div class="l3">Modelos (% dos tokens): — · modelo principal do print: gpt-6.1-terra</div>
+            </td>
+          </tr>
+
+          <tr class="main">
+            <td><div class="sess"><span class="v sm">01a1bc7c…</span><button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button></div><span class="sub-id">08/11 16:37 BRT</span></td>
+            <td><span class="v sm">lore-path-of-exile</span><span class="sub-id">12 turnos</span></td>
+            <td><span class="v sm">1,9M</span></td>
+            <td><span class="v sm">97%</span><div class="track ok"><i style="width:97%"></i></div></td>
+            <td><span class="v sm">40</span></td>
+            <td><span class="v sm">37min</span></td>
+            <td><span class="v sm">49 tok/s</span></td>
+          </tr>
+          <tr class="sub">
+            <td colspan="7">
+              <div class="l2"><span class="dot">●</span> 40 respostas · 12 turnos · <span class="dim">Codex CLI · cli · 0.167.0</span></div>
+              <div class="l3">Modelos (% dos tokens): — · modelo principal do print: gpt-6.1-terra</div>
+            </td>
+          </tr>
+
+          <tr class="main">
+            <td><div class="sess"><span class="v sm">01a1ca8d…</span><button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button></div><span class="sub-id">11/11 09:32 BRT</span></td>
+            <td><span class="v sm">monolith-feed</span><span class="sub-id">11 turnos</span></td>
+            <td><span class="v sm">1,2M</span></td>
+            <td><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></td>
+            <td><span class="v sm">23</span></td>
+            <td><span class="v sm">11min</span></td>
+            <td><span class="v sm">37 tok/s</span></td>
+          </tr>
+          <tr class="sub">
+            <td colspan="7">
+              <div class="l2"><span class="dot">●</span> 23 respostas · 11 turnos · <span class="dim">Codex CLI · cli · 0.167.1</span></div>
+              <div class="l3">Modelos (% dos tokens): — · modelo principal do print: gpt-6.1-terra</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">O print mostra 5 das 6 sessões da janela de 7 dias. Na linha 3, a fatia "desconhecido" do print foi omitida (bug #561, corrigido à parte), por isso a soma pode não fechar em 100%.</p>
+    </div>
+    <div class="statusbar"><span>última mudança 12/11 10:56 BRT</span><span class="sp"></span><span>● Fonte local: Codex</span></div>
+  </div>
+</section>
+
+<!-- ═════════════════════════ B · ABA RESUMO (eixo Agente aberto) ═════════════════════════ -->
+<section aria-labelledby="blk-b">
+  <h2 id="blk-b" class="cap">B. aba Resumo (eixo Agente aberto)</h2>
+  <div class="win" style="margin-top: var(--s2)">
+    <div class="titlebar">
+      <span class="t">Sessões CLI do Codex — Padrão</span><span class="wbtn" aria-hidden="true">□</span><span class="wbtn close" aria-hidden="true">×</span>
+    </div>
+    <div class="body">
+      <div class="hstack wrap">
+        <div class="tabs grow"><button type="button">Sessões</button><button class="on" type="button">Resumo</button></div>
+        <span class="acct">Padrão</span>
+        <span class="st ok">LIVE</span>
+        <div class="seg"><button type="button">5h</button><button type="button">7 dias</button><button class="on" type="button" aria-pressed="true">30 dias</button><button type="button">Tudo</button></div>
+        <button class="btn" type="button">Exportar CSV</button>
+        <button class="btn" type="button">Exportar JSON</button>
+        <button class="btn" type="button">Relatório PDF</button>
+        <button class="btn ghost" type="button" title="Como ler esta tela" aria-label="Como ler esta tela">?</button>
+      </div>
+
+      <div class="cards three">
+        <div class="metric"><span class="k">Respostas</span><span class="v big">13537</span><span class="k">30 dias</span></div>
+        <div class="metric"><span class="k">Reuso de cache</span><span class="v big">98%</span><span class="k">30 dias</span></div>
+        <div class="metric"><span class="k">Respostas por sessão</span><span class="v big">521</span><span class="k">30 dias</span></div>
+      </div>
+
+      <div class="sentence">gpt-6.1-terra responde por 10346 das 13537 respostas (76%) em 21 sessões; gpt-6.1-sol, por 3191 em 5 sessões.</div>
+      <div class="sentence">monolith-feed concentra 22 das 26 sessões e 12140 respostas.</div>
+
+      <div class="tabs" role="tablist" aria-label="Eixo do resumo">
+        <button type="button">Projeto</button><button type="button">Modelo</button><button type="button">Branch</button><button type="button">Ferramentas</button><button type="button">Atividade</button><button class="on" type="button" aria-selected="true">Agente</button>
+      </div>
+
+      <div class="filter">
+        <input class="field" type="text" placeholder="Filtrar agentes" aria-label="Filtro" style="width: 220px">
+        <span class="k">Ordenar por</span>
+        <select class="field" aria-label="Ordenar por"><option>Respostas</option><option>Tokens</option><option>Nome</option></select>
+        <button class="btn ghost" type="button" aria-label="Ordem decrescente">↓</button>
+      </div>
+
+      <div class="pager">
+        <span>1–2 de 2</span>
+        <button class="btn" type="button" disabled>Anterior</button>
+        <button class="btn" type="button" disabled>Próxima</button>
+        <span class="sp"></span>
+        <span>Por página</span>
+        <div class="seg"><button type="button">5</button><button class="on" type="button" aria-pressed="true">10</button><button type="button">50</button><button type="button">100</button></div>
+      </div>
+
+      <p class="k">Agente · sessão 01a1c80e… (dado do print; cartões e demais eixos seguem os 30 dias)</p>
+      <table class="dt ag-table">
+        <colgroup><col style="width:34%"><col style="width:18%"><col style="width:20%"><col style="width:28%"></colgroup>
+        <thead>
+          <tr><th>Agente</th><th>Respostas</th><th>Tokens (com cache)</th><th>Participação</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="v sm">Sessão principal</span></td>
+            <td><span class="v sm">765</span></td>
+            <td><span class="v sm">175,5M</span></td>
+            <td><span class="v sm">67%</span><div class="track"><i style="width:67%"></i></div></td>
+          </tr>
+          <tr>
+            <td><span class="v sm">Subagentes</span></td>
+            <td><span class="v sm">1423</span></td>
+            <td><span class="v sm">87,6M</span></td>
+            <td><span class="v sm">33%</span><div class="track"><i style="width:33%"></i></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="sentence">Subagentes fazem 1423 de 2188 respostas (65%) e 87,6M de 263,1M tokens (33%) da sessão 01a1c80e…</div>
+      <p class="note">Participação por tokens: o Codex não tem tarifa. Branch, Ferramentas e Atividade não têm dado medido no Codex: ao abrir, mostram "sem dado medido".</p>
+    </div>
+    <div class="statusbar"><span>última mudança 12/11 10:56 BRT</span><span class="sp"></span><span>● Fonte local: Codex</span></div>
+  </div>
+</section>
+
+</main>
+<script>
+(function () {
+  var root = document.documentElement;
+  var dark = document.getElementById('t-dark');
+  var light = document.getElementById('t-light');
+  function setTheme(name) {
+    root.setAttribute('data-app-theme', name);
+    var isDark = name === 'dark';
+    dark.classList.toggle('on', isDark);
+    light.classList.toggle('on', !isDark);
+    dark.setAttribute('aria-pressed', String(isDark));
+    light.setAttribute('aria-pressed', String(!isDark));
+  }
+  dark.addEventListener('click', function () { setTheme('dark'); });
+  light.addEventListener('click', function () { setTheme('light'); });
+})();
+</script>
+</body>
+</html>

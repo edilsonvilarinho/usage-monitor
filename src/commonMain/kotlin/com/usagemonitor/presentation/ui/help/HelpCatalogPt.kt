@@ -181,8 +181,8 @@ private val PT_TEAM = HelpEntry(
         "ela. Só metadados de uso trafegam — nada de conteúdo de prompt ou resposta.",
     steps = listOf(
         "Abra Configurações → \"Time\" e ligue a integração.",
-        "Preencha \"Servidor\", \"Chave do time\" e \"Seu apelido\".",
-        "Marque as contas em \"Contas que fazem parte do time\".",
+        "Preencha \"Servidor\" e \"Seu apelido\".",
+        "Em \"Contas\", marque cada conta e informe a \"Chave da conta\".",
         "Clique em \"Testar conexão\": é ela que vincula a conta à chave.",
         "O card da conta ganha o botão \"Sessões do time nesta conta\"."
     ),

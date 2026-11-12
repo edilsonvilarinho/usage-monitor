@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.AnalysisModelSpeed
+import com.usagemonitor.domain.entity.AnalysisPeriod
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -16,12 +17,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
- * O leitor da análise da sessão (bot e janela): qual card, qual índice e qual
- * carimbo de sincronização entram na análise.
+ * O leitor da análise da sessão (bot e janela): qual card, qual índice, qual carimbo de
+ * sincronização entram na análise e, desde o #538, qual faixa de histórico cada período lê.
  */
 class SessionAnalysisReaderTest {
 
@@ -42,6 +44,7 @@ class SessionAnalysisReaderTest {
     private val minimax = ApiUsageStats(source = ApiSource.MINIMAX, apiName = "MiniMax", quotas = emptyList())
 
     private val historyCalls = mutableListOf<Pair<ApiSource, UsageAccountKey?>>()
+    private val historyRanges = mutableListOf<HistoryRange>()
     private val claudeCalls = mutableListOf<Pair<String?, Long>>()
     private val codexCalls = mutableListOf<Long>()
 
@@ -53,10 +56,11 @@ class SessionAnalysisReaderTest {
         codexIndexedAt: Instant? = null
     ) = sessionAnalysisReader(
         currentStats = { stats },
-        history = { source, accountKey, at ->
+        history = { source, accountKey, range, at ->
             historyCalls += source to accountKey
+            historyRanges += range
             if (historyFails) error("banco fechado")
-            ApiUsageHistoryReport(source = source, range = HistoryRange.LAST_7_DAYS, lastUpdatedAt = at, series = emptyList())
+            ApiUsageHistoryReport(source = source, range = range, lastUpdatedAt = at, series = emptyList())
         },
         claudeThroughputs = { profileId, since ->
             claudeCalls += profileId to since
@@ -72,7 +76,7 @@ class SessionAnalysisReaderTest {
 
     @Test
     fun `claude reads seven days of the account history and the index of the card profile at every cut`() {
-        val analysis = runBlocking { reader()(claude.targetKey.storageKey) }
+        val analysis = runBlocking { reader()(claude.targetKey.storageKey, AnalysisPeriod.NOW) }
 
         assertNotNull(analysis)
         assertEquals("Anthropic · Trabalho", analysis.accountLabel)
@@ -95,7 +99,7 @@ class SessionAnalysisReaderTest {
             )
         )
 
-        val analysis = runBlocking { reader(codexIndex = codexIndex, codexIndexedAt = indexedAt)(codex.targetKey.storageKey) }
+        val analysis = runBlocking { reader(codexIndex = codexIndex, codexIndexedAt = indexedAt)(codex.targetKey.storageKey, AnalysisPeriod.NOW) }
 
         assertNotNull(analysis)
         assertEquals(listOf(AnalysisModelSpeed("gpt-5", 40.0)), analysis.modelSpeeds)
@@ -106,7 +110,7 @@ class SessionAnalysisReaderTest {
 
     @Test
     fun `an index that fails leaves the speeds empty but keeps the analysis`() {
-        val analysis = runBlocking { reader(claudeIndex = Result.failure(IllegalStateException("índice travado")))(claude.targetKey.storageKey) }
+        val analysis = runBlocking { reader(claudeIndex = Result.failure(IllegalStateException("índice travado")))(claude.targetKey.storageKey, AnalysisPeriod.NOW) }
 
         assertNotNull(analysis)
         assertEquals(emptyList<AnalysisModelSpeed>(), analysis.modelSpeeds)
@@ -114,11 +118,48 @@ class SessionAnalysisReaderTest {
 
     @Test
     fun `no analysis for an unknown card, a source without analysis or an unreadable history`() {
-        assertNull(runBlocking { reader()("anthropic:outro") })
-        assertNull(runBlocking { reader()(minimax.targetKey.storageKey) })
+        assertNull(runBlocking { reader()("anthropic:outro", AnalysisPeriod.NOW) })
+        assertNull(runBlocking { reader()(minimax.targetKey.storageKey, AnalysisPeriod.NOW) })
         assertEquals(emptyList<Pair<ApiSource, UsageAccountKey?>>(), historyCalls, "fonte sem análise não lê o histórico")
-        assertNull(runBlocking { reader(historyFails = true)(claude.targetKey.storageKey) })
+        assertNull(runBlocking { reader(historyFails = true)(claude.targetKey.storageKey, AnalysisPeriod.NOW) })
         assertEquals(emptyList<Pair<String?, Long>>(), claudeCalls, "sem histórico não há recorte para o índice")
-        assertNull(runBlocking { reader(stats = emptyList())(claude.targetKey.storageKey) })
+        assertNull(runBlocking { reader(stats = emptyList())(claude.targetKey.storageKey, AnalysisPeriod.NOW) })
+    }
+
+    /** Período (#538): cada período lê a faixa de histórico que o cobre. */
+    @Test
+    fun `each period reads the history range that covers it`() {
+        val read = reader()
+        listOf(
+            AnalysisPeriod.NOW to HistoryRange.LAST_7_DAYS,
+            AnalysisPeriod.HOURS_24 to HistoryRange.LAST_7_DAYS,
+            AnalysisPeriod.DAYS_7 to HistoryRange.LAST_7_DAYS,
+            AnalysisPeriod.DAYS_30 to HistoryRange.LAST_30_DAYS,
+            AnalysisPeriod.ALL to HistoryRange.TOTAL
+        ).forEach { (period, range) ->
+            historyRanges.clear()
+            runBlocking { read(claude.targetKey.storageKey, period) }
+            assertEquals(listOf(range), historyRanges, "faixa do período $period")
+        }
+    }
+
+    /** Período (#538): o recorte "desde o início do período" entra na vazão de 30 d. */
+    @Test
+    fun `the 30 day period asks the index for the cut at the start of the period`() {
+        runBlocking { reader()(claude.targetKey.storageKey, AnalysisPeriod.DAYS_30) }
+
+        val periodStart = now.toEpochMilliseconds() - AnalysisPeriod.DAYS_30.millis!!
+        val asked = claudeCalls.map { (_, since) -> since }.toSet()
+        assertEquals(analysisThroughputCuts(emptyList(), now, AnalysisPeriod.DAYS_30), asked)
+        assertTrue(periodStart in asked, "recorte do início do período de 30 d")
+    }
+
+    /** Período (#538): a análise diz com qual período foi lida. */
+    @Test
+    fun `the analysis carries the period it was read with`() {
+        val analysis = runBlocking { reader()(claude.targetKey.storageKey, AnalysisPeriod.DAYS_7) }
+
+        assertNotNull(analysis)
+        assertEquals(AnalysisPeriod.DAYS_7, analysis.period)
     }
 }

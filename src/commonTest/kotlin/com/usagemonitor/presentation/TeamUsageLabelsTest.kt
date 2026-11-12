@@ -28,6 +28,16 @@ class TeamUsageLabelsTest {
     }
 
     @Test
+    fun `window title names the team when the dashboard has several active teams`() {
+        // Com dois ou mais times ativos o título diz qual time está aberto, antes da conta.
+        assertEquals("Sessões do time — Empresa", teamUsageWindowTitle(PT, accountLabel = null, teamName = "Empresa"))
+        assertEquals("Sessões do time — Empresa · a@b.com", teamUsageWindowTitle(PT, "a@b.com", teamName = "Empresa"))
+        assertEquals("Team sessions — Empresa", teamUsageWindowTitle(EN, accountLabel = "  ", teamName = "Empresa"))
+        // Sem time nomeado o título fica como antes.
+        assertEquals("Sessões do time — a@b.com", teamUsageWindowTitle(PT, "a@b.com", teamName = null))
+    }
+
+    @Test
     fun `counts agree in number`() {
         assertEquals("1 member", TeamUsageLabels.memberCount(1, EN))
         assertEquals("3 members", TeamUsageLabels.memberCount(3, EN))

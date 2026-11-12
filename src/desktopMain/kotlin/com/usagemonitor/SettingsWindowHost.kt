@@ -14,6 +14,8 @@ import com.usagemonitor.presentation.ui.ModalWindowEnvironment
 import com.usagemonitor.presentation.ui.components.CodexAccountsSettings
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
+import com.usagemonitor.presentation.ui.components.TeamSectionActions
+import com.usagemonitor.presentation.ui.components.TeamSectionState
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.theme.AccountAccent
@@ -51,6 +53,7 @@ internal fun SettingsWindowHost(
     val apiKeySettings by graph.apiKeySettings.collectAsState()
     val alertSettings by graph.alertSettingsFlow.collectAsState()
     val teamSettings by graph.teamSettingsFlow.collectAsState()
+    val teamIntegrations by graph.store.teamIntegrationsFlow.collectAsState()
     val codexRecords by graph.codexProfileRegistry.profiles.collectAsState()
     val proxySettings by graph.proxySettingsFlow.collectAsState()
     val teamSyncStatus by viewModels.teamSync.syncStatus.collectAsState()
@@ -137,21 +140,32 @@ internal fun SettingsWindowHost(
                 onToggle = actions::toggleCodexProfile,
                 onRemove = actions::removeCodexProfile
             ),
-            teamSettings = teamSettings,
-            teamConnection = feedback.teamConnection,
-            onTeamEnabledChange = actions::changeTeamEnabled,
-            onTeamServerUrlChange = actions::changeTeamServerUrl,
-            onTeamApiKeyChange = actions::changeTeamApiKey,
-            onTeamAliasChange = actions::changeTeamAlias,
-            onTeamProfileParticipationChange = actions::changeTeamProfileParticipation,
-            onTeamTestConnection = feedback::checkTeamConnection,
-            teamSyncFailureMessage = teamSyncStatus.takeIf { status -> status.isFailing }?.failureText(language),
-            teamRejectedProfiles = teamSyncStatus.rejectedProfiles,
-            teamAdminConnection = feedback.teamAdminConnection,
-            onTeamAdminTokenChange = actions::changeTeamAdminToken,
-            onTeamValidateAdminToken = feedback::validateAdminToken,
-            onTeamOpenKeysManager = actions::openTeamKeysManager,
-            onTeamExitAdminMode = actions::exitTeamAdminMode,
+            teamState = TeamSectionState(
+                settings = teamIntegrations.team(actions.openedTeamId()) ?: teamSettings,
+                connection = feedback.teamConnection(actions.openedTeamId()),
+                adminConnection = feedback.teamAdminConnection(actions.openedTeamId()),
+                syncFailureMessage = teamSyncStatus.takeIf { status -> status.isFailing }?.failureText(language),
+                rejectedProfiles = teamSyncStatus.rejectedProfiles,
+                teams = teamIntegrations.teams,
+                selectedTeamId = actions.openedTeamId(),
+                teamConnections = teamIntegrations.teams.associate { team -> team.id to feedback.teamConnection(team.id) }
+            ),
+            teamActions = TeamSectionActions(
+                onEnabledChange = { value -> actions.changeTeamEnabled(value) },
+                onServerUrlChange = { value -> actions.changeTeamServerUrl(actions.openedTeamId(), value) },
+                onAliasChange = { value -> actions.changeTeamAlias(actions.openedTeamId(), value) },
+                onProfileParticipationChange = { profileId, participates -> actions.changeTeamProfileParticipation(actions.openedTeamId(), profileId, participates) },
+                onTestConnection = { feedback.checkTeamConnection(actions.openedTeamId()) },
+                onAdminTokenChange = { value -> actions.changeTeamAdminToken(actions.openedTeamId(), value) },
+                onValidateAdminToken = { feedback.validateAdminToken(actions.openedTeamId()) },
+                onOpenKeysManager = { actions.openTeamKeysManager(actions.openedTeamId()) },
+                onExitAdminMode = { actions.exitTeamAdminMode(actions.openedTeamId()) },
+                onSelectTeam = actions::selectTeam,
+                onAddTeam = { actions.addTeam() },
+                onRemoveTeam = actions::removeTeam,
+                onRenameTeam = { value -> actions.changeTeamName(actions.openedTeamId(), value) },
+                onAccountApiKeyChange = { profileId, value -> actions.changeTeamAccountKey(actions.openedTeamId(), profileId, value) }
+            ),
             proxySettings = proxySettings,
             proxyConnection = feedback.proxyConnection,
             onProxyUseEnvironmentChange = actions::changeProxyUseEnvironment,

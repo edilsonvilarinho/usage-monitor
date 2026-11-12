@@ -1,7 +1,12 @@
 package com.usagemonitor.presentation
 
+import com.usagemonitor.domain.entity.AnalysisPeriod
+import com.usagemonitor.domain.entity.AnalysisPeriodRate
+import com.usagemonitor.domain.entity.AnalysisPeriodSummary
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.AnalysisFact
 import com.usagemonitor.presentation.ui.AnalysisHourBar
+import com.usagemonitor.presentation.ui.AnalysisIntervalRowModel
 import com.usagemonitor.presentation.ui.AnalysisPanelModel
 import com.usagemonitor.presentation.ui.analysisBarAt
 import com.usagemonitor.presentation.ui.analysisAxisMax
@@ -26,9 +31,12 @@ class AnalysisPanelModelTest {
         // 09:00–14:00 BRT, lida às 12:30: 70% do tempo e 62% da cota, 8 pontos abaixo da linha.
         val fiveHour = AnalysisPanelModel.windowCard(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.PT)
         assertEquals("cabe até o reinício", fiveHour.verdict)
+        assertEquals("Cabe até o reinício: usa o ritmo da última hora (14 %/h). Projeção de 83 % no reinício, abaixo dos 100 %.", fiveHour.verdictSentence)
         assertEquals(AppTone.OK, fiveHour.verdictTone)
         assertEquals("reinicia 14:00", fiveHour.resetLabel)
         assertEquals("62% usada com 70% da janela já passada: 8 pontos abaixo da linha. Chega a ~83% no reinício (14:00).", fiveHour.sentence)
+        assertTrue(fiveHour.facts.contains(AnalysisFact("Ritmo seguro", "25 %/h")))
+        assertTrue(fiveHour.facts.contains(AnalysisFact("Última hora", "14 %/h")))
         val diagonal = fiveHour.diagonal!!
         assertEquals("62% · 70% do tempo", diagonal.pointLabel)
         assertEquals(listOf("09:00", "11:30", "14:00"), diagonal.axisLabels)
@@ -47,11 +55,16 @@ class AnalysisPanelModelTest {
         // 38% a 30 %/h: 76 min até 100%, 14 min antes do reinício das 14:00.
         val full = AnalysisPanelModel.windowCard(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.EN)
         assertEquals("runs out before the reset", full.verdict)
+        assertEquals(
+            "Runs out before the reset: uses the last hour's pace (30 %/h). At the window's average pace (18 %/h) it would fit.",
+            full.verdictSentence
+        )
         assertEquals(AppTone.CRITICAL, full.verdictTone)
         assertEquals(
             "62% used with 70% of the window gone: 8 points under the line. At the last hour's pace (30 %/h) it runs out around 13:46, 14 min before the reset.",
             full.sentence
         )
+        assertEquals(AnalysisFact("Runs out", "Tue 13:46 · 14 min before the reset"), full.facts.last())
         val projection = full.diagonal!!.projection
         assertTrue(full.diagonal!!.projectionCritical)
         assertEquals(100.0, projection[1].percent)
@@ -86,6 +99,28 @@ class AnalysisPanelModelTest {
         )
         assertEquals(AppTone.WARNING, rows.first().ratioTone)
         assertEquals("48", rows.first().tokensPerSecond)
+    }
+
+    @Test
+    fun `a 30 day table adds the period row against the 7 day pace`() {
+        val rates = analysis.copy(period = AnalysisPeriod.DAYS_30, periodRate = AnalysisPeriodRate(AnalysisPeriod.DAYS_30, 9.0, 40.0))
+        val rows = AnalysisPanelModel.intervals(rates, AppLanguage.PT)
+        assertEquals(6, rows.size)
+        assertEquals(AnalysisIntervalRowModel("30 d", "9,0", "40", "↑ 1,2× mais rápido", AppTone.WARNING), rows.last())
+        assertEquals("Ritmo por intervalo · 30 d", AnalysisPanelModel.intervalsTitle(AnalysisPeriod.DAYS_30, AppLanguage.PT))
+        assertEquals("Pace by interval · now", AnalysisPanelModel.intervalsTitle(AnalysisPeriod.NOW, AppLanguage.EN))
+    }
+
+    @Test
+    fun `period summary and bar titles follow the chosen period`() {
+        val hours = analysis.copy(period = AnalysisPeriod.HOURS_24, fiveHourSummary = AnalysisPeriodSummary(3, 1, 72))
+        assertEquals("3 janelas de 5 h nas últimas 24 h · 1 de 3 esgotaram · pico médio 72 %", AnalysisPanelModel.periodSummary(hours, AppLanguage.PT))
+        val month = analysis.copy(period = AnalysisPeriod.DAYS_30, weeklySummary = AnalysisPeriodSummary(4, 0, 61))
+        assertEquals("4 semanas anteriores · 0 de 4 esgotaram · pico médio 61 %", AnalysisPanelModel.periodSummary(month, AppLanguage.PT))
+        assertNull(AnalysisPanelModel.periodSummary(analysis, AppLanguage.PT))
+        assertEquals("Pico por dia · 7 d", AnalysisPanelModel.barsTitle(AnalysisPeriod.DAYS_7, AppLanguage.PT))
+        assertEquals("Peak per week · all", AnalysisPanelModel.barsTitle(AnalysisPeriod.ALL, AppLanguage.EN))
+        assertNull(AnalysisPanelModel.barsTitle(AnalysisPeriod.NOW, AppLanguage.PT))
     }
 
     @Test

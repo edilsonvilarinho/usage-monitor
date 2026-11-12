@@ -308,6 +308,10 @@ internal fun hudBalloonHeight(account: HudAccount, maxHeight: Dp = Dp.Infinity):
     if (account.detailLine != null) {
         height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_FOOTER
     }
+    // A linha de resets de limite (#571) existe só quando a API informa o bloco.
+    if (account.bankedResetCount != null) {
+        height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_QUOTA_TITLE
+    }
     // A fileira de botões do card — o histórico existe em toda conta.
     height += HUD_BALLOON_SECTION_GAP + HUD_BALLOON_ACTIONS
     return height

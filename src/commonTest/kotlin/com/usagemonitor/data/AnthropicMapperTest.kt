@@ -11,6 +11,7 @@ import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.isExtraCreditsQuota
 import kotlinx.serialization.json.Json
@@ -107,7 +108,7 @@ class AnthropicMapperTest {
 
         val response = json.decodeFromString<AnthropicUsageResponse>(payload)
 
-        assertEquals(null, response.fiveHour.resetsAt)
+        assertEquals(null, response.fiveHour?.resetsAt)
         assertEquals("2026-05-01T11:59:59.727703+00:00", response.sevenDay.resetsAt)
     }
 
@@ -370,11 +371,93 @@ class AnthropicMapperTest {
     }
 
     @Test
+    fun `keeps the credits row when the server blocked extra_usage out of credits`() {
+        // Payload real da conta sem saldo (probe em 2026-11-12): a linha some hoje.
+        val response = sampleResponse.copy(
+            extraUsage = AnthropicExtraUsage(
+                isEnabled = false,
+                monthlyLimit = 57000L,
+                usedCredits = 0.0,
+                utilization = 0.0,
+                currency = "BRL",
+                decimalPlaces = 2,
+                disabledReason = "out_of_credits",
+                userDisabled = false,
+                spendLimitReached = false,
+                creditsEverEnabled = true
+            )
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(3, result.quotas.size)
+        val credits = result.quotas[2]
+        assertEquals(AnthropicQuotaLabels.EXTRA_CREDITS, credits.label)
+        assertEquals(QuotaBlockReason.OUT_OF_CREDITS, credits.blockReason)
+        assertEquals(57000L, credits.rawTotal)
+        assertEquals("BRL", credits.currencyCode)
+        // Bloqueio é estado da conta, não falha de leitura: nada a avisar.
+        assertEquals(emptySet(), result.notices)
+    }
+
+    @Test
     fun `window start is the reset minus the window named by the response`() {
         val quotas = AnthropicMapper.toUsageStats(sampleResponse).quotas
 
         assertEquals(Instant.parse("2025-01-01T00:00:00Z"), quotas[0].periodStartAt)
         assertEquals(Instant.parse("2024-12-31T00:00:00Z"), quotas[1].periodStartAt)
+    }
+
+    @Test
+    fun `omits five_hour quota when the response sends five_hour null`() {
+        // Conta Ultra verificada: a Anthropic não tem janela de 5h para ela.
+        val response = decodeUsage(
+            """
+            {
+              "five_hour": null,
+              "seven_day": { "utilization": 0.0, "resets_at": "2026-11-19T00:00:00Z" },
+              "seven_day_sonnet": null
+            }
+            """.trimIndent()
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(listOf(AnthropicQuotaLabels.SEVEN_DAY), result.quotas.map { quota -> quota.label })
+        assertEquals(emptySet(), result.notices)
+    }
+
+    @Test
+    fun `keeps seven_day and credits when five_hour is null`() {
+        val response = decodeUsage(
+            """
+            {
+              "five_hour": null,
+              "seven_day": { "utilization": 12.0, "resets_at": "2026-11-19T00:00:00Z" },
+              "extra_usage": {
+                "is_enabled": true,
+                "monthly_limit": 55000,
+                "used_credits": 6600.0,
+                "utilization": 12.0,
+                "currency": "BRL",
+                "decimal_places": 2
+              }
+            }
+            """.trimIndent()
+        )
+
+        val result = AnthropicMapper.toUsageStats(response)
+
+        assertEquals(
+            listOf(AnthropicQuotaLabels.SEVEN_DAY, AnthropicQuotaLabels.EXTRA_CREDITS),
+            result.quotas.map { quota -> quota.label }
+        )
+        assertEquals(12L, result.quotas[0].used)
+        assertEquals(12L, result.quotas[1].used)
+    }
+
+    private fun decodeUsage(payload: String): AnthropicUsageResponse {
+        return Json { ignoreUnknownKeys = true }.decodeFromString<AnthropicUsageResponse>(payload)
     }
 
     @Test

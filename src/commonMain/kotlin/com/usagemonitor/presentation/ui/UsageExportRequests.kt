@@ -12,7 +12,6 @@ import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliUsageBreakdown
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.repository.UsageExportEncoder
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
 import com.usagemonitor.presentation.ui.report.UsageReportDocument
 
 /**
@@ -77,7 +76,7 @@ fun exportRequestForBreakdown(
 fun exportRequestForCodexCliSessions(
     encoder: UsageExportEncoder,
     sessions: List<CodexCliSessionSummary>,
-    range: CodexCliSessionRange,
+    range: CliSessionRange,
     format: UsageExportFormat,
     now: Instant,
     timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
@@ -85,13 +84,8 @@ fun exportRequestForCodexCliSessions(
     val local = now.toLocalDateTime(timeZone).date
     val month = local.monthNumber.toString().padStart(2, '0')
     val day = local.dayOfMonth.toString().padStart(2, '0')
-    val rangeSlug = when (range) {
-        CodexCliSessionRange.LAST_5H -> "5h"
-        CodexCliSessionRange.LAST_7D -> "7d"
-        CodexCliSessionRange.ALL -> "total"
-    }
     return UsageExportRequest(
-        suggestedFileName = "usage-monitor-codex-cli-$rangeSlug-${local.year}-$month-$day.${format.extension}",
+        suggestedFileName = "usage-monitor-codex-cli-${rangeSlug(range)}-${local.year}-$month-$day.${format.extension}",
         payload = UsageExportPayload.Text(encoder.encodeCodexCliSessions(sessions, format))
     )
 }
@@ -141,7 +135,7 @@ fun comparisonReportRequest(
 /** PDF do modal do Codex: `usage-monitor-codex-report-5h-2026-10-06.pdf`. */
 fun codexReportRequest(
     document: UsageReportDocument,
-    range: CodexCliSessionRange,
+    range: CliSessionRange,
     now: Instant,
     language: AppLanguage,
     timeZone: TimeZone = TimeZone.of(ACTIVITY_TIME_ZONE_ID)
@@ -149,13 +143,8 @@ fun codexReportRequest(
     val local = now.toLocalDateTime(timeZone).date
     val month = local.monthNumber.toString().padStart(2, '0')
     val day = local.dayOfMonth.toString().padStart(2, '0')
-    val rangeSlug = when (range) {
-        CodexCliSessionRange.LAST_5H -> "5h"
-        CodexCliSessionRange.LAST_7D -> "7d"
-        CodexCliSessionRange.ALL -> "total"
-    }
     return UsageExportRequest(
-        suggestedFileName = "usage-monitor-codex-report-$rangeSlug-${local.year}-$month-$day.pdf",
+        suggestedFileName = "usage-monitor-codex-report-${rangeSlug(range)}-${local.year}-$month-$day.pdf",
         payload = UsageExportPayload.Report(document, language)
     )
 }

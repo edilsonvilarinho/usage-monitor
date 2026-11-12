@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import java.sql.DriverManager
 import kotlin.time.Instant
 
 class LocalCodexCliSessionDataSourceTest {
@@ -160,6 +161,113 @@ class LocalCodexCliSessionDataSourceTest {
 
             val since = Instant.parse("2026-09-08T12:01:30Z").toEpochMilliseconds()
             assertEquals(listOf("gpt-b"), dataSource.readModelUsage(sinceEpochMillis = since).map { usage -> usage.model })
+        }
+    }
+
+    @Test
+    fun `turns since the cutoff come back in time order and drop older ones`() = runTest {
+        withFixture { home, dataSource ->
+            rolloutFile(home).writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-a"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:04Z", 100, 40, 0, 128, 0, 228),
+                    contextLine("turn-2", "2026-09-08T12:02:00Z", "gpt-a"),
+                    usageLine("turn-2", "response-2", "2026-09-08T12:02:04Z", 10, 0, 0, 20, 0, 30)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+
+            val since = Instant.parse("2026-09-08T12:01:00Z").toEpochMilliseconds()
+            val turns = dataSource.readTurnsSince(sinceEpochMillis = since)
+
+            assertEquals(listOf("turn-2"), turns.map { turn -> turn.turnId })
+            assertEquals(10L, turns.single().usage.inputTokens)
+        }
+    }
+
+    /**
+     * Tempo ativo pela regra do Claude: intervalo entre respostas consecutivas, somado só abaixo
+     * do corte de 5 min. O salto de 12:02:01 a 12:30:01 é pausa e não entra.
+     */
+    @Test
+    fun `session active time sums gaps below the cutoff and drops a pause above it`() = runTest {
+        withFixture { home, dataSource ->
+            rolloutFile(home).writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:01Z", 1, 0, 0, 2, 0, 3),
+                    contextLine("turn-2", "2026-09-08T12:02:00Z", "gpt-test"),
+                    usageLine("turn-2", "response-2", "2026-09-08T12:02:01Z", 1, 0, 0, 2, 0, 3),
+                    contextLine("turn-3", "2026-09-08T12:30:00Z", "gpt-test"),
+                    usageLine("turn-3", "response-3", "2026-09-08T12:30:01Z", 1, 0, 0, 2, 0, 3)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+
+            dataSource.syncIndex()
+
+            // 12:00:01 -> 12:02:01 = 120 s; 12:02:01 -> 12:30:01 = 28 min, acima do corte.
+            assertEquals(120_000L, dataSource.readSessions().single().activeMillis)
+        }
+    }
+
+    @Test
+    fun `turn context read in an earlier sync fills the model of a usage record appended later`() = runTest {
+        withFixture { home, dataSource ->
+            val file = rolloutFile(home)
+            file.writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test")
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+
+            file.appendText(usageLine("turn-1", "response-1", "2026-09-08T12:00:01Z", 100, 40, 5, 20, 7, 132) + "\n")
+            dataSource.syncIndex()
+
+            assertEquals("gpt-test", dataSource.readSession("session-1")?.turns?.single()?.model)
+        }
+    }
+
+    @Test
+    fun `index version bump refills a turn model stored as NULL`() = runTest {
+        withFixture { home, dataSource ->
+            val file = rolloutFile(home)
+            file.writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:01Z", 100, 40, 5, 20, 7, 132)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+            dataSource.syncIndex()
+            // Simula o índice gravado pela versão 1: modelo NULL e versão de índice 1.
+            rewriteIndexAsVersionOne(File(home.parentFile, "history.db"))
+            // A migração de versão roda ao abrir o banco: o reinício do coletor reabre a conexão.
+            dataSource.close()
+            val reopened = LocalCodexCliSessionDataSource(
+                codexHomeProvider = { home },
+                databaseFile = File(home.parentFile, "history.db")
+            )
+            try {
+                val report = reopened.syncIndex()
+
+                assertEquals("gpt-test", reopened.readSession("session-1")?.turns?.single()?.model)
+                assertEquals(1, report.updatedFiles)
+            } finally {
+                reopened.close()
+            }
+        }
+    }
+
+    private fun rewriteIndexAsVersionOne(databaseFile: File) {
+        DriverManager.getConnection("jdbc:sqlite:${databaseFile.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate("UPDATE codex_cli_turns SET model = NULL")
+                statement.executeUpdate("UPDATE codex_cli_index_meta SET value = '1' WHERE key = 'schema_version'")
+            }
         }
     }
 

@@ -4,6 +4,7 @@ import com.usagemonitor.data.dto.AnthropicExtraUsage
 import com.usagemonitor.data.dto.AnthropicSpend
 import com.usagemonitor.domain.entity.AnthropicQuotaLabels
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.UsageUnit
 import kotlin.time.Instant
@@ -30,6 +31,9 @@ private const val PERCENTAGE_SCALE = 100L
 private const val SUPPORTED_MONEY_EXPONENT = 2
 
 private const val DEFAULT_CURRENCY = "USD"
+
+/** Motivo de bloqueio que a Anthropic envia como texto em `disabled_reason`. */
+private const val OUT_OF_CREDITS_REASON = "out_of_credits"
 
 /**
  * Por que a leitura dos créditos de uso terminou como terminou.
@@ -89,13 +93,18 @@ data class AnthropicCreditsResolution(
  *
  * A resposta não traz a data do reinício mensal, então a cota fica sem
  * `periodEndAt` confiável (`hasKnownResetAt = false`) e o tipo é REPORTED.
+ *
+ * Conta bloqueada pelo servidor (issue #567) mantém a linha, com o motivo em
+ * [QuotaInfo.blockReason]; desligado por outro motivo continua sem linha.
  */
 fun resolveExtraCredits(
     extraUsage: AnthropicExtraUsage?,
     spend: AnthropicSpend?
 ): AnthropicCreditsResolution {
+    val blockReason = if (extraUsage == null) null else blockReasonOf(extraUsage)
     // Desligado é resposta, não falha: quem não contratou créditos não tem linha.
-    if (extraUsage != null && !extraUsage.isEnabled) {
+    // A exceção é o bloqueio pelo servidor, que mantém a linha com o motivo.
+    if (extraUsage != null && !extraUsage.isEnabled && blockReason == null) {
         return AnthropicCreditsResolution(quota = null, outcome = AnthropicCreditsOutcome.DISABLED)
     }
 
@@ -112,7 +121,8 @@ fun resolveExtraCredits(
                 utilization = utilization,
                 usedMinorUnits = usedCredits.roundToLong(),
                 limitMinorUnits = monthlyLimit,
-                currencyCode = currency
+                currencyCode = currency,
+                blockReason = blockReason
             ),
             outcome = AnthropicCreditsOutcome.QUOTA_FROM_EXTRA_USAGE
         )
@@ -168,11 +178,31 @@ private fun resolveFromSpend(
     )
 }
 
+/**
+ * Bloqueio imposto pela fonte com a conta ainda contratada (issue #567).
+ *
+ * Exige `is_enabled` falso, sem `user_disabled` (quem desligou não é bloqueio) e
+ * limite mensal positivo, sem o qual não há gasto a mostrar. Qualquer outro motivo
+ * continua escondido: sem amostra real, não se inventa o texto.
+ */
+private fun blockReasonOf(extraUsage: AnthropicExtraUsage): QuotaBlockReason? {
+    val hasLimit = (extraUsage.monthlyLimit ?: 0L) > 0L
+    if (extraUsage.isEnabled || extraUsage.userDisabled || !hasLimit) {
+        return null
+    }
+    return when {
+        extraUsage.disabledReason == OUT_OF_CREDITS_REASON -> QuotaBlockReason.OUT_OF_CREDITS
+        extraUsage.spendLimitReached -> QuotaBlockReason.SPEND_LIMIT_REACHED
+        else -> null
+    }
+}
+
 private fun creditsQuota(
     utilization: Double,
     usedMinorUnits: Long,
     limitMinorUnits: Long,
-    currencyCode: String
+    currencyCode: String,
+    blockReason: QuotaBlockReason? = null
 ): QuotaInfo {
     return QuotaInfo(
         label = AnthropicQuotaLabels.EXTRA_CREDITS,
@@ -184,6 +214,7 @@ private fun creditsQuota(
         unit = UsageUnit.PERCENTAGE,
         rawUsed = usedMinorUnits.coerceAtLeast(0L),
         rawTotal = limitMinorUnits,
-        currencyCode = currencyCode
+        currencyCode = currencyCode,
+        blockReason = blockReason
     )
 }

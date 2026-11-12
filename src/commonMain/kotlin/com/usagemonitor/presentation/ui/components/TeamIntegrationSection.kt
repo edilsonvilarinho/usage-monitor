@@ -1,15 +1,9 @@
 package com.usagemonitor.presentation.ui.components
 
-import com.usagemonitor.domain.entity.TeamConnectionFailure
-import com.usagemonitor.presentation.ui.TeamConnectionPath
-import com.usagemonitor.presentation.ui.TeamCredentialKind
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,13 +12,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.domain.entity.TeamConnectionFailure
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
+import com.usagemonitor.presentation.ui.TeamCredentialKind
+import com.usagemonitor.presentation.ui.theme.AppSpacing
 
 /** Resultado do botão "Testar conexão". */
 enum class TeamConnectionUiStatus { IDLE, CHECKING, OK, FAILED }
@@ -48,18 +43,22 @@ const val TEAM_ADMIN_VALIDATE_TEST_TAG = "teamIntegrationAdminValidate"
 const val TEAM_ADMIN_KEYS_TEST_TAG = "teamIntegrationAdminKeys"
 const val TEAM_ADMIN_EXIT_TEST_TAG = "teamIntegrationAdminExit"
 const val TEAM_PROFILE_REJECTION_TAG_PREFIX = "teamIntegrationProfileRejection:"
+const val TEAM_LIST_ROW_TAG_PREFIX = "teamIntegrationRow:"
+const val TEAM_MOVE_HINT_TAG_PREFIX = "teamIntegrationMoveHint:"
+const val TEAM_ADD_TEST_TAG = "teamIntegrationAdd"
+const val TEAM_EMPTY_STATE_TEST_TAG = "teamIntegrationEmpty"
+const val TEAM_NAME_FIELD_TEST_TAG = "teamIntegrationNameField"
+const val TEAM_REMOVE_TEST_TAG = "teamIntegrationRemove"
+const val TEAM_REMOVE_CONFIRM_TEST_TAG = "teamIntegrationRemoveConfirm"
+const val TEAM_ACCOUNT_KEY_TAG_PREFIX = "teamIntegrationAccountKey:"
 
 /**
- * Seção "Integração com time" das Configurações.
+ * Seção "Integração com time" das Configurações, em mestre-detalhe (A08, direção B).
  *
- * Stateless como o resto do diálogo: os valores chegam por [settings] e os
- * eventos saem pelas lambdas. Os campos usam [DebouncedTextField], então o texto
- * sobe numa pausa da digitação e não a cada tecla — ver o KDoc de lá para o
- * porquê do estado local do cursor.
- *
- * A lista de contas é a mesma dos perfis Anthropic: a máquina costuma estar
- * logada em várias ao mesmo tempo e só as marcadas aqui empurram dados ao
- * servidor e ganham o botão de time no card.
+ * Esquerda: a lista de times, com o status escrito por linha. Abaixo: o detalhe do time em
+ * [settings], em três blocos numerados (Conexão, Contas, Administração; ver [TeamStepsPane]).
+ * Stateless como o resto do diálogo: os valores chegam por parâmetro e os eventos saem pelas
+ * lambdas. Os campos usam [DebouncedTextField], então o texto sobe numa pausa da digitação.
  */
 @Composable
 fun TeamIntegrationSection(
@@ -69,7 +68,6 @@ fun TeamIntegrationSection(
     connection: TeamConnectionUiState,
     onEnabledChange: (Boolean) -> Unit,
     onServerUrlChange: (String) -> Unit,
-    onApiKeyChange: (String) -> Unit,
     onAliasChange: (String) -> Unit,
     onProfileParticipationChange: (String, Boolean) -> Unit,
     onTestConnection: () -> Unit,
@@ -85,9 +83,7 @@ fun TeamIntegrationSection(
      * Contas que o servidor recusou, por `profileId`, com o motivo dele.
      *
      * O aviso mora **na linha da conta**, e não junto do erro geral lá embaixo:
-     * o conserto é desligar aquele interruptor, que está ali do lado. Uma
-     * mensagem no rodapé dizia que algo foi recusado sem dizer qual das contas
-     * marcadas era a errada.
+     * o conserto é desligar aquele interruptor, que está ali do lado.
      */
     rejectedProfiles: Map<String, String> = emptyMap(),
     /** Resultado da última validação do token; separado do teste da chave de time. */
@@ -95,18 +91,29 @@ fun TeamIntegrationSection(
     onAdminTokenChange: (String) -> Unit = {},
     onValidateAdminToken: () -> Unit = {},
     onOpenKeysManager: () -> Unit = {},
-    onExitAdminMode: () -> Unit = {}
+    onExitAdminMode: () -> Unit = {},
+    /** Todos os times configurados; a lista lê daqui. Por padrão, só o time de [settings]. */
+    teams: List<TeamIntegrationSettings> = listOf(settings),
+    /** Time com o formulário aberto (destacado na lista). */
+    selectedTeamId: String? = settings.id,
+    /** Resultado do último teste por time, pelo id. Sem entrada, o time mostra "Não testado". */
+    teamConnections: Map<String, TeamConnectionUiState> = emptyMap(),
+    onSelectTeam: (String) -> Unit = {},
+    onAddTeam: () -> Unit = {},
+    onRemoveTeam: (String) -> Unit = {},
+    onRenameTeam: (String) -> Unit = {},
+    /** Chave própria de uma conta do time; recebe o `profileId` e o valor digitado. */
+    onAccountApiKeyChange: (String, String) -> Unit = { _, _ -> }
 ) {
-    val isPt = language == AppLanguage.PT
+    val labels = TeamIntegrationLabels(language)
 
     // Painel com cabeçalho e divisória, como os painéis da aba Sistema: o
-    // interruptor da integração inteira mora no cabeçalho, que é onde ele
-    // pertence — ele liga e desliga tudo o que está abaixo dele.
+    // interruptor da integração mora no cabeçalho e liga e desliga o time aberto.
     AppDataSurfaceFlush(
         modifier = modifier.fillMaxWidth().testTag(TEAM_SECTION_TEST_TAG),
         header = {
             AppSectionHeader(
-                title = if (isPt) "Integração com time" else "Team integration",
+                title = labels.title,
                 trailing = {
                     AppSwitch(
                         checked = settings.enabled,
@@ -122,331 +129,178 @@ fun TeamIntegrationSection(
         verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
       ) {
         Text(
-            text = if (isPt) {
-                "Envia ao servidor da empresa apenas os totais de tokens das sessões — " +
-                    "nunca o conteúdo das conversas."
-            } else {
-                "Sends only session token totals to your company server — never conversation content."
-            },
+            text = labels.description,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        if (!settings.enabled) {
+        if (teams.isEmpty()) {
+            TeamEmptyState(labels = labels, onAddTeam = onAddTeam)
             return@Column
         }
 
-        DebouncedTextField(
-            value = settings.serverUrl,
-            label = if (isPt) "Servidor" else "Server",
-            placeholder = "https://usage.empresa.com",
-            onCommit = onServerUrlChange
+        TeamListPane(
+            teams = teams,
+            selectedTeamId = selectedTeamId,
+            teamConnections = teamConnections,
+            labels = labels,
+            onSelectTeam = onSelectTeam,
+            onAddTeam = onAddTeam
         )
 
-        DebouncedSecretField(
-            value = settings.apiKey,
-            label = if (isPt) "Chave do time" else "Team key",
-            revealLabel = if (isPt) "Mostrar chave" else "Show key",
-            hideLabel = if (isPt) "Ocultar chave" else "Hide key",
-            onCommit = onApiKeyChange
-        )
-
-        DebouncedTextField(
-            value = settings.alias,
-            label = if (isPt) "Seu apelido" else "Your alias",
-            placeholder = if (isPt) "como o time vai te ver" else "how the team sees you",
-            onCommit = onAliasChange,
-            // Apagar o apelido derrubaria `isConfigured` e pararia o laço de
-            // envio sem nenhum aviso, e o servidor recusaria o ingest com 400.
-            // Um apelido já gravado nunca pode virar vazio por edição.
-            validate = { text ->
-                if (text.isBlank() && settings.alias.isNotBlank()) {
-                    if (isPt) "O apelido não pode ficar vazio." else "The alias cannot be empty."
-                } else {
-                    null
-                }
-            },
-            modifier = Modifier.testTag(TEAM_ALIAS_FIELD_TEST_TAG)
-        )
-
-        Text(
-            text = if (isPt) "Contas que fazem parte do time" else "Accounts in the team",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 4.dp)
-        )
-
-        if (profiles.isEmpty()) {
-            Text(
-                text = if (isPt) {
-                    "Nenhuma conta Anthropic detectada."
-                } else {
-                    "No Anthropic account detected."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            profiles.forEach { profile ->
-                key(profile.id) {
-                    TeamProfileCheckboxRow(
-                        profile = profile,
-                        checked = profile.id in settings.participatingProfileIds,
-                        onCheckedChange = { checked ->
-                            onProfileParticipationChange(profile.id, checked)
-                        },
-                        rejection = rejectedProfiles[profile.id],
-                        language = language,
-                        showDivider = profile !== profiles.last()
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Sem servidor, chave e apelido não há o que testar.
-            AppButton(
-                label = if (isPt) "Testar conexão" else "Test connection",
-                onClick = onTestConnection,
-                enabled = settings.isConfigured && connection.status != TeamConnectionUiStatus.CHECKING,
-                modifier = Modifier.testTag(TEAM_TEST_CONNECTION_TEST_TAG)
-            )
-
-            if (connection.status == TeamConnectionUiStatus.CHECKING) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            }
-
-            // Ponto e palavra: a mensagem dizia o resultado só pela cor do
-            // texto — vermelho para falha, azul para sucesso —, e azul neste
-            // sistema é informação, não confirmação.
-            val statusMessage = connection.message
-            if (statusMessage != null && connection.failure == null) {
-                AppStatusIndicator(
-                    label = statusMessage,
-                    tone = connectionTone(connection.status),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // O caminho mora fora da linha do botão: `AppStatusIndicator` é uma linha só, e o
-        // texto da exceção cortava em "failed:" (#494).
-        val connectionFailure = connection.failure
-        if (connectionFailure != null) {
-            TeamConnectionPath(failure = connectionFailure, kind = connection.credentialKind, language = language)
-        }
-
-        // O envio roda em background e falhava calado: quem estava com a chave
-        // errada só percebia pela ausência dos próprios dados na tela dos
-        // colegas, sem nada que apontasse a causa.
-        if (syncFailureMessage != null) {
-            Text(
-                text = if (isPt) {
-                    "Último envio ao time falhou: $syncFailureMessage"
-                } else {
-                    "Last team upload failed: $syncFailureMessage"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.fillMaxWidth().testTag(TEAM_SYNC_STATUS_TEST_TAG)
-            )
-        }
-
-        TeamAdminBlock(
+        TeamStepsPane(
             settings = settings,
-            isPt = isPt,
+            teams = teams,
+            teamConnections = teamConnections,
+            onRenameTeam = onRenameTeam,
             language = language,
-            connection = adminConnection,
+            labels = labels,
+            profiles = profiles,
+            connection = connection,
+            adminConnection = adminConnection,
+            syncFailureMessage = syncFailureMessage,
+            rejectedProfiles = rejectedProfiles,
+            onServerUrlChange = onServerUrlChange,
+            onAliasChange = onAliasChange,
+            onProfileParticipationChange = onProfileParticipationChange,
+            onAccountApiKeyChange = onAccountApiKeyChange,
+            onTestConnection = onTestConnection,
             onAdminTokenChange = onAdminTokenChange,
             onValidateAdminToken = onValidateAdminToken,
             onOpenKeysManager = onOpenKeysManager,
             onExitAdminMode = onExitAdminMode
         )
+
+        TeamRemoveAction(settings = settings, labels = labels, onRemoveTeam = onRemoveTeam)
       }
     }
 }
 
 /**
- * Bloco "Eu sou admin".
- *
- * Fica abaixo dos campos de participação de propósito, e não depende deles:
- * quem administra o servidor não é necessariamente integrante de nenhuma conta,
- * então basta servidor e token para o bloco funcionar — sem chave de time, sem
- * apelido e sem conta marcada.
- *
- * A marca de "validado" não é persistida: o botão de gerenciar chaves aparece
- * assim que há token gravado, e uma credencial que deixou de valer se denuncia
- * na primeira chamada, com a mensagem do servidor.
+ * Lista de times do mestre. Cada linha mostra o nome, o servidor e o status escrito;
+ * a linha aberta fica destacada. O botão de adicionar mora embaixo da lista.
  */
 @Composable
-private fun TeamAdminBlock(
-    settings: TeamIntegrationSettings,
-    isPt: Boolean,
-    language: AppLanguage,
-    connection: TeamConnectionUiState,
-    onAdminTokenChange: (String) -> Unit,
-    onValidateAdminToken: () -> Unit,
-    onOpenKeysManager: () -> Unit,
-    onExitAdminMode: () -> Unit
+private fun TeamListPane(
+    teams: List<TeamIntegrationSettings>,
+    selectedTeamId: String?,
+    teamConnections: Map<String, TeamConnectionUiState>,
+    labels: TeamIntegrationLabels,
+    onSelectTeam: (String) -> Unit,
+    onAddTeam: () -> Unit
 ) {
-    var adminExpanded by remember(settings.adminToken.isNotBlank()) {
-        mutableStateOf(settings.adminToken.isNotBlank())
+    Column(modifier = Modifier.fillMaxWidth()) {
+        teams.forEach { team ->
+            key(team.id) {
+                val status = teamStatusOf(team, teamConnections[team.id], labels)
+                AppDataRow(
+                    onClick = { onSelectTeam(team.id) },
+                    showDivider = team !== teams.last(),
+                    highlighted = team.id == selectedTeamId,
+                    horizontalPadding = 0.dp,
+                    modifier = Modifier.testTag("$TEAM_LIST_ROW_TAG_PREFIX${team.id}")
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = team.name,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = team.serverUrl,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    AppStatusIndicator(label = status.first, tone = status.second)
+                }
+            }
+        }
+        AppButton(
+            label = labels.addTeam,
+            onClick = onAddTeam,
+            tone = AppButtonTone.GHOST,
+            modifier = Modifier.padding(top = 4.dp).testTag(TEAM_ADD_TEST_TAG)
+        )
     }
+}
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+/** Estado sem time: diz o recorte e oferece o caminho para criar o primeiro. */
+@Composable
+private fun TeamEmptyState(labels: TeamIntegrationLabels, onAddTeam: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag(TEAM_EMPTY_STATE_TEST_TAG),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)
     ) {
         Text(
-            text = if (isPt) "Eu sou admin do servidor" else "I administer the server",
+            text = labels.emptyTitle,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
+            color = MaterialTheme.colorScheme.onSurface
         )
-        AppSwitch(
-            checked = adminExpanded,
-            onCheckedChange = { checked ->
-                adminExpanded = checked
-                if (!checked) {
-                    onExitAdminMode()
-                }
-            },
-            modifier = Modifier.testTag(TEAM_ADMIN_SWITCH_TEST_TAG)
+        Text(
+            text = labels.emptyBody,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-
-    if (!adminExpanded) {
-        return
-    }
-
-    Text(
-        text = if (isPt) {
-            "O token de administração dá acesso de leitura a todas as contas do servidor e " +
-                "permite emitir chaves. Não é preciso participar de nenhum time."
-        } else {
-            "The admin token grants read access to every account on the server and allows " +
-                "issuing keys. You do not need to belong to any team."
-        },
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-    DebouncedSecretField(
-        value = settings.adminToken,
-        label = if (isPt) "Token de administração" else "Admin token",
-        revealLabel = if (isPt) "Mostrar token" else "Show token",
-        hideLabel = if (isPt) "Ocultar token" else "Hide token",
-        onCommit = onAdminTokenChange
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
         AppButton(
-            label = if (isPt) "Validar" else "Validate",
-            onClick = onValidateAdminToken,
-            enabled = settings.isAdminMode && connection.status != TeamConnectionUiStatus.CHECKING,
-            modifier = Modifier.testTag(TEAM_ADMIN_VALIDATE_TEST_TAG)
-        )
-
-        AppButton(
-            label = if (isPt) "Configurar chaves das contas" else "Manage account keys",
-            onClick = onOpenKeysManager,
-            enabled = settings.isAdminMode,
-            modifier = Modifier.testTag(TEAM_ADMIN_KEYS_TEST_TAG)
-        )
-
-        if (connection.status == TeamConnectionUiStatus.CHECKING) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-        }
-    }
-
-    val adminFailure = connection.failure
-    val adminMessage = connection.message
-    if (adminFailure != null) {
-        TeamConnectionPath(failure = adminFailure, kind = connection.credentialKind, language = language)
-    } else if (adminMessage != null) {
-        AppStatusIndicator(label = adminMessage, tone = connectionTone(connection.status))
-    }
-
-    if (settings.adminToken.isNotBlank()) {
-        AppButton(
-            label = if (isPt) "Sair do modo admin" else "Leave admin mode",
-            onClick = onExitAdminMode,
-            modifier = Modifier.testTag(TEAM_ADMIN_EXIT_TEST_TAG),
-            tone = AppButtonTone.GHOST
+            label = labels.addTeam,
+            onClick = onAddTeam,
+            modifier = Modifier.testTag(TEAM_ADD_TEST_TAG)
         )
     }
 }
-
-@Composable
-private fun TeamProfileCheckboxRow(
-    profile: AnthropicProfileUiModel,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    language: AppLanguage,
-    rejection: String? = null,
-    showDivider: Boolean = true
-) {
-    // Linha de dados como as opções da aba Sistema: rótulo em mono à esquerda,
-    // controle à direita. O interruptor abria a linha, e a coluna de identidade
-    // começava depois dele — desalinhada de tudo o que vem acima.
-    AppDataRow(showDivider = showDivider, horizontalPadding = 0.dp) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = profile.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            val identity = profile.identityLabel
-            if (identity != null) {
-                Text(
-                    text = identity,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            // Ponto e palavra, e o motivo que o próprio servidor mandou: ele
-            // nomeia a chave e a conta, que é o que separa "desmarque esta
-            // conta" de "peça outra chave ao administrador".
-            if (rejection != null) {
-                AppStatusIndicator(
-                    label = if (language == AppLanguage.PT) {
-                        "Recusada pelo servidor — $rejection"
-                    } else {
-                        "Refused by the server — $rejection"
-                    },
-                    tone = AppTone.CRITICAL,
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .testTag("$TEAM_PROFILE_REJECTION_TAG_PREFIX${profile.id}")
-                )
-            }
-        }
-        // Interruptor e não caixa de seleção: a linha diz se a conta participa do
-        // time, que é um estado ligado ou desligado — a mesma coisa que os outros
-        // controles desta tela dizem, e agora com o mesmo desenho.
-        AppSwitch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
 
 /**
- * Tom do resultado de uma verificação de conexão.
- *
- * Enquanto checa não há veredito: neutro. Sem tentativa, também não — mas ali
- * não há mensagem, e o indicador nem chega a ser composto.
+ * Remover o time aberto. A ação só apaga a configuração local: os dados que já
+ * chegaram ao servidor continuam lá, e o diálogo diz isso antes de confirmar.
  */
-private fun connectionTone(status: TeamConnectionUiStatus): AppTone {
-    return when (status) {
-        TeamConnectionUiStatus.OK -> AppTone.OK
-        TeamConnectionUiStatus.FAILED -> AppTone.CRITICAL
-        TeamConnectionUiStatus.CHECKING, TeamConnectionUiStatus.IDLE -> AppTone.NEUTRAL
+@Composable
+private fun TeamRemoveAction(
+    settings: TeamIntegrationSettings,
+    labels: TeamIntegrationLabels,
+    onRemoveTeam: (String) -> Unit
+) {
+    var confirming by remember(settings.id) { mutableStateOf(false) }
+
+    AppButton(
+        label = labels.removeTeam,
+        onClick = { confirming = true },
+        tone = AppButtonTone.DANGER,
+        modifier = Modifier.padding(top = 4.dp).testTag(TEAM_REMOVE_TEST_TAG)
+    )
+
+    if (confirming) {
+        AppConfirmationDialog(
+            title = labels.removeTitle(settings.name),
+            message = labels.removeMessage,
+            confirmLabel = labels.removeConfirm,
+            cancelLabel = labels.cancel,
+            onConfirm = {
+                confirming = false
+                onRemoveTeam(settings.id)
+            },
+            onDismiss = { confirming = false },
+            confirmTag = TEAM_REMOVE_CONFIRM_TEST_TAG
+        )
+    }
+}
+
+/**
+ * Status escrito de um time na lista. A palavra é o que diz o estado; a cor só reforça.
+ *
+ * Sem resultado de teste para o time, o status é "Não testado" — nunca "Conectado" por
+ * deduzir da configuração: conexão só existe depois de um teste que a confirme.
+ */
+internal fun teamStatusOf(
+    team: TeamIntegrationSettings,
+    connection: TeamConnectionUiState?,
+    labels: TeamIntegrationLabels
+): Pair<String, AppTone> {
+    return when {
+        connection?.status == TeamConnectionUiStatus.OK -> labels.statusConnected to AppTone.OK
+        connection?.status == TeamConnectionUiStatus.FAILED -> labels.statusFailed to AppTone.CRITICAL
+        connection?.status == TeamConnectionUiStatus.CHECKING -> labels.statusChecking to AppTone.NEUTRAL
+        !team.isConfigured -> labels.statusIncomplete to AppTone.WARNING
+        else -> labels.statusNotTested to AppTone.NEUTRAL
     }
 }

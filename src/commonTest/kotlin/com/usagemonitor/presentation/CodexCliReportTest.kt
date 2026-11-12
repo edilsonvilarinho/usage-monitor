@@ -8,7 +8,7 @@ import com.usagemonitor.presentation.ui.codexReportRequest
 import com.usagemonitor.presentation.ui.UsageExportPayload
 import com.usagemonitor.presentation.ui.report.UsageReportSection
 import com.usagemonitor.presentation.ui.report.reportForCodexCliSessions
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -49,7 +49,7 @@ class CodexCliReportTest {
 
     @Test
     fun `report lists totals, both axes and every session without cost`() {
-        val document = reportForCodexCliSessions(sessions, CodexCliSessionRange.LAST_5H, AppLanguage.PT, NOW)
+        val document = reportForCodexCliSessions(sessions, CliSessionRange.LAST_5H, AppLanguage.PT, NOW)
 
         val totals = assertIs<UsageReportSection.KeyValues>(document.sections.first())
         assertTrue(totals.entries.any { it.label == "Vazão" && it.value == "32 tok/s" })
@@ -60,8 +60,8 @@ class CodexCliReportTest {
 
     @Test
     fun `pdf request carries the app language`() {
-        val document = reportForCodexCliSessions(sessions, CodexCliSessionRange.LAST_7D, AppLanguage.EN, NOW)
-        val request = codexReportRequest(document, CodexCliSessionRange.LAST_7D, NOW, AppLanguage.EN)
+        val document = reportForCodexCliSessions(sessions, CliSessionRange.LAST_7D, AppLanguage.EN, NOW)
+        val request = codexReportRequest(document, CliSessionRange.LAST_7D, NOW, AppLanguage.EN)
 
         assertEquals("usage-monitor-codex-report-7d-2026-10-06.pdf", request.suggestedFileName)
         assertEquals(AppLanguage.EN, assertIs<UsageExportPayload.Report>(request.payload).language)

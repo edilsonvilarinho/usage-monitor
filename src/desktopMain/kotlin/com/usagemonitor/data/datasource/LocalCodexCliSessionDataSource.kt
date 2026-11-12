@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.data.parser.CodexCliRolloutMetadata
 import com.usagemonitor.data.parser.CodexCliRolloutParser
+import com.usagemonitor.data.parser.CodexCliTurnContext
 import com.usagemonitor.data.CodexCliHomeProvider
 import com.usagemonitor.domain.entity.CodexCliRolloutSource
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
@@ -13,6 +14,7 @@ import com.usagemonitor.domain.entity.CodexCliModelUsage
 import com.usagemonitor.domain.entity.CodexCliUsageDelta
 import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
+import com.usagemonitor.domain.entity.activeMillisOfTimestamps
 import com.usagemonitor.domain.entity.combinedThroughput
 import com.usagemonitor.domain.entity.toCodexModelBreakdown
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +67,9 @@ class LocalCodexCliSessionDataSource(
                 }
 
                 val metadata = readMetadata(file)
-                val parsed = parseFromOffset(file, startOffset, metadata)
+                // Contextos de turno dos trechos anteriores: sem eles, o registro de uso posterior perde o modelo (#561).
+                val knownContexts = if (startOffset > 0L) CodexCliTurnContextStore.read(connection, path) else emptyMap()
+                val parsed = parseFromOffset(file, startOffset, metadata, knownContexts)
                 connection.autoCommit = false
                 try {
                     val nextSequenceBySession = parsed.turns
@@ -80,6 +84,7 @@ class LocalCodexCliSessionDataSource(
                         val indexedTurn = turn.copy(seq = nextSequence)
                         insertTurn(connection, path, indexedTurn)
                     }
+                    CodexCliTurnContextStore.upsert(connection, path, parsed.turnContexts)
                     for (sessionId in touchedSessions) {
                         upsertSession(connection, sessionId, path, parsed.metadata)
                     }
@@ -138,6 +143,27 @@ class LocalCodexCliSessionDataSource(
                     summary = buildSummary(connection, sessionId, turns),
                     turns = turns
                 )
+            }
+        }
+    }
+
+    /**
+     * Turnos de todas as sessões desde o corte, em ordem de tempo (#560). Desempate por
+     * sessão e `seq` para a lista ser total: duas leituras iguais dão a mesma ordem.
+     */
+    override suspend fun readTurnsSince(sinceEpochMillis: Long?): List<CodexCliSessionTurn> {
+        return withContext(Dispatchers.IO) {
+            connectionManager.useConnection { connection ->
+                connection.prepareStatement(
+                    "SELECT * FROM codex_cli_turns WHERE ts >= ? ORDER BY ts, session_id, seq"
+                ).use { statement ->
+                    statement.setLong(1, sinceEpochMillis ?: 0L)
+                    statement.executeQuery().use { rows ->
+                        buildList {
+                            while (rows.next()) add(readTurn(rows))
+                        }
+                    }
+                }
             }
         }
     }
@@ -220,17 +246,19 @@ class LocalCodexCliSessionDataSource(
     private fun parseFromOffset(
         file: File,
         startOffset: Long,
-        metadata: CodexCliRolloutMetadata?
+        metadata: CodexCliRolloutMetadata?,
+        knownContexts: Map<String, CodexCliTurnContext>
     ): ParsedFile {
         val lines = mutableListOf<String>()
         val endOffset = forEachCompleteLine(file, startOffset) { line -> lines += line }
-        val parsed = parser.parse(lines, knownMetadata = metadata)
+        val parsed = parser.parse(lines, knownMetadata = metadata, knownContexts = knownContexts)
         return ParsedFile(
             metadata = parsed.metadata ?: metadata,
             turns = parsed.turns,
             endOffset = endOffset,
             skippedLines = parsed.skippedLines,
-            unknownLines = parsed.unknownLines
+            unknownLines = parsed.unknownLines,
+            turnContexts = parsed.turnContexts
         )
     }
 
@@ -324,6 +352,7 @@ class LocalCodexCliSessionDataSource(
             )
             ensureColumn(connection, "codex_cli_sessions", "originator", "TEXT")
             ensureColumn(connection, "codex_cli_turns", "request_ts", "INTEGER")
+            CodexCliTurnContextStore.createTable(connection)
             statement.execute(
                 "CREATE TABLE IF NOT EXISTS codex_cli_index_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
             )
@@ -411,7 +440,9 @@ class LocalCodexCliSessionDataSource(
               request_ts
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id, response_id) DO UPDATE SET
-              request_ts = COALESCE(codex_cli_turns.request_ts, excluded.request_ts)
+              request_ts = COALESCE(codex_cli_turns.request_ts, excluded.request_ts),
+              model = COALESCE(codex_cli_turns.model, excluded.model),
+              cwd = COALESCE(codex_cli_turns.cwd, excluded.cwd)
             """.trimIndent()
         ).use { statement ->
             statement.setString(1, turn.sessionId)
@@ -526,6 +557,7 @@ class LocalCodexCliSessionDataSource(
             statement.setString(1, path)
             statement.executeUpdate()
         }
+        CodexCliTurnContextStore.purge(connection, path)
     }
 
     private fun refreshMissingOriginators(connection: Connection) {
@@ -647,6 +679,7 @@ class LocalCodexCliSessionDataSource(
             reasoningOutputTokens = usage.sumOf { value -> value.reasoningOutputTokens },
             totalTokens = usage.sumOf { value -> value.totalTokens },
             throughput = turns.map { turn -> turn.throughput }.combinedThroughput(),
+            activeMillis = activeMillisOfTimestamps(turns.map { turn -> turn.ts.toEpochMilliseconds() }),
             modelBreakdown = turns.toCodexModelBreakdown()
         )
     }
@@ -662,7 +695,8 @@ class LocalCodexCliSessionDataSource(
         val turns: List<CodexCliSessionTurn>,
         val endOffset: Long,
         val skippedLines: Int,
-        val unknownLines: Int
+        val unknownLines: Int,
+        val turnContexts: Map<String, CodexCliTurnContext>
     )
 
     private data class SessionMetadata(
@@ -676,8 +710,8 @@ class LocalCodexCliSessionDataSource(
     )
 
     companion object {
-        /** Versão 1: `request_ts` por resposta (#381). */
-        private const val CODEX_INDEX_VERSION = 1
+        /** Versão 1: `request_ts` por resposta (#381). Versão 2: contexto de turno persistido por arquivo (#561). */
+        private const val CODEX_INDEX_VERSION = 2
         private const val INDEX_VERSION_KEY = "schema_version"
 
         fun defaultDatabaseFile(): File {

@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.AnalysisPeriod
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.TelegramAnalysisImageLabels
 import com.usagemonitor.presentation.ui.UsageExportPayload
@@ -48,11 +49,11 @@ sealed interface AnalysisUiState {
  * ([freshness] muda — o host passa o `fetchedAt` dela) e a cada [liveIntervalMillis], porque
  * ritmo da última hora, ritmo seguro e fatias andam com o relógio mesmo sem coleta nova.
  * [close] para o laço: a janela de modal só se esconde, e escondida não lê nada.
- * [load] recebe o `storageKey` da conta e vem de quem tem o histórico e o índice CLI —
- * a apresentação não importa `data`.
+ * [load] recebe o `storageKey` da conta e o período (#538) e vem de quem tem o histórico e o
+ * índice CLI — a apresentação não importa `data`.
  */
 class AnalysisViewModel(
-    private val load: suspend (targetKey: String) -> SessionAnalysis?,
+    private val load: suspend (targetKey: String, period: AnalysisPeriod) -> SessionAnalysis?,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** Grava o PDF (B21b); `null` esconde o botão. */
     private val exportWriter: UsageExportWriter? = null,
@@ -78,12 +79,24 @@ class AnalysisViewModel(
     private val _accountLabel = MutableStateFlow<String?>(null)
     val accountLabel: StateFlow<String?> = _accountLabel.asStateFlow()
 
+    private val _period = MutableStateFlow(AnalysisPeriod.NOW)
+    /** Período da leitura (#538): nasce `NOW`; a abertura da conta volta a `NOW`. */
+    val period: StateFlow<AnalysisPeriod> = _period.asStateFlow()
+
     fun openForAccount(targetKey: String, accountLabel: String) {
         this.targetKey = targetKey
         _accountLabel.value = accountLabel
+        _period.value = AnalysisPeriod.NOW
         _uiState.value = AnalysisUiState.Loading
         refresh()
         startLive(targetKey)
+    }
+
+    /** Escolhe o período (#538) e relê já com ele; o laço ao vivo segue com o período escolhido. */
+    fun setPeriod(period: AnalysisPeriod) {
+        if (_period.value == period) return
+        _period.value = period
+        refresh()
     }
 
     /** A janela se escondeu: nada de releitura até a próxima abertura. */
@@ -111,10 +124,11 @@ class AnalysisViewModel(
 
     private fun refresh() {
         val key = targetKey ?: return
+        val period = _period.value
         loadJob?.cancel()
         loadJob = scope.launch {
             val analysis = try {
-                load(key)
+                load(key, period)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Exception) {

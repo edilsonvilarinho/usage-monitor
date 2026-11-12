@@ -20,7 +20,9 @@ import com.usagemonitor.presentation.ui.windowDragSink
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
+import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
 import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
+import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.update.ensureLinuxMenuIconCurrent
@@ -317,7 +319,7 @@ internal fun runUsageMonitor(
         inspections = profileResolution.inspections,
         duplicateProfileIds = profileResolution.duplicateProfileIds
     )
-    val teamSettings by graph.teamSettingsFlow.collectAsState()
+    val teamIntegrations by graph.store.teamIntegrationsFlow.collectAsState()
     val dashboardState by viewModels.dashboard.uiState.collectAsState()
 
     val shell = remember {
@@ -336,9 +338,13 @@ internal fun runUsageMonitor(
         AppSettingsFeedback(
             store = graph.store,
             breadcrumbs = breadcrumbs,
-            teamUsageRepository = graph.teamUsageRepository,
-            claimTeamKey = { accountKey, accountEmail -> viewModels.claimTeamKeyForAccount(accountKey, accountEmail) },
-            validateAdminTokenWithServer = { viewModels.validateAdminToken() },
+            teamUsageRepositoryFor = { teamId -> graph.teamRepositoryRegistry.usageRepository(teamId) },
+            claimTeamKey = { teamId, accountKey, accountEmail, profileId ->
+                ClaimTeamKeyForAccountUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))(accountKey, accountEmail, profileId)
+            },
+            validateAdminTokenWithServer = { teamId ->
+                ValidateAdminTokenUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))()
+            },
             scope = compositionScope,
             language = { shell.language },
             profileLabel = { profileId ->
@@ -346,7 +352,7 @@ internal fun runUsageMonitor(
             }
         )
     }
-    val settingsActions = remember { SettingsActions(graph.store, breadcrumbs, viewModels.settingsTargets, shell, modal, feedback, compositionScope) }
+    val settingsActions = remember { SettingsActions(graph.store, breadcrumbs, viewModels.settingsTargets, shell, modal, feedback, compositionScope, settingsTeamSelection = graph.teamViewSelection.settingsTeamId) }
 
     val iconImage = remember { loadWindowIcon() }
     val windowIconImage = remember { loadWindowIconImage() }
@@ -383,8 +389,10 @@ internal fun runUsageMonitor(
     }
 
     // As ações do rodapé moram no balão da engrenagem da barra HUD.
+    val syncTargets = remember(profileResolution) { buildTeamSyncTargets(graph.profileRegistry) }
     val shellActions = buildShellActions(
-        breadcrumbs, viewModels.shellTargets, graph.usageExportWriter, modal, profileRecords, profileResolution, dashboardState, teamSettings
+        breadcrumbs, viewModels.shellTargets, graph.usageExportWriter, modal, profileRecords, profileResolution, dashboardState,
+        teamIntegrations, graph.teamViewSelection.dashboardTeamId, syncTargets
     )
     val cliSessionPulses by viewModels.sessionPulse.cliPulses.collectAsState()
     val teamSessionPulses by viewModels.sessionPulse.teamPulses.collectAsState()
@@ -416,7 +424,7 @@ internal fun runUsageMonitor(
         breadcrumbs = breadcrumbs,
         prewarmReady = modalPrewarmReady
     )
-    ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamSettings, releaseNotes, startupGuide)
+    ModalWindowsHost(graph, viewModels, modal, windows, modalEnvironment, shell.language, teamIntegrations, shellActions.selectDashboardTeam, releaseNotes, startupGuide)
     BugReportWindow(graph, shell, modal, pendingCrash, windows, modalEnvironment)
 
     // A barra HUD numa janela própria (`HudWindow.kt`): a única de visualização.
@@ -439,7 +447,7 @@ internal fun runUsageMonitor(
             },
             actions = shellActions,
             // O que o card de cada conta oferece, para os botões do balão.
-            teamEnabledProfileIds = if (teamSettings.isActive) teamSettings.participatingProfileIds else emptySet(),
+            teamEnabledProfileIds = teamParticipatingProfileIds(teamIntegrations),
             cliSessionPulses = cliSessionPulses,
             teamSessionPulses = teamSessionPulses,
             accountColors = accountColors,

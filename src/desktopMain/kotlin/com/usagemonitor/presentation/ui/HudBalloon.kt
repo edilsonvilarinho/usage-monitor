@@ -63,6 +63,9 @@ import com.usagemonitor.presentation.ui.components.AppProgressTrack
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppStatusIndicator
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.quotaBlockReasonLabel
+import com.usagemonitor.presentation.ui.components.quotaBlockReasonTone
 import com.usagemonitor.presentation.ui.components.GargantuaJetFrame
 import com.usagemonitor.presentation.ui.components.drawGargantuaJet
 import com.usagemonitor.presentation.ui.components.accentColorFor
@@ -346,6 +349,27 @@ internal fun HudAccountBalloonContent(
                 }
             }
         }
+        // Resets de limite guardados (#571): linha própria, depois das cotas e antes dos sinais.
+        account.bankedResetCount?.let { count ->
+            Spacer(Modifier.height(HUD_BALLOON_SECTION_GAP))
+            Row(
+                modifier = Modifier.fillMaxWidth().height(HUD_BALLOON_QUOTA_TITLE),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = localized(language, "Resets de limite", "Rate-limit resets"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                AppStatusIndicator(
+                    label = bankedResetsLabel(count, language),
+                    tone = if (count > 0) AppTone.OK else AppTone.NEUTRAL
+                )
+            }
+        }
         // Sinais de sessão CLI (issue #265), depois das cotas: são da conta, mas
         // não são cota, e a palavra do cabeçalho continua sendo só do risco dela.
         if (account.sessionSignals.isNotEmpty()) {
@@ -405,13 +429,22 @@ private fun HudBalloonQuota(quota: HudQuota, language: AppLanguage, ringIndex: I
         )
         // Sem reset não se imprime nada no lugar, nem traço: saldo que não
         // expira é o caso comum.
-        quota.resetText?.let { reset ->
-            Text(
-                text = hudResetCaption(reset, language),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+        // Cota bloqueada (#567): o motivo com palavra substitui o reinício.
+        val blockReason = quota.blockReason
+        if (blockReason != null) {
+            AppStatusIndicator(
+                label = quotaBlockReasonLabel(reason = blockReason, language = language),
+                tone = quotaBlockReasonTone(reason = blockReason)
             )
+        } else {
+            quota.resetText?.let { reset ->
+                Text(
+                    text = hudResetCaption(reset, language),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
         }
     }
     Box(
@@ -617,3 +650,10 @@ private fun HudRingLegendGlyph(position: Int, count: Int) {
 internal val RING_LEGEND_SIZE = 14.dp
 private val RING_LEGEND_STROKE = 1.5.dp
 private val RING_LEGEND_GAP = 0.75.dp
+
+/** Palavra da linha de resets de limite (#571): zero é "nenhum", um é singular, o resto plural. */
+private fun bankedResetsLabel(count: Int, language: AppLanguage): String = when {
+    count <= 0 -> localized(language, "nenhum", "none")
+    count == 1 -> localized(language, "1 disponível", "1 available")
+    else -> localized(language, "$count disponíveis", "$count available")
+}

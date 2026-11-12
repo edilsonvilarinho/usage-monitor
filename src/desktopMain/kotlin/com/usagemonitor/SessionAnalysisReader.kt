@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import com.usagemonitor.domain.entity.ANALYSIS_SOURCES
+import com.usagemonitor.domain.entity.AnalysisPeriod
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -18,15 +19,16 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
- * Análise da sessão (rodada AB, B04): histórico de 7 dias da conta e a vazão do índice CLI
+ * Análise da sessão (rodada AB, B04): histórico da conta e a vazão do índice CLI
  * "desde" cada recorte que a análise pede. Anthropic lê o índice do perfil da conta (alvo Anthropic sempre tem perfil; o
  * mesmo das Sessões CLI); Codex lê o índice da máquina. Índice que falha deixa a vazão nula.
  * A janela relê ao vivo (rodada AD): ~20 ms de SQL por passada, medido no plano.
+ * Período (#538): a faixa do histórico e os recortes da vazão seguem o período escolhido.
  */
-internal fun sessionAnalysisReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (String) -> SessionAnalysis? =
+internal fun sessionAnalysisReader(graph: AppGraph, dashboard: DashboardViewModel): suspend (String, AnalysisPeriod) -> SessionAnalysis? =
     sessionAnalysisReader(
         currentStats = { (dashboard.uiState.value as? UiState.Success)?.data.orEmpty() },
-        history = { source, accountKey, now -> graph.getUsageHistory(source, HistoryRange.LAST_7_DAYS, accountKey, now) },
+        history = { source, accountKey, range, now -> graph.getUsageHistory(source, range, accountKey, now) },
         claudeThroughputs = { profileId, since -> graph.cliSessionRepository.getModelThroughputs(profileId = profileId, sinceEpochMillis = since) },
         codexUsage = { since -> graph.codexCliSessionRepository.getModelUsage(since) },
         codexIndexedAt = { graph.codexIndexSyncedAt.value }
@@ -35,17 +37,17 @@ internal fun sessionAnalysisReader(graph: AppGraph, dashboard: DashboardViewMode
 /** O mesmo leitor sobre as partes do grafo de que ele precisa, para o teste. */
 internal fun sessionAnalysisReader(
     currentStats: () -> List<ApiUsageStats>,
-    history: suspend (ApiSource, UsageAccountKey?, Instant) -> ApiUsageHistoryReport,
+    history: suspend (ApiSource, UsageAccountKey?, HistoryRange, Instant) -> ApiUsageHistoryReport,
     claudeThroughputs: suspend (profileId: String?, sinceEpochMillis: Long) -> Result<Map<String, OutputThroughput>>,
     codexUsage: suspend (sinceEpochMillis: Long) -> Result<List<CodexCliModelUsage>>,
     codexIndexedAt: () -> Instant?,
     clock: Clock = Clock.System
-): suspend (String) -> SessionAnalysis? = reader@{ key ->
+): suspend (String, AnalysisPeriod) -> SessionAnalysis? = reader@{ key, period ->
     val stats = currentStats().firstOrNull { item -> item.targetKey.storageKey == key } ?: return@reader null
     if (stats.source !in ANALYSIS_SOURCES) return@reader null
     val now = clock.now()
-    val report = runCatching { history(stats.source, stats.accountContext?.key, now) }.getOrNull() ?: return@reader null
-    val cumulative = analysisThroughputCuts(report.series, now).mapNotNull { since ->
+    val report = runCatching { history(stats.source, stats.accountContext?.key, historyRangeOf(period), now) }.getOrNull() ?: return@reader null
+    val cumulative = analysisThroughputCuts(report.series, now, period).mapNotNull { since ->
         val byModel = if (stats.source == ApiSource.ANTHROPIC) {
             claudeThroughputs(stats.targetKey.profileId, since).getOrNull()
         } else {
@@ -54,7 +56,14 @@ internal fun sessionAnalysisReader(
         }
         byModel?.let { value -> since to value }
     }.toMap()
-    val analysis = buildSessionAnalysis(stats.snapshotLabel, stats.source, report.series, cumulative, now)
+    val analysis = buildSessionAnalysis(stats.snapshotLabel, stats.source, report.series, cumulative, now, period = period)
     // O índice do Claude é sincronizado a cada 30 s; o do Codex, a cada 10 min — só ele diz a hora.
     if (stats.source == ApiSource.CODEX) analysis.copy(throughputIndexedAt = codexIndexedAt()) else analysis
+}
+
+/** Faixa do histórico que cobre o período: tudo pede a retenção inteira; 24 h e 7 d cabem nos 7 d. */
+private fun historyRangeOf(period: AnalysisPeriod): HistoryRange = when (period) {
+    AnalysisPeriod.NOW, AnalysisPeriod.HOURS_24, AnalysisPeriod.DAYS_7 -> HistoryRange.LAST_7_DAYS
+    AnalysisPeriod.DAYS_30 -> HistoryRange.LAST_30_DAYS
+    AnalysisPeriod.ALL -> HistoryRange.TOTAL
 }

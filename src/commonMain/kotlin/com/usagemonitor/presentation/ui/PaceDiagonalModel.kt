@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.exhaustionTimeOf
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
@@ -33,8 +34,34 @@ internal data class PaceDiagonalModel(
     /** Início, meio e reinício, na escala de tempo da janela. */
     val axisLabels: List<String>,
     /** A frase que o leitor de tela lê no lugar do desenho. */
-    val description: String
+    val description: String,
+    /** Rótulo do marcador "agora HH:MM"; `null` no histórico, que não tem agora. */
+    val nowLabel: String? = null,
+    /** Rótulo do ponto final "N % no reinício"; `null` quando a linha esgota antes. */
+    val endLabel: String? = null,
+    /** Rótulo do cruzamento dos 100% "esgota Ter 13:46"; `null` sem esgotamento. */
+    val exhaustionLabel: String? = null,
+    /** Teto do eixo Y: 100, ou a projeção quando ela passa de 100. */
+    val yMax: Double = 100.0,
+    /** Legenda na ordem de leitura. */
+    val legend: List<String> = emptyList()
 )
+
+private const val PREVIOUS_BASE_ALPHA = 0.45f
+private const val PREVIOUS_MIN_ALPHA = 0.12f
+
+/** Até quantas linhas anteriores a opacidade fica cheia. */
+private const val PREVIOUS_FULL_OPACITY_COUNT = 3
+
+/**
+ * Opacidade de cada linha anterior atrás da aberta (#556). Até três linhas, 0,45; acima, cai com a
+ * raiz de 3/n, para muitas linhas não virarem borrão, com piso 0,12 para continuarem visíveis.
+ */
+internal fun previousPathAlpha(count: Int): Float {
+    if (count <= PREVIOUS_FULL_OPACITY_COUNT) return PREVIOUS_BASE_ALPHA
+    val faded = PREVIOUS_BASE_ALPHA * sqrt(PREVIOUS_FULL_OPACITY_COUNT.toFloat() / count)
+    return faded.coerceAtLeast(PREVIOUS_MIN_ALPHA)
+}
 
 internal object PaceDiagonalLabels {
     fun above(language: AppLanguage) = localized(language, "acima da linha: esgota antes", "above the line: runs out first")
@@ -66,14 +93,28 @@ internal object PaceDiagonalModels {
             projected != null -> listOf(nowPoint, PacePathPoint(1.0, projected.toDouble()))
             else -> emptyList()
         }
+        val previous = window.previousPaths.map { previousPath -> previousPath.points }
+        val legend = buildList {
+            val safe = window.safePace
+            if (safe != null) add(localized(language, "linha segura: ${paceLabel(safe, language)} (100 % no reinício)", "safe line: ${paceLabel(safe, language)} (100% at reset)"))
+            add(localized(language, "seu uso até agora", "your use so far"))
+            if (projection.isNotEmpty()) add(projectionLegend(window, language))
+            add(localized(language, "agora (linha pontilhada)", "now (dotted line)"))
+            if (previous.isNotEmpty()) add(previousWindowsLegend(previous.size, language))
+        }
         return PaceDiagonalModel(
             current = current,
-            previous = window.previousPaths.map { path -> path.points },
+            previous = previous,
             projection = projection,
             projectionCritical = eta != null || (projected ?: 0) >= 100,
             pointLabel = "${window.percent}% · ${(fraction * 100).roundToInt()}% " + localized(language, "do tempo", "of time"),
             axisLabels = axisLabels(startsAt, resetsAt),
-            description = description
+            description = description,
+            nowLabel = localized(language, "agora ${TelegramBotMessages.clock(now)}", "now ${TelegramBotMessages.clock(now)}"),
+            endLabel = if (eta == null && projected != null) localized(language, "$projected % no reinício", "$projected% at reset") else null,
+            exhaustionLabel = eta?.let { at -> localized(language, "esgota ${weekdayClock(at, language)}", "runs out ${weekdayClock(at, language)}") },
+            yMax = maxOf(100.0, (projected ?: 0).toDouble()),
+            legend = legend
         )
     }
 
@@ -123,6 +164,22 @@ internal object PaceDiagonalModels {
         val fraction = elapsedFractionOf(window.startsAt, window.resetsAt, now) ?: return null
         return (window.percent - fraction * 100).roundToInt()
     }
+
+    /** "Ter 13:46" / "Tue 13:46": dia da semana no fuso do app, depois o horário. */
+    fun weekdayClock(at: Instant, language: AppLanguage): String {
+        val day = at.toLocalDateTime(TimeZone.of(ACTIVITY_TIME_ZONE_ID)).dayOfWeek
+        val name = localized(language, TelegramBotMessages.weekday(day, true), TelegramBotMessages.weekday(day, false))
+        return "$name ${TelegramBotMessages.clock(at)}"
+    }
+
+    /** Quantas janelas anteriores a diagonal desenha de fato, para o leitor saber o que está atrás. */
+    private fun previousWindowsLegend(count: Int, language: AppLanguage): String =
+        if (count == 1) localized(language, "1 janela anterior", "1 previous window")
+        else localized(language, "$count janelas anteriores", "$count previous windows")
+
+    private fun projectionLegend(window: AnalysisWindowView, language: AppLanguage): String =
+        if (window.paceNow != null) localized(language, "projeção pelo ritmo da última hora", "projection at the last hour's pace")
+        else localized(language, "projeção pelo ritmo médio da janela", "projection at the window's average pace")
 
     private fun dayMonth(at: Instant): String {
         val local = at.toLocalDateTime(TimeZone.of(ACTIVITY_TIME_ZONE_ID))

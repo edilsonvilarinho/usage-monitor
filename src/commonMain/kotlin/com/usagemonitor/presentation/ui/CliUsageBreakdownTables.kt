@@ -116,9 +116,11 @@ internal fun BudgetPanel(
 @Composable
 internal fun BucketTable(
     page: BreakdownPage<CliUsageBucket>,
-    axis: BreakdownAxis,
+    axisHeader: String,
+    rowLabel: (String) -> String,
     totals: CliUsageBucket,
     unknownLabel: String,
+    unpricedMode: Boolean,
     language: AppLanguage
 ) {
     val hasActiveTime = page.items.any { bucket -> bucket.activeMillis != null }
@@ -127,7 +129,7 @@ internal fun BucketTable(
         header = {
             AppColumnHeaderRow(startGutter = 0.dp) {
                 AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnAxis(axis, language),
+                    label = axisHeader,
                     modifier = Modifier.weight(1f).widthIn(min = AXIS_COLUMN_MIN_WIDTH)
                 )
                 AppColumnHeaderLabel(
@@ -135,17 +137,19 @@ internal fun BucketTable(
                     modifier = Modifier.width(SESSIONS_COLUMN_WIDTH)
                 )
                 AppColumnHeaderLabel(
-                    label = BreakdownLabels.columnTurns(language),
+                    label = if (unpricedMode) BreakdownLabels.responses(language) else BreakdownLabels.columnTurns(language),
                     modifier = Modifier.width(TURNS_COLUMN_WIDTH)
                 )
                 AppColumnHeaderLabel(
                     label = CliSessionsLabels.columnTokens(language),
                     modifier = Modifier.width(TOKENS_COLUMN_WIDTH)
                 )
-                AppColumnHeaderLabel(
-                    label = CliSessionsLabels.columnCost(language),
-                    modifier = Modifier.width(COST_COLUMN_WIDTH)
-                )
+                if (!unpricedMode) {
+                    AppColumnHeaderLabel(
+                        label = CliSessionsLabels.columnCost(language),
+                        modifier = Modifier.width(COST_COLUMN_WIDTH)
+                    )
+                }
                 if (hasActiveTime) {
                     AppColumnHeaderLabel(
                         label = CliSessionsLabels.activeTime(language),
@@ -164,6 +168,8 @@ internal fun BucketTable(
                 bucket = bucket,
                 totals = totals,
                 unknownLabel = unknownLabel,
+                rowLabel = rowLabel,
+                unpricedMode = unpricedMode,
                 hasActiveTime = hasActiveTime,
                 showDivider = index < page.items.lastIndex,
                 language = language
@@ -177,6 +183,8 @@ private fun BucketRow(
     bucket: CliUsageBucket,
     totals: CliUsageBucket,
     unknownLabel: String,
+    rowLabel: (String) -> String,
+    unpricedMode: Boolean,
     hasActiveTime: Boolean,
     showDivider: Boolean,
     language: AppLanguage
@@ -185,7 +193,7 @@ private fun BucketRow(
 
     AppDataRow(showDivider = showDivider) {
         AppCellValue(
-            value = bucket.label ?: unknownLabel,
+            value = bucket.label?.let(rowLabel) ?: unknownLabel,
             modifier = Modifier.weight(1f).widthIn(min = AXIS_COLUMN_MIN_WIDTH)
         )
         AppCellValue(
@@ -200,10 +208,12 @@ private fun BucketRow(
             value = formatQuantity(bucket.totalTokens),
             modifier = Modifier.width(TOKENS_COLUMN_WIDTH)
         )
-        AppCellValue(
-            value = BreakdownLabels.bucketCost(bucket),
-            modifier = Modifier.width(COST_COLUMN_WIDTH)
-        )
+        if (!unpricedMode) {
+            AppCellValue(
+                value = BreakdownLabels.bucketCost(bucket),
+                modifier = Modifier.width(COST_COLUMN_WIDTH)
+            )
+        }
         if (hasActiveTime) {
             // Hora nula é eixo sem medida e hora zero é balde só de sessões de um
             // turno: nos dois casos sai o travessão, porque "0min" seria lido como
