@@ -59,6 +59,11 @@ e devolver a que as janelas modais fechadas seguram para sempre.
 
 ## Problemas em aberto e riscos
 
+- Cobertura do diff 40% (2/5; `gradlew.bat allTests koverXmlReport -Pcoverage` → 4206 testes, 0 falhas;
+  `diff-coverage.mjs` → `AppDialogWindow.kt:253-254,256` descobertas). São o `ModalHostSlot` e a cola de
+  `rememberModalWindowHost`, que só rodam com janela AWT real; nenhum teste exercita o sistema de janelas (#342).
+  A regra mora nas funções puras (2/2) e a cola foi validada pela medição do A03.
+
 - **Não provado ainda** que tirar a janela da composição devolve a memória nativa (Skiko libera o `Direct3DRedrawer`
   no `dispose`?). A03 mede; se não cair, a mudança volta e o plano é revisto.
 - Estado de interface guardado só na composição da janela (aba, rolagem) se perde após 60 s fechada.
