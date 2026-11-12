@@ -1658,7 +1658,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
     tabela</b> (a mesma "Participação" do Resumo), porque o mesmo volume pesa muito mais num modelo caro, e é esse
     peso que aparece na cota. Sem custo nenhum na sessão, a base vira tokens e o rótulo diz <code>% dos tokens</code>.
     Modelo sem tarifa leva a palavra "sem tarifa", nunca 0%. Sem o corte lido (servidor de time antigo), a linha não
-    aparece. No Codex a mistura entra na segunda linha e só quando houve troca: a coluna Modelo já diz o modelo único. A coluna <b>% de uso</b> mostra a fatia dos turnos da sessão (<code>usageShare</code>) num trilho neutro, só na base de custo, nunca no Codex nem na base de tokens, e modelo sem tarifa mantém a sua fatia de turnos.</p>
+    aparece. No Codex a coluna Modelo saiu da grade: a mistura vai para a terceira linha, em <code>% dos tokens</code>, e sem mistura medida a linha mostra o modelo principal da sessão. A coluna <b>% de uso</b> mostra a fatia dos turnos da sessão (<code>usageShare</code>) num trilho neutro, só na base de custo, nunca no Codex nem na base de tokens, e modelo sem tarifa mantém a sua fatia de turnos.</p>
 
     <div class="g2">
       <div><div class="cap">Lista vazia</div><div class="panel"><div class="state"><span class="msg">Nenhum turno nesta janela.</span></div></div></div>
@@ -1669,6 +1669,156 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 </div>
 <p class="note">O botão de retomada copia <code>claude --resume &lt;uuid completo&gt;</code>: o id truncado em 8 que aparece na coluna <b>não retoma nada</b> — com prefixo o CLI cai no seletor interativo.</p>
 <p class="note"><b>O botão só existe na linha de uma sessão desta máquina.</b> Ele teve um segundo modo, que copiava apenas o identificador na lista do time, e esse modo saiu: sessão de outro integrante não oferece botão nenhum (issue #102). Rótulo diferente para a mesma ação continuava entregando o dado que a issue pede para não entregar, e um <code>--resume</code> com transcript de outra máquina cairia num seletor vazio. A linha continua clicável e o detalhe segue abrindo — é ele que permite diagnosticar a sessão saturada de um colega, que é para o que a lista do time existe.</p>
+
+<div class="cap">Codex · aba Sessões (#560)</div>
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões CLI do Codex — Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="tabs" style="flex:1"><button class="on" type="button">Sessões</button><button type="button">Resumo</button></div>
+      <div class="seg"><button type="button">5h</button><button type="button">7 dias</button><button type="button">30 dias</button><button class="on" type="button">Total</button></div>
+      <span class="st ok">AO VIVO</span>
+      <button class="btn" type="button">Exportar CSV</button>
+      <button class="btn" type="button">Exportar JSON</button>
+      <button class="btn" type="button">Relatório PDF</button>
+      <button class="btn ghost" type="button" title="Como ler esta tela">?</button>
+    </div>
+
+    <div class="g4" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+      <div class="metric"><span class="k">Sessões</span><span class="v big">6</span></div>
+      <div class="metric"><span class="k">Tokens (com cache)</span><span class="v big">494,9 M</span></div>
+      <div class="metric"><span class="k">Respostas</span><span class="v big">—</span><span class="k">sem total no print</span></div>
+      <div class="metric"><span class="k">Tempo ativo</span><span class="v big">16h39</span></div>
+      <div class="metric"><span class="k">Vazão</span><span class="v big">35 tok/s</span><span class="k">saída · ponta a ponta</span></div>
+    </div>
+
+    <table class="dt" style="table-layout:fixed">
+      <colgroup><col style="width:19%"><col style="width:17%"><col style="width:16%"><col style="width:14%"><col style="width:14%"><col style="width:10%"><col style="width:10%"></colgroup>
+      <thead>
+        <tr><th>Sessão</th><th>Projeto</th><th class="num">Tokens (com cache)</th><th class="num">Cache</th><th class="num" aria-sort="descending">Respostas ↓</th><th class="num">Tempo ativo</th><th class="num">Vazão</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="v sm">01a1c80e…</span> <button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button><br><span class="k">11/11 17:49 BRT</span></td>
+          <td><span class="v sm">monolith-feed</span><br><span class="k">94 turnos</span></td>
+          <td class="num"><span class="v sm">263,1 M</span></td>
+          <td class="num"><span class="v sm">98%</span><div class="track ok"><i style="width:98%"></i></div></td>
+          <td class="num"><span class="v sm">2188</span></td>
+          <td class="num"><span class="v sm">9h43</span></td>
+          <td class="num"><span class="v sm">31 tok/s</span></td>
+        </tr>
+        <tr><td colspan="7"><span class="k">● 2188 respostas · 94 turnos · Codex CLI · cli · 0.167.1</span><br><span class="k">Modelo principal: gpt-6.1-sol</span></td></tr>
+        <tr>
+          <td><span class="v sm">01a1c1a2…</span> <button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button><br><span class="k">10/11 14:46 BRT</span></td>
+          <td><span class="v sm">raio-x-brasil</span><br><span class="k">12 turnos</span></td>
+          <td class="num"><span class="v sm">138,5 M</span></td>
+          <td class="num"><span class="v sm">99%</span><div class="track ok"><i style="width:99%"></i></div></td>
+          <td class="num"><span class="v sm">646</span></td>
+          <td class="num"><span class="v sm">2h33</span></td>
+          <td class="num"><span class="v sm">45 tok/s</span></td>
+        </tr>
+        <tr><td colspan="7"><span class="k">● 646 respostas · 12 turnos · Codex CLI · cli · 0.167.0</span><br><span class="k">Modelo principal: gpt-6.1-terra</span></td></tr>
+        <tr>
+          <td><span class="v sm">01a1bdb0…</span> <button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button><br><span class="k">08/11 23:21 BRT</span></td>
+          <td><span class="v sm">monolith-feed</span><br><span class="k">39 turnos</span></td>
+          <td class="num"><span class="v sm">39,8 M</span></td>
+          <td class="num"><span class="v sm">99%</span><div class="track ok"><i style="width:99%"></i></div></td>
+          <td class="num"><span class="v sm">231</span></td>
+          <td class="num"><span class="v sm">1h17</span></td>
+          <td class="num"><span class="v sm">39 tok/s</span></td>
+        </tr>
+        <tr><td colspan="7"><span class="k">● 231 respostas · 39 turnos · Codex CLI · cli · 0.167.0</span><br><span class="k">Modelo principal: gpt-6.1-terra</span></td></tr>
+        <tr>
+          <td><span class="v sm">01a1bc7c…</span> <button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button><br><span class="k">08/11 16:37 BRT</span></td>
+          <td><span class="v sm">lore-path-of-exile</span><br><span class="k">12 turnos</span></td>
+          <td class="num"><span class="v sm">1,9 M</span></td>
+          <td class="num"><span class="v sm">97%</span><div class="track ok"><i style="width:97%"></i></div></td>
+          <td class="num"><span class="v sm">40</span></td>
+          <td class="num"><span class="v sm">37min</span></td>
+          <td class="num"><span class="v sm">49 tok/s</span></td>
+        </tr>
+        <tr><td colspan="7"><span class="k">● 40 respostas · 12 turnos · Codex CLI · cli · 0.167.0</span><br><span class="k">Modelo principal: gpt-6.1-terra</span></td></tr>
+        <tr>
+          <td><span class="v sm">01a1ca8d…</span> <button class="btn icon" type="button" aria-label="Copiar comando de retomada" title="Copiar comando de retomada">⧉</button><br><span class="k">11/11 09:32 BRT</span></td>
+          <td><span class="v sm">monolith-feed</span><br><span class="k">11 turnos</span></td>
+          <td class="num"><span class="v sm">1,2 M</span></td>
+          <td class="num"><span class="v sm">95%</span><div class="track ok"><i style="width:95%"></i></div></td>
+          <td class="num"><span class="v sm">23</span></td>
+          <td class="num"><span class="v sm">11min</span></td>
+          <td class="num"><span class="v sm">37 tok/s</span></td>
+        </tr>
+        <tr><td colspan="7"><span class="k">● 23 respostas · 11 turnos · Codex CLI · cli · 0.167.1</span><br><span class="k">Modelo principal: gpt-6.1-terra</span></td></tr>
+      </tbody>
+    </table>
+    <div class="dim" style="margin:var(--s2) 0">O print mostra 5 das 6 sessões da janela de 7 dias. A fatia "desconhecido" da mistura foi omitida (bug #561, corrigido à parte), por isso a soma pode não fechar em 100%.</div>
+
+    <div class="statusbar"><span>5 de 6 sessões · janela de 7 dias</span><span class="sp"></span><span>Total</span></div>
+  </div>
+</div>
+
+<div class="cap">Codex · aba Resumo, eixo Agente (#560)</div>
+<div class="win">
+  <div class="titlebar"><span class="t">Sessões CLI do Codex — Padrão</span><span class="wbtn">□</span><span class="wbtn close">×</span></div>
+  <div class="body">
+    <div class="hstack wrap">
+      <div class="tabs" style="flex:1"><button type="button">Sessões</button><button class="on" type="button">Resumo</button></div>
+      <div class="seg"><button type="button">5h</button><button type="button">7 dias</button><button class="on" type="button">30 dias</button><button type="button">Total</button></div>
+      <button class="btn" type="button">Relatório PDF</button>
+      <button class="btn ghost" type="button" title="Como ler esta tela">?</button>
+    </div>
+
+    <div class="g3">
+      <div class="metric"><span class="k">Respostas</span><span class="v big">13537</span><span class="k">30 dias</span></div>
+      <div class="metric"><span class="k">Reuso de cache</span><span class="v big">98%</span><span class="k">30 dias</span></div>
+      <div class="metric"><span class="k">Respostas por sessão</span><span class="v big">521</span><span class="k">30 dias</span></div>
+    </div>
+    <div class="k" style="margin:var(--s2) 0">gpt-6.1-terra responde por 10346 das 13537 respostas (76%) em 21 sessões; gpt-6.1-sol, por 3191 em 5 sessões.</div>
+
+    <div class="tabs" role="tablist" aria-label="Eixo do resumo">
+      <button class="on" type="button" aria-selected="true">Agente</button><button type="button">Projeto</button><button type="button">Modelo</button><button type="button">Atividade</button>
+    </div>
+    <div class="hstack wrap" style="margin:var(--s2) 0">
+      <input class="field" type="text" placeholder="Filtrar agentes" aria-label="Filtro" style="width:220px">
+      <span class="k">Ordenar por</span>
+      <select class="field" aria-label="Ordenar por"><option>Respostas</option><option>Tokens</option><option>Nome</option></select>
+      <button class="btn ghost" type="button" aria-label="Ordem decrescente">↓</button>
+    </div>
+    <div class="hstack wrap" style="margin-bottom:var(--s2)">
+      <span class="k">1–2 de 2</span>
+      <button class="btn" type="button" disabled>Anterior</button>
+      <button class="btn" type="button" disabled>Próxima</button>
+      <span class="sp" style="flex:1"></span>
+      <span class="k">Por página</span>
+      <div class="seg"><button type="button">5</button><button class="on" type="button" aria-pressed="true">10</button><button type="button">50</button><button type="button">100</button></div>
+    </div>
+
+    <div class="k" style="margin-bottom:var(--s2)">Agente · sessão 01a1c80e… (dado do print; cartões e demais eixos seguem os 30 dias)</div>
+    <table class="dt" style="table-layout:fixed">
+      <colgroup><col style="width:34%"><col style="width:18%"><col style="width:20%"><col style="width:28%"></colgroup>
+      <thead>
+        <tr><th>Agente</th><th class="num">Respostas</th><th class="num">Tokens (com cache)</th><th class="num">Participação</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="v sm">Sessão principal</span></td>
+          <td class="num"><span class="v sm">765</span></td>
+          <td class="num"><span class="v sm">175,5 M</span></td>
+          <td class="num"><span class="v sm">67%</span><div class="track"><i style="width:67%"></i></div></td>
+        </tr>
+        <tr>
+          <td><span class="v sm">Subagentes</span></td>
+          <td class="num"><span class="v sm">1423</span></td>
+          <td class="num"><span class="v sm">87,6 M</span></td>
+          <td class="num"><span class="v sm">33%</span><div class="track"><i style="width:33%"></i></div></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:var(--s2)">Subagentes fazem 1423 de 2188 respostas (65%) e 87,6 M de 263,1 M tokens (33%) da sessão 01a1c80e…</div>
+
+    <div class="statusbar"><span>2 agentes · eixo Agente</span><span class="sp"></span><span>30 dias</span></div>
+  </div>
+</div>
+<p class="note" style="margin:var(--s2) 0 var(--s4)"><b>Codex no padrão do Anthropic (#560).</b> Respostas entra no lugar do Custo: no cartão, na coluna e na linha 2 (<code>● N respostas · M turnos · app · origem · versão</code>), porque o Codex não tem tarifa e uma coluna de custo zerada mentiria. Sem tarifa, o que aparece é Respostas. O Resumo é um só, montado por <code>CliUsageBreakdownPane</code>, e o eixo Agente (sessão principal × subagentes) vem de <code>byMember</code>, com o rótulo como parâmetro: "Integrante" no time, "Agente" no Codex. Branch e Ferramentas somem quando vazios, porque o Codex não os indexa. A coluna Modelo saiu da grade; a mistura vai para a terceira linha, em <code>% dos tokens</code>.</p>
 
 <!-- ═══════════════════════════════ DETALHE ═══════════════════════════ -->
 <h2 id="detalhe">7 · Detalhe de sessão</h2>
