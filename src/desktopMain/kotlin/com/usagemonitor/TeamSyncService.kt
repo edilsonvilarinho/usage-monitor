@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /** Conta Anthropic que participa do time, resolvida a partir de um perfil local. */
@@ -83,6 +84,28 @@ private fun Throwable.admissionRejection(): String? {
     val serverError = this as? TeamServerException ?: return null
     return serverError.detail.takeIf { serverError.statusCode == 403 }
 }
+
+/**
+ * Impressão da conta que o servidor recusou: chave do perfil, `accountKey` e e-mail.
+ *
+ * Se qualquer um dos três muda, a configuração mudou e a pergunta ao servidor é
+ * nova. Segredo nunca no `toString`.
+ */
+private data class AdmissionFingerprint(
+    val apiKey: String,
+    val accountKey: String,
+    val accountEmail: String?
+) {
+    override fun toString(): String =
+        "AdmissionFingerprint(apiKey=${redactedSecret(apiKey)}, accountKey=$accountKey, accountEmail=$accountEmail)"
+}
+
+/** Recusa de uma conta num time: a impressão vista, o motivo do servidor e até quando o envio fica parado. */
+private class AdmissionSuspension(
+    val fingerprint: AdmissionFingerprint,
+    val reason: String,
+    val until: Instant
+)
 
 private fun TeamIntegrationSettings.confirmedIdentity(target: TeamSyncTarget): ConfirmedIdentity {
     return ConfirmedIdentity(alias = alias, apiKey = apiKeyFor(target.profileId), accountEmail = target.accountEmail)
@@ -211,6 +234,12 @@ internal class TeamSyncService(
     private val confirmedIdentityByTeamAccount = mutableMapOf<Pair<String, String>, ConfirmedIdentity>()
     private val lastRecordedFailureKeyByTeam = mutableMapOf<String, String?>()
 
+    /**
+     * Contas recusadas com `403` e suspensas, por (time, perfil). Só em memória: reiniciar o app
+     * devolve a pergunta ao servidor. O acesso é sempre de dentro do [passMutex].
+     */
+    private val admissionSuspensions = mutableMapOf<Pair<String, String>, AdmissionSuspension>()
+
     private val _syncStatus = MutableStateFlow(TeamSyncStatus())
 
     /** Desfecho da última passada do primeiro time ativo, para as Configurações mostrarem. */
@@ -333,6 +362,18 @@ internal class TeamSyncService(
                 continue
             }
 
+            val fingerprint = AdmissionFingerprint(
+                apiKey = team.apiKeyFor(target.profileId),
+                accountKey = target.accountKey,
+                accountEmail = target.accountEmail
+            )
+            // Conta recusada e ainda suspensa: nada sai para ela, e a recusa continua na tela.
+            val suspendedReason = activeAdmissionReason(team.id, target.profileId, fingerprint)
+            if (suspendedReason != null) {
+                rejections[target.profileId] = suspendedReason
+                continue
+            }
+
             val result = syncTarget(team, target)
             pushedTurns += result.pushedTurns
             batches += result.batches
@@ -346,10 +387,31 @@ internal class TeamSyncService(
             }
             if (rejection != null) {
                 rejections[target.profileId] = rejection
+                admissionSuspensions[team.id to target.profileId] = AdmissionSuspension(
+                    fingerprint = fingerprint,
+                    reason = rejection,
+                    until = clock.now() + ADMISSION_SUSPENSION
+                )
             }
         }
 
         return TeamPass(TeamSyncReport(pushedTurns, batches, failures), rejections)
+    }
+
+    /**
+     * Motivo da suspensão ativa da conta neste time, ou `null` quando ela deve ser consultada.
+     *
+     * Suspensão vencida ou de impressão diferente é apagada aqui: quem chama envia, e
+     * uma nova recusa grava uma suspensão nova.
+     */
+    private fun activeAdmissionReason(teamId: String, profileId: String, fingerprint: AdmissionFingerprint): String? {
+        val key = teamId to profileId
+        val suspension = admissionSuspensions[key] ?: return null
+        if (suspension.fingerprint != fingerprint || clock.now() >= suspension.until) {
+            admissionSuspensions.remove(key)
+            return null
+        }
+        return suspension.reason
     }
 
     /**
@@ -383,7 +445,9 @@ internal class TeamSyncService(
             // Passada limpa apaga a falha: o aviso é sobre o estado atual, e uma
             // mensagem que sobrevive ao conserto manda o usuário atrás de um
             // problema que já não existe.
-            TeamSyncStatus(lastSuccessAt = now)
+            // Recusa suspensa não é resolvida só porque o cliente parou de perguntar:
+            // a tela mantém o motivo do servidor até a suspensão cair.
+            TeamSyncStatus(lastSuccessAt = now, rejectedProfiles = rejections)
         }
         _syncStatusByTeam.value = _syncStatusByTeam.value + (teamId to next)
     }
@@ -563,6 +627,9 @@ internal class TeamSyncService(
 
         /** Teto de lotes por passada, para o backfill não monopolizar o índice. */
         const val DEFAULT_MAX_BATCHES_PER_PASS = 5
+
+        /** Prazo de uma suspensão por recusa: depois dele o servidor é consultado de novo (o rótulo pode ter sido corrigido). */
+        private val ADMISSION_SUSPENSION = 30.minutes
 
         fun defaultHostName(): String? {
             val fromEnvironment = System.getenv("COMPUTERNAME")?.takeIf { it.isNotBlank() }

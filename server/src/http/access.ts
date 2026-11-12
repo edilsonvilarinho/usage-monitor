@@ -7,6 +7,7 @@ import { logger } from '../logger.js';
 import { hashKey, type ResolvedTeamKey, type TeamKeyRepository } from '../repositories/teamKeyRepository.js';
 import type { TeamRepository } from '../repositories/teamRepository.js';
 import { isValidTeamKey, TEAM_KEY_HEADER } from './auth.js';
+import { LabelRefusalLog } from './labelRefusalLog.js';
 
 export const ADMIN_TOKEN_HEADER = 'x-admin-token';
 export const REPORT_TOKEN_HEADER = 'x-report-key';
@@ -275,6 +276,9 @@ export function assertNotBlocked(deps: AccessDeps, accountKey: string | null): v
   }
 }
 
+/** Dedup do aviso da recusa por rotulo. O 403 nao passa por aqui: sai a cada requisicao. */
+const labelRefusalLog = new LabelRefusalLog();
+
 /**
  * Recusa a conta que nao esta na relacao declarada no rotulo da chave.
  *
@@ -297,10 +301,13 @@ export function assertAllowedByLabel(
     return;
   }
 
-  logger.warn(
-    { keyId: resolved.id, label: resolved.label, accountKey, accountEmail },
-    'conta fora da relacao declarada no rotulo da chave',
-  );
+  const refusal = labelRefusalLog.register(resolved.id, accountKey, deps.now());
+  if (refusal.warn) {
+    logger.warn(
+      { keyId: resolved.id, label: resolved.label, accountKey, accountEmail, suppressed: refusal.suppressed },
+      'conta fora da relacao declarada no rotulo da chave',
+    );
+  }
   throw new ForbiddenError(labelMismatchMessage(resolved.label, accountEmail));
 }
 
