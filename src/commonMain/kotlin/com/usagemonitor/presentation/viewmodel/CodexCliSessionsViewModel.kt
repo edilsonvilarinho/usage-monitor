@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.viewmodel
 
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.domain.entity.UsageExportFormat
 import com.usagemonitor.domain.repository.UsageExportEncoder
 import com.usagemonitor.domain.entity.CodexCliSessionDetail
@@ -29,11 +30,6 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-enum class CodexCliSessionRange {
-    LAST_5H,
-    LAST_7D,
-    ALL
-}
 
 sealed interface CodexCliSessionsUiState {
     data object Loading : CodexCliSessionsUiState
@@ -42,7 +38,7 @@ sealed interface CodexCliSessionsUiState {
 
     data class Success(
         val sessions: List<CodexCliSessionSummary>,
-        val range: CodexCliSessionRange,
+        val range: CliSessionRange,
         val readAt: Instant,
         val indexReport: CodexCliSessionIndexReport? = null,
         val indexWarning: String? = null,
@@ -77,7 +73,7 @@ class CodexCliSessionsViewModel(
     private var detailJob: Job? = null
     private var liveJob: Job? = null
     private var exportJob: Job? = null
-    private var range = CodexCliSessionRange.LAST_5H
+    private var range = CliSessionRange.LAST_5H
     private var lastSessionsFailureKey: String? = null
     private var lastIndexFailureKey: String? = null
     private var lastDetailFailureKey: String? = null
@@ -152,7 +148,7 @@ class CodexCliSessionsViewModel(
         }
     }
 
-    fun setRange(range: CodexCliSessionRange) {
+    fun setRange(range: CliSessionRange) {
         if (this.range == range) return
         this.range = range
         val current = _uiState.value
@@ -244,11 +240,11 @@ class CodexCliSessionsViewModel(
     fun openWindow() {
         // A janela sempre começa no recorte operacional padrão, mesmo quando
         // o ViewModel foi reutilizado depois de uma seleção anterior.
-        range = CodexCliSessionRange.LAST_5H
+        range = CliSessionRange.LAST_5H
         val current = _uiState.value
         if (current is CodexCliSessionsUiState.Success) {
             _uiState.value = current.copy(
-                range = CodexCliSessionRange.LAST_5H,
+                range = CliSessionRange.LAST_5H,
                 isRefreshing = true,
                 detail = null
             )
@@ -290,12 +286,13 @@ class CodexCliSessionsViewModel(
         }
     }
 
-    private fun cutoffFor(range: CodexCliSessionRange): Long? {
+    private fun cutoffFor(range: CliSessionRange): Long? {
         val now = clock.now().toEpochMilliseconds()
         return when (range) {
-            CodexCliSessionRange.LAST_5H -> now - 5L * 60L * 60L * 1000L
-            CodexCliSessionRange.LAST_7D -> now - 7L * 24L * 60L * 60L * 1000L
-            CodexCliSessionRange.ALL -> null
+            CliSessionRange.LAST_5H -> now - 5L * 60L * 60L * 1000L
+            CliSessionRange.LAST_7D -> now - 7L * 24L * 60L * 60L * 1000L
+            CliSessionRange.LAST_30D -> now - 30L * 24L * 60L * 60L * 1000L
+            CliSessionRange.ALL -> null
         }
     }
 }

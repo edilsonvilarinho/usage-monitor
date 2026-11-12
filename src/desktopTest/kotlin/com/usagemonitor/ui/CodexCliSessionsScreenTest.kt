@@ -27,7 +27,7 @@ import com.usagemonitor.presentation.ui.ExportLabels
 import com.usagemonitor.presentation.ui.codexApplicationLabel
 import com.usagemonitor.presentation.ui.shortCodexId
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import com.usagemonitor.presentation.viewmodel.UsageExportWriter
@@ -73,7 +73,7 @@ class CodexCliSessionsScreenTest {
         onNodeWithText("Local source: Codex").assertExists()
         onNodeWithText("Updated", substring = true).assertExists()
         onNodeWithText("3 turn(s)").assertExists()
-        onNodeWithText("All").assertExists()
+        onNodeWithText("All time").assertExists()
         viewModel.onDestroy()
     }
 
@@ -96,17 +96,31 @@ class CodexCliSessionsScreenTest {
         }
 
     @Test
+    fun `range and export labels match the anthropic window`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(FakeCodexRepository())
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        onNodeWithText("5h").assertExists()
+        onNodeWithText("7 dias").assertExists()
+        onNodeWithText("30 dias").assertExists()
+        onNodeWithText("Total").assertExists()
+        onNodeWithText("Exportar CSV").assertExists()
+        onNodeWithText("Exportar JSON").assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
     fun `range segment reloads with the chosen cutoff`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
         val repository = FakeCodexRepository()
         val viewModel = viewModel(repository)
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
-        onNodeWithText("Tudo").performClick()
+        onNodeWithText("Total").performClick()
         waitForIdle()
 
         assertNull(repository.lastSince)
         assertEquals(
-            CodexCliSessionRange.ALL,
+            CliSessionRange.ALL,
             assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
         )
         viewModel.onDestroy()
@@ -125,7 +139,7 @@ class CodexCliSessionsScreenTest {
             assertEquals(LONG_SESSION_ID, state.detail?.summary?.sessionId)
             // Detalhe aberto: barra de status e abas da lista saem da tela.
             onAllNodesWithText("Fonte local: Codex").assertCountEquals(0)
-            onAllNodesWithText("CSV").assertCountEquals(0)
+            onAllNodesWithText("Exportar CSV").assertCountEquals(0)
             viewModel.onDestroy()
         }
 
@@ -134,7 +148,7 @@ class CodexCliSessionsScreenTest {
         val viewModel = viewModel(FakeCodexRepository(), writer = { "C:/exports/codex.csv" })
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
-        onNodeWithText("CSV").performClick()
+        onNodeWithText("Exportar CSV").performClick()
         waitForIdle()
 
         onNodeWithText("C:/exports/codex.csv").assertExists()
@@ -146,7 +160,7 @@ class CodexCliSessionsScreenTest {
         val viewModel = viewModel(FakeCodexRepository(), writer = { error("disco cheio") })
         setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
-        onNodeWithText("JSON").performClick()
+        onNodeWithText("Exportar JSON").performClick()
         waitForIdle()
 
         onNodeWithText("disco cheio").assertExists()

@@ -63,7 +63,7 @@ import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.presentation.viewmodel.CodexCliExportOutcome
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 
@@ -152,26 +152,22 @@ fun CodexCliSessionsScreen(
                 )
                 LiveBadge(language = language)
                 AppSegmentedControl(
-                    options = listOf(
-                        AppSegment("5h"),
-                        AppSegment("7d"),
-                        AppSegment(if (language == AppLanguage.PT) "Tudo" else "All")
-                    ),
+                    options = CliSessionRange.entries.map { AppSegment(CliSessionsLabels.rangeLabel(it, language)) },
                     selectedIndex = when (state) {
-                        is CodexCliSessionsUiState.Success -> CodexCliSessionRange.entries.indexOf(
+                        is CodexCliSessionsUiState.Success -> CliSessionRange.entries.indexOf(
                             (state as CodexCliSessionsUiState.Success).range
                         )
                         else -> 0
                     },
-                    onSelect = { index -> viewModel.setRange(CodexCliSessionRange.entries[index]) }
+                    onSelect = { index -> viewModel.setRange(CliSessionRange.entries[index]) }
                 )
                 AppButton(
-                    label = "CSV",
+                    label = ExportLabels.exportCsv(language),
                     onClick = { viewModel.exportCurrent(UsageExportFormat.CSV) },
                     tone = AppButtonTone.GHOST
                 )
                 AppButton(
-                    label = "JSON",
+                    label = ExportLabels.exportJson(language),
                     onClick = { viewModel.exportCurrent(UsageExportFormat.JSON) },
                     tone = AppButtonTone.GHOST
                 )

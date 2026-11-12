@@ -1768,6 +1768,7 @@ própria tabela e não trazem a linha; o alerta na bandeja continua cobrindo as 
 </div>
 <p class="note"><b>Detalhe do Codex com a mesma grade (#393, T3).</b> Contexto = entrada de cada resposta (prompt inteiro com cache; medido no rollout real), ▼ na queda; cache = parte da entrada servida do cache; saída empilha visível e raciocínio (o raciocínio é parte da saída); vazão quebra a linha onde a resposta não foi medida — nunca desce a zero. Sem custo (o app não tem tarifa do Codex) e sem percentual da janela (o índice não lê <code>model_context_window</code>). A tabela troca o id truncado da resposta por Contexto, Cache, Saída e Vazão, com números formatados.</p>
 <p class="note"><b>Modelos da sessão no Codex (#445).</b> A mesma tabela do Claude, sem a coluna Custo (o app não tem tarifa do Codex) e com a participação nos <b>tokens</b>: entrada cobrável, saída, <code>cached</code> como cache lido e <code>cache_write</code> como cache gravado. Turno é o <code>turn_id</code> distinto, a mesma contagem do resumo.</p>
+<p class="note"><b>Período e exportação do Codex iguais aos do Claude (#558).</b> A lista do Codex usa o mesmo segmentado da janela "Sessões CLI" — 5h · 7 dias · 30 dias · Total — e os mesmos rótulos "Exportar CSV" e "Exportar JSON". O enum próprio do Codex (5h/7d/Tudo) saiu: o período é o <code>CliSessionRange</code> do Claude, com corte corrido.</p>
 
 <!-- ═══════════════════════════════ RESUMO ════════════════════════════ -->
 <h2 id="resumo">8 · Resumo por eixo</h2>

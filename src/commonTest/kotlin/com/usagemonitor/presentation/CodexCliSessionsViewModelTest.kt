@@ -7,7 +7,7 @@ import com.usagemonitor.domain.entity.CodexCliSessionTurn
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
-import com.usagemonitor.presentation.viewmodel.CodexCliSessionRange
+import com.usagemonitor.domain.entity.CliSessionRange
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsUiState
 import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 import kotlin.test.Test
@@ -42,11 +42,11 @@ class CodexCliSessionsViewModelTest {
         val repository = FakeRepository()
         val viewModel = viewModel(repository, StandardTestDispatcher(testScheduler))
 
-        viewModel.setRange(CodexCliSessionRange.ALL)
+        viewModel.setRange(CliSessionRange.ALL)
         testScheduler.runCurrent()
 
         assertEquals(null, repository.lastSince)
-        assertEquals(CodexCliSessionRange.ALL, assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range)
+        assertEquals(CliSessionRange.ALL, assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range)
         viewModel.onDestroy()
     }
 
@@ -64,13 +64,39 @@ class CodexCliSessionsViewModelTest {
 
         viewModel.refresh()
         testScheduler.runCurrent()
-        viewModel.setRange(CodexCliSessionRange.LAST_7D)
+        viewModel.setRange(CliSessionRange.LAST_7D)
         testScheduler.runCurrent()
 
         val expectedCutoff = now.toEpochMilliseconds() - 7L * 24L * 60L * 60L * 1000L
         assertEquals(expectedCutoff, repository.lastSince)
         assertEquals(
-            CodexCliSessionRange.LAST_7D,
+            CliSessionRange.LAST_7D,
+            assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
+        )
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `thirty day selection uses a thirty day cutoff and publishes the selected range`() = runTest {
+        val repository = FakeRepository()
+        val now = Instant.parse("2026-09-08T15:00:00Z")
+        val viewModel = viewModel(
+            repository = repository,
+            dispatcher = StandardTestDispatcher(testScheduler),
+            clock = object : Clock {
+                override fun now(): Instant = now
+            }
+        )
+
+        viewModel.refresh()
+        testScheduler.runCurrent()
+        viewModel.setRange(CliSessionRange.LAST_30D)
+        testScheduler.runCurrent()
+
+        val expectedCutoff = now.toEpochMilliseconds() - 30L * 24L * 60L * 60L * 1000L
+        assertEquals(expectedCutoff, repository.lastSince)
+        assertEquals(
+            CliSessionRange.LAST_30D,
             assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
         )
         viewModel.onDestroy()
@@ -90,7 +116,7 @@ class CodexCliSessionsViewModelTest {
 
         viewModel.refresh()
         testScheduler.runCurrent()
-        viewModel.setRange(CodexCliSessionRange.ALL)
+        viewModel.setRange(CliSessionRange.ALL)
         testScheduler.runCurrent()
         viewModel.openWindow()
         testScheduler.runCurrent()
@@ -98,7 +124,7 @@ class CodexCliSessionsViewModelTest {
         val expectedCutoff = now.toEpochMilliseconds() - 5L * 60L * 60L * 1000L
         assertEquals(expectedCutoff, repository.lastSince)
         assertEquals(
-            CodexCliSessionRange.LAST_5H,
+            CliSessionRange.LAST_5H,
             assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).range
         )
         viewModel.onDestroy()

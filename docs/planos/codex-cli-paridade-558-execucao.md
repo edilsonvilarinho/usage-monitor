@@ -59,6 +59,7 @@ custo** — tudo o que os dados do Codex já sustentam; custo e linha de saúde 
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos e escopo aprovado | `gh issue view 558`; greps listados em "Fatos confirmados"; escopo escolhido pelo dono no chat |
+| A02 | Codex usa `CliSessionRange` (5h/7 dias/30 dias/Total, corte de 30 dias no view model, slug `30d`); botões "Exportar CSV/JSON" de `ExportLabels`; `CodexCliSessionRange` removido; teto `INLINE_LANGUAGE_CHECKS_CEILING` 700 → 699; nota no protótipo | Vermelho: `CodexCliSessionsViewModelTest` → `expected:<1786287600000> but was:<null>` (stub `LAST_30D -> null`); `CodexCliSessionsScreenTest.kt:99` → `Expected exactly '1' node ... contains '7 dias'`; `:113` → `expected:<ALL> but was:<LAST_30D>`; `UsageExportRequestsTest.kt:48` → 3 slugs esperados, 4 reais. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.CodexCliSessionsScreenTest"` → 1137 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
