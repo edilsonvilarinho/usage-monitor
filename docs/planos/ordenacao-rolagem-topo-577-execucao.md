@@ -27,9 +27,10 @@ aparece logo abaixo do cabeçalho. Hoje ele fica escondido acima da área visív
 1. Ao mudar `sort` (coluna ou direção) a lista rola **sem animação** (`scrollToItem`) para o primeiro item da nova ordem.
    Corte seco, como a reordenação (#537, decisão 10).
 2. Anthropic, Codex e Resumo: rola para o índice 0 da lista.
-3. Time: a lista é a tela inteira; rolar ao topo tiraria o usuário do integrante que ele ordenou. Rola só se o primeiro
-   item visível for uma linha de sessão — leva o cabeçalho de sessões daquele integrante (o primeiro expandido acima ou
-   no ponto visível) ao topo; senão a âncora atual já mantém o cabeçalho clicado na tela.
+3. Time: a lista é a tela inteira e a ordenação é uma só para todos os blocos (#537, decisão 8); rolar ao topo tiraria o
+   usuário do integrante que ele ordenou, e a âncora do Compose pode prender a rolagem numa sessão de **outro** bloco
+   aberto acima. Ao mudar a ordenação, a lista rola até o cabeçalho de sessões **clicado** (lembrado pelo integrante),
+   que fica no topo com a primeira sessão da nova ordem logo abaixo.
 4. A primeira composição não rola: só a **mudança** de ordenação dispara.
 5. Lógica de "para onde rolar" sai em função pura testável; a tela só chama.
 
@@ -48,6 +49,7 @@ aparece logo abaixo do cabeçalho. Hoje ele fica escondido acima da área visív
 |---|---|---|
 | A01 | Concluída | Sem harness de teste: documento. Validado pelas leituras de "Fatos confirmados". |
 | A02 | Concluída | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CliSessionsScreenTest" --tests "com.usagemonitor.ui.CodexCliSessionsScreenTest"`: `CliSessionsScreenTest.kt:1718: Assert failed: The component with TestTag = 'cliSessionRow:sess39' is not displayed!` e `CodexCliSessionsScreenTest.kt:323: Expected exactly '1' node but could not find any node that satisfies: (Text … contains 'cx39' …)`. Verde: mesmo comando, 56 + 27 = 83 testes, 0 falhas. Helper `ScrollToTopOnSortChange` em `SortScrollReset.kt`; a lista Codex ganhou `LazyListState` explícito. |
+| A03 | Concluída | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CliUsageBreakdownPaneTest"`: `java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains 'proj39' (ignoreCase: false) is not displayed!` (pré-condição de rolagem verde). Verde: `CliUsageBreakdownPaneTest` + `CliSessionsScreenTest` + `CodexCliSessionsScreenTest`, 9 + 56 + 27 = 92, 0 falhas. Chave de rolagem = `(sort, descending)`; o helper passou a aceitar `Any?`. `SortScrollResetTest` (commonTest, 3 casos) é de caracterização, nasce verde. Com cabeçalho de totais, o índice 0 é o bloco de totais. Troca de eixo fora do escopo. |
 
 ## Problemas em aberto e riscos
 

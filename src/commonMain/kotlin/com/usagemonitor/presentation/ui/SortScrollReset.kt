@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.usagemonitor.presentation.CliSessionSort
 
 /**
  * Índice para o qual a lista deve voltar depois de uma mudança de ordenação, ou `null` quando não
@@ -16,8 +15,8 @@ import com.usagemonitor.presentation.CliSessionSort
  */
 internal fun sortScrollTarget(
     hasComposed: Boolean,
-    previous: CliSessionSort?,
-    current: CliSessionSort?
+    previous: Any?,
+    current: Any?
 ): Int? = if (!hasComposed || previous == current) null else 0
 
 /**
@@ -26,7 +25,7 @@ internal fun sortScrollTarget(
  * instantâneo, sem animação.
  */
 @Composable
-internal fun ScrollToTopOnSortChange(listState: LazyListState, sort: CliSessionSort?) {
+internal fun ScrollToTopOnSortChange(listState: LazyListState, sort: Any?) {
     var composed by remember { mutableStateOf(false) }
     var previous by remember { mutableStateOf(sort) }
     LaunchedEffect(sort) {
