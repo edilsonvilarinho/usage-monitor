@@ -55,6 +55,7 @@ Cada linha é escrita no commit da atividade que descreve, com o comando executa
 | Atividade | Alteração | Comando e resultado |
 |---|---|---|
 | A01 | Plano criado. | Sem harness de teste (documento); validado por leitura dos pontos citados no código em `0e77f163`. |
+| A02 | `HudMinimizedAccounts.kt` (alternar, gravar na ordem de publicação, ler descartando entrada inválida) + `hudMinimizedAccounts` em `HudWindowPreferences`. | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.HudMinimizedAccountsTest" --tests "com.usagemonitor.HudWindowPreferencesTest"` → 9 falhas por asserção, ex. `HudMinimizedAccountsTest.kt:20 expected:<[UsageTargetKey(source=CODEX, profileId=null)]> but was:<[]>`. Verde: mesmo comando → `BUILD SUCCESSFUL`, 25 testes, 0 falhas. |
 
 ## Problemas em aberto e riscos
 
