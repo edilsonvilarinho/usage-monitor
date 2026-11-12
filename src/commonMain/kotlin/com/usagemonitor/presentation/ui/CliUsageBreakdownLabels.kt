@@ -91,6 +91,20 @@ internal object BreakdownLabels {
     }
 
     /** Rótulo do bloco de métrica; o valor sai de [bucketCost]. */
+    /** Cabeçalho da coluna de turnos e rótulo de cartão no modo sem tarifa: conta respostas, não custo. */
+    fun responses(language: AppLanguage): String = localized(language, "Respostas", "Responses")
+
+    fun cacheReuseLabel(language: AppLanguage): String = localized(language, "Reuso de cache", "Cache reuse")
+
+    fun responsesPerSessionLabel(language: AppLanguage): String =
+        localized(language, "Respostas por sessão", "Responses per session")
+
+    /** Média arredondada. Zero sessões é "não medido": sai travessão, não zero. */
+    fun responsesPerSession(totals: CliUsageBucket): String {
+        if (totals.sessionCount <= 0) return "—"
+        return ((totals.turnCount + totals.sessionCount / 2) / totals.sessionCount).toString()
+    }
+
     fun estimatedCostLabel(language: AppLanguage): String {
         return if (language == AppLanguage.PT) "Custo estimado" else "Estimated cost"
     }
@@ -466,6 +480,20 @@ internal object BreakdownLabels {
             "Intensidade pelo custo da célula, relativa ao pico desta janela. Horário BRT."
         } else {
             "Intensity by cell cost, relative to this window's peak. BRT time."
+        }
+    }
+
+    /** Eixo de integrantes do Codex: a conta principal e os subagentes da mesma sessão. */
+    fun codexMemberAxis(language: AppLanguage): String {
+        return localized(language, "Agente", "Agent")
+    }
+
+    /** Rótulo da linha do eixo Agente: o valor de `memberLabelOf` (domain) vira texto do app. */
+    fun codexMemberRow(bucketLabel: String, language: AppLanguage): String {
+        return when (bucketLabel) {
+            "principal" -> localized(language, "Sessão principal", "Main session")
+            "subagent" -> localized(language, "Subagentes", "Subagents")
+            else -> bucketLabel
         }
     }
 

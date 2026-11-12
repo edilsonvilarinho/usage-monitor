@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -22,6 +23,7 @@ import com.usagemonitor.domain.entity.OutputThroughput
 import com.usagemonitor.domain.repository.CodexCliSessionRepository
 import com.usagemonitor.domain.usecase.GetCodexCliSessionDetailUseCase
 import com.usagemonitor.domain.usecase.GetCodexCliSessionsUseCase
+import com.usagemonitor.presentation.ui.BREAKDOWN_AXIS_TAB_TAG_PREFIX
 import com.usagemonitor.presentation.ui.CODEX_SESSION_COLUMN_HEADER_TAG
 import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
@@ -100,20 +102,22 @@ class CodexCliSessionsScreenTest {
     }
 
     @Test
-    fun `summary tab groups sessions by project and by primary model`() =
-        runDesktopComposeUiTest(width = 1_200, height = 1_400) {
+    fun `summary tab names the codex axes, the main thread and drops the cost`() =
+        runDesktopComposeUiTest(width = 1_200, height = 1_600) {
             val viewModel = viewModel(FakeCodexRepository())
             setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
 
             onNodeWithText("Resumo").performClick()
             waitForIdle()
 
-            onNodeWithText("Por modelo").assertExists()
-            onNodeWithText("Modelo principal de cada sessão").assertExists()
-            assertEquals(
-                CliSessionsView.BREAKDOWN,
-                assertIs<CodexCliSessionsUiState.Success>(viewModel.uiState.value).view
-            )
+            for (tab in listOf("Projeto", "Modelo", "Agente", "Atividade")) {
+                assertTrue(onAllNodesWithText(tab).fetchSemanticsNodes().isNotEmpty(), "Falta a aba \"$tab\" no Resumo do Codex")
+            }
+            onNodeWithTag("${BREAKDOWN_AXIS_TAB_TAG_PREFIX}MEMBER").performClick()
+            waitForIdle()
+            assertTrue(onAllNodesWithText("Sessão principal").fetchSemanticsNodes().isNotEmpty(), "Falta a linha \"Sessão principal\" no eixo Agente")
+            assertTrue(onAllNodesWithText("Respostas").fetchSemanticsNodes().isNotEmpty(), "Falta o cartão \"Respostas\" no Resumo sem tarifa")
+            assertTrue(onAllNodesWithText("Custo").fetchSemanticsNodes().isEmpty(), "Resumo do Codex mostra \"Custo\"")
             viewModel.onDestroy()
         }
 
@@ -519,6 +523,17 @@ private fun summary(sessionId: String): CodexCliSessionSummary = CodexCliSession
     responseCount = 1
 )
 
+private fun codexTurn(threadSource: String): CodexCliSessionTurn = CodexCliSessionTurn(
+    sessionId = LONG_SESSION_ID,
+    turnId = "turn-$threadSource",
+    responseId = "resp-$threadSource",
+    seq = 0,
+    ts = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+    cwd = "C:\\workspace\\usage-monitor",
+    model = "gpt-6.1-sol",
+    threadSource = threadSource
+)
+
 private class FakeCodexRepository(
     private val sessions: List<CodexCliSessionSummary> = listOf(
         summary(LONG_SESSION_ID).copy(
@@ -540,6 +555,9 @@ private class FakeCodexRepository(
 ) : CodexCliSessionRepository {
     var lastSince: Long? = Long.MIN_VALUE
     var readCalls = 0
+
+    override suspend fun getTurnsSince(sinceEpochMillis: Long?): Result<List<CodexCliSessionTurn>> =
+        Result.success(listOf(codexTurn("user"), codexTurn("subagent")))
 
     override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> =
         indexFailure?.let { failure -> Result.failure(failure) }

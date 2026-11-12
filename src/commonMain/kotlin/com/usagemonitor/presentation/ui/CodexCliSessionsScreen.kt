@@ -279,7 +279,15 @@ private fun CodexCliSessionContent(
 
     CodexCliSessionMetrics(state.sessions, language)
     if (state.view == CliSessionsView.BREAKDOWN) {
-        CodexCliSessionBreakdown(state.sessions, language, modifier)
+        CliUsageBreakdownPane(
+            breakdown = state.usageBreakdown,
+            errorMessage = null,
+            language = language,
+            memberAxisLabel = BreakdownLabels.codexMemberAxis(language),
+            memberRowLabel = { bucketLabel -> BreakdownLabels.codexMemberRow(bucketLabel, language) },
+            unpricedMode = true,
+            modifier = modifier
+        )
         return
     }
 
