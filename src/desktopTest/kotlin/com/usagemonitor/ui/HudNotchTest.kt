@@ -23,6 +23,7 @@ import com.usagemonitor.ScreenWorkArea
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudDockedWindowBounds
 import com.usagemonitor.presentation.ui.HUD_BALLOON_CONTENT_TEST_TAG
+import com.usagemonitor.presentation.ui.hudMinimizeMillis
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_CONTENT_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_APP_BALLOON_QUIT_TAG
@@ -289,6 +290,47 @@ class HudNotchTest {
         val cell = onNodeWithTag(HUD_RING_ITEM_TEST_TAG).getUnclippedBoundsInRoot()
         assertEquals(minimizedRingWithFocusWidth(account), cell.width, "largura da célula minimizada, topo")
     }
+
+    /** Transição (#576, A05b): o anel vai de 64 a 28 dp em `hudMinimizeMillis`; o notch segura o tamanho cheio até o fim. */
+    @Test
+    fun `minimizar anima o anel e o notch so encolhe no fim da transicao`() = runDesktopComposeUiTest {
+        var minimized by mutableStateOf(false)
+        val full = accounts.first()
+        val fullWidth = hudNotchSizes(listOf(full), HudEdge.TOP, "Carregando", false).collapsed.width
+        val minimizedWidth = hudNotchSizes(listOf(full.copy(minimized = true)), HudEdge.TOP, "Carregando", false).collapsed.width
+        assertTrue(minimizedWidth < fullWidth, "precondição: o notch minimizado é menor que o cheio")
+        mainClock.autoAdvance = false
+        setContent { notch(list = listOf(full.copy(minimized = minimized))) }
+        mainClock.advanceTimeByFrame()
+        minimized = true
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(hudMinimizeMillis(motionReduced = false) / 2L)
+        val midRing = ringWidthOf()
+        assertTrue(midRing > 28.dp && midRing < HUD_RING_SIZE, "anel no meio da transição: $midRing")
+        assertEquals(fullWidth, notchWidthOf(), "o notch segura o tamanho cheio no meio da transição")
+
+        mainClock.advanceTimeBy(hudMinimizeMillis(motionReduced = false).toLong())
+        assertEquals(28.dp, ringWidthOf(), "anel depois da transição")
+        assertEquals(minimizedWidth, notchWidthOf(), "notch depois da transição")
+    }
+
+    /** Com "reduzir animações" o corte é seco: o anel já está em 28 dp no primeiro quadro depois da troca. */
+    @Test
+    fun `minimizar com animacao reduzida corta para 28 dp no primeiro quadro`() = runDesktopComposeUiTest {
+        var minimized by mutableStateOf(false)
+        val full = accounts.first()
+        mainClock.autoAdvance = false
+        setContent { notch(list = listOf(full.copy(minimized = minimized)), motion = AppMotionPolicy.Reduced) }
+        mainClock.advanceTimeByFrame()
+        minimized = true
+        mainClock.advanceTimeByFrame()
+        assertEquals(28.dp, ringWidthOf(), "anel com animação reduzida")
+    }
+
+    private fun ComposeUiTest.ringWidthOf() =
+        onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot().width
+
+    private fun ComposeUiTest.notchWidthOf() = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot().width
 
     /** Controle: sem minimizar, o anel segue de 64 dp e a palavra segue na pílula. */
     @Test

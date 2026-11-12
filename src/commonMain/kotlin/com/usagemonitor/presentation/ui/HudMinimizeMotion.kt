@@ -8,10 +8,9 @@ import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 private val minimizeEasing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
 /**
- * Quadro da transição de minimizar (#576, A05): diâmetro do anel e os dois alfas
- * do cross-fade entre o texto cheio e a linha de foco ao lado do anel.
+ * Quadro da transição de minimizar (#576, A05): diâmetro do anel e o alfa da linha de foco.
  */
-data class HudMinimizeFrame(val ringSize: Dp, val fullTextAlpha: Float, val focusLineAlpha: Float)
+data class HudMinimizeFrame(val ringSize: Dp, val focusLineAlpha: Float)
 
 /**
  * Duração da transição. Com "reduzir animações" é zero: o quadro final sai de
@@ -32,8 +31,8 @@ fun hudMinimizeProgress(elapsedMillis: Float, motionReduced: Boolean): Float {
 
 /**
  * O quadro em [progress] (0 = cheio, 1 = minimizado). O anel vai de 64 a 28 dp
- * pela curva ease-in-out, sem overshoot; o texto cheio e a linha de foco trocam
- * alfa com o mesmo valor eased, de modo que somam 1 em todo quadro.
+ * pela curva ease-in-out, sem overshoot; a linha de foco ao lado do anel segue o
+ * mesmo valor eased.
  */
 fun hudMinimizeFrame(progress: Float): HudMinimizeFrame {
     val eased = minimizeEased(progress.coerceIn(0f, 1f))
@@ -41,7 +40,6 @@ fun hudMinimizeFrame(progress: Float): HudMinimizeFrame {
     val to = AppGargantuaTokens.minimizedSize
     return HudMinimizeFrame(
         ringSize = from + (to - from) * eased,
-        fullTextAlpha = 1f - eased,
         focusLineAlpha = eased,
     )
 }

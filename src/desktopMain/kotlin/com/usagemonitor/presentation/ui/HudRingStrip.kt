@@ -88,6 +88,8 @@ internal fun HudRingStrip(
     departures: Map<UsageTargetKey, Float> = emptyMap(),
     /** O passo mais lento da saída; `null` sem ninguém saindo. */
     settle: Float? = null,
+    /** O progresso da transição de minimizar por conta ([rememberHudMinimizeProgress]). */
+    minimizeProgress: Map<UsageTargetKey, Float> = emptyMap(),
     language: AppLanguage,
     onRingHovered: (Int) -> Unit,
     onRingRefresh: (Int) -> Unit,
@@ -114,6 +116,7 @@ internal fun HudRingStrip(
                 // o estado (pulso, transição) da vizinha.
                 key(account.targetKey) {
                     HudRingItem(
+                        minimizeProgress = minimizeProgress[account.targetKey] ?: if (account.minimized) 1f else 0f,
                         account = account,
                         birthOrder = birthOrder[index],
                         vertical = !edge.isHorizontal,
@@ -164,6 +167,7 @@ internal const val HUD_RING_ITEM_TEST_TAG = "hud-ring-item"
 
 @Composable
 private fun HudRingItem(
+    minimizeProgress: Float,
     account: HudAccount,
     birthOrder: Int?,
     vertical: Boolean,
@@ -182,6 +186,8 @@ private fun HudRingItem(
     val policy = LocalAppMotionPolicy.current
     // Nascimento (API ativada, início do app) e colapso (API desativada).
     val frame = rememberHudRingFrame(account.presence, birthOrder, policy)
+    // Minimizar (#576): o anel e a cota em foco trocam pelo quadro da transição, não pelo estado.
+    val minimizeFrame = hudMinimizeFrame(minimizeProgress)
     val refreshLabel = hudRefreshAccountLabel(account, language)
     // A ação é **declarada** na semântica, não instalada: um `clickable` aqui
     // consumiria o `down` e o arrasto pelo corpo nunca começaria.
@@ -202,7 +208,7 @@ private fun HudRingItem(
     }
     val description = hudRingDescription(account, language)
     // Minimizada (#576): o anel vai a 28 dp; marca, arco e vão encolhem na mesma razão.
-    val ringSize = if (account.minimized) AppGargantuaTokens.minimizedSize else HUD_RING_SIZE
+    val ringSize = minimizeFrame.ringSize
     val ringScale = ringSize / HUD_RING_SIZE
     val ring: @Composable () -> Unit = {
         // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
@@ -307,7 +313,7 @@ private fun HudRingItem(
         content = {
             Box(Modifier.layoutId(HudItemPart.RING)) { ring() }
             if (account.minimized) {
-                Column(modifier = Modifier.layoutId(HudItemPart.FULL)) { lines(true, 1f) }
+                Column(modifier = Modifier.layoutId(HudItemPart.FULL)) { lines(true, minimizeFrame.focusLineAlpha) }
             }
             if (!account.minimized && (toFull != null || compact)) {
                 Box(Modifier.layoutId(HudItemPart.COMPACT)) { lines(true, 1f - fullWeight) }

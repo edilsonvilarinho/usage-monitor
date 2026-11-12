@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.rememberHudMinimizeProgress
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -232,7 +234,8 @@ internal fun HudWindowHost(
     }
 
     val scale = uiScaleFactor(uiScalePercent)
-    val (sizes, settledSizes) = hudWindowSizes(
+    val minimize = rememberHudMinimizeProgress(accounts)
+    val (sizesNow, settledNow) = hudWindowSizes(
         accounts = accounts,
         placement = placement,
         screenArea = screenArea,
@@ -241,6 +244,7 @@ internal fun HudWindowHost(
         hasUpdateIndicator = updateIndicator != null,
         hasUpdateAction = updateAction != null
     )
+    val (sizes, settledSizes) = rememberHudHeldWindowSizes(sizesNow, settledNow, minimize.moving)
     val composedArea = screenArea.inCompositionDp(scale)
     val bounds = hudHostWindowBounds(drag.dragging, placement, sizes, composedArea)
     val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
@@ -340,6 +344,7 @@ internal fun HudWindowHost(
                     edge = edge,
                     sizes = sizes,
                     settledSizes = settledSizes,
+                    minimize = minimize,
                     fallbackLabel = fallbackLabel,
                     fallbackTone = fallbackTone,
                     expanded = expanded && !drag.dragging,

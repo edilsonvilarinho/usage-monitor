@@ -1,5 +1,7 @@
 package com.usagemonitor
 
+import com.usagemonitor.presentation.ui.hudMinimizeHeldSize
+
 import com.usagemonitor.presentation.ui.HudAccount
 
 /*
@@ -54,4 +56,18 @@ internal fun hudHostWindowBounds(
     } else {
         hudDockedWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
     }
+}
+
+/**
+ * Tamanhos da janela durante a transição de minimizar (#576, A05b): enquanto [moving],
+ * segura o maior entre [before] e [after] em todos os campos, igual ao notch; parada, é [after].
+ */
+internal fun hudHeldNotchSizes(before: HudNotchSizes, after: HudNotchSizes, moving: Boolean): HudNotchSizes {
+    if (!moving) return after
+    return after.copy(
+        collapsed = hudMinimizeHeldSize(before.collapsed, after.collapsed, moving = true),
+        expanded = hudMinimizeHeldSize(before.expanded, after.expanded, moving = true),
+        balloon = hudMinimizeHeldSize(before.balloon, after.balloon, moving = true),
+        withHandles = hudMinimizeHeldSize(before.withHandles, after.withHandles, moving = true),
+    )
 }

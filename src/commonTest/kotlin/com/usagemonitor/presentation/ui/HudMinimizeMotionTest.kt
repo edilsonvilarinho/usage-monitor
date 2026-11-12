@@ -26,9 +26,7 @@ class HudMinimizeMotionTest {
         assertEquals(28.dp, minimized.ringSize)
         assertEquals(AppGargantuaTokens.size, full.ringSize)
         assertEquals(AppGargantuaTokens.minimizedSize, minimized.ringSize)
-        assertEquals(1f, full.fullTextAlpha)
         assertEquals(0f, full.focusLineAlpha)
-        assertEquals(0f, minimized.fullTextAlpha)
         assertEquals(1f, minimized.focusLineAlpha)
     }
 
@@ -53,12 +51,14 @@ class HudMinimizeMotionTest {
     }
 
     @Test
-    fun `o texto cheio e a linha de foco fazem cross-fade que soma 1 em todo quadro`() {
+    fun `a linha de foco sobe de 0 a 1 sem sair da faixa`() {
+        var previous = 0f
         for (step in 0..100) {
-            val frame = hudMinimizeFrame(step / 100f)
-            assertEquals(1f, frame.fullTextAlpha + frame.focusLineAlpha, alphaTolerance, "soma fora de 1 em $step%")
-            assertTrue(frame.fullTextAlpha in 0f..1f && frame.focusLineAlpha in 0f..1f, "alpha fora de 0..1 em $step%")
+            val alpha = hudMinimizeFrame(step / 100f).focusLineAlpha
+            assertTrue(alpha in 0f..1f && alpha >= previous - 1e-4f, "alfa da linha de foco fora da faixa em $step%: $alpha")
+            previous = alpha
         }
+        assertEquals(1f, previous, alphaTolerance)
     }
 
     @Test
