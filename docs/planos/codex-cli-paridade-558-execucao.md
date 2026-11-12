@@ -43,6 +43,9 @@ custo** — tudo o que os dados do Codex já sustentam; custo e linha de saúde 
   `null` = não medido; zero = medido.
 - Título da conta padrão do Codex: "Padrão", como o Anthropic; janela "Codex CLI Sessions — Padrão".
 - Mistura de modelos continua "% dos tokens" (sem tarifa).
+- Copiar da linha Codex copia `codex resume <id>`, como o Anthropic copia o comando de retomada (`codex resume --help`,
+  CLI local: `Usage: codex resume [OPTIONS] [SESSION_ID] [PROMPT]`, aceita UUID). A04 foi dividida: copiar e rodapé
+  exigem `CopySessionCommandButton` e `lastChangedAt`, fora da lista de arquivos da A04 → A05.
 
 ## Atividades
 
@@ -51,8 +54,9 @@ custo** — tudo o que os dados do Codex já sustentam; custo e linha de saúde 
 | A01 | Este plano | Neferpitou |
 | A02 | Codex usa `CliSessionRange` (5h/7 dias/30 dias/Total) e rótulos de exportação do Anthropic | frontend-dev |
 | A03 | Tempo ativo por sessão Codex (`activeMillis` no resumo, regra de `activeTimeMillisOf`) | backend-dev |
-| A04 | Resumo e linha: tile de tempo ativo, linha de tokens, coluna de tempo ativo, copiar id, rodapé "last change" | frontend-dev |
-| A05 | Títulos: conta padrão do Codex rotulada "Padrão"; janela "Codex CLI Sessions — Padrão"; protótipo e design system | frontend-dev |
+| A04 | Resumo e linha: tile de tempo ativo, linha de tokens, coluna de tempo ativo | frontend-dev |
+| A05 | Botão de copiar `codex resume <id>` na linha; rodapé "última alteração" (`lastChangedAt` no view model) | frontend-dev |
+| A06 | Títulos: conta padrão do Codex rotulada "Padrão"; janela "Codex CLI Sessions — Padrão"; protótipo | frontend-dev |
 
 ## Ponto de situação
 
@@ -61,6 +65,7 @@ custo** — tudo o que os dados do Codex já sustentam; custo e linha de saúde 
 | A01 | Plano com fatos medidos e escopo aprovado | `gh issue view 558`; greps listados em "Fatos confirmados"; escopo escolhido pelo dono no chat |
 | A02 | Codex usa `CliSessionRange` (5h/7 dias/30 dias/Total, corte de 30 dias no view model, slug `30d`); botões "Exportar CSV/JSON" de `ExportLabels`; `CodexCliSessionRange` removido; teto `INLINE_LANGUAGE_CHECKS_CEILING` 700 → 699; nota no protótipo | Vermelho: `CodexCliSessionsViewModelTest` → `expected:<1786287600000> but was:<null>` (stub `LAST_30D -> null`); `CodexCliSessionsScreenTest.kt:99` → `Expected exactly '1' node ... contains '7 dias'`; `:113` → `expected:<ALL> but was:<LAST_30D>`; `UsageExportRequestsTest.kt:48` → 3 slugs esperados, 4 reais. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.CodexCliSessionsScreenTest"` → 1137 testes, 0 falhas |
 | A03 | `activeMillisOfTimestamps` (domain) é a regra única de tempo ativo; `activeTimeMillisOf` delega a ela; `CodexCliSessionSummary.activeMillis` (`null` = não medido) preenchido em `buildSummary` a partir do `ts` das respostas do período | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCodexCliSessionDataSourceTest" --tests "com.usagemonitor.domain.CliSessionActiveTimeTest"` → `LocalCodexCliSessionDataSourceTest.kt:171` `expected:<120000> but was:<null>`. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.*"` → 1262 testes, 0 falhas |
+| A04 | Resumo do Codex: tile "Tempo ativo" (soma de `activeMillis`, "—" sem medida), linha `in · out · cache lido · cache gravado` por `CliSessionsLabels.tokensBreakdown` (`in` = input − cache lido); coluna "Tempo ativo" (76dp; id 140→130, projeto 150→140); nota no protótipo | Vermelho: `CodexCliSessionsScreenTest` 20 testes, 4 falhas → `Expected exactly '1' node ... contains 'in 2K · out 2,5K · cache lido 8K · cache gravado 500'`; `contains '2min'`; `contains '1h07'`; `Expected '3' nodes but found '2' ... '—'`. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CodexCliSessionsScreenTest" --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.presentation.*"` → 1141 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

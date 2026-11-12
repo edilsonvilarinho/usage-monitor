@@ -25,6 +25,7 @@ import com.usagemonitor.presentation.ui.CliSessionsLabels
 import com.usagemonitor.presentation.ui.CodexCliSessionsScreen
 import com.usagemonitor.presentation.ui.ExportLabels
 import com.usagemonitor.presentation.ui.codexApplicationLabel
+import com.usagemonitor.presentation.ui.formatActiveTime
 import com.usagemonitor.presentation.ui.shortCodexId
 import com.usagemonitor.presentation.viewmodel.CliSessionsView
 import com.usagemonitor.domain.entity.CliSessionRange
@@ -61,7 +62,7 @@ class CodexCliSessionsScreenTest {
             onNodeWithText("Codex Desktop").assertExists()
             onNodeWithText("Codex CLI").assertExists()
             // Sem modelo nem projeto, a célula diz "—" em vez de ficar vazia.
-            onAllNodesWithText("—").assertCountEquals(2)
+            onAllNodesWithText("—").assertCountEquals(3)
             viewModel.onDestroy()
         }
 
@@ -301,6 +302,83 @@ class CodexCliSessionsScreenTest {
             onNodeWithText(shortCodexId(id)).fetchSemanticsNode().positionInRoot.y
         }
     }
+
+    @Test
+    fun `summary tile sums the active time of the sessions`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(
+            FakeCodexRepository(
+                sessions = listOf(
+                    summary(LONG_SESSION_ID).copy(activeMillis = 120_000L),
+                    summary(SHORT_SESSION_ID).copy(activeMillis = 3_900_000L)
+                )
+            )
+        )
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        // 2 min + 65 min = 67 min; a linha de cada sessão mostra a sua parte.
+        onNodeWithText(formatActiveTime(4_020_000L)).assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `summary tile shows a dash when no session has active time measured`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            val viewModel = viewModel(FakeCodexRepository())
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            // Sem medida, o tile diz "—" e não zero: zero é "medido e sem intervalo".
+            // Os dois "—" do fake são modelo e projeto; o terceiro é o tile.
+            onAllNodesWithText("—").assertCountEquals(3)
+            viewModel.onDestroy()
+        }
+
+    @Test
+    fun `each row shows the active time of its own session`() = runDesktopComposeUiTest(width = 1_200, height = 900) {
+        val viewModel = viewModel(
+            FakeCodexRepository(
+                sessions = listOf(
+                    summary(LONG_SESSION_ID).copy(activeMillis = 120_000L),
+                    summary(SHORT_SESSION_ID).copy(activeMillis = 3_900_000L)
+                )
+            )
+        )
+        setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+        onNodeWithText(formatActiveTime(120_000L)).assertExists()
+        onNodeWithText(formatActiveTime(3_900_000L)).assertExists()
+        viewModel.onDestroy()
+    }
+
+    @Test
+    fun `summary tile shows the token breakdown in, out, cache read and cache write`() =
+        runDesktopComposeUiTest(width = 1_200, height = 900) {
+            // input_tokens inclui o cache lido: a parte faturável é input − cache lido.
+            val viewModel = viewModel(
+                FakeCodexRepository(
+                    sessions = listOf(
+                        summary(LONG_SESSION_ID).copy(
+                            inputTokens = 10_000L,
+                            cachedInputTokens = 8_000L,
+                            cacheWriteInputTokens = 500L,
+                            outputTokens = 2_500L,
+                            totalTokens = 12_500L
+                        )
+                    )
+                )
+            )
+            setContent { ScreenTestTheme { CodexCliSessionsScreen(viewModel, AppLanguage.PT) } }
+
+            onNodeWithText(
+                CliSessionsLabels.tokensBreakdown(
+                    inputTokens = 2_000L,
+                    outputTokens = 2_500L,
+                    cacheReadTokens = 8_000L,
+                    cacheWriteTokens = 500L,
+                    language = AppLanguage.PT
+                )
+            ).assertExists()
+            viewModel.onDestroy()
+        }
 
     private fun rated(
         sessionId: String,

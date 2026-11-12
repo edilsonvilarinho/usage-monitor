@@ -69,9 +69,10 @@ import com.usagemonitor.presentation.viewmodel.CodexCliSessionsViewModel
 
 // Com a coluna de vazão (#384) as sete colunas somam 880dp com os vãos; ID e
 // projeto cederam 30dp cada para a linha continuar sem quebrar em 960dp.
-private val CODEX_SESSION_ID_COLUMN = 140.dp
-private val CODEX_SESSION_PROJECT_COLUMN = 150.dp
+private val CODEX_SESSION_ID_COLUMN = 130.dp
+private val CODEX_SESSION_PROJECT_COLUMN = 140.dp
 private val CODEX_SESSION_THROUGHPUT_COLUMN = 84.dp
+private val CODEX_SESSION_ACTIVE_COLUMN = 76.dp
 private val CODEX_SESSION_MODEL_COLUMN = 130.dp
 private val CODEX_SESSION_RESPONSES_COLUMN = 84.dp
 private val CODEX_SESSION_TOKENS_COLUMN = 130.dp
@@ -366,6 +367,10 @@ private fun CodexSessionColumnHeader(
             language = language,
             onSortChange = onSortChange
         )
+        AppColumnHeaderLabel(
+            label = CliSessionsLabels.activeTime(language),
+            modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
+        )
     }
 }
 
@@ -388,6 +393,10 @@ private fun SortableCodexSessionHeader(
         modifier = modifier
     )
 }
+
+/** Tempo ativo da linha: `null` = não medido, mostrado como "—"; zero continua "0min". */
+private fun codexActiveCell(activeMillis: Long?): String =
+    if (activeMillis == null) "—" else formatActiveTime(activeMillis)
 
 @Composable
 private fun CodexCliSessionRow(
@@ -455,6 +464,10 @@ private fun CodexCliSessionRow(
                 AppCellValue(
                     value = formatThroughput(session.throughput),
                     modifier = Modifier.width(CODEX_SESSION_THROUGHPUT_COLUMN)
+                )
+                AppCellValue(
+                    value = codexActiveCell(session.activeMillis),
+                    modifier = Modifier.width(CODEX_SESSION_ACTIVE_COLUMN)
                 )
             }
             Row(
