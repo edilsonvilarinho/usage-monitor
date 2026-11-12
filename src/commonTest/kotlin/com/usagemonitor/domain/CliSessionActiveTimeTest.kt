@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.CliSessionDetail
 import com.usagemonitor.domain.entity.CliSessionSummary
 import com.usagemonitor.domain.entity.CliSessionTurn
 import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
+import com.usagemonitor.domain.entity.activeMillisOfTimestamps
 import com.usagemonitor.domain.entity.activeTimeMillisOf
 import com.usagemonitor.domain.usecase.ComputeCliSessionAnalyticsUseCase
 import kotlin.time.Instant
@@ -53,6 +54,43 @@ class CliSessionActiveTimeTest {
         )
 
         assertEquals(0L, activeTimeMillisOf(turns))
+    }
+
+    /** A regra sobre instantes em epoch millis é a que o Codex usa; testada sem os turnos do Claude. */
+    @Test
+    fun `shared gap rule sums consecutive gaps below the cutoff`() {
+        val base = START.toEpochMilliseconds()
+
+        assertEquals(
+            5.minutes.inWholeMilliseconds,
+            activeMillisOfTimestamps(
+                listOf(base, base + 2.minutes.inWholeMilliseconds, base + 5.minutes.inWholeMilliseconds)
+            )
+        )
+    }
+
+    /** Pausa acima do corte sai da soma; instante repetido (intervalo zero) também não conta. */
+    @Test
+    fun `shared gap rule drops a pause and a repeated instant`() {
+        val base = START.toEpochMilliseconds()
+
+        assertEquals(
+            1.minutes.inWholeMilliseconds,
+            activeMillisOfTimestamps(
+                listOf(
+                    base,
+                    base,
+                    base + 1.minutes.inWholeMilliseconds,
+                    base + 1.minutes.inWholeMilliseconds + TURN_GAP_CUTOFF_MILLIS
+                )
+            )
+        )
+    }
+
+    @Test
+    fun `shared gap rule has no time for fewer than two instants`() {
+        assertEquals(0L, activeMillisOfTimestamps(emptyList()))
+        assertEquals(0L, activeMillisOfTimestamps(listOf(START.toEpochMilliseconds())))
     }
 
     @Test

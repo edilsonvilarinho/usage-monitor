@@ -87,6 +87,8 @@ data class CodexCliSessionSummary(
     val skippedLines: Int = 0,
     /** Vazão de saída das respostas medidas; `null` = nenhuma medida (#381). */
     val throughput: OutputThroughput? = null,
+    /** Tempo de trabalho pela regra de [activeTimeMillisOf]; `null` = não medido, zero = medido sem intervalo. */
+    val activeMillis: Long? = null,
     /** Consumo de cada modelo da sessão (#445); vazio = não lido. Ver [toCodexModelBreakdown]. */
     val modelBreakdown: List<CliUsageBucket> = emptyList()
 ) {

@@ -163,6 +163,32 @@ class LocalCodexCliSessionDataSourceTest {
         }
     }
 
+    /**
+     * Tempo ativo pela regra do Claude: intervalo entre respostas consecutivas, somado só abaixo
+     * do corte de 5 min. O salto de 12:02:01 a 12:30:01 é pausa e não entra.
+     */
+    @Test
+    fun `session active time sums gaps below the cutoff and drops a pause above it`() = runTest {
+        withFixture { home, dataSource ->
+            rolloutFile(home).writeText(
+                listOf(
+                    metadataLine(),
+                    contextLine("turn-1", "2026-09-08T12:00:00Z", "gpt-test"),
+                    usageLine("turn-1", "response-1", "2026-09-08T12:00:01Z", 1, 0, 0, 2, 0, 3),
+                    contextLine("turn-2", "2026-09-08T12:02:00Z", "gpt-test"),
+                    usageLine("turn-2", "response-2", "2026-09-08T12:02:01Z", 1, 0, 0, 2, 0, 3),
+                    contextLine("turn-3", "2026-09-08T12:30:00Z", "gpt-test"),
+                    usageLine("turn-3", "response-3", "2026-09-08T12:30:01Z", 1, 0, 0, 2, 0, 3)
+                ).joinToString(separator = "\n", postfix = "\n")
+            )
+
+            dataSource.syncIndex()
+
+            // 12:00:01 -> 12:02:01 = 120 s; 12:02:01 -> 12:30:01 = 28 min, acima do corte.
+            assertEquals(120_000L, dataSource.readSessions().single().activeMillis)
+        }
+    }
+
     private suspend fun withFixture(block: suspend (File, LocalCodexCliSessionDataSource) -> Unit) {
         val root = createTempDirectory("codex-cli-index").toFile()
         val home = File(root, "codex-home").also { it.mkdirs() }
