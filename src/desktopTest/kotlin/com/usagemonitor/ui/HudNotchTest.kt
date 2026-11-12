@@ -2,6 +2,9 @@ package com.usagemonitor.ui
 
 import androidx.compose.ui.test.onAllNodesWithTag
 import com.usagemonitor.CURRENT_APP_VERSION
+import com.usagemonitor.AppShellActions
+import com.usagemonitor.HudAccountActions
+import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
@@ -186,6 +189,25 @@ class HudNotchTest {
             "DeepSeek", "Sem projeção", AppTone.NEUTRAL,
             HudQuota("Saldo", "\$2.27", 0.3f, AppTone.NEUTRAL, resetText = null, hasForecast = false)
         )
+    )
+
+    /** Ações do app sem efeito: o balão da conta só precisa delas para montar as janelas do card. */
+    private fun inertShellActions() = AppShellActions(
+        refreshAll = {},
+        openSettings = {},
+        openHelp = {},
+        exportSnapshot = { null },
+        onExportFailure = {},
+        openAdminOverview = null,
+        openTeamPresenceOverview = null,
+        selectDashboardTeam = {},
+        openComparison = {},
+        openHistory = { _, _ -> },
+        openCliSessions = {},
+        openCodexCliSessions = {},
+        openTeamUsage = {},
+        openTeamPresence = {},
+        openAnalysis = {}
     )
 
     @Composable
@@ -502,6 +524,34 @@ class HudNotchTest {
 
         hoverRing(DEEPSEEK_RING)
         onNodeWithText("botões de DeepSeek").assertIsDisplayed()
+    }
+
+    /** O balão da conta traz Minimizar, e o clique devolve a chave daquela conta (#576). */
+    @Test
+    fun `o balao da conta traz Minimizar e o clique devolve a chave da conta`() = runDesktopComposeUiTest {
+        val toggled = mutableListOf<UsageTargetKey>()
+        setContent {
+            notch(
+                expanded = true,
+                accountActions = { account ->
+                    HudAccountActions(
+                        account = account,
+                        language = AppLanguage.PT,
+                        teamEnabledProfileIds = emptySet(),
+                        cliSessionPulse = SessionPulse.EMPTY,
+                        teamSessionPulse = SessionPulse.EMPTY,
+                        actions = inertShellActions(),
+                        onRefresh = {},
+                        onToggleMinimize = { target -> toggled += target }
+                    )
+                }
+            )
+        }
+
+        hoverRing(DEEPSEEK_RING)
+        onNodeWithContentDescription("Minimizar").assertIsDisplayed()
+        onNodeWithContentDescription("Minimizar").performClick()
+        assertEquals(listOf(accounts[1].targetKey), toggled)
     }
 
     /**
