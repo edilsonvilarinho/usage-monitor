@@ -41,6 +41,8 @@ não diz.
 | Id | Execução | Resultado |
 |---|---|---|
 | A01 | plano escrito com os fatos acima | — |
+| A02 | três protótipos em `prototipos/issue-571/` (`a-rodape`, `b-linha-propria`, `c-junto-a-cota`), capturados com Edge headless e conferidos por screenshot; sem harness (pasta não versionada). Escolha do usuário em 2026-11-12: **B — linha própria** ("Resets de limite", indicador ponto + palavra: "1 disponível" ok, "nenhum" off; bloco ausente sem linha) | escolhido B |
+| A03 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.CodexMapperTest" --tests "com.usagemonitor.data.DashboardCacheMapperTest"` → 3 falhas de asserção (`CodexMapperTest.kt:101`, `:110` esperado 1, obtido `null`; `DashboardCacheMapperTest.kt:34` ida-e-volta) com o campo em stub; verde: `desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.domain.*"` → BUILD SUCCESSFUL, 0 falhas. `ApiUsageStats.bankedResetCount: Int? = null`; `CodexRepositoryImpl` intocado (o `.copy()` preserva o campo) | verde |
 
 ## Problemas em aberto e riscos
 

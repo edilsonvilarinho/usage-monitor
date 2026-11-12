@@ -15,7 +15,18 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CodexUsageResponse(
     @SerialName("plan_type") val planType: String,
-    @SerialName("rate_limit") val rateLimit: CodexRateLimitDto
+    @SerialName("rate_limit") val rateLimit: CodexRateLimitDto,
+    // Ausente em respostas sem o bloco: a leitura fica com `null` (não informado).
+    @SerialName("rate_limit_reset_credits") val resetCredits: CodexResetCreditsDto? = null
+)
+
+/**
+ * Bloco `rate_limit_reset_credits` (issue #571). `applicable_available_count` não é lido:
+ * a semântica não está documentada e a amostra real não basta para nomeá-la.
+ */
+@Serializable
+data class CodexResetCreditsDto(
+    @SerialName("available_count") val availableCount: Int? = null
 )
 
 @Serializable

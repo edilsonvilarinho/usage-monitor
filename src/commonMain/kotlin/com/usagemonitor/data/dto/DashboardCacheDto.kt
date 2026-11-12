@@ -30,7 +30,9 @@ data class ApiUsageStatsCacheDto(
     val planLabel: String? = null,
     // Default nulo mantém legível o cache anterior à #269; a leitura dele herda
     // o `savedAtEpochMillis` do arquivo.
-    val fetchedAtEpochMillis: Long? = null
+    val fetchedAtEpochMillis: Long? = null,
+    // Nulo no cache gravado antes dos resets guardados (issue #571); 0 é "nenhum", não ausência.
+    val bankedResetCount: Int? = null
 )
 
 @Serializable

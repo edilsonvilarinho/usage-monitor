@@ -11,8 +11,10 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageNotice
 import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.UsageUnit
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -92,6 +94,50 @@ class CodexMapperTest {
         assertEquals(emptySet(), result.notices)
     }
 
+    @Test
+    fun `reads available_count of the reset credits block seen in a real Plus account`() {
+        val result = CodexMapper.toUsageStats(decode(payloadWithCredits(REAL_RESET_CREDITS_BLOCK)))
+
+        assertEquals(1, result.bankedResetCount)
+    }
+
+    @Test
+    fun `zero available resets is an explicit zero and not unknown`() {
+        val result = CodexMapper.toUsageStats(
+            decode(payloadWithCredits("""{"available_count":0,"applicable_available_count":0}"""))
+        )
+
+        assertEquals(0, result.bankedResetCount)
+    }
+
+    @Test
+    fun `missing reset credits block leaves the count unknown`() {
+        val result = CodexMapper.toUsageStats(decode(payloadWithCredits(null)))
+
+        assertNull(result.bankedResetCount)
+    }
+
+    @Test
+    fun `block without available_count leaves the count unknown`() {
+        val result = CodexMapper.toUsageStats(decode(payloadWithCredits("""{"applicable_available_count":0}""")))
+
+        assertNull(result.bankedResetCount)
+    }
+
+    /** Mesmas flags do `Json` do ContentNegotiation (ver `RemoteApiDataSource`). */
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    private fun decode(payload: String): CodexUsageResponse = json.decodeFromString<CodexUsageResponse>(payload)
+
+    /** Chaves de topo fora do DTO (`promo`) entram para provar que são ignoradas. */
+    private fun payloadWithCredits(block: String?): String {
+        val resetCredits = block?.let { value -> ",\"rate_limit_reset_credits\":$value" }.orEmpty()
+        return """{"plan_type":"plus","rate_limit":{"allowed":true,"limit_reached":false},"promo":null$resetCredits}"""
+    }
+
     private fun response(
         primary: CodexUsageWindowDto?,
         secondary: CodexUsageWindowDto?
@@ -117,6 +163,8 @@ class CodexMapperTest {
     }
 
     private companion object {
+        /** Bloco `rate_limit_reset_credits` da conta Plus real (2026-11-12). */
+        const val REAL_RESET_CREDITS_BLOCK = """{"available_count":1,"applicable_available_count":0}"""
         const val FIVE_HOURS = 18_000L
         const val SEVEN_DAYS = 604_800L
         const val THIRTY_DAYS = 30L * 24L * 60L * 60L
