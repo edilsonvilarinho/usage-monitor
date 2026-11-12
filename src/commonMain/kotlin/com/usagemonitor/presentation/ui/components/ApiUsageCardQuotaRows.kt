@@ -200,12 +200,21 @@ private fun QuotaRowContent(
             )
         }
 
-        Text(
-            text = resetLabel(quota = quota, language = language, now = now),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2
-        )
+        val blockReason = quota.blockReason
+        if (blockReason != null) {
+            // Cota bloqueada: o estado com palavra substitui o reinício; valor e trilho ficam.
+            AppStatusIndicator(
+                label = quotaBlockReasonLabel(reason = blockReason, language = language),
+                tone = quotaBlockReasonTone(reason = blockReason)
+            )
+        } else {
+            Text(
+                text = resetLabel(quota = quota, language = language, now = now),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
+            )
+        }
 
         if (showRiskSummaryLine && risk != null) {
             Text(

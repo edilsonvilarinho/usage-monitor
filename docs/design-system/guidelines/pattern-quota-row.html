@@ -15,6 +15,7 @@
   .k { font-family: var(--mono); font-size: var(--t10); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .st { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--t10); letter-spacing: .06em; text-transform: uppercase; }
   .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .st.ok { color: var(--ok); } .st.warn { color: var(--warn); } .st.crit { color: var(--crit); }
   .box { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r2); display: grid; place-items: center; }
 
 </style>
@@ -51,6 +52,9 @@
       <div style="display:flex;align-items:center;gap:8px"><span class="k">Créditos de uso</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:var(--t14);font-variant-numeric:tabular-nums">US$ 190,00 / 500,00</span></div>
       <div style="height:4px;border-radius:2px;background:var(--raised);border:1px solid var(--border);overflow:hidden"><span style="display:block;height:100%;width:38%;background:var(--info)"></span></div>
       <span class="k">Reinicia no início do mês</span>
+      <!-- Estado bloqueado (#567): o indicador substitui a linha de reinício; valor e trilho ficam. -->
+      <span class="st crit">Sem créditos · trabalho extra pausado</span>
+      <span class="st warn">Limite mensal atingido</span>
     </div>
   </div>
 </div>

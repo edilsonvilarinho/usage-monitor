@@ -2,10 +2,12 @@ package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PeriodType
+import com.usagemonitor.domain.entity.QuotaBlockReason
 import com.usagemonitor.domain.entity.QuotaInfo
 import com.usagemonitor.domain.entity.QuotaRiskSummary
 import com.usagemonitor.domain.entity.UsageRiskLevel
 import com.usagemonitor.domain.entity.UsageUnit
+import com.usagemonitor.presentation.ui.components.buildQuotaTooltipMetrics
 import com.usagemonitor.presentation.ui.components.codexCliSessionsActionLabel
 import com.usagemonitor.presentation.ui.components.compactPercentageLabel
 import com.usagemonitor.presentation.ui.components.currencySymbol
@@ -74,6 +76,20 @@ class ApiUsageCardTextsTest {
         assertEquals("reiniciando", resetShortLabel(quota(endsAt = Instant.parse("2026-10-27T14:00:00Z")), AppLanguage.PT, now))
         assertNull(resetShortLabel(quota(knownReset = false), AppLanguage.EN, now))
         assertNull(resetShortLabel(quota(unit = UsageUnit.CURRENCY_USD), AppLanguage.EN, now))
+    }
+
+    /** Cota bloqueada (#567): a tooltip troca a linha de reinício pelo motivo. */
+    @Test
+    fun `tooltip shows the block reason in place of the reset line`() {
+        val blocked = quota().copy(blockReason = QuotaBlockReason.OUT_OF_CREDITS)
+
+        val pt = buildQuotaTooltipMetrics(quota = blocked, language = AppLanguage.PT, now = now)
+        assertTrue(pt.none { metric -> metric.label == "Reset" }, "reinicio ainda aparece: $pt")
+        assertEquals("Sem créditos · trabalho extra pausado", pt.first { metric -> metric.label == "Motivo" }.value)
+
+        val en = buildQuotaTooltipMetrics(quota = blocked, language = AppLanguage.EN, now = now)
+        assertTrue(en.none { metric -> metric.label == "Reset" }, "reset still shown: $en")
+        assertEquals("Out of credits · extra usage paused", en.first { metric -> metric.label == "Reason" }.value)
     }
 
     @Test
