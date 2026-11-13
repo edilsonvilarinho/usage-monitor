@@ -195,8 +195,8 @@ Antes de desenhar um retângulo novo, procure aqui.
 - **Emoji por conta** (`AccountEmoji` + `AccountEmojiGlyph` + `AppGlyphChip`; issue #287): a cor
   só separa duas contas Claude para quem lembra qual tom é de qual conta. Cada perfil pode ter um de
   dezesseis emojis em Configurações → Contas, gravado como a cor (`emoji` no nó do perfil, **nome**
-  do enum, desconhecido vira "Nenhum"). Aparece como **selo no canto de cima à direita do anel** da
-  HUD, ao lado da marca no cabeçalho do balão e do card, e antes do apelido na linha do perfil.
+  do enum, desconhecido vira "Nenhum"). Aparece como **lua de 18 dp tangente ao anel** da HUD, no canto de
+  cima à direita, ao lado da marca no cabeçalho do balão e do card, e antes do apelido na linha do perfil.
   - **É conteúdo do usuário, não cromo.** A regra "sem emoji" do design system continua valendo para
     a interface; este glifo é da natureza do apelido e o nome está sempre escrito ao lado, por isso
     ele é decorativo na semântica.
@@ -205,9 +205,20 @@ Antes de desenhar um retângulo novo, procure aqui.
     mono e **offscreen**, então os geradores de captura também o desenham. Campo livre traria
     sequências ZWJ, tons de pele e bandeiras de largura imprevisível, e quadrado vazio onde falta a
     fonte. **Linux e macOS não foram vistos**: dependem da fonte de emoji do sistema.
-  - **O selo não entra em `hudNotchSizes`.** Ele passa `HUD_EMOJI_BADGE_OVERSHOOT` (4dp) para fora do
-    anel, dentro do respiro que o notch já tem — `HudNotchGeometryTest` afirma o limite e a geometria
-    igual com e sem emoji. `AccountEmojiGlyph` mede o glifo em **dp**: em sp ele cresceria com a
+  - **A lua não entra em `hudNotchSizes`.** Ela passa `HUD_EMOJI_BADGE_OVERSHOOT` (6dp) para fora do
+    anel, dentro do respiro de 8dp que o notch já tem — `HudNotchGeometryTest` afirma o limite e a geometria
+    igual com e sem emoji.
+  - **A lua (#585).** Atrás do glifo fica um disco `AppGargantuaTokens.core` com fio de 1dp em
+    `AppGargantuaTokens.gold`, desenhado com `drawBehind` (sem reimplementar primitiva de superfície). Ela
+    tangencia o anel por fora a 45°: o centro fica a (anel/2 + lua/2) do centro do anel, e o excesso é
+    (32 + 9)/√2 + 9 − 32 ≈ 6dp. Por isso `HUD_EMOJI_BADGE_SIZE` é 18dp e não os 22dp do protótipo: o respiro aceita 6dp de excesso,
+    e 22dp exigiria crescer `HUD_ITEM_GAP`. `HudNotchGeometryTest` afirma a tangência e o excesso.
+  - **Troca animada, 420ms.** Nos primeiros 210ms a lua velha sai pela órbita, girando −20°, e some; nos 210ms
+    seguintes a nova entra com fade e escala 0,7→1, sem overshoot. `accountMoonSwapFrame` é a função pura de
+    quadro, em `commonMain` no padrão de `GargantuaRoll.kt` e `GargantuaTransition.kt`. As durações são
+    `AppGargantuaTokens.moonSwapOutMillis` (210) e `moonSwapMillis` (420), com espelho em
+    `docs/design-system/tokens/motion.css`, e o tween passa por `appTweenSpec`. Com "reduzir animações" a troca
+    é corte seco. `AccountEmojiGlyph` mede o glifo em **dp**: em sp ele cresceria com a
     escala de fonte do sistema e sairia da caixa que a geometria conta.
   - Mapa paralelo ao das cores (`accountEmojis`), e não um objeto de identidade que juntasse os dois:
     a cor já atravessava cinco assinaturas, e trocá-las todas por causa do emoji mexeria em código

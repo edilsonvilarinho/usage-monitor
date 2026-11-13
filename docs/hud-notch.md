@@ -484,6 +484,11 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   translúcida com Doppler (token `ember`). Tudo cabe no miolo livre; o disco não atravessa os
   arcos. **Decisão:** a regra anterior era "arco imóvel pixel a pixel"; agora três pulsos de luz
   correm no plasma em `flowMillis` (2,8s) e se apagam perto das pontas.
+- **Emoji da conta: lua em órbita (#585).** O selo de 14dp no canto do anel saiu; no lugar, uma lua de 18dp
+  (`HUD_EMOJI_BADGE_SIZE`): disco `core` com fio de 1dp em `gold`, tangente ao anel a 45°, com 6dp de excesso
+  (`HUD_EMOJI_BADGE_OVERSHOOT`). Por que 18dp e não 22dp: o respiro do notch aceita 6dp de excesso; 22dp
+  exigiria crescer `HUD_ITEM_GAP`, e o notch ficaria mais largo só por causa de um emoji. A troca de emoji
+  dura 420ms (`accountMoonSwapFrame`).
 - **Cena 3D AL1 e marca em relevo** (#517, 2026-10-28). Pedido: "os ícones das APIs mais 3D, hoje muito 2D".
   Duas rodadas de HTML (skill `usage-monitor-visual-options`): a AK mexia só no preenchimento da marca e não era o
   pedido; na AL (a cena inteira, buraco negro e órbitas) o dono escolheu **AL1 · Gargantua de Interstellar**, e
