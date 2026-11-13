@@ -35,6 +35,7 @@ de **18 dp**, que não muda o tamanho da barra.
 |---|---|
 | A01 | Este plano |
 | A02 | Geometria da lua (constantes) + testes de que a lua não toca a trilha e não sai do notch |
+| A03 | Lua desenhada (`AccountEmojiGlyph(moon = true)`: disco `core` + fio 1 dp `gold` por `drawBehind`); troca de emoji por função pura `accountMoonSwapFrame` (velha gira −20° em torno do anel e some em 210 ms, nova entra com alfa e escala 0,7→1 até 420 ms, sem overshoot), tokens `moonSwapOutMillis`/`moonSwapMillis` com espelho em `motion.css`; `appTweenSpec` corta seco com animação reduzida | Vermelho: `AccountMoonSwapTest` contra stub → `AssertionError` em `AccountMoonSwapTest.kt:21` (duração 420 ausente). Verde: `gradlew.bat desktopTest --tests "*AccountMoonSwapTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.architecture.*"` → 6 + 77 + 17 testes, 0 falhas. Desenho do disco sem teste de pixel (validado por compilação e captura na A04) |
 | A03 | Desenho da lua (disco + fio) e troca animada |
 | A04 | Docs: `compose-implementation.md` "Emoji por conta", `hud-notch.md`, protótipo `prototipo-visual-opencode.html`, histórico da skill `usage-monitor-visual-options` |
 
