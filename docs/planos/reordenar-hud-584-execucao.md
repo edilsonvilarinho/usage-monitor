@@ -40,7 +40,8 @@ escolheu a **AQ1 · Captura orbital por arrasto**: segurar o anel 300 ms, arrast
 | A01 | Este plano |
 | A02 | Regra pura do arrasto em `commonMain` (índice de destino, deslocamento das vizinhas, nova ordem) + testes |
 | A03 | Escrita da ordem em `AppShellState` (`CARD_ORDER_KEY`) + teste |
-| A04 | Gesto na HUD (pressão longa, arrasto, Esc) e halo de captura; teste de componente |
+| A04a | Gesto na HUD: pressão longa de 300 ms, arrasto ao longo da borda, soltar chama `onReorderAccounts`, Esc cancela; testes de componente |
+| A04b | Acabamento (anel segue o ponteiro, vizinhas com `dragShiftOffsets` e mola, halo) e ligação do host a `changeCardOrder` |
 | A05 | Docs: `hud-notch.md`, `presentation.md` ("Perdas aceitas"), protótipo, histórico da skill `usage-monitor-visual-options` |
 
 ## Ponto de situação
@@ -50,8 +51,10 @@ escolheu a **AQ1 · Captura orbital por arrasto**: segurar o anel 300 ms, arrast
 | A01 | Plano com fatos medidos e atividades | `gh issue comment 584` → plano curto publicado; fatos levantados por varredura de leitura |
 | A02 | Regra pura em `CardDragRule.kt` (`CardAxisSpan`, `dragTargetIndex`: troca quando o ponteiro passa do meio do vizinho; `dragShiftOffsets`: cada item vai para a vaga do destino, a vaga abre no destino); a ordem final reusa `moveVisibleCardToIndex`, que mantém as contas ocultas nas posições absolutas (contrato já testado) | Vermelho: 7 de 7 testes contra stub → `java.lang.AssertionError at CardDragRuleTest.kt:29` (`dragTargetIndex(..., pointer = 151f)` esperado 1, stub devolve 0). Verde: `./gradlew.bat desktopTest --tests 'com.usagemonitor.presentation.*'` → 1142 testes, 0 falhas (`CardDragRuleTest` 7/7) |
 | A03 | `AppShellState.changeCardOrder(order, availableTargets)`: normaliza com `normalizeCardOrder` (duplicata some, conta sem posição vai para o fim), atualiza `cardOrder` e grava em `CARD_ORDER_KEY`; reabrir lê a mesma ordem | Vermelho (stub vazio): `AppShellStateTest.kt:29` → `expected:<[CODEX, ANTHROPIC:default, MINIMAX]> but was:<[ANTHROPIC:default, MINIMAX, CODEX]>`. Verde: `./gradlew.bat desktopTest --tests '*AppShellState*'` → 2 testes, 0 falhas |
+| A04a | `hudPressGesture` ganhou o hold de 300 ms (`withTimeoutOrNull` sobre o evento; parado no limiar vira arrasto, senão segue como clique); `HudReorderSession` guarda origem, alvo (`dragTargetIndex` sobre as caixas de clique dos anéis) e cancelamento; Esc por `onKeyEvent` com foco no notch; `HudNotch(onReorderAccounts = {})` chama só quando a ordem mudou. O alvo usa o meio da caixa de clique (anel + texto), não o centro visual do anel | Vermelho: `AssertionError: esperava a ordem nova ao soltar expected:<[[ANTHROPIC:DeepSeek, ANTHROPIC:INFORMATA2]]> but was:<[]>`. Verde: `./gradlew.bat desktopTest --tests 'com.usagemonitor.ui.HudNotchTest' --tests 'com.usagemonitor.architecture.*'` → 80 + 17 testes, 0 falhas (pressão longa + arrasto + soltar → ordem nova; clique curto → recoleta sem reordenar; Esc → sem reordenar) |
 
 ## Problemas em aberto e riscos
 
 - Host de janela (#342): o gesto só foi exercitado no Windows; o PR declara o risco no Linux/macOS.
+- Esc depende de o notch ter foco de teclado; a janela da HUD pode não receber foco em todas as plataformas (o teste roda sem janela real).
 - Pressão longa no notch compete com o arrasto da alça de mover (`HudHandles.kt:100`): a alça fica fora do anel.

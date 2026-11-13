@@ -160,6 +160,11 @@ internal fun HudNotch(
     onDragEnd: () -> Unit = {},
     /** Clique num anel: recoleta aquela conta, como no Codenotch. */
     onRefreshAccount: (UsageTargetKey) -> Unit = {},
+    /**
+     * Pressão longa sobre um anel e arrasto: ao soltar, a ordem nova das contas (só se mudou). Esc e soltar no
+     * mesmo lugar não chamam.
+     */
+    onReorderAccounts: (List<UsageTargetKey>) -> Unit = {},
     /** Os botões do card de cada conta, na fileira de baixo do balão dela. */
     accountActions: (@Composable (HudAccount) -> Unit)? = null,
     /**
@@ -216,10 +221,10 @@ internal fun HudNotch(
     val ringItemBounds = remember { HudRingHitBoxes() }
     val currentAccounts by rememberUpdatedState(accounts)
     val currentOnRefreshAccount by rememberUpdatedState(onRefreshAccount)
+    val reorder = rememberHudRingReorder(ringItemBounds, currentAccounts, edge.isHorizontal, onReorderAccounts)
 
     val shape = remember(edge) { HudNotchShape(edge) }
-    // A saída (K1): enquanto a vaga fecha, o notch recolhe junto. O passo mais
-    // lento manda, para o corpo nunca ficar menor que as contas dentro dele.
+    // Saída (K1): o notch recolhe junto com a vaga; o passo mais lento manda.
     val departures = rememberHudDepartures(accounts)
     val settle = departures.values.minOrNull()
     val minimizeState = minimize ?: rememberHudMinimizeProgress(accounts)
@@ -254,27 +259,25 @@ internal fun HudNotch(
                     .testTag(HUD_CONTENT_TEST_TAG)
                     .hudEclipseIris(edge, iris)
                     .appDepth(AppDepth.DIALOG, shape)
-                    // O corpo é o horizonte de eventos (M1): núcleo escuro e
-                    // anel de fótons com Doppler na borda.
+                    // Corpo = horizonte de eventos (M1): núcleo escuro e anel de fótons na borda.
                     .gargantuaHorizonBody(shape)
                     .hoverable(hover.notch)
                     .onPlaced { coordinates -> ringItemBounds.body = coordinates }
-                    // Só a mão move. Arrastando pelo corpo o notch saía do lugar
-                    // quando a intenção era clicar num anel, e o cursor de mover
-                    // sobre a faixa inteira dizia que ela toda era alça.
+                    .hudReorderKeys(reorder)
+                    // Só a mão move: arrastar pelo corpo tirava o notch ao clicar num anel.
                     .hudPressGesture(
                         draggable = false,
                         onDragStart = {},
                         onDragMove = {},
                         onDragEnd = {},
-                        // Clique num anel recoleta aquela conta; fora dos anéis
-                        // (margem) não faz nada. Abrir a janela padrão
-                        // ficou com a engrenagem, a bandeja e `Ctrl+Shift+H`.
+                        // Clique num anel recoleta a conta; na margem não faz nada.
                         onClick = { position ->
-                            ringItemBounds.indexAt(position)
-                                ?.let { index -> currentAccounts.getOrNull(index) }
-                                ?.let { account -> currentOnRefreshAccount(account.targetKey) }
-                        }
+                            hudRingKeyAt(ringItemBounds, currentAccounts, position)
+                                ?.let { key -> currentOnRefreshAccount(key) }
+                        },
+                        onHoldStart = reorder::start,
+                        onHoldMove = reorder::move,
+                        onHoldEnd = reorder::end
                     )
                     .semantics { contentDescription = HUD_NOTCH_DESCRIPTION }
             ) {
@@ -319,8 +322,7 @@ internal fun HudNotch(
                     enter = fadeIn(appTween(AppMotion.normal, delayMillis = HINT_RETURN_DELAY_MS)),
                     exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
                 ) {
-                    // O ponto da atualização mora na ponta da engrenagem, também
-                    // parado: sem ele o aviso só existiria para quem abrisse o notch.
+                    // Ponto da atualização na ponta da engrenagem: sem ele só via quem abrisse o notch.
                     HudHandleHint(
                         edge = edge,
                         atStart = atStart,
@@ -574,11 +576,18 @@ private fun rememberHudHover(onHoverChange: (Boolean) -> Unit): HudHoverSources 
 private const val STRIP_Z_INDEX = -0.5f
 
 /** A caixa de cada conta no corpo do notch; o gesto do corpo acha o anel clicado por ela. */
-private class HudRingHitBoxes {
+internal class HudRingHitBoxes {
     var body: LayoutCoordinates? = null
     val boxes = mutableMapOf<Int, Rect>()
 
     fun indexAt(position: Offset): Int? = boxes.entries.firstOrNull { (_, box) -> box.contains(position) }?.key
+
+    /** Os limites de cada conta ao longo da borda, em ordem de índice; `null` se alguma caixa ainda não foi medida. */
+    fun spansAlong(count: Int, horizontal: Boolean): List<CardAxisSpan>? {
+        val found = (0 until count).mapNotNull { index -> boxes[index] }
+        if (found.size != count) return null
+        return found.map { box -> if (horizontal) CardAxisSpan(box.left, box.right) else CardAxisSpan(box.top, box.bottom) }
+    }
 }
 
 /** O "índice" do balão da engrenagem, fora do intervalo das contas. */
