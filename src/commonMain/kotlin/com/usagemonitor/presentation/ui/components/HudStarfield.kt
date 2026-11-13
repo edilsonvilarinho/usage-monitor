@@ -339,7 +339,7 @@ private fun hudStarfieldInside(box: HudStarfieldBox, x: Float, y: Float, margin:
 private fun hudStarfieldWrap(value: Float, period: Float): Float = ((value % period) + period) % period
 
 /** Smoothstep sem overshoot, igual ao `ss` do protótipo. */
-private fun hudStarfieldSmoothstep(a: Float, b: Float, x: Float): Float {
+internal fun hudStarfieldSmoothstep(a: Float, b: Float, x: Float): Float {
     val t = ((x - a) / (b - a)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
 }
