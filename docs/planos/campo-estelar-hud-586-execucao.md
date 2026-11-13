@@ -46,6 +46,7 @@ rodada seguinte (`prototipos/issue-586-r2/at1-claro/`), a **L1 · Tinta densa**.
 | Id | O que foi feito | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos e escolhas do usuário | `gh issue comment 586` → plano curto publicado |
+| A02 | `HudStarfield.kt` (`commonMain`, sem Compose): `hudStarfieldStars` nasce 140 estrelas (30/45/65) por semente fixa, só em áreas livres; `hudStarfieldFrame` dá posição, raio, alfa e rastro por quadro — deriva por camada com laço exato de 82,5 s, deflexão perto dos poços (sombra 0,62 R, influência 3 R, razões do protótipo) com rastro de 5 px só em perto/meio, alfa 0 dentro de caixa proibida. 18% das estrelas marcadas `gold` para a A03 colorir | Vermelho: `java.lang.AssertionError: expected:<140> but was:<0>` (stub vazio; 8 testes vermelhos). Verde: `./gradlew.bat desktopTest --tests '*HudStarfieldTest'` → 8 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
