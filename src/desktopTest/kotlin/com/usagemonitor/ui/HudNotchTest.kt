@@ -637,6 +637,40 @@ class HudNotchTest {
         assertEquals(listOf(expected), reordered, "esperava a ordem nova ao soltar")
     }
 
+    /**
+     * Durante o arrasto o anel capturado segue o ponteiro sem mola (o deslocamento é ponteiro − pressão) e a vizinha
+     * atravessada anda no sentido oposto, pela mola, até assentar (#584, A04b2).
+     */
+    @Test
+    fun `arrasto leva o anel capturado com o ponteiro e a vizinha no sentido oposto`() = runDesktopComposeUiTest {
+        setContent { notch(onReorderAccounts = {}) }
+
+        val from = ringCenterInBody(INFORMATA_RING)
+        val neighborBefore = ringCenterInBody(DEEPSEEK_RING)
+        val past = neighborBefore + Offset(80f, 0f)
+        val body = onNodeWithTag(HUD_CONTENT_TEST_TAG)
+        mainClock.autoAdvance = false
+        body.performTouchInput { down(from) }
+        mainClock.advanceTimeBy(HUD_REORDER_HOLD_MILLIS + 100)
+        waitForIdle()
+        body.performTouchInput { moveTo(past) }
+        waitForIdle()
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(2_000L)
+        waitForIdle()
+
+        val pointerDelta = past - from
+        val capturedDelta = ringCenterInBody(INFORMATA_RING) - from
+        assertTrue(
+            kotlin.math.abs(capturedDelta.x - pointerDelta.x) < 1f,
+            "anel capturado devia andar o delta do ponteiro (${pointerDelta.x}px), andou ${capturedDelta.x}px"
+        )
+        val neighborDelta = ringCenterInBody(DEEPSEEK_RING) - neighborBefore
+        assertTrue(neighborDelta.x < -1f, "vizinha atravessada devia andar no sentido oposto, andou ${neighborDelta.x}px")
+        body.performTouchInput { up() }
+        waitForIdle()
+    }
+
     /** Clique curto segue recoletando a conta, e não reordena. */
     @Test
     fun `clique curto num anel recoleta e nao reordena`() = runDesktopComposeUiTest {

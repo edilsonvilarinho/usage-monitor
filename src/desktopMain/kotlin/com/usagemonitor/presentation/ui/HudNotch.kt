@@ -275,9 +275,7 @@ internal fun HudNotch(
                             hudRingKeyAt(ringItemBounds, currentAccounts, position)
                                 ?.let { key -> currentOnRefreshAccount(key) }
                         },
-                        onHoldStart = reorder::start,
-                        onHoldMove = reorder::move,
-                        onHoldEnd = reorder::end
+                        onHoldStart = reorder::start, onHoldMove = reorder::move, onHoldEnd = reorder::end
                     )
                     .semantics { contentDescription = HUD_NOTCH_DESCRIPTION }
             ) {
@@ -292,6 +290,7 @@ internal fun HudNotch(
                     departures = departures,
                     settle = settle,
                     minimizeProgress = minimizeState.values,
+                    reorderDrag = reorder.drag, reorderDrop = reorder.drop,
                     onRingHovered = { index -> balloonIndex = index },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },

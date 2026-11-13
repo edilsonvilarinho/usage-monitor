@@ -11,6 +11,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -155,6 +156,18 @@ internal class HudReorderSession {
     private var target = -1
     private var cancelled = false
 
+    /** Índice da conta pega, ou `null` sem arrasto. */
+    val draggedIndex: Int?
+        get() = origin
+
+    /** Alvo atual do arrasto. */
+    val targetIndex: Int
+        get() = target
+
+    /** `true` depois do Esc: o anel volta e o arrasto só termina no soltar. */
+    val isCancelled: Boolean
+        get() = cancelled
+
     /** Começa o arrasto da conta [index], com os limites dos anéis ao longo da borda. */
     fun begin(index: Int, spans: List<CardAxisSpan>) {
         origin = index
@@ -202,6 +215,26 @@ internal fun <T> reorderedKeys(items: List<T>, from: Int, to: Int): List<T> {
  * gesto às caixas dos anéis. Fica fora de `HudNotch` para o composable caber
  * no limite de função.
  */
+/** Arrasto visível (#584): a conta pega, o alvo e quanto o ponteiro andou ao longo da borda. */
+internal class HudRingDrag(
+    val index: Int,
+    val target: Int,
+    /** Ponteiro menos pressão, ao longo da borda: é quanto o anel pego anda. */
+    val offset: Float,
+    val spans: List<CardAxisSpan>,
+)
+
+/** Soltar com reordenação: quanto cada conta anda de vaga, ao longo da borda. Objeto novo a cada soltar. */
+internal class HudRingDrop(val deltas: Map<UsageTargetKey, Float>)
+
+/** Quanto anda cada conta de vaga com a ordem nova (início da vaga nova menos o da antiga). */
+internal fun dropDeltas(
+    spans: List<CardAxisSpan>,
+    before: List<UsageTargetKey>,
+    after: List<UsageTargetKey>,
+): Map<UsageTargetKey, Float> =
+    after.withIndex().associate { (index, key) -> key to spans[index].start - spans[before.indexOf(key)].start }
+
 internal class HudRingReorder(
     private val session: HudReorderSession,
     private val bounds: HudRingHitBoxes,
@@ -212,25 +245,55 @@ internal class HudRingReorder(
 ) {
     val focus = FocusRequester()
 
+    /** Arrasto em curso, lido pela faixa para mover o capturado e as vizinhas. */
+    var drag: HudRingDrag? by mutableStateOf(null)
+        private set
+
+    /** Último soltar com reordenação; a faixa assenta a partir dele. */
+    var drop: HudRingDrop? by mutableStateOf(null)
+        private set
+
+    private var pressAlong = 0f
+    private var pressSpans: List<CardAxisSpan> = emptyList()
+
     /** Pressão longa sobre um anel: `true` se o arrasto começou. */
     fun start(position: Offset): Boolean {
         val index = bounds.indexAt(position) ?: return false
         val spans = bounds.spansAlong(count(), horizontal()) ?: return false
         session.begin(index, spans)
+        pressAlong = alongOf(position)
+        pressSpans = spans
+        drop = null
+        drag = HudRingDrag(index, index, 0f, spans)
         focus.requestFocus()
         return true
     }
 
     fun move(position: Offset) {
-        session.moveTo(if (horizontal()) position.x else position.y)
+        val along = alongOf(position)
+        session.moveTo(along)
+        val from = session.draggedIndex ?: return
+        if (session.isCancelled) return
+        drag = HudRingDrag(from, session.targetIndex, along - pressAlong, pressSpans)
     }
 
     fun end() {
-        session.finish(keys())?.let { order -> onReorder(order) }
+        val before = keys()
+        val order = session.finish(before)
+        drag = null
+        if (order == null) return
+        drop = HudRingDrop(dropDeltas(pressSpans, before, order))
+        onReorder(order)
     }
 
-    /** Esc: `true` se havia arrasto para cancelar. */
-    fun cancel(): Boolean = session.cancel()
+    /** Esc: `true` se havia arrasto para cancelar; o anel volta à vaga. */
+    fun cancel(): Boolean {
+        val cancelled = session.cancel()
+        if (cancelled) drag = null
+        return cancelled
+    }
+
+    private fun alongOf(position: Offset): Float = if (horizontal()) position.x else position.y
 }
 
 /** Guarda o arrasto de um notch; as leituras ao vivo passam por `rememberUpdatedState`. */
