@@ -587,6 +587,17 @@ célula dela no notch encolhe.
   minimizadas a `buildHudAccounts`. Alternar: `toggleHudMinimizedAccount` e persistir. Funções puras em
   `presentation/ui/HudMinimizedAccounts.kt` (commonMain).
 
+## Reordenar contas arrastando o anel (#584)
+
+Pressão longa no anel de uma conta vira arrasto. A ordem que sai do gesto vale também para a bandeja.
+
+- **Gesto.** Pressão de 300 ms no anel (`HUD_REORDER_HOLD_MILLIS`) vira arrasto. Clique curto continua recoletando.
+- **Troca.** A conta troca de vaga com o vizinho ao passar do meio da caixa dele (`dragTargetIndex`).
+- **Vizinhas.** As outras contas deslizam para abrir a vaga por `dragShiftOffsets`, com mola sem rebote.
+- **Halo.** O anel capturado ganha halo dourado de 1,5 dp.
+- **Soltar.** Grava `cardOrder` por `AppShellState.changeCardOrder`; vale também para a bandeja.
+- **Esc.** Cancela; depende de o notch ter foco de teclado.
+
 ## Fora do alcance dos testes
 
 Os testes de componente desenham numa cena fora de tela, sem janela AWT e sem gerenciador de
