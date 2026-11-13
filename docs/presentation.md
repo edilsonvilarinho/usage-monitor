@@ -318,8 +318,8 @@ visualização. Saíram `MainWindowHost`, `DesktopWindowFrame`, a geometria pers
 - **O relatório de bug ganhou janela própria** (`BugReportWindow` em `AppWindowAnchor.kt`, uma
   `AppDialogWindow`): ele morava dentro da janela principal, e a HUD tem o tamanho do notch. É também
   a janela que abre no arranque depois de uma queda. A captura passa a ser da HUD.
-- **Perdas aceitas**: reordenar cards por arrasto, minimizar card, o card completo com "tentar de
-  novo" e a tela vazia "Abrir configurações". A HUD segue lendo o `cardOrder` gravado; recoletar é
+- **Perdas aceitas**: minimizar card, o card completo com "tentar de
+  novo" e a tela vazia "Abrir configurações". A reordenação voltou pela HUD (#584), por pressão longa no anel e arrasto. A HUD segue lendo o `cardOrder` gravado; recoletar é
   clique no anel; sem API as Configurações abrem sozinhas.
 - `DashboardScreen`, a grade e o card continuam no código, consumidos só por testes e pelos geradores
   de captura. As duas seções abaixo descrevem esse código, não uma tela do app.

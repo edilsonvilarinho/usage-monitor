@@ -141,6 +141,8 @@ internal fun HudWindowHost(
      * "Sair do Usage Monitor" do balão da engrenagem, a saída sem bandeja (#416).
      */
     onCloseRequest: () -> Unit,
+    /** Arrasto de anel (#584): a nova ordem das contas vai ao estado da casca, que a grava. */
+    onReorderAccounts: (List<UsageTargetKey>) -> Unit,
     /** Alvos com turno de sessão CLI nos últimos 5 min; acende o arco que gira. */
     activeTargets: StateFlow<Set<UsageTargetKey>>? = null,
     /** Sessões sem resposta desde o último pedido; viram sinal no balão da conta (#265). */
@@ -358,6 +360,7 @@ internal fun HudWindowHost(
                     onDragEnd = dragFinish,
                     // Clique num anel recoleta aquela conta, como no Codenotch.
                     onRefreshAccount = { target -> viewModel.refresh(target) },
+                    onReorderAccounts = onReorderAccounts,
                     // Os botões do card daquela conta, pela mesma regra do card.
                     accountActions = { account ->
                         HudAccountActions(

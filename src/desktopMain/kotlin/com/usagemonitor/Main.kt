@@ -453,6 +453,8 @@ internal fun runUsageMonitor(
             accountColors = accountColors,
             accountEmojis = accountEmojis,
             onCloseRequest = { shutdownApplication() },
+            // Arrasto de anel (#584): a ordem nova passa pela casca, que normaliza e grava.
+            onReorderAccounts = { order -> shell.changeCardOrder(order, availableTargets) },
             activeTargets = viewModels.hudActiveTargets,
             stalledSessions = viewModels.sessionPulse.stalledSessions
         )

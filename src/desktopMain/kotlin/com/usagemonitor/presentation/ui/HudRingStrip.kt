@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -21,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -70,7 +73,9 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AppStatusPill
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
+import com.usagemonitor.presentation.ui.theme.AppMotion
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
+import com.usagemonitor.presentation.ui.theme.appSpring
 
 /** A faixa de anéis, do tamanho do notch. */
 @Composable
@@ -96,13 +101,19 @@ internal fun HudRingStrip(
     onRingHovered: (Int) -> Unit,
     onRingRefresh: (Int) -> Unit,
     onItemPlaced: (Int, LayoutCoordinates) -> Unit,
-    onRingPlaced: (Int, LayoutCoordinates) -> Unit
+    onRingPlaced: (Int, LayoutCoordinates) -> Unit,
+    /** Arrasto de reordenação em curso (#584); `null` sem arrasto. */
+    reorderDrag: HudRingDrag? = null,
+    /** O soltar com reordenação, para a faixa assentar (#584). */
+    reorderDrop: HudRingDrop? = null
 ) {
     val items: @Composable () -> Unit = {
         if (accounts.isEmpty()) {
             AppStatusIndicator(label = fallbackLabel, tone = fallbackTone)
         } else {
             val birthOrder = hudBirthOrder(accounts)
+            // As vizinhas andam pela regra pura do arrasto; o capturado segue o ponteiro (#584).
+            val shifts = reorderDrag?.let { drag -> dragShiftOffsets(drag.spans, drag.index, drag.target) }
             // O vão é de cada item, e não do arranjo: quem sai leva o seu junto
             // enquanto a vaga fecha (K1). Parado, dá o mesmo que `spacedBy`.
             val gaps = hudLeadingGapScales(accounts.map { account -> departures[account.targetKey] })
@@ -133,7 +144,10 @@ internal fun HudRingStrip(
                         onHovered = { onRingHovered(index) },
                         onRefresh = { onRingRefresh(index) },
                         onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
-                        onPlaced = { coordinates -> onRingPlaced(index, coordinates) }
+                        onPlaced = { coordinates -> onRingPlaced(index, coordinates) },
+                        reorderShift = reorderShiftOf(reorderDrag, shifts, index),
+                        reorderDragging = reorderDrag?.index == index,
+                        reorderDrop = reorderDrop
                     )
                 }
             }
@@ -167,6 +181,48 @@ internal const val HUD_STATUS_PILL_TEST_TAG = "hud-status-pill"
 internal const val HUD_STRIP_LINE_TEST_TAG = "hud-strip-line"
 internal const val HUD_RING_ITEM_TEST_TAG = "hud-ring-item"
 
+/** O deslocamento de cada item pelo arrasto (#584): o capturado segue o ponteiro; as vizinhas, a regra pura. */
+private fun reorderShiftOf(drag: HudRingDrag?, shifts: List<Float>?, index: Int): Float = when {
+    drag == null || shifts == null -> 0f
+    drag.index == index -> drag.offset
+    else -> shifts.getOrElse(index) { 0f }
+}
+
+/** Traço fino dourado no capturado (#584): só desenho, não muda o tamanho do anel. */
+private fun Modifier.hudReorderHalo(): Modifier = drawBehind {
+    drawCircle(
+        color = AppGargantuaTokens.gold.copy(alpha = HUD_REORDER_HALO_ALPHA),
+        radius = (size.minDimension - HUD_REORDER_HALO_WIDTH.toPx()) / 2f,
+        style = Stroke(width = HUD_REORDER_HALO_WIDTH.toPx()),
+    )
+}
+
+private val HUD_REORDER_HALO_WIDTH = 1.5.dp
+private const val HUD_REORDER_HALO_ALPHA = 0.6f
+private const val HUD_REORDER_SETTLE_THRESHOLD = 0.5f
+
+/**
+ * Desloca o item pelo arrasto (#584). O capturado segue o ponteiro sem mola; as vizinhas
+ * vão à vaga nova pela mola de `appSpring`, sem overshoot. No soltar, o resíduo de vaga é
+ * compensado num salto e a mola assenta em zero. Com movimento reduzido, `appSpring` é corte seco.
+ */
+@Composable
+private fun rememberHudReorderShift(target: Float, dragging: Boolean, drop: HudRingDrop?, delta: Float?): Float {
+    val shift = remember { Animatable(0f) }
+    val spec = appSpring<Float>(AppMotion.Springs.GENTLE, visibilityThreshold = HUD_REORDER_SETTLE_THRESHOLD)
+    LaunchedEffect(target, dragging, drop) {
+        when {
+            dragging -> shift.snapTo(target)
+            drop != null -> {
+                shift.snapTo(shift.value - (delta ?: 0f))
+                shift.animateTo(0f, spec)
+            }
+            else -> shift.animateTo(target, spec)
+        }
+    }
+    return shift.value
+}
+
 @Composable
 private fun HudRingItem(
     minimizeProgress: Float,
@@ -183,9 +239,21 @@ private fun HudRingItem(
     onHovered: () -> Unit,
     onRefresh: () -> Unit,
     onItemPlaced: (LayoutCoordinates) -> Unit,
-    onPlaced: (LayoutCoordinates) -> Unit
+    onPlaced: (LayoutCoordinates) -> Unit,
+    /** Deslocamento ao longo da borda vindo do arrasto (#584); 0 fora dele. */
+    reorderShift: Float,
+    /** O capturado: segue o ponteiro e leva o halo (#584). */
+    reorderDragging: Boolean,
+    /** O soltar desta rodada, para assentar sem salto (#584). */
+    reorderDrop: HudRingDrop?
 ) {
     val policy = LocalAppMotionPolicy.current
+    val reorderOffset = rememberHudReorderShift(
+        target = reorderShift,
+        dragging = reorderDragging,
+        drop = reorderDrop,
+        delta = reorderDrop?.deltas?.get(account.targetKey),
+    )
     // Nascimento (API ativada, início do app) e colapso (API desativada).
     val frame = rememberHudRingFrame(account.presence, birthOrder, policy)
     // Minimizar (#576): o anel e a cota em foco trocam pelo quadro da transição, não pelo estado.
@@ -195,6 +263,7 @@ private fun HudRingItem(
     // consumiria o `down` e o arrasto pelo corpo nunca começaria.
     val itemModifier = slot
         .onGloballyPositioned(onItemPlaced)
+        .graphicsLayer { if (vertical) translationY = reorderOffset else translationX = reorderOffset }
         .semantics {
             onClick(label = refreshLabel) {
                 onRefresh()
@@ -224,7 +293,8 @@ private fun HudRingItem(
         // com a órbita de sessão ativa.
         Box(
             modifier = Modifier
-                .onGloballyPositioned(onPlaced),
+                .onGloballyPositioned(onPlaced)
+                .then(if (reorderDragging) Modifier.hudReorderHalo() else Modifier),
             contentAlignment = Alignment.Center
         ) {
             AppGargantuaRing(

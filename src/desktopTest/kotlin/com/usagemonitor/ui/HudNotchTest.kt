@@ -7,6 +7,7 @@ import com.usagemonitor.HudAccountActions
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_REORDER_HOLD_MILLIS
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,6 +90,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -225,6 +229,7 @@ class HudNotchTest {
         onDragMove: () -> Unit = {},
         onDragEnd: () -> Unit = {},
         onRefreshAccount: (UsageTargetKey) -> Unit = {},
+        onReorderAccounts: (List<UsageTargetKey>) -> Unit = {},
         accountActions: (@Composable (HudAccount) -> Unit)? = null,
         dragging: Boolean = false,
         onGearClick: () -> Unit = {},
@@ -246,6 +251,7 @@ class HudNotchTest {
                     onDragMove = onDragMove,
                     onDragEnd = onDragEnd,
                     onRefreshAccount = onRefreshAccount,
+                    onReorderAccounts = onReorderAccounts,
                     accountActions = accountActions,
                     dragging = dragging,
                     onGearClick = onGearClick,
@@ -603,6 +609,127 @@ class HudNotchTest {
         // Fora dos anéis — a margem antes do primeiro — o clique não atualiza nada.
         onNodeWithTag(HUD_CONTENT_TEST_TAG).performMouseInput { click(Offset(14f, centerY)) }
         assertEquals(2, refreshed.size)
+    }
+
+    /**
+     * Pressão longa de 300 ms sobre um anel, arrastada até passar do meio do vizinho, e soltada: a ordem nova sai
+     * pelo callback, com a conta arrastada na posição nova e as outras na ordem que já tinham.
+     */
+    @Test
+    fun `pressao longa sobre um anel e arrasto reordenam as contas`() = runDesktopComposeUiTest {
+        val reordered = mutableListOf<List<UsageTargetKey>>()
+        setContent { notch(onReorderAccounts = { order -> reordered.add(order) }) }
+
+        val from = ringCenterInBody(INFORMATA_RING)
+        val past = ringCenterInBody(DEEPSEEK_RING) + Offset(80f, 0f)
+        val body = onNodeWithTag(HUD_CONTENT_TEST_TAG)
+        mainClock.autoAdvance = false
+        // O hold conta pelo relogio virtual (withTimeoutOrNull): avanca antes de mover.
+        body.performTouchInput { down(from) }
+        mainClock.advanceTimeBy(HUD_REORDER_HOLD_MILLIS + 100)
+        waitForIdle()
+        body.performTouchInput { moveTo(past) }
+        waitForIdle()
+        body.performTouchInput { up() }
+        waitForIdle()
+
+        val expected = (listOf(accounts[1], accounts[0]) + accounts.drop(2)).map { account -> account.targetKey }
+        assertEquals(listOf(expected), reordered, "esperava a ordem nova ao soltar")
+    }
+
+    /**
+     * Durante o arrasto o anel capturado segue o ponteiro sem mola (o deslocamento é ponteiro − pressão) e a vizinha
+     * atravessada anda no sentido oposto, pela mola, até assentar (#584, A04b2).
+     */
+    @Test
+    fun `arrasto leva o anel capturado com o ponteiro e a vizinha no sentido oposto`() = runDesktopComposeUiTest {
+        setContent { notch(onReorderAccounts = {}) }
+
+        val from = ringCenterInBody(INFORMATA_RING)
+        val neighborBefore = ringCenterInBody(DEEPSEEK_RING)
+        val past = neighborBefore + Offset(80f, 0f)
+        val body = onNodeWithTag(HUD_CONTENT_TEST_TAG)
+        mainClock.autoAdvance = false
+        body.performTouchInput { down(from) }
+        mainClock.advanceTimeBy(HUD_REORDER_HOLD_MILLIS + 100)
+        waitForIdle()
+        body.performTouchInput { moveTo(past) }
+        waitForIdle()
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(2_000L)
+        waitForIdle()
+
+        val pointerDelta = past - from
+        val capturedDelta = ringCenterInBody(INFORMATA_RING) - from
+        assertTrue(
+            kotlin.math.abs(capturedDelta.x - pointerDelta.x) < 1f,
+            "anel capturado devia andar o delta do ponteiro (${pointerDelta.x}px), andou ${capturedDelta.x}px"
+        )
+        val neighborDelta = ringCenterInBody(DEEPSEEK_RING) - neighborBefore
+        assertTrue(neighborDelta.x < -1f, "vizinha atravessada devia andar no sentido oposto, andou ${neighborDelta.x}px")
+        body.performTouchInput { up() }
+        waitForIdle()
+    }
+
+    /** Clique curto segue recoletando a conta, e não reordena. */
+    @Test
+    fun `clique curto num anel recoleta e nao reordena`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        val reordered = mutableListOf<List<UsageTargetKey>>()
+        setContent {
+            notch(
+                onRefreshAccount = { target -> refreshed += target },
+                onReorderAccounts = { order -> reordered.add(order) }
+            )
+        }
+
+        onNodeWithContentDescription(DEEPSEEK_RING).performClick()
+        waitForIdle()
+
+        assertEquals(listOf(accounts[1].targetKey), refreshed)
+        assertTrue(reordered.isEmpty(), "clique curto não reordena, veio $reordered")
+    }
+
+    /** Esc cancela o arrasto; soltar onde a conta já estava também não reordena. */
+    @Test
+    fun `esc cancela o arrasto e soltar no mesmo lugar nao reordena`() = runDesktopComposeUiTest {
+        val reordered = mutableListOf<List<UsageTargetKey>>()
+        setContent { notch(onReorderAccounts = { order -> reordered.add(order) }) }
+
+        val body = onNodeWithTag(HUD_CONTENT_TEST_TAG)
+        val from = ringCenterInBody(INFORMATA_RING)
+        val past = ringCenterInBody(DEEPSEEK_RING) + Offset(4f, 0f)
+        body.performMouseInput {
+            moveTo(from)
+            press()
+        }
+        waitForIdle()
+        body.performMouseInput { moveTo(past) }
+        waitForIdle()
+        body.performKeyInput {
+            keyDown(Key.Escape)
+            keyUp(Key.Escape)
+        }
+        waitForIdle()
+        body.performMouseInput { release() }
+        waitForIdle()
+        assertTrue(reordered.isEmpty(), "Esc cancela o arrasto, veio $reordered")
+
+        body.performMouseInput {
+            moveTo(from)
+            press()
+        }
+        waitForIdle()
+        body.performMouseInput { release() }
+        waitForIdle()
+        assertTrue(reordered.isEmpty(), "soltar no mesmo lugar não reordena, veio $reordered")
+    }
+
+    /** Centro de um anel no corpo do notch, em px: é onde o ponteiro pega o anel. */
+    private fun ComposeUiTest.ringCenterInBody(description: String): Offset {
+        val body = onNodeWithTag(HUD_CONTENT_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val ring = onNodeWithContentDescription(description, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        return ring.center - body.topLeft
     }
 
     /** O leitor de tela chega à mesma ação pela semântica do anel. */
