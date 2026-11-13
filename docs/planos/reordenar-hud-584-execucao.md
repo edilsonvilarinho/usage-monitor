@@ -49,6 +49,7 @@ escolheu a **AQ1 · Captura orbital por arrasto**: segurar o anel 300 ms, arrast
 |---|---|---|
 | A01 | Plano com fatos medidos e atividades | `gh issue comment 584` → plano curto publicado; fatos levantados por varredura de leitura |
 | A02 | Regra pura em `CardDragRule.kt` (`CardAxisSpan`, `dragTargetIndex`: troca quando o ponteiro passa do meio do vizinho; `dragShiftOffsets`: cada item vai para a vaga do destino, a vaga abre no destino); a ordem final reusa `moveVisibleCardToIndex`, que mantém as contas ocultas nas posições absolutas (contrato já testado) | Vermelho: 7 de 7 testes contra stub → `java.lang.AssertionError at CardDragRuleTest.kt:29` (`dragTargetIndex(..., pointer = 151f)` esperado 1, stub devolve 0). Verde: `./gradlew.bat desktopTest --tests 'com.usagemonitor.presentation.*'` → 1142 testes, 0 falhas (`CardDragRuleTest` 7/7) |
+| A03 | `AppShellState.changeCardOrder(order, availableTargets)`: normaliza com `normalizeCardOrder` (duplicata some, conta sem posição vai para o fim), atualiza `cardOrder` e grava em `CARD_ORDER_KEY`; reabrir lê a mesma ordem | Vermelho (stub vazio): `AppShellStateTest.kt:29` → `expected:<[CODEX, ANTHROPIC:default, MINIMAX]> but was:<[ANTHROPIC:default, MINIMAX, CODEX]>`. Verde: `./gradlew.bat desktopTest --tests '*AppShellState*'` → 2 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

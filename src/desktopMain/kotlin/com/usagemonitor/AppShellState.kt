@@ -149,4 +149,14 @@ internal class AppShellState(
         cardOrder = normalizeCardOrder(cardOrder, availableTargets)
         writeUsageTargetCollection(settings, CARD_ORDER_KEY, cardOrder)
     }
+
+    /**
+     * Grava a ordem que o arrasto da HUD soltou. Passa pela mesma normalização de
+     * [keepCardsOf]: duplicata cai, conta fora de [availableTargets] sai, conta sem
+     * posição vai para o fim. A ordem gravada é a que a barra HUD relê no arranque.
+     */
+    fun changeCardOrder(order: List<UsageTargetKey>, availableTargets: List<UsageTargetKey>) {
+        cardOrder = normalizeCardOrder(order, availableTargets)
+        writeUsageTargetCollection(settings, CARD_ORDER_KEY, cardOrder)
+    }
 }
