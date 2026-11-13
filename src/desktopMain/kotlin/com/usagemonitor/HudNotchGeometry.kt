@@ -52,13 +52,17 @@ internal enum class HudEdge {
 internal val HUD_RING_SIZE = AppGargantuaTokens.size
 
 /**
- * O selo do emoji da conta (issue #287): uma caixa no canto de cima à direita do
- * anel, que passa [HUD_EMOJI_BADGE_OVERSHOOT] para fora dele. O excesso cabe no
- * respiro do notch e no vão até o texto, e por isso o selo não entra na conta de
- * [hudNotchSizes] — `HudNotchGeometryTest` afirma as duas coisas.
+ * O selo do emoji da conta (issue #287, lua em órbita #585): uma caixa no canto de
+ * cima à direita do anel, que passa [HUD_EMOJI_BADGE_OVERSHOOT] para fora dele. O
+ * excesso cabe no respiro do notch e no vão até o texto, e por isso o selo não entra
+ * na conta de [hudNotchSizes] — `HudNotchGeometryTest` afirma as duas coisas.
+ *
+ * A conta do excesso (#585): o centro da lua fica a (anel/2 + lua/2) do centro do
+ * anel, a 45°, encostando por fora da trilha. Logo o excesso é
+ * (32 + 9)/√2 + 9 − 32 ≈ 6 dp, com anel 64 dp e lua 18 dp.
  */
-internal val HUD_EMOJI_BADGE_SIZE = 14.dp
-internal val HUD_EMOJI_BADGE_OVERSHOOT = 4.dp
+internal val HUD_EMOJI_BADGE_SIZE = 18.dp
+internal val HUD_EMOJI_BADGE_OVERSHOOT = 6.dp
 
 /** Espessura de cada arco e o vão entre dois arcos concêntricos. */
 internal val HUD_RING_STROKE = 2.5.dp

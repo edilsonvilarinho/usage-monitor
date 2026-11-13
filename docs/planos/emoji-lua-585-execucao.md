@@ -43,6 +43,7 @@ de **18 dp**, que não muda o tamanho da barra.
 | Id | O que foi feito | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos, decisão de 18 dp do usuário e atividades | `gh issue comment 585` → plano curto publicado; geometria conferida em `HudNotchGeometry.kt:60-83` |
+| A02 | `HUD_EMOJI_BADGE_SIZE` 14 → 18 dp e `HUD_EMOJI_BADGE_OVERSHOOT` 4 → 6 dp, com a conta no comentário; teste novo da tangência e do excesso no respiro (a tangência já era verdade com 14/4: o centro do selo fica a 41 dp nos dois casos; o vermelho veio do excesso) | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest"` → `AssertionError: excesso do selo 4.0 dp, alvo 5.991379 dp` (`HudNotchGeometryTest.kt:361`). Verde: mesmo comando + `--tests "com.usagemonitor.ui.HudNotchTest"` → 40 + 77 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
