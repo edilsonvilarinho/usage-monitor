@@ -159,6 +159,14 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   HTML: M2 disco na borda da tela, M3 lente gravitacional, M4 poço do espaço-tempo, M5 luz de
   acreção, M6 fóton no contorno, M7 jatos entre as contas, M8 silhueta de maré, M9 vidro fumê, M10
   órbita que liga as contas.
+- **Corpo: campo de estrelas com paralaxe (#586).** Atrás dos anéis, três camadas de estrelas (140: 30 perto,
+  45 no meio, 65 longe) derivam ao longo da barra, cada uma na sua velocidade, num laço exato de 82,5 s
+  (`HudStarfield.kt` é o quadro puro; `HudStarfieldCanvas.kt` desenha). Cada anel é um poço: a estrela que chega
+  a 2×R dele desvia em curva em volta, nunca entra no disco, e ganha um rastro de 5 px. Nada é desenhado sobre
+  texto nem pílula: as caixas de texto e de pílula são proibidas. Nos temas escuros as estrelas são
+  `AppGargantuaTokens.hot`, com 18% delas em `gold`; no claro, tinta `--fg` (`#171414`) com alfa 0,95/0,7/0,45 e
+  raios ×1,5. Só anima com `AppMotionPolicy.continuous` e sem "reduzir animações", que deixa o quadro em t = 0;
+  a barra recolhida não tem campo.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
   `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada só aceita clique no notch: ela tem
   sempre o tamanho da aberta, e a área de clique é recortada por `Window.shape` (`hudRestHitRegion`:
