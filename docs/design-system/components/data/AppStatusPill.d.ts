@@ -10,6 +10,8 @@ export interface AppStatusPillProps {
   /** The word. "Normal", "Atenção", "Crítico", "Sem projeção". */
   children: ReactNode;
   title?: string;
+  /** Contorno de 1px na cor do tom a 35%; o fundo continua em 8%. Só a HUD clara liga. Padrão false. */
+  outlined?: boolean;
   style?: CSSProperties;
 }
 

@@ -11,6 +11,9 @@ tone at **8%** over the surface.
 - **8%, not more.** The text is written in the tone itself; a fuller tint pulls it below AA. Measured:
   at 14% the light-theme green dropped to 4.17:1; 8% is the highest value where the three tones pass in
   both themes (worst case 4.53:1). `AppStatusPillContrastTest` guards it.
+- **`outlined` (#590, HUD light only).** Adds a 1dp border in the tone at **35%**, drawn over the 8% fill; the
+  fill stays at 8%. Off by default: every other place gets the plain chip. The border is a reinforcement of
+  the shape on a white surface, not a second color signal; the word still carries the state.
 - **The HUD geometry reads its constants** (`STATUS_PILL_PADDING_HORIZONTAL/VERTICAL`, `STATUS_DOT_SIZE`),
   never a copy, plus 1dp of pixel-rounding slack (`HudNotchTextFitTest` found up to 0.6dp at 110–144%).
 - Where the state sits next to other numbers of the same weight (the HUD notch) use the pill; in lists,

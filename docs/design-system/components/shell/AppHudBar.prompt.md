@@ -27,6 +27,14 @@ between 85% and 100% every 6s (`--dur-gargantua-horizon-breath`), only with `con
 otherwise it holds frame zero (92.5%). Paint only, inside the same box: nothing resizes. Balloons and
 handles keep the theme surface. Chosen among ten HTML options (round M).
 
+**Stronger reading in light themes (#590).** On a light surface the ring labels read darker and heavier:
+prefix (`7d`, `5h`, `Créditos`) in `--fg` at 78% weight 500 instead of `--muted`; value at weight 600
+(attention value keeps its tone, weight 600); the status pill keeps its 8% tone fill (14% fails AA on the
+light green) and adds a 1dp outline of the tone at 35% (`AppStatusPill` `outlined`); the empty glass wall
+goes from 0.10 to 0.22 and the dashed debris ring of a ring without forecast is ×1.6 (capped at 1). Stars
+within 8dp of a text box drop to 40% of their alpha. Dark themes are unchanged. The body stays the preset
+surface: a painted night sky in light themes was tried and refused (round AX).
+
 **The notch never grows.** Per account in the user's card order (never risk order — the first account
 used to swap by itself): an `AppGargantuaRing` (one arc per quota, up to three), **one line per ring with
 the window and its percentage** — `7d 72%` over `5h 45%`, outer ring first, `labelSmall` with the
