@@ -48,6 +48,7 @@ escolheu a **AQ1 · Captura orbital por arrasto**: segurar o anel 300 ms, arrast
 | Id | O que foi feito | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos e atividades | `gh issue comment 584` → plano curto publicado; fatos levantados por varredura de leitura |
+| A02 | Regra pura em `CardDragRule.kt` (`CardAxisSpan`, `dragTargetIndex`: troca quando o ponteiro passa do meio do vizinho; `dragShiftOffsets`: cada item vai para a vaga do destino, a vaga abre no destino); a ordem final reusa `moveVisibleCardToIndex`, que mantém as contas ocultas nas posições absolutas (contrato já testado) | Vermelho: 7 de 7 testes contra stub → `java.lang.AssertionError at CardDragRuleTest.kt:29` (`dragTargetIndex(..., pointer = 151f)` esperado 1, stub devolve 0). Verde: `./gradlew.bat desktopTest --tests 'com.usagemonitor.presentation.*'` → 1142 testes, 0 falhas (`CardDragRuleTest` 7/7) |
 
 ## Problemas em aberto e riscos
 
