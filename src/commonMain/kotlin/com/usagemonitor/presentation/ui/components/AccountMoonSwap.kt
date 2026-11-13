@@ -81,6 +81,8 @@ fun rememberAccountMoonSwap(emoji: AccountEmoji?): AccountMoonSwapState {
             targetValue = AppGargantuaTokens.moonSwapMillis.toFloat(),
             animationSpec = appTweenSpec(AppGargantuaTokens.moonSwapMillis, policy, easing = LinearEasing)
         )
+        // Fim da troca: a velha sai da árvore. Vale também para o corte seco (#585).
+        state.outgoing = null
     }
     return state
 }
