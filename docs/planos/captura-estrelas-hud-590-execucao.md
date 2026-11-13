@@ -67,6 +67,7 @@ fundo continua a superfície branca de hoje com estrelas em tinta, e o texto gan
 | Id | O que foi feito | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos, escolhas do usuário e decisões | `gh issue comment 590` → plano curto publicado |
+| A02 | `HudStarfield.kt`: laço 240 000 ms, camadas 60/56/40 a 3/1,5/0,5 por segundo com `tile = v·240 s` e cópias dentro do corpo, cintilação ±15% (3–6 s), `glint` nas 6 maiores de perto (cruz no canvas), `hudStarfieldTextAttenuation` ×0,4 a ≤ 8 dp de caixa só no claro, `hudStarfieldDrawAlpha` usado pelo canvas | Vermelho: 11 de 19 na asserção (`HudStarfieldTest.kt:53`, `:62`, `:69`, `:80`, `:87`, `:131`, `:150`, `:187`, `:204`, `:213`, `:230`, `AssertionError`). Verde: `./gradlew.bat desktopTest --tests '*HudStarfieldTest' --tests 'com.usagemonitor.ui.HudNotchTest' --tests 'com.usagemonitor.architecture.*'` → 19 + 85 + 17, 0 falhas |
 
 ## Problemas em aberto e riscos
 

@@ -19,7 +19,10 @@ import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.semantics
 import com.usagemonitor.presentation.ui.components.HudStarfieldBox
 import com.usagemonitor.presentation.ui.components.HudStarfieldWell
+import com.usagemonitor.presentation.ui.components.HUD_STARFIELD_GLINT_WIDTH
+import com.usagemonitor.presentation.ui.components.hudStarfieldDrawAlpha
 import com.usagemonitor.presentation.ui.components.hudStarfieldFrame
+import com.usagemonitor.presentation.ui.components.hudStarfieldGlintHalfLength
 import com.usagemonitor.presentation.ui.components.hudStarfieldInk
 import com.usagemonitor.presentation.ui.components.hudStarfieldRemainder
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
@@ -62,10 +65,11 @@ internal fun HudStarfieldCanvas(
                 val width = size.width
                 val height = size.height
                 onDrawBehind {
-                    val points = hudStarfieldFrame(timeMs, width, height, wells(), forbidden())
+                    val boxes = forbidden()
+                    val points = hudStarfieldFrame(timeMs, width, height, wells(), boxes)
                     for (point in points) {
                         val ink = hudStarfieldInk(dark, point.layer, point.gold)
-                        val alpha = if (dark) point.alpha * ink.alpha else ink.alpha * point.fade
+                        val alpha = hudStarfieldDrawAlpha(dark, point, boxes)
                         if (alpha <= 0f) continue
                         val color = ink.color.copy(alpha = alpha)
                         val radius = point.radius * ink.radiusScale
@@ -75,6 +79,13 @@ internal fun HudStarfieldCanvas(
                             drawLine(color, center, tail, strokeWidth = radius)
                         }
                         drawCircle(color, radius, center)
+                        if (point.glint) {
+                            // Brilho em cruz: duas linhas, alfa meio da estrela, centradas no ponto.
+                            val half = hudStarfieldGlintHalfLength(radius)
+                            val glint = ink.color.copy(alpha = alpha * 0.5f)
+                            drawLine(glint, Offset(point.x - half, point.y), Offset(point.x + half, point.y), strokeWidth = HUD_STARFIELD_GLINT_WIDTH)
+                            drawLine(glint, Offset(point.x, point.y - half), Offset(point.x, point.y + half), strokeWidth = HUD_STARFIELD_GLINT_WIDTH)
+                        }
                     }
                 }
             }
