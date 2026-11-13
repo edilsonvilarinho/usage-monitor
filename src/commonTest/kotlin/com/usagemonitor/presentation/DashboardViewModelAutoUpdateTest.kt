@@ -485,6 +485,43 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
         }
     }
 
+    // --- artefato ainda não publicado (#582) --------------------------------
+
+    @Test
+    fun `release without a verifiable artifact is offered, not failed, and not downloaded`() = runTest {
+        val installer = FakeInstaller()
+        installer.hasArtifact = false
+        val viewModel = autoUpdateViewModel(installer = installer, enabled = true)
+
+        try {
+            runCurrent()
+
+            assertEquals(0, installer.prepareCalls)
+            assertIs<AppUpdateUiState.Available>(viewModel.appUpdateState.value)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
+    @Test
+    fun `the next check after the artifact is published downloads and reaches ready`() = runTest {
+        val installer = FakeInstaller()
+        installer.hasArtifact = false
+        val viewModel = autoUpdateViewModel(installer = installer, enabled = true)
+
+        try {
+            runCurrent()
+            installer.hasArtifact = true
+            viewModel.refresh()
+            runCurrent()
+
+            assertEquals(1, installer.prepareCalls)
+            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+        } finally {
+            viewModel.onDestroy()
+        }
+    }
+
     // --- infraestrutura ------------------------------------------------------
 
     private class FakeInstaller(
@@ -501,9 +538,14 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             private set
         val scheduledVersions = mutableListOf<String>()
 
+        /** Retorno de [hasInstallableArtifact]; `true` por default, como release publicada. */
+        var hasArtifact: Boolean = true
+
         private var progressSink: ((Long, Long?) -> Unit)? = null
 
         override fun support(): AppUpdateSupport = support
+
+        override fun hasInstallableArtifact(update: AppUpdateInfo): Boolean = hasArtifact
 
         override suspend fun prepare(
             update: AppUpdateInfo,

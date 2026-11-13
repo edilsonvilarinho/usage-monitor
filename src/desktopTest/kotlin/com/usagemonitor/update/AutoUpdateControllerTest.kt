@@ -15,6 +15,7 @@ class AutoUpdateControllerTest {
 
     private class NamedInstaller(private val support: AppUpdateSupport = AppUpdateSupport.SUPPORTED) : AppUpdateInstaller {
         override fun support(): AppUpdateSupport = support
+        override fun hasInstallableArtifact(update: AppUpdateInfo): Boolean = true
         override suspend fun prepare(update: AppUpdateInfo, onProgress: (Long, Long?) -> Unit): Result<AppUpdatePreparation> =
             error("não usado")
         override fun schedule(preparation: AppUpdatePreparation): Result<Unit> = error("não usado")

@@ -121,6 +121,19 @@ class WindowsAppUpdateInstallerTest {
         assertNull(installer().selectArtifact(update))
     }
 
+    /** Release recém-publicada sem digest ainda não tem o que baixar (#582). */
+    @Test
+    fun `release whose nsis asset has no digest has no installable artifact yet`() {
+        val update = update(artifacts = listOf(nsisArtifact(sha256 = null)))
+
+        assertFalse(installer().hasInstallableArtifact(update))
+    }
+
+    @Test
+    fun `release whose nsis asset has a digest has an installable artifact`() {
+        assertTrue(installer().hasInstallableArtifact(update()))
+    }
+
     @Test
     fun `architecture mismatch selects nothing instead of the wrong binary`() {
         val installer = installer(osArch = "aarch64")

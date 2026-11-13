@@ -23,6 +23,14 @@ interface AppUpdateInstaller {
     fun support(): AppUpdateSupport
 
     /**
+     * Se a [update] já publicou um artefato verificável (com SHA-256) para esta
+     * plataforma e arquitetura. Uma release recém-publicada pode ainda não ter o
+     * instalador no ar: sem ele não há o que baixar, e isso não é falha de
+     * download. Quem chama decide o que mostrar com a resposta.
+     */
+    fun hasInstallableArtifact(update: AppUpdateInfo): Boolean
+
+    /**
      * Baixa e verifica o artefato da [update]. Idempotente por versão: chamada
      * repetida com um arquivo já baixado e íntegro não repete a rede.
      *

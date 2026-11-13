@@ -161,6 +161,8 @@ class WindowsAppUpdateInstaller(
         return !isVersionNewer(minUpdatableTargetVersion, targetVersion)
     }
 
+    override fun hasInstallableArtifact(update: AppUpdateInfo): Boolean = selectArtifact(update) != null
+
     internal fun selectArtifact(update: AppUpdateInfo): AppUpdateArtifact? {
         val architecture = currentArchitecture() ?: return null
         return update.artifacts.firstOrNull { artifact ->

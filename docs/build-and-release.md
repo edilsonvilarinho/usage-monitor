@@ -386,6 +386,12 @@ automática: sem ela a beta só é anunciada.
   estável do mesmo número.
 - **Publicação**: skill `usage-monitor-release-beta`. A estável segue na `usage-monitor-release`, e a
   versão-base dela e de `lastReleaseTagVersion()` ignora tags beta (`--exclude "*-beta*"`).
+- **Release nasce rascunho** (#582): o `release-linux.yml` cria a release com `draft: true`, espera todo
+  asset ter `state: uploaded` e `digest` `sha256:` (até 150 s, pelo id, porque rascunho não responde em
+  `/releases/tags/{tag}`) e só então publica com `gh release edit --draft=false`, com `--prerelease`/`--latest`
+  conforme o canal. Publicada antes, a v42.3.0-beta.2 ficou 9 s pública sem o `.exe`, e o app registrou
+  "download falhou". No app, release sem artefato verificável para a plataforma
+  (`AppUpdateInstaller.hasInstallableArtifact`) fica `Available`, sem `Failed` nem backoff.
 - **Ciclo de vida, todo pela skill** (`patch|minor|major`, `next`, `promote`, `withdraw`, `restore`):
   - *Não existe "mover a beta para a main"*: a tag já aponta para um commit da `main`. **Promover** é
     publicar a estável `vX.Y.Z` da série aberta como tag e build **novos** — nunca editar a release beta
