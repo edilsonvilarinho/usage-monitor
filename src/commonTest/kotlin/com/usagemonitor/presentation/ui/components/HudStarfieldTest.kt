@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.ui.graphics.Color
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,6 +21,7 @@ class HudStarfieldTest {
         HudStarfieldBox(left = 4f, top = 340f, right = 90f, bottom = 370f)
     )
     private val sampleTimes = (0L until HUD_STARFIELD_PERIOD_MS step 1_375L).toList()
+    private val inkLight = Color(0xFF171414)
 
     private fun frame(timeMs: Long) = hudStarfieldFrame(timeMs, width, height, wells, forbidden)
 
@@ -136,5 +139,61 @@ class HudStarfieldTest {
             }
         }
         assertTrue(withTrail > 0, "nenhum rastro em nenhum quadro")
+    }
+
+    @Test
+    fun `tema escuro usa a cor quente com alfa e escala cheios em todas as camadas`() {
+        for (layer in listOf(HudStarfieldLayer.NEAR, HudStarfieldLayer.MID, HudStarfieldLayer.FAR)) {
+            val ink = hudStarfieldInk(dark = true, layer = layer, gold = false)
+            assertEquals(AppGargantuaTokens.hot, ink.color, "cor escura na camada $layer")
+            assertEquals(1f, ink.alpha, "alfa escuro na camada $layer")
+            assertEquals(1f, ink.radiusScale, "escala escura na camada $layer")
+        }
+    }
+
+    @Test
+    fun `tema escuro dourado usa o ouro do token`() {
+        val ink = hudStarfieldInk(dark = true, layer = HudStarfieldLayer.NEAR, gold = true)
+        assertEquals(AppGargantuaTokens.gold, ink.color, "estrela dourada escura")
+    }
+
+    @Test
+    fun `tema claro usa a tinta do fg com alfa da L1 por camada e raio vezes 1,5`() {
+        val expected = listOf(
+            HudStarfieldLayer.NEAR to 0.95f,
+            HudStarfieldLayer.MID to 0.7f,
+            HudStarfieldLayer.FAR to 0.45f
+        )
+        for ((layer, alpha) in expected) {
+            val ink = hudStarfieldInk(dark = false, layer = layer, gold = false)
+            assertEquals(inkLight, ink.color, "tinta clara na camada $layer")
+            assertEquals(alpha, ink.alpha, "alfa claro na camada $layer")
+            assertEquals(1.5f, ink.radiusScale, "escala clara na camada $layer")
+        }
+    }
+
+    @Test
+    fun `tema claro dourado usa a mesma tinta do fg`() {
+        val ink = hudStarfieldInk(dark = false, layer = HudStarfieldLayer.NEAR, gold = true)
+        assertEquals(inkLight, ink.color, "estrela dourada clara")
+    }
+
+    @Test
+    fun `caixa menos anel nao cobre o anel e cobre o resto da caixa`() {
+        val item = HudStarfieldBox(left = 0f, top = 0f, right = 100f, bottom = 40f)
+        val ring = HudStarfieldBox(left = 30f, top = 5f, right = 70f, bottom = 35f)
+        val pieces = hudStarfieldRemainder(item, ring)
+        for (i in 0 until 20) {
+            for (j in 0 until 8) {
+                val x = 2.5f + 5f * i
+                val y = 2.5f + 5f * j
+                val covered = pieces.any { inside(it, x, y) }
+                if (inside(ring, x, y)) {
+                    assertTrue(!covered, "anel sem proibido em ($x, $y)")
+                } else {
+                    assertTrue(covered, "resto da caixa proibido em ($x, $y)")
+                }
+            }
+        }
     }
 }

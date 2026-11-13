@@ -1,5 +1,7 @@
 package com.usagemonitor.presentation.ui.components
 
+import androidx.compose.ui.graphics.Color
+import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -45,7 +47,8 @@ data class HudStarfieldPoint(
     val layer: HudStarfieldLayer,
     val trailX: Float,
     val trailY: Float,
-    val gold: Boolean = false
+    val gold: Boolean = false,
+    val fade: Float = 1f
 )
 
 /** Especificação de uma camada: velocidade de deriva (px por período de altura), quantidade e faixas. */
@@ -192,7 +195,8 @@ private fun hudStarfieldPoint(
         layer = star.layer,
         trailX = trailX,
         trailY = trailY,
-        gold = star.gold
+        gold = star.gold,
+        fade = if (hidden) 0f else deflected.cap * edge
     )
 }
 
@@ -252,4 +256,43 @@ private fun hudStarfieldWrap(value: Float, period: Float): Float = ((value % per
 private fun hudStarfieldSmoothstep(a: Float, b: Float, x: Float): Float {
     val t = ((x - a) / (b - a)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
+}
+
+/** Tinta do desenho: cor, alfa que multiplica o da estrela e escala do raio. */
+data class HudStarfieldInk(val color: Color, val alpha: Float, val radiusScale: Float)
+
+/** Tinta clara: `--fg` de `docs/design-system/tokens/colors.css:77/116` (preset `PORCELANA_LIGHT`, `AppThemePresets.kt:93`). */
+private val HUD_STARFIELD_INK_LIGHT = Color(0xFF171414)
+
+/**
+ * Escolhe a tinta do campo. Escuro: quente, ou ouro nas douradas, com alfa e raio cheios (o alfa de camada já
+ * vem do quadro). Claro: `--fg` com alfa da L1 por camada e raio ×1,5; a dourada usa a mesma tinta.
+ */
+fun hudStarfieldInk(dark: Boolean, layer: HudStarfieldLayer, gold: Boolean): HudStarfieldInk {
+    if (!dark) return HudStarfieldInk(HUD_STARFIELD_INK_LIGHT, lightLayerAlpha(layer), 1.5f)
+    val color = if (gold) AppGargantuaTokens.gold else AppGargantuaTokens.hot
+    return HudStarfieldInk(color, 1f, 1f)
+}
+
+private fun lightLayerAlpha(layer: HudStarfieldLayer): Float = when (layer) {
+    HudStarfieldLayer.NEAR -> 0.95f
+    HudStarfieldLayer.MID -> 0.7f
+    HudStarfieldLayer.FAR -> 0.45f
+}
+
+/** Caixa do item menos o recorte do anel: pedaços da [box] fora de [hole] (#586 A03). */
+fun hudStarfieldRemainder(box: HudStarfieldBox, hole: HudStarfieldBox): List<HudStarfieldBox> {
+    if (hole.right <= box.left || hole.left >= box.right || hole.bottom <= box.top || hole.top >= box.bottom) {
+        return listOf(box)
+    }
+    val left = maxOf(hole.left, box.left)
+    val top = maxOf(hole.top, box.top)
+    val right = minOf(hole.right, box.right)
+    val bottom = minOf(hole.bottom, box.bottom)
+    val pieces = mutableListOf<HudStarfieldBox>()
+    if (top > box.top) pieces += HudStarfieldBox(box.left, box.top, box.right, top)
+    if (bottom < box.bottom) pieces += HudStarfieldBox(box.left, bottom, box.right, box.bottom)
+    if (left > box.left) pieces += HudStarfieldBox(box.left, top, left, bottom)
+    if (right < box.right) pieces += HudStarfieldBox(right, top, box.right, bottom)
+    return pieces
 }

@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_REORDER_HOLD_MILLIS
+import com.usagemonitor.presentation.ui.HUD_STARFIELD_WELLS
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,6 +110,7 @@ import com.usagemonitor.presentation.ui.HUD_STATUS_PILL_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_COUNTDOWN_CLOCK_TAG
 import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HUD_CONTENT_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_STARFIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_HINT_UPDATE_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_UPDATE_DOT_TAG
 import com.usagemonitor.presentation.ui.HudAccount
@@ -261,6 +263,26 @@ class HudNotchTest {
                 )
             }
         }
+    }
+
+    /** A03 · #586: o campo estelar fica no corpo do notch, atrás dos anéis. */
+    @Test
+    fun `o notch contem o no do campo estelar`() = runDesktopComposeUiTest {
+        setContent { notch() }
+
+        onNodeWithTag(HUD_STARFIELD_TEST_TAG, useUnmergedTree = true).assertExists()
+    }
+
+    /** A03 · #586: cada conta tem um poço no campo estelar, com raio positivo. */
+    @Test
+    fun `o campo estelar tem um poco por conta com raio positivo`() = runDesktopComposeUiTest {
+        setContent { notch() }
+
+        val wells = onNodeWithTag(HUD_STARFIELD_TEST_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode().config[HUD_STARFIELD_WELLS]
+
+        assertEquals(accounts.size, wells.size, "um poço por conta")
+        assertTrue(wells.all { it.radius > 0f }, "raio dos poços positivo")
     }
 
     // ------------------------------------------------------------ minimizada (#576)
