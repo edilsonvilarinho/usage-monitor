@@ -24,6 +24,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
@@ -279,11 +280,11 @@ internal fun HudNotch(
                     )
                     .semantics { contentDescription = HUD_NOTCH_DESCRIPTION }
             ) {
+                HudStarfieldCanvas(wells = { hudStarfieldWells(ringItemBounds.rings()) }, forbidden = { hudStarfieldForbidden(ringItemBounds.boxes, ringItemBounds.rings()) }, modifier = Modifier.matchParentSize().clip(shape))
                 HudRingStrip(
                     accounts = accounts,
                     edge = edge,
-                    fallbackLabel = fallbackLabel,
-                    fallbackTone = fallbackTone,
+                    fallbackLabel = fallbackLabel, fallbackTone = fallbackTone,
                     size = notchSize,
                     compact = sizes.compact,
                     settledCompact = settledSizes?.compact ?: sizes.compact,
@@ -309,6 +310,7 @@ internal fun HudNotch(
                             )
                             ringCenters[index] = if (edge.isHorizontal) center.x else center.y
                             ringDepths[index] = if (edge.isHorizontal) center.y else center.x
+                            ringItemBounds.measureRing(index, coordinates)
                         }
                     }
                 )
@@ -576,8 +578,9 @@ private const val STRIP_Z_INDEX = -0.5f
 
 /** A caixa de cada conta no corpo do notch; o gesto do corpo acha o anel clicado por ela. */
 internal class HudRingHitBoxes {
-    var body: LayoutCoordinates? = null
+    var body: LayoutCoordinates? by mutableStateOf(null)
     val boxes = mutableMapOf<Int, Rect>()
+    private val ringCoordinates = mutableStateMapOf<Int, LayoutCoordinates>()
 
     fun indexAt(position: Offset): Int? = boxes.entries.firstOrNull { (_, box) -> box.contains(position) }?.key
 
@@ -586,6 +589,17 @@ internal class HudRingHitBoxes {
         val found = (0 until count).mapNotNull { index -> boxes[index] }
         if (found.size != count) return null
         return found.map { box -> if (horizontal) CardAxisSpan(box.left, box.right) else CardAxisSpan(box.top, box.bottom) }
+    }
+
+    /** Guarda as coordenadas do anel; o Rect sai do corpo só na leitura (#586 A03). */
+    fun measureRing(index: Int, coordinates: LayoutCoordinates) {
+        ringCoordinates[index] = coordinates
+    }
+
+    /** Rect de cada anel no espaço do corpo; vazio enquanto o corpo não foi posicionado. */
+    fun rings(): Map<Int, Rect> {
+        val current = body?.takeIf { it.isAttached } ?: return emptyMap()
+        return ringCoordinates.filterValues { it.isAttached }.mapValues { (_, ring) -> current.localBoundingBoxOf(ring) }
     }
 }
 
