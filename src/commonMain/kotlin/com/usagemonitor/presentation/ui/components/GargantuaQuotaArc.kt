@@ -41,11 +41,13 @@ internal fun DrawScope.drawGargantuaQuotaArc(
     /** Fase do anel de detritos (J7), `0..1`; zero com o movimento contínuo desligado. */
     debris: Float = 0f,
     /** Tinta do vidro conforme o fundo ([gargantuaScene]). */
-    scene: GargantuaScene = GargantuaScene.Dark
+    scene: GargantuaScene = GargantuaScene.Dark,
+    /** Escala do alfa do tracejado no claro (A04, #590); 1 = como antes. */
+    debrisAlphaScale: Float = 1f
 ) {
     val topLeft = center - Offset(radius, radius)
     val arcSize = Size(radius * 2, radius * 2)
-    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass, debris, scene)
+    if (glass > 0f) drawGlassTube(radius, stroke, hasForecast, glass, debris, scene, debrisAlphaScale)
     if (sweep <= 0f) return
     drawArc(color.copy(alpha = glow), -90f, sweep, false, topLeft, arcSize,
         style = Stroke(stroke * 2.4f, cap = StrokeCap.Round))
@@ -73,12 +75,13 @@ private fun DrawScope.drawGlassTube(
     hasForecast: Boolean,
     glass: Float,
     debris: Float,
-    scene: GargantuaScene
+    scene: GargantuaScene,
+    debrisAlphaScale: Float
 ) {
     if (hasForecast) {
         drawCircle(scene.ink.copy(alpha = scene.wallAlpha * glass), radius, style = Stroke(stroke * 1.4f))
     } else {
-        drawDebrisRing(radius, stroke, glass, debris, scene.ink)
+        drawDebrisRing(radius, stroke, glass, debris, scene.ink, debrisAlphaScale)
     }
     val reflections = glass * scene.reflectionScale
     drawCircle(reflection(maxAlpha = 0.28f * reflections, power = 3, ink = scene.ink), radius - stroke / 2, style = Stroke(stroke * 0.18f))
@@ -87,10 +90,19 @@ private fun DrawScope.drawGlassTube(
 
 /**
  * Fragmentos em órbitas próprias, cada um no raio e na velocidade dele. O
- * brilho segue a mesma luz do vidro; nenhum fragmento sai do tubo nem passa
- * da opacidade do reflexo, para não competir com o plasma.
+ * brilho segue a mesma luz do vidro; nenhum fragmento sai do tubo. O alfa passa
+ * da opacidade do reflexo só no claro (#590): [debrisAlphaScale] 1,6 reforça o
+ * tracejado sobre a superfície clara; no escuro fica em 1, como antes, para não
+ * competir com o plasma.
  */
-private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float, phase: Float, ink: Color) {
+private fun DrawScope.drawDebrisRing(
+    radius: Float,
+    stroke: Float,
+    glass: Float,
+    phase: Float,
+    ink: Color,
+    debrisAlphaScale: Float
+) {
     for (fragment in gargantuaDebrisField) {
         val start = gargantuaDebrisAngle(fragment, phase)
         val middle = (start + fragment.sweepDegrees / 2f) * PI / 180
@@ -98,12 +110,16 @@ private fun DrawScope.drawDebrisRing(radius: Float, stroke: Float, glass: Float,
         val tint = if (fragment.gold) AppGargantuaTokens.gold else ink
         val orbit = radius + fragment.radialOffset * stroke
         drawArc(
-            tint.copy(alpha = fragment.alpha * (0.6f + 0.4f * lit) * glass), start, fragment.sweepDegrees, false,
+            tint.copy(alpha = gargantuaDebrisAlpha(fragment.alpha * (0.6f + 0.4f * lit) * glass, debrisAlphaScale)),
+            start, fragment.sweepDegrees, false,
             center - Offset(orbit, orbit), Size(orbit * 2, orbit * 2),
             style = Stroke(fragment.width * stroke, cap = StrokeCap.Round)
         )
     }
 }
+
+/** Alfa do tracejado com a escala do tema aplicada (#590); teto 1 para não passar da tinta cheia. */
+internal fun gargantuaDebrisAlpha(base: Float, scale: Float): Float = (base * scale).coerceIn(0f, 1f)
 
 /**
  * [ink] cuja opacidade segue a luz: máximo voltado para a fonte, zero do lado

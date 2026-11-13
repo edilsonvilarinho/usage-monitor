@@ -1,6 +1,7 @@
 package com.usagemonitor.presentation.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,9 @@ internal val STATUS_PILL_PADDING_VERTICAL = 2.dp
  */
 internal const val STATUS_PILL_TINT_ALPHA = 0.08f
 
+/** Opacidade do contorno de [AppStatusPill] com `outlined` (A04, #590). */
+internal const val STATUS_PILL_OUTLINE_ALPHA = 0.35f
+
 /**
  * Indicador de estado em pílula: ponto e palavra sobre um fundo tingido do tom
  * (issue #322).
@@ -64,13 +68,16 @@ fun AppStatusPill(
      * A palavra rola pelo horizonte quando o estado muda (D5, [rememberGargantuaRoll]).
      * Só a barra HUD liga: fora dela a pílula não é dado que se atualiza sozinho.
      */
-    rollLabelChanges: Boolean = false
+    rollLabelChanges: Boolean = false,
+    /** Contorno de 1 dp no tom a [STATUS_PILL_OUTLINE_ALPHA] (A04, #590): o fundo tingido some no claro. */
+    outlined: Boolean = false
 ) {
     val color = tone.color()
     Row(
         modifier = modifier
             .clip(AppShapes.extraSmall)
             .background(color.copy(alpha = STATUS_PILL_TINT_ALPHA))
+            .then(if (outlined) Modifier.border(1.dp, color.copy(alpha = STATUS_PILL_OUTLINE_ALPHA), AppShapes.extraSmall) else Modifier)
             .padding(horizontal = STATUS_PILL_PADDING_HORIZONTAL, vertical = STATUS_PILL_PADDING_VERTICAL),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
