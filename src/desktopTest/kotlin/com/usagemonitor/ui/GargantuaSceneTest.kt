@@ -45,4 +45,9 @@ class GargantuaSceneTest {
         assertEquals(0.06f, GargantuaScene.Dark.wallAlpha)
         assertEquals(0.6f, GargantuaScene.Dark.plasmaHighlight)
     }
+
+    @Test
+    fun `the light scene draws the wall at 22 percent`() {
+        assertEquals(0.22f, GargantuaScene.light(Color.Black).wallAlpha)
+    }
 }

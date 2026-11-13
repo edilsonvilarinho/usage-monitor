@@ -62,7 +62,7 @@ internal class GargantuaScene(
 
         fun light(ink: Color): GargantuaScene = GargantuaScene(
             ink = ink,
-            wallAlpha = 0.10f,
+            wallAlpha = 0.22f,
             reflectionScale = 0.55f,
             plasmaHighlight = 0.22f,
             haloNear = AppGargantuaTokens.ember,

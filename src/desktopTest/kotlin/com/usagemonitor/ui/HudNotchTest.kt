@@ -9,6 +9,7 @@ import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.presentation.ui.HUD_ACCOUNT_EMOJI_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_REORDER_HOLD_MILLIS
 import com.usagemonitor.presentation.ui.HUD_STARFIELD_WELLS
+import com.usagemonitor.presentation.ui.HUD_STARFIELD_CAPTURE_COUNT
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -283,6 +284,17 @@ class HudNotchTest {
 
         assertEquals(accounts.size, wells.size, "um poço por conta")
         assertTrue(wells.all { it.radius > 0f }, "raio dos poços positivo")
+    }
+
+    /** A03 · #590: com movimento reduzido o campo não desenha captura nenhuma. */
+    @Test
+    fun `movimento reduzido nao desenha captura`() = runDesktopComposeUiTest {
+        setContent { notch(motion = AppMotionPolicy.Reduced) }
+
+        val captures = onNodeWithTag(HUD_STARFIELD_TEST_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode().config[HUD_STARFIELD_CAPTURE_COUNT]
+
+        assertEquals(0, captures, "capturas com movimento reduzido")
     }
 
     // ------------------------------------------------------------ minimizada (#576)

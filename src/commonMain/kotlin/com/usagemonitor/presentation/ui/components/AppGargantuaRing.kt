@@ -57,7 +57,9 @@ fun AppGargantuaRing(
     /** Nascimento ou colapso em andamento; parado por padrão. */
     frame: GargantuaFrame = GargantuaFrame.Settled,
     /** A marca da API, no centro da cena (#517). */
-    centerContent: (@Composable () -> Unit)? = null
+    centerContent: (@Composable () -> Unit)? = null,
+    /** Escala do alfa do tracejado no claro (A04, #590); 1 = como antes. */
+    debrisAlphaScale: Float = 1f
 ) {
     val policy = LocalAppMotionPolicy.current
     val moving = policy.continuous && !policy.reduced
@@ -139,7 +141,8 @@ fun AppGargantuaRing(
                     flow = if (moving) flow.value else null,
                     glass = frame.glass,
                     debris = debris.value,
-                    scene = scene
+                    scene = scene,
+                    debrisAlphaScale = debrisAlphaScale
                 )
             }
             if (active) drawGargantuaActivity(activity.value, strokePx, gapPx, activeColor)

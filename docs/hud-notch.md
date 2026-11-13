@@ -159,14 +159,25 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   HTML: M2 disco na borda da tela, M3 lente gravitacional, M4 poço do espaço-tempo, M5 luz de
   acreção, M6 fóton no contorno, M7 jatos entre as contas, M8 silhueta de maré, M9 vidro fumê, M10
   órbita que liga as contas.
-- **Corpo: campo de estrelas com paralaxe (#586).** Atrás dos anéis, três camadas de estrelas (140: 30 perto,
-  45 no meio, 65 longe) derivam ao longo da barra, cada uma na sua velocidade, num laço exato de 82,5 s
-  (`HudStarfield.kt` é o quadro puro; `HudStarfieldCanvas.kt` desenha). Cada anel é um poço: a estrela que chega
-  a 2×R dele desvia em curva em volta, nunca entra no disco, e ganha um rastro de 5 px. Nada é desenhado sobre
-  texto nem pílula: as caixas de texto e de pílula são proibidas. Nos temas escuros as estrelas são
-  `AppGargantuaTokens.hot`, com 18% delas em `gold`; no claro, tinta `--fg` (`#171414`) com alfa 0,95/0,7/0,45 e
-  raios ×1,5. Só anima com `AppMotionPolicy.continuous` e sem "reduzir animações", que deixa o quadro em t = 0;
-  a barra recolhida não tem campo.
+- **Corpo: campo de estrelas com paralaxe (#586, #590).** Atrás dos anéis, 156 estrelas em três camadas: 60 perto
+  (3 dp/s, raio 1,2–1,8, alfa .8–.95), 56 no meio (1,5 dp/s, raio .8–1,2, alfa .6–.7) e 40 longe (0,5 dp/s,
+  raio .5–.8, alfa .35–.5). Cada camada repete seu padrão num laço de 240 s (`HudStarfield.kt` é o quadro puro;
+  `HudStarfieldCanvas.kt` desenha). Seis das maiores de perto têm brilho em cruz, e cada uma cintila ±15% em
+  3–6 s. Cada anel é um poço: a estrela que chega a 2×R dele desvia em curva em volta, nunca entra no disco, e
+  ganha um rastro de 5 px. Nada é desenhado sobre texto nem pílula: as caixas de texto e de pílula são proibidas.
+  Nos temas escuros as estrelas são `AppGargantuaTokens.hot`, com 18% delas em `gold`; no claro, tinta `--fg`
+  (`#171414`) com alfa 0,95/0,7/0,45 e raios ×1,5, atenuada ×0,4 a até 8 dp do texto. Só anima com
+  `AppMotionPolicy.continuous` e sem "reduzir animações", que deixa o quadro em t = 0; a barra recolhida não tem
+  campo.
+- **Capturas (#590).** Uma estrela é capturada a cada 8 s, a partir de 4 s (30 por laço), e cai no poço
+  `n mod poços`, no ângulo `n·2,399963`. Ela espirala para dentro do anel em 2 600 ms (`r(s) = 2,4R(1−s)^1,6 +
+  0,55R·s`, `θ = θ0 + 3π·s`), deixa um rastro dos últimos 10 dp (alfa .9→0, largura 1,6→.4) e some com um
+  lampejo de 200 ms no ponto final. Desenha atrás do anel, depois das estrelas. Lampejo: no escuro alfa ≤ .6; no
+  claro, em tinta, alfa ≤ .35, porque branco sumiria no branco. Ponto dentro de caixa proibida tem alfa zero.
+  Com animação reduzida não há nenhuma captura.
+- **Leitura reforçada no claro (#590).** Só na HUD clara: prefixo em `onSurface` alfa .78 com peso Medium; valor
+  em SemiBold, e o valor em atenção também. Pílula com contorno de 1 dp do tom a 35% e fundo mantido em 0,08
+  (o 0,14 reprova AA no verde claro). Parede do vidro com alfa .22 (era .10). Detritos do arco tracejado ×1,6.
 - **Clique em pixel transparente é engolido** — medido no Windows 11, com os renderizadores padrão,
   `SOFTWARE` e `OPENGL` (C11 do plano). Por isso a janela parada só aceita clique no notch: ela tem
   sempre o tamanho da aberta, e a área de clique é recortada por `Window.shape` (`hudRestHitRegion`:

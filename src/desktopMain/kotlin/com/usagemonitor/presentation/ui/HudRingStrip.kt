@@ -308,6 +308,11 @@ private fun HudRingItem(
                 attentionIndex = account.attentionRingIndex,
                 refreshing = account.refreshing,
                 frame = frame,
+                debrisAlphaScale = hudReadingStyle(
+                    MaterialTheme.colorScheme.surface,
+                    MaterialTheme.colorScheme.onSurface,
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                ).debrisAlphaScale,
                 // Dentro da cena (AL1, #517): a frente do disco passa por cima da marca.
                 centerContent = {
                     AppProviderMark(
@@ -401,6 +406,7 @@ private fun HudRingItem(
             textAlign = if (vertical) TextAlign.Center else TextAlign.Start,
             maxLines = if (vertical) 2 else 1,
             rollLabelChanges = true,
+            outlined = hudIsLight(MaterialTheme.colorScheme.surface),
             modifier = Modifier.testTag(HUD_STATUS_PILL_TEST_TAG).graphicsLayer { alpha = frame.text * fade }
         )
     }
@@ -520,14 +526,18 @@ private fun Modifier.hudStripSlot(horizontal: Boolean, leadingGap: Dp, sizeScale
 private fun HudStripLineText(line: HudStripLine, percentColor: Color? = null) {
     val numberColor = percentColor ?: MaterialTheme.colorScheme.onSurface
     val label = line.label
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val reading = hudReadingStyle(
+        MaterialTheme.colorScheme.surface,
+        MaterialTheme.colorScheme.onSurface,
+        MaterialTheme.colorScheme.onSurfaceVariant
+    )
     // As cores vão como span, para o número antigo sair rolando no tom dele (D5).
     val text = buildAnnotatedString {
         if (label != null) {
-            withStyle(SpanStyle(color = labelColor)) { append(label) }
+            withStyle(SpanStyle(color = reading.prefixColor, fontWeight = reading.prefixWeight)) { append(label) }
             append(" ")
         }
-        withStyle(SpanStyle(color = numberColor)) { append(line.percentText) }
+        withStyle(SpanStyle(color = numberColor, fontWeight = reading.valueWeight)) { append(line.percentText) }
     }
     val style = (if (label == null) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall)
         .copy(color = MaterialTheme.colorScheme.onSurface)
