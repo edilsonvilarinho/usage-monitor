@@ -54,6 +54,10 @@ object AppGargantuaTokens {
     const val rollMillis = 480
     /** Cascata entre os caracteres que rolam, da esquerda para a direita (D5). */
     const val rollStaggerMillis = 50
+    /** Troca de emoji da lua da conta (#585): a velha sai pela órbita até aqui. */
+    const val moonSwapOutMillis = 210
+    /** Troca inteira de emoji da lua (#585): a velha sai até 210 ms; a nova entra até o fim. */
+    const val moonSwapMillis = 420
     /**
      * Abertura de modal: filamentos de plasma revelam cada linha (E9). Era 680 ms:
      * com a janela já pré-aquecida, a espera que sobrava no clique era a revelação.

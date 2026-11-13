@@ -73,6 +73,8 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.assertCountEquals
@@ -527,6 +529,63 @@ class HudNotchTest {
                 )
             }
         }
+    }
+
+    // ------------------------------------------------------------ troca de emoji (#585)
+
+    /**
+     * Selos de emoji na árvore: a caixa do emoji novo (com a tag) e a da lua velha,
+     * do mesmo tamanho e sem tag. O texto do glifo não aparece na semântica
+     * (`clearAndSetSemantics`), então a contagem é pela caixa.
+     */
+    private fun ComposeUiTest.emojiBadgeCount(): Int {
+        val incoming = onNodeWithTag(HUD_ACCOUNT_EMOJI_TEST_TAG, useUnmergedTree = true).fetchSemanticsNode()
+        return countNodesOfSize(onRoot(useUnmergedTree = true).fetchSemanticsNode(), incoming.size)
+    }
+
+    private fun countNodesOfSize(node: SemanticsNode, size: IntSize): Int =
+        (if (node.size == size) 1 else 0) + node.children.sumOf { countNodesOfSize(it, size) }
+
+    /**
+     * Trocar o emoji com a conta na tela (#585): durante a troca a velha sai e a nova
+     * entra, dois selos; depois de `moonSwapMillis` sobra só a nova.
+     */
+    @Test
+    fun `trocar o emoji mantem a lua velha durante a troca e depois so o novo`() = runDesktopComposeUiTest {
+        var emoji by mutableStateOf<AccountEmoji?>(AccountEmoji.FOX)
+        mainClock.autoAdvance = false
+        setContent { notch(list = listOf(accounts.first().copy(accountEmoji = emoji))) }
+        mainClock.advanceTimeByFrame()
+        assertEquals(1, emojiBadgeCount(), "antes da troca: um selo")
+
+        emoji = AccountEmoji.CAT
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeBy(AppGargantuaTokens.moonSwapOutMillis / 2L)
+        assertEquals(2, emojiBadgeCount(), "no meio da saída: a velha e a nova")
+
+        mainClock.advanceTimeBy(AppGargantuaTokens.moonSwapMillis.toLong())
+        assertEquals(1, emojiBadgeCount(), "depois de moonSwapMillis: só a nova")
+        onNodeWithTag(HUD_ACCOUNT_EMOJI_TEST_TAG, useUnmergedTree = true).assertExists()
+    }
+
+    /**
+     * Com "reduzir animações" o corte é seco (#585): no primeiro quadro depois da
+     * troca a lua velha já saiu da árvore, sem período de dois selos.
+     */
+    @Test
+    fun `trocar o emoji com animacao reduzida corta a lua velha no primeiro quadro`() = runDesktopComposeUiTest {
+        var emoji by mutableStateOf<AccountEmoji?>(AccountEmoji.FOX)
+        mainClock.autoAdvance = false
+        setContent {
+            notch(list = listOf(accounts.first().copy(accountEmoji = emoji)), motion = AppMotionPolicy.Reduced)
+        }
+        mainClock.advanceTimeByFrame()
+
+        emoji = AccountEmoji.CAT
+        // Dois quadros: o LaunchedEffect da troca precisa rodar antes da asserção.
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        assertEquals(1, emojiBadgeCount(), "com animação reduzida: só a nova depois da troca")
     }
 
     // ------------------------------------------------------------ gestos

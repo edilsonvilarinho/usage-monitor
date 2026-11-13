@@ -11,6 +11,8 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
 import com.usagemonitor.presentation.ui.hudRingMarkSize
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
+import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -336,6 +338,31 @@ class HudNotchGeometryTest {
                 "$edge"
             )
         }
+    }
+
+    /**
+     * A lua (#585) encosta por fora da trilha do anel: o centro dela fica a
+     * `anel/2 + lua/2` do centro do anel, a 45°, e o excesso para fora do topo do
+     * anel é o que [HUD_EMOJI_BADGE_OVERSHOOT] declara. A lua-alvo tem 18 dp; o
+     * excesso que o selo real mede tem de ser o geométrico, e ele cabe no respiro.
+     */
+    @Test
+    fun `a lua encosta por fora da trilha do anel e o excesso cabe no respiro`() {
+        val ring = HUD_RING_SIZE.value
+        val moon = 18f
+        val tangent = ring / 2 + moon / 2
+        // Centro do selo em cada eixo a partir do centro do anel, como `HudRingStrip` o posiciona.
+        val axis = ring / 2 + HUD_EMOJI_BADGE_OVERSHOOT.value - HUD_EMOJI_BADGE_SIZE.value / 2
+        val distance = axis * sqrt(2f)
+        assertTrue(distance >= tangent - 0.5f, "lua não encosta na trilha: centro a $distance dp, alvo $tangent dp")
+
+        // Topo da caixa da lua a 45°, medido para fora do topo do anel.
+        val excess = tangent / sqrt(2f) + moon / 2 - ring / 2
+        assertTrue(
+            abs(HUD_EMOJI_BADGE_OVERSHOOT.value - excess) <= 0.5f,
+            "excesso do selo ${HUD_EMOJI_BADGE_OVERSHOOT.value} dp, alvo $excess dp"
+        )
+        assertTrue(HUD_EMOJI_BADGE_OVERSHOOT.value <= HUD_NOTCH_PADDING_ACROSS.value, "passa do respiro do notch")
     }
 
     /** A órbita de sessão ativa gira por fora do anel e cabe no respiro do notch e entre dois anéis. */

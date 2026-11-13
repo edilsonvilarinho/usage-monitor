@@ -59,6 +59,8 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.gargantuaRoll
 import com.usagemonitor.presentation.ui.components.rememberGargantuaRoll
 import com.usagemonitor.presentation.ui.components.AccountEmojiGlyph
+import com.usagemonitor.presentation.ui.components.accountMoonSwapFrame
+import com.usagemonitor.presentation.ui.components.rememberAccountMoonSwap
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppGargantuaRing
 import com.usagemonitor.presentation.ui.components.appGargantuaMarkSize
@@ -210,6 +212,7 @@ private fun HudRingItem(
     // Minimizada (#576): o anel vai a 28 dp; marca, arco e vão encolhem na mesma razão.
     val ringSize = minimizeFrame.ringSize
     val ringScale = ringSize / HUD_RING_SIZE
+    val moon = rememberAccountMoonSwap(account.accountEmoji)
     val ring: @Composable () -> Unit = {
         // A marca do fornecedor no centro do anel, como no Codenotch: a conta se
         // reconhece antes de ler o nome, que o notch recolhido nem mostra. Na
@@ -254,16 +257,46 @@ private fun HudRingItem(
             // anel. Passa só `HUD_EMOJI_BADGE_OVERSHOOT` para fora dele, dentro do
             // respiro do notch: é selo, não item, e não mexe em `hudNotchSizes`.
             // Fica de pé em toda borda, como o texto do balão.
-            val emoji = account.accountEmoji
+            // A lua (#585): a velha sai pela órbita (−20°, centro do anel) e o novo
+            // entra no mesmo canto. Só existe lua velha durante a troca.
+            val outgoing = moon.outgoing
+            if (outgoing != null) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            val swap = accountMoonSwapFrame(moon.elapsed.value)
+                            rotationZ = swap.outgoingDegrees
+                            alpha = frame.mark * swap.outgoingAlpha
+                        }
+                ) {
+                    AccountEmojiGlyph(
+                        emoji = outgoing,
+                        size = HUD_EMOJI_BADGE_SIZE,
+                        moon = true,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = HUD_EMOJI_BADGE_OVERSHOOT, y = -HUD_EMOJI_BADGE_OVERSHOOT)
+                    )
+                }
+            }
+            // O emoji da conta (issue #287) é o selo; na troca, entra com fade e escala.
+            val emoji = moon.current
             if (emoji != null) {
                 AccountEmojiGlyph(
                     emoji = emoji,
                     size = HUD_EMOJI_BADGE_SIZE,
+                    moon = true,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .offset(x = HUD_EMOJI_BADGE_OVERSHOOT, y = -HUD_EMOJI_BADGE_OVERSHOOT)
                         .testTag(HUD_ACCOUNT_EMOJI_TEST_TAG)
-                        .graphicsLayer { alpha = frame.mark }
+                        .graphicsLayer {
+                            val swap = accountMoonSwapFrame(moon.elapsed.value)
+                            alpha = frame.mark * swap.incomingAlpha
+                            scaleX = swap.incomingScale
+                            scaleY = swap.incomingScale
+                        }
                 )
             }
         }
