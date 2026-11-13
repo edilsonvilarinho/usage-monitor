@@ -1,0 +1,53 @@
+# Campo de estrelas com paralaxe no fundo da barra HUD — issue #586
+
+Procedência: Claude Opus 5.5 (orquestração) com agentes de implementação, Claude Code CLI no Windows 11, 2026-11-13,
+branch `feat/issue-586-hud-starfield`, commits com a identidade `claude <claude@anthropic.com>`.
+
+## Objetivo
+
+O usuário achou a barra HUD "sem vida" e pediu animação no tema espacial. A rodada AS (15 opções, ícones interagindo
+quando em execução) foi recusada inteira; o pedido foi refeito: **só o fundo**, sem mexer no indicador de execução,
+com estrelas em paralaxe e cada anel tratado como buraco negro, funcionando em todos os temas. Na rodada AT (10
+opções, `prototipos/issue-586-r2/`) o usuário escolheu a **AT1 · Paralaxe em três camadas**; para o tema claro, na
+rodada seguinte (`prototipos/issue-586-r2/at1-claro/`), a **L1 · Tinta densa**.
+
+## Fatos confirmados (2026-11-13, `e048d361`)
+
+- Corpo do notch: `Modifier.gargantuaHorizonBody` (`GargantuaHorizonBody.kt:77-84`), aplicado em `HudNotch.kt:259` e
+  `HudRetractedStrip.kt:100`. Escuro/claro pela luminância da `surface`: escuro (13 presets) = `#07080B`
+  (`AppGargantuaTokens.horizon`); claro (13 presets) = `preset.surface` + `appSheen()`.
+- O que já anima na HUD (todos atrás de `continuous && !reduced`, `AppGargantuaRing.kt:63`): disco 14 s, cometa de
+  sessão 2,6 s, respiro 3,2 s, plasma 2,8 s, detritos J7 128 s, ondas R1 1,3 s, respiração do corpo M1 6 s
+  (`GargantuaHorizonBody.kt:82`). Nada é desenhado entre as contas.
+- Protótipo aprovado: 140 estrelas por palco (30 perto, 45 meio, 65 longe), só em áreas livres (fora das caixas de
+  texto e dos anéis), laço de 82,5 s; dentro de 2×R de um anel as estrelas de perto e meio desviam em curva com rastro
+  de 4–6 px. Claro: tinta `#2A2622`, alfa 0,95/0,7/0,45, raios ×1,5.
+
+## Decisões
+
+- O cálculo é uma função pura de quadro em `commonMain` (posição, raio, alfa e rastro de cada estrela dado o tempo, o
+  tamanho do corpo, os poços — centro e raio de cada anel — e as caixas proibidas de texto). Determinística por
+  semente, para o teste e para não "piscar" entre recomposições.
+- O desenho fica no corpo do notch, depois do fundo e antes dos anéis; não muda tamanho de nada.
+- Contínuo só com `AppMotionPolicy.continuous`; reduzido = quadro fixo (o campo continua visível, parado).
+- Barra recolhida (`HudRetractedStrip`) não ganha campo: é uma faixa de 10 dp.
+
+## Atividades
+
+| Id | Atividade |
+|---|---|
+| A01 | Este plano |
+| A02 | Quadro puro do campo + testes |
+| A03 | Desenho no notch por tema, com gate de movimento + teste de tela |
+| A04 | Docs: `hud-notch.md`, design system, protótipo, histórico da skill `usage-monitor-visual-options` (rodadas AS e AT) |
+
+## Ponto de situação
+
+| Id | O que foi feito | Comando e resultado |
+|---|---|---|
+| A01 | Plano com fatos e escolhas do usuário | `gh issue comment 586` → plano curto publicado |
+
+## Problemas em aberto e riscos
+
+- Custo: 140 pontos por quadro a 60 fps no notch. Medir na A03 (tempo de quadro com e sem o campo).
+- O claro fica legível só com a tinta densa; a superfície de cada preset claro muda pouco (`#F5FFFB`…`#FFFFFF`).
