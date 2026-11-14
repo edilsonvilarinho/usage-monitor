@@ -60,6 +60,7 @@ campo para e é ele que diz qual anel está em execução (pedido do usuário).
 |---|---|---|
 | A01 | Plano com fatos, escolha (P5) e decisões | Sem harness (texto): `gh issue view 592` → issue aberta com o plano curto |
 | A02 | `HudStarfield.kt`: `HudStarfieldLayerSpec.tile` separado de `speed`; 12 / 6 / 2 dp/s com ladrilhos 720 / 360 / 120 dp; 156 estrelas e laço de 240 s mantidos (Haiku, `frontend-dev`) | Vermelho: `HudStarfieldTest.kt:145` `deslocamento 3.0 dp na camada NEAR, esperado 12.0`; `:133` `volta de 60 s na camada NEAR. Expected <5.0> … actual <185.0>`. Verde: `gradlew.bat desktopTest --tests "*HudStarfieldTest" --tests "com.usagemonitor.architecture.*"` → 20 + 17, 0 falhas |
+| A03 | `HudStarfieldWell` ganha `activeSinceMs`/`activeUntilMs` (semiaberto); ociosos em 4 000 + n·30 000 ms (8 por laço), poço `idle[n mod idle.size]` escolhido no início **absoluto** da captura (`timeMs − idade`); voo 3 000 ms. Devolvida 1× (janela comparada no eixo do laço) (Haiku, `frontend-dev`) | Vermelho: `uma cabeça em voo em t=6999 expected:<1> but was:<0>`; `captura ociosa no poço 1, poço 0 em execução: … veio d=226.91139 com R=15.0`; após devolução `poço 0 em execução no tempo absoluto, captura deve ir ao poço 1: … veio d=228.69469`. Verde: `gradlew.bat desktopTest --tests "*HudStarCaptureTest" --tests "*HudStarfieldTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "com.usagemonitor.architecture.*"` → 20 + 20 + 86 + 17, 0 falhas |
 
 ## Problemas em aberto e riscos
 

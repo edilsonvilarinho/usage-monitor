@@ -17,8 +17,18 @@ const val HUD_STARFIELD_SEED: Int = 586
 /** Camada de paralaxe: perto é mais rápida, maior e mais clara; longe é lenta e tênue. */
 enum class HudStarfieldLayer { NEAR, MID, FAR }
 
-/** Poço gravitacional: centro e raio do anel, em px do corpo. */
-data class HudStarfieldWell(val centerX: Float, val centerY: Float, val radius: Float)
+/**
+ * Poço gravitacional: centro e raio do anel, em px do corpo. [activeSinceMs] e [activeUntilMs] são a janela de
+ * execução do poço, no mesmo eixo de tempo do `timeMs` (laço de 240 000 ms). Em execução no instante t ⇔
+ * since ≤ t e (until nulo ou t < until); since nulo = nunca em execução. Sem janela, o poço fica ocioso (#592 A03).
+ */
+data class HudStarfieldWell(
+    val centerX: Float,
+    val centerY: Float,
+    val radius: Float,
+    val activeSinceMs: Long? = null,
+    val activeUntilMs: Long? = null
+)
 
 /** Retângulo proibido (caixa de texto ou pílula), em px do corpo. Bordas inclusivas. */
 data class HudStarfieldBox(val left: Float, val top: Float, val right: Float, val bottom: Float)

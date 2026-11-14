@@ -23,11 +23,11 @@ data class HudStarCaptureFlight(
 /** Lampejo de 200 ms no ponto em que a estrela some. */
 data class HudStarCaptureFlash(val x: Float, val y: Float, val alpha: Float, val radius: Float) : HudStarCapture
 
-/** Agenda: primeira captura aos 4 000 ms, depois uma a cada 8 000 ms, 30 por laço de 240 000 ms. */
+/** Agenda: primeira captura aos 4 000 ms, depois uma a cada 30 000 ms, 8 por laço de 240 000 ms. */
 private const val HUD_STAR_CAPTURE_START_MS = 4_000L
-private const val HUD_STAR_CAPTURE_EVERY_MS = 8_000L
-private const val HUD_STAR_CAPTURE_COUNT = 30
-private const val HUD_STAR_CAPTURE_FLIGHT_MS = 2_600L
+private const val HUD_STAR_CAPTURE_EVERY_MS = 30_000L
+private const val HUD_STAR_CAPTURE_COUNT = 8
+private const val HUD_STAR_CAPTURE_FLIGHT_MS = 3_000L
 private const val HUD_STAR_CAPTURE_FLASH_MS = 200L
 private const val HUD_STAR_CAPTURE_ANGLE_STEP = 2.399963f
 private const val HUD_STAR_CAPTURE_TRAIL_DP = 10f
@@ -37,8 +37,10 @@ private const val HUD_STAR_CAPTURE_FLASH_ALPHA = 0.6f
 private const val HUD_STAR_CAPTURE_FLASH_RADIUS = 5f
 
 /**
- * Capturas ativas em [timeMs] (do laço de 240 000 ms). Cada uma é de um poço só, `n mod wells.size`, com ângulo
- * inicial `n · 2,399963`. Ponto dentro de caixa proibida sai com alfa zero, como as estrelas. Sem poços, nada.
+ * Capturas ativas em [timeMs] (tempo absoluto do quadro; o laço de 240 000 ms só posiciona a agenda). Cada captura
+ * escolhe, no instante absoluto do próprio início (`timeMs − idade`), um poço sem execução (`idle[n mod idle.size]`),
+ * para o voo não trocar de poço no meio; sem poço ocioso, não há captura.
+ * Ângulo inicial `n · 2,399963`. Ponto dentro de caixa proibida sai com alfa zero, como as estrelas. Sem poços, nada.
  */
 fun hudStarCaptures(
     timeMs: Long,
@@ -52,10 +54,20 @@ fun hudStarCaptures(
         val start = HUD_STAR_CAPTURE_START_MS + n * HUD_STAR_CAPTURE_EVERY_MS
         val age = hudStarCaptureWrap(loop - start, HUD_STARFIELD_PERIOD_MS)
         if (age >= HUD_STAR_CAPTURE_FLIGHT_MS + HUD_STAR_CAPTURE_FLASH_MS) continue
-        val well = wells[n % wells.size]
+        val absoluteStart = timeMs - age
+        val idle = wells.filter { !hudStarfieldWellRunning(it, absoluteStart) }
+        if (idle.isEmpty()) continue
+        val well = idle[n % idle.size]
         out.add(hudStarCaptureAt(age, well, n * HUD_STAR_CAPTURE_ANGLE_STEP, forbidden))
     }
     return out
+}
+
+/** Poço em execução no instante [t]: `since ≤ t` e (`until` nulo ou `t < until`), semiaberto no fim; `since` nulo é ocioso. */
+private fun hudStarfieldWellRunning(well: HudStarfieldWell, t: Long): Boolean {
+    val since = well.activeSinceMs ?: return false
+    val until = well.activeUntilMs
+    return t >= since && (until == null || t < until)
 }
 
 private fun hudStarCaptureAt(
