@@ -421,7 +421,7 @@ private fun horizontalCollapsed(
     )
 }
 
-private fun verticalCollapsed(
+internal fun verticalCollapsed(
     accounts: List<HudAccount>,
     fallbackLabel: String,
     compact: Boolean

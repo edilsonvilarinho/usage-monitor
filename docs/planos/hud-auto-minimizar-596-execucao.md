@@ -53,6 +53,7 @@ demais ficam completas (linhas + pílula). Com 7 fontes numa área útil de 900 
 | ID | Execução | Resultado |
 |---|---|---|
 | A01 | Sem harness (texto): protótipos P1/P2/P3 conferidos por captura; escolha do usuário via pergunta | P1 escolhido |
+| A02 | `hudAutoMinimizedTargets` em `HudAutoMinimize.kt` (o `HudNotchGeometry.kt` passaria de 750 linhas); `verticalCollapsed` vira `internal`. 7 casos em `HudAutoMinimizeTest` (Haiku, `frontend-dev`) | Vermelho (stub `emptySet()`): `gradlew.bat desktopTest --tests "com.usagemonitor.HudAutoMinimizeTest"` → 4/7 falham com `AssertionError` em `HudAutoMinimizeTest.kt:42, :56, :68, :80` (os 4 casos que esperam conjunto não vazio; texto literal da mensagem não guardado pelo agente). Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.HudAutoMinimizeTest"` → 7 + 40 + 17, 0 falhas |
 
 ## Problemas em aberto e riscos
 
