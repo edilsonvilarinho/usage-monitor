@@ -59,6 +59,7 @@ campo para e é ele que diz qual anel está em execução (pedido do usuário).
 | Id | O que foi feito | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos, escolha (P5) e decisões | Sem harness (texto): `gh issue view 592` → issue aberta com o plano curto |
+| A02 | `HudStarfield.kt`: `HudStarfieldLayerSpec.tile` separado de `speed`; 12 / 6 / 2 dp/s com ladrilhos 720 / 360 / 120 dp; 156 estrelas e laço de 240 s mantidos (Haiku, `frontend-dev`) | Vermelho: `HudStarfieldTest.kt:145` `deslocamento 3.0 dp na camada NEAR, esperado 12.0`; `:133` `volta de 60 s na camada NEAR. Expected <5.0> … actual <185.0>`. Verde: `gradlew.bat desktopTest --tests "*HudStarfieldTest" --tests "com.usagemonitor.architecture.*"` → 20 + 17, 0 falhas |
 
 ## Problemas em aberto e riscos
 
