@@ -11,7 +11,7 @@ class OpenRouterRepositoryImpl(
 ) : OpenRouterRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             val apiKey = apiKeyReader()?.takeIf { key -> key.isNotBlank() }
                 ?: throw IllegalStateException("Chave da API OpenRouter não configurada. Abra Configurações > APIs e informe a chave.")
             val response = apiDataSource.fetchOpenRouterCredits(apiKey)

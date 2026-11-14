@@ -9,9 +9,11 @@ import com.usagemonitor.domain.entity.ApiSource
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -83,6 +85,21 @@ class MiniMaxRepositoryImplTest {
         assertNotNull(stats)
         assertEquals(ApiSource.MINIMAX, stats.source)
         assertTrue(stats.quotas.isNotEmpty())
+    }
+
+    @Test
+    fun `rethrows cancellation instead of returning failure`() = runTest {
+        val repo = MiniMaxRepositoryImpl(
+            apiDataSource = object : RemoteApiDataSource(noopHttpClient()) {
+                override suspend fun fetchMiniMaxTokenPlan(apiKey: String): MiniMaxTokenPlanResponse {
+                    throw CancellationException("cancelado pelo escopo")
+                }
+            },
+            apiKeyReader = { "fake-key" }
+        )
+
+        // Cancelamento de coroutine não vira Result.failure: o escopo precisa vê-lo propagar (issue #598).
+        assertFailsWith<CancellationException> { repo.getUsage() }
     }
 
     private fun successResponse(): MiniMaxTokenPlanResponse {

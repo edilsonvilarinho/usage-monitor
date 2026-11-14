@@ -69,7 +69,7 @@ class TeamUsageRepositoryImpl(
             return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
         }
 
-        return runCatching {
+        return suspendRunCatching {
             remoteDataSource.pushIngest(
                 baseUrl = settings.normalizedServerUrl,
                 apiKey = settings.apiKeyFor(profileId),
@@ -117,7 +117,7 @@ class TeamUsageRepositoryImpl(
         val baseUrl = settings.normalizedServerUrl
         if (presenceRouteMissingFor != baseUrl) {
             val localNow = clock.now()
-            val result = runCatching {
+            val result = suspendRunCatching {
                 remoteDataSource.touchPresence(
                     baseUrl = baseUrl,
                     apiKey = settings.apiKeyFor(profileId),
@@ -161,7 +161,7 @@ class TeamUsageRepositoryImpl(
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
 
-        return runCatching {
+        return suspendRunCatching {
             remoteDataSource.fetchTeam(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
@@ -190,7 +190,7 @@ class TeamUsageRepositoryImpl(
             return Result.success(null)
         }
 
-        val result = runCatching {
+        val result = suspendRunCatching {
             remoteDataSource.fetchTeamTrend(
                 baseUrl = baseUrl,
                 credential = credential,
@@ -231,7 +231,7 @@ class TeamUsageRepositoryImpl(
         val credential = settings.readCredential()
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
 
-        val result = runCatching {
+        val result = suspendRunCatching {
             remoteDataSource.fetchSessionDetail(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
@@ -264,7 +264,7 @@ class TeamUsageRepositoryImpl(
             return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
         }
 
-        return runCatching { remoteDataSource.checkHealth(settings.normalizedServerUrl) }
+        return suspendRunCatching { remoteDataSource.checkHealth(settings.normalizedServerUrl) }
     }
 }
 

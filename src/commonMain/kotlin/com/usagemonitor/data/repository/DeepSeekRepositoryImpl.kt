@@ -11,7 +11,7 @@ class DeepSeekRepositoryImpl(
 ) : DeepSeekRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             val apiKey = apiKeyReader()?.takeIf { key -> key.isNotBlank() }
                 ?: throw IllegalStateException("Chave da API DeepSeek não configurada. Abra Configurações > APIs e informe a chave.")
             val response = apiDataSource.fetchDeepSeekBalance(apiKey)

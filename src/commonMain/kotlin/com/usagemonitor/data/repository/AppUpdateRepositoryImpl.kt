@@ -33,12 +33,12 @@ class AppUpdateRepositoryImpl(
         currentVersion: String,
         includePrereleases: Boolean
     ): Result<AppUpdateInfo?> {
-        return Result.runCatching {
-            val latestRelease = fetchCandidateRelease(includePrereleases) ?: return@runCatching null
+        return suspendRunCatching {
+            val latestRelease = fetchCandidateRelease(includePrereleases) ?: return@suspendRunCatching null
             val latestVersion = latestRelease.tagName.removePrefix("v")
 
             if (!isVersionNewer(latestVersion, currentVersion)) {
-                return@runCatching null
+                return@suspendRunCatching null
             }
 
             AppUpdateInfo(
@@ -80,7 +80,7 @@ class AppUpdateRepositoryImpl(
         version: String,
         previousVersion: String?
     ): Result<ReleaseNotes?> {
-        return Result.runCatching {
+        return suspendRunCatching {
             val release = remoteApiDataSource.fetchGitHubReleaseByTag(
                 owner = RELEASE_REPOSITORY_OWNER,
                 repository = RELEASE_REPOSITORY_NAME,
@@ -90,17 +90,17 @@ class AppUpdateRepositoryImpl(
                 feedUrlOverride = envVarReader()
             // Tag inexistente e release sem nada a mostrar dão no mesmo para quem
             // chama: não há novidade, e insistir não mudaria a resposta.
-            ) ?: return@runCatching null
+            ) ?: return@suspendRunCatching null
 
             val items = parseReleaseNoteItems(release.body)
             if (items.isEmpty()) {
-                return@runCatching null
+                return@suspendRunCatching null
             }
 
             ReleaseNotes(
                 version = version,
                 previousVersion = previousVersion,
-                publishedAt = release.publishedAt?.let { stamp -> runCatching { Instant.parse(stamp) }.getOrNull() },
+                publishedAt = release.publishedAt?.let { stamp -> suspendRunCatching { Instant.parse(stamp) }.getOrNull() },
                 releasePageUrl = release.htmlUrl,
                 items = items
             )

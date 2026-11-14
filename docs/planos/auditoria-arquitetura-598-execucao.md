@@ -59,6 +59,7 @@ para que ela deixe de depender de auditoria manual.
 | ID | Situação | Comando e resultado |
 |---|---|---|
 | A01 | Plano com fatos medidos, decisões e atividades | `gh issue create` → #598; `git worktree add … origin/main` (`acac74cd`) |
+| A02 | Hipótese confirmada: `runCatching` devolvia o cancelamento como `Result.failure`. `suspendRunCatching` (`data/repository/SuspendRunCatching.kt`) relança `CancellationException`; troca em 13 `*RepositoryImpl`; regra `repositorio nao usa runCatching que engole cancelamento` + teste do padrão; `CLAUDE.md` e `docs/integrations.md` | Vermelho: `MiniMaxRepositoryImplTest.kt:91` → `Expected an exception of class CancellationException to be thrown, but was completed successfully with the result: <Failure(CancellationException: cancelado pelo escopo)>`; `SuspendRunCatchingTest.kt:29` (stub) idem; `ArchitectureRulesTest.kt:300` → `runCatching em repositório engole CancellationException` + 13 arquivos. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.architecture.*"` → 709 testes, 0 falhas. `grep 'runCatching' data/repository/*RepositoryImpl.kt` → vazio |
 
 ## Problemas em aberto e riscos
 

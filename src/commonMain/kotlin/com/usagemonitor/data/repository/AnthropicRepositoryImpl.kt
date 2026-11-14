@@ -16,7 +16,7 @@ import com.usagemonitor.domain.repository.AnthropicRepository
  *
  * Orquestra: credenciais → chamada HTTP → mapeamento para entidade.
  *
- * `Result.runCatching { }` é o equivalente Kotlin de um try/catch que
+ * `suspendRunCatching { }` é o equivalente Kotlin de um try/catch que
  * retorna Result.success() ou Result.failure() automaticamente.
  * Muito mais limpo que try/catch manual para operações que podem falhar.
  */
@@ -30,7 +30,7 @@ class AnthropicRepositoryImpl(
     }
 
     override suspend fun getUsage(profile: AnthropicProfileRef): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             fetchStableUsage(profile)
         }
     }

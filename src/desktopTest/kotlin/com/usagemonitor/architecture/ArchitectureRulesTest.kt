@@ -285,6 +285,33 @@ class ArchitectureRulesTest {
         assertFalse(SECRET_PROPERTY.matches("inputTokens"))
     }
 
+    /**
+     * `runCatching` captura o `CancellationException` e devolve `Result.failure`: o
+     * cancelamento de coroutine some e a chamada segue como se tivesse falhado (issue #598).
+     * Repositório usa `suspendRunCatching`, que relança o cancelamento.
+     */
+    @Test
+    fun `repositorio nao usa runCatching que engole cancelamento`() {
+        val violations = sources
+            .filter { source -> source.path.substringAfterLast('/').endsWith("RepositoryImpl.kt") }
+            .filter { source -> RUN_CATCHING.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "runCatching em repositório engole CancellationException (use suspendRunCatching, issue #598):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    @Test
+    fun `o padrao do runCatching pega a chamada e ignora o helper`() {
+        assertTrue(RUN_CATCHING.containsMatchIn("return Result.runCatching {"))
+        assertTrue(RUN_CATCHING.containsMatchIn("return@runCatching null"))
+        assertFalse(RUN_CATCHING.containsMatchIn("return suspendRunCatching {"))
+        assertFalse(RUN_CATCHING.containsMatchIn("val result = suspendRunCatching { load() }"))
+    }
+
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
         val violations = sources
             .filter { source -> source.path.substringAfter("/kotlin/").startsWith(layerPrefix) }
@@ -376,6 +403,9 @@ class ArchitectureRulesTest {
 
         /** `.background = `; o `Modifier.background(` do Compose é chamada, não atribuição. */
         val WINDOW_BACKGROUND_ASSIGNMENT = Regex("""\.background\s*=(?!=)""")
+
+        /** `runCatching` como chamada; `suspendRunCatching` não casa, o `R` é maiúsculo (issue #598). */
+        val RUN_CATCHING = Regex("""\brunCatching\b""")
 
         val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
 

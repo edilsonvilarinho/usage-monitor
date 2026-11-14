@@ -20,7 +20,7 @@ class MiniMaxRepositoryImpl(
 ) : MiniMaxRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             val apiKey = apiKeyReader()?.takeIf { key -> key.isNotBlank() }
                 ?: throw IllegalStateException("Chave da API MiniMax não configurada. Abra Configurações > APIs e informe a chave.")
 
