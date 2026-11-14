@@ -29,14 +29,14 @@ class HudStarCaptureTest {
         boxes: List<HudStarfieldBox> = noBoxes,
         wellList: List<HudStarfieldWell> = wells
     ): HudStarCaptureFlight {
-        val found = flights(hudStarCaptures(t, wellList, boxes))
+        val found = flights(hudStarIdleCaptures(t, wellList, boxes))
         assertEquals(1, found.size, "uma cabeça em voo em t=$t")
         return found.single()
     }
 
     /** Um único lampejo no instante [t]; falha por asserção se não houver exatamente um. */
     private fun flashAt(t: Long, boxes: List<HudStarfieldBox> = noBoxes): HudStarCaptureFlash {
-        val found = flashes(hudStarCaptures(t, wells, boxes))
+        val found = flashes(hudStarIdleCaptures(t, wells, boxes))
         assertEquals(1, found.size, "um lampejo em t=$t")
         return found.single()
     }
@@ -53,12 +53,12 @@ class HudStarCaptureTest {
 
     @Test
     fun `nenhuma captura antes de 4000 ms`() {
-        assertTrue(hudStarCaptures(3_999L, wells, noBoxes).isEmpty(), "antes da primeira captura")
+        assertTrue(hudStarIdleCaptures(3_999L, wells, noBoxes).isEmpty(), "antes da primeira captura")
     }
 
     @Test
     fun `sem poco nao ha captura`() {
-        assertTrue(hudStarCaptures(5_300L, emptyList(), noBoxes).isEmpty(), "sem poços")
+        assertTrue(hudStarIdleCaptures(5_300L, emptyList(), noBoxes).isEmpty(), "sem poços")
     }
 
     @Test
@@ -120,10 +120,10 @@ class HudStarCaptureTest {
 
     @Test
     fun `lampejo so existe entre 3000 e 3200 ms de idade`() {
-        assertTrue(flashes(hudStarCaptures(6_999L, wells, noBoxes)).isEmpty(), "sem lampejo antes de 3000 ms")
-        assertEquals(1, flashes(hudStarCaptures(7_000L, wells, noBoxes)).size, "lampejo em 3000 ms")
-        assertEquals(1, flashes(hudStarCaptures(7_199L, wells, noBoxes)).size, "lampejo até 3199 ms")
-        assertTrue(hudStarCaptures(7_200L, wells, noBoxes).isEmpty(), "fora da janela em 3200 ms")
+        assertTrue(flashes(hudStarIdleCaptures(6_999L, wells, noBoxes)).isEmpty(), "sem lampejo antes de 3000 ms")
+        assertEquals(1, flashes(hudStarIdleCaptures(7_000L, wells, noBoxes)).size, "lampejo em 3000 ms")
+        assertEquals(1, flashes(hudStarIdleCaptures(7_199L, wells, noBoxes)).size, "lampejo até 3199 ms")
+        assertTrue(hudStarIdleCaptures(7_200L, wells, noBoxes).isEmpty(), "fora da janela em 3200 ms")
     }
 
     @Test
@@ -176,14 +176,14 @@ class HudStarCaptureTest {
     @Test
     fun `nenhum poco ocioso nao ha captura ociosa`() {
         val wellList = listOf(wells[0].copy(activeSinceMs = 0L, activeUntilMs = null))
-        assertTrue(hudStarCaptures(5_300L, wellList, noBoxes).isEmpty(), "único poço em execução, nenhuma captura")
-        assertTrue(hudStarCaptures(65_300L, wellList, noBoxes).isEmpty(), "único poço em execução, nenhuma captura em 65 300 ms")
+        assertTrue(hudStarIdleCaptures(5_300L, wellList, noBoxes).isEmpty(), "único poço em execução, nenhuma captura")
+        assertTrue(hudStarIdleCaptures(65_300L, wellList, noBoxes).isEmpty(), "único poço em execução, nenhuma captura em 65 300 ms")
     }
 
     @Test
     fun `janela de execucao e semiaberta no fim`() {
         val wellList = listOf(wells[0].copy(activeSinceMs = 34_000L, activeUntilMs = 64_000L))
-        assertTrue(hudStarCaptures(35_300L, wellList, noBoxes).isEmpty(), "poço em execução em 34 000 ms não recebe captura")
+        assertTrue(hudStarIdleCaptures(35_300L, wellList, noBoxes).isEmpty(), "poço em execução em 34 000 ms não recebe captura")
         flightAt(65_300L, wellList = wellList)
     }
 
@@ -219,5 +219,51 @@ class HudStarCaptureTest {
             wells[2]
         )
         assertFlightOnWell(timeMs, wells[2], wellList, "poço 0 em execução, rodízio entre ociosos [1,2] deve dar poço 2")
+    }
+
+    // ---- A04 · fluxo de 1,5 estrela/s no poço em execução ----
+
+    /** Ângulo do braço do poço de índice [index] no nascimento (s = 0), com só esse poço ativo desde 0 ms. */
+    private fun armAngleAtSpawn(index: Int, t: Long): Float {
+        val list = wells.mapIndexed { j, w -> if (j == index) w.copy(activeSinceMs = 0L) else w }
+        val well = wells[index]
+        val born = flights(hudStarFlowCaptures(t, list, noBoxes))
+            .filter { abs(distance(it.headX, it.headY, well) - 2.4f * well.radius) < 0.01f }
+        assertEquals(1, born.size, "um voo nascendo no poço $index em t=$t")
+        val head = born.single()
+        return kotlin.math.atan2(head.headY - well.centerY, head.headX - well.centerX)
+    }
+
+    @Test
+    fun `poco ativo ha 10 s mantem cerca de cinco voos de fluxo`() {
+        val active = listOf(wells[0].copy(activeSinceMs = 0L))
+        val found = flights(hudStarFlowCaptures(10_000L, active, noBoxes))
+        assertTrue(found.size in 4..6, "voos de fluxo visíveis em t=10 000 ms, veio ${found.size}")
+    }
+
+    @Test
+    fun `poco com since no futuro nao gera fluxo e ativo depois gera`() {
+        val future = listOf(wells[0].copy(activeSinceMs = 20_000L))
+        assertTrue(hudStarFlowCaptures(10_000L, future, noBoxes).isEmpty(), "poço com since no futuro não deve gerar fluxo")
+        assertTrue(hudStarFlowCaptures(21_000L, future, noBoxes).isNotEmpty(), "poço ativo em 21 000 ms deve gerar fluxo")
+    }
+
+    @Test
+    fun `voo nascido antes do until continua visivel depois dele`() {
+        // Nascem em 3 333, 4 000 e 4 666 ms (< 5 000); 5 333 ms já é depois do fim e não pode nascer.
+        val ended = listOf(wells[0].copy(activeSinceMs = 0L, activeUntilMs = 5_000L))
+        val found = flights(hudStarFlowCaptures(6_000L, ended, noBoxes))
+        assertEquals(3, found.size, "voos vivos em 6 000 ms de poço que parou em 5 000 ms")
+    }
+
+    @Test
+    fun `braco do poco 1 difere do poco 0`() {
+        val a0 = armAngleAtSpawn(0, 2_000L)
+        val a1 = armAngleAtSpawn(1, 2_000L)
+        val diff = abs(a0 - a1)
+        assertTrue(
+            diff > 0.1f && diff < 2f * kotlin.math.PI.toFloat() - 0.1f,
+            "braço do poço 1 deve diferir do poço 0, veio $a0 e $a1"
+        )
     }
 }
