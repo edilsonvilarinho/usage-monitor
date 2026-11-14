@@ -220,6 +220,30 @@ class ArchitectureRulesTest {
     }
 
     /**
+     * Raiz de tela pinta o fundo da janela e a cor de conteúdo. Se cada tela
+     * montar o próprio `Surface`, a cor de conteúdo e o fundo divergem por tela
+     * (A05, issue #598). Quem pinta é a primitiva em `presentation/ui/components/`.
+     */
+    @Test
+    fun `Surface de tela so nas primitivas de components`() {
+        val violations = sources
+            .filter { source -> !source.path.contains(SURFACE_OWNER_SEGMENT) }
+            .filter { source -> SURFACE_CALL.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail("Surface( fora de presentation/ui/components/ (use AppScreenSurface):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o padrao do Surface pega a chamada e ignora a primitiva`() {
+        assertTrue(SURFACE_CALL.containsMatchIn("Surface(modifier = modifier.fillMaxSize())"))
+        assertFalse(SURFACE_CALL.containsMatchIn("AppDataSurface(modifier = modifier)"))
+        assertFalse(SURFACE_CALL.containsMatchIn("AppTooltipSurface(text = \"x\")"))
+        assertFalse(SURFACE_CALL.containsMatchIn("AppScreenSurface(modifier = modifier)"))
+    }
+
+    /**
      * Texto PT/EN repetido em cada tela divergiu (nove traduções inconsistentes
      * na auditoria do plano `boas-praticas-377`). Texto novo passa por
      * `localized(language, pt, en)` ou por um objeto de rótulos existente
@@ -494,6 +518,12 @@ class ArchitectureRulesTest {
 
         /** `runCatching` como chamada; `suspendRunCatching` não casa, o `R` é maiúsculo (issue #598). */
         val RUN_CATCHING = Regex("""\brunCatching\b""")
+
+        /** `Surface(` como chamada do Material; `AppDataSurface(` não casa, o `\b` pede fronteira antes do `S`. */
+        val SURFACE_CALL = Regex("""\bSurface\(""")
+
+        /** Única pasta de produção que chama `Surface(`: as primitivas do design system (A05, #598). */
+        const val SURFACE_OWNER_SEGMENT = "/presentation/ui/components/"
 
         val DESKTOP_MAIN_DIRECTORY = "src/desktopMain/kotlin/com/usagemonitor/"
 

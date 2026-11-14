@@ -25,7 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.usagemonitor.presentation.ui.components.AppScreenSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -246,7 +246,7 @@ internal fun TeamUsageContent(
     var sessionSort by remember { mutableStateOf<CliSessionSort?>(null) }
     var teamMenuExpanded by remember { mutableStateOf(false) }
 
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    AppScreenSurface(modifier = modifier.fillMaxSize()) {
         AppStateCrossfade(state, key = { current -> if (current is TeamUsageUiState.Success) "success:${current.detail != null}" else current::class }) { state ->
     when (state) {
                 is TeamUsageUiState.Loading -> AppLoadingState(

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -113,6 +114,21 @@ fun AppWindowScaffold(
             AppStatusBar(content = statusBar)
         }
     }
+}
+
+/**
+ * Raiz de tela: pinta o fundo da janela e entrega a cor de conteúdo (`onBackground`)
+ * por `LocalContentColor`, para que texto e ícone sem cor explícita não herdem o
+ * padrão do Material no tema escuro. Sem padding: quem define a margem é a própria
+ * tela. Diferença para [AppWindowScaffold], que aplica margem e pinta por `background`.
+ */
+@Composable
+fun AppScreenSurface(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.background,
+        content = content
+    )
 }
 
 /**

@@ -265,6 +265,7 @@ found 16 public `App*` composables whose name no contract cited. Where each one 
 | Compose (`presentation/ui/components/`) | Contract |
 | --- | --- |
 | `AppWindowScaffold` | `shell/AppWindowFrame` — the body only: background, margin, status bar. The title bar is `DesktopDialogFrame` (desktop) |
+| `AppScreenSurface` | `shell/AppWindowFrame` — screen root: window background and content colour (`onBackground`), no margin. a production `Surface(` outside `presentation/ui/components/` fails `ArchitectureRulesTest` (#598) |
 | `AppDataSurface` | `core/AppPanel` |
 | `AppDataSurfaceFlush` | `core/AppPanel`, `AppPanelBody flush` |
 | `AppSectionHeader` | `core/AppPanel`, `AppPanelHeader` |

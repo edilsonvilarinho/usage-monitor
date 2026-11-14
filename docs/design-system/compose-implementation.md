@@ -141,7 +141,8 @@ fallback é falha silenciosa.
 
 **Primitivas** (`presentation/ui/components/AppStructure.kt`, `AppControls.kt`, `AppStates.kt` e os
 arquivos `App*.kt` vizinhos — abas, navegação lateral, profundidade, chips, menu e tooltip):
-todas stateless. Corpo de janela com barra de estado, barra de controles, superfície de dados,
+todas stateless. Raiz de tela (`AppScreenSurface`: fundo da janela e cor de conteúdo por
+`LocalContentColor`, sem margem; a margem é da tela, diferente de `AppWindowScaffold`), corpo de janela com barra de estado, barra de controles, superfície de dados,
 cabeçalho de seção com marcador de 2dp, linha de dados com divisória própria, bloco de métrica,
 faixa de legendas de coluna com valor de célula, abas sublinhadas, controle segmentado, chip de
 alternância, botão, botão de ícone, campo, interruptor, tooltip, aviso, vazio, carregando, erro,

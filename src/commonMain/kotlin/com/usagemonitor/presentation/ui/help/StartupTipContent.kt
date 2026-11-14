@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.usagemonitor.presentation.ui.components.AppScreenSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -59,9 +59,8 @@ fun StartupTipContent(
     val tip = tips[index]
     val topicTitle = HelpCatalog.entry(tip.topic, language).title
 
-    Surface(
-        modifier = modifier.fillMaxSize().testTag(STARTUP_TIP_TAG),
-        color = MaterialTheme.colorScheme.background
+    AppScreenSurface(
+        modifier = modifier.fillMaxSize().testTag(STARTUP_TIP_TAG)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {

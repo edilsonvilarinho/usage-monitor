@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.usagemonitor.presentation.ui.components.AppScreenSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -107,9 +107,8 @@ fun HelpContent(
     // defeito já corrigido nas abas das Configurações.
     val scrollState = remember(selectedTopic) { ScrollState(0) }
 
-    Surface(
-        modifier = modifier.fillMaxSize().testTag(HELP_CONTENT_TAG),
-        color = MaterialTheme.colorScheme.background
+    AppScreenSurface(
+        modifier = modifier.fillMaxSize().testTag(HELP_CONTENT_TAG)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             // A lista de tópicos fica à esquerda e não rola: ela é o controle, e
