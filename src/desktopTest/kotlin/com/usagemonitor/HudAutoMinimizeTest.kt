@@ -1,14 +1,17 @@
 package com.usagemonitor
 
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** Auto-minimizar contas excedentes na borda vertical (issue #596). */
 class HudAutoMinimizeTest {
@@ -89,6 +92,57 @@ class HudAutoMinimizeTest {
         val teto = alturaCom(contas, setOf(a.targetKey, b.targetKey)) - 1.dp
 
         assertEquals(emptySet<UsageTargetKey>(), hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto))
+    }
+
+    @Test
+    fun `applyHudAutoMinimize marca so as contas escolhidas, com as duas flags`() {
+        val a = conta("A", 0.9f)
+        val b = conta("B", 0.6f)
+        val c = conta("C")
+        val contas = listOf(a, b, c)
+        val teto = alturaCom(contas, setOf(c.targetKey))
+
+        val aplicadas = applyHudAutoMinimize(contas, HudEdge.LEFT, fallback, teto)
+
+        assertEquals(
+            listOf(false to false, false to false, true to true),
+            aplicadas.map { conta -> conta.minimized to conta.autoMinimized }
+        )
+    }
+
+    @Test
+    fun `conta minimizada pelo usuario continua com autoMinimized falso`() {
+        val x = conta("X", minimizada = true)
+        val y = conta("Y", 0.6f)
+        val z = conta("Z", 0.9f)
+        val contas = listOf(x, y, z)
+        val teto = alturaCom(contas, setOf(y.targetKey))
+
+        val aplicadas = applyHudAutoMinimize(contas, HudEdge.LEFT, fallback, teto)
+
+        assertEquals(false, aplicadas.first { conta -> conta.targetKey == x.targetKey }.autoMinimized)
+        assertEquals(true, aplicadas.first { conta -> conta.targetKey == y.targetKey }.autoMinimized)
+    }
+
+    @Test
+    fun `borda horizontal devolve as contas sem marcar nenhuma`() {
+        val contas = listOf(conta("A", 0.9f), conta("B", 0.1f))
+
+        val aplicadas = applyHudAutoMinimize(contas, HudEdge.TOP, fallback, 1.dp)
+
+        assertEquals(listOf(false, false), aplicadas.map { conta -> conta.autoMinimized })
+    }
+
+    @Test
+    fun `teto ao longo da borda e a altura util, ou a largura na horizontal, sobre a escala e a fracao`() {
+        val area = ScreenWorkArea(0.dp, 0.dp, DpSize(800.dp, 1000.dp))
+
+        assertAproximado(400.dp, hudMaxAlong(HudEdge.LEFT, area, 2f))
+        assertAproximado(180.dp, hudMaxAlong(HudEdge.TOP, area, 2f))
+    }
+
+    private fun assertAproximado(esperado: Dp, obtido: Dp) {
+        assertTrue(abs(esperado.value - obtido.value) < 0.01f, "esperado $esperado, veio $obtido")
     }
 
     private fun conta(nome: String, vararg usos: Float, minimizada: Boolean = false): HudAccount {

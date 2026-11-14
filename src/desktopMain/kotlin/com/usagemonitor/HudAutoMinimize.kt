@@ -39,3 +39,16 @@ internal fun hudAutoMinimizedTargets(
     }
     return emptySet()
 }
+
+/** Aplica a regra às contas: marca [HudAccount.minimized] e [HudAccount.autoMinimized] nas escolhidas. */
+internal fun applyHudAutoMinimize(
+    accounts: List<HudAccount>,
+    edge: HudEdge,
+    fallbackLabel: String,
+    maxAlong: Dp
+): List<HudAccount> {
+    val escolhidas = hudAutoMinimizedTargets(accounts, edge, fallbackLabel, maxAlong)
+    return accounts.map { account ->
+        if (account.targetKey in escolhidas) account.copy(minimized = true, autoMinimized = true) else account
+    }
+}
