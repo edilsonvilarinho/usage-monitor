@@ -37,7 +37,7 @@ internal enum class TeamStep { CONNECTION, ACCOUNTS, ADMIN }
  */
 internal fun initialTeamStepOf(
     settings: TeamIntegrationSettings,
-    connection: TeamConnectionUiState
+    connection: TeamConnectionFormState
 ): TeamStep = when {
     settings.serverUrl.isBlank() -> TeamStep.CONNECTION
     connection.status == TeamConnectionUiStatus.FAILED -> TeamStep.CONNECTION
@@ -56,9 +56,9 @@ internal fun TeamStepsPane(
     language: AppLanguage,
     labels: TeamIntegrationLabels,
     profiles: List<AnthropicProfileUiModel>,
-    connection: TeamConnectionUiState,
-    teamConnections: Map<String, TeamConnectionUiState>,
-    adminConnection: TeamConnectionUiState,
+    connection: TeamConnectionFormState,
+    teamConnections: Map<String, TeamConnectionFormState>,
+    adminConnection: TeamConnectionFormState,
     syncFailureMessage: String?,
     rejectedProfiles: Map<String, String>,
     onRenameTeam: (String) -> Unit,
@@ -204,7 +204,7 @@ private fun TeamConnectionStep(
     settings: TeamIntegrationSettings,
     language: AppLanguage,
     labels: TeamIntegrationLabels,
-    connection: TeamConnectionUiState,
+    connection: TeamConnectionFormState,
     onRenameTeam: (String) -> Unit,
     onServerUrlChange: (String) -> Unit,
     onAliasChange: (String) -> Unit,
@@ -325,7 +325,7 @@ private fun TeamAdminStep(
     settings: TeamIntegrationSettings,
     labels: TeamIntegrationLabels,
     language: AppLanguage,
-    connection: TeamConnectionUiState,
+    connection: TeamConnectionFormState,
     onAdminTokenChange: (String) -> Unit,
     onValidateAdminToken: () -> Unit,
     onOpenKeysManager: () -> Unit,

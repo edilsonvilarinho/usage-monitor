@@ -47,7 +47,7 @@ import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiModel
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import kotlinx.datetime.DateTimeUnit
 import kotlin.time.Instant
@@ -836,7 +836,7 @@ internal object ScreenshotFixtures {
         participatingProfileIds = setOf(PRIMARY_PROFILE_ID)
     )
 
-    val teamConnection = TeamConnectionUiState(
+    val teamConnection = TeamConnectionFormState(
         status = TeamConnectionUiStatus.OK,
         message = "Conexão confirmada."
     )

@@ -11,10 +11,10 @@ import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import java.io.File
 import java.util.UUID
 import com.usagemonitor.presentation.ui.MODAL_CLOSE_SETTLE_MILLIS
-import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
+import com.usagemonitor.presentation.ui.components.ProxyConnectionFormState
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
 import com.usagemonitor.presentation.ui.theme.AppThemePreset
@@ -470,7 +470,7 @@ internal class SettingsActions(
     private fun updateProxy(resetConnection: Boolean, transform: (ProxySettings) -> ProxySettings) {
         val saved = updateProxySettings(store.proxySettingsFlow, store.proxySettingsDataSource, transform)
         if (resetConnection) {
-            feedback.proxyConnection = ProxyConnectionUiState()
+            feedback.proxyConnection = ProxyConnectionFormState()
         }
         feedback.reportSave(SettingsField.NETWORK_PROXY, saved)
     }

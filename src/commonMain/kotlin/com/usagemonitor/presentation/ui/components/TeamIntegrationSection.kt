@@ -24,7 +24,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 /** Resultado do botão "Testar conexão". */
 enum class TeamConnectionUiStatus { IDLE, CHECKING, OK, FAILED }
 
-data class TeamConnectionUiState(
+data class TeamConnectionFormState(
     val status: TeamConnectionUiStatus = TeamConnectionUiStatus.IDLE,
     val message: String? = null,
     /** Onde a conexão parou (#494); com ela a seção mostra o caminho em vez de [message]. */
@@ -65,7 +65,7 @@ fun TeamIntegrationSection(
     settings: TeamIntegrationSettings,
     language: AppLanguage,
     profiles: List<AnthropicProfileUiModel>,
-    connection: TeamConnectionUiState,
+    connection: TeamConnectionFormState,
     onEnabledChange: (Boolean) -> Unit,
     onServerUrlChange: (String) -> Unit,
     onAliasChange: (String) -> Unit,
@@ -87,7 +87,7 @@ fun TeamIntegrationSection(
      */
     rejectedProfiles: Map<String, String> = emptyMap(),
     /** Resultado da última validação do token; separado do teste da chave de time. */
-    adminConnection: TeamConnectionUiState = TeamConnectionUiState(),
+    adminConnection: TeamConnectionFormState = TeamConnectionFormState(),
     onAdminTokenChange: (String) -> Unit = {},
     onValidateAdminToken: () -> Unit = {},
     onOpenKeysManager: () -> Unit = {},
@@ -97,7 +97,7 @@ fun TeamIntegrationSection(
     /** Time com o formulário aberto (destacado na lista). */
     selectedTeamId: String? = settings.id,
     /** Resultado do último teste por time, pelo id. Sem entrada, o time mostra "Não testado". */
-    teamConnections: Map<String, TeamConnectionUiState> = emptyMap(),
+    teamConnections: Map<String, TeamConnectionFormState> = emptyMap(),
     onSelectTeam: (String) -> Unit = {},
     onAddTeam: () -> Unit = {},
     onRemoveTeam: (String) -> Unit = {},
@@ -184,7 +184,7 @@ fun TeamIntegrationSection(
 private fun TeamListPane(
     teams: List<TeamIntegrationSettings>,
     selectedTeamId: String?,
-    teamConnections: Map<String, TeamConnectionUiState>,
+    teamConnections: Map<String, TeamConnectionFormState>,
     labels: TeamIntegrationLabels,
     onSelectTeam: (String) -> Unit,
     onAddTeam: () -> Unit
@@ -293,7 +293,7 @@ private fun TeamRemoveAction(
  */
 internal fun teamStatusOf(
     team: TeamIntegrationSettings,
-    connection: TeamConnectionUiState?,
+    connection: TeamConnectionFormState?,
     labels: TeamIntegrationLabels
 ): Pair<String, AppTone> {
     return when {

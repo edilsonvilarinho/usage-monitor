@@ -19,7 +19,7 @@ import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_RESULT_TEST_TAG
 import com.usagemonitor.presentation.ui.components.API_KEY_DIALOG_TEST_TEST_TAG
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckStatus
-import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
+import com.usagemonitor.presentation.ui.components.ApiKeyCheckFormState
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
@@ -149,7 +149,7 @@ class ApiKeyDialogTest {
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
-                    apiKeyCheck = ApiKeyCheckUiState(status = ApiKeyCheckStatus.CHECKING),
+                    apiKeyCheck = ApiKeyCheckFormState(status = ApiKeyCheckStatus.CHECKING),
                     initialTab = SettingsTab.APIS
                 )
             }
@@ -173,7 +173,7 @@ class ApiKeyDialogTest {
                     onLanguageChange = {},
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
-                    apiKeyCheck = ApiKeyCheckUiState(
+                    apiKeyCheck = ApiKeyCheckFormState(
                         status = ApiKeyCheckStatus.FAILED,
                         message = "Chave válida, sem assinatura Go ativa.",
                         tone = AppTone.WARNING
@@ -200,7 +200,7 @@ class ApiKeyDialogTest {
         // O estado mora FORA do `setContent`: abrir o diálogo já chama
         // `onApiKeyCheckReset` — o veredito da fonte anterior não pode sobreviver
         // à troca —, então semear o resultado antes da abertura o apagaria.
-        val check = mutableStateOf(ApiKeyCheckUiState())
+        val check = mutableStateOf(ApiKeyCheckFormState())
 
         setContent {
             ScreenTestTheme(isDark = true) {
@@ -215,7 +215,7 @@ class ApiKeyDialogTest {
                     onAutoStartChange = {},
                     onApiToggle = { _, _ -> },
                     apiKeyCheck = check.value,
-                    onApiKeyCheckReset = { check.value = ApiKeyCheckUiState() },
+                    onApiKeyCheckReset = { check.value = ApiKeyCheckFormState() },
                     initialTab = SettingsTab.APIS
                 )
             }
@@ -223,7 +223,7 @@ class ApiKeyDialogTest {
 
         onNodeWithTag(apiSelectorEditKeyTestTag(ApiSource.MINIMAX)).performScrollTo().performClick()
 
-        check.value = ApiKeyCheckUiState(
+        check.value = ApiKeyCheckFormState(
             status = ApiKeyCheckStatus.FAILED,
             message = "Chave recusada pela API (HTTP 401/403). Revise a chave.",
             tone = AppTone.CRITICAL

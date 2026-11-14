@@ -40,7 +40,7 @@ internal fun MonitoredApisTab(
     onApiToggle: (ApiSource, Boolean) -> Unit,
     onApiKeySave: (ApiSource, String) -> Boolean,
     onApiKeyRemove: (ApiSource) -> Boolean,
-    apiKeyCheck: ApiKeyCheckUiState,
+    apiKeyCheck: ApiKeyCheckFormState,
     onApiKeyTest: (ApiSource, String) -> Unit,
     onApiKeyCheckReset: () -> Unit
 ) {
@@ -147,7 +147,7 @@ private fun ApiKeyDialog(
      * campo vazio — sem chave nenhuma o botão não teria o que enviar.
      */
     hasStoredKey: Boolean,
-    checkState: ApiKeyCheckUiState,
+    checkState: ApiKeyCheckFormState,
     /** Recebe o texto digitado; vazio significa "use a chave já guardada". */
     onTest: (String) -> Unit,
     onCheckReset: () -> Unit,

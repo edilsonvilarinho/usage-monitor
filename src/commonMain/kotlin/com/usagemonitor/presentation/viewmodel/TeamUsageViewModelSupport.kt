@@ -99,7 +99,7 @@ internal fun aggregatedTeamSessionDetail(
             accountKey = scopedAccountKey
         )
 
-    return TeamSessionDetailUiState.Ready(
+    return TeamSessionDetailUiState.Success(
         deviceId = deviceId,
         sessionId = sessionId,
         accountKey = scopedAccountKey,

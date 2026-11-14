@@ -13,11 +13,11 @@ import java.net.UnknownHostException
 import java.security.cert.CertificateExpiredException
 import javax.net.ssl.SSLHandshakeException
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckStatus
-import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
+import com.usagemonitor.presentation.ui.components.ApiKeyCheckFormState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -139,7 +139,7 @@ class AppSettingsFeedbackTest {
         assertEquals(listOf("Bearer typed-key", "Bearer saved-key"), requests.map { request -> request.second })
         assertTrue(harness.breadcrumbs.messages.none { message -> message.contains("key") && message.contains("Bearer") })
         feedback.resetApiKeyCheck()
-        assertEquals(ApiKeyCheckUiState(), feedback.apiKeyCheck)
+        assertEquals(ApiKeyCheckFormState(), feedback.apiKeyCheck)
     }
 
     @Test
@@ -306,7 +306,7 @@ class AppSettingsFeedbackTest {
 
     @Test
     fun `a state written for one team leaves the other team as it was`() {
-        feedback.setTeamConnection("team-b", TeamConnectionUiState(TeamConnectionUiStatus.OK, "b"))
+        feedback.setTeamConnection("team-b", TeamConnectionFormState(TeamConnectionUiStatus.OK, "b"))
         harness.health = Result.failure(IOException("servidor fora"))
 
         feedback.checkTeamConnection(teamId)
@@ -314,8 +314,8 @@ class AppSettingsFeedbackTest {
         harness.settle()
 
         assertEquals(TeamConnectionUiStatus.FAILED, feedback.teamConnection(teamId).status)
-        assertEquals(TeamConnectionUiState(TeamConnectionUiStatus.OK, "b"), feedback.teamConnection("team-b"))
-        assertEquals(TeamConnectionUiState(), feedback.teamAdminConnection("team-b"))
+        assertEquals(TeamConnectionFormState(TeamConnectionUiStatus.OK, "b"), feedback.teamConnection("team-b"))
+        assertEquals(TeamConnectionFormState(), feedback.teamAdminConnection("team-b"))
     }
 
     @Test
@@ -328,7 +328,7 @@ class AppSettingsFeedbackTest {
         assertEquals(listOf("team-b"), harness.repositoryTeamIds)
         assertEquals(listOf("team-b"), harness.claimTeamIds)
         assertEquals(TeamConnectionUiStatus.OK, feedback.teamConnection("team-b").status)
-        assertEquals(TeamConnectionUiState(), feedback.teamConnection(teamId))
+        assertEquals(TeamConnectionFormState(), feedback.teamConnection(teamId))
     }
 
     @Test
@@ -338,6 +338,6 @@ class AppSettingsFeedbackTest {
 
         assertEquals(listOf("team-b"), harness.adminTeamIds)
         assertEquals(TeamConnectionUiStatus.OK, feedback.teamAdminConnection("team-b").status)
-        assertEquals(TeamConnectionUiState(), feedback.teamAdminConnection(teamId))
+        assertEquals(TeamConnectionFormState(), feedback.teamAdminConnection(teamId))
     }
 }

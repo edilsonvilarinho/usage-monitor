@@ -457,7 +457,7 @@ token e conversas pareadas ficam em `~/.usage-monitor/telegram.json` (arquivo de
     time no bot"** (nasce desligado: expõe dado de outras pessoas); desligado, o servidor nem é consultado. O consumo em
     dinheiro por pessoa do mockup ficou fora (desvio registrado no plano).
   - **Atualização pelo bot** (AA17): com **"Permitir atualizar pelo bot"** (nasce desligado: reinicia o app no PC a pedido de
-    uma conversa), o serviço checa a cada minuto se há versão **pronta** (`AppUpdateUiState.Ready`: baixada e com SHA-256
+    uma conversa), o serviço checa a cada minuto se há versão **pronta** (`AppUpdateUiState.Downloaded`: baixada e com SHA-256
     conferido; a só disponível não tem o que instalar) e avisa uma vez por versão — `announcedUpdateVersion` gravada antes do
     envio — com o botão "⬆ Atualizar e reiniciar o app" (`upd:<versão>`). O toque relê permissão e versão: aviso antigo
     responde "não está mais pronta", e só a versão pronta chama `restartAndUpdateNow`, o mesmo botão da faixa do app. O texto

@@ -21,7 +21,7 @@ import com.usagemonitor.presentation.ui.theme.AppSpacing
 /** Resultado do "Testar conexão" da seção de proxy — par próprio, não o de Time. */
 enum class ProxyConnectionUiStatus { IDLE, CHECKING, OK, FAILED }
 
-data class ProxyConnectionUiState(
+data class ProxyConnectionFormState(
     val status: ProxyConnectionUiStatus = ProxyConnectionUiStatus.IDLE,
     val message: String? = null
 )
@@ -53,7 +53,7 @@ const val NETWORK_TEST_CONNECTION_TEST_TAG = "networkProxyTestConnection"
 fun NetworkSettingsSection(
     settings: ProxySettings,
     language: AppLanguage,
-    connection: ProxyConnectionUiState,
+    connection: ProxyConnectionFormState,
     onUseEnvironmentProxyChange: (Boolean) -> Unit,
     onHostChange: (String) -> Unit,
     onPortChange: (String) -> Unit,

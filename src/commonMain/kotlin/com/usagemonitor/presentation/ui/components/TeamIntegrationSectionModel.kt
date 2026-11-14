@@ -10,8 +10,8 @@ import com.usagemonitor.domain.entity.TeamIntegrationSettings
  */
 data class TeamSectionState(
     val settings: TeamIntegrationSettings = TeamIntegrationSettings(),
-    val connection: TeamConnectionUiState = TeamConnectionUiState(),
-    val adminConnection: TeamConnectionUiState = TeamConnectionUiState(),
+    val connection: TeamConnectionFormState = TeamConnectionFormState(),
+    val adminConnection: TeamConnectionFormState = TeamConnectionFormState(),
     /** Falha do último envio ao servidor; `null` sem falha. */
     val syncFailureMessage: String? = null,
     /** Contas recusadas pelo servidor, por `profileId`. Aponta a linha errada. */
@@ -19,7 +19,7 @@ data class TeamSectionState(
     /** Todos os times configurados; a seção lista e abre um deles. */
     val teams: List<TeamIntegrationSettings> = listOf(settings),
     val selectedTeamId: String? = settings.id,
-    val teamConnections: Map<String, TeamConnectionUiState> = emptyMap()
+    val teamConnections: Map<String, TeamConnectionFormState> = emptyMap()
 )
 
 /**

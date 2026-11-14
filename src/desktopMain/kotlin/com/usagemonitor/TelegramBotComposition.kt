@@ -104,7 +104,7 @@ private fun createTelegramBotService(
         ),
         teamClockOffsetMillis = { graph.teamServerClockOffset.offsetMillis },
         // Só a pronta (baixada e com SHA-256 conferido): a só "disponível" não tem o que instalar.
-        readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Ready)?.update?.version },
+        readyUpdate = { (dashboard.appUpdateState.value as? AppUpdateUiState.Downloaded)?.update?.version },
         applyUpdate = { dashboard.restartAndUpdateNow() },
         appReady = { graph.appAnchored.first { anchored -> anchored } },
         releaseNotes = { version, previous -> GetReleaseNotesUseCase(graph.appUpdateRepository)(version, previous) },

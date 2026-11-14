@@ -97,7 +97,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
 
             assertEquals(1, installer.prepareCalls)
             val state = viewModel.appUpdateState.value
-            assertIs<AppUpdateUiState.Ready>(state)
+            assertIs<AppUpdateUiState.Downloaded>(state)
             assertEquals("7.1.0", state.update.version)
         } finally {
             viewModel.onDestroy()
@@ -185,7 +185,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             runCurrent()
 
             assertEquals(1, installer.prepareCalls)
-            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+            assertIs<AppUpdateUiState.Downloaded>(viewModel.appUpdateState.value)
         } finally {
             viewModel.onDestroy()
         }
@@ -276,7 +276,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             runCurrent()
 
             assertEquals(2, installer.prepareCalls)
-            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+            assertIs<AppUpdateUiState.Downloaded>(viewModel.appUpdateState.value)
         } finally {
             viewModel.onDestroy()
         }
@@ -316,7 +316,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
 
         try {
             runCurrent()
-            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+            assertIs<AppUpdateUiState.Downloaded>(viewModel.appUpdateState.value)
 
             enabled.value = false
             runCurrent()
@@ -350,7 +350,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             enabled.value = true
             runCurrent()
 
-            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+            assertIs<AppUpdateUiState.Downloaded>(viewModel.appUpdateState.value)
             viewModel.scheduleUpdateOnExit()
             assertEquals(1, installer.scheduleCalls)
         } finally {
@@ -516,7 +516,7 @@ class DashboardViewModelAutoUpdateTest : DashboardViewModelTestSupport() {
             runCurrent()
 
             assertEquals(1, installer.prepareCalls)
-            assertIs<AppUpdateUiState.Ready>(viewModel.appUpdateState.value)
+            assertIs<AppUpdateUiState.Downloaded>(viewModel.appUpdateState.value)
         } finally {
             viewModel.onDestroy()
         }

@@ -34,7 +34,7 @@ sealed interface AppUpdateUiState {
     ) : AppUpdateUiState
 
     /** Baixada e conferida. Será aplicada ao fechar o app. */
-    data class Ready(override val update: AppUpdateInfo) : AppUpdateUiState
+    data class Downloaded(override val update: AppUpdateInfo) : AppUpdateUiState
 
     /**
      * A tentativa falhou. A versão instalada continua intacta — a faixa oferece

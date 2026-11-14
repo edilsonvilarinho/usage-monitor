@@ -244,6 +244,54 @@ class ArchitectureRulesTest {
     }
 
     /**
+     * `UiState` de produção é `sealed interface` (`Loading`/`Success`/`Error`), nunca
+     * `data class` (A06, issue #598). Estado de formulário com esse sufixo leva `FormState`.
+     */
+    @Test
+    fun `UiState de presentation nao e data class`() {
+        val violations = sources
+            .filter { source -> source.path.contains(PRESENTATION_SEGMENT) }
+            .flatMap { source ->
+                UI_STATE_DATA_CLASS.findAll(stripCommentsAndStrings(source.text))
+                    .map { match -> "${source.path}: ${match.value}" }
+                    .toList()
+            }
+        if (violations.isNotEmpty()) {
+            fail("data class com sufixo UiState (estado de formulário usa FormState):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    /** Nenhum subtipo de `sealed interface *UiState` se chama `Ready` (A06, issue #598). */
+    @Test
+    fun `subtipo de UiState nao se chama Ready`() {
+        val violations = sources
+            .filter { source -> source.path.contains(PRESENTATION_SEGMENT) }
+            .flatMap { source -> readySubtypesOfUiState(source.text).map { name -> "${source.path}: $name" } }
+        if (violations.isNotEmpty()) {
+            fail("subtipo Ready em sealed interface *UiState (use Success ou o nome do estado):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o padrao de UiState pega data class e Ready e ignora o resto`() {
+        assertTrue(UI_STATE_DATA_CLASS.containsMatchIn("data class SampleUiState("))
+        assertFalse(UI_STATE_DATA_CLASS.containsMatchIn("data class SampleFormState("))
+        assertFalse(UI_STATE_DATA_CLASS.containsMatchIn("sealed interface SampleUiState {"))
+        assertEquals(
+            listOf("SampleUiState.Ready"),
+            readySubtypesOfUiState("sealed interface SampleUiState {\n    data class Ready(val x: Int) : SampleUiState\n}")
+        )
+        assertEquals(
+            emptyList<String>(),
+            readySubtypesOfUiState("sealed interface SampleUiState {\n    data class Success(val x: Int) : SampleUiState\n}")
+        )
+        assertEquals(
+            emptyList<String>(),
+            readySubtypesOfUiState("data class Ready(val x: Int)")
+        )
+    }
+
+    /**
      * Texto PT/EN repetido em cada tela divergiu (nove traduções inconsistentes
      * na auditoria do plano `boas-praticas-377`). Texto novo passa por
      * `localized(language, pt, en)` ou por um objeto de rótulos existente
@@ -524,6 +572,49 @@ class ArchitectureRulesTest {
 
         /** Única pasta de produção que chama `Surface(`: as primitivas do design system (A05, #598). */
         const val SURFACE_OWNER_SEGMENT = "/presentation/ui/components/"
+
+        /** Pasta de apresentação de produção, para as regras de nome de `UiState` (A06). */
+        const val PRESENTATION_SEGMENT = "/presentation/"
+
+        /** `data class` com sufixo `UiState`: estado de formulário, que leva `FormState` (A06). */
+        val UI_STATE_DATA_CLASS = Regex("""\bdata\s+class\s+\w+UiState\b""")
+
+        /** `sealed interface` cujo nome termina em `UiState`; o nome vai no primeiro grupo (A06). */
+        val SEALED_UI_STATE = Regex("""\bsealed\s+interface\s+(\w+UiState)\b""")
+
+        /** Declaração de subtipo `Ready`: `class Ready` ou `object Ready` (A06). */
+        val READY_SUBTYPE = Regex("""\b(?:class|object)\s+Ready\b""")
+
+        /**
+         * Subtipos `Ready` dentro de cada `sealed interface \w+UiState` do código, no formato
+         * `Interface.Ready`. Lê o código sem comentários nem strings e corta no `}` que fecha a interface.
+         */
+        fun readySubtypesOfUiState(source: String): List<String> {
+            val code = stripCommentsAndStrings(source)
+            return SEALED_UI_STATE.findAll(code).flatMap { match ->
+                val open = code.indexOf('{', match.range.last)
+                val close = closingBraceOf(code, open)
+                if (open < 0 || close == null) {
+                    emptyList()
+                } else {
+                    READY_SUBTYPE.findAll(code.substring(open, close)).map { "${match.groupValues[1]}.Ready" }.toList()
+                }
+            }.toList()
+        }
+
+        /** Posição do `}` que fecha o `{` em [open], ou `null` se o bloco não fecha. */
+        private fun closingBraceOf(code: String, open: Int): Int? {
+            if (open < 0) return null
+            var depth = 0
+            for (index in open until code.length) {
+                if (code[index] == '{') depth++
+                if (code[index] == '}') {
+                    depth--
+                    if (depth == 0) return index
+                }
+            }
+            return null
+        }
 
         val DESKTOP_MAIN_DIRECTORY = "src/desktopMain/kotlin/com/usagemonitor/"
 

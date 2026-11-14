@@ -53,7 +53,7 @@ class AppUpdateBannerTest {
         val states = listOf(
             AppUpdateUiState.Available(update),
             AppUpdateUiState.Downloading(update, percent = 42),
-            AppUpdateUiState.Ready(update),
+            AppUpdateUiState.Downloaded(update),
             AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD)
         )
 
@@ -122,7 +122,7 @@ class AppUpdateBannerTest {
     @Test
     fun `the action is a button and the strip itself is not clickable`() = runDesktopComposeUiTest {
         var restarted = false
-        showBanner(state = AppUpdateUiState.Ready(update), onRestartAndUpdate = { restarted = true })
+        showBanner(state = AppUpdateUiState.Downloaded(update), onRestartAndUpdate = { restarted = true })
 
         onNodeWithTag(APP_UPDATE_BANNER_TAG).assertHasNoClickAction()
         onNodeWithTag(APP_UPDATE_BANNER_ACTION_TAG)
@@ -144,7 +144,7 @@ class AppUpdateBannerTest {
             AppUpdateUiState.Available(update),
             AppUpdateUiState.Downloading(update, percent = 42),
             AppUpdateUiState.Downloading(update, percent = null),
-            AppUpdateUiState.Ready(update),
+            AppUpdateUiState.Downloaded(update),
             AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD),
             AppUpdateUiState.Failed(update, AppUpdateFailureReason.SCHEDULE)
         )
@@ -171,7 +171,7 @@ class AppUpdateBannerTest {
             AppUpdateUiState.Available(beta),
             AppUpdateUiState.Downloading(beta, percent = 42),
             AppUpdateUiState.Downloading(beta, percent = null),
-            AppUpdateUiState.Ready(beta),
+            AppUpdateUiState.Downloaded(beta),
             AppUpdateUiState.Failed(beta, AppUpdateFailureReason.DOWNLOAD),
             AppUpdateUiState.Failed(beta, AppUpdateFailureReason.SCHEDULE)
         )
@@ -201,7 +201,7 @@ class AppUpdateBannerTest {
     fun `a stable update keeps its wording`() {
         assertEquals("Nova versão 38.0.0 disponível", updateBannerContent(AppUpdateUiState.Available(update), AppLanguage.PT).title)
         assertEquals("Version 38.0.0 is available", updateBannerContent(AppUpdateUiState.Available(update), AppLanguage.EN).title)
-        assertEquals("Version 38.0.0 ready", updateBannerContent(AppUpdateUiState.Ready(update), AppLanguage.EN).headline)
+        assertEquals("Version 38.0.0 ready", updateBannerContent(AppUpdateUiState.Downloaded(update), AppLanguage.EN).headline)
         assertEquals(
             "Could not download version 38.0.0",
             updateBannerContent(AppUpdateUiState.Failed(update, AppUpdateFailureReason.DOWNLOAD), AppLanguage.EN).title
@@ -213,7 +213,7 @@ class AppUpdateBannerTest {
         var opened = false
         var restarted = false
         showBanner(
-            state = AppUpdateUiState.Ready(update),
+            state = AppUpdateUiState.Downloaded(update),
             onOpenRelease = { opened = true },
             onRestartAndUpdate = { restarted = true }
         )
@@ -255,7 +255,7 @@ class AppUpdateBannerTest {
             ScreenTestTheme(isDark = true) {
                 Box(modifier = Modifier.width(640.dp)) {
                     AppUpdateBanner(
-                        state = AppUpdateUiState.Ready(update),
+                        state = AppUpdateUiState.Downloaded(update),
                         language = AppLanguage.EN,
                         onOpenRelease = {},
                         onRestartAndUpdate = {}

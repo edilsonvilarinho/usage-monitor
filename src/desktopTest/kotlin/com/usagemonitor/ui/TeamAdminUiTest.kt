@@ -45,7 +45,7 @@ import com.usagemonitor.presentation.ui.components.AnthropicProfileUiStatus
 import com.usagemonitor.presentation.ui.components.TEAM_ADMIN_VALIDATE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_PROFILE_REJECTION_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TEAM_SYNC_STATUS_TEST_TAG
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.viewmodel.TeamKeysUiState
 import com.usagemonitor.presentation.ui.TeamCredentialKind
@@ -142,7 +142,7 @@ class TeamAdminSectionTest {
     fun `teste de conexao classificado mostra o caminho completo`() = runDesktopComposeUiTest {
         renderSection(
             settings = TeamIntegrationSettings(enabled = true, serverUrl = "https://time.local", apiKey = "chave"),
-            connection = TeamConnectionUiState(
+            connection = TeamConnectionFormState(
                 status = TeamConnectionUiStatus.FAILED,
                 message = "(certificate_expired) PKIX path validation failed:",
                 failure = TeamConnectionFailure(stage = TeamConnectionStage.CERTIFICATE, certificateProblem = TeamCertificateProblem.EXPIRED)
@@ -161,7 +161,7 @@ class TeamAdminSectionTest {
     fun `validacao do token classificada nomeia o token admin`() = runDesktopComposeUiTest {
         renderSection(
             settings = TeamIntegrationSettings(enabled = true, serverUrl = "https://time.local", adminToken = "tok"),
-            adminConnection = TeamConnectionUiState(
+            adminConnection = TeamConnectionFormState(
                 status = TeamConnectionUiStatus.FAILED,
                 message = "lab.example",
                 failure = TeamConnectionFailure(stage = TeamConnectionStage.ADDRESS),
@@ -248,8 +248,8 @@ class TeamAdminSectionTest {
         syncFailureMessage: String? = null,
         profiles: List<AnthropicProfileUiModel> = emptyList(),
         rejectedProfiles: Map<String, String> = emptyMap(),
-        connection: TeamConnectionUiState = TeamConnectionUiState(),
-        adminConnection: TeamConnectionUiState = TeamConnectionUiState()
+        connection: TeamConnectionFormState = TeamConnectionFormState(),
+        adminConnection: TeamConnectionFormState = TeamConnectionFormState()
     ) {
         setContent {
             ScreenTestTheme(isDark = true) {

@@ -184,7 +184,7 @@ class HudNotchTextFitTest {
                 AppUpdateUiState.Available(info),
                 AppUpdateUiState.Downloading(info, percent = 100),
                 AppUpdateUiState.Downloading(info, percent = null),
-                AppUpdateUiState.Ready(info),
+                AppUpdateUiState.Downloaded(info),
                 AppUpdateUiState.Failed(info, AppUpdateFailureReason.DOWNLOAD),
                 AppUpdateUiState.Failed(info, AppUpdateFailureReason.SCHEDULE)
             )

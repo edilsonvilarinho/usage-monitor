@@ -428,7 +428,7 @@ sealed interface TeamSessionDetailUiState {
         val failure: TeamConnectionFailure? = null
     ) : TeamSessionDetailUiState
 
-    data class Ready(
+    data class Success(
         override val deviceId: String,
         override val sessionId: String,
         override val accountKey: String? = null,

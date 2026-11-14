@@ -7,11 +7,11 @@ import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.entity.UsageAlertSettings
-import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
+import com.usagemonitor.presentation.ui.components.ProxyConnectionFormState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.theme.AccountAccent
 import com.usagemonitor.presentation.ui.theme.AccountEmoji
@@ -293,16 +293,16 @@ class SettingsActionsTest {
 
     @Test
     fun `changing the server or turning the team on clears a stale check`() {
-        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionFormState(TeamConnectionUiStatus.OK, "velho"))
 
         actions.changeTeamEnabled(true)
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(TeamConnectionFormState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_INTEGRATION), lastToast)
 
-        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionFormState(TeamConnectionUiStatus.OK, "velho"))
         actions.changeTeamServerUrl(TeamIntegrations.LEGACY_TEAM_ID, "https://team.example")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(TeamConnectionFormState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals("https://team.example", store.teamSettingsDataSource.load().serverUrl)
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_SERVER), lastToast)
     }
@@ -344,11 +344,11 @@ class SettingsActionsTest {
     @Test
     fun `a team key that cannot be written is not checked`() {
         blockWrites("team.json")
-        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionFormState(TeamConnectionUiStatus.OK, "velho"))
 
         actions.changeTeamApiKey(TeamIntegrations.LEGACY_TEAM_ID, "key-1")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(TeamConnectionFormState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(0, harness.teamSyncs)
         assertEquals(SettingsToast.SaveFailed(SettingsField.TEAM_KEY), lastToast)
         assertTrue(harness.breadcrumbs.messages.any { message -> message.contains("salvar configuração TEAM_KEY") })
@@ -408,11 +408,11 @@ class SettingsActionsTest {
     @Test
     fun `an account key that cannot be written is not checked`() {
         blockWrites("team.json")
-        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionFormState(TeamConnectionUiStatus.OK, "velho"))
 
         actions.changeTeamAccountKey(TeamIntegrations.LEGACY_TEAM_ID, "default", "chave-conta")
 
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(TeamConnectionFormState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(0, harness.teamSyncs)
         assertEquals(SettingsToast.SaveFailed(SettingsField.TEAM_KEY), lastToast)
     }
@@ -436,12 +436,12 @@ class SettingsActionsTest {
         harness.settle()
         assertEquals(setOf("default"), store.teamSettingsFlow.value.participatingProfileIds)
         assertEquals(TeamConnectionUiStatus.OK, harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID).status)
-        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState())
+        harness.feedback.setTeamConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionFormState())
 
         actions.changeTeamProfileParticipation(TeamIntegrations.LEGACY_TEAM_ID, "default", participates = false)
 
         assertTrue(store.teamSettingsFlow.value.participatingProfileIds.isEmpty())
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(TeamConnectionFormState(), harness.feedback.teamConnection(TeamIntegrations.LEGACY_TEAM_ID))
         assertEquals(SettingsToast.Saved(SettingsField.TEAM_ACCOUNTS), lastToast)
     }
 
@@ -518,10 +518,10 @@ class SettingsActionsTest {
 
     @Test
     fun `admin mode is entered by token, opens the keys and exits clearing it`() {
-        harness.feedback.setTeamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionUiState(TeamConnectionUiStatus.OK, "velho"))
+        harness.feedback.setTeamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID, TeamConnectionFormState(TeamConnectionUiStatus.OK, "velho"))
         actions.changeTeamAdminToken(TeamIntegrations.LEGACY_TEAM_ID, "adm")
         assertEquals("adm", store.teamSettingsFlow.value.adminToken)
-        assertEquals(TeamConnectionUiState(), harness.feedback.teamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID))
+        assertEquals(TeamConnectionFormState(), harness.feedback.teamAdminConnection(TeamIntegrations.LEGACY_TEAM_ID))
 
         actions.openTeamKeysManager(TeamIntegrations.LEGACY_TEAM_ID)
         assertTrue(harness.modal.isTeamKeysOpen)
@@ -536,14 +536,14 @@ class SettingsActionsTest {
 
     @Test
     fun `proxy address changes clear the check and credentials do not`() {
-        val checked = ProxyConnectionUiState(ProxyConnectionUiStatus.OK, "ok")
+        val checked = ProxyConnectionFormState(ProxyConnectionUiStatus.OK, "ok")
         harness.feedback.proxyConnection = checked
         actions.changeProxyUsername("user")
         actions.changeProxyPassword("secret")
         assertEquals(checked, harness.feedback.proxyConnection)
 
         actions.changeProxyHost("proxy.local")
-        assertEquals(ProxyConnectionUiState(), harness.feedback.proxyConnection)
+        assertEquals(ProxyConnectionFormState(), harness.feedback.proxyConnection)
         actions.changeProxyPort("abc")
         assertEquals(0, store.proxySettingsFlow.value.port)
         actions.changeProxyPort("3128")

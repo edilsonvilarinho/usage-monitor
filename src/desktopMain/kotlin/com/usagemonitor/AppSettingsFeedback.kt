@@ -19,13 +19,13 @@ import com.usagemonitor.domain.entity.TeamKeyVerification
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.TeamUsageRepository
 import com.usagemonitor.presentation.ui.components.ApiKeyCheckStatus
-import com.usagemonitor.presentation.ui.components.ApiKeyCheckUiState
-import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
+import com.usagemonitor.presentation.ui.components.ApiKeyCheckFormState
+import com.usagemonitor.presentation.ui.components.ProxyConnectionFormState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsField
 import com.usagemonitor.presentation.ui.components.SettingsToast
 import com.usagemonitor.presentation.ui.components.SettingsToastEvent
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.apiKeyCheckResult
 import com.usagemonitor.presentation.viewmodel.recordFailure
@@ -71,18 +71,18 @@ internal class AppSettingsFeedback(
     private var toastGeneration = 0
 
     // Resultado por time: um time nunca apaga o retorno de outro.
-    private val teamConnections = mutableStateMapOf<String, TeamConnectionUiState>()
-    private val teamAdminConnections = mutableStateMapOf<String, TeamConnectionUiState>()
+    private val teamConnections = mutableStateMapOf<String, TeamConnectionFormState>()
+    private val teamAdminConnections = mutableStateMapOf<String, TeamConnectionFormState>()
 
-    fun teamConnection(teamId: String): TeamConnectionUiState = teamConnections[teamId] ?: TeamConnectionUiState()
+    fun teamConnection(teamId: String): TeamConnectionFormState = teamConnections[teamId] ?: TeamConnectionFormState()
 
-    fun teamAdminConnection(teamId: String): TeamConnectionUiState = teamAdminConnections[teamId] ?: TeamConnectionUiState()
+    fun teamAdminConnection(teamId: String): TeamConnectionFormState = teamAdminConnections[teamId] ?: TeamConnectionFormState()
 
-    fun setTeamConnection(teamId: String, state: TeamConnectionUiState) {
+    fun setTeamConnection(teamId: String, state: TeamConnectionFormState) {
         teamConnections[teamId] = state
     }
 
-    fun setTeamAdminConnection(teamId: String, state: TeamConnectionUiState) {
+    fun setTeamAdminConnection(teamId: String, state: TeamConnectionFormState) {
         teamAdminConnections[teamId] = state
     }
 
@@ -97,8 +97,8 @@ internal class AppSettingsFeedback(
     fun clearTeamAdminConnection(teamId: String) {
         teamAdminConnections.remove(teamId)
     }
-    var proxyConnection by mutableStateOf(ProxyConnectionUiState())
-    var apiKeyCheck by mutableStateOf(ApiKeyCheckUiState())
+    var proxyConnection by mutableStateOf(ProxyConnectionFormState())
+    var apiKeyCheck by mutableStateOf(ApiKeyCheckFormState())
 
     fun showToast(toast: SettingsToast) {
         toastGeneration += 1
@@ -125,7 +125,7 @@ internal class AppSettingsFeedback(
      */
     fun checkProxyConnection() {
         val manualProxy = resolveEffectiveProxy(store.proxySettingsFlow.value.copy(useEnvironmentProxy = false))
-        proxyConnection = ProxyConnectionUiState(ProxyConnectionUiStatus.CHECKING)
+        proxyConnection = ProxyConnectionFormState(ProxyConnectionUiStatus.CHECKING)
         scope.launch {
             val result = Result.runCatching {
                 val testClient = httpClientFactory(manualProxy)
@@ -138,13 +138,13 @@ internal class AppSettingsFeedback(
             proxyConnection = result.fold(
                 onSuccess = { response ->
                     if (response.status.isSuccess()) {
-                        ProxyConnectionUiState(
+                        ProxyConnectionFormState(
                             status = ProxyConnectionUiStatus.OK,
                             message = pick("Conexão OK.", "Connection OK.")
                         )
                     } else {
                         breadcrumbs.recordFailure("testar conexão do proxy", "HTTP ${response.status.value}")
-                        ProxyConnectionUiState(
+                        ProxyConnectionFormState(
                             status = ProxyConnectionUiStatus.FAILED,
                             message = "HTTP ${response.status.value}"
                         )
@@ -152,7 +152,7 @@ internal class AppSettingsFeedback(
                 },
                 onFailure = { error ->
                     breadcrumbs.recordFailure("testar conexão do proxy", error)
-                    ProxyConnectionUiState(
+                    ProxyConnectionFormState(
                         status = ProxyConnectionUiStatus.FAILED,
                         message = error.message ?: pick("Falha desconhecida.", "Unknown failure.")
                     )
@@ -180,7 +180,7 @@ internal class AppSettingsFeedback(
         val apiKey = candidateKey.takeIf { key -> key.isNotBlank() }
             ?: store.apiKeySettings.value.forSource(source).orEmpty()
         val proxy = resolveEffectiveProxy(store.proxySettingsFlow.value)
-        apiKeyCheck = ApiKeyCheckUiState(status = ApiKeyCheckStatus.CHECKING)
+        apiKeyCheck = ApiKeyCheckFormState(status = ApiKeyCheckStatus.CHECKING)
         scope.launch {
             val result = runCatching {
                 val testClient = httpClientFactory(proxy)
@@ -202,7 +202,7 @@ internal class AppSettingsFeedback(
     }
 
     fun resetApiKeyCheck() {
-        apiKeyCheck = ApiKeyCheckUiState()
+        apiKeyCheck = ApiKeyCheckFormState()
     }
 
     /**
@@ -214,14 +214,14 @@ internal class AppSettingsFeedback(
      * configuração correta. Agora o alvo é real, e o erro aponta qual conta falhou.
      */
     fun checkTeamConnection(teamId: String) {
-        setTeamConnection(teamId, TeamConnectionUiState(TeamConnectionUiStatus.CHECKING))
+        setTeamConnection(teamId, TeamConnectionFormState(TeamConnectionUiStatus.CHECKING))
         scope.launch {
             val healthError = teamUsageRepositoryFor(teamId).checkConnection().exceptionOrNull()
             if (healthError != null) {
                 breadcrumbs.recordFailure("testar conexão do time", healthError)
                 setTeamConnection(
                     teamId,
-                    TeamConnectionUiState(
+                    TeamConnectionFormState(
                         status = TeamConnectionUiStatus.FAILED,
                         message = healthError.message ?: pick("Falha desconhecida.", "Unknown failure."),
                         failure = teamConnectionFailureOf(healthError)
@@ -232,7 +232,7 @@ internal class AppSettingsFeedback(
 
             val current = store.teamIntegrationsFlow.value.team(teamId)
             if (current == null) {
-                setTeamConnection(teamId, TeamConnectionUiState())
+                setTeamConnection(teamId, TeamConnectionFormState())
                 return@launch
             }
             val targets = buildTeamSyncTargets(store.profileRegistry)
@@ -240,7 +240,7 @@ internal class AppSettingsFeedback(
             if (targets.isEmpty()) {
                 setTeamConnection(
                     teamId,
-                    TeamConnectionUiState(
+                    TeamConnectionFormState(
                         status = TeamConnectionUiStatus.OK,
                         message = pick(
                             "Servidor OK. Marque uma conta para conferir a chave.",
@@ -287,7 +287,7 @@ internal class AppSettingsFeedback(
             setTeamConnection(
                 teamId,
                 if (failures.isEmpty()) {
-                    TeamConnectionUiState(
+                    TeamConnectionFormState(
                         status = TeamConnectionUiStatus.OK,
                         message = pick(
                             "Conexão OK e conta vinculada a esta chave.",
@@ -295,7 +295,7 @@ internal class AppSettingsFeedback(
                         )
                     )
                 } else {
-                    TeamConnectionUiState(
+                    TeamConnectionFormState(
                         status = TeamConnectionUiStatus.FAILED,
                         message = failures.joinToString(" • "),
                         failure = unreachable
@@ -306,16 +306,16 @@ internal class AppSettingsFeedback(
     }
 
     fun validateAdminToken(teamId: String) {
-        setTeamAdminConnection(teamId, TeamConnectionUiState(TeamConnectionUiStatus.CHECKING))
+        setTeamAdminConnection(teamId, TeamConnectionFormState(TeamConnectionUiStatus.CHECKING))
         scope.launch {
             val error = validateAdminTokenWithServer(teamId).exceptionOrNull()
             setTeamAdminConnection(
                 teamId,
                 if (error == null) {
-                    TeamConnectionUiState(status = TeamConnectionUiStatus.OK, message = pick("Token válido.", "Token is valid."))
+                    TeamConnectionFormState(status = TeamConnectionUiStatus.OK, message = pick("Token válido.", "Token is valid."))
                 } else {
                     breadcrumbs.recordFailure("validar token administrativo do time", error)
-                    TeamConnectionUiState(
+                    TeamConnectionFormState(
                         status = TeamConnectionUiStatus.FAILED,
                         message = error.message ?: pick("Falha desconhecida.", "Unknown failure."),
                         failure = teamConnectionFailureOf(error),
