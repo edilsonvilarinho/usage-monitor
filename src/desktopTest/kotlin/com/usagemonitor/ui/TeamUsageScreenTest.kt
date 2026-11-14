@@ -27,8 +27,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.hasScrollToKeyAction
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
@@ -1227,7 +1227,11 @@ class TeamUsageScreenTest {
                 height = 700.dp
             )
             val headerTag = TEAM_MEMBER_SESSION_HEADER_TAG_PREFIX + "device-2"
-            scrollUntilRowAtTop(headerTag, cliSessionRowTag("a29"))
+            val rowTag = cliSessionRowTag("a29")
+            // Posicionamento pela âncora do próprio LazyColumn (#594): a roda do mouse é despachada por
+            // corrotina com timeout de 50 ms em tempo real e, no CI, rolava depois da cena fechada.
+            onNode(hasScrollToKeyAction()).performScrollToKey("device-1:a29")
+            assertTrue(rowAtTopEdge(headerTag, rowTag), "a linha a29 não chegou ao topo da lista")
 
             onNode(hasText(CliSessionsLabels.columnCost(AppLanguage.PT)) and hasAnyAncestor(hasTestTag(headerTag)))
                 .performClick()
@@ -1235,17 +1239,6 @@ class TeamUsageScreenTest {
             // Ordem nova do bloco de maria: o maior custo (b11) primeiro, logo abaixo do cabeçalho.
             onNodeWithTag(cliSessionRowTag("b11"), useUnmergedTree = true).assertIsDisplayed()
         }
-
-    /**
-     * Rola para baixo até a última sessão de A ser a primeira linha visível, com o cabeçalho de B logo abaixo.
-     */
-    private fun ComposeUiTest.scrollUntilRowAtTop(headerTag: String, rowTag: String) {
-        repeat(600) {
-            if (rowAtTopEdge(headerTag, rowTag)) return
-            onRoot().performMouseInput { moveTo(center); scroll(1f) }
-        }
-        assertTrue(rowAtTopEdge(headerTag, rowTag), "a linha nunca chegou ao topo da lista")
-    }
 
     /** Linha com o topo na borda de cima da lista (nenhuma linha acima dela visível) e cabeçalho logo abaixo. */
     private fun ComposeUiTest.rowAtTopEdge(headerTag: String, rowTag: String): Boolean {

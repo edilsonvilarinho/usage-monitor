@@ -45,6 +45,8 @@ Tornar o teste determinístico sem mudar o que ele afirma (#577: ordenar o bloco
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (documento) | plano revisado contra os runs e a fonte citados |
+| A02 | vermelho: chave temporária `device-1:zz`, `gradlew.bat desktopTest --tests "com.usagemonitor.ui.TeamUsageScreenTest" --rerun` | `IllegalArgumentException: Failed to scroll to the item identified by "device-1:zz", couldn't find the key.` (`TeamUsageScreenTest.kt:1234`) — prova que o teste depende do posicionamento por chave; a corrida em si não reproduz localmente |
+| A02 | verde: chave `device-1:a29`, mesmo comando | `BUILD SUCCESSFUL`, 61 testes, 0 falhas; precondição `rowAtTopEdge` aprovada; zero `performMouseInput`/`scroll(` no arquivo |
 
 ## Problemas em aberto e riscos
 
