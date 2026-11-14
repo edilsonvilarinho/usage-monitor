@@ -280,7 +280,7 @@ internal fun HudNotch(
                     )
                     .semantics { contentDescription = HUD_NOTCH_DESCRIPTION }
             ) {
-                HudStarfieldCanvas(wells = { hudStarfieldWells(ringItemBounds.rings()) }, forbidden = { hudStarfieldForbidden(ringItemBounds.boxes, ringItemBounds.rings()) }, modifier = Modifier.matchParentSize().clip(shape))
+                HudStarfieldCanvas(rings = { ringItemBounds.rings() }, running = { hudStarRunningRings(currentAccounts) }, forbidden = { hudStarfieldForbidden(ringItemBounds.boxes, ringItemBounds.rings()) }, modifier = Modifier.matchParentSize().clip(shape))
                 HudRingStrip(
                     accounts = accounts,
                     edge = edge,

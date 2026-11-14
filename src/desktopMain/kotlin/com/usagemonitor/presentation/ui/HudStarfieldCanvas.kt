@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
@@ -46,12 +47,14 @@ internal val HUD_STARFIELD_CAPTURE_COUNT = SemanticsPropertyKey<Int>("HudStarfie
 
 /**
  * Campo estelar atrás dos anéis (#586). Tempo avança só com `continuous && !reduced`; senão quadro fixo em t = 0.
- * [wells] são os poços (um por anel medido) e [forbidden] as caixas proibidas, ambos lidos no desenho.
+ * [rings] são os anéis medidos pelo índice da conta, [running] os índices em execução (#592 A05: cada um vira
+ * janela de atividade no quadro em que ligou/desligou) e [forbidden] as caixas proibidas; tudo lido no desenho.
  * No claro o alfa é o da L1 por camada; no escuro é o da AT1. Fade de borda e caixa multiplicam nos dois.
  */
 @Composable
 internal fun HudStarfieldCanvas(
-    wells: () -> List<HudStarfieldWell>,
+    rings: () -> Map<Int, Rect>,
+    running: () -> Set<Int>,
     forbidden: () -> List<HudStarfieldBox>,
     modifier: Modifier = Modifier
 ) {
@@ -59,12 +62,17 @@ internal fun HudStarfieldCanvas(
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val live = policy.continuous && !policy.reduced
     var timeMs by remember { mutableLongStateOf(0L) }
+    var windows by remember { mutableStateOf<Map<Int, HudStarActivityWindow>>(emptyMap()) }
     LaunchedEffect(live) {
         if (!live) {
             timeMs = 0L
+            windows = emptyMap()
         } else {
             while (true) {
-                withFrameMillis { frameTime -> timeMs = frameTime }
+                withFrameMillis { frameTime ->
+                    timeMs = frameTime
+                    windows = hudStarActivityStep(windows, running(), frameTime)
+                }
             }
         }
     }
@@ -72,15 +80,16 @@ internal fun HudStarfieldCanvas(
         modifier
             .testTag(HUD_STARFIELD_TEST_TAG)
             .semantics {
-                set(HUD_STARFIELD_WELLS, wells())
-                set(HUD_STARFIELD_CAPTURE_COUNT, if (live) hudStarCaptures(timeMs, wells(), forbidden()).size else 0)
+                val wellList = hudStarfieldWells(rings(), windows)
+                set(HUD_STARFIELD_WELLS, wellList)
+                set(HUD_STARFIELD_CAPTURE_COUNT, if (live) hudStarCaptures(timeMs, wellList, forbidden()).size else 0)
             }
             .drawWithCache {
                 val width = size.width
                 val height = size.height
                 onDrawBehind {
                     val boxes = forbidden()
-                    val wellList = wells()
+                    val wellList = hudStarfieldWells(rings(), windows)
                     val captures = if (live) hudStarCaptures(timeMs, wellList, boxes) else emptyList()
                     val captureInk = hudStarfieldInk(dark, HudStarfieldLayer.NEAR, gold = false).color
                     for (capture in captures) drawStarCapture(capture, captureInk, dark)
@@ -110,9 +119,56 @@ internal fun HudStarfieldCanvas(
     )
 }
 
-/** Poços: um por anel medido, no centro do Rect e com raio = metade da largura (#586 A03). */
-internal fun hudStarfieldWells(rings: Map<Int, Rect>): List<HudStarfieldWell> =
-    rings.toSortedMap().values.map { ring -> HudStarfieldWell(ring.center.x, ring.center.y, ring.width / 2f) }
+/**
+ * Poços: um por anel medido, no centro do Rect e com raio = metade da largura (#586 A03).
+ * A janela de atividade vai junto pelo índice do anel (#592 A05); anel sem janela fica ocioso.
+ */
+internal fun hudStarfieldWells(
+    rings: Map<Int, Rect>,
+    windows: Map<Int, HudStarActivityWindow> = emptyMap()
+): List<HudStarfieldWell> =
+    rings.toSortedMap().map { (index, ring) ->
+        val window = windows[index]
+        HudStarfieldWell(
+            ring.center.x,
+            ring.center.y,
+            ring.width / 2f,
+            activeSinceMs = window?.sinceMs,
+            activeUntilMs = window?.untilMs
+        )
+    }
+
+/** Janela de atividade de um anel (#592 A05): `sinceMs` é o quadro em que ligou, `untilMs` o em que desligou (nulo enquanto roda). */
+internal data class HudStarActivityWindow(val sinceMs: Long, val untilMs: Long?)
+
+/**
+ * Transição pura de um anel (#592 A05): ligar abre janela no quadro `t`; desligar fecha a aberta em `t`;
+ * religar depois de desligar abre outra janela. Sem mudança de estado, a janela fica como está.
+ */
+internal fun hudStarActivityWindowStep(previous: HudStarActivityWindow?, running: Boolean, t: Long): HudStarActivityWindow? {
+    val open = previous != null && previous.untilMs == null
+    if (running) return if (previous != null && open) previous else HudStarActivityWindow(t, null)
+    if (previous != null && open) return previous.copy(untilMs = t)
+    return previous
+}
+
+/** Passo do quadro para todos os anéis: anel sem janela e fora da execução não entra no mapa (#592 A05). */
+internal fun hudStarActivityStep(
+    previous: Map<Int, HudStarActivityWindow>,
+    running: Set<Int>,
+    t: Long
+): Map<Int, HudStarActivityWindow> {
+    val next = mutableMapOf<Int, HudStarActivityWindow>()
+    for (index in previous.keys + running) {
+        val window = hudStarActivityWindowStep(previous[index], index in running, t)
+        if (window != null) next[index] = window
+    }
+    return next
+}
+
+/** Índices (ordem da conta = índice do anel em `ringItemBounds.rings()`) das contas com sessão ativa (#592 A05). */
+internal fun hudStarRunningRings(accounts: List<HudAccount>): Set<Int> =
+    accounts.indices.filter { accounts[it].sessionActive }.toSet()
 
 /** Caixas proibidas: a caixa do item menos o recorte do anel dele; item sem anel medido fica inteiro. */
 internal fun hudStarfieldForbidden(items: Map<Int, Rect>, rings: Map<Int, Rect>): List<HudStarfieldBox> =
