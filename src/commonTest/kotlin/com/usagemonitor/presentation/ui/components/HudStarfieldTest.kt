@@ -30,13 +30,19 @@ class HudStarfieldTest {
 
     private fun frame(timeMs: Long) = hudStarfieldFrame(timeMs, width, height, wells, forbidden)
 
+    /** #592 A02: velocidade ×4 (12/6/2 dp/s). */
     private fun speedOf(layer: HudStarfieldLayer): Float = when (layer) {
-        HudStarfieldLayer.NEAR -> 3f
-        HudStarfieldLayer.MID -> 1.5f
-        HudStarfieldLayer.FAR -> 0.5f
+        HudStarfieldLayer.NEAR -> 12f
+        HudStarfieldLayer.MID -> 6f
+        HudStarfieldLayer.FAR -> 2f
     }
 
-    private fun tileOf(layer: HudStarfieldLayer): Float = speedOf(layer) * 240f
+    /** #592 A02: ladrilho fixo (720/360/120 dp), independente da velocidade. */
+    private fun tileOf(layer: HudStarfieldLayer): Float = when (layer) {
+        HudStarfieldLayer.NEAR -> 720f
+        HudStarfieldLayer.MID -> 360f
+        HudStarfieldLayer.FAR -> 120f
+    }
 
     private fun distance(x: Float, y: Float, well: HudStarfieldWell): Float {
         val dx = x - well.centerX
@@ -121,7 +127,15 @@ class HudStarfieldTest {
     }
 
     @Test
-    fun `o deslocamento em 1 s longe de poco e 3, 1,5 e 0,5 dp por camada`() {
+    fun `o ladrilho e fixo em 720, 360 e 120 dp e cada camada volta ao y0 em 60 s`() {
+        for (layer in listOf(HudStarfieldLayer.NEAR, HudStarfieldLayer.MID, HudStarfieldLayer.FAR)) {
+            val star = HudStar(x = 10f, y = 5f, radius = 1f, alpha = 0.5f, layer = layer)
+            assertEquals(5f, hudStarfieldDriftY(star, 60_000L), 1e-3f, "volta de 60 s na camada $layer")
+        }
+    }
+
+    @Test
+    fun `o deslocamento em 1 s longe de poco e 12, 6 e 2 dp por camada`() {
         val t0 = 20_000L
         for (star in hudStarfieldStars(width, height, wells, forbidden)) {
             val tile = tileOf(star.layer)

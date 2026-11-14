@@ -17,8 +17,18 @@ const val HUD_STARFIELD_SEED: Int = 586
 /** Camada de paralaxe: perto é mais rápida, maior e mais clara; longe é lenta e tênue. */
 enum class HudStarfieldLayer { NEAR, MID, FAR }
 
-/** Poço gravitacional: centro e raio do anel, em px do corpo. */
-data class HudStarfieldWell(val centerX: Float, val centerY: Float, val radius: Float)
+/**
+ * Poço gravitacional: centro e raio do anel, em px do corpo. [activeSinceMs] e [activeUntilMs] são a janela de
+ * execução do poço, no mesmo eixo de tempo do `timeMs` (laço de 240 000 ms). Em execução no instante t ⇔
+ * since ≤ t e (until nulo ou t < until); since nulo = nunca em execução. Sem janela, o poço fica ocioso (#592 A03).
+ */
+data class HudStarfieldWell(
+    val centerX: Float,
+    val centerY: Float,
+    val radius: Float,
+    val activeSinceMs: Long? = null,
+    val activeUntilMs: Long? = null
+)
 
 /** Retângulo proibido (caixa de texto ou pílula), em px do corpo. Bordas inclusivas. */
 data class HudStarfieldBox(val left: Float, val top: Float, val right: Float, val bottom: Float)
@@ -60,10 +70,15 @@ data class HudStarfieldPoint(
     val glint: Boolean = false
 )
 
-/** Especificação de uma camada: velocidade de deriva em dp/s, quantidade e faixas. */
+/**
+ * Especificação de uma camada: velocidade de deriva em dp/s, ladrilho em dp, quantidade e faixas.
+ * O ladrilho é independente da velocidade: é ele que define a densidade do campo, e a velocidade só
+ * decide quão depressa a camada corre por dentro dele.
+ */
 private class HudStarfieldLayerSpec(
     val layer: HudStarfieldLayer,
     val speed: Float,
+    val tile: Float,
     val count: Int,
     val radiusMin: Float,
     val radiusMax: Float,
@@ -73,14 +88,13 @@ private class HudStarfieldLayerSpec(
 )
 
 // Números da AW1 (prototipos/issue-590-r3/aw1-ceu-noturno-claro/index.html, LAYERS): 60/56/40 estrelas.
+// #592 A02: velocidade ×4 (12/6/2 dp/s) com os ladrilhos de hoje (720/360/120 dp). Velocidade × 240 s dá
+// 4 voltas de ladrilho em cada camada, então o laço de 240 s fecha sem salto.
 private val HUD_STARFIELD_LAYERS = listOf(
-    HudStarfieldLayerSpec(HudStarfieldLayer.NEAR, speed = 3f, count = 60, radiusMin = 1.2f, radiusMax = 1.8f, alphaMin = 0.8f, alphaMax = 0.95f, trail = true),
-    HudStarfieldLayerSpec(HudStarfieldLayer.MID, speed = 1.5f, count = 56, radiusMin = 0.8f, radiusMax = 1.2f, alphaMin = 0.6f, alphaMax = 0.7f, trail = true),
-    HudStarfieldLayerSpec(HudStarfieldLayer.FAR, speed = 0.5f, count = 40, radiusMin = 0.5f, radiusMax = 0.8f, alphaMin = 0.35f, alphaMax = 0.5f, trail = false)
+    HudStarfieldLayerSpec(HudStarfieldLayer.NEAR, speed = 12f, tile = 720f, count = 60, radiusMin = 1.2f, radiusMax = 1.8f, alphaMin = 0.8f, alphaMax = 0.95f, trail = true),
+    HudStarfieldLayerSpec(HudStarfieldLayer.MID, speed = 6f, tile = 360f, count = 56, radiusMin = 0.8f, radiusMax = 1.2f, alphaMin = 0.6f, alphaMax = 0.7f, trail = true),
+    HudStarfieldLayerSpec(HudStarfieldLayer.FAR, speed = 2f, tile = 120f, count = 40, radiusMin = 0.5f, radiusMax = 0.8f, alphaMin = 0.35f, alphaMax = 0.5f, trail = false)
 )
-
-/** Tile da deriva = velocidade × 240 s (720/360/120 dp): a volta completa da camada. */
-private const val HUD_STARFIELD_TILE_SECONDS = 240f
 
 /** Sombra = 0,62 R; influência = 3 R; massa = (1,1 R)². Razões do protótipo, com o raio do poço. */
 private const val HUD_STARFIELD_SHADOW_FACTOR = 0.62f
@@ -154,7 +168,7 @@ fun hudStarfieldStars(
     val random = HudStarfieldRandom(seed)
     val stars = mutableListOf<HudStar>()
     for (spec in HUD_STARFIELD_LAYERS) {
-        val yLimit = min(hudStarfieldTile(spec), height)
+        val yLimit = min(spec.tile, height)
         var placed = 0
         while (placed < spec.count) {
             val spot = hudStarfieldFreeSpot(random, width, yLimit, wells, forbidden) ?: break
@@ -207,15 +221,13 @@ private fun hudStarfieldLoopMs(timeMs: Long): Long =
 fun hudStarfieldDriftY(star: HudStar, timeMs: Long): Float {
     val spec = hudStarfieldSpec(star.layer)
     val seconds = hudStarfieldLoopMs(timeMs) / 1000f
-    return hudStarfieldWrap(star.y + spec.speed * seconds, hudStarfieldTile(spec))
+    return hudStarfieldWrap(star.y + spec.speed * seconds, spec.tile)
 }
 
 private fun hudStarfieldSpec(layer: HudStarfieldLayer): HudStarfieldLayerSpec =
     HUD_STARFIELD_LAYERS.first { it.layer == layer }
 
-private fun hudStarfieldTile(layer: HudStarfieldLayer): Float = hudStarfieldTile(hudStarfieldSpec(layer))
-
-private fun hudStarfieldTile(spec: HudStarfieldLayerSpec): Float = spec.speed * HUD_STARFIELD_TILE_SECONDS
+private fun hudStarfieldTile(layer: HudStarfieldLayer): Float = hudStarfieldSpec(layer).tile
 
 /** Cópias da estrela no corpo: a deriva e depois +1 tile por vez, enquanto cair abaixo da altura. */
 private fun hudStarfieldCopies(

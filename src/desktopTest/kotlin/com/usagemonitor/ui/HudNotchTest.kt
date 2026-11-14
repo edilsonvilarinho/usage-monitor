@@ -297,6 +297,21 @@ class HudNotchTest {
         assertEquals(0, captures, "capturas com movimento reduzido")
     }
 
+    /** #592 A05: o poço do anel em execução leva janela de atividade; o ocioso não. */
+    @Test
+    fun `o poco do anel em execucao leva a janela de atividade`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        val list = listOf(accounts.first().copy(sessionActive = true)) + accounts.drop(1)
+        setContent { notch(list = list, motion = AppMotionPolicy.Live) }
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        val wells = onNodeWithTag(HUD_STARFIELD_TEST_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode().config[HUD_STARFIELD_WELLS]
+
+        assertTrue(wells.first().activeSinceMs != null, "anel 0 em execução sem janela de atividade")
+        assertEquals(null as Long?, wells[1].activeSinceMs, "anel 1 ocioso com janela de atividade")
+    }
+
     // ------------------------------------------------------------ minimizada (#576)
 
     /** Minimizada: anel de 28 dp e a cota em foco ao lado; a palavra e a pílula saem. */
