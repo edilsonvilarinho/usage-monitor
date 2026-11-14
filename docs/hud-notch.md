@@ -66,6 +66,12 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     `HudNotchGeometryTest` prende as três contas completas na lateral e compactas com o teto de cima.
     Recusadas: L2 compactar só as contas em dia (a palavra "Normal" ficaria só no balão), L3 um degrau
     sem pílula e L4 duas colunas na lateral.
+  - **Na lateral, a conta de menor uso recolhe antes (#596).** Se a coluna completa ainda passa de 80% da borda
+    vertical, a conta com **menor uso** sai primeiro. Uso da conta = a maior `fraction` das suas cotas (0 sem cota);
+    empate, a de cima. Ela vira a célula minimizada (anel de 28 dp e cota em foco, como #576), uma por vez, até
+    caber. Sem botão de restaurar: volta sozinha quando houver espaço, e `hudMinimizedAccounts` não muda. Se nem
+    assim cabe, fica o compacto. Só a borda vertical; a horizontal (45%) não muda. Regra em `hudAutoMinimizedTargets`
+    e `applyHudAutoMinimize` (`src/desktopMain/kotlin/com/usagemonitor/HudAutoMinimize.kt`), aplicada em `HudWindow.kt`.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,

@@ -61,6 +61,13 @@ the cadence in force. A bare progress line on the notch border was tried and rej
 number beside it, nobody could tell what it measured. Each text estimate carries 1dp of slack for
 Skia's whole-pixel rounding, or the last item of the strip breaks at fractional densities.
 
+**Auto-minimize on the sides (#596).** When the full column still takes more than 80% of a side edge, the account
+with the **lowest usage** goes first, one at a time, until the column fits. Usage of an account = its highest quota
+`fraction` (0 without a quota); ties go to the one higher in the list. The auto-minimized cell is the #576 one (28dp
+ring with its focus quota beside it). If it still does not fit, the compact cell above applies. The auto-minimized
+account has no restore button, never writes `hudMinimizedAccounts`, and returns on its own when there is room. Top
+and bottom edges do not change.
+
 **Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon
 for **that account only** — Codenotch's card, not a panel of every account. Header with the provider
 mark in the source accent, the card title and the state; per quota the card's title and
