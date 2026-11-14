@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import androidx.compose.ui.unit.Dp
 import com.usagemonitor.presentation.ui.hudMinimizeHeldSize
 
 import com.usagemonitor.presentation.ui.HudAccount
@@ -32,12 +33,15 @@ internal fun hudWindowSizes(
         edge = edge,
         fallbackLabel = fallbackLabel,
         hasUpdateIndicator = hasUpdateIndicator,
-        maxAlong = (if (edge.isHorizontal) screenArea.size.width else screenArea.size.height) / scale *
-            hudMaxAlongFraction(edge),
+        maxAlong = hudMaxAlong(edge, screenArea, scale),
         hasUpdateAction = hasUpdateAction,
         maxWindowHeight = screenArea.size.height / scale
     )
 }
+
+/** Teto ao longo da borda da HUD: [hudMaxAlongFraction] da área útil, em dp lógicos (#596). */
+internal fun hudMaxAlong(edge: HudEdge, screenArea: ScreenWorkArea, scale: Float): Dp =
+    (if (edge.isHorizontal) screenArea.size.width else screenArea.size.height) / scale * hudMaxAlongFraction(edge)
 
 /**
  * Onde a janela fica. Parada e aberta a janela é a mesma, com o notch no mesmo ponto da

@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.buildHudAccounts
 import com.usagemonitor.presentation.ui.HudMinimizeButton
+import com.usagemonitor.presentation.ui.hudShowsMinimizeButton
 import com.usagemonitor.presentation.ui.toggleHudMinimizedAccount
 import com.usagemonitor.presentation.ui.hudFallbackLabel
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -184,7 +185,7 @@ internal fun HudWindowHost(
     }
     // Conta que nasce ou colapsa (API ativada/desativada, início do app) fica na
     // lista durante a transição; a geometria segue essa lista.
-    val accounts = rememberHudPresence(buildHudAccounts(
+    val presentAccounts = rememberHudPresence(buildHudAccounts(
         quotaRisks = quotaRisks,
         cardOrder = cardOrder,
         language = language,
@@ -236,6 +237,7 @@ internal fun HudWindowHost(
     }
 
     val scale = uiScaleFactor(uiScalePercent)
+    val accounts = applyHudAutoMinimize(presentAccounts, placement.edge, fallbackLabel, hudMaxAlong(placement.edge, screenArea, scale))
     val minimize = rememberHudMinimizeProgress(accounts)
     val (sizesNow, settledNow) = hudWindowSizes(
         accounts = accounts,
@@ -503,7 +505,7 @@ internal fun HudAccountActions(
             }
         )
     }
-    HudMinimizeButton(
+    if (hudShowsMinimizeButton(account)) HudMinimizeButton(
         targetKey = target,
         minimized = account.minimized,
         language = language,

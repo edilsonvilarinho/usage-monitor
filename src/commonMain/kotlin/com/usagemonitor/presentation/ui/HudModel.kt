@@ -107,7 +107,9 @@ data class HudAccount(
     /** Contagens locais por modelo; não são cotas nem arcos percentuais. */
     val observedModels: List<HudObservedModel> = emptyList(),
     /** Conta minimizada na HUD (#576): só o anel de 28 dp e a cota em foco. */
-    val minimized: Boolean = false
+    val minimized: Boolean = false,
+    /** Minimizada pela regra da borda vertical (#596), não pelo usuário: sem botão de restaurar, fora da preferência. */
+    val autoMinimized: Boolean = false
 ) {
     /** "Plus · via Codex": plano e origem numa linha só, cada um quando existe. */
     val detailLine: String?
