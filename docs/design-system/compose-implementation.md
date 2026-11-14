@@ -46,8 +46,8 @@ quadros, um percentual que não é verdade.
   testável sem composição.
 - **Campo de estrelas no notch (#586, #590).** O fundo é `HudStarfieldCanvas`, atrás dos anéis, com o quadro puro de
   `HudStarfield.kt` (156 estrelas em três camadas 60/56/40, laço de 240 s, anéis como poços, cintilação e brilho
-  em cruz). `HudStarCapture.kt` calcula, a cada 8 s, a captura de uma estrela que espirala para o anel e some com
-  um lampejo; o canvas desenha atrás do anel, e com animação reduzida não há nenhuma captura. Os poços e as caixas proibidas vêm de
+  em cruz). `HudStarCapture.kt` calcula as capturas (#592: anel ocioso a cada 30 s; anel em execução, fluxo de 1,5 estrela/s) da
+  estrela que espirala para o anel em 3 000 ms e some com um lampejo; deriva a 12/6/2 dp/s com ladrilho fixo; o canvas desenha atrás do anel, e com animação reduzida não há nenhuma captura. Os poços e as caixas proibidas vêm de
   `HudRingHitBoxes`, cujo mapa de caixas é `mutableStateMapOf`: com um mapa comum o canvas não era relido quando o
   anel media a posição e saía sem poços. O tempo avança só com `AppMotionPolicy.continuous` e sem "reduzir
   animações"; senão é o quadro de t = 0.

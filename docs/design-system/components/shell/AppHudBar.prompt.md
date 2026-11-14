@@ -35,6 +35,12 @@ goes from 0.10 to 0.22 and the dashed debris ring of a ring without forecast is 
 within 8dp of a text box drop to 40% of their alpha. Dark themes are unchanged. The body stays the preset
 surface: a painted night sky in light themes was tried and refused (round AX).
 
+**Star field speed and execution flow (#592).** Layers drift at 12 / 6 / 2 dp/s over fixed tiles (720 / 360 /
+120dp, density unchanged). A ring without execution captures one star every 30 s, in turn among idle rings; a
+ring whose session is active (`sessionActive`) pulls a continuous filament of 1.5 stars/s, each spiralling in for
+3000ms. The active orbit arc of `AppGargantuaRing` stays: with reduced motion the field stops and that static arc
+is what tells which ring is running.
+
 **The notch never grows.** Per account in the user's card order (never risk order — the first account
 used to swap by itself): an `AppGargantuaRing` (one arc per quota, up to three), **one line per ring with
 the window and its percentage** — `7d 72%` over `5h 45%`, outer ring first, `labelSmall` with the

@@ -169,8 +169,16 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   (`#171414`) com alfa 0,95/0,7/0,45 e raios ×1,5, atenuada ×0,4 a até 8 dp do texto. Só anima com
   `AppMotionPolicy.continuous` e sem "reduzir animações", que deixa o quadro em t = 0; a barra recolhida não tem
   campo.
-- **Capturas (#590).** Uma estrela é capturada a cada 8 s, a partir de 4 s (30 por laço), e cai no poço
-  `n mod poços`, no ângulo `n·2,399963`. Ela espirala para dentro do anel em 2 600 ms (`r(s) = 2,4R(1−s)^1,6 +
+- **Velocidade (#592).** As camadas derivam a 12 / 6 / 2 dp/s (×4 da #590) com o ladrilho **fixo** em 720 / 360 / 120
+  dp: o ladrilho define a densidade e não acompanha a velocidade (ladrilho = velocidade × 240 s rarefazia o campo,
+  medido no protótipo P1 da #592). Cada camada dá 4 voltas no laço de 240 s, sem salto.
+- **Capturas (#590, #592).** Anel **sem** execução: uma captura a cada 30 s, a partir de 4 s (8 por laço), em rodízio
+  só pelos poços ociosos (`idle[n mod ociosos]`, escolhido no início absoluto da captura), no ângulo `n·2,399963`.
+  Anel **em execução** (`sessionActive`): filamento contínuo de 1,5 estrela/s em grade absoluta `k·2000/3` ms, braço
+  `0,6 + i·0,9` rad com jitter ±0,125 por hash de `(i, k)`; o canvas guarda por anel a janela de atividade
+  (`activeSinceMs`/`activeUntilMs`, semiaberta): ligar não faz estrela surgir no meio do voo e desligar deixa os
+  voos em curso terminarem. O arco de execução do `AppGargantuaRing` **continua** — com "reduzir animações" o campo
+  para e é ele, parado, que mostra o anel em execução (#592). A estrela espirala para dentro do anel em 3 000 ms (`r(s) = 2,4R(1−s)^1,6 +
   0,55R·s`, `θ = θ0 + 3π·s`), deixa um rastro dos últimos 10 dp (alfa .9→0, largura 1,6→.4) e some com um
   lampejo de 200 ms no ponto final. Desenha atrás do anel, depois das estrelas. Lampejo: no escuro alfa ≤ .6; no
   claro, em tinta, alfa ≤ .35, porque branco sumiria no branco. Ponto dentro de caixa proibida tem alfa zero.
