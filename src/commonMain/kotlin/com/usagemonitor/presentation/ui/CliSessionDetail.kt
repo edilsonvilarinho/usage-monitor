@@ -85,7 +85,7 @@ internal fun CliSessionDetailPane(
         when (detail) {
             is CliSessionDetailUiState.Loading -> AppLoadingState(CliSessionsLabels.loading(language))
             is CliSessionDetailUiState.Error -> AppErrorState(detail.message)
-            is CliSessionDetailUiState.Ready -> CliSessionDetailBody(
+            is CliSessionDetailUiState.Success -> CliSessionDetailBody(
                 detail = detail.result.detail,
                 analytics = detail.result.analytics,
                 language = language,

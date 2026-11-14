@@ -220,6 +220,78 @@ class ArchitectureRulesTest {
     }
 
     /**
+     * Raiz de tela pinta o fundo da janela e a cor de conteúdo. Se cada tela
+     * montar o próprio `Surface`, a cor de conteúdo e o fundo divergem por tela
+     * (A05, issue #598). Quem pinta é a primitiva em `presentation/ui/components/`.
+     */
+    @Test
+    fun `Surface de tela so nas primitivas de components`() {
+        val violations = sources
+            .filter { source -> !source.path.contains(SURFACE_OWNER_SEGMENT) }
+            .filter { source -> SURFACE_CALL.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail("Surface( fora de presentation/ui/components/ (use AppScreenSurface):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o padrao do Surface pega a chamada e ignora a primitiva`() {
+        assertTrue(SURFACE_CALL.containsMatchIn("Surface(modifier = modifier.fillMaxSize())"))
+        assertFalse(SURFACE_CALL.containsMatchIn("AppDataSurface(modifier = modifier)"))
+        assertFalse(SURFACE_CALL.containsMatchIn("AppTooltipSurface(text = \"x\")"))
+        assertFalse(SURFACE_CALL.containsMatchIn("AppScreenSurface(modifier = modifier)"))
+    }
+
+    /**
+     * `UiState` de produção é `sealed interface` (`Loading`/`Success`/`Error`), nunca
+     * `data class` (A06, issue #598). Estado de formulário com esse sufixo leva `FormState`.
+     */
+    @Test
+    fun `UiState de presentation nao e data class`() {
+        val violations = sources
+            .filter { source -> source.path.contains(PRESENTATION_SEGMENT) }
+            .flatMap { source ->
+                UI_STATE_DATA_CLASS.findAll(stripCommentsAndStrings(source.text))
+                    .map { match -> "${source.path}: ${match.value}" }
+                    .toList()
+            }
+        if (violations.isNotEmpty()) {
+            fail("data class com sufixo UiState (estado de formulário usa FormState):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    /** Nenhum subtipo de `sealed interface *UiState` se chama `Ready` (A06, issue #598). */
+    @Test
+    fun `subtipo de UiState nao se chama Ready`() {
+        val violations = sources
+            .filter { source -> source.path.contains(PRESENTATION_SEGMENT) }
+            .flatMap { source -> readySubtypesOfUiState(source.text).map { name -> "${source.path}: $name" } }
+        if (violations.isNotEmpty()) {
+            fail("subtipo Ready em sealed interface *UiState (use Success ou o nome do estado):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o padrao de UiState pega data class e Ready e ignora o resto`() {
+        assertTrue(UI_STATE_DATA_CLASS.containsMatchIn("data class SampleUiState("))
+        assertFalse(UI_STATE_DATA_CLASS.containsMatchIn("data class SampleFormState("))
+        assertFalse(UI_STATE_DATA_CLASS.containsMatchIn("sealed interface SampleUiState {"))
+        assertEquals(
+            listOf("SampleUiState.Ready"),
+            readySubtypesOfUiState("sealed interface SampleUiState {\n    data class Ready(val x: Int) : SampleUiState\n}")
+        )
+        assertEquals(
+            emptyList<String>(),
+            readySubtypesOfUiState("sealed interface SampleUiState {\n    data class Success(val x: Int) : SampleUiState\n}")
+        )
+        assertEquals(
+            emptyList<String>(),
+            readySubtypesOfUiState("data class Ready(val x: Int)")
+        )
+    }
+
+    /**
      * Texto PT/EN repetido em cada tela divergiu (nove traduções inconsistentes
      * na auditoria do plano `boas-praticas-377`). Texto novo passa por
      * `localized(language, pt, en)` ou por um objeto de rótulos existente
@@ -277,12 +349,127 @@ class ArchitectureRulesTest {
 
         val declarations = dataClassDeclarations(source).associateBy { declaration -> declaration.name }
 
-        assertEquals(listOf("accessToken", "count"), declarations.getValue("Plain").properties)
+        assertEquals(listOf("accessToken", "count"), declarations["Plain"]?.properties.orEmpty())
         assertEquals("", declarations.getValue("Plain").body)
         assertTrue(declarations.getValue("Safe").body.contains("override fun toString"))
         assertTrue(SECRET_PROPERTY.matches("accessToken"))
         assertTrue(SECRET_PROPERTY.matches("refresh_token"))
         assertFalse(SECRET_PROPERTY.matches("inputTokens"))
+    }
+
+    /**
+     * `runCatching` captura o `CancellationException` e devolve `Result.failure`: o
+     * cancelamento de coroutine some e a chamada segue como se tivesse falhado (issue #598).
+     * Repositório usa `suspendRunCatching`, que relança o cancelamento.
+     */
+    @Test
+    fun `repositorio nao usa runCatching que engole cancelamento`() {
+        val violations = sources
+            .filter { source -> source.path.substringAfterLast('/').endsWith("RepositoryImpl.kt") }
+            .filter { source -> RUN_CATCHING.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "runCatching em repositório engole CancellationException (use suspendRunCatching, issue #598):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    @Test
+    fun `o padrao do runCatching pega a chamada e ignora o helper`() {
+        assertTrue(RUN_CATCHING.containsMatchIn("return Result.runCatching {"))
+        assertTrue(RUN_CATCHING.containsMatchIn("return@runCatching null"))
+        assertFalse(RUN_CATCHING.containsMatchIn("return suspendRunCatching {"))
+        assertFalse(RUN_CATCHING.containsMatchIn("val result = suspendRunCatching { load() }"))
+    }
+
+    /**
+     * A chave JSON de uma propriedade serializável é o nome Kotlin dela: não há
+     * `JsonNamingStrategy` no projeto. `@SerialName` fixa o nome atual, então
+     * renomear a propriedade sem a anotação muda o JSON gravado em disco e enviado
+     * ao servidor do time. `@Transient` fica de fora: não entra no JSON.
+     */
+    @Test
+    fun `propriedade serializavel de data tem SerialName`() {
+        val violations = sources
+            .filter { source -> SERIAL_NAME_SCOPES.any { scope -> source.path.startsWith(scope) } }
+            .flatMap { source ->
+                serializableClassDeclarations(source.text).flatMap { declaration ->
+                    declaration.properties
+                        .filter { property -> !property.hasSerialName }
+                        .map { property -> "${source.path}: ${declaration.name}.${property.name}" }
+                }
+            }
+        if (violations.isNotEmpty()) {
+            fail("Propriedade serializável sem @SerialName (a chave JSON é o nome Kotlin atual):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o scanner de serializable le propriedades com e sem SerialName`() {
+        val source = """
+            @Serializable
+            data class Wire(
+                @SerialName("access_token") val accessToken: String,
+                val count: Int,
+                @Transient val cache: String = ""
+            ) {
+                @SerialName("extra") val extra: Int = 0
+                val computed: Int get() = 1
+                val lazyValue by lazy { 2 }
+            }
+
+            @Serializable
+            enum class Mode(val label: String) { ON("on") }
+
+            @Serializable
+            private class Plain(var inner: Map<String, Int>)
+
+            data class NotSerializable(val skipped: Int)
+        """.trimIndent()
+
+        val declarations = serializableClassDeclarations(source).associateBy { declaration -> declaration.name }
+
+        assertEquals(
+            listOf(
+                SerializableProperty("accessToken", hasSerialName = true),
+                SerializableProperty("count", hasSerialName = false),
+                SerializableProperty("extra", hasSerialName = true)
+            ),
+            declarations["Wire"]?.properties.orEmpty()
+        )
+        assertEquals(listOf(SerializableProperty("inner", hasSerialName = false)), declarations["Plain"]?.properties.orEmpty())
+        assertEquals(setOf("Wire", "Plain"), declarations.keys)
+    }
+
+    /**
+     * Use case se monta só nas raízes de composição (`AppGraph` e vizinhos, e o modo
+     * sem tela em `terminal/`). `Main.kt` e as janelas montando use case criam um
+     * segundo ponto de montagem fora do grafo (issue #598, A04). Declaração de classe
+     * e import não contam: só a chamada de construtor.
+     */
+    @Test
+    fun `o use case so e montado nas raizes de composicao`() {
+        val violations = sources
+            .filter { source -> source.path.startsWith(DESKTOP_MAIN_DIRECTORY) }
+            .filter { source -> source.path !in USE_CASE_COMPOSITION_ROOTS && !source.path.startsWith(USE_CASE_COMPOSITION_DIRECTORY) }
+            .filter { source -> USE_CASE_CONSTRUCTION.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "Use case montado fora das raizes de composicao (AppGraph e vizinhos, issue #598):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    @Test
+    fun `o padrao do use case pega a chamada e ignora a declaracao`() {
+        assertTrue(USE_CASE_CONSTRUCTION.containsMatchIn("val getReleaseNotes = GetReleaseNotesUseCase(graph.appUpdateRepository)"))
+        assertFalse(USE_CASE_CONSTRUCTION.containsMatchIn("class GetReleaseNotesUseCase(private val repository: AppUpdateRepository)"))
+        assertFalse(USE_CASE_CONSTRUCTION.containsMatchIn("import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase"))
+        assertFalse(USE_CASE_CONSTRUCTION.containsMatchIn("fun buildUseCase(graph: AppGraph) = graph"))
     }
 
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
@@ -376,6 +563,80 @@ class ArchitectureRulesTest {
 
         /** `.background = `; o `Modifier.background(` do Compose é chamada, não atribuição. */
         val WINDOW_BACKGROUND_ASSIGNMENT = Regex("""\.background\s*=(?!=)""")
+
+        /** `runCatching` como chamada; `suspendRunCatching` não casa, o `R` é maiúsculo (issue #598). */
+        val RUN_CATCHING = Regex("""\brunCatching\b""")
+
+        /** `Surface(` como chamada do Material; `AppDataSurface(` não casa, o `\b` pede fronteira antes do `S`. */
+        val SURFACE_CALL = Regex("""\bSurface\(""")
+
+        /** Única pasta de produção que chama `Surface(`: as primitivas do design system (A05, #598). */
+        const val SURFACE_OWNER_SEGMENT = "/presentation/ui/components/"
+
+        /** Pasta de apresentação de produção, para as regras de nome de `UiState` (A06). */
+        const val PRESENTATION_SEGMENT = "/presentation/"
+
+        /** `data class` com sufixo `UiState`: estado de formulário, que leva `FormState` (A06). */
+        val UI_STATE_DATA_CLASS = Regex("""\bdata\s+class\s+\w+UiState\b""")
+
+        /** `sealed interface` cujo nome termina em `UiState`; o nome vai no primeiro grupo (A06). */
+        val SEALED_UI_STATE = Regex("""\bsealed\s+interface\s+(\w+UiState)\b""")
+
+        /** Declaração de subtipo `Ready`: `class Ready` ou `object Ready` (A06). */
+        val READY_SUBTYPE = Regex("""\b(?:class|object)\s+Ready\b""")
+
+        /**
+         * Subtipos `Ready` dentro de cada `sealed interface \w+UiState` do código, no formato
+         * `Interface.Ready`. Lê o código sem comentários nem strings e corta no `}` que fecha a interface.
+         */
+        fun readySubtypesOfUiState(source: String): List<String> {
+            val code = stripCommentsAndStrings(source)
+            return SEALED_UI_STATE.findAll(code).flatMap { match ->
+                val open = code.indexOf('{', match.range.last)
+                val close = closingBraceOf(code, open)
+                if (open < 0 || close == null) {
+                    emptyList()
+                } else {
+                    READY_SUBTYPE.findAll(code.substring(open, close)).map { "${match.groupValues[1]}.Ready" }.toList()
+                }
+            }.toList()
+        }
+
+        /** Posição do `}` que fecha o `{` em [open], ou `null` se o bloco não fecha. */
+        private fun closingBraceOf(code: String, open: Int): Int? {
+            if (open < 0) return null
+            var depth = 0
+            for (index in open until code.length) {
+                if (code[index] == '{') depth++
+                if (code[index] == '}') {
+                    depth--
+                    if (depth == 0) return index
+                }
+            }
+            return null
+        }
+
+        val DESKTOP_MAIN_DIRECTORY = "src/desktopMain/kotlin/com/usagemonitor/"
+
+        /** Raízes de composição do desktop: as únicas que montam use case (issue #598, A04). */
+        val USE_CASE_COMPOSITION_ROOTS = setOf(
+            "src/desktopMain/kotlin/com/usagemonitor/AppGraph.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/AppViewModels.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/CollectorEngine.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/TelegramBotComposition.kt"
+        )
+
+        /** Modo sem tela (#439-#441): a pasta inteira é raiz de composição. */
+        val USE_CASE_COMPOSITION_DIRECTORY = "src/desktopMain/kotlin/com/usagemonitor/terminal/"
+
+        /** Chamada de construtor `XUseCase(`; `class XUseCase(` e import não casam. */
+        val USE_CASE_CONSTRUCTION = Regex("""(?<!class\s)\b[A-Z]\w*UseCase\(""")
+
+        /** Pastas de `data` (commonMain e desktopMain): onde o DTO e o JSON de disco moram. */
+        val SERIAL_NAME_SCOPES = listOf(
+            "src/commonMain/kotlin/com/usagemonitor/data/",
+            "src/desktopMain/kotlin/com/usagemonitor/data/"
+        )
 
         val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
 

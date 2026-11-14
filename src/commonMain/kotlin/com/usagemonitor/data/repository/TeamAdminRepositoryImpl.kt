@@ -50,7 +50,7 @@ class TeamAdminRepositoryImpl(
             return Result.failure(IllegalStateException(NOT_ADMIN_MESSAGE))
         }
 
-        return runCatching {
+        return suspendRunCatching {
             // Health antes do ping: separa "URL errada" de "token errado" na
             // mensagem, como o teste de conexão da chave de time já faz.
             remoteDataSource.checkHealth(settings.normalizedServerUrl)
@@ -281,7 +281,7 @@ class TeamAdminRepositoryImpl(
         credential: TeamCredential,
         accountKey: String,
         accountEmail: String?
-    ): Result<TeamKeyVerification> = runCatching {
+    ): Result<TeamKeyVerification> = suspendRunCatching {
         remoteDataSource.verifyKey(
             baseUrl = settings.normalizedServerUrl,
             credential = credential,
@@ -312,7 +312,7 @@ class TeamAdminRepositoryImpl(
         val credential = settings.readCredential(profileId)
             ?: return Result.failure(IllegalStateException(NOT_CONFIGURED_MESSAGE))
 
-        val result = runCatching {
+        val result = suspendRunCatching {
             remoteDataSource.claimKey(
                 baseUrl = settings.normalizedServerUrl,
                 credential = credential,
@@ -351,7 +351,7 @@ class TeamAdminRepositoryImpl(
         if (!settings.isAdminMode) {
             return Result.failure(IllegalStateException(NOT_ADMIN_MESSAGE))
         }
-        return runCatching { block(settings) }
+        return suspendRunCatching { block(settings) }
     }
 }
 

@@ -90,7 +90,7 @@ import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
 import com.usagemonitor.presentation.ui.components.TEAM_ALIAS_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_STEP_TAG_PREFIX
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import com.usagemonitor.presentation.ui.components.ThemeToggle
 import com.usagemonitor.presentation.ui.components.WindowOpacitySlider
@@ -2644,7 +2644,7 @@ class ComponentTest {
                     settings = ACTIVE_TEAM_SETTINGS,
                     language = AppLanguage.PT,
                     profiles = emptyList(),
-                    connection = TeamConnectionUiState(),
+                    connection = TeamConnectionFormState(),
                     onEnabledChange = {},
                     onServerUrlChange = {},
                     onAliasChange = { alias -> committed = alias },
@@ -2675,7 +2675,7 @@ class ComponentTest {
                     settings = ACTIVE_TEAM_SETTINGS,
                     language = AppLanguage.PT,
                     profiles = emptyList(),
-                    connection = TeamConnectionUiState(),
+                    connection = TeamConnectionFormState(),
                     onEnabledChange = {},
                     onServerUrlChange = {},
                     onAliasChange = { alias -> committed = alias },

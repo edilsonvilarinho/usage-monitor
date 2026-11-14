@@ -180,7 +180,7 @@ fun SettingsDialogContent(
      * Veredito do "Testar chave" (issue #204). Um estado só, e não um por fonte:
      * o diálogo é modal e só existe uma fonte em edição de cada vez.
      */
-    apiKeyCheck: ApiKeyCheckUiState = ApiKeyCheckUiState(),
+    apiKeyCheck: ApiKeyCheckFormState = ApiKeyCheckFormState(),
     /** Recebe a fonte e a chave candidata — a digitada, ou vazia para usar a guardada. */
     onApiKeyTest: (ApiSource, String) -> Unit = { _, _ -> },
     /** Apaga o veredito: ele descreve a chave anterior, não a que está no campo agora. */
@@ -201,7 +201,7 @@ fun SettingsDialogContent(
     /** Callbacks da seção Time; par de [teamState]. */
     teamActions: TeamSectionActions = TeamSectionActions(),
     proxySettings: ProxySettings = ProxySettings(),
-    proxyConnection: ProxyConnectionUiState = ProxyConnectionUiState(),
+    proxyConnection: ProxyConnectionFormState = ProxyConnectionFormState(),
     onProxyUseEnvironmentChange: (Boolean) -> Unit = {},
     onProxyHostChange: (String) -> Unit = {},
     onProxyPortChange: (String) -> Unit = {},

@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -35,9 +36,9 @@ object NoOpAnthropicCreditsDiagnosticsRecorder : AnthropicCreditsDiagnosticsReco
  */
 @Serializable
 data class AnthropicCreditsDiagnosticsEvent(
-    val timestamp: String,
-    val event: String = "anthropic_credits",
-    val outcome: String,
-    val extraUsageRaw: String? = null,
-    val spendRaw: String? = null
+    @SerialName("timestamp") val timestamp: String,
+    @SerialName("event") val event: String = "anthropic_credits",
+    @SerialName("outcome") val outcome: String,
+    @SerialName("extraUsageRaw") val extraUsageRaw: String? = null,
+    @SerialName("spendRaw") val spendRaw: String? = null
 )

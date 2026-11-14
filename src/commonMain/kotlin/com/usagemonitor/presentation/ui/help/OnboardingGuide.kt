@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.usagemonitor.presentation.ui.components.AppScreenSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -161,9 +161,8 @@ fun OnboardingGuideContent(
     val slide = slides[index]
     val isLast = index == slides.lastIndex
 
-    Surface(
-        modifier = modifier.fillMaxSize().testTag(ONBOARDING_GUIDE_TAG),
-        color = MaterialTheme.colorScheme.background
+    AppScreenSurface(
+        modifier = modifier.fillMaxSize().testTag(ONBOARDING_GUIDE_TAG)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {

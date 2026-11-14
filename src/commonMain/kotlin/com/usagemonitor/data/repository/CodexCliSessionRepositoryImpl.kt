@@ -12,23 +12,23 @@ import com.usagemonitor.domain.repository.CodexCliSessionRepository
 class CodexCliSessionRepositoryImpl(
     private val dataSource: CodexCliSessionDataSource
 ) : CodexCliSessionRepository {
-    override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> = runCatching {
+    override suspend fun syncIndex(): Result<CodexCliSessionIndexReport> = suspendRunCatching {
         dataSource.syncIndex()
     }
 
-    override suspend fun getSessions(sinceEpochMillis: Long?): Result<List<CodexCliSessionSummary>> = runCatching {
+    override suspend fun getSessions(sinceEpochMillis: Long?): Result<List<CodexCliSessionSummary>> = suspendRunCatching {
         dataSource.readSessions(sinceEpochMillis)
     }
 
-    override suspend fun getSessionDetail(sessionId: String): Result<CodexCliSessionDetail?> = runCatching {
+    override suspend fun getSessionDetail(sessionId: String): Result<CodexCliSessionDetail?> = suspendRunCatching {
         dataSource.readSession(sessionId)
     }
 
-    override suspend fun getModelUsage(sinceEpochMillis: Long?): Result<List<CodexCliModelUsage>> = runCatching {
+    override suspend fun getModelUsage(sinceEpochMillis: Long?): Result<List<CodexCliModelUsage>> = suspendRunCatching {
         dataSource.readModelUsage(sinceEpochMillis)
     }
 
-    override suspend fun getTurnsSince(sinceEpochMillis: Long?): Result<List<CodexCliSessionTurn>> = runCatching {
+    override suspend fun getTurnsSince(sinceEpochMillis: Long?): Result<List<CodexCliSessionTurn>> = suspendRunCatching {
         dataSource.readTurnsSince(sinceEpochMillis)
     }
 }

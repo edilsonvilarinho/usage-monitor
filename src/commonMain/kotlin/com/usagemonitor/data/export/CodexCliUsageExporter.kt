@@ -2,6 +2,7 @@ package com.usagemonitor.data.export
 
 import com.usagemonitor.domain.entity.CodexCliSessionSummary
 import com.usagemonitor.domain.entity.UsageExportFormat
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -50,26 +51,26 @@ object CodexCliUsageExporter {
 
     @Serializable
     private data class SessionDto(
-        val sessionId: String,
-        val filePath: String,
-        val cwd: String? = null,
-        val gitBranch: String? = null,
-        val firstTs: String,
-        val lastTs: String,
-        val primaryModel: String? = null,
-        val originator: String? = null,
-        val source: String,
-        val rawSource: String? = null,
-        val threadSource: String? = null,
-        val cliVersion: String? = null,
-        val turnCount: Int,
-        val responseCount: Int,
-        val inputTokens: Long,
-        val cachedInputTokens: Long,
-        val cacheWriteInputTokens: Long,
-        val outputTokens: Long,
-        val reasoningOutputTokens: Long,
-        val totalTokens: Long
+        @SerialName("sessionId") val sessionId: String,
+        @SerialName("filePath") val filePath: String,
+        @SerialName("cwd") val cwd: String? = null,
+        @SerialName("gitBranch") val gitBranch: String? = null,
+        @SerialName("firstTs") val firstTs: String,
+        @SerialName("lastTs") val lastTs: String,
+        @SerialName("primaryModel") val primaryModel: String? = null,
+        @SerialName("originator") val originator: String? = null,
+        @SerialName("source") val source: String,
+        @SerialName("rawSource") val rawSource: String? = null,
+        @SerialName("threadSource") val threadSource: String? = null,
+        @SerialName("cliVersion") val cliVersion: String? = null,
+        @SerialName("turnCount") val turnCount: Int,
+        @SerialName("responseCount") val responseCount: Int,
+        @SerialName("inputTokens") val inputTokens: Long,
+        @SerialName("cachedInputTokens") val cachedInputTokens: Long,
+        @SerialName("cacheWriteInputTokens") val cacheWriteInputTokens: Long,
+        @SerialName("outputTokens") val outputTokens: Long,
+        @SerialName("reasoningOutputTokens") val reasoningOutputTokens: Long,
+        @SerialName("totalTokens") val totalTokens: Long
     )
 
     private fun CodexCliSessionSummary.toDto(): SessionDto {

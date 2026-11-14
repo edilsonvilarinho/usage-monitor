@@ -500,7 +500,7 @@ private fun recordUpdates(options: HelpMediaOptions) {
         update = AppUpdateUiState.Downloading(DEMO_UPDATE, percent = 88)
         recorder.animate(300) {}
         recorder.hold(1_200)
-        update = AppUpdateUiState.Ready(DEMO_UPDATE)
+        update = AppUpdateUiState.Downloaded(DEMO_UPDATE)
         recorder.animate(300) {}
         recorder.hold(2_000)
     }

@@ -4,7 +4,6 @@ import com.usagemonitor.presentation.ui.CommonLabels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.domain.usecase.GenerateBugReportUseCase
 import com.usagemonitor.presentation.ui.AppDialogWindow
 import com.usagemonitor.presentation.ui.BugReportHost
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
@@ -98,14 +97,9 @@ internal fun BugReportWindow(
     ) {
         val breadcrumbs = graph.breadcrumbs
         val generateBugReport = remember(breadcrumbs) {
-            GenerateBugReportUseCase(
-                breadcrumbs = breadcrumbs,
-                // Função, e não valor: idioma e escala mudam enquanto o app roda, e
-                // congelá-los faria o relatório descrever outro momento.
-                machineInfo = { desktopBugReportMachineInfo(shell.language, shell.uiScalePercent) },
-                // O corte do arquivo tem um dono só, e é o registro de arranque.
-                breadcrumbLimit = StartupDiagnostics.MAX_LINES
-            )
+            // Função, e não valor: idioma e escala mudam enquanto o app roda, e
+            // congelá-los faria o relatório descrever outro momento.
+            graph.generateBugReport { desktopBugReportMachineInfo(shell.language, shell.uiScalePercent) }
         }
         val writer = remember { DesktopBugReportWriter(parentWindow = { graph.mainWindow }) }
         val issueOpener = remember { BugReportIssueOpener() }

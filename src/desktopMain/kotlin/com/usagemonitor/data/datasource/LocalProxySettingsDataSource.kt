@@ -3,6 +3,7 @@ package com.usagemonitor.data.datasource
 import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.ProxySettings
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -12,11 +13,11 @@ import java.nio.file.StandardCopyOption
 
 @Serializable
 private data class ProxySettingsDto(
-    val useEnvironmentProxy: Boolean = true,
-    val host: String = "",
-    val port: Int = 0,
-    val username: String = "",
-    val password: String = ""
+    @SerialName("useEnvironmentProxy") val useEnvironmentProxy: Boolean = true,
+    @SerialName("host") val host: String = "",
+    @SerialName("port") val port: Int = 0,
+    @SerialName("username") val username: String = "",
+    @SerialName("password") val password: String = ""
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =

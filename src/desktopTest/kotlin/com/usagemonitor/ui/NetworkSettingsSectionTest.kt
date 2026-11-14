@@ -12,7 +12,7 @@ import com.usagemonitor.domain.entity.ProxySettings
 import com.usagemonitor.presentation.ui.components.NETWORK_HOST_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.NETWORK_TEST_CONNECTION_TEST_TAG
 import com.usagemonitor.presentation.ui.components.NETWORK_USE_ENV_SWITCH_TEST_TAG
-import com.usagemonitor.presentation.ui.components.ProxyConnectionUiState
+import com.usagemonitor.presentation.ui.components.ProxyConnectionFormState
 import com.usagemonitor.presentation.ui.components.ProxyConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.SettingsDialogContent
 import com.usagemonitor.presentation.ui.components.SettingsTab
@@ -104,7 +104,7 @@ class NetworkSettingsSectionTest {
     fun `test connection status message is displayed`() = runDesktopComposeUiTest {
         showNetworkTab(
             settings = ProxySettings(useEnvironmentProxy = false, host = "proxy.empresa.com", port = 8080),
-            connection = ProxyConnectionUiState(
+            connection = ProxyConnectionFormState(
                 status = ProxyConnectionUiStatus.FAILED,
                 message = "Connection refused: connect"
             )
@@ -127,7 +127,7 @@ class NetworkSettingsSectionTest {
     private fun ComposeUiTest.showNetworkTab(
         settings: ProxySettings,
         language: AppLanguage = AppLanguage.PT,
-        connection: ProxyConnectionUiState = ProxyConnectionUiState(),
+        connection: ProxyConnectionFormState = ProxyConnectionFormState(),
         onUseEnvironmentProxyChange: (Boolean) -> Unit = {},
         onTestConnection: () -> Unit = {}
     ) {

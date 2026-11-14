@@ -1,5 +1,6 @@
 package com.usagemonitor.data.datasource
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 interface CodexDiagnosticsRecorder {
@@ -16,23 +17,23 @@ object NoOpCodexDiagnosticsRecorder : CodexDiagnosticsRecorder {
 
 @Serializable
 data class CodexDiagnosticsSuccessEvent(
-    val timestamp: String,
-    val event: String = "success",
-    val sourceKind: String = "legacy_five_hour",
-    val planType: String,
-    val allowed: Boolean,
-    val limitReached: Boolean,
-    val primaryUsedPercent: Long? = null,
-    val primaryResetAt: Long? = null,
-    val primaryResetAfterSeconds: Long? = null,
-    val primaryLimitWindowSeconds: Long? = null
+    @SerialName("timestamp") val timestamp: String,
+    @SerialName("event") val event: String = "success",
+    @SerialName("sourceKind") val sourceKind: String = "legacy_five_hour",
+    @SerialName("planType") val planType: String,
+    @SerialName("allowed") val allowed: Boolean,
+    @SerialName("limitReached") val limitReached: Boolean,
+    @SerialName("primaryUsedPercent") val primaryUsedPercent: Long? = null,
+    @SerialName("primaryResetAt") val primaryResetAt: Long? = null,
+    @SerialName("primaryResetAfterSeconds") val primaryResetAfterSeconds: Long? = null,
+    @SerialName("primaryLimitWindowSeconds") val primaryLimitWindowSeconds: Long? = null
 )
 
 @Serializable
 data class CodexDiagnosticsFailureEvent(
-    val timestamp: String,
-    val event: String = "failure",
-    val statusCode: Int? = null,
-    val failureKind: String,
-    val message: String
+    @SerialName("timestamp") val timestamp: String,
+    @SerialName("event") val event: String = "failure",
+    @SerialName("statusCode") val statusCode: Int? = null,
+    @SerialName("failureKind") val failureKind: String,
+    @SerialName("message") val message: String
 )

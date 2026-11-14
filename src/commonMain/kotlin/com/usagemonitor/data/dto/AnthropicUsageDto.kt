@@ -23,12 +23,12 @@ data class AnthropicUsageResponse(
     @SerialName("seven_day") val sevenDay: AnthropicUsageWindow,
     @SerialName("seven_day_sonnet") val sevenDaySonnet: AnthropicUsageWindow? = null,
     @SerialName("extra_usage") val extraUsage: AnthropicExtraUsage? = null,
-    val spend: AnthropicSpend? = null,
+    @SerialName("spend") val spend: AnthropicSpend? = null,
 )
 
 @Serializable
 data class AnthropicUsageWindow(
-    val utilization: Double,
+    @SerialName("utilization") val utilization: Double,
     @SerialName("resets_at") val resetsAt: String?,
 )
 
@@ -50,8 +50,8 @@ data class AnthropicExtraUsage(
     @SerialName("is_enabled") val isEnabled: Boolean,
     @SerialName("monthly_limit") val monthlyLimit: Long? = null,
     @SerialName("used_credits") val usedCredits: Double? = null,
-    val utilization: Double? = null,
-    val currency: String? = null,
+    @SerialName("utilization") val utilization: Double? = null,
+    @SerialName("currency") val currency: String? = null,
     @SerialName("decimal_places") val decimalPlaces: Int? = null,
     @SerialName("disabled_reason") val disabledReason: String? = null,
     @SerialName("user_disabled") val userDisabled: Boolean = false,
@@ -66,16 +66,16 @@ data class AnthropicExtraUsage(
  */
 @Serializable
 data class AnthropicSpend(
-    val used: AnthropicSpendAmount? = null,
-    val limit: AnthropicSpendAmount? = null,
-    val percent: Double? = null,
-    val enabled: Boolean = false,
+    @SerialName("used") val used: AnthropicSpendAmount? = null,
+    @SerialName("limit") val limit: AnthropicSpendAmount? = null,
+    @SerialName("percent") val percent: Double? = null,
+    @SerialName("enabled") val enabled: Boolean = false,
 )
 
 /** Valor monetário em unidades menores: `amount_minor` com `exponent` casas decimais. */
 @Serializable
 data class AnthropicSpendAmount(
     @SerialName("amount_minor") val amountMinor: Long,
-    val currency: String,
-    val exponent: Int,
+    @SerialName("currency") val currency: String,
+    @SerialName("exponent") val exponent: Int,
 )

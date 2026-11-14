@@ -29,7 +29,7 @@ import com.usagemonitor.presentation.ui.components.TEAM_LIST_ROW_TAG_PREFIX
 import com.usagemonitor.presentation.ui.components.TEAM_NAME_FIELD_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_REMOVE_TEST_TAG
 import com.usagemonitor.presentation.ui.components.TEAM_STEP_TAG_PREFIX
-import com.usagemonitor.presentation.ui.components.TeamConnectionUiState
+import com.usagemonitor.presentation.ui.components.TeamConnectionFormState
 import com.usagemonitor.presentation.ui.components.TeamConnectionUiStatus
 import com.usagemonitor.presentation.ui.components.TeamIntegrationSection
 import kotlin.test.Test
@@ -81,9 +81,9 @@ class TeamIntegrationSectionTest {
         onRemoveTeam: (String) -> Unit = {},
         onAccountKeyChange: (String, String) -> Unit = { _, _ -> },
         profiles: List<AnthropicProfileUiModel> = listOf(contaTrabalho),
-        connection: TeamConnectionUiState = TeamConnectionUiState(),
-        teamConnections: Map<String, TeamConnectionUiState> =
-            mapOf("pessoal" to TeamConnectionUiState(status = TeamConnectionUiStatus.OK))
+        connection: TeamConnectionFormState = TeamConnectionFormState(),
+        teamConnections: Map<String, TeamConnectionFormState> =
+            mapOf("pessoal" to TeamConnectionFormState(status = TeamConnectionUiStatus.OK))
     ) {
         ScreenTestTheme(isDark = true) {
             TeamIntegrationSection(
@@ -132,7 +132,7 @@ class TeamIntegrationSectionTest {
             Section(
                 settings = time,
                 teams = listOf(time),
-                connection = TeamConnectionUiState(status = TeamConnectionUiStatus.OK),
+                connection = TeamConnectionFormState(status = TeamConnectionUiStatus.OK),
                 teamConnections = emptyMap()
             )
         }
@@ -337,7 +337,7 @@ class TeamIntegrationSectionTest {
 
     @Test
     fun `falha de conexao abre Conexao mesmo com servidor preenchido`() = runDesktopComposeUiTest {
-        val falhou = TeamConnectionUiState(
+        val falhou = TeamConnectionFormState(
             status = TeamConnectionUiStatus.FAILED,
             message = "Falha de conexão"
         )

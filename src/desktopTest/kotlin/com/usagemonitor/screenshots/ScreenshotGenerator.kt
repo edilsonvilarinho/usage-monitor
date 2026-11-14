@@ -472,7 +472,7 @@ private class ScreenshotGenerator(private val outputDir: File) {
                 range = CliSessionRange.LAST_5H,
                 profileLabel = "Padrão",
                 lastChangedAt = ScreenshotFixtures.NOW,
-                detail = CliSessionDetailUiState.Ready(
+                detail = CliSessionDetailUiState.Success(
                     sessionId = detail.summary.sessionId,
                     result = CliSessionDetailResult(
                         detail = detail,

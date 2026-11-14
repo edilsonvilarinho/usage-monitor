@@ -18,31 +18,31 @@ class CliSessionRepositoryImpl(
 ) : CliSessionRepository {
 
     override suspend fun syncIndex(): Result<CliSessionIndexReport> {
-        return runCatching { dataSource.syncIndex() }
+        return suspendRunCatching { dataSource.syncIndex() }
     }
 
     override suspend fun getSessions(
         profileId: String?,
         sinceEpochMillis: Long?
     ): Result<List<CliSessionSummary>> {
-        return runCatching { dataSource.readSessions(profileId, sinceEpochMillis) }
+        return suspendRunCatching { dataSource.readSessions(profileId, sinceEpochMillis) }
     }
 
     override suspend fun getSessionDetail(sessionId: String): Result<CliSessionDetail?> {
-        return runCatching { dataSource.readSession(sessionId) }
+        return suspendRunCatching { dataSource.readSession(sessionId) }
     }
 
     override suspend fun getUsageBreakdown(
         profileId: String?,
         sinceEpochMillis: Long
     ): Result<CliUsageBreakdown> {
-        return runCatching {
+        return suspendRunCatching {
             val rows = dataSource.readUsageGroups(profileId, sinceEpochMillis)
 
             // A hora é acessória, como a grade e as ferramentas: uma falha nela
             // não pode derrubar o resumo, que é a informação principal da aba.
             // Sem medida as horas saem nulas — "não se sabe", não "zero".
-            val activeTimes = runCatching { dataSource.readSessionActiveTimes(profileId, sinceEpochMillis) }
+            val activeTimes = suspendRunCatching { dataSource.readSessionActiveTimes(profileId, sinceEpochMillis) }
                 .getOrNull()
                 ?.associate { entry -> entry.sessionId to entry.activeMillis }
                 .orEmpty()
@@ -55,24 +55,24 @@ class CliSessionRepositoryImpl(
         profileId: String?,
         sinceEpochMillis: Long
     ): Result<Map<String, OutputThroughput>> {
-        return runCatching { dataSource.readModelThroughputs(profileId, sinceEpochMillis) }
+        return suspendRunCatching { dataSource.readModelThroughputs(profileId, sinceEpochMillis) }
     }
 
     override suspend fun getHourlyUsage(
         profileId: String?,
         sinceEpochMillis: Long
     ): Result<List<CliHourlyUsageRow>> {
-        return runCatching { dataSource.readHourlyUsage(profileId, sinceEpochMillis) }
+        return suspendRunCatching { dataSource.readHourlyUsage(profileId, sinceEpochMillis) }
     }
 
     override suspend fun getToolUsage(
         profileId: String?,
         sinceEpochMillis: Long
     ): Result<List<CliToolUsage>> {
-        return runCatching { dataSource.readToolUsage(profileId, sinceEpochMillis) }
+        return suspendRunCatching { dataSource.readToolUsage(profileId, sinceEpochMillis) }
     }
 
     override suspend fun getSessionTails(sessionIds: Collection<String>): Result<List<CliSessionTail>> {
-        return runCatching { dataSource.readSessionTails(sessionIds) }
+        return suspendRunCatching { dataSource.readSessionTails(sessionIds) }
     }
 }

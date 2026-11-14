@@ -1,0 +1,72 @@
+# Auditoria de arquitetura — issue #598
+
+Procedência: Claude Opus 5.5 (orquestração), agentes de implementação conforme `.claude/agents/`, Claude Code CLI no
+Windows 11, 2026-11-14, branch `fix/issue-598-architecture-audit`, commits com a identidade `claude <claude@anthropic.com>`.
+
+## Objetivo
+
+Corrigir os desvios das regras de arquitetura do `CLAUDE.md` (camadas da Clean Architecture, DI manual, primitivas
+visuais, contrato de `UiState`) que o `ArchitectureRulesTest` não cobre, e transformar cada regra corrigida em teste,
+para que ela deixe de depender de auditoria manual.
+
+## Fatos confirmados (2026-11-14, `acac74cd`)
+
+- `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*"` → 17 testes, 0 falhas. Regras já impostas: camadas
+  por import, tamanho de arquivo e função, recorte de janela, raiz de dados, idioma inline, `toString` de segredo.
+- 18 contratos `interface *Repository` só em `domain/repository`; 37 use cases, todos com `operator fun invoke`.
+- Nenhum `System.getenv` lê chave de API; nenhum `AlertDialog`; todo `TimeZone.of` é `America/Sao_Paulo`; todo
+  `CoroutineScope` de view model tem `SupervisorJob`; nenhum arquivo de produção entre 750 e 800 linhas (máx. 743).
+- `runCatching` em 13 `*RepositoryImpl` de `commonMain/data/repository`; só `CodexRepositoryImpl` cita
+  `CancellationException` (varredura `grep -c` por arquivo). `Cursor`/`Gemini`/`Antigravity` usam `try/catch` que relança.
+- Heurística awk (propriedade de classe `@Serializable` sem `@SerialName` na linha ou na anterior) em `data/`: ~340
+  propriedades em 23 arquivos; `TeamDto.kt` 132 (1 `@SerialName` no arquivo). Nenhum `JsonNamingStrategy` no projeto.
+- `Main.kt:293,343,346` monta `GetReleaseNotesUseCase`, `ClaimTeamKeyForAccountUseCase`, `ValidateAdminTokenUseCase`;
+  `AppWindowAnchor.kt:101` monta `GenerateBugReportUseCase` dentro de `remember`.
+- `Surface(color = MaterialTheme.colorScheme.background)` como raiz em `CliSessionsScreen.kt:164`,
+  `TeamUsageScreen.kt:249`, `TeamKeysAdminScreen.kt:101`, `help/HelpContent.kt:110`, `help/OnboardingGuide.kt:164`,
+  `help/StartupTipContent.kt:62`, `DesktopWindowFrame.kt:120`. `AppWindowScaffold` (`AppStructure.kt:96`) não é
+  equivalente: pinta com `Modifier.background` (sem `LocalContentColor`) e aplica padding.
+- `CliSessionDetailUiState` e `TeamSessionDetailUiState` usam `Ready` (38 ocorrências em 11 arquivos);
+  `ApiKeyCheck.kt:21`, `NetworkSettingsSection.kt:24`, `TeamIntegrationSection.kt:27` declaram `data class *UiState`.
+
+## Decisões
+
+- **Fora do escopo, por serem intencionais:** `DashboardViewModelDefaults.kt` (Null Object quando a build não liga a
+  fonte); `AnalysisUiState` sem `Error` (falha mantém a análise anterior com `liveFailedAt`, regra "leitura que falha
+  mantém os números"); raízes de composição do modo terminal e do bot Telegram (rodam sem a interface gráfica);
+  `defaultScreenDevice` em diagnóstico, fallback do `ScreenLocator` e checagem de translucidez.
+- **A02 é hipótese:** começa pelo teste que cancela a coleta durante a requisição. Se o teste nascer verde, a hipótese
+  cai, a linha registra a execução e nada muda em produção.
+- **`@SerialName` com o nome atual da propriedade:** o JSON não muda (sem estratégia de nomes, a chave já é o nome
+  Kotlin). A anotação congela o contrato contra renomeação.
+- **Toda regra corrigida vira teste no `ArchitectureRulesTest`**, vermelho antes da correção.
+- **Uma branch, atividades sequenciais:** as atividades tocam arquivos que compilam juntos; agentes em paralelo no
+  mesmo checkout misturariam vermelhos.
+
+## Atividades
+
+| ID | O quê |
+|---|---|
+| A01 | Este plano |
+| A02 | Repositórios: cancelamento propaga em vez de virar `Result.failure` (hipótese, teste primeiro) |
+| A03 | `@SerialName("<nome atual>")` em 397 propriedades de 23 arquivos de `data` (a heurística do A01 contou ~340; o scanner também lê corpo e classes de uma linha); regra `propriedade serializavel de data tem SerialName` + scanner `serializableClassDeclarations` (ignora `@Transient`, `get()`, `by`, enum/object) e teste do scanner. Anotação por script fora do repositório | Vermelho: teste do scanner com stub → `AssertionError` em `ArchitectureRulesTest.kt:362`; regra → `Propriedade serializável sem @SerialName (a chave JSON é o nome Kotlin atual): … AnthropicCreditsDiagnosticsEvent.timestamp`, 397 violações. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.data.*"` → BUILD SUCCESSFUL, 0 falhas. Conferência do orquestrador: pareamento `git diff -U0` linha removida × adicionada → 380 linhas só ganharam `@SerialName` com o nome da própria propriedade + 10 linhas de classe de uma linha conferidas à mão; 11 imports; nenhuma outra mudança |
+| A04 | `AppGraph` ganha `getReleaseNotes`, `claimTeamKeyForAccount(teamId)`, `validateAdminToken(teamId)` e `generateBugReport(machineInfo)`; `Main.kt` e `AppWindowAnchor.kt` só consomem. Os de time seguem montados por chamada (time escolhido na ação) e a máquina do relatório segue lida na hora. Regra `o use case so e montado nas raizes de composicao` (raízes: `AppGraph`, `AppViewModels`, `CollectorEngine`, `TelegramBotComposition`, `terminal/`) + teste do padrão | Vermelho: `ArchitectureRulesTest.kt:388` → `Use case montado fora das raizes de composicao (AppGraph e vizinhos, issue #598):` `AppWindowAnchor.kt`, `Main.kt` (23 testes, 1 falha). Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*"` → 23 testes, 0 falhas; `gradlew.bat desktopJar` → saída 0 |
+| A05 | `AppScreenSurface` em `AppStructure.kt` (fundo `background` + `LocalContentColor` `onBackground`, sem margem) substitui `Surface(color = background)` nas 7 raízes, `modifier`/`testTag` preservados; regra `Surface de tela so nas primitivas de components` + teste do padrão; teste de primitiva em `AppStructureTest`; `docs/design-system/readme.md` (tabela Compose → contrato) e `compose-implementation.md` (lista de primitivas). Protótipo sem mudança: nenhuma alteração visual, `.win { background: var(--bg) }` já descreve a raiz | Vermelho: `ArchitectureRulesTest.kt:234` → `Surface( fora de presentation/ui/components/ (use AppScreenSurface): …CliSessionsScreen.kt, TeamKeysAdminScreen.kt, TeamUsageScreen.kt, …`; `AppStructureTest.kt:188` (stub) → `conteudo sem a cor de onBackground expected:<Color(0.949, 0.929, 0.929)> but was:<Color(0.0, 0.0, 0.0)>`. 1ª entrega devolvida: o teste amostrava o pixel [5,5] sobre o glifo do texto; amostra movida para [190,110], asserção de fundo mantida. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.ui.*"` → 751 testes, 0 falhas |
+| A06 | `CliSessionDetailUiState.Ready` e `TeamSessionDetailUiState.Ready` → `Success`; `AppUpdateUiState.Ready` → `Downloaded` (fora da lista do A01, achado pela regra: é máquina de estados de atualização, não estado de carga — `Success` não descreveria "baixada e conferida"); `ApiKeyCheckUiState`, `ProxyConnectionUiState`, `TeamConnectionUiState` → `*FormState`. Regras `subtipo Ready em sealed interface UiState` e `data class com sufixo UiState` + teste do padrão; `docs/integrations.md` | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*"` → 28 testes, 2 falhas: `subtipo Ready em sealed interface *UiState (...)`: `AppUpdateUiState.Ready`, `CliSessionDetailUiState.Ready`, `TeamSessionDetailUiState.Ready`; `data class com sufixo UiState (...)`: os 3 de formulário. Verde: `gradlew.bat allTests` → 4404 testes, 0 falhas, 1 ignorado (pré-existente). Conferência do orquestrador: pareamento do diff de produção normalizando os nomes trocados → 0 linhas além da renomeação |
+| A03 | `@SerialName` em toda propriedade `@Serializable` de `data` + regra no `ArchitectureRulesTest` |
+| A04 | Use cases de `Main.kt` e `AppWindowAnchor.kt` montados pelo `AppGraph` + regra |
+| A05 | Primitiva de raiz de tela no lugar de `Surface(color = background)` + regra + design system |
+| A06 | `Ready` → `Success` nos `UiState` de detalhe; `data class *UiState` de formulário → `*FormState` |
+
+## Ponto de situação
+
+| ID | Situação | Comando e resultado |
+|---|---|---|
+| A01 | Plano com fatos medidos, decisões e atividades | `gh issue create` → #598; `git worktree add … origin/main` (`acac74cd`) |
+| A02 | Hipótese confirmada: `runCatching` devolvia o cancelamento como `Result.failure`. `suspendRunCatching` (`data/repository/SuspendRunCatching.kt`) relança `CancellationException`; troca em 13 `*RepositoryImpl`; regra `repositorio nao usa runCatching que engole cancelamento` + teste do padrão; `CLAUDE.md` e `docs/integrations.md` | Vermelho: `MiniMaxRepositoryImplTest.kt:91` → `Expected an exception of class CancellationException to be thrown, but was completed successfully with the result: <Failure(CancellationException: cancelado pelo escopo)>`; `SuspendRunCatchingTest.kt:29` (stub) idem; `ArchitectureRulesTest.kt:300` → `runCatching em repositório engole CancellationException` + 13 arquivos. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.data.*" --tests "com.usagemonitor.architecture.*"` → 709 testes, 0 falhas. `grep 'runCatching' data/repository/*RepositoryImpl.kt` → vazio |
+
+## Problemas em aberto e riscos
+
+- A03 é mecânica e extensa: o risco é anotar com nome diferente do atual e mudar o JSON. A regra nova só verifica a
+  presença da anotação; a igualdade com o nome atual é verificada pelos testes de serialização existentes e pelo diff.
+- A05 troca a raiz de 7 telas: a cor de conteúdo herdada (`LocalContentColor`) precisa continuar igual.

@@ -189,7 +189,7 @@ private class TourState {
     fun openSessionDetail() {
         val detail = ScreenshotFixtures.saturatedSessionDetail
         cliState = cliState.copy(
-            detail = CliSessionDetailUiState.Ready(
+            detail = CliSessionDetailUiState.Success(
                 sessionId = detail.summary.sessionId,
                 result = CliSessionDetailResult(
                     detail = detail,

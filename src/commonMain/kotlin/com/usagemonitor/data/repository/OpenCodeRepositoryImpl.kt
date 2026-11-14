@@ -13,7 +13,7 @@ class OpenCodeRepositoryImpl(
 ) : OpenCodeRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             if (!dataSource.isAvailable()) {
                 error("OpenCode local database not found")
             }
@@ -22,7 +22,7 @@ class OpenCodeRepositoryImpl(
                 .sortedBy { snapshot -> snapshot.modelName.lowercase() }
 
             if (snapshots.isEmpty()) {
-                return@runCatching ApiUsageStats(
+                return@suspendRunCatching ApiUsageStats(
                     source = ApiSource.OPENCODE,
                     apiName = OPEN_CODE_API_NAME,
                     quotas = emptyList()

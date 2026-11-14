@@ -62,7 +62,7 @@ class HelpCatalogTest {
     fun `the updates step quotes the real restart action label`() {
         val update = AppUpdateInfo(version = "38.0.0", releasePageUrl = "https://example.com")
         for (language in AppLanguage.entries) {
-            val label = updateBannerContent(AppUpdateUiState.Ready(update), language).actionLabel
+            val label = updateBannerContent(AppUpdateUiState.Downloaded(update), language).actionLabel
             requireNotNull(label)
             val steps = HelpCatalog.entry(HelpTopic.UPDATES, language).steps
             assertTrue(steps.any { step -> "\"$label\"" in step }, "passo sem \"$label\" em $language")

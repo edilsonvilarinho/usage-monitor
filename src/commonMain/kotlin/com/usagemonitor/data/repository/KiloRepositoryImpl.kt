@@ -13,7 +13,7 @@ class KiloRepositoryImpl(
 ) : KiloRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             if (!dataSource.isAvailable()) {
                 error("Kilo local database not found")
             }
@@ -22,7 +22,7 @@ class KiloRepositoryImpl(
                 .sortedBy { snapshot -> snapshot.modelName.lowercase() }
 
             if (snapshots.isEmpty()) {
-                return@runCatching ApiUsageStats(
+                return@suspendRunCatching ApiUsageStats(
                     source = ApiSource.KILO,
                     apiName = KILO_API_NAME,
                     quotas = emptyList()

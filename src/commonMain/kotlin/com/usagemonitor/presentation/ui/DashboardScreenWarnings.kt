@@ -437,7 +437,7 @@ internal fun updateBannerAction(
 ): (() -> Unit)? {
     return when (state) {
         is AppUpdateUiState.Available -> onOpenRelease
-        is AppUpdateUiState.Ready -> onRestartAndUpdate
+        is AppUpdateUiState.Downloaded -> onRestartAndUpdate
         is AppUpdateUiState.Failed -> onOpenRelease
         // Baixando não tem ação: um alvo clicável sem rótulo de ação seria um
         // alvo de clique invisível.
@@ -503,7 +503,7 @@ internal fun updateBannerContent(
             }
         )
 
-        is AppUpdateUiState.Ready -> UpdateBannerContent(
+        is AppUpdateUiState.Downloaded -> UpdateBannerContent(
             title = if (isPt) {
                 "${versionNoun.capitalized()} $version pronta — será aplicada ao fechar o Usage Monitor"
             } else {
@@ -543,7 +543,7 @@ private fun betaUpdateHeadline(state: AppUpdateUiState, isPt: Boolean): String {
     return when (state) {
         is AppUpdateUiState.Available -> if (isPt) "Nova versão beta" else "New beta version"
         is AppUpdateUiState.Downloading -> if (isPt) "Baixando a beta" else "Downloading beta"
-        is AppUpdateUiState.Ready -> if (isPt) "Beta pronta" else "Beta ready"
+        is AppUpdateUiState.Downloaded -> if (isPt) "Beta pronta" else "Beta ready"
         is AppUpdateUiState.Failed -> if (isPt) "Falha na beta" else "Beta failed"
     }
 }

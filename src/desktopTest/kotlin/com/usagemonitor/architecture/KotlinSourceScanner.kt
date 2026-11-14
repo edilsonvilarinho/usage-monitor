@@ -228,3 +228,132 @@ private fun matchingParenthesis(code: String, open: Int): Int? {
     }
     return null
 }
+
+/** Propriedade de classe `@Serializable`: nome e se carrega `@SerialName`. */
+internal data class SerializableProperty(val name: String, val hasSerialName: Boolean)
+
+/** Classe `@Serializable` com as propriedades que entram no JSON. */
+internal data class SerializableClassDeclaration(val name: String, val properties: List<SerializableProperty>)
+
+private val SERIALIZABLE_ANNOTATION = Regex("""@Serializable\b""")
+private val CLASS_KEYWORD = Regex("""(?<![:.\w])(enum\s+class|class|object|interface)\s+(\w+)""")
+private val NOT_A_CLASS_BETWEEN = Regex("""\b(val|var|fun)\b|[{}]""")
+private val BODY_OPEN = Regex("""\A\s*(?::[^{}\n]*)?\{""")
+private val BY_DELEGATE = Regex("""\bby\b""")
+private const val PROPERTY_PATTERN = """((?:@[\w.]+(?:\([^)]*\))?\s*)*)(?:(?:private|internal|public|protected|override|lateinit|const)\s+)*\b(val|var)\s+(\w+)"""
+private val SERIAL_CONSTRUCTOR_PROPERTY = Regex("""^\s*$PROPERTY_PATTERN""")
+private val BODY_PROPERTY = Regex(PROPERTY_PATTERN)
+
+/** Classes `@Serializable` (não enum, object nem interface) com as propriedades que entram no JSON. */
+internal fun serializableClassDeclarations(source: String): List<SerializableClassDeclaration> {
+    val code = stripCommentsAndStrings(source)
+    return SERIALIZABLE_ANNOTATION.findAll(code)
+        .mapNotNull { annotation -> serializableClassAfter(code, annotation.range.last + 1) }
+        .toList()
+}
+
+private fun serializableClassAfter(code: String, from: Int): SerializableClassDeclaration? {
+    val keyword = CLASS_KEYWORD.find(code, from) ?: return null
+    val between = code.substring(from, keyword.range.first)
+    if (keyword.groupValues[1] != "class" || NOT_A_CLASS_BETWEEN.containsMatchIn(between)) {
+        return null
+    }
+    return SerializableClassDeclaration(name = keyword.groupValues[2], properties = classProperties(code, keyword.range.last + 1))
+}
+
+/** Propriedades do construtor primário e do corpo (profundidade 1), nessa ordem. */
+private fun classProperties(code: String, afterName: Int): List<SerializableProperty> {
+    val properties = mutableListOf<SerializableProperty>()
+    var cursor = afterName
+    while (cursor < code.length && code[cursor] != '(' && code[cursor] != '{' && code[cursor] != '\n') {
+        cursor++
+    }
+    if (cursor < code.length && code[cursor] == '(') {
+        val close = matchingParenthesis(code, cursor) ?: return properties
+        properties += constructorProperties(code.substring(cursor + 1, close))
+        cursor = close + 1
+    }
+    val open = BODY_OPEN.find(code.substring(cursor))?.range?.last ?: return properties
+    val bodyOpen = cursor + open
+    val bodyClose = matchingBrace(code, bodyOpen) ?: return properties
+    properties += bodyProperties(code.substring(bodyOpen + 1, bodyClose))
+    return properties
+}
+
+private fun constructorProperties(parameters: String): List<SerializableProperty> =
+    splitTopLevel(parameters).mapNotNull { parameter -> propertyOf(SERIAL_CONSTRUCTOR_PROPERTY.find(parameter)) }
+
+private fun bodyProperties(body: String): List<SerializableProperty> {
+    val masked = maskNestedBlocks(body)
+    return BODY_PROPERTY.findAll(masked)
+        .filter { match -> !isDelegatedOrComputed(masked.substring(match.range.last + 1)) }
+        .mapNotNull { match -> propertyOf(match) }
+        .toList()
+}
+
+/** Propriedade com `@Transient` fica de fora; `@SerialName` vale pelo prefixo de anotações. */
+private fun propertyOf(match: MatchResult?): SerializableProperty? {
+    match ?: return null
+    val annotations = match.groupValues[1]
+    if (annotations.contains("@Transient")) {
+        return null
+    }
+    return SerializableProperty(name = match.groupValues[3], hasSerialName = annotations.contains("@SerialName"))
+}
+
+/** Propriedade delegada (`by`) ou computada (`get()`, na mesma linha ou na seguinte) não tem campo de backing. */
+private fun isDelegatedOrComputed(tail: String): Boolean {
+    val sameLine = tail.substringBefore('\n')
+    if (BY_DELEGATE.containsMatchIn(sameLine) || sameLine.contains("get(")) {
+        return true
+    }
+    val nextLine = tail.substringAfter('\n', "").lineSequence().firstOrNull { line -> line.isNotBlank() }
+    return nextLine?.trim()?.startsWith("get(") == true
+}
+
+/** Troca o conteúdo de blocos aninhados por espaço, mantendo quebras de linha: sobra só o nível 1. */
+private fun maskNestedBlocks(body: String): String {
+    val out = StringBuilder(body.length)
+    var depth = 0
+    for (char in body) {
+        when (char) {
+            '{' -> {
+                depth++
+                out.append(' ')
+            }
+            '}' -> {
+                depth--
+                out.append(' ')
+            }
+            '\n' -> out.append('\n')
+            else -> out.append(if (depth > 0) ' ' else char)
+        }
+    }
+    return out.toString()
+}
+
+/** Divide os parâmetros por vírgula de nível 0 (ignora vírgula dentro de `<>`, `()`, `[]`, `{}`). */
+private fun splitTopLevel(text: String): List<String> {
+    val parts = mutableListOf<String>()
+    val current = StringBuilder()
+    var depth = 0
+    for (char in text) {
+        when {
+            char == ',' && depth == 0 -> {
+                parts += current.toString()
+                current.setLength(0)
+            }
+            char in "([{<" -> {
+                depth++
+                current.append(char)
+            }
+            char in ")]}>" -> {
+                depth--
+                current.append(char)
+            }
+            else -> current.append(char)
+        }
+    }
+    parts += current.toString()
+    return parts
+}

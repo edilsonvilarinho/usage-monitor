@@ -7,50 +7,51 @@ import com.usagemonitor.domain.entity.TelegramBotPreferences
 import com.usagemonitor.domain.entity.TelegramBotSettings
 import com.usagemonitor.domain.entity.TelegramChat
 import com.usagemonitor.domain.entity.TelegramPendingRestart
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.security.SecureRandom
 
 @Serializable
-private data class TelegramChatDto(val id: Long, val name: String = "", val readOnly: Boolean = false)
+private data class TelegramChatDto(@SerialName("id") val id: Long, @SerialName("name") val name: String = "", @SerialName("readOnly") val readOnly: Boolean = false)
 
 @Serializable
-private data class TelegramPanelMessageDto(val chatId: Long, val messageId: Long)
+private data class TelegramPanelMessageDto(@SerialName("chatId") val chatId: Long, @SerialName("messageId") val messageId: Long)
 
 @Serializable
-private data class TelegramPendingRestartDto(val targetVersion: String, val fromVersion: String)
+private data class TelegramPendingRestartDto(@SerialName("targetVersion") val targetVersion: String, @SerialName("fromVersion") val fromVersion: String)
 
 /** Opções da #408; cada campo com default, para o arquivo antigo continuar valendo. */
 @Serializable
 private data class TelegramPreferencesDto(
-    val allowPcActions: Boolean = false,
-    val showMachineName: Boolean = false,
-    val showTeam: Boolean = false,
-    val allowRemoteUpdate: Boolean = false,
-    val announcedUpdateVersion: String? = null,
-    val soundOnlyOnCritical: Boolean = true,
-    val groupRepeatedAlerts: Boolean = true,
-    val batchAlerts: Boolean = true,
-    val compactPanel: Boolean = true,
-    val sourceHealthAlerts: Boolean = true,
-    val pendingRestart: TelegramPendingRestartDto? = null,
-    val keyboardLayout: Int = 0
+    @SerialName("allowPcActions") val allowPcActions: Boolean = false,
+    @SerialName("showMachineName") val showMachineName: Boolean = false,
+    @SerialName("showTeam") val showTeam: Boolean = false,
+    @SerialName("allowRemoteUpdate") val allowRemoteUpdate: Boolean = false,
+    @SerialName("announcedUpdateVersion") val announcedUpdateVersion: String? = null,
+    @SerialName("soundOnlyOnCritical") val soundOnlyOnCritical: Boolean = true,
+    @SerialName("groupRepeatedAlerts") val groupRepeatedAlerts: Boolean = true,
+    @SerialName("batchAlerts") val batchAlerts: Boolean = true,
+    @SerialName("compactPanel") val compactPanel: Boolean = true,
+    @SerialName("sourceHealthAlerts") val sourceHealthAlerts: Boolean = true,
+    @SerialName("pendingRestart") val pendingRestart: TelegramPendingRestartDto? = null,
+    @SerialName("keyboardLayout") val keyboardLayout: Int = 0
 )
 
 @Serializable
 private data class TelegramSettingsDto(
-    val enabled: Boolean = false,
-    val botToken: String = "",
-    val authorizedChats: List<TelegramChatDto> = emptyList(),
-    val pairingCode: String? = null,
-    val pairingExpiresAtMillis: Long? = null,
-    val allowSourceControl: Boolean = false,
-    val dailySummaryHour: Int? = null,
-    val lastSummaryDate: String? = null,
-    val livePanelEnabled: Boolean = false,
-    val panelMessages: List<TelegramPanelMessageDto> = emptyList(),
-    val preferences: TelegramPreferencesDto = TelegramPreferencesDto()
+    @SerialName("enabled") val enabled: Boolean = false,
+    @SerialName("botToken") val botToken: String = "",
+    @SerialName("authorizedChats") val authorizedChats: List<TelegramChatDto> = emptyList(),
+    @SerialName("pairingCode") val pairingCode: String? = null,
+    @SerialName("pairingExpiresAtMillis") val pairingExpiresAtMillis: Long? = null,
+    @SerialName("allowSourceControl") val allowSourceControl: Boolean = false,
+    @SerialName("dailySummaryHour") val dailySummaryHour: Int? = null,
+    @SerialName("lastSummaryDate") val lastSummaryDate: String? = null,
+    @SerialName("livePanelEnabled") val livePanelEnabled: Boolean = false,
+    @SerialName("panelMessages") val panelMessages: List<TelegramPanelMessageDto> = emptyList(),
+    @SerialName("preferences") val preferences: TelegramPreferencesDto = TelegramPreferencesDto()
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =

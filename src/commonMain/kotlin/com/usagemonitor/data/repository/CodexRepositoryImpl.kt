@@ -33,7 +33,7 @@ class CodexRepositoryImpl(
 ) : CodexRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             // A conta padrão também leva rótulo: sem ele o card mostra só "Codex", sem a conta.
             fetchStableUsage(CodexProfileSources(authDataSource, rolloutRateLimits)).copy(
                 profileLabel = CodexProfileRef.DEFAULT_LABEL
@@ -42,7 +42,7 @@ class CodexRepositoryImpl(
     }
 
     override suspend fun getUsage(profile: CodexProfileRef): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             val sources = profileSources(profile)
                 ?: throw IllegalStateException("Perfil Codex não configurado: ${profile.label}.")
             // O alvo e o rótulo vão na leitura: é por eles que o card, a HUD e o
@@ -79,7 +79,7 @@ class CodexRepositoryImpl(
      */
     private suspend fun modelLimitQuotas(source: CodexRolloutRateLimitDataSource?, livePlanType: String): List<QuotaInfo> {
         if (source == null) return emptyList()
-        val limits = runCatching { source.latestRateLimits() }.getOrElse { failure ->
+        val limits = suspendRunCatching { source.latestRateLimits() }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
             return emptyList()
         }

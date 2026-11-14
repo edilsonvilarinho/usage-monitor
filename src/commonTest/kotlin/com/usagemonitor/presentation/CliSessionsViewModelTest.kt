@@ -193,7 +193,7 @@ class CliSessionsViewModelTest {
         viewModel.openSession("a")
 
         val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
-        val detail = assertIs<CliSessionDetailUiState.Ready>(state.detail)
+        val detail = assertIs<CliSessionDetailUiState.Success>(state.detail)
         assertEquals("a", detail.sessionId)
         assertEquals(1, detail.result.detail.turns.size)
         assertEquals(20_000L, detail.result.analytics.liveContextTokens)
@@ -472,7 +472,7 @@ class CliSessionsViewModelTest {
         val viewModel = buildViewModel(repository)
 
         viewModel.openSession("a")
-        assertIs<CliSessionDetailUiState.Ready>(
+        assertIs<CliSessionDetailUiState.Success>(
             assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).detail
         )
 
@@ -670,7 +670,7 @@ class CliSessionsViewModelTest {
             runCurrent()
             states.add((viewModel.uiState.value as? CliSessionsUiState.Success)?.detail)
 
-            val detail = assertIs<CliSessionDetailUiState.Ready>(states.last())
+            val detail = assertIs<CliSessionDetailUiState.Success>(states.last())
             assertEquals(2, detail.result.detail.turns.size)
             assertEquals(90_000L, detail.result.analytics.liveContextTokens)
         } finally {
@@ -692,7 +692,7 @@ class CliSessionsViewModelTest {
             advanceTimeBy(LIVE_INTERVAL_MILLIS)
             runCurrent()
 
-            val detail = assertIs<CliSessionDetailUiState.Ready>(
+            val detail = assertIs<CliSessionDetailUiState.Success>(
                 assertIs<CliSessionsUiState.Success>(viewModel.uiState.value).detail
             )
             assertEquals(20_000L, detail.result.analytics.liveContextTokens)
@@ -717,7 +717,7 @@ class CliSessionsViewModelTest {
 
             val state = assertIs<CliSessionsUiState.Success>(viewModel.uiState.value)
             assertTrue(state.sessions.isEmpty())
-            assertIs<CliSessionDetailUiState.Ready>(state.detail)
+            assertIs<CliSessionDetailUiState.Success>(state.detail)
         } finally {
             viewModel.onDestroy()
         }

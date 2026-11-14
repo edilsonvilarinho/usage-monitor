@@ -845,7 +845,7 @@ class TeamUsageViewModelTest {
         assertEquals("device-1", repository.lastDetailDeviceId)
         assertEquals("s1", repository.lastDetailSessionId)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        val ready = assertIs<TeamSessionDetailUiState.Success>(state.detail)
         assertFalse(ready.turnsUnavailable)
         assertEquals(1, ready.result.detail.turns.size)
         assertEquals(listOf(10_000L), ready.result.analytics.contextPerTurn)
@@ -870,7 +870,7 @@ class TeamUsageViewModelTest {
         // Sem carregar o detalhe do estado anterior em `loadTeam`, o tique de 5s
         // fecharia o painel na cara de quem está lendo.
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        val ready = assertIs<TeamSessionDetailUiState.Success>(state.detail)
         assertEquals("s1", ready.sessionId)
         viewModel.onDestroy()
     }
@@ -924,7 +924,7 @@ class TeamUsageViewModelTest {
         runCurrent()
 
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        val ready = assertIs<TeamSessionDetailUiState.Success>(state.detail)
         assertTrue(ready.turnsUnavailable)
         assertTrue(ready.result.detail.turns.isEmpty())
         // O veredito de contexto sai do resumo e continua exato.
@@ -1436,7 +1436,7 @@ class TeamUsageViewModelTest {
         assertEquals(1, admin.detailCalls)
         assertEquals(ACCOUNT_KEY, admin.lastDetailAccountKey)
         val state = assertIs<TeamUsageUiState.Success>(viewModel.uiState.value)
-        val ready = assertIs<TeamSessionDetailUiState.Ready>(state.detail)
+        val ready = assertIs<TeamSessionDetailUiState.Success>(state.detail)
         assertEquals(ACCOUNT_KEY, ready.accountKey)
         assertEquals(listOf(10_000L), ready.result.analytics.contextPerTurn)
         viewModel.onDestroy()

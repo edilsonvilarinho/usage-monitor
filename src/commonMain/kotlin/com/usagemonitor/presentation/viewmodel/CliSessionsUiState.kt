@@ -188,7 +188,7 @@ sealed interface CliSessionDetailUiState {
         val message: String
     ) : CliSessionDetailUiState
 
-    data class Ready(
+    data class Success(
         override val sessionId: String,
         val result: CliSessionDetailResult
     ) : CliSessionDetailUiState

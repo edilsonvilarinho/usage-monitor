@@ -18,21 +18,21 @@ import kotlinx.serialization.json.contentOrNull
  */
 @Serializable
 data class ClaudeTranscriptLineDto(
-    val type: String? = null,
-    val uuid: String? = null,
+    @SerialName("type") val type: String? = null,
+    @SerialName("uuid") val uuid: String? = null,
     @SerialName("sessionId") val sessionId: String? = null,
-    val timestamp: String? = null,
-    val cwd: String? = null,
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("cwd") val cwd: String? = null,
     @SerialName("gitBranch") val gitBranch: String? = null,
     @SerialName("isSidechain") val isSidechain: Boolean = false,
-    val message: ClaudeTranscriptMessageDto? = null
+    @SerialName("message") val message: ClaudeTranscriptMessageDto? = null
 )
 
 @Serializable
 data class ClaudeTranscriptMessageDto(
-    val id: String? = null,
-    val model: String? = null,
-    val usage: ClaudeTranscriptUsageDto? = null,
+    @SerialName("id") val id: String? = null,
+    @SerialName("model") val model: String? = null,
+    @SerialName("usage") val usage: ClaudeTranscriptUsageDto? = null,
     /**
      * Blocos da mensagem, lidos como [JsonElement] cru.
      *
@@ -43,7 +43,7 @@ data class ClaudeTranscriptMessageDto(
      * Só o **nome** da ferramenta é extraído daqui — nunca o `input` nem o texto
      * da resposta, na mesma regra que o envio para o time segue.
      */
-    val content: JsonElement? = null
+    @SerialName("content") val content: JsonElement? = null
 ) {
     /**
      * Ferramentas invocadas nesta mensagem, com a contagem de chamadas.
@@ -84,10 +84,10 @@ private const val TOOL_USE_BLOCK_TYPE = "tool_use"
  */
 @Serializable
 data class ClaudeTranscriptTailLineDto(
-    val type: String? = null,
+    @SerialName("type") val type: String? = null,
     /** Distingue os vários `type: "system"`; `turn_duration` é o fim de turno. */
-    val subtype: String? = null,
-    val timestamp: String? = null,
+    @SerialName("subtype") val subtype: String? = null,
+    @SerialName("timestamp") val timestamp: String? = null,
     @SerialName("sessionId") val sessionId: String? = null,
     @SerialName("isSidechain") val isSidechain: Boolean = false
 )

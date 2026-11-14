@@ -4,6 +4,7 @@ import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.DEFAULT_WEB_ACCESS_PORT
 import com.usagemonitor.domain.entity.WebAccessSettings
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -11,9 +12,9 @@ import java.security.SecureRandom
 
 @Serializable
 private data class WebAccessSettingsDto(
-    val enabled: Boolean = false,
-    val port: Int = DEFAULT_WEB_ACCESS_PORT,
-    val token: String = ""
+    @SerialName("enabled") val enabled: Boolean = false,
+    @SerialName("port") val port: Int = DEFAULT_WEB_ACCESS_PORT,
+    @SerialName("token") val token: String = ""
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =

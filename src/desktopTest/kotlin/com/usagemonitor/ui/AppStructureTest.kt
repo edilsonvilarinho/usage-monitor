@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -33,7 +34,9 @@ import com.usagemonitor.presentation.ui.components.APP_TABS_INDICATOR_TEST_TAG
 import com.usagemonitor.presentation.ui.components.AppDataRow
 import com.usagemonitor.presentation.ui.components.AppDataSurfaceFlush
 import com.usagemonitor.presentation.ui.components.AppGroupBand
+import androidx.compose.ui.platform.testTag
 import com.usagemonitor.presentation.ui.components.AppModalRevealScope
+import com.usagemonitor.presentation.ui.components.AppScreenSurface
 import com.usagemonitor.presentation.ui.components.AppSectionHeader
 import com.usagemonitor.presentation.ui.components.AppSettingsNav
 import com.usagemonitor.presentation.ui.components.AppTab
@@ -174,6 +177,34 @@ class AppStructureTest {
 
         onNodeWithText("Conteúdo").assertIsDisplayed()
         onNodeWithText("v35.0.0").assertIsDisplayed()
+    }
+
+    /**
+     * A raiz de tela é o único lugar que pinta o fundo da janela e fixa a cor de
+     * conteúdo. Sem `LocalContentColor` = `onBackground`, o texto de cada tela
+     * herda a cor do `Surface` padrão do Material e some no tema escuro.
+     */
+    @Test
+    fun `a superficie de tela entrega a cor de conteudo e aplica o modifier`() = runDesktopComposeUiTest {
+        var contentColor = Color.Unspecified
+        var expectedContent = Color.Unspecified
+        var expectedBackground = Color.Unspecified
+        setContent {
+            AppTheme(isDark = true) {
+                expectedContent = MaterialTheme.colorScheme.onBackground
+                expectedBackground = MaterialTheme.colorScheme.background
+                AppScreenSurface(modifier = Modifier.testTag("raiz-de-tela").width(200.dp).height(120.dp)) {
+                    contentColor = LocalContentColor.current
+                    Text("Conteúdo")
+                }
+            }
+        }
+
+        assertEquals(expectedContent, contentColor, "conteudo sem a cor de onBackground")
+        onNodeWithTag("raiz-de-tela").assertIsDisplayed()
+        assertEquals(200.dp, onNodeWithTag("raiz-de-tela").getUnclippedBoundsInRoot().width, "modifier nao chegou a raiz")
+        // Amostra o canto inferior direito da superficie (200x120): o texto fica no canto superior esquerdo.
+        assertEquals(expectedBackground, onRoot().captureToImage().toPixelMap()[190, 110], "fundo da janela nao pintado")
     }
 
     /**

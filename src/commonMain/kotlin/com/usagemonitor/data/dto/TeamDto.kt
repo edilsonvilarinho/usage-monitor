@@ -12,52 +12,52 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TeamMemberDto(
-    val deviceId: String,
-    val alias: String,
-    val hostName: String? = null,
-    val organizationUuid: String? = null,
-    val organizationName: String? = null
+    @SerialName("deviceId") val deviceId: String,
+    @SerialName("alias") val alias: String,
+    @SerialName("hostName") val hostName: String? = null,
+    @SerialName("organizationUuid") val organizationUuid: String? = null,
+    @SerialName("organizationName") val organizationName: String? = null
 )
 
 @Serializable
 data class TeamSessionUploadDto(
-    val sessionId: String,
-    val cwd: String? = null,
-    val gitBranch: String? = null,
-    val firstTs: Long,
-    val lastTs: Long,
-    val liveContextTokens: Long = 0L,
-    val liveContextModel: String? = null
+    @SerialName("sessionId") val sessionId: String,
+    @SerialName("cwd") val cwd: String? = null,
+    @SerialName("gitBranch") val gitBranch: String? = null,
+    @SerialName("firstTs") val firstTs: Long,
+    @SerialName("lastTs") val lastTs: Long,
+    @SerialName("liveContextTokens") val liveContextTokens: Long = 0L,
+    @SerialName("liveContextModel") val liveContextModel: String? = null
 )
 
 @Serializable
 data class TeamTurnUploadDto(
-    val sessionId: String,
-    val messageId: String,
-    val ts: Long,
-    val model: String? = null,
-    val isSidechain: Boolean = false,
-    val inputTokens: Long = 0L,
-    val outputTokens: Long = 0L,
-    val cacheReadTokens: Long = 0L,
-    val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    @SerialName("sessionId") val sessionId: String,
+    @SerialName("messageId") val messageId: String,
+    @SerialName("ts") val ts: Long,
+    @SerialName("model") val model: String? = null,
+    @SerialName("isSidechain") val isSidechain: Boolean = false,
+    @SerialName("inputTokens") val inputTokens: Long = 0L,
+    @SerialName("outputTokens") val outputTokens: Long = 0L,
+    @SerialName("cacheReadTokens") val cacheReadTokens: Long = 0L,
+    @SerialName("cacheWrite5mTokens") val cacheWrite5mTokens: Long = 0L,
+    @SerialName("cacheWrite1hTokens") val cacheWrite1hTokens: Long = 0L
 )
 
 @Serializable
 data class TeamIngestRequestDto(
-    val accountKey: String,
-    val accountEmail: String? = null,
-    val member: TeamMemberDto,
-    val sessions: List<TeamSessionUploadDto> = emptyList(),
-    val turns: List<TeamTurnUploadDto> = emptyList()
+    @SerialName("accountKey") val accountKey: String,
+    @SerialName("accountEmail") val accountEmail: String? = null,
+    @SerialName("member") val member: TeamMemberDto,
+    @SerialName("sessions") val sessions: List<TeamSessionUploadDto> = emptyList(),
+    @SerialName("turns") val turns: List<TeamTurnUploadDto> = emptyList()
 )
 
 @Serializable
 data class TeamIngestResponseDto(
-    val acceptedTurns: Int = 0,
-    val ignoredTurns: Int = 0,
-    val acceptedSessions: Int = 0
+    @SerialName("acceptedTurns") val acceptedTurns: Int = 0,
+    @SerialName("ignoredTurns") val ignoredTurns: Int = 0,
+    @SerialName("acceptedSessions") val acceptedSessions: Int = 0
 )
 
 /**
@@ -66,9 +66,9 @@ data class TeamIngestResponseDto(
  */
 @Serializable
 data class TeamPresenceRequestDto(
-    val accountKey: String,
-    val accountEmail: String? = null,
-    val member: TeamMemberDto
+    @SerialName("accountKey") val accountKey: String,
+    @SerialName("accountEmail") val accountEmail: String? = null,
+    @SerialName("member") val member: TeamMemberDto
 )
 
 /**
@@ -80,17 +80,17 @@ data class TeamPresenceRequestDto(
  */
 @Serializable
 data class TeamPresenceResponseDto(
-    val lastSeenAt: Long = 0L
+    @SerialName("lastSeenAt") val lastSeenAt: Long = 0L
 )
 
 @Serializable
 data class TeamMemberRowDto(
-    val deviceId: String,
-    val alias: String,
-    val hostName: String? = null,
-    val organizationUuid: String? = null,
-    val organizationName: String? = null,
-    val lastSeenAt: Long = 0L
+    @SerialName("deviceId") val deviceId: String,
+    @SerialName("alias") val alias: String,
+    @SerialName("hostName") val hostName: String? = null,
+    @SerialName("organizationUuid") val organizationUuid: String? = null,
+    @SerialName("organizationName") val organizationName: String? = null,
+    @SerialName("lastSeenAt") val lastSeenAt: Long = 0L
 )
 
 /**
@@ -103,30 +103,30 @@ data class TeamMemberRowDto(
  */
 @Serializable
 data class TeamUsageRowDto(
-    val deviceId: String,
-    val sessionId: String,
-    val cwd: String? = null,
-    val gitBranch: String? = null,
-    val liveContextTokens: Long = 0L,
-    val liveContextModel: String? = null,
-    val model: String? = null,
-    val turnCount: Int = 0,
-    val firstTs: Long = 0L,
-    val lastTs: Long = 0L,
-    val inputTokens: Long = 0L,
-    val outputTokens: Long = 0L,
-    val cacheReadTokens: Long = 0L,
-    val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L,
+    @SerialName("deviceId") val deviceId: String,
+    @SerialName("sessionId") val sessionId: String,
+    @SerialName("cwd") val cwd: String? = null,
+    @SerialName("gitBranch") val gitBranch: String? = null,
+    @SerialName("liveContextTokens") val liveContextTokens: Long = 0L,
+    @SerialName("liveContextModel") val liveContextModel: String? = null,
+    @SerialName("model") val model: String? = null,
+    @SerialName("turnCount") val turnCount: Int = 0,
+    @SerialName("firstTs") val firstTs: Long = 0L,
+    @SerialName("lastTs") val lastTs: Long = 0L,
+    @SerialName("inputTokens") val inputTokens: Long = 0L,
+    @SerialName("outputTokens") val outputTokens: Long = 0L,
+    @SerialName("cacheReadTokens") val cacheReadTokens: Long = 0L,
+    @SerialName("cacheWrite5mTokens") val cacheWrite5mTokens: Long = 0L,
+    @SerialName("cacheWrite1hTokens") val cacheWrite1hTokens: Long = 0L,
     /**
      * Parte de prompt longo do grupo. `null` quando o servidor não manda os cinco campos
      * (servidor anterior à faixa de prompt longo); o mapper só monta a parte com os cinco presentes.
      */
-    val longPromptInputTokens: Long? = null,
-    val longPromptOutputTokens: Long? = null,
-    val longPromptCacheReadTokens: Long? = null,
-    val longPromptCacheWrite5mTokens: Long? = null,
-    val longPromptCacheWrite1hTokens: Long? = null
+    @SerialName("longPromptInputTokens") val longPromptInputTokens: Long? = null,
+    @SerialName("longPromptOutputTokens") val longPromptOutputTokens: Long? = null,
+    @SerialName("longPromptCacheReadTokens") val longPromptCacheReadTokens: Long? = null,
+    @SerialName("longPromptCacheWrite5mTokens") val longPromptCacheWrite5mTokens: Long? = null,
+    @SerialName("longPromptCacheWrite1hTokens") val longPromptCacheWrite1hTokens: Long? = null
 )
 
 /**
@@ -138,36 +138,36 @@ data class TeamUsageRowDto(
  */
 @Serializable
 data class TeamSessionActivityDto(
-    val deviceId: String = "",
-    val sessionId: String = "",
-    val activeMillis: Long = 0L
+    @SerialName("deviceId") val deviceId: String = "",
+    @SerialName("sessionId") val sessionId: String = "",
+    @SerialName("activeMillis") val activeMillis: Long = 0L
 )
 
 @Serializable
 data class TeamSnapshotDto(
-    val members: List<TeamMemberRowDto> = emptyList(),
-    val rows: List<TeamUsageRowDto> = emptyList(),
+    @SerialName("members") val members: List<TeamMemberRowDto> = emptyList(),
+    @SerialName("rows") val rows: List<TeamUsageRowDto> = emptyList(),
     /**
      * Vazia contra servidor anterior à 0.7.0, que não conhece o campo.
      *
      * Lista vazia vira hora **não medida** no domínio, e não zero: o campo
      * ausente diz que o servidor não sabe, não que ninguém trabalhou.
      */
-    val activity: List<TeamSessionActivityDto> = emptyList()
+    @SerialName("activity") val activity: List<TeamSessionActivityDto> = emptyList()
 )
 
 /** Metadados da sessão pedida em `GET /api/v1/session`, já com a máquina de origem. */
 @Serializable
 data class TeamSessionRowDto(
-    val deviceId: String = "",
-    val sessionId: String = "",
-    val hostName: String? = null,
-    val cwd: String? = null,
-    val gitBranch: String? = null,
-    val firstTs: Long = 0L,
-    val lastTs: Long = 0L,
-    val liveContextTokens: Long = 0L,
-    val liveContextModel: String? = null
+    @SerialName("deviceId") val deviceId: String = "",
+    @SerialName("sessionId") val sessionId: String = "",
+    @SerialName("hostName") val hostName: String? = null,
+    @SerialName("cwd") val cwd: String? = null,
+    @SerialName("gitBranch") val gitBranch: String? = null,
+    @SerialName("firstTs") val firstTs: Long = 0L,
+    @SerialName("lastTs") val lastTs: Long = 0L,
+    @SerialName("liveContextTokens") val liveContextTokens: Long = 0L,
+    @SerialName("liveContextModel") val liveContextModel: String? = null
 )
 
 /**
@@ -179,21 +179,21 @@ data class TeamSessionRowDto(
  */
 @Serializable
 data class TeamTurnRowDto(
-    val messageId: String,
-    val ts: Long,
-    val model: String? = null,
-    val isSidechain: Boolean = false,
-    val inputTokens: Long = 0L,
-    val outputTokens: Long = 0L,
-    val cacheReadTokens: Long = 0L,
-    val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L
+    @SerialName("messageId") val messageId: String,
+    @SerialName("ts") val ts: Long,
+    @SerialName("model") val model: String? = null,
+    @SerialName("isSidechain") val isSidechain: Boolean = false,
+    @SerialName("inputTokens") val inputTokens: Long = 0L,
+    @SerialName("outputTokens") val outputTokens: Long = 0L,
+    @SerialName("cacheReadTokens") val cacheReadTokens: Long = 0L,
+    @SerialName("cacheWrite5mTokens") val cacheWrite5mTokens: Long = 0L,
+    @SerialName("cacheWrite1hTokens") val cacheWrite1hTokens: Long = 0L
 )
 
 @Serializable
 data class TeamSessionDetailResponseDto(
-    val session: TeamSessionRowDto = TeamSessionRowDto(),
-    val turns: List<TeamTurnRowDto> = emptyList()
+    @SerialName("session") val session: TeamSessionRowDto = TeamSessionRowDto(),
+    @SerialName("turns") val turns: List<TeamTurnRowDto> = emptyList()
 )
 
 /**
@@ -206,18 +206,18 @@ data class TeamSessionDetailResponseDto(
  */
 @Serializable
 data class TeamClaimRequestDto(
-    val accountKey: String,
-    val accountEmail: String? = null
+    @SerialName("accountKey") val accountKey: String,
+    @SerialName("accountEmail") val accountEmail: String? = null
 )
 
 /** Resposta de `GET /api/v1/verify` e de `POST /api/v1/claim`. */
 @Serializable
 data class TeamVerificationDto(
-    val authorized: Boolean = false,
-    val claimed: Boolean = false,
-    val label: String? = null,
-    val maxAccounts: Int = 0,
-    val claimedAccounts: Int = 0
+    @SerialName("authorized") val authorized: Boolean = false,
+    @SerialName("claimed") val claimed: Boolean = false,
+    @SerialName("label") val label: String? = null,
+    @SerialName("maxAccounts") val maxAccounts: Int = 0,
+    @SerialName("claimedAccounts") val claimedAccounts: Int = 0
 )
 
 /**
@@ -228,12 +228,12 @@ data class TeamVerificationDto(
  */
 @Serializable
 data class TeamKeyDto(
-    val id: String,
-    val label: String = "",
-    val key: String = "",
-    val keyPrefix: String = "",
-    val maxAccounts: Int = 1,
-    val accounts: List<String> = emptyList(),
+    @SerialName("id") val id: String,
+    @SerialName("label") val label: String = "",
+    @SerialName("key") val key: String = "",
+    @SerialName("keyPrefix") val keyPrefix: String = "",
+    @SerialName("maxAccounts") val maxAccounts: Int = 1,
+    @SerialName("accounts") val accounts: List<String> = emptyList(),
     /**
      * As mesmas contas de [accounts], com e-mail e veredito (servidor 0.11.0+).
      *
@@ -241,45 +241,45 @@ data class TeamKeyDto(
      * `accounts` quebraria app anterior. Vazia contra servidor mais velho, e aí
      * a tela cai em [accounts] e mostra só o UUID, como sempre mostrou.
      */
-    val accountDetails: List<TeamKeyAccountDto> = emptyList(),
-    val createdAt: Long? = null,
-    val revokedAt: Long? = null,
-    val lastUsedAt: Long? = null
+    @SerialName("accountDetails") val accountDetails: List<TeamKeyAccountDto> = emptyList(),
+    @SerialName("createdAt") val createdAt: Long? = null,
+    @SerialName("revokedAt") val revokedAt: Long? = null,
+    @SerialName("lastUsedAt") val lastUsedAt: Long? = null
 )
 
 /** Conta vinculada a uma chave, com o que a tela precisa para decidir sobre ela. */
 @Serializable
 data class TeamKeyAccountDto(
-    val accountKey: String,
-    val accountEmail: String? = null,
+    @SerialName("accountKey") val accountKey: String,
+    @SerialName("accountEmail") val accountEmail: String? = null,
     /** `false` quando o e-mail da conta não está na relação declarada no rótulo. */
-    val authorized: Boolean = true
+    @SerialName("authorized") val authorized: Boolean = true
 )
 
 /** Resposta de `GET` e `DELETE /api/admin/v1/blocked-accounts`. */
 @Serializable
 data class TeamBlockedAccountListDto(
-    val accounts: List<TeamBlockedAccountDto> = emptyList()
+    @SerialName("accounts") val accounts: List<TeamBlockedAccountDto> = emptyList()
 )
 
 @Serializable
 data class TeamBlockedAccountDto(
-    val accountKey: String,
+    @SerialName("accountKey") val accountKey: String,
     /** Retrato do e-mail no momento do bloqueio; a conta em si já foi apagada. */
-    val accountEmail: String? = null,
-    val reason: String? = null,
-    val blockedAt: Long? = null
+    @SerialName("accountEmail") val accountEmail: String? = null,
+    @SerialName("reason") val reason: String? = null,
+    @SerialName("blockedAt") val blockedAt: Long? = null
 )
 
 @Serializable
 data class TeamKeyListDto(
-    val keys: List<TeamKeyDto> = emptyList()
+    @SerialName("keys") val keys: List<TeamKeyDto> = emptyList()
 )
 
 @Serializable
 data class CreateTeamKeyRequestDto(
-    val label: String,
-    val maxAccounts: Int = 1
+    @SerialName("label") val label: String,
+    @SerialName("maxAccounts") val maxAccounts: Int = 1
 )
 
 /**
@@ -288,8 +288,8 @@ data class CreateTeamKeyRequestDto(
  */
 @Serializable
 data class UpdateTeamKeyRequestDto(
-    val label: String? = null,
-    val maxAccounts: Int? = null
+    @SerialName("label") val label: String? = null,
+    @SerialName("maxAccounts") val maxAccounts: Int? = null
 )
 
 /**
@@ -300,34 +300,34 @@ data class UpdateTeamKeyRequestDto(
  */
 @Serializable
 data class TeamAccountDeletionDto(
-    val deletedTurns: Int = 0,
-    val deletedSessions: Int = 0,
-    val deletedMembers: Int = 0,
-    val unlinkedKeys: Int = 0
+    @SerialName("deletedTurns") val deletedTurns: Int = 0,
+    @SerialName("deletedSessions") val deletedSessions: Int = 0,
+    @SerialName("deletedMembers") val deletedMembers: Int = 0,
+    @SerialName("unlinkedKeys") val unlinkedKeys: Int = 0
 )
 
 /** Uma conta dentro de `GET /api/admin/v1/overview`. */
 @Serializable
 data class TeamAccountSnapshotDto(
-    val accountKey: String,
-    val label: String? = null,
-    val accountEmail: String? = null,
-    val emailSource: String? = null,
-    val members: List<TeamMemberRowDto> = emptyList(),
-    val rows: List<TeamUsageRowDto> = emptyList(),
-    val activity: List<TeamSessionActivityDto> = emptyList()
+    @SerialName("accountKey") val accountKey: String,
+    @SerialName("label") val label: String? = null,
+    @SerialName("accountEmail") val accountEmail: String? = null,
+    @SerialName("emailSource") val emailSource: String? = null,
+    @SerialName("members") val members: List<TeamMemberRowDto> = emptyList(),
+    @SerialName("rows") val rows: List<TeamUsageRowDto> = emptyList(),
+    @SerialName("activity") val activity: List<TeamSessionActivityDto> = emptyList()
 )
 
 @Serializable
 data class TeamOverviewDto(
-    val accounts: List<TeamAccountSnapshotDto> = emptyList()
+    @SerialName("accounts") val accounts: List<TeamAccountSnapshotDto> = emptyList()
 )
 
 /** Corpo de erro do servidor: `{ "error": "...", "code": "..." }`. */
 @Serializable
 data class TeamErrorDto(
     @SerialName("error") val message: String = "",
-    val code: String = ""
+    @SerialName("code") val code: String = ""
 )
 
 /**
@@ -338,28 +338,28 @@ data class TeamErrorDto(
  */
 @Serializable
 data class TeamTrendRowDto(
-    val deviceId: String,
-    val dayStartMillis: Long,
-    val model: String? = null,
-    val turnCount: Int = 0,
-    val inputTokens: Long = 0L,
-    val outputTokens: Long = 0L,
-    val cacheReadTokens: Long = 0L,
-    val cacheWrite5mTokens: Long = 0L,
-    val cacheWrite1hTokens: Long = 0L,
+    @SerialName("deviceId") val deviceId: String,
+    @SerialName("dayStartMillis") val dayStartMillis: Long,
+    @SerialName("model") val model: String? = null,
+    @SerialName("turnCount") val turnCount: Int = 0,
+    @SerialName("inputTokens") val inputTokens: Long = 0L,
+    @SerialName("outputTokens") val outputTokens: Long = 0L,
+    @SerialName("cacheReadTokens") val cacheReadTokens: Long = 0L,
+    @SerialName("cacheWrite5mTokens") val cacheWrite5mTokens: Long = 0L,
+    @SerialName("cacheWrite1hTokens") val cacheWrite1hTokens: Long = 0L,
     /**
      * Parte de prompt longo da linha. `null` quando o servidor não manda os cinco campos
      * (servidor anterior à faixa de prompt longo); o mapper só monta a parte com os cinco presentes.
      */
-    val longPromptInputTokens: Long? = null,
-    val longPromptOutputTokens: Long? = null,
-    val longPromptCacheReadTokens: Long? = null,
-    val longPromptCacheWrite5mTokens: Long? = null,
-    val longPromptCacheWrite1hTokens: Long? = null
+    @SerialName("longPromptInputTokens") val longPromptInputTokens: Long? = null,
+    @SerialName("longPromptOutputTokens") val longPromptOutputTokens: Long? = null,
+    @SerialName("longPromptCacheReadTokens") val longPromptCacheReadTokens: Long? = null,
+    @SerialName("longPromptCacheWrite5mTokens") val longPromptCacheWrite5mTokens: Long? = null,
+    @SerialName("longPromptCacheWrite1hTokens") val longPromptCacheWrite1hTokens: Long? = null
 )
 
 @Serializable
 data class TeamTrendResponseDto(
-    val members: List<TeamMemberDto> = emptyList(),
-    val rows: List<TeamTrendRowDto> = emptyList()
+    @SerialName("members") val members: List<TeamMemberDto> = emptyList(),
+    @SerialName("rows") val rows: List<TeamTrendRowDto> = emptyList()
 )

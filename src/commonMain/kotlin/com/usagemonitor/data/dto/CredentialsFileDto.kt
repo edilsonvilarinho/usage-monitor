@@ -17,15 +17,15 @@ data class CredentialsFileDto(
 
 @Serializable
 data class OAuthCredentialsDto(
-    val accessToken: String,
-    val refreshToken: String = "",
+    @SerialName("accessToken") val accessToken: String,
+    @SerialName("refreshToken") val refreshToken: String = "",
 
     // Timestamp de expiração em milissegundos (epoch ms)
-    val expiresAt: Long = Long.MAX_VALUE,
+    @SerialName("expiresAt") val expiresAt: Long = Long.MAX_VALUE,
 
-    val scopes: List<String> = emptyList(),
-    val subscriptionType: String? = null,
-    val rateLimitTier: String? = null
+    @SerialName("scopes") val scopes: List<String> = emptyList(),
+    @SerialName("subscriptionType") val subscriptionType: String? = null,
+    @SerialName("rateLimitTier") val rateLimitTier: String? = null
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =

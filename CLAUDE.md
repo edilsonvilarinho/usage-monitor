@@ -77,7 +77,7 @@ Decisões e histórico por fornecedor em [`docs/integrations.md`](docs/integrati
 "Decisões de implementação". **Leia a seção da fonte antes de mexer nela.** Regras que não podem
 ser esquecidas:
 
-- DTOs com `@Serializable` + `@SerialName`; repositórios usam `Result.runCatching { }`.
+- DTOs com `@Serializable` + `@SerialName`; repositórios usam `suspendRunCatching { }`, que relança `CancellationException` (`runCatching` o engolia; #598).
 - Leitura de ficheiro só em **desktopMain** (`LocalCredentialDataSource`, `LocalApiKeyDataSource`).
   Chaves de MiniMax/DeepSeek/OpenCode Go só de `~/.usage-monitor/api-keys.json`, nunca hardcode nem
   variável de ambiente. Fontes com chave: `API_KEY_DEPENDENT_SOURCES`, não literal repetido.

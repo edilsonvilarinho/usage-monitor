@@ -758,7 +758,7 @@ class TeamUsageScreenTest {
         renderSuccess(
             TeamUsageUiState.Success(
                 members = listOf(member("device-1", "edilson", "NOTE-B2", listOf(summary))),
-                detail = TeamSessionDetailUiState.Ready(
+                detail = TeamSessionDetailUiState.Success(
                     deviceId = "device-1",
                     sessionId = summary.sessionId,
                     result = CliSessionDetailResult(
@@ -785,7 +785,7 @@ class TeamUsageScreenTest {
         renderSuccess(
             TeamUsageUiState.Success(
                 members = listOf(member("device-1", "edilson", "DESKTOP-A1", listOf(summary))),
-                detail = TeamSessionDetailUiState.Ready(
+                detail = TeamSessionDetailUiState.Success(
                     deviceId = "device-1",
                     sessionId = summary.sessionId,
                     result = CliSessionDetailResult(

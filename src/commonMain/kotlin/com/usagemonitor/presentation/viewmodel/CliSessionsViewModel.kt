@@ -619,10 +619,10 @@ class CliSessionsViewModel(
      */
     private suspend fun reloadOpenDetail() {
         val current = _uiState.value as? CliSessionsUiState.Success ?: return
-        val sessionId = (current.detail as? CliSessionDetailUiState.Ready)?.sessionId ?: return
+        val sessionId = (current.detail as? CliSessionDetailUiState.Success)?.sessionId ?: return
 
         val reloaded = loadDetailState(sessionId)
-        if (reloaded is CliSessionDetailUiState.Ready) {
+        if (reloaded is CliSessionDetailUiState.Success) {
             publishDetail(sessionId, reloaded)
         }
     }
@@ -634,7 +634,7 @@ class CliSessionsViewModel(
                 if (loaded == null) {
                     CliSessionDetailUiState.Error(sessionId, "Sessão não encontrada no índice.")
                 } else {
-                    CliSessionDetailUiState.Ready(sessionId, loaded)
+                    CliSessionDetailUiState.Success(sessionId, loaded)
                 }
             },
             onFailure = { error ->

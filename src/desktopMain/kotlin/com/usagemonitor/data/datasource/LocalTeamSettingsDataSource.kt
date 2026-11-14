@@ -4,6 +4,7 @@ import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.TeamIntegrationSettings
 import com.usagemonitor.domain.entity.TeamIntegrations
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -18,18 +19,18 @@ private const val LEGACY_TEAM_NAME = "Time"
 /** Um time no `team.json` v2. Mesmos campos do time único, mais `id` e `name`. */
 @Serializable
 private data class TeamEntryDto(
-    val id: String = "",
-    val name: String = "",
-    val serverUrl: String = "",
-    val apiKey: String = "",
-    val alias: String = "",
-    val participatingProfileIds: List<String> = emptyList(),
-    val adminToken: String = "",
+    @SerialName("id") val id: String = "",
+    @SerialName("name") val name: String = "",
+    @SerialName("serverUrl") val serverUrl: String = "",
+    @SerialName("apiKey") val apiKey: String = "",
+    @SerialName("alias") val alias: String = "",
+    @SerialName("participatingProfileIds") val participatingProfileIds: List<String> = emptyList(),
+    @SerialName("adminToken") val adminToken: String = "",
     /**
      * Chave própria de cada conta (profileId → chave). `null` quando vazio: com `explicitNulls = false`
      * o campo some do arquivo, e um `team.json` sem chaves por conta fica byte a byte igual ao de antes.
      */
-    val accountApiKeys: Map<String, String>? = null
+    @SerialName("accountApiKeys") val accountApiKeys: Map<String, String>? = null
 ) {
     /** Segredos nunca no `toString`, mesmo dentro da lista de times do DTO. */
     override fun toString(): String =
@@ -40,24 +41,24 @@ private data class TeamEntryDto(
 
 @Serializable
 private data class TeamSettingsDto(
-    val enabled: Boolean = false,
-    val serverUrl: String = "",
-    val apiKey: String = "",
-    val alias: String = "",
-    val deviceId: String = "",
-    val participatingProfileIds: List<String> = emptyList(),
+    @SerialName("enabled") val enabled: Boolean = false,
+    @SerialName("serverUrl") val serverUrl: String = "",
+    @SerialName("apiKey") val apiKey: String = "",
+    @SerialName("alias") val alias: String = "",
+    @SerialName("deviceId") val deviceId: String = "",
+    @SerialName("participatingProfileIds") val participatingProfileIds: List<String> = emptyList(),
     /**
      * Token de administração, quando esta máquina administra o servidor.
      *
      * Campo novo com default: um `team.json` gravado por versão anterior continua
      * legível, e o `ignoreUnknownKeys` cobre o caminho de volta.
      */
-    val adminToken: String = "",
+    @SerialName("adminToken") val adminToken: String = "",
     /**
      * Times do formato v2. `null` é o arquivo plano da versão anterior: os campos planos
      * viram um time só. Lista presente (mesmo vazia) manda e ignora os campos planos.
      */
-    val teams: List<TeamEntryDto>? = null
+    @SerialName("teams") val teams: List<TeamEntryDto>? = null
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =

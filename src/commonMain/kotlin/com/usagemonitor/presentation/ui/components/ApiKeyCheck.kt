@@ -11,14 +11,14 @@ import com.usagemonitor.presentation.viewmodel.sanitizeUiErrorMessage
 enum class ApiKeyCheckStatus { IDLE, CHECKING, OK, FAILED }
 
 /**
- * Espelha `ProxyConnectionUiState`, com um campo a mais: [tone].
+ * Espelha `ProxyConnectionFormState`, com um campo a mais: [tone].
  *
  * Lá bastam OK e CRITICAL porque a conexão ou passa ou não passa. Aqui existe um
  * terceiro veredito — chave **válida** sem assinatura, sem plano, ou serviço que
  * não respondeu a tempo —, e chamar isso de falha vermelha mandaria o usuário
  * trocar uma credencial que está correta.
  */
-data class ApiKeyCheckUiState(
+data class ApiKeyCheckFormState(
     val status: ApiKeyCheckStatus = ApiKeyCheckStatus.IDLE,
     val message: String? = null,
     val tone: AppTone = AppTone.NEUTRAL
@@ -46,11 +46,11 @@ fun apiKeyCheckResult(
     source: ApiSource,
     error: Throwable?,
     language: AppLanguage
-): ApiKeyCheckUiState {
+): ApiKeyCheckFormState {
     val isPt = language == AppLanguage.PT
 
     if (error == null) {
-        return ApiKeyCheckUiState(
+        return ApiKeyCheckFormState(
             status = ApiKeyCheckStatus.OK,
             message = if (isPt) "Chave válida." else "Key is valid.",
             tone = AppTone.OK
@@ -151,8 +151,8 @@ fun apiKeyCheckResult(
     return failed(uiError.message)
 }
 
-private fun failed(message: String): ApiKeyCheckUiState {
-    return ApiKeyCheckUiState(
+private fun failed(message: String): ApiKeyCheckFormState {
+    return ApiKeyCheckFormState(
         status = ApiKeyCheckStatus.FAILED,
         message = message,
         tone = AppTone.CRITICAL
@@ -164,8 +164,8 @@ private fun failed(message: String): ApiKeyCheckUiState {
  * coisa. `FAILED` como status, porque não houve leitura de uso; âmbar como tom,
  * porque não há credencial a corrigir.
  */
-private fun inconclusive(message: String): ApiKeyCheckUiState {
-    return ApiKeyCheckUiState(
+private fun inconclusive(message: String): ApiKeyCheckFormState {
+    return ApiKeyCheckFormState(
         status = ApiKeyCheckStatus.FAILED,
         message = message,
         tone = AppTone.WARNING

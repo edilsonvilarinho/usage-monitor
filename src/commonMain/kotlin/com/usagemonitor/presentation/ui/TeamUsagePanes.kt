@@ -167,7 +167,7 @@ internal fun TeamSessionDetailPane(
                 onRetry = null
             )
 
-            is TeamSessionDetailUiState.Ready -> TeamSessionDetailBody(
+            is TeamSessionDetailUiState.Success -> TeamSessionDetailBody(
                 detail = detail,
                 language = language,
                 advancedExpanded = advancedExpanded,
@@ -181,7 +181,7 @@ internal fun TeamSessionDetailPane(
 
 @Composable
 private fun TeamSessionDetailBody(
-    detail: TeamSessionDetailUiState.Ready,
+    detail: TeamSessionDetailUiState.Success,
     language: AppLanguage,
     advancedExpanded: Boolean,
     glossaryExpanded: Boolean,

@@ -147,7 +147,7 @@ internal class DashboardUpdateCoordinator(
 
         val prepared = preparedUpdate
         if (prepared != null && prepared.version == update.version) {
-            _state.value = AppUpdateUiState.Ready(update)
+            _state.value = AppUpdateUiState.Downloaded(update)
             return
         }
 
@@ -222,7 +222,7 @@ internal class DashboardUpdateCoordinator(
                 .onSuccess { preparation ->
                     preparedUpdate = preparation
                     updateBackoff = null
-                    _state.value = AppUpdateUiState.Ready(update)
+                    _state.value = AppUpdateUiState.Downloaded(update)
                 }
                 .onFailure { error ->
                     breadcrumbs.recordFailure("baixar atualização do app", error)

@@ -646,7 +646,7 @@ class TeamUsageViewModel(
      */
     private suspend fun reloadOpenDetail() {
         val current = _uiState.value as? TeamUsageUiState.Success ?: return
-        val open = current.detail as? TeamSessionDetailUiState.Ready ?: return
+        val open = current.detail as? TeamSessionDetailUiState.Success ?: return
         val targetAccountKey = open.accountKey ?: accountKey ?: return
 
         val reloaded = loadDetailState(
@@ -656,7 +656,7 @@ class TeamUsageViewModel(
             scopedAccountKey = open.accountKey,
             adminAccess = current.isAdminOverview
         )
-        if (reloaded is TeamSessionDetailUiState.Ready) {
+        if (reloaded is TeamSessionDetailUiState.Success) {
             publishDetail(
                 deviceId = open.deviceId,
                 sessionId = open.sessionId,
@@ -701,7 +701,7 @@ class TeamUsageViewModel(
                     // Servidor sem a rota de detalhe, ou sessão fora da retenção.
                     aggregatedTeamSessionDetail(_uiState.value, deviceId, sessionId, scopedAccountKey, computeAnalytics)
                 } else {
-                    TeamSessionDetailUiState.Ready(
+                    TeamSessionDetailUiState.Success(
                         deviceId = deviceId,
                         sessionId = sessionId,
                         accountKey = scopedAccountKey,

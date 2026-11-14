@@ -513,7 +513,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -745,7 +745,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -787,7 +787,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -834,7 +834,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -872,7 +872,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -908,7 +908,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -945,7 +945,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -984,7 +984,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1042,7 +1042,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1074,7 +1074,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1111,7 +1111,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1149,7 +1149,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1207,7 +1207,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1775,7 +1775,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,
@@ -1816,7 +1816,7 @@ class CliSessionsScreenTest {
                     CliSessionsContent(
                         state = CliSessionsUiState.Success(
                             sessions = listOf(summary),
-                            detail = CliSessionDetailUiState.Ready(
+                            detail = CliSessionDetailUiState.Success(
                                 sessionId = summary.sessionId,
                                 result = CliSessionDetailResult(
                                     detail = detail,

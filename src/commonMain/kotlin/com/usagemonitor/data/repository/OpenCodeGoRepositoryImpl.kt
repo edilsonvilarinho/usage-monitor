@@ -29,7 +29,7 @@ class OpenCodeGoRepositoryImpl(
 ) : OpenCodeGoRepository {
 
     override suspend fun getUsage(): Result<ApiUsageStats> {
-        return Result.runCatching {
+        return suspendRunCatching {
             val apiKey = apiKeyReader()?.takeIf { key -> key.isNotBlank() }
                 ?: throw IllegalStateException(OPEN_CODE_GO_API_KEY_MISSING_MESSAGE)
 

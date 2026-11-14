@@ -276,10 +276,10 @@ internal class LocalCredentialDataSource(
 
     @Serializable
     private data class TokenRefreshRequest(
-        val grant_type: String,
-        val refresh_token: String,
-        val client_id: String,
-        val scope: String,
+        @SerialName("grant_type") val grant_type: String,
+        @SerialName("refresh_token") val refresh_token: String,
+        @SerialName("client_id") val client_id: String,
+        @SerialName("scope") val scope: String,
     ) {
         /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
         override fun toString(): String =
@@ -299,14 +299,14 @@ internal class LocalCredentialDataSource(
 
     @Serializable
     private data class ClaudeConfigDto(
-        val oauthAccount: ClaudeOauthAccountDto? = null
+        @SerialName("oauthAccount") val oauthAccount: ClaudeOauthAccountDto? = null
     )
 
     @Serializable
     private data class ClaudeOauthAccountDto(
-        val accountUuid: String = "",
-        val emailAddress: String = "",
-        val organizationUuid: String? = null,
-        val organizationName: String? = null
+        @SerialName("accountUuid") val accountUuid: String = "",
+        @SerialName("emailAddress") val emailAddress: String = "",
+        @SerialName("organizationUuid") val organizationUuid: String? = null,
+        @SerialName("organizationName") val organizationName: String? = null
     )
 }

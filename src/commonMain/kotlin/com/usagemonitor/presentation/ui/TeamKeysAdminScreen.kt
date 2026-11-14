@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.usagemonitor.presentation.ui.components.AppScreenSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -98,7 +98,7 @@ internal fun TeamKeysAdminContent(
     onDismissError: () -> Unit = {},
     onRetry: () -> Unit = {}
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    AppScreenSurface(modifier = modifier.fillMaxSize()) {
         AppStateCrossfade(state) { state ->
     when (state) {
                 is TeamKeysUiState.Loading -> AppLoadingState(TeamKeysLabels.loading(language))
