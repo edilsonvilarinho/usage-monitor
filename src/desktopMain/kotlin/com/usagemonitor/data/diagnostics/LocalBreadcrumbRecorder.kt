@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -15,9 +16,9 @@ import java.io.File
 
 @Serializable
 private data class BreadcrumbLineDto(
-    val ts: String,
-    val category: String,
-    val message: String
+    @SerialName("ts") val ts: String,
+    @SerialName("category") val category: String,
+    @SerialName("message") val message: String
 )
 
 /**

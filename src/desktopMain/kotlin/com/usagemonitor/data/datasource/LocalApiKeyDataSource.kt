@@ -4,6 +4,7 @@ import com.usagemonitor.data.AppDataDirectory
 import com.usagemonitor.domain.entity.redactedSecret
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.requiresLocalApiKey
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -80,10 +81,10 @@ data class ApiKeySettings(
 
 @Serializable
 private data class ApiKeySettingsDto(
-    val minimax: String = "",
-    val deepSeek: String = "",
-    val openCodeGo: String = "",
-    val openRouter: String = ""
+    @SerialName("minimax") val minimax: String = "",
+    @SerialName("deepSeek") val deepSeek: String = "",
+    @SerialName("openCodeGo") val openCodeGo: String = "",
+    @SerialName("openRouter") val openRouter: String = ""
 ) {
     /** Segredo nunca no `toString` (log, relatório de bug, mensagem de exceção). */
     override fun toString(): String =

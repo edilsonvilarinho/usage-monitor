@@ -16,7 +16,7 @@ data class GitHubReleaseDto(
      * porque release publicada sem descrição existe — e ali a janela
      * simplesmente não abre, em vez de abrir vazia.
      */
-    val body: String? = null,
+    @SerialName("body") val body: String? = null,
     /** ISO 8601. Nulo é "não informado": a linha de data some, a janela fica. */
     @SerialName("published_at")
     val publishedAt: String? = null,
@@ -24,15 +24,15 @@ data class GitHubReleaseDto(
      * Release beta (issue #355). Só a listagem `/releases` a devolve com `true`:
      * `/releases/latest` nunca traz prerelease. Ausente vale `false`.
      */
-    val prerelease: Boolean = false,
+    @SerialName("prerelease") val prerelease: Boolean = false,
     /** Rascunho aparece na listagem para quem tem acesso de escrita; nunca é oferecido. */
-    val draft: Boolean = false,
-    val assets: List<GitHubReleaseAssetDto> = emptyList()
+    @SerialName("draft") val draft: Boolean = false,
+    @SerialName("assets") val assets: List<GitHubReleaseAssetDto> = emptyList()
 )
 
 @Serializable
 data class GitHubReleaseAssetDto(
-    val name: String,
+    @SerialName("name") val name: String,
     @SerialName("browser_download_url")
     val browserDownloadUrl: String,
     /**
@@ -42,12 +42,12 @@ data class GitHubReleaseAssetDto(
      * seria trocar uma conferência acessória pela funcionalidade toda — quem
      * barra artefato trocado é o [digest].
      */
-    val size: Long? = null,
+    @SerialName("size") val size: Long? = null,
     /**
      * Checksum no formato `sha256:<hex>`, conferido nos sete assets do v37.0.0.
      * É o portão de integridade do download: a allowlist de host só valida a URL
      * inicial, e o GitHub redireciona os downloads para `objects.githubusercontent.com`.
      * Asset sem digest não é elegível para atualização automática.
      */
-    val digest: String? = null
+    @SerialName("digest") val digest: String? = null
 )

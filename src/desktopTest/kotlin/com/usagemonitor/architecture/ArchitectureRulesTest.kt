@@ -277,7 +277,7 @@ class ArchitectureRulesTest {
 
         val declarations = dataClassDeclarations(source).associateBy { declaration -> declaration.name }
 
-        assertEquals(listOf("accessToken", "count"), declarations.getValue("Plain").properties)
+        assertEquals(listOf("accessToken", "count"), declarations["Plain"]?.properties.orEmpty())
         assertEquals("", declarations.getValue("Plain").body)
         assertTrue(declarations.getValue("Safe").body.contains("override fun toString"))
         assertTrue(SECRET_PROPERTY.matches("accessToken"))
@@ -310,6 +310,65 @@ class ArchitectureRulesTest {
         assertTrue(RUN_CATCHING.containsMatchIn("return@runCatching null"))
         assertFalse(RUN_CATCHING.containsMatchIn("return suspendRunCatching {"))
         assertFalse(RUN_CATCHING.containsMatchIn("val result = suspendRunCatching { load() }"))
+    }
+
+    /**
+     * A chave JSON de uma propriedade serializável é o nome Kotlin dela: não há
+     * `JsonNamingStrategy` no projeto. `@SerialName` fixa o nome atual, então
+     * renomear a propriedade sem a anotação muda o JSON gravado em disco e enviado
+     * ao servidor do time. `@Transient` fica de fora: não entra no JSON.
+     */
+    @Test
+    fun `propriedade serializavel de data tem SerialName`() {
+        val violations = sources
+            .filter { source -> SERIAL_NAME_SCOPES.any { scope -> source.path.startsWith(scope) } }
+            .flatMap { source ->
+                serializableClassDeclarations(source.text).flatMap { declaration ->
+                    declaration.properties
+                        .filter { property -> !property.hasSerialName }
+                        .map { property -> "${source.path}: ${declaration.name}.${property.name}" }
+                }
+            }
+        if (violations.isNotEmpty()) {
+            fail("Propriedade serializável sem @SerialName (a chave JSON é o nome Kotlin atual):\n" + violations.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `o scanner de serializable le propriedades com e sem SerialName`() {
+        val source = """
+            @Serializable
+            data class Wire(
+                @SerialName("access_token") val accessToken: String,
+                val count: Int,
+                @Transient val cache: String = ""
+            ) {
+                @SerialName("extra") val extra: Int = 0
+                val computed: Int get() = 1
+                val lazyValue by lazy { 2 }
+            }
+
+            @Serializable
+            enum class Mode(val label: String) { ON("on") }
+
+            @Serializable
+            private class Plain(var inner: Map<String, Int>)
+
+            data class NotSerializable(val skipped: Int)
+        """.trimIndent()
+
+        val declarations = serializableClassDeclarations(source).associateBy { declaration -> declaration.name }
+
+        assertEquals(
+            listOf(
+                SerializableProperty("accessToken", hasSerialName = true),
+                SerializableProperty("count", hasSerialName = false),
+                SerializableProperty("extra", hasSerialName = true)
+            ),
+            declarations["Wire"]?.properties.orEmpty()
+        )
+        assertEquals(listOf(SerializableProperty("inner", hasSerialName = false)), declarations["Plain"]?.properties.orEmpty())
+        assertEquals(setOf("Wire", "Plain"), declarations.keys)
     }
 
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
@@ -406,6 +465,12 @@ class ArchitectureRulesTest {
 
         /** `runCatching` como chamada; `suspendRunCatching` não casa, o `R` é maiúsculo (issue #598). */
         val RUN_CATCHING = Regex("""\brunCatching\b""")
+
+        /** Pastas de `data` (commonMain e desktopMain): onde o DTO e o JSON de disco moram. */
+        val SERIAL_NAME_SCOPES = listOf(
+            "src/commonMain/kotlin/com/usagemonitor/data/",
+            "src/desktopMain/kotlin/com/usagemonitor/data/"
+        )
 
         val INLINE_LANGUAGE_CHECK = Regex("""==\s*AppLanguage\.PT\b""")
 

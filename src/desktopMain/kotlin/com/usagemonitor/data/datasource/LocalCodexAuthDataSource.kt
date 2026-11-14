@@ -105,7 +105,7 @@ class LocalCodexAuthDataSource(
 
 @Serializable
 private data class CodexAuthFileDto(
-    val tokens: CodexTokensDto
+    @SerialName("tokens") val tokens: CodexTokensDto
 )
 
 @Serializable

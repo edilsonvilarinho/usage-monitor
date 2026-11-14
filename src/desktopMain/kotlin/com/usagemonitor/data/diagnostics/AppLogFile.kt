@@ -7,6 +7,7 @@ import com.usagemonitor.domain.entity.breadcrumbFailureReasonOf
 import com.usagemonitor.domain.entity.sanitizeBreadcrumbMessage
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -38,16 +39,16 @@ internal enum class AppLogLevel {
 
 @Serializable
 private data class AppLogLineDto(
-    val ts: String,
-    val pid: Long,
-    val version: String,
-    val level: String,
-    val source: String,
-    val thread: String,
-    val message: String,
-    val error: String? = null,
-    val stack: List<String>? = null,
-    val causes: List<String>? = null
+    @SerialName("ts") val ts: String,
+    @SerialName("pid") val pid: Long,
+    @SerialName("version") val version: String,
+    @SerialName("level") val level: String,
+    @SerialName("source") val source: String,
+    @SerialName("thread") val thread: String,
+    @SerialName("message") val message: String,
+    @SerialName("error") val error: String? = null,
+    @SerialName("stack") val stack: List<String>? = null,
+    @SerialName("causes") val causes: List<String>? = null
 )
 
 /**

@@ -31,7 +31,7 @@ data class CodexResetCreditsDto(
 
 @Serializable
 data class CodexRateLimitDto(
-    val allowed: Boolean,
+    @SerialName("allowed") val allowed: Boolean,
     @SerialName("limit_reached") val limitReached: Boolean,
     @SerialName("primary_window") val primaryWindow: CodexUsageWindowDto? = null,
     @SerialName("secondary_window") val secondaryWindow: CodexUsageWindowDto? = null

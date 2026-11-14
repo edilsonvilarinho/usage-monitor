@@ -228,7 +228,7 @@ object UsageExporter {
 @Serializable
 private data class ExportedSessionDto(
     @SerialName("session_id") val sessionId: String,
-    val project: String? = null,
+    @SerialName("project") val project: String? = null,
     @SerialName("git_branch") val gitBranch: String? = null,
     @SerialName("profile_id") val profileId: String? = null,
     @SerialName("host_name") val hostName: String? = null,
@@ -271,10 +271,10 @@ private fun CliSessionSummary.toDto(): ExportedSessionDto {
 @Serializable
 private data class ExportedTurnDto(
     @SerialName("session_id") val sessionId: String,
-    val seq: Int,
+    @SerialName("seq") val seq: Int,
     @SerialName("message_id") val messageId: String,
-    val ts: String,
-    val model: String? = null,
+    @SerialName("ts") val ts: String,
+    @SerialName("model") val model: String? = null,
     @SerialName("is_sidechain") val isSidechain: Boolean,
     @SerialName("input_tokens") val inputTokens: Long,
     @SerialName("output_tokens") val outputTokens: Long,
@@ -304,7 +304,7 @@ private fun CliSessionTurn.toDto(): ExportedTurnDto {
 
 @Serializable
 private data class ExportedBucketDto(
-    val label: String? = null,
+    @SerialName("label") val label: String? = null,
     @SerialName("session_count") val sessionCount: Int,
     @SerialName("turn_count") val turnCount: Int,
     @SerialName("total_tokens") val totalTokens: Long,
@@ -319,7 +319,7 @@ private data class ExportedBreakdownDto(
     @SerialName("by_project") val byProject: List<ExportedBucketDto>,
     @SerialName("by_model") val byModel: List<ExportedBucketDto>,
     @SerialName("by_branch") val byBranch: List<ExportedBucketDto>,
-    val totals: ExportedBucketDto
+    @SerialName("totals") val totals: ExportedBucketDto
 )
 
 private fun CliUsageBucket.toDto(): ExportedBucketDto {

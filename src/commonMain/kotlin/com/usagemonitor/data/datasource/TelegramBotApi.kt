@@ -277,29 +277,29 @@ open class TelegramBotApi(
 
     @Serializable
     private data class UpdatesResponseDto(
-        override val ok: Boolean = false,
-        override val description: String? = null,
-        override val parameters: ResponseParametersDto? = null,
-        val result: List<UpdateDto>? = null
+        @SerialName("ok") override val ok: Boolean = false,
+        @SerialName("description") override val description: String? = null,
+        @SerialName("parameters") override val parameters: ResponseParametersDto? = null,
+        @SerialName("result") val result: List<UpdateDto>? = null
     ) : OkResponse
 
     @Serializable
     private data class MeResponseDto(
-        override val ok: Boolean = false,
-        override val description: String? = null,
-        override val parameters: ResponseParametersDto? = null,
-        val result: MeDto? = null
+        @SerialName("ok") override val ok: Boolean = false,
+        @SerialName("description") override val description: String? = null,
+        @SerialName("parameters") override val parameters: ResponseParametersDto? = null,
+        @SerialName("result") val result: MeDto? = null
     ) : OkResponse
 
     @Serializable
-    private data class MeDto(val username: String? = null)
+    private data class MeDto(@SerialName("username") val username: String? = null)
 
     @Serializable
     private data class SentResponseDto(
-        override val ok: Boolean = false,
-        override val description: String? = null,
-        override val parameters: ResponseParametersDto? = null,
-        val result: MessageDto? = null
+        @SerialName("ok") override val ok: Boolean = false,
+        @SerialName("description") override val description: String? = null,
+        @SerialName("parameters") override val parameters: ResponseParametersDto? = null,
+        @SerialName("result") val result: MessageDto? = null
     ) : OkResponse
 
     @Serializable
@@ -311,40 +311,40 @@ open class TelegramBotApi(
 
     @Serializable
     private data class SimpleResponseDto(
-        override val ok: Boolean = false,
-        override val description: String? = null,
-        override val parameters: ResponseParametersDto? = null
+        @SerialName("ok") override val ok: Boolean = false,
+        @SerialName("description") override val description: String? = null,
+        @SerialName("parameters") override val parameters: ResponseParametersDto? = null
     ) : OkResponse
 
     @Serializable
     private data class UpdateDto(
         @SerialName("update_id") val updateId: Long,
-        val message: MessageDto? = null,
+        @SerialName("message") val message: MessageDto? = null,
         @SerialName("callback_query") val callbackQuery: CallbackQueryDto? = null
     )
 
     @Serializable
     private data class MessageDto(
-        val chat: ChatDto = ChatDto(0L),
-        val text: String? = null,
+        @SerialName("chat") val chat: ChatDto = ChatDto(0L),
+        @SerialName("text") val text: String? = null,
         @SerialName("message_id") val messageId: Long? = null
     )
 
     @Serializable
-    private data class CallbackQueryDto(val id: String, val data: String? = null, val message: MessageDto? = null)
+    private data class CallbackQueryDto(@SerialName("id") val id: String, @SerialName("data") val data: String? = null, @SerialName("message") val message: MessageDto? = null)
 
     @Serializable
     private data class ChatDto(
-        val id: Long,
-        val username: String? = null,
+        @SerialName("id") val id: Long,
+        @SerialName("username") val username: String? = null,
         @SerialName("first_name") val firstName: String? = null,
-        val title: String? = null
+        @SerialName("title") val title: String? = null
     )
 
     @Serializable
     private data class SendMessageDto(
         @SerialName("chat_id") val chatId: Long,
-        val text: String,
+        @SerialName("text") val text: String,
         @SerialName("parse_mode") val parseMode: String? = null,
         @SerialName("reply_markup") val replyMarkup: JsonElement? = null,
         @SerialName("disable_notification") val disableNotification: Boolean? = null
@@ -353,13 +353,13 @@ open class TelegramBotApi(
     /** Sem default de propósito: o `Json` do cliente não grava valor padrão, e estes têm de ir. */
     @Serializable
     private data class ReplyKeyboardDto(
-        val keyboard: List<List<ReplyButtonDto>>,
+        @SerialName("keyboard") val keyboard: List<List<ReplyButtonDto>>,
         @SerialName("resize_keyboard") val resizeKeyboard: Boolean,
         @SerialName("is_persistent") val isPersistent: Boolean
     )
 
     @Serializable
-    private data class ReplyButtonDto(val text: String)
+    private data class ReplyButtonDto(@SerialName("text") val text: String)
 
     @Serializable
     private data class RemoveKeyboardDto(@SerialName("remove_keyboard") val removeKeyboard: Boolean)
@@ -368,25 +368,25 @@ open class TelegramBotApi(
     private data class EditMessageDto(
         @SerialName("chat_id") val chatId: Long,
         @SerialName("message_id") val messageId: Long,
-        val text: String,
+        @SerialName("text") val text: String,
         @SerialName("parse_mode") val parseMode: String,
         @SerialName("reply_markup") val replyMarkup: KeyboardDto? = null
     )
 
     @Serializable
-    private data class AnswerCallbackDto(@SerialName("callback_query_id") val callbackQueryId: String, val text: String? = null)
+    private data class AnswerCallbackDto(@SerialName("callback_query_id") val callbackQueryId: String, @SerialName("text") val text: String? = null)
 
     @Serializable
     private data class KeyboardDto(@SerialName("inline_keyboard") val inlineKeyboard: List<List<ButtonDto>>)
 
     @Serializable
-    private data class ButtonDto(val text: String, @SerialName("callback_data") val callbackData: String)
+    private data class ButtonDto(@SerialName("text") val text: String, @SerialName("callback_data") val callbackData: String)
 
     @Serializable
-    private data class CommandDto(val command: String, val description: String)
+    private data class CommandDto(@SerialName("command") val command: String, @SerialName("description") val description: String)
 
     @Serializable
-    private data class SetCommandsDto(val commands: List<CommandDto>)
+    private data class SetCommandsDto(@SerialName("commands") val commands: List<CommandDto>)
 
     private companion object {
         const val LONG_POLL_MARGIN_SECONDS = 10

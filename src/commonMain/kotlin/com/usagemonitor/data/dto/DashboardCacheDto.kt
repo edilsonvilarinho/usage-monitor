@@ -1,5 +1,6 @@
 package com.usagemonitor.data.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -10,46 +11,46 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class DashboardCacheDto(
-    val savedAtEpochMillis: Long,
-    val entries: List<ApiUsageStatsCacheDto>
+    @SerialName("savedAtEpochMillis") val savedAtEpochMillis: Long,
+    @SerialName("entries") val entries: List<ApiUsageStatsCacheDto>
 )
 
 @Serializable
 data class ApiUsageStatsCacheDto(
-    val targetKey: String,
-    val source: String,
-    val apiName: String,
-    val quotas: List<QuotaInfoCacheDto>,
-    val accountSource: String? = null,
-    val accountProviderAccountId: String? = null,
-    val accountWorkspaceId: String? = null,
-    val accountEmail: String? = null,
-    val accountWorkspaceName: String? = null,
-    val profileLabel: String? = null,
-    val notices: List<String> = emptyList(),
-    val planLabel: String? = null,
+    @SerialName("targetKey") val targetKey: String,
+    @SerialName("source") val source: String,
+    @SerialName("apiName") val apiName: String,
+    @SerialName("quotas") val quotas: List<QuotaInfoCacheDto>,
+    @SerialName("accountSource") val accountSource: String? = null,
+    @SerialName("accountProviderAccountId") val accountProviderAccountId: String? = null,
+    @SerialName("accountWorkspaceId") val accountWorkspaceId: String? = null,
+    @SerialName("accountEmail") val accountEmail: String? = null,
+    @SerialName("accountWorkspaceName") val accountWorkspaceName: String? = null,
+    @SerialName("profileLabel") val profileLabel: String? = null,
+    @SerialName("notices") val notices: List<String> = emptyList(),
+    @SerialName("planLabel") val planLabel: String? = null,
     // Default nulo mantém legível o cache anterior à #269; a leitura dele herda
     // o `savedAtEpochMillis` do arquivo.
-    val fetchedAtEpochMillis: Long? = null,
+    @SerialName("fetchedAtEpochMillis") val fetchedAtEpochMillis: Long? = null,
     // Nulo no cache gravado antes dos resets guardados (issue #571); 0 é "nenhum", não ausência.
-    val bankedResetCount: Int? = null
+    @SerialName("bankedResetCount") val bankedResetCount: Int? = null
 )
 
 @Serializable
 data class QuotaInfoCacheDto(
-    val label: String,
-    val used: Long,
-    val total: Long,
-    val periodEndAtEpochMillis: Long,
-    val hasKnownResetAt: Boolean = true,
-    val periodType: String,
-    val unit: String,
-    val rawUsed: Long = 0L,
-    val rawTotal: Long = 0L,
+    @SerialName("label") val label: String,
+    @SerialName("used") val used: Long,
+    @SerialName("total") val total: Long,
+    @SerialName("periodEndAtEpochMillis") val periodEndAtEpochMillis: Long,
+    @SerialName("hasKnownResetAt") val hasKnownResetAt: Boolean = true,
+    @SerialName("periodType") val periodType: String,
+    @SerialName("unit") val unit: String,
+    @SerialName("rawUsed") val rawUsed: Long = 0L,
+    @SerialName("rawTotal") val rawTotal: Long = 0L,
     // Default mantém legível o cache gravado antes da leitura de créditos.
-    val currencyCode: String = "USD",
+    @SerialName("currencyCode") val currencyCode: String = "USD",
     // Nulo no cache gravado antes da marca de ritmo (issue #327).
-    val periodStartAtEpochMillis: Long? = null,
+    @SerialName("periodStartAtEpochMillis") val periodStartAtEpochMillis: Long? = null,
     // Nulo no cache gravado antes do bloqueio de créditos (issue #567).
-    val blockReason: String? = null
+    @SerialName("blockReason") val blockReason: String? = null
 )

@@ -12,14 +12,14 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CodexRolloutTokenCountLineDto(
-    val timestamp: String? = null,
-    val type: String? = null,
-    val payload: CodexRolloutTokenCountPayloadDto? = null
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("type") val type: String? = null,
+    @SerialName("payload") val payload: CodexRolloutTokenCountPayloadDto? = null
 )
 
 @Serializable
 data class CodexRolloutTokenCountPayloadDto(
-    val type: String? = null,
+    @SerialName("type") val type: String? = null,
     @SerialName("rate_limits") val rateLimits: CodexRolloutRateLimitsDto? = null
 )
 
@@ -27,8 +27,8 @@ data class CodexRolloutTokenCountPayloadDto(
 data class CodexRolloutRateLimitsDto(
     @SerialName("limit_id") val limitId: String? = null,
     @SerialName("limit_name") val limitName: String? = null,
-    val primary: CodexRolloutRateLimitWindowDto? = null,
-    val secondary: CodexRolloutRateLimitWindowDto? = null,
+    @SerialName("primary") val primary: CodexRolloutRateLimitWindowDto? = null,
+    @SerialName("secondary") val secondary: CodexRolloutRateLimitWindowDto? = null,
     @SerialName("plan_type") val planType: String? = null
 )
 

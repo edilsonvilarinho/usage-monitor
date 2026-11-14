@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class CodexCliRolloutTypeDto(
-    val type: String? = null
+    @SerialName("type") val type: String? = null
 )
 
 /**
@@ -16,53 +16,53 @@ data class CodexCliRolloutTypeDto(
  */
 @Serializable
 data class CodexCliRequestMarkerLineDto(
-    val type: String? = null,
-    val timestamp: String? = null,
-    val payload: CodexCliRequestMarkerPayloadDto? = null
+    @SerialName("type") val type: String? = null,
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("payload") val payload: CodexCliRequestMarkerPayloadDto? = null
 )
 
 @Serializable
 data class CodexCliRequestMarkerPayloadDto(
-    val type: String? = null,
-    val role: String? = null
+    @SerialName("type") val type: String? = null,
+    @SerialName("role") val role: String? = null
 )
 
 @Serializable
 data class CodexCliSessionMetaLineDto(
-    val type: String? = null,
-    val payload: CodexCliSessionMetaPayloadDto? = null
+    @SerialName("type") val type: String? = null,
+    @SerialName("payload") val payload: CodexCliSessionMetaPayloadDto? = null
 )
 
 @Serializable
 data class CodexCliSessionMetaPayloadDto(
     @SerialName("session_id") val sessionId: String? = null,
-    val id: String? = null,
-    val cwd: String? = null,
-    val originator: String? = null,
+    @SerialName("id") val id: String? = null,
+    @SerialName("cwd") val cwd: String? = null,
+    @SerialName("originator") val originator: String? = null,
     @SerialName("cli_version") val cliVersion: String? = null,
-    val source: JsonElement? = null,
+    @SerialName("source") val source: JsonElement? = null,
     @SerialName("thread_source") val threadSource: String? = null
 )
 
 @Serializable
 data class CodexCliTurnContextLineDto(
-    val type: String? = null,
-    val timestamp: String? = null,
-    val payload: CodexCliTurnContextPayloadDto? = null
+    @SerialName("type") val type: String? = null,
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("payload") val payload: CodexCliTurnContextPayloadDto? = null
 )
 
 @Serializable
 data class CodexCliTurnContextPayloadDto(
     @SerialName("turn_id") val turnId: String? = null,
-    val cwd: String? = null,
-    val model: String? = null
+    @SerialName("cwd") val cwd: String? = null,
+    @SerialName("model") val model: String? = null
 )
 
 @Serializable
 data class CodexCliTokenUsageRecordLineDto(
-    val type: String? = null,
-    val timestamp: String? = null,
-    val payload: CodexCliTokenUsageRecordPayloadDto? = null
+    @SerialName("type") val type: String? = null,
+    @SerialName("timestamp") val timestamp: String? = null,
+    @SerialName("payload") val payload: CodexCliTokenUsageRecordPayloadDto? = null
 )
 
 @Serializable
@@ -71,7 +71,7 @@ data class CodexCliTokenUsageRecordPayloadDto(
     @SerialName("turn_id") val turnId: String? = null,
     @SerialName("session_id") val sessionId: String? = null,
     @SerialName("response_id") val responseId: String? = null,
-    val usage: CodexCliUsageDto? = null
+    @SerialName("usage") val usage: CodexCliUsageDto? = null
 )
 
 @Serializable

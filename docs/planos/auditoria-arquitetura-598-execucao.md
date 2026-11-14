@@ -49,6 +49,7 @@ para que ela deixe de depender de auditoria manual.
 |---|---|
 | A01 | Este plano |
 | A02 | Repositórios: cancelamento propaga em vez de virar `Result.failure` (hipótese, teste primeiro) |
+| A03 | `@SerialName("<nome atual>")` em 397 propriedades de 23 arquivos de `data` (a heurística do A01 contou ~340; o scanner também lê corpo e classes de uma linha); regra `propriedade serializavel de data tem SerialName` + scanner `serializableClassDeclarations` (ignora `@Transient`, `get()`, `by`, enum/object) e teste do scanner. Anotação por script fora do repositório | Vermelho: teste do scanner com stub → `AssertionError` em `ArchitectureRulesTest.kt:362`; regra → `Propriedade serializável sem @SerialName (a chave JSON é o nome Kotlin atual): … AnthropicCreditsDiagnosticsEvent.timestamp`, 397 violações. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.architecture.*" --tests "com.usagemonitor.data.*"` → BUILD SUCCESSFUL, 0 falhas. Conferência do orquestrador: pareamento `git diff -U0` linha removida × adicionada → 380 linhas só ganharam `@SerialName` com o nome da própria propriedade + 10 linhas de classe de uma linha conferidas à mão; 11 imports; nenhuma outra mudança |
 | A03 | `@SerialName` em toda propriedade `@Serializable` de `data` + regra no `ArchitectureRulesTest` |
 | A04 | Use cases de `Main.kt` e `AppWindowAnchor.kt` montados pelo `AppGraph` + regra |
 | A05 | Primitiva de raiz de tela no lugar de `Surface(color = background)` + regra + design system |
