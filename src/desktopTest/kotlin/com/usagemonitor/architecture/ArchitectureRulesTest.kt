@@ -371,6 +371,35 @@ class ArchitectureRulesTest {
         assertEquals(setOf("Wire", "Plain"), declarations.keys)
     }
 
+    /**
+     * Use case se monta só nas raízes de composição (`AppGraph` e vizinhos, e o modo
+     * sem tela em `terminal/`). `Main.kt` e as janelas montando use case criam um
+     * segundo ponto de montagem fora do grafo (issue #598, A04). Declaração de classe
+     * e import não contam: só a chamada de construtor.
+     */
+    @Test
+    fun `o use case so e montado nas raizes de composicao`() {
+        val violations = sources
+            .filter { source -> source.path.startsWith(DESKTOP_MAIN_DIRECTORY) }
+            .filter { source -> source.path !in USE_CASE_COMPOSITION_ROOTS && !source.path.startsWith(USE_CASE_COMPOSITION_DIRECTORY) }
+            .filter { source -> USE_CASE_CONSTRUCTION.containsMatchIn(stripCommentsAndStrings(source.text)) }
+            .map { source -> source.path }
+        if (violations.isNotEmpty()) {
+            fail(
+                "Use case montado fora das raizes de composicao (AppGraph e vizinhos, issue #598):\n" +
+                    violations.joinToString("\n")
+            )
+        }
+    }
+
+    @Test
+    fun `o padrao do use case pega a chamada e ignora a declaracao`() {
+        assertTrue(USE_CASE_CONSTRUCTION.containsMatchIn("val getReleaseNotes = GetReleaseNotesUseCase(graph.appUpdateRepository)"))
+        assertFalse(USE_CASE_CONSTRUCTION.containsMatchIn("class GetReleaseNotesUseCase(private val repository: AppUpdateRepository)"))
+        assertFalse(USE_CASE_CONSTRUCTION.containsMatchIn("import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase"))
+        assertFalse(USE_CASE_CONSTRUCTION.containsMatchIn("fun buildUseCase(graph: AppGraph) = graph"))
+    }
+
     private fun assertNoImports(layerPrefix: String, forbidden: List<String>) {
         val violations = sources
             .filter { source -> source.path.substringAfter("/kotlin/").startsWith(layerPrefix) }
@@ -465,6 +494,22 @@ class ArchitectureRulesTest {
 
         /** `runCatching` como chamada; `suspendRunCatching` não casa, o `R` é maiúsculo (issue #598). */
         val RUN_CATCHING = Regex("""\brunCatching\b""")
+
+        val DESKTOP_MAIN_DIRECTORY = "src/desktopMain/kotlin/com/usagemonitor/"
+
+        /** Raízes de composição do desktop: as únicas que montam use case (issue #598, A04). */
+        val USE_CASE_COMPOSITION_ROOTS = setOf(
+            "src/desktopMain/kotlin/com/usagemonitor/AppGraph.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/AppViewModels.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/CollectorEngine.kt",
+            "src/desktopMain/kotlin/com/usagemonitor/TelegramBotComposition.kt"
+        )
+
+        /** Modo sem tela (#439-#441): a pasta inteira é raiz de composição. */
+        val USE_CASE_COMPOSITION_DIRECTORY = "src/desktopMain/kotlin/com/usagemonitor/terminal/"
+
+        /** Chamada de construtor `XUseCase(`; `class XUseCase(` e import não casam. */
+        val USE_CASE_CONSTRUCTION = Regex("""(?<!class\s)\b[A-Z]\w*UseCase\(""")
 
         /** Pastas de `data` (commonMain e desktopMain): onde o DTO e o JSON de disco moram. */
         val SERIAL_NAME_SCOPES = listOf(

@@ -42,6 +42,7 @@ import com.usagemonitor.data.repository.UsageHistoryRepositoryImpl
 import com.usagemonitor.data.repository.resolveEffectiveProxy
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.BugReportMachineInfo
 import com.usagemonitor.domain.entity.CliProjectRoot
 import com.usagemonitor.domain.entity.TeamIntegrations
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
@@ -49,12 +50,16 @@ import com.usagemonitor.domain.repository.InMemoryTeamServerClockOffset
 import com.usagemonitor.domain.repository.TeamAdminRepository
 import com.usagemonitor.domain.repository.TeamServerClockOffset
 import com.usagemonitor.domain.repository.TeamUsageRepository
+import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
+import com.usagemonitor.domain.usecase.GenerateBugReportUseCase
 import com.usagemonitor.domain.usecase.GetCachedDashboardStatsUseCase
+import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
 import com.usagemonitor.domain.usecase.GetStalledCliSessionsUseCase
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.domain.usecase.RecordUsageSnapshotUseCase
 import com.usagemonitor.domain.usecase.SaveDashboardCacheUseCase
 import com.usagemonitor.domain.usecase.SyncCliSessionIndexUseCase
+import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.update.DesktopAppUpdateReleaseOpener
 import java.io.File
 import java.util.prefs.Preferences
@@ -233,6 +238,21 @@ internal class AppGraph(
     // indexam o mesmo banco, e duas cópias do caso de uso não trariam nada.
     val syncCliSessionIndex = SyncCliSessionIndexUseCase(cliSessionRepository)
     val getStalledCliSessions = GetStalledCliSessionsUseCase(cliSessionRepository)
+
+    // Casos de uso de tela montados só aqui (issue #598): as raízes de composição são o único lugar que os constrói.
+    val getReleaseNotes = GetReleaseNotesUseCase(appUpdateRepository)
+
+    // Função, e não valor: o time do pedido é escolhido na hora da ação, não no arranque da janela.
+    fun claimTeamKeyForAccount(teamId: String) = ClaimTeamKeyForAccountUseCase(teamRepositoryRegistry.adminRepository(teamId))
+
+    fun validateAdminToken(teamId: String) = ValidateAdminTokenUseCase(teamRepositoryRegistry.adminRepository(teamId))
+
+    // Função, e não valor: a máquina é lida no momento de gerar, não no arranque. O corte do arquivo tem um dono só, e é o registro de arranque.
+    fun generateBugReport(machineInfo: () -> BugReportMachineInfo) = GenerateBugReportUseCase(
+        breadcrumbs = breadcrumbs,
+        machineInfo = machineInfo,
+        breadcrumbLimit = StartupDiagnostics.MAX_LINES
+    )
 
     // A janela principal só existe depois da composição; por isso o writer
     // recebe uma função e não a referência. O idioma efetivo é lido na hora

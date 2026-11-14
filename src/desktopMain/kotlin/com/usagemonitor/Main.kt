@@ -20,9 +20,6 @@ import com.usagemonitor.presentation.ui.windowDragSink
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.repository.BreadcrumbRecorder
-import com.usagemonitor.domain.usecase.ClaimTeamKeyForAccountUseCase
-import com.usagemonitor.domain.usecase.GetReleaseNotesUseCase
-import com.usagemonitor.domain.usecase.ValidateAdminTokenUseCase
 import com.usagemonitor.presentation.ui.ModalWindowEnvironment
 import com.usagemonitor.presentation.viewmodel.UiState
 import com.usagemonitor.update.ensureLinuxMenuIconCurrent
@@ -290,7 +287,7 @@ internal fun runUsageMonitor(
     // Idem: decide, busca e lembra as novidades da versão recém-instalada.
     val releaseNotes = rememberReleaseNotesController(
         settings = settings,
-        getReleaseNotes = GetReleaseNotesUseCase(graph.appUpdateRepository),
+        getReleaseNotes = graph.getReleaseNotes,
         receipt = autoUpdate.lastReceipt,
         breadcrumbs = breadcrumbs
     )
@@ -340,10 +337,10 @@ internal fun runUsageMonitor(
             breadcrumbs = breadcrumbs,
             teamUsageRepositoryFor = { teamId -> graph.teamRepositoryRegistry.usageRepository(teamId) },
             claimTeamKey = { teamId, accountKey, accountEmail, profileId ->
-                ClaimTeamKeyForAccountUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))(accountKey, accountEmail, profileId)
+                graph.claimTeamKeyForAccount(teamId)(accountKey, accountEmail, profileId)
             },
             validateAdminTokenWithServer = { teamId ->
-                ValidateAdminTokenUseCase(graph.teamRepositoryRegistry.adminRepository(teamId))()
+                graph.validateAdminToken(teamId)()
             },
             scope = compositionScope,
             language = { shell.language },
