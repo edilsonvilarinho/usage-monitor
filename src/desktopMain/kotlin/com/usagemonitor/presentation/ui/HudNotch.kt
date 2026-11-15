@@ -434,117 +434,7 @@ internal fun HudNotch(
     )
 }
 
-/**
- * A medida do notch: o corpo rente à borda, as dicas e as alças nas pontas e o
- * balão centrado no anel em foco, preso ao contêiner com a margem da sombra.
- *
- * Criada a cada composição, como o lambda que ela substitui: o balão lê a
- * posição animada de [balloonAlong] e os centros de [ringCenters], e é a nova
- * política que faz a medida seguinte enxergar o anel novo.
- */
-private fun hudNotchMeasurePolicy(
-    edge: HudEdge,
-    notchCenter: Dp?,
-    ringCenters: Map<Int, Float>,
-    shownIndex: Int?,
-    placement: HudBalloonPlacement,
-    balloonAlong: Animatable<Float, AnimationVector1D>,
-    alongSpec: AnimationSpec<Float>,
-    scope: CoroutineScope
-): MeasurePolicy = MeasurePolicy { measurables, constraints ->
-    val notch = measurables.first { measurable -> measurable.layoutId == HudNotchPart.NOTCH }
-        .measure(Constraints())
-    val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
-        ?.measure(Constraints())
-    val extras = listOf<Any>(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR, HudRetractPart.HANDLE, HudRetractPart.STRIP)
-        .associateWith { part ->
-            measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
-        }
-    val width = if (constraints.hasBoundedWidth) constraints.maxWidth else notch.width
-    val height = if (constraints.hasBoundedHeight) constraints.maxHeight else notch.height
-    val alongLength = if (edge.isHorizontal) width else height
-    val notchAlong = if (edge.isHorizontal) notch.width else notch.height
-    val center = notchCenter?.roundToPx() ?: (alongLength / 2)
-    val notchStart = (center - notchAlong / 2).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
-
-    // O balão centrado no anel e preso ao contêiner, com a margem da sombra.
-    var balloonStart = 0
-    if (balloon != null && balloon.width > 0) {
-        val balloonAlongSize = if (edge.isHorizontal) balloon.width else balloon.height
-        val ring = ringCenters[shownIndex ?: 0] ?: (notchStart + notchAlong / 2f)
-        val margin = HUD_SHADOW_MARGIN.roundToPx()
-        val maxStart = (alongLength - margin - balloonAlongSize).coerceAtLeast(0).toFloat()
-        val target = (ring - balloonAlongSize / 2f).coerceIn(margin.toFloat().coerceAtMost(maxStart), maxStart)
-        // Trocar de anel repete o jato a partir do anel novo (B3): o balão salta
-        // para lá em vez de deslizar, senão desdobraria no meio do caminho.
-        if (!placement.placed || placement.index != shownIndex) {
-            placement.placed = true
-            placement.index = shownIndex
-            placement.target = target
-            scope.launch { balloonAlong.snapTo(target) }
-            balloonStart = target.roundToInt()
-        } else {
-            if (placement.target != target) {
-                placement.target = target
-                scope.launch { balloonAlong.animateTo(target, alongSpec) }
-            }
-            balloonStart = balloonAlong.value.roundToInt()
-        }
-    }
-
-    val notchAcross = if (edge.isHorizontal) notch.height else notch.width
-    val handleGap = HUD_HANDLE_GAP.roundToPx()
-
-    layout(width, height) {
-        // (ao longo, a partir da borda da tela) → posição na caixa de cada borda.
-        fun Placeable.placeAt(along: Int, across: Int, zIndex: Float = 0f) {
-            val acrossSize = if (edge.isHorizontal) this.height else this.width
-            when (edge) {
-                HudEdge.TOP -> place(along, across, zIndex)
-                HudEdge.BOTTOM -> place(along, height - across - acrossSize, zIndex)
-                HudEdge.LEFT -> place(across, along, zIndex)
-                HudEdge.RIGHT -> place(width - across - acrossSize, along, zIndex)
-            }
-        }
-        // A faixa do modo recolher (#400) por baixo do notch: aberto, ele a cobre.
-        extras[HudRetractPart.STRIP]?.placeAt(notchStart, 0, STRIP_Z_INDEX)
-        notch.placeAt(notchStart, 0)
-        val notchEnd = notchStart + notchAlong
-        extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
-        extras[HudNotchPart.HINT_END]?.let { hint -> hint.placeAt(notchEnd, 0) }
-        // As alças centradas na espessura do notch, uma além de cada ponta, e
-        // por baixo dele: entrando, elas saem de trás do notch.
-        extras[HudNotchPart.MOVE]?.let { handle ->
-            handle.placeAt(
-                notchStart - handleGap - handle.alongSize(edge),
-                (notchAcross - handle.acrossSize(edge)) / 2,
-                HANDLE_Z_INDEX
-            )
-        }
-        // O alfinete do modo recolher, além da mão (#400); a geometria reserva
-        // duas alças em cada ponta.
-        extras[HudRetractPart.HANDLE]?.let { handle ->
-            handle.placeAt(
-                notchStart - (handleGap + HUD_HANDLE_SIZE.roundToPx()) - handleGap - handle.alongSize(edge),
-                (notchAcross - handle.acrossSize(edge)) / 2,
-                HANDLE_Z_INDEX
-            )
-        }
-        extras[HudNotchPart.GEAR]?.let { handle ->
-            handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2, HANDLE_Z_INDEX)
-        }
-        if (balloon != null) {
-            when (edge) {
-                HudEdge.TOP -> balloon.place(balloonStart, notch.height)
-                HudEdge.BOTTOM -> balloon.place(balloonStart, height - notch.height - balloon.height)
-                HudEdge.LEFT -> balloon.place(notch.width, balloonStart)
-                HudEdge.RIGHT -> balloon.place(width - notch.width - balloon.width, balloonStart)
-            }
-        }
-    }
-}
-
-private enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
+internal enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
 
 /**
  * As fontes de hover do notch. O ponteiro "está no notch" enquanto estiver no
@@ -574,7 +464,7 @@ private fun rememberHudHover(onHoverChange: (Boolean) -> Unit): HudHoverSources 
 }
 
 /** A faixa recolhida fica por baixo do corpo, acima das alças que saem de trás dele. */
-private const val STRIP_Z_INDEX = -0.5f
+internal const val STRIP_Z_INDEX = -0.5f
 
 /** A caixa de cada conta no corpo do notch; o gesto do corpo acha o anel clicado por ela. */
 internal class HudRingHitBoxes {
@@ -606,9 +496,9 @@ internal class HudRingHitBoxes {
 /** O "índice" do balão da engrenagem, fora do intervalo das contas. */
 private const val APP_BALLOON = -1
 
-private fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) width else height
+internal fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) width else height
 
-private fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) height else width
+internal fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) height else width
 
 /**
  * As alças saem **de dentro do notch**: deslizam da ponta para fora crescendo e
@@ -658,7 +548,7 @@ private const val HANDLE_ENTER_SCALE = 0.6f
 private val HANDLE_SLIDE = 14.dp
 
 /** Abaixo do notch: a alça que desliza de dentro dele sai de trás, não por cima. */
-private const val HANDLE_Z_INDEX = -1f
+internal const val HANDLE_Z_INDEX = -1f
 
 /** O arco parado volta depois de as alças saírem, não por cima delas. */
 private const val HINT_RETURN_DELAY_MS = 120
@@ -667,14 +557,14 @@ private const val HINT_RETURN_DELAY_MS = 120
  * Onde o balão foi posto nesta abertura. Não é estado de composição: é lido e
  * escrito no passo de layout, e como estado cada escrita pediria outro layout.
  */
-private class HudBalloonPlacement {
+internal class HudBalloonPlacement {
     var placed = false
     var index: Int? = null
     var target = 0f
 }
 
 /** Meio pixel: abaixo disso o balão já está no anel. */
-private const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
+internal const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
 
 /**
  * Onde a caixa do balão ficou no contêiner, para o feixe saber de onde vem. Não
