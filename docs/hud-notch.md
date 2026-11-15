@@ -72,6 +72,12 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     caber. Sem botão de restaurar: volta sozinha quando houver espaço, e `hudMinimizedAccounts` não muda. Se nem
     assim cabe, fica o compacto. Só a borda vertical; a horizontal (45%) não muda. Regra em `hudAutoMinimizedTargets`
     e `applyHudAutoMinimize` (`src/desktopMain/kotlin/com/usagemonitor/HudAutoMinimize.kt`), aplicada em `HudWindow.kt`.
+- **Na lateral, as minimizadas viram um buraco negro (#600).** Na borda vertical, as contas minimizadas (manuais #576 e
+  automáticas #596) saem da coluna e viram **uma** célula só, na base da coluna, depois da última completa: um anel de
+  64 dp com a contagem embaixo ("4 minimizadas"). Quem entra é `hudColumnArrangement`
+  (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`). Passar o mouse no buraco abre a lista de quem está
+  dentro; uma linha abre o balão da conta com "← N no buraco". Detalhes na seção "Buraco negro das minimizadas (#600)".
+  Só a borda vertical; em cima e embaixo as minimizadas seguem como hoje.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
@@ -619,6 +625,39 @@ célula dela no notch encolhe.
   `decodeHudMinimizedAccounts`, que descarta entrada inválida. `HudWindowHost` lê uma vez e passa as contas
   minimizadas a `buildHudAccounts`. Alternar: `toggleHudMinimizedAccount` e persistir. Funções puras em
   `presentation/ui/HudMinimizedAccounts.kt` (commonMain).
+
+## Buraco negro das minimizadas (#600)
+
+Na borda vertical, as contas minimizadas deixam de ocupar uma célula cada e viram **um** buraco negro na base da
+coluna, depois da última completa. Só a borda vertical; em cima e embaixo as minimizadas seguem como hoje. Fonte do
+comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Decisões") e o protótipo
+`prototipos/issue-600/p10-sumidouro-r2/index.html`.
+
+- **Arranjo.** `hudColumnArrangement` (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`) separa as contas.
+  `shown` são as completas, na ordem. `holeMembers` são as minimizadas (manuais #576 e automáticas #596), na ordem de
+  publicação, que é total e determinística. Sem minimizadas não existe buraco.
+- **Geometria.** O buraco mede uma célula: anel de 64 dp mais a linha da contagem. A largura é a da maior linha de
+  rótulo entre `AppLanguage.entries`. Com buraco, o piso do anel é 64 dp. Auto-minimizar mede a coluna com o buraco
+  (`verticalCollapsed`), então a regra converge com menos ou igual número de contas recolhidas.
+- **Célula.** `HudBlackHoleCell` desenha o anel Gargantua sem arcos de cota e a contagem em `label*`: PT "1 minimizada"
+  / "4 minimizadas", EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem
+  `testTag("hudBlackHole")` e descrição semântica com o rótulo. O campo estelar trata o buraco como um anel.
+- **Lista.** Hover no buraco abre a lista (ou clique, ou Enter com foco). Há uma linha por membro, com o glifo da
+  marca, o nome, o valor em foco e o selo "auto" na auto-minimizada. A seleção por hover espera ~160 ms, para passar
+  por cima da lista sem trocar de conta.
+- **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
+  com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só
+  aquela conta: o balão volta à lista, ou fecha se o buraco esvaziar. A auto-minimizada não tem botão e diz "volta
+  sozinha quando couber" (EN "returns on its own when there is room"). Os rótulos vêm de `localized`.
+- **Sumidouro (transição).** Minimizar: a conta encolhe de 64 a 28 dp e desliza ao longo da borda até o centro do
+  buraco, em 520 ms (ease-in-out, sem overshoot). A contagem só inclui a conta quando o progresso chega a 1. Restaurar
+  faz o inverso: a conta sai do buraco e a contagem desce na saída. "Reduzir animações" = troca direta. O quadro é
+  função pura (`hudSinkFrame`), testada em TDD.
+- **Janela.** Durante a transição a janela segue o maior tamanho (`hudMinimizeWindowSize`, #576).
+- **Estado.** A sentinela do balão do buraco é `accounts.size`, a mesma chave do buraco em `HudRingStrip`.
+  `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered` e quando o balão fecha.
+- **Decisões.** A ordem da lista é a de publicação. "Mais recente primeiro" do protótipo ficou fora, porque exigiria
+  persistir quando cada conta entrou.
 
 ## Reordenar contas arrastando o anel (#584)
 

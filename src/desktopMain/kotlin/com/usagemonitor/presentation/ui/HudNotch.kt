@@ -65,6 +65,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.HudNotchSizes
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudBalloonHeight
+import com.usagemonitor.hudColumnArrangement
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appDepth
 import com.usagemonitor.presentation.ui.components.gargantuaHorizonBody
@@ -196,7 +197,13 @@ internal fun HudNotch(
     // ([APP_BALLOON]). Fechado, ele é esquecido: a próxima abertura começa pelo
     // anel em que o ponteiro entrar.
     var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
+    // Buraco negro da coluna (#600): as contas minimizadas. [holeSelection] é a conta aberta a partir
+    // da lista do buraco; `null` mostra a lista. Sentinela do buraco = `accounts.size`.
+    val holeMembers = remember(accounts, edge) { hudColumnArrangement(accounts, edge).holeMembers }
+    val holeIndex = accounts.size
+    var holeSelection by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(open) {
+        if (!open) holeSelection = null
         if (!open && initialBalloonIndex == null) balloonIndex = null
     }
     // A engrenagem abre o balão dela no hover, como o anel abre o da conta
@@ -206,7 +213,9 @@ internal fun HudNotch(
         if (gearHovered && open && appBalloon != null) balloonIndex = APP_BALLOON
     }
     val shownIndex = balloonIndex?.takeIf { index ->
-        index in accounts.indices || (index == APP_BALLOON && appBalloon != null)
+        index in accounts.indices ||
+            (index == APP_BALLOON && appBalloon != null) ||
+            (index == holeIndex && holeMembers.isNotEmpty())
     }
     // Durante a saída o balão continua desenhando a última conta.
     val lastShown = rememberLatestNonNull(shownIndex)
@@ -292,7 +301,14 @@ internal fun HudNotch(
                     settle = settle,
                     minimizeProgress = minimizeState.values,
                     reorderDrag = reorder.drag, reorderDrop = reorder.drop,
-                    onRingHovered = { index -> balloonIndex = index },
+                    onRingHovered = { index ->
+                        balloonIndex = index
+                        holeSelection = null
+                    },
+                    onHoleHovered = {
+                        balloonIndex = holeIndex
+                        holeSelection = null
+                    },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
                     onItemPlaced = { index, coordinates ->
@@ -316,21 +332,7 @@ internal fun HudNotch(
                 )
             }
             HudRetractParts(autoRetract, onToggleAutoRetract, showHandles, accounts, edge, notchSize, ringCenters, { rootCoordinates }, language, hover)
-            for ((part, atStart) in listOf(HudNotchPart.HINT_START to true, HudNotchPart.HINT_END to false)) {
-                AnimatedVisibility(
-                    visible = !showHandles,
-                    modifier = Modifier.layoutId(part),
-                    enter = fadeIn(appTween(AppMotion.normal, delayMillis = HINT_RETURN_DELAY_MS)),
-                    exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
-                ) {
-                    // Ponto da atualização na ponta da engrenagem: sem ele só via quem abrisse o notch.
-                    HudHandleHint(
-                        edge = edge,
-                        atStart = atStart,
-                        accent = if (atStart) null else updateIndicator?.tone?.color()
-                    )
-                }
-            }
+            HudHandleHints(visible = !showHandles, edge = edge, updateTone = updateIndicator?.tone)
             AnimatedVisibility(
                 visible = showHandles,
                 modifier = Modifier.layoutId(HudNotchPart.MOVE),
@@ -383,43 +385,15 @@ internal fun HudNotch(
                     }
                 )
             }
-            AnimatedVisibility(
-                visible = open && shownIndex != null,
-                modifier = Modifier.layoutId(HudNotchPart.BALLOON),
-                // B3 · jato relativístico: a transição toda é o quadro abaixo.
-                enter = EnterTransition.None,
-                exit = ExitTransition.None
-            ) {
-                val index = lastShown ?: 0
-                val jet = gargantuaJetProgress(index)
-                val account = accounts.getOrNull(index)
-                val app = appBalloon.takeIf { index == APP_BALLOON }
-                if (account != null || app != null) {
-                    HudBalloon(
-                        edge = edge,
-                        bodyHeight = if (app == null && account != null) hudBalloonHeight(account, sizes.balloon.height) else appBalloonHeight,
-                        tailCenter = { (ringCenters[index] ?: 0f) - balloonAlong.value },
-                        reveal = jet,
-                        beamOrigin = { balloonBox.depthTo(edge, ringDepths[index]) },
-                        modifier = Modifier
-                            .hoverable(hover.balloon)
-                            .onPlaced { coordinates ->
-                                val root = rootCoordinates
-                                if (root != null && root.isAttached && coordinates.isAttached) {
-                                    balloonBox.bounds = root.localBoundingBoxOf(coordinates)
-                                }
-                            },
-                        // Sem crossfade na troca: o jato repetido já é a transição,
-                        // e o conteúdo antigo apagando dentro do desdobrar novo sujava.
-                        content = {
-                            when {
-                                index == APP_BALLOON -> appBalloon?.invoke()
-                                account != null -> HudAccountBalloonContent(account, language, accountActions, sizes.balloon.height)
-                            }
-                        }
-                    )
-                }
-            }
+            HudBalloonVisibility(
+                visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
+                accounts = accounts, holeMembers = holeMembers, holeSelection = holeSelection,
+                onHoleSelect = { position -> holeSelection = position }, sizes = sizes,
+                appBalloon = appBalloon, appBalloonHeight = appBalloonHeight, language = language,
+                accountActions = accountActions, ringCenters = ringCenters, ringDepths = ringDepths,
+                balloonAlong = balloonAlong, balloonBox = balloonBox, rootCoordinates = { rootCoordinates },
+                hover = hover.balloon
+            )
         },
         measurePolicy = hudNotchMeasurePolicy(
             edge = edge,
@@ -435,116 +409,106 @@ internal fun HudNotch(
 }
 
 /**
- * A medida do notch: o corpo rente à borda, as dicas e as alças nas pontas e o
- * balão centrado no anel em foco, preso ao contêiner com a margem da sombra.
- *
- * Criada a cada composição, como o lambda que ela substitui: o balão lê a
- * posição animada de [balloonAlong] e os centros de [ringCenters], e é a nova
- * política que faz a medida seguinte enxergar o anel novo.
+ * O balão aberto (B3): a conta do último anel sob o ponteiro, a engrenagem ou a coluna do buraco. Fica fora de
+ * [HudNotch] para a função dele caber no limite; os valores chegam prontos, sem estado de composição.
  */
-private fun hudNotchMeasurePolicy(
-    edge: HudEdge,
-    notchCenter: Dp?,
-    ringCenters: Map<Int, Float>,
+@Composable
+private fun HudBalloonVisibility(
+    visible: Boolean,
     shownIndex: Int?,
-    placement: HudBalloonPlacement,
+    edge: HudEdge,
+    accounts: List<HudAccount>,
+    holeMembers: List<Int>,
+    holeSelection: Int?,
+    onHoleSelect: (Int?) -> Unit,
+    sizes: HudNotchSizes,
+    appBalloon: (@Composable () -> Unit)?,
+    appBalloonHeight: Dp,
+    language: AppLanguage,
+    accountActions: (@Composable (HudAccount) -> Unit)?,
+    ringCenters: Map<Int, Float>,
+    ringDepths: Map<Int, Float>,
     balloonAlong: Animatable<Float, AnimationVector1D>,
-    alongSpec: AnimationSpec<Float>,
-    scope: CoroutineScope
-): MeasurePolicy = MeasurePolicy { measurables, constraints ->
-    val notch = measurables.first { measurable -> measurable.layoutId == HudNotchPart.NOTCH }
-        .measure(Constraints())
-    val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
-        ?.measure(Constraints())
-    val extras = listOf<Any>(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR, HudRetractPart.HANDLE, HudRetractPart.STRIP)
-        .associateWith { part ->
-            measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
-        }
-    val width = if (constraints.hasBoundedWidth) constraints.maxWidth else notch.width
-    val height = if (constraints.hasBoundedHeight) constraints.maxHeight else notch.height
-    val alongLength = if (edge.isHorizontal) width else height
-    val notchAlong = if (edge.isHorizontal) notch.width else notch.height
-    val center = notchCenter?.roundToPx() ?: (alongLength / 2)
-    val notchStart = (center - notchAlong / 2).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
-
-    // O balão centrado no anel e preso ao contêiner, com a margem da sombra.
-    var balloonStart = 0
-    if (balloon != null && balloon.width > 0) {
-        val balloonAlongSize = if (edge.isHorizontal) balloon.width else balloon.height
-        val ring = ringCenters[shownIndex ?: 0] ?: (notchStart + notchAlong / 2f)
-        val margin = HUD_SHADOW_MARGIN.roundToPx()
-        val maxStart = (alongLength - margin - balloonAlongSize).coerceAtLeast(0).toFloat()
-        val target = (ring - balloonAlongSize / 2f).coerceIn(margin.toFloat().coerceAtMost(maxStart), maxStart)
-        // Trocar de anel repete o jato a partir do anel novo (B3): o balão salta
-        // para lá em vez de deslizar, senão desdobraria no meio do caminho.
-        if (!placement.placed || placement.index != shownIndex) {
-            placement.placed = true
-            placement.index = shownIndex
-            placement.target = target
-            scope.launch { balloonAlong.snapTo(target) }
-            balloonStart = target.roundToInt()
-        } else {
-            if (placement.target != target) {
-                placement.target = target
-                scope.launch { balloonAlong.animateTo(target, alongSpec) }
-            }
-            balloonStart = balloonAlong.value.roundToInt()
-        }
-    }
-
-    val notchAcross = if (edge.isHorizontal) notch.height else notch.width
-    val handleGap = HUD_HANDLE_GAP.roundToPx()
-
-    layout(width, height) {
-        // (ao longo, a partir da borda da tela) → posição na caixa de cada borda.
-        fun Placeable.placeAt(along: Int, across: Int, zIndex: Float = 0f) {
-            val acrossSize = if (edge.isHorizontal) this.height else this.width
-            when (edge) {
-                HudEdge.TOP -> place(along, across, zIndex)
-                HudEdge.BOTTOM -> place(along, height - across - acrossSize, zIndex)
-                HudEdge.LEFT -> place(across, along, zIndex)
-                HudEdge.RIGHT -> place(width - across - acrossSize, along, zIndex)
-            }
-        }
-        // A faixa do modo recolher (#400) por baixo do notch: aberto, ele a cobre.
-        extras[HudRetractPart.STRIP]?.placeAt(notchStart, 0, STRIP_Z_INDEX)
-        notch.placeAt(notchStart, 0)
-        val notchEnd = notchStart + notchAlong
-        extras[HudNotchPart.HINT_START]?.let { hint -> hint.placeAt(notchStart - hint.alongSize(edge), 0) }
-        extras[HudNotchPart.HINT_END]?.let { hint -> hint.placeAt(notchEnd, 0) }
-        // As alças centradas na espessura do notch, uma além de cada ponta, e
-        // por baixo dele: entrando, elas saem de trás do notch.
-        extras[HudNotchPart.MOVE]?.let { handle ->
-            handle.placeAt(
-                notchStart - handleGap - handle.alongSize(edge),
-                (notchAcross - handle.acrossSize(edge)) / 2,
-                HANDLE_Z_INDEX
+    balloonBox: HudBalloonBox,
+    rootCoordinates: () -> LayoutCoordinates?,
+    hover: MutableInteractionSource
+) {
+    val holeIndex = accounts.size
+    AnimatedVisibility(
+        visible = visible,
+        modifier = Modifier.layoutId(HudNotchPart.BALLOON),
+        // B3 · jato relativístico: a transição toda é o quadro abaixo.
+        enter = EnterTransition.None,
+        exit = ExitTransition.None
+    ) {
+        val index = shownIndex ?: 0
+        val jet = gargantuaJetProgress(index)
+        val account = accounts.getOrNull(index)
+        val app = appBalloon.takeIf { index == APP_BALLOON }
+        val inHole = index == holeIndex && holeMembers.isNotEmpty()
+        if (inHole || account != null || app != null) {
+            HudBalloon(
+                edge = edge,
+                bodyHeight = when {
+                    inHole -> sizes.balloon.height
+                    app == null && account != null -> hudBalloonHeight(account, sizes.balloon.height)
+                    else -> appBalloonHeight
+                },
+                tailCenter = { (ringCenters[index] ?: 0f) - balloonAlong.value },
+                reveal = jet,
+                beamOrigin = { balloonBox.depthTo(edge, ringDepths[index]) },
+                modifier = Modifier
+                    .hoverable(hover)
+                    .onPlaced { coordinates ->
+                        val root = rootCoordinates()
+                        if (root != null && root.isAttached && coordinates.isAttached) {
+                            balloonBox.bounds = root.localBoundingBoxOf(coordinates)
+                        }
+                    },
+                // Sem crossfade na troca: o jato repetido já é a transição,
+                // e o conteúdo antigo apagando dentro do desdobrar novo sujava.
+                content = {
+                    when {
+                        index == APP_BALLOON -> appBalloon?.invoke()
+                        inHole -> HudBlackHoleBalloonContent(
+                            accounts = accounts,
+                            members = holeMembers,
+                            selected = holeSelection,
+                            language = language,
+                            accountActions = accountActions,
+                            bodyHeight = sizes.balloon.height,
+                            onSelect = { position -> onHoleSelect(position) },
+                            onBack = { onHoleSelect(null) }
+                        )
+                        account != null -> HudAccountBalloonContent(account, language, accountActions, sizes.balloon.height)
+                    }
+                }
             )
-        }
-        // O alfinete do modo recolher, além da mão (#400); a geometria reserva
-        // duas alças em cada ponta.
-        extras[HudRetractPart.HANDLE]?.let { handle ->
-            handle.placeAt(
-                notchStart - (handleGap + HUD_HANDLE_SIZE.roundToPx()) - handleGap - handle.alongSize(edge),
-                (notchAcross - handle.acrossSize(edge)) / 2,
-                HANDLE_Z_INDEX
-            )
-        }
-        extras[HudNotchPart.GEAR]?.let { handle ->
-            handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2, HANDLE_Z_INDEX)
-        }
-        if (balloon != null) {
-            when (edge) {
-                HudEdge.TOP -> balloon.place(balloonStart, notch.height)
-                HudEdge.BOTTOM -> balloon.place(balloonStart, height - notch.height - balloon.height)
-                HudEdge.LEFT -> balloon.place(notch.width, balloonStart)
-                HudEdge.RIGHT -> balloon.place(width - notch.width - balloon.width, balloonStart)
-            }
         }
     }
 }
 
-private enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
+/** As dicas das pontas do notch, em repouso: somem quando as alças aparecem. */
+@Composable
+private fun HudHandleHints(visible: Boolean, edge: HudEdge, updateTone: AppTone?) {
+    for ((part, atStart) in listOf(HudNotchPart.HINT_START to true, HudNotchPart.HINT_END to false)) {
+        AnimatedVisibility(
+            visible = visible,
+            modifier = Modifier.layoutId(part),
+            enter = fadeIn(appTween(AppMotion.normal, delayMillis = HINT_RETURN_DELAY_MS)),
+            exit = fadeOut(appTween(AppMotion.exit, AppMotion.exitEasing))
+        ) {
+            // Ponto da atualização na ponta da engrenagem: sem ele só via quem abrisse o notch.
+            HudHandleHint(
+                edge = edge,
+                atStart = atStart,
+                accent = if (atStart) null else updateTone?.color()
+            )
+        }
+    }
+}
+
+internal enum class HudNotchPart { NOTCH, BALLOON, HINT_START, HINT_END, MOVE, GEAR }
 
 /**
  * As fontes de hover do notch. O ponteiro "está no notch" enquanto estiver no
@@ -574,7 +538,7 @@ private fun rememberHudHover(onHoverChange: (Boolean) -> Unit): HudHoverSources 
 }
 
 /** A faixa recolhida fica por baixo do corpo, acima das alças que saem de trás dele. */
-private const val STRIP_Z_INDEX = -0.5f
+internal const val STRIP_Z_INDEX = -0.5f
 
 /** A caixa de cada conta no corpo do notch; o gesto do corpo acha o anel clicado por ela. */
 internal class HudRingHitBoxes {
@@ -606,9 +570,9 @@ internal class HudRingHitBoxes {
 /** O "índice" do balão da engrenagem, fora do intervalo das contas. */
 private const val APP_BALLOON = -1
 
-private fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) width else height
+internal fun Placeable.alongSize(edge: HudEdge): Int = if (edge.isHorizontal) width else height
 
-private fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) height else width
+internal fun Placeable.acrossSize(edge: HudEdge): Int = if (edge.isHorizontal) height else width
 
 /**
  * As alças saem **de dentro do notch**: deslizam da ponta para fora crescendo e
@@ -658,7 +622,7 @@ private const val HANDLE_ENTER_SCALE = 0.6f
 private val HANDLE_SLIDE = 14.dp
 
 /** Abaixo do notch: a alça que desliza de dentro dele sai de trás, não por cima. */
-private const val HANDLE_Z_INDEX = -1f
+internal const val HANDLE_Z_INDEX = -1f
 
 /** O arco parado volta depois de as alças saírem, não por cima delas. */
 private const val HINT_RETURN_DELAY_MS = 120
@@ -667,14 +631,14 @@ private const val HINT_RETURN_DELAY_MS = 120
  * Onde o balão foi posto nesta abertura. Não é estado de composição: é lido e
  * escrito no passo de layout, e como estado cada escrita pediria outro layout.
  */
-private class HudBalloonPlacement {
+internal class HudBalloonPlacement {
     var placed = false
     var index: Int? = null
     var target = 0f
 }
 
 /** Meio pixel: abaixo disso o balão já está no anel. */
-private const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
+internal const val BALLOON_ALONG_THRESHOLD_PX = 0.5f
 
 /**
  * Onde a caixa do balão ficou no contêiner, para o feixe saber de onde vem. Não
