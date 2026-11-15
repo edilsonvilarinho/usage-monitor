@@ -201,9 +201,20 @@ internal fun hudNotchSizes(
     // O balão da engrenagem existe mesmo sem conta nenhuma: é a saída do modo.
     val availableBalloonHeight = (maxWindowHeight - HUD_SHADOW_MARGIN * 2 -
         if (edge.isHorizontal) collapsed.height + HUD_BALLOON_GAP else 0.dp).coerceAtLeast(0.dp)
+    // Com buraco, o balão do buraco é a lista (cabeçalho + linhas) ou a conta mais alta com a faixa de volta.
+    val arrangement = hudColumnArrangement(accounts, edge)
+    val holeHeight = if (arrangement.hasHole) {
+        maxOf(
+            hudBlackHoleListHeight(arrangement.holeMembers.size),
+            (arrangement.holeMembers.maxOfOrNull { index -> hudBlackHoleAccountBalloonHeight(accounts[index], availableBalloonHeight) } ?: 0.dp)
+        )
+    } else {
+        0.dp
+    }
     val tallest = maxOf(
         accounts.maxOfOrNull { account -> hudBalloonHeight(account, availableBalloonHeight) } ?: 0.dp,
-        hudAppBalloonHeight(hasUpdateIndicator, hasUpdateAction)
+        hudAppBalloonHeight(hasUpdateIndicator, hasUpdateAction),
+        holeHeight
     )
     // O balão não gira com a borda: é texto, e fica sempre de pé.
     val balloon = DpSize(HUD_BALLOON_WIDTH, tallest)
@@ -723,3 +734,24 @@ internal fun nearestHudPlacement(centerX: Dp, centerY: Dp, area: ScreenWorkArea)
     val fraction = if (edge.isHorizontal) fromLeft / width else fromTop / height
     return HudPlacement(edge, fraction.coerceIn(0f, 1f))
 }
+
+/** Cabeçalho da lista do buraco e altura de cada linha (#600, A05). */
+internal val HUD_BLACK_HOLE_LIST_HEADER = 24.dp
+internal val HUD_BLACK_HOLE_LIST_ROW = 28.dp
+
+/** Faixa "← N no buraco" no topo do balão de uma conta vinda do buraco (#600, A05). */
+internal val HUD_BLACK_HOLE_BACK_STRIP = 24.dp
+
+/** Nota "volta sozinha quando couber" sob a conta auto-minimizada do buraco (#600, A05). Altura fixa. */
+internal val HUD_BLACK_HOLE_AUTO_NOTE = 24.dp
+
+/** Altura da lista do buraco com [count] contas: cabeçalho mais uma linha por conta (#600, A05). */
+internal fun hudBlackHoleListHeight(count: Int): Dp = HUD_BLACK_HOLE_LIST_HEADER + HUD_BLACK_HOLE_LIST_ROW * count
+
+/**
+ * Altura do balão de uma conta aberta a partir do buraco (#600, A05): o conteúdo, a faixa de volta e, na
+ * auto-minimizada, a nota de altura fixa. Sem a nota, ela ficava fora da altura medida.
+ */
+internal fun hudBlackHoleAccountBalloonHeight(account: HudAccount, maxBodyHeight: Dp = Dp.Infinity): Dp =
+    hudBalloonHeight(account, maxBodyHeight) + HUD_BLACK_HOLE_BACK_STRIP +
+        if (account.autoMinimized) HUD_BLACK_HOLE_AUTO_NOTE else 0.dp

@@ -108,4 +108,36 @@ class HudBlackHoleGeometryTest {
             minimized = minimizada
         )
     }
+
+    @Test
+    fun `a lista do buraco mede cabecalho mais uma linha por conta`() {
+        assertEquals(HUD_BLACK_HOLE_LIST_HEADER + HUD_BLACK_HOLE_LIST_ROW * 8, hudBlackHoleListHeight(8))
+    }
+
+    @Test
+    fun `o balao do buraco mede pela maior entre a lista a conta mais alta com a faixa e a engrenagem`() {
+        val alta = conta("Alta", 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, minimizada = true)
+        val minimizadas = listOf(alta) + (1..7).map { indice -> conta("M$indice", 0.2f, minimizada = true) }
+        val maiorConta = minimizadas.maxOf { cartao -> hudBalloonHeight(cartao) }
+        val esperado = maxOf(hudBlackHoleListHeight(8), maiorConta + HUD_BLACK_HOLE_BACK_STRIP, hudAppBalloonHeight(false, false))
+
+        val altura = hudNotchSizes(minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).balloon.height
+
+        assertEquals(esperado, altura, "o balao do buraco deve medir a maior entre a lista, a conta mais alta com a faixa de volta e a engrenagem")
+    }
+
+    @Test
+    fun `conta auto minimizada do buraco soma a nota de volta sozinha ao balao`() {
+        val auto = conta("Auto", 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, minimizada = true).copy(autoMinimized = true)
+        val minimizadas = listOf(auto) + (1..7).map { indice -> conta("M$indice", 0.2f, minimizada = true) }
+        val esperado = maxOf(
+            hudBlackHoleListHeight(8),
+            hudBalloonHeight(auto) + HUD_BLACK_HOLE_BACK_STRIP + HUD_BLACK_HOLE_AUTO_NOTE,
+            hudAppBalloonHeight(false, false)
+        )
+
+        val altura = hudNotchSizes(minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).balloon.height
+
+        assertEquals(esperado, altura, "a nota da auto-minimizada precisa entrar na altura do balao do buraco")
+    }
 }

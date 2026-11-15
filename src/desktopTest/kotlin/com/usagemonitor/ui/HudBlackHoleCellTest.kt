@@ -66,6 +66,7 @@ class HudBlackHoleCellTest {
                     compact = false,
                     language = AppLanguage.PT,
                     onRingHovered = {},
+                    onHoleHovered = {},
                     onRingRefresh = {},
                     onItemPlaced = { _, _ -> },
                     onRingPlaced = { _, _ -> }

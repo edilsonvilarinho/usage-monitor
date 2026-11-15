@@ -101,6 +101,8 @@ internal fun HudRingStrip(
     minimizeProgress: Map<UsageTargetKey, Float> = emptyMap(),
     language: AppLanguage,
     onRingHovered: (Int) -> Unit,
+    /** O cursor sobre o buraco negro da coluna (#600); a lista de contas minimizadas abre a partir dele. */
+    onHoleHovered: () -> Unit,
     onRingRefresh: (Int) -> Unit,
     onItemPlaced: (Int, LayoutCoordinates) -> Unit,
     onRingPlaced: (Int, LayoutCoordinates) -> Unit,
@@ -164,7 +166,7 @@ internal fun HudRingStrip(
                 HudBlackHoleCell(
                     count = arrangement.holeMembers.size,
                     language = language,
-                    onHovered = { hovered -> if (hovered) onRingHovered(arrangement.holeMembers.first()) },
+                    onHovered = { hovered -> if (hovered) onHoleHovered() },
                     onItemPlaced = { coordinates -> onItemPlaced(holeIndex, coordinates) },
                     onRingPlaced = { coordinates -> onRingPlaced(holeIndex, coordinates) }
                 )
