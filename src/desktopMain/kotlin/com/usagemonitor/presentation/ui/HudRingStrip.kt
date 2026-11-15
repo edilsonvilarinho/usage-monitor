@@ -20,8 +20,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -111,6 +113,11 @@ internal fun HudRingStrip(
     /** O soltar com reordenação, para a faixa assentar (#584). */
     reorderDrop: HudRingDrop? = null
 ) {
+    // Na coluna vertical as minimizadas saem da lista e formam o buraco (#600).
+    val arrangement = hudColumnArrangement(accounts, edge, minimizeProgress)
+    // Coordenadas de slot e do anel do buraco; o voo mede o centro delas na caixa da faixa (#600 A06).
+    val itemCoordinates = remember { mutableMapOf<Int, LayoutCoordinates>() }
+    val flightCenters = remember { mutableStateOf<Map<Int, Float>>(emptyMap()) }
     val items: @Composable () -> Unit = {
         if (accounts.isEmpty()) {
             AppStatusIndicator(label = fallbackLabel, tone = fallbackTone)
@@ -127,8 +134,6 @@ internal fun HudRingStrip(
                 compact -> settle
                 else -> 1f - settle
             }
-            // Na coluna vertical as minimizadas saem da lista e formam o buraco (#600).
-            val arrangement = hudColumnArrangement(accounts, edge)
             val drawn = if (edge.isHorizontal) accounts.indices.toList() else arrangement.shown
             drawn.forEach { index ->
                 val account = accounts[index]
@@ -143,15 +148,19 @@ internal fun HudRingStrip(
                         vertical = !edge.isHorizontal,
                         compact = compact,
                         toFull = if (leaving == null) toFull else null,
+                        // A conta em voo mantém o slot, mas o anel dela é o do overlay (#600 A06).
                         slot = Modifier.hudStripSlot(
                             horizontal = edge.isHorizontal,
                             leadingGap = HUD_ITEM_GAP * gaps[index],
                             sizeScale = 1f - (leaving ?: 0f)
-                        ),
+                        ).alpha(if (index in arrangement.flying) 0f else 1f),
                         language = language,
                         onHovered = { onRingHovered(index) },
                         onRefresh = { onRingRefresh(index) },
-                        onItemPlaced = { coordinates -> onItemPlaced(index, coordinates) },
+                        onItemPlaced = { coordinates ->
+                            itemCoordinates[index] = coordinates
+                            onItemPlaced(index, coordinates)
+                        },
                         onPlaced = { coordinates -> onRingPlaced(index, coordinates) },
                         reorderShift = reorderShiftOf(reorderDrag, shifts, index),
                         reorderDragging = reorderDrag?.index == index,
@@ -168,7 +177,10 @@ internal fun HudRingStrip(
                     language = language,
                     onHovered = { hovered -> if (hovered) onHoleHovered() },
                     onItemPlaced = { coordinates -> onItemPlaced(holeIndex, coordinates) },
-                    onRingPlaced = { coordinates -> onRingPlaced(holeIndex, coordinates) }
+                    onRingPlaced = { coordinates ->
+                        itemCoordinates[holeIndex] = coordinates
+                        onRingPlaced(holeIndex, coordinates)
+                    }
                 )
             }
         }
@@ -186,13 +198,28 @@ internal fun HudRingStrip(
             verticalAlignment = Alignment.CenterVertically
         ) { items() }
     } else {
-        Column(
+        // A caixa mede o voo: o centro de cada slot e do buraco entram na mesma régua (#600 A06).
+        val holeIndex = accounts.size
+        val flightIndices = arrangement.flying + holeIndex
+        Box(
             modifier = Modifier
                 .size(size)
-                .padding(horizontal = HUD_NOTCH_PADDING_ACROSS, vertical = HUD_NOTCH_SHOULDER + HUD_NOTCH_PADDING_ALONG),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) { items() }
+                .onGloballyPositioned { box ->
+                    val centers = hudFlightCenters(box, itemCoordinates, flightIndices)
+                    if (centers != flightCenters.value) flightCenters.value = centers
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .size(size)
+                    .padding(horizontal = HUD_NOTCH_PADDING_ACROSS, vertical = HUD_NOTCH_SHOULDER + HUD_NOTCH_PADDING_ALONG),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) { items() }
+            HudBlackHoleFlights(
+                flights = hudFlights(accounts, arrangement.flying, minimizeProgress, flightCenters.value, holeIndex)
+            )
+        }
     }
 }
 
