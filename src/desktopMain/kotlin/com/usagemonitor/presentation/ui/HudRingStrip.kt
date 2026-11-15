@@ -57,6 +57,8 @@ import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.HUD_RING_TEXT_GAP
 import com.usagemonitor.HudEdge
+import com.usagemonitor.hasHole
+import com.usagemonitor.hudColumnArrangement
 import com.usagemonitor.minimizedRingWithFocusWidth
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.gargantuaRoll
@@ -123,7 +125,11 @@ internal fun HudRingStrip(
                 compact -> settle
                 else -> 1f - settle
             }
-            accounts.forEachIndexed { index, account ->
+            // Na coluna vertical as minimizadas saem da lista e formam o buraco (#600).
+            val arrangement = hudColumnArrangement(accounts, edge)
+            val drawn = if (edge.isHorizontal) accounts.indices.toList() else arrangement.shown
+            drawn.forEach { index ->
+                val account = accounts[index]
                 val leaving = departures[account.targetKey]
                 // Por chave: a conta que colapsa no meio da faixa não pode herdar
                 // o estado (pulso, transição) da vizinha.
@@ -150,6 +156,18 @@ internal fun HudRingStrip(
                         reorderDrop = reorderDrop
                     )
                 }
+            }
+            // O buraco entra depois da última completa, como uma célula só (#600).
+            if (arrangement.hasHole) {
+                // Índice fora da faixa das contas: o buraco é medido no campo estelar sem virar conta (#600 A04).
+                val holeIndex = accounts.size
+                HudBlackHoleCell(
+                    count = arrangement.holeMembers.size,
+                    language = language,
+                    onHovered = { hovered -> if (hovered) onRingHovered(arrangement.holeMembers.first()) },
+                    onItemPlaced = { coordinates -> onItemPlaced(holeIndex, coordinates) },
+                    onRingPlaced = { coordinates -> onRingPlaced(holeIndex, coordinates) }
+                )
             }
         }
         // A faixa é só das contas. A contagem até a próxima coleta mora no balão

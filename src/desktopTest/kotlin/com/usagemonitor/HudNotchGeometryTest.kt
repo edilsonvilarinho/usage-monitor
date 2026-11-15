@@ -3,12 +3,14 @@ package com.usagemonitor
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.appUsageRingOrbitReach
+import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.presentation.ui.hudRingMarkSize
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.math.abs
@@ -629,15 +631,14 @@ class HudNotchGeometryTest {
     }
 
     @Test
-    fun `conta minimizada na lateral soma anel de 28 dp e cota de foco, altura pelo maior dos dois`() {
+    fun `conta minimizada na lateral vira a celula do buraco, anel de 64 dp mais a linha da contagem`() {
         val normal = account("Claude", "Em dia", listOf("5h" to "40%"))
         val minimized = normal.copy(minimized = true)
-        val focus = minimized.focusLine
         val sizes = hudNotchSizes(listOf(minimized), HudEdge.LEFT, "", false)
-        val expectedWidth = AppGargantuaTokens.minimizedSize + HUD_RING_TEXT_GAP + stripLineWidth(focus) +
-            HUD_NOTCH_PADDING_ACROSS * 2
-        val expectedHeight = maxOf(AppGargantuaTokens.minimizedSize, stripLineHeight(focus)) +
-            HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
+        // Uma minimizada só: o buraco é a única célula. Largura = rótulo inteiro numa linha, maior entre idiomas, piso de 64 dp (#600).
+        val labelWidth = AppLanguage.entries.maxOf { language -> wordWidth(hudBlackHoleCountLabel(1, language)) }
+        val expectedWidth = maxOf(HUD_RING_SIZE, labelWidth) + HUD_NOTCH_PADDING_ACROSS * 2
+        val expectedHeight = HUD_RING_SIZE + HUD_WORD_LINE + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
         assertEquals(expectedWidth, sizes.collapsed.width)
         assertEquals(expectedHeight, sizes.collapsed.height)
     }

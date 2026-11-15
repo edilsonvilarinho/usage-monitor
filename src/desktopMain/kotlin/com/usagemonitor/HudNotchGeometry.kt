@@ -4,10 +4,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
+import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_HORIZONTAL
@@ -426,18 +428,21 @@ internal fun verticalCollapsed(
     fallbackLabel: String,
     compact: Boolean
 ): DpSize {
+    // As minimizadas saem da coluna e viram uma célula do buraco negro (#600), no fim.
+    val arrangement = hudColumnArrangement(accounts, HudEdge.LEFT)
+    val shown = arrangement.shown.map { index -> accounts[index] }
+    val hole = arrangement.hasHole
     // A palavra solta do estado sem contas e a pílula de cada conta (#322) têm
     // larguras diferentes: a pílula soma a folga, o ponto e o vão.
     val wordWidths = when {
         accounts.isEmpty() -> listOf(verticalWordLineWidth(fallbackLabel))
         compact -> emptyList()
-        else -> accounts.filterNot { account -> account.minimized }.map { account -> verticalStatusPillWidth(account.statusLabel) }
+        else -> shown.map { account -> verticalStatusPillWidth(account.statusLabel) }
     }
-    val itemHeights = if (accounts.isEmpty()) {
+    val shownHeights = if (accounts.isEmpty()) {
         listOf(HUD_RING_SIZE + HUD_WORD_LINE * verticalWordLines(fallbackLabel))
     } else {
-        accounts.map { account ->
-            if (account.minimized) return@map minimizedRingWithFocusHeight(account)
+        shown.map { account ->
             if (compact) {
                 HUD_RING_SIZE + stripLineHeight(account.focusLine)
             } else {
@@ -445,19 +450,26 @@ internal fun verticalCollapsed(
             }
         }
     }
-    val all = itemHeights
+    // Célula do buraco: anel, uma linha da contagem e o vão até ela.
+    val all = if (hole) shownHeights + (HUD_RING_SIZE + HUD_WORD_LINE) else shownHeights
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    val widestWord = wordWidths.maxOrNull() ?: 0.dp
-    val widestPercent = accounts.maxOfOrNull { account ->
+    // O rótulo do buraco é uma linha só, inteira: a maior largura entre os idiomas, para a troca não cortar o texto.
+    val holeWordWidths = if (hole) {
+        AppLanguage.entries.map { language ->
+            wordWidth(hudBlackHoleCountLabel(arrangement.holeMembers.size, language))
+        }
+    } else {
+        emptyList()
+    }
+    val widestWord = (wordWidths + holeWordWidths).maxOrNull() ?: 0.dp
+    val widestPercent = shown.maxOfOrNull { account ->
         when {
-            account.minimized -> minimizedRingWithFocusWidth(account)
             compact -> stripLineWidth(account.focusLine)
             else -> account.stripLines.maxOf { line -> stripLineWidth(line) }
         }
     } ?: 0.dp
-    // O piso de 64 dp é das contas comuns; só com minimizadas a lateral pode ficar no anel de 28 dp.
-    val ringFloor = if (accounts.isEmpty() || accounts.any { account -> !account.minimized }) HUD_RING_SIZE else 0.dp
-    val across = maxOf(ringFloor, widestWord, widestPercent)
+    // Piso de 64 dp (HUD_RING_SIZE): vale para contas comuns e para o buraco, que é uma célula de anel.
+    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
         height = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
@@ -521,12 +533,9 @@ internal fun verticalWordLines(word: String): Int {
     return if (word.length > VERTICAL_WORD_LINE_CHARS && word.contains(' ')) 2 else 1
 }
 
-private fun verticalWordLineWidth(word: String): Dp {
-    val longestLine = if (verticalWordLines(word) == 2) {
-        word.split(' ').maxOf { part -> part.length }
-    } else {
-        word.length
-    }
+internal fun verticalWordLineWidth(word: String): Dp {
+    if (verticalWordLines(word) == 1) return wordWidth(word)
+    val longestLine = word.split(' ').maxOf { part -> part.length }
     return charWidth(longestLine, WORD_ADVANCE_DP)
 }
 

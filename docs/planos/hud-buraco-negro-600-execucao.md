@@ -50,7 +50,7 @@ usuário (`prototipos/issue-600/p10-sumidouro-r2/index.html`):
 | A01 | Este plano |
 | A02 | Arranjo puro da coluna: completas + um buraco com as minimizadas (vertical), em TDD |
 | A03 | Geometria: `verticalCollapsed` mede o buraco como uma célula; auto-minimizar coerente; TDD |
-| A04 | Célula do buraco (anel + "N minimizadas") no lugar das minimizadas em `HudRingStrip`; teste de tela |
+| A04 | Célula do buraco (anel + "N minimizadas") no lugar das minimizadas em `HudRingStrip`; teste de tela — **mesmo commit do A03**: geometria nova sem o desenho novo mede o que não desenha |
 | A05 | Balão do buraco: lista; linha (hover/clique/Enter) abre o `HudBalloon` da conta com "← N no buraco"; Restaurar e "auto"; teste de tela |
 | A06 | Transição "sumidouro": a conta desliza até o buraco e a contagem sobe na chegada; restaurar inverso; quadro puro em TDD |
 | A07 | `docs/hud-notch.md`, design system (`AppHudBar.prompt.md`) e protótipo visual registram a regra |
@@ -61,6 +61,8 @@ usuário (`prototipos/issue-600/p10-sumidouro-r2/index.html`):
 |---|---|---|
 | A01 | Sem harness (texto): 10 protótipos conferidos por captura headless (`qa600.mjs`, zero erros de console); P10 escolhido; rodadas 2 e 3 a pedido do usuário; teste de interação da rodada 3 `r2-test.mjs` → 25 OK, 0 FAIL, `errors=0` | P10 rodada 3 aprovado |
 | A02 | `hudColumnArrangement` + `HudColumnArrangement.hasHole` em `HudBlackHole.kt`; 6 casos em `HudBlackHoleTest` (Haiku, `frontend-dev`) | Vermelho (stub com todas na coluna): `gradlew.bat desktopTest --tests "com.usagemonitor.HudBlackHoleTest"` → 3/6 falham, ex. `AssertionError: expected:<[1, 4]> but was:<[0, 1, 2, 3, 4, 5]>` (`HudBlackHoleTest.kt:50`). Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.HudBlackHoleTest" --tests "com.usagemonitor.architecture.*"` → 6 + 28, 0 falhas |
+| A03 | `hudBlackHoleCountLabel` (`HudBlackHoleLabels.kt`, por `localized`); `verticalCollapsed` usa `hudColumnArrangement`: minimizadas viram uma célula `HUD_RING_SIZE + HUD_WORD_LINE`, largura = maior rótulo **de uma linha** entre `AppLanguage.entries` (sem parâmetro de idioma nos ~70 chamadores), piso 64 dp. Devolvida 1× (rótulo medido em 2 linhas na largura e 1 na altura) (Haiku, `frontend-dev`) | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudBlackHoleGeometryTest" --tests "com.usagemonitor.presentation.HudBlackHoleCountLabelTest"` → `expected:<448.0.dp> but was:<518.0.dp>` (`HudBlackHoleGeometryTest.kt:33`), `expected:<[1 minimizada]> but was:<[]>`; após a devolução `largura=91.0.dp rotulo=4 minimizadas umaLinha=89.0.dp` (`:62`). Verde: recorte `HudBlackHole*` + `HudNotchGeometryTest` + `HudAutoMinimizeTest` + `presentation.*` + `architecture.*` → 1 287 casos, 0 falhas |
+| A04 | `HudBlackHoleCell` (anel sem arcos + contagem numa linha de `HUD_WORD_LINE`); `HudRingStrip` desenha `arrangement.shown` + buraco na vertical; poço/caixa do campo estelar pelo índice `accounts.size`; `HudNotchTest` da célula minimizada lateral passa a medir o buraco. Hover do buraco abre o balão do 1º membro até o A05 (Haiku, `frontend-dev`) | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleCellTest"` → `Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'hudBlackHole')` (`HudBlackHoleCellTest.kt:36`). Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.HudBlackHole*" --tests "com.usagemonitor.HudNotchGeometryTest" --tests "com.usagemonitor.architecture.*"` → exit 0 |
 
 ## Problemas em aberto e riscos
 
