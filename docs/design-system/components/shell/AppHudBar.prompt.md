@@ -68,6 +68,8 @@ ring with its focus quota beside it). If it still does not fit, the compact cell
 account has no restore button, never writes `hudMinimizedAccounts`, and returns on its own when there is room. Top
 and bottom edges do not change.
 
+**Black hole for minimized accounts (#600).** On a side edge only (top and bottom are unchanged), minimized accounts (manual #576 and auto-minimized #596) leave the column and become **one** cell: a 64dp ring with the count below ("4 minimized"), placed after the last full account. Hovering the hole opens a list of the accounts inside (provider glyph, name, value in focus, "auto" on the auto-minimized one); a click or Enter does the same. A row opens that account's balloon with "← N in the black hole" at the top; Restore removes only that account. The auto-minimized account has no Restore button and says "returns on its own when there is room". The arrangement is `hudColumnArrangement` in `src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`; full rules in `docs/hud-notch.md` ("Buraco negro das minimizadas (#600)").
+
 **Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon
 for **that account only** — Codenotch's card, not a panel of every account. Header with the provider
 mark in the source accent, the card title and the state; per quota the card's title and
