@@ -60,6 +60,7 @@ usuário (`prototipos/issue-600/p10-sumidouro-r2/index.html`):
 | ID | Execução | Resultado |
 |---|---|---|
 | A01 | Sem harness (texto): 10 protótipos conferidos por captura headless (`qa600.mjs`, zero erros de console); P10 escolhido; rodadas 2 e 3 a pedido do usuário; teste de interação da rodada 3 `r2-test.mjs` → 25 OK, 0 FAIL, `errors=0` | P10 rodada 3 aprovado |
+| A02 | `hudColumnArrangement` + `HudColumnArrangement.hasHole` em `HudBlackHole.kt`; 6 casos em `HudBlackHoleTest` (Haiku, `frontend-dev`) | Vermelho (stub com todas na coluna): `gradlew.bat desktopTest --tests "com.usagemonitor.HudBlackHoleTest"` → 3/6 falham, ex. `AssertionError: expected:<[1, 4]> but was:<[0, 1, 2, 3, 4, 5]>` (`HudBlackHoleTest.kt:50`). Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.HudBlackHoleTest" --tests "com.usagemonitor.architecture.*"` → 6 + 28, 0 falhas |
 
 ## Problemas em aberto e riscos
 
