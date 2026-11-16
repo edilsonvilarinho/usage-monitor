@@ -648,7 +648,8 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   conta só por clique ou Enter (a seleção por hover de 160 ms saiu na #602).
 - **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
   com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só
-  aquela conta: o balão volta à lista, ou fecha se o buraco esvaziar. A auto-minimizada não tem botão e diz "volta
+  aquela conta: o balão volta à lista, já sem ela, ou fecha se o buraco esvaziar (#602: antes o balão ficava na
+  conta restaurada; a seleção que sai de `holeMembers` é descartada, por Restaurar ou outro caminho). A auto-minimizada não tem botão e diz "volta
   sozinha quando couber" (EN "returns on its own when there is room"). Os rótulos vêm de `localized`.
 - **Sumidouro (transição).** Minimizar: a conta encolhe de 64 a 28 dp e desliza ao longo da borda até o centro do
   buraco, em 520 ms (ease-in-out, sem overshoot). A contagem só inclui a conta quando o progresso chega a 1. Restaurar

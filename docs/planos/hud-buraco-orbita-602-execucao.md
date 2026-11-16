@@ -54,6 +54,7 @@ Parâmetros fixados pelo usuário (JSON da rodada 3, unidades medidas em `az-flu
 |---|---|
 | A01 | Este plano |
 | A02 | Lista do buraco abre só por clique/Enter; hover não abre; clique fora e Esc fecham |
+| A03 | `HudNotch`: seleção do buraco que sai de `holeMembers` é descartada (`LaunchedEffect(holeMembers)` + `takeIf` no repasse ao balão); buraco vazio fecha o balão. Bug reproduzido antes da correção com estado elevado no teste (Haiku, `frontend-dev`) | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest"` → 3/16 falham, ex. `AssertionError: ... Did not expect any node but found '1' node that satisfies: (Text ... contains 'Anthropic — Charlie')` (`HudBlackHoleBalloonTest.kt:149`, conta restaurada seguia no balão). Verde: recorte `ui.*` + `HudBlackHole*` + `architecture.*` → 796 casos, 0 falhas (`test-runner`) |
 | A03 | Restaurar no balão do buraco volta à lista sem a conta; fecha se o buraco esvaziar |
 | A04 | Céu novo (quadro puro): 120 estrelas + 600 grãos, deriva horizontal, cintilação, sem rastro/cruz; canvas |
 | A05 | Órbita em comboio (quadro puro) e geometria estática da célula que a contém |

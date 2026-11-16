@@ -211,6 +211,11 @@ internal fun HudNotch(
         if (!open) holeSelection = null
         if (!open && initialBalloonIndex == null) balloonIndex = null
     }
+    // A conta aberta deixa o buraco (Restaurar ou outro caminho): a lista volta sem ela, e o buraco vazio fecha o balão.
+    LaunchedEffect(holeMembers) {
+        if (holeSelection != null && holeSelection !in holeMembers) holeSelection = null
+        if (holeMembers.isEmpty() && balloonIndex == holeIndex) balloonIndex = null
+    }
     // A engrenagem abre o balão dela no hover, como o anel abre o da conta
     // (#317). Só com o notch aberto: durante o arrasto as alças continuam na
     // tela, e o índice gravado ali reabriria o balão ao soltar.
@@ -411,7 +416,7 @@ internal fun HudNotch(
             }
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
-                accounts = accounts, holeMembers = holeMembers, holeSelection = holeSelection,
+                accounts = accounts, holeMembers = holeMembers, holeSelection = holeSelection?.takeIf { index -> index in holeMembers },
                 onHoleSelect = { position -> holeSelection = position }, sizes = sizes,
                 appBalloon = appBalloon, appBalloonHeight = appBalloonHeight, language = language,
                 accountActions = accountActions, ringCenters = ringCenters, ringDepths = ringDepths,

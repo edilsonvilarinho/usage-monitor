@@ -1,5 +1,7 @@
 package com.usagemonitor.ui
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ComposeUiTest
@@ -144,6 +146,45 @@ class HudBlackHoleBalloonTest {
     }
 
     @Test
+    fun `restaurar no balao da conta devolve a lista do buraco sem ela`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        onNodeWithText(labels[2]).performClick()
+        onNodeWithContentDescription("Restaurar").performClick()
+
+        onAllNodesWithText(labels[2]).assertCountEquals(0)
+        listOf(labels[0], labels[1], labels[3]).forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+        onAllNodesWithText("← 3 no buraco").assertCountEquals(0)
+    }
+
+    @Test
+    fun `conta que sai do buraco por outro caminho com o balao aberto some da lista`() = runDesktopComposeUiTest {
+        val state = setNotch(minimized)
+        clickHole()
+        onNodeWithText(labels[1]).performClick()
+        runOnIdle { state.value = state.value.map { account -> if (account.label == labels[1]) account.copy(minimized = false) else account } }
+        waitForIdle()
+
+        onAllNodesWithText(labels[1]).assertCountEquals(0)
+        listOf(labels[0], labels[2], labels[3]).forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+    }
+
+    @Test
+    fun `buraco esvaziado fecha o balao e nao reabre quando a conta volta a minimizar`() = runDesktopComposeUiTest {
+        val state = setNotch(listOf(minimized[0]))
+        clickHole()
+        onNodeWithText(labels[0]).performClick()
+        onNodeWithContentDescription("Restaurar").performClick()
+        waitForIdle()
+        onAllNodesWithContentDescription("Restaurar").assertCountEquals(0)
+
+        runOnIdle { state.value = listOf(minimized[0]) }
+        waitForIdle()
+
+        onAllNodesWithText(labels[0]).assertCountEquals(0)
+    }
+
+    @Test
     fun `auto minimizada nao tem Restaurar e mostra o texto da auto`() = runDesktopComposeUiTest {
         val accounts = listOf(
             account(labels[0], minimized = true, auto = true),
@@ -199,13 +240,18 @@ class HudBlackHoleBalloonTest {
         onNodeWithTag(NOTCH_TAG).performMouseInput { click(point) }
     }
 
-    private fun ComposeUiTest.setNotch(accounts: List<HudAccount>, onToggleMinimize: (UsageTargetKey) -> Unit = {}) {
+    /** Estado das contas fica aqui; o toggle de minimizar troca a conta como o app, então o Restaurar a tira do buraco. */
+    private fun ComposeUiTest.setNotch(
+        initial: List<HudAccount>,
+        onToggleMinimize: (UsageTargetKey) -> Unit = {}
+    ): MutableState<List<HudAccount>> {
+        val accounts = mutableStateOf(initial)
         setContent {
             ScreenTestTheme(isDark = true) {
                 HudNotch(
-                    accounts = accounts,
+                    accounts = accounts.value,
                     edge = HudEdge.LEFT,
-                    sizes = hudNotchSizes(accounts, HudEdge.LEFT, "Carregando", false),
+                    sizes = hudNotchSizes(accounts.value, HudEdge.LEFT, "Carregando", false),
                     fallbackLabel = "Carregando",
                     expanded = true,
                     language = AppLanguage.PT,
@@ -218,12 +264,18 @@ class HudBlackHoleBalloonTest {
                             teamSessionPulse = SessionPulse.EMPTY,
                             actions = inertShellActions(),
                             onRefresh = {},
-                            onToggleMinimize = onToggleMinimize
+                            onToggleMinimize = { target ->
+                                onToggleMinimize(target)
+                                accounts.value = accounts.value.map { item ->
+                                    if (item.targetKey == target) item.copy(minimized = false) else item
+                                }
+                            }
                         )
                     }
                 )
             }
         }
+        return accounts
     }
 
     /** Ações do app sem efeito: o balão da conta só precisa delas para montar as janelas do card. */
