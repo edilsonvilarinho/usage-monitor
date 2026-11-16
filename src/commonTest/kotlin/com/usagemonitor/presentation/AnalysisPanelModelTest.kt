@@ -17,6 +17,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
@@ -37,7 +38,7 @@ class AnalysisPanelModelTest {
         assertEquals("62% usada com 70% da janela já passada: 8 pontos abaixo da linha. Chega a ~83% no reinício (14:00).", fiveHour.sentence)
         assertTrue(fiveHour.facts.contains(AnalysisFact("Ritmo seguro", "25 %/h")))
         assertTrue(fiveHour.facts.contains(AnalysisFact("Última hora", "14 %/h")))
-        val diagonal = fiveHour.diagonal!!
+        val diagonal = fiveHour.diagonal
         assertEquals("62% · 70% do tempo", diagonal.pointLabel)
         assertEquals(listOf("09:00", "11:30", "14:00"), diagonal.axisLabels)
         assertEquals(listOf(PacePathPoint(0.7, 62.0), PacePathPoint(1.0, 83.0)), diagonal.projection)
@@ -46,7 +47,7 @@ class AnalysisPanelModelTest {
 
         // A leitura nova chega antes do caminho relido: a linha termina nela, e "1 ponto" no singular.
         val newer = AnalysisPanelModel.windowCard(analysis.fiveHour!!.copy(percent = 71, projectedAtReset = 92), analysis.generatedAt, AppLanguage.PT)
-        assertEquals(PacePathPoint(0.7, 71.0), newer.diagonal!!.current.last())
+        assertEquals(PacePathPoint(0.7, 71.0), newer.diagonal.current.last())
         assertTrue(newer.sentence.startsWith("71% usada com 70% da janela já passada: 1 ponto acima da linha."))
     }
 
@@ -65,21 +66,44 @@ class AnalysisPanelModelTest {
             full.sentence
         )
         assertEquals(AnalysisFact("Runs out", "Tue 13:46 · 14 min before the reset"), full.facts.last())
-        val projection = full.diagonal!!.projection
-        assertTrue(full.diagonal!!.projectionCritical)
+        val projection = full.diagonal.projection
+        assertTrue(full.diagonal.projectionCritical)
         assertEquals(100.0, projection[1].percent)
         assertEquals((210.0 + 76.0) / 300.0, projection[1].elapsedFraction, 1e-6)
         assertEquals(PacePathPoint(1.0, 100.0), projection.last())
     }
 
     @Test
-    fun `a window without its start has no diagonal, only the sentence`() {
-        val unknown = AnalysisPanelModel.windowCard(analysis.weekly!!.copy(startsAt = null, projectedAtReset = null, paceNow = null, paceAverage = null), analysis.generatedAt, AppLanguage.EN)
-        assertEquals("no projection", unknown.verdict)
-        assertEquals(AppTone.NEUTRAL, unknown.verdictTone)
-        assertEquals("Weekly", unknown.title)
-        assertEquals("41% used; with no known reset there is no pace line.", unknown.sentence)
-        assertNull(unknown.diagonal)
+    fun `a 5 hour window with no open window keeps the previous paths behind the diagonal, without the live line`() {
+        // Sem início nem reinício: não há janela aberta, mas as anteriores continuam atrás da diagonal.
+        val closed = AnalysisPanelModel.windowCard(analysis.fiveHour!!.copy(startsAt = null, resetsAt = null), analysis.generatedAt, AppLanguage.EN)
+        assertEquals("62% used; no open window, the chart shows only the previous ones.", closed.sentence)
+        val diagonal = assertNotNull(closed.diagonal)
+        assertEquals(emptyList(), diagonal.current)
+        assertEquals(analysis.fiveHour!!.previousPaths.map { path -> path.points }, diagonal.previous)
+        assertEquals(listOf("start", "2 h 30 min", "reset"), diagonal.axisLabels)
+        assertNull(diagonal.nowLabel)
+        assertNull(diagonal.pointLabel)
+        assertNull(diagonal.endLabel)
+        assertNull(diagonal.exhaustionLabel)
+        assertEquals(emptyList(), diagonal.projection)
+        assertFalse(diagonal.projectionCritical)
+        assertEquals(100.0, diagonal.yMax)
+        assertEquals(listOf("1 previous window"), diagonal.legend)
+        assertEquals(closed.sentence, diagonal.description)
+    }
+
+    @Test
+    fun `a weekly window with no open window and no previous paths still draws the axis in days`() {
+        val closed = AnalysisPanelModel.windowCard(analysis.weekly!!.copy(startsAt = null, resetsAt = null, projectedAtReset = null, paceNow = null, paceAverage = null), analysis.generatedAt, AppLanguage.EN)
+        assertEquals("Weekly", closed.title)
+        assertEquals("41% used; no open window, the chart shows only the previous ones.", closed.sentence)
+        val diagonal = assertNotNull(closed.diagonal)
+        assertEquals(emptyList(), diagonal.previous)
+        assertEquals(emptyList(), diagonal.current)
+        assertEquals(listOf("start", "3 d 12 h", "reset"), diagonal.axisLabels)
+        assertEquals(emptyList(), diagonal.legend)
+        assertNull(diagonal.nowLabel)
     }
 
     @Test

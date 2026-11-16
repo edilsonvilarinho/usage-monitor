@@ -110,7 +110,7 @@ private fun AnalysisWindowCard(model: AnalysisWindowCardModel, lineColor: Color,
         model.resetLabel?.let { label ->
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        model.diagonal?.let { diagonal -> PaceDiagonalChart(diagonal, lineColor, language) }
+        PaceDiagonalChart(model.diagonal, lineColor, language)
         AnalysisFactsGrid(model.facts)
     }
 }

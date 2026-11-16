@@ -44,6 +44,8 @@ diagonal sempre: com janela aberta como hoje; sem ela, as janelas anteriores do 
 | ID | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness (plano); fatos medidos com `sed`/`grep` acima | plano gravado |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*"` | `AnalysisPanelModelTest.kt:80` `expected:<62% used; [no open window, the chart shows only the previous ones.]> but was:<62% used; [with no known reset there is no pace line.]>`; idem `:100` (semanal, 41%) |
+| A02 | verde: o mesmo comando; `desktopTest --tests "com.usagemonitor.ui.*"`; `allTests koverXmlReport -Pcoverage` | 1216 testes / 0 falhas; 754 / 0; 4476 testes, 0 falhas, 1 ignorado. Protótipo: html.parser sem erro no bloco novo |
 
 ## Problemas em aberto e riscos
 

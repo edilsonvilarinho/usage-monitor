@@ -30,8 +30,8 @@ internal data class AnalysisWindowCardModel(
     val resetLabel: String?,
     /** O que a diagonal mostra, em frase: onde a janela está em relação à linha e como termina. */
     val sentence: String,
-    /** `null` sem início e reinício conhecidos: sem eixo do tempo, só a frase. */
-    val diagonal: PaceDiagonalModel?,
+    /** Sem início e reinício conhecidos a diagonal não tem linha de agora nem projeção: só as anteriores e o eixo de duração. */
+    val diagonal: PaceDiagonalModel,
     /** Fatos da janela: uso, tempo, reinício, ritmos e, se esgota, quando. */
     val facts: List<AnalysisFact> = emptyList()
 )
@@ -148,7 +148,7 @@ internal object AnalysisPanelModel {
     fun windowSentence(window: AnalysisWindowView, now: Instant, language: AppLanguage): String {
         val used = localized(language, "${window.percent}% usada", "${window.percent}% used")
         val gap = PaceDiagonalModels.gapNow(window, now)
-            ?: return used + localized(language, "; sem reinício conhecido, não há linha de ritmo.", "; with no known reset there is no pace line.")
+            ?: return used + localized(language, "; sem janela aberta, o gráfico mostra só as anteriores.", "; no open window, the chart shows only the previous ones.")
         val elapsed = window.percent - gap
         val span = if (window.periodType == PeriodType.WEEKLY) localized(language, "da semana", "of the week") else localized(language, "da janela", "of the window")
         val points = if (abs(gap) == 1) localized(language, "1 ponto", "1 point") else localized(language, "${abs(gap)} pontos", "${abs(gap)} points")
