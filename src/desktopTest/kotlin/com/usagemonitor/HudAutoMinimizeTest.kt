@@ -36,38 +36,40 @@ class HudAutoMinimizeTest {
 
     @Test
     fun `sem cota conta como zero e sai antes da conta de maior uso`() {
-        // Duas contas sem cota: uma sozinha não basta para passar do buraco (114 dp + linha), duas bastam.
+        // Com o buraco de 236 dp, a coluna só diminui a partir de três contas recolhidas: por isso são três sem cota.
         val a = conta("A", 0.9f)
         val b = conta("B", 0.6f)
         val c1 = conta("C1")
         val c2 = conta("C2")
-        val contas = listOf(a, b, c1, c2)
+        val c3 = conta("C3")
+        val contas = listOf(a, b, c1, c2, c3)
 
-        val duas = alturaCom(contas, setOf(c1.targetKey, c2.targetKey))
+        val tresSemCota = alturaCom(contas, setOf(c1.targetKey, c2.targetKey, c3.targetKey))
         assertEquals(
-            setOf(c1.targetKey, c2.targetKey),
-            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, duas)
+            setOf(c1.targetKey, c2.targetKey, c3.targetKey),
+            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, tresSemCota)
         )
 
-        val tres = alturaCom(contas, setOf(c1.targetKey, c2.targetKey, b.targetKey))
+        val quatro = alturaCom(contas, setOf(c1.targetKey, c2.targetKey, c3.targetKey, b.targetKey))
         assertEquals(
-            setOf(c1.targetKey, c2.targetKey, b.targetKey),
-            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, tres)
+            setOf(c1.targetKey, c2.targetKey, c3.targetKey, b.targetKey),
+            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, quatro)
         )
     }
 
     @Test
     fun `o uso da conta e a maior cota, nao a primeira`() {
-        // Pela maior cota a ordem é C (0,3), B (0,6), A (0,9). Pela primeira cota seria A (0,1), C (0,3).
+        // Pela maior cota a ordem é C (0,3), D (0,4), B (0,6), A (0,9). Pela primeira cota A (0,1) sairia antes.
         val a = conta("A", 0.1f, 0.9f)
         val b = conta("B", 0.6f)
         val c = conta("C", 0.3f)
-        val contas = listOf(a, b, c)
+        val d = conta("D", 0.4f)
+        val contas = listOf(a, b, c, d)
 
-        val teto = alturaCom(contas, setOf(c.targetKey, b.targetKey))
+        val teto = alturaCom(contas, setOf(c.targetKey, d.targetKey, b.targetKey))
 
         assertEquals(
-            setOf(c.targetKey, b.targetKey),
+            setOf(c.targetKey, d.targetKey, b.targetKey),
             hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto)
         )
     }
@@ -77,12 +79,13 @@ class HudAutoMinimizeTest {
         val a = conta("A", 0.5f)
         val b = conta("B", 0.5f)
         val c = conta("C", 0.5f)
-        val contas = listOf(a, b, c)
+        val d = conta("D", 0.5f)
+        val contas = listOf(a, b, c, d)
 
-        val teto = alturaCom(contas, setOf(a.targetKey, b.targetKey))
+        val teto = alturaCom(contas, setOf(a.targetKey, b.targetKey, c.targetKey))
 
         assertEquals(
-            setOf(a.targetKey, b.targetKey),
+            setOf(a.targetKey, b.targetKey, c.targetKey),
             hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto)
         )
     }
@@ -116,13 +119,14 @@ class HudAutoMinimizeTest {
         val b = conta("B", 0.6f)
         val c1 = conta("C1")
         val c2 = conta("C2")
-        val contas = listOf(a, b, c1, c2)
-        val teto = alturaCom(contas, setOf(c1.targetKey, c2.targetKey))
+        val c3 = conta("C3")
+        val contas = listOf(a, b, c1, c2, c3)
+        val teto = alturaCom(contas, setOf(c1.targetKey, c2.targetKey, c3.targetKey))
 
         val aplicadas = applyHudAutoMinimize(contas, HudEdge.LEFT, fallback, teto)
 
         assertEquals(
-            listOf(false to false, false to false, true to true, true to true),
+            listOf(false to false, false to false, true to true, true to true, true to true),
             aplicadas.map { conta -> conta.minimized to conta.autoMinimized }
         )
     }

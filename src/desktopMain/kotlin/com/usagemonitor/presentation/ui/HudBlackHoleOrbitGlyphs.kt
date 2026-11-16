@@ -13,10 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -27,17 +29,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_BLACK_HOLE_CELL_SIZE
-import com.usagemonitor.HUD_RING_SIZE
-import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.presentation.ui.components.AppGargantuaRing
 import com.usagemonitor.presentation.ui.components.AppProviderMark
-import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_EXTENT
 import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_SIZE
 import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_ORBIT_RADIUS
 import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_TRAIL_DEG
 import com.usagemonitor.presentation.ui.components.HudBlackHoleOrbitEntry
 import com.usagemonitor.presentation.ui.components.hudBlackHoleFilament
+import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.components.hudBlackHoleOrbit
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
@@ -49,6 +49,9 @@ internal const val HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG = "hudBlackHoleOrbitGlyph
 /** Tag de um nó vazio por conta em execução, só na árvore não mesclada: prova que o filamento foi pedido (#602, A07). */
 internal const val HUD_BLACK_HOLE_FILAMENT_TEST_TAG = "hudBlackHoleFilament"
 
+/** Tag da marca real do provedor dentro de cada glifo em órbita (#611, P1). */
+internal const val HUD_BLACK_HOLE_MARK_TEST_TAG = "hudBlackHoleOrbitMark"
+
 private const val HUD_BLACK_HOLE_TRAIL_SEGMENTS = 10
 private const val HUD_BLACK_HOLE_TRAIL_ALPHA_RUNNING = 0.85f
 private const val HUD_BLACK_HOLE_TRAIL_ALPHA_IDLE = 0.2f
@@ -58,6 +61,23 @@ private val HUD_BLACK_HOLE_HALO_RADIUS = 18.dp
 private val HUD_BLACK_HOLE_HALO_RING_RADIUS = 14.dp
 private val HUD_BLACK_HOLE_HALO_RING_WIDTH = 1.dp
 private const val HUD_BLACK_HOLE_HALO_ALPHA = 0.35f
+/** Marca real do provedor no centro do disco (#611, P1). */
+private val HUD_BLACK_HOLE_MARK_SIZE = 20.dp
+/** Contorno do disco: raio 15,4 dp e traço de 1,2 dp (#611, P1). */
+private val HUD_BLACK_HOLE_CONTOUR_RADIUS = 15.4.dp
+private val HUD_BLACK_HOLE_CONTOUR_WIDTH = 1.2.dp
+/** Traço e vão do tracejado do contorno ocioso: 2 dp e 2 dp (#611, P1). */
+private val HUD_BLACK_HOLE_DASH = 2.dp
+/** Primeiro arco de cota: 16 dp do disco + 1,5 dp de folga + 1,25 dp de meio traço (#611, P1). */
+private val HUD_BLACK_HOLE_ARC_FIRST_RADIUS = 18.75.dp
+/** Passo radial entre arcos de cota: traço 2,5 dp + folga 1,5 dp (#611, P1). */
+private val HUD_BLACK_HOLE_ARC_STEP = 4.dp
+private val HUD_BLACK_HOLE_ARC_WIDTH = 2.5.dp
+/** Trilho de fundo e tracejado do contorno, na cor de texto com alfa do prótipo (#611, P1). */
+private const val HUD_BLACK_HOLE_TRACK_ALPHA_DARK = 0.06f
+private const val HUD_BLACK_HOLE_TRACK_ALPHA_LIGHT = 0.10f
+private const val HUD_BLACK_HOLE_DASH_ALPHA_DARK = 0.14f
+private const val HUD_BLACK_HOLE_DASH_ALPHA_LIGHT = 0.25f
 
 /**
  * Glifos em órbita da célula do buraco (#602, A06): um glifo por conta do comboio, no raio de
@@ -101,7 +121,8 @@ internal fun HudBlackHoleOrbitGlyphs(
                 index = index,
                 members = members,
                 timeMs = timeMs,
-                runningLabel = runningLabel
+                runningLabel = runningLabel,
+                lens = lens
             )
         }
     }
@@ -123,34 +144,113 @@ private fun rememberHudBlackHoleClock(live: Boolean): State<Long> {
     return relogio
 }
 
+/** Arco de cota de um glifo: fração preenchida e cor do tom da cota (#611, P1). */
+private class HudBlackHoleArc(val fraction: Float, val color: Color)
+
+/**
+ * Glifo de uma conta em órbita (#611, P1). A caixa externa, de [HUD_BLACK_HOLE_GLYPH_EXTENT] × 2, carrega o
+ * deslocamento da órbita e os arcos de cota por fora do disco; a interna, de [HUD_BLACK_HOLE_GLYPH_SIZE], é o
+ * disco com a tag de glifo e a semântica, e a marca real de [HUD_BLACK_HOLE_MARK_SIZE] no centro.
+ */
 @Composable
 private fun HudBlackHoleGlyph(
     account: HudAccount,
     index: Int,
     members: List<HudAccount>,
     timeMs: State<Long>,
-    runningLabel: String
+    runningLabel: String,
+    lens: Color
 ) {
+    val claro = hudIsLight(MaterialTheme.colorScheme.surface)
+    val trilho = MaterialTheme.colorScheme.onSurface.copy(
+        alpha = if (claro) HUD_BLACK_HOLE_TRACK_ALPHA_LIGHT else HUD_BLACK_HOLE_TRACK_ALPHA_DARK
+    )
+    val tracejado = MaterialTheme.colorScheme.onSurface.copy(
+        alpha = if (claro) HUD_BLACK_HOLE_DASH_ALPHA_LIGHT else HUD_BLACK_HOLE_DASH_ALPHA_DARK
+    )
+    val arcos = account.rings.map { quota -> HudBlackHoleArc(quota.fraction, quota.tone.color()) }
     Box(
         modifier = Modifier
-            .size(HUD_BLACK_HOLE_GLYPH_SIZE)
+            .size(HUD_BLACK_HOLE_GLYPH_EXTENT * 2)
             .offset {
                 val entrada = hudBlackHoleOrbit(members, { conta -> conta.sessionActive }, timeMs.value)[index]
                 IntOffset(entrada.x.roundToPx(), entrada.y.roundToPx())
             }
-            .clearAndSetSemantics {
-                this[SemanticsProperties.TestTag] = HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG
-                if (account.sessionActive) contentDescription = "${account.label}, $runningLabel"
-            }
+            .drawBehind { drawHudBlackHoleArcos(arcos, trilho) },
+        contentAlignment = Alignment.Center
     ) {
-        AppGargantuaRing(
-            arcs = account.rings.map { quota -> AppRingArc(quota.fraction, quota.tone, quota.hasForecast) },
-            description = account.label,
-            size = HUD_BLACK_HOLE_GLYPH_SIZE,
-            stroke = HUD_RING_STROKE * (HUD_BLACK_HOLE_GLYPH_SIZE / HUD_RING_SIZE),
-            centerContent = { AppProviderMark(source = account.source, tint = AppGargantuaTokens.mark) }
+        // Disco com a semântica do glifo; a marca fica irmã, no mesmo centro, fora da subárvore que o clearAndSetSemantics limpa.
+        Box(
+            modifier = Modifier
+                .size(HUD_BLACK_HOLE_GLYPH_SIZE)
+                .drawBehind { drawHudBlackHoleDisco(account.sessionActive, lens, tracejado) }
+                .clearAndSetSemantics {
+                    this[SemanticsProperties.TestTag] = HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG
+                    if (account.sessionActive) contentDescription = "${account.label}, $runningLabel"
+                }
+        )
+        AppProviderMark(
+            source = account.source,
+            tint = AppGargantuaTokens.hot,
+            modifier = Modifier.clearAndSetSemantics { this[SemanticsProperties.TestTag] = HUD_BLACK_HOLE_MARK_TEST_TAG },
+            size = HUD_BLACK_HOLE_MARK_SIZE
         )
     }
+}
+
+/**
+ * Arcos de cota por fora do disco (#611, P1): um anel por cota, do raio [HUD_BLACK_HOLE_ARC_FIRST_RADIUS] com passo
+ * [HUD_BLACK_HOLE_ARC_STEP]. Trilho de fundo em volta inteira e arco preenchido a partir de -90 graus.
+ */
+private fun DrawScope.drawHudBlackHoleArcos(arcos: List<HudBlackHoleArc>, trilho: Color) {
+    val centro = center
+    arcos.forEachIndexed { indice, arco ->
+        val raio = (HUD_BLACK_HOLE_ARC_FIRST_RADIUS + HUD_BLACK_HOLE_ARC_STEP * indice).toPx()
+        val topLeft = Offset(centro.x - raio, centro.y - raio)
+        val tamanho = Size(raio * 2f, raio * 2f)
+        val largura = HUD_BLACK_HOLE_ARC_WIDTH.toPx()
+        drawArc(
+            color = trilho,
+            startAngle = -90f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = topLeft,
+            size = tamanho,
+            style = Stroke(width = largura, cap = StrokeCap.Butt)
+        )
+        val fracao = arco.fraction.coerceIn(0f, 1f)
+        if (fracao > 0f) {
+            drawArc(
+                color = arco.color,
+                startAngle = -90f,
+                sweepAngle = 360f * fracao,
+                useCenter = false,
+                topLeft = topLeft,
+                size = tamanho,
+                style = Stroke(width = largura, cap = StrokeCap.Round)
+            )
+        }
+    }
+}
+
+/**
+ * Disco do glifo (#611, P1): 32 dp em `core` e contorno de 1,2 dp no raio 15,4 dp. Em execução, contorno
+ * sólido na cor da lente; ociosa, tracejado de 2/2 dp na cor de texto com alfa.
+ */
+private fun DrawScope.drawHudBlackHoleDisco(running: Boolean, lens: Color, tracejado: Color) {
+    val centro = center
+    drawCircle(color = AppGargantuaTokens.core, radius = HUD_BLACK_HOLE_GLYPH_SIZE.toPx() / 2f, center = centro)
+    val efeito = if (running) {
+        null
+    } else {
+        PathEffect.dashPathEffect(floatArrayOf(HUD_BLACK_HOLE_DASH.toPx(), HUD_BLACK_HOLE_DASH.toPx()))
+    }
+    drawCircle(
+        color = if (running) lens else tracejado,
+        radius = HUD_BLACK_HOLE_CONTOUR_RADIUS.toPx(),
+        center = centro,
+        style = Stroke(width = HUD_BLACK_HOLE_CONTOUR_WIDTH.toPx(), pathEffect = efeito)
+    )
 }
 
 private fun DrawScope.drawHudBlackHoleOrbit(

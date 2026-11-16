@@ -2,11 +2,14 @@ package com.usagemonitor.ui
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
@@ -135,6 +138,15 @@ class HudBlackHoleCellTest {
         setStrip(accounts, HudEdge.LEFT, motion = AppMotionPolicy.Reduced)
 
         onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `glifo em orbita e disco de 32 dp com marca de 20 dp`() = runDesktopComposeUiTest {
+        setStrip(fourMinimized, HudEdge.LEFT)
+
+        onAllNodesWithTag("hudBlackHoleOrbitMark", useUnmergedTree = true).assertCountEquals(4)
+        onAllNodesWithTag("hudBlackHoleOrbitMark", useUnmergedTree = true).onFirst().assertWidthIsEqualTo(20.dp)
+        onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).onFirst().assertWidthIsEqualTo(32.dp)
     }
 
     @Test

@@ -46,6 +46,15 @@ class HudStarActivityWindowTest {
     }
 
     @Test
+    fun `anel de conta de 64 dp mantem o poco de raio 32 px com o limite do buraco`() {
+        val ringPx = 64f
+        val account = mapOf(0 to Rect(100f, 100f, 100f + ringPx, 100f + ringPx))
+        val capped = hudStarfieldWells(account, maxRadiusPx = ringPx / 2f)
+        assertEquals(hudStarfieldWells(account), capped, "limite do buraco nao altera o poco de conta de 64 dp")
+        assertEquals(32f, capped[0].radius, "raio do poco de conta de 64 dp")
+    }
+
+    @Test
     fun `os pocos levam a janela do anel de cada indice`() {
         val rings = mapOf(0 to Rect(0f, 0f, 40f, 40f), 1 to Rect(50f, 0f, 90f, 40f))
         val wells = hudStarfieldWells(rings, mapOf(1 to HudStarActivityWindow(4_000L, null)))

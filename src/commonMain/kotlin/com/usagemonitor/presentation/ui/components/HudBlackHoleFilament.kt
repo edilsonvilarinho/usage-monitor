@@ -55,7 +55,7 @@ private data class PontoDaFita(val s: Double, val x: Double, val y: Double, val 
  */
 internal fun hudBlackHoleFilament(
     orbitAngleRad: Double,
-    orbitRadius: Float = 45f,
+    orbitRadius: Float = HUD_BLACK_HOLE_ORBIT_RADIUS.value,
     horizonRadius: Float = 20f,
     timeMs: Long
 ): List<HudBlackHoleFilamentSegment> {

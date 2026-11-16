@@ -9,7 +9,6 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
-import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_SIZE
 import com.usagemonitor.presentation.ui.components.hudBlackHoleOrbit
 import kotlin.math.abs
 import kotlin.test.Test
@@ -35,7 +34,7 @@ class HudBlackHoleGeometryTest {
         val comBuraco = hudNotchSizes(completas + minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
 
         // Buraco = uma célula (órbita + glifo, #602) mais a linha da contagem, mais o vão até ela.
-        assertEquals(base + 114.dp + HUD_WORD_LINE + HUD_ITEM_GAP, comBuraco)
+        assertEquals(base + 236.dp + HUD_WORD_LINE + HUD_ITEM_GAP, comBuraco)
     }
 
     @Test
@@ -95,15 +94,15 @@ class HudBlackHoleGeometryTest {
     }
 
     @Test
-    fun `a celula do buraco mede 114 dp, a orbita de 45 dp mais meio glifo para cada lado`() {
-        assertEquals(114.dp, HUD_BLACK_HOLE_CELL_SIZE)
+    fun `a celula do buraco mede 236 dp, a orbita de 90 dp mais o glifo de 28 dp para cada lado`() {
+        assertEquals(236.dp, HUD_BLACK_HOLE_CELL_SIZE)
     }
 
     @Test
     fun `a celula contem a orbita e o glifo em qualquer instante`() {
         val tolerancia = 0.001f
         val metade = HUD_BLACK_HOLE_CELL_SIZE.value / 2f + tolerancia
-        val folga = HUD_BLACK_HOLE_GLYPH_SIZE.value / 2f
+        val folga = 28f
         for (instante in listOf(0L, 15_000L, 37_000L, 59_999L)) {
             val orbita = hudBlackHoleOrbit((0 until 10).map { indice -> "M$indice" }, running = { false }, timeMs = instante)
             assertEquals(10, orbita.size, "uma posicao por membro no instante $instante")
