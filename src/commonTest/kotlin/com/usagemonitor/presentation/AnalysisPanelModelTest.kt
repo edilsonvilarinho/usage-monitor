@@ -8,12 +8,17 @@ import com.usagemonitor.presentation.ui.AnalysisFact
 import com.usagemonitor.presentation.ui.AnalysisHourBar
 import com.usagemonitor.presentation.ui.AnalysisIntervalRowModel
 import com.usagemonitor.presentation.ui.AnalysisPanelModel
+import com.usagemonitor.presentation.ui.AnalysisPaceComparatorModel
 import com.usagemonitor.presentation.ui.analysisBarAt
 import com.usagemonitor.presentation.ui.analysisAxisMax
 import com.usagemonitor.presentation.ui.analysisBarFraction
 import com.usagemonitor.presentation.ui.PaceDiagonalModels
 import com.usagemonitor.domain.entity.PacePathPoint
+import com.usagemonitor.presentation.ui.PaceLegendEntry
+import com.usagemonitor.presentation.ui.PaceLegendTone
+import com.usagemonitor.presentation.ui.components.AppChartKeyStyle
 import com.usagemonitor.presentation.ui.components.AppTone
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,12 +37,21 @@ class AnalysisPanelModelTest {
         // 09:00–14:00 BRT, lida às 12:30: 70% do tempo e 62% da cota, 8 pontos abaixo da linha.
         val fiveHour = AnalysisPanelModel.windowCard(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.PT)
         assertEquals("cabe até o reinício", fiveHour.verdict)
-        assertEquals("Cabe até o reinício: usa o ritmo da última hora (14 %/h). Projeção de 83 % no reinício, abaixo dos 100 %.", fiveHour.verdictSentence)
+        assertEquals("Projeção de 83 % no reinício, abaixo dos 100 %.", fiveHour.verdictSentence)
+        assertEquals("Projection of 83% at the reset, under 100%.", AnalysisPanelModel.windowCard(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.EN).verdictSentence)
         assertEquals(AppTone.OK, fiveHour.verdictTone)
         assertEquals("reinicia 14:00", fiveHour.resetLabel)
         assertEquals("62% usada com 70% da janela já passada: 8 pontos abaixo da linha. Chega a ~83% no reinício (14:00).", fiveHour.sentence)
-        assertTrue(fiveHour.facts.contains(AnalysisFact("Ritmo seguro", "25 %/h")))
-        assertTrue(fiveHour.facts.contains(AnalysisFact("Última hora", "14 %/h")))
+        // Ritmos saem da lista de fatos: já estão no comparador logo acima.
+        assertEquals(
+            listOf(
+                AnalysisFact("Uso", "62% · 70% do tempo"),
+                AnalysisFact("Decorrido", "3 h 30 min"),
+                AnalysisFact("Reinício", "14:00"),
+                AnalysisFact("Janelas anteriores", "1")
+            ),
+            fiveHour.facts
+        )
         val diagonal = fiveHour.diagonal
         assertEquals("62% · 70% do tempo", diagonal.pointLabel)
         assertEquals(listOf("09:00", "11:30", "14:00"), diagonal.axisLabels)
@@ -56,16 +70,22 @@ class AnalysisPanelModelTest {
         // 38% a 30 %/h: 76 min até 100%, 14 min antes do reinício das 14:00.
         val full = AnalysisPanelModel.windowCard(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.EN)
         assertEquals("runs out before the reset", full.verdict)
-        assertEquals(
-            "Runs out before the reset: uses the last hour's pace (30 %/h). At the window's average pace (18 %/h) it would fit.",
-            full.verdictSentence
-        )
+        assertEquals("Runs out Tue 13:46, 14 min before the reset.", full.verdictSentence)
         assertEquals(AppTone.CRITICAL, full.verdictTone)
         assertEquals(
             "62% used with 70% of the window gone: 8 points under the line. At the last hour's pace (30 %/h) it runs out around 13:46, 14 min before the reset.",
             full.sentence
         )
-        assertEquals(AnalysisFact("Runs out", "Tue 13:46 · 14 min before the reset"), full.facts.last())
+        assertEquals(
+            listOf(
+                AnalysisFact("Used", "62% · 70% of the time"),
+                AnalysisFact("Elapsed", "3 h 30 min"),
+                AnalysisFact("Reset", "14:00"),
+                AnalysisFact("Runs out", "Tue 13:46 · 14 min before"),
+                AnalysisFact("Previous windows", "1")
+            ),
+            full.facts
+        )
         val projection = full.diagonal.projection
         assertTrue(full.diagonal.projectionCritical)
         assertEquals(100.0, projection[1].percent)
@@ -89,7 +109,7 @@ class AnalysisPanelModelTest {
         assertEquals(emptyList(), diagonal.projection)
         assertFalse(diagonal.projectionCritical)
         assertEquals(100.0, diagonal.yMax)
-        assertEquals(listOf("1 previous window"), diagonal.legend)
+        assertEquals(listOf(PaceLegendEntry("1 previous window", AppChartKeyStyle.FADED, PaceLegendTone.MUTED)), diagonal.legend)
         assertEquals(closed.sentence, diagonal.description)
     }
 
@@ -180,5 +200,72 @@ class AnalysisPanelModelTest {
             "tok/s na última hora: sem medição · índice do Codex às 12:20",
             AnalysisPanelModel.speedLine(analysis.copy(modelSpeeds = emptyList(), throughputIndexedAt = analysis.generatedAt - 10.minutes), AppLanguage.PT)
         )
+    }
+
+    private fun Float?.pct(): Int? = this?.let { (it * 100).roundToInt() }
+
+    @Test
+    fun `pace comparator scale steps 1-2-3-5 times a power of ten above the highest pace`() {
+        assertEquals(30.0, AnalysisPaceComparatorModel.scaleCeiling(29.0))
+        assertEquals(3.0, AnalysisPaceComparatorModel.scaleCeiling(2.7))
+        assertEquals(5.0, AnalysisPaceComparatorModel.scaleCeiling(5.0))
+        assertEquals(1.0, AnalysisPaceComparatorModel.scaleCeiling(null))
+    }
+
+    @Test
+    fun `pace comparator puts both paces and the safe marker on one scale`() {
+        // 5h: teto 30 (maior dos três é o seguro, 25,3); média 17,7 → 59%; última hora 14 → 47%; seguro → marca em 84%.
+        val comparator = AnalysisPaceComparatorModel.of(analysis.fiveHour!!, AppLanguage.PT)
+        assertEquals("Ritmo · mesma escala · 0 a 30 %/h", comparator.eyebrow)
+        assertEquals("seguro 25 %/h", comparator.safeCaption)
+        assertEquals(84, comparator.marker.pct())
+        assertEquals(listOf("Média", "Última hora"), comparator.rows.map { it.label })
+        assertEquals(listOf("18 %/h", "14 %/h"), comparator.rows.map { it.value })
+        assertEquals(listOf(59, 47), comparator.rows.map { it.fraction.pct() })
+        assertEquals(listOf("abaixo do seguro", "abaixo do seguro"), comparator.rows.map { it.verdict })
+    }
+
+    @Test
+    fun `pace comparator says above the safe pace only when the pace is over it`() {
+        val comparator = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(paceAverage = 27.0), AppLanguage.PT)
+        assertEquals(listOf("acima do seguro", "abaixo do seguro"), comparator.rows.map { it.verdict })
+        assertEquals(listOf(true, false), comparator.rows.map { it.aboveSafe })
+        // Igualdade com o seguro cai em "abaixo", como no protótipo p05.
+        val equal = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(paceAverage = 25.3), AppLanguage.PT)
+        assertEquals("abaixo do seguro", equal.rows[0].verdict)
+    }
+
+    @Test
+    fun `pace comparator shows a null pace as a dash without bar or word`() {
+        val lastHour = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(paceNow = null), AppLanguage.PT).rows[1]
+        assertEquals("—", lastHour.value)
+        assertNull(lastHour.fraction)
+        assertNull(lastHour.verdict)
+    }
+
+    @Test
+    fun `pace comparator without a safe pace has no marker and no word`() {
+        // Sem seguro, o teto sai do maior ritmo medido (17,0 → 20): média 85%, última hora 70%.
+        val comparator = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(safePace = null, paceAverage = 17.0), AppLanguage.PT)
+        assertEquals("Ritmo · mesma escala · 0 a 20 %/h", comparator.eyebrow)
+        assertNull(comparator.marker)
+        assertNull(comparator.safeCaption)
+        assertEquals(listOf(85, 70), comparator.rows.map { it.fraction.pct() })
+        assertEquals(listOf(null, null), comparator.rows.map { it.verdict })
+    }
+
+    @Test
+    fun `pace comparator writes one decimal below ten in both languages`() {
+        // Protótipo p05: 2,7 e 2,0 com teto 3; seguro 2,2 → marca em 73%.
+        val window = analysis.weekly!!.copy(paceAverage = 2.7, paceNow = 2.0, safePace = 2.2)
+        val pt = AnalysisPaceComparatorModel.of(window, AppLanguage.PT)
+        assertEquals("Ritmo · mesma escala · 0 a 3 %/h", pt.eyebrow)
+        assertEquals(listOf("2,7 %/h", "2,0 %/h"), pt.rows.map { it.value })
+        assertEquals(listOf("acima do seguro", "abaixo do seguro"), pt.rows.map { it.verdict })
+        assertEquals(73, pt.marker.pct())
+        val en = AnalysisPaceComparatorModel.of(window, AppLanguage.EN)
+        assertEquals("Pace · same scale · 0 to 3 %/h", en.eyebrow)
+        assertEquals(listOf("2.7 %/h", "2.0 %/h"), en.rows.map { it.value })
+        assertEquals(listOf("above the safe pace", "below the safe pace"), en.rows.map { it.verdict })
     }
 }

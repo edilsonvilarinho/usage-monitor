@@ -1,7 +1,11 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.PaceDiagonalLabels
 import com.usagemonitor.presentation.ui.PaceDiagonalModels
+import com.usagemonitor.presentation.ui.PaceLegendEntry
+import com.usagemonitor.presentation.ui.PaceLegendTone
+import com.usagemonitor.presentation.ui.components.AppChartKeyStyle
 import com.usagemonitor.presentation.ui.previousPathAlpha
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -22,14 +26,23 @@ class PaceDiagonalModelTest {
         assertNull(fiveHour.exhaustionLabel)
         assertEquals(100.0, fiveHour.yMax)
         assertEquals(
-            listOf("linha segura: 25 %/h (100 % no reinício)", "seu uso até agora", "projeção pelo ritmo da última hora", "agora (linha pontilhada)", "1 janela anterior"),
+            listOf(
+                PaceLegendEntry("linha segura: 25 %/h (100 % no reinício)", AppChartKeyStyle.DASHED, PaceLegendTone.GOLD),
+                PaceLegendEntry("seu uso até agora", AppChartKeyStyle.SOLID, PaceLegendTone.LINE),
+                PaceLegendEntry("projeção pelo ritmo da última hora", AppChartKeyStyle.DASHED, PaceLegendTone.LINE),
+                PaceLegendEntry("agora (linha pontilhada)", AppChartKeyStyle.DOTTED, PaceLegendTone.MUTED),
+                PaceLegendEntry(PaceDiagonalLabels.above(AppLanguage.PT), AppChartKeyStyle.ZONE, PaceLegendTone.CRITICAL),
+                PaceLegendEntry(PaceDiagonalLabels.below(AppLanguage.PT), AppChartKeyStyle.ZONE, PaceLegendTone.OK),
+                PaceLegendEntry("1 janela anterior", AppChartKeyStyle.FADED, PaceLegendTone.MUTED),
+            ),
             fiveHour.legend
         )
 
-        // Esgota às 13:46: sem ponto final, rótulo no cruzamento dos 100%.
+        // Esgota às 13:46: sem ponto final, rótulo no cruzamento dos 100%; a projeção vira crítica.
         val full = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.PT, "descrição")
         assertEquals("esgota ter 13:46", full.exhaustionLabel)
         assertNull(full.endLabel)
+        assertContains(full.legend, PaceLegendEntry("projeção pelo ritmo da última hora", AppChartKeyStyle.DASHED, PaceLegendTone.CRITICAL))
 
         val english = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.EN, "description")
         assertEquals("runs out Tue 13:46", english.exhaustionLabel)
@@ -54,10 +67,10 @@ class PaceDiagonalModelTest {
         val previous = analysis.fiveHour!!.previousPaths.single()
         val twelve = analysis.fiveHour!!.copy(previousPaths = List(12) { previous })
         val pt = PaceDiagonalModels.forWindow(twelve, analysis.generatedAt, AppLanguage.PT, "descrição")
-        assertContains(pt.legend, "12 janelas anteriores")
+        assertContains(pt.legend, PaceLegendEntry("12 janelas anteriores", AppChartKeyStyle.FADED, PaceLegendTone.MUTED))
         val en = PaceDiagonalModels.forWindow(twelve, analysis.generatedAt, AppLanguage.EN, "description")
-        assertContains(en.legend, "12 previous windows")
+        assertContains(en.legend, PaceLegendEntry("12 previous windows", AppChartKeyStyle.FADED, PaceLegendTone.MUTED))
         val one = PaceDiagonalModels.forWindow(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.EN, "description")
-        assertContains(one.legend, "1 previous window")
+        assertContains(one.legend, PaceLegendEntry("1 previous window", AppChartKeyStyle.FADED, PaceLegendTone.MUTED))
     }
 }

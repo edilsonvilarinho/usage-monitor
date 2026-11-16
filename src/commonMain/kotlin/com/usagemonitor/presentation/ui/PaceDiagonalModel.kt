@@ -8,6 +8,7 @@ import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaWindowPacePath
 import com.usagemonitor.domain.entity.elapsedFractionOf
 import com.usagemonitor.domain.entity.exhaustionTimeOf
+import com.usagemonitor.presentation.ui.components.AppChartKeyStyle
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
@@ -44,9 +45,15 @@ internal data class PaceDiagonalModel(
     val exhaustionLabel: String? = null,
     /** Teto do eixo Y: 100, ou a projeção quando ela passa de 100. */
     val yMax: Double = 100.0,
-    /** Legenda na ordem de leitura. */
-    val legend: List<String> = emptyList()
+    /** Legenda na ordem de leitura; cada entrada leva o estilo do traço que ela explica. */
+    val legend: List<PaceLegendEntry> = emptyList()
 )
+
+/** Uma linha da legenda: o rótulo e o traço (estilo e tom) que a amostra desenha igual ao gráfico. */
+internal data class PaceLegendEntry(val label: String, val style: AppChartKeyStyle, val tone: PaceLegendTone)
+
+/** Cor da amostra, em papel e não em cor: o gráfico resolve o tom no tema. */
+internal enum class PaceLegendTone { GOLD, LINE, CRITICAL, OK, MUTED }
 
 private const val PREVIOUS_BASE_ALPHA = 0.45f
 private const val PREVIOUS_MIN_ALPHA = 0.12f
@@ -101,19 +108,13 @@ internal object PaceDiagonalModels {
             else -> emptyList()
         }
         val previous = window.previousPaths.map { previousPath -> previousPath.points }
-        val legend = buildList {
-            val safe = window.safePace
-            if (safe != null) add(localized(language, "linha segura: ${paceLabel(safe, language)} (100 % no reinício)", "safe line: ${paceLabel(safe, language)} (100% at reset)"))
-            add(localized(language, "seu uso até agora", "your use so far"))
-            if (projection.isNotEmpty()) add(projectionLegend(window, language))
-            add(localized(language, "agora (linha pontilhada)", "now (dotted line)"))
-            if (previous.isNotEmpty()) add(previousWindowsLegend(previous.size, language))
-        }
+        val critical = eta != null || (projected ?: 0) >= 100
+        val legend = openWindowLegend(window, projection.isNotEmpty(), critical, previous.size, language)
         return PaceDiagonalModel(
             current = current,
             previous = previous,
             projection = projection,
-            projectionCritical = eta != null || (projected ?: 0) >= 100,
+            projectionCritical = critical,
             pointLabel = "${window.percent}% · ${(fraction * 100).roundToInt()}% " + localized(language, "do tempo", "of time"),
             axisLabels = axisLabels(startsAt, resetsAt),
             description = description,
@@ -140,7 +141,7 @@ internal object PaceDiagonalModels {
             pointLabel = null,
             axisLabels = relativeAxisLabels(lengthMillis, language),
             description = description,
-            legend = if (previous.isEmpty()) emptyList() else listOf(previousWindowsLegend(previous.size, language))
+            legend = previousLegend(previous.size, language)
         )
     }
 
@@ -206,6 +207,34 @@ internal object PaceDiagonalModels {
     private fun projectionLegend(window: AnalysisWindowView, language: AppLanguage): String =
         if (window.paceNow != null) localized(language, "projeção pelo ritmo da última hora", "projection at the last hour's pace")
         else localized(language, "projeção pelo ritmo médio da janela", "projection at the window's average pace")
+
+    /**
+     * Legenda da janela aberta, na ordem de leitura do gráfico: a linha segura, o uso até agora, a
+     * projeção (vermelha quando esgota), o marcador de agora, as duas regiões e as anteriores.
+     */
+    private fun openWindowLegend(window: AnalysisWindowView, hasProjection: Boolean, critical: Boolean, previousCount: Int, language: AppLanguage): List<PaceLegendEntry> = buildList {
+        add(PaceLegendEntry(safeLineLabel(window.safePace, language), AppChartKeyStyle.DASHED, PaceLegendTone.GOLD))
+        add(PaceLegendEntry(localized(language, "seu uso até agora", "your usage so far"), AppChartKeyStyle.SOLID, PaceLegendTone.LINE))
+        if (hasProjection) {
+            add(PaceLegendEntry(projectionLegend(window, language), AppChartKeyStyle.DASHED, if (critical) PaceLegendTone.CRITICAL else PaceLegendTone.LINE))
+        }
+        add(PaceLegendEntry(localized(language, "agora (linha pontilhada)", "now (dotted line)"), AppChartKeyStyle.DOTTED, PaceLegendTone.MUTED))
+        add(PaceLegendEntry(PaceDiagonalLabels.above(language), AppChartKeyStyle.ZONE, PaceLegendTone.CRITICAL))
+        add(PaceLegendEntry(PaceDiagonalLabels.below(language), AppChartKeyStyle.ZONE, PaceLegendTone.OK))
+        addAll(previousLegend(previousCount, language))
+    }
+
+    /** Rótulo da linha segura: com o ritmo quando a janela o informa, sem ele quando não. */
+    private fun safeLineLabel(safePace: Double?, language: AppLanguage): String {
+        val head = localized(language, "linha segura", "safe line")
+        val reset = localized(language, "100 % no reinício", "100% at reset")
+        return if (safePace == null) "$head ($reset)" else "$head: ${paceLabel(safePace, language)} ($reset)"
+    }
+
+    /** A linha das janelas anteriores atrás; vazia sem nenhuma. */
+    private fun previousLegend(count: Int, language: AppLanguage): List<PaceLegendEntry> =
+        if (count == 0) emptyList()
+        else listOf(PaceLegendEntry(previousWindowsLegend(count, language), AppChartKeyStyle.FADED, PaceLegendTone.MUTED))
 
     private fun dayMonth(at: Instant): String {
         val local = at.toLocalDateTime(TimeZone.of(ACTIVITY_TIME_ZONE_ID))

@@ -247,7 +247,7 @@ permanent green dot is decoration.
 | `assets/` | App icon per size band (full name, initials, tray core), written by `render_icons.py` |
 | `components/core/` | AppButton · AppIconButton · AppMenu · AppPanel (+Header/Body) · AppSourceMark (+Dot) · AppProviderMark · AppMetric · AppTooltipSurface |
 | `components/forms/` | AppTextField · AppTextArea · AppSwitch · AppTabs · AppSegmentedControl · AppSwatchChip · AppGlyphChip |
-| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing · AppGargantuaRing (HUD) |
+| `components/data/` | AppProgressTrack · AppStatusIndicator (+AppStatusDot) · AppStatusPill · AppDataRow (+AppKey/AppValue) · AppDataTable · AppColumnHeader · AppGroupBand · AppUsageRing · AppGargantuaRing (HUD) · AppChartKey |
 | `components/feedback/` | AppBanner · AppDialog · AppConfirmationDialog · AppEmptyState · AppLoadingState · AppErrorState · AppStepTrail (+AppStepList) |
 | `components/shell/` | AppWindowFrame · AppStatusBar · AppToolbar · AppUpdateStrip · AppSettingsNav · AppHudBar · AppModalRevealRow (E9, how every modal opens and closes) |
 | `guidelines/` | 21 foundation specimen cards (Colors, Type, Spacing, Patterns, Brand) |

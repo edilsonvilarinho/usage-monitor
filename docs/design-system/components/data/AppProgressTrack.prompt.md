@@ -20,3 +20,7 @@ until the reset. Fill past the marker means ahead of pace. It is painted over th
 **Motion.** Width follows the `GENTLE` spring (critically damped, no rebound past the value) and
 the level color crossfades in 180ms, so a collection that moves a quota from 41% to 68% slides
 instead of jumping. Both are finite; with "Reduzir animações" the bar swaps in one frame.
+
+**Marca de ritmo seguro (#610, D2).** O mesmo `marker` pode marcar o ritmo seguro numa barra de ritmo, com a
+escala comum do comparador (teto 1-2-3-5 × 10^k do maior ritmo). Nesse uso a posição é o valor do seguro, não o
+relógio da janela; o texto ao lado ("seguro 25 %/h") diz qual dos dois é. Sem ritmo seguro, sem marca.

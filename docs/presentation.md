@@ -407,3 +407,14 @@ aviso: a tooltip lista todos, com bullet só a partir do segundo.
 - **As frases inteiras vão no `contentDescription` do ícone.** Sem hover a tooltip não existe na
   árvore, então é por ela que leitor de tela e testes chegam ao aviso — os dois asserts de notice
   em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
+
+## Análise: comparador de ritmo (#610)
+
+Plano em `docs/planos/analise-comparador-ritmo-610-execucao.md`; protótipo `prototipos/issue-610/p05-comparador-ritmo/index.html`.
+
+- **Comparador** no card de cada janela, entre a diagonal e os fatos: linhas "Média" e "Última hora" em barra
+  `AppProgressTrack` na **mesma escala** (teto 1-2-3-5 × 10^k do maior ritmo, `AnalysisPaceComparatorModel.scaleCeiling`).
+- **Marca** = ritmo seguro nessa escala; o texto ao lado ("seguro 25 %/h") diz o que é. Palavra "acima do seguro"/"abaixo do seguro" (igualdade cai em "abaixo").
+- `null` (não medido) mostra "—" sem barra e sem palavra; sem ritmo seguro, sem marca e sem palavra.
+- **Fatos** da janela em lista `AppDataRow` (rótulo à esquerda, valor mono à direita), nesta ordem (D4, `AnalysisFactsList`): Uso ("62% · 70% do tempo"), Decorrido, Reinício, Esgota (só quando a projeção chega a 100%, ex.: "Tue 13:46 · 14 min before") e Janelas anteriores (contagem). Ritmo seguro, médio e última hora saem da lista e ficam no comparador.
+- **Frase curta do veredito** (D5, `verdictSentence`, PT e EN): quem cabe diz "Projeção de 83 % no reinício, abaixo dos 100 %."; quem esgota diz quando e quanto antes do reinício ("Esgota Tue 13:46, 14 min antes do reinício."). Sem ritmo na frase: o ritmo usado está no comparador. A pílula continua com o veredito curto.

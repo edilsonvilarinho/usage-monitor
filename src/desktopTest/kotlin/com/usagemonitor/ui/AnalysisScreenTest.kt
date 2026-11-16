@@ -71,8 +71,8 @@ class AnalysisScreenTest {
         }
         onNodeWithText("30 d").performClick()
         assertEquals(listOf(AnalysisPeriod.DAYS_30), requested)
-        onNodeWithText("Pico por semana · 30 d").assertIsDisplayed()
-        onNodeWithText("4 semanas anteriores · 1 de 4 esgotaram · pico médio 62 %").assertIsDisplayed()
+        onNodeWithText("Pico por semana · 30 d").performScrollTo().assertIsDisplayed()
+        onNodeWithText("4 semanas anteriores · 1 de 4 esgotaram · pico médio 62 %").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -102,11 +102,34 @@ class AnalysisScreenTest {
         // #538, A05a: o marcador "agora" e a legenda da diagonal, nas duas janelas.
         onAllNodesWithText("agora 12:30").assertCountEquals(2)
         onAllNodesWithText("seu uso até agora").assertCountEquals(2)
-        onNodeWithText("acima da linha: esgota antes").assertDoesNotExist() // desenhado no Canvas, não é nó de texto
+        // #610: a frase de cada região entra na legenda (AppChartKey), uma por diagonal aberta; o desenho no Canvas não é nó.
+        onAllNodesWithText("acima da linha: esgota antes").assertCountEquals(2)
         onNodeWithText("Ritmo por intervalo · 24 h").performScrollTo().assertIsDisplayed()
         // As anteriores ficam desenhadas atrás da aberta: a tabela "antes × agora" saiu.
         onNodeWithText("Esta janela × anterior").assertDoesNotExist()
         onNodeWithText("tok/s na última hora: claude-sonnet 71 · claude-opus 48").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `pace comparator puts both paces on one scale with the safe marker and says above or below`() = runDesktopComposeUiTest(width = 1100, height = 900) {
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.size(1000.dp, 860.dp)) {
+                    AnalysisContent(
+                        state = AnalysisUiState.Success(analysisFor(AnalysisPeriod.HOURS_24)),
+                        accountLabel = "Anthropic · Padrão",
+                        language = AppLanguage.PT
+                    )
+                }
+            }
+        }
+
+        // #610, D2/D3: 5h com seguro 25 %/h na escala comum 0 a 30 %/h; semanal com escala 0 a 2 %/h.
+        onNodeWithText("Ritmo · mesma escala · 0 a 30 %/h").assertIsDisplayed()
+        onNodeWithText("seguro 25 %/h").assertIsDisplayed()
+        onNodeWithText("Ritmo · mesma escala · 0 a 2 %/h").assertIsDisplayed()
+        // Média e última hora de cada janela estão abaixo do seguro: quatro palavras, sem depender da cor.
+        onAllNodesWithText("abaixo do seguro").assertCountEquals(4)
     }
 
     /** A hora sob o ponteiro: pontos e vazão numa bolha; a hora sem leitura diz que não foi medida. */
@@ -145,7 +168,8 @@ class AnalysisScreenTest {
         }
         onNodeWithText("Failed at 12:31:00 · reading from 12:30:00").assertIsDisplayed()
         // #538, A05a: a frase "X% used with Y% gone" saiu da tela (é só o contentDescription); a tela mostra o veredito.
-        onAllNodesWithText("Fits until the reset", substring = true).assertCountEquals(2)
+        // #610, D5: a frase curta do veredito cabe nas duas janelas (5h 83%, semanal 55%).
+        onAllNodesWithText("Projection of", substring = true).assertCountEquals(2)
     }
 
     /** B21b: com exportação, o botão "Relatório PDF" aparece e o resultado vira faixa com o caminho. */
