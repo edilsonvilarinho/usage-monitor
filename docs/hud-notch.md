@@ -72,12 +72,13 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     caber. Sem botão de restaurar: volta sozinha quando houver espaço, e `hudMinimizedAccounts` não muda. Se nem
     assim cabe, fica o compacto. Só a borda vertical; a horizontal (45%) não muda. Regra em `hudAutoMinimizedTargets`
     e `applyHudAutoMinimize` (`src/desktopMain/kotlin/com/usagemonitor/HudAutoMinimize.kt`), aplicada em `HudWindow.kt`.
-- **Na lateral, as minimizadas viram um buraco negro (#600).** Na borda vertical, as contas minimizadas (manuais #576 e
-  automáticas #596) saem da coluna e viram **uma** célula só, na base da coluna, depois da última completa: um anel de
-  40 dp, sem texto (a contagem fica só na descrição semântica, #612). Quem entra é `hudColumnArrangement`
+- **As minimizadas viram um buraco negro nas quatro bordas (#600; cima e embaixo desde #612).** As contas minimizadas
+  (manuais #576 e automáticas #596) saem da fileira e viram **uma** célula só, depois da última completa, com vão de
+  12 dp: na coluna, na base; na faixa, no fim, e nela o voo segue o eixo X. Um anel de 40 dp, sem texto (a contagem
+  fica só na descrição semântica, #612). Quem entra é `hudColumnArrangement`
   (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`). Passar o mouse no buraco abre a lista de quem está
-  dentro; uma linha abre o balão da conta com "← N no buraco". Detalhes na seção "Buraco negro das minimizadas (#600)".
-  Só a borda vertical; em cima e embaixo as minimizadas seguem como hoje.
+  dentro (#612, reverte o clique da #602); uma linha abre o balão da conta com "← N no buraco". Detalhes na seção
+  "Buraco negro das minimizadas (#600)". O auto-minimizar segue só na vertical; a horizontal não recolhe sozinha.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
@@ -627,15 +628,15 @@ célula dela no notch encolhe.
 
 ## Buraco negro das minimizadas (#600)
 
-Na borda vertical, as contas minimizadas deixam de ocupar uma célula cada e viram **um** buraco negro na base da
-coluna, depois da última completa. Só a borda vertical; em cima e embaixo as minimizadas seguem como hoje. Fonte do
+Nas quatro bordas, as contas minimizadas deixam de ocupar uma célula cada e viram **um** buraco negro depois da última
+completa: na base da coluna (vertical) ou no fim da faixa (cima e embaixo, #612, voo ao longo do eixo X, vão de 12 dp). Fonte do
 comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Decisões") e o protótipo
 `prototipos/issue-600/p10-sumidouro-r2/index.html`.
 
 - **Arranjo.** `hudColumnArrangement` (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`) separa as contas.
   `shown` são as completas, na ordem. `holeMembers` são as minimizadas (manuais #576 e automáticas #596), na ordem de
   publicação, que é total e determinística. Sem minimizadas não existe buraco.
-- **Geometria (#612, C1).** O buraco mede uma célula quadrada de `HUD_BLACK_HOLE_CELL_SIZE` = 106 dp: órbita de 38 dp mais a extensão do glifo, `HUD_BLACK_HOLE_GLYPH_EXTENT` = 15 dp (raio do arco de cota 13,75 dp mais meio traço de 1,25 dp); o anel de 40 dp fica no centro, sem linha da contagem (a contagem vai só na descrição semântica). O piso de largura vale **só** na borda vertical e só com buraco: o conteúdo tem piso de 106 dp − 2·8 dp de padding transversal = 90 dp, e o total volta a 106 dp. A largura é a maior entre esse piso e a maior linha das contas completas. Tamanho estático, nunca por quadro. Na coluna, o buraco custa 106 dp mais o vão de 12 dp (`HUD_ITEM_GAP`), e auto-minimizar mede a coluna com esse custo (`verticalCollapsed`); o limiar de quantas contas recolher não é fixado aqui (ver `HudAutoMinimizeTest`). Antes (#611), a célula tinha 236 dp (órbita de 90 dp, anel de 64 dp e linha da contagem) e o buraco custava 262 dp na coluna; era grande demais para o dono (#612).
+- **Geometria (#612, C1).** O buraco mede uma célula quadrada de `HUD_BLACK_HOLE_CELL_SIZE` = 106 dp: órbita de 38 dp mais a extensão do glifo, `HUD_BLACK_HOLE_GLYPH_EXTENT` = 15 dp (raio do arco de cota 13,75 dp mais meio traço de 1,25 dp); o anel de 40 dp fica no centro, sem linha da contagem (a contagem vai só na descrição semântica). O piso transversal vale nas **duas** bordas e só com buraco: o conteúdo tem piso de 106 dp − 2·8 dp de padding transversal = 90 dp (largura na coluna, altura na faixa), e o total volta a 106 dp. A dimensão transversal é a maior entre esse piso e a das contas completas. Tamanho estático, nunca por quadro. Na coluna e na faixa, o buraco custa 106 dp mais o vão de 12 dp (`HUD_ITEM_GAP`), e auto-minimizar mede a coluna com esse custo (`verticalCollapsed`); o limiar de quantas contas recolher não é fixado aqui (ver `HudAutoMinimizeTest`). Antes (#611), a célula tinha 236 dp (órbita de 90 dp, anel de 64 dp e linha da contagem) e o buraco custava 262 dp na coluna; era grande demais para o dono (#612).
 - **Órbita (#602; C1, #612).** `hudBlackHoleOrbit` (`HudBlackHoleOrbit.kt`, quadro puro) põe os membros num comboio: cabeça em
   −π/2 + 2π·t/60 s, membro k a k·espaçamento atrás, espaçamento = 360°/n, na volta inteira (#612: o comboio a 40° ficou apertado), raio 38 dp, arco de 5° atrás de
   cada um; as contas em execução ocupam as primeiras vagas, na ordem de publicação.
@@ -652,10 +653,13 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   É o único sinal de consumo: o usuário recusou a captura de estrelas pelo buraco (`reach` 1,1 no JSON). Desenhado antes
   dos glifos e só com o relógio vivo; com "reduzir animações" não há filamento, e o arco de execução segue indicando.
 - **Célula.** `HudBlackHoleCell` desenha o anel Gargantua de 40 dp, sem arcos de cota e sem texto. A contagem fica só na descrição semântica, com o rótulo PT "1 minimizada" / "4 minimizadas" e EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem `testTag("hudBlackHole")`. O campo estelar trata o buraco como um poço de 20 dp de raio no centro (#612), não como a célula inteira.
-- **Lista.** Clique no buraco (ou Enter com foco) abre e fecha a lista; hover não abre nada (#602, pedido do usuário:
-  "clicar e não colocar o mouse em cima"). Esc e clique no corpo do notch fora do buraco fecham. Há uma linha por
-  membro, com o glifo da marca, o nome, o valor em foco e o selo "auto" na auto-minimizada; a linha abre o balão da
-  conta só por clique ou Enter (a seleção por hover de 160 ms saiu na #602).
+- **Lista.** Passar o mouse no buraco abre a lista (#612, pedido do dono em 2026-11-16: "o ideal é passar o mouse e ele já
+  abrir"; reverte o "clicar e não colocar o mouse em cima" da #602). Se a lista ou uma conta dela já está aberta, o hover
+  não muda nada; um segundo hover mantém a lista aberta. Clique no buraco (ou Enter com foco) abre e fecha a lista. Esc e
+  clique no corpo do notch fora do buraco fecham. Há uma linha por membro, com o glifo da marca, o nome, o valor em foco
+  e o selo "auto" na auto-minimizada. A linha sob o ponteiro ganha a camada de hover do `AppSurfaceLadders` (a mesma da
+  `AppDataRow`, #612); só destaca. O balão da conta abre só por clique ou Enter (a seleção por hover de 160 ms saiu na
+  #602).
 - **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
   com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só
   aquela conta: o balão volta à lista, já sem ela, ou fecha se o buraco esvaziar (#602: antes o balão ficava na
@@ -670,6 +674,8 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered` e quando o balão fecha.
 - **Decisões.** A ordem da lista é a de publicação. "Mais recente primeiro" do protótipo ficou fora, porque exigiria
   persistir quando cada conta entrou.
+- **Risco aberto (fora do escopo da #612).** Primeira minimização com o buraco vazio: nos 520 ms do voo a conta fica
+  invisível no slot até o buraco nascer (`hasHole` exige um membro com progresso 1), nas quatro bordas.
 
 ## Reordenar contas arrastando o anel (#584)
 
