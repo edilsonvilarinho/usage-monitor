@@ -1,7 +1,10 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,9 +15,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_BLACK_HOLE_LIST_HEADER
@@ -27,13 +33,18 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
+import com.usagemonitor.presentation.ui.theme.AppSurfaceLadders
 
 /** Tamanho do glifo da marca e do emoji de cada linha da lista do buraco (#600, A05). */
 private val BLACK_HOLE_ROW_MARK_SIZE = 16.dp
 
+/** Tag semântica da linha sob o ponteiro: é ela que o teste de componente enxerga (#612, A08). */
+private const val BLACK_HOLE_ROW_HOVERED_TAG = "hudBlackHoleListRowHovered"
+
 /**
  * Lista do buraco negro da HUD (#600, A05): uma linha por membro, na ordem recebida. [onSelect] recebe a posição
- * da conta em [members]. Só clique e Enter selecionam (#602, A02): hover não troca o balão.
+ * da conta em [members]. Só clique e Enter selecionam (#602, A02): hover não troca o balão. Hover realça a linha
+ * com a camada de hover do [AppSurfaceLadders], a mesma que o `AppDataRow` pinta (#612, A08).
  */
 @Composable
 internal fun HudBlackHoleList(
@@ -68,13 +79,18 @@ private fun HudBlackHoleListRow(
     onSelect: () -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val ladder = AppSurfaceLadders.current
     val emoji = account.accountEmoji
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(HUD_BLACK_HOLE_LIST_ROW)
+            .background(if (hovered) ladder.hoverLayer else Color.Transparent)
+            .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null) { onSelect() }
-            .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
+            .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs)
+            .then(if (hovered) Modifier.testTag(BLACK_HOLE_ROW_HOVERED_TAG) else Modifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AppProviderMark(

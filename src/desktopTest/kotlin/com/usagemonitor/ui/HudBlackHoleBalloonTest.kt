@@ -9,7 +9,11 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -117,6 +121,18 @@ class HudBlackHoleBalloonTest {
 
         onAllNodesWithText("← 4 no buraco").assertCountEquals(0)
         onAllNodesWithText(labels[1]).assertCountEquals(1)
+    }
+
+    @Test
+    fun `hover numa linha da lista realca so aquela linha e nao abre o balao`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        onNodeWithText(labels[1], useUnmergedTree = true).performMouseInput { enter(center) }
+        waitForIdle()
+
+        onAllNodesWithTag(HOVERED_ROW_TAG, useUnmergedTree = true).assertCountEquals(1)
+        onAllNodes(hasTestTag(HOVERED_ROW_TAG) and hasAnyDescendant(hasText(labels[1])), useUnmergedTree = true).assertCountEquals(1)
+        onAllNodesWithText("← 4 no buraco").assertCountEquals(0)
     }
 
     @Test
@@ -318,6 +334,7 @@ class HudBlackHoleBalloonTest {
 
     private companion object {
         const val NOTCH_TAG = "hudContent"
+        const val HOVERED_ROW_TAG = "hudBlackHoleListRowHovered"
         const val MARGIN_PX = 2f
 
         /** Espera real para o atraso de 160 ms da linha antiga: se ele ainda existisse, a linha abriria o balão. */
