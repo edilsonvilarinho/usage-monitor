@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -42,6 +43,14 @@ const val CODEX_TURN_ROW_TAG_PREFIX = "codexTurnRow:"
 
 private val CODEX_TURN_NUMBER_COLUMN = 52.dp
 private val CODEX_TURN_VALUE_COLUMN = 96.dp
+
+// Respostas por página na tabela: a cauda mais recente aparece e "Mostrar anteriores" acrescenta 200 (#609).
+private const val CODEX_TURN_PAGE_SIZE = 200
+
+private fun codexTurnPageLabel(language: AppLanguage, hidden: Int): String {
+    val step = minOf(CODEX_TURN_PAGE_SIZE, hidden)
+    return localized(language, "Mostrar $step anteriores (restam $hidden)", "Show $step earlier ($hidden left)")
+}
 
 /**
  * Detalhe de uma sessão do Codex CLI (#393, direção T3): metadados, blocos,
@@ -180,6 +189,10 @@ private fun CodexTurnTable(detail: CodexCliSessionDetail, analytics: CodexCliSes
     val ordered = remember(detail.turns) {
         detail.turns.sortedWith(compareBy({ turn -> turn.seq }, { turn -> turn.ts }, { turn -> turn.responseId }))
     }
+    // Limite por sessão: volta às 200 mais recentes ao trocar de sessão e sobrevive à recarga da mesma.
+    val shownState = remember(detail.summary.sessionId) { mutableIntStateOf(CODEX_TURN_PAGE_SIZE) }
+    val total = ordered.size
+    val hidden = total - minOf(shownState.intValue, total)
     AppDataSurfaceFlush(
         modifier = Modifier.fillMaxWidth(),
         header = {
@@ -200,8 +213,17 @@ private fun CodexTurnTable(detail: CodexCliSessionDetail, analytics: CodexCliSes
             }
         }
     ) {
-        ordered.forEachIndexed { index, turn ->
-            AppDataRow(modifier = Modifier.testTag("$CODEX_TURN_ROW_TAG_PREFIX${turn.seq}"), showDivider = index != ordered.lastIndex) {
+        if (hidden > 0) {
+            AppButton(
+                label = codexTurnPageLabel(language, hidden),
+                onClick = { shownState.intValue += CODEX_TURN_PAGE_SIZE },
+                modifier = Modifier.padding(AppSpacing.sm),
+                tone = AppButtonTone.GHOST
+            )
+        }
+        for (index in hidden until total) {
+            val turn = ordered[index]
+            AppDataRow(modifier = Modifier.testTag("$CODEX_TURN_ROW_TAG_PREFIX${turn.seq}"), showDivider = index != total - 1) {
                 AppCellValue(value = "#${turn.seq + 1}", modifier = Modifier.width(CODEX_TURN_NUMBER_COLUMN))
                 AppCellValue(value = turn.model ?: "—", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 AppCellValue(value = formatQuantity(analytics.contextPerTurn[index]), modifier = Modifier.width(CODEX_TURN_VALUE_COLUMN))

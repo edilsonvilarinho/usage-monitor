@@ -42,6 +42,9 @@ detalhamento da sessão, não a janela nem a lista). O detalhe tem de abrir sem 
 | Id | Comando | Resultado |
 |---|---|---|
 | A01 | `python sqlite3` sobre `codex-cli-history.db` (somente leitura) | 4.317 turnos na sessão, consulta 14,3 ms |
+| A02 | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.CodexCliSession*"` | `CodexCliSessionDetailTest.kt:67 AssertionError: linhas de turno montadas: 4317`; botão "Mostrar 200 anteriores (restam 4117)" ausente (asserção) |
+| A02 | Verde: mesmo comando | exit 0; `CodexCliSessionDetailTest` 8/8, `CodexCliSessionsScreenTest` 27/27 |
+| A02 | Medição descartável `setContent → waitForIdle`, 4.317 turnos, uma passada fria cada | antes 6.012 ms, depois 1.201 ms — hipótese confirmada |
 
 ## Problemas em aberto e riscos
 
