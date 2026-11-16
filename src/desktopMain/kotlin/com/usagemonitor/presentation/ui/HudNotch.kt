@@ -201,28 +201,27 @@ internal fun HudNotch(
     // O balão é da conta do último anel sob o ponteiro, ou da engrenagem
     // ([APP_BALLOON]). Fechado, ele é esquecido: a próxima abertura começa pelo
     // anel em que o ponteiro entrar.
-    var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
-    // Buraco negro da coluna (#600): as contas minimizadas. [holeSelection] é a conta aberta a partir
+    val balloon = rememberHudNotchBalloonState(initialBalloonIndex)
+    // Buraco negro da coluna (#600): as contas minimizadas. `balloon.holeSelection` é a conta aberta a partir
     // da lista do buraco; `null` mostra a lista. Sentinela do buraco = `accounts.size`.
     val holeMembers = remember(accounts) { hudColumnArrangement(accounts).holeMembers }
     val holeIndex = accounts.size
-    var holeSelection by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(open) {
-        if (!open) holeSelection = null
-        if (!open && initialBalloonIndex == null) balloonIndex = null
+        if (!open) balloon.holeSelection = null
+        if (!open && initialBalloonIndex == null) balloon.balloonIndex = null
     }
     // A conta aberta deixa o buraco (Restaurar ou outro caminho): a lista volta sem ela, e o buraco vazio fecha o balão.
     LaunchedEffect(holeMembers) {
-        if (holeSelection != null && holeSelection !in holeMembers) holeSelection = null
-        if (holeMembers.isEmpty() && balloonIndex == holeIndex) balloonIndex = null
+        if (balloon.holeSelection != null && balloon.holeSelection !in holeMembers) balloon.holeSelection = null
+        if (holeMembers.isEmpty() && balloon.balloonIndex == holeIndex) balloon.balloonIndex = null
     }
     // A engrenagem abre o balão dela no hover, como o anel abre o da conta
     // (#317). Só com o notch aberto: durante o arrasto as alças continuam na
     // tela, e o índice gravado ali reabriria o balão ao soltar.
     LaunchedEffect(gearHovered, open) {
-        if (gearHovered && open && appBalloon != null) balloonIndex = APP_BALLOON
+        if (gearHovered && open && appBalloon != null) balloon.balloonIndex = APP_BALLOON
     }
-    val shownIndex = balloonIndex?.takeIf { index ->
+    val shownIndex = balloon.balloonIndex?.takeIf { index ->
         index in accounts.indices ||
             (index == APP_BALLOON && appBalloon != null) ||
             (index == holeIndex && holeMembers.isNotEmpty())
@@ -285,11 +284,8 @@ internal fun HudNotch(
                     .onPlaced { coordinates -> ringItemBounds.body = coordinates }
                     .hudReorderKeys(reorder)
                     .onKeyEvent { event ->
-                        val closes = event.type == KeyEventType.KeyDown && event.key == Key.Escape && balloonIndex == holeIndex
-                        if (closes) {
-                            balloonIndex = null
-                            holeSelection = null
-                        }
+                        val closes = event.type == KeyEventType.KeyDown && event.key == Key.Escape && balloon.balloonIndex == holeIndex
+                        if (closes) balloon.closeHole()
                         closes
                     }
                     // Só a mão move: arrastar pelo corpo tirava o notch ao clicar num anel.
@@ -304,9 +300,8 @@ internal fun HudNotch(
                             val ring = hudRingKeyAt(ringItemBounds, currentAccounts, position)
                             if (ring != null) {
                                 currentOnRefreshAccount(ring)
-                            } else if (balloonIndex == holeIndex && ringItemBounds.boxes[holeIndex]?.contains(position) != true) {
-                                balloonIndex = null
-                                holeSelection = null
+                            } else if (balloon.balloonIndex == holeIndex && ringItemBounds.boxes[holeIndex]?.contains(position) != true) {
+                                balloon.closeHole()
                             }
                         },
                         onHoldStart = reorder::start, onHoldMove = reorder::move, onHoldEnd = reorder::end
@@ -325,26 +320,9 @@ internal fun HudNotch(
                     settle = settle,
                     minimizeProgress = minimizeState.values,
                     reorderDrag = reorder.drag, reorderDrop = reorder.drop,
-                    onRingHovered = { index ->
-                        balloonIndex = index
-                        holeSelection = null
-                    },
-                    // Clique no buraco alterna a lista: aberta, fecha; fechada, ou com a conta da lista aberta, mostra a lista.
-                    onHoleClicked = {
-                        if (balloonIndex == holeIndex && holeSelection == null) {
-                            balloonIndex = null
-                        } else {
-                            balloonIndex = holeIndex
-                            holeSelection = null
-                        }
-                    },
-                    // Entrada do ponteiro no buraco abre a lista (#612), salvo se ela já é a do buraco: não zera a conta aberta nela.
-                    onHoleHovered = {
-                        if (balloonIndex != holeIndex) {
-                            balloonIndex = holeIndex
-                            holeSelection = null
-                        }
-                    },
+                    onRingHovered = balloon::ringHovered,
+                    onHoleClicked = { balloon.holeClicked(holeIndex) },
+                    onHoleHovered = { balloon.holeHovered(holeIndex) },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
                     onItemPlaced = { index, coordinates ->
@@ -354,14 +332,7 @@ internal fun HudNotch(
                         }
                     },
                     onRingPlaced = { index, coordinates ->
-                        val root = rootCoordinates
-                        if (root != null && root.isAttached && coordinates.isAttached) {
-                            val center = root.localPositionOf(
-                                coordinates,
-                                Offset(coordinates.size.width / 2f, coordinates.size.height / 2f)
-                            )
-                            ringCenters[index] = if (edge.isHorizontal) center.x else center.y
-                            ringDepths[index] = if (edge.isHorizontal) center.y else center.x
+                        if (recordHudAnchor(rootCoordinates, coordinates, edge, index, ringCenters, ringDepths)) {
                             ringItemBounds.measureRing(index, coordinates)
                         }
                     }
@@ -402,29 +373,21 @@ internal fun HudNotch(
                         if (appBalloon == null) {
                             onGearClick()
                         } else {
-                            balloonIndex = APP_BALLOON
+                            balloon.balloonIndex = APP_BALLOON
                         }
                     },
                     interaction = hover.gear,
                     // A cauda do balão da engrenagem aponta para ela, como a do
                     // de conta aponta para o anel.
                     modifier = Modifier.onGloballyPositioned { coordinates ->
-                        val root = rootCoordinates
-                        if (root != null && root.isAttached && coordinates.isAttached) {
-                            val center = root.localPositionOf(
-                                coordinates,
-                                Offset(coordinates.size.width / 2f, coordinates.size.height / 2f)
-                            )
-                            ringCenters[APP_BALLOON] = if (edge.isHorizontal) center.x else center.y
-                            ringDepths[APP_BALLOON] = if (edge.isHorizontal) center.y else center.x
-                        }
+                        recordHudAnchor(rootCoordinates, coordinates, edge, APP_BALLOON, ringCenters, ringDepths)
                     }
                 )
             }
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
-                accounts = accounts, holeMembers = holeMembers, holeSelection = holeSelection?.takeIf { index -> index in holeMembers },
-                onHoleSelect = { position -> holeSelection = position }, sizes = sizes,
+                accounts = accounts, holeMembers = holeMembers, holeSelection = balloon.holeSelection?.takeIf { index -> index in holeMembers },
+                onHoleSelect = { position -> balloon.holeSelection = position }, sizes = sizes,
                 appBalloon = appBalloon, appBalloonHeight = appBalloonHeight, language = language,
                 accountActions = accountActions, ringCenters = ringCenters, ringDepths = ringDepths,
                 balloonAlong = balloonAlong, balloonBox = balloonBox, rootCoordinates = { rootCoordinates },
@@ -442,6 +405,25 @@ internal fun HudNotch(
             scope = scope
         )
     )
+}
+
+/**
+ * Registra o centro e a profundidade de um anel (ou da engrenagem, com [key] = `APP_BALLOON`) no contêiner: de lá
+ * saem a cauda e o feixe do balão. Devolve `false`, sem gravar nada, enquanto o contêiner ou o anel não estão anexados.
+ */
+private fun recordHudAnchor(
+    root: LayoutCoordinates?,
+    coordinates: LayoutCoordinates,
+    edge: HudEdge,
+    key: Int,
+    centers: MutableMap<Int, Float>,
+    depths: MutableMap<Int, Float>
+): Boolean {
+    if (root == null || !root.isAttached || !coordinates.isAttached) return false
+    val center = root.localPositionOf(coordinates, Offset(coordinates.size.width / 2f, coordinates.size.height / 2f))
+    centers[key] = if (edge.isHorizontal) center.x else center.y
+    depths[key] = if (edge.isHorizontal) center.y else center.x
+    return true
 }
 
 /**
