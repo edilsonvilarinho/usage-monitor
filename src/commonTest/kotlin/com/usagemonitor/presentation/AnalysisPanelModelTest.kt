@@ -37,12 +37,21 @@ class AnalysisPanelModelTest {
         // 09:00–14:00 BRT, lida às 12:30: 70% do tempo e 62% da cota, 8 pontos abaixo da linha.
         val fiveHour = AnalysisPanelModel.windowCard(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.PT)
         assertEquals("cabe até o reinício", fiveHour.verdict)
-        assertEquals("Cabe até o reinício: usa o ritmo da última hora (14 %/h). Projeção de 83 % no reinício, abaixo dos 100 %.", fiveHour.verdictSentence)
+        assertEquals("Projeção de 83 % no reinício, abaixo dos 100 %.", fiveHour.verdictSentence)
+        assertEquals("Projection of 83% at the reset, under 100%.", AnalysisPanelModel.windowCard(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.EN).verdictSentence)
         assertEquals(AppTone.OK, fiveHour.verdictTone)
         assertEquals("reinicia 14:00", fiveHour.resetLabel)
         assertEquals("62% usada com 70% da janela já passada: 8 pontos abaixo da linha. Chega a ~83% no reinício (14:00).", fiveHour.sentence)
-        assertTrue(fiveHour.facts.contains(AnalysisFact("Ritmo seguro", "25 %/h")))
-        assertTrue(fiveHour.facts.contains(AnalysisFact("Última hora", "14 %/h")))
+        // Ritmos saem da lista de fatos: já estão no comparador logo acima.
+        assertEquals(
+            listOf(
+                AnalysisFact("Uso", "62% · 70% do tempo"),
+                AnalysisFact("Decorrido", "3 h 30 min"),
+                AnalysisFact("Reinício", "14:00"),
+                AnalysisFact("Janelas anteriores", "1")
+            ),
+            fiveHour.facts
+        )
         val diagonal = fiveHour.diagonal
         assertEquals("62% · 70% do tempo", diagonal.pointLabel)
         assertEquals(listOf("09:00", "11:30", "14:00"), diagonal.axisLabels)
@@ -61,16 +70,22 @@ class AnalysisPanelModelTest {
         // 38% a 30 %/h: 76 min até 100%, 14 min antes do reinício das 14:00.
         val full = AnalysisPanelModel.windowCard(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.EN)
         assertEquals("runs out before the reset", full.verdict)
-        assertEquals(
-            "Runs out before the reset: uses the last hour's pace (30 %/h). At the window's average pace (18 %/h) it would fit.",
-            full.verdictSentence
-        )
+        assertEquals("Runs out Tue 13:46, 14 min before the reset.", full.verdictSentence)
         assertEquals(AppTone.CRITICAL, full.verdictTone)
         assertEquals(
             "62% used with 70% of the window gone: 8 points under the line. At the last hour's pace (30 %/h) it runs out around 13:46, 14 min before the reset.",
             full.sentence
         )
-        assertEquals(AnalysisFact("Runs out", "Tue 13:46 · 14 min before the reset"), full.facts.last())
+        assertEquals(
+            listOf(
+                AnalysisFact("Used", "62% · 70% of the time"),
+                AnalysisFact("Elapsed", "3 h 30 min"),
+                AnalysisFact("Reset", "14:00"),
+                AnalysisFact("Runs out", "Tue 13:46 · 14 min before"),
+                AnalysisFact("Previous windows", "1")
+            ),
+            full.facts
+        )
         val projection = full.diagonal.projection
         assertTrue(full.diagonal.projectionCritical)
         assertEquals(100.0, projection[1].percent)

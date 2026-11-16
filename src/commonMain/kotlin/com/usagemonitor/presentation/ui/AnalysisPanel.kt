@@ -1,12 +1,10 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -113,30 +111,18 @@ private fun AnalysisWindowCard(model: AnalysisWindowCardModel, comparator: PaceC
         }
         PaceDiagonalChart(model.diagonal, lineColor, language)
         AnalysisPaceComparator(comparator)
-        AnalysisFactsGrid(model.facts)
+        AnalysisFactsList(model.facts)
     }
 }
 
-/** Fatos da janela em grade de duas colunas, com fio no topo (fundo, não borda). */
+/** Fatos da janela (#610, D4): uma linha por fato, rótulo à esquerda e valor mono à direita, como as demais tabelas. */
 @Composable
-private fun AnalysisFactsGrid(facts: List<AnalysisFact>) {
-    if (facts.isEmpty()) return
-    Column(Modifier.fillMaxWidth().padding(top = AppSpacing.xs), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-        Spacer(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
-        facts.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                pair.forEach { fact -> AnalysisFactCell(fact, Modifier.weight(1f)) }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
+private fun AnalysisFactsList(facts: List<AnalysisFact>) {
+    facts.forEachIndexed { index, fact ->
+        AppDataRow(showDivider = index != facts.lastIndex) {
+            AppCellValue(fact.label, Modifier.weight(1f), maxLines = 1)
+            AppCellValue(fact.value, Modifier.weight(1f), textAlign = TextAlign.End)
         }
-    }
-}
-
-@Composable
-private fun AnalysisFactCell(fact: AnalysisFact, modifier: Modifier) {
-    Column(modifier) {
-        Text(fact.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        Text(fact.value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

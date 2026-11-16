@@ -62,6 +62,9 @@ veredito repetindo a pílula. Direção escolhida pelo usuário: **P05 — Compa
 | A03 | Vermelho de tela (comparador fora do card): `desktopTest --tests "com.usagemonitor.ui.AnalysisScreenTest"` | `AssertionError at AnalysisScreenTest.kt:114` (nó do comparador ausente) |
 | A03 | Verde: `desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*Analysis*"` | exit 0; `AnalysisPanelModelTest` 16/16, `AnalysisScreenTest` 7/7 |
 | A03 | Decisões da entrega; mockup 9d por captura headless | ritmo igual ao seguro = "abaixo do seguro"; sem ritmo positivo, escala 1 %/h; marca é posição relativa; mockup com comparador nos cards e zonas na chave |
+| A04 | Vermelho (asserção): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*Analysis*"` antes da implementação | `AnalysisPanelModelTest.kt:40 expected:<[]Projeção de 83 % no ...> but was:<[Cabe até o reinício: usa o ritmo da última hora (14 %/h). ]Projeção de 83 % no ...>`; `:73 expected:<Runs out [Tue 13:46, 14 min before the rese]t.> but was:<Runs out [before the reset: uses the last hour's pace (30 %/h)...]t.>` |
+| A04 | Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*Analysis*"` | exit 0; 1229 testes, 0 falhas (XML de `desktopTest`); `AnalysisPanelModelTest` 16/16; `AnalysisScreenTest` 7/7 |
+| A04 | Decisões: fatos na ordem D4 em `AppDataRow`; "30 d" da tela usa `performScrollTo` antes do `assertIsDisplayed` (o `Box` de 860 dp é o viewport do `verticalScroll`, subir a cena não o altera); Uso sem espaço antes do % ("62% · 70% do tempo"), o briefing citava "49 % · 34 %" | Protótipo 9d não editado (outro agente); divergência de formato para o orquestrador |
 | A02 | Decisões da entrega | linha segura em `AppGargantuaTokens.gold` (como o gráfico); legenda inclui as zonas acima/abaixo (`ZONE`); medidas da amostra fixas e registradas no contrato |
 
 ## Problemas em aberto e riscos

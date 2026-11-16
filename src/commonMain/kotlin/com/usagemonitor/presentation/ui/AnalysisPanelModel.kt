@@ -25,14 +25,14 @@ internal data class AnalysisWindowCardModel(
     val title: String,
     val verdict: String,
     val verdictTone: AppTone,
-    /** Frase do veredito: diz o ritmo usado e a projeção; o `verdict` curto é a pílula. */
+    /** Frase curta do veredito (#610, D5): a projeção, ou quando esgota; o `verdict` curto é a pílula. */
     val verdictSentence: String,
     val resetLabel: String?,
     /** O que a diagonal mostra, em frase: onde a janela está em relação à linha e como termina. */
     val sentence: String,
     /** Sem início e reinício conhecidos a diagonal não tem linha de agora nem projeção: só as anteriores e o eixo de duração. */
     val diagonal: PaceDiagonalModel,
-    /** Fatos da janela: uso, tempo, reinício, ritmos e, se esgota, quando. */
+    /** Fatos da janela (#610, D4): uso, tempo, reinício, esgota só quando esgota, e janelas anteriores. Os ritmos ficam no comparador. */
     val facts: List<AnalysisFact> = emptyList()
 )
 
@@ -56,7 +56,7 @@ internal object AnalysisPanelModel {
         val verdictSentence = when {
             projected == null -> verdict
             projected >= 100 -> overLimitVerdict(window, now, language)
-            else -> fitsVerdict(window, projected, language)
+            else -> fitsVerdict(projected, language)
         }
         val sentence = windowSentence(window, now, language)
         return AnalysisWindowCardModel(
@@ -71,60 +71,39 @@ internal object AnalysisPanelModel {
         )
     }
 
-    /** Veredito de quem cabe: diz o ritmo usado e a projeção no reinício. */
-    private fun fitsVerdict(window: AnalysisWindowView, projected: Int, language: AppLanguage): String {
-        val head = localized(language, "Cabe até o reinício", "Fits until the reset")
-        val clause = paceClause(window, language)
-        val first = if (clause == null) "$head." else "$head: $clause."
-        val projection = localized(language, "Projeção de $projected % no reinício, abaixo dos 100 %.", "Projection of $projected% at the reset, under 100%.")
-        return "$first $projection"
-    }
+    /** Frase de quem cabe (#610, D5): a projeção no reinício, curta; o ritmo usado fica no comparador. */
+    private fun fitsVerdict(projected: Int, language: AppLanguage): String =
+        localized(language, "Projeção de $projected % no reinício, abaixo dos 100 %.", "Projection of $projected% at the reset, under 100%.")
 
-    /** Veredito de quem esgota: diz o ritmo usado e, se o ritmo médio caberia, diz isso. */
+    /** Frase de quem esgota (#610, D5): quando e quanto antes do reinício; sem ritmo ou reinício, só o veredito. */
     private fun overLimitVerdict(window: AnalysisWindowView, now: Instant, language: AppLanguage): String {
-        val head = localized(language, "Esgota antes do reinício", "Runs out before the reset")
-        val clause = paceClause(window, language)
-        val first = if (clause == null) "$head." else "$head: $clause."
-        val average = window.paceAverage
-        if (window.paceNow == null || average == null || !fitsAtAverage(window, now)) return first
-        return "$first ${averageLead(window, language)} (${paceLabel(average, language)}) " + localized(language, "caberia.", "it would fit.")
+        val runsOut = localized(language, "Esgota antes do reinício.", "Runs out before the reset.")
+        val resetsAt = window.resetsAt ?: return runsOut
+        val eta = exhaustionTimeOf(window.percent, window.paceNow ?: window.paceAverage, now, resetsAt) ?: return runsOut
+        val before = PaceDiagonalModels.durationLabel((resetsAt - eta).inWholeMilliseconds)
+        val at = PaceDiagonalModels.weekdayClock(eta, language)
+        return localized(language, "Esgota $at, $before antes do reinício.", "Runs out $at, $before before the reset.")
     }
 
-    /** Ritmo que decide o veredito: o da última hora, senão o médio da janela; `null` sem ritmo. */
-    private fun paceClause(window: AnalysisWindowView, language: AppLanguage): String? {
-        val lastHour = window.paceNow
-        if (lastHour != null) return localized(language, "usa o ritmo da última hora (${paceLabel(lastHour, language)})", "uses the last hour's pace (${paceLabel(lastHour, language)})")
-        val average = window.paceAverage ?: return null
-        return localized(language, "usa o ${averagePaceName(window, language)} (${paceLabel(average, language)})", "uses the ${averagePaceName(window, language)} (${paceLabel(average, language)})")
-    }
-
-    /** Com o ritmo médio a janela não esgota antes do reinício; `false` sem médio ou sem reinício. */
-    private fun fitsAtAverage(window: AnalysisWindowView, now: Instant): Boolean {
-        val average = window.paceAverage ?: return false
-        val resetsAt = window.resetsAt ?: return false
-        return window.percent < 100 && exhaustionTimeOf(window.percent, average, now, resetsAt) == null
-    }
-
-    private fun averagePaceName(window: AnalysisWindowView, language: AppLanguage): String =
-        if (window.periodType == PeriodType.WEEKLY) localized(language, "ritmo médio da semana", "week's average pace")
-        else localized(language, "ritmo médio da janela", "window's average pace")
-
-    private fun averageLead(window: AnalysisWindowView, language: AppLanguage): String =
-        localized(language, "Pelo ${averagePaceName(window, language)}", "At the ${averagePaceName(window, language)}")
-
-    /** Fatos do card: uso, tempo, reinício, ritmos e, se esgota, quando; medido ausente vira "—". */
+    /**
+     * Fatos do card (#610, D4): uso com o quanto do tempo já passou, tempo decorrido, reinício, "Esgota"
+     * só quando a projeção chega a 100%, e a contagem de janelas anteriores. Medido ausente vira "—".
+     */
     private fun windowFacts(window: AnalysisWindowView, now: Instant, language: AppLanguage): List<AnalysisFact> {
         val startsAt = window.startsAt
         val resetsAt = window.resetsAt
+        val gap = PaceDiagonalModels.gapNow(window, now)
+        val used = if (gap == null) "${window.percent}%" else {
+            val elapsed = window.percent - gap
+            localized(language, "${window.percent}% · $elapsed% do tempo", "${window.percent}% · $elapsed% of the time")
+        }
         val fixed = listOf(
-            AnalysisFact(localized(language, "Uso", "Used"), "${window.percent}%"),
-            AnalysisFact(localized(language, "Tempo decorrido", "Elapsed"), if (startsAt == null) "—" else PaceDiagonalModels.durationLabel((now - startsAt).inWholeMilliseconds)),
-            AnalysisFact(localized(language, "Reinício", "Reset"), if (resetsAt == null) "—" else resetClock(resetsAt, now, language)),
-            AnalysisFact(localized(language, "Ritmo seguro", "Safe pace"), paceLabel(window.safePace, language)),
-            AnalysisFact(localized(language, "Ritmo médio", "Average pace"), paceLabel(window.paceAverage, language)),
-            AnalysisFact(localized(language, "Última hora", "Last hour"), paceLabel(window.paceNow, language))
+            AnalysisFact(localized(language, "Uso", "Used"), used),
+            AnalysisFact(localized(language, "Decorrido", "Elapsed"), if (startsAt == null) "—" else PaceDiagonalModels.durationLabel((now - startsAt).inWholeMilliseconds)),
+            AnalysisFact(localized(language, "Reinício", "Reset"), if (resetsAt == null) "—" else resetClock(resetsAt, now, language))
         )
-        return fixed + listOfNotNull(runsOutFact(window, now, language))
+        val previous = AnalysisFact(localized(language, "Janelas anteriores", "Previous windows"), window.previousPaths.size.toString())
+        return fixed + listOfNotNull(runsOutFact(window, now, language), previous)
     }
 
     /** "Esgota" só quando a projeção chega a 100%: o instante e quanto falta para o reinício. */
@@ -135,7 +114,7 @@ internal object AnalysisPanelModel {
         val before = PaceDiagonalModels.durationLabel((resetsAt - eta).inWholeMilliseconds)
         return AnalysisFact(
             localized(language, "Esgota", "Runs out"),
-            "${PaceDiagonalModels.weekdayClock(eta, language)} · " + localized(language, "$before antes do reinício", "$before before the reset")
+            "${PaceDiagonalModels.weekdayClock(eta, language)} · " + localized(language, "$before antes", "$before before")
         )
     }
 

@@ -71,8 +71,8 @@ class AnalysisScreenTest {
         }
         onNodeWithText("30 d").performClick()
         assertEquals(listOf(AnalysisPeriod.DAYS_30), requested)
-        onNodeWithText("Pico por semana · 30 d").assertIsDisplayed()
-        onNodeWithText("4 semanas anteriores · 1 de 4 esgotaram · pico médio 62 %").assertIsDisplayed()
+        onNodeWithText("Pico por semana · 30 d").performScrollTo().assertIsDisplayed()
+        onNodeWithText("4 semanas anteriores · 1 de 4 esgotaram · pico médio 62 %").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -168,7 +168,8 @@ class AnalysisScreenTest {
         }
         onNodeWithText("Failed at 12:31:00 · reading from 12:30:00").assertIsDisplayed()
         // #538, A05a: a frase "X% used with Y% gone" saiu da tela (é só o contentDescription); a tela mostra o veredito.
-        onAllNodesWithText("Fits until the reset", substring = true).assertCountEquals(2)
+        // #610, D5: a frase curta do veredito cabe nas duas janelas (5h 83%, semanal 55%).
+        onAllNodesWithText("Projection of", substring = true).assertCountEquals(2)
     }
 
     /** B21b: com exportação, o botão "Relatório PDF" aparece e o resultado vira faixa com o caminho. */
