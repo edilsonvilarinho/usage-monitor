@@ -6,11 +6,14 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Raio da órbita em comboio do buraco negro, do centro até o centro do glifo (#602, A05). */
-internal val HUD_BLACK_HOLE_ORBIT_RADIUS: Dp = 45.dp
+/** Raio da órbita em comboio do buraco negro, do centro até o centro do glifo (#602, A05; #611 escolha P1: 90 dp). */
+internal val HUD_BLACK_HOLE_ORBIT_RADIUS: Dp = 90.dp
 
-/** Diâmetro do glifo em órbita; meio glifo entra na conta da célula (#602, A05). */
-internal val HUD_BLACK_HOLE_GLYPH_SIZE: Dp = 24.dp
+/** Diâmetro do disco do glifo em órbita (#611, escolha P1: 32 dp). */
+internal val HUD_BLACK_HOLE_GLYPH_SIZE: Dp = 32.dp
+
+/** Extensão do glifo a partir do centro dele até a borda externa; entra na conta da célula (#611). */
+internal val HUD_BLACK_HOLE_GLYPH_EXTENT: Dp = 28.dp
 
 /** Duração de uma volta completa da cabeça do trem (#602, A05). */
 internal const val HUD_BLACK_HOLE_TURN_MS: Long = 60_000L

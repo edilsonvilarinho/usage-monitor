@@ -50,7 +50,7 @@ class HudBlackHoleFilamentTest {
         assertTrue(fita.isNotEmpty(), "fita sem segmentos")
         val raios = fita.map { segmento -> raioDoFim(segmento) }
 
-        perto(45.0 - 25.0 / 48.0, raios.first(), "primeiro fim em s=1/48")
+        perto(90.0 - 70.0 / 48.0, raios.first(), "primeiro fim em s=1/48")
         for (indice in 1 until raios.size) {
             assertTrue(raios[indice] < raios[indice - 1], "raio cai no segmento $indice: ${raios[indice - 1]} -> ${raios[indice]}")
         }
@@ -85,8 +85,8 @@ class HudBlackHoleFilamentTest {
         val cabecaT0 = cabecaT0Fita.first()
         val cabecaT7 = cabecaT7Fita.first()
 
-        perto(45.0 * cos(angulo), cabecaT0.startX.toDouble(), "início da cabeça em x, sem ondulação")
-        perto(45.0 * sin(angulo), cabecaT0.startY.toDouble(), "início da cabeça em y, sem ondulação")
+        perto(90.0 * cos(angulo), cabecaT0.startX.toDouble(), "início da cabeça em x, sem ondulação")
+        perto(90.0 * sin(angulo), cabecaT0.startY.toDouble(), "início da cabeça em y, sem ondulação")
         perto(cabecaT0.startX, cabecaT7.startX, "início da cabeça independe de t (x)")
         perto(cabecaT0.startY, cabecaT7.startY, "início da cabeça independe de t (y)")
 
@@ -106,12 +106,12 @@ class HudBlackHoleFilamentTest {
     fun `o ponto em s igual a meio segue a formula com ondulacao em t zero`() {
         val fita = hudBlackHoleFilament(orbitAngleRad = angulo, timeMs = 0L)
         assertTrue(fita.size > 23, "fita tem de ter o segmento de s=0,5, tem ${fita.size}")
-        // s = 24/48 = 0,5: raio 32,5; ângulo = a - 0,55 + 0,035 * sen(4,5 pi) * sen(0,5 pi) = a - 0,515
+        // s = 24/48 = 0,5: raio 55; ângulo = a - 0,55 + 0,035 * sen(4,5 pi) * sen(0,5 pi) = a - 0,515
         val meio = fita[23]
         val anguloEsperado = angulo - 0.55 + 0.035 * sin(4.5 * PI) * sin(0.5 * PI)
 
-        perto(32.5 * cos(anguloEsperado), meio.endX.toDouble(), "x em s=0,5")
-        perto(32.5 * sin(anguloEsperado), meio.endY.toDouble(), "y em s=0,5")
+        perto(55.0 * cos(anguloEsperado), meio.endX.toDouble(), "x em s=0,5")
+        perto(55.0 * sin(anguloEsperado), meio.endY.toDouble(), "y em s=0,5")
     }
 
     @Test

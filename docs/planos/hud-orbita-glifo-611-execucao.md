@@ -55,6 +55,7 @@ dois estados (ocioso e em execução), sem perder a informação de cota e de ex
 |---|---|---|
 | A01 | feito | sem harness de teste (documento); validado pela leitura dos arquivos citados em "Fatos confirmados" |
 | A02 | feito | sem harness (protótipo); P1–P4 conferidos por captura headless do Chrome (`--screenshot`, escuro/claro, 1x/2x, n=7 e n=10); escolhido P1 com raio 90 |
+| A03 | feito | Raio 90 dp, disco 32 dp, `HUD_BLACK_HOLE_GLYPH_EXTENT` 28 dp, célula 2·(90+28) = 236 dp; filamento parte do raio da órbita. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotchGeometry*" --tests "*HudAutoMinimize*"` → 9 falhas na asserção (`HudBlackHoleOrbitTest.kt:18`, `:22`; `HudBlackHoleFilamentTest.kt:20`; `HudBlackHoleGeometryTest.kt:37`, `:98`, `:111`). Verde: mesmo comando → 123 testes, 0 falhas. Medido por `verticalCollapsed`: conta 110 dp na coluna, buraco 262 dp; o auto-minimizar (#596, regra intacta) só encurta a coluna a partir de 3 contas recolhidas — 4 cenários do `HudAutoMinimizeTest` refeitos com tetos de `alturaCom` |
 
 - Céu ausente na célula (leitura, A05): o poço do buraco nasce do retângulo de `onRingPlaced`, que em
   `HudBlackHoleCell.kt:55` é a caixa da célula inteira (114 dp), não o anel de 64 dp; `hudStarfieldWells`

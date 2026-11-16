@@ -330,7 +330,7 @@ class HudNotchTest {
     }
     /** Buraco na lateral (#600 A04, #602): a célula tem altura exata de célula + linha da contagem; largura não passa da geometria. */
     @Test
-    fun `buraco na lateral mede a celula de 114 dp mais a linha da contagem`() = runDesktopComposeUiTest {
+    fun `buraco na lateral mede a celula de 236 dp mais a linha da contagem`() = runDesktopComposeUiTest {
         val account = accounts.first().copy(minimized = true)
         setContent { notch(edge = HudEdge.LEFT, list = listOf(account)) }
 
