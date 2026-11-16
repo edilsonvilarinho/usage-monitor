@@ -1,0 +1,75 @@
+# Buraco negro das minimizadas: clique, órbita, filamento e céu de estrelas — issue #602
+
+Procedência: Claude Opus 5.5 (orquestração) com agentes de implementação, Claude Code CLI no Windows 11, 2026-11-16,
+branch `feat/issue-602-hud-orbit`, commits com a identidade `claude <claude@anthropic.com>`.
+
+## Objetivo
+
+Pedido (#602): a lista do buraco abre por hover e devia abrir por **clique**; depois de Restaurar, o balão continua na
+conta restaurada e devia **voltar à lista** já sem ela; os glifos das minimizadas devem **orbitar** o buraco; minimizada
+em execução deve mostrar o buraco **atraindo**; as estrelas "parecem flocos de neve" e devem parecer estrelas, com
+**poeira estelar**. Rodadas: AY (5 opções, `prototipos/issue-602/index.html`) → **AY5 · Comboio orbital**; rodada 2 com
+parâmetros (`ay5-r2-parametros/`); rodada 3 só do fluxo (`az-fluxo-poeira/`) → **AZ2 · Filamento de maré**.
+
+Parâmetros fixados pelo usuário (JSON da rodada 3, unidades medidas em `az-fluxo-poeira/index.html`):
+
+| Chave | Valor | Significado no protótipo |
+|---|---|---|
+| `stars` | 120 | estrelas; raio 1–1,5 dp (28% grandes 1,6–2,0) × `starSz` 1 (`:213-214`, `:519`) |
+| `starBri` | 20 | alfa = alfa base (0,45–0,8; grandes 0,9) × 0,20 (`:522`) |
+| `twin` | 2 | período da cintilação = (3–6 s) × 2 / 4,5; brilho 0,8 + 0,2·sen (`:518`) |
+| `drift`, `dir` | 1, 0 | deriva de 1 dp/s a 0° (horizontal), sem queda (`:450`, `:514`) |
+| `grains`, `grainA`, `grainSz` | 600, 2, 0,5 | poeira: 600 grãos, alfa (0,05–0,25) × 2, raio 0,5 dp (`:218`, `:536-540`) |
+| `turn`, `gap`, `orb`, `arc` | 60, 40, 45, 5 | comboio: volta de 60 s, 40° entre glifos, raio 45 dp, arco de 5° atrás (`:364-365`, `:493`, `:679`) |
+| `flow`, `flowStyle` | true, AZ2 | filamento de maré da conta em execução até o horizonte (`:571-586`) |
+| `rate`, `dur`, `turns`, `trail`, `flash`, `reach` | — | **sem efeito**: `reach` 1,1 < 1,2 esvazia a faixa de captura (`:459`); o usuário escolheu só o filamento |
+| `slow` | 3 | câmera lenta do protótipo; **não entra no app** (decisão do usuário) |
+
+## Fatos confirmados (2026-11-16, `b91c0384`)
+
+- Hover abre a lista: `HudBlackHoleCell.kt:46-54` (`hoverable`, `onHovered`) → `HudNotch.kt:308-311` (`onHoleHovered`).
+  Linha da lista: hover com 160 ms (`HudBlackHoleList.kt:37`, `:79-86`), clique `:93`.
+- Estado: `balloonIndex` `HudNotch.kt:199`; `holeIndex = accounts.size` e `holeSelection` `:203-204`; reset `:205-208`.
+- Restaurar: `HudWindow.kt:367-375` → `:508-514` → `toggleMinimize` `:181-185`; **não** zera `holeSelection`, então o balão
+  fica na conta restaurada (`HudBlackHoleBalloon.kt:38`, `HudNotch.kt:476`) — causa do segundo ponto da issue (leitura).
+- Célula do buraco: `HudBlackHoleCell.kt:36-42`, recebe só `count`; `sessionActive` existe em `HudModel.kt:67`/`:406` e chega
+  ao canvas por `hudStarRunningRings` (`HudStarfieldCanvas.kt:170-171`).
+- Céu de hoje: três camadas caindo em +y a 12/6/2 dp/s (`HudStarfield.kt:93-97`, `:221-225`), rastro 5 px (`:105`,
+  `:270-279`), brilho em cruz nas 6 maiores (`:127-130`; desenho `HudStarfieldCanvas.kt:109-115`).
+- Linhas: `HudNotch.kt` 703, `HudRingStrip.kt` 609, `HudWindow.kt` 547, `HudStarfield.kt` 429, `HudStarCapture.kt` 208.
+
+## Decisões
+
+- Só o filamento AZ2 representa o consumo; **sem captura** de estrela pelo buraco. Capturas dos anéis completos (#592)
+  ficam como estão.
+- O céu novo substitui as três camadas que caem: deriva horizontal de 1 dp/s, sem rastro e sem cruz; os poços seguem
+  desviando estrelas e as caixas proibidas seguem valendo.
+- Cada quadro é função pura em `commonMain` com teste em `commonTest`; o canvas só desenha. Laço contínuo só com
+  `AppMotionPolicy.continuous` e sem "reduzir animações" (quadro t = 0, sem filamento).
+- A geometria da célula do buraco cresce de forma **estática** para conter a órbita (nunca por quadro).
+
+## Atividades
+
+| ID | Atividade |
+|---|---|
+| A01 | Este plano |
+| A02 | Lista do buraco abre só por clique/Enter; hover não abre; clique fora e Esc fecham |
+| A03 | Restaurar no balão do buraco volta à lista sem a conta; fecha se o buraco esvaziar |
+| A04 | Céu novo (quadro puro): 120 estrelas + 600 grãos, deriva horizontal, cintilação, sem rastro/cruz; canvas |
+| A05 | Órbita em comboio (quadro puro) e geometria estática da célula que a contém |
+| A06 | Glifos em órbita desenhados na célula; conta em execução destacada (não só por cor) |
+| A07 | Filamento de maré AZ2 (quadro puro + canvas) da conta em execução até o horizonte |
+
+Cada atividade leva no mesmo commit `docs/hud-notch.md`, o design system e o protótipo visual quando muda a tela.
+
+## Ponto de situação
+
+| ID | Execução | Resultado |
+|---|---|---|
+| A01 | Sem harness (texto): protótipos AY1–AY5, AY5 r2 e AZ conferidos por captura headless e CDP (`ay*-qa.mjs`, `az-qa.mjs`, zero erros de JS); escolhidos AY5 + AZ2 com o JSON do usuário | Plano aprovado para execução |
+
+## Problemas em aberto e riscos
+
+- Raio de órbita 45 dp + glifo excede a célula de 64 dp: a largura mínima da barra pode subir; medir no A05.
+- 720 pontos por quadro no canvas (120 estrelas + 600 grãos): custo a medir no A04.
+- Mudança em host de janela não é exercitada por teste (#342): o PR diz o risco.
