@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -36,6 +37,7 @@ import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_SIZE
 import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_ORBIT_RADIUS
 import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_TRAIL_DEG
 import com.usagemonitor.presentation.ui.components.HudBlackHoleOrbitEntry
+import com.usagemonitor.presentation.ui.components.hudBlackHoleFilament
 import com.usagemonitor.presentation.ui.components.hudBlackHoleOrbit
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
@@ -43,6 +45,9 @@ import kotlin.math.PI
 
 /** Tag de cada glifo em órbita do buraco (#602, A06). */
 internal const val HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG = "hudBlackHoleOrbitGlyph"
+
+/** Tag de um nó vazio por conta em execução, só na árvore não mesclada: prova que o filamento foi pedido (#602, A07). */
+internal const val HUD_BLACK_HOLE_FILAMENT_TEST_TAG = "hudBlackHoleFilament"
 
 private const val HUD_BLACK_HOLE_TRAIL_SEGMENTS = 10
 private const val HUD_BLACK_HOLE_TRAIL_ALPHA_RUNNING = 0.85f
@@ -68,13 +73,27 @@ internal fun HudBlackHoleOrbitGlyphs(
 ) {
     val policy = LocalAppMotionPolicy.current
     val live = policy.continuous && !policy.reduced
-    val lens = if (hudIsLight(MaterialTheme.colorScheme.surface)) AppGargantuaTokens.gold else AppGargantuaTokens.lens
+    val claro = hudIsLight(MaterialTheme.colorScheme.surface)
+    val lens = if (claro) AppGargantuaTokens.gold else AppGargantuaTokens.lens
+    // Filamento: no escuro vai de quente a dourado; no claro, de dourado a poeira (#602, A07).
+    val filamentoInicio = if (claro) AppGargantuaTokens.gold else AppGargantuaTokens.hot
+    val filamentoFim = if (claro) AppGargantuaTokens.dust else AppGargantuaTokens.gold
     val idleInk = MaterialTheme.colorScheme.onSurface
     val runningLabel = localized(language, "em execução", "running")
     val timeMs = rememberHudBlackHoleClock(live)
     Box(modifier = modifier.size(HUD_BLACK_HOLE_CELL_SIZE), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(HUD_BLACK_HOLE_CELL_SIZE)) {
-            drawHudBlackHoleOrbit(members, timeMs.value, lens, idleInk)
+            drawHudBlackHoleOrbit(members, timeMs.value, lens, idleInk, live, filamentoInicio, filamentoFim)
+        }
+        if (live) {
+            // Um nó vazio por conta em execução: o filamento é desenhado no Canvas acima, este nó só expõe a contagem.
+            repeat(members.count { conta -> conta.sessionActive }) {
+                Box(
+                    modifier = Modifier
+                        .size(HUD_BLACK_HOLE_CELL_SIZE)
+                        .clearAndSetSemantics { this[SemanticsProperties.TestTag] = HUD_BLACK_HOLE_FILAMENT_TEST_TAG }
+                )
+            }
         }
         members.indices.forEach { index ->
             HudBlackHoleGlyph(
@@ -134,7 +153,15 @@ private fun HudBlackHoleGlyph(
     }
 }
 
-private fun DrawScope.drawHudBlackHoleOrbit(members: List<HudAccount>, timeMs: Long, lens: Color, idleInk: Color) {
+private fun DrawScope.drawHudBlackHoleOrbit(
+    members: List<HudAccount>,
+    timeMs: Long,
+    lens: Color,
+    idleInk: Color,
+    live: Boolean,
+    filamentoInicio: Color,
+    filamentoFim: Color
+) {
     val entradas = hudBlackHoleOrbit(members, { conta -> conta.sessionActive }, timeMs)
     val raio = HUD_BLACK_HOLE_ORBIT_RADIUS.toPx()
     val centro = center
@@ -142,6 +169,29 @@ private fun DrawScope.drawHudBlackHoleOrbit(members: List<HudAccount>, timeMs: L
         val glifo = centro + Offset(entrada.x.toPx(), entrada.y.toPx())
         if (entrada.running) drawHudBlackHoleHalo(glifo, lens)
         drawHudBlackHoleTrail(entrada, centro, raio, if (entrada.running) lens else idleInk)
+    }
+    if (live) {
+        entradas.filter { entrada -> entrada.running }.forEach { entrada ->
+            drawHudBlackHoleFilament(entrada.angleRad, timeMs, filamentoInicio, filamentoFim)
+        }
+    }
+}
+
+/**
+ * Fita de maré da conta em execução (#602, A07): segmentos de [hudBlackHoleFilament] saindo do centro do
+ * buraco, com cabo redondo. Cor vai de [inicio] a [fim] pelo fator de cada segmento; alfa e espessura vêm do segmento.
+ * Chamada só com o relógio vivo; sem movimento contínuo a órbita fica parada e nenhuma fita é desenhada.
+ */
+private fun DrawScope.drawHudBlackHoleFilament(angleRad: Double, timeMs: Long, inicio: Color, fim: Color) {
+    val centro = center
+    hudBlackHoleFilament(orbitAngleRad = angleRad, timeMs = timeMs).forEach { segmento ->
+        drawLine(
+            color = lerp(inicio, fim, segmento.colorMix).copy(alpha = segmento.alpha),
+            start = centro + Offset(segmento.startX.dp.toPx(), segmento.startY.dp.toPx()),
+            end = centro + Offset(segmento.endX.dp.toPx(), segmento.endY.dp.toPx()),
+            strokeWidth = segmento.widthDp.dp.toPx(),
+            cap = StrokeCap.Round
+        )
     }
 }
 

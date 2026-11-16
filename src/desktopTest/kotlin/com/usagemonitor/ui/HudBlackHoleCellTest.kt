@@ -17,6 +17,7 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudRingStrip
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -102,6 +103,41 @@ class HudBlackHoleCellTest {
     }
 
     @Test
+    fun `movimento continuo desenha um filamento por conta em execucao e nenhum nas ociosas`() = runDesktopComposeUiTest {
+        val accounts = listOf(
+            account("A", minimized = true, sessionActive = true),
+            account("B", minimized = true),
+            account("C", minimized = true, sessionActive = true),
+            account("D", minimized = true)
+        )
+        mainClock.autoAdvance = false
+        setStrip(accounts, HudEdge.LEFT, motion = AppMotionPolicy.Live)
+
+        onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(2)
+    }
+
+    @Test
+    fun `movimento continuo sem conta em execucao nao desenha filamento`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        setStrip(fourMinimized, HudEdge.LEFT, motion = AppMotionPolicy.Live)
+
+        onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `movimento reduzido nao desenha filamento mesmo com conta em execucao`() = runDesktopComposeUiTest {
+        val accounts = listOf(
+            account("A", minimized = true, sessionActive = true),
+            account("B", minimized = true),
+            account("C", minimized = true),
+            account("D", minimized = true)
+        )
+        setStrip(accounts, HudEdge.LEFT, motion = AppMotionPolicy.Reduced)
+
+        onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
     fun `movimento reduzido mantem os glifos na mesma posicao em dois quadros e em posicoes distintas`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.LEFT)
         mainClock.autoAdvance = false
@@ -120,9 +156,10 @@ class HudBlackHoleCellTest {
         accounts: List<HudAccount>,
         edge: HudEdge,
         minimizeProgress: Map<UsageTargetKey, Float> = emptyMap(),
+        motion: AppMotionPolicy = AppMotionPolicy.Reduced,
     ) {
         setContent {
-            ScreenTestTheme(isDark = true) {
+            ScreenTestTheme(isDark = true, motion = motion) {
                 HudRingStrip(
                     accounts = accounts,
                     edge = edge,

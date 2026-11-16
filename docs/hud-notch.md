@@ -648,6 +648,11 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   18 dp e anel de 1 dp em 14 dp. A conta em execução diz "em execução" na descrição, então a cor não informa sozinha.
   O relógio só corre com `AppMotionPolicy.continuous` e sem "reduzir animações" (senão t = 0). Os glifos ficam na
   árvore não mesclada; a célula segue um botão só na semântica mesclada.
+- **Filamento de maré (#602, AZ2).** Conta do buraco em execução puxa uma fita fina do glifo até o horizonte:
+  `hudBlackHoleFilament` (quadro puro) dá 47 segmentos de 45 dp a 20 dp, ondulação de 0,035 rad que se desloca a
+  2,2 rad/s, alfa 0,75·(1−s)^0,8 e largura 1,1 − 0,5·s dp; cor de `hot` a `gold` no escuro e de `gold` a `dust` no claro.
+  É o único sinal de consumo: o usuário recusou a captura de estrelas pelo buraco (`reach` 1,1 no JSON). Desenhado antes
+  dos glifos e só com o relógio vivo; com "reduzir animações" não há filamento, e o arco de execução segue indicando.
 - **Célula.** `HudBlackHoleCell` desenha o anel Gargantua sem arcos de cota e a contagem em `label*`: PT "1 minimizada"
   / "4 minimizadas", EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem
   `testTag("hudBlackHole")` e descrição semântica com o rótulo. O campo estelar trata o buraco como um anel.

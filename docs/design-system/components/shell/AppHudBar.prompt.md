@@ -75,6 +75,7 @@ and bottom edges do not change.
 - **Cell.** `HUD_BLACK_HOLE_CELL_SIZE` = 114dp square (orbit radius 45dp plus half a 12dp glyph on each side), with the 64dp ring in the centre and the count line. The 114dp floor applies on the vertical edge and only with a hole; the width is the larger of 114dp and the widest label line. Static size, never per frame.
 - **Orbit train.** Members form one train in publication order: head at -π/2 + 2π·t/60 s (one turn per 60 s); member k sits k·min(40°, 360°/n) behind it, radius 45dp, with a 5° trail behind each. Running accounts take the first slots: they get a lens halo (`--gargantua-lens`) and a brighter trail; the others get a faint trail.
 - **Star field.** 120 stars (28% large, r 1.6–2.0dp, base alpha 0.9; the rest r 1–1.5dp, alpha 0.45–0.8; final alpha ×0.20) drift sideways at 1dp/s with a continuous wrap. No trails and no crosses. 600 stellar dust grains stay still (r 0.5dp, alpha (0.05–0.25)×2, `--gargantua-dust`, ×1.2 in light).
+- Running member (AZ2 tidal filament): a thin ribbon from its glyph to the horizon (47 segments, alpha 0.75·(1−s)^0.8, width 1.1→0.6dp, hot→gold dark, gold→dust light), only with continuous motion; reduced motion draws none.
 - Full rules: `docs/hud-notch.md`, sections "Corpo: céu de estrelas e poeira (#602…)", "Geometria" and "Órbita (#602)"; prototype `prototipos/issue-602/az-fluxo-poeira/`.
 
 **Account balloon.** Hovering a ring opens, beside the notch on the inside of the screen, a balloon
