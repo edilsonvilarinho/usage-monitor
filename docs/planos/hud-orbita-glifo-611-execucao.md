@@ -56,6 +56,7 @@ dois estados (ocioso e em execução), sem perder a informação de cota e de ex
 | A01 | feito | sem harness de teste (documento); validado pela leitura dos arquivos citados em "Fatos confirmados" |
 | A02 | feito | sem harness (protótipo); P1–P4 conferidos por captura headless do Chrome (`--screenshot`, escuro/claro, 1x/2x, n=7 e n=10); escolhido P1 com raio 90 |
 | A03 | feito | Raio 90 dp, disco 32 dp, `HUD_BLACK_HOLE_GLYPH_EXTENT` 28 dp, célula 2·(90+28) = 236 dp; filamento parte do raio da órbita. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotchGeometry*" --tests "*HudAutoMinimize*"` → 9 falhas na asserção (`HudBlackHoleOrbitTest.kt:18`, `:22`; `HudBlackHoleFilamentTest.kt:20`; `HudBlackHoleGeometryTest.kt:37`, `:98`, `:111`). Verde: mesmo comando → 123 testes, 0 falhas. Medido por `verticalCollapsed`: conta 110 dp na coluna, buraco 262 dp; o auto-minimizar (#596, regra intacta) só encurta a coluna a partir de 3 contas recolhidas — 4 cenários do `HudAutoMinimizeTest` refeitos com tetos de `alturaCom` |
+| A04 | feito | `HudBlackHoleOrbitGlyphs.kt` troca a miniatura `AppGargantuaRing` pelo glifo P1 (disco 32 dp `core`, marca 20 dp `hot` irmã do disco, contorno 1,2 dp contínuo/tracejado, arcos de cota fora em 18,75 + 4·i dp); docs: `docs/hud-notch.md`, `AppHudBar.prompt.md`, `prototipo-visual-opencode.html:1190-1194` (SVG 236 dp, conferido por captura headless). Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHoleCellTest*"` → `HudBlackHoleCellTest.kt:153` "Expected '4' nodes but could not find any node that satisfies: (TestTag = 'hudBlackHoleOrbitMark')". Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*"` → 209 testes, 0 falhas (com um teste de captura PNG que foi removido antes do commit por não afirmar comportamento) |
 | A05 | feito | `hudStarfieldWells` limita o raio do poço ao anel central (`maxRadiusPx` = `HUD_RING_SIZE`/2), passado pelo `HudStarfieldCanvas`; área proibida e `onRingPlaced` intactos. Vermelho (parâmetro ignorado): `gradlew.bat desktopTest --tests "*HudBlackHoleStarfieldTest*"` → `HudBlackHoleStarfieldTest.kt:43` "estrelas visiveis na faixa 35 a 57 px da celula: 0 (esperado > 0)" e `:54` "graos … 0". Verde: `gradlew.bat desktopTest --tests "*HudStar*" --tests "*HudBlackHole*" --tests "*HudNotch*"` → 257 testes, 0 falhas. Guarda: poço de conta de 64 dp idêntico com o limite (`HudStarActivityWindowTest`) |
 
 - Céu ausente na célula (leitura, A05): o poço do buraco nasce do retângulo de `onRingPlaced`, que em
@@ -69,5 +70,7 @@ dois estados (ocioso e em execução), sem perder a informação de cota e de ex
   os trilhos externos encostam. Aceito pela escolha do raio 90.
 
 - Célula maior que 114 dp alarga a coluna vertical e muda a conta do auto-minimizar (`HudAutoMinimizeTest`, #600).
-- Hipótese não confirmada: os glifos "▯" da captura podem ser a marca deformada pela cena Gargantua em 24 dp; só a
-  captura real com a fonte identificada confirma.
+- Os glifos "▯" da captura são a marca real do OpenCode Go (retângulo vazado, `AppProviderMark.jsx`), não deformação:
+  confirmado nos protótipos P1–P4, que desenham os caminhos reais.
+- Trilho, tracejado e contorno usam `onSurface` com alfa (0,06/0,10 e 0,14/0,25) e a lente da #602; não há token nominal
+  para esses alfas no design system — mesmo critério do arco de rastro da #602.
