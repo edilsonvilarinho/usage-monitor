@@ -67,6 +67,7 @@ Cada atividade leva no mesmo commit `docs/hud-notch.md`, o design system e o pro
 | ID | Execução | Resultado |
 |---|---|---|
 | A01 | Sem harness (texto): protótipos AY1–AY5, AY5 r2 e AZ conferidos por captura headless e CDP (`ay*-qa.mjs`, `az-qa.mjs`, zero erros de JS); escolhidos AY5 + AZ2 com o JSON do usuário | Plano aprovado para execução |
+| A02 | `HudBlackHoleCell` troca `hoverable` por `clickable` (clique/Enter alternam); `HudBlackHoleList` perde a seleção por hover de 160 ms; `HudNotch`: Esc e clique no corpo fora do buraco fecham. Medido: o ponto (2,2) do teste caía fora do corpo arredondado do notch e não chegava ao gesto; o teste clica no meio da faixa acima do buraco. Devolvida 1× (verde com 1 falha) (Haiku, `frontend-dev`) | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHole*"` → `AssertionError: ... Did not expect any node but found '1' node that satisfies: (Text ... contains 'Anthropic — Alfa')` (hover no buraco abria a lista); Enter/Esc: `the node is missing [RequestFocus]`. Verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.*" --tests "com.usagemonitor.HudBlackHole*" --tests "com.usagemonitor.architecture.*"` → 793 casos, 0 falhas (`test-runner`) |
 
 ## Problemas em aberto e riscos
 

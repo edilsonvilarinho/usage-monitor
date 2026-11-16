@@ -1,9 +1,7 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,18 +27,13 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.accentColorFor
 import com.usagemonitor.presentation.ui.theme.AppAccents
 import com.usagemonitor.presentation.ui.theme.AppSpacing
-import kotlinx.coroutines.delay
-
-/** Permanência do cursor numa linha antes de ela abrir o balão da conta (#600, A05). */
-internal const val HUD_BLACK_HOLE_HOVER_DELAY_MS = 160L
 
 /** Tamanho do glifo da marca e do emoji de cada linha da lista do buraco (#600, A05). */
 private val BLACK_HOLE_ROW_MARK_SIZE = 16.dp
 
 /**
  * Lista do buraco negro da HUD (#600, A05): uma linha por membro, na ordem recebida. [onSelect] recebe a posição
- * da conta em [members]. Hover espera [HUD_BLACK_HOLE_HOVER_DELAY_MS] antes de selecionar, para o cursor poder
- * passar por cima sem trocar; clique e Enter selecionam na hora.
+ * da conta em [members]. Só clique e Enter selecionam (#602, A02): hover não troca o balão.
  */
 @Composable
 internal fun HudBlackHoleList(
@@ -77,19 +68,11 @@ private fun HudBlackHoleListRow(
     onSelect: () -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    LaunchedEffect(hovered) {
-        if (hovered) {
-            delay(HUD_BLACK_HOLE_HOVER_DELAY_MS)
-            onSelect()
-        }
-    }
     val emoji = account.accountEmoji
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(HUD_BLACK_HOLE_LIST_ROW)
-            .hoverable(interactionSource = interaction)
             .clickable(interactionSource = interaction, indication = null) { onSelect() }
             .padding(horizontal = AppSpacing.sm, vertical = AppSpacing.xs),
         verticalAlignment = Alignment.CenterVertically

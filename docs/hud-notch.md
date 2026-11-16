@@ -642,9 +642,10 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
 - **Célula.** `HudBlackHoleCell` desenha o anel Gargantua sem arcos de cota e a contagem em `label*`: PT "1 minimizada"
   / "4 minimizadas", EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem
   `testTag("hudBlackHole")` e descrição semântica com o rótulo. O campo estelar trata o buraco como um anel.
-- **Lista.** Hover no buraco abre a lista (ou clique, ou Enter com foco). Há uma linha por membro, com o glifo da
-  marca, o nome, o valor em foco e o selo "auto" na auto-minimizada. A seleção por hover espera ~160 ms, para passar
-  por cima da lista sem trocar de conta.
+- **Lista.** Clique no buraco (ou Enter com foco) abre e fecha a lista; hover não abre nada (#602, pedido do usuário:
+  "clicar e não colocar o mouse em cima"). Esc e clique no corpo do notch fora do buraco fecham. Há uma linha por
+  membro, com o glifo da marca, o nome, o valor em foco e o selo "auto" na auto-minimizada; a linha abre o balão da
+  conta só por clique ou Enter (a seleção por hover de 160 ms saiu na #602).
 - **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
   com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só
   aquela conta: o balão volta à lista, ou fecha se o buraco esvaziar. A auto-minimizada não tem botão e diz "volta

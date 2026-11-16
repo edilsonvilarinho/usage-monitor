@@ -97,7 +97,7 @@ class HudBlackHoleCellTest {
                     minimizeProgress = minimizeProgress,
                     language = AppLanguage.PT,
                     onRingHovered = {},
-                    onHoleHovered = {},
+                    onHoleClicked = {},
                     onRingRefresh = {},
                     onItemPlaced = { _, _ -> },
                     onRingPlaced = { _, _ -> }
