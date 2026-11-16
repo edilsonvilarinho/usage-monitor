@@ -25,7 +25,7 @@ internal data class HudBlackHoleFilamentSegment(
 private const val HUD_BLACK_HOLE_FILAMENT_STEPS = 48
 
 /** Raio mínimo de um ponto para virar segmento: horizonte mais meio dp (#602, AZ2). */
-private const val HUD_BLACK_HOLE_FILAMENT_MIN_RADIUS = 20.5
+private const val HUD_BLACK_HOLE_FILAMENT_MIN_RADIUS = 12.9
 
 /** Quanto a fita dá de volta ao longo do filamento, em radianos (#602, AZ2). */
 private const val HUD_BLACK_HOLE_FILAMENT_SWEEP_RAD = 1.1
@@ -50,13 +50,13 @@ private data class PontoDaFita(val s: Double, val x: Double, val y: Double, val 
 /**
  * Fita de maré da conta em execução até o horizonte (#602, AZ2). Função pura: mesma entrada, mesma fita.
  * A cabeça parte de [orbitRadius] no ângulo [orbitAngleRad] e cai até [horizonRadius]; a ondulação some nas
- * duas pontas. Cada segmento liga o ponto anterior ao atual e só existe se o ponto atual tiver raio >= 20,5.
+ * duas pontas. Cada segmento liga o ponto anterior ao atual e só existe se o ponto atual tiver raio >= 12,9 (horizonte 12,4 + 0,5, #612 C1).
  * Alfa, espessura e mistura de cor usam o s do ponto final do segmento.
  */
 internal fun hudBlackHoleFilament(
     orbitAngleRad: Double,
     orbitRadius: Float = HUD_BLACK_HOLE_ORBIT_RADIUS.value,
-    horizonRadius: Float = 20f,
+    horizonRadius: Float = 12.4f,
     timeMs: Long
 ): List<HudBlackHoleFilamentSegment> {
     val segundos = timeMs / 1000.0

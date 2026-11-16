@@ -4,10 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -17,17 +16,17 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import com.usagemonitor.HUD_BLACK_HOLE_CELL_SIZE
-import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.HUD_RING_STROKE
-import com.usagemonitor.HUD_WORD_LINE
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AppGargantuaRing
 
+/** Anel central do buraco (#612, C1): 40 dp; também é o poço do campo estelar da célula (raio 20 dp). */
+internal val HUD_BLACK_HOLE_RING_SIZE: Dp = 40.dp
+
 /**
  * Buraco negro (#600): as contas minimizadas da coluna vertical viram um anel sem arcos de cota
- * e a contagem numa linha só, com altura de [HUD_WORD_LINE]. Altura total = anel + linha, a da geometria.
+ * sem texto visível: a contagem vai só na semântica (#612, C1). Anel central de 40 dp; célula de 106 dp, a da geometria.
  * Clique (ou Enter com foco) chama [onClick], que alterna a lista; hover não abre (#602, A02).
  * Órbita (#602, A06): um glifo por conta de [members] gira no comboio em volta do anel.
  */
@@ -52,25 +51,16 @@ internal fun HudBlackHoleCell(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(HUD_BLACK_HOLE_CELL_SIZE).onPlaced { coordinates -> onRingPlaced(coordinates) },
+            modifier = Modifier.requiredSize(HUD_BLACK_HOLE_CELL_SIZE).onPlaced { coordinates -> onRingPlaced(coordinates) },
             contentAlignment = Alignment.Center
         ) {
             AppGargantuaRing(
                 arcs = emptyList(),
                 description = label,
-                size = HUD_RING_SIZE,
+                size = HUD_BLACK_HOLE_RING_SIZE,
                 stroke = HUD_RING_STROKE
             )
             HudBlackHoleOrbitGlyphs(members = members, language = language)
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip,
-            modifier = Modifier.height(HUD_WORD_LINE)
-        )
     }
 }

@@ -56,6 +56,10 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
 - Encaixe na janela: a célula de 96 dp ocupa o vão da conta **mais** o padding transversal (8 dp de cada lado, centrada
   por `requiredSize`). A espessura da faixa horizontal e a largura da coluna vertical sobem no máximo para
   96 − 2·8 = 80 dp de conteúdo. Com isso a faixa fica em 96 dp no total, como no protótipo.
+- **Ajuste do dono após ver o app (2026-11-16):** com raio 33 e passo de 40° os glifos ficaram apertados (corda
+  2·33·sen 20° ≈ 22,6 dp para glifo de 30 dp). Escolha: **volta inteira + raio 38**. Passo = 360°/n para todo n (deixa
+  de ser comboio agrupado), raio 38 dp, célula 2·(38 + 15) = 106 dp, piso de conteúdo 106 − 16 = 90 dp. Com 7 contas a
+  corda é 33 dp; com 10 contas é 23,5 dp, os discos não se tocam e só os arcos encostam.
 - O voo do sumidouro (520 ms, `hudSinkFrame`) vale nas duas bordas: na horizontal, o deslocamento é ao longo da faixa.
 
 ## Atividades
@@ -75,6 +79,7 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
 |---|---|---|
 | A01 | feito | sem harness de teste (documento); validado pela leitura dos arquivos citados em "Fatos confirmados" |
 | A02 | feito | sem harness (protótipo); C1–C3 conferidos por captura headless do Chrome (`--screenshot`, n=7 e n=10, escuro/claro, 1x/2x); C1 e C2 devolvidos uma vez (anel central ausente; texto sob o anel e glifos cobrindo marcas), C3 uma vez (célula cortada em 2x); escolhido C1 |
+| A03 | feito | Geometria C1 com o ajuste do dono (raio 38, passo 360°/n, célula 106 dp, anel 40, glifo 22/marca 15, um arco), rótulo fora do desenho, poço do campo estelar do buraco = 20 dp. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*"` → 6 falhas na asserção (`expected:<33.0.dp> but was:<90.0.dp>`, `expected:<96.0.dp> but was:<236.0.dp>`, `altura do buraco, lateral expected:<236.0.dp> but was:<250.0.dp>`); fiação do poço `HudNotchTest`: `expected:<20.0> but was:<32.0>`; passo: `HudBlackHoleOrbitTest.kt:18` `passo com n=3 … esperado=2.094 obtido=0.698`. Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*" --tests "*HudStar*"` → 272 testes, 0 falhas; `gradlew.bat allTests` (antes do ajuste de raio) → 0 falhas. Conferido no app local (`gradlew.bat run`) pelo dono na borda lateral |
 
 ## Problemas em aberto e riscos
 

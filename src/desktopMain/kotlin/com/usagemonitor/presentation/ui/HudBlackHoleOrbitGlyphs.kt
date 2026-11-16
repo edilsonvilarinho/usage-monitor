@@ -62,16 +62,14 @@ private val HUD_BLACK_HOLE_HALO_RING_RADIUS = 14.dp
 private val HUD_BLACK_HOLE_HALO_RING_WIDTH = 1.dp
 private const val HUD_BLACK_HOLE_HALO_ALPHA = 0.35f
 /** Marca real do provedor no centro do disco (#611, P1). */
-private val HUD_BLACK_HOLE_MARK_SIZE = 20.dp
-/** Contorno do disco: raio 15,4 dp e traço de 1,2 dp (#611, P1). */
-private val HUD_BLACK_HOLE_CONTOUR_RADIUS = 15.4.dp
+private val HUD_BLACK_HOLE_MARK_SIZE = 15.dp
+/** Contorno do disco: raio 10,4 dp (#612, C1) e traço de 1,2 dp (#611, P1). */
+private val HUD_BLACK_HOLE_CONTOUR_RADIUS = 10.4.dp
 private val HUD_BLACK_HOLE_CONTOUR_WIDTH = 1.2.dp
 /** Traço e vão do tracejado do contorno ocioso: 2 dp e 2 dp (#611, P1). */
 private val HUD_BLACK_HOLE_DASH = 2.dp
-/** Primeiro arco de cota: 16 dp do disco + 1,5 dp de folga + 1,25 dp de meio traço (#611, P1). */
-private val HUD_BLACK_HOLE_ARC_FIRST_RADIUS = 18.75.dp
-/** Passo radial entre arcos de cota: traço 2,5 dp + folga 1,5 dp (#611, P1). */
-private val HUD_BLACK_HOLE_ARC_STEP = 4.dp
+/** Raio do arco de cota: 11 dp do disco + 1,25 dp de meio traço + 1,5 dp de folga (#612, C1). */
+private val HUD_BLACK_HOLE_ARC_FIRST_RADIUS = 13.75.dp
 private val HUD_BLACK_HOLE_ARC_WIDTH = 2.5.dp
 /** Trilho de fundo e tracejado do contorno, na cor de texto com alfa do prótipo (#611, P1). */
 private const val HUD_BLACK_HOLE_TRACK_ALPHA_DARK = 0.06f
@@ -199,13 +197,12 @@ private fun HudBlackHoleGlyph(
 }
 
 /**
- * Arcos de cota por fora do disco (#611, P1): um anel por cota, do raio [HUD_BLACK_HOLE_ARC_FIRST_RADIUS] com passo
- * [HUD_BLACK_HOLE_ARC_STEP]. Trilho de fundo em volta inteira e arco preenchido a partir de -90 graus.
+ * Arcos de cota por fora do disco (#611, P1): um único arco, o de maior fração (#612, C1), no raio [HUD_BLACK_HOLE_ARC_FIRST_RADIUS]. Trilho de fundo em volta inteira e arco preenchido a partir de -90 graus.
  */
 private fun DrawScope.drawHudBlackHoleArcos(arcos: List<HudBlackHoleArc>, trilho: Color) {
     val centro = center
-    arcos.forEachIndexed { indice, arco ->
-        val raio = (HUD_BLACK_HOLE_ARC_FIRST_RADIUS + HUD_BLACK_HOLE_ARC_STEP * indice).toPx()
+    listOfNotNull(arcos.maxByOrNull { cota -> cota.fraction }).forEach { arco ->
+        val raio = HUD_BLACK_HOLE_ARC_FIRST_RADIUS.toPx()
         val topLeft = Offset(centro.x - raio, centro.y - raio)
         val tamanho = Size(raio * 2f, raio * 2f)
         val largura = HUD_BLACK_HOLE_ARC_WIDTH.toPx()

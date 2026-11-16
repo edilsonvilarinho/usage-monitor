@@ -9,7 +9,6 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
-import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_HORIZONTAL
@@ -460,26 +459,18 @@ internal fun verticalCollapsed(
             }
         }
     }
-    // Célula do buraco (#602): órbita inteira na altura, uma linha da contagem e o vão até ela.
-    val all = if (hole) shownHeights + (HUD_BLACK_HOLE_CELL_SIZE + HUD_WORD_LINE) else shownHeights
+    // Célula do buraco (#612, C1): 106 dp na altura, sem linha da contagem, e o vão até ela.
+    val all = if (hole) shownHeights + HUD_BLACK_HOLE_CELL_SIZE else shownHeights
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    // O rótulo do buraco é uma linha só, inteira: a maior largura entre os idiomas, para a troca não cortar o texto.
-    val holeWordWidths = if (hole) {
-        AppLanguage.entries.map { language ->
-            wordWidth(hudBlackHoleCountLabel(arrangement.holeMembers.size, language))
-        }
-    } else {
-        emptyList()
-    }
-    val widestWord = (wordWidths + holeWordWidths).maxOrNull() ?: 0.dp
+    val widestWord = wordWidths.maxOrNull() ?: 0.dp
     val widestPercent = shown.maxOfOrNull { account ->
         when {
             compact -> stripLineWidth(account.focusLine)
             else -> account.stripLines.maxOf { line -> stripLineWidth(line) }
         }
     } ?: 0.dp
-    // Piso de 64 dp (HUD_RING_SIZE) para contas comuns; com buraco, piso da célula de 114 dp (#602), só nesta borda.
-    val floor = if (hole) HUD_BLACK_HOLE_CELL_SIZE else HUD_RING_SIZE
+    // Piso de 64 dp (HUD_RING_SIZE) para contas comuns; com buraco, piso de 90 dp (a célula de 106 dp sai na margem, #612, C1), só nesta borda.
+    val floor = if (hole) HUD_BLACK_HOLE_CELL_SIZE - HUD_NOTCH_PADDING_ACROSS * 2 else HUD_RING_SIZE
     val across = maxOf(floor, widestWord, widestPercent)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,

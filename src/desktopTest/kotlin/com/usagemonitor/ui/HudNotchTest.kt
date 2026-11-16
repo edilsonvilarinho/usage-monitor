@@ -99,6 +99,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.usagemonitor.HudEdge
@@ -288,6 +291,41 @@ class HudNotchTest {
         assertTrue(wells.all { it.radius > 0f }, "raio dos poços positivo")
     }
 
+    /**
+     * #612 A03c: com as contas minimizadas na coluna vertical, o poço do buraco é o anel central de 40 dp
+     * (raio 20 dp), não o teto de 32 dp dos anéis. Densidade 1 fixa, então px = dp.
+     */
+    @Test
+    fun `o poco do buraco vertical tem o raio do anel central de 40 dp`() = runDesktopComposeUiTest {
+        val account = accounts.first().copy(minimized = true)
+        setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                notch(edge = HudEdge.LEFT, list = listOf(account))
+            }
+        }
+
+        val wells = onNodeWithTag(HUD_STARFIELD_TEST_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode().config[HUD_STARFIELD_WELLS]
+
+        assertEquals(1, wells.size, "um poço para o buraco")
+        assertEquals(20f, wells.single().radius, "raio do poço do buraco vertical (px = dp, densidade 1)")
+    }
+
+    /** #612 A03c: com as contas cheias, o poço de cada anel segue no teto de 32 dp (raio do anel de 64 dp). */
+    @Test
+    fun `o poco do anel cheio mantem o raio de 32 dp`() = runDesktopComposeUiTest {
+        setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                notch(edge = HudEdge.LEFT)
+            }
+        }
+
+        val wells = onNodeWithTag(HUD_STARFIELD_TEST_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode().config[HUD_STARFIELD_WELLS]
+
+        assertEquals(32f, wells.first().radius, "raio do poço do anel cheio (px = dp, densidade 1)")
+    }
+
     /** A03 · #590: com movimento reduzido o campo não desenha captura nenhuma. */
     @Test
     fun `movimento reduzido nao desenha captura`() = runDesktopComposeUiTest {
@@ -330,13 +368,13 @@ class HudNotchTest {
     }
     /** Buraco na lateral (#600 A04, #602): a célula tem altura exata de célula + linha da contagem; largura não passa da geometria. */
     @Test
-    fun `buraco na lateral mede a celula de 236 dp mais a linha da contagem`() = runDesktopComposeUiTest {
+    fun `buraco na lateral mede a celula de 106 dp, sem linha da contagem`() = runDesktopComposeUiTest {
         val account = accounts.first().copy(minimized = true)
         setContent { notch(edge = HudEdge.LEFT, list = listOf(account)) }
 
         val hole = onNodeWithTag("hudBlackHole").getUnclippedBoundsInRoot()
         val geometry = hudNotchSizes(listOf(account), HudEdge.LEFT, "Carregando", false).collapsed
-        assertEquals(HUD_BLACK_HOLE_CELL_SIZE + HUD_WORD_LINE, hole.height, "altura do buraco, lateral")
+        assertEquals(HUD_BLACK_HOLE_CELL_SIZE, hole.height, "altura do buraco, lateral")
         assertTrue(hole.width <= geometry.width, "largura do buraco (${hole.width}) passa da geometria (${geometry.width}), lateral")
     }
 

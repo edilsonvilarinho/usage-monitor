@@ -17,7 +17,7 @@ internal val HUD_BLACK_HOLE_BACK_STRIP = 24.dp
 internal val HUD_BLACK_HOLE_AUTO_NOTE = 24.dp
 
 /**
- * Célula do buraco (#602, A05; #611): a órbita mais a extensão do glifo para cada lado, 2 × (90 + 28) = 236 dp.
+ * Célula do buraco (#602, A05; #611): a órbita mais a extensão do glifo para cada lado, 2 × (38 + 15) = 106 dp (#612, C1).
  * Constante, nunca por quadro.
  */
 internal val HUD_BLACK_HOLE_CELL_SIZE: Dp = (HUD_BLACK_HOLE_ORBIT_RADIUS + HUD_BLACK_HOLE_GLYPH_EXTENT) * 2f

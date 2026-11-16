@@ -16,6 +16,13 @@ class HudBlackHoleFilamentTest {
 
     private val angulo = 0.4
 
+    // Números de C1 (#612): órbita padrão derivada da constante de produção; horizonte de 12,4 dp, igual ao default de hudBlackHoleFilament.
+    private val raioOrbita = HUD_BLACK_HOLE_ORBIT_RADIUS.value.toDouble()
+    private val horizonte = 12.4
+
+    // Corte de C1: passo cujo fim fica abaixo de 12,9 dp não vira segmento.
+    private val corte = 12.9
+
     private fun perto(esperado: Double, obtido: Double, mensagem: String) {
         assertTrue(abs(esperado - obtido) < 1e-3, "$mensagem: esperado=$esperado obtido=$obtido")
     }
@@ -31,30 +38,31 @@ class HudBlackHoleFilamentTest {
     }
 
     @Test
-    fun `com a orbita padrao a fita tem um segmento por passo acima de 20,5 dp, ou seja 47 de 48`() {
+    fun `com a orbita padrao a fita tem um segmento por passo acima do corte de 12,9 dp, ou seja 47 de 48`() {
         val fita = hudBlackHoleFilament(orbitAngleRad = angulo, timeMs = 0L)
 
-        assertEquals(47, fita.size, "passos j=1..47 têm raio >= 20,5 (raio do passo 48 é 20, no horizonte)")
+        // raio(j) = R + (H - R) * j / 48 com R = 38: j = 47 fica em 12,933 dp; j = 48 cai em 12,4 dp, abaixo do corte.
+        assertEquals(47, fita.size, "passos j=1..47 têm raio >= 12,9; o passo 48 (12,4 = horizonte) é cortado")
     }
 
     @Test
     fun `com horizonte a 30 dp todos os 48 passos viram segmento`() {
         val fita = hudBlackHoleFilament(orbitAngleRad = angulo, horizonRadius = 30f, timeMs = 0L)
 
-        assertEquals(48, fita.size, "raio mínimo 30 >= 20,5: nenhum passo cortado")
+        assertEquals(48, fita.size, "raio mínimo 30 >= 12,9: nenhum passo cortado")
     }
 
     @Test
-    fun `o raio cai monotonicamente da cabeca e o ultimo segmento termina acima do horizonte`() {
+    fun `o raio cai monotonicamente da cabeca e o ultimo segmento termina acima do corte`() {
         val fita = hudBlackHoleFilament(orbitAngleRad = angulo, timeMs = 0L)
         assertTrue(fita.isNotEmpty(), "fita sem segmentos")
         val raios = fita.map { segmento -> raioDoFim(segmento) }
 
-        perto(90.0 - 70.0 / 48.0, raios.first(), "primeiro fim em s=1/48")
+        perto(raioOrbita + (horizonte - raioOrbita) / 48.0, raios.first(), "primeiro fim em s=1/48")
         for (indice in 1 until raios.size) {
             assertTrue(raios[indice] < raios[indice - 1], "raio cai no segmento $indice: ${raios[indice - 1]} -> ${raios[indice]}")
         }
-        assertTrue(raios.last() >= 20.5, "último fim acima de 20,5 dp, era ${raios.last()}")
+        assertTrue(raios.last() >= corte, "último fim acima de 12,9 dp, era ${raios.last()}")
     }
 
     @Test
@@ -85,8 +93,8 @@ class HudBlackHoleFilamentTest {
         val cabecaT0 = cabecaT0Fita.first()
         val cabecaT7 = cabecaT7Fita.first()
 
-        perto(90.0 * cos(angulo), cabecaT0.startX.toDouble(), "início da cabeça em x, sem ondulação")
-        perto(90.0 * sin(angulo), cabecaT0.startY.toDouble(), "início da cabeça em y, sem ondulação")
+        perto(raioOrbita * cos(angulo), cabecaT0.startX.toDouble(), "início da cabeça em x, sem ondulação")
+        perto(raioOrbita * sin(angulo), cabecaT0.startY.toDouble(), "início da cabeça em y, sem ondulação")
         perto(cabecaT0.startX, cabecaT7.startX, "início da cabeça independe de t (x)")
         perto(cabecaT0.startY, cabecaT7.startY, "início da cabeça independe de t (y)")
 
@@ -106,12 +114,13 @@ class HudBlackHoleFilamentTest {
     fun `o ponto em s igual a meio segue a formula com ondulacao em t zero`() {
         val fita = hudBlackHoleFilament(orbitAngleRad = angulo, timeMs = 0L)
         assertTrue(fita.size > 23, "fita tem de ter o segmento de s=0,5, tem ${fita.size}")
-        // s = 24/48 = 0,5: raio 55; ângulo = a - 0,55 + 0,035 * sen(4,5 pi) * sen(0,5 pi) = a - 0,515
+        // s = 24/48 = 0,5: raio 22,7 (= R + (H - R) * 0,5); ângulo = a - 0,55 + 0,035 * sen(4,5 pi) * sen(0,5 pi) = a - 0,515
+        val raioMeio = raioOrbita + (horizonte - raioOrbita) * 0.5
         val meio = fita[23]
         val anguloEsperado = angulo - 0.55 + 0.035 * sin(4.5 * PI) * sin(0.5 * PI)
 
-        perto(55.0 * cos(anguloEsperado), meio.endX.toDouble(), "x em s=0,5")
-        perto(55.0 * sin(anguloEsperado), meio.endY.toDouble(), "y em s=0,5")
+        perto(raioMeio * cos(anguloEsperado), meio.endX.toDouble(), "x em s=0,5")
+        perto(raioMeio * sin(anguloEsperado), meio.endY.toDouble(), "y em s=0,5")
     }
 
     @Test
@@ -129,4 +138,22 @@ class HudBlackHoleFilamentTest {
 
         assertNotEquals(emT0, emT1, "a ondulação depende de t: a fita tem de mudar entre t=0 e t=1 s")
     }
+
+    @Test
+    fun `a fita de mare para no corte de 12,9 dp, o menor ponto desenhado e o fim do passo 47`() {
+        val distancias = (0..6).flatMap { passo -> hudBlackHoleFilament(orbitAngleRad = passo * 0.5, timeMs = 0L) }
+            .flatMap { segmento ->
+                listOf(
+                    distanciaDoCentro(segmento.startX, segmento.startY),
+                    distanciaDoCentro(segmento.endX, segmento.endY),
+                )
+            }
+        val menor = distancias.minOrNull() ?: Float.MAX_VALUE
+        // Fim do passo 47: R + (H - R) * 47 / 48 = 12,933 dp.
+        val esperadoMenor = (raioOrbita + (horizonte - raioOrbita) * 47.0 / 48.0).toFloat()
+        assertTrue(menor >= corte.toFloat(), "raio minimo $menor abaixo do corte de 12,9")
+        perto(esperadoMenor, menor, "menor ponto desenhado é o fim do passo 47")
+    }
+
+    private fun distanciaDoCentro(x: Float, y: Float): Float = sqrt(x * x + y * y)
 }

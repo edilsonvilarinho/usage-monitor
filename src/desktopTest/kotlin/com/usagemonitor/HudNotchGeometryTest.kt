@@ -631,14 +631,13 @@ class HudNotchGeometryTest {
     }
 
     @Test
-    fun `conta minimizada na lateral vira a celula do buraco, 236 dp (#602, #611) mais a linha da contagem`() {
+    fun `conta minimizada na lateral vira a celula do buraco, 106 dp, sem linha da contagem (C1, #612)`() {
         val normal = account("Claude", "Em dia", listOf("5h" to "40%"))
         val minimized = normal.copy(minimized = true)
         val sizes = hudNotchSizes(listOf(minimized), HudEdge.LEFT, "", false)
-        // Uma minimizada só: o buraco é a única célula. Largura = rótulo inteiro numa linha, maior entre idiomas, piso da célula de 236 dp (#602, #611).
-        val labelWidth = AppLanguage.entries.maxOf { language -> wordWidth(hudBlackHoleCountLabel(1, language)) }
-        val expectedWidth = maxOf(HUD_BLACK_HOLE_CELL_SIZE, labelWidth) + HUD_NOTCH_PADDING_ACROSS * 2
-        val expectedHeight = HUD_BLACK_HOLE_CELL_SIZE + HUD_WORD_LINE + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
+        // Uma minimizada só: o buraco é a única célula. Largura = a célula inteira (piso derivado: célula menos 2 × padding, mais o padding de cada lado), sem rótulo (C1, #612).
+        val expectedWidth = HUD_BLACK_HOLE_CELL_SIZE
+        val expectedHeight = HUD_BLACK_HOLE_CELL_SIZE + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
         assertEquals(expectedWidth, sizes.collapsed.width)
         assertEquals(expectedHeight, sizes.collapsed.height)
     }
