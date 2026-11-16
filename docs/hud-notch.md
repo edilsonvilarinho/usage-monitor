@@ -72,12 +72,13 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     caber. Sem botão de restaurar: volta sozinha quando houver espaço, e `hudMinimizedAccounts` não muda. Se nem
     assim cabe, fica o compacto. Só a borda vertical; a horizontal (45%) não muda. Regra em `hudAutoMinimizedTargets`
     e `applyHudAutoMinimize` (`src/desktopMain/kotlin/com/usagemonitor/HudAutoMinimize.kt`), aplicada em `HudWindow.kt`.
-- **Na lateral, as minimizadas viram um buraco negro (#600).** Na borda vertical, as contas minimizadas (manuais #576 e
-  automáticas #596) saem da coluna e viram **uma** célula só, na base da coluna, depois da última completa: um anel de
-  64 dp com a contagem embaixo ("4 minimizadas"). Quem entra é `hudColumnArrangement`
+- **As minimizadas viram um buraco negro nas quatro bordas (#600; cima e embaixo desde #612).** As contas minimizadas
+  (manuais #576 e automáticas #596) saem da fileira e viram **uma** célula só, depois da última completa, com vão de
+  12 dp: na coluna, na base; na faixa, no fim, e nela o voo segue o eixo X. Um anel de 40 dp, sem texto (a contagem
+  fica só na descrição semântica, #612). Quem entra é `hudColumnArrangement`
   (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`). Passar o mouse no buraco abre a lista de quem está
-  dentro; uma linha abre o balão da conta com "← N no buraco". Detalhes na seção "Buraco negro das minimizadas (#600)".
-  Só a borda vertical; em cima e embaixo as minimizadas seguem como hoje.
+  dentro (#612, reverte o clique da #602); uma linha abre o balão da conta com "← N no buraco". Detalhes na seção
+  "Buraco negro das minimizadas (#600)". O auto-minimizar segue só na vertical; a horizontal não recolhe sozinha.
 - **O notch não cresce; o detalhe é um balão de uma conta só** (`HudBalloon`), como o card do
   Codenotch: o ponteiro sobre um anel abre, ao lado do notch e do lado de dentro da tela, o balão
   **daquela** conta — o painel com todas as contas empilhadas saiu (rodada 3). Cabeçalho com marca,
@@ -178,7 +179,7 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   alfa (0,05–0,25)×2, `AppGargantuaTokens.dust`, ×1,2 no claro). Cintilação 0,8 + 0,2·sen com períodos de 1,5/1,6/2,0/2,4 s
   (divisores do laço de 240 s; o JSON da rodada AY5 pedia (3–6 s)·2/4,5). Valores do JSON escolhido no protótipo
   `prototipos/issue-602/az-fluxo-poeira/`. Cada anel segue como poço (a estrela desvia em curva, sem rastro) e as caixas
-  de texto e pílula seguem proibidas. O raio do poço é limitado ao anel central de 64 dp (`maxRadiusPx` de
+  de texto e pílula seguem proibidas. O raio do poço é limitado ao anel da conta (64 dp) e, no buraco, ao anel central de 40 dp (#612) (`maxRadiusPx` de
   `hudStarfieldWells`, #611): o buraco registra a célula inteira como anel, e com raio de célula o sorteio recusava
   todo ponto da órbita — o usuário viu a célula sem céu nem poeira (`HudBlackHoleStarfieldTest`). Escuro: `hot` com 18% em `gold`; claro: tinta `--fg` com alfa 0,55 e raio ×1,5.
   `HudStarfield.kt` é o quadro puro; `HudStarfieldCanvas.kt` desenha. Só anima com `AppMotionPolicy.continuous` e sem
@@ -627,46 +628,38 @@ célula dela no notch encolhe.
 
 ## Buraco negro das minimizadas (#600)
 
-Na borda vertical, as contas minimizadas deixam de ocupar uma célula cada e viram **um** buraco negro na base da
-coluna, depois da última completa. Só a borda vertical; em cima e embaixo as minimizadas seguem como hoje. Fonte do
+Nas quatro bordas, as contas minimizadas deixam de ocupar uma célula cada e viram **um** buraco negro depois da última
+completa: na base da coluna (vertical) ou no fim da faixa (cima e embaixo, #612, voo ao longo do eixo X, vão de 12 dp). Fonte do
 comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Decisões") e o protótipo
 `prototipos/issue-600/p10-sumidouro-r2/index.html`.
 
 - **Arranjo.** `hudColumnArrangement` (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`) separa as contas.
   `shown` são as completas, na ordem. `holeMembers` são as minimizadas (manuais #576 e automáticas #596), na ordem de
   publicação, que é total e determinística. Sem minimizadas não existe buraco.
-- **Geometria (#611).** O buraco mede uma célula quadrada de `HUD_BLACK_HOLE_CELL_SIZE` = 236 dp: órbita de 90 dp mais
-  a extensão do glifo, `HUD_BLACK_HOLE_GLYPH_EXTENT` = 28 dp (disco de 16 dp + três arcos de cota), dos dois lados; o anel
-  de 64 dp fica no centro, mais a linha da contagem. A largura é a maior entre 236 dp e a maior linha de rótulo de
-  `AppLanguage.entries`; o piso vale **só** na borda vertical e só com buraco. Tamanho estático, nunca por quadro.
-  Antes da #611 eram 114 dp (órbita de 45 dp e miniatura de 24 dp, ilegível: issue #611, protótipo escolhido
-  `prototipos/issue-611/p1-glifo-32/`). Auto-minimizar mede a coluna com o buraco (`verticalCollapsed`): o buraco custa
-  262 dp na coluna (célula + linha + vão) e cada conta 110 dp, então recolher uma ou duas contas não encurta a coluna e
-  a regra só passa a caber a partir de três recolhidas, as de menor uso (`HudAutoMinimizeTest`).
-- **Órbita (#602).** `hudBlackHoleOrbit` (`HudBlackHoleOrbit.kt`, quadro puro) põe os membros num comboio: cabeça em
-  −π/2 + 2π·t/60 s, membro k a k·espaçamento atrás, espaçamento = min(40°, 360°/n), raio 90 dp (#611), arco de 5° atrás de
+- **Geometria (#612, C1).** O buraco mede uma célula quadrada de `HUD_BLACK_HOLE_CELL_SIZE` = 106 dp: órbita de 38 dp mais a extensão do glifo, `HUD_BLACK_HOLE_GLYPH_EXTENT` = 15 dp (raio do arco de cota 13,75 dp mais meio traço de 1,25 dp); o anel de 40 dp fica no centro, sem linha da contagem (a contagem vai só na descrição semântica). O piso transversal vale nas **duas** bordas e só com buraco: o conteúdo tem piso de 106 dp − 2·8 dp de padding transversal = 90 dp (largura na coluna, altura na faixa), e o total volta a 106 dp. A dimensão transversal é a maior entre esse piso e a das contas completas. Tamanho estático, nunca por quadro. Na coluna e na faixa, o buraco custa 106 dp mais o vão de 12 dp (`HUD_ITEM_GAP`), e auto-minimizar mede a coluna com esse custo (`verticalCollapsed`); o limiar de quantas contas recolher não é fixado aqui (ver `HudAutoMinimizeTest`). Antes (#611), a célula tinha 236 dp (órbita de 90 dp, anel de 64 dp e linha da contagem) e o buraco custava 262 dp na coluna; era grande demais para o dono (#612).
+- **Órbita (#602; C1, #612).** `hudBlackHoleOrbit` (`HudBlackHoleOrbit.kt`, quadro puro) põe os membros num comboio: cabeça em
+  −π/2 + 2π·t/60 s, membro k a k·espaçamento atrás, espaçamento = 360°/n, na volta inteira (#612: o comboio a 40° ficou apertado), raio 38 dp, arco de 5° atrás de
   cada um; as contas em execução ocupam as primeiras vagas, na ordem de publicação.
-  `HudBlackHoleOrbitGlyphs` desenha cada membro (#611) como disco de 32 dp em `AppGargantuaTokens.core`, sem cena
-  Gargantua, com a marca de 20 dp em `AppGargantuaTokens.hot` no centro, contorno de 1,2 dp no raio 15,4 dp (contínuo na
-  cor da lente em execução, tracejado 2/2 dp na ociosa) e os arcos de cota **fora** do disco, um anel por cota (traço
-  2,5 dp, folga 1,5 dp, raio 18,75 + 4·i dp, de −90°, trilho em volta inteira). Com 10 membros e dois vizinhos de três
-  cotas os trilhos externos encostam (corda de 55,6 dp para 56 dp). O arco de 5° vai em 10 segmentos: ocioso em `onSurface` alfa 0,2 e 0,8 dp; em execução em
+  `HudBlackHoleOrbitGlyphs` desenha cada membro como disco de 22 dp em `AppGargantuaTokens.core`, sem cena
+  Gargantua, com a marca de 15 dp em `AppGargantuaTokens.hot` no centro, contorno de 1,2 dp no raio 10,4 dp (contínuo na
+  cor da lente em execução, tracejado 2/2 dp na ociosa) e **um único** arco de cota por fora do disco: o da cota de maior fração (empate: a primeira na ordem), no raio 13,75 dp, traço 2,5 dp, folga 1,5 dp, de −90°, com trilho em volta inteira. Com 10 membros a corda é 2·33·sen 18° = 20,4 dp, menor que o disco de 22 dp: os discos se sobrepõem 1,6 dp (aceito pelo dono). O arco de 5° vai em 10 segmentos: ocioso em `onSurface` alfa 0,2 e 0,8 dp; em execução em
   `AppGargantuaTokens.lens` (espelho de `--gargantua-lens`; `gold` no claro) alfa 0,85 e 1,6 dp, mais halo radial de
   18 dp e anel de 1 dp em 14 dp. A conta em execução diz "em execução" na descrição, então a cor não informa sozinha.
   O relógio só corre com `AppMotionPolicy.continuous` e sem "reduzir animações" (senão t = 0). Os glifos ficam na
   árvore não mesclada; a célula segue um botão só na semântica mesclada.
 - **Filamento de maré (#602, AZ2).** Conta do buraco em execução puxa uma fita fina do glifo até o horizonte:
-  `hudBlackHoleFilament` (quadro puro) dá 47 segmentos do raio da órbita (90 dp, #611) a 20 dp, ondulação de 0,035 rad que se desloca a
+  `hudBlackHoleFilament` (quadro puro) dá 48 passos do raio da órbita (38 dp, #612) a 12,4 dp, sem os que caem abaixo do corte de 12,9 dp (o horizonte), ondulação de 0,035 rad que se desloca a
   2,2 rad/s, alfa 0,75·(1−s)^0,8 e largura 1,1 − 0,5·s dp; cor de `hot` a `gold` no escuro e de `gold` a `dust` no claro.
   É o único sinal de consumo: o usuário recusou a captura de estrelas pelo buraco (`reach` 1,1 no JSON). Desenhado antes
   dos glifos e só com o relógio vivo; com "reduzir animações" não há filamento, e o arco de execução segue indicando.
-- **Célula.** `HudBlackHoleCell` desenha o anel Gargantua sem arcos de cota e a contagem em `label*`: PT "1 minimizada"
-  / "4 minimizadas", EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem
-  `testTag("hudBlackHole")` e descrição semântica com o rótulo. O campo estelar trata o buraco como um anel.
-- **Lista.** Clique no buraco (ou Enter com foco) abre e fecha a lista; hover não abre nada (#602, pedido do usuário:
-  "clicar e não colocar o mouse em cima"). Esc e clique no corpo do notch fora do buraco fecham. Há uma linha por
-  membro, com o glifo da marca, o nome, o valor em foco e o selo "auto" na auto-minimizada; a linha abre o balão da
-  conta só por clique ou Enter (a seleção por hover de 160 ms saiu na #602).
+- **Célula.** `HudBlackHoleCell` desenha o anel Gargantua de 40 dp, sem arcos de cota e sem texto. A contagem fica só na descrição semântica, com o rótulo PT "1 minimizada" / "4 minimizadas" e EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem `testTag("hudBlackHole")`. O campo estelar trata o buraco como um poço de 20 dp de raio no centro (#612), não como a célula inteira.
+- **Lista.** Passar o mouse no buraco abre a lista (#612, pedido do dono em 2026-11-16: "o ideal é passar o mouse e ele já
+  abrir"; reverte o "clicar e não colocar o mouse em cima" da #602). Se a lista ou uma conta dela já está aberta, o hover
+  não muda nada; um segundo hover mantém a lista aberta. Clique no buraco (ou Enter com foco) abre e fecha a lista. Esc e
+  clique no corpo do notch fora do buraco fecham. Há uma linha por membro, com o glifo da marca, o nome, o valor em foco
+  e o selo "auto" na auto-minimizada. A linha sob o ponteiro ganha a camada de hover do `AppSurfaceLadders` (a mesma da
+  `AppDataRow`, #612); só destaca. O balão da conta abre só por clique ou Enter (a seleção por hover de 160 ms saiu na
+  #602).
 - **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
   com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só
   aquela conta: o balão volta à lista, já sem ela, ou fecha se o buraco esvaziar (#602: antes o balão ficava na
@@ -681,6 +674,8 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered` e quando o balão fecha.
 - **Decisões.** A ordem da lista é a de publicação. "Mais recente primeiro" do protótipo ficou fora, porque exigiria
   persistir quando cada conta entrou.
+- **Risco aberto (fora do escopo da #612).** Primeira minimização com o buraco vazio: nos 520 ms do voo a conta fica
+  invisível no slot até o buraco nascer (`hasHole` exige um membro com progresso 1), nas quatro bordas.
 
 ## Reordenar contas arrastando o anel (#584)
 

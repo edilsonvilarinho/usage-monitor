@@ -57,12 +57,15 @@ internal fun HudStarfieldCanvas(
     rings: () -> Map<Int, Rect>,
     running: () -> Set<Int>,
     forbidden: () -> List<HudStarfieldBox>,
+    holeIndex: Int,
     modifier: Modifier = Modifier
 ) {
     val policy = LocalAppMotionPolicy.current
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val live = policy.continuous && !policy.reduced
     val ringRadiusPx = with(LocalDensity.current) { HUD_RING_SIZE.toPx() / 2f }
+    // #612 C1: o buraco (índice [holeIndex]) tem o poço do anel central de 40 dp, não o teto dos anéis de 64 dp.
+    val holeRadiusPx = with(LocalDensity.current) { HUD_BLACK_HOLE_RING_SIZE.toPx() / 2f }
     var timeMs by remember { mutableLongStateOf(0L) }
     var windows by remember { mutableStateOf<Map<Int, HudStarActivityWindow>>(emptyMap()) }
     LaunchedEffect(live) {
@@ -82,7 +85,7 @@ internal fun HudStarfieldCanvas(
         modifier
             .testTag(HUD_STARFIELD_TEST_TAG)
             .semantics {
-                val wellList = hudStarfieldWells(rings(), windows, ringRadiusPx)
+                val wellList = hudStarfieldWells(rings(), windows, ringRadiusPx, holeIndex, holeRadiusPx)
                 set(HUD_STARFIELD_WELLS, wellList)
                 set(HUD_STARFIELD_CAPTURE_COUNT, if (live) hudStarCaptures(timeMs, wellList, forbidden()).size else 0)
             }
@@ -91,7 +94,7 @@ internal fun HudStarfieldCanvas(
                 val height = size.height
                 onDrawBehind {
                     val boxes = forbidden()
-                    val wellList = hudStarfieldWells(rings(), windows, ringRadiusPx)
+                    val wellList = hudStarfieldWells(rings(), windows, ringRadiusPx, holeIndex, holeRadiusPx)
                     val captures = if (live) hudStarCaptures(timeMs, wellList, boxes) else emptyList()
                     val captureInk = hudStarfieldInk(dark, gold = false).color
                     for (capture in captures) drawStarCapture(capture, captureInk, dark)
@@ -116,21 +119,25 @@ internal fun HudStarfieldCanvas(
 }
 
 /**
- * Poços: um por anel medido, no centro do Rect e com raio = metade da largura (#586 A03), limitado a [maxRadiusPx]
- * (#611 A05: a célula do buraco tem 114 dp, e o poço é o anel central de 64 dp, não a célula inteira).
+ * Poços: um por anel medido, no centro do Rect e com raio = metade da largura (#586 A03), limitado a [maxRadiusPx].
+ * O anel de índice [holeIndex] (buraco negro, #612 C1) é limitado a [holeMaxRadiusPx] em vez de [maxRadiusPx]:
+ * a célula do buraco tem 106 dp e o poço é o anel central de 40 dp, não a célula inteira.
  * A janela de atividade vai junto pelo índice do anel (#592 A05); anel sem janela fica ocioso.
  */
 internal fun hudStarfieldWells(
     rings: Map<Int, Rect>,
     windows: Map<Int, HudStarActivityWindow> = emptyMap(),
-    maxRadiusPx: Float = Float.POSITIVE_INFINITY
+    maxRadiusPx: Float = Float.POSITIVE_INFINITY,
+    holeIndex: Int? = null,
+    holeMaxRadiusPx: Float = Float.POSITIVE_INFINITY
 ): List<HudStarfieldWell> =
     rings.toSortedMap().map { (index, ring) ->
         val window = windows[index]
+        val cap = if (index == holeIndex) holeMaxRadiusPx else maxRadiusPx
         HudStarfieldWell(
             ring.center.x,
             ring.center.y,
-            min(ring.width / 2f, maxRadiusPx),
+            min(ring.width / 2f, cap),
             activeSinceMs = window?.sinceMs,
             activeUntilMs = window?.untilMs
         )

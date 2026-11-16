@@ -3,12 +3,13 @@ package com.usagemonitor
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.ApiSource
-import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
-import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_EXTENT
+import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_SIZE
+import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_ORBIT_RADIUS
 import com.usagemonitor.presentation.ui.components.hudBlackHoleOrbit
 import kotlin.math.abs
 import kotlin.test.Test
@@ -33,8 +34,8 @@ class HudBlackHoleGeometryTest {
         val base = hudNotchSizes(completas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
         val comBuraco = hudNotchSizes(completas + minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
 
-        // Buraco = uma célula (órbita + glifo, #602) mais a linha da contagem, mais o vão até ela.
-        assertEquals(base + 236.dp + HUD_WORD_LINE + HUD_ITEM_GAP, comBuraco)
+        // Buraco = uma célula (órbita + glifo, #602), mais o vão até ela. Sem linha de contagem na coluna (C1, #612).
+        assertEquals(base + HUD_BLACK_HOLE_CELL_SIZE + HUD_ITEM_GAP, comBuraco)
     }
 
     @Test
@@ -44,24 +45,6 @@ class HudBlackHoleGeometryTest {
         val altura = hudNotchSizes(contas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
 
         assertEquals(verticalAlturaEsperadaSemBuraco(contas), altura)
-    }
-
-    @Test
-    fun `o rotulo do buraco cabe inteiro numa linha so na largura da coluna`() {
-        val completas = listOf(conta("A"), conta("B"), conta("C"))
-        val minimizadas = listOf(
-            conta("D", minimizada = true),
-            conta("E", minimizada = true),
-            conta("F", minimizada = true),
-            conta("G", minimizada = true)
-        )
-
-        val largura = hudNotchSizes(completas + minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.width
-        // "4 minimizadas" são 13 caracteres: uma linha mono inteira, não só a palavra mais longa (#600, protótipo).
-        val rotulo = hudBlackHoleCountLabel(4, AppLanguage.PT)
-        val umaLinha = wordWidth(rotulo)
-
-        assertTrue(largura >= umaLinha + HUD_NOTCH_PADDING_ACROSS * 2, "largura=$largura rotulo=$rotulo umaLinha=$umaLinha")
     }
 
     @Test
@@ -94,15 +77,18 @@ class HudBlackHoleGeometryTest {
     }
 
     @Test
-    fun `a celula do buraco mede 236 dp, a orbita de 90 dp mais o glifo de 28 dp para cada lado`() {
-        assertEquals(236.dp, HUD_BLACK_HOLE_CELL_SIZE)
+    fun `a celula do buraco mede 106 dp, a orbita de 38 dp mais o glifo de 15 dp para cada lado`() {
+        assertEquals(38.dp, HUD_BLACK_HOLE_ORBIT_RADIUS)
+        assertEquals(22.dp, HUD_BLACK_HOLE_GLYPH_SIZE)
+        assertEquals(15.dp, HUD_BLACK_HOLE_GLYPH_EXTENT)
+        assertEquals(106.dp, HUD_BLACK_HOLE_CELL_SIZE)
     }
 
     @Test
     fun `a celula contem a orbita e o glifo em qualquer instante`() {
         val tolerancia = 0.001f
         val metade = HUD_BLACK_HOLE_CELL_SIZE.value / 2f + tolerancia
-        val folga = 28f
+        val folga = 15f
         for (instante in listOf(0L, 15_000L, 37_000L, 59_999L)) {
             val orbita = hudBlackHoleOrbit((0 until 10).map { indice -> "M$indice" }, running = { false }, timeMs = instante)
             assertEquals(10, orbita.size, "uma posicao por membro no instante $instante")
@@ -120,7 +106,8 @@ class HudBlackHoleGeometryTest {
 
         val largura = hudNotchSizes(completas + minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.width
 
-        assertTrue(largura >= HUD_BLACK_HOLE_CELL_SIZE + HUD_NOTCH_PADDING_ACROSS * 2, "largura=$largura")
+        // A célula de 106 dp cabe na coluna: a largura da coluna não é menor que ela.
+        assertTrue(largura >= HUD_BLACK_HOLE_CELL_SIZE, "largura=$largura celula=$HUD_BLACK_HOLE_CELL_SIZE")
     }
 
     /** Altura de referência: a coluna sem nenhuma minimizada, medida pela mesma função. */

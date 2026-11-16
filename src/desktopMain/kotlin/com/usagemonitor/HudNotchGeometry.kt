@@ -9,7 +9,6 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudPresence
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudStripLine
-import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.domain.entity.isObservedActivitySource
 import com.usagemonitor.presentation.ui.components.STATUS_DOT_SIZE
 import com.usagemonitor.presentation.ui.components.STATUS_PILL_PADDING_HORIZONTAL
@@ -202,7 +201,7 @@ internal fun hudNotchSizes(
     val availableBalloonHeight = (maxWindowHeight - HUD_SHADOW_MARGIN * 2 -
         if (edge.isHorizontal) collapsed.height + HUD_BALLOON_GAP else 0.dp).coerceAtLeast(0.dp)
     // Com buraco, o balão do buraco é a lista (cabeçalho + linhas) ou a conta mais alta com a faixa de volta.
-    val arrangement = hudColumnArrangement(accounts, edge)
+    val arrangement = hudColumnArrangement(accounts)
     val holeHeight = if (arrangement.hasHole) {
         maxOf(
             hudBlackHoleListHeight(arrangement.holeMembers.size),
@@ -403,11 +402,14 @@ private fun horizontalCollapsed(
     fallbackLabel: String,
     compact: Boolean
 ): DpSize {
+    // As minimizadas saem da faixa e viram a célula do buraco negro (#612, A04b), no fim, como na vertical.
+    val arrangement = hudColumnArrangement(accounts)
+    val shown = arrangement.shown.map { index -> accounts[index] }
+    val hole = arrangement.hasHole
     val items = if (accounts.isEmpty()) {
         listOf(HUD_RING_SIZE + HUD_RING_TEXT_GAP + wordWidth(fallbackLabel))
     } else {
-        accounts.map { account ->
-            if (account.minimized) return@map minimizedRingWithFocusWidth(account)
+        shown.map { account ->
             if (compact) {
                 // Compacta: a cota em foco embaixo do anel, sem a palavra.
                 maxOf(HUD_RING_SIZE, stripLineWidth(account.focusLine))
@@ -419,13 +421,18 @@ private fun horizontalCollapsed(
     }
     // Só as contas: a contagem mora no balão da engrenagem (issue #269) e a
     // atualização pendente é o ponto da engrenagem (issue #291).
-    val all = items
+    val all = if (hole) items + HUD_BLACK_HOLE_CELL_SIZE else items
     val along = all.fold(0.dp) { sum, width -> sum + width } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    // A espessura é a da conta mais alta: com duas janelas o texto passa do anel.
+    // A espessura é a da conta mais alta entre as que ficam na faixa: com duas janelas o texto passa do anel.
+    // Com buraco, o piso transversal é a célula de 106 dp menos o padding (#612, A04b), como na vertical.
+    val shownAcross = shown.maxOfOrNull { account ->
+        if (compact) HUD_RING_SIZE + stripLineHeight(account.focusLine)
+        else maxOf(HUD_RING_SIZE, stripLinesHeight(account) + statusPillHeight(1))
+    } ?: 0.dp
+    val floor = if (hole) HUD_BLACK_HOLE_CELL_SIZE - HUD_NOTCH_PADDING_ACROSS * 2 else HUD_RING_SIZE
     val across = when {
         accounts.isEmpty() -> maxOf(HUD_RING_SIZE, HUD_PERCENT_LINE + HUD_WORD_LINE)
-        compact -> accounts.maxOf { account -> HUD_RING_SIZE + stripLineHeight(account.focusLine) }
-        else -> accounts.maxOf { account -> maxOf(HUD_RING_SIZE, stripLinesHeight(account) + statusPillHeight(1)) }
+        else -> maxOf(floor, shownAcross)
     }
     return DpSize(
         width = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2,
@@ -439,7 +446,7 @@ internal fun verticalCollapsed(
     compact: Boolean
 ): DpSize {
     // As minimizadas saem da coluna e viram uma célula do buraco negro (#600), no fim.
-    val arrangement = hudColumnArrangement(accounts, HudEdge.LEFT)
+    val arrangement = hudColumnArrangement(accounts)
     val shown = arrangement.shown.map { index -> accounts[index] }
     val hole = arrangement.hasHole
     // A palavra solta do estado sem contas e a pílula de cada conta (#322) têm
@@ -460,26 +467,18 @@ internal fun verticalCollapsed(
             }
         }
     }
-    // Célula do buraco (#602): órbita inteira na altura, uma linha da contagem e o vão até ela.
-    val all = if (hole) shownHeights + (HUD_BLACK_HOLE_CELL_SIZE + HUD_WORD_LINE) else shownHeights
+    // Célula do buraco (#612, C1): 106 dp na altura, sem linha da contagem, e o vão até ela.
+    val all = if (hole) shownHeights + HUD_BLACK_HOLE_CELL_SIZE else shownHeights
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
-    // O rótulo do buraco é uma linha só, inteira: a maior largura entre os idiomas, para a troca não cortar o texto.
-    val holeWordWidths = if (hole) {
-        AppLanguage.entries.map { language ->
-            wordWidth(hudBlackHoleCountLabel(arrangement.holeMembers.size, language))
-        }
-    } else {
-        emptyList()
-    }
-    val widestWord = (wordWidths + holeWordWidths).maxOrNull() ?: 0.dp
+    val widestWord = wordWidths.maxOrNull() ?: 0.dp
     val widestPercent = shown.maxOfOrNull { account ->
         when {
             compact -> stripLineWidth(account.focusLine)
             else -> account.stripLines.maxOf { line -> stripLineWidth(line) }
         }
     } ?: 0.dp
-    // Piso de 64 dp (HUD_RING_SIZE) para contas comuns; com buraco, piso da célula de 114 dp (#602), só nesta borda.
-    val floor = if (hole) HUD_BLACK_HOLE_CELL_SIZE else HUD_RING_SIZE
+    // Piso de 64 dp (HUD_RING_SIZE) para contas comuns; com buraco, piso de 90 dp (a célula de 106 dp sai na margem, #612, C1), só nesta borda.
+    val floor = if (hole) HUD_BLACK_HOLE_CELL_SIZE - HUD_NOTCH_PADDING_ACROSS * 2 else HUD_RING_SIZE
     val across = maxOf(floor, widestWord, widestPercent)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,

@@ -6,20 +6,17 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Raio da órbita em comboio do buraco negro, do centro até o centro do glifo (#602, A05; #611 escolha P1: 90 dp). */
-internal val HUD_BLACK_HOLE_ORBIT_RADIUS: Dp = 90.dp
+/** Raio da órbita em comboio do buraco negro, do centro até o centro do glifo (#602, A05; #612, ajuste do dono: 38 dp). */
+internal val HUD_BLACK_HOLE_ORBIT_RADIUS: Dp = 38.dp
 
-/** Diâmetro do disco do glifo em órbita (#611, escolha P1: 32 dp). */
-internal val HUD_BLACK_HOLE_GLYPH_SIZE: Dp = 32.dp
+/** Diâmetro do disco do glifo em órbita (#612, escolha C1: 22 dp). */
+internal val HUD_BLACK_HOLE_GLYPH_SIZE: Dp = 22.dp
 
-/** Extensão do glifo a partir do centro dele até a borda externa; entra na conta da célula (#611). */
-internal val HUD_BLACK_HOLE_GLYPH_EXTENT: Dp = 28.dp
+/** Extensão do glifo a partir do centro dele até a borda externa; entra na conta da célula (#612, C1: 15 dp). */
+internal val HUD_BLACK_HOLE_GLYPH_EXTENT: Dp = 15.dp
 
 /** Duração de uma volta completa da cabeça do trem (#602, A05). */
 internal const val HUD_BLACK_HOLE_TURN_MS: Long = 60_000L
-
-/** Teto do passo angular entre glifos vizinhos, em graus (#602, A05). */
-internal const val HUD_BLACK_HOLE_MAX_GAP_DEG: Double = 40.0
 
 /** Comprimento do arco de rastro atrás de cada glifo, em graus (#602, A05). */
 internal const val HUD_BLACK_HOLE_TRAIL_DEG: Double = 5.0
@@ -43,7 +40,7 @@ internal data class HudBlackHoleOrbitEntry(
  * Posição de cada membro do comboio no instante [timeMs] (#602, A05). Função pura: mesma entrada, mesma órbita.
  * Contas em execução tomam os primeiros slots, na ordem da lista; as ociosas seguem na mesma ordem. A cabeça
  * percorre a volta em [HUD_BLACK_HOLE_TURN_MS] a partir de -90 graus; cada slot fica um passo atrás do anterior.
- * O passo é o menor entre [HUD_BLACK_HOLE_MAX_GAP_DEG] e 360 / n, para o trem fechar a volta sem sobrepor glifos.
+ * O passo é 360 / n para todo n (#612, ajuste do dono): a volta inteira é dividida entre os membros, sem comboio agrupado.
  * Devolve uma entrada por membro, na ordem da lista de entrada.
  */
 internal fun <T> hudBlackHoleOrbit(members: List<T>, running: (T) -> Boolean, timeMs: Long): List<HudBlackHoleOrbitEntry> {
@@ -52,7 +49,7 @@ internal fun <T> hudBlackHoleOrbit(members: List<T>, running: (T) -> Boolean, ti
     val ordem = members.indices.filter { indice -> flags[indice] } + members.indices.filterNot { indice -> flags[indice] }
     val slotDe = IntArray(members.size)
     ordem.forEachIndexed { slot, indice -> slotDe[indice] = slot }
-    val passoRad = grauParaRadiano(minOf(HUD_BLACK_HOLE_MAX_GAP_DEG, 360.0 / members.size))
+    val passoRad = grauParaRadiano(360.0 / members.size)
     val fracaoDaVolta = (timeMs % HUD_BLACK_HOLE_TURN_MS).toDouble() / HUD_BLACK_HOLE_TURN_MS
     val cabecaRad = -PI / 2 + 2 * PI * fracaoDaVolta
     val trilhaRad = grauParaRadiano(HUD_BLACK_HOLE_TRAIL_DEG)

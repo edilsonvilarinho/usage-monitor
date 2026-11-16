@@ -40,7 +40,8 @@ class HudBlackHoleCellTest {
         setStrip(fourMinimized, HudEdge.LEFT)
 
         onAllNodesWithTag("hudBlackHole").assertCountEquals(1)
-        onAllNodesWithText("4 minimizadas").assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(1)
+        onAllNodesWithText("4 minimizadas").assertCountEquals(0)
         onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(0)
     }
 
@@ -53,19 +54,20 @@ class HudBlackHoleCellTest {
     }
 
     @Test
-    fun `horizontal com minimizadas nao mostra buraco e mantem as celulas de hoje`() = runDesktopComposeUiTest {
+    fun `horizontal com minimizadas mostra buraco com a contagem e nenhuma celula por conta`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.TOP)
 
-        onAllNodesWithTag("hudBlackHole").assertCountEquals(0)
-        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(4)
+        onAllNodesWithTag("hudBlackHole").assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(1)
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(0)
     }
 
     @Test
     fun `vertical com conta a meio caminho conta so as que chegaram e desenha a em voo`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.LEFT, minimizeProgress = mapOf(fourMinimized[3].targetKey to 0.5f))
 
-        onAllNodesWithText("3 minimizadas").assertCountEquals(1)
-        onAllNodesWithText("4 minimizadas").assertCountEquals(0)
+        onAllNodesWithContentDescription("3 minimizadas", substring = true).assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(0)
         onAllNodesWithTag("hudBlackHoleFlying").assertCountEquals(1)
     }
 
@@ -73,16 +75,17 @@ class HudBlackHoleCellTest {
     fun `vertical com conta que chegou ao buraco conta as quatro e nao desenha voo`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.LEFT, minimizeProgress = mapOf(fourMinimized[3].targetKey to 1f))
 
-        onAllNodesWithText("4 minimizadas").assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(1)
         onAllNodesWithTag("hudBlackHoleFlying").assertCountEquals(0)
     }
 
     @Test
-    fun `horizontal com conta a meio caminho nao desenha buraco nem voo`() = runDesktopComposeUiTest {
+    fun `horizontal com conta a meio caminho conta so as que chegaram e desenha a em voo`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.TOP, minimizeProgress = mapOf(fourMinimized[3].targetKey to 0.5f))
 
-        onAllNodesWithTag("hudBlackHoleFlying").assertCountEquals(0)
-        onAllNodesWithTag("hudBlackHole").assertCountEquals(0)
+        onAllNodesWithContentDescription("3 minimizadas", substring = true).assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(0)
+        onAllNodesWithTag("hudBlackHoleFlying").assertCountEquals(1)
     }
 
     @Test
@@ -141,12 +144,12 @@ class HudBlackHoleCellTest {
     }
 
     @Test
-    fun `glifo em orbita e disco de 32 dp com marca de 20 dp`() = runDesktopComposeUiTest {
+    fun `glifo em orbita e disco de 22 dp com marca de 15 dp`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.LEFT)
 
         onAllNodesWithTag("hudBlackHoleOrbitMark", useUnmergedTree = true).assertCountEquals(4)
-        onAllNodesWithTag("hudBlackHoleOrbitMark", useUnmergedTree = true).onFirst().assertWidthIsEqualTo(20.dp)
-        onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).onFirst().assertWidthIsEqualTo(32.dp)
+        onAllNodesWithTag("hudBlackHoleOrbitMark", useUnmergedTree = true).onFirst().assertWidthIsEqualTo(15.dp)
+        onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).onFirst().assertWidthIsEqualTo(22.dp)
     }
 
     @Test
@@ -183,6 +186,7 @@ class HudBlackHoleCellTest {
                     language = AppLanguage.PT,
                     onRingHovered = {},
                     onHoleClicked = {},
+                    onHoleHovered = {},
                     onRingRefresh = {},
                     onItemPlaced = { _, _ -> },
                     onRingPlaced = { _, _ -> }
