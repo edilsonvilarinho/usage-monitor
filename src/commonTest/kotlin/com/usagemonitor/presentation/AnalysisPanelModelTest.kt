@@ -8,6 +8,7 @@ import com.usagemonitor.presentation.ui.AnalysisFact
 import com.usagemonitor.presentation.ui.AnalysisHourBar
 import com.usagemonitor.presentation.ui.AnalysisIntervalRowModel
 import com.usagemonitor.presentation.ui.AnalysisPanelModel
+import com.usagemonitor.presentation.ui.AnalysisPaceComparatorModel
 import com.usagemonitor.presentation.ui.analysisBarAt
 import com.usagemonitor.presentation.ui.analysisAxisMax
 import com.usagemonitor.presentation.ui.analysisBarFraction
@@ -17,6 +18,7 @@ import com.usagemonitor.presentation.ui.PaceLegendEntry
 import com.usagemonitor.presentation.ui.PaceLegendTone
 import com.usagemonitor.presentation.ui.components.AppChartKeyStyle
 import com.usagemonitor.presentation.ui.components.AppTone
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -183,5 +185,72 @@ class AnalysisPanelModelTest {
             "tok/s na última hora: sem medição · índice do Codex às 12:20",
             AnalysisPanelModel.speedLine(analysis.copy(modelSpeeds = emptyList(), throughputIndexedAt = analysis.generatedAt - 10.minutes), AppLanguage.PT)
         )
+    }
+
+    private fun Float?.pct(): Int? = this?.let { (it * 100).roundToInt() }
+
+    @Test
+    fun `pace comparator scale steps 1-2-3-5 times a power of ten above the highest pace`() {
+        assertEquals(30.0, AnalysisPaceComparatorModel.scaleCeiling(29.0))
+        assertEquals(3.0, AnalysisPaceComparatorModel.scaleCeiling(2.7))
+        assertEquals(5.0, AnalysisPaceComparatorModel.scaleCeiling(5.0))
+        assertEquals(1.0, AnalysisPaceComparatorModel.scaleCeiling(null))
+    }
+
+    @Test
+    fun `pace comparator puts both paces and the safe marker on one scale`() {
+        // 5h: teto 30 (maior dos três é o seguro, 25,3); média 17,7 → 59%; última hora 14 → 47%; seguro → marca em 84%.
+        val comparator = AnalysisPaceComparatorModel.of(analysis.fiveHour!!, AppLanguage.PT)
+        assertEquals("Ritmo · mesma escala · 0 a 30 %/h", comparator.eyebrow)
+        assertEquals("seguro 25 %/h", comparator.safeCaption)
+        assertEquals(84, comparator.marker.pct())
+        assertEquals(listOf("Média", "Última hora"), comparator.rows.map { it.label })
+        assertEquals(listOf("18 %/h", "14 %/h"), comparator.rows.map { it.value })
+        assertEquals(listOf(59, 47), comparator.rows.map { it.fraction.pct() })
+        assertEquals(listOf("abaixo do seguro", "abaixo do seguro"), comparator.rows.map { it.verdict })
+    }
+
+    @Test
+    fun `pace comparator says above the safe pace only when the pace is over it`() {
+        val comparator = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(paceAverage = 27.0), AppLanguage.PT)
+        assertEquals(listOf("acima do seguro", "abaixo do seguro"), comparator.rows.map { it.verdict })
+        assertEquals(listOf(true, false), comparator.rows.map { it.aboveSafe })
+        // Igualdade com o seguro cai em "abaixo", como no protótipo p05.
+        val equal = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(paceAverage = 25.3), AppLanguage.PT)
+        assertEquals("abaixo do seguro", equal.rows[0].verdict)
+    }
+
+    @Test
+    fun `pace comparator shows a null pace as a dash without bar or word`() {
+        val lastHour = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(paceNow = null), AppLanguage.PT).rows[1]
+        assertEquals("—", lastHour.value)
+        assertNull(lastHour.fraction)
+        assertNull(lastHour.verdict)
+    }
+
+    @Test
+    fun `pace comparator without a safe pace has no marker and no word`() {
+        // Sem seguro, o teto sai do maior ritmo medido (17,0 → 20): média 85%, última hora 70%.
+        val comparator = AnalysisPaceComparatorModel.of(analysis.fiveHour!!.copy(safePace = null, paceAverage = 17.0), AppLanguage.PT)
+        assertEquals("Ritmo · mesma escala · 0 a 20 %/h", comparator.eyebrow)
+        assertNull(comparator.marker)
+        assertNull(comparator.safeCaption)
+        assertEquals(listOf(85, 70), comparator.rows.map { it.fraction.pct() })
+        assertEquals(listOf(null, null), comparator.rows.map { it.verdict })
+    }
+
+    @Test
+    fun `pace comparator writes one decimal below ten in both languages`() {
+        // Protótipo p05: 2,7 e 2,0 com teto 3; seguro 2,2 → marca em 73%.
+        val window = analysis.weekly!!.copy(paceAverage = 2.7, paceNow = 2.0, safePace = 2.2)
+        val pt = AnalysisPaceComparatorModel.of(window, AppLanguage.PT)
+        assertEquals("Ritmo · mesma escala · 0 a 3 %/h", pt.eyebrow)
+        assertEquals(listOf("2,7 %/h", "2,0 %/h"), pt.rows.map { it.value })
+        assertEquals(listOf("acima do seguro", "abaixo do seguro"), pt.rows.map { it.verdict })
+        assertEquals(73, pt.marker.pct())
+        val en = AnalysisPaceComparatorModel.of(window, AppLanguage.EN)
+        assertEquals("Pace · same scale · 0 to 3 %/h", en.eyebrow)
+        assertEquals(listOf("2.7 %/h", "2.0 %/h"), en.rows.map { it.value })
+        assertEquals(listOf("above the safe pace", "below the safe pace"), en.rows.map { it.verdict })
     }
 }

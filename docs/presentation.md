@@ -407,3 +407,12 @@ aviso: a tooltip lista todos, com bullet só a partir do segundo.
 - **As frases inteiras vão no `contentDescription` do ícone.** Sem hover a tooltip não existe na
   árvore, então é por ela que leitor de tela e testes chegam ao aviso — os dois asserts de notice
   em `ComponentTest` usam `onNodeWithContentDescription(..., substring = true)`.
+
+## Análise: comparador de ritmo (#610)
+
+Plano em `docs/planos/analise-comparador-ritmo-610-execucao.md`; protótipo `prototipos/issue-610/p05-comparador-ritmo/index.html`.
+
+- **Comparador** no card de cada janela, entre a diagonal e os fatos: linhas "Média" e "Última hora" em barra
+  `AppProgressTrack` na **mesma escala** (teto 1-2-3-5 × 10^k do maior ritmo, `AnalysisPaceComparatorModel.scaleCeiling`).
+- **Marca** = ritmo seguro nessa escala; o texto ao lado ("seguro 25 %/h") diz o que é. Palavra "acima do seguro"/"abaixo do seguro" (igualdade cai em "abaixo").
+- `null` (não medido) mostra "—" sem barra e sem palavra; sem ritmo seguro, sem marca e sem palavra.

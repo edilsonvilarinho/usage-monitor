@@ -110,6 +110,28 @@ class AnalysisScreenTest {
         onNodeWithText("tok/s na última hora: claude-sonnet 71 · claude-opus 48").performScrollTo().assertIsDisplayed()
     }
 
+    @Test
+    fun `pace comparator puts both paces on one scale with the safe marker and says above or below`() = runDesktopComposeUiTest(width = 1100, height = 900) {
+        setContent {
+            ScreenTestTheme {
+                Box(Modifier.size(1000.dp, 860.dp)) {
+                    AnalysisContent(
+                        state = AnalysisUiState.Success(analysisFor(AnalysisPeriod.HOURS_24)),
+                        accountLabel = "Anthropic · Padrão",
+                        language = AppLanguage.PT
+                    )
+                }
+            }
+        }
+
+        // #610, D2/D3: 5h com seguro 25 %/h na escala comum 0 a 30 %/h; semanal com escala 0 a 2 %/h.
+        onNodeWithText("Ritmo · mesma escala · 0 a 30 %/h").assertIsDisplayed()
+        onNodeWithText("seguro 25 %/h").assertIsDisplayed()
+        onNodeWithText("Ritmo · mesma escala · 0 a 2 %/h").assertIsDisplayed()
+        // Média e última hora de cada janela estão abaixo do seguro: quatro palavras, sem depender da cor.
+        onAllNodesWithText("abaixo do seguro").assertCountEquals(4)
+    }
+
     /** A hora sob o ponteiro: pontos e vazão numa bolha; a hora sem leitura diz que não foi medida. */
     @Test
     fun `hovering an hour shows its points and throughput`() = runDesktopComposeUiTest(width = 1100, height = 900) {

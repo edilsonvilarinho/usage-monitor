@@ -58,6 +58,10 @@ veredito repetindo a pílula. Direção escolhida pelo usuário: **P05 — Compa
 | A01 | `explorer` 610-X2 (somente leitura) | fatos acima; escolha P05 e D1/D2 pelo usuário em 2026-11-16 |
 | A02 | Vermelho (stub com todo estilo `SOLID`): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.PaceDiagonalModelTest"` | `PaceDiagonalModelTest.kt:28 expected:<[… style=DASHED …]> but was:<[… style=SOLID …]>` |
 | A02 | Verde: `desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*Analysis*" --tests "com.usagemonitor.ui.*Pace*" --tests "com.usagemonitor.ui.*ChartKey*"` | exit 0; `PaceDiagonalModelTest` 3/3, `AppChartKeyTest` 1/1, `PaceLabelPlacementTest` 4/4 |
+| A03 | Vermelho (stub do modelo): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.AnalysisPanelModelTest"` | `:235 expected:<[Ritmo · mesma escala · 0 a 20 %/h]> but was:<[]>`; `:194 expected:<30.0> but was:<0.0>`; `:216 expected:<[acima do seguro, abaixo do seguro]> but was:<[null, null]>` |
+| A03 | Vermelho de tela (comparador fora do card): `desktopTest --tests "com.usagemonitor.ui.AnalysisScreenTest"` | `AssertionError at AnalysisScreenTest.kt:114` (nó do comparador ausente) |
+| A03 | Verde: `desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*Analysis*"` | exit 0; `AnalysisPanelModelTest` 16/16, `AnalysisScreenTest` 7/7 |
+| A03 | Decisões da entrega; mockup 9d por captura headless | ritmo igual ao seguro = "abaixo do seguro"; sem ritmo positivo, escala 1 %/h; marca é posição relativa; mockup com comparador nos cards e zonas na chave |
 | A02 | Decisões da entrega | linha segura em `AppGargantuaTokens.gold` (como o gráfico); legenda inclui as zonas acima/abaixo (`ZONE`); medidas da amostra fixas e registradas no contrato |
 
 ## Problemas em aberto e riscos

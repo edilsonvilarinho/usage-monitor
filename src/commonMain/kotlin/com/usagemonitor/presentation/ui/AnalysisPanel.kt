@@ -59,7 +59,8 @@ internal fun AnalysisPanel(analysis: SessionAnalysis, language: AppLanguage, mod
                 windows.forEach { window ->
                     // A semanal usa o acento da saída, como no histórico; a 5h, o da fonte.
                     val lineColor = if (window.periodType == PeriodType.WEEKLY) accents.output else accentColorFor(analysis.source, accents)
-                    AnalysisWindowCard(AnalysisPanelModel.windowCard(window, analysis.generatedAt, language), lineColor, language, Modifier.weight(1f))
+                    val card = AnalysisPanelModel.windowCard(window, analysis.generatedAt, language)
+                    AnalysisWindowCard(card, AnalysisPaceComparatorModel.of(window, language), lineColor, language, Modifier.weight(1f))
                 }
             }
         }
@@ -98,7 +99,7 @@ private fun AnalysisBarsBlock(analysis: SessionAnalysis, language: AppLanguage, 
 }
 
 @Composable
-private fun AnalysisWindowCard(model: AnalysisWindowCardModel, lineColor: Color, language: AppLanguage, modifier: Modifier) {
+private fun AnalysisWindowCard(model: AnalysisWindowCardModel, comparator: PaceComparatorModel, lineColor: Color, language: AppLanguage, modifier: Modifier) {
     AppDataSurface(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Text(model.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
@@ -111,6 +112,7 @@ private fun AnalysisWindowCard(model: AnalysisWindowCardModel, lineColor: Color,
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         PaceDiagonalChart(model.diagonal, lineColor, language)
+        AnalysisPaceComparator(comparator)
         AnalysisFactsGrid(model.facts)
     }
 }
