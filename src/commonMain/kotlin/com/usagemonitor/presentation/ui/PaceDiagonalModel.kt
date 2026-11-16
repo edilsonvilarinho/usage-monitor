@@ -4,6 +4,7 @@ import com.usagemonitor.domain.entity.ACTIVITY_TIME_ZONE_ID
 import com.usagemonitor.domain.entity.AnalysisWindowView
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PacePathPoint
+import com.usagemonitor.domain.entity.PeriodType
 import com.usagemonitor.domain.entity.QuotaWindowPacePath
 import com.usagemonitor.domain.entity.elapsedFractionOf
 import com.usagemonitor.domain.entity.exhaustionTimeOf
@@ -71,15 +72,21 @@ internal object PaceDiagonalLabels {
 
 internal object PaceDiagonalModels {
 
+    /** Duração do eixo de uma janela fechada: a 5 h e a semanal de 7 dias. */
+    private const val FIVE_HOURS_MILLIS = 5L * 60 * 60 * 1000
+    private const val WEEK_MILLIS = 7L * 24 * 60 * 60 * 1000
+
     /**
      * A janela aberta da "Análise": o caminho dela, as anteriores atrás e a projeção no ritmo
      * da última hora (sem ele, no médio) — o mesmo ritmo de [AnalysisWindowView.projectedAtReset].
-     * `null` sem início e reinício conhecidos: sem eles não há eixo do tempo.
+     * Sem início ou sem reinício (janela fechada, ou sem fração do tempo) não há linha de agora nem
+     * projeção: o modelo sai com as anteriores atrás e o eixo de duração, ver [closedWindowModel].
      */
-    fun forWindow(window: AnalysisWindowView, now: Instant, language: AppLanguage, description: String): PaceDiagonalModel? {
-        val startsAt = window.startsAt ?: return null
-        val resetsAt = window.resetsAt ?: return null
-        val fraction = elapsedFractionOf(startsAt, resetsAt, now) ?: return null
+    fun forWindow(window: AnalysisWindowView, now: Instant, language: AppLanguage, description: String): PaceDiagonalModel {
+        val startsAt = window.startsAt
+        val resetsAt = window.resetsAt
+        val fraction = if (startsAt != null && resetsAt != null) elapsedFractionOf(startsAt, resetsAt, now) else null
+        if (startsAt == null || resetsAt == null || fraction == null) return closedWindowModel(window, language, description)
         val nowPoint = PacePathPoint(fraction, window.percent.toDouble())
         // O caminho termina na leitura de agora: o percentual do card pode ser mais novo que o último ponto lido.
         val path = window.path?.points.orEmpty()
@@ -115,6 +122,25 @@ internal object PaceDiagonalModels {
             exhaustionLabel = eta?.let { at -> localized(language, "esgota ${weekdayClock(at, language)}", "runs out ${weekdayClock(at, language)}") },
             yMax = maxOf(100.0, (projected ?: 0).toDouble()),
             legend = legend
+        )
+    }
+
+    /**
+     * Janela sem início ou sem reinício: sem linha de agora nem projeção. Fica o eixo de duração da
+     * janela (5 h, ou 7 dias na semanal) e as anteriores atrás, se houver.
+     */
+    private fun closedWindowModel(window: AnalysisWindowView, language: AppLanguage, description: String): PaceDiagonalModel {
+        val previous = window.previousPaths.map { previousPath -> previousPath.points }
+        val lengthMillis = if (window.periodType == PeriodType.WEEKLY) WEEK_MILLIS else FIVE_HOURS_MILLIS
+        return PaceDiagonalModel(
+            current = emptyList(),
+            previous = previous,
+            projection = emptyList(),
+            projectionCritical = false,
+            pointLabel = null,
+            axisLabels = relativeAxisLabels(lengthMillis, language),
+            description = description,
+            legend = if (previous.isEmpty()) emptyList() else listOf(previousWindowsLegend(previous.size, language))
         )
     }
 

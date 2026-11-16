@@ -16,7 +16,7 @@ class PaceDiagonalModelTest {
     @Test
     fun `chart labels say where now is and how the window ends`() {
         // Lida às 12:30 BRT; reinício 14:00; projeção 83% no reinício, sem esgotar.
-        val fiveHour = PaceDiagonalModels.forWindow(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.PT, "descrição")!!
+        val fiveHour = PaceDiagonalModels.forWindow(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.PT, "descrição")
         assertEquals("agora 12:30", fiveHour.nowLabel)
         assertEquals("83 % no reinício", fiveHour.endLabel)
         assertNull(fiveHour.exhaustionLabel)
@@ -27,16 +27,16 @@ class PaceDiagonalModelTest {
         )
 
         // Esgota às 13:46: sem ponto final, rótulo no cruzamento dos 100%.
-        val full = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.PT, "descrição")!!
+        val full = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.PT, "descrição")
         assertEquals("esgota ter 13:46", full.exhaustionLabel)
         assertNull(full.endLabel)
 
-        val english = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.EN, "description")!!
+        val english = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 100, paceNow = 30.0), analysis.generatedAt, AppLanguage.EN, "description")
         assertEquals("runs out Tue 13:46", english.exhaustionLabel)
         assertEquals("now 12:30", english.nowLabel)
 
         // Projeção acima de 100%: o eixo Y vai até ela.
-        val above = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 150), analysis.generatedAt, AppLanguage.PT, "descrição")!!
+        val above = PaceDiagonalModels.forWindow(analysis.fiveHour!!.copy(projectedAtReset = 150), analysis.generatedAt, AppLanguage.PT, "descrição")
         assertEquals(150.0, above.yMax)
     }
 
@@ -53,11 +53,11 @@ class PaceDiagonalModelTest {
     fun `legend counts the previous windows drawn in the chosen language`() {
         val previous = analysis.fiveHour!!.previousPaths.single()
         val twelve = analysis.fiveHour!!.copy(previousPaths = List(12) { previous })
-        val pt = PaceDiagonalModels.forWindow(twelve, analysis.generatedAt, AppLanguage.PT, "descrição")!!
+        val pt = PaceDiagonalModels.forWindow(twelve, analysis.generatedAt, AppLanguage.PT, "descrição")
         assertContains(pt.legend, "12 janelas anteriores")
-        val en = PaceDiagonalModels.forWindow(twelve, analysis.generatedAt, AppLanguage.EN, "description")!!
+        val en = PaceDiagonalModels.forWindow(twelve, analysis.generatedAt, AppLanguage.EN, "description")
         assertContains(en.legend, "12 previous windows")
-        val one = PaceDiagonalModels.forWindow(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.EN, "description")!!
+        val one = PaceDiagonalModels.forWindow(analysis.fiveHour!!, analysis.generatedAt, AppLanguage.EN, "description")
         assertContains(one.legend, "1 previous window")
     }
 }
