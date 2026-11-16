@@ -174,6 +174,7 @@ internal fun HudRingStrip(
                 val holeIndex = accounts.size
                 HudBlackHoleCell(
                     count = arrangement.holeMembers.size,
+                    members = arrangement.holeMembers.map { index -> accounts[index] },
                     language = language,
                     onClick = onHoleClicked,
                     onItemPlaced = { coordinates -> onItemPlaced(holeIndex, coordinates) },

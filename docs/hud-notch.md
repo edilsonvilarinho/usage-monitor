@@ -642,6 +642,12 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
 - **Órbita (#602).** `hudBlackHoleOrbit` (`HudBlackHoleOrbit.kt`, quadro puro) põe os membros num comboio: cabeça em
   −π/2 + 2π·t/60 s, membro k a k·espaçamento atrás, espaçamento = min(40°, 360°/n), raio 45 dp, arco de 5° atrás de
   cada um; as contas em execução ocupam as primeiras vagas, na ordem de publicação.
+  `HudBlackHoleOrbitGlyphs` desenha cada membro como miniatura de 24 dp do anel da conta (arcos de cota e marca em
+  `AppGargantuaTokens.mark`) e o arco de 5° em 10 segmentos: ocioso em `onSurface` alfa 0,2 e 0,8 dp; em execução em
+  `AppGargantuaTokens.lens` (espelho de `--gargantua-lens`; `gold` no claro) alfa 0,85 e 1,6 dp, mais halo radial de
+  18 dp e anel de 1 dp em 14 dp. A conta em execução diz "em execução" na descrição, então a cor não informa sozinha.
+  O relógio só corre com `AppMotionPolicy.continuous` e sem "reduzir animações" (senão t = 0). Os glifos ficam na
+  árvore não mesclada; a célula segue um botão só na semântica mesclada.
 - **Célula.** `HudBlackHoleCell` desenha o anel Gargantua sem arcos de cota e a contagem em `label*`: PT "1 minimizada"
   / "4 minimizadas", EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem
   `testTag("hudBlackHole")` e descrição semântica com o rótulo. O campo estelar trata o buraco como um anel.

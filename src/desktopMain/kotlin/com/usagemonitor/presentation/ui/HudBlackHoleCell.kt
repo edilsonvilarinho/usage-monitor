@@ -29,10 +29,12 @@ import com.usagemonitor.presentation.ui.components.AppGargantuaRing
  * Buraco negro (#600): as contas minimizadas da coluna vertical viram um anel sem arcos de cota
  * e a contagem numa linha só, com altura de [HUD_WORD_LINE]. Altura total = anel + linha, a da geometria.
  * Clique (ou Enter com foco) chama [onClick], que alterna a lista; hover não abre (#602, A02).
+ * Órbita (#602, A06): um glifo por conta de [members] gira no comboio em volta do anel.
  */
 @Composable
 internal fun HudBlackHoleCell(
     count: Int,
+    members: List<HudAccount>,
     language: AppLanguage,
     onClick: () -> Unit,
     onItemPlaced: (LayoutCoordinates) -> Unit,
@@ -59,6 +61,7 @@ internal fun HudBlackHoleCell(
                 size = HUD_RING_SIZE,
                 stroke = HUD_RING_STROKE
             )
+            HudBlackHoleOrbitGlyphs(members = members, language = language)
         }
         Text(
             text = label,
