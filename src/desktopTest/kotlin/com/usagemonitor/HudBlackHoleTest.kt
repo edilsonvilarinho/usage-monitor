@@ -19,7 +19,7 @@ class HudBlackHoleTest {
     fun `vertical sem minimizada nao tem buraco e mantem todas as contas`() {
         val contas = listOf(conta("A"), conta("B"))
 
-        val arranjo = hudColumnArrangement(contas, HudEdge.LEFT)
+        val arranjo = hudColumnArrangement(contas)
 
         assertEquals(listOf(0, 1), arranjo.shown)
         assertEquals(emptyList(), arranjo.holeMembers)
@@ -30,7 +30,7 @@ class HudBlackHoleTest {
     fun `vertical com uma minimizada tira so ela da coluna e a leva ao buraco`() {
         val contas = listOf(conta("A"), conta("B", minimizada = true), conta("C"))
 
-        val arranjo = hudColumnArrangement(contas, HudEdge.RIGHT)
+        val arranjo = hudColumnArrangement(contas)
 
         assertEquals(listOf(0, 2), arranjo.shown)
         assertEquals(listOf(1), arranjo.holeMembers)
@@ -48,7 +48,7 @@ class HudBlackHoleTest {
             conta("F", minimizada = true)
         )
 
-        val arranjo = hudColumnArrangement(contas, HudEdge.LEFT)
+        val arranjo = hudColumnArrangement(contas)
 
         assertEquals(listOf(1, 4), arranjo.shown)
         assertEquals(listOf(0, 2, 3, 5), arranjo.holeMembers)
@@ -65,28 +65,26 @@ class HudBlackHoleTest {
             conta("E")
         )
 
-        val arranjo = hudColumnArrangement(contas, HudEdge.LEFT)
+        val arranjo = hudColumnArrangement(contas)
 
         assertEquals(listOf(1, 4), arranjo.shown)
         assertEquals(listOf(0, 2, 3), arranjo.holeMembers)
     }
 
     @Test
-    fun `borda horizontal fica inalterada mesmo com minimizadas`() {
+    fun `arranjo do buraco nao depende da borda, a horizontal manda minimizadas ao buraco (A04a, #612)`() {
         val contas = listOf(conta("A", minimizada = true), conta("B"), conta("C", automatica = true))
 
-        for (borda in listOf(HudEdge.TOP, HudEdge.BOTTOM)) {
-            val arranjo = hudColumnArrangement(contas, borda)
+        val arranjo = hudColumnArrangement(contas)
 
-            assertEquals(listOf(0, 1, 2), arranjo.shown, "borda $borda")
-            assertEquals(emptyList(), arranjo.holeMembers, "borda $borda")
-            assertFalse(arranjo.hasHole, "borda $borda")
-        }
+        assertEquals(listOf(1), arranjo.shown)
+        assertEquals(listOf(0, 2), arranjo.holeMembers)
+        assertTrue(arranjo.hasHole)
     }
 
     @Test
     fun `lista vazia nao gera coluna nem buraco`() {
-        val arranjo = hudColumnArrangement(emptyList(), HudEdge.LEFT)
+        val arranjo = hudColumnArrangement(emptyList())
 
         assertEquals(emptyList(), arranjo.shown)
         assertEquals(emptyList(), arranjo.holeMembers)
@@ -120,7 +118,7 @@ class HudBlackHoleTest {
     fun `conta a meio voo nao entra no buraco nem na contagem, so ao chegar em 1`() {
         val contas = listOf(conta("A"), conta("B", minimizada = true), conta("C", minimizada = true))
 
-        val voo = hudColumnArrangement(contas, HudEdge.LEFT, mapOf(chave("B") to 0.5f, chave("C") to 1f))
+        val voo = hudColumnArrangement(contas,mapOf(chave("B") to 0.5f, chave("C") to 1f))
 
         assertEquals(listOf(2), voo.holeMembers, "contagem do buraco")
         assertEquals(listOf(0, 1), voo.shown, "a conta em voo ainda ocupa a coluna")
@@ -131,7 +129,7 @@ class HudBlackHoleTest {
     fun `restaurar tira a conta do buraco e da contagem no inicio do voo`() {
         val contas = listOf(conta("A"), conta("B"), conta("C", minimizada = true))
 
-        val volta = hudColumnArrangement(contas, HudEdge.LEFT, mapOf(chave("B") to 1f))
+        val volta = hudColumnArrangement(contas,mapOf(chave("B") to 1f))
 
         assertEquals(listOf(2), volta.holeMembers, "B sai da contagem no primeiro quadro")
         assertEquals(listOf(1), volta.flying, "B voa de volta ao seu lugar")
@@ -145,7 +143,7 @@ class HudBlackHoleTest {
         assertEquals(300f, hudSinkFrame(progresso, fromAlong = 100f, toAlong = 300f).along)
 
         val contas = listOf(conta("A"), conta("B", minimizada = true))
-        val arranjo = hudColumnArrangement(contas, HudEdge.LEFT, mapOf(chave("B") to progresso))
+        val arranjo = hudColumnArrangement(contas,mapOf(chave("B") to progresso))
 
         assertEquals(listOf(1), arranjo.holeMembers)
         assertEquals(emptyList(), arranjo.flying)

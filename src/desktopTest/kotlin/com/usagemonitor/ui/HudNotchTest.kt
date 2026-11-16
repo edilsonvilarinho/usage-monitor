@@ -354,17 +354,16 @@ class HudNotchTest {
 
     // ------------------------------------------------------------ minimizada (#576)
 
-    /** Minimizada: anel de 28 dp e a cota em foco ao lado; a palavra e a pílula saem. */
+    /** Minimizada na borda de cima (#612): a conta vai para o buraco; a faixa não mostra anel nem cota, e a pílula sai. */
     @Test
-    fun `conta minimizada mostra so a cota em foco e anel de 28 dp`() = runDesktopComposeUiTest {
+    fun `conta minimizada na borda de cima vai para o buraco e a faixa nao mostra anel nem cota`() = runDesktopComposeUiTest {
         setContent { notch(list = listOf(accounts.first().copy(minimized = true))) }
 
-        onNodeWithText("5h 28%").assertIsDisplayed()
+        onNodeWithTag("hudBlackHole").assertIsDisplayed()
+        onNodeWithText("5h 28%").assertDoesNotExist()
         onNodeWithText("Crítico").assertDoesNotExist()
         onNodeWithTag(HUD_STATUS_PILL_TEST_TAG).assertDoesNotExist()
-        val ring = onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(28.dp, ring.width, "largura do anel minimizado")
-        assertEquals(28.dp, ring.height, "altura do anel minimizado")
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(0)
     }
     /** Buraco na lateral (#600 A04, #602): a célula tem altura exata de célula + linha da contagem; largura não passa da geometria. */
     @Test
@@ -378,42 +377,63 @@ class HudNotchTest {
         assertTrue(hole.width <= geometry.width, "largura do buraco (${hole.width}) passa da geometria (${geometry.width}), lateral")
     }
 
-    /** Célula minimizada na borda de cima: a faixa é horizontal, então a largura é a da geometria. */
+    /** Buraco na borda de cima (A04b, #612): a célula de 106 dp é a da lateral; a largura cabe na geometria horizontal. */
     @Test
-    fun `celula minimizada na borda de cima mede a largura com a linha de foco`() = runDesktopComposeUiTest {
+    fun `buraco na borda de cima mede a celula de 106 dp, sem linha de foco`() = runDesktopComposeUiTest {
         val account = accounts.first().copy(minimized = true)
         setContent { notch(edge = HudEdge.TOP, list = listOf(account)) }
 
-        val cell = onNodeWithTag(HUD_RING_ITEM_TEST_TAG).getUnclippedBoundsInRoot()
-        assertEquals(minimizedRingWithFocusWidth(account), cell.width, "largura da célula minimizada, topo")
+        val hole = onNodeWithTag("hudBlackHole").getUnclippedBoundsInRoot()
+        val geometry = hudNotchSizes(listOf(account), HudEdge.TOP, "Carregando", false).collapsed
+        assertEquals(HUD_BLACK_HOLE_CELL_SIZE, hole.height, "altura do buraco, topo")
+        assertTrue(hole.width <= geometry.width, "largura do buraco (${hole.width}) passa da geometria (${geometry.width}), topo")
     }
 
-    /** Transição (#576, A05b): o anel vai de 64 a 28 dp em `hudMinimizeMillis`; o notch segura o tamanho cheio até o fim. */
+    /** Clique no buraco na borda de cima (A04c, #612): a lista abre com a conta minimizada, que sai da faixa. */
     @Test
-    fun `minimizar anima o anel e o notch so encolhe no fim da transicao`() = runDesktopComposeUiTest {
-        var minimized by mutableStateOf(false)
-        val full = accounts.first()
-        val fullWidth = hudNotchSizes(listOf(full), HudEdge.TOP, "Carregando", false).collapsed.width
-        val minimizedWidth = hudNotchSizes(listOf(full.copy(minimized = true)), HudEdge.TOP, "Carregando", false).collapsed.width
-        assertTrue(minimizedWidth < fullWidth, "precondição: o notch minimizado é menor que o cheio")
+    fun `top edge click on the hole opens the list`()= runDesktopComposeUiTest {
+        val minimized = accounts.first().copy(minimized = true)
+        val visible = accounts[1]
+        // Clique real só existe com o notch aberto pelo hover: o balão da lista depende de `open` (HudNotch.kt).
+        setContent { notch(expanded = true, edge = HudEdge.TOP, list = listOf(minimized, visible)) }
+
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(1)
+        onNodeWithTag("hudBlackHole").performClick()
+        waitForIdle()
+
+        assertTrue(
+            onAllNodesWithText(minimized.label, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "nome '${minimized.label}' da conta minimizada deveria aparecer na lista do buraco, topo"
+        )
+    }
+
+    /** Transição (#576, A05b; #612): com o buraco já existente, a conta voa até ele em `hudMinimizeMillis`; o notch segura a largura de antes até o fim. */
+    @Test
+    fun `minimizar anima o voo ao buraco e o notch so encolhe no fim da transicao`() = runDesktopComposeUiTest {
+        var targetMinimized by mutableStateOf(false)
+        val holder = accounts.first().copy(minimized = true)
+        val target = accounts[1]
+        val preWidth = hudNotchSizes(listOf(holder, target), HudEdge.TOP, "Carregando", false).collapsed.width
+        val finalWidth = hudNotchSizes(listOf(holder, target.copy(minimized = true)), HudEdge.TOP, "Carregando", false).collapsed.width
+        assertTrue(finalWidth != preWidth, "precondição: a segunda conta minimizada muda a largura do notch")
         mainClock.autoAdvance = false
-        setContent { notch(list = listOf(full.copy(minimized = minimized))) }
+        setContent { notch(list = listOf(holder, target.copy(minimized = targetMinimized))) }
         mainClock.advanceTimeByFrame()
-        minimized = true
+        targetMinimized = true
         mainClock.advanceTimeByFrame()
         mainClock.advanceTimeBy(hudMinimizeMillis(motionReduced = false) / 2L)
-        val midRing = ringWidthOf()
-        assertTrue(midRing > 28.dp && midRing < HUD_RING_SIZE, "anel no meio da transição: $midRing")
-        assertEquals(fullWidth, notchWidthOf(), "o notch segura o tamanho cheio no meio da transição")
+        assertEquals(1, onAllNodesWithTag("hudBlackHoleFlying", useUnmergedTree = true).fetchSemanticsNodes().size, "voo no meio da transição")
+        assertEquals(preWidth, notchWidthOf(), "o notch segura a largura de antes no meio da transição")
 
         mainClock.advanceTimeBy(hudMinimizeMillis(motionReduced = false).toLong())
-        assertEquals(28.dp, ringWidthOf(), "anel depois da transição")
-        assertEquals(minimizedWidth, notchWidthOf(), "notch depois da transição")
+        onAllNodesWithTag("hudBlackHoleFlying", useUnmergedTree = true).assertCountEquals(0)
+        onNodeWithTag("hudBlackHole").assertIsDisplayed()
+        assertEquals(finalWidth, notchWidthOf(), "notch depois da transição")
     }
 
-    /** Com "reduzir animações" o corte é seco: o anel já está em 28 dp no primeiro quadro depois da troca. */
+    /** Com "reduzir animações" o corte é seco: a conta já está no buraco no primeiro quadro depois da troca (#612). */
     @Test
-    fun `minimizar com animacao reduzida corta para 28 dp no primeiro quadro`() = runDesktopComposeUiTest {
+    fun `minimizar com animacao reduzida corta para o buraco no primeiro quadro`() = runDesktopComposeUiTest {
         var minimized by mutableStateOf(false)
         val full = accounts.first()
         mainClock.autoAdvance = false
@@ -421,11 +441,9 @@ class HudNotchTest {
         mainClock.advanceTimeByFrame()
         minimized = true
         mainClock.advanceTimeByFrame()
-        assertEquals(28.dp, ringWidthOf(), "anel com animação reduzida")
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(0)
+        onNodeWithTag("hudBlackHole").assertIsDisplayed()
     }
-
-    private fun ComposeUiTest.ringWidthOf() =
-        onNodeWithContentDescription("INFORMATA2", substring = true, useUnmergedTree = true).getUnclippedBoundsInRoot().width
 
     private fun ComposeUiTest.notchWidthOf() = onNodeWithTag(HUD_CONTENT_TEST_TAG).getUnclippedBoundsInRoot().width
 

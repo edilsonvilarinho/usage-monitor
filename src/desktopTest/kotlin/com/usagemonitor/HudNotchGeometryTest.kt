@@ -617,17 +617,15 @@ class HudNotchGeometryTest {
 
 
     @Test
-    fun `conta minimizada no topo cabe em anel de 28 dp com a cota de foco ao lado`() {
+    fun `conta minimizada no topo vira a celula do buraco, 106 dp, sem linha de foco (A04b, #612)`() {
         val normal = account("Claude", "Em dia", listOf("5h" to "40%"))
         val minimized = normal.copy(minimized = true)
-        val focus = minimized.focusLine
         val sizes = hudNotchSizes(listOf(minimized), HudEdge.TOP, "", false)
-        // Largura: anel minimizado, vão, cota de foco; altura continua a da conta comum.
-        val expectedWidth = AppGargantuaTokens.minimizedSize + HUD_RING_TEXT_GAP + stripLineWidth(focus) +
-            HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
-        assertEquals(expectedWidth, sizes.collapsed.width)
-        val normalHeight = hudNotchSizes(listOf(normal), HudEdge.TOP, "", false).collapsed.height
-        assertEquals(normalHeight, sizes.collapsed.height)
+        // Uma minimizada só: o buraco é a única célula, também na borda horizontal (A04b, #612).
+        // Largura = a célula inteira mais o padding e os ombros; altura = a célula (piso transversal + padding).
+        val expectedWidth = HUD_BLACK_HOLE_CELL_SIZE + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
+        assertEquals(expectedWidth, sizes.collapsed.width, "largura, topo")
+        assertEquals(HUD_BLACK_HOLE_CELL_SIZE, sizes.collapsed.height, "altura, topo")
     }
 
     @Test

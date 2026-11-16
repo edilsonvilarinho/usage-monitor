@@ -204,7 +204,7 @@ internal fun HudNotch(
     var balloonIndex by remember { mutableStateOf(initialBalloonIndex) }
     // Buraco negro da coluna (#600): as contas minimizadas. [holeSelection] é a conta aberta a partir
     // da lista do buraco; `null` mostra a lista. Sentinela do buraco = `accounts.size`.
-    val holeMembers = remember(accounts, edge) { hudColumnArrangement(accounts, edge).holeMembers }
+    val holeMembers = remember(accounts) { hudColumnArrangement(accounts).holeMembers }
     val holeIndex = accounts.size
     var holeSelection by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(open) {

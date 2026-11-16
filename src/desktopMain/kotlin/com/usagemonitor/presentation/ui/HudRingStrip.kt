@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,6 +51,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import kotlin.math.roundToInt
 import com.usagemonitor.HUD_EMOJI_BADGE_OVERSHOOT
 import com.usagemonitor.HUD_EMOJI_BADGE_SIZE
+import com.usagemonitor.HUD_BLACK_HOLE_CELL_SIZE
 import com.usagemonitor.HUD_ITEM_GAP
 import com.usagemonitor.HUD_NOTCH_PADDING_ACROSS
 import com.usagemonitor.HUD_NOTCH_PADDING_ALONG
@@ -114,7 +116,7 @@ internal fun HudRingStrip(
     reorderDrop: HudRingDrop? = null
 ) {
     // Na coluna vertical as minimizadas saem da lista e formam o buraco (#600).
-    val arrangement = hudColumnArrangement(accounts, edge, minimizeProgress)
+    val arrangement = hudColumnArrangement(accounts, minimizeProgress)
     // Coordenadas de slot e do anel do buraco; o voo mede o centro delas na caixa da faixa (#600 A06).
     val itemCoordinates = remember { mutableMapOf<Int, LayoutCoordinates>() }
     val flightCenters = remember { mutableStateOf<Map<Int, Float>>(emptyMap()) }
@@ -134,7 +136,7 @@ internal fun HudRingStrip(
                 compact -> settle
                 else -> 1f - settle
             }
-            val drawn = if (edge.isHorizontal) accounts.indices.toList() else arrangement.shown
+            val drawn = arrangement.shown
             drawn.forEach { index ->
                 val account = accounts[index]
                 val leaving = departures[account.targetKey]
@@ -177,6 +179,12 @@ internal fun HudRingStrip(
                     members = arrangement.holeMembers.map { index -> accounts[index] },
                     language = language,
                     onClick = onHoleClicked,
+                    // Na horizontal o buraco fecha a faixa com o mesmo vão das contas (#612).
+                    modifier = if (edge.isHorizontal) {
+                        Modifier.padding(start = HUD_ITEM_GAP).requiredSize(HUD_BLACK_HOLE_CELL_SIZE)
+                    } else {
+                        Modifier
+                    },
                     onItemPlaced = { coordinates -> onItemPlaced(holeIndex, coordinates) },
                     onRingPlaced = { coordinates ->
                         itemCoordinates[holeIndex] = coordinates
@@ -191,13 +199,29 @@ internal fun HudRingStrip(
         // (issue #291) — é o ponto da engrenagem.
     }
     if (edge.isHorizontal) {
-        Row(
+        // Na horizontal o buraco e o voo andam ao longo da faixa: a caixa mede o eixo X (#612).
+        val holeIndex = accounts.size
+        val flightIndices = arrangement.flying + holeIndex
+        Box(
             modifier = Modifier
                 .size(size)
-                .padding(horizontal = HUD_NOTCH_SHOULDER + HUD_NOTCH_PADDING_ALONG, vertical = HUD_NOTCH_PADDING_ACROSS),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) { items() }
+                .onGloballyPositioned { box ->
+                    val centers = hudFlightCenters(box, itemCoordinates, flightIndices, horizontal = true)
+                    if (centers != flightCenters.value) flightCenters.value = centers
+                }
+        ) {
+            Row(
+                modifier = Modifier
+                    .size(size)
+                    .padding(horizontal = HUD_NOTCH_SHOULDER + HUD_NOTCH_PADDING_ALONG, vertical = HUD_NOTCH_PADDING_ACROSS),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) { items() }
+            HudBlackHoleFlights(
+                flights = hudFlights(accounts, arrangement.flying, minimizeProgress, flightCenters.value, holeIndex),
+                horizontal = true
+            )
+        }
     } else {
         // A caixa mede o voo: o centro de cada slot e do buraco entram na mesma régua (#600 A06).
         val holeIndex = accounts.size

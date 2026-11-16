@@ -54,11 +54,12 @@ class HudBlackHoleCellTest {
     }
 
     @Test
-    fun `horizontal com minimizadas nao mostra buraco e mantem as celulas de hoje`() = runDesktopComposeUiTest {
+    fun `horizontal com minimizadas mostra buraco com a contagem e nenhuma celula por conta`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.TOP)
 
-        onAllNodesWithTag("hudBlackHole").assertCountEquals(0)
-        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(4)
+        onAllNodesWithTag("hudBlackHole").assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(1)
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(0)
     }
 
     @Test
@@ -79,11 +80,12 @@ class HudBlackHoleCellTest {
     }
 
     @Test
-    fun `horizontal com conta a meio caminho nao desenha buraco nem voo`() = runDesktopComposeUiTest {
+    fun `horizontal com conta a meio caminho conta so as que chegaram e desenha a em voo`() = runDesktopComposeUiTest {
         setStrip(fourMinimized, HudEdge.TOP, minimizeProgress = mapOf(fourMinimized[3].targetKey to 0.5f))
 
-        onAllNodesWithTag("hudBlackHoleFlying").assertCountEquals(0)
-        onAllNodesWithTag("hudBlackHole").assertCountEquals(0)
+        onAllNodesWithContentDescription("3 minimizadas", substring = true).assertCountEquals(1)
+        onAllNodesWithContentDescription("4 minimizadas", substring = true).assertCountEquals(0)
+        onAllNodesWithTag("hudBlackHoleFlying").assertCountEquals(1)
     }
 
     @Test

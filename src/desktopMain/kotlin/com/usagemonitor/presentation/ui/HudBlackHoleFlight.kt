@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.hudSinkFrame
@@ -43,32 +44,40 @@ internal fun hudFlights(
     }
 }
 
-/** Centro ao longo da borda vertical de cada índice medido, na caixa [box]. Índice sem coordenada fica de fora. */
+/**
+ * Centro ao longo da borda de cada índice medido, na caixa [box]: Y na borda vertical, X na horizontal
+ * ([horizontal], #612). Índice sem coordenada fica de fora.
+ */
 internal fun hudFlightCenters(
     box: LayoutCoordinates,
     coordinates: Map<Int, LayoutCoordinates>,
     indices: List<Int>,
+    horizontal: Boolean = false,
 ): Map<Int, Float> {
     if (!box.isAttached) return emptyMap()
     return indices.mapNotNull { index ->
         val coords = coordinates[index]?.takeIf { it.isAttached } ?: return@mapNotNull null
         val center = Offset(coords.size.width / 2f, coords.size.height / 2f)
-        index to box.localPositionOf(coords, center).y
+        val local = box.localPositionOf(coords, center)
+        index to (if (horizontal) local.x else local.y)
     }.toMap()
 }
 
-/** Desenha cada voo como anel sobreposto; sem interação, sem animação própria (o progresso vem de fora). */
+/**
+ * Desenha cada voo como anel sobreposto; sem interação, sem animação própria (o progresso vem de fora).
+ * [horizontal] leva o trajeto ao eixo X, ao longo da faixa de cima ou de baixo (#612).
+ */
 @Composable
-internal fun HudBlackHoleFlights(flights: List<HudFlight>) {
+internal fun HudBlackHoleFlights(flights: List<HudFlight>, horizontal: Boolean = false) {
     val density = LocalDensity.current
     Box(modifier = Modifier.fillMaxSize()) {
         flights.forEach { flight ->
             val frame = hudSinkFrame(flight.progress, flight.fromAlong, flight.toAlong)
-            val top = with(density) { (frame.along - frame.ringSize.toPx() / 2f).toDp() }
+            val shift = with(density) { (frame.along - frame.ringSize.toPx() / 2f).toDp() }
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = top)
+                    .align(if (horizontal) Alignment.CenterStart else Alignment.TopCenter)
+                    .offset(x = if (horizontal) shift else 0.dp, y = if (horizontal) 0.dp else shift)
                     .size(frame.ringSize)
                     .testTag("hudBlackHoleFlying"),
             ) {

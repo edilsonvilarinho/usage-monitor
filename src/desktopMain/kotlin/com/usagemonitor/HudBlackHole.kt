@@ -41,18 +41,14 @@ internal val HudColumnArrangement.hasHole: Boolean
     get() = holeMembers.isNotEmpty()
 
 /**
- * Na borda vertical, as minimizadas entram no buraco só ao chegar ao progresso 1; enquanto
- * [progress] (0..1 por conta) não chega, seguem em voo. Conta sem entrada usa o próprio flag:
- * minimizada começa em 1, completa em 0. Na borda horizontal nada muda: todas ficam na faixa.
+ * As minimizadas entram no buraco só ao chegar ao progresso 1; enquanto [progress] (0..1 por conta)
+ * não chega, seguem em voo. Conta sem entrada usa o próprio flag: minimizada começa em 1, completa em 0.
+ * A borda (horizontal ou vertical) não muda o arranjo: o buraco é o mesmo nas duas (A04a, #612).
  */
 internal fun hudColumnArrangement(
     accounts: List<HudAccount>,
-    edge: HudEdge,
     progress: Map<UsageTargetKey, Float> = emptyMap(),
 ): HudColumnArrangement {
-    if (edge.isHorizontal) {
-        return HudColumnArrangement(shown = accounts.indices.toList(), holeMembers = emptyList())
-    }
     val value = accounts.map { account -> progress[account.targetKey] ?: if (account.minimized) 1f else 0f }
     val holeMembers = accounts.indices.filter { index ->
         accounts[index].minimized && value[index] >= 1f

@@ -73,6 +73,20 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
 | A05 | (absorvida pela A03: o rótulo sai junto com a geometria, que dependia da largura dele) | — |
 | A06 | `docs/hud-notch.md`, `AppHudBar.prompt.md` e protótipo de tela | docs |
 
+## Mapa da A04 (leitura do agente, 2026-11-16)
+
+- A04a — arranjo: gate em `HudBlackHole.kt:53-55`; teste que fixava a horizontal em `HudBlackHoleTest.kt:75-85` passa a
+  esperar `shown=[1]`, `holeMembers=[0,2]`, `hasHole=true` em TOP e BOTTOM.
+- A04b — geometria: `horizontalCollapsed` (`HudNotchGeometry.kt`, ~400) usa `hudColumnArrangement` como a vertical:
+  minimizadas saem, a célula soma `HUD_BLACK_HOLE_CELL_SIZE` + `HUD_ITEM_GAP` no comprimento e o conteúdo transversal
+  tem piso `HUD_BLACK_HOLE_CELL_SIZE − 2·HUD_NOTCH_PADDING_ACROSS`. Testes que fixavam a horizontal:
+  `HudNotchGeometryTest.kt:619-631`, `ui/HudNotchTest.kt:381-398`.
+- A04c — desenho: ramo horizontal de `HudRingStrip.kt` (~196-200, ~216-230) desenha `arrangement.shown`, vão de 12 dp e
+  `HudBlackHoleCell`; `hudFlightCenters` (`HudBlackHoleFlight.kt`) e `HudBlackHoleFlights` ganham `horizontal: Boolean
+  = false` (eixo X, `Alignment.CenterStart` + `offset(x =)`). Testes: `ui/HudBlackHoleCellTest.kt:57-62` e `:81-87`;
+  teste novo no `HudNotch`: borda de cima, clique no buraco abre a lista (o nome da conta minimizada aparece; ela não
+  aparece mais na faixa).
+
 ## Ponto de situação
 
 | Id | Situação | Comando e resultado |
@@ -80,10 +94,15 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
 | A01 | feito | sem harness de teste (documento); validado pela leitura dos arquivos citados em "Fatos confirmados" |
 | A02 | feito | sem harness (protótipo); C1–C3 conferidos por captura headless do Chrome (`--screenshot`, n=7 e n=10, escuro/claro, 1x/2x); C1 e C2 devolvidos uma vez (anel central ausente; texto sob o anel e glifos cobrindo marcas), C3 uma vez (célula cortada em 2x); escolhido C1 |
 | A03 | feito | Geometria C1 com o ajuste do dono (raio 38, passo 360°/n, célula 106 dp, anel 40, glifo 22/marca 15, um arco), rótulo fora do desenho, poço do campo estelar do buraco = 20 dp. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*"` → 6 falhas na asserção (`expected:<33.0.dp> but was:<90.0.dp>`, `expected:<96.0.dp> but was:<236.0.dp>`, `altura do buraco, lateral expected:<236.0.dp> but was:<250.0.dp>`); fiação do poço `HudNotchTest`: `expected:<20.0> but was:<32.0>`; passo: `HudBlackHoleOrbitTest.kt:18` `passo com n=3 … esperado=2.094 obtido=0.698`. Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*" --tests "*HudStar*"` → 272 testes, 0 falhas; `gradlew.bat allTests` (antes do ajuste de raio) → 0 falhas. Conferido no app local (`gradlew.bat run`) pelo dono na borda lateral |
+| A04 | feito | Buraco nas bordas de cima e de baixo: `hudColumnArrangement` sem o parâmetro `edge`, `horizontalCollapsed` com a célula de 106 dp e piso transversal de 90 dp, ramo horizontal do `HudRingStrip` com célula e voo no eixo X. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHoleTest*" --tests "*HudNotchGeometryTest*" --tests "*HudNotchTest*"` → `HudBlackHoleTest.kt:81` `borda TOP expected:<[1]> but was:<[0, 1, 2]>`, `HudNotchGeometryTest.kt:627` `largura, topo expected:<146.0.dp> but was:<97.0.dp>`, `HudNotchTest.kt:383` `Expected exactly '1' node … (TestTag = 'hudBlackHole')`, depois `altura do buraco, topo expected:<106.0.dp> but was:<90.0.dp>`. Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*" --tests "*HudStar*" --tests "*HudRing*"` → 277 testes, 0 falhas. O teste do voo no topo nasceu verde (contrato novo, sem regressão provada). Conferido no app local pelo dono no topo e na lateral |
 
 ## Problemas em aberto e riscos
 
 - Coluna vertical com buraco cai de 236 dp para 96 dp de largura e a célula de 262 dp (célula + rótulo + vão) para
   96 dp: a conta do auto-minimizar (#596, `HudAutoMinimizeTest`) muda; recolher uma conta de 110 dp já encurta a coluna.
+- Primeira minimização com o buraco vazio (as duas bordas, desde a #600): durante os 520 ms não há buraco composto
+  (`hasHole` exige um membro com progresso 1), então `hudFlights` não tem alvo e a conta fica invisível no slot até o
+  buraco nascer. Lido em `HudBlackHole.kt:40`, `HudRingStrip.kt:174` e `HudBlackHoleFlight.kt:34` (agente da A04c).
+  Fora do escopo da #612; corrigir pede compor o buraco durante o voo sem estourar o tamanho segurado da janela.
 - Glifos encostam na borda do notch (a célula usa o padding transversal): o contorno do notch não pode cortá-los.
 - Mudança no tamanho da janela da HUD horizontal: o risco de sistema de janelas da #342 vale (suíte só no Windows).
