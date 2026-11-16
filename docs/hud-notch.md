@@ -171,19 +171,16 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   HTML: M2 disco na borda da tela, M3 lente gravitacional, M4 poço do espaço-tempo, M5 luz de
   acreção, M6 fóton no contorno, M7 jatos entre as contas, M8 silhueta de maré, M9 vidro fumê, M10
   órbita que liga as contas.
-- **Corpo: campo de estrelas com paralaxe (#586, #590).** Atrás dos anéis, 156 estrelas em três camadas: 60 perto
-  (3 dp/s, raio 1,2–1,8, alfa .8–.95), 56 no meio (1,5 dp/s, raio .8–1,2, alfa .6–.7) e 40 longe (0,5 dp/s,
-  raio .5–.8, alfa .35–.5). Cada camada repete seu padrão num laço de 240 s (`HudStarfield.kt` é o quadro puro;
-  `HudStarfieldCanvas.kt` desenha). Seis das maiores de perto têm brilho em cruz, e cada uma cintila ±15% em
-  3–6 s. Cada anel é um poço: a estrela que chega a 2×R dele desvia em curva em volta, nunca entra no disco, e
-  ganha um rastro de 5 px. Nada é desenhado sobre texto nem pílula: as caixas de texto e de pílula são proibidas.
-  Nos temas escuros as estrelas são `AppGargantuaTokens.hot`, com 18% delas em `gold`; no claro, tinta `--fg`
-  (`#171414`) com alfa 0,95/0,7/0,45 e raios ×1,5, atenuada ×0,4 a até 8 dp do texto. Só anima com
-  `AppMotionPolicy.continuous` e sem "reduzir animações", que deixa o quadro em t = 0; a barra recolhida não tem
-  campo.
-- **Velocidade (#592).** As camadas derivam a 12 / 6 / 2 dp/s (×4 da #590) com o ladrilho **fixo** em 720 / 360 / 120
-  dp: o ladrilho define a densidade e não acompanha a velocidade (ladrilho = velocidade × 240 s rarefazia o campo,
-  medido no protótipo P1 da #592). Cada camada dá 4 voltas no laço de 240 s, sem salto.
+- **Corpo: céu de estrelas e poeira (#602; antes três camadas que caíam, #586/#590/#592).** O usuário viu "flocos de
+  neve" nas três camadas caindo em +y, no rastro de 5 px e no brilho em cruz; os três saíram. Hoje: uma camada de 120
+  estrelas (28% grandes, raio 1,6–2,0 dp e alfa base 0,9; as demais 1–1,5 dp e alfa 0,45–0,8; alfa final ×0,20) que
+  deriva na **horizontal** a 1 dp/s, com volta contínua na largura, e 600 grãos de poeira estelar parados (raio 0,5 dp,
+  alfa (0,05–0,25)×2, `AppGargantuaTokens.dust`, ×1,2 no claro). Cintilação 0,8 + 0,2·sen com períodos de 1,5/1,6/2,0/2,4 s
+  (divisores do laço de 240 s; o JSON da rodada AY5 pedia (3–6 s)·2/4,5). Valores do JSON escolhido no protótipo
+  `prototipos/issue-602/az-fluxo-poeira/`. Cada anel segue como poço (a estrela desvia em curva, sem rastro) e as caixas
+  de texto e pílula seguem proibidas. Escuro: `hot` com 18% em `gold`; claro: tinta `--fg` com alfa 0,55 e raio ×1,5.
+  `HudStarfield.kt` é o quadro puro; `HudStarfieldCanvas.kt` desenha. Só anima com `AppMotionPolicy.continuous` e sem
+  "reduzir animações" (quadro em t = 0); a barra recolhida não tem campo.
 - **Capturas (#590, #592).** Anel **sem** execução: uma captura a cada 30 s, a partir de 4 s (8 por laço), em rodízio
   só pelos poços ociosos (`idle[n mod ociosos]`, escolhido no início absoluto da captura), no ângulo `n·2,399963`.
   Anel **em execução** (`sessionActive`): filamento contínuo de 1,5 estrela/s em grade absoluta `k·2000/3` ms, braço

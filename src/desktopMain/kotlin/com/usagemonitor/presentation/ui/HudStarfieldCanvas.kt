@@ -25,12 +25,11 @@ import com.usagemonitor.presentation.ui.components.HudStarfieldBox
 import com.usagemonitor.presentation.ui.components.HudStarCapture
 import com.usagemonitor.presentation.ui.components.HudStarCaptureFlash
 import com.usagemonitor.presentation.ui.components.HudStarCaptureFlight
-import com.usagemonitor.presentation.ui.components.HudStarfieldLayer
 import com.usagemonitor.presentation.ui.components.HudStarfieldWell
-import com.usagemonitor.presentation.ui.components.HUD_STARFIELD_GLINT_WIDTH
 import com.usagemonitor.presentation.ui.components.hudStarfieldDrawAlpha
+import com.usagemonitor.presentation.ui.components.hudStarfieldDustInk
 import com.usagemonitor.presentation.ui.components.hudStarfieldFrame
-import com.usagemonitor.presentation.ui.components.hudStarfieldGlintHalfLength
+import com.usagemonitor.presentation.ui.components.hudStarfieldGrainFrame
 import com.usagemonitor.presentation.ui.components.hudStarfieldInk
 import com.usagemonitor.presentation.ui.components.hudStarfieldRemainder
 import com.usagemonitor.presentation.ui.components.hudStarCaptures
@@ -91,28 +90,22 @@ internal fun HudStarfieldCanvas(
                     val boxes = forbidden()
                     val wellList = hudStarfieldWells(rings(), windows)
                     val captures = if (live) hudStarCaptures(timeMs, wellList, boxes) else emptyList()
-                    val captureInk = hudStarfieldInk(dark, HudStarfieldLayer.NEAR, gold = false).color
+                    val captureInk = hudStarfieldInk(dark, gold = false).color
                     for (capture in captures) drawStarCapture(capture, captureInk, dark)
+                    val dustInk = hudStarfieldDustInk(dark)
+                    for (grain in hudStarfieldGrainFrame(width, height, wellList, boxes)) {
+                        val grainAlpha = grain.alpha * dustInk.alpha
+                        if (grainAlpha <= 0f) continue
+                        drawCircle(dustInk.color.copy(alpha = grainAlpha), grain.radius, Offset(grain.x, grain.y))
+                    }
                     val points = hudStarfieldFrame(timeMs, width, height, wellList, boxes)
                     for (point in points) {
-                        val ink = hudStarfieldInk(dark, point.layer, point.gold)
+                        val ink = hudStarfieldInk(dark, point.gold)
                         val alpha = hudStarfieldDrawAlpha(dark, point, boxes)
                         if (alpha <= 0f) continue
                         val color = ink.color.copy(alpha = alpha)
                         val radius = point.radius * ink.radiusScale
-                        val center = Offset(point.x, point.y)
-                        if (point.trailX != 0f || point.trailY != 0f) {
-                            val tail = Offset(point.x - point.trailX, point.y - point.trailY)
-                            drawLine(color, center, tail, strokeWidth = radius)
-                        }
-                        drawCircle(color, radius, center)
-                        if (point.glint) {
-                            // Brilho em cruz: duas linhas, alfa meio da estrela, centradas no ponto.
-                            val half = hudStarfieldGlintHalfLength(radius)
-                            val glint = ink.color.copy(alpha = alpha * 0.5f)
-                            drawLine(glint, Offset(point.x - half, point.y), Offset(point.x + half, point.y), strokeWidth = HUD_STARFIELD_GLINT_WIDTH)
-                            drawLine(glint, Offset(point.x, point.y - half), Offset(point.x, point.y + half), strokeWidth = HUD_STARFIELD_GLINT_WIDTH)
-                        }
+                        drawCircle(color, radius, Offset(point.x, point.y))
                     }
                 }
             }
