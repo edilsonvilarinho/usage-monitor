@@ -102,7 +102,8 @@ class AnalysisScreenTest {
         // #538, A05a: o marcador "agora" e a legenda da diagonal, nas duas janelas.
         onAllNodesWithText("agora 12:30").assertCountEquals(2)
         onAllNodesWithText("seu uso até agora").assertCountEquals(2)
-        onNodeWithText("acima da linha: esgota antes").assertDoesNotExist() // desenhado no Canvas, não é nó de texto
+        // #610: a frase de cada região entra na legenda (AppChartKey), uma por diagonal aberta; o desenho no Canvas não é nó.
+        onAllNodesWithText("acima da linha: esgota antes").assertCountEquals(2)
         onNodeWithText("Ritmo por intervalo · 24 h").performScrollTo().assertIsDisplayed()
         // As anteriores ficam desenhadas atrás da aberta: a tabela "antes × agora" saiu.
         onNodeWithText("Esta janela × anterior").assertDoesNotExist()

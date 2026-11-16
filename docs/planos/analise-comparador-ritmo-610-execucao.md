@@ -56,6 +56,9 @@ veredito repetindo a pílula. Direção escolhida pelo usuário: **P05 — Compa
 | Id | Comando | Resultado |
 |---|---|---|
 | A01 | `explorer` 610-X2 (somente leitura) | fatos acima; escolha P05 e D1/D2 pelo usuário em 2026-11-16 |
+| A02 | Vermelho (stub com todo estilo `SOLID`): `gradlew.bat desktopTest --tests "com.usagemonitor.presentation.PaceDiagonalModelTest"` | `PaceDiagonalModelTest.kt:28 expected:<[… style=DASHED …]> but was:<[… style=SOLID …]>` |
+| A02 | Verde: `desktopTest --tests "com.usagemonitor.presentation.*" --tests "com.usagemonitor.ui.*Analysis*" --tests "com.usagemonitor.ui.*Pace*" --tests "com.usagemonitor.ui.*ChartKey*"` | exit 0; `PaceDiagonalModelTest` 3/3, `AppChartKeyTest` 1/1, `PaceLabelPlacementTest` 4/4 |
+| A02 | Decisões da entrega | linha segura em `AppGargantuaTokens.gold` (como o gráfico); legenda inclui as zonas acima/abaixo (`ZONE`); medidas da amostra fixas e registradas no contrato |
 
 ## Problemas em aberto e riscos
 

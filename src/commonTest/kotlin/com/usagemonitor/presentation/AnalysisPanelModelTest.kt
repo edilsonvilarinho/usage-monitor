@@ -13,6 +13,9 @@ import com.usagemonitor.presentation.ui.analysisAxisMax
 import com.usagemonitor.presentation.ui.analysisBarFraction
 import com.usagemonitor.presentation.ui.PaceDiagonalModels
 import com.usagemonitor.domain.entity.PacePathPoint
+import com.usagemonitor.presentation.ui.PaceLegendEntry
+import com.usagemonitor.presentation.ui.PaceLegendTone
+import com.usagemonitor.presentation.ui.components.AppChartKeyStyle
 import com.usagemonitor.presentation.ui.components.AppTone
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -89,7 +92,7 @@ class AnalysisPanelModelTest {
         assertEquals(emptyList(), diagonal.projection)
         assertFalse(diagonal.projectionCritical)
         assertEquals(100.0, diagonal.yMax)
-        assertEquals(listOf("1 previous window"), diagonal.legend)
+        assertEquals(listOf(PaceLegendEntry("1 previous window", AppChartKeyStyle.FADED, PaceLegendTone.MUTED)), diagonal.legend)
         assertEquals(closed.sentence, diagonal.description)
     }
 

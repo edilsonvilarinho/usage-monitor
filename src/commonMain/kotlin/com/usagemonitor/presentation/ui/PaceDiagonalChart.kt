@@ -33,6 +33,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.PacePathPoint
+import com.usagemonitor.presentation.ui.components.AppChartKey
+import com.usagemonitor.presentation.ui.components.AppChartKeyItem
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.color
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
@@ -195,11 +197,10 @@ internal fun PaceDiagonalChart(model: PaceDiagonalModel, lineColor: Color, langu
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
-        Column(Modifier.fillMaxWidth().padding(top = AppSpacing.xs), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-            model.legend.forEach { entry ->
-                Text(entry, style = labelStyle, color = axisColor, maxLines = 1)
-            }
-        }
+        AppChartKey(
+            items = model.legend.map { entry -> AppChartKeyItem(entry.label, entry.style, legendToneColor(entry.tone, lineColor, criticalColor, okColor, axisColor)) },
+            modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.xs)
+        )
     }
 }
 
@@ -280,6 +281,16 @@ private fun DrawScope.placePointLabel(measurer: TextMeasurer, text: String, poin
     )
     return PlacedLabel(layout, box)
 }
+
+/** Cor de cada tom da legenda: o mesmo traço que o gráfico desenha, resolvido no tema. */
+private fun legendToneColor(tone: PaceLegendTone, lineColor: Color, criticalColor: Color, okColor: Color, mutedColor: Color): Color =
+    when (tone) {
+        PaceLegendTone.GOLD -> AppGargantuaTokens.gold
+        PaceLegendTone.LINE -> lineColor
+        PaceLegendTone.CRITICAL -> criticalColor
+        PaceLegendTone.OK -> okColor
+        PaceLegendTone.MUTED -> mutedColor
+    }
 
 private fun DrawScope.drawPlacedLabel(placed: PlacedLabel, plateColor: Color) {
     val box = placed.box
