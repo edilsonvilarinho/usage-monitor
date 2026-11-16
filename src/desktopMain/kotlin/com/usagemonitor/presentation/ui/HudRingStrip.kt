@@ -107,6 +107,8 @@ internal fun HudRingStrip(
     onRingHovered: (Int) -> Unit,
     /** O cursor sobre o buraco negro da coluna (#600); a lista de contas minimizadas abre a partir dele. */
     onHoleClicked: () -> Unit,
+    /** Entrada do ponteiro no buraco (#612): o dono decide se a lista abre; já aberta na lista do buraco, não muda. */
+    onHoleHovered: () -> Unit,
     onRingRefresh: (Int) -> Unit,
     onItemPlaced: (Int, LayoutCoordinates) -> Unit,
     onRingPlaced: (Int, LayoutCoordinates) -> Unit,
@@ -179,6 +181,7 @@ internal fun HudRingStrip(
                     members = arrangement.holeMembers.map { index -> accounts[index] },
                     language = language,
                     onClick = onHoleClicked,
+                    onHovered = onHoleHovered,
                     // Na horizontal o buraco fecha a faixa com o mesmo vão das contas (#612).
                     modifier = if (edge.isHorizontal) {
                         Modifier.padding(start = HUD_ITEM_GAP).requiredSize(HUD_BLACK_HOLE_CELL_SIZE)

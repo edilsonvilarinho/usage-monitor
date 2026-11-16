@@ -407,6 +407,41 @@ class HudNotchTest {
         )
     }
 
+    /** Hover no buraco na borda de cima (#612): mesmo gesto da lateral abre a lista. */
+    @Test
+    fun `hover no buraco na borda de cima abre a lista`() = runDesktopComposeUiTest {
+        val minimized = accounts.first().copy(minimized = true)
+        setContent { notch(expanded = true, edge = HudEdge.TOP, list = listOf(minimized, accounts[1])) }
+
+        onNodeWithTag("hudBlackHole").performMouseInput { enter(center) }
+        waitForIdle()
+
+        assertTrue(
+            onAllNodesWithText(minimized.label, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "nome '${minimized.label}' da conta minimizada deveria aparecer na lista do buraco, topo"
+        )
+    }
+
+    /** Segundo hover (#612): com a lista já aberta pelo buraco, sair e entrar de novo a mantém; hover não alterna. */
+    @Test
+    fun `segundo hover no buraco mantem a lista aberta`() = runDesktopComposeUiTest {
+        val minimized = accounts.first().copy(minimized = true)
+        setContent { notch(expanded = true, edge = HudEdge.LEFT, list = listOf(minimized, accounts[1])) }
+        val hole = onNodeWithTag("hudBlackHole")
+
+        hole.performMouseInput { enter(center) }
+        waitForIdle()
+        hole.performMouseInput { exit(Offset(-1f, -1f)) }
+        waitForIdle()
+        hole.performMouseInput { enter(center) }
+        waitForIdle()
+
+        assertTrue(
+            onAllNodesWithText(minimized.label, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "segundo hover fechou a lista do buraco; deveria mantê-la aberta"
+        )
+    }
+
     /** Transição (#576, A05b; #612): com o buraco já existente, a conta voa até ele em `hudMinimizeMillis`; o notch segura a largura de antes até o fim. */
     @Test
     fun `minimizar anima o voo ao buraco e o notch so encolhe no fim da transicao`() = runDesktopComposeUiTest {

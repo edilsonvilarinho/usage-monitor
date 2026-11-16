@@ -34,6 +34,7 @@ import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Buraco negro (#600, A05; #602, A02): o clique (ou Enter com foco) no buraco alterna a lista das minimizadas;
@@ -48,11 +49,15 @@ class HudBlackHoleBalloonTest {
     private val minimized = labels.map { label -> account(label, minimized = true) }
 
     @Test
-    fun `hover no buraco nao abre a lista`() = runDesktopComposeUiTest {
+    fun `hover no buraco abre a lista`() = runDesktopComposeUiTest {
         setNotch(minimized)
         hoverHole()
+        waitForIdle()
 
-        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+        assertTrue(
+            onAllNodesWithText(labels[0], useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "nome '${labels[0]}' deveria aparecer na lista do buraco após o hover (#612)"
+        )
     }
 
     @Test

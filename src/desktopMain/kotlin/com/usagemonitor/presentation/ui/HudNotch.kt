@@ -338,6 +338,13 @@ internal fun HudNotch(
                             holeSelection = null
                         }
                     },
+                    // Entrada do ponteiro no buraco abre a lista (#612), salvo se ela já é a do buraco: não zera a conta aberta nela.
+                    onHoleHovered = {
+                        if (balloonIndex != holeIndex) {
+                            balloonIndex = holeIndex
+                            holeSelection = null
+                        }
+                    },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
                     onItemPlaced = { index, coordinates ->

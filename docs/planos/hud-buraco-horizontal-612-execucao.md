@@ -60,6 +60,10 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
   2·33·sen 20° ≈ 22,6 dp para glifo de 30 dp). Escolha: **volta inteira + raio 38**. Passo = 360°/n para todo n (deixa
   de ser comboio agrupado), raio 38 dp, célula 2·(38 + 15) = 106 dp, piso de conteúdo 106 − 16 = 90 dp. Com 7 contas a
   corda é 33 dp; com 10 contas é 23,5 dp, os discos não se tocam e só os arcos encostam.
+- **Hover abre a lista do buraco (dono, 2026-11-16, depois de testar o app):** "o ideal é passar o mouse e ele já
+  abrir". Reverte a decisão da #602 ("clicar e não colocar o mouse em cima"). Regra: a entrada do ponteiro no buraco
+  abre a lista se o balão aberto não for o do buraco; se já for (lista ou conta escolhida nela), nada muda. O clique e o
+  Enter seguem alternando. A seleção de linha da lista continua só por clique ou Enter.
 - O voo do sumidouro (520 ms, `hudSinkFrame`) vale nas duas bordas: na horizontal, o deslocamento é ao longo da faixa.
 
 ## Atividades
@@ -72,6 +76,8 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
 | A04 | TDD: buraco na borda horizontal (arranjo, espessura da faixa, célula e voo ao longo da faixa) | `HudBlackHole.kt`, `HudNotchGeometry.kt`, `HudRingStrip.kt` |
 | A05 | (absorvida pela A03: o rótulo sai junto com a geometria, que dependia da largura dele) | — |
 | A06 | `docs/hud-notch.md`, `AppHudBar.prompt.md` e protótipo de tela | docs |
+| A07 | TDD: hover no buraco abre a lista (reverte a regra de clique da #602) | `HudBlackHoleCell.kt`, `HudRingStrip.kt`, `HudNotch.kt` |
+| A08 | TDD: linha da lista do buraco destacada sob o mouse (só destaque; balão segue no clique/Enter) | `HudBlackHoleList.kt` |
 
 ## Mapa da A04 (leitura do agente, 2026-11-16)
 
@@ -95,6 +101,7 @@ Todos lidos nos arquivos citados (varredura do agente `explorer`, conferida por 
 | A02 | feito | sem harness (protótipo); C1–C3 conferidos por captura headless do Chrome (`--screenshot`, n=7 e n=10, escuro/claro, 1x/2x); C1 e C2 devolvidos uma vez (anel central ausente; texto sob o anel e glifos cobrindo marcas), C3 uma vez (célula cortada em 2x); escolhido C1 |
 | A03 | feito | Geometria C1 com o ajuste do dono (raio 38, passo 360°/n, célula 106 dp, anel 40, glifo 22/marca 15, um arco), rótulo fora do desenho, poço do campo estelar do buraco = 20 dp. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*"` → 6 falhas na asserção (`expected:<33.0.dp> but was:<90.0.dp>`, `expected:<96.0.dp> but was:<236.0.dp>`, `altura do buraco, lateral expected:<236.0.dp> but was:<250.0.dp>`); fiação do poço `HudNotchTest`: `expected:<20.0> but was:<32.0>`; passo: `HudBlackHoleOrbitTest.kt:18` `passo com n=3 … esperado=2.094 obtido=0.698`. Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*" --tests "*HudStar*"` → 272 testes, 0 falhas; `gradlew.bat allTests` (antes do ajuste de raio) → 0 falhas. Conferido no app local (`gradlew.bat run`) pelo dono na borda lateral |
 | A04 | feito | Buraco nas bordas de cima e de baixo: `hudColumnArrangement` sem o parâmetro `edge`, `horizontalCollapsed` com a célula de 106 dp e piso transversal de 90 dp, ramo horizontal do `HudRingStrip` com célula e voo no eixo X. Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHoleTest*" --tests "*HudNotchGeometryTest*" --tests "*HudNotchTest*"` → `HudBlackHoleTest.kt:81` `borda TOP expected:<[1]> but was:<[0, 1, 2]>`, `HudNotchGeometryTest.kt:627` `largura, topo expected:<146.0.dp> but was:<97.0.dp>`, `HudNotchTest.kt:383` `Expected exactly '1' node … (TestTag = 'hudBlackHole')`, depois `altura do buraco, topo expected:<106.0.dp> but was:<90.0.dp>`. Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudAutoMinimize*" --tests "*HudStar*" --tests "*HudRing*"` → 277 testes, 0 falhas. O teste do voo no topo nasceu verde (contrato novo, sem regressão provada). Conferido no app local pelo dono no topo e na lateral |
+| A07 | feito | Hover no buraco abre a lista (`onHoleHovered`: abre só se o balão aberto não é o do buraco; clique/Enter seguem alternando). Vermelho: `gradlew.bat desktopTest --tests "*HudNotchTest*"` → `HudNotchTest.kt:412` `nome 'INFORMATA2' da conta minimizada deveria aparecer na lista do buraco, esquerda`, `:427` `… topo`, `:442` `segundo hover fechou a lista do buraco; deveria mantê-la aberta`; `HudBlackHoleBalloonTest.kt:55` (regra da #602) invertido para "hover no buraco abre a lista". Verde: `gradlew.bat desktopTest --tests "*HudBlackHole*" --tests "*HudNotch*" --tests "*HudRing*"` → 218 testes, 0 falhas. Conferido no app local pelo dono |
 
 ## Problemas em aberto e riscos
 
