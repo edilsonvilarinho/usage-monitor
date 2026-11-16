@@ -1,4 +1,5 @@
 # Buraco negro das minimizadas: clique, órbita, filamento e céu de estrelas — issue #602
+| A07a | `hudBlackHoleFilament` (`HudBlackHoleFilament.kt`, 8 casos): 48 passos da órbita (45 dp) ao horizonte (20 dp), ângulo `θ − 1,1·s + 0,035·sen(9π·s − 2,2·t)·sen(π·s)`, alfa `0,75·(1−s)^0,8`, largura `1,1 − 0,5·s` dp, mistura de cor = s; segmento só com raio final ≥ 20,5, então 47 segmentos (o último toca o horizonte, como no protótipo `:575`). Feita em worktree paralela e trazida por cherry-pick (Haiku, `frontend-dev`) | Vermelho (stub vazio): `gradlew.bat desktopTest --tests "*HudBlackHoleFilament*"` → `AssertionError: passos j=1..47 têm raio >= 20,5 ... expected:<47> but was:<0>` (`HudBlackHoleFilamentTest.kt:37`). Verde: `gradlew.bat desktopTest --tests "*HudBlackHoleFilament*" --tests "com.usagemonitor.architecture.*"` → 36 casos, 0 falhas (`test-runner`) |
 
 Procedência: Claude Opus 5.5 (orquestração) com agentes de implementação, Claude Code CLI no Windows 11, 2026-11-16,
 branch `feat/issue-602-hud-orbit`, commits com a identidade `claude <claude@anthropic.com>`.
@@ -62,7 +63,8 @@ Parâmetros fixados pelo usuário (JSON da rodada 3, unidades medidas em `az-flu
 | A04 | Céu novo (quadro puro): 120 estrelas + 600 grãos, deriva horizontal, cintilação, sem rastro/cruz; canvas |
 | A05 | Órbita em comboio (quadro puro) e geometria estática da célula que a contém |
 | A06 | Glifos em órbita desenhados na célula; conta em execução destacada (não só por cor) |
-| A07 | Filamento de maré AZ2 (quadro puro + canvas) da conta em execução até o horizonte |
+| A07a | Filamento de maré AZ2: quadro puro `hudBlackHoleFilament` |
+| A07b | Filamento desenhado na célula para cada conta em execução |
 
 Cada atividade leva no mesmo commit `docs/hud-notch.md`, o design system e o protótipo visual quando muda a tela.
 
