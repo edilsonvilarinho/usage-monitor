@@ -17,10 +17,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.semantics
 import kotlin.math.min
+import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.presentation.ui.components.HudStarfieldBox
 import com.usagemonitor.presentation.ui.components.HudStarCapture
 import com.usagemonitor.presentation.ui.components.HudStarCaptureFlash
@@ -60,6 +62,7 @@ internal fun HudStarfieldCanvas(
     val policy = LocalAppMotionPolicy.current
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val live = policy.continuous && !policy.reduced
+    val ringRadiusPx = with(LocalDensity.current) { HUD_RING_SIZE.toPx() / 2f }
     var timeMs by remember { mutableLongStateOf(0L) }
     var windows by remember { mutableStateOf<Map<Int, HudStarActivityWindow>>(emptyMap()) }
     LaunchedEffect(live) {
@@ -79,7 +82,7 @@ internal fun HudStarfieldCanvas(
         modifier
             .testTag(HUD_STARFIELD_TEST_TAG)
             .semantics {
-                val wellList = hudStarfieldWells(rings(), windows)
+                val wellList = hudStarfieldWells(rings(), windows, ringRadiusPx)
                 set(HUD_STARFIELD_WELLS, wellList)
                 set(HUD_STARFIELD_CAPTURE_COUNT, if (live) hudStarCaptures(timeMs, wellList, forbidden()).size else 0)
             }
@@ -88,7 +91,7 @@ internal fun HudStarfieldCanvas(
                 val height = size.height
                 onDrawBehind {
                     val boxes = forbidden()
-                    val wellList = hudStarfieldWells(rings(), windows)
+                    val wellList = hudStarfieldWells(rings(), windows, ringRadiusPx)
                     val captures = if (live) hudStarCaptures(timeMs, wellList, boxes) else emptyList()
                     val captureInk = hudStarfieldInk(dark, gold = false).color
                     for (capture in captures) drawStarCapture(capture, captureInk, dark)
@@ -113,19 +116,21 @@ internal fun HudStarfieldCanvas(
 }
 
 /**
- * Poços: um por anel medido, no centro do Rect e com raio = metade da largura (#586 A03).
+ * Poços: um por anel medido, no centro do Rect e com raio = metade da largura (#586 A03), limitado a [maxRadiusPx]
+ * (#611 A05: a célula do buraco tem 114 dp, e o poço é o anel central de 64 dp, não a célula inteira).
  * A janela de atividade vai junto pelo índice do anel (#592 A05); anel sem janela fica ocioso.
  */
 internal fun hudStarfieldWells(
     rings: Map<Int, Rect>,
-    windows: Map<Int, HudStarActivityWindow> = emptyMap()
+    windows: Map<Int, HudStarActivityWindow> = emptyMap(),
+    maxRadiusPx: Float = Float.POSITIVE_INFINITY
 ): List<HudStarfieldWell> =
     rings.toSortedMap().map { (index, ring) ->
         val window = windows[index]
         HudStarfieldWell(
             ring.center.x,
             ring.center.y,
-            ring.width / 2f,
+            min(ring.width / 2f, maxRadiusPx),
             activeSinceMs = window?.sinceMs,
             activeUntilMs = window?.untilMs
         )
