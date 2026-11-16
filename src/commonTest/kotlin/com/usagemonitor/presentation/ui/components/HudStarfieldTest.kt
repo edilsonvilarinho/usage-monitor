@@ -4,14 +4,13 @@ import androidx.compose.ui.graphics.Color
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** A02 · #590: campo lento da AW1 — três camadas, laço de 240 s, cintilação, brilho em cruz e atenuação no claro. */
+/** A04 · #602: céu novo — 120 estrelas numa camada e 600 grãos, deriva horizontal de 1 dp/s, sem queda, sem rastro, sem brilho em cruz. */
 class HudStarfieldTest {
     private val width = 110f
     private val height = 660f
@@ -30,19 +29,7 @@ class HudStarfieldTest {
 
     private fun frame(timeMs: Long) = hudStarfieldFrame(timeMs, width, height, wells, forbidden)
 
-    /** #592 A02: velocidade ×4 (12/6/2 dp/s). */
-    private fun speedOf(layer: HudStarfieldLayer): Float = when (layer) {
-        HudStarfieldLayer.NEAR -> 12f
-        HudStarfieldLayer.MID -> 6f
-        HudStarfieldLayer.FAR -> 2f
-    }
-
-    /** #592 A02: ladrilho fixo (720/360/120 dp), independente da velocidade. */
-    private fun tileOf(layer: HudStarfieldLayer): Float = when (layer) {
-        HudStarfieldLayer.NEAR -> 720f
-        HudStarfieldLayer.MID -> 360f
-        HudStarfieldLayer.FAR -> 120f
-    }
+    private fun grains() = hudStarfieldGrainFrame(width, height, wells, forbidden)
 
     private fun distance(x: Float, y: Float, well: HudStarfieldWell): Float {
         val dx = x - well.centerX
@@ -53,44 +40,47 @@ class HudStarfieldTest {
     private fun inside(box: HudStarfieldBox, x: Float, y: Float): Boolean =
         x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
 
+    /** Longe de todo poço: fora da influência (3 R), então sem deflexão. */
+    private fun farFrom(x: Float, y: Float): Boolean = wells.all { distance(x, y, it) >= 3f * it.radius }
+
     @Test
-    fun `o campo tem 156 estrelas, 60 perto, 56 no meio e 40 longe`() {
+    fun `o campo tem 120 estrelas numa camada so, com cerca de 28 por cento grandes`() {
         val stars = hudStarfieldStars(width, height, wells, forbidden)
-        assertEquals(156, stars.size)
-        assertEquals(60, stars.count { it.layer == HudStarfieldLayer.NEAR })
-        assertEquals(56, stars.count { it.layer == HudStarfieldLayer.MID })
-        assertEquals(40, stars.count { it.layer == HudStarfieldLayer.FAR })
+        assertEquals(120, stars.size, "estrelas")
+        val big = stars.count { it.radius >= 1.6f }
+        assertTrue(big in 24..43, "estrelas grandes $big fora de 20 a 36 por cento de 120")
     }
 
     @Test
     fun `mesma semente gera o mesmo campo e outra semente gera outro`() {
         val stars = hudStarfieldStars(width, height, wells, forbidden)
-        assertEquals(156, stars.size)
+        assertEquals(120, stars.size)
         assertEquals(stars, hudStarfieldStars(width, height, wells, forbidden))
         assertTrue(stars != hudStarfieldStars(width, height, wells, forbidden, seed = 7), "semente 7 deu o mesmo campo")
     }
 
     @Test
-    fun `o laco e de 240 000 ms e o quadro em t e em t mais 240 000 ms e igual`() {
+    fun `o laco e de 240 000 ms e a cintilacao em t e em t mais 240 000 ms e igual`() {
         assertEquals(240_000L, HUD_STARFIELD_PERIOD_MS, "periodo do laco")
         for (timeMs in listOf(0L, 1_000L, 37_123L, 82_499L, 200_000L)) {
-            assertEquals(frame(timeMs), frame(timeMs + loopMs), "laco quebrado em t=$timeMs")
+            val first = frame(timeMs).map { it.twinkle }
+            val second = frame(timeMs + loopMs).map { it.twinkle }
+            assertEquals(first, second, "laco quebrado em t=$timeMs")
         }
     }
 
     @Test
-    fun `o y0 sorteado cabe em min(tile, altura) de cada camada`() {
+    fun `o y0 sorteado cabe no corpo, de 0 a altura`() {
         val stars = hudStarfieldStars(width, height, wells, forbidden)
         for (star in stars) {
-            val limit = min(tileOf(star.layer), height)
-            assertTrue(star.y >= 0f && star.y < limit, "y0 ${star.y} fora de [0, $limit) na camada ${star.layer}")
+            assertTrue(star.y >= 0f && star.y < height, "y0 ${star.y} fora de [0, $height)")
         }
     }
 
     @Test
     fun `nenhuma estrela nasce dentro de disco de poco nem de caixa proibida`() {
         val stars = hudStarfieldStars(width, height, wells, forbidden)
-        assertEquals(156, stars.size)
+        assertEquals(120, stars.size)
         for (star in stars) {
             for (well in wells) {
                 assertTrue(distance(star.x, star.y, well) >= well.radius + 3f, "estrela nasceu no disco: ${star.x},${star.y}")
@@ -120,105 +110,108 @@ class HudStarfieldTest {
 
     @Test
     fun `estrela que cai numa caixa proibida some com alfa zero`() {
-        val strip = listOf(HudStarfieldBox(left = 0f, top = 200f, right = 110f, bottom = 260f))
+        val strip = listOf(HudStarfieldBox(left = 50f, top = 200f, right = 110f, bottom = 260f))
         val frames = sampleTimes.map { hudStarfieldFrame(it, width, height, emptyList(), strip) }
         val hidden = frames.sumOf { quadro -> quadro.count { it.alpha == 0f } }
         assertTrue(hidden > 0, "nenhuma estrela sumiu ao cruzar a faixa proibida")
     }
 
     @Test
-    fun `o ladrilho e fixo em 720, 360 e 120 dp e cada camada volta ao y0 em 60 s`() {
-        for (layer in listOf(HudStarfieldLayer.NEAR, HudStarfieldLayer.MID, HudStarfieldLayer.FAR)) {
-            val star = HudStar(x = 10f, y = 5f, radius = 1f, alpha = 0.5f, layer = layer)
-            assertEquals(5f, hudStarfieldDriftY(star, 60_000L), 1e-3f, "volta de 60 s na camada $layer")
-        }
-    }
-
-    @Test
-    fun `o deslocamento em 1 s longe de poco e 12, 6 e 2 dp por camada`() {
-        val t0 = 20_000L
-        for (star in hudStarfieldStars(width, height, wells, forbidden)) {
-            val tile = tileOf(star.layer)
-            val expected = speedOf(star.layer)
-            val moved = hudStarfieldDriftY(star, t0 + 1_000L) - hudStarfieldDriftY(star, t0)
-            val wrapped = ((moved % tile) + tile) % tile
-            assertTrue(abs(wrapped - expected) <= 0.05f, "deslocamento $wrapped dp na camada ${star.layer}, esperado $expected")
-        }
-    }
-
-    @Test
-    fun `longe de pocos cada copia cai na deriva, sem desvio nem rastro`() {
-        val timeMs = 20_000L
-        val points = frame(timeMs)
+    fun `sem queda vertical, a y de cada estrela longe dos pocos nao muda no tempo`() {
+        val a = frame(20_000L)
+        val b = frame(47_000L)
+        assertEquals(120, a.size, "uma entrada por estrela em t=20 s")
+        assertEquals(120, b.size, "uma entrada por estrela em t=47 s")
         var checked = 0
-        for (star in hudStarfieldStars(width, height, wells, forbidden)) {
-            val tile = tileOf(star.layer)
-            val drift = hudStarfieldDriftY(star, timeMs)
-            val copies = (0..6).map { drift + it * tile }.filter { it < height }.sorted()
-            val far = copies.all { y -> wells.all { distance(star.x, y, it) >= 3f * it.radius } }
-            if (!far) continue
+        for (i in a.indices) {
+            if (!farFrom(a[i].x, a[i].y) || !farFrom(b[i].x, b[i].y)) continue
             checked++
-            val own = points.filter { it.x == star.x && it.layer == star.layer }.sortedBy { it.y }
-            assertEquals(copies.size, own.size, "copias da estrela em x=${star.x}")
-            for ((expectedY, point) in copies.zip(own)) {
-                assertTrue(abs(point.y - expectedY) < 1e-3f, "copia fora da deriva: ${point.y} x $expectedY")
-                assertEquals(0f, point.trailX, "rastro longe do poco")
-                assertEquals(0f, point.trailY, "rastro longe do poco")
-            }
+            assertEquals(a[i].y, b[i].y, 1e-3f, "estrela $i caiu: y ${a[i].y} -> ${b[i].y}")
         }
         assertTrue(checked > 0, "nenhuma estrela longe dos pocos para checar")
     }
 
     @Test
-    fun `perto de um poco a distancia ao centro e no minimo R e o rastro tem de 4 a 6 px`() {
-        var withTrail = 0
-        for (timeMs in sampleTimes) {
-            for (point in frame(timeMs)) {
-                val trail = sqrt(point.trailX * point.trailX + point.trailY * point.trailY)
-                if (trail == 0f) continue
-                assertTrue(point.layer != HudStarfieldLayer.FAR, "longe com rastro em t=$timeMs")
-                assertTrue(trail in 4f..6f, "rastro de $trail px em t=$timeMs")
-                withTrail++
-            }
+    fun `cada estrela longe dos pocos anda 1 dp por segundo na horizontal`() {
+        val t0 = 20_000L
+        val a = frame(t0)
+        val b = frame(t0 + 1_000L)
+        var checked = 0
+        for (i in a.indices) {
+            if (!farFrom(a[i].x, a[i].y) || !farFrom(b[i].x, b[i].y)) continue
+            checked++
+            val moved = ((b[i].x - a[i].x) % width + width) % width
+            assertTrue(abs(moved - 1f) <= 0.05f, "estrela $i andou $moved dp em 1 s, esperado 1")
         }
-        assertTrue(withTrail > 0, "nenhum rastro em nenhum quadro")
+        assertTrue(checked > 0, "nenhuma estrela longe dos pocos para checar")
     }
 
     @Test
-    fun `cintilacao com periodo de 3 a 6 s que divide 240 s e alfa dentro de 15 por cento`() {
+    fun `a deriva da borda direita volta pela esquerda, sem sair de 0 a largura`() {
+        var wraps = 0
+        var previous = frame(0L)
+        for (second in 1..240) {
+            val current = frame(second * 1_000L)
+            for (i in current.indices) {
+                if (!farFrom(current[i].x, current[i].y) || !farFrom(previous[i].x, previous[i].y)) continue
+                assertTrue(current[i].x >= 0f && current[i].x <= width, "x ${current[i].x} fora de [0, $width) em t=${second}s")
+                if (previous[i].x - current[i].x > width / 2f) wraps++
+            }
+            previous = current
+        }
+        assertTrue(wraps > 0, "nenhuma estrela deu volta na largura em 240 s")
+    }
+
+    @Test
+    fun `grao visivel nao cai em caixa proibida e tem alfa de ate 0,5`() {
+        val grains = grains()
+        assertTrue(grains.any { it.alpha > 0f }, "nenhum grao visivel")
+        for (grain in grains.filter { it.alpha > 0f }) {
+            for (box in forbidden) {
+                assertTrue(!inside(box, grain.x, grain.y), "grao visivel na caixa: ${grain.x},${grain.y}")
+            }
+            assertTrue(grain.alpha <= 0.5f + 1e-4f, "alfa de grao ${grain.alpha} acima de 0,5")
+        }
+    }
+
+    @Test
+    fun `o campo de graos tem 600 entradas e raio de 0,5 dp`() {
+        val grains = grains()
+        assertEquals(600, grains.size, "graos")
+        assertTrue(grains.all { it.radius == 0.5f }, "raio de grao diferente de 0,5 dp")
+    }
+
+    @Test
+    fun `a poeira usa o token dust nos dois temas, com alfa 1 no escuro e 1,2 no claro`() {
+        assertEquals(AppGargantuaTokens.dust, hudStarfieldDustInk(dark = true).color, "poeira escura")
+        assertEquals(AppGargantuaTokens.dust, hudStarfieldDustInk(dark = false).color, "poeira clara")
+        assertEquals(1f, hudStarfieldDustInk(dark = true).alpha, 1e-4f, "alfa escuro da poeira")
+        assertEquals(1.2f, hudStarfieldDustInk(dark = false).alpha, 1e-4f, "alfa claro da poeira")
+    }
+
+    @Test
+    fun `cintilacao com periodo que divide 240 s, fator de 0,8 mais 0,2 seno e alfa acompanha`() {
         val stars = hudStarfieldStars(width, height, wells, forbidden)
         for (star in stars) {
-            assertTrue(star.twinklePeriodMs in listOf(3_000L, 4_000L, 5_000L, 6_000L), "periodo ${star.twinklePeriodMs}")
+            assertTrue(star.twinklePeriodMs in listOf(1_500L, 1_600L, 2_000L, 2_400L), "periodo ${star.twinklePeriodMs}")
             assertEquals(0L, loopMs % star.twinklePeriodMs, "periodo nao divide o laco")
         }
         var checked = 0
         for (timeMs in listOf(20_000L, 21_375L, 33_000L)) {
             val points = frame(timeMs)
-            for (star in stars) {
-                for (point in points.filter { it.x == star.x && it.layer == star.layer }) {
-                    assertTrue(abs(point.twinkle - 1f) <= 0.15f + 1e-4f, "cintilacao fora de 15%: ${point.twinkle}")
-                    val expected = 1f + 0.15f * sin(2.0 * PI * timeMs / star.twinklePeriodMs + star.twinklePhase).toFloat()
-                    assertEquals(expected, point.twinkle, 1e-3f, "fase da cintilacao em t=$timeMs")
-                    val far = wells.all { distance(point.x, point.y, it) >= 3f * it.radius }
-                    val middle = point.y in 40f..620f
-                    if (far && middle && point.alpha > 0f) {
-                        checked++
-                        assertEquals(min(1f, star.alpha * point.twinkle), point.alpha, 1e-4f, "alfa com cintilacao em t=$timeMs")
-                    }
+            for (i in stars.indices) {
+                val star = stars[i]
+                val point = points[i]
+                assertTrue(abs(point.twinkle - 0.8f) <= 0.2f + 1e-4f, "cintilacao fora de [0,6; 1]: ${point.twinkle}")
+                val expected = 0.8f + 0.2f * sin(2.0 * PI * timeMs / star.twinklePeriodMs + star.twinklePhase).toFloat()
+                assertEquals(expected, point.twinkle, 1e-3f, "fase da cintilacao em t=$timeMs")
+                if (farFrom(point.x, point.y) && point.y in 40f..620f && point.alpha > 0f) {
+                    checked++
+                    assertEquals(star.alpha * 0.2f * point.twinkle, point.alpha, 1e-4f, "alfa com cintilacao em t=$timeMs")
                 }
             }
         }
         assertTrue(checked > 0, "nenhum ponto longe e no meio para checar o alfa")
-    }
-
-    @Test
-    fun `exatamente seis estrelas com brilho em cruz, as seis maiores de perto`() {
-        val stars = hudStarfieldStars(width, height, wells, forbidden)
-        val glints = stars.filter { it.glint }
-        assertEquals(6, glints.size, "brilhos em cruz")
-        assertTrue(glints.all { it.layer == HudStarfieldLayer.NEAR }, "brilho fora das estrelas de perto")
-        val topRadii = stars.filter { it.layer == HudStarfieldLayer.NEAR }.map { it.radius }.sortedDescending().take(6)
-        assertEquals(topRadii, glints.map { it.radius }.sortedDescending(), "brilho nas seis maiores de perto")
     }
 
     @Test
@@ -233,53 +226,33 @@ class HudStarfieldTest {
     }
 
     @Test
-    fun `alfa de desenho no claro multiplica a atenuacao e no escuro fica o alfa da estrela`() {
+    fun `alfa de desenho no claro multiplica a luz e a atenuacao e no escuro fica o alfa da estrela`() {
         val boxes = listOf(HudStarfieldBox(left = 10f, top = 100f, right = 50f, bottom = 130f))
-        val near = HudStarfieldPoint(
-            x = 30f, y = 135f, radius = 1.5f, alpha = 0.9f, layer = HudStarfieldLayer.NEAR,
-            trailX = 0f, trailY = 0f, fade = 1f, twinkle = 1f
-        )
+        val near = HudStarfieldPoint(x = 30f, y = 135f, radius = 1.5f, alpha = 0.9f, fade = 1f, twinkle = 1f)
         val far = near.copy(y = 300f)
         assertEquals(0.9f, hudStarfieldDrawAlpha(dark = true, point = near, forbidden = boxes), 1e-4f, "escuro perto de caixa")
-        assertEquals(0.95f * 0.4f, hudStarfieldDrawAlpha(dark = false, point = near, forbidden = boxes), 1e-4f, "claro perto de caixa")
-        assertEquals(0.95f, hudStarfieldDrawAlpha(dark = false, point = far, forbidden = boxes), 1e-4f, "claro longe de caixa")
+        assertEquals(0.9f * 0.55f * 0.4f, hudStarfieldDrawAlpha(dark = false, point = near, forbidden = boxes), 1e-4f, "claro perto de caixa")
+        assertEquals(0.9f * 0.55f, hudStarfieldDrawAlpha(dark = false, point = far, forbidden = boxes), 1e-4f, "claro longe de caixa")
     }
 
     @Test
-    fun `tema escuro usa a cor quente com alfa e escala cheios em todas as camadas`() {
-        for (layer in listOf(HudStarfieldLayer.NEAR, HudStarfieldLayer.MID, HudStarfieldLayer.FAR)) {
-            val ink = hudStarfieldInk(dark = true, layer = layer, gold = false)
-            assertEquals(AppGargantuaTokens.hot, ink.color, "cor escura na camada $layer")
-            assertEquals(1f, ink.alpha, "alfa escuro na camada $layer")
-            assertEquals(1f, ink.radiusScale, "escala escura na camada $layer")
+    fun `tema escuro usa a cor quente ou o ouro com alfa e escala cheios`() {
+        for (gold in listOf(false, true)) {
+            val ink = hudStarfieldInk(dark = true, gold = gold)
+            assertEquals(if (gold) AppGargantuaTokens.gold else AppGargantuaTokens.hot, ink.color, "cor escura gold=$gold")
+            assertEquals(1f, ink.alpha, "alfa escuro gold=$gold")
+            assertEquals(1f, ink.radiusScale, "escala escura gold=$gold")
         }
     }
 
     @Test
-    fun `tema escuro dourado usa o ouro do token`() {
-        val ink = hudStarfieldInk(dark = true, layer = HudStarfieldLayer.NEAR, gold = true)
-        assertEquals(AppGargantuaTokens.gold, ink.color, "estrela dourada escura")
-    }
-
-    @Test
-    fun `tema claro usa a tinta do fg com alfa da L1 por camada e raio vezes 1,5`() {
-        val expected = listOf(
-            HudStarfieldLayer.NEAR to 0.95f,
-            HudStarfieldLayer.MID to 0.7f,
-            HudStarfieldLayer.FAR to 0.45f
-        )
-        for ((layer, alpha) in expected) {
-            val ink = hudStarfieldInk(dark = false, layer = layer, gold = false)
-            assertEquals(inkLight, ink.color, "tinta clara na camada $layer")
-            assertEquals(alpha, ink.alpha, "alfa claro na camada $layer")
-            assertEquals(1.5f, ink.radiusScale, "escala clara na camada $layer")
+    fun `tema claro usa a tinta do fg com alfa 0,55 e raio vezes 1,5, dourada incluida`() {
+        for (gold in listOf(false, true)) {
+            val ink = hudStarfieldInk(dark = false, gold = gold)
+            assertEquals(inkLight, ink.color, "tinta clara gold=$gold")
+            assertEquals(0.55f, ink.alpha, 1e-4f, "alfa claro gold=$gold")
+            assertEquals(1.5f, ink.radiusScale, "escala clara gold=$gold")
         }
-    }
-
-    @Test
-    fun `tema claro dourado usa a mesma tinta do fg`() {
-        val ink = hudStarfieldInk(dark = false, layer = HudStarfieldLayer.NEAR, gold = true)
-        assertEquals(inkLight, ink.color, "estrela dourada clara")
     }
 
     @Test

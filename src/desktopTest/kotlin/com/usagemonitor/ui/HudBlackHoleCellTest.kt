@@ -3,10 +3,9 @@ package com.usagemonitor.ui
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.ApiSource
@@ -18,11 +17,14 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudRingStrip
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Buraco negro (#600, A04): as contas minimizadas na lateral viram uma célula só, com a contagem;
  * na horizontal a faixa segue como antes. Tag `hudBlackHole` (literal, o nó ainda não existe).
+ * Órbita (#602, A06): um glifo por conta do buraco, o em execução com semântica própria.
  */
 @OptIn(ExperimentalTestApi::class)
 class HudBlackHoleCellTest {
@@ -80,13 +82,84 @@ class HudBlackHoleCellTest {
         onAllNodesWithTag("hudBlackHole").assertCountEquals(0)
     }
 
+    @Test
+    fun `buraco com quatro minimizadas desenha um glifo em orbita por conta`() = runDesktopComposeUiTest {
+        setStrip(fourMinimized, HudEdge.LEFT)
+
+        onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).assertCountEquals(4)
+    }
+
+    @Test
+    fun `so o glifo da conta em execucao leva a semantica de em execucao`() = runDesktopComposeUiTest {
+        val accounts = listOf(
+            account("A", minimized = true, sessionActive = true),
+            account("B", minimized = true),
+            account("C", minimized = true),
+            account("D", minimized = true)
+        )
+        setStrip(accounts, HudEdge.LEFT)
+
+        onAllNodesWithContentDescription("em execução", substring = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun `movimento continuo desenha um filamento por conta em execucao e nenhum nas ociosas`() = runDesktopComposeUiTest {
+        val accounts = listOf(
+            account("A", minimized = true, sessionActive = true),
+            account("B", minimized = true),
+            account("C", minimized = true, sessionActive = true),
+            account("D", minimized = true)
+        )
+        mainClock.autoAdvance = false
+        setStrip(accounts, HudEdge.LEFT, motion = AppMotionPolicy.Live)
+
+        onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(2)
+    }
+
+    @Test
+    fun `movimento continuo sem conta em execucao nao desenha filamento`() = runDesktopComposeUiTest {
+        mainClock.autoAdvance = false
+        setStrip(fourMinimized, HudEdge.LEFT, motion = AppMotionPolicy.Live)
+
+        onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `movimento reduzido nao desenha filamento mesmo com conta em execucao`() = runDesktopComposeUiTest {
+        val accounts = listOf(
+            account("A", minimized = true, sessionActive = true),
+            account("B", minimized = true),
+            account("C", minimized = true),
+            account("D", minimized = true)
+        )
+        setStrip(accounts, HudEdge.LEFT, motion = AppMotionPolicy.Reduced)
+
+        onAllNodesWithTag("hudBlackHoleFilament", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun `movimento reduzido mantem os glifos na mesma posicao em dois quadros e em posicoes distintas`() = runDesktopComposeUiTest {
+        setStrip(fourMinimized, HudEdge.LEFT)
+        mainClock.autoAdvance = false
+
+        onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).assertCountEquals(4)
+        val primeiroQuadro = onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).fetchSemanticsNodes().map { no -> no.positionInRoot }
+        mainClock.advanceTimeByFrame()
+        waitForIdle()
+        val segundoQuadro = onAllNodesWithTag("hudBlackHoleOrbitGlyph", useUnmergedTree = true).fetchSemanticsNodes().map { no -> no.positionInRoot }
+
+        assertEquals(primeiroQuadro, segundoQuadro)
+        assertEquals(4, primeiroQuadro.distinct().size)
+    }
+
     private fun ComposeUiTest.setStrip(
         accounts: List<HudAccount>,
         edge: HudEdge,
         minimizeProgress: Map<UsageTargetKey, Float> = emptyMap(),
+        motion: AppMotionPolicy = AppMotionPolicy.Reduced,
     ) {
         setContent {
-            ScreenTestTheme(isDark = true) {
+            ScreenTestTheme(isDark = true, motion = motion) {
                 HudRingStrip(
                     accounts = accounts,
                     edge = edge,
@@ -97,7 +170,7 @@ class HudBlackHoleCellTest {
                     minimizeProgress = minimizeProgress,
                     language = AppLanguage.PT,
                     onRingHovered = {},
-                    onHoleHovered = {},
+                    onHoleClicked = {},
                     onRingRefresh = {},
                     onItemPlaced = { _, _ -> },
                     onRingPlaced = { _, _ -> }
@@ -106,7 +179,7 @@ class HudBlackHoleCellTest {
         }
     }
 
-    private fun account(label: String, minimized: Boolean): HudAccount {
+    private fun account(label: String, minimized: Boolean, sessionActive: Boolean = false): HudAccount {
         val quota = HudQuota("5h", "28%", 0.28f, AppTone.OK, resetText = null, hasForecast = false)
         return HudAccount(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, label),
@@ -115,6 +188,7 @@ class HudBlackHoleCellTest {
             tone = AppTone.OK,
             quotas = listOf(quota),
             focusIndex = 0,
+            sessionActive = sessionActive,
             minimized = minimized
         )
     }

@@ -9,11 +9,14 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.components.HUD_BLACK_HOLE_GLYPH_SIZE
+import com.usagemonitor.presentation.ui.components.hudBlackHoleOrbit
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Geometria da coluna vertical com o buraco negro das minimizadas (issue #600, A03). */
+/** Geometria da coluna vertical com o buraco negro das minimizadas (issue #600, A03; #602, A05). */
 class HudBlackHoleGeometryTest {
 
     private val fallback = "Carregando"
@@ -31,8 +34,8 @@ class HudBlackHoleGeometryTest {
         val base = hudNotchSizes(completas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
         val comBuraco = hudNotchSizes(completas + minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
 
-        // Buraco = uma célula de anel + linha da contagem, mais o vão até ela.
-        assertEquals(base + HUD_RING_SIZE + HUD_WORD_LINE + HUD_ITEM_GAP, comBuraco)
+        // Buraco = uma célula (órbita + glifo, #602) mais a linha da contagem, mais o vão até ela.
+        assertEquals(base + 114.dp + HUD_WORD_LINE + HUD_ITEM_GAP, comBuraco)
     }
 
     @Test
@@ -89,6 +92,36 @@ class HudBlackHoleGeometryTest {
         val altura = hudNotchSizes(aplicadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
 
         assertTrue(altura <= teto, "altura=$altura teto=$teto")
+    }
+
+    @Test
+    fun `a celula do buraco mede 114 dp, a orbita de 45 dp mais meio glifo para cada lado`() {
+        assertEquals(114.dp, HUD_BLACK_HOLE_CELL_SIZE)
+    }
+
+    @Test
+    fun `a celula contem a orbita e o glifo em qualquer instante`() {
+        val tolerancia = 0.001f
+        val metade = HUD_BLACK_HOLE_CELL_SIZE.value / 2f + tolerancia
+        val folga = HUD_BLACK_HOLE_GLYPH_SIZE.value / 2f
+        for (instante in listOf(0L, 15_000L, 37_000L, 59_999L)) {
+            val orbita = hudBlackHoleOrbit((0 until 10).map { indice -> "M$indice" }, running = { false }, timeMs = instante)
+            assertEquals(10, orbita.size, "uma posicao por membro no instante $instante")
+            orbita.forEach { entrada ->
+                assertTrue(abs(entrada.x.value) + folga <= metade, "x=${entrada.x} no instante $instante")
+                assertTrue(abs(entrada.y.value) + folga <= metade, "y=${entrada.y} no instante $instante")
+            }
+        }
+    }
+
+    @Test
+    fun `com buraco a largura da coluna cabe a celula inteira`() {
+        val completas = listOf(conta("A"), conta("B"), conta("C"))
+        val minimizadas = (1..4).map { indice -> conta("M$indice", minimizada = true) }
+
+        val largura = hudNotchSizes(completas + minimizadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.width
+
+        assertTrue(largura >= HUD_BLACK_HOLE_CELL_SIZE + HUD_NOTCH_PADDING_ACROSS * 2, "largura=$largura")
     }
 
     /** Altura de referência: a coluna sem nenhuma minimizada, medida pela mesma função. */

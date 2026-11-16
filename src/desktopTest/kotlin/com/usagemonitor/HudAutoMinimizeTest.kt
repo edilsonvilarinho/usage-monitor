@@ -36,27 +36,40 @@ class HudAutoMinimizeTest {
 
     @Test
     fun `sem cota conta como zero e sai antes da conta de maior uso`() {
+        // Duas contas sem cota: uma sozinha não basta para passar do buraco (114 dp + linha), duas bastam.
         val a = conta("A", 0.9f)
         val b = conta("B", 0.6f)
-        val c = conta("C")
-        val contas = listOf(a, b, c)
+        val c1 = conta("C1")
+        val c2 = conta("C2")
+        val contas = listOf(a, b, c1, c2)
 
-        val umaSo = alturaCom(contas, setOf(c.targetKey))
-        assertEquals(setOf(c.targetKey), hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, umaSo))
+        val duas = alturaCom(contas, setOf(c1.targetKey, c2.targetKey))
+        assertEquals(
+            setOf(c1.targetKey, c2.targetKey),
+            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, duas)
+        )
 
-        val duas = alturaCom(contas, setOf(c.targetKey, b.targetKey))
-        assertEquals(setOf(c.targetKey, b.targetKey), hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, duas))
+        val tres = alturaCom(contas, setOf(c1.targetKey, c2.targetKey, b.targetKey))
+        assertEquals(
+            setOf(c1.targetKey, c2.targetKey, b.targetKey),
+            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, tres)
+        )
     }
 
     @Test
     fun `o uso da conta e a maior cota, nao a primeira`() {
+        // Pela maior cota a ordem é C (0,3), B (0,6), A (0,9). Pela primeira cota seria A (0,1), C (0,3).
         val a = conta("A", 0.1f, 0.9f)
         val b = conta("B", 0.6f)
-        val contas = listOf(a, b)
+        val c = conta("C", 0.3f)
+        val contas = listOf(a, b, c)
 
-        val teto = alturaCom(contas, setOf(b.targetKey))
+        val teto = alturaCom(contas, setOf(c.targetKey, b.targetKey))
 
-        assertEquals(setOf(b.targetKey), hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto))
+        assertEquals(
+            setOf(c.targetKey, b.targetKey),
+            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto)
+        )
     }
 
     @Test
@@ -66,9 +79,12 @@ class HudAutoMinimizeTest {
         val c = conta("C", 0.5f)
         val contas = listOf(a, b, c)
 
-        val teto = alturaCom(contas, setOf(a.targetKey))
+        val teto = alturaCom(contas, setOf(a.targetKey, b.targetKey))
 
-        assertEquals(setOf(a.targetKey), hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto))
+        assertEquals(
+            setOf(a.targetKey, b.targetKey),
+            hudAutoMinimizedTargets(contas, HudEdge.LEFT, fallback, teto)
+        )
     }
 
     @Test
@@ -98,14 +114,15 @@ class HudAutoMinimizeTest {
     fun `applyHudAutoMinimize marca so as contas escolhidas, com as duas flags`() {
         val a = conta("A", 0.9f)
         val b = conta("B", 0.6f)
-        val c = conta("C")
-        val contas = listOf(a, b, c)
-        val teto = alturaCom(contas, setOf(c.targetKey))
+        val c1 = conta("C1")
+        val c2 = conta("C2")
+        val contas = listOf(a, b, c1, c2)
+        val teto = alturaCom(contas, setOf(c1.targetKey, c2.targetKey))
 
         val aplicadas = applyHudAutoMinimize(contas, HudEdge.LEFT, fallback, teto)
 
         assertEquals(
-            listOf(false to false, false to false, true to true),
+            listOf(false to false, false to false, true to true, true to true),
             aplicadas.map { conta -> conta.minimized to conta.autoMinimized }
         )
     }
@@ -159,11 +176,14 @@ class HudAutoMinimizeTest {
         )
     }
 
-    /** Altura da coluna completa com as contas de [minimizadas] recolhidas: o teto de cada cenário. */
+    /**
+     * Altura da coluna com as contas de [minimizadas] recolhidas, pela mesma conta que a regra usa
+     * (`verticalCollapsed`, compacto desligado): o teto de cada cenário sai daqui, nunca de número fixo.
+     */
     private fun alturaCom(contas: List<HudAccount>, minimizadas: Set<UsageTargetKey>): Dp {
         val ajustadas = contas.map { conta ->
             if (conta.targetKey in minimizadas) conta.copy(minimized = true) else conta
         }
-        return hudNotchSizes(ajustadas, HudEdge.LEFT, fallback, hasUpdateIndicator = false).collapsed.height
+        return verticalCollapsed(ajustadas, fallback, compact = false).height
     }
 }

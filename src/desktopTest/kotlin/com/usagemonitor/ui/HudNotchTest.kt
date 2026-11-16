@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.platform.testTag
 import com.usagemonitor.HUD_RING_GAP
+import com.usagemonitor.HUD_BLACK_HOLE_CELL_SIZE
 import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.HUD_WORD_LINE
 import com.usagemonitor.HUD_RING_STROKE
@@ -327,16 +328,15 @@ class HudNotchTest {
         assertEquals(28.dp, ring.width, "largura do anel minimizado")
         assertEquals(28.dp, ring.height, "altura do anel minimizado")
     }
-
-    /** Buraco na lateral (#600 A04): a célula tem altura exata de anel + linha da contagem; largura não passa da geometria. */
+    /** Buraco na lateral (#600 A04, #602): a célula tem altura exata de célula + linha da contagem; largura não passa da geometria. */
     @Test
-    fun `buraco na lateral mede o anel mais a linha da contagem`() = runDesktopComposeUiTest {
+    fun `buraco na lateral mede a celula de 114 dp mais a linha da contagem`() = runDesktopComposeUiTest {
         val account = accounts.first().copy(minimized = true)
         setContent { notch(edge = HudEdge.LEFT, list = listOf(account)) }
 
         val hole = onNodeWithTag("hudBlackHole").getUnclippedBoundsInRoot()
         val geometry = hudNotchSizes(listOf(account), HudEdge.LEFT, "Carregando", false).collapsed
-        assertEquals(HUD_RING_SIZE + HUD_WORD_LINE, hole.height, "altura do buraco, lateral")
+        assertEquals(HUD_BLACK_HOLE_CELL_SIZE + HUD_WORD_LINE, hole.height, "altura do buraco, lateral")
         assertTrue(hole.width <= geometry.width, "largura do buraco (${hole.width}) passa da geometria (${geometry.width}), lateral")
     }
 

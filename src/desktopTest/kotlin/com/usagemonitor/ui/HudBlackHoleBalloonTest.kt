@@ -1,5 +1,8 @@
 package com.usagemonitor.ui
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -11,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -32,8 +36,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Buraco negro (#600, A05): o hover no buraco abre a lista das minimizadas; a linha abre o balão da conta
- * com a volta "← N no buraco" e o Restaurar, que tira só aquela conta. Tag `hudBlackHole` (literal).
+ * Buraco negro (#600, A05; #602, A02): o clique (ou Enter com foco) no buraco alterna a lista das minimizadas;
+ * hover não abre. Esc e clique na margem do notch, fora do buraco, fecham a lista. A linha abre o balão da conta
+ * só por clique ou Enter, com a volta "← N no buraco" e o Restaurar, que tira só aquela conta.
+ * Tags `hudBlackHole` e `hudContent` (literais).
  */
 @OptIn(ExperimentalTestApi::class)
 class HudBlackHoleBalloonTest {
@@ -42,17 +48,76 @@ class HudBlackHoleBalloonTest {
     private val minimized = labels.map { label -> account(label, minimized = true) }
 
     @Test
-    fun `hover no buraco abre a lista com os quatro nomes`() = runDesktopComposeUiTest {
+    fun `hover no buraco nao abre a lista`() = runDesktopComposeUiTest {
         setNotch(minimized)
         hoverHole()
+
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+    }
+
+    @Test
+    fun `clique no buraco abre a lista com os quatro nomes`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
 
         labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
     }
 
     @Test
+    fun `segundo clique no buraco fecha a lista`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        clickHole()
+
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+    }
+
+    @Test
+    fun `Enter com foco no buraco alterna a lista`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        onNodeWithTag("hudBlackHole").performSemanticsAction(SemanticsActions.RequestFocus)
+        onNodeWithTag("hudBlackHole").performKeyInput { pressKey(Key.Enter) }
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+
+        onNodeWithTag("hudBlackHole").performKeyInput { pressKey(Key.Enter) }
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+    }
+
+    @Test
+    fun `Esc fecha a lista do buraco`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        onNodeWithTag("hudBlackHole").performSemanticsAction(SemanticsActions.RequestFocus)
+        onNodeWithTag("hudBlackHole").performKeyInput { pressKey(Key.Escape) }
+
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+    }
+
+    @Test
+    fun `clique na margem do notch fora do buraco fecha a lista`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        clickNotchOutsideHole()
+
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+    }
+
+    @Test
+    fun `hover numa linha da lista nao abre o balao da conta`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        onNodeWithText(labels[1]).performMouseInput { enter(center) }
+        Thread.sleep(HOVER_SETTLE_MS)
+        waitForIdle()
+
+        onAllNodesWithText("← 4 no buraco").assertCountEquals(0)
+        onAllNodesWithText(labels[1]).assertCountEquals(1)
+    }
+
+    @Test
     fun `selecionar uma linha mostra o balao da conta com a volta e Restaurar`() = runDesktopComposeUiTest {
         setNotch(minimized)
-        hoverHole()
+        clickHole()
         onNodeWithText(labels[1]).performClick()
 
         onAllNodesWithText("← 4 no buraco").assertCountEquals(1)
@@ -62,7 +127,7 @@ class HudBlackHoleBalloonTest {
     @Test
     fun `voltar pela linha de volta mostra a lista outra vez`() = runDesktopComposeUiTest {
         setNotch(minimized)
-        hoverHole()
+        clickHole()
         onNodeWithText(labels[1]).performClick()
         onNodeWithText("← 4 no buraco").performClick()
 
@@ -73,11 +138,50 @@ class HudBlackHoleBalloonTest {
     fun `restaurar tira so aquela conta do buraco`() = runDesktopComposeUiTest {
         val toggled = mutableListOf<UsageTargetKey>()
         setNotch(minimized, onToggleMinimize = { target -> toggled += target })
-        hoverHole()
+        clickHole()
         onNodeWithText(labels[2]).performClick()
         onNodeWithContentDescription("Restaurar").performClick()
 
         assertEquals(listOf(minimized[2].targetKey), toggled)
+    }
+
+    @Test
+    fun `restaurar no balao da conta devolve a lista do buraco sem ela`() = runDesktopComposeUiTest {
+        setNotch(minimized)
+        clickHole()
+        onNodeWithText(labels[2]).performClick()
+        onNodeWithContentDescription("Restaurar").performClick()
+
+        onAllNodesWithText(labels[2]).assertCountEquals(0)
+        listOf(labels[0], labels[1], labels[3]).forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+        onAllNodesWithText("← 3 no buraco").assertCountEquals(0)
+    }
+
+    @Test
+    fun `conta que sai do buraco por outro caminho com o balao aberto some da lista`() = runDesktopComposeUiTest {
+        val state = setNotch(minimized)
+        clickHole()
+        onNodeWithText(labels[1]).performClick()
+        runOnIdle { state.value = state.value.map { account -> if (account.label == labels[1]) account.copy(minimized = false) else account } }
+        waitForIdle()
+
+        onAllNodesWithText(labels[1]).assertCountEquals(0)
+        listOf(labels[0], labels[2], labels[3]).forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+    }
+
+    @Test
+    fun `buraco esvaziado fecha o balao e nao reabre quando a conta volta a minimizar`() = runDesktopComposeUiTest {
+        val state = setNotch(listOf(minimized[0]))
+        clickHole()
+        onNodeWithText(labels[0]).performClick()
+        onNodeWithContentDescription("Restaurar").performClick()
+        waitForIdle()
+        onAllNodesWithContentDescription("Restaurar").assertCountEquals(0)
+
+        runOnIdle { state.value = listOf(minimized[0]) }
+        waitForIdle()
+
+        onAllNodesWithText(labels[0]).assertCountEquals(0)
     }
 
     @Test
@@ -87,7 +191,7 @@ class HudBlackHoleBalloonTest {
             account(labels[1], minimized = true)
         )
         setNotch(accounts)
-        hoverHole()
+        clickHole()
         onNodeWithText(labels[0]).performClick()
 
         onAllNodesWithContentDescription("Restaurar").assertCountEquals(0)
@@ -97,7 +201,7 @@ class HudBlackHoleBalloonTest {
     @Test
     fun `foco na linha da lista e Enter abrem o balao da conta`() = runDesktopComposeUiTest {
         setNotch(minimized)
-        hoverHole()
+        clickHole()
         onNodeWithText(labels[0]).performSemanticsAction(SemanticsActions.RequestFocus)
         onNodeWithText(labels[0]).performKeyInput { pressKey(Key.Enter) }
 
@@ -107,7 +211,7 @@ class HudBlackHoleBalloonTest {
     @Test
     fun `foco na linha da lista e Enter do teclado numerico abrem o balao da conta`() = runDesktopComposeUiTest {
         setNotch(minimized)
-        hoverHole()
+        clickHole()
         onNodeWithText(labels[3]).performSemanticsAction(SemanticsActions.RequestFocus)
         onNodeWithText(labels[3]).performKeyInput { pressKey(Key.NumPadEnter) }
 
@@ -118,13 +222,36 @@ class HudBlackHoleBalloonTest {
         onNodeWithTag("hudBlackHole").performMouseInput { enter(center) }
     }
 
-    private fun ComposeUiTest.setNotch(accounts: List<HudAccount>, onToggleMinimize: (UsageTargetKey) -> Unit = {}) {
+    private fun ComposeUiTest.clickHole() {
+        onNodeWithTag("hudBlackHole").performClick()
+    }
+
+    /** Clique a 2 px de uma quina do notch, do lado oposto ao buraco: margem, sem anel e sem buraco. */
+    private fun ComposeUiTest.clickNotchOutsideHole() {
+        val notch = onNodeWithTag(NOTCH_TAG).fetchSemanticsNode().boundsInRoot
+        val hole = onNodeWithTag("hudBlackHole").fetchSemanticsNode().boundsInRoot
+        // Canto do notch cai fora do corpo arredondado: o gesto nao recebe o clique (medido, HUDPROBE).
+        // Ponto no meio da faixa acima do buraco, dentro do corpo.
+        val point = if (hole.top - notch.top > MARGIN_PX) {
+            Offset(notch.width / 2f, (hole.top - notch.top) / 2f)
+        } else {
+            Offset(notch.width - MARGIN_PX, notch.height - MARGIN_PX)
+        }
+        onNodeWithTag(NOTCH_TAG).performMouseInput { click(point) }
+    }
+
+    /** Estado das contas fica aqui; o toggle de minimizar troca a conta como o app, então o Restaurar a tira do buraco. */
+    private fun ComposeUiTest.setNotch(
+        initial: List<HudAccount>,
+        onToggleMinimize: (UsageTargetKey) -> Unit = {}
+    ): MutableState<List<HudAccount>> {
+        val accounts = mutableStateOf(initial)
         setContent {
             ScreenTestTheme(isDark = true) {
                 HudNotch(
-                    accounts = accounts,
+                    accounts = accounts.value,
                     edge = HudEdge.LEFT,
-                    sizes = hudNotchSizes(accounts, HudEdge.LEFT, "Carregando", false),
+                    sizes = hudNotchSizes(accounts.value, HudEdge.LEFT, "Carregando", false),
                     fallbackLabel = "Carregando",
                     expanded = true,
                     language = AppLanguage.PT,
@@ -137,12 +264,18 @@ class HudBlackHoleBalloonTest {
                             teamSessionPulse = SessionPulse.EMPTY,
                             actions = inertShellActions(),
                             onRefresh = {},
-                            onToggleMinimize = onToggleMinimize
+                            onToggleMinimize = { target ->
+                                onToggleMinimize(target)
+                                accounts.value = accounts.value.map { item ->
+                                    if (item.targetKey == target) item.copy(minimized = false) else item
+                                }
+                            }
                         )
                     }
                 )
             }
         }
+        return accounts
     }
 
     /** Ações do app sem efeito: o balão da conta só precisa delas para montar as janelas do card. */
@@ -176,5 +309,13 @@ class HudBlackHoleBalloonTest {
             minimized = minimized,
             autoMinimized = auto
         )
+    }
+
+    private companion object {
+        const val NOTCH_TAG = "hudContent"
+        const val MARGIN_PX = 2f
+
+        /** Espera real para o atraso de 160 ms da linha antiga: se ele ainda existisse, a linha abriria o balão. */
+        const val HOVER_SETTLE_MS = 400L
     }
 }

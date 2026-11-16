@@ -16,6 +16,8 @@ object AppGargantuaTokens {
      */
     val horizon = Color(0xFF07080B)
     val gold = Color(0xFFE8AE63)
+    /** Lente do buraco em órbita (#602): espelho de `--gargantua-lens` no escuro; no claro o call site usa [gold]. */
+    val lens = Color(0xFFF4CF97)
     val hot = Color(0xFFFFF0CB)
     val dust = Color(0xFF8C643F)
     /** Lado que se afasta do observador: o disco escurece para brasa. */

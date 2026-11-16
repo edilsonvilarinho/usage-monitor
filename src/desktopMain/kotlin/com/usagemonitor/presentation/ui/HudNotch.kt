@@ -1,5 +1,10 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
@@ -206,6 +211,11 @@ internal fun HudNotch(
         if (!open) holeSelection = null
         if (!open && initialBalloonIndex == null) balloonIndex = null
     }
+    // A conta aberta deixa o buraco (Restaurar ou outro caminho): a lista volta sem ela, e o buraco vazio fecha o balão.
+    LaunchedEffect(holeMembers) {
+        if (holeSelection != null && holeSelection !in holeMembers) holeSelection = null
+        if (holeMembers.isEmpty() && balloonIndex == holeIndex) balloonIndex = null
+    }
     // A engrenagem abre o balão dela no hover, como o anel abre o da conta
     // (#317). Só com o notch aberto: durante o arrasto as alças continuam na
     // tela, e o índice gravado ali reabriria o balão ao soltar.
@@ -274,6 +284,14 @@ internal fun HudNotch(
                     .hoverable(hover.notch)
                     .onPlaced { coordinates -> ringItemBounds.body = coordinates }
                     .hudReorderKeys(reorder)
+                    .onKeyEvent { event ->
+                        val closes = event.type == KeyEventType.KeyDown && event.key == Key.Escape && balloonIndex == holeIndex
+                        if (closes) {
+                            balloonIndex = null
+                            holeSelection = null
+                        }
+                        closes
+                    }
                     // Só a mão move: arrastar pelo corpo tirava o notch ao clicar num anel.
                     .hudPressGesture(
                         draggable = false,
@@ -281,9 +299,15 @@ internal fun HudNotch(
                         onDragMove = {},
                         onDragEnd = {},
                         // Clique num anel recoleta a conta; na margem não faz nada.
+                        // Clique fora do buraco com a lista aberta fecha a lista (#602, A02).
                         onClick = { position ->
-                            hudRingKeyAt(ringItemBounds, currentAccounts, position)
-                                ?.let { key -> currentOnRefreshAccount(key) }
+                            val ring = hudRingKeyAt(ringItemBounds, currentAccounts, position)
+                            if (ring != null) {
+                                currentOnRefreshAccount(ring)
+                            } else if (balloonIndex == holeIndex && ringItemBounds.boxes[holeIndex]?.contains(position) != true) {
+                                balloonIndex = null
+                                holeSelection = null
+                            }
                         },
                         onHoldStart = reorder::start, onHoldMove = reorder::move, onHoldEnd = reorder::end
                     )
@@ -305,9 +329,14 @@ internal fun HudNotch(
                         balloonIndex = index
                         holeSelection = null
                     },
-                    onHoleHovered = {
-                        balloonIndex = holeIndex
-                        holeSelection = null
+                    // Clique no buraco alterna a lista: aberta, fecha; fechada, ou com a conta da lista aberta, mostra a lista.
+                    onHoleClicked = {
+                        if (balloonIndex == holeIndex && holeSelection == null) {
+                            balloonIndex = null
+                        } else {
+                            balloonIndex = holeIndex
+                            holeSelection = null
+                        }
                     },
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
@@ -387,7 +416,7 @@ internal fun HudNotch(
             }
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
-                accounts = accounts, holeMembers = holeMembers, holeSelection = holeSelection,
+                accounts = accounts, holeMembers = holeMembers, holeSelection = holeSelection?.takeIf { index -> index in holeMembers },
                 onHoleSelect = { position -> holeSelection = position }, sizes = sizes,
                 appBalloon = appBalloon, appBalloonHeight = appBalloonHeight, language = language,
                 accountActions = accountActions, ringCenters = ringCenters, ringDepths = ringDepths,

@@ -104,7 +104,7 @@ internal fun HudRingStrip(
     language: AppLanguage,
     onRingHovered: (Int) -> Unit,
     /** O cursor sobre o buraco negro da coluna (#600); a lista de contas minimizadas abre a partir dele. */
-    onHoleHovered: () -> Unit,
+    onHoleClicked: () -> Unit,
     onRingRefresh: (Int) -> Unit,
     onItemPlaced: (Int, LayoutCoordinates) -> Unit,
     onRingPlaced: (Int, LayoutCoordinates) -> Unit,
@@ -174,8 +174,9 @@ internal fun HudRingStrip(
                 val holeIndex = accounts.size
                 HudBlackHoleCell(
                     count = arrangement.holeMembers.size,
+                    members = arrangement.holeMembers.map { index -> accounts[index] },
                     language = language,
-                    onHovered = { hovered -> if (hovered) onHoleHovered() },
+                    onClick = onHoleClicked,
                     onItemPlaced = { coordinates -> onItemPlaced(holeIndex, coordinates) },
                     onRingPlaced = { coordinates ->
                         itemCoordinates[holeIndex] = coordinates
