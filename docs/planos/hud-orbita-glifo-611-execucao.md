@@ -29,6 +29,15 @@ dois estados (ocioso e em execução), sem perder a informação de cota e de ex
 
 - Mudança visual: passa pelo portão de protótipos (`prototipos/issue-611/`); nenhum Kotlin antes da escolha do usuário.
 - A geometria escolhida entra como função/constante pura com teste (TDD), como a da #602.
+- **Escolha do usuário (2026-11-16): P1 · Glifo 32 sem cena, raio 90** (`prototipos/issue-611/p1-glifo-32/index.html`,
+  `:325-344`). Glifo: disco de 32 dp em `AppGargantuaTokens.core` (#030508), sem cena Gargantua; marca real de 20 dp em
+  `AppGargantuaTokens.hot` (#FFF0CB); contorno de 1,2 dp no raio 15,4 dp — contínuo na cor da lente em execução,
+  tracejado 2/2 dp na ociosa; arcos de cota **fora** do disco, um anel por cota, traço 2,5 dp, folga 1,5 dp, o i-ésimo no
+  raio 16 + 1,5 + 1,25 + i·4 dp, começando em −90°, trilho de fundo em volta inteira. Raio externo do glifo com 3 cotas:
+  28 dp. Raio da órbita 90 dp; célula = 2·(90 + 28) = 236 dp. Passo, volta, rastro de 5° e filamento AZ2 seguem a #602;
+  o filamento sai do raio da órbita (não mais de 45 dp fixos).
+- Céu e poeira seguem o JSON da #602 (120 estrelas, `starBri` 20, 600 grãos, `grainA` 2, `grainSz` 0,5, deriva 1 dp/s a
+  0°) — o usuário confirmou que **não aparecem** na célula do buraco (captura do app enviada no chat em 2026-11-16).
 
 ## Atividades
 
@@ -38,14 +47,24 @@ dois estados (ocioso e em execução), sem perder a informação de cota e de ex
 | A02 | Protótipos com direções distintas; escolha do usuário | `prototipos/issue-611/` (fora do versionamento) |
 | A03 | TDD da geometria escolhida (glifo, raio, célula, sem sobreposição) | `HudBlackHoleOrbit.kt`, `HudBlackHoleGeometry.kt` |
 | A04 | Desenho do glifo escolhido + `docs/hud-notch.md`, protótipo e design system | `HudBlackHoleOrbitGlyphs.kt`, docs |
+| A05 | Céu e poeira dentro da célula do buraco: o poço do buraco usa o anel central, não a célula | `HudStarfieldCanvas.kt`, `HudNotch.kt` |
 
 ## Ponto de situação
 
 | Id | Situação | Comando e resultado |
 |---|---|---|
 | A01 | feito | sem harness de teste (documento); validado pela leitura dos arquivos citados em "Fatos confirmados" |
+| A02 | feito | sem harness (protótipo); P1–P4 conferidos por captura headless do Chrome (`--screenshot`, escuro/claro, 1x/2x, n=7 e n=10); escolhido P1 com raio 90 |
+
+- Céu ausente na célula (leitura, A05): o poço do buraco nasce do retângulo de `onRingPlaced`, que em
+  `HudBlackHoleCell.kt:55` é a caixa da célula inteira (114 dp), não o anel de 64 dp; `hudStarfieldWells`
+  (`HudStarfieldCanvas.kt:119-131`) dá raio `width / 2` = 57 dp, e o sorteio recusa ponto a menos de raio + 3 dp
+  (`HudStarfield.kt:240`): sobra só o canto da célula. A causa só fica confirmada pelo teste vermelho da A05.
 
 ## Problemas em aberto e riscos
+
+- Com 10 membros e dois vizinhos de 3 cotas, a corda a 36° no raio 90 (55,6 dp) fica 0,4 dp abaixo de 2 × 28 dp:
+  os trilhos externos encostam. Aceito pela escolha do raio 90.
 
 - Célula maior que 114 dp alarga a coluna vertical e muda a conta do auto-minimizar (`HudAutoMinimizeTest`, #600).
 - Hipótese não confirmada: os glifos "▯" da captura podem ser a marca deformada pela cena Gargantua em 24 dp; só a
