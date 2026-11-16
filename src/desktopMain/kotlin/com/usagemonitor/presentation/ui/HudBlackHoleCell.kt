@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import com.usagemonitor.HUD_BLACK_HOLE_CELL_SIZE
 import com.usagemonitor.HUD_RING_SIZE
 import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.HUD_WORD_LINE
@@ -49,7 +50,7 @@ internal fun HudBlackHoleCell(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(HUD_RING_SIZE).onPlaced { coordinates -> onRingPlaced(coordinates) },
+            modifier = Modifier.size(HUD_BLACK_HOLE_CELL_SIZE).onPlaced { coordinates -> onRingPlaced(coordinates) },
             contentAlignment = Alignment.Center
         ) {
             AppGargantuaRing(

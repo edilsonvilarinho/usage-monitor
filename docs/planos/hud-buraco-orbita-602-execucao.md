@@ -55,6 +55,7 @@ Parâmetros fixados pelo usuário (JSON da rodada 3, unidades medidas em `az-flu
 | A01 | Este plano |
 | A02 | Lista do buraco abre só por clique/Enter; hover não abre; clique fora e Esc fecham |
 | A03 | `HudNotch`: seleção do buraco que sai de `holeMembers` é descartada (`LaunchedEffect(holeMembers)` + `takeIf` no repasse ao balão); buraco vazio fecha o balão. Bug reproduzido antes da correção com estado elevado no teste (Haiku, `frontend-dev`) | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest"` → 3/16 falham, ex. `AssertionError: ... Did not expect any node but found '1' node that satisfies: (Text ... contains 'Anthropic — Charlie')` (`HudBlackHoleBalloonTest.kt:149`, conta restaurada seguia no balão). Verde: recorte `ui.*` + `HudBlackHole*` + `architecture.*` → 796 casos, 0 falhas (`test-runner`) |
+| A05 | `hudBlackHoleOrbit` (`HudBlackHoleOrbit.kt`, 9 casos); célula do buraco 114 dp (`HUD_BLACK_HOLE_CELL_SIZE`) na altura e no piso de largura da borda vertical com buraco (`HudNotchGeometry.kt`, 736 linhas); `HudBlackHoleCell` mede 114 dp com o anel centrado. Testes antigos atualizados por medirem o buraco de 64 dp: `HudNotchGeometryTest` (1), `HudNotchTest` (1), `HudAutoMinimizeTest` (4 fixtures: teto agora sai de `verticalCollapsed` com as contas esperadas; com o buraco de 114 dp + linha uma conta curta não basta, então os casos recolhem duas) (Haiku, `frontend-dev`, 4 agentes por limite de turnos) | Vermelho: `gradlew.bat desktopTest --tests "*HudBlackHoleOrbit*" --tests "com.usagemonitor.HudBlackHoleGeometryTest"` → 10/20 falham, ex. `AssertionError: expected:<114.0.dp> but was:<64.0.dp>` (`HudBlackHoleGeometryTest.kt:99`), `expected:<498.0.dp> but was:<448.0.dp>` (`:38`), `uma posicao por membro ... expected:<10> but was:<0>`. Verde: recorte `ui.*` + `HudBlackHole*` + `HudNotchGeometryTest` + `HudAutoMinimizeTest` + `*HudBlackHoleOrbit*` + `architecture.*` → 859 casos, 0 falhas (`test-runner`) |
 | A03 | Restaurar no balão do buraco volta à lista sem a conta; fecha se o buraco esvaziar |
 | A04 | Céu novo (quadro puro): 120 estrelas + 600 grãos, deriva horizontal, cintilação, sem rastro/cruz; canvas |
 | A05 | Órbita em comboio (quadro puro) e geometria estática da célula que a contém |
@@ -72,6 +73,7 @@ Cada atividade leva no mesmo commit `docs/hud-notch.md`, o design system e o pro
 
 ## Problemas em aberto e riscos
 
-- Raio de órbita 45 dp + glifo excede a célula de 64 dp: a largura mínima da barra pode subir; medir no A05.
+- Medido no A05: a célula do buraco passou a 114 dp e a barra lateral com buraco ganhou piso de 114 dp; auto-minimizar
+  pode recolher uma conta a mais que antes (o buraco custa mais que uma conta curta).
 - 720 pontos por quadro no canvas (120 estrelas + 600 grãos): custo a medir no A04.
 - Mudança em host de janela não é exercitada por teste (#342): o PR diz o risco.

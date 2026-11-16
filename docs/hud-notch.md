@@ -636,9 +636,15 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
 - **Arranjo.** `hudColumnArrangement` (`src/desktopMain/kotlin/com/usagemonitor/HudBlackHole.kt`) separa as contas.
   `shown` são as completas, na ordem. `holeMembers` são as minimizadas (manuais #576 e automáticas #596), na ordem de
   publicação, que é total e determinística. Sem minimizadas não existe buraco.
-- **Geometria.** O buraco mede uma célula: anel de 64 dp mais a linha da contagem. A largura é a da maior linha de
-  rótulo entre `AppLanguage.entries`. Com buraco, o piso do anel é 64 dp. Auto-minimizar mede a coluna com o buraco
-  (`verticalCollapsed`), então a regra converge com menos ou igual número de contas recolhidas.
+- **Geometria.** O buraco mede uma célula quadrada de `HUD_BLACK_HOLE_CELL_SIZE` = 114 dp (#602: órbita de 45 dp +
+  meio glifo de 12 dp, dos dois lados), com o anel de 64 dp no centro, mais a linha da contagem. A largura é a maior
+  entre 114 dp e a maior linha de rótulo de `AppLanguage.entries`; o piso de 114 dp vale **só** na borda vertical e só
+  com buraco (a barra do protótipo escolhido tem 128 dp). Tamanho estático, nunca por quadro. Auto-minimizar mede a
+  coluna com o buraco (`verticalCollapsed`): como o buraco agora custa 114 dp + linha, recolher uma conta curta sozinha
+  pode não encurtar a coluna e a regra recolhe a seguinte, de menor uso, até caber (`HudAutoMinimizeTest`).
+- **Órbita (#602).** `hudBlackHoleOrbit` (`HudBlackHoleOrbit.kt`, quadro puro) põe os membros num comboio: cabeça em
+  −π/2 + 2π·t/60 s, membro k a k·espaçamento atrás, espaçamento = min(40°, 360°/n), raio 45 dp, arco de 5° atrás de
+  cada um; as contas em execução ocupam as primeiras vagas, na ordem de publicação.
 - **Célula.** `HudBlackHoleCell` desenha o anel Gargantua sem arcos de cota e a contagem em `label*`: PT "1 minimizada"
   / "4 minimizadas", EN "1 minimized" / "4 minimized" (`hudBlackHoleCountLabel`, por `localized`). Tem
   `testTag("hudBlackHole")` e descrição semântica com o rótulo. O campo estelar trata o buraco como um anel.

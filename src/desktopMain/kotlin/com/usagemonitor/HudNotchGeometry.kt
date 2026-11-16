@@ -460,8 +460,8 @@ internal fun verticalCollapsed(
             }
         }
     }
-    // Célula do buraco: anel, uma linha da contagem e o vão até ela.
-    val all = if (hole) shownHeights + (HUD_RING_SIZE + HUD_WORD_LINE) else shownHeights
+    // Célula do buraco (#602): órbita inteira na altura, uma linha da contagem e o vão até ela.
+    val all = if (hole) shownHeights + (HUD_BLACK_HOLE_CELL_SIZE + HUD_WORD_LINE) else shownHeights
     val along = all.fold(0.dp) { sum, height -> sum + height } + HUD_ITEM_GAP * (all.size - 1).coerceAtLeast(0)
     // O rótulo do buraco é uma linha só, inteira: a maior largura entre os idiomas, para a troca não cortar o texto.
     val holeWordWidths = if (hole) {
@@ -478,8 +478,9 @@ internal fun verticalCollapsed(
             else -> account.stripLines.maxOf { line -> stripLineWidth(line) }
         }
     } ?: 0.dp
-    // Piso de 64 dp (HUD_RING_SIZE): vale para contas comuns e para o buraco, que é uma célula de anel.
-    val across = maxOf(HUD_RING_SIZE, widestWord, widestPercent)
+    // Piso de 64 dp (HUD_RING_SIZE) para contas comuns; com buraco, piso da célula de 114 dp (#602), só nesta borda.
+    val floor = if (hole) HUD_BLACK_HOLE_CELL_SIZE else HUD_RING_SIZE
+    val across = maxOf(floor, widestWord, widestPercent)
     return DpSize(
         width = across + HUD_NOTCH_PADDING_ACROSS * 2,
         height = along + HUD_NOTCH_PADDING_ALONG * 2 + HUD_NOTCH_SHOULDER * 2
