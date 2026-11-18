@@ -31,6 +31,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.usagemonitor.HudOrbitAccountSlot
@@ -180,6 +181,17 @@ private fun hudOrbitLabelWidths(accounts: List<HudAccount>, measure: (String) ->
     } ?: 0f
     val compact = accounts.maxOfOrNull { account -> measure(quotaText(account)) } ?: 0f
     return HudOrbitLabelWidths(complete = complete, compact = compact)
+}
+
+/**
+ * Diâmetro do campo orbital em dp, o mesmo que [HudOrbitField] desenha. A janela flutuante dimensiona o
+ * buraco e a coluna de botões com ele sem medir de novo: a medição é a de [rememberHudOrbitMeasure].
+ */
+@Composable
+internal fun rememberHudOrbitFieldDiameter(accounts: List<HudAccount>, params: HudOrbitParams, language: AppLanguage): Dp {
+    val measure = rememberHudOrbitMeasure(params)
+    val widths = remember(accounts, measure) { hudOrbitLabelWidths(accounts, measure) }
+    return hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter.dp
 }
 
 /** Corpo da HUD: fundo opaco circular com a borda e a poeira. */
