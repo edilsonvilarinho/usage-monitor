@@ -185,6 +185,19 @@ internal fun hudDetachedHoleRect(edge: HudEdge, windowSize: DpSize, notchCenterI
 }
 
 /**
+ * Centro do buraco solto, em pixel de tela, no ponto em que foi solto (#619): a posição da janela
+ * mais o centro do buraco na janela, em dp de composição, vezes a escala.
+ */
+internal fun hudDetachedDropCenter(windowPosition: DpOffset, holeRect: DpRect, scale: Float): HudFloatCenter {
+    val centerX = holeRect.left + (holeRect.right - holeRect.left) / 2f
+    val centerY = holeRect.top + (holeRect.bottom - holeRect.top) / 2f
+    return HudFloatCenter(
+        xPx = (windowPosition.x + centerX * scale).value.roundToInt(),
+        yPx = (windowPosition.y + centerY * scale).value.roundToInt()
+    )
+}
+
+/**
  * Modo solto (A10c): o centro do buraco é preso aos limites inteiros do monitor ([monitorBounds]),
  * e a borda, a fração e a área virtual saem de [hudFloatingDock] sobre a área útil. [holeD] é em
  * dp de composição; a borda virtual usa o diâmetro em dp de tela (`holeD * scale`). A coluna

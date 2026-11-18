@@ -18,9 +18,6 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.SessionPulse
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
-import com.usagemonitor.presentation.ui.HudAccountBalloonContent
-import com.usagemonitor.presentation.ui.HudFloatingBalloon
-import com.usagemonitor.presentation.ui.HudFloatingHud
 import com.usagemonitor.presentation.ui.HudMinimizeProgress
 import com.usagemonitor.presentation.ui.HudNotch
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
@@ -62,10 +59,7 @@ internal fun HudWindowContent(
     cliSessionPulses: Map<UsageTargetKey, SessionPulse>,
     teamSessionPulses: Map<UsageTargetKey, SessionPulse>,
     toggleMinimize: (UsageTargetKey) -> Unit,
-    floatingParams: HudOrbitParams,
-    floatingBalloon: HudFloatingBalloon?,
-    onFloatingBalloonToggle: (HudFloatingBalloon) -> Unit,
-    floatingSide: HudEdge,
+    detachedAlongShift: Dp,
     appBalloonHeight: Dp,
     autoRetract: Boolean,
     onToggleAutoRetract: () -> Unit,
@@ -108,63 +102,41 @@ internal fun HudWindowContent(
         )
     }
     Box(modifier = Modifier.fillMaxSize()) {
-        if (floating) {
-            HudFloatingHud(
-                accounts = accounts,
-                params = floatingParams,
-                language = language,
-                expanded = expanded && !dragging,
-                balloon = floatingBalloon,
-                balloonSide = floatingSide,
-                update = updateIndicator,
-                gearDescription = hudGearDescription(language),
-                onHoverChange = onHoverChange,
-                onAccountClick = { index -> onFloatingBalloonToggle(HudFloatingBalloon.Account(index)) },
-                onGearClick = { onFloatingBalloonToggle(HudFloatingBalloon.App) },
-                onToggleFloating = onToggleFloating,
-                onDragStart = onDragStart,
-                onDrag = onDragMove,
-                onDragEnd = onDragEnd,
-                balloonHeight = appBalloonHeight,
-                accountBalloon = { index ->
-                    HudAccountBalloonContent(accounts[index], language, accountActions, appBalloonHeight)
-                },
-                appBalloon = appBalloon
-            )
-        } else {
-            HudNotch(
-                accounts = accounts,
-                edge = edge,
-                sizes = sizes,
-                settledSizes = settledSizes,
-                minimize = minimize,
-                fallbackLabel = fallbackLabel,
-                fallbackTone = fallbackTone,
-                expanded = expanded && !dragging,
-                dragging = dragging,
-                updateIndicator = updateIndicator,
-                notchCenter = notchCenter,
-                language = language,
-                onHoverChange = onHoverChange,
-                onDragStart = onDragStart,
-                onDragMove = onDragMove,
-                onDragEnd = onDragEnd,
-                // Clique num anel recoleta aquela conta, como no Codenotch.
-                onRefreshAccount = { target -> viewModel.refresh(target) },
-                onReorderAccounts = onReorderAccounts,
-                // Os botões do card daquela conta, pela mesma regra do card.
-                accountActions = accountActions,
-                appBalloon = appBalloon,
-                appBalloonHeight = appBalloonHeight,
-                gearDescription = hudGearDescription(language),
-                autoRetract = autoRetract,
-                onToggleAutoRetract = onToggleAutoRetract,
-                floatingSupported = hudFloatingSupported(AutoStartManager.currentPlatform()),
-                floating = floating,
-                onToggleFloating = onToggleFloating,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        HudNotch(
+            accounts = accounts,
+            edge = edge,
+            sizes = sizes,
+            settledSizes = settledSizes,
+            minimize = minimize,
+            fallbackLabel = fallbackLabel,
+            fallbackTone = fallbackTone,
+            expanded = expanded && !dragging,
+            dragging = dragging,
+            updateIndicator = updateIndicator,
+            notchCenter = notchCenter,
+            language = language,
+            onHoverChange = onHoverChange,
+            onDragStart = onDragStart,
+            onDragMove = onDragMove,
+            onDragEnd = onDragEnd,
+            // Clique num anel recoleta aquela conta, como no Codenotch.
+            onRefreshAccount = { target -> viewModel.refresh(target) },
+            onReorderAccounts = onReorderAccounts,
+            // Os botões do card daquela conta, pela mesma regra do card.
+            accountActions = accountActions,
+            appBalloon = appBalloon,
+            appBalloonHeight = appBalloonHeight,
+            gearDescription = hudGearDescription(language),
+            autoRetract = autoRetract,
+            onToggleAutoRetract = onToggleAutoRetract,
+            floatingSupported = hudFloatingSupported(AutoStartManager.currentPlatform()),
+            floating = floating,
+            onToggleFloating = onToggleFloating,
+            // Modo flutuante (#619): o notch desprendido do buraco; encaixado, `detached` é falso.
+            detached = floating,
+            detachedAlongShift = detachedAlongShift,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

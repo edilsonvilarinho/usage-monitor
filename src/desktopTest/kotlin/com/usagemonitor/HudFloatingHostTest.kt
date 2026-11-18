@@ -298,4 +298,11 @@ class HudFloatingHostTest {
         assertEquals(60.dp, inside.holeRect.right - inside.holeRect.left)
         assertEquals(inside.bounds, outside.bounds)
     }
+
+    /** Buraco (10,20)-(30,40) tem centro (20,30); janela em (100,50) com escala 2 põe o centro em (140,110). */
+    @Test
+    fun `soltar o buraco devolve o centro dele em pixel, pela posicao da janela e a escala`() {
+        val center = hudDetachedDropCenter(DpOffset(100.dp, 50.dp), DpRect(10.dp, 20.dp, 30.dp, 40.dp), 2f)
+        assertEquals(HudFloatCenter(140, 110), center)
+    }
 }
