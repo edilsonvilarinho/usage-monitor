@@ -21,25 +21,32 @@ internal fun hudFloatingBounds(
     notchCenter: HudFloatCenter,
     windowWidthPx: Int,
     windowHeightPx: Int,
-    workArea: HudPxRect
+    workArea: HudPxRect,
+    anchorRadiusPx: Int
 ): HudPxRect {
     val effectiveCenter = center ?: notchCenter
-    val desiredX = effectiveCenter.xPx - windowWidthPx / 2
-    val desiredY = effectiveCenter.yPx - windowHeightPx / 2
+    val anchorX = clampAnchor(effectiveCenter.xPx, workArea.xPx, workArea.widthPx, anchorRadiusPx)
+    val anchorY = clampAnchor(effectiveCenter.yPx, workArea.yPx, workArea.heightPx, anchorRadiusPx)
 
-    val x = clampAxis(desiredX, workArea.xPx, workArea.widthPx, windowWidthPx)
-    val y = clampAxis(desiredY, workArea.yPx, workArea.heightPx, windowHeightPx)
-
-    return HudPxRect(xPx = x, yPx = y, widthPx = windowWidthPx, heightPx = windowHeightPx)
+    return HudPxRect(
+        xPx = anchorX - windowWidthPx / 2,
+        yPx = anchorY - windowHeightPx / 2,
+        widthPx = windowWidthPx,
+        heightPx = windowHeightPx
+    )
 }
 
-/** Prende um eixo entre a origem e a borda final da área; janela maior que o eixo fica na origem. */
-private fun clampAxis(desired: Int, origin: Int, areaLength: Int, windowLength: Int): Int {
-    val lastStart = origin + areaLength - windowLength
-    if (lastStart < origin) {
-        return origin
+/**
+ * Prende o centro de um eixo para que a âncora (raio [radius]) caiba entre a origem e a borda
+ * final da área. Âncora maior que o eixo: sem intervalo válido, o centro vai a origem + raio.
+ */
+private fun clampAnchor(center: Int, origin: Int, areaLength: Int, radius: Int): Int {
+    val lowest = origin + radius
+    val highest = origin + areaLength - radius
+    if (highest < lowest) {
+        return lowest
     }
-    return desired.coerceIn(origin, lastStart)
+    return center.coerceIn(lowest, highest)
 }
 
 /**

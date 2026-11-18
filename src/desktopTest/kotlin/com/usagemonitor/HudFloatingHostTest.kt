@@ -14,29 +14,40 @@ class HudFloatingHostTest {
     private val windowSize = DpSize(200.dp, 60.dp)
     private val notch = HudFloatCenter(500, 40)
 
+    /** Buraco de diâmetro 60: a âncora do minimizado tem raio 30. */
+    private val holeDiameter = 60.dp
+
     @Test
     fun `sem centro salvo nasce centrado no notch atual`() {
-        val position = hudFloatingWindowPosition(null, notch, windowSize, area)
+        val position = hudFloatingWindowPosition(null, notch, windowSize, area, anchorDiameter = 0.dp)
         assertEquals(DpOffset(400.dp, 10.dp), position)
     }
 
     @Test
     fun `com centro salvo fica centrado nele, nao no notch`() {
-        val position = hudFloatingWindowPosition(HudFloatCenter(300, 200), notch, windowSize, area)
+        val position = hudFloatingWindowPosition(HudFloatCenter(300, 200), notch, windowSize, area, 0.dp)
         assertEquals(DpOffset(200.dp, 170.dp), position)
     }
 
+    /** Centro (0,0) vai a (30,30): o buraco fica de (0,0) a (60,60), encostado nas duas bordas. */
     @Test
-    fun `centro perto do canto e prendido dentro da area`() {
-        val position = hudFloatingWindowPosition(HudFloatCenter(10, 10), notch, windowSize, area)
-        assertEquals(DpOffset(0.dp, 0.dp), position)
+    fun `buraco no canto superior esquerdo encosta nas duas bordas`() {
+        val position = hudFloatingWindowPosition(HudFloatCenter(0, 0), notch, windowSize, area, holeDiameter)
+        assertEquals(DpOffset(-70.dp, 0.dp), position)
+    }
+
+    /** Centro (1000,800) vai a (970,770): o buraco fica de (940,740) a (1000,800). */
+    @Test
+    fun `buraco no canto inferior direito encosta nas duas bordas`() {
+        val position = hudFloatingWindowPosition(HudFloatCenter(1000, 800), notch, windowSize, area, holeDiameter)
+        assertEquals(DpOffset(870.dp, 740.dp), position)
     }
 
     @Test
-    fun `area com origem deslocada prende na origem dela`() {
+    fun `area com origem deslocada prende o buraco a partir da origem dela`() {
         val offsetArea = ScreenWorkArea(100.dp, 50.dp, DpSize(1000.dp, 800.dp))
-        val position = hudFloatingWindowPosition(HudFloatCenter(110, 60), notch, windowSize, offsetArea)
-        assertEquals(DpOffset(100.dp, 50.dp), position)
+        val position = hudFloatingWindowPosition(HudFloatCenter(110, 60), notch, windowSize, offsetArea, holeDiameter)
+        assertEquals(DpOffset(30.dp, 50.dp), position)
     }
 
     @Test
@@ -45,7 +56,8 @@ class HudFloatingHostTest {
             center = HudFloatCenter(100, 100),
             notchCenter = notch,
             windowSize = DpSize(200.dp, 100.dp),
-            area = ScreenWorkArea.Unknown
+            area = ScreenWorkArea.Unknown,
+            anchorDiameter = holeDiameter
         )
         assertEquals(DpOffset(0.dp, 50.dp), position)
     }
@@ -53,7 +65,7 @@ class HudFloatingHostTest {
     @Test
     fun `centro de janela de largura impar faz a ida e volta exata`() {
         val oddSize = DpSize(201.dp, 60.dp)
-        val position = hudFloatingWindowPosition(HudFloatCenter(500, 300), notch, oddSize, area)
+        val position = hudFloatingWindowPosition(HudFloatCenter(500, 300), notch, oddSize, area, 0.dp)
         assertEquals(HudFloatCenter(500, 300), hudFloatCenterOf(position, oddSize))
     }
 
@@ -142,6 +154,36 @@ class HudFloatingHostTest {
     @Test
     fun `posicao com centro salvo fica centrada nele`() {
         assertEquals(DpOffset(78.dp, 200.dp), geometry(center = HudFloatCenter(500, 300)).position)
+    }
+
+    /** Buraco (raio 30) no canto superior esquerdo: centro vai a (30,30); janela em (30-422, 30-100). */
+    @Test
+    fun `minimizado com buraco no canto superior esquerdo prende o buraco`() {
+        assertEquals(DpOffset(-392.dp, -70.dp), geometry(center = HudFloatCenter(0, 0)).position)
+    }
+
+    /** Buraco no canto inferior direito: centro vai a (970,770); janela em (970-422, 770-100). */
+    @Test
+    fun `minimizado com buraco no canto inferior direito prende o buraco`() {
+        assertEquals(DpOffset(548.dp, 670.dp), geometry(center = HudFloatCenter(1000, 800)).position)
+    }
+
+    /** Campo expandido (raio 100) no canto: centro vai a (100,100); o campo fica dentro da área. */
+    @Test
+    fun `expandido no canto superior esquerdo desloca o campo para dentro`() {
+        assertEquals(DpOffset(-322.dp, 0.dp), geometry(center = HudFloatCenter(0, 0), expanded = true).position)
+    }
+
+    /** Centro gravado (0,0) fixo: expandir e recolher devolve a mesma posição do minimizado. */
+    @Test
+    fun `ao recolher volta ao mesmo centro gravado`() {
+        val saved = HudFloatCenter(0, 0)
+        val collapsedBefore = geometry(center = saved).position
+        geometry(center = saved, expanded = true)
+        val collapsedAfter = geometry(center = saved).position
+
+        assertEquals(collapsedBefore, collapsedAfter)
+        assertEquals(DpOffset(-392.dp, -70.dp), collapsedAfter)
     }
 
     @Test

@@ -262,7 +262,7 @@ internal fun HudWindowHost(
         balloonSize = DpSize(HUD_BALLOON_WIDTH, appBalloonHeight),
         handleSize = HUD_HANDLE_SIZE,
         gap = HUD_HANDLE_GAP,
-        expanded = false,
+        expanded = expanded,
         balloonOpen = false
     )
     val restHitRegion = when {

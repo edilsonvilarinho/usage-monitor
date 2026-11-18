@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudFloatingBalloon
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
@@ -48,7 +49,8 @@ internal fun hudFloatingWindowGeometry(
 ): HudFloatingWindowGeometry {
     val unscaled = hudFloatingWindowSize(maxFieldDiameter, balloonSize, handleSize, gap)
     val size = DpSize(unscaled.width * scale, unscaled.height * scale)
-    val position = hudFloatingWindowPosition(center, notchCenter, size, area)
+    val anchorDiameter = if (expanded) maxFieldDiameter * scale else holeDiameter * scale
+    val position = hudFloatingWindowPosition(center, notchCenter, size, area, anchorDiameter)
     val windowCenterXPx = (position.x.value + size.width.value / 2f).roundToInt()
     val balloonSide = hudFloatingBalloonSide(windowCenterXPx, area.toPxRect())
     val parts = hudFloatingParts(
@@ -76,14 +78,16 @@ internal fun hudFloatingWindowPosition(
     center: HudFloatCenter?,
     notchCenter: HudFloatCenter,
     windowSize: DpSize,
-    area: ScreenWorkArea
+    area: ScreenWorkArea,
+    anchorDiameter: Dp
 ): DpOffset {
     val rect = hudFloatingBounds(
         center = center,
         notchCenter = notchCenter,
         windowWidthPx = windowSize.width.value.roundToInt(),
         windowHeightPx = windowSize.height.value.roundToInt(),
-        workArea = area.toPxRect()
+        workArea = area.toPxRect(),
+        anchorRadiusPx = ceil(anchorDiameter.value / 2f).toInt()
     )
     return DpOffset(rect.xPx.dp, rect.yPx.dp)
 }
