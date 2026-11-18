@@ -37,6 +37,7 @@ import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudFloatingColumnWindowSize
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_FLOATING_COLUMN_TEST_TAG
@@ -158,10 +159,20 @@ class HudFloatingHudTest {
         onAllNodesWithText("balloon-account-0").assertCountEquals(0)
     }
 
+    /** A11j: a altura do balão de conta é a do conteúdo dela, limitada pela maior; não estica até a maior. */
     @Test
-    fun `balao de conta usa a altura de conta, nao a da engrenagem`() = hudTest {
+    fun `balao de conta tem a altura do conteudo dela, limitada pela maior`() = hudTest {
+        val expected = hudBalloonHeight(accounts[2], TALLEST_BALLOON_HEIGHT)
+        assertTrue(expected < TALLEST_BALLOON_HEIGHT, "a conta precisa ser menor que a maior para o teste discriminar")
         render(expanded = true, balloon = HudFloatingBalloon.Account(2))
-        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertHeightIsEqualTo(200.dp)
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertHeightIsEqualTo(expected)
+    }
+
+    /** A11j: a lista do buraco ocupa a altura da maior, como o balão do buraco na barra. */
+    @Test
+    fun `balao da lista do buraco tem a altura da maior, nao a da engrenagem`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.Hole(null))
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertHeightIsEqualTo(TALLEST_BALLOON_HEIGHT)
     }
 
     @Test
@@ -175,6 +186,13 @@ class HudFloatingHudTest {
     fun `balao da engrenagem sai numa moldura de HudBalloon`() = hudTest {
         render(expanded = true, balloon = HudFloatingBalloon.App)
         onAllNodesWithTag(HUD_BALLOON_TEST_TAG).assertCountEquals(1)
+    }
+
+    /** A11j: a engrenagem mantém a altura própria, nunca a da maior. */
+    @Test
+    fun `balao da engrenagem tem a altura do appBalloon`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.App)
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertHeightIsEqualTo(APP_BALLOON_HEIGHT)
     }
 
     @Test
@@ -208,6 +226,12 @@ class HudFloatingHudTest {
     private companion object {
         const val UPDATE_PHRASE = "Atualização pronta para reiniciar"
         const val FALLBACK_LABEL = "Sem conta"
+
+        /** Altura do balão da engrenagem nos testes: é o `appBalloonHeight` que o host passa. */
+        val APP_BALLOON_HEIGHT = 120.dp
+
+        /** Altura da maior do notch nos testes: teto do balão de conta e altura da lista do buraco. */
+        val TALLEST_BALLOON_HEIGHT = 400.dp
 
         /** Tag da célula do buraco negro na coluna (`HudBlackHoleCell`). */
         const val HUD_BLACK_HOLE_CELL_TAG = "hudBlackHole"
@@ -303,8 +327,8 @@ class HudFloatingHudTest {
                         onDragStart = onDragStart,
                         onDrag = {},
                         onDragEnd = onDragEnd,
-                        balloonHeight = 120.dp,
-                        accountBalloonHeight = 200.dp,
+                        appBalloonHeight = APP_BALLOON_HEIGHT,
+                        tallestBalloonHeight = TALLEST_BALLOON_HEIGHT,
                         accountBalloon = { index ->
                             Box(Modifier.fillMaxSize().testTag("accountBalloonProbe")) { Text("balloon-account-$index") }
                         },

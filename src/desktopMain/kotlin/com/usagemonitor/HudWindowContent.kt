@@ -138,8 +138,8 @@ internal fun HudWindowContent(
                 onDragStart = onDragStart,
                 onDrag = onDragMove,
                 onDragEnd = onDragEnd,
-                balloonHeight = appBalloonHeight,
-                accountBalloonHeight = sizes.balloon.height,
+                appBalloonHeight = appBalloonHeight,
+                tallestBalloonHeight = sizes.balloon.height,
                 minimize = minimize,
                 accountBalloon = { index ->
                     HudAccountBalloonContent(accounts[index], language, accountActions, sizes.balloon.height)

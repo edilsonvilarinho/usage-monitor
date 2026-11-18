@@ -36,6 +36,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.HudPxRect
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudColumnArrangement
 import com.usagemonitor.hudFloatingBalloonHeight
 import com.usagemonitor.hudFloatingBalloonTop
@@ -88,8 +89,8 @@ internal fun HudFloatingHud(
     onDragStart: () -> Unit,
     onDrag: () -> Unit,
     onDragEnd: () -> Unit,
-    balloonHeight: Dp,
-    accountBalloonHeight: Dp = balloonHeight,
+    appBalloonHeight: Dp,
+    tallestBalloonHeight: Dp = appBalloonHeight,
     minimize: HudMinimizeProgress = HudMinimizeProgress(emptyMap(), moving = false),
     accountBalloon: @Composable (Int) -> Unit,
     appBalloon: @Composable () -> Unit,
@@ -102,8 +103,8 @@ internal fun HudFloatingHud(
 ) {
     val hitBoxes = remember { HudRingHitBoxes() }
     val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
-    // A janela reserva a maior altura entre a da engrenagem e a da conta; o balão aberto usa a própria (A11i).
-    val reserveHeight = hudFloatingBalloonHeight(balloonHeight, accountBalloonHeight)
+    // A janela reserva a maior altura entre as do balão de contas e da lista (A11j) e a da engrenagem (A11i); cada balão usa a sua.
+    val reserveHeight = hudFloatingBalloonHeight(appBalloonHeight, tallestBalloonHeight)
     val hover = rememberHudFloatingHover(onHoverChange)
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -173,10 +174,11 @@ internal fun HudFloatingHud(
             val balloonTop = hudFloatingBalloonTop(ringCenterY, reserveHeight, maxHeight)
             // A caixa do HudBalloon é HUD_BALLOON_GAP mais larga que o corpo; no lado esquerdo o corpo fica depois do vão.
             val boxLeft = if (balloonSide == HudEdge.LEFT) balloonRect.left - HUD_BALLOON_GAP else balloonRect.left
+            val bodyHeight = hudFloatingBodyHeight(balloon, accounts, appBalloonHeight, tallestBalloonHeight)
             HudBalloon(
                 edge = balloonSide,
                 tailCenter = { with(density) { (ringCenterY - balloonTop).toPx() } },
-                bodyHeight = if (balloon is HudFloatingBalloon.Account) accountBalloonHeight else balloonHeight,
+                bodyHeight = bodyHeight,
                 modifier = Modifier.offset(x = boxLeft, y = balloonTop).hoverable(hover.balloon),
                 content = {
                     HudFloatingBalloonContent(
@@ -184,8 +186,7 @@ internal fun HudFloatingHud(
                         accounts = accounts,
                         language = language,
                         accountActions = accountActions,
-                        balloonHeight = balloonHeight,
-                        accountBalloonHeight = accountBalloonHeight,
+                        bodyHeight = bodyHeight,
                         accountBalloon = accountBalloon,
                         appBalloon = appBalloon,
                         onHoleSelect = onHoleSelect,
@@ -303,15 +304,14 @@ private fun HudFloatingBalloonContent(
     accounts: List<HudAccount>,
     language: AppLanguage,
     accountActions: @Composable (HudAccount) -> Unit,
-    balloonHeight: Dp,
-    accountBalloonHeight: Dp,
+    bodyHeight: Dp,
     accountBalloon: @Composable (Int) -> Unit,
     appBalloon: @Composable () -> Unit,
     onHoleSelect: (Int) -> Unit,
     onHoleBack: () -> Unit
 ) {
     when (balloon) {
-        is HudFloatingBalloon.Account -> Box(Modifier.fillMaxWidth().height(accountBalloonHeight)) {
+        is HudFloatingBalloon.Account -> Box(Modifier.fillMaxWidth().height(bodyHeight)) {
             accountBalloon(balloon.index)
         }
         HudFloatingBalloon.App -> appBalloon()
@@ -321,7 +321,7 @@ private fun HudFloatingBalloonContent(
             selected = balloon.selection,
             language = language,
             accountActions = accountActions,
-            bodyHeight = balloonHeight,
+            bodyHeight = bodyHeight,
             onSelect = onHoleSelect,
             onBack = onHoleBack
         )
@@ -362,3 +362,18 @@ private fun HudFloatingDragArea(
 /** Posiciona e dimensiona um filho pelo retângulo calculado por [hudFloatingColumnParts]. */
 private fun Modifier.placedAt(rect: DpRect): Modifier =
     offset(x = rect.left, y = rect.top).size(rect.right - rect.left, rect.bottom - rect.top)
+
+/**
+ * Altura do corpo do balão aberto (A11j): a conta usa a altura do próprio conteúdo, limitada pela
+ * mais alta; a lista do buraco usa a mais alta; a engrenagem, a própria.
+ */
+private fun hudFloatingBodyHeight(
+    balloon: HudFloatingBalloon,
+    accounts: List<HudAccount>,
+    appHeight: Dp,
+    tallestHeight: Dp
+): Dp = when (balloon) {
+    is HudFloatingBalloon.Account -> hudBalloonHeight(accounts[balloon.index], tallestHeight)
+    HudFloatingBalloon.App -> appHeight
+    is HudFloatingBalloon.Hole -> tallestHeight
+}
