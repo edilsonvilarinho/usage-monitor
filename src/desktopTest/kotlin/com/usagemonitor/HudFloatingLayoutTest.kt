@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -134,6 +135,149 @@ class HudFloatingLayoutTest {
         assertEquals(HudEdge.RIGHT, hudFloatingBalloonSide(3700, secondArea))
     }
 
+    /** Janela do modo coluna: 80 + 4x6 + 2x60 + 2x264 de largura; altura = dobro da coluna (640). */
+    @Test
+    fun `column window is wide enough for both sides and tall enough for the slide`() {
+        val size = hudFloatingColumnWindowSize(COLUMN, balloon, 80.dp, gap)
+
+        assertEquals(COLUMN_WINDOW, size)
+    }
+
+    /** Coluna curta com balão alto: a altura da janela é a do balão, não o dobro da coluna. */
+    @Test
+    fun `column window height is the balloon when it is taller than twice the column`() {
+        val size = hudFloatingColumnWindowSize(DpSize(60.dp, 100.dp), DpSize(264.dp, 300.dp), 80.dp, gap)
+
+        assertEquals(DpSize(752.dp, 300.dp), size)
+    }
+
+    /** Minimizado: só o buraco no centro da janela (336..416, 280..360); coluna e balão somem. */
+    @Test
+    fun `column mode minimized keeps only the hole and the hit area is the hole`() {
+        val parts = columnLayout(expanded = false, holeCenterYPx = 540, side = HudEdge.LEFT, balloonOpen = true)
+
+        assertEquals(DpRect(336.dp, 280.dp, 416.dp, 360.dp), parts.hole)
+        assertEquals(parts.hole, parts.hitRect)
+        assertNull(parts.column)
+        assertNull(parts.balloon)
+    }
+
+    /** Buraco no meio da área (y 540): coluna centrada no Y do buraco, à direita (lado LEFT). */
+    @Test
+    fun `column is centered on the hole when the hole is in the middle of the work area`() {
+        val parts = columnLayout(holeCenterYPx = 540, side = HudEdge.LEFT)
+
+        assertEquals(DpRect(422.dp, 160.dp, 482.dp, 480.dp), parts.column)
+        assertEquals(DpRect(336.dp, 280.dp, 416.dp, 360.dp), parts.hole)
+    }
+
+    /**
+     * Canto superior direito (centro x 1800, y 40): o lado com mais espaço é o esquerdo
+     * (RIGHT). A coluna fica à esquerda do buraco e desce até a área (top 280, não 160).
+     * O buraco não se move.
+     */
+    @Test
+    fun `column goes left of the hole and slides down at the top right corner`() {
+        assertEquals(HudEdge.RIGHT, hudFloatingBalloonSide(1800, PRIMARY_AREA))
+
+        val parts = columnLayout(holeCenterYPx = 40, side = HudEdge.RIGHT)
+
+        assertEquals(DpRect(270.dp, 280.dp, 330.dp, 600.dp), parts.column)
+        assertEquals(DpRect(336.dp, 280.dp, 416.dp, 360.dp), parts.hole)
+    }
+
+    /**
+     * Canto inferior esquerdo (centro x 120, y 1040): o lado com mais espaço é o direito
+     * (LEFT). A coluna fica à direita do buraco e sobe até a área (top 40, não 160).
+     */
+    @Test
+    fun `column goes right of the hole and slides up at the bottom left corner`() {
+        assertEquals(HudEdge.LEFT, hudFloatingBalloonSide(120, PRIMARY_AREA))
+
+        val parts = columnLayout(holeCenterYPx = 1040, side = HudEdge.LEFT)
+
+        assertEquals(DpRect(422.dp, 40.dp, 482.dp, 360.dp), parts.column)
+    }
+
+    /** Buraco na borda superior da área: a coluna encosta na metade de baixo da janela (top 320). */
+    @Test
+    fun `hole on the top edge of the work area pushes the column to the lower half of the window`() {
+        val parts = columnLayout(holeCenterYPx = 0, side = HudEdge.LEFT)
+
+        assertEquals(320.dp, parts.column?.top)
+        assertEquals(DpRect(422.dp, 320.dp, 482.dp, 640.dp), parts.column)
+    }
+
+    /** Qualquer Y do buraco, dos dois lados: a coluna nunca sai da janela. */
+    @Test
+    fun `column stays inside the window for any hole height on both sides`() {
+        for (y in listOf(-1000, -300, 0, 40, 540, 1040, 1080, 2000)) {
+            for (side in listOf(HudEdge.LEFT, HudEdge.RIGHT)) {
+                val column = columnLayout(holeCenterYPx = y, side = side).column
+                val label = "y=$y side=$side"
+
+                assertNotNull(column, "coluna ausente $label")
+                assertInside(column, COLUMN_WINDOW, "column $label")
+            }
+        }
+    }
+
+    /** Expandido sem balão: recorte = buraco ∪ coluna (336..482 x 160..480). */
+    @Test
+    fun `expanded column without balloon hit area is the hole united with the column`() {
+        val parts = columnLayout(holeCenterYPx = 540, side = HudEdge.LEFT)
+
+        assertEquals(DpRect(336.dp, 160.dp, 482.dp, 480.dp), parts.hitRect)
+        assertNull(parts.balloon)
+    }
+
+    /** Balão além da coluna (lado LEFT): x 488..752, centrado na vertical da janela (220..420). */
+    @Test
+    fun `balloon sits beyond the column and the hit area includes it`() {
+        val parts = columnLayout(holeCenterYPx = 540, balloonOpen = true, side = HudEdge.LEFT)
+
+        assertEquals(DpRect(488.dp, 220.dp, 752.dp, 420.dp), parts.balloon)
+        assertEquals(DpRect(336.dp, 160.dp, 752.dp, 480.dp), parts.hitRect)
+    }
+
+    /** Todo estado, em todo Y de teste, cabe na janela fixa. */
+    @Test
+    fun `every column state fits inside the same fixed window size`() {
+        for (y in listOf(40, 540, 1040)) {
+            for (expanded in listOf(false, true)) {
+                for (balloonOpen in listOf(false, true)) {
+                    for (side in listOf(HudEdge.LEFT, HudEdge.RIGHT)) {
+                        val parts = columnLayout(expanded, y, side, balloonOpen)
+                        val label = "y=$y expanded=$expanded balloonOpen=$balloonOpen side=$side"
+
+                        assertInside(parts.hitRect, COLUMN_WINDOW, "hitRect $label")
+                        parts.column?.let { assertInside(it, COLUMN_WINDOW, "column $label") }
+                        parts.balloon?.let { assertInside(it, COLUMN_WINDOW, "balloon $label") }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun columnLayout(
+        expanded: Boolean = true,
+        holeCenterYPx: Int,
+        side: HudEdge,
+        balloonOpen: Boolean = false
+    ): HudFloatingColumnParts =
+        hudFloatingColumnParts(
+            windowSize = COLUMN_WINDOW,
+            expanded = expanded,
+            columnSize = COLUMN,
+            holeDiameter = 80.dp,
+            holeCenterYPx = holeCenterYPx,
+            workArea = PRIMARY_AREA,
+            balloonOpen = balloonOpen,
+            balloonSide = side,
+            balloonSize = balloon,
+            gap = gap
+        )
+
     private fun layout(expanded: Boolean, balloonOpen: Boolean, side: HudEdge): HudFloatingParts =
         hudFloatingParts(
             windowSize = windowSize,
@@ -163,5 +307,11 @@ class HudFloatingLayoutTest {
     private companion object {
         /** Monitor 1920x1080 com origem em (0, 0). */
         val PRIMARY_AREA = HudPxRect(xPx = 0, yPx = 0, widthPx = 1920, heightPx = 1080)
+
+        /** Coluna de anéis de referência: 60 de largura, 320 de altura (8 contas, por exemplo). */
+        val COLUMN = DpSize(60.dp, 320.dp)
+
+        /** Janela do modo coluna: 752 (buraco 80, dois vãos de 6 por lado, coluna 60, balão 264) x 640. */
+        val COLUMN_WINDOW = DpSize(752.dp, 640.dp)
     }
 }

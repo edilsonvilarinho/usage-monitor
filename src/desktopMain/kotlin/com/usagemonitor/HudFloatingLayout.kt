@@ -89,6 +89,96 @@ internal fun hudFloatingParts(
     )
 }
 
+/**
+ * Retângulos do modo coluna (A11b): buraco no centro da janela, coluna de anéis ao lado dele
+ * e balão além da coluna. Não há campo circular.
+ */
+internal data class HudFloatingColumnParts(
+    /** Buraco negro central: sempre visível e nunca se move dentro da janela. */
+    val hole: DpRect,
+    /** Coluna de anéis ao lado do buraco; `null` quando minimizado. */
+    val column: DpRect?,
+    /** Balão aberto, além da coluna; `null` quando fechado ou minimizado. */
+    val balloon: DpRect?,
+    /** União do que está visível: o recorte da janela. */
+    val hitRect: DpRect
+)
+
+/**
+ * Tamanho fixo da janela do modo coluna: largura = buraco + 4 vãos + coluna dos dois lados
+ * + balão dos dois lados; altura = a maior entre o dobro da coluna (o deslize vertical) e o balão.
+ */
+internal fun hudFloatingColumnWindowSize(columnSize: DpSize, balloonSize: DpSize, holeDiameter: Dp, gap: Dp): DpSize {
+    val width = holeDiameter + gap * 4 + columnSize.width * 2 + balloonSize.width * 2
+    val height = maxOf(columnSize.height * 2, balloonSize.height)
+    return DpSize(width, height)
+}
+
+/**
+ * Retângulos do modo coluna. Buraco sempre no centro da janela. Coluna ao lado do buraco, no
+ * lado de [balloonSide] (LEFT = direita, RIGHT = esquerda), centrada no Y do buraco e deslizada
+ * para caber na área de trabalho e na janela. Balão além da coluna, centrado na vertical.
+ */
+internal fun hudFloatingColumnParts(
+    windowSize: DpSize,
+    expanded: Boolean,
+    columnSize: DpSize,
+    holeDiameter: Dp,
+    holeCenterYPx: Int,
+    workArea: HudPxRect,
+    balloonOpen: Boolean,
+    balloonSide: HudEdge,
+    balloonSize: DpSize,
+    gap: Dp
+): HudFloatingColumnParts {
+    val centerX = windowSize.width / 2f
+    val centerY = windowSize.height / 2f
+    val hole = centeredRect(centerX, centerY, holeDiameter, holeDiameter)
+    if (!expanded) {
+        return HudFloatingColumnParts(hole = hole, column = null, balloon = null, hitRect = hole)
+    }
+
+    val columnTop = columnTopDp(windowSize, columnSize, holeCenterYPx, workArea)
+    val columnLeft = if (balloonSide == HudEdge.LEFT) {
+        centerX + holeDiameter / 2f + gap
+    } else {
+        centerX - holeDiameter / 2f - gap - columnSize.width
+    }
+    val column = DpRect(columnLeft, columnTop, columnLeft + columnSize.width, columnTop + columnSize.height)
+
+    val balloon = if (balloonOpen) {
+        balloonRect(windowSize, balloonSide, balloonSize.width, balloonSize.height)
+    } else {
+        null
+    }
+
+    val visible = listOfNotNull(hole, column, balloon)
+    return HudFloatingColumnParts(
+        hole = hole,
+        column = column,
+        balloon = balloon,
+        hitRect = unionOf(visible)
+    )
+}
+
+/**
+ * Topo da coluna em relação à janela. Ideal: centrada no buraco (metade da janela menos metade
+ * da coluna). Limites: a área de trabalho, convertida para a janela, e a própria janela. O buraco
+ * não se move; só a coluna desliza. Janela fora da área cai no limite da janela.
+ */
+private fun columnTopDp(windowSize: DpSize, columnSize: DpSize, holeCenterYPx: Int, workArea: HudPxRect): Dp {
+    val windowTopPx = holeCenterYPx - windowSize.height.value / 2f
+    val areaTopInWindow = workArea.yPx - windowTopPx
+    val areaBottomInWindow = workArea.yPx + workArea.heightPx - windowTopPx
+    val windowHeight = windowSize.height.value
+    val columnHeight = columnSize.height.value
+    val ideal = (windowHeight - columnHeight) / 2f
+    val low = maxOf(0f, areaTopInWindow)
+    val high = minOf(windowHeight - columnHeight, areaBottomInWindow - columnHeight)
+    val top = maxOf(0f, minOf(maxOf(ideal, low), high))
+    return top.dp
+}
+
 /** Retângulo de [width] x [height] centrado em ([centerX], [centerY]). */
 private fun centeredRect(centerX: Dp, centerY: Dp, width: Dp, height: Dp): DpRect =
     DpRect(
