@@ -32,6 +32,11 @@ Varredura do agente `explorer` sobre `docs/hud-notch.md` e `Hud*.kt`.
   pelo dono. Nenhum Kotlin antes da escolha.
 - O modo encaixado de hoje não muda; o flutuante é adicional.
 - Comportamento nativo novo (janela solta, transparência, clique atravessável) nasce restrito à plataforma medida (#340).
+- **Escolha do dono (2026-11-18): P05 · órbita radial**, com quatro mudanças (`prototipos/issue-619/briefing-r2.md`):
+  o modo encaixado e a faixa recolhida de hoje ficam; o flutuante entra por um novo botão redondo na coluna dos botões
+  (alfinete, mão, novo, engrenagem); campo expandido menor (~240 dp) com o fundo do corpo da barra HUD, sem gradiente
+  dourado; disco de acreção do buraco girando (atrás de `AppMotionPolicy.continuous`); protótipo R2 com painel de
+  parâmetros que exporta JSON, para o dono ajustar e devolver os valores.
 
 ## Atividades
 
@@ -46,7 +51,7 @@ Varredura do agente `explorer` sobre `docs/hud-notch.md` e `Hud*.kt`.
 | ID | Estado | Execução |
 |---|---|---|
 | A01 | feito | sem harness (documento); conferido por leitura |
-| A02 | em andamento | — |
+| A02 | feito | sem harness (protótipo); P01–P10 conferidos por captura headless do Chrome a 1400 px (escuro/claro); devolvidos uma vez P02–P08; escolhido P05. R2 (`prototipos/issue-619/r2-orbita-radial/`) devolvido uma vez (rótulos fora do campo, cena encaixada, botões) e aprovado: giro conferido por diferença de quadros `?t=0` × `?t=1500`, JSON de parâmetros e restauração por `#p=` conferidos |
 
 ## Problemas em aberto e riscos
 
