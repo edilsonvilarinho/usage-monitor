@@ -113,8 +113,11 @@ internal data class HudFloatingColumnParts(
 /**
  * Tamanho fixo da janela do modo coluna: largura = buraco + 4 vãos + coluna dos dois lados
  * + balão dos dois lados; altura = a maior entre o dobro da coluna mais as alças dos dois
- * extremos (`2·(2·handleSize + 2·gap)`) e o balão. Sem as alças na conta, a coluna colada
- * no extremo do deslize empurra engrenagem e encaixar para fora da janela.
+ * extremos (`2·(2·handleSize + 2·gap)`) e o dobro do balão (`2·balão`, A11l). O buraco fica
+ * no centro da janela, então metade do balão cai para cima e metade para baixo; com só o
+ * buraco à vista, um balão de altura `h` só cabe inteiro se a janela tiver `2·h`. Sem as
+ * alças na conta, a coluna colada no extremo do deslize empurra engrenagem e encaixar para
+ * fora da janela.
  */
 internal fun hudFloatingColumnWindowSize(
     columnSize: DpSize,
@@ -125,7 +128,7 @@ internal fun hudFloatingColumnWindowSize(
 ): DpSize {
     val width = holeDiameter + gap * 4 + columnSize.width * 2 + balloonSize.width * 2
     val handlesBothEnds = (handleSize * 2 + gap * 2) * 2
-    val height = maxOf(columnSize.height * 2 + handlesBothEnds, balloonSize.height)
+    val height = maxOf(columnSize.height * 2 + handlesBothEnds, balloonSize.height * 2)
     return DpSize(width, height)
 }
 

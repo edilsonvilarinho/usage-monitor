@@ -143,12 +143,48 @@ class HudFloatingLayoutTest {
         assertEquals(COLUMN_WINDOW, size)
     }
 
-    /** Coluna curta com balão alto: a altura da janela é a do balão, não o dobro da coluna. */
+    /**
+     * Coluna curta com balão alto: a altura da janela é o dobro do balão (A11l), para que um balão
+     * inteiro caiba para cima e para baixo do buraco, que fica no centro.
+     */
     @Test
-    fun `column window height is the balloon when it is taller than twice the column`() {
+    fun `column window height is twice the balloon when the balloon is taller than the column`() {
         val size = hudFloatingColumnWindowSize(DpSize(60.dp, 100.dp), DpSize(264.dp, 400.dp), 80.dp, 32.dp, gap)
 
-        assertEquals(DpSize(752.dp, 400.dp), size)
+        assertEquals(DpSize(752.dp, 800.dp), size)
+    }
+
+    /**
+     * A11l: só o buraco (coluna sem anéis) com balão de 600 dp. A janela tem de caber um balão inteiro
+     * acima e abaixo do centro, onde o buraco fica; antes a altura era a do balão, e o balão saía dela.
+     */
+    @Test
+    fun `window holds a whole tall balloon above and below the hole when only the hole is left`() {
+        val window = hudFloatingColumnWindowSize(DpSize(60.dp, 0.dp), DpSize(264.dp, 600.dp), 80.dp, 32.dp, gap)
+
+        assertTrue(window.height >= 1200.dp, "altura da janela ${window.height} menor que 2 x balão de 600 dp")
+    }
+
+    /**
+     * A11l: buraco 10 dp abaixo do topo da área útil e balão de 600 dp preso ao topo da área (A11k).
+     * A base do balão tem de cair dentro da janela; senão a fileira de ações sai cortada.
+     */
+    @Test
+    fun `balloon base stays inside the window when the hole is 10 dp below the top of the work area`() {
+        val tallBalloon = DpSize(264.dp, 600.dp)
+        val window = hudFloatingColumnWindowSize(DpSize(60.dp, 0.dp), tallBalloon, 80.dp, 32.dp, gap)
+        val holeCenterY = window.height / 2f
+        val areaTop = holeCenterY - 10.dp
+        val top = hudFloatingBalloonTop(
+            ringCenterY = holeCenterY,
+            balloonHeight = tallBalloon.height,
+            windowHeight = window.height,
+            areaTop = areaTop,
+            areaBottom = window.height
+        )
+        val bottom = top + tallBalloon.height
+
+        assertTrue(bottom <= window.height, "base do balão $bottom fora da janela ${window.height} (topo $top, área a partir de $areaTop)")
     }
 
     /**
