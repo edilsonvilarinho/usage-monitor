@@ -394,8 +394,9 @@ class LocalCredentialDataSourceTest {
 
     @Test
     fun `refresh failure reports the http status and body`() = runTest {
-        val nearExpiry = System.currentTimeMillis() + 60 * 1000L
-        writeCredentials(accessToken = "old-token", refreshToken = "rt", expiresAt = nearExpiry)
+        // Token já vencido: sem access token válido, a falha da renovação tem de aparecer.
+        val expired = System.currentTimeMillis() - 60 * 1000L
+        writeCredentials(accessToken = "old-token", refreshToken = "rt", expiresAt = expired)
         val dataSource = LocalCredentialDataSource(
             httpClient = jsonHttpClient {
                 respond(
@@ -442,8 +443,8 @@ class LocalCredentialDataSourceTest {
 
     @Test
     fun `refresh failure does not touch the credentials file`() = runTest {
-        val nearExpiry = System.currentTimeMillis() + 60 * 1000L
-        writeCredentials(accessToken = "old-token", refreshToken = "rt", expiresAt = nearExpiry)
+        val expired = System.currentTimeMillis() - 60 * 1000L
+        writeCredentials(accessToken = "old-token", refreshToken = "rt", expiresAt = expired)
         val before = credentialsFile.readText()
         val dataSource = LocalCredentialDataSource(
             httpClient = jsonHttpClient { respondError(HttpStatusCode.BadRequest) },
@@ -453,6 +454,44 @@ class LocalCredentialDataSourceTest {
         assertFailsWith<IllegalStateException> { dataSource.loadAnthropicSession() }
 
         assertEquals(before, credentialsFile.readText())
+    }
+
+    @Test
+    fun `rejected refresh token keeps the session while the access token is still valid`() = runTest {
+        val unexpired = System.currentTimeMillis() + 60 * 1000L
+        writeCredentials(accessToken = "still-valid-token", refreshToken = "revoked-rt", expiresAt = unexpired)
+        val before = credentialsFile.readText()
+        val dataSource = LocalCredentialDataSource(
+            httpClient = jsonHttpClient {
+                respond(
+                    content = ByteReadChannel(
+                        """{"error":"invalid_grant","error_description":"Refresh token expired"}"""
+                    ),
+                    status = HttpStatusCode.BadRequest,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            },
+            homeDirProvider = homeDirProvider
+        )
+
+        val session = dataSource.loadAnthropicSession()
+
+        assertEquals("still-valid-token", session.accessToken)
+        assertEquals(before, credentialsFile.readText())
+    }
+
+    @Test
+    fun `server error from the token endpoint still throws while the access token is valid`() = runTest {
+        val unexpired = System.currentTimeMillis() + 60 * 1000L
+        writeCredentials(accessToken = "still-valid-token", refreshToken = "rt", expiresAt = unexpired)
+        val dataSource = LocalCredentialDataSource(
+            httpClient = jsonHttpClient { respondError(HttpStatusCode.InternalServerError) },
+            homeDirProvider = homeDirProvider
+        )
+
+        val error = assertFailsWith<IllegalStateException> { dataSource.loadAnthropicSession() }
+
+        assertTrue(error.message.orEmpty().contains("Token refresh falhou (HTTP 500)"), error.message)
     }
 
     private fun writeClaudeConfig(
