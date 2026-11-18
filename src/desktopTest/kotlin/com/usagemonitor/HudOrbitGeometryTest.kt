@@ -23,7 +23,7 @@ class HudOrbitGeometryTest {
         assertEquals(28.0, p.accD.toDouble(), "accD")
         assertEquals(8.0, p.markD.toDouble(), "markD")
         assertEquals(32.0, p.holeD.toDouble(), "holeD")
-        assertEquals(29.0, p.tiltDegrees.toDouble(), "tilt")
+        assertEquals(29.0, p.tiltPercent.toDouble(), "tilt")
         assertEquals(3.0, p.diskWidthPercent.toDouble(), "diskW")
         assertEquals(3.5, p.diskSpinSeconds.toDouble(), "spin")
         assertEquals(180.0, p.orbitPeriodSeconds.toDouble(), "orbS")

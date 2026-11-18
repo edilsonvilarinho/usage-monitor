@@ -20,8 +20,8 @@ internal data class HudOrbitParams(
     val accD: Float = 28f,
     val markD: Float = 8f,
     val holeD: Float = 32f,
-    /** Inclinação do disco de acreção, em graus. */
-    val tiltDegrees: Float = 29f,
+    /** Inclinação do disco de acreção, em porcentagem: ry = rx * tilt / 100. */
+    val tiltPercent: Float = 29f,
     /** Espessura do disco, em porcentagem. */
     val diskWidthPercent: Float = 3f,
     /** Segundos para uma volta do disco. */
