@@ -255,6 +255,60 @@ class HudFloatingLayoutTest {
         assertEquals(DpRect(284.dp, 396.dp, 316.dp, 466.dp), parts.buttons)
     }
 
+    /**
+     * Buraco a 20 px da base da área (y 1060): a coluna desce até a base e a pilha de alças fica
+     * acima dela, tudo dentro da área útil (A11h). Embaixo, a engrenagem sairia pela barra de tarefas.
+     */
+    @Test
+    fun `buttons stay inside the work area above the column when the hole is 20 px above its bottom`() {
+        val parts = columnLayout(holeCenterYPx = 1060, side = HudEdge.LEFT)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertInsideArea(column, holeCenterYPx = 1060, label = "column y=1060")
+        assertInsideArea(buttons, holeCenterYPx = 1060, label = "buttons y=1060")
+        assertTrue(buttons.bottom <= column.top, "alças fora de cima da coluna: buttons=$buttons column=$column")
+    }
+
+    /** Buraco a 20 px do topo da área (y 20): alças abaixo da coluna, tudo dentro da área útil (A11h). */
+    @Test
+    fun `buttons stay inside the work area below the column when the hole is 20 px below its top`() {
+        val parts = columnLayout(holeCenterYPx = 20, side = HudEdge.LEFT)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertInsideArea(column, holeCenterYPx = 20, label = "column y=20")
+        assertInsideArea(buttons, holeCenterYPx = 20, label = "buttons y=20")
+        assertTrue(buttons.top >= column.bottom, "alças fora de baixo da coluna: buttons=$buttons column=$column")
+    }
+
+    /** Buraco no meio da área (y 540): alças abaixo da coluna, tudo dentro da área útil (A11h). */
+    @Test
+    fun `buttons stay inside the work area below the column when the hole is in the middle`() {
+        val parts = columnLayout(holeCenterYPx = 540, side = HudEdge.LEFT)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertInsideArea(column, holeCenterYPx = 540, label = "column y=540")
+        assertInsideArea(buttons, holeCenterYPx = 540, label = "buttons y=540")
+        assertTrue(buttons.top >= column.bottom, "alças fora de baixo da coluna: buttons=$buttons column=$column")
+    }
+
+    /**
+     * Área útil de 400 px com o buraco em y 196 (área em 200..600 na janela): a coluna sozinha cabe,
+     * mas com a pilha embaixo ela passa da base. O deslize considera o bloco inteiro (A11h).
+     */
+    @Test
+    fun `the whole column and button stack slides into a short work area`() {
+        val area = HudPxRect(xPx = 0, yPx = 0, widthPx = 1920, heightPx = 400)
+        val parts = columnLayout(holeCenterYPx = 196, side = HudEdge.LEFT, workArea = area)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertInsideArea(column, holeCenterYPx = 196, label = "column", workArea = area)
+        assertInsideArea(buttons, holeCenterYPx = 196, label = "buttons", workArea = area)
+    }
+
     /** Minimizado: nem coluna nem botões. */
     @Test
     fun `buttons are absent while minimized`() {
@@ -339,7 +393,8 @@ class HudFloatingLayoutTest {
         side: HudEdge,
         balloonOpen: Boolean = false,
         window: DpSize = COLUMN_WINDOW,
-        columnSize: DpSize = COLUMN
+        columnSize: DpSize = COLUMN,
+        workArea: HudPxRect = PRIMARY_AREA
     ): HudFloatingColumnParts =
         hudFloatingColumnParts(
             windowSize = window,
@@ -347,7 +402,7 @@ class HudFloatingLayoutTest {
             columnSize = columnSize,
             holeDiameter = 80.dp,
             holeCenterYPx = holeCenterYPx,
-            workArea = PRIMARY_AREA,
+            workArea = workArea,
             balloonOpen = balloonOpen,
             balloonSide = side,
             balloonSize = balloon,
@@ -378,6 +433,24 @@ class HudFloatingLayoutTest {
         assertTrue(
             rect.left >= 0.dp && rect.top >= 0.dp && rect.right <= size.width && rect.bottom <= size.height,
             "$label fora da janela $size: $rect"
+        )
+    }
+
+    /** Dentro da janela e da área útil; a área útil vem em px de tela e vira dp de janela, como no layout. */
+    private fun assertInsideArea(
+        rect: DpRect,
+        holeCenterYPx: Int,
+        label: String,
+        window: DpSize = COLUMN_WINDOW,
+        workArea: HudPxRect = PRIMARY_AREA
+    ) {
+        assertInside(rect, window, label)
+        val windowTopPx = holeCenterYPx - window.height.value / 2f
+        val areaTop = workArea.yPx - windowTopPx
+        val areaBottom = workArea.yPx + workArea.heightPx - windowTopPx
+        assertTrue(
+            rect.top.value >= areaTop && rect.bottom.value <= areaBottom,
+            "$label fora da área útil [$areaTop, $areaBottom]: $rect"
         )
     }
 

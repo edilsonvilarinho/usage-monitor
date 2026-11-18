@@ -150,7 +150,8 @@ internal fun hudFloatingColumnParts(
     val centerX = windowSize.width / 2f
     val centerY = windowSize.height / 2f
     val hole = centeredRect(centerX, centerY, holeDiameter, holeDiameter)
-    val columnTop = columnTopDp(windowSize, columnSize, holeCenterYPx, workArea)
+    val slide = columnSlide(windowSize, columnSize, handleSize, gap, holeCenterYPx, workArea)
+    val columnTop = slide.top
     val columnLeft = if (balloonSide == HudEdge.LEFT) {
         centerX + holeDiameter / 2f + gap
     } else {
@@ -159,7 +160,7 @@ internal fun hudFloatingColumnParts(
     val column = DpRect(columnLeft, columnTop, columnLeft + columnSize.width, columnTop + columnSize.height)
 
     // Slots sempre calculados: minimizado, a coluna e as alças existem no mesmo retângulo, e a íris é que as revela (A11e).
-    val buttonsSlot = buttonsRect(column, windowSize, handleSize, gap)
+    val buttonsSlot = buttonsRect(column, windowSize, handleSize, gap, slide.stackAbove)
     if (!expanded) {
         return HudFloatingColumnParts(
             hole = hole,
@@ -192,32 +193,63 @@ internal fun hudFloatingColumnParts(
 
 /**
  * Engrenagem e encaixar: duas alças empilhadas, de altura `2·handleSize + gap`, centradas no X da
- * coluna. Ficam logo abaixo dela; se não couberem dentro da janela, sobem para logo acima.
+ * coluna. [stackAbove] `true` põe a pilha logo acima da coluna, `false` logo abaixo; `null` usa a
+ * regra pela janela (abaixo se couber, senão acima), que só vale quando nenhum lado cabe na área.
  */
-private fun buttonsRect(column: DpRect, windowSize: DpSize, handleSize: Dp, gap: Dp): DpRect {
+private fun buttonsRect(column: DpRect, windowSize: DpSize, handleSize: Dp, gap: Dp, stackAbove: Boolean?): DpRect {
     val height = handleSize * 2 + gap
     val centerX = (column.left + column.right) / 2f
     val below = column.bottom + gap
-    val top = if (below + height <= windowSize.height) below else column.top - gap - height
+    val top = when (stackAbove) {
+        true -> column.top - gap - height
+        false -> below
+        null -> if (below + height <= windowSize.height) below else column.top - gap - height
+    }
     return DpRect(centerX - handleSize / 2f, top, centerX + handleSize / 2f, top + height)
 }
 
+/** Topo da coluna e lado da pilha de alças; [stackAbove] `null` quando nenhum lado cabe na área útil. */
+private data class HudColumnSlide(val top: Dp, val stackAbove: Boolean?)
+
 /**
- * Topo da coluna em relação à janela. Ideal: centrada no buraco (metade da janela menos metade
- * da coluna). Limites: a área de trabalho, convertida para a janela, e a própria janela. O buraco
- * não se move; só a coluna desliza. Janela fora da área cai no limite da janela.
+ * Coluna e pilha de alças como um bloco só, dentro da área útil. Ideal: coluna centrada no buraco,
+ * presa à área e à janela. Passo 1: a coluna fica no ideal e a pilha vai embaixo, senão em cima.
+ * Passo 2: nenhum lado cabe no ideal, então a coluna desliza até o bloco caber, embaixo antes de em
+ * cima. Passo 3: nenhuma posição cabe na área (buraco fora dela): sem lado, regra pela janela. O
+ * buraco não se move; só o bloco desliza.
  */
-private fun columnTopDp(windowSize: DpSize, columnSize: DpSize, holeCenterYPx: Int, workArea: HudPxRect): Dp {
-    val windowTopPx = holeCenterYPx - windowSize.height.value / 2f
-    val areaTopInWindow = workArea.yPx - windowTopPx
-    val areaBottomInWindow = workArea.yPx + workArea.heightPx - windowTopPx
+private fun columnSlide(
+    windowSize: DpSize,
+    columnSize: DpSize,
+    handleSize: Dp,
+    gap: Dp,
+    holeCenterYPx: Int,
+    workArea: HudPxRect
+): HudColumnSlide {
     val windowHeight = windowSize.height.value
     val columnHeight = columnSize.height.value
+    val gapValue = gap.value
+    val stackHeight = handleSize.value * 2 + gapValue
+    val windowTopPx = holeCenterYPx - windowHeight / 2f
+    val areaTop = maxOf(0f, workArea.yPx - windowTopPx)
+    val areaBottom = minOf(windowHeight, workArea.yPx + workArea.heightPx - windowTopPx)
     val ideal = (windowHeight - columnHeight) / 2f
-    val low = maxOf(0f, areaTopInWindow)
-    val high = minOf(windowHeight - columnHeight, areaBottomInWindow - columnHeight)
-    val top = maxOf(0f, minOf(maxOf(ideal, low), high))
-    return top.dp
+    val high = minOf(windowHeight - columnHeight, areaBottom - columnHeight)
+    val start = maxOf(0f, minOf(maxOf(ideal, areaTop), high))
+
+    if (start + columnHeight + gapValue + stackHeight <= areaBottom) return HudColumnSlide(start.dp, false)
+    if (start - gapValue - stackHeight >= areaTop) return HudColumnSlide(start.dp, true)
+
+    val belowHigh = areaBottom - columnHeight - gapValue - stackHeight
+    if (areaTop <= belowHigh) {
+        return HudColumnSlide(minOf(maxOf(start, areaTop), belowHigh).dp, false)
+    }
+    val aboveLow = areaTop + gapValue + stackHeight
+    val aboveHigh = areaBottom - columnHeight
+    if (aboveLow <= aboveHigh) {
+        return HudColumnSlide(minOf(maxOf(start, aboveLow), aboveHigh).dp, true)
+    }
+    return HudColumnSlide(start.dp, null)
 }
 
 /**
