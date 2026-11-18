@@ -111,6 +111,11 @@ internal fun HudWindowContent(
         )
     }
     Box(modifier = Modifier.fillMaxSize()) {
+        // O host só alterna o balão: o pedido de estado vai até o alvo pelo alternar, e um alvo igual ao atual não pede nada.
+        fun requestFloatingBalloon(current: HudFloatingBalloon?, next: HudFloatingBalloon?) {
+            if (next == current) return
+            if (next != null) onFloatingBalloonToggle(next) else if (current != null) onFloatingBalloonToggle(current)
+        }
         if (floating) {
             HudFloatingHud(
                 accounts = accounts,
@@ -137,7 +142,12 @@ internal fun HudWindowContent(
                 accountBalloon = { index ->
                     HudAccountBalloonContent(accounts[index], language, accountActions, appBalloonHeight)
                 },
-                appBalloon = appBalloon
+                appBalloon = appBalloon,
+                accountActions = accountActions,
+                onHoleHover = { requestFloatingBalloon(floatingBalloon, hudFloatingHoleHovered(floatingBalloon)) },
+                onHoleClick = { requestFloatingBalloon(floatingBalloon, hudFloatingHoleClicked(floatingBalloon)) },
+                onHoleSelect = { index -> requestFloatingBalloon(floatingBalloon, hudFloatingHoleSelected(index)) },
+                onHoleBack = { requestFloatingBalloon(floatingBalloon, hudFloatingHoleBack(floatingBalloon)) }
             )
         } else {
             HudNotch(

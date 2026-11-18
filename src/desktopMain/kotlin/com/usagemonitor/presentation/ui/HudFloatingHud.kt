@@ -34,6 +34,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.HudPxRect
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.hudColumnArrangement
 import com.usagemonitor.hudFloatingBalloonTop
 import com.usagemonitor.hudFloatingColumnParts
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -46,7 +47,7 @@ const val HUD_FLOATING_HOLE_DRAG_TAG = "hud-floating-hole-drag"
 /** Tag da coluna de anéis da janela flutuante, para os testes de tela (A11e). */
 const val HUD_FLOATING_COLUMN_TEST_TAG = "hud-floating-column"
 
-/** Balão aberto na janela flutuante: de uma conta (pelo índice) ou da engrenagem. */
+/** Balão aberto na janela flutuante: de uma conta (pelo índice), da engrenagem ou da lista do buraco negro. */
 internal sealed interface HudFloatingBalloon {
     data class Account(val index: Int) : HudFloatingBalloon
     data object App : HudFloatingBalloon
@@ -87,6 +88,11 @@ internal fun HudFloatingHud(
     balloonHeight: Dp,
     accountBalloon: @Composable (Int) -> Unit,
     appBalloon: @Composable () -> Unit,
+    accountActions: @Composable (HudAccount) -> Unit,
+    onHoleHover: () -> Unit,
+    onHoleClick: () -> Unit,
+    onHoleSelect: (Int) -> Unit,
+    onHoleBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hitBoxes = remember { HudRingHitBoxes() }
@@ -122,6 +128,8 @@ internal fun HudFloatingHud(
             revealed = expanded,
             onRingHovered = { index -> if (expanded) onAccountClick(index) },
             onRingRefresh = {},
+            onHoleHovered = { if (expanded) onHoleHover() },
+            onHoleClicked = { if (expanded) onHoleClick() },
             hitBoxes = hitBoxes,
             modifier = Modifier
                 .placedAt(parts.columnSlot)
@@ -147,8 +155,13 @@ internal fun HudFloatingHud(
         )
         val balloonRect = parts.balloon
         if (balloonRect != null && balloon != null) {
-            // Balão alinhado ao anel em foco; o da engrenagem fica centralizado na janela.
-            val ringCenterY = focusedRingCenterY(balloon, hitBoxes, parts.columnSlot, density) ?: (maxHeight / 2f)
+            // Balão alinhado ao anel em foco (ou à sentinela do buraco, na lista); o da engrenagem fica centralizado.
+            val ringCenterY = focusedRingCenterY(
+                focusedRingIndex(balloon, accounts.size),
+                hitBoxes,
+                parts.columnSlot,
+                density
+            ) ?: (maxHeight / 2f)
             val balloonTop = hudFloatingBalloonTop(ringCenterY, balloonHeight, maxHeight)
             // A caixa do HudBalloon é HUD_BALLOON_GAP mais larga que o corpo; no lado esquerdo o corpo fica depois do vão.
             val boxLeft = if (balloonSide == HudEdge.LEFT) balloonRect.left - HUD_BALLOON_GAP else balloonRect.left
@@ -157,7 +170,19 @@ internal fun HudFloatingHud(
                 tailCenter = { with(density) { (ringCenterY - balloonTop).toPx() } },
                 bodyHeight = balloonHeight,
                 modifier = Modifier.offset(x = boxLeft, y = balloonTop).hoverable(hover.balloon),
-                content = { HudFloatingBalloonContent(balloon, accountBalloon, appBalloon) }
+                content = {
+                    HudFloatingBalloonContent(
+                        balloon = balloon,
+                        accounts = accounts,
+                        language = language,
+                        accountActions = accountActions,
+                        balloonHeight = balloonHeight,
+                        accountBalloon = accountBalloon,
+                        appBalloon = appBalloon,
+                        onHoleSelect = onHoleSelect,
+                        onHoleBack = onHoleBack
+                    )
+                }
             )
         }
         HudFloatingDragArea(
@@ -196,17 +221,27 @@ private fun rememberHudFloatingHover(onHoverChange: (Boolean) -> Unit): HudFloat
 }
 
 /**
+ * Índice do anel em foco no balão: a conta pelo índice, o buraco pela sentinela `accountCount` (a coluna mede o
+ * buraco com esse índice), e `null` para o balão da engrenagem.
+ */
+private fun focusedRingIndex(balloon: HudFloatingBalloon, accountCount: Int): Int? = when (balloon) {
+    is HudFloatingBalloon.Account -> balloon.index
+    is HudFloatingBalloon.Hole -> accountCount
+    HudFloatingBalloon.App -> null
+}
+
+/**
  * Centro Y, em dp de janela, do anel em foco. A caixa do anel é medida no corpo da coluna, então soma-se o topo
  * da coluna. `null` para o balão da engrenagem ou enquanto o anel ainda não foi medido.
  */
 private fun focusedRingCenterY(
-    balloon: HudFloatingBalloon,
+    ringIndex: Int?,
     hitBoxes: HudRingHitBoxes,
     column: DpRect?,
     density: Density
 ): Dp? {
-    if (balloon !is HudFloatingBalloon.Account || column == null) return null
-    val ring = hitBoxes.rings()[balloon.index] ?: return null
+    if (ringIndex == null || column == null) return null
+    val ring = hitBoxes.rings()[ringIndex] ?: return null
     return with(density) { column.top + ring.center.y.toDp() }
 }
 
@@ -252,18 +287,32 @@ private fun HudFloatingButtons(
     }
 }
 
-/** Conteúdo do balão aberto: o de conta pelo índice, ou o da engrenagem. */
+/** Conteúdo do balão aberto: o de conta pelo índice, o da engrenagem, ou a lista das minimizadas no buraco (A11g). */
 @Composable
 private fun HudFloatingBalloonContent(
     balloon: HudFloatingBalloon,
+    accounts: List<HudAccount>,
+    language: AppLanguage,
+    accountActions: @Composable (HudAccount) -> Unit,
+    balloonHeight: Dp,
     accountBalloon: @Composable (Int) -> Unit,
-    appBalloon: @Composable () -> Unit
+    appBalloon: @Composable () -> Unit,
+    onHoleSelect: (Int) -> Unit,
+    onHoleBack: () -> Unit
 ) {
     when (balloon) {
         is HudFloatingBalloon.Account -> accountBalloon(balloon.index)
         HudFloatingBalloon.App -> appBalloon()
-        // Lista do buraco negro: conteúdo entra na etapa de UI do A11g.
-        is HudFloatingBalloon.Hole -> Unit
+        is HudFloatingBalloon.Hole -> HudBlackHoleBalloonContent(
+            accounts = accounts,
+            members = hudColumnArrangement(accounts).holeMembers,
+            selected = balloon.selection,
+            language = language,
+            accountActions = accountActions,
+            bodyHeight = balloonHeight,
+            onSelect = onHoleSelect,
+            onBack = onHoleBack
+        )
     }
 }
 

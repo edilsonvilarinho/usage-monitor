@@ -2,6 +2,10 @@ package com.usagemonitor.ui
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -13,6 +17,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
@@ -41,6 +46,7 @@ import com.usagemonitor.presentation.ui.HudFloatingHud
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.verticalCollapsed
 import kotlin.math.roundToInt
 import kotlin.test.Test
@@ -90,6 +96,15 @@ class HudFloatingHudTest {
         // O hover de `hoverable` é entregue num frame posterior ao gesto; sem esperar o ocioso, a asserção lê a lista antes.
         waitForIdle()
         assertEquals(listOf(2), hovered)
+    }
+
+    /** A11g: hover no buraco da coluna abre a lista das contas minimizadas, com a contagem no topo. */
+    @Test
+    fun `expandido, hover no buraco da coluna abre a lista das minimizadas`() = hudTestWith(MINIMIZED_WINDOW) {
+        render(expanded = true, language = AppLanguage.EN, accountList = MINIMIZED_ACCOUNTS, window = MINIMIZED_WINDOW)
+        onNodeWithTag(HUD_BLACK_HOLE_CELL_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        onAllNodesWithText(hudBlackHoleCountLabel(3, AppLanguage.EN)).assertCountEquals(1)
     }
 
     /** A11f: o vão entre o buraco e a coluna não é a janela; o ponteiro ali não conta como hover. */
@@ -184,24 +199,37 @@ class HudFloatingHudTest {
         const val UPDATE_PHRASE = "Atualização pronta para reiniciar"
         const val FALLBACK_LABEL = "Sem conta"
 
+        /** Tag da célula do buraco negro na coluna (`HudBlackHoleCell`). */
+        const val HUD_BLACK_HOLE_CELL_TAG = "hudBlackHole"
+
         val accounts: List<HudAccount> = listOf("Alfa", "Beta", "Gama", "Delta", "Epsilon", "Zeta", "Eta")
             .mapIndexed { index, name -> account(index, "Conta $name") }
 
+        /** As três últimas contas minimizadas: o buraco da coluna lista três. */
+        val MINIMIZED_ACCOUNTS: List<HudAccount> = accounts.mapIndexed { index, account ->
+            if (index >= 4) account.copy(minimized = true) else account
+        }
+
         /** Janela do teste: largura e altura da coluna de contas de exemplo, com balão de 240 dp de altura. */
-        val WINDOW: DpSize = hudFloatingColumnWindowSize(
-            columnSize = verticalCollapsed(accounts, FALLBACK_LABEL, compact = false),
+        fun windowFor(list: List<HudAccount>): DpSize = hudFloatingColumnWindowSize(
+            columnSize = verticalCollapsed(list, FALLBACK_LABEL, compact = false),
             balloonSize = DpSize(HUD_BALLOON_WIDTH, 240.dp),
             holeDiameter = HudOrbitParams().holeD.dp,
             handleSize = HUD_HANDLE_SIZE,
             gap = HUD_HANDLE_GAP
         )
 
+        val WINDOW: DpSize = windowFor(accounts)
+        val MINIMIZED_WINDOW: DpSize = windowFor(MINIMIZED_ACCOUNTS)
+
         /**
-         * Roda o teste com a raiz do tamanho de [WINDOW]. Sem isso a raiz cai no 768 px padrão do teste e o
+         * Roda o teste com a raiz do tamanho de [window]. Sem isso a raiz cai no 768 px padrão do teste e o
          * `maxHeight` do composable fica menor que a janela real (1748 px), o que desloca a coluna e os botões.
          */
-        fun hudTest(block: ComposeUiTest.() -> Unit) =
-            runDesktopComposeUiTest(width = WINDOW.width.value.roundToInt(), height = WINDOW.height.value.roundToInt(), block = block)
+        fun hudTestWith(window: DpSize, block: ComposeUiTest.() -> Unit) =
+            runDesktopComposeUiTest(width = window.width.value.roundToInt(), height = window.height.value.roundToInt(), block = block)
+
+        fun hudTest(block: ComposeUiTest.() -> Unit) = hudTestWith(WINDOW, block)
 
         /** Retângulo, em px de raiz, do nó com a tag. */
         fun ComposeUiTest.boundsOf(tag: String): Rect = onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
@@ -236,24 +264,28 @@ class HudFloatingHudTest {
             onToggleFloating: () -> Unit = {},
             onDragStart: () -> Unit = {},
             onDragEnd: () -> Unit = {},
-            onHoverChange: (Boolean) -> Unit = {}
+            onHoverChange: (Boolean) -> Unit = {},
+            accountList: List<HudAccount> = accounts,
+            window: DpSize = WINDOW
         ) {
             setContent {
+                // Estado do balão no próprio teste: o hover e o clique do buraco mudam o que a tela mostra, como no host.
+                var openBalloon by remember { mutableStateOf(balloon) }
                 ScreenTestTheme {
                     HudFloatingHud(
-                        accounts = accounts,
+                        accounts = accountList,
                         params = HudOrbitParams(),
                         language = language,
                         expanded = expanded,
-                        balloon = balloon,
+                        balloon = openBalloon,
                         balloonSide = HudEdge.RIGHT,
                         update = update,
                         gearDescription = "Configurações",
                         fallbackLabel = FALLBACK_LABEL,
                         fallbackTone = AppTone.OK,
-                        holeScreenY = WINDOW.height / 2f,
+                        holeScreenY = window.height / 2f,
                         areaTop = 0.dp,
-                        areaBottom = WINDOW.height,
+                        areaBottom = window.height,
                         onHoverChange = onHoverChange,
                         onAccountClick = onAccountClick,
                         onGearClick = {},
@@ -264,7 +296,14 @@ class HudFloatingHudTest {
                         balloonHeight = 120.dp,
                         accountBalloon = { index -> Text("balloon-account-$index") },
                         appBalloon = { Text("balloon-app") },
-                        modifier = Modifier.size(WINDOW.width, WINDOW.height)
+                        accountActions = {},
+                        onHoleHover = { if (openBalloon !is HudFloatingBalloon.Hole) openBalloon = HudFloatingBalloon.Hole(null) },
+                        onHoleClick = {
+                            openBalloon = if (openBalloon is HudFloatingBalloon.Hole) null else HudFloatingBalloon.Hole(null)
+                        },
+                        onHoleSelect = { index -> openBalloon = HudFloatingBalloon.Hole(index) },
+                        onHoleBack = { openBalloon = HudFloatingBalloon.Hole(null) },
+                        modifier = Modifier.size(window.width, window.height)
                     )
                 }
             }
