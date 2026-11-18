@@ -176,6 +176,13 @@ class HudFloatingHostTest {
         assertEquals(DpSize(792.dp, 512.dp), geometry(expanded = true, balloonOpen = true).size)
     }
 
+    /** A11i: balão de conta mais alto que o da engrenagem; a janela reserva a maior das duas alturas. */
+    @Test
+    fun `balao reserva a maior altura entre engrenagem e conta`() {
+        assertEquals(240.dp, hudFloatingBalloonHeight(appHeight = 60.dp, accountHeight = 240.dp))
+        assertEquals(240.dp, hudFloatingBalloonHeight(appHeight = 240.dp, accountHeight = 60.dp))
+    }
+
     @Test
     fun `minimizado o recorte e so o buraco`() {
         assertEquals(DpRect(366.dp, 226.dp, 426.dp, 286.dp), geometry().hitRect)

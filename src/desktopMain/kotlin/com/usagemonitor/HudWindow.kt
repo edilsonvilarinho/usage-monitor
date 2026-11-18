@@ -259,7 +259,7 @@ internal fun HudWindowHost(
         scale = scale,
         columnSize = columnSize,
         holeDiameter = floatingParams.holeD.dp,
-        balloonSize = DpSize(HUD_BALLOON_WIDTH, appBalloonHeight),
+        balloonSize = DpSize(HUD_BALLOON_WIDTH, hudFloatingBalloonHeight(appBalloonHeight, sizes.balloon.height)),
         handleSize = HUD_HANDLE_SIZE,
         gap = HUD_HANDLE_GAP,
         expanded = expanded,

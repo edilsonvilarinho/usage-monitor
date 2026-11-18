@@ -149,3 +149,7 @@ internal fun ScreenWorkArea.toPxRect(): HudPxRect {
         heightPx = size.height.value.roundToInt()
     )
 }
+
+/** Altura do balão do modo flutuante: a janela reserva a maior entre a da engrenagem e a da conta (A11i). */
+internal fun hudFloatingBalloonHeight(appHeight: Dp, accountHeight: Dp): Dp =
+    if (appHeight > accountHeight) appHeight else accountHeight

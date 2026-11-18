@@ -32,6 +32,7 @@ internal fun HudFloatingColumn(
     onHoleClicked: () -> Unit = {},
     onHoleHovered: () -> Unit = {},
     hitBoxes: HudRingHitBoxes = remember { HudRingHitBoxes() },
+    minimize: HudMinimizeProgress = HudMinimizeProgress(emptyMap(), moving = false),
     modifier: Modifier = Modifier
 ) {
     val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
@@ -40,6 +41,9 @@ internal fun HudFloatingColumn(
     val shape = AppShapes.large
     // O buraco ocupa o índice após a última conta, como na barra encaixada.
     val holeIndex = accounts.size
+    // Voo da conta pelo buraco: entrada e saída seguem o progresso de minimizar, como na barra (A11i).
+    val departures = rememberHudDepartures(accounts)
+    val settle = departures.values.minOrNull()
     Box(
         modifier = modifier
             .size(columnSize)
@@ -66,6 +70,9 @@ internal fun HudFloatingColumn(
             onHoleClicked = onHoleClicked,
             onHoleHovered = onHoleHovered,
             onRingRefresh = onRingRefresh,
+            departures = departures,
+            settle = settle,
+            minimizeProgress = minimize.values,
             onItemPlaced = { index, coordinates ->
                 val body = ringItemBounds.body
                 if (body != null && body.isAttached && coordinates.isAttached) {

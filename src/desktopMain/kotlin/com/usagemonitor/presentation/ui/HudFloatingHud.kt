@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -35,6 +37,7 @@ import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.HudPxRect
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.hudColumnArrangement
+import com.usagemonitor.hudFloatingBalloonHeight
 import com.usagemonitor.hudFloatingBalloonTop
 import com.usagemonitor.hudFloatingColumnParts
 import com.usagemonitor.presentation.ui.components.AppTone
@@ -86,6 +89,8 @@ internal fun HudFloatingHud(
     onDrag: () -> Unit,
     onDragEnd: () -> Unit,
     balloonHeight: Dp,
+    accountBalloonHeight: Dp = balloonHeight,
+    minimize: HudMinimizeProgress = HudMinimizeProgress(emptyMap(), moving = false),
     accountBalloon: @Composable (Int) -> Unit,
     appBalloon: @Composable () -> Unit,
     accountActions: @Composable (HudAccount) -> Unit,
@@ -97,6 +102,8 @@ internal fun HudFloatingHud(
 ) {
     val hitBoxes = remember { HudRingHitBoxes() }
     val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
+    // A janela reserva a maior altura entre a da engrenagem e a da conta; o balão aberto usa a própria (A11i).
+    val reserveHeight = hudFloatingBalloonHeight(balloonHeight, accountBalloonHeight)
     val hover = rememberHudFloatingHover(onHoverChange)
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -114,7 +121,7 @@ internal fun HudFloatingHud(
             ),
             balloonOpen = balloon != null,
             balloonSide = balloonSide,
-            balloonSize = DpSize(HUD_BALLOON_WIDTH, balloonHeight),
+            balloonSize = DpSize(HUD_BALLOON_WIDTH, reserveHeight),
             handleSize = HUD_HANDLE_SIZE,
             gap = HUD_HANDLE_GAP
         )
@@ -131,6 +138,7 @@ internal fun HudFloatingHud(
             onHoleHovered = { if (expanded) onHoleHover() },
             onHoleClicked = { if (expanded) onHoleClick() },
             hitBoxes = hitBoxes,
+            minimize = minimize,
             modifier = Modifier
                 .placedAt(parts.columnSlot)
                 .testTag(HUD_FLOATING_COLUMN_TEST_TAG)
@@ -162,13 +170,13 @@ internal fun HudFloatingHud(
                 parts.columnSlot,
                 density
             ) ?: (maxHeight / 2f)
-            val balloonTop = hudFloatingBalloonTop(ringCenterY, balloonHeight, maxHeight)
+            val balloonTop = hudFloatingBalloonTop(ringCenterY, reserveHeight, maxHeight)
             // A caixa do HudBalloon é HUD_BALLOON_GAP mais larga que o corpo; no lado esquerdo o corpo fica depois do vão.
             val boxLeft = if (balloonSide == HudEdge.LEFT) balloonRect.left - HUD_BALLOON_GAP else balloonRect.left
             HudBalloon(
                 edge = balloonSide,
                 tailCenter = { with(density) { (ringCenterY - balloonTop).toPx() } },
-                bodyHeight = balloonHeight,
+                bodyHeight = if (balloon is HudFloatingBalloon.Account) accountBalloonHeight else balloonHeight,
                 modifier = Modifier.offset(x = boxLeft, y = balloonTop).hoverable(hover.balloon),
                 content = {
                     HudFloatingBalloonContent(
@@ -177,6 +185,7 @@ internal fun HudFloatingHud(
                         language = language,
                         accountActions = accountActions,
                         balloonHeight = balloonHeight,
+                        accountBalloonHeight = accountBalloonHeight,
                         accountBalloon = accountBalloon,
                         appBalloon = appBalloon,
                         onHoleSelect = onHoleSelect,
@@ -295,13 +304,16 @@ private fun HudFloatingBalloonContent(
     language: AppLanguage,
     accountActions: @Composable (HudAccount) -> Unit,
     balloonHeight: Dp,
+    accountBalloonHeight: Dp,
     accountBalloon: @Composable (Int) -> Unit,
     appBalloon: @Composable () -> Unit,
     onHoleSelect: (Int) -> Unit,
     onHoleBack: () -> Unit
 ) {
     when (balloon) {
-        is HudFloatingBalloon.Account -> accountBalloon(balloon.index)
+        is HudFloatingBalloon.Account -> Box(Modifier.fillMaxWidth().height(accountBalloonHeight)) {
+            accountBalloon(balloon.index)
+        }
         HudFloatingBalloon.App -> appBalloon()
         is HudFloatingBalloon.Hole -> HudBlackHoleBalloonContent(
             accounts = accounts,

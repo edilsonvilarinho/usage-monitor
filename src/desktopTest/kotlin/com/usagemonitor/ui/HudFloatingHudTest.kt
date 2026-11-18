@@ -1,5 +1,7 @@
 package com.usagemonitor.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -9,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionContains
@@ -19,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
@@ -152,6 +156,12 @@ class HudFloatingHudTest {
         render(expanded = true, balloon = HudFloatingBalloon.Account(2))
         onAllNodesWithText("balloon-account-2").assertCountEquals(1)
         onAllNodesWithText("balloon-account-0").assertCountEquals(0)
+    }
+
+    @Test
+    fun `balao de conta usa a altura de conta, nao a da engrenagem`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.Account(2))
+        onNodeWithTag(HUD_BALLOON_TEST_TAG).assertHeightIsEqualTo(200.dp)
     }
 
     @Test
@@ -294,7 +304,10 @@ class HudFloatingHudTest {
                         onDrag = {},
                         onDragEnd = onDragEnd,
                         balloonHeight = 120.dp,
-                        accountBalloon = { index -> Text("balloon-account-$index") },
+                        accountBalloonHeight = 200.dp,
+                        accountBalloon = { index ->
+                            Box(Modifier.fillMaxSize().testTag("accountBalloonProbe")) { Text("balloon-account-$index") }
+                        },
                         appBalloon = { Text("balloon-app") },
                         accountActions = {},
                         onHoleHover = { if (openBalloon !is HudFloatingBalloon.Hole) openBalloon = HudFloatingBalloon.Hole(null) },
