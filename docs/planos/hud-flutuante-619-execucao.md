@@ -44,7 +44,44 @@ Varredura do agente `explorer` sobre `docs/hud-notch.md` e `Hud*.kt`.
 |---|---|---|
 | A01 | Este plano | `docs/planos/hud-flutuante-619-execucao.md` |
 | A02 | 10 protótipos com direções distintas; escolha do dono | `prototipos/issue-619/` (fora do versionamento) |
-| A03+ | Implementação TDD da direção escolhida (definida após a escolha) | a definir |
+| A03 | Preferências do modo flutuante | `HudWindowPreferences.kt` + `HudWindowPreferencesTest.kt` |
+| A04 | Parâmetros e geometria pura do campo orbital | novo `HudOrbitGeometry.kt` + teste |
+| A05 | Posição flutuante e plataforma suportada | novo `HudFloatingPlacement.kt` + teste |
+| A06 | Botão "Soltar da borda" / "Encaixar na borda" | `HudHandles.kt` (ou arquivo novo) + teste de tela |
+| A07 | Campo orbital e buraco minimizado (composables) | novos `HudOrbitField.kt`, `HudFloatingHole.kt` + testes |
+| A08 | Host do modo flutuante na janela da HUD | `HudWindow.kt` + arquivos novos de estado/efeitos + testes de decisão |
+| A09 | Documentação e design system | `docs/hud-notch.md`, `AppHudBar.prompt.md`, protótipo visual |
+
+### Especificação por atividade
+
+Parâmetros do dono (`prototipos/issue-619/parametros-dono.json`), valores padrão do modo: campo 180 dp, raio da
+órbita 40 dp, anel da conta 28 dp, marca 8 dp, buraco minimizado 32 dp, inclinação do disco 29°, espessura do disco 3 %,
+uma volta do disco a cada 3,5 s, uma volta da órbita a cada 180 s, fundo 100 % opaco, poeira densidade 100 % e brilho
+200 %, borda 0 dp, rótulos `completo`, texto 8 sp, disco no token `hot`. Com rótulos completos o campo cresce até caber
+os rótulos (no R2: 244 dp); nada é desenhado fora do campo.
+
+- **A03.** `hudFloating: Boolean` (padrão `false`) e centro flutuante em px de tela (`hudFloatX`, `hudFloatY`; ausente =
+  nunca posto). Mesmo padrão de `hudAutoRetract` (`HudWindowPreferences.kt:122-132`); teste de ida e volta como
+  `HudWindowPreferencesTest.kt:144-156`.
+- **A04.** `HudOrbitParams` com os padrões acima e `hudOrbitLayout(params, accountCount, labels, orbitPhase)` →
+  diâmetro do campo, centro de cada conta (ângulo inicial −90°, passo 360°/n, sentido horário, ordem da lista),
+  diâmetro do buraco minimizado. Ordem total e determinística.
+- **A05.** `hudFloatingBounds(center, windowSize, workArea)` prende a janela dentro da área de trabalho e **nunca**
+  encosta numa borda por conta própria; sem centro salvo, nasce no centro do notch atual. `hudFloatingSupported(os)`:
+  só Windows (#340); outros sistemas não mostram o botão.
+- **A06.** Botão redondo novo na coluna (ordem: alfinete, mão, novo, engrenagem), mesmo estilo dos de hoje, ícone de
+  buraco com órbita; rótulo por objeto de rótulos (`localized`), "Soltar da borda" / "Release from edge" no encaixado e
+  "Encaixar na borda" / "Dock to edge" no flutuante; ausente quando `hudFloatingSupported` é falso.
+- **A07.** `HudOrbitField` (expandido: fundo do corpo da HUD, poeira, contas em `AppGargantuaRing` com arcos e marca,
+  rótulos, buraco central) e `HudFloatingHole` (minimizado: buraco com disco inclinado girando só com
+  `policy.continuous && !policy.reduced`, ponto de atualização quando `HudUpdateIndicator` existe). Animação infinita
+  só atrás de `AppMotionPolicy` (trava o `waitForIdle`).
+- **A08.** No modo flutuante, a mesma `HudWindowHost` troca o notch pelo campo: janela de tamanho fixo (campo + balão),
+  recorte pelo `hudHitRegionMode`, hover de 200 ms abre o campo, arrasto livre persistido (A03/A05), clique numa conta
+  abre `HudAccountBalloonContent`, engrenagem abre `HudWindowAppBalloon`, indicador de atualização igual ao de hoje
+  (`hudUpdateIndicatorOf`). O botão novo alterna os modos. Nenhuma mudança no modo encaixado.
+- **A09.** Seção "Modo flutuante" na `hud-notch.md`; contrato em `AppHudBar.prompt.md` (e correção da seção Gestures,
+  que ainda cita o clique direito); tela no `prototipo-visual-opencode.html`.
 
 ## Ponto de situação
 
@@ -58,3 +95,6 @@ Varredura do agente `explorer` sobre `docs/hud-notch.md` e `Hud*.kt`.
 - Janela solta fora da borda muda a premissa da `hud-notch.md` (forma de encaixe, `hudHitRegionMode`, alfa no Linux);
   o custo depende da direção escolhida.
 - Clique atravessável e transparência por proximidade (se escolhidos) são nativos por plataforma: medir antes de liberar.
+- `HudNotch.kt` (721 linhas) e `HudNotchGeometry.kt` (735) estão perto do teto de 800: tudo do modo flutuante entra em
+  arquivos novos; quem toca nesses dois começa extraindo.
+- Nenhum teste exercita o sistema de janelas: A08 é aberto no app real no Windows antes do PR; Linux fica fora (A05).
