@@ -1,7 +1,14 @@
 package com.usagemonitor
 
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.HudQuota
+import com.usagemonitor.presentation.ui.components.AppTone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Geometria pura do campo orbital do modo flutuante (issue #619, A04).
@@ -140,6 +147,38 @@ class HudOrbitGeometryTest {
         hudOrbitLayout(HudOrbitParams(labels = HudOrbitLabels.COMPACT), 2, labelWidths, 0.9f)
         val second = hudOrbitLayout(HudOrbitParams(), 5, labelWidths, 0.37f)
         assertEquals(first, second, "determinismo")
+    }
+
+    /** Fora de composição (escopo `application { }`) o diâmetro sai da mesma geometria, sem medir texto. */
+    @Test
+    fun `field diameter outside composition keeps owner size for compact and off labels`() {
+        val accounts = sevenAccounts()
+        assertNear(180f, hudOrbitFieldDiameter(accounts, HudOrbitParams(labels = HudOrbitLabels.COMPACT), AppLanguage.EN).value, "diametro compacto")
+        assertNear(180f, hudOrbitFieldDiameter(accounts, HudOrbitParams(labels = HudOrbitLabels.OFF), AppLanguage.EN).value, "diametro desligado")
+    }
+
+    /** Sete contas com rótulo completo: o campo cresce além do tamanho do dono. */
+    @Test
+    fun `field diameter outside composition grows with full labels`() {
+        val diameter = hudOrbitFieldDiameter(sevenAccounts(), HudOrbitParams(), AppLanguage.EN).value
+        assertTrue(diameter > 180f, "diametro completo $diameter dp")
+    }
+
+    private fun sevenAccounts(): List<HudAccount> = (0 until 7).map { index -> account(index, "Conta $index") }
+
+    private fun account(index: Int, label: String): HudAccount {
+        val percent = 10 + index
+        val quota = HudQuota("5h", "$percent%", percent / 100f, AppTone.OK, resetText = null, hasForecast = false)
+        return HudAccount(
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "perfil-$index"),
+            label = label,
+            statusLabel = "Ok",
+            tone = AppTone.OK,
+            quotas = listOf(quota),
+            focusIndex = 0,
+            sessionActive = false,
+            minimized = false
+        )
     }
 
     private fun assertNear(expected: Float, actual: Float, message: String) {

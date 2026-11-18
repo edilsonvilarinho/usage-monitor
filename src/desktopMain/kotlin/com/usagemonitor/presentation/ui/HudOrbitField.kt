@@ -21,13 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalDensity
+import com.usagemonitor.hudOrbitAccountLabelWidth
+import com.usagemonitor.hudOrbitFieldDiameter
+import com.usagemonitor.hudOrbitLabelWidths
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
@@ -89,8 +90,7 @@ internal fun HudOrbitField(
 ) {
     val motion = LocalAppMotionPolicy.current
     val phase = rememberHudOrbitPhase(live = motion.continuous && !motion.reduced, periodSeconds = params.orbitPeriodSeconds)
-    val measure = rememberHudOrbitMeasure(params)
-    val widths = remember(accounts, measure) { hudOrbitLabelWidths(accounts, measure) }
+    val widths = remember(accounts) { hudOrbitLabelWidths(accounts) }
     // O diâmetro do campo não depende da fase: a fase 0 dimensiona o Box sem ler o State.
     val fieldDiameter = hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter
     val orbit = HudOrbitSlots(params = params, count = accounts.size, widths = widths, phase = phase)
@@ -121,7 +121,6 @@ internal fun HudOrbitField(
                     account = account,
                     params = params,
                     fieldRadius = fieldRadius,
-                    measure = measure,
                     orbit = orbit
                 )
             }
@@ -163,35 +162,13 @@ private fun rememberHudOrbitPhase(live: Boolean, periodSeconds: Float): State<Fl
     return phase
 }
 
-/** Largura em dp de um texto na família e no tamanho dos rótulos. */
-@Composable
-private fun rememberHudOrbitMeasure(params: HudOrbitParams): (String) -> Float {
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val style = MaterialTheme.typography.labelSmall.copy(fontSize = params.textSp.sp)
-    return remember(measurer, density, style) {
-        { text: String -> with(density) { measurer.measure(text, style).size.width.toDp().value } }
-    }
-}
-
-/** Maior largura dos rótulos completos (nome, cota e estado) e dos compactos (só a cota). */
-private fun hudOrbitLabelWidths(accounts: List<HudAccount>, measure: (String) -> Float): HudOrbitLabelWidths {
-    val complete = accounts.maxOfOrNull { account ->
-        maxOf(measure(account.label), measure(quotaText(account)), measure(account.statusLabel))
-    } ?: 0f
-    val compact = accounts.maxOfOrNull { account -> measure(quotaText(account)) } ?: 0f
-    return HudOrbitLabelWidths(complete = complete, compact = compact)
-}
-
 /**
- * Diâmetro do campo orbital em dp, o mesmo que [HudOrbitField] desenha. A janela flutuante dimensiona o
- * buraco e a coluna de botões com ele sem medir de novo: a medição é a de [rememberHudOrbitMeasure].
+ * Diâmetro do campo orbital em dp, o mesmo que [HudOrbitField] desenha. Wrapper composable fino sobre
+ * [hudOrbitFieldDiameter]: não mede texto, então pode ser chamado em qualquer escopo de composição.
  */
 @Composable
 internal fun rememberHudOrbitFieldDiameter(accounts: List<HudAccount>, params: HudOrbitParams, language: AppLanguage): Dp {
-    val measure = rememberHudOrbitMeasure(params)
-    val widths = remember(accounts, measure) { hudOrbitLabelWidths(accounts, measure) }
-    return hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter.dp
+    return remember(accounts, params, language) { hudOrbitFieldDiameter(accounts, params, language) }
 }
 
 /** Corpo da HUD: fundo opaco circular com a borda e a poeira. */
@@ -285,7 +262,6 @@ private fun BoxScope.HudOrbitAccountLabel(
     account: HudAccount,
     params: HudOrbitParams,
     fieldRadius: Float,
-    measure: (String) -> Float,
     orbit: HudOrbitSlots
 ) {
     val lines = if (params.labels == HudOrbitLabels.FULL) {
@@ -294,7 +270,7 @@ private fun BoxScope.HudOrbitAccountLabel(
         listOf(quotaText(account))
     }
     val lineDp = params.textSp * LABEL_LINE_FACTOR
-    val width = lines.maxOf { line -> measure(line) }
+    val width = hudOrbitAccountLabelWidth(account, params.labels).value
     val height = lines.size * lineDp
     val accountRadius = params.accD / 2f
     val style = MaterialTheme.typography.labelSmall.copy(fontSize = params.textSp.sp)
@@ -336,7 +312,7 @@ private fun BoxScope.HudOrbitAccountLabel(
 }
 
 /** Cota principal da conta, a mesma que a faixa de hoje mostra no anel. */
-private fun quotaText(account: HudAccount): String = account.rings.firstOrNull()?.percentText.orEmpty()
+internal fun quotaText(account: HudAccount): String = account.rings.firstOrNull()?.percentText.orEmpty()
 
 /** Canto superior esquerdo do rótulo, em dp relativos ao centro do campo. */
 private fun labelOrigin(slot: HudOrbitAccountSlot, width: Float, height: Float, accountRadius: Float): Pair<Float, Float> {

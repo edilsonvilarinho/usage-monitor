@@ -1,5 +1,10 @@
 package com.usagemonitor
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.quotaText
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -48,6 +53,31 @@ internal data class HudOrbitAccountSlot(val index: Int, val angleDegrees: Float,
 
 /** Diâmetro do campo expandido, diâmetro do buraco minimizado e as contas na ordem da lista. */
 internal data class HudOrbitLayout(val fieldDiameter: Float, val holeDiameter: Float, val accounts: List<HudOrbitAccountSlot>)
+
+/**
+ * Diâmetro do campo orbital em dp para as contas e os parâmetros dados. Função pura, sem composição: pode ser
+ * chamada no escopo `application { }`, onde não há `LocalFontFamilyResolver`. Os rótulos já chegam localizados
+ * em [HudAccount], por isso o idioma não altera a largura estimada.
+ */
+@Suppress("UNUSED_PARAMETER")
+internal fun hudOrbitFieldDiameter(accounts: List<HudAccount>, params: HudOrbitParams, language: AppLanguage): Dp {
+    val widths = hudOrbitLabelWidths(accounts)
+    return hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter.dp
+}
+
+/** Largura estimada dos rótulos em dp: `FULL` é o maior entre nome, cota e estado; `COMPACT` é só a cota. */
+internal fun hudOrbitLabelWidths(accounts: List<HudAccount>): HudOrbitLabelWidths {
+    val complete = accounts.maxOfOrNull { account -> hudOrbitAccountLabelWidth(account, HudOrbitLabels.FULL).value } ?: 0f
+    val compact = accounts.maxOfOrNull { account -> hudOrbitAccountLabelWidth(account, HudOrbitLabels.COMPACT).value } ?: 0f
+    return HudOrbitLabelWidths(complete = complete, compact = compact)
+}
+
+/** Largura estimada de um rótulo: `wordWidth` para nome e estado, `percentWidth` para a cota. Sem medir texto. */
+internal fun hudOrbitAccountLabelWidth(account: HudAccount, labels: HudOrbitLabels): Dp {
+    val quota = percentWidth(quotaText(account))
+    if (labels != HudOrbitLabels.FULL) return quota
+    return maxOf(wordWidth(account.label), quota, wordWidth(account.statusLabel))
+}
 
 /** Passos de 5 graus (k·π/36) em volta do anel para achar o raio mínimo que contém os rótulos, como o `fitRadius` do R2. */
 private const val FIT_STEPS = 72

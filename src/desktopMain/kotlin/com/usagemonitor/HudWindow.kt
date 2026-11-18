@@ -28,7 +28,6 @@ import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudFloatingBalloon
-import com.usagemonitor.presentation.ui.rememberHudOrbitFieldDiameter
 import kotlin.math.roundToInt
 import com.usagemonitor.presentation.ui.components.CardAction
 import com.usagemonitor.presentation.ui.components.CardActionButton
@@ -247,7 +246,7 @@ internal fun HudWindowHost(
     val bounds = hudHostWindowBounds(drag.dragging, placement, sizes, composedArea)
     val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
     // Modo flutuante (#619): o conjunto solto usa o layout dele; sem centro guardado, nasce no notch.
-    val fieldDiameter = rememberHudOrbitFieldDiameter(accounts, floatingParams, language)
+    val fieldDiameter = hudOrbitFieldDiameter(accounts, floatingParams, language)
     val appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = updateIndicator != null, hasUpdateAction = updateAction != null)
     // Geometria pura do modo flutuante (#619): tamanho, posição, lado do balão e recorte, em dp de composição.
     val floatingGeometry = hudFloatingWindowGeometry(
