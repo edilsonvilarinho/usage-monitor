@@ -162,3 +162,72 @@ internal fun hudFloatingAlongShift(holeAlong: Dp, expandedAlong: Dp, areaStart: 
     val high = areaEnd - (columnStart + expandedAlong)
     return minOf(maxOf(0.dp, low), high)
 }
+
+/** Borda, tamanhos, janela, buraco em coordenadas da janela e deslocamento da coluna do modo solto (A10c). */
+internal data class HudDetachedWindow(
+    val edge: HudEdge,
+    val placement: HudPlacement,
+    val sizes: HudNotchSizes,
+    val settledSizes: HudNotchSizes,
+    val bounds: HudWindowBounds,
+    val alongShift: Dp,
+    val holeRect: DpRect
+)
+
+/**
+ * Buraco encostado no lado da borda da janela, centrado em [notchCenterInWindow] ao longo dela
+ * (A10c). Coordenadas da janela em dp de composição.
+ */
+internal fun hudDetachedHoleRect(edge: HudEdge, windowSize: DpSize, notchCenterInWindow: Dp, holeD: Dp): DpRect {
+    val top = notchCenterInWindow - holeD / 2
+    val left = if (edge == HudEdge.RIGHT) windowSize.width - holeD else 0.dp
+    return DpRect(left, top, left + holeD, top + holeD)
+}
+
+/**
+ * Modo solto (A10c): o centro do buraco é preso aos limites inteiros do monitor ([monitorBounds]),
+ * e a borda, a fração e a área virtual saem de [hudFloatingDock] sobre a área útil. [holeD] é em
+ * dp de composição; a borda virtual usa o diâmetro em dp de tela (`holeD * scale`). A coluna
+ * aberta desliza para dentro da área útil ([hudFloatingAlongShift]).
+ */
+internal fun hudDetachedWindow(
+    holeCenter: HudFloatCenter,
+    holeD: Dp,
+    screenArea: ScreenWorkArea,
+    monitorBounds: ScreenWorkArea,
+    scale: Float,
+    sizesOf: (HudPlacement, ScreenWorkArea) -> Pair<HudNotchSizes, HudNotchSizes>,
+    dragging: Boolean
+): HudDetachedWindow {
+    val monitor = monitorBounds.toPxRect()
+    val clamped = HudFloatCenter(
+        xPx = holeCenter.xPx.coerceIn(monitor.xPx, monitor.xPx + monitor.widthPx),
+        yPx = holeCenter.yPx.coerceIn(monitor.yPx, monitor.yPx + monitor.heightPx)
+    )
+    val dock = hudFloatingDock(clamped, holeD * scale, screenArea)
+    val placement = HudPlacement(dock.edge, dock.offsetFraction)
+    val built = sizesOf(placement, dock.virtualArea)
+    val sizes = hudFloatingSizes(built.first, holeD)
+    val settledSizes = hudFloatingSizes(built.second, holeD)
+    val composed = dock.virtualArea.inCompositionDp(scale)
+    val bounds = hudHostWindowBounds(dragging, placement, sizes, composed)
+    val holeRect = hudDetachedHoleRect(dock.edge, bounds.size, bounds.notchCenterInWindow, holeD)
+    val usable = screenArea.inCompositionDp(scale)
+    val horizontal = dock.edge.isHorizontal
+    val windowStart = if (horizontal) bounds.x else bounds.y
+    val holeAlong = windowStart + bounds.notchCenterInWindow
+    val expanded = settledSizes.expanded
+    val expandedAlong = if (horizontal) expanded.width else expanded.height
+    val areaStart = if (horizontal) usable.x else usable.y
+    val areaEnd = areaStart + if (horizontal) usable.size.width else usable.size.height
+    val alongShift = hudFloatingAlongShift(holeAlong, expandedAlong, areaStart, areaEnd)
+    return HudDetachedWindow(
+        edge = dock.edge,
+        placement = placement,
+        sizes = sizes,
+        settledSizes = settledSizes,
+        bounds = bounds,
+        alongShift = alongShift,
+        holeRect = holeRect
+    )
+}

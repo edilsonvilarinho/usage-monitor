@@ -269,4 +269,33 @@ class HudFloatingHostTest {
         val shift = hudFloatingAlongShift(holeAlong = 400.dp, expandedAlong = 900.dp, areaStart = 0.dp, areaEnd = 800.dp)
         assertEquals(50.dp, shift)
     }
+
+    /** Buraco de 60 numa janela de 200x100, centro do notch em y=50: encostado na borda direita. */
+    @Test
+    fun `buraco a direita encosta na borda direita da janela`() {
+        val rect = hudDetachedHoleRect(HudEdge.RIGHT, DpSize(200.dp, 100.dp), notchCenterInWindow = 50.dp, holeD = 60.dp)
+        assertEquals(DpRect(140.dp, 20.dp, 200.dp, 80.dp), rect)
+    }
+
+    @Test
+    fun `buraco a esquerda encosta na borda esquerda da janela`() {
+        val rect = hudDetachedHoleRect(HudEdge.LEFT, DpSize(200.dp, 100.dp), notchCenterInWindow = 50.dp, holeD = 60.dp)
+        assertEquals(DpRect(0.dp, 20.dp, 60.dp, 80.dp), rect)
+    }
+
+    private val monitor = ScreenWorkArea(0.dp, 0.dp, DpSize(1000.dp, 800.dp))
+    private val usable = ScreenWorkArea(0.dp, 0.dp, DpSize(1000.dp, 760.dp))
+    private val sizesOf = { _: HudPlacement, _: ScreenWorkArea ->
+        val sizes = HudNotchSizes(collapsed = DpSize(60.dp, 60.dp), expanded = DpSize(200.dp, 300.dp))
+        sizes to sizes
+    }
+
+    /** O centro do buraco é preso ao monitor inteiro (o buraco pode ficar sobre a barra de tarefas). */
+    @Test
+    fun `buraco do modo solto mantem o diametro e prende o centro ao monitor`() {
+        val inside = hudDetachedWindow(HudFloatCenter(1000, 400), 60.dp, usable, monitor, 1f, sizesOf, dragging = false)
+        val outside = hudDetachedWindow(HudFloatCenter(1200, 400), 60.dp, usable, monitor, 1f, sizesOf, dragging = false)
+        assertEquals(60.dp, inside.holeRect.right - inside.holeRect.left)
+        assertEquals(inside.bounds, outside.bounds)
+    }
 }
