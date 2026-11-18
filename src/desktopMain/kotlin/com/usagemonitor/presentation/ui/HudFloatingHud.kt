@@ -171,10 +171,18 @@ internal fun HudFloatingHud(
                 parts.columnSlot,
                 density
             ) ?: (maxHeight / 2f)
-            val balloonTop = hudFloatingBalloonTop(ringCenterY, reserveHeight, maxHeight)
+            val bodyHeight = hudFloatingBodyHeight(balloon, accounts, appBalloonHeight, tallestBalloonHeight)
+            // A janela tem o buraco no centro: o topo dela na tela é o Y do buraco menos metade da altura (A11k).
+            val windowTopOnScreen = holeScreenY - maxHeight / 2f
+            val balloonTop = hudFloatingBalloonTop(
+                ringCenterY = ringCenterY,
+                balloonHeight = bodyHeight,
+                windowHeight = maxHeight,
+                areaTop = areaTop - windowTopOnScreen,
+                areaBottom = areaBottom - windowTopOnScreen
+            )
             // A caixa do HudBalloon é HUD_BALLOON_GAP mais larga que o corpo; no lado esquerdo o corpo fica depois do vão.
             val boxLeft = if (balloonSide == HudEdge.LEFT) balloonRect.left - HUD_BALLOON_GAP else balloonRect.left
-            val bodyHeight = hudFloatingBodyHeight(balloon, accounts, appBalloonHeight, tallestBalloonHeight)
             HudBalloon(
                 edge = balloonSide,
                 tailCenter = { with(density) { (ringCenterY - balloonTop).toPx() } },

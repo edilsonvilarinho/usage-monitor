@@ -254,11 +254,20 @@ private fun columnSlide(
 
 /**
  * Topo do balão do modo coluna: centrado no anel em foco ([ringCenterY], em dp de janela) e preso
- * dentro da janela.
+ * à área útil da tela ([areaTop]..[areaBottom], em dp de janela) e à própria janela (A11k). Se o
+ * balão for mais alto que a área, o topo fica em [areaTop] (o `coerceIn` não aceita `min > max`).
  */
-internal fun hudFloatingBalloonTop(ringCenterY: Dp, balloonHeight: Dp, windowHeight: Dp): Dp {
+internal fun hudFloatingBalloonTop(
+    ringCenterY: Dp,
+    balloonHeight: Dp,
+    windowHeight: Dp,
+    areaTop: Dp,
+    areaBottom: Dp
+): Dp {
     val ideal = ringCenterY - balloonHeight / 2f
-    return ideal.coerceIn(0.dp, (windowHeight - balloonHeight).coerceAtLeast(0.dp))
+    val low = maxOf(0.dp, areaTop)
+    val high = (minOf(windowHeight, areaBottom) - balloonHeight).coerceAtLeast(low)
+    return ideal.coerceIn(low, high)
 }
 
 /** Retângulo de [width] x [height] centrado em ([centerX], [centerY]). */

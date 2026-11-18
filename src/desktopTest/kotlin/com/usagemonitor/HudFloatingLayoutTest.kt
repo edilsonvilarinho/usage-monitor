@@ -382,9 +382,24 @@ class HudFloatingLayoutTest {
     fun `balao fica centrado no anel em foco e preso dentro da janela`() {
         val window = 200.dp
         val balloon = 100.dp
-        assertEquals(50.dp, hudFloatingBalloonTop(ringCenterY = 100.dp, balloonHeight = balloon, windowHeight = window))
-        assertEquals(0.dp, hudFloatingBalloonTop(ringCenterY = 10.dp, balloonHeight = balloon, windowHeight = window))
-        assertEquals(100.dp, hudFloatingBalloonTop(ringCenterY = 190.dp, balloonHeight = balloon, windowHeight = window))
+        assertEquals(50.dp, hudFloatingBalloonTop(ringCenterY = 100.dp, balloonHeight = balloon, windowHeight = window, areaTop = 0.dp, areaBottom = window))
+        assertEquals(0.dp, hudFloatingBalloonTop(ringCenterY = 10.dp, balloonHeight = balloon, windowHeight = window, areaTop = 0.dp, areaBottom = window))
+        assertEquals(100.dp, hudFloatingBalloonTop(ringCenterY = 190.dp, balloonHeight = balloon, windowHeight = window, areaTop = 0.dp, areaBottom = window))
+    }
+
+    /** A11k: o balão nunca sai da área útil da tela, nem pelo topo nem pela base. */
+    @Test
+    fun `balao nao sai da area util perto do topo da tela`() {
+        // Janela de 200 dp com a área útil começando em 20 dp: anel a 10 dp do topo da área.
+        val top = hudFloatingBalloonTop(ringCenterY = 30.dp, balloonHeight = 100.dp, windowHeight = 200.dp, areaTop = 20.dp, areaBottom = 200.dp)
+        assertEquals(20.dp, top, "topo do balão deve encostar no topo da área útil")
+    }
+
+    @Test
+    fun `balao nao sai da area util perto da base da tela`() {
+        // Área útil termina em 180 dp: anel a 10 dp da base da área.
+        val top = hudFloatingBalloonTop(ringCenterY = 170.dp, balloonHeight = 100.dp, windowHeight = 200.dp, areaTop = 0.dp, areaBottom = 180.dp)
+        assertEquals(80.dp, top, "base do balão deve encostar na base da área útil")
     }
 
     private fun columnLayout(
