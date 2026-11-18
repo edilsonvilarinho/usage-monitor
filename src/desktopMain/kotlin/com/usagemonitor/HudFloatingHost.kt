@@ -122,3 +122,43 @@ internal fun ScreenWorkArea.toPxRect(): HudPxRect {
         heightPx = size.height.value.roundToInt()
     )
 }
+
+/** Dono do modo solto: borda virtual, fração ao longo dela e área que o notch enxerga (A10a). */
+internal data class HudFloatingDock(
+    val edge: HudEdge,
+    val offsetFraction: Float,
+    val virtualArea: ScreenWorkArea
+)
+
+/** Lado pela metade da área (mesma regra do balão); a borda virtual vai até a face externa do buraco. */
+internal fun hudFloatingDock(holeCenter: HudFloatCenter, holeD: Dp, area: ScreenWorkArea): HudFloatingDock {
+    val edge = hudFloatingBalloonSide(holeCenter.xPx, area.toPxRect())
+    val radius = holeD / 2
+    val holeCenterX = holeCenter.xPx.dp
+    val virtualArea = if (edge == HudEdge.RIGHT) {
+        val faceX = holeCenterX + radius
+        ScreenWorkArea(area.x, area.y, DpSize(faceX - area.x, area.size.height))
+    } else {
+        val faceX = holeCenterX - radius
+        ScreenWorkArea(faceX, area.y, DpSize(area.x + area.size.width - faceX, area.size.height))
+    }
+    val offsetFraction = ((holeCenter.yPx.toFloat() - area.y.value) / area.size.height.value).coerceIn(0f, 1f)
+    return HudFloatingDock(edge, offsetFraction, virtualArea)
+}
+
+/** Modo solto: só o buraco muda de tamanho; expandido, balão e alças são os de antes. */
+internal fun hudFloatingSizes(sizes: HudNotchSizes, holeD: Dp): HudNotchSizes =
+    sizes.copy(collapsed = DpSize(holeD, holeD))
+
+/**
+ * Deslocamento da coluna aberta em relação ao centro do buraco, ao longo da borda. O buraco não
+ * se move: a coluna desliza só o necessário para caber inteira na área. Coluna maior que a área
+ * se alinha ao início.
+ */
+internal fun hudFloatingAlongShift(holeAlong: Dp, expandedAlong: Dp, areaStart: Dp, areaEnd: Dp): Dp {
+    val columnStart = holeAlong - expandedAlong / 2
+    if (expandedAlong >= areaEnd - areaStart) return areaStart - columnStart
+    val low = areaStart - columnStart
+    val high = areaEnd - (columnStart + expandedAlong)
+    return minOf(maxOf(0.dp, low), high)
+}

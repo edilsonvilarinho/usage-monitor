@@ -193,4 +193,80 @@ class HudFloatingHostTest {
         assertEquals(DpSize(1688.dp, 400.dp), scaled.size)
         assertEquals(DpRect(392.dp, 70.dp, 452.dp, 130.dp), scaled.hitRect)
     }
+
+    // Borda virtual (A10a): buraco 60 numa área 1000x800 com origem 0,0.
+
+    @Test
+    fun `buraco na metade direita gruda na borda RIGHT, com a face externa do buraco como limite`() {
+        val dock = hudFloatingDock(HudFloatCenter(700, 400), holeDiameter, area)
+        assertEquals(HudEdge.RIGHT, dock.edge)
+        assertEquals(730.dp, dock.virtualArea.x + dock.virtualArea.size.width)
+    }
+
+    @Test
+    fun `buraco na metade esquerda gruda na borda LEFT, com a face externa do buraco como limite`() {
+        val dock = hudFloatingDock(HudFloatCenter(300, 400), holeDiameter, area)
+        assertEquals(HudEdge.LEFT, dock.edge)
+        assertEquals(270.dp, dock.virtualArea.x)
+        assertEquals(1000.dp, dock.virtualArea.x + dock.virtualArea.size.width)
+    }
+
+    @Test
+    fun `o centro do notch, calculado de volta pela fracao, cai na altura do buraco`() {
+        val dock = hudFloatingDock(HudFloatCenter(700, 400), holeDiameter, area)
+        assertEquals(0.5f, dock.offsetFraction)
+        val bounds = hudWindowBounds(dock.edge, dock.offsetFraction, DpSize(60.dp, 200.dp), dock.virtualArea)
+        assertEquals(400.dp, bounds.y + bounds.notchCenterInWindow)
+    }
+
+    /** Buraco com centro em y=20: o centro do notch cai no limite da borda (margem + metade do notch). */
+    @Test
+    fun `buraco perto do topo deixa o centro do notch preso pelo limite`() {
+        val dock = hudFloatingDock(HudFloatCenter(700, 20), holeDiameter, area)
+        val bounds = hudWindowBounds(dock.edge, dock.offsetFraction, DpSize(60.dp, 200.dp), dock.virtualArea)
+        assertEquals(HUD_SHADOW_MARGIN + 100.dp, bounds.y + bounds.notchCenterInWindow)
+    }
+
+    @Test
+    fun `repouso do modo solto e o buraco quadrado, o resto do notch fica igual`() {
+        val sizes = HudNotchSizes(
+            collapsed = DpSize(120.dp, 40.dp),
+            expanded = DpSize(300.dp, 500.dp),
+            balloon = DpSize(264.dp, 200.dp),
+            withHandles = DpSize(140.dp, 40.dp),
+            compact = true
+        )
+        val floating = hudFloatingSizes(sizes, holeDiameter)
+        assertEquals(DpSize(60.dp, 60.dp), floating.collapsed)
+        assertEquals(sizes.expanded, floating.expanded)
+        assertEquals(sizes.balloon, floating.balloon)
+        assertEquals(sizes.withHandles, floating.withHandles)
+        assertEquals(sizes.compact, floating.compact)
+    }
+
+    // Ajuste dinâmico nos cantos: centro do buraco ao longo do eixo; área de 0 a 800; coluna de 200.
+
+    @Test
+    fun `buraco perto do topo desloca a coluna para baixo, inteira na area`() {
+        val shift = hudFloatingAlongShift(holeAlong = 40.dp, expandedAlong = 200.dp, areaStart = 0.dp, areaEnd = 800.dp)
+        assertEquals(60.dp, shift)
+    }
+
+    @Test
+    fun `buraco perto do fundo desloca a coluna para cima, inteira na area`() {
+        val shift = hudFloatingAlongShift(holeAlong = 760.dp, expandedAlong = 200.dp, areaStart = 0.dp, areaEnd = 800.dp)
+        assertEquals((-60).dp, shift)
+    }
+
+    @Test
+    fun `buraco no meio deixa a coluna centrada nele`() {
+        val shift = hudFloatingAlongShift(holeAlong = 400.dp, expandedAlong = 200.dp, areaStart = 0.dp, areaEnd = 800.dp)
+        assertEquals(0.dp, shift)
+    }
+
+    @Test
+    fun `coluna maior que a area se alinha ao inicio`() {
+        val shift = hudFloatingAlongShift(holeAlong = 400.dp, expandedAlong = 900.dp, areaStart = 0.dp, areaEnd = 800.dp)
+        assertEquals(50.dp, shift)
+    }
 }
