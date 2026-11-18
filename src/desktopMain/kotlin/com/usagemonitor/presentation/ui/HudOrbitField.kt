@@ -21,9 +21,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import com.usagemonitor.HudOrbitAccountSlot
+import com.usagemonitor.HudOrbitLabelBox
+import com.usagemonitor.HudOrbitLabelSide
+import com.usagemonitor.HudOrbitLabelWidths
+import com.usagemonitor.HudOrbitLabels
+import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.hudOrbitAccountLabelWidth
 import com.usagemonitor.hudOrbitFieldDiameter
+import com.usagemonitor.hudOrbitLabelBoxes
+import com.usagemonitor.hudOrbitLabelSide
 import com.usagemonitor.hudOrbitLabelWidths
+import com.usagemonitor.hudOrbitLayout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -35,21 +44,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.usagemonitor.HudOrbitAccountSlot
-import com.usagemonitor.HudOrbitLabelWidths
-import com.usagemonitor.HudOrbitLabels
-import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.hudOrbitLayout
 import com.usagemonitor.presentation.ui.components.AppGargantuaRing
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppRingArc
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
-import kotlin.math.sin
 import kotlin.random.Random
 
 /** Tag do campo orbital, para os testes de tela. */
@@ -63,15 +65,6 @@ private const val DUST_SEED = 619L
 private const val DUST_COUNT = 60
 private const val DUST_BASE_ALPHA = 0.25f
 private const val DUST_RADIUS_DP = 0.8f
-
-/** Distância entre a borda do anel e o rótulo, em dp. */
-private const val LABEL_GAP_DP = 2f
-
-/** Altura de uma linha de rótulo como múltiplo do corpo do texto. */
-private const val LABEL_LINE_FACTOR = 1.4f
-
-/** Cosseno acima do qual o rótulo fica à direita ou à esquerda do anel, e não acima ou abaixo. */
-private const val SIDE_COS_THRESHOLD = 0.3f
 
 /**
  * Campo orbital do modo flutuante expandido: as contas giram em volta do buraco central e cada uma mostra
@@ -91,9 +84,10 @@ internal fun HudOrbitField(
     val motion = LocalAppMotionPolicy.current
     val phase = rememberHudOrbitPhase(live = motion.continuous && !motion.reduced, periodSeconds = params.orbitPeriodSeconds)
     val widths = remember(accounts) { hudOrbitLabelWidths(accounts) }
+    val larguras = remember(accounts, params.labels) { accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value } }
     // O diâmetro do campo não depende da fase: a fase 0 dimensiona o Box sem ler o State.
     val fieldDiameter = hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter
-    val orbit = HudOrbitSlots(params = params, count = accounts.size, widths = widths, phase = phase)
+    val orbit = HudOrbitSlots(params = params, count = accounts.size, widths = widths, larguras = larguras, phase = phase)
     val fieldRadius = fieldDiameter / 2f
     Box(
         modifier = modifier.testTag(HUD_ORBIT_FIELD_TEST_TAG).size(fieldDiameter.dp),
@@ -129,16 +123,20 @@ internal fun HudOrbitField(
 }
 
 /**
- * Posições das contas na órbita. `slot` lê a fase e só pode ser chamado de lambda de layout ou de desenho;
- * chamá-lo na composição faria o campo inteiro recompor a cada quadro.
+ * Posições das contas e caixas dos rótulos na órbita. `slot` e `labelBox` leem a fase e só podem ser chamados de
+ * lambda de layout ou de desenho; chamá-los na composição faria o campo inteiro recompor a cada quadro.
  */
 private class HudOrbitSlots(
     private val params: HudOrbitParams,
     private val count: Int,
     private val widths: HudOrbitLabelWidths,
+    private val larguras: List<Float>,
     private val phase: State<Float>
 ) {
     fun slot(index: Int): HudOrbitAccountSlot = hudOrbitLayout(params, count, widths, phase.value).accounts[index]
+
+    fun labelBox(index: Int): HudOrbitLabelBox =
+        hudOrbitLabelBoxes(hudOrbitLayout(params, count, widths, phase.value), larguras, params)[index]
 }
 
 /** Relógio da órbita: só anda com a política viva; fora disso fica na fase zero. Devolve o State, não o valor. */
@@ -255,7 +253,10 @@ private fun BoxScope.HudOrbitAccountNode(
     }
 }
 
-/** Rótulo da conta, ao lado do anel no sentido do ângulo do slot. Posição lida no layout, como a conta. */
+/**
+ * Rótulo da conta, na caixa que [hudOrbitLabelBoxes] calcula: mesma geometria que o teste de sobreposição verifica.
+ * A posição é lida no layout, como a conta. O alinhamento do texto segue o lado do anel em que a caixa fica.
+ */
 @Composable
 private fun BoxScope.HudOrbitAccountLabel(
     index: Int,
@@ -269,10 +270,7 @@ private fun BoxScope.HudOrbitAccountLabel(
     } else {
         listOf(quotaText(account))
     }
-    val lineDp = params.textSp * LABEL_LINE_FACTOR
     val width = hudOrbitAccountLabelWidth(account, params.labels).value
-    val height = lines.size * lineDp
-    val accountRadius = params.accD / 2f
     val style = MaterialTheme.typography.labelSmall.copy(fontSize = params.textSp.sp)
     val color = MaterialTheme.colorScheme.onSurface
     Layout(
@@ -282,17 +280,16 @@ private fun BoxScope.HudOrbitAccountLabel(
         modifier = Modifier
             .align(Alignment.TopStart)
             .offset {
-                val slot = orbit.slot(index)
-                val origin = labelOrigin(slot, width, height, accountRadius)
+                val box = orbit.labelBox(index)
                 IntOffset(
-                    x = (fieldRadius + origin.first).dp.roundToPx(),
-                    y = (fieldRadius + origin.second).dp.roundToPx()
+                    x = (fieldRadius + box.x).dp.roundToPx(),
+                    y = (fieldRadius + box.y).dp.roundToPx()
                 )
             }
             .width(width.dp)
     ) { measurables, constraints ->
         // O alinhamento do texto lê a fase na medição, não na composição: o rótulo acompanha o lado do anel sem recompor.
-        val align = labelAlign(orbit.slot(index))
+        val align = labelAlign(hudOrbitLabelSide(orbit.slot(index)))
         val blockWidth = constraints.maxWidth
         val placeables = measurables.map { measurable -> measurable.measure(Constraints(maxWidth = blockWidth)) }
         val blockHeight = placeables.sumOf { placeable -> placeable.height }
@@ -314,26 +311,9 @@ private fun BoxScope.HudOrbitAccountLabel(
 /** Cota principal da conta, a mesma que a faixa de hoje mostra no anel. */
 internal fun quotaText(account: HudAccount): String = account.rings.firstOrNull()?.percentText.orEmpty()
 
-/** Canto superior esquerdo do rótulo, em dp relativos ao centro do campo. */
-private fun labelOrigin(slot: HudOrbitAccountSlot, width: Float, height: Float, accountRadius: Float): Pair<Float, Float> {
-    val radians = Math.toRadians(slot.angleDegrees.toDouble())
-    val ca = cos(radians).toFloat()
-    val sa = sin(radians).toFloat()
-    val gap = LABEL_GAP_DP
-    return when {
-        ca > SIDE_COS_THRESHOLD -> (slot.x + accountRadius + gap) to (slot.y - height / 2f)
-        ca < -SIDE_COS_THRESHOLD -> (slot.x - accountRadius - gap - width) to (slot.y - height / 2f)
-        sa >= 0f -> (slot.x - width / 2f) to (slot.y + accountRadius + gap)
-        else -> (slot.x - width / 2f) to (slot.y - accountRadius - gap - height)
-    }
-}
-
 /** Alinhamento do texto: encostado no anel do lado em que o rótulo fica. */
-private fun labelAlign(slot: HudOrbitAccountSlot): TextAlign {
-    val ca = cos(Math.toRadians(slot.angleDegrees.toDouble())).toFloat()
-    return when {
-        ca > SIDE_COS_THRESHOLD -> TextAlign.Start
-        ca < -SIDE_COS_THRESHOLD -> TextAlign.End
-        else -> TextAlign.Center
-    }
+private fun labelAlign(side: HudOrbitLabelSide): TextAlign = when (side) {
+    HudOrbitLabelSide.RIGHT -> TextAlign.Start
+    HudOrbitLabelSide.LEFT -> TextAlign.End
+    HudOrbitLabelSide.CENTER -> TextAlign.Center
 }

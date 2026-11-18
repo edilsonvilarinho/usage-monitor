@@ -6,30 +6,33 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
+import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Geometria pura do campo orbital do modo flutuante (issue #619, A04).
+ * Geometria pura do campo orbital do modo flutuante (issue #619, A04 e A08e1).
  *
- * Padrões do dono em `prototipos/issue-619/parametros-dono.json`. O crescimento do campo
- * segue o `fitRadius` do protótipo R2 (`prototipos/issue-619/r2-orbita-radial/index.html`),
- * com a largura dos rótulos como entrada: a geometria não mede texto.
+ * Padrões do dono em `prototipos/issue-619/parametros-dono.json`, dobrados na A08e1 (o app real ficou pequeno em 1x).
+ * O campo cresce até caber os rótulos; a órbita abre o raio até os rótulos não baterem uns nos outros nem nos anéis.
+ * A geometria não mede texto: quem tem Canvas entrega a largura medida.
  */
 class HudOrbitGeometryTest {
 
     private val labelWidths = HudOrbitLabelWidths(complete = 60f, compact = 30f)
 
-    /** Padrões do dono: se um valor mudar sem o JSON, o modo deixa de ser o aprovado. */
+    /** Padrões do dono dobrados (A08e1): se um valor mudar sem o JSON, o modo deixa de ser o aprovado. */
     @Test
     fun `defaults are the owner values`() {
         val p = HudOrbitParams()
-        assertEquals(180.0, p.fieldD.toDouble(), "fieldD")
-        assertEquals(40.0, p.orbR.toDouble(), "orbR")
-        assertEquals(28.0, p.accD.toDouble(), "accD")
-        assertEquals(8.0, p.markD.toDouble(), "markD")
-        assertEquals(32.0, p.holeD.toDouble(), "holeD")
+        assertEquals(360.0, p.fieldD.toDouble(), "fieldD")
+        assertEquals(80.0, p.orbR.toDouble(), "orbR")
+        assertEquals(56.0, p.accD.toDouble(), "accD")
+        assertEquals(16.0, p.markD.toDouble(), "markD")
+        assertEquals(64.0, p.holeD.toDouble(), "holeD")
         assertEquals(29.0, p.tiltPercent.toDouble(), "tilt")
         assertEquals(3.0, p.diskWidthPercent.toDouble(), "diskW")
         assertEquals(3.5, p.diskSpinSeconds.toDouble(), "spin")
@@ -39,7 +42,7 @@ class HudOrbitGeometryTest {
         assertEquals(200.0, p.dustBrightnessPercent.toDouble(), "dustB")
         assertEquals(0.0, p.borderWidth.toDouble(), "borderW")
         assertEquals(HudOrbitLabels.FULL, p.labels, "rotulos")
-        assertEquals(8.0, p.textSp.toDouble(), "txt")
+        assertEquals(16.0, p.textSp.toDouble(), "txt")
     }
 
     /** Sentido horário na tela (y para baixo): a primeira conta no topo, depois direita, base, esquerda. */
@@ -48,12 +51,12 @@ class HudOrbitGeometryTest {
         val layout = hudOrbitLayout(HudOrbitParams(), 4, labelWidths, 0f)
         assertEquals(listOf(-90.0, 0.0, 90.0, 180.0), layout.accounts.map { it.angleDegrees.toDouble() }, "angulos")
         assertNear(0f, layout.accounts[0].x, "x0")
-        assertNear(-40f, layout.accounts[0].y, "y0")
-        assertNear(40f, layout.accounts[1].x, "x1")
+        assertNear(-80f, layout.accounts[0].y, "y0")
+        assertNear(80f, layout.accounts[1].x, "x1")
         assertNear(0f, layout.accounts[1].y, "y1")
         assertNear(0f, layout.accounts[2].x, "x2")
-        assertNear(40f, layout.accounts[2].y, "y2")
-        assertNear(-40f, layout.accounts[3].x, "x3")
+        assertNear(80f, layout.accounts[2].y, "y2")
+        assertNear(-80f, layout.accounts[3].x, "x3")
         assertNear(0f, layout.accounts[3].y, "y3")
     }
 
@@ -95,28 +98,28 @@ class HudOrbitGeometryTest {
     fun `no accounts means no slots and no growth`() {
         val layout = hudOrbitLayout(HudOrbitParams(), 0, labelWidths, 0f)
         assertEquals(emptyList(), layout.accounts, "contas")
-        assertNear(180f, layout.fieldDiameter, "campo sem contas")
+        assertNear(360f, layout.fieldDiameter, "campo sem contas")
     }
 
     /** Rótulo compacto (só a cota) cabe no campo padrão: não cresce. */
     @Test
     fun `compact labels keep the owner field size`() {
         val layout = hudOrbitLayout(HudOrbitParams(labels = HudOrbitLabels.COMPACT), 4, labelWidths, 0f)
-        assertNear(180f, layout.fieldDiameter, "campo compacto")
+        assertNear(360f, layout.fieldDiameter, "campo compacto")
     }
 
-    /** Rótulo completo (nome, cota e estado) cresce até caber: 262 dp pelo `fitRadius` do R2 com 60 dp de largura. */
+    /** Rótulo completo com largura grande cresce o campo além do tamanho do dono. */
     @Test
     fun `complete labels grow the field to fit`() {
-        val layout = hudOrbitLayout(HudOrbitParams(), 4, labelWidths, 0f)
-        assertNear(262f, layout.fieldDiameter, "campo completo")
+        val wide = hudOrbitLayout(HudOrbitParams(), 4, HudOrbitLabelWidths(complete = 120f, compact = 30f), 0f)
+        assertTrue(wide.fieldDiameter > 360f, "campo completo largo ${wide.fieldDiameter} dp")
     }
 
-    /** Mesmo com rótulo estreito o completo cresce: 198 dp com 10 dp de largura (fitRadius 99). */
+    /** Rótulo completo estreito cabe no campo do dono: não cresce. */
     @Test
-    fun `complete labels grow even when narrow`() {
+    fun `complete labels with narrow width keep the owner field size`() {
         val layout = hudOrbitLayout(HudOrbitParams(), 4, HudOrbitLabelWidths(complete = 10f, compact = 10f), 0f)
-        assertNear(198f, layout.fieldDiameter, "campo completo estreito")
+        assertNear(360f, layout.fieldDiameter, "campo completo estreito")
     }
 
     /** Crescimento depende da largura e não da quantidade de contas. */
@@ -131,13 +134,13 @@ class HudOrbitGeometryTest {
     @Test
     fun `labels off keep the owner field size`() {
         val layout = hudOrbitLayout(HudOrbitParams(labels = HudOrbitLabels.OFF), 4, labelWidths, 0f)
-        assertNear(180f, layout.fieldDiameter, "campo desligado")
+        assertNear(360f, layout.fieldDiameter, "campo desligado")
     }
 
     /** O buraco minimizado é o `holeD`, independente das contas. */
     @Test
     fun `hole diameter is the owner hole size`() {
-        assertNear(32f, hudOrbitLayout(HudOrbitParams(), 3, labelWidths, 0f).holeDiameter, "buraco")
+        assertNear(64f, hudOrbitLayout(HudOrbitParams(), 3, labelWidths, 0f).holeDiameter, "buraco")
     }
 
     /** Mesma entrada, mesma saída, mesmo com outra chamada no meio. */
@@ -149,30 +152,70 @@ class HudOrbitGeometryTest {
         assertEquals(first, second, "determinismo")
     }
 
+    /**
+     * Oito contas com os rótulos reais do teste do dono (capturas `r4-app-real`): em FULL nenhuma caixa cruza outra,
+     * nenhuma cruza um anel e todas ficam dentro do campo. Antes da A08e1 "OpenRouter" cobria "Normal" e
+     * "Local activity" cobria "DeepSeek".
+     */
+    @Test
+    fun `eight real account labels never overlap each other, any ring or leave the field`() {
+        val params = HudOrbitParams()
+        val accounts = realAccounts()
+        val larguras = accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value }
+        val layout = hudOrbitLayout(params, accounts.size, hudOrbitLabelWidths(accounts), orbitPhase = 0f)
+        val boxes = hudOrbitLabelBoxes(layout, larguras, params)
+        val fieldRadius = (layout.fieldDiameter / 2f).toDouble()
+        val accRadius = (params.accD / 2f).toDouble()
+        assertEquals(accounts.size, boxes.size, "uma caixa por conta")
+        boxes.forEach { box ->
+            boxes.filter { other -> other.index > box.index }.forEach { other ->
+                assertFalse(overlaps(box, other), "rotulo ${box.index} sobrepoe o ${other.index}")
+            }
+            layout.accounts.forEach { slot ->
+                assertTrue(distanceToBox(box, slot.x, slot.y) >= accRadius - EPS, "rotulo ${box.index} cruza o anel ${slot.index}")
+            }
+            corners(box).forEach { (x, y) ->
+                assertTrue(hypot(x, y) <= fieldRadius + EPS, "rotulo ${box.index} sai do campo")
+            }
+        }
+    }
+
     /** Fora de composição (escopo `application { }`) o diâmetro sai da mesma geometria, sem medir texto. */
     @Test
     fun `field diameter outside composition keeps owner size for compact and off labels`() {
         val accounts = sevenAccounts()
-        assertNear(180f, hudOrbitFieldDiameter(accounts, HudOrbitParams(labels = HudOrbitLabels.COMPACT), AppLanguage.EN).value, "diametro compacto")
-        assertNear(180f, hudOrbitFieldDiameter(accounts, HudOrbitParams(labels = HudOrbitLabels.OFF), AppLanguage.EN).value, "diametro desligado")
+        assertNear(360f, hudOrbitFieldDiameter(accounts, HudOrbitParams(labels = HudOrbitLabels.COMPACT), AppLanguage.EN).value, "diametro compacto")
+        assertNear(360f, hudOrbitFieldDiameter(accounts, HudOrbitParams(labels = HudOrbitLabels.OFF), AppLanguage.EN).value, "diametro desligado")
     }
 
     /** Sete contas com rótulo completo: o campo cresce além do tamanho do dono. */
     @Test
     fun `field diameter outside composition grows with full labels`() {
-        val diameter = hudOrbitFieldDiameter(sevenAccounts(), HudOrbitParams(), AppLanguage.EN).value
-        assertTrue(diameter > 180f, "diametro completo $diameter dp")
+        // Nomes reais e longos: com "Conta N" (~47 dp) as caixas cabem nos 360 dp e o campo não cresce.
+        val diameter = hudOrbitFieldDiameter(realAccounts(), HudOrbitParams(), AppLanguage.EN).value
+        assertTrue(diameter > 360f, "diametro completo $diameter dp")
     }
+
+    private fun realAccounts(): List<HudAccount> = listOf(
+        account(0, "Anthropic — TRABALHO", statusLabel = "Normal"),
+        account(1, "OpenCode Zen Free"),
+        account(2, "OpenRouter"),
+        account(3, "Local activity"),
+        account(4, "DeepSeek"),
+        account(5, "MiniMax — PESSOAL"),
+        account(6, "Codex Extra"),
+        account(7, "Anthropic — CLIENTE"),
+    )
 
     private fun sevenAccounts(): List<HudAccount> = (0 until 7).map { index -> account(index, "Conta $index") }
 
-    private fun account(index: Int, label: String): HudAccount {
+    private fun account(index: Int, label: String, statusLabel: String = "Ok"): HudAccount {
         val percent = 10 + index
         val quota = HudQuota("5h", "$percent%", percent / 100f, AppTone.OK, resetText = null, hasForecast = false)
         return HudAccount(
             targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "perfil-$index"),
             label = label,
-            statusLabel = "Ok",
+            statusLabel = statusLabel,
             tone = AppTone.OK,
             quotas = listOf(quota),
             focusIndex = 0,
@@ -181,7 +224,29 @@ class HudOrbitGeometryTest {
         )
     }
 
+    /** Duas caixas se cruzam só se as duas faixas, horizontal e vertical, se sobrepõem. Encostar não é cruzar. */
+    private fun overlaps(a: HudOrbitLabelBox, b: HudOrbitLabelBox): Boolean =
+        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+    /** Distância do centro do anel (`px`, `py`) até a caixa; zero se o centro está dentro dela. */
+    private fun distanceToBox(box: HudOrbitLabelBox, px: Float, py: Float): Double {
+        val dx = max(max(box.x - px, 0f), px - (box.x + box.width)).toDouble()
+        val dy = max(max(box.y - py, 0f), py - (box.y + box.height)).toDouble()
+        return hypot(dx, dy)
+    }
+
+    /** Os quatro cantos da caixa, em dp relativos ao centro do campo. */
+    private fun corners(box: HudOrbitLabelBox): List<Pair<Double, Double>> {
+        val xs = listOf(box.x.toDouble(), (box.x + box.width).toDouble())
+        val ys = listOf(box.y.toDouble(), (box.y + box.height).toDouble())
+        return xs.flatMap { x -> ys.map { y -> x to y } }
+    }
+
     private fun assertNear(expected: Float, actual: Float, message: String) {
         assertEquals(expected.toDouble(), actual.toDouble(), 0.01, message)
+    }
+
+    private companion object {
+        const val EPS = 0.01
     }
 }
