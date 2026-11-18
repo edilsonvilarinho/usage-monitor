@@ -10,6 +10,8 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.animation.core.AnimationVector1D
@@ -48,6 +50,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.geometry.Rect
+import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.domain.entity.UsageTargetKey
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
@@ -191,6 +194,10 @@ internal fun HudNotch(
     floatingSupported: Boolean = false,
     floating: Boolean = false,
     onToggleFloating: () -> Unit = {},
+    /** Modo flutuante (#619, A10b): a coluna solta, com cantos nos 4 lados; o repouso é o buraco. */
+    detached: Boolean = false,
+    /** Deslocamento da coluna aberta ao longo da borda, a partir do buraco (A10c); só com [detached]. */
+    detachedAlongShift: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val hover = rememberHudHover(onHoverChange)
@@ -246,7 +253,7 @@ internal fun HudNotch(
     val currentOnRefreshAccount by rememberUpdatedState(onRefreshAccount)
     val reorder = rememberHudRingReorder(ringItemBounds, currentAccounts, edge.isHorizontal, onReorderAccounts)
 
-    val shape = remember(edge) { HudNotchShape(edge) }
+    val shape = remember(edge, detached) { hudNotchShape(edge, detached) }
     // Saída (K1): o notch recolhe junto com a vaga; o passo mais lento manda.
     val departures = rememberHudDepartures(accounts)
     val settle = departures.values.minOrNull()
@@ -267,6 +274,9 @@ internal fun HudNotch(
     val balloonAlong = remember { Animatable(0f) }
     val placement = remember { HudBalloonPlacement() }
     val alongSpec = appSpring(AppMotion.Springs.GENTLE, visibilityThreshold = BALLOON_ALONG_THRESHOLD_PX)
+    // Abertura da coluna destacada (A10b): o deslocamento ao longo da borda acompanha este progresso.
+    val openProgress by animateFloatAsState(
+        if (open) 1f else 0f, animationSpec = if (LocalAppMotionPolicy.current.reduced) snap() else appSpring(AppMotion.Springs.GENTLE))
     val scope = rememberCoroutineScope()
     LaunchedEffect(open) {
         if (!open) placement.placed = false
@@ -275,7 +285,9 @@ internal fun HudNotch(
     Layout(
         modifier = modifier.onPlaced { coordinates -> rootCoordinates = coordinates },
         content = {
-            Box(
+            // Repouso destacado (A10b): o buraco no lugar do corpo; aberto, a coluna de sempre.
+            if (detached && !open) HudFloatingHole(params = HudOrbitParams(), update = updateIndicator,
+                description = hudFloatingHoleDescription(language), modifier = Modifier.layoutId(HudNotchPart.NOTCH)) else Box(
                 modifier = Modifier
                     .layoutId(HudNotchPart.NOTCH)
                     .requiredSize(notchSize)
@@ -343,7 +355,7 @@ internal fun HudNotch(
                 )
             }
             HudRetractParts(autoRetract, onToggleAutoRetract, showHandles, accounts, edge, notchSize, ringCenters, { rootCoordinates }, language, hover)
-            HudHandleHints(visible = !showHandles, edge = edge, updateTone = updateIndicator?.tone)
+            HudHandleHints(visible = !showHandles && !detached, edge = edge, updateTone = updateIndicator?.tone)
             AnimatedVisibility(
                 visible = showHandles,
                 modifier = Modifier.layoutId(HudNotchPart.MOVE),
@@ -421,8 +433,11 @@ internal fun HudNotch(
             placement = placement,
             balloonAlong = balloonAlong,
             alongSpec = alongSpec,
-            scope = scope
+            scope = scope,
+            detachedAlongShift = if (detached) detachedAlongShift else 0.dp,
+            openProgress = { openProgress }
         )
+
     )
 }
 
