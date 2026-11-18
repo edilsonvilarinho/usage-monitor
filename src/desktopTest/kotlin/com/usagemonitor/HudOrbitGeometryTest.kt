@@ -29,16 +29,16 @@ class HudOrbitGeometryTest {
     fun `defaults are the owner values`() {
         val p = HudOrbitParams()
         assertEquals(360.0, p.fieldD.toDouble(), "fieldD")
-        assertEquals(80.0, p.orbR.toDouble(), "orbR")
-        assertEquals(56.0, p.accD.toDouble(), "accD")
-        assertEquals(16.0, p.markD.toDouble(), "markD")
+        assertEquals(64.0, p.orbR.toDouble(), "orbR")
+        assertEquals(48.0, p.accD.toDouble(), "accD")
+        assertEquals(14.0, p.markD.toDouble(), "markD")
         assertEquals(64.0, p.holeD.toDouble(), "holeD")
         assertEquals(29.0, p.tiltPercent.toDouble(), "tilt")
         assertEquals(3.0, p.diskWidthPercent.toDouble(), "diskW")
         assertEquals(3.5, p.diskSpinSeconds.toDouble(), "spin")
-        assertEquals(180.0, p.orbitPeriodSeconds.toDouble(), "orbS")
+        assertEquals(0.0, p.orbitPeriodSeconds.toDouble(), "orbS")
         assertEquals(HudOrbitLabels.FULL, p.labels, "rotulos")
-        assertEquals(16.0, p.textSp.toDouble(), "txt")
+        assertEquals(11.0, p.textSp.toDouble(), "txt")
     }
 
     /** Sentido horário na tela (y para baixo): a primeira conta no topo, depois direita, base, esquerda. */
@@ -47,12 +47,12 @@ class HudOrbitGeometryTest {
         val layout = hudOrbitLayout(HudOrbitParams(), 4, labelWidths, 0f)
         assertEquals(listOf(-90.0, 0.0, 90.0, 180.0), layout.accounts.map { it.angleDegrees.toDouble() }, "angulos")
         assertNear(0f, layout.accounts[0].x, "x0")
-        assertNear(-80f, layout.accounts[0].y, "y0")
-        assertNear(80f, layout.accounts[1].x, "x1")
+        assertNear(-64f, layout.accounts[0].y, "y0")
+        assertNear(64f, layout.accounts[1].x, "x1")
         assertNear(0f, layout.accounts[1].y, "y1")
         assertNear(0f, layout.accounts[2].x, "x2")
-        assertNear(80f, layout.accounts[2].y, "y2")
-        assertNear(-80f, layout.accounts[3].x, "x3")
+        assertNear(64f, layout.accounts[2].y, "y2")
+        assertNear(-64f, layout.accounts[3].x, "x3")
         assertNear(0f, layout.accounts[3].y, "y3")
     }
 
@@ -157,8 +157,8 @@ class HudOrbitGeometryTest {
     fun `eight real account labels never overlap each other, any ring or leave the field`() {
         val params = HudOrbitParams()
         val accounts = realAccounts()
-        val larguras = accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value }
-        val layout = hudOrbitLayout(params, accounts.size, hudOrbitLabelWidths(accounts), orbitPhase = 0f)
+        val larguras = accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels, params.textSp).value }
+        val layout = hudOrbitLayout(params, accounts.size, hudOrbitLabelWidths(accounts, params.textSp), orbitPhase = 0f)
         val boxes = hudOrbitLabelBoxes(layout, larguras, params)
         val fieldRadius = (layout.fieldDiameter / 2f).toDouble()
         val accRadius = (params.accD / 2f).toDouble()
@@ -184,7 +184,7 @@ class HudOrbitGeometryTest {
     fun `slot by phase matches the full layout for every account and phase`() {
         val params = HudOrbitParams()
         val accounts = realAccounts()
-        val widths = hudOrbitLabelWidths(accounts)
+        val widths = hudOrbitLabelWidths(accounts, params.textSp)
         for (phase in listOf(0f, 0.25f, 0.6f, 0.999f)) {
             val layout = hudOrbitLayout(params, accounts.size, widths, phase)
             layout.accounts.forEach { slot ->
@@ -198,8 +198,8 @@ class HudOrbitGeometryTest {
     fun `label box by phase matches the full layout for every account and phase`() {
         val params = HudOrbitParams()
         val accounts = realAccounts()
-        val widths = hudOrbitLabelWidths(accounts)
-        val larguras = accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value }
+        val widths = hudOrbitLabelWidths(accounts, params.textSp)
+        val larguras = accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels, params.textSp).value }
         for (phase in listOf(0f, 0.25f, 0.6f, 0.999f)) {
             val layout = hudOrbitLayout(params, accounts.size, widths, phase)
             val boxes = hudOrbitLabelBoxes(layout, larguras, params)
@@ -211,6 +211,30 @@ class HudOrbitGeometryTest {
                 )
             }
         }
+    }
+
+    /** Largura do rótulo acompanha o `textSp`: IBM Plex Mono tem avanço de 0,6 em, então caracteres × 0,6 × sp + 2 dp. */
+    @Test
+    fun `label width follows the text size with the monospace advance`() {
+        val trabalho = realAccounts().first()
+        assertNear(20f * 0.6f * 11f + 2f, hudOrbitAccountLabelWidth(trabalho, HudOrbitLabels.FULL, 11f).value, "Anthropic — TRABALHO a 11 sp")
+    }
+
+    /** Período zero é órbita parada: a fase fica em 0 em qualquer tempo, sem relógio de quadro. */
+    @Test
+    fun `orbit period zero keeps the phase at zero at any time`() {
+        for (millis in listOf(0L, 1_000L, 5_000L, 123_456L)) {
+            assertNear(0f, hudOrbitPhaseAt(millis, 0f), "fase em $millis ms com período 0")
+        }
+    }
+
+    /** Os padrões novos deixam o campo menor que os antigos (orbR 80, accD 56, markD 16, textSp 16). */
+    @Test
+    fun `new owner defaults make the field smaller than the previous defaults`() {
+        val antigo = HudOrbitParams(orbR = 80f, accD = 56f, markD = 16f, textSp = 16f)
+        val novo = hudOrbitFieldDiameter(realAccounts(), HudOrbitParams(), AppLanguage.EN).value
+        val velho = hudOrbitFieldDiameter(realAccounts(), antigo, AppLanguage.EN).value
+        assertTrue(novo < velho, "campo novo $novo dp, campo antigo $velho dp")
     }
 
     /** Fora de composição (escopo `application { }`) o diâmetro sai da mesma geometria, sem medir texto. */

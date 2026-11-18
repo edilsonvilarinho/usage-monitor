@@ -23,9 +23,9 @@ internal enum class HudOrbitLabels { FULL, COMPACT, OFF }
  */
 internal data class HudOrbitParams(
     val fieldD: Float = 360f,
-    val orbR: Float = 80f,
-    val accD: Float = 56f,
-    val markD: Float = 16f,
+    val orbR: Float = 64f,
+    val accD: Float = 48f,
+    val markD: Float = 14f,
     val holeD: Float = 64f,
     /** Inclinação do disco de acreção, em porcentagem: ry = rx * tilt / 100. */
     val tiltPercent: Float = 29f,
@@ -33,11 +33,11 @@ internal data class HudOrbitParams(
     val diskWidthPercent: Float = 3f,
     /** Segundos para uma volta do disco. */
     val diskSpinSeconds: Float = 3.5f,
-    /** Segundos para uma volta da órbita das contas. */
-    val orbitPeriodSeconds: Float = 180f,
+    /** Segundos para uma volta da órbita das contas. Zero deixa as contas paradas na fase 0; o disco continua girando. */
+    val orbitPeriodSeconds: Float = 0f,
     val labels: HudOrbitLabels = HudOrbitLabels.FULL,
     /** Tamanho do texto dos rótulos, em sp. */
-    val textSp: Float = 16f,
+    val textSp: Float = 11f,
 )
 
 /** Largura medida dos rótulos, em dp. A geometria não mede texto: quem tem Canvas mede e entrega o número. */
@@ -64,6 +64,12 @@ internal const val HUD_ORBIT_LINE_FACTOR = 1.2f
 /** Distância entre a borda do anel e o rótulo, em dp. */
 private const val LABEL_GAP_DP = 2f
 
+/** Avanço médio de um caractere da IBM Plex Mono, em em (600/1000). */
+private const val MONO_ADVANCE_EM = 0.6f
+
+/** Folga somada à largura estimada de cada texto, em dp. */
+private const val TEXT_SLACK_DP = 2f
+
 /** Folga entre a borda de uma conta e a borda da vizinha, usada no cálculo do raio efetivo, em dp. */
 private const val SPACING_GAP_DP = 8.0
 
@@ -83,22 +89,37 @@ private const val SIDE_COS_THRESHOLD = 0.3
  */
 @Suppress("UNUSED_PARAMETER")
 internal fun hudOrbitFieldDiameter(accounts: List<HudAccount>, params: HudOrbitParams, language: AppLanguage): Dp {
-    val widths = hudOrbitLabelWidths(accounts)
+    val widths = hudOrbitLabelWidths(accounts, params.textSp)
     return hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter.dp
 }
 
 /** Largura estimada dos rótulos em dp: `FULL` é o maior entre nome, cota e estado; `COMPACT` é só a cota. */
-internal fun hudOrbitLabelWidths(accounts: List<HudAccount>): HudOrbitLabelWidths {
-    val complete = accounts.maxOfOrNull { account -> hudOrbitAccountLabelWidth(account, HudOrbitLabels.FULL).value } ?: 0f
-    val compact = accounts.maxOfOrNull { account -> hudOrbitAccountLabelWidth(account, HudOrbitLabels.COMPACT).value } ?: 0f
+internal fun hudOrbitLabelWidths(accounts: List<HudAccount>, textSp: Float): HudOrbitLabelWidths {
+    val complete = accounts.maxOfOrNull { account -> hudOrbitAccountLabelWidth(account, HudOrbitLabels.FULL, textSp).value } ?: 0f
+    val compact = accounts.maxOfOrNull { account -> hudOrbitAccountLabelWidth(account, HudOrbitLabels.COMPACT, textSp).value } ?: 0f
     return HudOrbitLabelWidths(complete = complete, compact = compact)
 }
 
-/** Largura estimada de um rótulo: `wordWidth` para nome e estado, `percentWidth` para a cota. Sem medir texto. */
-internal fun hudOrbitAccountLabelWidth(account: HudAccount, labels: HudOrbitLabels): Dp {
-    val quota = percentWidth(quotaText(account))
-    if (labels != HudOrbitLabels.FULL) return quota
-    return maxOf(wordWidth(account.label), quota, wordWidth(account.statusLabel))
+/**
+ * Largura estimada de um texto em dp: IBM Plex Mono tem avanço de 600/1000 em, então `caracteres × 0,6 × textSp`,
+ * mais uma folga de 2 dp. Usada pela geometria e pela caixa do desenho, para o texto nunca ser cortado.
+ */
+internal fun hudOrbitTextWidth(text: String, textSp: Float): Float = text.length * MONO_ADVANCE_EM * textSp + TEXT_SLACK_DP
+
+/** Largura estimada de um rótulo: `FULL` é o maior entre nome, cota e estado; `COMPACT` é só a cota. */
+internal fun hudOrbitAccountLabelWidth(account: HudAccount, labels: HudOrbitLabels, textSp: Float): Dp {
+    val quota = hudOrbitTextWidth(quotaText(account), textSp)
+    if (labels != HudOrbitLabels.FULL) return quota.dp
+    return maxOf(hudOrbitTextWidth(account.label, textSp), quota, hudOrbitTextWidth(account.statusLabel, textSp)).dp
+}
+
+/**
+ * Fase da órbita em voltas a partir do tempo decorrido. Período zero ou negativo é fase fixa em 0 (órbita parada):
+ * sem período não há volta, então o tempo não entra.
+ */
+internal fun hudOrbitPhaseAt(elapsedMillis: Long, periodSeconds: Float): Float {
+    if (periodSeconds <= 0f) return 0f
+    return (elapsedMillis / 1000f) / periodSeconds
 }
 
 /** Linhas de cada rótulo por modo: nome, cota e estado; só a cota; nenhuma. */

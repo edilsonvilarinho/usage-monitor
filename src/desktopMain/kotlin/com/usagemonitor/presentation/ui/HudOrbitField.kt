@@ -29,6 +29,7 @@ import com.usagemonitor.hudOrbitLabelBoxAt
 import com.usagemonitor.hudOrbitLabelSide
 import com.usagemonitor.hudOrbitLabelWidths
 import com.usagemonitor.hudOrbitLayout
+import com.usagemonitor.hudOrbitPhaseAt
 import com.usagemonitor.hudOrbitSlotAt
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
@@ -76,8 +77,8 @@ internal fun HudOrbitField(
 ) {
     val motion = LocalAppMotionPolicy.current
     val phase = rememberHudOrbitPhase(live = motion.continuous && !motion.reduced, periodSeconds = params.orbitPeriodSeconds)
-    val widths = remember(accounts) { hudOrbitLabelWidths(accounts) }
-    val larguras = remember(accounts, params.labels) { accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value } }
+    val widths = remember(accounts, params.textSp) { hudOrbitLabelWidths(accounts, params.textSp) }
+    val larguras = remember(accounts, params.labels, params.textSp) { accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels, params.textSp).value } }
     // Diâmetro calculado uma vez por contas e parâmetros: não depende da fase, então não varre o layout por quadro.
     val fieldDiameter = remember(accounts, params) { hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter }
     val orbit = HudOrbitSlots(params = params, count = accounts.size, larguras = larguras, phase = phase)
@@ -168,12 +169,15 @@ private fun rememberHudOrbitPhase(live: Boolean, periodSeconds: Float): State<Fl
             phase.value = 0f
             return@LaunchedEffect
         }
-        val period = max(periodSeconds, 1f)
+        if (periodSeconds <= 0f) {
+            phase.value = 0f
+            return@LaunchedEffect
+        }
         var start = -1L
         while (true) {
             withFrameMillis { now ->
                 if (start < 0L) start = now
-                phase.value = ((now - start) / 1000f) / period
+                phase.value = hudOrbitPhaseAt(now - start, periodSeconds)
             }
         }
     }
@@ -288,12 +292,12 @@ private fun BoxScope.HudOrbitAccountLabel(
     } else {
         listOf(quotaText(account))
     }
-    val width = hudOrbitAccountLabelWidth(account, params.labels).value
+    val width = hudOrbitAccountLabelWidth(account, params.labels, params.textSp).value
     val style = MaterialTheme.typography.labelSmall.copy(fontSize = params.textSp.sp)
     val color = MaterialTheme.colorScheme.onSurface
     Layout(
         content = {
-            lines.forEach { line -> Text(text = line, style = style, color = color, maxLines = 1) }
+            lines.forEach { line -> Text(text = line, style = style, color = color) }
         },
         modifier = Modifier
             .align(Alignment.TopStart)
