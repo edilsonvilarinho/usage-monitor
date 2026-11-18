@@ -2,8 +2,6 @@ package com.usagemonitor
 
 import com.usagemonitor.presentation.ui.rememberHudMinimizeProgress
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -16,16 +14,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.rememberWindowState
 import com.russhwolf.settings.PreferencesSettings
 import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
@@ -33,7 +27,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.usagemonitor.presentation.ui.HudAppBalloonContent
 import com.usagemonitor.presentation.ui.HudCountdown
 import com.usagemonitor.presentation.ui.HudAccount
-import com.usagemonitor.presentation.ui.HudNotch
+import com.usagemonitor.presentation.ui.HudFloatingBalloon
+import com.usagemonitor.presentation.ui.rememberHudOrbitFieldDiameter
+import kotlin.math.roundToInt
 import com.usagemonitor.presentation.ui.components.CardAction
 import com.usagemonitor.presentation.ui.components.CardActionButton
 import com.usagemonitor.presentation.ui.components.CardIconActionButton
@@ -65,8 +61,6 @@ import com.usagemonitor.presentation.ui.updateBannerAction
 import com.usagemonitor.presentation.viewmodel.DashboardViewModel
 import com.usagemonitor.presentation.viewmodel.UsageAlertViewModel
 import java.awt.MouseInfo
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -152,8 +146,6 @@ internal fun HudWindowHost(
     val snapshot by usageAlertViewModel.worstSnapshot.collectAsState()
     val quotaRisks by usageAlertViewModel.quotaRisks.collectAsState()
     val appUpdateState by viewModel.appUpdateState.collectAsState()
-    val nextRefreshAt by viewModel.nextRefreshAt.collectAsState()
-    val pollInterval by viewModel.currentPollInterval.collectAsState()
     val dashboardState by viewModel.uiState.collectAsState()
     val refreshingTargets by viewModel.refreshingTargets.collectAsState()
     val exportScope = rememberCoroutineScope()
@@ -211,15 +203,15 @@ internal fun HudWindowHost(
     val drag = remember { HudDragState() }
     val retract = remember { HudAutoRetractState(settings) }
     var floating by remember { mutableStateOf(readHudFloating(settings)) }
-    // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
-    // janela (dp de janela). Nulo fora de arrasto.
-    var dragWindowPosition by remember { mutableStateOf<DpOffset?>(null) }
-    var dragPointer by remember { mutableStateOf<java.awt.Point?>(null) }
+    // Modo flutuante (#619): balão aberto (conta ou app) e centro guardado do conjunto solto.
+    var floatingBalloon by remember { mutableStateOf<HudFloatingBalloon?>(null) }
+    var floatCenter by remember { mutableStateOf(readHudFloatCenter(settings)) }
+    val floatingParams = remember { HudOrbitParams() }
 
     LaunchedEffect(hovered, drag.dragging) {
         if (drag.dragging) return@LaunchedEffect
         if (hovered) {
-            delay(hudOpenDelayMillis(retract.enabled, alreadyOpen = windowOpen))
+            delay(hudOpenDelayMillis(retract.enabled || floating, alreadyOpen = windowOpen))
             screen.reload(hudScreenArea)
             windowOpen = true
             // Um quadro para o recorte sair antes de o conteúdo começar a se
@@ -232,6 +224,7 @@ internal fun HudWindowHost(
             // notch e o painel gera um `Exit` de um quadro.
             delay(HUD_COLLAPSE_DELAY_MILLIS)
             expanded = false
+            floatingBalloon = null
             delay(HUD_COLLAPSE_SETTLE_MILLIS)
             windowOpen = false
         }
@@ -253,25 +246,35 @@ internal fun HudWindowHost(
     val composedArea = screenArea.inCompositionDp(scale)
     val bounds = hudHostWindowBounds(drag.dragging, placement, sizes, composedArea)
     val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
-    val restHitRegion = if (drag.dragging || windowOpen) {
-        null
-    } else {
-        hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
-    }
-    val windowSize = DpSize(bounds.size.width * scale, bounds.size.height * scale)
-    val docked = WindowPosition(bounds.x * scale, bounds.y * scale)
-
-    val windowState = rememberWindowState(
-        placement = WindowPlacement.Floating,
-        size = windowSize,
-        position = docked
+    // Modo flutuante (#619): o conjunto solto usa o layout dele; sem centro guardado, nasce no notch.
+    val fieldDiameter = rememberHudOrbitFieldDiameter(accounts, floatingParams, language)
+    val appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = updateIndicator != null, hasUpdateAction = updateAction != null)
+    // Geometria pura do modo flutuante (#619): tamanho, posição, lado do balão e recorte, em dp de composição.
+    val floatingGeometry = hudFloatingWindowGeometry(
+        center = floatCenter,
+        notchCenter = HudFloatCenter(
+            xPx = ((bounds.x + bounds.notchCenterInWindow) * scale).value.roundToInt(),
+            yPx = ((bounds.y + bounds.size.height / 2f) * scale).value.roundToInt()
+        ),
+        area = screen.area,
+        scale = scale,
+        maxFieldDiameter = fieldDiameter,
+        holeDiameter = floatingParams.holeD.dp,
+        balloonSize = DpSize(HUD_BALLOON_WIDTH, appBalloonHeight),
+        handleSize = HUD_HANDLE_SIZE,
+        gap = HUD_HANDLE_GAP,
+        expanded = false,
+        balloonOpen = false
     )
-    // Um salto, nunca interpolação AWT: o movimento é do conteúdo.
-    LaunchedEffect(windowSize, docked, drag.windowPosition) {
-        windowState.size = windowSize
-        val free = drag.windowPosition
-        windowState.position = if (free != null) WindowPosition(free.x, free.y) else docked
+    val restHitRegion = when {
+        drag.dragging || windowOpen -> null
+        floating -> floatingGeometry.hitRect
+        else -> hudRestHitRegion(placement.edge, bounds, sizes, retracted = retract.enabled)
     }
+    val windowSize = if (floating) floatingGeometry.size else DpSize(bounds.size.width * scale, bounds.size.height * scale)
+    val docked = if (floating) WindowPosition(floatingGeometry.position.x, floatingGeometry.position.y) else WindowPosition(bounds.x * scale, bounds.y * scale)
+    // Um salto, nunca interpolação AWT: o movimento é do conteúdo (ver `rememberHudDockedWindowState`).
+    val windowState = rememberHudDockedWindowState(windowSize, docked, drag.windowPosition)
 
     // A janela de arrasto, que é o que se move (issue #288). O gesto guarda os
     // lambdas da composição em que começou, com o notch **aberto**: com
@@ -280,18 +283,23 @@ internal fun HudWindowHost(
     // embaixo e à direita, onde a aberta é recuada. O encaixe lia o centro dessa
     // mesma largura errada. Esta medida sai da geometria e não muda no arrasto.
     val dragStart = hudDragWindowBounds(placement.edge, placement.offsetFraction, sizes, composedArea)
-    val dragSize = DpSize(dragStart.size.width * scale, dragStart.size.height * scale)
+    val dragSize = if (floating) windowSize else DpSize(dragStart.size.width * scale, dragStart.size.height * scale)
 
     // Estado e contas do gesto moram em `HudWindowDrag.kt`, onde são testáveis.
     val dragBegin = {
         expanded = false
         windowOpen = false
-        drag.begin(DpOffset(dragStart.x * scale, dragStart.y * scale))
+        drag.begin(if (floating) floatingGeometry.position else DpOffset(dragStart.x * scale, dragStart.y * scale))
     }
     val dragTo = { drag.moveTo(dragSize, pointerScreen()?.bounds ?: screen.area) }
     val dragFinish = {
         val position = drag.finish()
-        if (position != null) {
+        if (position != null && floating) {
+            // Solto no modo flutuante: o centro gravado é o que a próxima abertura reencontra (#619).
+            val center = hudFloatCenterOf(position, windowSize)
+            floatCenter = center
+            persistHudFloatCenter(settings, center.xPx.toFloat(), center.yPx.toFloat())
+        } else if (position != null) {
             // Borda, fração e monitor do ponto em que foi solto são gravados.
             val target = pointerScreen()
             val snapped = hudDragLanding(position, dragSize, screen.area, target)
@@ -341,73 +349,47 @@ internal fun HudWindowHost(
             onAlphaLost = { state -> rebirth.onAlphaLost(state, drag.dragging, screen.id, onAdopt = screen::moveTo) }
         )
         AppTheme(preset = themePreset, uiScalePercent = uiScalePercent, motion = motion) {
-            val edge = placement.edge
-            val centerInWindow = if (drag.dragging) null else bounds.notchCenterInWindow
-            Box(modifier = Modifier.fillMaxSize()) {
-                HudNotch(
-                    accounts = accounts,
-                    edge = edge,
-                    sizes = sizes,
-                    settledSizes = settledSizes,
-                    minimize = minimize,
-                    fallbackLabel = fallbackLabel,
-                    fallbackTone = fallbackTone,
-                    expanded = expanded && !drag.dragging,
-                    dragging = drag.dragging,
-                    updateIndicator = updateIndicator,
-                    notchCenter = centerInWindow,
-                    language = language,
-                    onHoverChange = { isHovered -> hovered = isHovered },
-                    onDragStart = dragBegin,
-                    onDragMove = dragTo,
-                    onDragEnd = dragFinish,
-                    // Clique num anel recoleta aquela conta, como no Codenotch.
-                    onRefreshAccount = { target -> viewModel.refresh(target) },
-                    onReorderAccounts = onReorderAccounts,
-                    // Os botões do card daquela conta, pela mesma regra do card.
-                    accountActions = { account ->
-                        HudAccountActions(
-                            account = account,
-                            language = language,
-                            teamEnabledProfileIds = teamEnabledProfileIds,
-                            cliSessionPulse = cliSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
-                            teamSessionPulse = teamSessionPulses[account.targetKey] ?: SessionPulse.EMPTY,
-                            actions = actions,
-                            onRefresh = { viewModel.refresh(account.targetKey) },
-                            onToggleMinimize = toggleMinimize
-                        )
-                    },
-                    // A engrenagem da ponta de longe abre o balão com o que o
-                    // rodapé do modo padrão oferece — aqui não há rodapé.
-                    appBalloon = {
-                        HudWindowAppBalloon(
-                            language = language,
-                            nextRefreshAt = nextRefreshAt,
-                            refreshInterval = pollInterval,
-                            updateIndicator = updateIndicator,
-                            updateAction = updateAction,
-                            actions = actions,
-                            exportScope = exportScope,
-                            currentStats = { (dashboardState as? UiState.Success)?.data },
-                            onQuit = onCloseRequest
-                        )
-                    },
-                    appBalloonHeight = hudAppBalloonHeight(
-                        hasUpdateIndicator = updateIndicator != null,
-                        hasUpdateAction = updateAction != null
-                    ),
-                    gearDescription = hudGearDescription(language),
-                    autoRetract = retract.enabled,
-                    onToggleAutoRetract = retract::toggle,
-                    floatingSupported = hudFloatingSupported(AutoStartManager.currentPlatform()),
-                    floating = floating,
-                    onToggleFloating = {
-                        floating = !floating
-                        persistHudFloating(settings, floating)
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+            val onToggleFloating: () -> Unit = {
+                floating = !floating
+                persistHudFloating(settings, floating)
             }
+            HudWindowContent(
+                floating = floating,
+                expanded = expanded,
+                dragging = drag.dragging,
+                accounts = accounts,
+                edge = placement.edge,
+                notchCenter = if (drag.dragging) null else bounds.notchCenterInWindow,
+                sizes = sizes,
+                settledSizes = settledSizes,
+                minimize = minimize,
+                fallbackLabel = fallbackLabel,
+                fallbackTone = fallbackTone,
+                updateIndicator = updateIndicator,
+                updateAction = updateAction,
+                language = language,
+                viewModel = viewModel,
+                actions = actions,
+                exportScope = exportScope,
+                onCloseRequest = onCloseRequest,
+                teamEnabledProfileIds = teamEnabledProfileIds,
+                cliSessionPulses = cliSessionPulses,
+                teamSessionPulses = teamSessionPulses,
+                toggleMinimize = toggleMinimize,
+                floatingParams = floatingParams,
+                floatingBalloon = floatingBalloon,
+                onFloatingBalloonToggle = { requested -> floatingBalloon = hudFloatingBalloonToggle(floatingBalloon, requested) },
+                floatingSide = floatingGeometry.balloonSide,
+                appBalloonHeight = appBalloonHeight,
+                autoRetract = retract.enabled,
+                onToggleAutoRetract = retract::toggle,
+                onToggleFloating = onToggleFloating,
+                onHoverChange = { isHovered -> hovered = isHovered },
+                onDragStart = dragBegin,
+                onDragMove = dragTo,
+                onDragEnd = dragFinish,
+                onReorderAccounts = onReorderAccounts
+            )
         }
     }
     }
@@ -421,7 +403,7 @@ internal fun HudWindowHost(
  * ponteiro deixa a HUD, e um escopo dele cancelaria a exportação no meio.
  */
 @Composable
-private fun HudWindowAppBalloon(
+internal fun HudWindowAppBalloon(
     language: AppLanguage,
     nextRefreshAt: Instant?,
     refreshInterval: Duration,
