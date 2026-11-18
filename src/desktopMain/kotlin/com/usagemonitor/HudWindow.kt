@@ -246,7 +246,7 @@ internal fun HudWindowHost(
     val bounds = hudHostWindowBounds(drag.dragging, placement, sizes, composedArea)
     val hitRegionMode = remember { hudHitRegionMode(AutoStartManager.currentPlatform()) }
     // Modo flutuante (#619): o conjunto solto usa o layout dele; sem centro guardado, nasce no notch.
-    val fieldDiameter = hudOrbitFieldDiameter(accounts, floatingParams, language)
+    val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
     val appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = updateIndicator != null, hasUpdateAction = updateAction != null)
     // Geometria pura do modo flutuante (#619): tamanho, posição, lado do balão e recorte, em dp de composição.
     val floatingGeometry = hudFloatingWindowGeometry(
@@ -257,7 +257,7 @@ internal fun HudWindowHost(
         ),
         area = screen.area,
         scale = scale,
-        maxFieldDiameter = fieldDiameter,
+        columnSize = columnSize,
         holeDiameter = floatingParams.holeD.dp,
         balloonSize = DpSize(HUD_BALLOON_WIDTH, appBalloonHeight),
         handleSize = HUD_HANDLE_SIZE,
@@ -382,6 +382,7 @@ internal fun HudWindowHost(
                 floatingBalloon = floatingBalloon,
                 onFloatingBalloonToggle = { requested -> floatingBalloon = hudFloatingBalloonToggle(floatingBalloon, requested) },
                 floatingSide = floatingGeometry.balloonSide,
+                floatingHoleScreenY = floatingGeometry.holeScreenY, floatingAreaTop = floatingGeometry.areaTop, floatingAreaBottom = floatingGeometry.areaBottom,
                 appBalloonHeight = appBalloonHeight,
                 autoRetract = retract.enabled,
                 onToggleAutoRetract = retract::toggle,

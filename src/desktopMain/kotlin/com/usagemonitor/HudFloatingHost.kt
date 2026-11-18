@@ -27,7 +27,12 @@ internal data class HudFloatingWindowGeometry(
     val size: DpSize,
     val position: DpOffset,
     val balloonSide: HudEdge,
-    val hitRect: DpRect
+    val hitRect: DpRect,
+    /** Y do buraco na tela, em dp de composição: a coluna desliza em torno dele. */
+    val holeScreenY: Dp,
+    /** Topo e base da área de trabalho, em dp de composição. */
+    val areaTop: Dp,
+    val areaBottom: Dp
 )
 
 /**
@@ -39,7 +44,7 @@ internal fun hudFloatingWindowGeometry(
     notchCenter: HudFloatCenter,
     area: ScreenWorkArea,
     scale: Float,
-    maxFieldDiameter: Dp,
+    columnSize: DpSize,
     holeDiameter: Dp,
     balloonSize: DpSize,
     handleSize: Dp,
@@ -47,21 +52,25 @@ internal fun hudFloatingWindowGeometry(
     expanded: Boolean,
     balloonOpen: Boolean
 ): HudFloatingWindowGeometry {
-    val unscaled = hudFloatingWindowSize(maxFieldDiameter, balloonSize, handleSize, gap)
+    val unscaled = hudFloatingColumnWindowSize(columnSize, balloonSize, holeDiameter, handleSize, gap)
     val size = DpSize(unscaled.width * scale, unscaled.height * scale)
-    val anchorDiameter = if (expanded) maxFieldDiameter * scale else holeDiameter * scale
-    val position = hudFloatingWindowPosition(center, notchCenter, size, area, anchorDiameter)
+    // A âncora é sempre o buraco: no modo coluna ele fica fixo no centro da janela, expandido ou não.
+    val position = hudFloatingWindowPosition(center, notchCenter, size, area, holeDiameter * scale)
     val windowCenterXPx = (position.x.value + size.width.value / 2f).roundToInt()
     val balloonSide = hudFloatingBalloonSide(windowCenterXPx, area.toPxRect())
-    val parts = hudFloatingParts(
+    // Buraco e área em dp de composição: é a unidade em que a coluna e o recorte são calculados.
+    val holeScreenY = (position.y + size.height / 2f) / scale
+    val composedArea = area.inCompositionDp(scale)
+    val parts = hudFloatingColumnParts(
         windowSize = unscaled,
         expanded = expanded,
-        fieldDiameter = maxFieldDiameter,
+        columnSize = columnSize,
         holeDiameter = holeDiameter,
+        holeCenterYPx = holeScreenY.value.roundToInt(),
+        workArea = composedArea.toPxRect(),
         balloonOpen = balloonOpen,
         balloonSide = balloonSide,
-        balloonWidth = balloonSize.width,
-        balloonHeight = balloonSize.height,
+        balloonSize = balloonSize,
         handleSize = handleSize,
         gap = gap
     )
@@ -69,7 +78,10 @@ internal fun hudFloatingWindowGeometry(
         size = size,
         position = position,
         balloonSide = balloonSide,
-        hitRect = parts.hitRect
+        hitRect = parts.hitRect,
+        holeScreenY = holeScreenY,
+        areaTop = composedArea.y,
+        areaBottom = composedArea.y + composedArea.size.height
     )
 }
 

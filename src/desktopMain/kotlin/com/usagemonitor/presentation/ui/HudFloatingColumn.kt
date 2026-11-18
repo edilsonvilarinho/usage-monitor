@@ -31,10 +31,11 @@ internal fun HudFloatingColumn(
     onRingRefresh: (Int) -> Unit,
     onHoleClicked: () -> Unit = {},
     onHoleHovered: () -> Unit = {},
+    hitBoxes: HudRingHitBoxes = remember { HudRingHitBoxes() },
     modifier: Modifier = Modifier
 ) {
     val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
-    val ringItemBounds = remember { HudRingHitBoxes() }
+    val ringItemBounds = hitBoxes
     val iris = rememberHudIrisFrame(revealed)
     val shape = AppShapes.large
     // O buraco ocupa o índice após a última conta, como na barra encaixada.

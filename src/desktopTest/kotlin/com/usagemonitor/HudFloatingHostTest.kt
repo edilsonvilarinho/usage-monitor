@@ -105,8 +105,10 @@ class HudFloatingHostTest {
         assertEquals(null, next)
     }
 
-    // Geometria da janela: campo 200, buraco 60, balão 300x100, alça 20, vão 8.
-    // Tamanho fixo: 300*2 + 8*3 + 200 + 20 = 844 de largura; altura = max(200, 100).
+    // Geometria da janela do modo coluna: buraco 60, coluna 50x200, balão 300x100, alça 20, vão 8.
+    // Tamanho fixo: 60 + 8*4 + 50*2 + 300*2 = 792 de largura; altura = 2*200 + (2*20 + 2*8)*2 = 512.
+
+    private val columnSize = DpSize(50.dp, 200.dp)
 
     private fun geometry(
         center: HudFloatCenter? = null,
@@ -118,7 +120,7 @@ class HudFloatingHostTest {
         notchCenter = notch,
         area = area,
         scale = scale,
-        maxFieldDiameter = 200.dp,
+        columnSize = columnSize,
         holeDiameter = 60.dp,
         balloonSize = DpSize(300.dp, 100.dp),
         handleSize = 20.dp,
@@ -128,21 +130,28 @@ class HudFloatingHostTest {
     )
 
     @Test
-    fun `tamanho fixo independe de expandido e do balao`() {
-        assertEquals(DpSize(844.dp, 200.dp), geometry().size)
-        assertEquals(DpSize(844.dp, 200.dp), geometry(expanded = true, balloonOpen = true).size)
+    fun `tamanho fixo da coluna independe de expandido e do balao`() {
+        assertEquals(DpSize(792.dp, 512.dp), geometry().size)
+        assertEquals(DpSize(792.dp, 512.dp), geometry(expanded = true, balloonOpen = true).size)
     }
 
     @Test
     fun `minimizado o recorte e so o buraco`() {
-        assertEquals(DpRect(392.dp, 70.dp, 452.dp, 130.dp), geometry().hitRect)
+        assertEquals(DpRect(366.dp, 226.dp, 426.dp, 286.dp), geometry().hitRect)
     }
 
     @Test
-    fun `expandido com balao a esquerda o recorte cobre balao campo e botoes`() {
+    fun `expandido com balao a esquerda o recorte cobre balao coluna e botoes`() {
         val expanded = geometry(center = HudFloatCenter(700, 400), expanded = true, balloonOpen = true)
         assertEquals(HudEdge.RIGHT, expanded.balloonSide)
-        assertEquals(DpRect(0.dp, 0.dp, 550.dp, 200.dp), expanded.hitRect)
+        assertEquals(DpRect(0.dp, 156.dp, 426.dp, 412.dp), expanded.hitRect)
+    }
+
+    /** Centro (700,40): o buraco encosta no topo da área; a coluna desliza para baixo e fica colada na borda da área. */
+    @Test
+    fun `expandido perto do topo desliza a coluna para caber na area`() {
+        val expanded = geometry(center = HudFloatCenter(700, 40), expanded = true)
+        assertEquals(DpRect(308.dp, 216.dp, 426.dp, 472.dp), expanded.hitRect)
     }
 
     @Test
@@ -153,25 +162,25 @@ class HudFloatingHostTest {
 
     @Test
     fun `posicao com centro salvo fica centrada nele`() {
-        assertEquals(DpOffset(78.dp, 200.dp), geometry(center = HudFloatCenter(500, 300)).position)
+        assertEquals(DpOffset(104.dp, 44.dp), geometry(center = HudFloatCenter(500, 300)).position)
     }
 
-    /** Buraco (raio 30) no canto superior esquerdo: centro vai a (30,30); janela em (30-422, 30-100). */
+    /** Buraco (raio 30) no canto superior esquerdo: centro vai a (30,30); janela em (-366, -170). */
     @Test
     fun `minimizado com buraco no canto superior esquerdo prende o buraco`() {
-        assertEquals(DpOffset(-392.dp, -70.dp), geometry(center = HudFloatCenter(0, 0)).position)
+        assertEquals(DpOffset(-366.dp, -226.dp), geometry(center = HudFloatCenter(0, 0)).position)
     }
 
-    /** Buraco no canto inferior direito: centro vai a (970,770); janela em (970-422, 770-100). */
+    /** Buraco no canto inferior direito: centro vai a (970,770); janela em (574, 570). */
     @Test
     fun `minimizado com buraco no canto inferior direito prende o buraco`() {
-        assertEquals(DpOffset(548.dp, 670.dp), geometry(center = HudFloatCenter(1000, 800)).position)
+        assertEquals(DpOffset(574.dp, 514.dp), geometry(center = HudFloatCenter(1000, 800)).position)
     }
 
-    /** Campo expandido (raio 100) no canto: centro vai a (100,100); o campo fica dentro da área. */
+    /** A âncora é sempre o buraco: expandir não desloca a janela. */
     @Test
-    fun `expandido no canto superior esquerdo desloca o campo para dentro`() {
-        assertEquals(DpOffset(-322.dp, 0.dp), geometry(center = HudFloatCenter(0, 0), expanded = true).position)
+    fun `expandido nao desloca a janela, a ancora e sempre o buraco`() {
+        assertEquals(DpOffset(-366.dp, -226.dp), geometry(center = HudFloatCenter(0, 0), expanded = true).position)
     }
 
     /** Centro gravado (0,0) fixo: expandir e recolher devolve a mesma posição do minimizado. */
@@ -183,14 +192,35 @@ class HudFloatingHostTest {
         val collapsedAfter = geometry(center = saved).position
 
         assertEquals(collapsedBefore, collapsedAfter)
-        assertEquals(DpOffset(-392.dp, -70.dp), collapsedAfter)
+        assertEquals(DpOffset(-366.dp, -226.dp), collapsedAfter)
     }
 
     @Test
     fun `escala multiplica o tamanho e o recorte fica em dp de composicao`() {
         // O recorte sai sem escala: o `HudWindowEffects` escala o retângulo ao aplicar.
         val scaled = geometry(scale = 2f)
-        assertEquals(DpSize(1688.dp, 400.dp), scaled.size)
-        assertEquals(DpRect(392.dp, 70.dp, 452.dp, 130.dp), scaled.hitRect)
+        assertEquals(DpSize(1584.dp, 1024.dp), scaled.size)
+        assertEquals(DpRect(366.dp, 226.dp, 426.dp, 286.dp), scaled.hitRect)
+    }
+
+    /** Centro salvo (500,300): o buraco está em y=300 da tela. */
+    @Test
+    fun `altura do buraco na tela e o centro dele`() {
+        assertEquals(300.dp, geometry(center = HudFloatCenter(500, 300)).holeScreenY)
+    }
+
+    @Test
+    fun `area de trabalho em dp de composicao vai do topo a base`() {
+        val collapsed = geometry()
+        assertEquals(0.dp, collapsed.areaTop)
+        assertEquals(800.dp, collapsed.areaBottom)
+    }
+
+    /** Escala 2, centro (250,150) em dp de janela: buraco em y=75 e base da área em 400 em dp de composição. */
+    @Test
+    fun `com escala a altura do buraco e a area saem em dp de composicao`() {
+        val scaled = geometry(center = HudFloatCenter(250, 150), scale = 2f)
+        assertEquals(75.dp, scaled.holeScreenY)
+        assertEquals(400.dp, scaled.areaBottom)
     }
 }

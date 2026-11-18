@@ -20,6 +20,7 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
@@ -30,8 +31,13 @@ import com.usagemonitor.HUD_HANDLE_GAP
 import com.usagemonitor.HUD_HANDLE_SIZE
 import com.usagemonitor.HudEdge
 import com.usagemonitor.HudOrbitParams
+import com.usagemonitor.HudPxRect
 import com.usagemonitor.domain.entity.AppLanguage
-import com.usagemonitor.hudFloatingParts
+import com.usagemonitor.hudFloatingBalloonTop
+import com.usagemonitor.hudFloatingColumnParts
+import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.verticalCollapsed
+import kotlin.math.roundToInt
 
 /** Tag do vão de arrasto sobre o buraco, para os testes de tela. */
 const val HUD_FLOATING_HOLE_DRAG_TAG = "hud-floating-hole-drag"
@@ -43,10 +49,10 @@ internal sealed interface HudFloatingBalloon {
 }
 
 /**
- * Janela flutuante da HUD (A08b). O tamanho é fixo e vem do host; minimizado mostra só o buraco;
- * expandido mostra campo, coluna de botões e o balão do lado [balloonSide]. Arrastar o buraco chama
- * início, fim e passos do arrasto. O conteúdo dos balões vem de fora: o host monta o `HudBalloon`
- * com a cauda apontada para a conta.
+ * Janela flutuante da HUD (A11c-2). O buraco fica sempre visível; expandido mostra a coluna vertical de
+ * anéis ao lado dele, as alças (engrenagem e encaixar) logo abaixo da coluna e o balão alinhado ao anel
+ * em foco. Tamanho fixo, vindo do host. Arrastar o buraco chama início, fim e passos do arrasto. O
+ * conteúdo dos balões vem de fora: o host monta o `HudBalloon` com a cauda apontada para a conta.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -59,6 +65,11 @@ internal fun HudFloatingHud(
     balloonSide: HudEdge,
     update: HudUpdateIndicator?,
     gearDescription: String,
+    fallbackLabel: String,
+    fallbackTone: AppTone,
+    holeScreenY: Dp,
+    areaTop: Dp,
+    areaBottom: Dp,
     onHoverChange: (Boolean) -> Unit,
     onAccountClick: (Int) -> Unit,
     onGearClick: () -> Unit,
@@ -71,44 +82,53 @@ internal fun HudFloatingHud(
     appBalloon: @Composable () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val fieldDiameter = rememberHudOrbitFieldDiameter(accounts, params, language)
+    val hitBoxes = remember { HudRingHitBoxes() }
+    val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
     val hoverModifier = modifier
         .fillMaxSize()
         .onPointerEvent(PointerEventType.Enter) { onHoverChange(true) }
         .onPointerEvent(PointerEventType.Exit) { onHoverChange(false) }
     BoxWithConstraints(modifier = hoverModifier) {
         val density = LocalDensity.current
-        val parts = hudFloatingParts(
+        val parts = hudFloatingColumnParts(
             windowSize = DpSize(maxWidth, maxHeight),
             expanded = expanded,
-            fieldDiameter = fieldDiameter,
+            columnSize = columnSize,
             holeDiameter = params.holeD.dp,
+            holeCenterYPx = holeScreenY.value.roundToInt(),
+            workArea = HudPxRect(
+                xPx = 0,
+                yPx = areaTop.value.roundToInt(),
+                widthPx = 1,
+                heightPx = (areaBottom - areaTop).value.roundToInt()
+            ),
             balloonOpen = balloon != null,
             balloonSide = balloonSide,
-            balloonWidth = HUD_BALLOON_WIDTH,
-            balloonHeight = balloonHeight,
+            balloonSize = DpSize(HUD_BALLOON_WIDTH, balloonHeight),
             handleSize = HUD_HANDLE_SIZE,
             gap = HUD_HANDLE_GAP
         )
-        // Minimizado: o buraco é o próprio desenho. Expandido: o campo já desenha o seu buraco.
-        if (!expanded) {
-            HudFloatingHole(
-                params = params,
-                update = update,
-                description = localized(language, "Buraco negro", "Black hole"),
-                modifier = Modifier.placedAt(parts.hole)
-            )
-        }
-        val field = parts.field
-        if (field != null) {
-            HudOrbitField(
+        val column = parts.column
+        if (column != null) {
+            HudFloatingColumn(
                 accounts = accounts,
-                params = params,
+                fallbackLabel = fallbackLabel,
+                fallbackTone = fallbackTone,
                 language = language,
-                onAccountClick = onAccountClick,
-                modifier = Modifier.placedAt(field)
+                revealed = expanded,
+                onRingHovered = onAccountClick,
+                onRingRefresh = {},
+                hitBoxes = hitBoxes,
+                modifier = Modifier.offset(x = column.left, y = column.top)
             )
         }
+        // O buraco fica sempre visível, minimizado e expandido.
+        HudFloatingHole(
+            params = params,
+            update = update,
+            description = localized(language, "Buraco negro", "Black hole"),
+            modifier = Modifier.placedAt(parts.hole)
+        )
         val buttons = parts.buttons
         if (buttons != null) {
             HudFloatingButtons(
@@ -122,14 +142,16 @@ internal fun HudFloatingHud(
         }
         val balloonRect = parts.balloon
         if (balloonRect != null && balloon != null) {
+            // Balão alinhado ao anel em foco; o da engrenagem fica centralizado na janela.
+            val ringCenterY = focusedRingCenterY(balloon, hitBoxes, column, density) ?: (maxHeight / 2f)
+            val balloonTop = hudFloatingBalloonTop(ringCenterY, balloonHeight, maxHeight)
             // A caixa do HudBalloon é HUD_BALLOON_GAP mais larga que o corpo; no lado esquerdo o corpo fica depois do vão.
             val boxLeft = if (balloonSide == HudEdge.LEFT) balloonRect.left - HUD_BALLOON_GAP else balloonRect.left
-            val windowCenterY = maxHeight / 2f
             HudBalloon(
                 edge = balloonSide,
-                tailCenter = { with(density) { (windowCenterY - balloonRect.top).toPx() } },
+                tailCenter = { with(density) { (ringCenterY - balloonTop).toPx() } },
                 bodyHeight = balloonHeight,
-                modifier = Modifier.offset(x = boxLeft, y = balloonRect.top),
+                modifier = Modifier.offset(x = boxLeft, y = balloonTop),
                 content = { HudFloatingBalloonContent(balloon, accountBalloon, appBalloon) }
             )
         }
@@ -142,7 +164,22 @@ internal fun HudFloatingHud(
     }
 }
 
-/** Coluna à direita do campo: engrenagem em cima, encaixar na borda embaixo. */
+/**
+ * Centro Y, em dp de janela, do anel em foco. A caixa do anel é medida no corpo da coluna, então soma-se o topo
+ * da coluna. `null` para o balão da engrenagem ou enquanto o anel ainda não foi medido.
+ */
+private fun focusedRingCenterY(
+    balloon: HudFloatingBalloon,
+    hitBoxes: HudRingHitBoxes,
+    column: DpRect?,
+    density: Density
+): Dp? {
+    if (balloon !is HudFloatingBalloon.Account || column == null) return null
+    val ring = hitBoxes.rings()[balloon.index] ?: return null
+    return with(density) { column.top + ring.center.y.toDp() }
+}
+
+/** Alças logo abaixo da coluna: engrenagem em cima, encaixar embaixo. */
 @Composable
 private fun HudFloatingButtons(
     buttons: DpRect,
@@ -217,6 +254,6 @@ private fun HudFloatingDragArea(
     )
 }
 
-/** Posiciona e dimensiona um filho pelo retângulo calculado por [hudFloatingParts]. */
+/** Posiciona e dimensiona um filho pelo retângulo calculado por [hudFloatingColumnParts]. */
 private fun Modifier.placedAt(rect: DpRect): Modifier =
     offset(x = rect.left, y = rect.top).size(rect.right - rect.left, rect.bottom - rect.top)

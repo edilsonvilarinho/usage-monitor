@@ -98,6 +98,8 @@ internal data class HudFloatingColumnParts(
     val hole: DpRect,
     /** Coluna de anéis ao lado do buraco; `null` quando minimizado. */
     val column: DpRect?,
+    /** Engrenagem e encaixar, logo abaixo da coluna; `null` quando minimizado. */
+    val buttons: DpRect?,
     /** Balão aberto, além da coluna; `null` quando fechado ou minimizado. */
     val balloon: DpRect?,
     /** União do que está visível: o recorte da janela. */
@@ -106,11 +108,20 @@ internal data class HudFloatingColumnParts(
 
 /**
  * Tamanho fixo da janela do modo coluna: largura = buraco + 4 vãos + coluna dos dois lados
- * + balão dos dois lados; altura = a maior entre o dobro da coluna (o deslize vertical) e o balão.
+ * + balão dos dois lados; altura = a maior entre o dobro da coluna mais as alças dos dois
+ * extremos (`2·(2·handleSize + 2·gap)`) e o balão. Sem as alças na conta, a coluna colada
+ * no extremo do deslize empurra engrenagem e encaixar para fora da janela.
  */
-internal fun hudFloatingColumnWindowSize(columnSize: DpSize, balloonSize: DpSize, holeDiameter: Dp, gap: Dp): DpSize {
+internal fun hudFloatingColumnWindowSize(
+    columnSize: DpSize,
+    balloonSize: DpSize,
+    holeDiameter: Dp,
+    handleSize: Dp,
+    gap: Dp
+): DpSize {
     val width = holeDiameter + gap * 4 + columnSize.width * 2 + balloonSize.width * 2
-    val height = maxOf(columnSize.height * 2, balloonSize.height)
+    val handlesBothEnds = (handleSize * 2 + gap * 2) * 2
+    val height = maxOf(columnSize.height * 2 + handlesBothEnds, balloonSize.height)
     return DpSize(width, height)
 }
 
@@ -129,13 +140,14 @@ internal fun hudFloatingColumnParts(
     balloonOpen: Boolean,
     balloonSide: HudEdge,
     balloonSize: DpSize,
+    handleSize: Dp,
     gap: Dp
 ): HudFloatingColumnParts {
     val centerX = windowSize.width / 2f
     val centerY = windowSize.height / 2f
     val hole = centeredRect(centerX, centerY, holeDiameter, holeDiameter)
     if (!expanded) {
-        return HudFloatingColumnParts(hole = hole, column = null, balloon = null, hitRect = hole)
+        return HudFloatingColumnParts(hole = hole, column = null, buttons = null, balloon = null, hitRect = hole)
     }
 
     val columnTop = columnTopDp(windowSize, columnSize, holeCenterYPx, workArea)
@@ -146,19 +158,33 @@ internal fun hudFloatingColumnParts(
     }
     val column = DpRect(columnLeft, columnTop, columnLeft + columnSize.width, columnTop + columnSize.height)
 
+    val buttons = buttonsRect(column, windowSize, handleSize, gap)
     val balloon = if (balloonOpen) {
         balloonRect(windowSize, balloonSide, balloonSize.width, balloonSize.height)
     } else {
         null
     }
 
-    val visible = listOfNotNull(hole, column, balloon)
+    val visible = listOfNotNull(hole, column, buttons, balloon)
     return HudFloatingColumnParts(
         hole = hole,
         column = column,
+        buttons = buttons,
         balloon = balloon,
         hitRect = unionOf(visible)
     )
+}
+
+/**
+ * Engrenagem e encaixar: duas alças empilhadas, de altura `2·handleSize + gap`, centradas no X da
+ * coluna. Ficam logo abaixo dela; se não couberem dentro da janela, sobem para logo acima.
+ */
+private fun buttonsRect(column: DpRect, windowSize: DpSize, handleSize: Dp, gap: Dp): DpRect {
+    val height = handleSize * 2 + gap
+    val centerX = (column.left + column.right) / 2f
+    val below = column.bottom + gap
+    val top = if (below + height <= windowSize.height) below else column.top - gap - height
+    return DpRect(centerX - handleSize / 2f, top, centerX + handleSize / 2f, top + height)
 }
 
 /**
