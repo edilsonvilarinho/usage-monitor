@@ -28,6 +28,7 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.hudFloatingColumnWindowSize
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_FLOATING_COLUMN_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_FLOATING_HOLE_DRAG_TAG
 import com.usagemonitor.presentation.ui.HUD_FLOAT_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_GEAR_HANDLE_TAG
@@ -52,11 +53,22 @@ import kotlin.test.assertEquals
 class HudFloatingHudTest {
 
     @Test
-    fun `minimizado mostra o buraco e nenhum anel`() = hudTest {
-        render(expanded = false)
+    fun `minimizado mostra o buraco, nenhuma alca e anel nao recebe hover`() = hudTest {
+        // A coluna fica na árvore recolhida (A11e), então os anéis existem, mas a coluna recolhida não repassa hover.
+        val hovered = mutableListOf<Int>()
+        render(expanded = false, onAccountClick = { hovered += it })
         onAllNodesWithContentDescription("Black hole", substring = true).assertCountEquals(1)
-        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG).assertCountEquals(0)
         onAllNodesWithTag(HUD_GEAR_HANDLE_TAG).assertCountEquals(0)
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG)[2].performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(emptyList(), hovered)
+    }
+
+    /** A coluna existe minimizada (recolhida pela íris), para a íris revelar no mesmo lugar (A11e). */
+    @Test
+    fun `minimizado monta a coluna recolhida no lugar dela, para a iris animar`() = hudTest {
+        render(expanded = false)
+        onAllNodesWithTag(HUD_FLOATING_COLUMN_TEST_TAG).assertCountEquals(1)
     }
 
     @Test

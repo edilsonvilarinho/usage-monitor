@@ -103,7 +103,11 @@ internal data class HudFloatingColumnParts(
     /** Balão aberto, além da coluna; `null` quando fechado ou minimizado. */
     val balloon: DpRect?,
     /** União do que está visível: o recorte da janela. */
-    val hitRect: DpRect
+    val hitRect: DpRect,
+    /** Retângulo da coluna, sempre calculado (minimizado ou não); a íris é que a revela. */
+    val columnSlot: DpRect,
+    /** Retângulo das alças, sempre calculado (minimizado ou não). */
+    val buttonsSlot: DpRect
 )
 
 /**
@@ -146,10 +150,6 @@ internal fun hudFloatingColumnParts(
     val centerX = windowSize.width / 2f
     val centerY = windowSize.height / 2f
     val hole = centeredRect(centerX, centerY, holeDiameter, holeDiameter)
-    if (!expanded) {
-        return HudFloatingColumnParts(hole = hole, column = null, buttons = null, balloon = null, hitRect = hole)
-    }
-
     val columnTop = columnTopDp(windowSize, columnSize, holeCenterYPx, workArea)
     val columnLeft = if (balloonSide == HudEdge.LEFT) {
         centerX + holeDiameter / 2f + gap
@@ -158,20 +158,35 @@ internal fun hudFloatingColumnParts(
     }
     val column = DpRect(columnLeft, columnTop, columnLeft + columnSize.width, columnTop + columnSize.height)
 
-    val buttons = buttonsRect(column, windowSize, handleSize, gap)
+    // Slots sempre calculados: minimizado, a coluna e as alças existem no mesmo retângulo, e a íris é que as revela (A11e).
+    val buttonsSlot = buttonsRect(column, windowSize, handleSize, gap)
+    if (!expanded) {
+        return HudFloatingColumnParts(
+            hole = hole,
+            column = null,
+            buttons = null,
+            balloon = null,
+            hitRect = hole,
+            columnSlot = column,
+            buttonsSlot = buttonsSlot
+        )
+    }
+
     val balloon = if (balloonOpen) {
         balloonRect(windowSize, balloonSide, balloonSize.width, balloonSize.height)
     } else {
         null
     }
 
-    val visible = listOfNotNull(hole, column, buttons, balloon)
+    val visible = listOfNotNull(hole, column, buttonsSlot, balloon)
     return HudFloatingColumnParts(
         hole = hole,
         column = column,
-        buttons = buttons,
+        buttons = buttonsSlot,
         balloon = balloon,
-        hitRect = unionOf(visible)
+        hitRect = unionOf(visible),
+        columnSlot = column,
+        buttonsSlot = buttonsSlot
     )
 }
 

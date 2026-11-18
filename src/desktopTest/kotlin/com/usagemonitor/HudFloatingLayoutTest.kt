@@ -281,6 +281,29 @@ class HudFloatingLayoutTest {
         assertEquals(DpRect(336.dp, 236.dp, 752.dp, 632.dp), parts.hitRect)
     }
 
+    /**
+     * Coluna com retângulo fixo, minimizado ou não (A11e): a íris revela dentro do mesmo retângulo,
+     * em vez de a coluna nascer ou sumir de uma vez.
+     */
+    @Test
+    fun `column slot is the same rectangle minimized as expanded`() {
+        val expanded = columnLayout(expanded = true, holeCenterYPx = 540, side = HudEdge.LEFT)
+        val minimized = columnLayout(expanded = false, holeCenterYPx = 540, side = HudEdge.LEFT)
+
+        assertEquals(DpRect(422.dp, 236.dp, 482.dp, 556.dp), minimized.columnSlot)
+        assertEquals(expanded.columnSlot, minimized.columnSlot)
+    }
+
+    /** Alças com retângulo fixo, minimizado ou não (A11e): a animação de entrada e saída fica no lugar. */
+    @Test
+    fun `buttons slot is the same rectangle minimized as expanded`() {
+        val expanded = columnLayout(expanded = true, holeCenterYPx = 540, side = HudEdge.LEFT)
+        val minimized = columnLayout(expanded = false, holeCenterYPx = 540, side = HudEdge.LEFT)
+
+        assertEquals(DpRect(436.dp, 562.dp, 468.dp, 632.dp), minimized.buttonsSlot)
+        assertEquals(expanded.buttonsSlot, minimized.buttonsSlot)
+    }
+
     /** Todo estado, em todo Y de teste, cabe na janela fixa. */
     @Test
     fun `every column state fits inside the same fixed window size`() {

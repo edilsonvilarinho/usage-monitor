@@ -1,5 +1,6 @@
 package com.usagemonitor.presentation.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,9 @@ import kotlin.math.roundToInt
 
 /** Tag do vão de arrasto sobre o buraco, para os testes de tela. */
 const val HUD_FLOATING_HOLE_DRAG_TAG = "hud-floating-hole-drag"
+
+/** Tag da coluna de anéis da janela flutuante, para os testes de tela (A11e). */
+const val HUD_FLOATING_COLUMN_TEST_TAG = "hud-floating-column"
 
 /** Balão aberto na janela flutuante: de uma conta (pelo índice) ou da engrenagem. */
 internal sealed interface HudFloatingBalloon {
@@ -108,20 +112,19 @@ internal fun HudFloatingHud(
             handleSize = HUD_HANDLE_SIZE,
             gap = HUD_HANDLE_GAP
         )
-        val column = parts.column
-        if (column != null) {
-            HudFloatingColumn(
-                accounts = accounts,
-                fallbackLabel = fallbackLabel,
-                fallbackTone = fallbackTone,
-                language = language,
-                revealed = expanded,
-                onRingHovered = onAccountClick,
-                onRingRefresh = {},
-                hitBoxes = hitBoxes,
-                modifier = Modifier.offset(x = column.left, y = column.top)
-            )
-        }
+        // A coluna é composta sempre, no mesmo retângulo: a íris revela e recolhe dentro dele (A11e).
+        // Recolhida, não recebe hover: o callback de anel só passa quando expandida.
+        HudFloatingColumn(
+            accounts = accounts,
+            fallbackLabel = fallbackLabel,
+            fallbackTone = fallbackTone,
+            language = language,
+            revealed = expanded,
+            onRingHovered = { index -> if (expanded) onAccountClick(index) },
+            onRingRefresh = {},
+            hitBoxes = hitBoxes,
+            modifier = Modifier.placedAt(parts.columnSlot).testTag(HUD_FLOATING_COLUMN_TEST_TAG)
+        )
         // O buraco fica sempre visível, minimizado e expandido.
         HudFloatingHole(
             params = params,
@@ -129,21 +132,19 @@ internal fun HudFloatingHud(
             description = localized(language, "Buraco negro", "Black hole"),
             modifier = Modifier.placedAt(parts.hole)
         )
-        val buttons = parts.buttons
-        if (buttons != null) {
-            HudFloatingButtons(
-                buttons = buttons,
-                gearDescription = gearDescription,
-                update = update,
-                language = language,
-                onGearClick = onGearClick,
-                onToggleFloating = onToggleFloating
-            )
-        }
+        HudFloatingButtons(
+            rect = parts.buttonsSlot,
+            expanded = expanded,
+            gearDescription = gearDescription,
+            update = update,
+            language = language,
+            onGearClick = onGearClick,
+            onToggleFloating = onToggleFloating
+        )
         val balloonRect = parts.balloon
         if (balloonRect != null && balloon != null) {
             // Balão alinhado ao anel em foco; o da engrenagem fica centralizado na janela.
-            val ringCenterY = focusedRingCenterY(balloon, hitBoxes, column, density) ?: (maxHeight / 2f)
+            val ringCenterY = focusedRingCenterY(balloon, hitBoxes, parts.columnSlot, density) ?: (maxHeight / 2f)
             val balloonTop = hudFloatingBalloonTop(ringCenterY, balloonHeight, maxHeight)
             // A caixa do HudBalloon é HUD_BALLOON_GAP mais larga que o corpo; no lado esquerdo o corpo fica depois do vão.
             val boxLeft = if (balloonSide == HudEdge.LEFT) balloonRect.left - HUD_BALLOON_GAP else balloonRect.left
@@ -179,10 +180,14 @@ private fun focusedRingCenterY(
     return with(density) { column.top + ring.center.y.toDp() }
 }
 
-/** Alças logo abaixo da coluna: engrenagem em cima, encaixar embaixo. */
+/**
+ * Alças logo abaixo da coluna: engrenagem em cima, encaixar embaixo. Entram e saem pelo mesmo
+ * `handleEnter`/`handleExit` das alças do notch; recolhidas, não compõem e não recebem clique (A11e).
+ */
 @Composable
 private fun HudFloatingButtons(
-    buttons: DpRect,
+    rect: DpRect,
+    expanded: Boolean,
     gearDescription: String,
     update: HudUpdateIndicator?,
     language: AppLanguage,
@@ -191,24 +196,28 @@ private fun HudFloatingButtons(
 ) {
     val gearInteraction = remember { MutableInteractionSource() }
     val floatInteraction = remember { MutableInteractionSource() }
-    Column(
-        modifier = Modifier.placedAt(buttons),
-        verticalArrangement = Arrangement.spacedBy(HUD_HANDLE_GAP)
+    AnimatedVisibility(
+        visible = expanded,
+        modifier = Modifier.placedAt(rect),
+        enter = handleEnter(HudEdge.LEFT, true),
+        exit = handleExit(HudEdge.LEFT, true)
     ) {
-        // A frase da atualização entra na descrição da engrenagem, como no notch (HudNotch.kt).
-        val gearText = update?.let { "$gearDescription · ${it.description}" } ?: gearDescription
-        HudGearHandle(
-            description = gearText,
-            onClick = onGearClick,
-            interaction = gearInteraction,
-            badgeTone = update?.tone
-        )
-        HudFloatHandle(
-            floating = true,
-            language = language,
-            onToggle = onToggleFloating,
-            interaction = floatInteraction
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(HUD_HANDLE_GAP)) {
+            // A frase da atualização entra na descrição da engrenagem, como no notch (HudNotch.kt).
+            val gearText = update?.let { "$gearDescription · ${it.description}" } ?: gearDescription
+            HudGearHandle(
+                description = gearText,
+                onClick = onGearClick,
+                interaction = gearInteraction,
+                badgeTone = update?.tone
+            )
+            HudFloatHandle(
+                floating = true,
+                language = language,
+                onToggle = onToggleFloating,
+                interaction = floatInteraction
+            )
+        }
     }
 }
 
