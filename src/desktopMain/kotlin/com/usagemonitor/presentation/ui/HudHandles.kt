@@ -225,7 +225,7 @@ internal fun HudGearHandle(
 
 /** O disco das duas alças: superfície em `RAISED`, hover que acende o glifo e pressão que encolhe. */
 @Composable
-private fun HudHandleDisc(
+internal fun HudHandleDisc(
     carrying: Boolean,
     modifier: Modifier,
     interaction: MutableInteractionSource,
@@ -337,7 +337,7 @@ private fun angleOf(vector: Offset): Float = Math.toDegrees(atan2(vector.y, vect
 internal val HUD_HANDLE_HINT_SIZE = 14.dp
 private val HINT_STROKE = 3.dp
 private const val HINT_RADIUS_FRACTION = 0.7f
-private val HANDLE_ICON_SIZE = 16.dp
+internal val HANDLE_ICON_SIZE = 16.dp
 
 /** O ponto sobre o arco parado: cabe na caixa de 14dp em qualquer ângulo. */
 private val HINT_DOT_RADIUS = 2.5.dp
@@ -345,4 +345,4 @@ private val HINT_DOT_RADIUS = 2.5.dp
 /** O ponto da engrenagem aberta e o anel de superfície em volta dele. */
 private val BADGE_DOT_SIZE = 8.dp
 private val BADGE_DOT_RING = 1.5.dp
-private const val PRESSED_SCALE = 0.9f
+internal const val PRESSED_SCALE = 0.9f

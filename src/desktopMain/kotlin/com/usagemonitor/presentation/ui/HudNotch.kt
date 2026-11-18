@@ -187,6 +187,10 @@ internal fun HudNotch(
     autoRetract: Boolean = false,
     /** O alfinete ao lado da mão, que alterna [autoRetract]; `null` não o mostra. */
     onToggleAutoRetract: (() -> Unit)? = null,
+    /** Só Windows (#619): a alça de soltar/encaixar a barra na borda. */
+    floatingSupported: Boolean = false,
+    floating: Boolean = false,
+    onToggleFloating: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hover = rememberHudHover(onHoverChange)
@@ -384,6 +388,21 @@ internal fun HudNotch(
                     }
                 )
             }
+            if (floatingSupported) {
+                AnimatedVisibility(
+                    visible = showHandles,
+                    modifier = Modifier.layoutId(HudFloatPart.HANDLE),
+                    enter = handleEnter(edge, atStart = false),
+                    exit = handleExit(edge, atStart = false)
+                ) {
+                    HudFloatHandle(
+                        floating = floating,
+                        language = language,
+                        onToggle = onToggleFloating,
+                        interaction = hover.float
+                    )
+                }
+            }
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
                 accounts = accounts, holeMembers = holeMembers, holeSelection = balloon.holeSelection?.takeIf { index -> index in holeMembers },
@@ -540,7 +559,8 @@ internal class HudHoverSources {
     val gear = MutableInteractionSource()
     val retract = MutableInteractionSource()
     val strip = MutableInteractionSource()
-    val all: List<MutableInteractionSource> get() = listOf(notch, balloon, move, gear, retract, strip)
+    val float = MutableInteractionSource()
+    val all: List<MutableInteractionSource> get() = listOf(notch, balloon, move, gear, retract, strip, float)
 }
 
 /** As fontes, e [onHoverChange] a cada troca da união delas. */

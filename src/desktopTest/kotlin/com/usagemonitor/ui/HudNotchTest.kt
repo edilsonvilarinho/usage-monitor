@@ -49,6 +49,7 @@ import com.usagemonitor.HUD_BALLOON_WIDTH
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.test.assertIsSelected
 import com.usagemonitor.presentation.ui.HUD_GEAR_HANDLE_TAG
+import com.usagemonitor.presentation.ui.HUD_FLOAT_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_MOVE_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_RETRACT_HANDLE_TAG
 import com.usagemonitor.presentation.ui.HUD_RETRACTED_STRIP_TAG
@@ -243,7 +244,11 @@ class HudNotchTest {
         onGearClick: () -> Unit = {},
         motion: AppMotionPolicy = AppMotionPolicy.Static,
         autoRetract: Boolean = false,
-        onToggleAutoRetract: (() -> Unit)? = null
+        onToggleAutoRetract: (() -> Unit)? = null,
+        language: AppLanguage = AppLanguage.PT,
+        floatingSupported: Boolean = false,
+        floating: Boolean = false,
+        onToggleFloating: () -> Unit = {}
     ) {
         AppTheme(isDark = true, motion = motion) {
             Box(modifier = Modifier.size(900.dp, 600.dp)) {
@@ -265,7 +270,11 @@ class HudNotchTest {
                     onGearClick = onGearClick,
                     gearDescription = GEAR,
                     autoRetract = autoRetract,
-                    onToggleAutoRetract = onToggleAutoRetract
+                    onToggleAutoRetract = onToggleAutoRetract,
+                    language = language,
+                    floatingSupported = floatingSupported,
+                    floating = floating,
+                    onToggleFloating = onToggleFloating
                 )
             }
         }
@@ -1184,6 +1193,52 @@ class HudNotchTest {
         onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(true, reported.last())
+    }
+
+    /** #619: o botão de soltar/encaixar só existe onde a plataforma suporta (Windows). */
+    @Test
+    fun `o botao de soltar da borda aparece com o notch aberto e suporte`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true, floatingSupported = true) }
+
+        onNodeWithContentDescription("Soltar da borda").assertIsDisplayed()
+    }
+
+    @Test
+    fun `o botao de soltar da borda tem rotulo em ingles`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true, floatingSupported = true, language = AppLanguage.EN) }
+
+        onNodeWithContentDescription("Release from edge").assertIsDisplayed()
+    }
+
+    @Test
+    fun `sem suporte da plataforma o botao de soltar nao existe`() = runDesktopComposeUiTest {
+        setContent { notch(expanded = true, floatingSupported = false) }
+
+        onNodeWithContentDescription(GEAR).assertIsDisplayed()
+        onNodeWithTag(HUD_FLOAT_HANDLE_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `o clique no botao de soltar chama a acao`() = runDesktopComposeUiTest {
+        var toggles = 0
+        setContent { notch(expanded = true, floatingSupported = true, onToggleFloating = { toggles += 1 }) }
+
+        onNodeWithTag(HUD_FLOAT_HANDLE_TAG).performClick()
+        assertEquals(1, toggles)
+    }
+
+    /** O botão novo fica por fora da engrenagem: a posição dela não pode mudar por causa dele. */
+    @Test
+    fun `o botao de soltar nao muda a posicao da engrenagem`() = runDesktopComposeUiTest {
+        var supported by mutableStateOf(false)
+        setContent { notch(expanded = true, floatingSupported = supported) }
+
+        val withoutButton = onNodeWithContentDescription(GEAR).getUnclippedBoundsInRoot()
+        supported = true
+        waitForIdle()
+        onNodeWithTag(HUD_FLOAT_HANDLE_TAG).assertIsDisplayed()
+        val withButton = onNodeWithContentDescription(GEAR).getUnclippedBoundsInRoot()
+        assertEquals(withoutButton, withButton, "a engrenagem nao muda de lugar com o botao novo")
     }
 
     // ------------------------------------------------------------ modo recolher (#400)

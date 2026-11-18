@@ -210,6 +210,7 @@ internal fun HudWindowHost(
     var windowOpen by remember { mutableStateOf(false) }
     val drag = remember { HudDragState() }
     val retract = remember { HudAutoRetractState(settings) }
+    var floating by remember { mutableStateOf(readHudFloating(settings)) }
     // Durante o arrasto o notch sai da borda e anda livre; esta é a posição da
     // janela (dp de janela). Nulo fora de arrasto.
     var dragWindowPosition by remember { mutableStateOf<DpOffset?>(null) }
@@ -398,6 +399,12 @@ internal fun HudWindowHost(
                     gearDescription = hudGearDescription(language),
                     autoRetract = retract.enabled,
                     onToggleAutoRetract = retract::toggle,
+                    floatingSupported = hudFloatingSupported(AutoStartManager.currentPlatform()),
+                    floating = floating,
+                    onToggleFloating = {
+                        floating = !floating
+                        persistHudFloating(settings, floating)
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }

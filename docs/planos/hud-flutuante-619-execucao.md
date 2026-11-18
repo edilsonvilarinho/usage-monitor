@@ -69,7 +69,9 @@ os rótulos (no R2: 244 dp); nada é desenhado fora do campo.
 - **A05.** `hudFloatingBounds(center, windowSize, workArea)` prende a janela dentro da área de trabalho e **nunca**
   encosta numa borda por conta própria; sem centro salvo, nasce no centro do notch atual. `hudFloatingSupported(os)`:
   só Windows (#340); outros sistemas não mostram o botão.
-- **A06.** Botão redondo novo na coluna (ordem: alfinete, mão, novo, engrenagem), mesmo estilo dos de hoje, ícone de
+- **A06.** Botão redondo novo na ponta da engrenagem (fato: a ponta de perto já tem alfinete e mão; a de longe só a
+  engrenagem, e `HUD_HANDLES_PER_SIDE = 2`, `HudNotchGeometry.kt:260`, já reserva a segunda vaga — a janela não cresce).
+  Espelha a ponta de perto: engrenagem junto ao notch, botão novo por fora. Mesmo estilo dos de hoje, ícone de
   buraco com órbita; rótulo por objeto de rótulos (`localized`), "Soltar da borda" / "Release from edge" no encaixado e
   "Encaixar na borda" / "Dock to edge" no flutuante; ausente quando `hudFloatingSupported` é falso.
 - **A07.** `HudOrbitField` (expandido: fundo do corpo da HUD, poeira, contas em `AppGargantuaRing` com arcos e marca,
@@ -92,6 +94,7 @@ os rótulos (no R2: 244 dp); nada é desenhado fora do campo.
 | A03 | feito | vermelho: `gradlew.bat desktopTest --tests "*HudWindowPreferencesTest*"` → 3 falhas de asserção em 22 (`HudWindowPreferencesTest.kt:161`, `:181`, `:190`); verde: mesmo comando, 22 testes, 0 falhas |
 | A04 | feito | vermelho: `gradlew.bat desktopTest --tests "*HudOrbitGeometryTest*"` com stub → falhas de asserção, entre elas `HudOrbitGeometryTest.kt:76` (a fase gira o anel); verde: mesmo comando, 13 testes, 0 falhas. Devolvida uma vez (nomes em português, declarações públicas) |
 | A05 | feito | vermelho: `gradlew.bat desktopTest --tests "*HudFloatingPlacementTest*"` com stub → 11 de 11 falhas de asserção (ex.: `HudFloatingPlacementTest.kt:41` `assertEquals(1520, bounds.xPx)`); verde: mesmo comando, 11 testes, 0 falhas. Assinatura recebe `notchCenter` para o primeiro uso |
+| A06 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudNotchTest"` com stub → 4 falhas de asserção do finder (ex.: `Expected exactly '1' node … (ContentDescription = 'Soltar da borda')`); verde: mesmo comando, 97 testes, 0 falhas; `*HudWindowPreferencesTest*` 22/22. Botão por fora da engrenagem (`HudNotchMeasure.kt`), parte própria `HudFloatPart` (sem valor novo em `HudNotchPart`); `HudNotch.kt` 741 linhas. Só alterna e grava o modo; o efeito na janela é a A08 |
 
 ## Problemas em aberto e riscos
 

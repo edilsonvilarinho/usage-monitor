@@ -38,7 +38,7 @@ internal fun hudNotchMeasurePolicy(
         .measure(Constraints())
     val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
         ?.measure(Constraints())
-    val extras = listOf<Any>(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR, HudRetractPart.HANDLE, HudRetractPart.STRIP)
+    val extras = listOf<Any>(HudNotchPart.HINT_START, HudNotchPart.HINT_END, HudNotchPart.MOVE, HudNotchPart.GEAR, HudRetractPart.HANDLE, HudRetractPart.STRIP, HudFloatPart.HANDLE)
         .associateWith { part ->
             measurables.firstOrNull { measurable -> measurable.layoutId == part }?.measure(Constraints())
         }
@@ -114,6 +114,14 @@ internal fun hudNotchMeasurePolicy(
         }
         extras[HudNotchPart.GEAR]?.let { handle ->
             handle.placeAt(notchEnd + handleGap, (notchAcross - handle.acrossSize(edge)) / 2, HANDLE_Z_INDEX)
+        }
+        // O botão de soltar/encaixar (#619), por fora da engrenagem: não move nem o notch nem a engrenagem.
+        extras[HudFloatPart.HANDLE]?.let { handle ->
+            handle.placeAt(
+                notchEnd + handleGap + HUD_HANDLE_SIZE.roundToPx() + handleGap,
+                (notchAcross - handle.acrossSize(edge)) / 2,
+                HANDLE_Z_INDEX
+            )
         }
         if (balloon != null) {
             when (edge) {
