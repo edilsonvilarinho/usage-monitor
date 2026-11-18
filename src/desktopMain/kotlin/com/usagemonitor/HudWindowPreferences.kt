@@ -175,5 +175,52 @@ internal fun persistHudMinimizedAccounts(settings: PreferencesSettings, minimize
     settings.putString(HUD_MINIMIZED_ACCOUNTS_KEY, encodeHudMinimizedAccounts(minimized))
 }
 
+private const val HUD_FLOATING_KEY = "hudFloating"
+private const val HUD_FLOAT_X_KEY = "hudFloatX"
+private const val HUD_FLOAT_Y_KEY = "hudFloatY"
+
+/**
+ * Modo flutuante da HUD (issue #619): a barra fica onde for largada, em qualquer
+ * ponto da tela, em vez de encostar numa borda. Nasce **desligado**, pelo mesmo
+ * motivo de [readHudAutoRetract]: quem atualiza o app não vê a HUD mudar sozinha.
+ */
+internal fun readHudFloating(settings: PreferencesSettings): Boolean =
+    settings.getBoolean(HUD_FLOATING_KEY, false)
+
+internal fun persistHudFloating(settings: PreferencesSettings, floating: Boolean) {
+    settings.putBoolean(HUD_FLOATING_KEY, floating)
+}
+
+/** Centro da janela flutuante em px de tela (issue #619). */
+internal data class HudFloatCenter(val xPx: Int, val yPx: Int)
+
+/**
+ * `null` quando nunca foi posta solta — quem chama nasce no notch atual. Meia
+ * posição gravada é `null`, pela mesma razão de [readPersistedHudPosition].
+ */
+internal fun readHudFloatCenter(settings: PreferencesSettings): HudFloatCenter? {
+    val xPx = settings.getStringOrNull(HUD_FLOAT_X_KEY)?.toIntOrNull()
+    val yPx = settings.getStringOrNull(HUD_FLOAT_Y_KEY)?.toIntOrNull()
+
+    if (xPx == null || yPx == null) {
+        return null
+    }
+
+    return HudFloatCenter(xPx = xPx, yPx = yPx)
+}
+
+/**
+ * Coordenada não finita não é gravada, pelo mesmo motivo de [persistHudPosition].
+ * Os dois eixos são gravados juntos, para a leitura nunca encontrar meia posição.
+ */
+internal fun persistHudFloatCenter(settings: PreferencesSettings, xPx: Float, yPx: Float) {
+    if (!xPx.isFinite() || !yPx.isFinite()) {
+        return
+    }
+
+    settings.putString(HUD_FLOAT_X_KEY, xPx.roundToInt().toString())
+    settings.putString(HUD_FLOAT_Y_KEY, yPx.roundToInt().toString())
+}
+
 private const val LEGACY_PILL_HALF_WIDTH_DP = 100
 private const val LEGACY_PILL_HALF_HEIGHT_DP = 14
