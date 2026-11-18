@@ -8,7 +8,6 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_HANDLE_GAP
 import com.usagemonitor.HUD_HANDLE_SIZE
 import com.usagemonitor.HUD_SHADOW_MARGIN
@@ -33,11 +32,8 @@ internal fun hudNotchMeasurePolicy(
     placement: HudBalloonPlacement,
     balloonAlong: Animatable<Float, AnimationVector1D>,
     alongSpec: AnimationSpec<Float>,
-    scope: CoroutineScope,
-    detachedAlongShift: Dp = 0.dp,
-    openProgress: () -> Float = { 1f }
-): MeasurePolicy
- = MeasurePolicy { measurables, constraints ->
+    scope: CoroutineScope
+): MeasurePolicy = MeasurePolicy { measurables, constraints ->
     val notch = measurables.first { measurable -> measurable.layoutId == HudNotchPart.NOTCH }
         .measure(Constraints())
     val balloon = measurables.firstOrNull { measurable -> measurable.layoutId == HudNotchPart.BALLOON }
@@ -51,9 +47,7 @@ internal fun hudNotchMeasurePolicy(
     val alongLength = if (edge.isHorizontal) width else height
     val notchAlong = if (edge.isHorizontal) notch.width else notch.height
     val center = notchCenter?.roundToPx() ?: (alongLength / 2)
-    // Detached (A10b): a coluna nasce no buraco e escorrega para dentro da área junto com a abertura.
-    val shiftPx = detachedAlongShift.roundToPx() * openProgress()
-    val notchStart = (center - notchAlong / 2 + shiftPx.roundToInt()).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
+    val notchStart = (center - notchAlong / 2).coerceIn(0, (alongLength - notchAlong).coerceAtLeast(0))
 
     // O balão centrado no anel e preso ao contêiner, com a margem da sombra.
     var balloonStart = 0

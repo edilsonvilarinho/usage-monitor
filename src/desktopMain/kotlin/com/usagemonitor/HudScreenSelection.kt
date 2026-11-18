@@ -28,10 +28,6 @@ internal class HudScreenSelection(private val settings: PreferencesSettings, fal
     var area by mutableStateOf(resolveHudScreen(settings)?.workArea ?: fallbackArea)
         private set
 
-    /** Os limites inteiros do monitor (não a área útil): o modo solto prende o buraco a eles (#619). */
-    var bounds by mutableStateOf(resolveHudScreen(settings)?.bounds ?: fallbackArea)
-        private set
-
     var id by mutableStateOf(resolveHudScreen(settings)?.id)
         private set
 
@@ -39,7 +35,6 @@ internal class HudScreenSelection(private val settings: PreferencesSettings, fal
     fun reload(fallbackArea: ScreenWorkArea) {
         val resolved = resolveHudScreen(settings)
         area = resolved?.workArea ?: fallbackArea
-        bounds = resolved?.bounds ?: fallbackArea
         id = resolved?.id ?: id
     }
 
@@ -52,7 +47,6 @@ internal class HudScreenSelection(private val settings: PreferencesSettings, fal
      */
     fun moveTo(screen: ScreenInfo) {
         area = screen.workArea
-        bounds = screen.bounds
         id = screen.id
         persistHudScreen(settings, screen)
     }
