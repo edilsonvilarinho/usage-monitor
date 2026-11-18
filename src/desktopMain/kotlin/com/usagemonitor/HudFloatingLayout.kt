@@ -179,6 +179,15 @@ private fun columnTopDp(windowSize: DpSize, columnSize: DpSize, holeCenterYPx: I
     return top.dp
 }
 
+/**
+ * Topo do balão do modo coluna: centrado no anel em foco ([ringCenterY], em dp de janela) e preso
+ * dentro da janela.
+ */
+internal fun hudFloatingBalloonTop(ringCenterY: Dp, balloonHeight: Dp, windowHeight: Dp): Dp {
+    val ideal = ringCenterY - balloonHeight / 2f
+    return ideal.coerceIn(0.dp, (windowHeight - balloonHeight).coerceAtLeast(0.dp))
+}
+
 /** Retângulo de [width] x [height] centrado em ([centerX], [centerY]). */
 private fun centeredRect(centerX: Dp, centerY: Dp, width: Dp, height: Dp): DpRect =
     DpRect(

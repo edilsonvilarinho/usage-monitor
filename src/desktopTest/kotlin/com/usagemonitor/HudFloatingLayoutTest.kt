@@ -259,6 +259,16 @@ class HudFloatingLayoutTest {
         }
     }
 
+    /** Balão alinhado ao anel em foco e preso dentro da janela (A11c, adendo do balão). */
+    @Test
+    fun `balao fica centrado no anel em foco e preso dentro da janela`() {
+        val window = 200.dp
+        val balloon = 100.dp
+        assertEquals(50.dp, hudFloatingBalloonTop(ringCenterY = 100.dp, balloonHeight = balloon, windowHeight = window))
+        assertEquals(0.dp, hudFloatingBalloonTop(ringCenterY = 10.dp, balloonHeight = balloon, windowHeight = window))
+        assertEquals(100.dp, hudFloatingBalloonTop(ringCenterY = 190.dp, balloonHeight = balloon, windowHeight = window))
+    }
+
     private fun columnLayout(
         expanded: Boolean = true,
         holeCenterYPx: Int,
