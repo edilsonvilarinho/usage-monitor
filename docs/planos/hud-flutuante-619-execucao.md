@@ -91,6 +91,7 @@ os rótulos (no R2: 244 dp); nada é desenhado fora do campo.
 | A02 | feito | sem harness (protótipo); P01–P10 conferidos por captura headless do Chrome a 1400 px (escuro/claro); devolvidos uma vez P02–P08; escolhido P05. R2 (`prototipos/issue-619/r2-orbita-radial/`) devolvido uma vez (rótulos fora do campo, cena encaixada, botões) e aprovado: giro conferido por diferença de quadros `?t=0` × `?t=1500`, JSON de parâmetros e restauração por `#p=` conferidos |
 | A03 | feito | vermelho: `gradlew.bat desktopTest --tests "*HudWindowPreferencesTest*"` → 3 falhas de asserção em 22 (`HudWindowPreferencesTest.kt:161`, `:181`, `:190`); verde: mesmo comando, 22 testes, 0 falhas |
 | A04 | feito | vermelho: `gradlew.bat desktopTest --tests "*HudOrbitGeometryTest*"` com stub → falhas de asserção, entre elas `HudOrbitGeometryTest.kt:76` (a fase gira o anel); verde: mesmo comando, 13 testes, 0 falhas. Devolvida uma vez (nomes em português, declarações públicas) |
+| A05 | feito | vermelho: `gradlew.bat desktopTest --tests "*HudFloatingPlacementTest*"` com stub → 11 de 11 falhas de asserção (ex.: `HudFloatingPlacementTest.kt:41` `assertEquals(1520, bounds.xPx)`); verde: mesmo comando, 11 testes, 0 falhas. Assinatura recebe `notchCenter` para o primeiro uso |
 
 ## Problemas em aberto e riscos
 
