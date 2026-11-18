@@ -35,13 +35,6 @@ internal data class HudOrbitParams(
     val diskSpinSeconds: Float = 3.5f,
     /** Segundos para uma volta da órbita das contas. */
     val orbitPeriodSeconds: Float = 180f,
-    /** Opacidade do fundo do corpo da HUD, em porcentagem. */
-    val backgroundAlphaPercent: Float = 100f,
-    /** Densidade da poeira, em porcentagem. */
-    val dustDensityPercent: Float = 100f,
-    /** Brilho da poeira, em porcentagem. */
-    val dustBrightnessPercent: Float = 200f,
-    val borderWidth: Float = 0f,
     val labels: HudOrbitLabels = HudOrbitLabels.FULL,
     /** Tamanho do texto dos rótulos, em sp. */
     val textSp: Float = 16f,
@@ -180,6 +173,27 @@ private fun orbitSlot(index: Int, count: Int, orbR: Double, phase: Double): HudO
         x = (orbR * cos(radians)).toFloat(),
         y = (orbR * sin(radians)).toFloat(),
     )
+}
+
+/**
+ * Centro de uma conta na fase dada, sem montar o layout inteiro. Dá o mesmo valor que `hudOrbitLayout(...).accounts[index]`,
+ * mas sem a varredura de crescimento do campo: é o que o desenho chama por quadro.
+ */
+internal fun hudOrbitSlotAt(params: HudOrbitParams, accountCount: Int, index: Int, orbitPhase: Float): HudOrbitAccountSlot {
+    val count = max(accountCount, 0)
+    val phase = (orbitPhase - floor(orbitPhase)).toDouble()
+    return orbitSlot(index, count, hudOrbitRingRadius(params, count).toDouble(), phase)
+}
+
+/**
+ * Caixa do rótulo da conta `index` na fase dada, com largura `width` em dp. Mesma caixa que [hudOrbitLabelBoxes] dá para
+ * o mesmo slot. Com rótulos desligados a altura é zero: quem chama não desenha rótulo nesse modo.
+ */
+internal fun hudOrbitLabelBoxAt(params: HudOrbitParams, accountCount: Int, index: Int, width: Float, orbitPhase: Float): HudOrbitLabelBox {
+    val slot = hudOrbitSlotAt(params, accountCount, index, orbitPhase)
+    val height = if (params.labels == HudOrbitLabels.OFF) 0f else hudOrbitLabelBlockHeight(params)
+    val origin = labelOriginOf(slot, width, height, params.accD / 2f)
+    return HudOrbitLabelBox(index = index, x = origin.first, y = origin.second, width = width, height = height)
 }
 
 /** Caixas de rótulo dos slots dados, na ordem deles. Sem rótulo, não há caixa. */

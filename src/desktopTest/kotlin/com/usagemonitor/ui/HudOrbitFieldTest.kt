@@ -24,6 +24,7 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudOrbitField
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.theme.AppMotionPolicy
 import com.usagemonitor.presentation.ui.hudRingDescription
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,6 +74,27 @@ class HudOrbitFieldTest {
         accounts.forEach { account ->
             onAllNodesWithText(account.label, substring = true).assertCountEquals(0)
             onAllNodesWithText(account.quotas.first().percentText, substring = true).assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun `field composes in dark and light themes with seven clickable accounts`() {
+        listOf(true, false).forEach { dark ->
+            runDesktopComposeUiTest {
+                setContent {
+                    ScreenTestTheme(isDark = dark, motion = AppMotionPolicy.Static) {
+                        HudOrbitField(
+                            accounts = accounts,
+                            params = HudOrbitParams(labels = HudOrbitLabels.FULL),
+                            language = AppLanguage.EN,
+                            onAccountClick = {}
+                        )
+                    }
+                }
+                waitForIdle()
+                onAllNodesWithTag(HUD_ORBIT_FIELD_TEST_TAG).assertCountEquals(1)
+                onAllNodesWithTag(HUD_ORBIT_ACCOUNT_TEST_TAG).assertCountEquals(7)
+            }
         }
     }
 

@@ -37,10 +37,6 @@ class HudOrbitGeometryTest {
         assertEquals(3.0, p.diskWidthPercent.toDouble(), "diskW")
         assertEquals(3.5, p.diskSpinSeconds.toDouble(), "spin")
         assertEquals(180.0, p.orbitPeriodSeconds.toDouble(), "orbS")
-        assertEquals(100.0, p.backgroundAlphaPercent.toDouble(), "bgA")
-        assertEquals(100.0, p.dustDensityPercent.toDouble(), "dustD")
-        assertEquals(200.0, p.dustBrightnessPercent.toDouble(), "dustB")
-        assertEquals(0.0, p.borderWidth.toDouble(), "borderW")
         assertEquals(HudOrbitLabels.FULL, p.labels, "rotulos")
         assertEquals(16.0, p.textSp.toDouble(), "txt")
     }
@@ -176,6 +172,43 @@ class HudOrbitGeometryTest {
             }
             corners(box).forEach { (x, y) ->
                 assertTrue(hypot(x, y) <= fieldRadius + EPS, "rotulo ${box.index} sai do campo")
+            }
+        }
+    }
+
+    /**
+     * Slot por fase sem montar o layout inteiro: `hudOrbitSlotAt` tem de dar a mesma conta que `hudOrbitLayout`
+     * em toda fase. O campo chama isso a cada quadro, por conta, então não pode divergir do desenho do layout.
+     */
+    @Test
+    fun `slot by phase matches the full layout for every account and phase`() {
+        val params = HudOrbitParams()
+        val accounts = realAccounts()
+        val widths = hudOrbitLabelWidths(accounts)
+        for (phase in listOf(0f, 0.25f, 0.6f, 0.999f)) {
+            val layout = hudOrbitLayout(params, accounts.size, widths, phase)
+            layout.accounts.forEach { slot ->
+                assertEquals(slot, hudOrbitSlotAt(params, accounts.size, slot.index, phase), "slot ${slot.index} fase $phase")
+            }
+        }
+    }
+
+    /** A caixa do rótulo por fase bate com a caixa do layout completo, conta a conta. */
+    @Test
+    fun `label box by phase matches the full layout for every account and phase`() {
+        val params = HudOrbitParams()
+        val accounts = realAccounts()
+        val widths = hudOrbitLabelWidths(accounts)
+        val larguras = accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value }
+        for (phase in listOf(0f, 0.25f, 0.6f, 0.999f)) {
+            val layout = hudOrbitLayout(params, accounts.size, widths, phase)
+            val boxes = hudOrbitLabelBoxes(layout, larguras, params)
+            layout.accounts.forEach { slot ->
+                assertEquals(
+                    boxes[slot.index],
+                    hudOrbitLabelBoxAt(params, accounts.size, slot.index, larguras[slot.index], phase),
+                    "caixa ${slot.index} fase $phase",
+                )
             }
         }
     }

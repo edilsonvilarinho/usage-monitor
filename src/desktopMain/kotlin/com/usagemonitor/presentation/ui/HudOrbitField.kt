@@ -1,8 +1,5 @@
 package com.usagemonitor.presentation.ui
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
@@ -20,7 +17,6 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import com.usagemonitor.HudOrbitAccountSlot
 import com.usagemonitor.HudOrbitLabelBox
 import com.usagemonitor.HudOrbitLabelSide
@@ -29,10 +25,13 @@ import com.usagemonitor.HudOrbitLabels
 import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.hudOrbitAccountLabelWidth
 import com.usagemonitor.hudOrbitFieldDiameter
-import com.usagemonitor.hudOrbitLabelBoxes
+import com.usagemonitor.hudOrbitLabelBoxAt
 import com.usagemonitor.hudOrbitLabelSide
 import com.usagemonitor.hudOrbitLabelWidths
 import com.usagemonitor.hudOrbitLayout
+import com.usagemonitor.hudOrbitSlotAt
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -48,23 +47,17 @@ import com.usagemonitor.domain.entity.AppLanguage
 import com.usagemonitor.presentation.ui.components.AppGargantuaRing
 import com.usagemonitor.presentation.ui.components.AppProviderMark
 import com.usagemonitor.presentation.ui.components.AppRingArc
+import com.usagemonitor.presentation.ui.components.HudStarfieldBox
+import com.usagemonitor.presentation.ui.components.gargantuaHorizonBody
 import com.usagemonitor.presentation.ui.theme.AppGargantuaTokens
 import com.usagemonitor.presentation.ui.theme.LocalAppMotionPolicy
-import kotlin.math.hypot
 import kotlin.math.max
-import kotlin.random.Random
 
 /** Tag do campo orbital, para os testes de tela. */
 const val HUD_ORBIT_FIELD_TEST_TAG = "hud-orbit-field"
 
 /** Tag de cada conta do campo, para os testes de tela. */
 const val HUD_ORBIT_ACCOUNT_TEST_TAG = "hud-orbit-account"
-
-/** Semente fixa da poeira: a mesma posição em toda composição. */
-private const val DUST_SEED = 619L
-private const val DUST_COUNT = 60
-private const val DUST_BASE_ALPHA = 0.25f
-private const val DUST_RADIUS_DP = 0.8f
 
 /**
  * Campo orbital do modo flutuante expandido: as contas giram em volta do buraco central e cada uma mostra
@@ -85,15 +78,22 @@ internal fun HudOrbitField(
     val phase = rememberHudOrbitPhase(live = motion.continuous && !motion.reduced, periodSeconds = params.orbitPeriodSeconds)
     val widths = remember(accounts) { hudOrbitLabelWidths(accounts) }
     val larguras = remember(accounts, params.labels) { accounts.map { account -> hudOrbitAccountLabelWidth(account, params.labels).value } }
-    // O diâmetro do campo não depende da fase: a fase 0 dimensiona o Box sem ler o State.
-    val fieldDiameter = hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter
-    val orbit = HudOrbitSlots(params = params, count = accounts.size, widths = widths, larguras = larguras, phase = phase)
+    // Diâmetro calculado uma vez por contas e parâmetros: não depende da fase, então não varre o layout por quadro.
+    val fieldDiameter = remember(accounts, params) { hudOrbitLayout(params, accounts.size, widths, orbitPhase = 0f).fieldDiameter }
+    val orbit = HudOrbitSlots(params = params, count = accounts.size, larguras = larguras, phase = phase)
     val fieldRadius = fieldDiameter / 2f
+    val scale = LocalDensity.current.density
     Box(
         modifier = modifier.testTag(HUD_ORBIT_FIELD_TEST_TAG).size(fieldDiameter.dp),
         contentAlignment = Alignment.Center
     ) {
-        HudOrbitBody(params = params, fieldDiameter = fieldDiameter)
+        // O céu lê anéis, caixas e corrida só no desenho: a fase entra por `orbit`, sem recompor o campo.
+        HudOrbitBody(
+            fieldDiameter = fieldDiameter,
+            rings = { orbit.ringRects(fieldRadius, scale) },
+            running = { hudStarRunningRings(accounts) },
+            forbidden = { hudStarfieldForbidden(orbit.labelRects(fieldRadius, scale), orbit.ringRects(fieldRadius, scale)) }
+        )
         HudFloatingHole(
             params = params,
             update = null,
@@ -129,14 +129,34 @@ internal fun HudOrbitField(
 private class HudOrbitSlots(
     private val params: HudOrbitParams,
     private val count: Int,
-    private val widths: HudOrbitLabelWidths,
     private val larguras: List<Float>,
     private val phase: State<Float>
 ) {
-    fun slot(index: Int): HudOrbitAccountSlot = hudOrbitLayout(params, count, widths, phase.value).accounts[index]
+    fun slot(index: Int): HudOrbitAccountSlot = hudOrbitSlotAt(params, count, index, phase.value)
 
-    fun labelBox(index: Int): HudOrbitLabelBox =
-        hudOrbitLabelBoxes(hudOrbitLayout(params, count, widths, phase.value), larguras, params)[index]
+    fun labelBox(index: Int): HudOrbitLabelBox = hudOrbitLabelBoxAt(params, count, index, larguras[index], phase.value)
+
+    /** Anel de cada conta em px do campo (origem no canto do Box), na fase atual. Lido só no desenho. */
+    fun ringRects(fieldRadius: Float, scale: Float): Map<Int, Rect> {
+        val half = params.accD / 2f * scale
+        return (0 until count).associateWith { index ->
+            val slot = slot(index)
+            val cx = (fieldRadius + slot.x) * scale
+            val cy = (fieldRadius + slot.y) * scale
+            Rect(cx - half, cy - half, cx + half, cy + half)
+        }
+    }
+
+    /** Caixa de cada rótulo em px, a mesma geometria de [HudOrbitAccountLabel]; vazio com os rótulos desligados. */
+    fun labelRects(fieldRadius: Float, scale: Float): Map<Int, Rect> {
+        if (params.labels == HudOrbitLabels.OFF) return emptyMap()
+        return (0 until count).associateWith { index ->
+            val box = labelBox(index)
+            val left = (fieldRadius + box.x) * scale
+            val top = (fieldRadius + box.y) * scale
+            Rect(left, top, left + box.width * scale, top + box.height * scale)
+        }
+    }
 }
 
 /** Relógio da órbita: só anda com a política viva; fora disso fica na fase zero. Devolve o State, não o valor. */
@@ -169,31 +189,29 @@ internal fun rememberHudOrbitFieldDiameter(accounts: List<HudAccount>, params: H
     return remember(accounts, params, language) { hudOrbitFieldDiameter(accounts, params, language) }
 }
 
-/** Corpo da HUD: fundo opaco circular com a borda e a poeira. */
+/**
+ * Corpo da HUD: o horizonte do notch recortado em círculo, com o céu estrelado do notch (poços dos anéis, anéis em
+ * execução e caixas dos rótulos proibidas). O buraco central fica com o `HudFloatingHole`, por isso `holeIndex` é -1.
+ */
 @Composable
-private fun HudOrbitBody(params: HudOrbitParams, fieldDiameter: Float) {
-    val body = MaterialTheme.colorScheme.surface.copy(alpha = params.backgroundAlphaPercent / 100f)
-    val border = MaterialTheme.colorScheme.outline
-    val dust = MaterialTheme.colorScheme.onSurface
+private fun HudOrbitBody(
+    fieldDiameter: Float,
+    rings: () -> Map<Int, Rect>,
+    running: () -> Set<Int>,
+    forbidden: () -> List<HudStarfieldBox>
+) {
     Box(
         modifier = Modifier
             .size(fieldDiameter.dp)
-            .clip(CircleShape)
-            .background(body)
-            .border(params.borderWidth.dp, border, CircleShape)
-    )
-    Canvas(modifier = Modifier.size(fieldDiameter.dp)) {
-        val random = Random(DUST_SEED)
-        val count = (DUST_COUNT * params.dustDensityPercent / 100f).toInt()
-        val radius = size.width / 2f
-        val alpha = (DUST_BASE_ALPHA * params.dustBrightnessPercent / 100f).coerceIn(0f, 1f)
-        repeat(count) {
-            val x = random.nextFloat() * size.width
-            val y = random.nextFloat() * size.height
-            if (hypot(x - radius, y - radius) <= radius) {
-                drawCircle(color = dust.copy(alpha = alpha), radius = DUST_RADIUS_DP.dp.toPx(), center = Offset(x, y))
-            }
-        }
+            .gargantuaHorizonBody(CircleShape)
+    ) {
+        HudStarfieldCanvas(
+            rings = rings,
+            running = running,
+            forbidden = forbidden,
+            holeIndex = -1,
+            modifier = Modifier.matchParentSize().clip(CircleShape)
+        )
     }
 }
 
