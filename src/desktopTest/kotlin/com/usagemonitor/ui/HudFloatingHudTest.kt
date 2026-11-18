@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionContains
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
@@ -43,6 +45,7 @@ import com.usagemonitor.verticalCollapsed
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Composable da janela flutuante (A11c-2): o buraco fica sempre visível; expandido mostra a coluna de anéis,
@@ -87,6 +90,46 @@ class HudFloatingHudTest {
         // O hover de `hoverable` é entregue num frame posterior ao gesto; sem esperar o ocioso, a asserção lê a lista antes.
         waitForIdle()
         assertEquals(listOf(2), hovered)
+    }
+
+    /** A11f: o vão entre o buraco e a coluna não é a janela; o ponteiro ali não conta como hover. */
+    @Test
+    fun `expandido, ponteiro no vao entre o buraco e a coluna nao conta como hover`() = hudTest {
+        val hover = mutableListOf<Boolean>()
+        render(expanded = true, onHoverChange = { hover += it })
+        val hole = boundsOf(HUD_FLOATING_HOLE_DRAG_TAG)
+        val column = boundsOf(HUD_FLOATING_COLUMN_TEST_TAG)
+        assertTrue(column.left > hole.right || column.right < hole.left, "a coluna precisa ficar ao lado do buraco")
+        onRoot().performMouseInput { enter(hole.center) }
+        waitForIdle()
+        assertEquals(true, hover.last())
+        onRoot().performMouseInput { moveTo(gapBetween(hole, column)) }
+        waitForIdle()
+        assertEquals(false, hover.last())
+    }
+
+    @Test
+    fun `expandido, ponteiro na coluna e no buraco contam como hover`() = hudTest {
+        val hover = mutableListOf<Boolean>()
+        render(expanded = true, onHoverChange = { hover += it })
+        val hole = boundsOf(HUD_FLOATING_HOLE_DRAG_TAG)
+        val column = boundsOf(HUD_FLOATING_COLUMN_TEST_TAG)
+        onRoot().performMouseInput { enter(column.center) }
+        waitForIdle()
+        assertEquals(true, hover.last())
+        onRoot().performMouseInput { moveTo(hole.center) }
+        waitForIdle()
+        assertEquals(true, hover.last())
+    }
+
+    @Test
+    fun `minimizado, ponteiro sobre a coluna recolhida nao conta como hover`() = hudTest {
+        val hover = mutableListOf<Boolean>()
+        render(expanded = false, onHoverChange = { hover += it })
+        val column = boundsOf(HUD_FLOATING_COLUMN_TEST_TAG)
+        onRoot().performMouseInput { enter(column.center) }
+        waitForIdle()
+        assertEquals(false, hover.last())
     }
 
     @Test
@@ -160,6 +203,15 @@ class HudFloatingHudTest {
         fun hudTest(block: ComposeUiTest.() -> Unit) =
             runDesktopComposeUiTest(width = WINDOW.width.value.roundToInt(), height = WINDOW.height.value.roundToInt(), block = block)
 
+        /** Retângulo, em px de raiz, do nó com a tag. */
+        fun ComposeUiTest.boundsOf(tag: String): Rect = onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+
+        /** Ponto no meio do vão horizontal entre o buraco e a coluna, na altura do centro do buraco. */
+        fun gapBetween(hole: Rect, column: Rect): Offset {
+            val x = if (column.left >= hole.right) (hole.right + column.left) / 2f else (column.right + hole.left) / 2f
+            return Offset(x, hole.center.y)
+        }
+
         fun account(index: Int, label: String): HudAccount {
             val percent = 10 + index
             val quota = HudQuota("5h", "$percent%", percent / 100f, AppTone.OK, resetText = null, hasForecast = false)
@@ -183,7 +235,8 @@ class HudFloatingHudTest {
             onAccountClick: (Int) -> Unit = {},
             onToggleFloating: () -> Unit = {},
             onDragStart: () -> Unit = {},
-            onDragEnd: () -> Unit = {}
+            onDragEnd: () -> Unit = {},
+            onHoverChange: (Boolean) -> Unit = {}
         ) {
             setContent {
                 ScreenTestTheme {
@@ -201,7 +254,7 @@ class HudFloatingHudTest {
                         holeScreenY = WINDOW.height / 2f,
                         areaTop = 0.dp,
                         areaBottom = WINDOW.height,
-                        onHoverChange = {},
+                        onHoverChange = onHoverChange,
                         onAccountClick = onAccountClick,
                         onGearClick = {},
                         onToggleFloating = onToggleFloating,

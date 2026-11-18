@@ -2,7 +2,9 @@ package com.usagemonitor.presentation.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -11,13 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -57,8 +57,8 @@ internal sealed interface HudFloatingBalloon {
  * anéis ao lado dele, as alças (engrenagem e encaixar) logo abaixo da coluna e o balão alinhado ao anel
  * em foco. Tamanho fixo, vindo do host. Arrastar o buraco chama início, fim e passos do arrasto. O
  * conteúdo dos balões vem de fora: o host monta o `HudBalloon` com a cauda apontada para a conta.
+ * O hover é por parte visível (A11f): o vão entre o buraco e a coluna não conta como janela.
  */
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun HudFloatingHud(
     accounts: List<HudAccount>,
@@ -88,11 +88,8 @@ internal fun HudFloatingHud(
 ) {
     val hitBoxes = remember { HudRingHitBoxes() }
     val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
-    val hoverModifier = modifier
-        .fillMaxSize()
-        .onPointerEvent(PointerEventType.Enter) { onHoverChange(true) }
-        .onPointerEvent(PointerEventType.Exit) { onHoverChange(false) }
-    BoxWithConstraints(modifier = hoverModifier) {
+    val hover = rememberHudFloatingHover(onHoverChange)
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val parts = hudFloatingColumnParts(
             windowSize = DpSize(maxWidth, maxHeight),
@@ -123,7 +120,10 @@ internal fun HudFloatingHud(
             onRingHovered = { index -> if (expanded) onAccountClick(index) },
             onRingRefresh = {},
             hitBoxes = hitBoxes,
-            modifier = Modifier.placedAt(parts.columnSlot).testTag(HUD_FLOATING_COLUMN_TEST_TAG)
+            modifier = Modifier
+                .placedAt(parts.columnSlot)
+                .testTag(HUD_FLOATING_COLUMN_TEST_TAG)
+                .hoverable(hover.column, enabled = expanded)
         )
         // O buraco fica sempre visível, minimizado e expandido.
         HudFloatingHole(
@@ -139,7 +139,8 @@ internal fun HudFloatingHud(
             update = update,
             language = language,
             onGearClick = onGearClick,
-            onToggleFloating = onToggleFloating
+            onToggleFloating = onToggleFloating,
+            hover = hover.handles
         )
         val balloonRect = parts.balloon
         if (balloonRect != null && balloon != null) {
@@ -152,17 +153,43 @@ internal fun HudFloatingHud(
                 edge = balloonSide,
                 tailCenter = { with(density) { (ringCenterY - balloonTop).toPx() } },
                 bodyHeight = balloonHeight,
-                modifier = Modifier.offset(x = boxLeft, y = balloonTop),
+                modifier = Modifier.offset(x = boxLeft, y = balloonTop).hoverable(hover.balloon),
                 content = { HudFloatingBalloonContent(balloon, accountBalloon, appBalloon) }
             )
         }
         HudFloatingDragArea(
             hole = parts.hole,
+            hover = hover.hole,
             onDragStart = onDragStart,
             onDrag = onDrag,
             onDragEnd = onDragEnd
         )
     }
+}
+
+/** Fontes de hover do modo flutuante, uma por parte visível: buraco, coluna, alças e balão (A11f). */
+private class HudFloatingHover {
+    val hole = MutableInteractionSource()
+    val column = MutableInteractionSource()
+    val handles = MutableInteractionSource()
+    val balloon = MutableInteractionSource()
+    val all: List<MutableInteractionSource> get() = listOf(hole, column, handles, balloon)
+}
+
+/**
+ * Hover por parte, como o da barra (`rememberHudHover`): [onHoverChange] recebe a união das partes a cada troca.
+ * O atraso de recolher do host cobre a travessia entre o buraco e a coluna.
+ */
+@Composable
+private fun rememberHudFloatingHover(onHoverChange: (Boolean) -> Unit): HudFloatingHover {
+    val sources = remember { HudFloatingHover() }
+    val currentHoverChange by rememberUpdatedState(onHoverChange)
+    val states = sources.all.map { source -> source.collectIsHoveredAsState() }
+    val hovered = states.any { state -> state.value }
+    LaunchedEffect(hovered) {
+        currentHoverChange(hovered)
+    }
+    return sources
 }
 
 /**
@@ -192,13 +219,14 @@ private fun HudFloatingButtons(
     update: HudUpdateIndicator?,
     language: AppLanguage,
     onGearClick: () -> Unit,
-    onToggleFloating: () -> Unit
+    onToggleFloating: () -> Unit,
+    hover: MutableInteractionSource
 ) {
     val gearInteraction = remember { MutableInteractionSource() }
     val floatInteraction = remember { MutableInteractionSource() }
     AnimatedVisibility(
         visible = expanded,
-        modifier = Modifier.placedAt(rect),
+        modifier = Modifier.placedAt(rect).hoverable(hover, enabled = expanded),
         enter = handleEnter(HudEdge.LEFT, true),
         exit = handleExit(HudEdge.LEFT, true)
     ) {
@@ -241,6 +269,7 @@ private fun HudFloatingBalloonContent(
 @Composable
 private fun HudFloatingDragArea(
     hole: DpRect,
+    hover: MutableInteractionSource,
     onDragStart: () -> Unit,
     onDrag: () -> Unit,
     onDragEnd: () -> Unit
@@ -252,6 +281,7 @@ private fun HudFloatingDragArea(
         modifier = Modifier
             .placedAt(hole)
             .testTag(HUD_FLOATING_HOLE_DRAG_TAG)
+            .hoverable(hover)
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { currentDragStart() },
