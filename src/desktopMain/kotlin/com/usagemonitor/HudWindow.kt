@@ -290,7 +290,10 @@ internal fun HudWindowHost(
         windowOpen = false
         drag.begin(if (floating) floatingGeometry.position else DpOffset(dragStart.x * scale, dragStart.y * scale))
     }
-    val dragTo = { drag.moveTo(dragSize, pointerScreen()?.bounds ?: screen.area) }
+    val dragTo = {
+        val anchor = if (floating) hudFloatingHoleAnchor(windowSize, floatingParams.holeD.dp * scale) else null
+        drag.moveTo(dragSize, pointerScreen()?.bounds ?: screen.area, anchor)
+    }
     val dragFinish = {
         val position = drag.finish()
         if (position != null && floating) {
