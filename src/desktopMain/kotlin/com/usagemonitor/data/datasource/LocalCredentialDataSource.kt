@@ -15,6 +15,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.SerialName
@@ -205,6 +206,12 @@ internal class LocalCredentialDataSource(
             // do ai-usagebar): sem isso o poll seguinte renovaria de novo e
             // prolongaria o próprio bloqueio.
             throwIfRateLimited(httpResponse, "Token refresh")
+            // Refresh token recusado (ex.: `400 invalid_grant`, token aposentado) com o access
+            // token ainda válido: segue com ele, e o GET de uso decide. Token já vencido mantém
+            // a falha, que é a causa mais útil na tela. Nada é regravado nesse caminho.
+            if (keepsSessionAfterRejectedRefresh(httpResponse.status.value, creds.claudeAiOauth.expiresAt)) {
+                return creds
+            }
             val body = httpResponse.bodyAsText()
             throw IllegalStateException(
                 "Token refresh falhou (HTTP ${httpResponse.status.value}): $body"
@@ -241,6 +248,16 @@ internal class LocalCredentialDataSource(
             )
         )
         return updated
+    }
+
+    /**
+     * 4xx do endpoint de token que não é 429 (o 429 já lançou em `throwIfRateLimited`) com
+     * o access token ainda não vencido. 5xx nunca cai aqui: queda do endpoint de token
+     * não acrescenta requisição de uso.
+     */
+    private fun keepsSessionAfterRejectedRefresh(statusCode: Int, accessTokenExpiresAt: Long): Boolean {
+        val isClientError = statusCode in 400..499 && statusCode != HttpStatusCode.TooManyRequests.value
+        return isClientError && accessTokenExpiresAt > System.currentTimeMillis()
     }
 
     /**

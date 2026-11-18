@@ -39,8 +39,12 @@ token atual ainda não venceu, seguir com ele para o `GET /api/oauth/usage` em v
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (documento) | plano revisado contra `LocalCredentialDataSource.kt` em `a3276141` |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.data.LocalCredentialDataSourceTest"` | 22 testes, 1 falha: `rejected refresh token keeps the session while the access token is still valid` (`:460`) — `IllegalStateException: Token refresh falhou (HTTP 400): {"error":"invalid_grant",...}` |
+| A02 | verde: mesmo comando | `BUILD SUCCESSFUL`, 22 testes, 0 falhas; dois testes de falha passaram a token vencido, novo teste do 5xx com token válido |
 
 ## Problemas em aberto e riscos
 
 - Na janela de 5 min o POST de renovação é repetido a cada poll (comportamento já existente, não muda aqui).
+- O caminho 4xx com token válido não grava trilha (`LocalCredentialDataSource` não tem `BreadcrumbRecorder`): a falha
+  reaparece na tela quando o token vence, pelo erro "Token refresh falhou".
 - Sem captura real de `invalid_grant` nesta máquina: o corpo usado no teste é o documentado na ai-usagebar#637.
