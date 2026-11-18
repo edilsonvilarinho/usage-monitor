@@ -105,6 +105,47 @@ class HudFloatingHostTest {
         assertEquals(null, next)
     }
 
+    // Buraco negro do modo coluna (A11g): hover abre a lista das minimizadas, clique alterna, escolher abre a conta.
+    @Test
+    fun `hover no buraco abre a lista quando nada esta aberto`() {
+        assertEquals(HudFloatingBalloon.Hole(null), hudFloatingHoleHovered(null))
+    }
+
+    @Test
+    fun `hover no buraco troca o balao de conta pela lista`() {
+        assertEquals(HudFloatingBalloon.Hole(null), hudFloatingHoleHovered(HudFloatingBalloon.Account(1)))
+    }
+
+    @Test
+    fun `hover no buraco com conta escolhida mantem a conta`() {
+        assertEquals(HudFloatingBalloon.Hole(4), hudFloatingHoleHovered(HudFloatingBalloon.Hole(4)))
+    }
+
+    @Test
+    fun `clique no buraco fechado abre a lista`() {
+        assertEquals(HudFloatingBalloon.Hole(null), hudFloatingHoleClicked(null))
+    }
+
+    @Test
+    fun `clique no buraco com a lista aberta a fecha`() {
+        assertEquals(null, hudFloatingHoleClicked(HudFloatingBalloon.Hole(null)))
+    }
+
+    @Test
+    fun `clique no buraco com conta escolhida fecha tudo`() {
+        assertEquals(null, hudFloatingHoleClicked(HudFloatingBalloon.Hole(4)))
+    }
+
+    @Test
+    fun `escolher uma conta da lista abre o balao dela`() {
+        assertEquals(HudFloatingBalloon.Hole(3), hudFloatingHoleSelected(3))
+    }
+
+    @Test
+    fun `voltar da conta escolhida volta para a lista`() {
+        assertEquals(HudFloatingBalloon.Hole(null), hudFloatingHoleBack(HudFloatingBalloon.Hole(3)))
+    }
+
     // Geometria da janela do modo coluna: buraco 60, coluna 50x200, balão 300x100, alça 20, vão 8.
     // Tamanho fixo: 60 + 8*4 + 50*2 + 300*2 = 792 de largura; altura = 2*200 + (2*20 + 2*8)*2 = 512.
 

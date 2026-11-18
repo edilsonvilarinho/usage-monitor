@@ -121,6 +121,21 @@ internal fun hudFloatingBalloonToggle(
     clicked: HudFloatingBalloon
 ): HudFloatingBalloon? = if (current == clicked) null else clicked
 
+/** Hover no buraco abre a lista das minimizadas; sobre a lista ou a conta escolhida, mantém o estado. */
+internal fun hudFloatingHoleHovered(current: HudFloatingBalloon?): HudFloatingBalloon? =
+    if (current is HudFloatingBalloon.Hole) current else HudFloatingBalloon.Hole(null)
+
+/** Clique no buraco alterna a lista; com a conta escolhida, fecha. */
+internal fun hudFloatingHoleClicked(current: HudFloatingBalloon?): HudFloatingBalloon? =
+    if (current is HudFloatingBalloon.Hole) null else HudFloatingBalloon.Hole(null)
+
+/** Escolher uma conta da lista abre o balão dela. */
+internal fun hudFloatingHoleSelected(index: Int): HudFloatingBalloon = HudFloatingBalloon.Hole(index)
+
+/** Voltar da conta escolhida para a lista. Fora do buraco, não muda nada. */
+internal fun hudFloatingHoleBack(current: HudFloatingBalloon?): HudFloatingBalloon? =
+    if (current is HudFloatingBalloon.Hole) HudFloatingBalloon.Hole(null) else current
+
 /** Área em px lógicos inteiros; área desconhecida (NaN) vira retângulo sem limite. */
 internal fun ScreenWorkArea.toPxRect(): HudPxRect {
     val unknown = x.value.isNaN() || y.value.isNaN() || size.width.value.isNaN() || size.height.value.isNaN()

@@ -50,6 +50,9 @@ const val HUD_FLOATING_COLUMN_TEST_TAG = "hud-floating-column"
 internal sealed interface HudFloatingBalloon {
     data class Account(val index: Int) : HudFloatingBalloon
     data object App : HudFloatingBalloon
+
+    /** Lista das contas no buraco negro; [selection] é a conta escolhida da lista, ou nenhuma (A11g). */
+    data class Hole(val selection: Int?) : HudFloatingBalloon
 }
 
 /**
@@ -259,6 +262,8 @@ private fun HudFloatingBalloonContent(
     when (balloon) {
         is HudFloatingBalloon.Account -> accountBalloon(balloon.index)
         HudFloatingBalloon.App -> appBalloon()
+        // Lista do buraco negro: conteúdo entra na etapa de UI do A11g.
+        is HudFloatingBalloon.Hole -> Unit
     }
 }
 
