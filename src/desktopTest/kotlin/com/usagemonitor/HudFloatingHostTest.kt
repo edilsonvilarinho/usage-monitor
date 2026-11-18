@@ -160,6 +160,7 @@ class HudFloatingHostTest {
         center = center,
         notchCenter = notch,
         area = area,
+        monitorBounds = area,
         scale = scale,
         columnSize = columnSize,
         holeDiameter = 60.dp,
@@ -270,5 +271,54 @@ class HudFloatingHostTest {
         val scaled = geometry(center = HudFloatCenter(250, 150), scale = 2f)
         assertEquals(75.dp, scaled.holeScreenY)
         assertEquals(400.dp, scaled.areaBottom)
+    }
+
+    /**
+     * A11m: o buraco é preso ao monitor inteiro, não à área útil. Monitor 0..1080 com a barra de 48
+     * (área útil 0..1032) e buraco de diâmetro 48 (raio 24): o centro salvo em y=1056 fica sobre a barra.
+     * A área útil continua sendo a área da coluna (`areaBottom`).
+     */
+    @Test
+    fun `buraco salvo sobre a barra de tarefas fica no monitor e nao na area util`() {
+        val workArea = ScreenWorkArea(0.dp, 0.dp, DpSize(1000.dp, 1032.dp))
+        val monitor = ScreenWorkArea(0.dp, 0.dp, DpSize(1000.dp, 1080.dp))
+        val geometry = hudFloatingWindowGeometry(
+            center = HudFloatCenter(500, 1056),
+            notchCenter = notch,
+            area = workArea,
+            monitorBounds = monitor,
+            scale = 1f,
+            columnSize = columnSize,
+            holeDiameter = 48.dp,
+            balloonSize = DpSize(300.dp, 100.dp),
+            handleSize = 20.dp,
+            gap = 8.dp,
+            expanded = true,
+            balloonOpen = false
+        )
+        assertEquals(1056.dp, geometry.holeScreenY)
+        assertEquals(1032.dp, geometry.areaBottom)
+    }
+
+    /** O monitor também prende o buraco: centro além da base do monitor volta a 1080 - 24. */
+    @Test
+    fun `buraco arrastado para alem da base do monitor fica preso a base do monitor`() {
+        val workArea = ScreenWorkArea(0.dp, 0.dp, DpSize(1000.dp, 1032.dp))
+        val monitor = ScreenWorkArea(0.dp, 0.dp, DpSize(1000.dp, 1080.dp))
+        val geometry = hudFloatingWindowGeometry(
+            center = HudFloatCenter(500, 1100),
+            notchCenter = notch,
+            area = workArea,
+            monitorBounds = monitor,
+            scale = 1f,
+            columnSize = columnSize,
+            holeDiameter = 48.dp,
+            balloonSize = DpSize(300.dp, 100.dp),
+            handleSize = 20.dp,
+            gap = 8.dp,
+            expanded = false,
+            balloonOpen = false
+        )
+        assertEquals(1056.dp, geometry.holeScreenY)
     }
 }

@@ -256,6 +256,7 @@ internal fun HudWindowHost(
             yPx = ((bounds.y + bounds.size.height / 2f) * scale).value.roundToInt()
         ),
         area = screen.area,
+        monitorBounds = screen.bounds,
         scale = scale,
         columnSize = columnSize,
         holeDiameter = floatingParams.holeD.dp,
