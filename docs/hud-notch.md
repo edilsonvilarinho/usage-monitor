@@ -688,6 +688,20 @@ Pressão longa no anel de uma conta vira arrasto. A ordem que sai do gesto vale 
 - **Soltar.** Grava `cardOrder` por `AppShellState.changeCardOrder`; vale também para a bandeja.
 - **Esc.** Cancela; depende de o notch ter foco de teclado.
 
+## Modo flutuante (#619)
+
+Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-flutuante-619-execucao.md` (linhas A11*). Só existe no Windows (#340).
+
+- **Buraco solto.** Minimizado, o buraco fica onde foi largado, fora de qualquer borda. O disco gira atrás de `AppMotionPolicy`. Não há campo circular.
+- **Soltar e encaixar.** Botão "Soltar da borda" / "Encaixar na borda", por fora da engrenagem.
+- **Expandido.** A coluna de anéis da barra abre ao lado do buraco, no lado com mais espaço, com a íris da barra: 420 ms para abrir, 240 ms para fechar. Se não couber na área útil, a coluna desliza na vertical. As alças (engrenagem e encaixe) ficam abaixo da coluna quando cabem na área útil.
+- **Hover por parte.** Buraco, coluna e alças têm hover próprio (`rememberHudHover`); a coluna só recolhe quando nenhuma parte está sob o ponteiro (`hovered = any`).
+- **Balão.** A altura segue o conteúdo (conta, lista de minimizadas, engrenagem). Fica além da coluna e preso à área útil. Alfinete, mão e botão de soltar fecham o balão aberto.
+- **Janela de tamanho fixo.** Altura de pelo menos 2 × balão, com alças nas duas pontas. Vale também com a coluna curta (todas minimizadas).
+- **Área útil.** O buraco fica preso à área útil e não cobre a barra de tarefas (#621). Na medição no Windows 11 desta issue, o buraco sobre a barra sumia atrás dela ao trocar de janela; a versão que deixava o buraco sobre a barra (`1e6824a0`) foi revertida.
+- **Barra de tarefas.** O botão na barra de tarefas é tratado em #620.
+- **Gestos.** Clique direito não tem ação. Arrastar o buraco solto não o encaixa em borda.
+
 ## Fora do alcance dos testes
 
 Os testes de componente desenham numa cena fora de tela, sem janela AWT e sem gerenciador de
@@ -706,6 +720,7 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 | Clique em pixel transparente é engolido pela janela | medido (C11) | provável no X11, com a janela sem recorte (#340) — custo não medido | |
 | Janela transparente que muda de origem mostra quadro antigo | medido (#294, 39–49 de ~668 quadros) | | |
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
+| Buraco sobre a barra de tarefas some atrás dela ao trocar de janela | medido no Windows 11 (#619) | o buraco fica preso à área útil (#621) | |
 | Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
 
 **Parte disso virou medida automática** (`./gradlew probeHudAlpha`, #426). A sonda abre uma janela
