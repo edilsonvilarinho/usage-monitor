@@ -37,6 +37,7 @@ Varredura do agente `explorer` e leitura direta.
 | A01 | Este plano |
 | A02 | `hudFloatingSupported` aceita `LINUX`; teste de plataforma primeiro; `docs/hud-notch.md` atualizado |
 | A03 | Âncora do balão da engrenagem no centro Y da engrenagem; testes de posição (pura e de tela, pilha em cima e embaixo) |
+| A04 | Engrenagem abre o balão no hover no modo flutuante, como no notch (`HudNotch.kt:227-232`); achado pelo dono no teste local |
 
 ## Ponto de situação
 
@@ -44,6 +45,7 @@ Varredura do agente `explorer` e leitura direta.
 |---|---|---|
 | A01 | feito | plano criado; sem harness de teste (documento) |
 | A02 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudFloatingPlacementTest"` → `floating mode is supported on Windows and Linux only FAILED`, `AssertionError at HudFloatingPlacementTest.kt:97` (`assertTrue(LINUX)`); verde: mesmo comando, 9 testes, 0 falhas |
+| A03 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudFloatingLayoutTest" --tests "com.usagemonitor.ui.HudFloatingHudTest"` → `HudFloatingLayoutTest.kt:211 expected:<578.0.dp> but was:<562.0.dp>`, `:220 expected:<412.0.dp> but was:<396.0.dp>`, `HudFloatingHudTest.kt:204 centro da engrenagem y=1295.0 fora do balão 814.0..934.0`, `:212 y=36.0 fora do balão 774.0..894.0`; verde: mesmo comando + `*ArchitectureRulesTest*`, 83 testes, 0 falhas (34 + 21 + 28) |
 
 ## Problemas em aberto e riscos
 
