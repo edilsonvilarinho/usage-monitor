@@ -183,7 +183,6 @@ class HudWindowContentTest {
                         floating = floating,
                         expanded = expanded,
                         dragging = false,
-                        warmingUp = false,
                         accounts = accounts,
                         edge = HudEdge.RIGHT,
                         notchCenter = null,
