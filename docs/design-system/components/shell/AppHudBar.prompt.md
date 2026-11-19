@@ -185,7 +185,7 @@ clicks at rest too. At the bottom and right edges the origin still moves across 
 inward), and one blank frame remains there on open.
 
 **Gestures**, one detector: a click on a ring **refreshes that account** (the ring stays pressed while
-it collects); right-click goes straight to Cards only; a drag past the touch slop frees the notch, and
+it collects); a drag past the touch slop frees the notch, and
 on release it docks to the **nearest edge**, saved as edge + fraction along it. Each ring declares its
 refresh action in semantics. Ways back to the full window: "Padrão" in the gear balloon, the tray
 item, Ctrl+Shift+H.
@@ -212,3 +212,5 @@ the existing HUD surface, balloons, account ordering, gestures and API data cont
 unchanged. All eleven APIs reuse the same renderer with the existing provider mark. Quota arcs
 never rotate. Session activity is the blue external comet, with a straight thin **ion tail** (F10) leaving its head backwards, 18° outwards, sized to stay inside the orbit reach. Refresh accelerates the decorative
 disc, never the provider logo. A complete static scene is drawn with reduced motion and in tests.
+
+**Floating mode (#619).** On Windows only (#340), the notch can be released from its edge with the "Soltar da borda" button placed outside the gear; "Encaixar na borda" docks it back. Released, the minimized hole stays where it was dropped, outside any edge, with the same spinning disc behind `AppMotionPolicy`; there is no circular field. Expanded, the ring column opens beside the hole with the bar's iris (420 ms open, 240 ms close), on the side with more room, and slides vertically to fit the work area. The gear and the dock button stay below the column when they fit. Hover is per part (`rememberHudHover`, `hovered = any`). Balloons size to their content (account, hole list, gear), stay beside the column and inside the work area. The window is fixed at no less than twice the balloon height, with handles at both ends. The hole is kept inside the work area and out of the taskbar strip (#621); the taskbar button is tracked in #620. Right-click has no action.

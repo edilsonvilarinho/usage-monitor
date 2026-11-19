@@ -4,7 +4,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import java.awt.MouseInfo
@@ -33,18 +35,49 @@ internal fun hudDragStep(
     position: DpOffset?,
     size: DpSize,
     /** A tela **inteira** do monitor sob o ponteiro: presa ao primário, o notch nunca cruza a divisa. */
-    workArea: ScreenWorkArea
+    workArea: ScreenWorkArea,
+    /** Retângulo, relativo à janela, que tem de ficar na tela. Sem ele, a janela inteira é presa. */
+    anchor: DpRect? = null
 ): DpOffset? {
     if (previous == null || current == null || position == null) {
         return null
     }
-    val moved = fitWindowPosition(
-        x = position.x + (current.x - previous.x).dp,
-        y = position.y + (current.y - previous.y).dp,
-        size = size,
-        workArea = workArea
-    )
+    val x = position.x + (current.x - previous.x).dp
+    val y = position.y + (current.y - previous.y).dp
+    if (anchor != null) {
+        // Modo flutuante (#619, A08f1): o buraco é que fica na tela; a janela inteira pode passar da borda.
+        return DpOffset(
+            x = anchoredWindowOrigin(x, anchor.left, anchor.right - anchor.left, workArea.x, workArea.size.width),
+            y = anchoredWindowOrigin(y, anchor.top, anchor.bottom - anchor.top, workArea.y, workArea.size.height)
+        )
+    }
+    val moved = fitWindowPosition(x = x, y = y, size = size, workArea = workArea)
     return DpOffset(moved.x, moved.y)
+}
+
+/**
+ * Origem da janela que deixa o trecho `[anchorStart, anchorStart + anchorSize]` (relativo à janela) dentro do
+ * eixo `[origin, origin + available]`. Eixo sem medida fica livre; trecho maior que o eixo prende no começo dele,
+ * como em `fitWindowPosition`.
+ */
+private fun anchoredWindowOrigin(windowOrigin: Dp, anchorStart: Dp, anchorSize: Dp, origin: Dp, available: Dp): Dp {
+    if (!windowOrigin.value.isFinite() || !anchorStart.value.isFinite() || !anchorSize.value.isFinite() ||
+        !origin.value.isFinite() || !available.value.isFinite()
+    ) {
+        return windowOrigin
+    }
+    val maxAnchor = maxOf(origin, origin + available - anchorSize)
+    val anchorNow = windowOrigin + anchorStart
+    return maxOf(origin, minOf(anchorNow, maxAnchor)) - anchorStart
+}
+
+/**
+ * Retângulo do buraco minimizado, em dp de janela, centrado na janela de arrasto (modo flutuante, #619).
+ */
+internal fun hudFloatingHoleAnchor(windowSize: DpSize, holeDiameter: Dp): DpRect {
+    val left = (windowSize.width - holeDiameter) / 2f
+    val top = (windowSize.height - holeDiameter) / 2f
+    return DpRect(left, top, left + holeDiameter, top + holeDiameter)
 }
 
 /**
@@ -104,9 +137,9 @@ internal class HudDragState(
     }
 
     /** Um tique do mouse. [workArea] é a tela **inteira** do monitor sob ele. */
-    fun moveTo(size: DpSize, workArea: ScreenWorkArea) {
+    fun moveTo(size: DpSize, workArea: ScreenWorkArea, anchor: DpRect? = null) {
         val current = readPointer()
-        val moved = hudDragStep(pointer, current, windowPosition, size, workArea)
+        val moved = hudDragStep(pointer, current, windowPosition, size, workArea, anchor)
         if (moved != null) {
             pointer = current
             windowPosition = moved

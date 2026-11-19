@@ -152,6 +152,65 @@ class HudWindowPreferencesTest {
         }
     }
 
+    /** Issue #619: o modo flutuante nasce desligado; quem atualiza continua com o notch encaixado. */
+    @Test
+    fun `hud floating starts off and round trips the toggle`() {
+        withTestSettings { settings ->
+            assertEquals(false, readHudFloating(settings))
+            persistHudFloating(settings, true)
+            assertEquals(true, readHudFloating(settings))
+            persistHudFloating(settings, false)
+            assertEquals(false, readHudFloating(settings))
+        }
+    }
+
+    /** Issue #619: sem centro gravado a janela flutuante nunca foi posta solta, e nasce no notch atual. */
+    @Test
+    fun `hud float center is absent until the floating window is dropped`() {
+        withTestSettings { settings ->
+            assertNull(readHudFloatCenter(settings))
+        }
+    }
+
+    /** Issue #619: o centro é em px de tela, os dois eixos juntos. */
+    @Test
+    fun `persist and read hud float center round trips both axes`() {
+        withTestSettings { settings ->
+            persistHudFloatCenter(settings, xPx = 1046f, yPx = 704f)
+
+            assertEquals(HudFloatCenter(xPx = 1046, yPx = 704), readHudFloatCenter(settings))
+        }
+    }
+
+    @Test
+    fun `persist hud float center rounds fractional pixels`() {
+        withTestSettings { settings ->
+            persistHudFloatCenter(settings, xPx = 1045.6f, yPx = 703.4f)
+
+            assertEquals(HudFloatCenter(xPx = 1046, yPx = 703), readHudFloatCenter(settings))
+        }
+    }
+
+    /** Coordenada sem medida não é gravada: o mesmo motivo de [persistHudPosition]. */
+    @Test
+    fun `persist hud float center ignores coordinates without measurement`() {
+        withTestSettings { settings ->
+            persistHudFloatCenter(settings, xPx = Float.NaN, yPx = 704f)
+
+            assertNull(readHudFloatCenter(settings))
+        }
+    }
+
+    /** Meia posição não é posição, como em [readPersistedHudPosition]. */
+    @Test
+    fun `half a stored hud float center reads as absent`() {
+        withTestSettings { settings ->
+            settings.putString("hudFloatX", "1046")
+
+            assertNull(readHudFloatCenter(settings))
+        }
+    }
+
     /** Issue #576: contas minimizadas são um texto só, em ordem de publicação; nasce vazio. */
     @Test
     fun `minimized hud accounts start empty and round trip through one preference`() {

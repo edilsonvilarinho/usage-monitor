@@ -210,24 +210,31 @@ it (parse, a real run, real data). That is the only exception.
 
 ## 5. Local tests before the PR
 
-`test-runner` runs these commands. Run the slice of what changed, mirroring the `changes` job of `ci.yml`:
+`test-runner` runs these commands. The full suite is the CI's job: the PR runs it on every push and `ci-ok` blocks the
+merge if it fails (decision of the owner, #619 — running it locally too doubled the wait). Locally run only the **slice
+of what changed**, by test class:
 
 | Changed | Command |
 |---|---|
-| `src/**`, Gradle files | `gradlew.bat allTests` (narrow with `desktopTest --tests …` while iterating) |
+| `src/**` | `gradlew.bat desktopTest --tests "<classes of the changed files>" --tests "*ArchitectureRulesTest*"` |
+| Gradle files, `commonMain` domain/data shared by many screens | `gradlew.bat allTests` (the slice cannot be named) |
 | `server/**` | `cd server && npm test` (`npm run test:coverage` for coverage) |
 | `tools/ci/**` | `node --test "tools/ci/test/*.test.mjs"` |
-| any test change | report of the `usage-monitor-test-report` skill |
 
-Diff coverage before opening the PR (advisory in CI, floor 90%):
+`ArchitectureRulesTest` always goes in the slice: it is the only check of file/function size and layering, and it is
+cheap. The test report of the `usage-monitor-test-report` skill is produced by the CI's `test-report` job; run it
+locally only when asked.
+
+Diff coverage before opening the PR (advisory in CI, floor 90%), on the same slice:
 
 ```bash
-gradlew.bat allTests koverXmlReport -Pcoverage
+gradlew.bat desktopTest --tests "<slice>" --tests "*ArchitectureRulesTest*" koverXmlReport -Pcoverage
 node tools/ci/diff-coverage.mjs --base origin/main --kover build/reports/kover/report.xml
 node tools/ci/diff-coverage.mjs --base origin/main --lcov server/coverage/lcov.info
 ```
 
-Below 90%: write the missing tests (TDD) or justify each uncovered line in the plan row.
+Below 90%: write the missing tests (TDD) or justify each uncovered line in the plan row. A red CI caused by a test
+outside the slice counts as an incident like any other (section 7).
 
 ## 6. PR with auto-merge
 

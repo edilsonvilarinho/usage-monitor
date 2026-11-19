@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.windowDragSink
@@ -135,6 +136,73 @@ class HudWindowDragTest {
         } finally {
             windowDragSink = previousSink
         }
+    }
+
+    /**
+     * Modo flutuante (#619, A08f1): o buraco minimizado é a âncora. Arrastado além do canto
+     * inferior direito, ele para encostado no canto e a janela passa da tela; prender a janela
+     * inteira prenderia o buraco longe do canto, por causa da vaga dos balões.
+     */
+    @Test
+    fun `with an anchor the hole stops at the corner while the window may pass the edge`() {
+        val hole = DpRect(left = 189.dp, top = 246.dp, right = 253.dp, bottom = 310.dp)
+        val moved = hudDragStep(
+            previous = Point(0, 0),
+            current = Point(9000, 9000),
+            position = DpOffset(2000.dp, 800.dp),
+            size = size,
+            workArea = secondary,
+            anchor = hole
+        )
+
+        // Âncora em (421 + 2560 - 64, 1440 - 64) = (2917, 1376): a janela fica em (2917 - 189, 1376 - 246).
+        assertEquals(DpOffset(2728.dp, 1130.dp), moved)
+    }
+
+    /** Com o buraco dentro do monitor, o âncora não atrapalha: a janela anda o delta do tique. */
+    @Test
+    fun `with an anchor inside the monitor the window follows the pointer`() {
+        val hole = DpRect(left = 189.dp, top = 246.dp, right = 253.dp, bottom = 310.dp)
+        val moved = hudDragStep(Point(1000, 500), Point(1030, 480), DpOffset(900.dp, 400.dp), size, secondary, anchor = hole)
+
+        assertEquals(DpOffset(930.dp, 380.dp), moved)
+    }
+
+    /** Medida não finita no âncora: o guard devolve a origem crua, sem clamp com número inválido. */
+    @Test
+    fun `an anchor with a non finite size leaves the window origin untouched`() {
+        val broken = DpRect(left = Float.NaN.dp, top = 246.dp, right = Float.NaN.dp, bottom = 310.dp)
+        val moved = hudDragStep(
+            previous = Point(0, 0),
+            current = Point(30, 0),
+            position = DpOffset(2000.dp, 800.dp),
+            size = size,
+            workArea = secondary,
+            anchor = broken
+        )
+
+        // Delta de 30 px em x: 2000 + 30 = 2030 dp, sem prender, porque a medida do âncora é NaN.
+        assertEquals(2030.dp, moved?.x)
+    }
+
+    /** O buraco é centrado na janela, com o diâmetro dado (em dp de janela). */
+    @Test
+    fun `the floating hole anchor is centred in the window`() {
+        val anchor = hudFloatingHoleAnchor(DpSize(442.dp, 557.dp), 64.dp)
+
+        assertEquals(DpRect(189.dp, 246.5f.dp, 253.dp, 310.5f.dp), anchor)
+    }
+
+    /** `HudDragState.moveTo` repassa a âncora ao passo. */
+    @Test
+    fun `the drag state clamps the hole anchor when a tick goes past the corner`() {
+        val pointer = ArrayDeque(listOf(Point(0, 0), Point(9000, 9000)))
+        val drag = HudDragState(readPointer = { pointer.removeFirst() })
+
+        drag.begin(DpOffset(2000.dp, 800.dp))
+        drag.moveTo(size, secondary, DpRect(left = 189.dp, top = 246.dp, right = 253.dp, bottom = 310.dp))
+
+        assertEquals(DpOffset(2728.dp, 1130.dp), drag.windowPosition)
     }
 
     @Test

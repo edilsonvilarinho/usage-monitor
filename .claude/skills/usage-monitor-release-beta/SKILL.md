@@ -69,8 +69,11 @@ when a higher version reaches them — the next beta or the stable.
    - Continue: same `X.Y.Z`, `N + 1`; refuse if the stable `vX.Y.Z` already exists (the series is
      closed — start a new one).
 6. Run the local verification that must pass before the tag exists:
-   - `gradlew.bat allTests` — mandatory. A beta is still a public tag; a broken suite discovered after
-     the push is a burned tag.
+   - The suite of the commit to tag must be green — mandatory. A beta is still a public tag; a broken
+     suite discovered after the push is a burned tag. Do **not** rerun `allTests` locally (#619): check
+     the `CI` run of that commit exactly as the stable skill's step 7 says (`gh run list --workflow
+     ci.yml --commit <sha>` → `completed`/`success`); missing or red → stop. Local `allTests` only when
+     no CI run exists for that commit.
    - **Window hosts changed? Stop before the tag** (#342), exactly as in the stable skill: run
      `git diff --name-only $(git describe --tags --abbrev=0)..HEAD` and look for `HudWindow.kt`,
      `DesktopWindowFrame.kt`, `Main.kt` or any `*WindowHost*.kt`. If one changed, list the rows of
@@ -116,7 +119,7 @@ edited release would hand every user a build that calls itself beta. Never run
    - `promote exact` — the very commit the testers ran: tag `vX.Y.Z` on `vX.Y.Z-beta.N^{commit}`.
      `verify-version` accepts it, because that commit is on `main`.
 3. Run the stable flow of [usage-monitor-release](../usage-monitor-release/SKILL.md) from its step 4
-   (clean `main` = `origin/main`, `allTests`, the #342 window-host question, annotated tag, push only
+   (clean `main` = `origin/main`, green CI run of the commit, the #342 window-host question, annotated tag, push only
    the tag, watch the workflow, check every artifact) with the version fixed to `X.Y.Z` — do **not**
    bump it by type. For `promote exact`, create the tag on the beta commit:
    `git -c user.name=claude -c user.email=claude@anthropic.com tag -a vX.Y.Z vX.Y.Z-beta.N^{commit} -m "vX.Y.Z"`.

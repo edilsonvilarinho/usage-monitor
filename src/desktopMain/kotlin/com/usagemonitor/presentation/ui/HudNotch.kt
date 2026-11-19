@@ -187,10 +187,19 @@ internal fun HudNotch(
     autoRetract: Boolean = false,
     /** O alfinete ao lado da mão, que alterna [autoRetract]; `null` não o mostra. */
     onToggleAutoRetract: (() -> Unit)? = null,
+    /** Só Windows (#619): a alça de soltar/encaixar a barra na borda. */
+    floatingSupported: Boolean = false,
+    floating: Boolean = false,
+    onToggleFloating: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hover = rememberHudHover(onHoverChange)
     val gearHovered by hover.gear.collectIsHoveredAsState()
+    val retractHovered by hover.retract.collectIsHoveredAsState()
+    val moveHovered by hover.move.collectIsHoveredAsState()
+    val floatHovered by hover.float.collectIsHoveredAsState()
+    // Alfinete, mão ou encaixar fecham o balão aberto (A11o): o ponteiro saiu da engrenagem ou da lista do buraco.
+    val leavingBalloon = retractHovered || moveHovered || floatHovered
 
     val open = expanded && !dragging
     // As alças ficam durante o arrasto: é a mão que está sendo carregada, e
@@ -220,6 +229,9 @@ internal fun HudNotch(
     // tela, e o índice gravado ali reabriria o balão ao soltar.
     LaunchedEffect(gearHovered, open) {
         if (gearHovered && open && appBalloon != null) balloon.balloonIndex = APP_BALLOON
+    }
+    LaunchedEffect(leavingBalloon) {
+        if (leavingBalloon) balloon.closeHole()
     }
     val shownIndex = balloon.balloonIndex?.takeIf { index ->
         index in accounts.indices ||
@@ -384,6 +396,21 @@ internal fun HudNotch(
                     }
                 )
             }
+            if (floatingSupported) {
+                AnimatedVisibility(
+                    visible = showHandles,
+                    modifier = Modifier.layoutId(HudFloatPart.HANDLE),
+                    enter = handleEnter(edge, atStart = false),
+                    exit = handleExit(edge, atStart = false)
+                ) {
+                    HudFloatHandle(
+                        floating = floating,
+                        language = language,
+                        onToggle = onToggleFloating,
+                        interaction = hover.float
+                    )
+                }
+            }
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
                 accounts = accounts, holeMembers = holeMembers, holeSelection = balloon.holeSelection?.takeIf { index -> index in holeMembers },
@@ -540,7 +567,8 @@ internal class HudHoverSources {
     val gear = MutableInteractionSource()
     val retract = MutableInteractionSource()
     val strip = MutableInteractionSource()
-    val all: List<MutableInteractionSource> get() = listOf(notch, balloon, move, gear, retract, strip)
+    val float = MutableInteractionSource()
+    val all: List<MutableInteractionSource> get() = listOf(notch, balloon, move, gear, retract, strip, float)
 }
 
 /** As fontes, e [onHoverChange] a cada troca da união delas. */

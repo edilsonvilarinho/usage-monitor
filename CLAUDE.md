@@ -371,7 +371,8 @@ Roteiro executável, com os comandos de cada passo: skill **`usage-monitor-workf
 2. **Desenvolvimento em TDD pelos agentes de implementação**, em worktree/branch própria, nunca na `main`; uma atividade, um commit. Teste primeiro e
    vermelho **na asserção** (erro de compilação não conta), depois o código mínimo, depois a refatoração; a linha da
    atividade no plano registra a execução vermelha e a verde. Correção de bug começa pelo teste que a reproduz.
-3. **Testes locais** antes do PR: os recortes de "Commands" e o relatório da skill `usage-monitor-test-report`.
+3. **Testes locais** antes do PR: só o **recorte** das classes que mudaram, mais o `ArchitectureRulesTest`, e a cobertura
+   do diff nesse recorte; a suíte completa e o relatório de testes são do CI (decisão do dono, #619).
 4. **PR** aberto por Claude, dizendo em que plataformas foi testado, com `gh pr merge --auto --merge` na abertura: o
    ruleset da `main` exige o `ci-ok` e o GitHub mescla sozinho. Claude acompanha o CI e corrige o que ficar vermelho.
 5. **Parada de segurança:** cada run de CI vermelho, ou rodada de testes locais falhando depois de aberto o PR, é uma
