@@ -712,7 +712,7 @@ Na primeira expansão depois do arranque, o Direct3D no Windows paga um custo de
 - **Nunca com "Reduzir animações".** Sem tween não há o que aquecer; com a preferência ligada, zero ciclos.
 - **Uso real tem precedência.** Hover ou arrasto interrompe o aquecimento; o alfa volta a 1 na hora e o estado de abertura fica com o dono do hover (`LaunchedEffect(hovered, drag.dragging)`).
 - **Área de clique durante o aquecimento.** Por ~3 s no arranque a janela fica aberta (área de clique da janela inteira) e quase invisível; clique nessa área cai na HUD. Hover interrompe o aquecimento.
-- **Não medido.** Sobra de ~107 ms na 1ª expansão com o protótipo (causa não confirmada, A05).
+- **Medido (A05).** 1ª expansão com uma pausa de 69 ms (antes 227 + 354 ms); da 2ª em diante, 16 ms por quadro, com picos esporádicos na mesma faixa (53–93 ms) que já existiam sem aquecimento. A causa da sobra não foi isolada.
 
 ## Fora do alcance dos testes
 
