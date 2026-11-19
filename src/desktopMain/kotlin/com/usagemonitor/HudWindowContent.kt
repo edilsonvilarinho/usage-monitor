@@ -133,7 +133,9 @@ internal fun HudWindowContent(
                 gearDescription = hudGearDescription(language),
                 onHoverChange = onHoverChange,
                 onAccountClick = { index -> onFloatingBalloonToggle(HudFloatingBalloon.Account(index)) },
-                onGearClick = { onFloatingBalloonToggle(HudFloatingBalloon.App) },
+                // Hover e clique só abrem, como no notch (#623): alternar no clique fecharia o que o hover abriu.
+                onGearClick = { requestFloatingBalloon(floatingBalloon, HudFloatingBalloon.App) },
+                onGearHover = { requestFloatingBalloon(floatingBalloon, HudFloatingBalloon.App) },
                 onToggleFloating = onToggleFloating,
                 onFloatHover = { requestFloatingBalloon(floatingBalloon, null) },
                 onDragStart = onDragStart,

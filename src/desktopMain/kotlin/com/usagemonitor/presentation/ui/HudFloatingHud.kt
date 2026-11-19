@@ -88,6 +88,7 @@ internal fun HudFloatingHud(
     onGearClick: () -> Unit,
     onToggleFloating: () -> Unit,
     onFloatHover: () -> Unit = {},
+    onGearHover: () -> Unit = {},
     onDragStart: () -> Unit,
     onDrag: () -> Unit,
     onDragEnd: () -> Unit,
@@ -163,6 +164,7 @@ internal fun HudFloatingHud(
             onGearClick = onGearClick,
             onToggleFloating = onToggleFloating,
             onFloatHover = onFloatHover,
+            onGearHover = onGearHover,
             hover = hover.handles
         )
         val balloonRect = parts.balloon
@@ -284,9 +286,16 @@ private fun HudFloatingButtons(
     onGearClick: () -> Unit,
     onToggleFloating: () -> Unit,
     onFloatHover: () -> Unit,
+    onGearHover: () -> Unit,
     hover: MutableInteractionSource
 ) {
     val gearInteraction = remember { MutableInteractionSource() }
+    val gearHovered by gearInteraction.collectIsHoveredAsState()
+    val currentOnGearHover by rememberUpdatedState(onGearHover)
+    // A engrenagem abre o balão dela no hover, como no notch (#623). Só expandida: recolhida, a alça não compõe.
+    LaunchedEffect(gearHovered) {
+        if (gearHovered && expanded) currentOnGearHover()
+    }
     val floatInteraction = remember { MutableInteractionSource() }
     val floatHovered by floatInteraction.collectIsHoveredAsState()
     val currentOnFloatHover by rememberUpdatedState(onFloatHover)

@@ -245,6 +245,26 @@ class HudFloatingHudTest {
         assertEquals(1, hovers)
     }
 
+    /** A04 (#623): a engrenagem abre o balão dela no hover, como no notch; uma chamada por entrada. */
+    @Test
+    fun `hover na engrenagem chama onGearHover uma vez`() = hudTest {
+        var hovers = 0
+        render(expanded = true, onGearHover = { hovers++ })
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(1, hovers)
+    }
+
+    /** A04 (#623): o hover no botão de encaixar não abre o balão da engrenagem. */
+    @Test
+    fun `hover no botao de encaixar nao chama onGearHover`() = hudTest {
+        var gearHovers = 0
+        render(expanded = true, onGearHover = { gearHovers++ })
+        onNodeWithTag(HUD_FLOAT_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(0, gearHovers)
+    }
+
     @Test
     fun `arrastar o buraco chama onDragStart e onDragEnd uma vez`() = hudTest {
         var starts = 0
@@ -340,6 +360,7 @@ class HudFloatingHudTest {
             onAccountClick: (Int) -> Unit = {},
             onToggleFloating: () -> Unit = {},
             onFloatHover: () -> Unit = {},
+            onGearHover: () -> Unit = {},
             onDragStart: () -> Unit = {},
             onDragEnd: () -> Unit = {},
             onHoverChange: (Boolean) -> Unit = {},
@@ -372,6 +393,7 @@ class HudFloatingHudTest {
                         onGearClick = {},
                         onToggleFloating = onToggleFloating,
                         onFloatHover = onFloatHover,
+                        onGearHover = onGearHover,
                         onDragStart = onDragStart,
                         onDrag = {},
                         onDragEnd = onDragEnd,
