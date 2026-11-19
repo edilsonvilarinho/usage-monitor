@@ -703,6 +703,17 @@ Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-fl
 - **Barra de tarefas.** O botão na barra de tarefas é tratado em #620.
 - **Gestos.** Clique direito não tem ação. Arrastar o buraco solto não o encaixa em borda.
 
+## Aquecimento da GPU (#627)
+
+Na primeira expansão depois do arranque, o Direct3D no Windows paga um custo de primeira execução e a animação engasga; a partir da 4ª expansão ela sai lisa. Medido no `v42.3.0-beta.14`; decisões e medições no plano `docs/planos/hud-aquecimento-gpu-627-execucao.md`.
+
+- **O quê.** Três ciclos de abrir (600 ms) e fechar (400 ms) a janela da HUD, 3 s depois do arranque, com o conteúdo a alfa 0,01 (`HUD_GPU_WARM_UP_ALPHA`), pela camada `graphicsLayer` com `CompositingStrategy.ModulateAlpha` que fica sempre no conteúdo. O aquecimento percorre o mesmo caminho de desenho do uso real.
+- **Só Windows.** Única plataforma medida (#340). Linux e macOS têm zero ciclos (`hudGpuWarmUpCycles`) e ficam sem aquecimento.
+- **Nunca com "Reduzir animações".** Sem tween não há o que aquecer; com a preferência ligada, zero ciclos.
+- **Uso real tem precedência.** Hover ou arrasto interrompe o aquecimento; o alfa volta a 1 na hora e o estado de abertura fica com o dono do hover (`LaunchedEffect(hovered, drag.dragging)`).
+- **Área de clique durante o aquecimento.** Por ~3 s no arranque a janela fica aberta (área de clique da janela inteira) e quase invisível; clique nessa área cai na HUD. Hover interrompe o aquecimento.
+- **Não medido.** Sobra de ~107 ms na 1ª expansão com o protótipo (causa não confirmada, A05).
+
 ## Fora do alcance dos testes
 
 Os testes de componente desenham numa cena fora de tela, sem janela AWT e sem gerenciador de

@@ -7,6 +7,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
@@ -43,6 +45,8 @@ internal fun HudWindowContent(
     floating: Boolean,
     expanded: Boolean,
     dragging: Boolean,
+    /** Aquecimento da GPU em curso (#627): o conteúdo sai quase transparente, pelo mesmo caminho de desenho. */
+    warmingUp: Boolean,
     accounts: List<HudAccount>,
     edge: HudEdge,
     notchCenter: Dp?,
@@ -112,7 +116,15 @@ internal fun HudWindowContent(
             onQuit = onCloseRequest
         )
     }
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Camada sempre presente, alfa 1 fora do aquecimento: o aquecimento percorre o mesmo caminho de desenho do uso real (#627).
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                alpha = if (warmingUp) HUD_GPU_WARM_UP_ALPHA else 1f
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }
+    ) {
         // O host só alterna o balão: o pedido de estado vai até o alvo pelo alternar, e um alvo igual ao atual não pede nada.
         fun requestFloatingBalloon(current: HudFloatingBalloon?, next: HudFloatingBalloon?) {
             if (next == current) return

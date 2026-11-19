@@ -65,6 +65,7 @@ abertura em `HudWindow.kt` e carimbo de `System.nanoTime()` a cada leitura do qu
 | A01 | sem harness de teste (plano) | revisado contra as medições acima |
 | A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudGpuWarmUpTest"` | vermelho (stub devolvendo 0): `HudGpuWarmUpTest.kt:15 expected:<3> but was:<0>`; verde: 4 testes |
 | A03 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudGpuWarmUpTest" --tests "*ArchitectureRulesTest*"` | vermelho (stub devolvendo `SKIPPED`): 6 de 11 na asserção, ex. `HudGpuWarmUpTest.kt:126 expected:<COMPLETED> but was:<SKIPPED>`; verde: 11/11 e `ArchitectureRulesTest` 28/28. A02 e A03 dividem os dois arquivos novos e foram para um commit só |
+| A04 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudGpuWarmUpTest" --tests "*HudFloating*" --tests "*ArchitectureRulesTest*"` e `gradlew.bat desktopJar` | cola de janela sem harness de unidade (o `LaunchedEffect` e a camada não têm teste direto; a lógica é do A03). Vermelho real do `ArchitectureRulesTest.kt:507`: `HudWindow.kt::HudWindowHost: 307 linhas (limite 300)`, resolvido extraindo `rememberHudGpuWarmingUp`; verde: 170 testes, 0 falhas; `desktopJar` exit 0. `motion.reduced` da janela no lugar de `LocalAppMotionPolicy` (o efeito fica fora do `AppTheme`) |
 
 ## Problemas em aberto e riscos
 
