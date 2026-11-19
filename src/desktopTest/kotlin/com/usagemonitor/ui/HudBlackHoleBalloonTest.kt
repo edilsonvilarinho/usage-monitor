@@ -167,27 +167,49 @@ class HudBlackHoleBalloonTest {
     }
 
     @Test
-    fun `restaurar no balao da conta devolve a lista do buraco sem ela`() = runDesktopComposeUiTest {
+    fun `restaurar no balao da conta fecha o balao, sem devolver a lista do buraco`() = runDesktopComposeUiTest {
         setNotch(minimized)
         clickHole()
         onNodeWithText(labels[2]).performClick()
         onNodeWithContentDescription("Restaurar").performClick()
 
-        onAllNodesWithText(labels[2]).assertCountEquals(0)
-        listOf(labels[0], labels[1], labels[3]).forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
         onAllNodesWithText("← 3 no buraco").assertCountEquals(0)
     }
 
     @Test
-    fun `conta que sai do buraco por outro caminho com o balao aberto some da lista`() = runDesktopComposeUiTest {
+    fun `conta que sai do buraco por outro caminho com o balao aberto fecha o balao`() = runDesktopComposeUiTest {
         val state = setNotch(minimized)
         clickHole()
         onNodeWithText(labels[1]).performClick()
         runOnIdle { state.value = state.value.map { account -> if (account.label == labels[1]) account.copy(minimized = false) else account } }
         waitForIdle()
 
-        onAllNodesWithText(labels[1]).assertCountEquals(0)
-        listOf(labels[0], labels[2], labels[3]).forEach { label -> onAllNodesWithText(label).assertCountEquals(1) }
+        labels.forEach { label -> onAllNodesWithText(label).assertCountEquals(0) }
+        onAllNodesWithText("← 3 no buraco").assertCountEquals(0)
+    }
+
+    @Test
+    fun `balao de um anel fecha quando o Minimizar muda a conta que ele mostra`() = runDesktopComposeUiTest {
+        setNotch(listOf(account(labels[0], minimized = false), account(labels[1], minimized = true)))
+        hoverRingOf(labels[0])
+        onNodeWithContentDescription("Minimizar").performClick()
+        waitForIdle()
+
+        onAllNodesWithContentDescription("Restaurar").assertCountEquals(0)
+        onAllNodesWithText(labels[0]).assertCountEquals(0)
+    }
+
+    @Test
+    fun `outra conta mudar de minimized nao fecha o balao de um anel`() = runDesktopComposeUiTest {
+        val state = setNotch(listOf(account(labels[0], minimized = false), account(labels[1], minimized = false)))
+        hoverRingOf(labels[0])
+        onAllNodesWithContentDescription("Minimizar").assertCountEquals(1)
+
+        runOnIdle { state.value = state.value.map { account -> if (account.label == labels[1]) account.copy(minimized = true) else account } }
+        waitForIdle()
+
+        onAllNodesWithContentDescription("Minimizar").assertCountEquals(1)
     }
 
     @Test
@@ -239,6 +261,12 @@ class HudBlackHoleBalloonTest {
         onAllNodesWithText("← 4 no buraco").assertCountEquals(1)
     }
 
+    /** Hover no anel da conta (o descritivo do anel traz o nome dela): abre o balão do anel. */
+    private fun ComposeUiTest.hoverRingOf(label: String) {
+        onNodeWithContentDescription(label, substring = true, useUnmergedTree = true).performMouseInput { moveTo(center) }
+        waitForIdle()
+    }
+
     private fun ComposeUiTest.hoverHole() {
         onNodeWithTag("hudBlackHole").performMouseInput { enter(center) }
     }
@@ -288,7 +316,7 @@ class HudBlackHoleBalloonTest {
                             onToggleMinimize = { target ->
                                 onToggleMinimize(target)
                                 accounts.value = accounts.value.map { item ->
-                                    if (item.targetKey == target) item.copy(minimized = false) else item
+                                    if (item.targetKey == target) item.copy(minimized = !item.minimized) else item
                                 }
                             }
                         )

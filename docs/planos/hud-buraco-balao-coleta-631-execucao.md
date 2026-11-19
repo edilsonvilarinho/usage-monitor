@@ -44,6 +44,8 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `git worktree add .claude/worktrees/hud-hole-631 -b fix/issue-631-hud-hole-balloon origin/main` | plano escrito; sem harness de teste |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest"` | 19 testes, 3 falhas na asserção: restaurar/outro caminho "Did not expect any node but found '1' node … 'Anthropic — Alfa'"; anel "Did not expect any node … (ContentDescription = 'Restaurar')"; "outra conta não fecha" já verde |
+| A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "*ArchitectureRulesTest*"` | BUILD SUCCESSFUL: 19 + 99 + 28 testes, 0 falhas; `HudNotch.kt` 749 → 746 linhas |
 
 ## Problemas em aberto e riscos
 

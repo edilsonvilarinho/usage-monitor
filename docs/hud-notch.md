@@ -661,9 +661,7 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   `AppDataRow`, #612); só destaca. O balão da conta abre só por clique ou Enter (a seleção por hover de 160 ms saiu na
   #602).
 - **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
-  com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só
-  aquela conta: o balão volta à lista, já sem ela, ou fecha se o buraco esvaziar (#602: antes o balão ficava na
-  conta restaurada; a seleção que sai de `holeMembers` é descartada, por Restaurar ou outro caminho). A auto-minimizada não tem botão e diz "volta
+  com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só aquela conta da lista e fecha o balão inteiro (`closeHole()`), e o balão não volta à lista. O mesmo vale para qualquer mudança de `minimized` da conta que o balão mostra, seja no balão do anel ou no detalhe aberto a partir da lista (`HudNotchBalloonState.FollowAccounts`, #631: antes o balão voltava à lista sem a conta, ou ficava aberto depois de minimizar pelo anel). Mudança de `minimized` de outra conta não fecha o balão. Buraco esvaziado também fecha. A auto-minimizada não tem botão e diz "volta
   sozinha quando couber" (EN "returns on its own when there is room"). Os rótulos vêm de `localized`.
 - **Sumidouro (transição).** Minimizar: a conta encolhe de 64 a 28 dp e desliza ao longo da borda até o centro do
   buraco, em 520 ms (ease-in-out, sem overshoot). A contagem só inclui a conta quando o progresso chega a 1. Restaurar
@@ -671,7 +669,7 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   função pura (`hudSinkFrame`), testada em TDD.
 - **Janela.** Durante a transição a janela segue o maior tamanho (`hudMinimizeWindowSize`, #576).
 - **Estado.** A sentinela do balão do buraco é `accounts.size`, a mesma chave do buraco em `HudRingStrip`.
-  `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered` e quando o balão fecha.
+  `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered`, quando o balão fecha e quando a conta mostrada muda de `minimized` (#631).
 - **Decisões.** A ordem da lista é a de publicação. "Mais recente primeiro" do protótipo ficou fora, porque exigiria
   persistir quando cada conta entrou.
 - **Risco aberto (fora do escopo da #612).** Primeira minimização com o buraco vazio: nos 520 ms do voo a conta fica
