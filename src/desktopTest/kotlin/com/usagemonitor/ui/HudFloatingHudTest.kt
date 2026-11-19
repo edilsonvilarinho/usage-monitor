@@ -43,6 +43,7 @@ import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudFloatingColumnWindowSize
 import com.usagemonitor.presentation.ui.HUD_BALLOON_TEST_TAG
+import com.usagemonitor.presentation.ui.HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_FLOATING_COLUMN_TEST_TAG
 import com.usagemonitor.presentation.ui.HUD_FLOATING_HOLE_DRAG_TAG
 import com.usagemonitor.presentation.ui.HUD_FLOAT_HANDLE_TAG
@@ -54,6 +55,7 @@ import com.usagemonitor.presentation.ui.HudFloatingHud
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.hudBlackHoleBackLabel
 import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.verticalCollapsed
 import kotlin.math.roundToInt
@@ -104,6 +106,74 @@ class HudFloatingHudTest {
         // O hover de `hoverable` é entregue num frame posterior ao gesto; sem esperar o ocioso, a asserção lê a lista antes.
         waitForIdle()
         assertEquals(listOf(2), hovered)
+    }
+
+    /** A06: clique no anel da coluna recoleta a conta dele, sem iniciar arrasto. */
+    @Test
+    fun `clique num anel do flutuante chama onRefreshAccount com a chave dele, sem arrastar`() = hudTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        val drags = mutableListOf<Int>()
+        render(
+            expanded = true,
+            onRefreshAccount = { refreshed += it },
+            onDragStart = { drags += 1 },
+        )
+        onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG)[2].performClick()
+        waitForIdle()
+        assertEquals(listOf(accounts[2].targetKey), refreshed)
+        assertEquals(emptyList(), drags)
+    }
+
+    /** A06: clique no glifo em órbita do buraco recoleta a conta dele. */
+    @Test
+    fun `clique num glifo em orbita do flutuante chama onRefreshAccount com a chave da conta`() = hudTestWith(MINIMIZED_WINDOW) {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        render(
+            expanded = true,
+            accountList = MINIMIZED_ACCOUNTS,
+            window = MINIMIZED_WINDOW,
+            onRefreshAccount = { refreshed += it },
+        )
+        val minimized = MINIMIZED_ACCOUNTS.filter { it.minimized }
+        onAllNodesWithTag(HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG).assertCountEquals(minimized.size)
+        for (index in minimized.indices) {
+            onAllNodesWithTag(HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG)[index].performClick()
+            waitForIdle()
+        }
+        assertEquals(minimized.map { it.targetKey }.sortedBy { it.toString() }, refreshed.sortedBy { it.toString() })
+    }
+
+    /** A07 (#631): clique numa linha da lista do buraco abre o detalhe da conta e a recoleta. */
+    @Test
+    fun `clique numa linha da lista do buraco chama onRefreshAccount com a chave da conta da linha`() = hudTestWith(MINIMIZED_WINDOW) {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        render(
+            expanded = true,
+            balloon = HudFloatingBalloon.Hole(null),
+            accountList = MINIMIZED_ACCOUNTS,
+            window = MINIMIZED_WINDOW,
+            onRefreshAccount = { refreshed += it },
+        )
+        onNodeWithText("Conta Zeta").performClick()
+        waitForIdle()
+        assertEquals(listOf(MINIMIZED_ACCOUNTS[5].targetKey), refreshed)
+    }
+
+    /** A07 (#631): a volta "← N no buraco" fecha o detalhe e não recoleta a conta. */
+    @Test
+    fun `voltar do detalhe do buraco nao chama onRefreshAccount`() = hudTestWith(MINIMIZED_WINDOW) {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        render(
+            expanded = true,
+            balloon = HudFloatingBalloon.Hole(4),
+            accountList = MINIMIZED_ACCOUNTS,
+            window = MINIMIZED_WINDOW,
+            onRefreshAccount = { refreshed += it },
+        )
+        onNodeWithText(hudBlackHoleBackLabel(3, AppLanguage.EN)).performClick()
+        waitForIdle()
+        onAllNodesWithText(hudBlackHoleCountLabel(3, AppLanguage.EN)).assertCountEquals(1)
+        assertEquals(emptyList(), refreshed)
     }
 
     /** A11g: hover no buraco da coluna abre a lista das contas minimizadas, com a contagem no topo. */
@@ -391,6 +461,7 @@ class HudFloatingHudTest {
             onToggleFloating: () -> Unit = {},
             onFloatHover: () -> Unit = {},
             onGearHover: () -> Unit = {},
+            onRefreshAccount: (UsageTargetKey) -> Unit = {},
             onDragStart: () -> Unit = {},
             onDragEnd: () -> Unit = {},
             onHoverChange: (Boolean) -> Unit = {},
@@ -426,6 +497,7 @@ class HudFloatingHudTest {
                         onToggleFloating = onToggleFloating,
                         onFloatHover = onFloatHover,
                         onGearHover = onGearHover,
+                        onRefreshAccount = onRefreshAccount,
                         onDragStart = onDragStart,
                         onDrag = {},
                         onDragEnd = onDragEnd,

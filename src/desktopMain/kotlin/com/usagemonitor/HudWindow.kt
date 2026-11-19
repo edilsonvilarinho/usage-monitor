@@ -170,11 +170,6 @@ internal fun HudWindowHost(
     // Contas minimizadas (#576): lidas da preferência uma vez; cada alternância grava.
     // Minimizar não desabilita a conta — só muda o que o notch desenha.
     var minimizedTargets by remember { mutableStateOf(readHudMinimizedAccounts(settings)) }
-    val toggleMinimize: (UsageTargetKey) -> Unit = { target ->
-        val next = toggleHudMinimizedAccount(minimizedTargets, target)
-        minimizedTargets = next
-        persistHudMinimizedAccounts(settings, next)
-    }
     // Conta que nasce ou colapsa (API ativada/desativada, início do app) fica na
     // lista durante a transição; a geometria segue essa lista.
     val presentAccounts = rememberHudPresence(buildHudAccounts(
@@ -232,6 +227,12 @@ internal fun HudWindowHost(
 
     val scale = uiScaleFactor(uiScalePercent)
     val accounts = applyHudAutoMinimize(presentAccounts, placement.edge, fallbackLabel, hudMaxAlong(placement.edge, screenArea, scale))
+    val toggleMinimize: (UsageTargetKey) -> Unit = { target ->
+        val next = toggleHudMinimizedAccount(minimizedTargets, target)
+        minimizedTargets = next
+        persistHudMinimizedAccounts(settings, next)
+        floatingBalloon = hudFloatingBalloonAfterMinimize(floatingBalloon, accounts, target)
+    }
     val minimize = rememberHudMinimizeProgress(accounts)
     val (sizesNow, settledNow) = hudWindowSizes(
         accounts = accounts,

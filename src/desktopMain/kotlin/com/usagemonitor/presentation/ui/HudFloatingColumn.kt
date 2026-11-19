@@ -10,6 +10,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onPlaced
 import com.usagemonitor.HudEdge
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.presentation.ui.components.gargantuaHorizonBody
 import com.usagemonitor.presentation.ui.theme.AppShapes
@@ -29,6 +30,10 @@ internal fun HudFloatingColumn(
     revealed: Boolean,
     onRingHovered: (Int) -> Unit,
     onRingRefresh: (Int) -> Unit,
+    /** Clique no glifo em órbita do buraco recoleta a conta dele (A06). */
+    onHoleGlyphRefresh: (UsageTargetKey) -> Unit = {},
+    /** Clique no corpo da coluna sobre um anel recoleta a conta dele, sem arrastar nem fechar o balão (A06). */
+    onRingClicked: (UsageTargetKey) -> Unit = {},
     onHoleClicked: () -> Unit = {},
     onHoleHovered: () -> Unit = {},
     hitBoxes: HudRingHitBoxes = remember { HudRingHitBoxes() },
@@ -50,6 +55,13 @@ internal fun HudFloatingColumn(
             .hudEclipseIris(HudEdge.LEFT, iris)
             .gargantuaHorizonBody(shape)
             .onPlaced { coordinates -> ringItemBounds.body = coordinates }
+            .hudPressGesture(
+                draggable = false,
+                onDragStart = {},
+                onDragMove = {},
+                onDragEnd = {},
+                onClick = { position -> hudRingKeyAt(ringItemBounds, accounts, position)?.let(onRingClicked) },
+            )
     ) {
         HudStarfieldCanvas(
             rings = { ringItemBounds.rings() },
@@ -70,6 +82,7 @@ internal fun HudFloatingColumn(
             onHoleClicked = onHoleClicked,
             onHoleHovered = onHoleHovered,
             onRingRefresh = onRingRefresh,
+            onHoleGlyphRefresh = onHoleGlyphRefresh,
             departures = departures,
             settle = settle,
             minimizeProgress = minimize.values,

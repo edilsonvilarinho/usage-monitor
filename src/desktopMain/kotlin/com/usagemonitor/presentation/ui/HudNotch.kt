@@ -219,11 +219,7 @@ internal fun HudNotch(
         if (!open) balloon.holeSelection = null
         if (!open && initialBalloonIndex == null) balloon.balloonIndex = null
     }
-    // A conta aberta deixa o buraco (Restaurar ou outro caminho): a lista volta sem ela, e o buraco vazio fecha o balão.
-    LaunchedEffect(holeMembers) {
-        if (balloon.holeSelection != null && balloon.holeSelection !in holeMembers) balloon.holeSelection = null
-        if (holeMembers.isEmpty() && balloon.balloonIndex == holeIndex) balloon.balloonIndex = null
-    }
+    balloon.FollowAccounts(accounts, holeMembers, holeIndex)
     // A engrenagem abre o balão dela no hover, como o anel abre o da conta
     // (#317). Só com o notch aberto: durante o arrasto as alças continuam na
     // tela, e o índice gravado ali reabriria o balão ao soltar.
@@ -333,8 +329,8 @@ internal fun HudNotch(
                     minimizeProgress = minimizeState.values,
                     reorderDrag = reorder.drag, reorderDrop = reorder.drop,
                     onRingHovered = balloon::ringHovered,
-                    onHoleClicked = { balloon.holeClicked(holeIndex) },
-                    onHoleHovered = { balloon.holeHovered(holeIndex) },
+                    onHoleClicked = { balloon.holeClicked(holeIndex) }, onHoleHovered = { balloon.holeHovered(holeIndex) },
+                    onHoleGlyphRefresh = currentOnRefreshAccount,
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
                     onItemPlaced = { index, coordinates ->
@@ -414,7 +410,7 @@ internal fun HudNotch(
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
                 accounts = accounts, holeMembers = holeMembers, holeSelection = balloon.holeSelection?.takeIf { index -> index in holeMembers },
-                onHoleSelect = { position -> balloon.holeSelection = position }, sizes = sizes,
+                onHoleSelect = { position -> balloon.holeRowSelected(position, currentAccounts, currentOnRefreshAccount) }, sizes = sizes,
                 appBalloon = appBalloon, appBalloonHeight = appBalloonHeight, language = language,
                 accountActions = accountActions, ringCenters = ringCenters, ringDepths = ringDepths,
                 balloonAlong = balloonAlong, balloonBox = balloonBox, rootCoordinates = { rootCoordinates },

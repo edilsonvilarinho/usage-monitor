@@ -1,6 +1,9 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.foundation.Canvas
+import com.usagemonitor.domain.entity.UsageTargetKey
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -87,6 +90,8 @@ private const val HUD_BLACK_HOLE_DASH_ALPHA_LIGHT = 0.25f
 internal fun HudBlackHoleOrbitGlyphs(
     members: List<HudAccount>,
     language: AppLanguage,
+    /** Clique no glifo de uma conta: força a coleta dela, sem abrir a lista do buraco (#631, A03). */
+    onGlyphRefresh: (UsageTargetKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val policy = LocalAppMotionPolicy.current
@@ -120,7 +125,8 @@ internal fun HudBlackHoleOrbitGlyphs(
                 members = members,
                 timeMs = timeMs,
                 runningLabel = runningLabel,
-                lens = lens
+                lens = lens,
+                onRefresh = { onGlyphRefresh(members[index].targetKey) }
             )
         }
     }
@@ -157,7 +163,8 @@ private fun HudBlackHoleGlyph(
     members: List<HudAccount>,
     timeMs: State<Long>,
     runningLabel: String,
-    lens: Color
+    lens: Color,
+    onRefresh: () -> Unit
 ) {
     val claro = hudIsLight(MaterialTheme.colorScheme.surface)
     val trilho = MaterialTheme.colorScheme.onSurface.copy(
@@ -181,6 +188,8 @@ private fun HudBlackHoleGlyph(
         Box(
             modifier = Modifier
                 .size(HUD_BLACK_HOLE_GLYPH_SIZE)
+                // Clique próprio do glifo: dispara a coleta da conta dele (#631, A03).
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onRefresh)
                 .drawBehind { drawHudBlackHoleDisco(account.sessionActive, lens, tracejado) }
                 .clearAndSetSemantics {
                     this[SemanticsProperties.TestTag] = HUD_BLACK_HOLE_ORBIT_GLYPH_TEST_TAG

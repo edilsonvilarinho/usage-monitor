@@ -1,10 +1,12 @@
 package com.usagemonitor.presentation.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.usagemonitor.domain.entity.UsageTargetKey
 
 /**
  * Estado do balão do notch (#612): a conta que ele mostra ([balloonIndex]) e, quando ela é o buraco negro, a conta
@@ -39,7 +41,18 @@ internal class HudNotchBalloonState(initialBalloonIndex: Int?) {
         }
     }
 
-    /** Fecha o balão e a lista do buraco de uma vez (Esc, ou clique fora da lista). */
+    /**
+     * Linha da lista do buraco (#631, A04): abre o detalhe da conta e a recoleta, como o clique no anel. A volta
+     * (`null`, "← N no buraco") só fecha o detalhe, sem coleta.
+     */
+    fun holeRowSelected(position: Int?, accounts: List<HudAccount>, onRefresh: (UsageTargetKey) -> Unit) {
+        holeSelection = position
+        if (position == null) return
+        val account = accounts.getOrNull(position) ?: return
+        onRefresh(account.targetKey)
+    }
+
+    /** Fecha o balão e a lista do buraco de uma vez (Esc, clique fora da lista, ou a conta mostrada mudou de minimizada). */
     fun closeHole() {
         balloonIndex = null
         holeSelection = null
@@ -50,3 +63,41 @@ internal class HudNotchBalloonState(initialBalloonIndex: Int?) {
 @Composable
 internal fun rememberHudNotchBalloonState(initialBalloonIndex: Int?): HudNotchBalloonState =
     remember { HudNotchBalloonState(initialBalloonIndex) }
+
+/**
+ * Regras do balão que dependem das contas: a lista do buraco perde a conta que saiu dela, e o buraco vazio fecha o
+ * balão. Também fecha o balão quando muda o `minimized` da conta que ele mostra (balão de um anel, ou o detalhe
+ * aberto a partir da lista do buraco, [HudNotchBalloonState.holeSelection]). Mudança de outra conta não fecha.
+ */
+@Composable
+internal fun HudNotchBalloonState.FollowAccounts(accounts: List<HudAccount>, holeMembers: List<Int>, holeIndex: Int) {
+    // A conta aberta deixa o buraco (Restaurar ou outro caminho): a lista volta sem ela, e o buraco vazio fecha o balão.
+    LaunchedEffect(holeMembers) {
+        if (holeSelection != null && holeSelection !in holeMembers) holeSelection = null
+        if (holeMembers.isEmpty() && balloonIndex == holeIndex) balloonIndex = null
+    }
+    // Conta mostrada: a do anel, ou a do detalhe do buraco. Fora dela (lista do buraco, balão fechado) não há conta.
+    val shown = shownAccountOf(accounts, holeIndex)
+    val watch = remember { HudMinimizedWatch() }
+    // Mesma conta com `minimized` trocado = o Minimizar (ou Restaurar) dela mudou: o balão fecha por inteiro.
+    LaunchedEffect(shown?.targetKey, shown?.minimized) {
+        val sameAccount = shown != null && watch.key == shown.targetKey
+        if (sameAccount && watch.minimized != shown.minimized) closeHole()
+        watch.key = shown?.targetKey
+        watch.minimized = shown?.minimized
+    }
+}
+
+/** A conta que o balão mostra agora, ou `null` se ele não mostra conta (fechado, ou lista do buraco). */
+private fun HudNotchBalloonState.shownAccountOf(accounts: List<HudAccount>, holeIndex: Int): HudAccount? {
+    val index = balloonIndex ?: return null
+    if (index in accounts.indices) return accounts[index]
+    if (index == holeIndex) return holeSelection?.let { accounts.getOrNull(it) }
+    return null
+}
+
+/** Última chave e último `minimized` vistos do balão; lembrados pela composição, não publicados. */
+private class HudMinimizedWatch {
+    var key: UsageTargetKey? = null
+    var minimized: Boolean? = null
+}
