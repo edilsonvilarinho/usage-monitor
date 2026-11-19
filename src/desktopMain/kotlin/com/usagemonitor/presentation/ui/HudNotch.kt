@@ -329,8 +329,8 @@ internal fun HudNotch(
                     minimizeProgress = minimizeState.values,
                     reorderDrag = reorder.drag, reorderDrop = reorder.drop,
                     onRingHovered = balloon::ringHovered,
-                    onHoleClicked = { balloon.holeClicked(holeIndex) },
-                    onHoleHovered = { balloon.holeHovered(holeIndex) },
+                    onHoleClicked = { balloon.holeClicked(holeIndex) }, onHoleHovered = { balloon.holeHovered(holeIndex) },
+                    onHoleGlyphRefresh = currentOnRefreshAccount,
                     language = language,
                     onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
                     onItemPlaced = { index, coordinates ->

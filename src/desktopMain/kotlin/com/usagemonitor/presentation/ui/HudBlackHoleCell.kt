@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import com.usagemonitor.HUD_BLACK_HOLE_CELL_SIZE
 import com.usagemonitor.HUD_RING_STROKE
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.presentation.ui.components.AppGargantuaRing
 
 /** Anel central do buraco (#612, C1): 40 dp; também é o poço do campo estelar da célula (raio 20 dp). */
@@ -40,6 +41,7 @@ internal fun HudBlackHoleCell(
     count: Int,
     members: List<HudAccount>,
     language: AppLanguage,
+    onGlyphRefresh: (UsageTargetKey) -> Unit,
     onClick: () -> Unit,
     onHovered: () -> Unit,
     onItemPlaced: (LayoutCoordinates) -> Unit,
@@ -69,7 +71,7 @@ internal fun HudBlackHoleCell(
                 size = HUD_BLACK_HOLE_RING_SIZE,
                 stroke = HUD_RING_STROKE
             )
-            HudBlackHoleOrbitGlyphs(members = members, language = language)
+            HudBlackHoleOrbitGlyphs(members = members, language = language, onGlyphRefresh = onGlyphRefresh)
         }
     }
 }

@@ -261,7 +261,52 @@ class HudBlackHoleBalloonTest {
         onAllNodesWithText("← 4 no buraco").assertCountEquals(1)
     }
 
-    /** Hover no anel da conta (o descritivo do anel traz o nome dela): abre o balão do anel. */
+    /** Clique num glifo em órbita força a coleta da conta dele e não abre a lista (#631, A03). */
+    @Test
+    fun `clique num glifo do buraco chama refresh da conta e mantem a lista aberta`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setNotch(
+            listOf(account("Ativa", minimized = false), account("Zeta", minimized = true)),
+            onRefreshAccount = { target -> refreshed += target }
+        )
+
+        // Hover no buraco abre a lista (#612); o clique no glifo, que está dentro do buraco, não pode fechá-la.
+        onNodeWithTag("hudBlackHole").performMouseInput { moveTo(center) }
+        waitForIdle()
+        onNodeWithTag(HOLE_GLYPH_TAG, useUnmergedTree = true).performMouseInput { click(center) }
+        waitForIdle()
+
+        assertEquals(
+            listOf(UsageTargetKey(ApiSource.ANTHROPIC, "Zeta")),
+            refreshed,
+            "clique no glifo da conta 'Zeta' deve chamar refresh dela (#631, A03)"
+        )
+        assertEquals(
+            true,
+            onAllNodesWithText("Zeta", useUnmergedTree = true).fetchSemanticsNodes().size >= 1,
+            "clique no glifo não deve fechar a lista aberta por hover (#631, A03)"
+        )
+    }
+
+    /** Clique no centro do buraco continua abrindo a lista, sem coleta (#631, A03). */
+    @Test
+    fun `clique no centro do buraco abre a lista sem chamar refresh`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setNotch(
+            listOf(account("Ativa", minimized = false), account("Zeta", minimized = true)),
+            onRefreshAccount = { target -> refreshed += target }
+        )
+
+        clickHole()
+        waitForIdle()
+
+        assertEquals(emptyList<UsageTargetKey>(), refreshed, "clique no centro do buraco não chama refresh (#631, A03)")
+        assertTrue(
+            onAllNodesWithText("Zeta", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty(),
+            "clique no centro do buraco deve abrir a lista com 'Zeta' (#631, A03)"
+        )
+    }
+
     private fun ComposeUiTest.hoverRingOf(label: String) {
         onNodeWithContentDescription(label, substring = true, useUnmergedTree = true).performMouseInput { moveTo(center) }
         waitForIdle()
@@ -292,7 +337,8 @@ class HudBlackHoleBalloonTest {
     /** Estado das contas fica aqui; o toggle de minimizar troca a conta como o app, então o Restaurar a tira do buraco. */
     private fun ComposeUiTest.setNotch(
         initial: List<HudAccount>,
-        onToggleMinimize: (UsageTargetKey) -> Unit = {}
+        onToggleMinimize: (UsageTargetKey) -> Unit = {},
+        onRefreshAccount: (UsageTargetKey) -> Unit = {}
     ): MutableState<List<HudAccount>> {
         val accounts = mutableStateOf(initial)
         setContent {
@@ -304,6 +350,7 @@ class HudBlackHoleBalloonTest {
                     fallbackLabel = "Carregando",
                     expanded = true,
                     language = AppLanguage.PT,
+                    onRefreshAccount = onRefreshAccount,
                     accountActions = { account ->
                         HudAccountActions(
                             account = account,
@@ -363,6 +410,7 @@ class HudBlackHoleBalloonTest {
     private companion object {
         const val NOTCH_TAG = "hudContent"
         const val HOVERED_ROW_TAG = "hudBlackHoleListRowHovered"
+        const val HOLE_GLYPH_TAG = "hudBlackHoleOrbitGlyph"
         const val MARGIN_PX = 2f
 
         /** Espera real para o atraso de 160 ms da linha antiga: se ele ainda existisse, a linha abriria o balão. */

@@ -110,6 +110,8 @@ internal fun HudRingStrip(
     /** Entrada do ponteiro no buraco (#612): o dono decide se a lista abre; já aberta na lista do buraco, não muda. */
     onHoleHovered: () -> Unit,
     onRingRefresh: (Int) -> Unit,
+    /** Clique no glifo em órbita do buraco força a coleta da conta dele (#631, A03). */
+    onHoleGlyphRefresh: (UsageTargetKey) -> Unit = {},
     onItemPlaced: (Int, LayoutCoordinates) -> Unit,
     onRingPlaced: (Int, LayoutCoordinates) -> Unit,
     /** Arrasto de reordenação em curso (#584); `null` sem arrasto. */
@@ -182,6 +184,7 @@ internal fun HudRingStrip(
                     language = language,
                     onClick = onHoleClicked,
                     onHovered = onHoleHovered,
+                    onGlyphRefresh = onHoleGlyphRefresh,
                     // Na horizontal o buraco fecha a faixa com o mesmo vão das contas (#612).
                     modifier = if (edge.isHorizontal) {
                         Modifier.padding(start = HUD_ITEM_GAP).requiredSize(HUD_BLACK_HOLE_CELL_SIZE)

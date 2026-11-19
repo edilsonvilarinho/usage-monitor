@@ -362,7 +362,10 @@ linhas que ele substituiu. `HudEdge` é enum novo.
   direito é engolido sem ação (levava ao modo somente cards, removido). No corpo o
   gesto é `draggable = false`: passar do limiar só desiste do clique, e **mover é só pela mão**, que usa o
   mesmo gesto com arrasto. A ação de cada anel é **declarada** na semântica, não instalada por `clickable`, que
-  consumiria o `down`. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
+  consumiria o `down`. O buraco é outro caso (#631): o `Column` dele usa `clickable` (alterna a lista), e cada
+  glifo em órbita tem `clickable` próprio que chama `onGlyphRefresh` da conta. Como o `clickable` do glifo consome
+  o `down`, o clique no glifo não sobe ao `Column` e não alterna a lista; o clique no centro alterna a lista e não
+  chama refresh. Nenhuma coordenada sai do composable: o host lê o ponteiro na tela por
   `MouseInfo`, incremental. Não há saída para outra janela: "Abrir" da bandeja e a segunda instância
   trazem a janela da HUD para a frente (`focusHud` → `activateWindow`), e `F1` é o único atalho.
 - **Contagem até a próxima coleta só no balão da engrenagem** (#185, #269): ela ficava no fim da
@@ -699,7 +702,9 @@ Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-fl
 - **Área útil.** O buraco fica preso à área útil e não cobre a barra de tarefas (#621). Na medição no Windows 11 desta issue, o buraco sobre a barra sumia atrás dela ao trocar de janela; a versão que deixava o buraco sobre a barra (`1e6824a0`) foi revertida.
 - **Janela presa, buraco deslocado (#625).** A janela real fica sempre dentro da área útil. Com o buraco perto da borda, a janela para na borda e o buraco anda dentro dela; o centro gravado continua sendo o do buraco na tela. Caso medido no log da issue: área `0,30 1920×1050`, janela `778×546`, raio 40, centro pedido `1880,10` — antes a janela saía da área; agora fica em `1142,30` com o buraco em `738,40` dentro dela. O arrasto segue o ponteiro pelo centro ao vivo (`hudFloatingLiveCenter`) e a janela é posicionada pela origem presa, nunca pela origem virtual crua.
 - **Barra de tarefas.** O botão na barra de tarefas é tratado em #620.
-- **Gestos.** Clique direito não tem ação. Arrastar o buraco solto não o encaixa em borda.
+- **Gestos.** Clique direito não tem ação. Clique num glifo em órbita recoleta aquela conta e **não** alterna a lista:
+  a lista aberta por hover continua aberta (#631). Clique no centro alterna a lista e não recoleta. Hover no buraco
+  abre a lista (#612). Arrastar o buraco solto não o encaixa em borda.
 
 ## Aquecimento da GPU (#627, revertido na #629)
 
