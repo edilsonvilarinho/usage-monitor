@@ -75,3 +75,11 @@ abertura em `HudWindow.kt` e carimbo de `System.nanoTime()` a cada leitura do qu
 - Sobra de 107 + 35 ms na 1ª expansão com o protótipo; causa não medida (hipótese: alfa 0,01 não percorre exatamente o
   mesmo caminho do desenho opaco). A05.
 - Linux e macOS sem medição: ficam sem aquecimento.
+
+## Reversão (#629)
+
+O `v42.3.0-beta.15` (commit `3d30fbb5`) publicou o aquecimento. Captura do dono do produto: logo após o arranque a HUD
+abre e fecha por inteiro, **visível**. O A05 mediu só a cadência dos quadros e não conferiu a tela — falha de validação.
+Decisão do dono: reverter o código (A02–A04) e publicar o beta seguinte, sem retirar o beta.15. O engasgo das 3 primeiras
+expansões volta ao estado anterior. Hipótese não verificada: a `ModulateAlpha` não alcança as camadas filhas
+(`graphicsLayer` da íris e dos anéis), que pintam opacas.

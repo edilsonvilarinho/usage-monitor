@@ -229,7 +229,7 @@ internal fun HudWindowHost(
             windowOpen = false
         }
     }
-    val warmingUp = rememberHudGpuWarmingUp(motion.reduced, { hovered || drag.dragging }, { windowOpen = it }, { expanded = it })
+
     val scale = uiScaleFactor(uiScalePercent)
     val accounts = applyHudAutoMinimize(presentAccounts, placement.edge, fallbackLabel, hudMaxAlong(placement.edge, screenArea, scale))
     val minimize = rememberHudMinimizeProgress(accounts)
@@ -359,7 +359,6 @@ internal fun HudWindowHost(
                 floating = floating,
                 expanded = expanded,
                 dragging = drag.dragging,
-                warmingUp = warmingUp,
                 accounts = accounts,
                 edge = placement.edge,
                 notchCenter = if (drag.dragging) null else bounds.notchCenterInWindow,
@@ -527,38 +526,6 @@ private const val HUD_COLLAPSE_DELAY_MILLIS = 150L
  * notch corta a pintura do fechamento.
  */
 private const val HUD_COLLAPSE_SETTLE_MILLIS = AppGargantuaTokens.jetCloseMillis + 60L
-
-/**
- * Estado do aquecimento da GPU (#627) e o efeito que o dirige. A janela é dona de
- * `windowOpen` e `expanded`; o aquecimento só os recebe pelos callbacks. Uso real (hover ou arrasto)
- * interrompe. `motionReduced` vem da janela: `LocalAppMotionPolicy` só existe dentro do `AppTheme`.
- */
-@Composable
-private fun rememberHudGpuWarmingUp(
-    motionReduced: Boolean,
-    interrupted: () -> Boolean,
-    onWindowOpen: (Boolean) -> Unit,
-    onExpanded: (Boolean) -> Unit
-): Boolean {
-    var warming by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        val target = object : HudGpuWarmUpTarget {
-            override fun setWarming(active: Boolean) {
-                warming = active
-            }
-
-            override fun setWindowOpen(open: Boolean) = onWindowOpen(open)
-
-            override fun setExpanded(expanded: Boolean) = onExpanded(expanded)
-
-            override suspend fun awaitFrame() {
-                withFrameNanos { }
-            }
-        }
-        runHudGpuWarmUp(hudGpuWarmUpCycles(AutoStartManager.currentPlatform(), motionReduced), target, interrupted)
-    }
-    return warming
-}
 
 /** O monitor sob o ponteiro; `null` se o AWT não souber dizer. */
 private fun pointerScreen(): ScreenInfo? =

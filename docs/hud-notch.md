@@ -703,16 +703,17 @@ Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-fl
 - **Barra de tarefas.** O botão na barra de tarefas é tratado em #620.
 - **Gestos.** Clique direito não tem ação. Arrastar o buraco solto não o encaixa em borda.
 
-## Aquecimento da GPU (#627)
+## Aquecimento da GPU (#627, revertido na #629)
 
-Na primeira expansão depois do arranque, o Direct3D no Windows paga um custo de primeira execução e a animação engasga; a partir da 4ª expansão ela sai lisa. Medido no `v42.3.0-beta.14`; decisões e medições no plano `docs/planos/hud-aquecimento-gpu-627-execucao.md`.
+As 3 primeiras expansões depois do arranque engasgam no Windows (Direct3D): pausas de 227 + 354 ms na 1ª, lisas da 4ª em
+diante; com `skiko.renderApi=SOFTWARE_FAST` abrem lisas desde a 1ª, e `-Xcomp` não resolve — custo de primeira execução da
+GPU, não JIT. Medições no plano `docs/planos/hud-aquecimento-gpu-627-execucao.md`.
 
-- **O quê.** Três ciclos de abrir (600 ms) e fechar (400 ms) a janela da HUD, 3 s depois do arranque, com o conteúdo a alfa 0,01 (`HUD_GPU_WARM_UP_ALPHA`), pela camada `graphicsLayer` com `CompositingStrategy.ModulateAlpha` que fica sempre no conteúdo. O aquecimento percorre o mesmo caminho de desenho do uso real.
-- **Só Windows.** Única plataforma medida (#340). Linux e macOS têm zero ciclos (`hudGpuWarmUpCycles`) e ficam sem aquecimento.
-- **Nunca com "Reduzir animações".** Sem tween não há o que aquecer; com a preferência ligada, zero ciclos.
-- **Uso real tem precedência.** Hover ou arrasto interrompe o aquecimento; o alfa volta a 1 na hora e o estado de abertura fica com o dono do hover (`LaunchedEffect(hovered, drag.dragging)`).
-- **Área de clique durante o aquecimento.** Por ~3 s no arranque a janela fica aberta (área de clique da janela inteira) e quase invisível; clique nessa área cai na HUD. Hover interrompe o aquecimento.
-- **Medido (A05).** 1ª expansão com uma pausa de 69 ms (antes 227 + 354 ms); da 2ª em diante, 16 ms por quadro, com picos esporádicos na mesma faixa (53–93 ms) que já existiam sem aquecimento. A causa da sobra não foi isolada.
+- **Tentativa recusada (#627 → #629).** Abrir e fechar a janela 3 vezes no arranque com o conteúdo a alfa 0,01
+  (`graphicsLayer` com `CompositingStrategy.ModulateAlpha` na raiz) tirou o engasgo, mas no `v42.3.0-beta.15` a HUD
+  apareceu aberta por inteiro, visível, nos ciclos. Usabilidade recusada pelo dono do produto; código revertido.
+- **Não repetir sem conferir a tela.** A validação mediu só a cadência dos quadros. Aquecimento futuro precisa provar,
+  por captura de tela no app empacotado, que nada aparece. Por que o alfa 0,01 não valeu não foi investigado.
 
 ## Fora do alcance dos testes
 
