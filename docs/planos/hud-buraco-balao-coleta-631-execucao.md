@@ -21,6 +21,7 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
   contrariam a decisão do dono e serão invertidos.
 - `HudBlackHoleCell.kt:58`: o `clickable` da célula inteira (106 dp) chama `holeClicked`; os glifos
   (`HudBlackHoleOrbitGlyphs.kt:154`) não têm clique próprio. `HudNotch.kt:417`: a linha só grava `holeSelection`.
+- Teste no app real (2026-11-19, após A04): nada mudou para o dono. `Get-ItemProperty HKCU:\Software\JavaSoft\Prefs\com.usagemonitor` → `hud/Floating = true`: o dono usa o modo flutuante (#619), servido por `HudFloatingHud` (`HudWindowContent.kt:121-159`), não por `HudNotch`. Lá o balão é `floatingBalloon` (`HudWindow.kt:207`), o anel só tem hover (`HudFloatingHud.kt:146`) e `onRingRefresh = {}` (`:147`).
 - `wc -l`: `HudNotch.kt` = 749 linhas (teto 800); função `HudNotch` = linhas 142-435 (293, teto 300).
 
 ## Decisões
@@ -38,6 +39,9 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
 - A02: balão fecha quando a conta mostrada muda de minimização (TDD em `HudBlackHoleBalloonTest`).
 - A03: clique no glifo em órbita força a coleta daquela conta; anel central segue alternando a lista.
 - A04: clique/Enter numa linha da lista abre o detalhe e força a coleta.
+- A05: modo flutuante — minimizar/restaurar a conta mostrada fecha `floatingBalloon`.
+- A06: modo flutuante — clique no planeta e no glifo em órbita recoleta.
+- A07: modo flutuante — linha da lista do buraco recoleta.
 
 ## Ponto de situação
 
@@ -50,6 +54,8 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
 | A03 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest" --tests "com.usagemonitor.ui.HudBlackHoleCellTest" --tests "*ArchitectureRulesTest*"` | BUILD SUCCESSFUL: 21 + 13 + 28 testes, 0 falhas (JUnit XML); 1ª entrega devolvida (clique da célula reescrito à mão, asserção contra o hover da #612) |
 | A04 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "*ArchitectureRulesTest*"` | 151 testes, 3 falhas na asserção (`AssertionError`): clique na linha (`:266`), Enter na linha (`:283`), voltar não recoleta (`:300`) |
 | A04 | verde: mesmo comando | BUILD SUCCESSFUL: 24 + 99 + 28 testes, 0 falhas (JUnit XML) |
+| A05 | vermelho: `gradlew.bat desktopTest --tests "*HudFloatingHostTest*" --tests "*HudWindowContentTest*" --tests "*ArchitectureRulesTest*"` | `HudFloatingHostTest.kt:365` "expected null, but was:<Account(index=1)>"; `:370` "expected null, but was:<Hole(selection=2)>" |
+| A05 | verde: mesmo comando | BUILD SUCCESSFUL: 51 + 7 + 28 testes, 0 falhas; `HudWindowHost` = 300 linhas (teto). Sem teste de tela: o harness de `HudWindowContentTest` recebe `toggleMinimize = {}` e a ligação mora em `HudWindowHost` |
 
 ## Problemas em aberto e riscos
 

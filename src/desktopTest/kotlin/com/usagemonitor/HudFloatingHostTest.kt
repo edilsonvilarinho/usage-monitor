@@ -5,6 +5,10 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudFloatingBalloon
+import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.HudAccount
+import com.usagemonitor.presentation.ui.components.AppTone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -340,5 +344,58 @@ class HudFloatingHostTest {
         val scaled = geometry(center = HudFloatCenter(250, 150), scale = 2f)
         assertEquals(75.dp, scaled.holeScreenY)
         assertEquals(400.dp, scaled.areaBottom)
+    }
+
+    // A05 (flutuante): minimizar ou restaurar a conta mostrada no balão fecha o balão; outra conta não mexe nele.
+    private val floatingAccounts = listOf(0, 1, 2).map { index ->
+        HudAccount(
+            targetKey = UsageTargetKey(ApiSource.ANTHROPIC, "perfil-$index"),
+            label = "Conta $index",
+            statusLabel = "Ok",
+            tone = AppTone.OK,
+            quotas = emptyList(),
+            focusIndex = 0
+        )
+    }
+
+    private fun keyOf(index: Int) = UsageTargetKey(ApiSource.ANTHROPIC, "perfil-$index")
+
+    @Test
+    fun `minimizar a conta do balao de conta fecha o balao`() {
+        assertNull(hudFloatingBalloonAfterMinimize(HudFloatingBalloon.Account(1), floatingAccounts, keyOf(1)))
+    }
+
+    @Test
+    fun `minimizar a conta do detalhe do buraco fecha o balao`() {
+        assertNull(hudFloatingBalloonAfterMinimize(HudFloatingBalloon.Hole(2), floatingAccounts, keyOf(2)))
+    }
+
+    @Test
+    fun `minimizar outra conta mantem o balao de conta`() {
+        val next = hudFloatingBalloonAfterMinimize(HudFloatingBalloon.Account(1), floatingAccounts, keyOf(2))
+        assertEquals(HudFloatingBalloon.Account(1), next)
+    }
+
+    @Test
+    fun `minimizar outra conta mantem o detalhe do buraco`() {
+        val next = hudFloatingBalloonAfterMinimize(HudFloatingBalloon.Hole(2), floatingAccounts, keyOf(0))
+        assertEquals(HudFloatingBalloon.Hole(2), next)
+    }
+
+    @Test
+    fun `minimizar uma conta com o balao do app aberto mantem o balao do app`() {
+        val next = hudFloatingBalloonAfterMinimize(HudFloatingBalloon.App, floatingAccounts, keyOf(1))
+        assertEquals(HudFloatingBalloon.App, next)
+    }
+
+    @Test
+    fun `minimizar uma conta com a lista do buraco sem conta escolhida mantem a lista`() {
+        val next = hudFloatingBalloonAfterMinimize(HudFloatingBalloon.Hole(null), floatingAccounts, keyOf(1))
+        assertEquals(HudFloatingBalloon.Hole(null), next)
+    }
+
+    @Test
+    fun `sem balao aberto nada muda`() {
+        assertNull(hudFloatingBalloonAfterMinimize(null, floatingAccounts, keyOf(1)))
     }
 }

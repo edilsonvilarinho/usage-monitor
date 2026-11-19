@@ -6,6 +6,8 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudFloatingBalloon
+import com.usagemonitor.domain.entity.UsageTargetKey
+import com.usagemonitor.presentation.ui.HudAccount
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -175,3 +177,20 @@ internal fun ScreenWorkArea.toPxRect(): HudPxRect {
 /** Altura do balão do modo flutuante: a janela reserva a maior entre a da engrenagem e a da conta (A11i). */
 internal fun hudFloatingBalloonHeight(appHeight: Dp, accountHeight: Dp): Dp =
     if (appHeight > accountHeight) appHeight else accountHeight
+
+/**
+ * A05: minimizar ou restaurar a conta que o balão mostra fecha o balão. Balão de conta ou detalhe
+ * do buraco da conta `target` some; outra conta, o balão do app e a lista sem conta escolhida ficam.
+ */
+internal fun hudFloatingBalloonAfterMinimize(
+    current: HudFloatingBalloon?,
+    accounts: List<HudAccount>,
+    target: UsageTargetKey
+): HudFloatingBalloon? {
+    val shown: UsageTargetKey? = when (current) {
+        is HudFloatingBalloon.Account -> accounts.getOrNull(current.index)?.targetKey
+        is HudFloatingBalloon.Hole -> current.selection?.let { accounts.getOrNull(it)?.targetKey }
+        else -> null
+    }
+    return if (shown == target) null else current
+}
