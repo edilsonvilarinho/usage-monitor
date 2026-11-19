@@ -26,6 +26,10 @@ private const val UNBOUNDED_PX = 1 shl 20
 internal data class HudFloatingWindowGeometry(
     val size: DpSize,
     val position: DpOffset,
+    /** Origem, em dp de janela, da janela com o buraco no centro: é o que o arrasto move e grava (#625). */
+    val virtualPosition: DpOffset,
+    /** Centro do buraco dentro da janela real, em dp de composição (#625). */
+    val holeCenter: DpOffset,
     val balloonSide: HudEdge,
     val hitRect: DpRect,
     /** Y do buraco na tela, em dp de composição: a coluna desliza em torno dele. */
@@ -54,12 +58,19 @@ internal fun hudFloatingWindowGeometry(
 ): HudFloatingWindowGeometry {
     val unscaled = hudFloatingColumnWindowSize(columnSize, balloonSize, holeDiameter, handleSize, gap)
     val size = DpSize(unscaled.width * scale, unscaled.height * scale)
-    // A âncora é sempre o buraco: no modo coluna ele fica fixo no centro da janela, expandido ou não.
-    val position = hudFloatingWindowPosition(center, notchCenter, size, area, holeDiameter * scale)
-    val windowCenterXPx = (position.x.value + size.width.value / 2f).roundToInt()
-    val balloonSide = hudFloatingBalloonSide(windowCenterXPx, area.toPxRect())
+    // A âncora é sempre o buraco. A janela fica presa na área útil e o buraco anda dentro dela perto da borda (#625).
+    val placement = hudFloatingWindowPlacement(center, notchCenter, size, area, holeDiameter * scale)
+    val position = DpOffset(placement.window.xPx.dp, placement.window.yPx.dp)
+    val holeInWindow = DpOffset(placement.holeCenterXPx.dp, placement.holeCenterYPx.dp)
+    val holeCenter = DpOffset(holeInWindow.x / scale, holeInWindow.y / scale)
+    val virtualPosition = DpOffset(
+        x = position.x + holeInWindow.x - size.width / 2f,
+        y = position.y + holeInWindow.y - size.height / 2f
+    )
+    val holeScreenX = placement.window.xPx + placement.holeCenterXPx
+    val balloonSide = hudFloatingBalloonSide(holeScreenX, area.toPxRect())
     // Buraco e área em dp de composição: é a unidade em que a coluna e o recorte são calculados.
-    val holeScreenY = (position.y + size.height / 2f) / scale
+    val holeScreenY = (position.y + holeInWindow.y) / scale
     val composedArea = area.inCompositionDp(scale)
     val parts = hudFloatingColumnParts(
         windowSize = unscaled,
@@ -72,11 +83,14 @@ internal fun hudFloatingWindowGeometry(
         balloonSide = balloonSide,
         balloonSize = balloonSize,
         handleSize = handleSize,
-        gap = gap
+        gap = gap,
+        holeCenter = holeCenter
     )
     return HudFloatingWindowGeometry(
         size = size,
         position = position,
+        virtualPosition = virtualPosition,
+        holeCenter = holeCenter,
         balloonSide = balloonSide,
         hitRect = parts.hitRect,
         holeScreenY = holeScreenY,
@@ -85,24 +99,21 @@ internal fun hudFloatingWindowGeometry(
     )
 }
 
-/** Canto superior esquerdo da janela solta, em dp de janela. */
-internal fun hudFloatingWindowPosition(
+/** Posicionamento da janela solta em px: origem real presa na área e centro do buraco dentro dela (#625). */
+internal fun hudFloatingWindowPlacement(
     center: HudFloatCenter?,
     notchCenter: HudFloatCenter,
     windowSize: DpSize,
     area: ScreenWorkArea,
     anchorDiameter: Dp
-): DpOffset {
-    val rect = hudFloatingBounds(
-        center = center,
-        notchCenter = notchCenter,
-        windowWidthPx = windowSize.width.value.roundToInt(),
-        windowHeightPx = windowSize.height.value.roundToInt(),
-        workArea = area.toPxRect(),
-        anchorRadiusPx = ceil(anchorDiameter.value / 2f).toInt()
-    )
-    return DpOffset(rect.xPx.dp, rect.yPx.dp)
-}
+): HudFloatingPlacementPx = hudFloatingBounds(
+    center = center,
+    notchCenter = notchCenter,
+    windowWidthPx = windowSize.width.value.roundToInt(),
+    windowHeightPx = windowSize.height.value.roundToInt(),
+    workArea = area.toPxRect(),
+    anchorRadiusPx = ceil(anchorDiameter.value / 2f).toInt()
+)
 
 /**
  * Centro da janela solta a partir do canto superior esquerdo. `floor` e não `roundToInt`:
@@ -114,6 +125,17 @@ internal fun hudFloatCenterOf(position: DpOffset, windowSize: DpSize): HudFloatC
         xPx = floor(position.x.value + windowSize.width.value / 2f).toInt(),
         yPx = floor(position.y.value + windowSize.height.value / 2f).toInt()
     )
+
+/**
+ * Centro da janela flutuante enquanto há arrasto: o do ponteiro quando [dragPosition] existe, senão o
+ * centro salvo. Com arrasto, a geometria segue o ponteiro, não o centro gravado (#625, A04a).
+ */
+internal fun hudFloatingLiveCenter(
+    floatCenter: HudFloatCenter?,
+    dragPosition: DpOffset?,
+    windowSize: DpSize
+): HudFloatCenter? =
+    if (dragPosition != null) hudFloatCenterOf(dragPosition, windowSize) else floatCenter
 
 /** Clicar no balão aberto o fecha; clicar em outro o troca. */
 internal fun hudFloatingBalloonToggle(
