@@ -1,6 +1,7 @@
 package com.usagemonitor
 
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -67,9 +68,10 @@ internal fun hudFloatingColumnWindowSize(
 }
 
 /**
- * Retângulos do modo coluna. Buraco sempre no centro da janela. Coluna ao lado do buraco, no
- * lado de [balloonSide] (LEFT = direita, RIGHT = esquerda), centrada no Y do buraco e deslizada
- * para caber na área de trabalho e na janela. Balão além da coluna, centrado na vertical.
+ * Retângulos do modo coluna. Buraco centrado em [holeCenter] (padrão: centro da janela). Coluna ao
+ * lado do buraco, no lado de [balloonSide] (LEFT = direita, RIGHT = esquerda), centrada no Y do buraco
+ * e deslizada para caber na área de trabalho e na janela. Balão além da coluna, encostado nela (a
+ * [gap]) e centrado no Y do buraco, preso à janela.
  */
 internal fun hudFloatingColumnParts(
     windowSize: DpSize,
@@ -82,17 +84,16 @@ internal fun hudFloatingColumnParts(
     balloonSide: HudEdge,
     balloonSize: DpSize,
     handleSize: Dp,
-    gap: Dp
+    gap: Dp,
+    holeCenter: DpOffset = DpOffset(windowSize.width / 2f, windowSize.height / 2f)
 ): HudFloatingColumnParts {
-    val centerX = windowSize.width / 2f
-    val centerY = windowSize.height / 2f
-    val hole = centeredRect(centerX, centerY, holeDiameter, holeDiameter)
-    val slide = columnSlide(windowSize, columnSize, handleSize, gap, holeCenterYPx, workArea)
+    val hole = centeredRect(holeCenter.x, holeCenter.y, holeDiameter, holeDiameter)
+    val slide = columnSlide(windowSize, columnSize, handleSize, gap, holeCenterYPx, holeCenter.y, workArea)
     val columnTop = slide.top
     val columnLeft = if (balloonSide == HudEdge.LEFT) {
-        centerX + holeDiameter / 2f + gap
+        holeCenter.x + holeDiameter / 2f + gap
     } else {
-        centerX - holeDiameter / 2f - gap - columnSize.width
+        holeCenter.x - holeDiameter / 2f - gap - columnSize.width
     }
     val column = DpRect(columnLeft, columnTop, columnLeft + columnSize.width, columnTop + columnSize.height)
 
@@ -111,7 +112,7 @@ internal fun hudFloatingColumnParts(
     }
 
     val balloon = if (balloonOpen) {
-        balloonRect(windowSize, balloonSide, balloonSize.width, balloonSize.height)
+        balloonRect(windowSize, balloonSide, column, gap, holeCenter.y, balloonSize)
     } else {
         null
     }
@@ -161,16 +162,17 @@ private fun columnSlide(
     handleSize: Dp,
     gap: Dp,
     holeCenterYPx: Int,
+    holeCenterY: Dp,
     workArea: HudPxRect
 ): HudColumnSlide {
     val windowHeight = windowSize.height.value
     val columnHeight = columnSize.height.value
     val gapValue = gap.value
     val stackHeight = handleSize.value * 2 + gapValue
-    val windowTopPx = holeCenterYPx - windowHeight / 2f
+    val windowTopPx = holeCenterYPx - holeCenterY.value
     val areaTop = maxOf(0f, workArea.yPx - windowTopPx)
     val areaBottom = minOf(windowHeight, workArea.yPx + workArea.heightPx - windowTopPx)
-    val ideal = (windowHeight - columnHeight) / 2f
+    val ideal = holeCenterY.value - columnHeight / 2f
     val high = minOf(windowHeight - columnHeight, areaBottom - columnHeight)
     val start = maxOf(0f, minOf(maxOf(ideal, areaTop), high))
 
@@ -223,11 +225,24 @@ private fun centeredRect(centerX: Dp, centerY: Dp, width: Dp, height: Dp): DpRec
         bottom = centerY + height / 2f
     )
 
-/** Balão encostado na borda da janela: [HudEdge.RIGHT] à esquerda, [HudEdge.LEFT] à direita. */
-private fun balloonRect(windowSize: DpSize, balloonSide: HudEdge, balloonWidth: Dp, balloonHeight: Dp): DpRect {
-    val top = ((windowSize.height - balloonHeight) / 2f).coerceAtLeast(0.dp)
-    val left = if (balloonSide == HudEdge.RIGHT) 0.dp else windowSize.width - balloonWidth
-    return DpRect(left, top, left + balloonWidth, top + balloonHeight)
+/**
+ * Balão ao lado da coluna: [HudEdge.RIGHT] deixa a borda direita do balão a [gap] da esquerda da coluna;
+ * [HudEdge.LEFT] põe a borda esquerda a [gap] da direita da coluna. Y centrado em [holeCenterY]. Preso à
+ * janela nos dois eixos, então com a coluna colada na borda o balão encosta na borda, sem sair dela.
+ */
+private fun balloonRect(
+    windowSize: DpSize,
+    balloonSide: HudEdge,
+    column: DpRect,
+    gap: Dp,
+    holeCenterY: Dp,
+    balloonSize: DpSize
+): DpRect {
+    val rawLeft = if (balloonSide == HudEdge.RIGHT) column.left - gap - balloonSize.width else column.right + gap
+    val left = rawLeft.coerceIn(0.dp, (windowSize.width - balloonSize.width).coerceAtLeast(0.dp))
+    val rawTop = holeCenterY - balloonSize.height / 2f
+    val top = rawTop.coerceIn(0.dp, (windowSize.height - balloonSize.height).coerceAtLeast(0.dp))
+    return DpRect(left, top, left + balloonSize.width, top + balloonSize.height)
 }
 
 /** Menor retângulo que contém todos; a lista é sempre não vazia (o buraco está nela). */

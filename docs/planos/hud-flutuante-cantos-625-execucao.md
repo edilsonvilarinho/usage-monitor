@@ -50,6 +50,7 @@ Pacote `--diagnostics` do usuário (`usage-monitor-diagnostics-2026-11-19T170233
 | ID | Estado | Execução |
 |---|---|---|
 | A01 | feito | Plano escrito; sem harness de teste (documento). |
+| A02 | feito | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudFloatingLayoutTest"` → 37 testes, 3 falhas na asserção (`HudFloatingLayoutTest.kt:401` buraco deslocado: `expected DpRect(left=560.0.dp…) but was DpRect(left=336.0.dp…)`; `:417` idem à esquerda; `:436` perto do topo: coluna `expected top=30.0.dp but was top=366.0.dp`). Verde: `--tests "com.usagemonitor.HudFloatingLayoutTest" --tests "com.usagemonitor.ui.HudFloatingHudTest"` → 37 + 23, 0 falhas; testes antigos sem edição. |
 
 ## Problemas em aberto e riscos
 

@@ -1,5 +1,6 @@
 package com.usagemonitor
 
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -385,6 +386,98 @@ class HudFloatingLayoutTest {
         // Área útil termina em 180 dp: anel a 10 dp da base da área.
         val top = hudFloatingBalloonTop(ringCenterY = 170.dp, balloonHeight = 100.dp, windowHeight = 200.dp, areaTop = 0.dp, areaBottom = 180.dp)
         assertEquals(80.dp, top, "base do balão deve encostar na base da área útil")
+    }
+
+    /**
+     * Buraco deslocado à direita (centro x 600 de uma janela de 752): o lado com mais espaço é o esquerdo
+     * (RIGHT). A coluna fica à esquerda do buraco, e o balão tem a borda direita a `gap` da coluna (A02, #625).
+     */
+    @Test
+    fun `hole shifted right keeps the column left of it and the balloon a gap away from the column`() {
+        val parts = layoutAt(holeCenter = DpOffset(600.dp, 396.dp), holeCenterYPx = 540, side = HudEdge.RIGHT, balloonOpen = true)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val balloonRect = assertNotNull(parts.balloon, "balão ausente")
+
+        assertEquals(DpRect(560.dp, 356.dp, 640.dp, 436.dp), parts.hole)
+        assertEquals(DpRect(494.dp, 236.dp, 554.dp, 556.dp), column)
+        assertEquals(column.left - 6.dp, balloonRect.right)
+        assertEquals(DpRect(224.dp, 296.dp, 488.dp, 496.dp), balloonRect)
+    }
+
+    /**
+     * Buraco deslocado à esquerda (centro x 150): o lado com mais espaço é o direito (LEFT). A coluna fica
+     * à direita do buraco, e o balão tem a borda esquerda a `gap` da coluna (A02, #625).
+     */
+    @Test
+    fun `hole shifted left keeps the column right of it and the balloon a gap away from the column`() {
+        val parts = layoutAt(holeCenter = DpOffset(150.dp, 396.dp), holeCenterYPx = 540, side = HudEdge.LEFT, balloonOpen = true)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val balloonRect = assertNotNull(parts.balloon, "balão ausente")
+
+        assertEquals(DpRect(110.dp, 356.dp, 190.dp, 436.dp), parts.hole)
+        assertEquals(DpRect(196.dp, 236.dp, 256.dp, 556.dp), column)
+        assertEquals(column.right + 6.dp, balloonRect.left)
+        assertEquals(DpRect(262.dp, 296.dp, 526.dp, 496.dp), balloonRect)
+    }
+
+    /**
+     * Buraco com centro a 60 dp do topo da janela, janela colada no topo da tela e área útil começando em
+     * y 30 px: a coluna desce até a área (top 30, não -100), e a pilha de alças fica embaixo dela, tudo
+     * dentro da área útil e da janela (A02, #625).
+     */
+    @Test
+    fun `hole near the top of the window with the work area starting at 30 px keeps column and buttons inside`() {
+        val area = HudPxRect(xPx = 0, yPx = 30, widthPx = 1920, heightPx = 1050)
+        val holeCenter = DpOffset(376.dp, 60.dp)
+        val parts = layoutAt(holeCenter = holeCenter, holeCenterYPx = 60, side = HudEdge.LEFT, workArea = area)
+        val column = assertNotNull(parts.column, "coluna ausente")
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertEquals(DpRect(422.dp, 30.dp, 482.dp, 350.dp), column)
+        assertEquals(DpRect(436.dp, 356.dp, 468.dp, 426.dp), buttons)
+        assertInsideAreaAt(column, holeCenter, holeCenterYPx = 60, label = "column", workArea = area)
+        assertInsideAreaAt(buttons, holeCenter, holeCenterYPx = 60, label = "buttons", workArea = area)
+    }
+
+    /** Layout do modo coluna com o centro do buraco pedido (A02, #625); os demais parâmetros são os da janela de referência. */
+    private fun layoutAt(
+        holeCenter: DpOffset,
+        holeCenterYPx: Int,
+        side: HudEdge,
+        balloonOpen: Boolean = false,
+        workArea: HudPxRect = PRIMARY_AREA
+    ): HudFloatingColumnParts =
+        hudFloatingColumnParts(
+            windowSize = COLUMN_WINDOW,
+            expanded = true,
+            columnSize = COLUMN,
+            holeDiameter = 80.dp,
+            holeCenterYPx = holeCenterYPx,
+            workArea = workArea,
+            balloonOpen = balloonOpen,
+            balloonSide = side,
+            balloonSize = balloon,
+            handleSize = handle,
+            gap = gap,
+            holeCenter = holeCenter
+        )
+
+    /** Como [assertInsideArea], com o buraco no centro pedido em vez do centro da janela. */
+    private fun assertInsideAreaAt(
+        rect: DpRect,
+        holeCenter: DpOffset,
+        holeCenterYPx: Int,
+        label: String,
+        workArea: HudPxRect
+    ) {
+        assertInside(rect, COLUMN_WINDOW, label)
+        val windowTopPx = holeCenterYPx - holeCenter.y.value
+        val areaTop = workArea.yPx - windowTopPx
+        val areaBottom = workArea.yPx + workArea.heightPx - windowTopPx
+        assertTrue(
+            rect.top.value >= areaTop && rect.bottom.value <= areaBottom,
+            "$label fora da área útil [$areaTop, $areaBottom]: $rect"
+        )
     }
 
     private fun columnLayout(
