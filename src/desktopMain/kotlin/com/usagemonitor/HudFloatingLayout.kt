@@ -207,6 +207,13 @@ internal fun hudFloatingBalloonTop(
     return ideal.coerceIn(low, high)
 }
 
+/**
+ * Centro Y da engrenagem, em dp de janela: o meio da primeira alça da pilha (A03, #623). A
+ * engrenagem é a alça de cima, então o centro dela é o topo da pilha mais metade da alça. O balão
+ * da engrenagem se centra aqui, não no meio da janela.
+ */
+internal fun hudFloatingGearCenterY(buttons: DpRect, handleSize: Dp): Dp = buttons.top + handleSize / 2f
+
 /** Retângulo de [width] x [height] centrado em ([centerX], [centerY]). */
 private fun centeredRect(centerX: Dp, centerY: Dp, width: Dp, height: Dp): DpRect =
     DpRect(

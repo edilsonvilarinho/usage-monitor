@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.usagemonitor.HUD_BALLOON_WIDTH
@@ -195,6 +196,31 @@ class HudFloatingHudTest {
         onNodeWithTag(HUD_BALLOON_TEST_TAG).assertHeightIsEqualTo(APP_BALLOON_HEIGHT)
     }
 
+    /** A03 (#623): o balão da engrenagem contém o centro dela, com a pilha de alças embaixo da coluna. */
+    @Test
+    fun `balao da engrenagem contem o centro da engrenagem com a pilha embaixo da coluna`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.App)
+        assertTrue(boundsOf(HUD_GEAR_HANDLE_TAG).top >= boundsOf(HUD_FLOATING_COLUMN_TEST_TAG).bottom, "a pilha precisa ficar embaixo da coluna")
+        assertBalloonHoldsGear()
+    }
+
+    /** A03 (#623): com a área útil terminando 20 dp abaixo do centro da janela, a pilha sobe para cima da coluna e o balão segue a engrenagem. */
+    @Test
+    fun `balao da engrenagem contem o centro da engrenagem com a pilha em cima da coluna`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.App, areaBottom = WINDOW.height / 2f + 20.dp)
+        assertTrue(boundsOf(HUD_GEAR_HANDLE_TAG).bottom <= boundsOf(HUD_FLOATING_COLUMN_TEST_TAG).top, "a pilha precisa ficar em cima da coluna")
+        assertBalloonHoldsGear()
+    }
+
+    /** Regressão (#623): o balão de conta continua contendo o centro do anel em foco. */
+    @Test
+    fun `balao de conta continua contendo o centro do anel em foco`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.Account(2))
+        val ring = onAllNodesWithTag(HUD_RING_ITEM_TEST_TAG)[2].fetchSemanticsNode().boundsInRoot
+        val balloon = boundsOf(HUD_BALLOON_TEST_TAG)
+        assertTrue(ring.center.y in balloon.top..balloon.bottom, "centro do anel y=${ring.center.y} fora do balão ${balloon.top}..${balloon.bottom}")
+    }
+
     @Test
     fun `atualizacao pendente entra na descricao da engrenagem`() = hudTest {
         render(expanded = true, update = HudUpdateIndicator(tone = AppTone.INFO, description = UPDATE_PHRASE))
@@ -217,6 +243,26 @@ class HudFloatingHudTest {
         onNodeWithTag(HUD_FLOAT_HANDLE_TAG).performMouseInput { enter(center) }
         waitForIdle()
         assertEquals(1, hovers)
+    }
+
+    /** A04 (#623): a engrenagem abre o balão dela no hover, como no notch; uma chamada por entrada. */
+    @Test
+    fun `hover na engrenagem chama onGearHover uma vez`() = hudTest {
+        var hovers = 0
+        render(expanded = true, onGearHover = { hovers++ })
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(1, hovers)
+    }
+
+    /** A04 (#623): o hover no botão de encaixar não abre o balão da engrenagem. */
+    @Test
+    fun `hover no botao de encaixar nao chama onGearHover`() = hudTest {
+        var gearHovers = 0
+        render(expanded = true, onGearHover = { gearHovers++ })
+        onNodeWithTag(HUD_FLOAT_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(0, gearHovers)
     }
 
     @Test
@@ -278,6 +324,13 @@ class HudFloatingHudTest {
         /** Retângulo, em px de raiz, do nó com a tag. */
         fun ComposeUiTest.boundsOf(tag: String): Rect = onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
 
+        /** Confere que o centro Y da engrenagem cai dentro do balão da engrenagem (A03, #623). */
+        fun ComposeUiTest.assertBalloonHoldsGear() {
+            val balloon = boundsOf(HUD_BALLOON_TEST_TAG)
+            val gearY = boundsOf(HUD_GEAR_HANDLE_TAG).center.y
+            assertTrue(gearY in balloon.top..balloon.bottom, "centro da engrenagem y=$gearY fora do balão ${balloon.top}..${balloon.bottom}")
+        }
+
         /** Ponto no meio do vão horizontal entre o buraco e a coluna, na altura do centro do buraco. */
         fun gapBetween(hole: Rect, column: Rect): Offset {
             val x = if (column.left >= hole.right) (hole.right + column.left) / 2f else (column.right + hole.left) / 2f
@@ -307,11 +360,15 @@ class HudFloatingHudTest {
             onAccountClick: (Int) -> Unit = {},
             onToggleFloating: () -> Unit = {},
             onFloatHover: () -> Unit = {},
+            onGearHover: () -> Unit = {},
             onDragStart: () -> Unit = {},
             onDragEnd: () -> Unit = {},
             onHoverChange: (Boolean) -> Unit = {},
             accountList: List<HudAccount> = accounts,
-            window: DpSize = WINDOW
+            window: DpSize = WINDOW,
+            holeScreenY: Dp = window.height / 2f,
+            areaTop: Dp = 0.dp,
+            areaBottom: Dp = window.height
         ) {
             setContent {
                 // Estado do balão no próprio teste: o hover e o clique do buraco mudam o que a tela mostra, como no host.
@@ -328,14 +385,15 @@ class HudFloatingHudTest {
                         gearDescription = "Configurações",
                         fallbackLabel = FALLBACK_LABEL,
                         fallbackTone = AppTone.OK,
-                        holeScreenY = window.height / 2f,
-                        areaTop = 0.dp,
-                        areaBottom = window.height,
+                        holeScreenY = holeScreenY,
+                        areaTop = areaTop,
+                        areaBottom = areaBottom,
                         onHoverChange = onHoverChange,
                         onAccountClick = onAccountClick,
                         onGearClick = {},
                         onToggleFloating = onToggleFloating,
                         onFloatHover = onFloatHover,
+                        onGearHover = onGearHover,
                         onDragStart = onDragStart,
                         onDrag = {},
                         onDragEnd = onDragEnd,

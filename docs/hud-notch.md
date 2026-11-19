@@ -690,13 +690,13 @@ Pressão longa no anel de uma conta vira arrasto. A ordem que sai do gesto vale 
 
 ## Modo flutuante (#619)
 
-Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-flutuante-619-execucao.md` (linhas A11*). Só existe no Windows (#340).
+Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-flutuante-619-execucao.md` (linhas A11*). Existe no Windows e no Linux (Linux desde #623, a medir no beta; macOS fora). O Windows foi medido (#340); o Linux foi liberado sem medição por decisão do dono.
 
 - **Buraco solto.** Minimizado, o buraco fica onde foi largado, fora de qualquer borda. O disco gira atrás de `AppMotionPolicy`. Não há campo circular.
 - **Soltar e encaixar.** Botão "Soltar da borda" / "Encaixar na borda", por fora da engrenagem.
 - **Expandido.** A coluna de anéis da barra abre ao lado do buraco, no lado com mais espaço, com a íris da barra: 420 ms para abrir, 240 ms para fechar. Se não couber na área útil, a coluna desliza na vertical. As alças (engrenagem e encaixe) ficam abaixo da coluna quando cabem na área útil.
 - **Hover por parte.** Buraco, coluna e alças têm hover próprio (`rememberHudHover`); a coluna só recolhe quando nenhuma parte está sob o ponteiro (`hovered = any`).
-- **Balão.** A altura segue o conteúdo (conta, lista de minimizadas, engrenagem). Fica além da coluna e preso à área útil. Alfinete, mão e botão de soltar fecham o balão aberto.
+- **Balão.** A altura segue o conteúdo (conta, lista de minimizadas, engrenagem). Fica além da coluna e preso à área útil. Alfinete, mão e botão de soltar fecham o balão aberto. O balão da engrenagem abre centrado na engrenagem, com a ponta nela (#623); antes centrava na janela. A engrenagem abre o balão dela no hover e no clique, como no notch (#623); o clique só abre, nunca fecha, porque alternar fecharia o que o hover acabou de abrir.
 - **Janela de tamanho fixo.** Altura de pelo menos 2 × balão, com alças nas duas pontas. Vale também com a coluna curta (todas minimizadas).
 - **Área útil.** O buraco fica preso à área útil e não cobre a barra de tarefas (#621). Na medição no Windows 11 desta issue, o buraco sobre a barra sumia atrás dela ao trocar de janela; a versão que deixava o buraco sobre a barra (`1e6824a0`) foi revertida.
 - **Barra de tarefas.** O botão na barra de tarefas é tratado em #620.
@@ -722,6 +722,7 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
 | Buraco sobre a barra de tarefas some atrás dela ao trocar de janela | medido no Windows 11 (#619) | o buraco fica preso à área útil (#621) | |
 | Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
+| Modo flutuante com alfa (área transparente da janela flutuante) | medido (#619) | liberado sem medição (#623): com alfa o recorte não vale (#426) e a área transparente pode engolir cliques — medir no beta | |
 
 **Parte disso virou medida automática** (`./gradlew probeHudAlpha`, #426). A sonda abre uma janela
 transparente na mesma `GraphicsConfiguration` que o app escolhe, por monitor, e **falha** se ela não

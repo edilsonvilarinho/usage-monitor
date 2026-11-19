@@ -42,6 +42,7 @@ import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.verticalCollapsed
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Composable de conteúdo da janela da HUD (`HudWindowContent`) com o view model vazio e as ações no-op.
@@ -76,14 +77,44 @@ class HudWindowContentTest {
     }
 
     @Test
-    fun `flutuante expandida, engrenagem abre o balao do app e um segundo clique o fecha`() = hudTest {
+    fun `flutuante expandida, engrenagem abre o balao do app e um segundo clique nao o fecha (#623)`() = hudTest {
         render(floating = true, expanded = true)
         onNodeWithTag(HUD_GEAR_HANDLE_TAG).performClick()
         waitForIdle()
         onAllNodesWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertCountEquals(1)
         onNodeWithTag(HUD_GEAR_HANDLE_TAG).performClick()
         waitForIdle()
-        onAllNodesWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertCountEquals(0)
+        onAllNodesWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertCountEquals(1)
+    }
+
+    @Test
+    fun `flutuante expandida, clique na engrenagem sem balao pede o balao do app`() = hudTest {
+        val toggles = mutableListOf<HudFloatingBalloon>()
+        render(floating = true, expanded = true, toggles = toggles)
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performClick()
+        waitForIdle()
+        assertEquals(listOf<HudFloatingBalloon>(HudFloatingBalloon.App), toggles)
+    }
+
+    @Test
+    fun `flutuante expandida, clique na engrenagem com o balao do app aberto nao pede o toggle`() = hudTest {
+        val toggles = mutableListOf<HudFloatingBalloon>()
+        render(floating = true, expanded = true, toggles = toggles)
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performClick()
+        waitForIdle()
+        toggles.clear()
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performClick()
+        waitForIdle()
+        assertEquals(emptyList<HudFloatingBalloon>(), toggles, "o clique nao fecha o balao que o hover abriu (#623)")
+    }
+
+    @Test
+    fun `flutuante expandida, hover na engrenagem sem balao pede o balao do app`() = hudTest {
+        val toggles = mutableListOf<HudFloatingBalloon>()
+        render(floating = true, expanded = true, toggles = toggles)
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(listOf<HudFloatingBalloon>(HudFloatingBalloon.App), toggles)
     }
 
     private companion object {
@@ -120,7 +151,11 @@ class HudWindowContentTest {
             runDesktopComposeUiTest(width = WINDOW.width.value.toInt(), height = WINDOW.height.value.toInt(), block = block)
 
         /** Monta o conteúdo com estado de balão no próprio teste; o `onFloatingBalloonToggle` é o do host. */
-        fun ComposeUiTest.render(floating: Boolean, expanded: Boolean) {
+        fun ComposeUiTest.render(
+            floating: Boolean,
+            expanded: Boolean,
+            toggles: MutableList<HudFloatingBalloon> = mutableListOf()
+        ) {
             val viewModel = emptyDashboardViewModel(MutableStateFlow(emptySet()))
             val sizes = hudNotchSizes(accounts, HudEdge.RIGHT, FALLBACK_LABEL, hasUpdateIndicator = false)
             val actions = AppShellActions(
@@ -169,7 +204,10 @@ class HudWindowContentTest {
                         toggleMinimize = {},
                         floatingParams = HudOrbitParams(),
                         floatingBalloon = balloon,
-                        onFloatingBalloonToggle = { requested -> balloon = hudFloatingBalloonToggle(balloon, requested) },
+                        onFloatingBalloonToggle = { requested ->
+                            toggles += requested
+                            balloon = hudFloatingBalloonToggle(balloon, requested)
+                        },
                         floatingSide = HudEdge.RIGHT,
                         floatingHoleScreenY = WINDOW.height / 2f,
                         floatingAreaTop = 0.dp,

@@ -202,6 +202,44 @@ class HudFloatingLayoutTest {
         assertEquals(DpRect(284.dp, 396.dp, 316.dp, 466.dp), parts.buttons)
     }
 
+    /** A03 (#623): com a pilha embaixo da coluna, o centro da engrenagem é o meio da alça de cima (562 + 16). */
+    @Test
+    fun `gear center is the middle of the first handle when the stack sits below the column`() {
+        val parts = columnLayout(holeCenterYPx = 540, side = HudEdge.LEFT)
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertEquals(578.dp, hudFloatingGearCenterY(buttons, handle))
+    }
+
+    /** A03 (#623): com a pilha em cima da coluna, o centro da engrenagem é o meio da alça de cima (396 + 16). */
+    @Test
+    fun `gear center is the middle of the first handle when the stack sits above the column`() {
+        val parts = columnLayout(holeCenterYPx = -100, side = HudEdge.RIGHT)
+        val buttons = assertNotNull(parts.buttons, "alças ausentes")
+
+        assertEquals(412.dp, hudFloatingGearCenterY(buttons, handle))
+    }
+
+    /** A03 (#623): o balão da engrenagem contém o centro dela, com a pilha embaixo da coluna. */
+    @Test
+    fun `balloon top keeps the gear center inside the balloon when the stack sits below the column`() {
+        val parts = columnLayout(holeCenterYPx = 540, side = HudEdge.LEFT)
+        val gearY = hudFloatingGearCenterY(assertNotNull(parts.buttons, "alças ausentes"), handle)
+        val top = hudFloatingBalloonTop(gearY, balloon.height, COLUMN_WINDOW.height, 0.dp, COLUMN_WINDOW.height)
+
+        assertTrue(gearY >= top && gearY <= top + balloon.height, "centro da engrenagem $gearY fora do balão $top..${top + balloon.height}")
+    }
+
+    /** A03 (#623): o balão da engrenagem contém o centro dela, com a pilha em cima da coluna. */
+    @Test
+    fun `balloon top keeps the gear center inside the balloon when the stack sits above the column`() {
+        val parts = columnLayout(holeCenterYPx = -100, side = HudEdge.RIGHT)
+        val gearY = hudFloatingGearCenterY(assertNotNull(parts.buttons, "alças ausentes"), handle)
+        val top = hudFloatingBalloonTop(gearY, balloon.height, COLUMN_WINDOW.height, 0.dp, COLUMN_WINDOW.height)
+
+        assertTrue(gearY >= top && gearY <= top + balloon.height, "centro da engrenagem $gearY fora do balão $top..${top + balloon.height}")
+    }
+
     /**
      * Buraco a 20 px da base da área (y 1060): a coluna desce até a base e a pilha de alças fica
      * acima dela, tudo dentro da área útil (A11h). Embaixo, a engrenagem sairia pela barra de tarefas.

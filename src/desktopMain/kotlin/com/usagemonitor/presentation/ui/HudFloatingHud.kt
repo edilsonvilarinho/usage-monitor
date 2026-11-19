@@ -41,6 +41,7 @@ import com.usagemonitor.hudColumnArrangement
 import com.usagemonitor.hudFloatingBalloonHeight
 import com.usagemonitor.hudFloatingBalloonTop
 import com.usagemonitor.hudFloatingColumnParts
+import com.usagemonitor.hudFloatingGearCenterY
 import com.usagemonitor.presentation.ui.components.AppTone
 import com.usagemonitor.verticalCollapsed
 import kotlin.math.roundToInt
@@ -87,6 +88,7 @@ internal fun HudFloatingHud(
     onGearClick: () -> Unit,
     onToggleFloating: () -> Unit,
     onFloatHover: () -> Unit = {},
+    onGearHover: () -> Unit = {},
     onDragStart: () -> Unit,
     onDrag: () -> Unit,
     onDragEnd: () -> Unit,
@@ -162,17 +164,22 @@ internal fun HudFloatingHud(
             onGearClick = onGearClick,
             onToggleFloating = onToggleFloating,
             onFloatHover = onFloatHover,
+            onGearHover = onGearHover,
             hover = hover.handles
         )
         val balloonRect = parts.balloon
         if (balloonRect != null && balloon != null) {
-            // Balão alinhado ao anel em foco (ou à sentinela do buraco, na lista); o da engrenagem fica centralizado.
-            val ringCenterY = focusedRingCenterY(
-                focusedRingIndex(balloon, accounts.size),
-                hitBoxes,
-                parts.columnSlot,
-                density
-            ) ?: (maxHeight / 2f)
+            // Balão alinhado ao anel em foco (ou à sentinela do buraco, na lista); o da engrenagem se alinha ao centro da engrenagem (#623).
+            val ringCenterY = if (balloon == HudFloatingBalloon.App) {
+                hudFloatingGearCenterY(parts.buttonsSlot, HUD_HANDLE_SIZE)
+            } else {
+                focusedRingCenterY(
+                    focusedRingIndex(balloon, accounts.size),
+                    hitBoxes,
+                    parts.columnSlot,
+                    density
+                ) ?: (maxHeight / 2f)
+            }
             val bodyHeight = hudFloatingBodyHeight(balloon, accounts, appBalloonHeight, tallestBalloonHeight)
             // A janela tem o buraco no centro: o topo dela na tela é o Y do buraco menos metade da altura (A11k).
             val windowTopOnScreen = holeScreenY - maxHeight / 2f
@@ -279,9 +286,16 @@ private fun HudFloatingButtons(
     onGearClick: () -> Unit,
     onToggleFloating: () -> Unit,
     onFloatHover: () -> Unit,
+    onGearHover: () -> Unit,
     hover: MutableInteractionSource
 ) {
     val gearInteraction = remember { MutableInteractionSource() }
+    val gearHovered by gearInteraction.collectIsHoveredAsState()
+    val currentOnGearHover by rememberUpdatedState(onGearHover)
+    // A engrenagem abre o balão dela no hover, como no notch (#623). Só expandida: recolhida, a alça não compõe.
+    LaunchedEffect(gearHovered) {
+        if (gearHovered && expanded) currentOnGearHover()
+    }
     val floatInteraction = remember { MutableInteractionSource() }
     val floatHovered by floatInteraction.collectIsHoveredAsState()
     val currentOnFloatHover by rememberUpdatedState(onFloatHover)
