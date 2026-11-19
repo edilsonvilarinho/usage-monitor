@@ -55,6 +55,7 @@ import com.usagemonitor.presentation.ui.HudFloatingHud
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.HudUpdateIndicator
 import com.usagemonitor.presentation.ui.components.AppTone
+import com.usagemonitor.presentation.ui.hudBlackHoleBackLabel
 import com.usagemonitor.presentation.ui.hudBlackHoleCountLabel
 import com.usagemonitor.verticalCollapsed
 import kotlin.math.roundToInt
@@ -140,6 +141,39 @@ class HudFloatingHudTest {
             waitForIdle()
         }
         assertEquals(minimized.map { it.targetKey }.sortedBy { it.toString() }, refreshed.sortedBy { it.toString() })
+    }
+
+    /** A07 (#631): clique numa linha da lista do buraco abre o detalhe da conta e a recoleta. */
+    @Test
+    fun `clique numa linha da lista do buraco chama onRefreshAccount com a chave da conta da linha`() = hudTestWith(MINIMIZED_WINDOW) {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        render(
+            expanded = true,
+            balloon = HudFloatingBalloon.Hole(null),
+            accountList = MINIMIZED_ACCOUNTS,
+            window = MINIMIZED_WINDOW,
+            onRefreshAccount = { refreshed += it },
+        )
+        onNodeWithText("Conta Zeta").performClick()
+        waitForIdle()
+        assertEquals(listOf(MINIMIZED_ACCOUNTS[5].targetKey), refreshed)
+    }
+
+    /** A07 (#631): a volta "← N no buraco" fecha o detalhe e não recoleta a conta. */
+    @Test
+    fun `voltar do detalhe do buraco nao chama onRefreshAccount`() = hudTestWith(MINIMIZED_WINDOW) {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        render(
+            expanded = true,
+            balloon = HudFloatingBalloon.Hole(4),
+            accountList = MINIMIZED_ACCOUNTS,
+            window = MINIMIZED_WINDOW,
+            onRefreshAccount = { refreshed += it },
+        )
+        onNodeWithText(hudBlackHoleBackLabel(3, AppLanguage.EN)).performClick()
+        waitForIdle()
+        onAllNodesWithText(hudBlackHoleCountLabel(3, AppLanguage.EN)).assertCountEquals(1)
+        assertEquals(emptyList(), refreshed)
     }
 
     /** A11g: hover no buraco da coluna abre a lista das contas minimizadas, com a contagem no topo. */

@@ -59,6 +59,8 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
 | A06 | vermelho (anel): `gradlew.bat desktopTest --tests "*HudFloatingHudTest*" …` | `HudFloatingHudTest.kt:122` "expected:<[UsageTargetKey(source=ANTHROPIC, profileId=perfil-2)]> but was:<[]>" |
 | A06 | vermelho (glifo, sonda com `onHoleGlyphRefresh = {}` em `HudFloatingColumn`): `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudFloatingHudTest"` | 27 testes, 1 falha: `HudFloatingHudTest.kt:142` "expected:<[perfil-4, perfil-5, perfil-6]> but was:<[]>" |
 | A06 | verde: `gradlew.bat desktopTest --tests "*HudFloatingHudTest*" --tests "*HudFloatingColumnTest*" --tests "*HudWindowContentTest*" --tests "*ArchitectureRulesTest*"` | BUILD SUCCESSFUL, 0 falhas; clique no anel não chama `onDragStart` |
+| A07 | vermelho: `gradlew.bat desktopTest --tests "*HudFloatingHudTest*" --tests "*ArchitectureRulesTest*"` | `HudFloatingHudTest.kt:159` "expected:<[UsageTargetKey(source=ANTHROPIC, profileId=perfil-5)]> but was:<[]>"; 1ª tentativa (view model real em `HudWindowContentTest`) descartada: a coleta inicial contaminava o vermelho |
+| A07 | verde: mesmo comando | BUILD SUCCESSFUL: 29 + 28 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 

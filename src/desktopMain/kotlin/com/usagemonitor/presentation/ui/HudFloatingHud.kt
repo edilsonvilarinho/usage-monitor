@@ -218,7 +218,10 @@ internal fun HudFloatingHud(
                         bodyHeight = bodyHeight,
                         accountBalloon = accountBalloon,
                         appBalloon = appBalloon,
-                        onHoleSelect = onHoleSelect,
+                        onHoleSelect = { index ->
+                            onHoleSelect(index)
+                            accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) }
+                        },
                         onHoleBack = onHoleBack
                     )
                 }

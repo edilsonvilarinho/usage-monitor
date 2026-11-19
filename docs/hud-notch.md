@@ -709,6 +709,7 @@ Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-fl
   lista (ou Enter) recoleta a conta dela (#631, A04); a volta "← N no buraco" não recoleta. Hover no buraco
   abre a lista (#612). Arrastar o buraco solto não o encaixa em borda.
 - **Minimizar pelo balão (A05, #631).** Minimizar ou restaurar a conta que o balão mostra (balão de conta ou detalhe do buraco) fecha o balão inteiro (`hudFloatingBalloonAfterMinimize`). Outra conta, o balão do app e a lista sem conta escolhida não mudam.
+- **Lista do buraco (A07, #631).** Clique numa linha da lista abre o detalhe da conta e recoleta a conta dela (`onHoleSelect` em `HudFloatingHud` chama `onRefreshAccount`); a volta "← N no buraco" (`onHoleBack`) não recoleta.
 
 ## Aquecimento da GPU (#627, revertido na #629)
 
