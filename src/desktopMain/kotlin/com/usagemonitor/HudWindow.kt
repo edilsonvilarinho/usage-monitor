@@ -15,6 +15,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -249,12 +250,10 @@ internal fun HudWindowHost(
     val columnSize = verticalCollapsed(accounts, fallbackLabel, compact = false)
     val appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = updateIndicator != null, hasUpdateAction = updateAction != null)
     // Geometria pura do modo flutuante (#619): tamanho, posição, lado do balão e recorte, em dp de composição.
+    val floatingSize = hudFloatingSizeOf(columnSize, appBalloonHeight, sizes.balloon.height, floatingParams.holeD.dp, scale)
     val floatingGeometry = hudFloatingWindowGeometry(
-        center = floatCenter,
-        notchCenter = HudFloatCenter(
-            xPx = ((bounds.x + bounds.notchCenterInWindow) * scale).value.roundToInt(),
-            yPx = ((bounds.y + bounds.size.height / 2f) * scale).value.roundToInt()
-        ),
+        center = hudFloatingLiveCenter(floatCenter, if (floating) drag.windowPosition else null, floatingSize),
+        notchCenter = hudNotchCenterPx(bounds, scale),
         area = screen.area,
         scale = scale,
         columnSize = columnSize,
@@ -273,7 +272,8 @@ internal fun HudWindowHost(
     val windowSize = if (floating) floatingGeometry.size else DpSize(bounds.size.width * scale, bounds.size.height * scale)
     val docked = if (floating) WindowPosition(floatingGeometry.position.x, floatingGeometry.position.y) else WindowPosition(bounds.x * scale, bounds.y * scale)
     // Um salto, nunca interpolação AWT: o movimento é do conteúdo (ver `rememberHudDockedWindowState`).
-    val windowState = rememberHudDockedWindowState(windowSize, docked, drag.windowPosition)
+    val freePosition = if (floating) null else drag.windowPosition
+    val windowState = rememberHudDockedWindowState(windowSize, docked, freePosition)
 
     // A janela de arrasto, que é o que se move (issue #288). O gesto guarda os
     // lambdas da composição em que começou, com o notch **aberto**: com
@@ -288,11 +288,11 @@ internal fun HudWindowHost(
     val dragBegin = {
         expanded = false
         windowOpen = false
-        drag.begin(if (floating) floatingGeometry.position else DpOffset(dragStart.x * scale, dragStart.y * scale))
+        drag.begin(if (floating) floatingGeometry.virtualPosition else DpOffset(dragStart.x * scale, dragStart.y * scale))
     }
     val dragTo = {
         val anchor = if (floating) hudFloatingHoleAnchor(windowSize, floatingParams.holeD.dp * scale) else null
-        drag.moveTo(dragSize, pointerScreen()?.bounds ?: screen.area, anchor)
+        drag.moveTo(dragSize, (if (floating) pointerScreen()?.workArea else pointerScreen()?.bounds) ?: screen.area, anchor)
     }
     val dragFinish = {
         val position = drag.finish()
@@ -328,7 +328,7 @@ internal fun HudWindowHost(
         // A posição desta composição: no arrasto, onde o gesto está; fora dele,
         // a encaixada. O `windowState` só recebe isto no efeito abaixo, tarde
         // demais para a janela que renasce (#426).
-        position = drag.windowPosition?.let { free -> WindowPosition(free.x, free.y) } ?: docked,
+        position = freePosition?.let { free -> WindowPosition(free.x, free.y) } ?: docked,
         icon = iconImage,
         iconImage = windowIconImage,
         onCloseRequest = onCloseRequest,
@@ -382,6 +382,7 @@ internal fun HudWindowHost(
                 floatingBalloon = floatingBalloon,
                 onFloatingBalloonToggle = { requested -> floatingBalloon = hudFloatingBalloonToggle(floatingBalloon, requested) },
                 floatingSide = floatingGeometry.balloonSide,
+                floatingHoleCenter = floatingGeometry.holeCenter,
                 floatingHoleScreenY = floatingGeometry.holeScreenY, floatingAreaTop = floatingGeometry.areaTop, floatingAreaBottom = floatingGeometry.areaBottom,
                 appBalloonHeight = appBalloonHeight,
                 autoRetract = retract.enabled,
@@ -529,6 +530,25 @@ private const val HUD_COLLAPSE_SETTLE_MILLIS = AppGargantuaTokens.jetCloseMillis
 /** O monitor sob o ponteiro; `null` se o AWT não souber dizer. */
 private fun pointerScreen(): ScreenInfo? =
     runCatching { MouseInfo.getPointerInfo()?.device?.toScreenInfo() }.getOrNull()
+
+/** Tamanho da janela flutuante em dp de janela, sem o centro: o arrasto precisa dele antes da geometria (#625). */
+private fun hudFloatingSizeOf(
+    columnSize: DpSize,
+    appBalloonHeight: Dp,
+    accountHeight: Dp,
+    holeDiameter: Dp,
+    scale: Float
+): DpSize {
+    val balloonSize = DpSize(HUD_BALLOON_WIDTH, hudFloatingBalloonHeight(appBalloonHeight, accountHeight))
+    val unscaled = hudFloatingColumnWindowSize(columnSize, balloonSize, holeDiameter, HUD_HANDLE_SIZE, HUD_HANDLE_GAP)
+    return DpSize(unscaled.width * scale, unscaled.height * scale)
+}
+
+/** Centro do notch em px lógicos: onde a HUD solta nasce quando ainda não há centro gravado (#619). */
+private fun hudNotchCenterPx(bounds: HudWindowBounds, scale: Float): HudFloatCenter = HudFloatCenter(
+    xPx = ((bounds.x + bounds.notchCenterInWindow) * scale).value.roundToInt(),
+    yPx = ((bounds.y + bounds.size.height / 2f) * scale).value.roundToInt()
+)
 
 internal fun applyHudWindowOpacity(window: java.awt.Window, percent: Int, platform: AutoStartManager.Platform) {
     applyWindowOpacity(window, hudWindowOpacityPercent(percent, platform))

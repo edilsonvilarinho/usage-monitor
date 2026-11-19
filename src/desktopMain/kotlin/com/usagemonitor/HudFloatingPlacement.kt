@@ -9,12 +9,21 @@ package com.usagemonitor
 internal data class HudPxRect(val xPx: Int, val yPx: Int, val widthPx: Int, val heightPx: Int)
 
 /**
- * Canto superior esquerdo da janela solta. Com [center] salvo, a janela fica centrada nele.
- * Sem [center] (nunca foi posta solta), nasce centrada em [notchCenter], o notch atual.
- *
- * O resultado é prendido dentro de [workArea] e **não encaixa numa borda por conta própria**:
- * uma janela a 20 px da borda fica a 20 px. Janela maior que a área fica no canto superior
- * esquerdo da área.
+ * Posição da janela solta em px de tela. [window] é a origem real (já presa dentro da área útil);
+ * [holeCenterXPx]/[holeCenterYPx] são o centro do buraco **dentro da janela**, em px relativos à
+ * origem real: `âncora na tela − origem real`.
+ */
+internal data class HudFloatingPlacementPx(
+    val window: HudPxRect,
+    val holeCenterXPx: Int,
+    val holeCenterYPx: Int
+)
+
+/**
+ * Posição da janela solta (#625). A âncora (buraco ou campo, pelo raio) é presa na área útil. A
+ * origem da janela é a âncora menos metade do tamanho, presa em `[área.origem, área.origem + área.tamanho − janela]`:
+ * com a janela perto da borda ela fica deslocada do centro pedido e o buraco anda dentro dela.
+ * Janela maior que o eixo da área: a origem vai à origem da área.
  */
 internal fun hudFloatingBounds(
     center: HudFloatCenter?,
@@ -23,16 +32,16 @@ internal fun hudFloatingBounds(
     windowHeightPx: Int,
     workArea: HudPxRect,
     anchorRadiusPx: Int
-): HudPxRect {
+): HudFloatingPlacementPx {
     val effectiveCenter = center ?: notchCenter
     val anchorX = clampAnchor(effectiveCenter.xPx, workArea.xPx, workArea.widthPx, anchorRadiusPx)
     val anchorY = clampAnchor(effectiveCenter.yPx, workArea.yPx, workArea.heightPx, anchorRadiusPx)
-
-    return HudPxRect(
-        xPx = anchorX - windowWidthPx / 2,
-        yPx = anchorY - windowHeightPx / 2,
-        widthPx = windowWidthPx,
-        heightPx = windowHeightPx
+    val originX = clampWindowOrigin(anchorX - windowWidthPx / 2, workArea.xPx, workArea.widthPx, windowWidthPx)
+    val originY = clampWindowOrigin(anchorY - windowHeightPx / 2, workArea.yPx, workArea.heightPx, windowHeightPx)
+    return HudFloatingPlacementPx(
+        window = HudPxRect(originX, originY, windowWidthPx, windowHeightPx),
+        holeCenterXPx = anchorX - originX,
+        holeCenterYPx = anchorY - originY
     )
 }
 
@@ -47,6 +56,19 @@ private fun clampAnchor(center: Int, origin: Int, areaLength: Int, radius: Int):
         return lowest
     }
     return center.coerceIn(lowest, highest)
+}
+
+/**
+ * Prende a origem da janela em um eixo para que ela caiba entre a origem da área e a borda final
+ * dela. Janela maior que o eixo: sem intervalo válido, a origem vai à origem da área.
+ */
+private fun clampWindowOrigin(ideal: Int, origin: Int, areaLength: Int, windowLength: Int): Int {
+    val lowest = origin
+    val highest = origin + areaLength - windowLength
+    if (highest < lowest) {
+        return lowest
+    }
+    return ideal.coerceIn(lowest, highest)
 }
 
 /**

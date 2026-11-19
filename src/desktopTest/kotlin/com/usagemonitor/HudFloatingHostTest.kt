@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.dp
 import com.usagemonitor.presentation.ui.HudFloatingBalloon
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class HudFloatingHostTest {
 
@@ -17,47 +18,53 @@ class HudFloatingHostTest {
     /** Buraco de diâmetro 60: a âncora do minimizado tem raio 30. */
     private val holeDiameter = 60.dp
 
+    /** Origem real da janela em dp, a partir do posicionamento em px. */
+    private fun originOf(placement: HudFloatingPlacementPx): DpOffset =
+        DpOffset(placement.window.xPx.dp, placement.window.yPx.dp)
+
     @Test
     fun `sem centro salvo nasce centrado no notch atual`() {
-        val position = hudFloatingWindowPosition(null, notch, windowSize, area, anchorDiameter = 0.dp)
+        val position = originOf(hudFloatingWindowPlacement(null, notch, windowSize, area, anchorDiameter = 0.dp))
         assertEquals(DpOffset(400.dp, 10.dp), position)
     }
 
     @Test
     fun `com centro salvo fica centrado nele, nao no notch`() {
-        val position = hudFloatingWindowPosition(HudFloatCenter(300, 200), notch, windowSize, area, 0.dp)
+        val position = originOf(hudFloatingWindowPlacement(HudFloatCenter(300, 200), notch, windowSize, area, 0.dp))
         assertEquals(DpOffset(200.dp, 170.dp), position)
     }
 
-    /** Centro (0,0) vai a (30,30): o buraco fica de (0,0) a (60,60), encostado nas duas bordas. */
+    /** Centro (0,0) vai a (30,30): a janela encosta na origem da área e o buraco fica em (30,30) dela. */
     @Test
     fun `buraco no canto superior esquerdo encosta nas duas bordas`() {
-        val position = hudFloatingWindowPosition(HudFloatCenter(0, 0), notch, windowSize, area, holeDiameter)
-        assertEquals(DpOffset(-70.dp, 0.dp), position)
+        val position = originOf(hudFloatingWindowPlacement(HudFloatCenter(0, 0), notch, windowSize, area, holeDiameter))
+        assertEquals(DpOffset(0.dp, 0.dp), position)
     }
 
-    /** Centro (1000,800) vai a (970,770): o buraco fica de (940,740) a (1000,800). */
+    /** Centro (1000,800) vai a (970,770): a janela encosta na borda final da área, o buraco fica em (170,30) dela. */
     @Test
     fun `buraco no canto inferior direito encosta nas duas bordas`() {
-        val position = hudFloatingWindowPosition(HudFloatCenter(1000, 800), notch, windowSize, area, holeDiameter)
-        assertEquals(DpOffset(870.dp, 740.dp), position)
+        val position = originOf(hudFloatingWindowPlacement(HudFloatCenter(1000, 800), notch, windowSize, area, holeDiameter))
+        assertEquals(DpOffset(800.dp, 740.dp), position)
     }
 
     @Test
-    fun `area com origem deslocada prende o buraco a partir da origem dela`() {
+    fun `area com origem deslocada prende a janela a partir da origem dela`() {
         val offsetArea = ScreenWorkArea(100.dp, 50.dp, DpSize(1000.dp, 800.dp))
-        val position = hudFloatingWindowPosition(HudFloatCenter(110, 60), notch, windowSize, offsetArea, holeDiameter)
-        assertEquals(DpOffset(30.dp, 50.dp), position)
+        val position = originOf(hudFloatingWindowPlacement(HudFloatCenter(110, 60), notch, windowSize, offsetArea, holeDiameter))
+        assertEquals(DpOffset(100.dp, 50.dp), position)
     }
 
     @Test
     fun `area desconhecida nao prende a janela`() {
-        val position = hudFloatingWindowPosition(
-            center = HudFloatCenter(100, 100),
-            notchCenter = notch,
-            windowSize = DpSize(200.dp, 100.dp),
-            area = ScreenWorkArea.Unknown,
-            anchorDiameter = holeDiameter
+        val position = originOf(
+            hudFloatingWindowPlacement(
+                center = HudFloatCenter(100, 100),
+                notchCenter = notch,
+                windowSize = DpSize(200.dp, 100.dp),
+                area = ScreenWorkArea.Unknown,
+                anchorDiameter = holeDiameter
+            )
         )
         assertEquals(DpOffset(0.dp, 50.dp), position)
     }
@@ -65,14 +72,38 @@ class HudFloatingHostTest {
     @Test
     fun `centro de janela de largura impar faz a ida e volta exata`() {
         val oddSize = DpSize(201.dp, 60.dp)
-        val position = hudFloatingWindowPosition(HudFloatCenter(500, 300), notch, oddSize, area, 0.dp)
-        assertEquals(HudFloatCenter(500, 300), hudFloatCenterOf(position, oddSize))
+        val origin = originOf(hudFloatingWindowPlacement(HudFloatCenter(500, 300), notch, oddSize, area, 0.dp))
+        assertEquals(HudFloatCenter(500, 300), hudFloatCenterOf(origin, oddSize))
     }
 
     @Test
     fun `hudFloatCenterOf devolve o centro do canto mais metade do tamanho`() {
         val center = hudFloatCenterOf(DpOffset(400.dp, 10.dp), DpSize(200.dp, 60.dp))
         assertEquals(HudFloatCenter(500, 40), center)
+    }
+
+    /** Sem arrasto, vale o centro salvo. */
+    @Test
+    fun `sem arrasto o centro vivo e o salvo`() {
+        assertEquals(HudFloatCenter(300, 200), hudFloatingLiveCenter(HudFloatCenter(300, 200), null, windowSize))
+    }
+
+    @Test
+    fun `sem arrasto e sem centro salvo o centro vivo e nulo`() {
+        assertNull(hudFloatingLiveCenter(null, null, windowSize))
+    }
+
+    /** Com arrasto, o centro é o do ponteiro (origem (400,10) com janela 200x60 = (500,40)), não o salvo. */
+    @Test
+    fun `com arrasto o centro vivo segue o ponteiro e nao o salvo`() {
+        val live = hudFloatingLiveCenter(HudFloatCenter(300, 200), DpOffset(400.dp, 10.dp), windowSize)
+        assertEquals(HudFloatCenter(500, 40), live)
+    }
+
+    @Test
+    fun `arrasto vale mesmo sem centro salvo`() {
+        val live = hudFloatingLiveCenter(null, DpOffset(400.dp, 10.dp), windowSize)
+        assertEquals(HudFloatCenter(500, 40), live)
     }
 
     @Test
@@ -183,23 +214,31 @@ class HudFloatingHostTest {
         assertEquals(240.dp, hudFloatingBalloonHeight(appHeight = 240.dp, accountHeight = 60.dp))
     }
 
+    /**
+     * Notch no topo da área: a janela encosta no topo (origem y = 0) e o buraco fica em (396, 40) dela,
+     * então o recorte desce 40 px em relação ao centro da janela.
+     */
     @Test
     fun `minimizado o recorte e so o buraco`() {
-        assertEquals(DpRect(366.dp, 226.dp, 426.dp, 286.dp), geometry().hitRect)
+        assertEquals(DpRect(366.dp, 10.dp, 426.dp, 70.dp), geometry().hitRect)
     }
 
+    /**
+     * Centro (700,400): a janela presa à direita (origem x = 208); o buraco fica em (492, 256) dela.
+     * Balão à esquerda da coluna, em x = 96..396; coluna em 404..454; alças em 364..412.
+     */
     @Test
     fun `expandido com balao a esquerda o recorte cobre balao coluna e botoes`() {
         val expanded = geometry(center = HudFloatCenter(700, 400), expanded = true, balloonOpen = true)
         assertEquals(HudEdge.RIGHT, expanded.balloonSide)
-        assertEquals(DpRect(0.dp, 156.dp, 426.dp, 412.dp), expanded.hitRect)
+        assertEquals(DpRect(96.dp, 156.dp, 522.dp, 412.dp), expanded.hitRect)
     }
 
-    /** Centro (700,40): o buraco encosta no topo da área; a coluna desliza para baixo e fica colada na borda da área. */
+    /** Centro (700,40): o buraco encosta no topo da área; a coluna desce até o topo da área e a pilha fica embaixo. */
     @Test
     fun `expandido perto do topo desliza a coluna para caber na area`() {
         val expanded = geometry(center = HudFloatCenter(700, 40), expanded = true)
-        assertEquals(DpRect(308.dp, 216.dp, 426.dp, 472.dp), expanded.hitRect)
+        assertEquals(DpRect(404.dp, 0.dp, 522.dp, 256.dp), expanded.hitRect)
     }
 
     @Test
@@ -213,22 +252,22 @@ class HudFloatingHostTest {
         assertEquals(DpOffset(104.dp, 44.dp), geometry(center = HudFloatCenter(500, 300)).position)
     }
 
-    /** Buraco (raio 30) no canto superior esquerdo: centro vai a (30,30); janela em (-366, -170). */
+    /** Buraco (raio 30) no canto superior esquerdo: centro vai a (30,30); a janela encosta na origem (0,0). */
     @Test
-    fun `minimizado com buraco no canto superior esquerdo prende o buraco`() {
-        assertEquals(DpOffset(-366.dp, -226.dp), geometry(center = HudFloatCenter(0, 0)).position)
+    fun `minimizado com buraco no canto superior esquerdo prende a janela na origem`() {
+        assertEquals(DpOffset(0.dp, 0.dp), geometry(center = HudFloatCenter(0, 0)).position)
     }
 
-    /** Buraco no canto inferior direito: centro vai a (970,770); janela em (574, 570). */
+    /** Buraco no canto inferior direito: centro vai a (970,770); a janela encosta em (208, 288). */
     @Test
-    fun `minimizado com buraco no canto inferior direito prende o buraco`() {
-        assertEquals(DpOffset(574.dp, 514.dp), geometry(center = HudFloatCenter(1000, 800)).position)
+    fun `minimizado com buraco no canto inferior direito prende a janela na borda`() {
+        assertEquals(DpOffset(208.dp, 288.dp), geometry(center = HudFloatCenter(1000, 800)).position)
     }
 
     /** A âncora é sempre o buraco: expandir não desloca a janela. */
     @Test
     fun `expandido nao desloca a janela, a ancora e sempre o buraco`() {
-        assertEquals(DpOffset(-366.dp, -226.dp), geometry(center = HudFloatCenter(0, 0), expanded = true).position)
+        assertEquals(DpOffset(0.dp, 0.dp), geometry(center = HudFloatCenter(0, 0), expanded = true).position)
     }
 
     /** Centro gravado (0,0) fixo: expandir e recolher devolve a mesma posição do minimizado. */
@@ -240,15 +279,46 @@ class HudFloatingHostTest {
         val collapsedAfter = geometry(center = saved).position
 
         assertEquals(collapsedBefore, collapsedAfter)
-        assertEquals(DpOffset(-366.dp, -226.dp), collapsedAfter)
+        assertEquals(DpOffset(0.dp, 0.dp), collapsedAfter)
+    }
+
+    /** Buraco no centro pedido dentro da janela: o centro do buraco em dp de composição é (30, 30). */
+    @Test
+    fun `o centro do buraco dentro da janela sai em dp de composicao`() {
+        assertEquals(DpOffset(30.dp, 30.dp), geometry(center = HudFloatCenter(0, 0)).holeCenter)
+    }
+
+    /**
+     * Posição virtual: a origem que põe o buraco como centro da janela virtual. Com a janela presa
+     * (origem (208, 288)), o buraco fica em (762, 482) dela e a virtual sai em (574, 514): o centro
+     * dela na tela é o centro pedido (970, 770).
+     */
+    @Test
+    fun `posicao virtual tem o centro do buraco na tela como centro`() {
+        val clamped = geometry(center = HudFloatCenter(1000, 800))
+        assertEquals(DpOffset(574.dp, 514.dp), clamped.virtualPosition)
+        assertEquals(HudFloatCenter(970, 770), hudFloatCenterOf(clamped.virtualPosition, clamped.size))
+    }
+
+    @Test
+    fun `fora da borda a posicao virtual e a real`() {
+        val inside = geometry(center = HudFloatCenter(500, 300))
+        assertEquals(inside.position, inside.virtualPosition)
     }
 
     @Test
     fun `escala multiplica o tamanho e o recorte fica em dp de composicao`() {
         // O recorte sai sem escala: o `HudWindowEffects` escala o retângulo ao aplicar.
+        // Janela 1584x1024 maior que a área 1000x800: origem em (0,0); buraco (500,60) em px, (250,30) em composição.
         val scaled = geometry(scale = 2f)
         assertEquals(DpSize(1584.dp, 1024.dp), scaled.size)
-        assertEquals(DpRect(366.dp, 226.dp, 426.dp, 286.dp), scaled.hitRect)
+        assertEquals(DpRect(220.dp, 0.dp, 280.dp, 60.dp), scaled.hitRect)
+    }
+
+    /** Escala 2 com centro (250,150): o centro do buraco em dp de composição é (125, 75). */
+    @Test
+    fun `com escala o centro do buraco sai em dp de composicao`() {
+        assertEquals(DpOffset(125.dp, 75.dp), geometry(center = HudFloatCenter(250, 150), scale = 2f).holeCenter)
     }
 
     /** Centro salvo (500,300): o buraco está em y=300 da tela. */
