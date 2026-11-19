@@ -12,30 +12,6 @@ import androidx.compose.ui.unit.dp
  * muda entre minimizado e expandido é só o que aparece dentro dele.
  */
 
-/** Retângulos de cada parte da janela flutuante, em dp relativos à janela. */
-internal data class HudFloatingParts(
-    /** Buraco negro central: sempre visível. */
-    val hole: DpRect,
-    /** Campo das contas; `null` quando minimizado. */
-    val field: DpRect?,
-    /** Coluna de botões à direita do campo; `null` quando minimizado. */
-    val buttons: DpRect?,
-    /** Balão aberto; `null` quando fechado ou minimizado. */
-    val balloon: DpRect?,
-    /** União do que está visível: o recorte da janela. */
-    val hitRect: DpRect
-)
-
-/**
- * Tamanho fixo da janela: largura = balão + vão + campo máximo + vão + coluna + vão + balão
- * (o balão cabe dos dois lados); altura = a maior entre o campo máximo e o balão.
- */
-internal fun hudFloatingWindowSize(maxFieldDiameter: Dp, balloonSize: DpSize, handleSize: Dp, gap: Dp): DpSize {
-    val width = balloonSize.width * 2 + gap * 3 + maxFieldDiameter + handleSize
-    val height = maxOf(maxFieldDiameter, balloonSize.height)
-    return DpSize(width, height)
-}
-
 /**
  * Lado do balão: abre para o lado com mais espaço livre na área de trabalho. Centro na
  * metade direita devolve [HudEdge.RIGHT] (balão à esquerda de quem o abre). Empate exato
@@ -45,48 +21,6 @@ internal fun hudFloatingBalloonSide(windowCenterXPx: Int, workArea: HudPxRect): 
     val freeLeft = windowCenterXPx - workArea.xPx
     val freeRight = workArea.xPx + workArea.widthPx - windowCenterXPx
     return if (freeLeft > freeRight) HudEdge.RIGHT else HudEdge.LEFT
-}
-
-/**
- * Retângulos das partes. Buraco e campo centrados na janela; coluna de botões à direita
- * do campo, centrada na vertical (engrenagem em cima, encaixar embaixo: altura de duas
- * alturas de botão mais o vão); balão encostado na borda indicada por [balloonSide].
- * `hitRect` é a união do que está visível.
- */
-internal fun hudFloatingParts(
-    windowSize: DpSize,
-    expanded: Boolean,
-    fieldDiameter: Dp,
-    holeDiameter: Dp,
-    balloonOpen: Boolean,
-    balloonSide: HudEdge,
-    balloonWidth: Dp,
-    balloonHeight: Dp,
-    handleSize: Dp,
-    gap: Dp
-): HudFloatingParts {
-    val centerX = windowSize.width / 2f
-    val centerY = windowSize.height / 2f
-    val hole = centeredRect(centerX, centerY, holeDiameter, holeDiameter)
-    if (!expanded) {
-        return HudFloatingParts(hole = hole, field = null, buttons = null, balloon = null, hitRect = hole)
-    }
-
-    val field = centeredRect(centerX, centerY, fieldDiameter, fieldDiameter)
-    val columnHeight = handleSize * 2 + gap
-    val buttonsLeft = centerX + fieldDiameter / 2f + gap
-    val buttons = centeredRect(buttonsLeft + handleSize / 2f, centerY, handleSize, columnHeight)
-
-    val balloon = if (balloonOpen) balloonRect(windowSize, balloonSide, balloonWidth, balloonHeight) else null
-
-    val visible = listOfNotNull(hole, field, buttons, balloon)
-    return HudFloatingParts(
-        hole = hole,
-        field = field,
-        buttons = buttons,
-        balloon = balloon,
-        hitRect = unionOf(visible)
-    )
 }
 
 /**
