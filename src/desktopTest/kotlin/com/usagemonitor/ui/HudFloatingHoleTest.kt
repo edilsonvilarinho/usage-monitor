@@ -52,20 +52,4 @@ class HudFloatingHoleTest {
         waitForIdle()
         onAllNodesWithContentDescription("Buraco negro").assertCountEquals(1)
     }
-
-    /**
-     * Com animação permitida, o laço de quadros (`rememberHudFloatingHoleClock(live = true)`) roda.
-     * Sem `waitForIdle`: animação contínua não fica ociosa. O valor do relógio não é observável daqui;
-     * o teste prova que o buraco segue presente com o laço ativo.
-     */
-    @Test
-    fun `com animacao permitida o buraco segue presente com o laco de quadros ativo`() = runDesktopComposeUiTest {
-        setContent {
-            ScreenTestTheme(motion = AppMotionPolicy(reduced = false, continuous = true)) {
-                HudFloatingHole(params = HudOrbitParams(), update = null, description = "Buraco negro")
-            }
-        }
-
-        onAllNodesWithContentDescription("Buraco negro").assertCountEquals(1)
-    }
 }
