@@ -690,7 +690,7 @@ Pressão longa no anel de uma conta vira arrasto. A ordem que sai do gesto vale 
 
 ## Modo flutuante (#619)
 
-Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-flutuante-619-execucao.md` (linhas A11*). Só existe no Windows (#340).
+Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-flutuante-619-execucao.md` (linhas A11*). Existe no Windows e no Linux (Linux desde #623, a medir no beta; macOS fora). O Windows foi medido (#340); o Linux foi liberado sem medição por decisão do dono.
 
 - **Buraco solto.** Minimizado, o buraco fica onde foi largado, fora de qualquer borda. O disco gira atrás de `AppMotionPolicy`. Não há campo circular.
 - **Soltar e encaixar.** Botão "Soltar da borda" / "Encaixar na borda", por fora da engrenagem.
@@ -722,6 +722,7 @@ reality" no `CONTRIBUTING.md`, #342). Célula vazia é **não medido**, não "fu
 | `alwaysOnTop` perde para a barra de tarefas *topmost* | medido (#288) | | |
 | Buraco sobre a barra de tarefas some atrás dela ao trocar de janela | medido no Windows 11 (#619) | o buraco fica preso à área útil (#621) | |
 | Monitor sob o ponteiro e encaixe na área útil | medido (#273, #288) | | |
+| Modo flutuante com alfa (área transparente da janela flutuante) | medido (#619) | liberado sem medição (#623): com alfa o recorte não vale (#426) e a área transparente pode engolir cliques — medir no beta | |
 
 **Parte disso virou medida automática** (`./gradlew probeHudAlpha`, #426). A sonda abre uma janela
 transparente na mesma `GraphicsConfiguration` que o app escolhe, por monitor, e **falha** se ela não

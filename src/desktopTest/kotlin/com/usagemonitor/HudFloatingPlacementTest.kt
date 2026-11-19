@@ -90,11 +90,11 @@ class HudFloatingPlacementTest {
         assertEquals(HudPxRect(xPx = 1000, yPx = 1050, widthPx = 400, heightPx = 300), bounds)
     }
 
-    /** Só Windows: a HUD solta é medida no Windows (#340); os outros sistemas não mostram o botão. */
+    /** Windows (#340, medido) e Linux (#623, liberado sem medição); macOS e outros sistemas não mostram o botão. */
     @Test
-    fun `floating mode is supported only on Windows`() {
+    fun `floating mode is supported on Windows and Linux only`() {
         assertTrue(hudFloatingSupported(AutoStartManager.Platform.WINDOWS))
-        assertFalse(hudFloatingSupported(AutoStartManager.Platform.LINUX))
+        assertTrue(hudFloatingSupported(AutoStartManager.Platform.LINUX))
         assertFalse(hudFloatingSupported(AutoStartManager.Platform.MACOS))
         assertFalse(hudFloatingSupported(AutoStartManager.Platform.OTHER))
     }

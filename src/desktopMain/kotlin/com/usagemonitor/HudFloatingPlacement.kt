@@ -2,7 +2,7 @@ package com.usagemonitor
 
 /*
  * A posição da HUD solta (issue #619, A05). Funções puras, sem janela AWT: quem chama
- * (`HudWindow`, em A08) aplica o retângulo na janela. Medida só no Windows (#340).
+ * (`HudWindow`, em A08) aplica o retângulo na janela. Medida no Windows (#340); Linux sem medição (#623).
  */
 
 /** Retângulo em pixels de tela: `xPx`/`yPx` é o canto superior esquerdo. */
@@ -50,8 +50,10 @@ private fun clampAnchor(center: Int, origin: Int, areaLength: Int, radius: Int):
 }
 
 /**
- * O modo flutuante só existe no Windows (#340): é a única plataforma em que o recorte e o
- * arrasto da janela foram medidos. Nos outros sistemas o botão nem aparece.
+ * O modo flutuante existe no Windows e no Linux. No Windows o recorte e o arrasto foram medidos
+ * (#340, #619). O Linux foi liberado por decisão do dono na #623, **sem medição**: o recorte só
+ * vale sem alfa (#426) e a área transparente da janela solta pode engolir cliques. Medir no beta.
+ * No macOS o botão não aparece.
  */
 internal fun hudFloatingSupported(platform: AutoStartManager.Platform): Boolean =
-    platform == AutoStartManager.Platform.WINDOWS
+    platform == AutoStartManager.Platform.WINDOWS || platform == AutoStartManager.Platform.LINUX

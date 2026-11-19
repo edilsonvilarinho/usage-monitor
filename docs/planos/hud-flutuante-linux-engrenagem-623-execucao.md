@@ -43,6 +43,7 @@ Varredura do agente `explorer` e leitura direta.
 | ID | Estado | Comando e resultado |
 |---|---|---|
 | A01 | feito | plano criado; sem harness de teste (documento) |
+| A02 | feito | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudFloatingPlacementTest"` → `floating mode is supported on Windows and Linux only FAILED`, `AssertionError at HudFloatingPlacementTest.kt:97` (`assertTrue(LINUX)`); verde: mesmo comando, 9 testes, 0 falhas |
 
 ## Problemas em aberto e riscos
 
