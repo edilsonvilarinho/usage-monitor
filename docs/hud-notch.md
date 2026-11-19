@@ -662,7 +662,8 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   clique no corpo do notch fora do buraco fecham. Há uma linha por membro, com o glifo da marca, o nome, o valor em foco
   e o selo "auto" na auto-minimizada. A linha sob o ponteiro ganha a camada de hover do `AppSurfaceLadders` (a mesma da
   `AppDataRow`, #612); só destaca. O balão da conta abre só por clique ou Enter (a seleção por hover de 160 ms saiu na
-  #602).
+  #602). Clique na linha (ou Enter) abre o detalhe **e recoleta aquela conta** (#631, A04; `HudNotchBalloonState.holeRowSelected`,
+  como o clique no anel). A volta "← N no buraco" só fecha o detalhe e **não** recoleta.
 - **Balão da conta.** Uma linha abre o balão de conta de hoje (`HudAccountBalloonContent`, com `HudMinimizeButton`),
   com a faixa "← N no buraco" no topo; a faixa volta à lista. A cauda aponta o centro do buraco. Restaurar tira só aquela conta da lista e fecha o balão inteiro (`closeHole()`), e o balão não volta à lista. O mesmo vale para qualquer mudança de `minimized` da conta que o balão mostra, seja no balão do anel ou no detalhe aberto a partir da lista (`HudNotchBalloonState.FollowAccounts`, #631: antes o balão voltava à lista sem a conta, ou ficava aberto depois de minimizar pelo anel). Mudança de `minimized` de outra conta não fecha o balão. Buraco esvaziado também fecha. A auto-minimizada não tem botão e diz "volta
   sozinha quando couber" (EN "returns on its own when there is room"). Os rótulos vêm de `localized`.
@@ -672,7 +673,7 @@ comportamento: `docs/planos/hud-buraco-negro-600-execucao.md` ("Objetivo" e "Dec
   função pura (`hudSinkFrame`), testada em TDD.
 - **Janela.** Durante a transição a janela segue o maior tamanho (`hudMinimizeWindowSize`, #576).
 - **Estado.** A sentinela do balão do buraco é `accounts.size`, a mesma chave do buraco em `HudRingStrip`.
-  `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered`, quando o balão fecha e quando a conta mostrada muda de `minimized` (#631).
+  `holeSelection` guarda a conta escolhida na lista. Zera em `onRingHovered`, quando o balão fecha e quando a conta mostrada muda de `minimized` (#631). Abrir pela linha passa por `holeRowSelected`, que também recoleta a conta (#631, A04); a volta (`null`) não recoleta.
 - **Decisões.** A ordem da lista é a de publicação. "Mais recente primeiro" do protótipo ficou fora, porque exigiria
   persistir quando cada conta entrou.
 - **Risco aberto (fora do escopo da #612).** Primeira minimização com o buraco vazio: nos 520 ms do voo a conta fica
@@ -703,7 +704,8 @@ Estado no commit `23b00fc4`; decisões e histórico no plano `docs/planos/hud-fl
 - **Janela presa, buraco deslocado (#625).** A janela real fica sempre dentro da área útil. Com o buraco perto da borda, a janela para na borda e o buraco anda dentro dela; o centro gravado continua sendo o do buraco na tela. Caso medido no log da issue: área `0,30 1920×1050`, janela `778×546`, raio 40, centro pedido `1880,10` — antes a janela saía da área; agora fica em `1142,30` com o buraco em `738,40` dentro dela. O arrasto segue o ponteiro pelo centro ao vivo (`hudFloatingLiveCenter`) e a janela é posicionada pela origem presa, nunca pela origem virtual crua.
 - **Barra de tarefas.** O botão na barra de tarefas é tratado em #620.
 - **Gestos.** Clique direito não tem ação. Clique num glifo em órbita recoleta aquela conta e **não** alterna a lista:
-  a lista aberta por hover continua aberta (#631). Clique no centro alterna a lista e não recoleta. Hover no buraco
+  a lista aberta por hover continua aberta (#631). Clique no centro alterna a lista e não recoleta. Clique numa linha da
+  lista (ou Enter) recoleta a conta dela (#631, A04); a volta "← N no buraco" não recoleta. Hover no buraco
   abre a lista (#612). Arrastar o buraco solto não o encaixa em borda.
 
 ## Aquecimento da GPU (#627, revertido na #629)

@@ -410,7 +410,7 @@ internal fun HudNotch(
             HudBalloonVisibility(
                 visible = open && shownIndex != null, shownIndex = lastShown, edge = edge,
                 accounts = accounts, holeMembers = holeMembers, holeSelection = balloon.holeSelection?.takeIf { index -> index in holeMembers },
-                onHoleSelect = { position -> balloon.holeSelection = position }, sizes = sizes,
+                onHoleSelect = { position -> balloon.holeRowSelected(position, currentAccounts, currentOnRefreshAccount) }, sizes = sizes,
                 appBalloon = appBalloon, appBalloonHeight = appBalloonHeight, language = language,
                 accountActions = accountActions, ringCenters = ringCenters, ringDepths = ringDepths,
                 balloonAlong = balloonAlong, balloonBox = balloonBox, rootCoordinates = { rootCoordinates },

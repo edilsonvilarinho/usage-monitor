@@ -261,6 +261,57 @@ class HudBlackHoleBalloonTest {
         onAllNodesWithText("← 4 no buraco").assertCountEquals(1)
     }
 
+    /** Clique na linha abre o detalhe da conta e a recoleta, uma vez (#631, A04). */
+    @Test
+    fun `clique numa linha da lista abre o detalhe e recoleta so a conta dela`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setNotch(minimized, onRefreshAccount = { target -> refreshed += target })
+        clickHole()
+        onNodeWithText(labels[1]).performClick()
+        waitForIdle()
+
+        onAllNodesWithText("← 4 no buraco").assertCountEquals(1)
+        assertEquals(
+            listOf(minimized[1].targetKey),
+            refreshed,
+            "clique na linha 'Bravo' deve recoletar só ela, uma vez (#631, A04)"
+        )
+    }
+
+    /** Enter com foco na linha abre o detalhe e recoleta a conta, uma vez (#631, A04). */
+    @Test
+    fun `Enter numa linha da lista abre o detalhe e recoleta so a conta dela`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setNotch(minimized, onRefreshAccount = { target -> refreshed += target })
+        clickHole()
+        onNodeWithText(labels[0]).performSemanticsAction(SemanticsActions.RequestFocus)
+        onNodeWithText(labels[0]).performKeyInput { pressKey(Key.Enter) }
+        waitForIdle()
+
+        assertEquals(
+            listOf(minimized[0].targetKey),
+            refreshed,
+            "Enter na linha 'Alfa' deve recoletar só ela, uma vez (#631, A04)"
+        )
+    }
+
+    /** A volta "← N no buraco" fecha o detalhe sem recoletar: só a abertura da linha conta (#631, A04). */
+    @Test
+    fun `voltar pela linha de volta nao recoleta a conta`() = runDesktopComposeUiTest {
+        val refreshed = mutableListOf<UsageTargetKey>()
+        setNotch(minimized, onRefreshAccount = { target -> refreshed += target })
+        clickHole()
+        onNodeWithText(labels[1]).performClick()
+        onNodeWithText("← 4 no buraco").performClick()
+        waitForIdle()
+
+        assertEquals(
+            listOf(minimized[1].targetKey),
+            refreshed,
+            "voltar não deve recoletar; só a abertura da linha 'Bravo' conta (#631, A04)"
+        )
+    }
+
     /** Clique num glifo em órbita força a coleta da conta dele e não abre a lista (#631, A03). */
     @Test
     fun `clique num glifo do buraco chama refresh da conta e mantem a lista aberta`() = runDesktopComposeUiTest {

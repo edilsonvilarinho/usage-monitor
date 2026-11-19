@@ -48,6 +48,8 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
 | A02 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "*ArchitectureRulesTest*"` | BUILD SUCCESSFUL: 19 + 99 + 28 testes, 0 falhas; `HudNotch.kt` 749 → 746 linhas |
 | A03 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest"` (glifo sem `clickable`) | 21 testes, 1 falha na asserção: `clique num glifo do buraco chama refresh da conta e mantem a lista aberta` → `AssertionError` em `HudBlackHoleBalloonTest.kt:266` (refresh vazio) |
 | A03 | verde: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest" --tests "com.usagemonitor.ui.HudBlackHoleCellTest" --tests "*ArchitectureRulesTest*"` | BUILD SUCCESSFUL: 21 + 13 + 28 testes, 0 falhas (JUnit XML); 1ª entrega devolvida (clique da célula reescrito à mão, asserção contra o hover da #612) |
+| A04 | vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudBlackHoleBalloonTest" --tests "com.usagemonitor.ui.HudNotchTest" --tests "*ArchitectureRulesTest*"` | 151 testes, 3 falhas na asserção (`AssertionError`): clique na linha (`:266`), Enter na linha (`:283`), voltar não recoleta (`:300`) |
+| A04 | verde: mesmo comando | BUILD SUCCESSFUL: 24 + 99 + 28 testes, 0 falhas (JUnit XML) |
 
 ## Problemas em aberto e riscos
 

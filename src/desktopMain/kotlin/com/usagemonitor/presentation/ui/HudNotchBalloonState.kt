@@ -41,6 +41,17 @@ internal class HudNotchBalloonState(initialBalloonIndex: Int?) {
         }
     }
 
+    /**
+     * Linha da lista do buraco (#631, A04): abre o detalhe da conta e a recoleta, como o clique no anel. A volta
+     * (`null`, "← N no buraco") só fecha o detalhe, sem coleta.
+     */
+    fun holeRowSelected(position: Int?, accounts: List<HudAccount>, onRefresh: (UsageTargetKey) -> Unit) {
+        holeSelection = position
+        if (position == null) return
+        val account = accounts.getOrNull(position) ?: return
+        onRefresh(account.targetKey)
+    }
+
     /** Fecha o balão e a lista do buraco de uma vez (Esc, clique fora da lista, ou a conta mostrada mudou de minimizada). */
     fun closeHole() {
         balloonIndex = null
