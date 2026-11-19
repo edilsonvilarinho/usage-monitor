@@ -37,6 +37,7 @@ import com.usagemonitor.HudEdge
 import com.usagemonitor.HudOrbitParams
 import com.usagemonitor.HudPxRect
 import com.usagemonitor.domain.entity.AppLanguage
+import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.hudBalloonHeight
 import com.usagemonitor.hudColumnArrangement
 import com.usagemonitor.hudFloatingBalloonHeight
@@ -90,6 +91,8 @@ internal fun HudFloatingHud(
     onToggleFloating: () -> Unit,
     onFloatHover: () -> Unit = {},
     onGearHover: () -> Unit = {},
+    /** Coleta da conta pelo clique no anel ou no glifo (A06); o host liga em `viewModel.refresh`. */
+    onRefreshAccount: (UsageTargetKey) -> Unit = {},
     onDragStart: () -> Unit,
     onDrag: () -> Unit,
     onDragEnd: () -> Unit,
@@ -144,7 +147,10 @@ internal fun HudFloatingHud(
             language = language,
             revealed = expanded,
             onRingHovered = { index -> if (expanded) onAccountClick(index) },
-            onRingRefresh = {},
+            // Clique no anel recoleta a conta dele (A06); o hover segue só abrindo o balão.
+            onRingRefresh = { index -> accounts.getOrNull(index)?.let { account -> onRefreshAccount(account.targetKey) } },
+            onHoleGlyphRefresh = onRefreshAccount,
+            onRingClicked = onRefreshAccount,
             onHoleHovered = { if (expanded) onHoleHover() },
             onHoleClicked = { if (expanded) onHoleClick() },
             hitBoxes = hitBoxes,

@@ -56,6 +56,9 @@ Procedência: Claude Opus 5.5 (orquestração), implementação por `frontend-de
 | A04 | verde: mesmo comando | BUILD SUCCESSFUL: 24 + 99 + 28 testes, 0 falhas (JUnit XML) |
 | A05 | vermelho: `gradlew.bat desktopTest --tests "*HudFloatingHostTest*" --tests "*HudWindowContentTest*" --tests "*ArchitectureRulesTest*"` | `HudFloatingHostTest.kt:365` "expected null, but was:<Account(index=1)>"; `:370` "expected null, but was:<Hole(selection=2)>" |
 | A05 | verde: mesmo comando | BUILD SUCCESSFUL: 51 + 7 + 28 testes, 0 falhas; `HudWindowHost` = 300 linhas (teto). Sem teste de tela: o harness de `HudWindowContentTest` recebe `toggleMinimize = {}` e a ligação mora em `HudWindowHost` |
+| A06 | vermelho (anel): `gradlew.bat desktopTest --tests "*HudFloatingHudTest*" …` | `HudFloatingHudTest.kt:122` "expected:<[UsageTargetKey(source=ANTHROPIC, profileId=perfil-2)]> but was:<[]>" |
+| A06 | vermelho (glifo, sonda com `onHoleGlyphRefresh = {}` em `HudFloatingColumn`): `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudFloatingHudTest"` | 27 testes, 1 falha: `HudFloatingHudTest.kt:142` "expected:<[perfil-4, perfil-5, perfil-6]> but was:<[]>" |
+| A06 | verde: `gradlew.bat desktopTest --tests "*HudFloatingHudTest*" --tests "*HudFloatingColumnTest*" --tests "*HudWindowContentTest*" --tests "*ArchitectureRulesTest*"` | BUILD SUCCESSFUL, 0 falhas; clique no anel não chama `onDragStart` |
 
 ## Problemas em aberto e riscos
 
