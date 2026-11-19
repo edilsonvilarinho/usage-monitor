@@ -43,7 +43,6 @@ internal fun hudFloatingWindowGeometry(
     center: HudFloatCenter?,
     notchCenter: HudFloatCenter,
     area: ScreenWorkArea,
-    monitorBounds: ScreenWorkArea,
     scale: Float,
     columnSize: DpSize,
     holeDiameter: Dp,
@@ -56,8 +55,7 @@ internal fun hudFloatingWindowGeometry(
     val unscaled = hudFloatingColumnWindowSize(columnSize, balloonSize, holeDiameter, handleSize, gap)
     val size = DpSize(unscaled.width * scale, unscaled.height * scale)
     // A âncora é sempre o buraco: no modo coluna ele fica fixo no centro da janela, expandido ou não.
-    // O buraco é preso ao monitor inteiro (A11m): pode ficar sobre a barra de tarefas; a coluna segue a área útil.
-    val position = hudFloatingWindowPosition(center, notchCenter, size, monitorBounds, holeDiameter * scale)
+    val position = hudFloatingWindowPosition(center, notchCenter, size, area, holeDiameter * scale)
     val windowCenterXPx = (position.x.value + size.width.value / 2f).roundToInt()
     val balloonSide = hudFloatingBalloonSide(windowCenterXPx, area.toPxRect())
     // Buraco e área em dp de composição: é a unidade em que a coluna e o recorte são calculados.
