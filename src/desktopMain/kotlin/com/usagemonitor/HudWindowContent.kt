@@ -69,6 +69,8 @@ internal fun HudWindowContent(
     floatingHoleScreenY: Dp,
     floatingAreaTop: Dp,
     floatingAreaBottom: Dp,
+    /** Centro do buraco na janela flutuante, em dp; `null` é o centro da janela (#625). */
+    floatingHoleCenter: DpOffset? = null,
     appBalloonHeight: Dp,
     autoRetract: Boolean,
     onToggleAutoRetract: () -> Unit,
@@ -129,6 +131,7 @@ internal fun HudWindowContent(
                 holeScreenY = floatingHoleScreenY,
                 areaTop = floatingAreaTop,
                 areaBottom = floatingAreaBottom,
+                holeCenter = floatingHoleCenter,
                 update = updateIndicator,
                 gearDescription = hudGearDescription(language),
                 onHoverChange = onHoverChange,

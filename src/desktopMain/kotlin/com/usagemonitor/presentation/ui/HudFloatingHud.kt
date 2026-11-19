@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -102,6 +103,8 @@ internal fun HudFloatingHud(
     onHoleClick: () -> Unit,
     onHoleSelect: (Int) -> Unit,
     onHoleBack: () -> Unit,
+    /** Centro do buraco na janela, em dp; `null` é o centro da janela (A03, #625). */
+    holeCenter: DpOffset? = null,
     modifier: Modifier = Modifier
 ) {
     val hitBoxes = remember { HudRingHitBoxes() }
@@ -111,11 +114,14 @@ internal fun HudFloatingHud(
     val hover = rememberHudFloatingHover(onHoverChange)
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
+        // Centro do buraco na janela; sem pedido, é o centro da janela (A03, #625).
+        val center = holeCenter ?: DpOffset(maxWidth / 2f, maxHeight / 2f)
         val parts = hudFloatingColumnParts(
             windowSize = DpSize(maxWidth, maxHeight),
             expanded = expanded,
             columnSize = columnSize,
             holeDiameter = params.holeD.dp,
+            holeCenter = center,
             holeCenterYPx = holeScreenY.value.roundToInt(),
             workArea = HudPxRect(
                 xPx = 0,
@@ -178,11 +184,11 @@ internal fun HudFloatingHud(
                     hitBoxes,
                     parts.columnSlot,
                     density
-                ) ?: (maxHeight / 2f)
+                ) ?: center.y
             }
             val bodyHeight = hudFloatingBodyHeight(balloon, accounts, appBalloonHeight, tallestBalloonHeight)
-            // A janela tem o buraco no centro: o topo dela na tela é o Y do buraco menos metade da altura (A11k).
-            val windowTopOnScreen = holeScreenY - maxHeight / 2f
+            // O topo da janela na tela é o Y do buraco menos o Y do centro dele na janela (A11k, #625).
+            val windowTopOnScreen = holeScreenY - center.y
             val balloonTop = hudFloatingBalloonTop(
                 ringCenterY = ringCenterY,
                 balloonHeight = bodyHeight,

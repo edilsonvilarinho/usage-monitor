@@ -51,6 +51,7 @@ Pacote `--diagnostics` do usuário (`usage-monitor-diagnostics-2026-11-19T170233
 |---|---|---|
 | A01 | feito | Plano escrito; sem harness de teste (documento). |
 | A02 | feito | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.HudFloatingLayoutTest"` → 37 testes, 3 falhas na asserção (`HudFloatingLayoutTest.kt:401` buraco deslocado: `expected DpRect(left=560.0.dp…) but was DpRect(left=336.0.dp…)`; `:417` idem à esquerda; `:436` perto do topo: coluna `expected top=30.0.dp but was top=366.0.dp`). Verde: `--tests "com.usagemonitor.HudFloatingLayoutTest" --tests "com.usagemonitor.ui.HudFloatingHudTest"` → 37 + 23, 0 falhas; testes antigos sem edição. |
+| A03 | feito | Vermelho: `gradlew.bat desktopTest --tests "com.usagemonitor.ui.HudFloatingHudTest"` → 25 testes, 2 falhas na asserção (`HudFloatingHudTest.kt:291` centro X do buraco ≠ 583 pedido, buraco ainda no centro da janela; `:303` balão ao lado da coluna deslocada); mensagem literal da :291 não capturada (XML sobrescrito pela execução verde). Devolvida 1×: o teste da :303 media a caixa do balão (+`HUD_BALLOON_GAP`), não o corpo. Verde: `--tests "com.usagemonitor.ui.HudFloatingHudTest" --tests "com.usagemonitor.ui.HudWindowContentTest" --tests "*ArchitectureRulesTest*"` → 60 testes, 0 falhas. |
 
 ## Problemas em aberto e riscos
 

@@ -28,8 +28,10 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.usagemonitor.HUD_BALLOON_GAP
 import com.usagemonitor.HUD_BALLOON_WIDTH
 import com.usagemonitor.HUD_HANDLE_GAP
 import com.usagemonitor.HUD_HANDLE_SIZE
@@ -279,6 +281,34 @@ class HudFloatingHudTest {
         assertEquals(1, ends)
     }
 
+    /** A03 (#625): com o centro do buraco deslocado, o buraco aparece nesse ponto e a coluna fica do lado dele, dentro da janela. */
+    @Test
+    fun `buraco com centro deslocado aparece no ponto pedido, com a coluna ao lado`() = hudTest {
+        val wantedX = WINDOW.width.value * 0.75f
+        render(expanded = true, holeCenter = DpOffset(WINDOW.width * 0.75f, WINDOW.height / 2f))
+        val hole = boundsOf(HUD_FLOATING_HOLE_DRAG_TAG)
+        val column = boundsOf(HUD_FLOATING_COLUMN_TEST_TAG)
+        assertTrue(hole.center.x in wantedX - 1f..wantedX + 1f, "expected centro X do buraco $wantedX actual ${hole.center.x}")
+        assertTrue(column.right <= hole.left || column.left >= hole.right, "expected coluna ao lado do buraco actual coluna ${column.left}..${column.right}")
+    }
+
+    /** A03 (#625): com o centro deslocado, o balão de conta abre do outro lado da coluna em relação ao buraco, encostado nela. */
+    @Test
+    fun `balao de conta abre ao lado da coluna deslocada`() = hudTest {
+        render(expanded = true, balloon = HudFloatingBalloon.Account(2), holeCenter = DpOffset(WINDOW.width * 0.75f, WINDOW.height / 2f))
+        val hole = boundsOf(HUD_FLOATING_HOLE_DRAG_TAG)
+        val column = boundsOf(HUD_FLOATING_COLUMN_TEST_TAG)
+        val balloon = boundsOf(HUD_BALLOON_TEST_TAG)
+        assertTrue(column.right <= hole.left, "expected coluna à esquerda do buraco (borda ${hole.left}) actual coluna right ${column.right}")
+        // A caixa do balão tem HUD_BALLOON_GAP a mais do lado da cauda: mede-se o corpo, que fica HUD_HANDLE_GAP da coluna (#625).
+        val bodyRight = balloon.right - HUD_BALLOON_GAP.value
+        val expectedBodyRight = column.left - HUD_HANDLE_GAP.value
+        assertTrue(
+            bodyRight in expectedBodyRight - 1f..expectedBodyRight + 1f,
+            "expected borda direita do corpo do balão perto de $expectedBodyRight actual $bodyRight"
+        )
+    }
+
     private companion object {
         const val UPDATE_PHRASE = "Atualização pronta para reiniciar"
         const val FALLBACK_LABEL = "Sem conta"
@@ -366,7 +396,8 @@ class HudFloatingHudTest {
             onHoverChange: (Boolean) -> Unit = {},
             accountList: List<HudAccount> = accounts,
             window: DpSize = WINDOW,
-            holeScreenY: Dp = window.height / 2f,
+            holeCenter: DpOffset? = null,
+            holeScreenY: Dp = holeCenter?.y ?: window.height / 2f,
             areaTop: Dp = 0.dp,
             areaBottom: Dp = window.height
         ) {
@@ -386,6 +417,7 @@ class HudFloatingHudTest {
                         fallbackLabel = FALLBACK_LABEL,
                         fallbackTone = AppTone.OK,
                         holeScreenY = holeScreenY,
+                        holeCenter = holeCenter,
                         areaTop = areaTop,
                         areaBottom = areaBottom,
                         onHoverChange = onHoverChange,
