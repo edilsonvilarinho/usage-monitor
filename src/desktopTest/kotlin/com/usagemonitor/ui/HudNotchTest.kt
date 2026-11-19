@@ -1376,6 +1376,8 @@ class HudNotchTest {
                     fallbackLabel = "Carregando",
                     expanded = true,
                     appBalloon = { appBalloonFixture(onRefresh, onQuit) },
+                    // Sem `onToggleAutoRetract` o alfinete não é desenhado: o teste dele precisa do alfinete na árvore.
+                    onToggleAutoRetract = {},
                     appBalloonHeight = hudAppBalloonHeight(hasUpdateIndicator = false),
                     gearDescription = GEAR
                 )
@@ -1415,6 +1417,34 @@ class HudNotchTest {
         onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
         waitForIdle()
         onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+    }
+
+    /** A11o: sair da engrenagem para o alfinete fecha o balão dela. */
+    @Test
+    fun `o ponteiro sobre o alfinete fecha o balao da engrenagem`() = runDesktopComposeUiTest {
+        setContent { notchWithActions() }
+
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+        // O ponteiro já está na janela (sobre a engrenagem): `enter` de novo lança "already hovering"; é `moveTo`.
+        onNodeWithTag(HUD_RETRACT_HANDLE_TAG).performMouseInput { moveTo(center) }
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertDoesNotExist()
+    }
+
+    /** A11o: sair da engrenagem para a mão fecha o balão dela. */
+    @Test
+    fun `o ponteiro sobre a mao fecha o balao da engrenagem`() = runDesktopComposeUiTest {
+        setContent { notchWithActions() }
+
+        onNodeWithTag(HUD_GEAR_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertIsDisplayed()
+        // O ponteiro já está na janela (sobre a engrenagem): `enter` de novo lança "already hovering"; é `moveTo`.
+        onNodeWithTag(HUD_MOVE_HANDLE_TAG).performMouseInput { moveTo(center) }
+        waitForIdle()
+        onNodeWithTag(HUD_APP_BALLOON_CONTENT_TEST_TAG).assertDoesNotExist()
     }
 
     /** Sem balão da engrenagem, o hover não dispara a ação dela: ação é do clique. */

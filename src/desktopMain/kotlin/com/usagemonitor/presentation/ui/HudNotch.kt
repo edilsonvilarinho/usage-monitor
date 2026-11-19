@@ -195,6 +195,11 @@ internal fun HudNotch(
 ) {
     val hover = rememberHudHover(onHoverChange)
     val gearHovered by hover.gear.collectIsHoveredAsState()
+    val retractHovered by hover.retract.collectIsHoveredAsState()
+    val moveHovered by hover.move.collectIsHoveredAsState()
+    val floatHovered by hover.float.collectIsHoveredAsState()
+    // Alfinete, mão ou encaixar fecham o balão aberto (A11o): o ponteiro saiu da engrenagem ou da lista do buraco.
+    val leavingBalloon = retractHovered || moveHovered || floatHovered
 
     val open = expanded && !dragging
     // As alças ficam durante o arrasto: é a mão que está sendo carregada, e
@@ -224,6 +229,9 @@ internal fun HudNotch(
     // tela, e o índice gravado ali reabriria o balão ao soltar.
     LaunchedEffect(gearHovered, open) {
         if (gearHovered && open && appBalloon != null) balloon.balloonIndex = APP_BALLOON
+    }
+    LaunchedEffect(leavingBalloon) {
+        if (leavingBalloon) balloon.closeHole()
     }
     val shownIndex = balloon.balloonIndex?.takeIf { index ->
         index in accounts.indices ||

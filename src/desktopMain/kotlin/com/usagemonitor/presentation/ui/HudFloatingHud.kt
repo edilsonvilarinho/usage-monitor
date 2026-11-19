@@ -86,6 +86,7 @@ internal fun HudFloatingHud(
     onAccountClick: (Int) -> Unit,
     onGearClick: () -> Unit,
     onToggleFloating: () -> Unit,
+    onFloatHover: () -> Unit = {},
     onDragStart: () -> Unit,
     onDrag: () -> Unit,
     onDragEnd: () -> Unit,
@@ -160,6 +161,7 @@ internal fun HudFloatingHud(
             language = language,
             onGearClick = onGearClick,
             onToggleFloating = onToggleFloating,
+            onFloatHover = onFloatHover,
             hover = hover.handles
         )
         val balloonRect = parts.balloon
@@ -276,10 +278,17 @@ private fun HudFloatingButtons(
     language: AppLanguage,
     onGearClick: () -> Unit,
     onToggleFloating: () -> Unit,
+    onFloatHover: () -> Unit,
     hover: MutableInteractionSource
 ) {
     val gearInteraction = remember { MutableInteractionSource() }
     val floatInteraction = remember { MutableInteractionSource() }
+    val floatHovered by floatInteraction.collectIsHoveredAsState()
+    val currentOnFloatHover by rememberUpdatedState(onFloatHover)
+    // Passar pelo botão de encaixar avisa o host, que fecha o balão aberto (A11o).
+    LaunchedEffect(floatHovered) {
+        if (floatHovered) currentOnFloatHover()
+    }
     AnimatedVisibility(
         visible = expanded,
         modifier = Modifier.placedAt(rect).hoverable(hover, enabled = expanded),

@@ -209,6 +209,16 @@ class HudFloatingHudTest {
         assertEquals(1, toggles)
     }
 
+    /** A11o: o botão de encaixar avisa o host, que fecha o balão aberto. */
+    @Test
+    fun `hover no botao de encaixar chama onFloatHover`() = hudTest {
+        var hovers = 0
+        render(expanded = true, balloon = HudFloatingBalloon.App, onFloatHover = { hovers++ })
+        onNodeWithTag(HUD_FLOAT_HANDLE_TAG).performMouseInput { enter(center) }
+        waitForIdle()
+        assertEquals(1, hovers)
+    }
+
     @Test
     fun `arrastar o buraco chama onDragStart e onDragEnd uma vez`() = hudTest {
         var starts = 0
@@ -296,6 +306,7 @@ class HudFloatingHudTest {
             update: HudUpdateIndicator? = null,
             onAccountClick: (Int) -> Unit = {},
             onToggleFloating: () -> Unit = {},
+            onFloatHover: () -> Unit = {},
             onDragStart: () -> Unit = {},
             onDragEnd: () -> Unit = {},
             onHoverChange: (Boolean) -> Unit = {},
@@ -324,6 +335,7 @@ class HudFloatingHudTest {
                         onAccountClick = onAccountClick,
                         onGearClick = {},
                         onToggleFloating = onToggleFloating,
+                        onFloatHover = onFloatHover,
                         onDragStart = onDragStart,
                         onDrag = {},
                         onDragEnd = onDragEnd,

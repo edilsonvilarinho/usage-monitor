@@ -135,6 +135,7 @@ internal fun HudWindowContent(
                 onAccountClick = { index -> onFloatingBalloonToggle(HudFloatingBalloon.Account(index)) },
                 onGearClick = { onFloatingBalloonToggle(HudFloatingBalloon.App) },
                 onToggleFloating = onToggleFloating,
+                onFloatHover = { requestFloatingBalloon(floatingBalloon, null) },
                 onDragStart = onDragStart,
                 onDrag = onDragMove,
                 onDragEnd = onDragEnd,
