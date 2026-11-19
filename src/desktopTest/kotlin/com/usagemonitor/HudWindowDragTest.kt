@@ -168,6 +168,23 @@ class HudWindowDragTest {
         assertEquals(DpOffset(930.dp, 380.dp), moved)
     }
 
+    /** Medida não finita no âncora: o guard devolve a origem crua, sem clamp com número inválido. */
+    @Test
+    fun `an anchor with a non finite size leaves the window origin untouched`() {
+        val broken = DpRect(left = Float.NaN.dp, top = 246.dp, right = Float.NaN.dp, bottom = 310.dp)
+        val moved = hudDragStep(
+            previous = Point(0, 0),
+            current = Point(30, 0),
+            position = DpOffset(2000.dp, 800.dp),
+            size = size,
+            workArea = secondary,
+            anchor = broken
+        )
+
+        // Delta de 30 px em x: 2000 + 30 = 2030 dp, sem prender, porque a medida do âncora é NaN.
+        assertEquals(2030.dp, moved?.x)
+    }
+
     /** O buraco é centrado na janela, com o diâmetro dado (em dp de janela). */
     @Test
     fun `the floating hole anchor is centred in the window`() {
