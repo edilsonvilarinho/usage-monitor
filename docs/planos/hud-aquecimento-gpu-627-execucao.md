@@ -63,6 +63,8 @@ abertura em `HudWindow.kt` e carimbo de `System.nanoTime()` a cada leitura do qu
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (plano) | revisado contra as medições acima |
+| A02 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudGpuWarmUpTest"` | vermelho (stub devolvendo 0): `HudGpuWarmUpTest.kt:15 expected:<3> but was:<0>`; verde: 4 testes |
+| A03 | `gradlew.bat desktopTest --tests "com.usagemonitor.HudGpuWarmUpTest" --tests "*ArchitectureRulesTest*"` | vermelho (stub devolvendo `SKIPPED`): 6 de 11 na asserção, ex. `HudGpuWarmUpTest.kt:126 expected:<COMPLETED> but was:<SKIPPED>`; verde: 11/11 e `ArchitectureRulesTest` 28/28. A02 e A03 dividem os dois arquivos novos e foram para um commit só |
 
 ## Problemas em aberto e riscos
 
