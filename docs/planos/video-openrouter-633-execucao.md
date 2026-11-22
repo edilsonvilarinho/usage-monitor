@@ -51,6 +51,7 @@ skill. Também pediu protótipos de roteiro **no visual do app** para escolher o
 | ID | Comando | Resultado |
 |---|---|---|
 | A01 | plano escrito | — |
+| A02 | `node --test …/scripts/test/openrouter.test.mjs` | vermelho: 9 × `Error: não implementado` (esboço); verde: exit 0 |
 
 ## Problemas em aberto e riscos
 
