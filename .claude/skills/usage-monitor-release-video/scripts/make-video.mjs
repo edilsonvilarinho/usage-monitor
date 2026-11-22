@@ -12,6 +12,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { renderStills, renderVideo } from './render.mjs'
 import { setupTools } from './setup-tools.mjs'
+import { speakScenes } from './speak.mjs'
 import { LANGUAGES, buildTimeline, captionCues, toSrt } from './timeline.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -34,7 +35,7 @@ const outDir = join(homedir(), 'Videos', 'usage-monitor', version)
 const project = JSON.parse(readFileSync(join(docsDir, 'scenes.json'), 'utf8'))
 const log = (message) => process.stdout.write(`${message}\n`)
 
-const tools = await setupTools()
+const tools = await setupTools({ piper: false })
 
 // Palco: renderizador, fontes do app e as imagens das cenas.
 rmSync(stage, { recursive: true, force: true })
@@ -53,12 +54,9 @@ for (const [key, source] of Object.entries(project.sources ?? {})) {
 }
 
 // Voz: a duração medida de cada fala decide a linha do tempo.
-log('Sintetizando as falas (Piper)…')
+log('Sintetizando as falas (OpenRouter, com cache por assinatura)…')
 const voiceDir = join(work, 'voice')
-execFileSync(tools.python, [join(here, 'synthesize.py'), join(docsDir, 'scenes.json'), tools.voices, voiceDir], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-})
-const durations = JSON.parse(readFileSync(join(voiceDir, 'durations.json'), 'utf8'))
+const durations = await speakScenes({ project, outDir: voiceDir })
 const timeline = buildTimeline(project.scenes, durations)
 writeFileSync(join(work, 'timeline.json'), JSON.stringify(timeline, null, 2))
 log(`Linha do tempo: ${timeline.total.toFixed(1)} s, ${timeline.scenes.length} cenas`)

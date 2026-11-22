@@ -49,23 +49,42 @@ async function download(url, target) {
     writeFileSync(target, Buffer.from(await response.arrayBuffer()))
 }
 
-export async function setupTools({ kokoro = false } = {}) {
+// Etapas do setup para as opções dadas. O vídeo de release passa { piper: false }: a fala vem da API do OpenRouter,
+// então não há Piper nem vozes para baixar. O tour (16:9) mantém o padrão e, com voice.engine "kokoro", o Kokoro.
+export function toolSteps({ piper = true, kokoro = false } = {}) {
+    const steps = []
+    if (piper) steps.push('piper', 'voices')
+    if (kokoro) steps.push('kokoro')
+    steps.push('puppeteer')
+    return steps
+}
+
+export async function setupTools({ piper = true, kokoro = false } = {}) {
     const paths = toolPaths()
+    const steps = toolSteps({ piper, kokoro })
     mkdirSync(paths.voices, { recursive: true })
-    if (!existsSync(paths.python)) {
-        execFileSync(process.platform === 'win32' ? 'python' : 'python3', ['-m', 'venv', join(paths.base, 'venv')], {
-            stdio: 'inherit',
-        })
-        execFileSync(paths.python, ['-m', 'pip', 'install', '-q', 'piper-tts'], { stdio: 'inherit' })
-    }
-    for (const voice of VOICE_PATHS) {
-        const name = voice.split('/').pop()
-        for (const suffix of ['.onnx', '.onnx.json']) {
-            const target = join(paths.voices, `${name}${suffix}`)
-            if (!existsSync(target)) await download(`${VOICE_BASE}/${voice}${suffix}`, target)
+    if (steps.includes('piper') || steps.includes('kokoro')) {
+        if (!existsSync(paths.python)) {
+            execFileSync(process.platform === 'win32' ? 'python' : 'python3', ['-m', 'venv', join(paths.base, 'venv')], {
+                stdio: 'inherit',
+            })
         }
     }
-    if (kokoro) {
+    if (steps.includes('piper')) {
+        try {
+            execFileSync(paths.python, ['-c', 'import piper'], { stdio: 'ignore' })
+        } catch {
+            execFileSync(paths.python, ['-m', 'pip', 'install', '-q', 'piper-tts'], { stdio: 'inherit' })
+        }
+        for (const voice of VOICE_PATHS) {
+            const name = voice.split('/').pop()
+            for (const suffix of ['.onnx', '.onnx.json']) {
+                const target = join(paths.voices, `${name}${suffix}`)
+                if (!existsSync(target)) await download(`${VOICE_BASE}/${voice}${suffix}`, target)
+            }
+        }
+    }
+    if (steps.includes('kokoro')) {
         try {
             execFileSync(paths.python, ['-c', 'import kokoro_onnx, scipy'], { stdio: 'ignore' })
         } catch {
