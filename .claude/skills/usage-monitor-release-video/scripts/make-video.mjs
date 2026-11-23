@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 // Gera o vídeo de lançamento a partir de docs/planos/video-v<maior>-<menor>/scenes.json e social.json.
-// Uso: node make-video.mjs vX.Y.Z [--stills] [--only en|pt]
+// Uso: node make-video.mjs vX.Y.Z [--stills] [--only en|pt] [--preview [--scenes <scenes.json>] [--out <dir>]]
 //   --stills  só os quadros de conferência de cada cena (rápido; para revisar o roteiro)
 //   --only    um idioma só
+//   --preview  não renderiza: gera preview.html + <lang>.mp3 para abrir no navegador (#633)
+//   --scenes   roteiro alternativo (padrão: docs/planos/video-vX-Y/scenes.json)
+//   --out      pasta do preview (padrão: build/release-video/<versão>/preview)
 // Saída: build/release-video/<versão>/ (intermediários e quadros de conferência) e
 // ~/Videos/usage-monitor/<versão>/ (vídeos, .srt e social.md).
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { renderStills, renderVideo } from './render.mjs'
+import { frameFile, frameHtml, previewAudioArgs, previewHtml } from './preview.mjs'
 import { setupTools } from './setup-tools.mjs'
 import { speakScenes } from './speak.mjs'
 import { LANGUAGES, buildTimeline, captionCues, toSrt } from './timeline.mjs'
@@ -25,14 +29,19 @@ if (!version) {
 const stillsOnly = args.includes('--stills')
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null
 const languages = only ? [only] : LANGUAGES
+const preview = args.includes('--preview')
+const pathArg = (flag) => (args.includes(flag) && args[args.indexOf(flag) + 1] ? resolve(args[args.indexOf(flag) + 1]) : null)
+const scenesOverride = pathArg('--scenes')
+const outOverride = pathArg('--out')
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const [major, minor] = version.slice(1).split('.')
 const docsDir = join(root, 'docs', 'planos', `video-v${major}-${minor}`)
 const work = join(root, 'build', 'release-video', version)
-const stage = join(work, 'stage')
+const previewDir = preview ? (outOverride ?? join(work, 'preview')) : null
+const stage = preview ? join(previewDir, 'stage') : join(work, 'stage')
 const outDir = join(homedir(), 'Videos', 'usage-monitor', version)
-const project = JSON.parse(readFileSync(join(docsDir, 'scenes.json'), 'utf8'))
+const project = JSON.parse(readFileSync(scenesOverride ?? join(docsDir, 'scenes.json'), 'utf8'))
 const log = (message) => process.stdout.write(`${message}\n`)
 
 const tools = await setupTools({ piper: false })
@@ -60,6 +69,23 @@ const durations = await speakScenes({ project, outDir: voiceDir })
 const timeline = buildTimeline(project.scenes, durations)
 writeFileSync(join(work, 'timeline.json'), JSON.stringify(timeline, null, 2))
 log(`Linha do tempo: ${timeline.total.toFixed(1)} s, ${timeline.scenes.length} cenas`)
+
+if (preview) {
+    // Preview (#633): o mesmo data do render, um quadro por idioma e a trilha de fala, sem drone e sem renderizar.
+    const videoHtml = readFileSync(join(here, '..', 'assets', 'video.html'), 'utf8')
+    const tokensCss = readFileSync(join(root, 'docs', 'design-system', 'tokens', 'colors.css'), 'utf8')
+    for (const language of languages) {
+        const cues = captionCues(project.scenes, timeline, durations, language)
+        const data = { scenes: project.scenes, timeline, cues, lang: language, label: project.label }
+        writeFileSync(join(previewDir, frameFile(language)), frameHtml({ videoHtml, data }))
+        const track = join(previewDir, `${language}.mp3`)
+        execFileSync('ffmpeg', previewAudioArgs({ scenes: project.scenes, timeline, voiceDir: join(voiceDir, language), output: track }), { stdio: 'inherit' })
+        log(`  ${language}: ${track}`)
+    }
+    writeFileSync(join(previewDir, 'preview.html'), previewHtml({ total: timeline.total, tokensCss }))
+    log(`Preview: ${join(previewDir, 'preview.html')}`)
+    process.exit(0)
+}
 
 mkdirSync(outDir, { recursive: true })
 mkdirSync(join(work, 'check'), { recursive: true })

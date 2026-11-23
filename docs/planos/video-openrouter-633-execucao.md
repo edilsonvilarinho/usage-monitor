@@ -53,6 +53,7 @@ skill. Também pediu protótipos de roteiro **no visual do app** para escolher o
 | A01 | plano escrito | — |
 | A02 | `node --test …/scripts/test/openrouter.test.mjs` | vermelho: 9 × `Error: não implementado` (esboço); verde: exit 0 |
 | A03 | `node --test …/test/speak.test.mjs …/test/setup-tools.test.mjs` | vermelho: 6 × `Error: não implementado` (esboço do `speak`), depois `pt.status` 3.1 ≠ 3 (erro da fixture: `ó` tem 2 bytes); verde: 4 arquivos, 27/27, exit 0 |
+| A04 | `node --test …/test/preview.test.mjs`; `make-video.mjs v42.3.0 --preview --scenes prototipos/video-v42-3/p5/scenes.json --out …/p5` + captura Edge headless `?t=2`/`?t=9` | vermelho: módulo ausente; depois `AssertionError` (quadro não pintava antes do `ready`: título vazio em t=2); verde: 5/5, glob inteiro 50/50, exit 0; capturas com anel, nome, versão e legenda |
 
 ## Problemas em aberto e riscos
 
