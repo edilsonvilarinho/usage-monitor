@@ -54,6 +54,101 @@ class LocalCursorSessionDataSourceTest {
         }
     }
 
+    /** Cursor 3.27.12+: token opaco (sem pontos) e identificador só em `cachedScopedProfile`. */
+    @Test
+    fun `opaque access token reads the account id from the cached scoped profile`() = runTest {
+        val tempDirectory = createTempDirectory()
+        try {
+            val databaseFile = tempDirectory.resolve("state.vscdb")
+            seedDatabase(
+                databaseFile,
+                accountId = null,
+                accessToken = "curs_opaque_synthetic_token",
+                cachedScopedProfile = """{"authId":"auth0|opaque-user","email":"synthetic@example.com"}"""
+            )
+
+            val credentials = LocalCursorSessionDataSource(databaseFile.toFile()).readCredentials()
+
+            assertEquals("auth0|opaque-user", credentials.accountId)
+            assertEquals("curs_opaque_synthetic_token", credentials.accessToken)
+        } finally {
+            tempDirectory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `the JWT subject wins over the cached scoped profile`() = runTest {
+        val tempDirectory = createTempDirectory()
+        try {
+            val databaseFile = tempDirectory.resolve("state.vscdb")
+            val payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("""{"sub":"google-oauth2|jwt-user"}""".toByteArray())
+            seedDatabase(
+                databaseFile,
+                accountId = null,
+                accessToken = "header.$payload.signature",
+                cachedScopedProfile = """{"authId":"auth0|cached-user"}"""
+            )
+
+            val credentials = LocalCursorSessionDataSource(databaseFile.toFile()).readCredentials()
+
+            assertEquals("google-oauth2|jwt-user", credentials.accountId)
+        } finally {
+            tempDirectory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `the stored membership id wins over the cached scoped profile`() = runTest {
+        val tempDirectory = createTempDirectory()
+        try {
+            val databaseFile = tempDirectory.resolve("state.vscdb")
+            seedDatabase(
+                databaseFile,
+                accountId = "stripe-account",
+                accessToken = "curs_opaque_synthetic_token",
+                cachedScopedProfile = """{"authId":"auth0|cached-user"}"""
+            )
+
+            val credentials = LocalCursorSessionDataSource(databaseFile.toFile()).readCredentials()
+
+            assertEquals("stripe-account", credentials.accountId)
+        } finally {
+            tempDirectory.toFile().deleteRecursively()
+        }
+    }
+
+    /** Perfil em cache sem identificador utilizável não autentica: segue para `SIGNED_OUT`. */
+    @Test
+    fun `cached scoped profile without a usable authId is signed out`() = runTest {
+        val tempDirectory = createTempDirectory()
+        try {
+            val profiles = listOf(
+                "{not json",
+                """{"email":"synthetic@example.com"}""",
+                """{"authId":"   "}""",
+                """{"authId":""}"""
+            )
+            profiles.forEachIndexed { index, profile ->
+                val databaseFile = tempDirectory.resolve("profile-$index.vscdb")
+                seedDatabase(
+                    databaseFile,
+                    accountId = null,
+                    accessToken = "curs_opaque_synthetic_token",
+                    cachedScopedProfile = profile
+                )
+
+                val failure = assertFailsWith<CursorUsageException> {
+                    LocalCursorSessionDataSource(databaseFile.toFile()).readCredentials()
+                }
+
+                assertEquals(CursorUsageFailureKind.SIGNED_OUT, failure.kind, "perfil: $profile")
+            }
+        } finally {
+            tempDirectory.toFile().deleteRecursively()
+        }
+    }
+
     /** Duas respostas diferentes para o usuário: instalar o Cursor ou entrar nele. */
     @Test
     fun `missing database is not installed and incomplete credentials are signed out`() = runTest {
@@ -117,7 +212,8 @@ class LocalCursorSessionDataSourceTest {
         file: java.nio.file.Path,
         accountId: String?,
         accessToken: String?,
-        journalMode: String? = null
+        journalMode: String? = null,
+        cachedScopedProfile: String? = null
     ) {
         DriverManager.getConnection("jdbc:sqlite:${file.toAbsolutePath()}").use { connection ->
             connection.createStatement().use { statement ->
@@ -133,6 +229,11 @@ class LocalCursorSessionDataSourceTest {
                 if (accessToken != null) {
                     statement.setString(1, "cursorAuth/accessToken")
                     statement.setString(2, accessToken)
+                    statement.executeUpdate()
+                }
+                if (cachedScopedProfile != null) {
+                    statement.setString(1, "cursorAuth/cachedScopedProfile")
+                    statement.setString(2, cachedScopedProfile)
                     statement.executeUpdate()
                 }
             }

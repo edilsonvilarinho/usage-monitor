@@ -40,7 +40,9 @@ class LocalCursorSessionDataSource(
 
         val accessToken = values.accessToken?.takeIf(String::isNotBlank)
             ?: throw CursorUsageException(CursorUsageFailureKind.SIGNED_OUT)
+        // Ordem: membership guardado → sub do JWT → authId do perfil em cache (token opaco do Cursor 3.27.12+).
         val accountId = values.accountId?.takeIf(String::isNotBlank) ?: subjectFromJwt(accessToken)
+            ?: authIdFromCachedProfile(values.cachedScopedProfile)
             ?: throw CursorUsageException(CursorUsageFailureKind.SIGNED_OUT)
         if (hasUnsafeCookieCharacter(accountId) || hasUnsafeCookieCharacter(accessToken)) {
             throw CursorUsageException(CursorUsageFailureKind.SIGNED_OUT)
@@ -49,7 +51,7 @@ class LocalCursorSessionDataSource(
         CursorSessionCredentials(accountId = accountId, accessToken = accessToken)
     }
 
-    private class AuthValues(val accessToken: String?, val accountId: String?)
+    private class AuthValues(val accessToken: String?, val accountId: String?, val cachedScopedProfile: String?)
 
     private fun readAuthValues(connection: Connection): AuthValues =
         connection.prepareStatement(SELECT_ITEM_VALUE).use { statement ->
@@ -59,7 +61,11 @@ class LocalCursorSessionDataSource(
                     if (result.next()) result.getString("value") else null
                 }
             }
-            AuthValues(accessToken = valueOf(ACCESS_TOKEN_KEY), accountId = valueOf(ACCOUNT_ID_KEY))
+            AuthValues(
+                accessToken = valueOf(ACCESS_TOKEN_KEY),
+                accountId = valueOf(ACCOUNT_ID_KEY),
+                cachedScopedProfile = valueOf(CACHED_SCOPED_PROFILE_KEY)
+            )
         }
 
     private fun openReadOnly(): Connection {
@@ -88,12 +94,21 @@ class LocalCursorSessionDataSource(
         }.getOrNull()
     }
 
+    /** `cachedScopedProfile` é `{"authId":"<issuer>|<userId>",…}`; JSON inválido ou sem `authId` vira ausência. */
+    private fun authIdFromCachedProfile(profile: String?): String? {
+        if (profile == null) return null
+        return runCatching {
+            Json.parseToJsonElement(profile).jsonObject["authId"]?.jsonPrimitive?.content
+        }.getOrNull()?.takeIf(String::isNotBlank)
+    }
+
     private fun hasUnsafeCookieCharacter(value: String): Boolean =
         value.any { character -> character.isWhitespace() || character == ';' || character == '\r' || character == '\n' }
 
     private companion object {
         const val ACCESS_TOKEN_KEY = "cursorAuth/accessToken"
         const val ACCOUNT_ID_KEY = "cursorAuth/stripeMembershipAuthId"
+        const val CACHED_SCOPED_PROFILE_KEY = "cursorAuth/cachedScopedProfile"
         const val SELECT_ITEM_VALUE = "SELECT value FROM ItemTable WHERE key = ?"
         const val BUSY_TIMEOUT_MILLIS = 2_000
 
