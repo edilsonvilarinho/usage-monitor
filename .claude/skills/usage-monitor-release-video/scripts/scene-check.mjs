@@ -5,11 +5,19 @@ export const MAX_ZOOM = 1.35
 // Intervalo mínimo entre duas chaves de câmera: abaixo disso o movimento vira solavanco ("cortaram demais").
 export const MIN_KEY_GAP = 1.5
 
+// Zoom máximo de uma cena: o dela (`maxZoom`, 1 a 3) ou o padrão. A câmera em video.html aplica o mesmo valor.
+export const MAX_ZOOM_CEILING = 3
+export const zoomLimit = (scene) => scene.maxZoom ?? MAX_ZOOM
+
 const seconds = (value) => value.toFixed(1).replace('.', ',')
 
 // Lista de problemas de uma cena (vazia se estiver certa). Mensagens em português, com o id da cena.
 export function sceneProblems(scene) {
     const problems = []
+    if (scene.maxZoom !== undefined &&
+        !(typeof scene.maxZoom === 'number' && scene.maxZoom >= 1 && scene.maxZoom <= MAX_ZOOM_CEILING)) {
+        problems.push(`${scene.id}: maxZoom ${scene.maxZoom} precisa ser um número de 1 a ${MAX_ZOOM_CEILING}`)
+    }
     if (scene.camera) {
         const times = scene.camera.map((key) => key.at).sort((a, b) => a - b)
         for (let index = 0; index < times.length - 1; index += 1) {

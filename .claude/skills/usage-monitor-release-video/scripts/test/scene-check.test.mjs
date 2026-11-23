@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MAX_ZOOM, MIN_KEY_GAP, sceneProblems, assertScenes } from '../scene-check.mjs'
+import { MAX_ZOOM, MIN_KEY_GAP, zoomLimit, sceneProblems, assertScenes } from '../scene-check.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -42,4 +42,20 @@ test('o zoom máximo do validador é o mesmo do video.html', () => {
     const found = source.match(/const MAX_ZOOM = ([\d.]+)/)
     assert.ok(found, 'video.html declara MAX_ZOOM')
     assert.equal(Number(found[1]), MAX_ZOOM)
+})
+
+test('zoomLimit: a cena pode declarar maxZoom; sem ele vale o padrão de 1,35x', () => {
+    assert.equal(zoomLimit({ id: 'a' }), MAX_ZOOM)
+    assert.equal(zoomLimit({ id: 'a', maxZoom: 2.2 }), 2.2)
+    assert.equal(zoomLimit({ id: 'a', maxZoom: 1 }), 1)
+})
+
+test('sceneProblems: maxZoom precisa ser um número entre 1 e 3, e a mensagem diz a cena', () => {
+    assert.deepEqual(sceneProblems({ ...screen(undefined), maxZoom: 2.2 }), [])
+    for (const bad of [0.5, 0, -1, 3.5, '2', NaN]) {
+        const found = sceneProblems({ ...screen(undefined), maxZoom: bad })
+        assert.equal(found.length, 1, `maxZoom ${bad}`)
+        assert.match(found[0], /demo/)
+        assert.match(found[0], /maxZoom/)
+    }
 })

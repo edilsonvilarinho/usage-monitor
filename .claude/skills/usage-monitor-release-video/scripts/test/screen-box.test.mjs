@@ -53,3 +53,10 @@ test('buildScene e setup: nenhuma medida fixa de 876×544 no dimensionamento de 
     assert.ok(!/Math\.min\(876\s*\//.test(source), 'o 876/544 antigo saiu')
     assert.ok(/fitCapture\(/.test(source), 'a captura é dimensionada por fitCapture')
 })
+
+test('zona do painel: legenda na faixa 1500–1680 px e título em até 2 linhas (A15)', () => {
+    const { CAPTURE } = layout()
+    assert.equal(1920 - CAPTURE.captionEdge, 1680, 'a legenda acaba em 1680 px')
+    assert.equal(CAPTURE.headlineLines, 2)
+    assert.match(source, /#caption \{[^}]*bottom: 240px/)
+})

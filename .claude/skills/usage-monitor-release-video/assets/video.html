@@ -46,6 +46,9 @@ body { font-family: "Plex Sans", sans-serif; }
 .kicker b { color: var(--gold); font-weight: 600; }
 .headline { position: absolute; left: var(--left); top: 432px; width: var(--width); font-family: "Plex Mono";
   font-size: 64px; font-weight: 600; line-height: 1.16; color: var(--fg); }
+/* Cena screen: cabeçalho compacto (título em até 2 linhas) para dar a maior zona possível ao painel; placeCapture mede. */
+.scene.screen .kicker { top: 350px; }
+.scene.screen .headline { top: 396px; font-size: 56px; }
 .visual { position: absolute; left: var(--left); top: 712px; width: var(--width); height: 590px;
   display: flex; align-items: center; justify-content: center; }
 
@@ -101,8 +104,8 @@ body { font-family: "Plex Sans", sans-serif; }
 /* No fechamento não há título acima do anel: o conjunto sobe para o link não encostar na legenda. */
 .hero.closing { transform: translateY(-90px); }
 
-/* Legenda: no máximo 2 linhas, dentro da área segura (acaba antes dos 420 px de baixo). */
-#caption { position: absolute; left: var(--left); width: var(--width); bottom: 430px; display: flex; justify-content: center; }
+/* Legenda: no máximo 2 linhas, na faixa ~1500–1680 px (acaba 240 px acima da borda; as redes cobrem só abaixo de ~1700). */
+#caption { position: absolute; left: var(--left); width: var(--width); bottom: 240px; display: flex; justify-content: center; }
 #caption div { background: rgba(8, 11, 18, .86); border: 1px solid rgba(232, 174, 99, .28); border-radius: 10px;
   padding: 14px 26px; text-align: center; font-family: "Plex Sans"; font-weight: 600; font-size: 50px; line-height: 1.24;
   color: var(--fg); }
@@ -128,25 +131,26 @@ const easeInOut = (value) => {
   const x = clamp(value)
   return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
 }
-// Zoom máximo da câmera sobre a captura inteira (espelha scripts/scene-check.mjs, que recusa roteiro fora da regra).
+// Zoom máximo padrão da câmera sobre a captura inteira (espelha scripts/scene-check.mjs, que recusa roteiro fora da regra).
+// A cena pode declarar `maxZoom` (ex.: 2.2 numa tela densa); 1 trava a câmera na captura inteira.
 const MAX_ZOOM = 1.35
-// Retângulo visível limitado à captura: nunca menor que 1/MAX_ZOOM dela, nunca maior que ela, sempre dentro dela.
+// Retângulo visível limitado à captura: nunca menor que 1/maxZoom dela, nunca maior que ela, sempre dentro dela.
 // O retângulo cresce em torno do próprio centro e depois desliza para dentro, sem mudar de proporção.
-function limitRect(rect, capture) {
+function limitRect(rect, capture, maxZoom = MAX_ZOOM) {
   const [cx, cy, cl, ca] = capture
-  const l = Math.min(cl, Math.max(cl / MAX_ZOOM, rect[2]))
-  const a = Math.min(ca, Math.max(ca / MAX_ZOOM, rect[3]))
+  const l = Math.min(cl, Math.max(cl / maxZoom, rect[2]))
+  const a = Math.min(ca, Math.max(ca / maxZoom, rect[3]))
   const x = Math.min(cx + cl - l, Math.max(cx, rect[0] - (l - rect[2]) / 2))
   const y = Math.min(cy + ca - a, Math.max(cy, rect[1] - (a - rect[3]) / 2))
   return [x, y, l, a]
 }
 // Câmera de uma cena screen: keys = [{ at, rect: [x, y, l, a] }] (at em s desde o início da cena; rect em pixels da captura).
 // Entre duas chaves interpola o retângulo com easeInOut; antes da primeira e depois da última segura a chave.
-// Com `capture` ([x, y, l, a] da captura), o resultado respeita MAX_ZOOM e fica dentro dela.
-function cameraRectAt(keys, t, capture) {
+// Com `capture` ([x, y, l, a] da captura), o resultado respeita `maxZoom` (padrão MAX_ZOOM) e fica dentro dela.
+function cameraRectAt(keys, t, capture, maxZoom = MAX_ZOOM) {
   if (!keys || keys.length === 0) return null
   const sorted = [...keys].sort((a, b) => a.at - b.at)
-  const finish = (rect) => (capture ? limitRect(rect, capture) : rect)
+  const finish = (rect) => (capture ? limitRect(rect, capture, maxZoom) : rect)
   if (t <= sorted[0].at) return finish(sorted[0].rect.slice())
   for (let index = 0; index < sorted.length - 1; index += 1) {
     const from = sorted[index]
@@ -234,7 +238,8 @@ function pick(value) {
 // layout:begin
 // Caixa da captura de uma cena screen: a maior escala que cabe em maxWidth × maxHeight, mantendo a proporção.
 // Captura pequena cresce até encostar num limite; nunca passa dos dois. Medidas inteiras (floor) para o DOM.
-const CAPTURE = { maxWidth: 950, chrome: 48, gap: 36 }
+// A zona do painel vai do fim do título (mais gap) ao começo da legenda (menos gap); a legenda acaba em captionEdge px do rodapé.
+const CAPTURE = { maxWidth: 950, chrome: 48, gap: 24, captionEdge: 240, headlineLines: 2, headlineMin: 40 }
 function fitCapture(crop, bounds) {
   const [, , cropW, cropH] = crop
   const scale = Math.min(bounds.maxWidth / cropW, bounds.maxHeight / cropH)
@@ -249,7 +254,7 @@ function kickerHtml(scene) {
 
 function buildScene(scene) {
   const element = document.createElement('div')
-  element.className = 'scene'
+  element.className = scene.kind === 'screen' ? 'scene screen' : 'scene'
   const parts = {}
   if (scene.kind === 'title' || scene.kind === 'closing') {
     element.innerHTML = `<div class="hero ${scene.kind}"><canvas width="800" height="800"></canvas>
@@ -537,7 +542,7 @@ function renderScene(node, index, t, transition) {
     // Câmera: o retângulo visível (em pixels da captura) vem das chaves; sem elas, Ken Burns lento de 1 a 1,06.
     const zoom = 1 + 0.06 * clamp(local / (end - timing.start))
     const [rx, ry, rl, ra] = scene.camera
-      ? cameraRectAt(scene.camera, local, scene.crop)
+      ? cameraRectAt(scene.camera, local, scene.crop, scene.maxZoom)
       : [cropX + (cropW - cropW / zoom) / 2, cropY + (cropH - cropH / zoom) / 2, cropW / zoom, cropH / zoom]
     const k = Math.min(width / rl, height / ra)
     const ox = (width - rl * k) / 2
@@ -624,8 +629,16 @@ function measureCaption() {
 function placeCapture(node, captionHeight) {
   const { element, scene, parts } = node
   const headline = element.querySelector('.headline')
+  // Título em no máximo 2 linhas: se passar, reduz a fonte de 2 em 2 px até caber (ou até o mínimo).
+  let size = parseFloat(getComputedStyle(headline).fontSize)
+  const lineHeight = () => parseFloat(getComputedStyle(headline).lineHeight)
+  while (headline.offsetHeight > lineHeight() * CAPTURE.headlineLines + 1 && size > CAPTURE.headlineMin) {
+    size -= 2
+    headline.style.fontSize = `${size}px`
+  }
+  if (headline.offsetHeight > lineHeight() * CAPTURE.headlineLines + 1) console.warn(`${scene.id}: título passa de 2 linhas`)
   const top = headline.offsetTop + headline.offsetHeight + CAPTURE.gap
-  const bottom = 1920 - 430 - captionHeight - CAPTURE.gap
+  const bottom = 1920 - CAPTURE.captionEdge - captionHeight - CAPTURE.gap
   const box = fitCapture(scene.crop, { maxWidth: CAPTURE.maxWidth, maxHeight: bottom - top - CAPTURE.chrome })
   const visual = element.querySelector('.visual')
   visual.style.left = '0'

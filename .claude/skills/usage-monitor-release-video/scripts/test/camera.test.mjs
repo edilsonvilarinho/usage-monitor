@@ -64,6 +64,24 @@ test('cameraRectAt: com a captura, o zoom passa de no máximo 1,35x e o retângu
     assert.ok(shifted[0] + shifted[2] <= 2800 + 1e-6 && shifted[1] + shifted[3] <= 1694 + 1e-6, 'desloca para dentro')
 })
 
+test('cameraRectAt: maxZoom da cena vale no lugar do padrão (2,2x aproxima mais; 1x trava na captura inteira)', () => {
+    const { cameraRectAt } = motion()
+    const capture = [100, 50, 2700, 1644]
+    const tight = [{ at: 0, rect: [100, 50, 2700, 1644] }, { at: 2, rect: [1000, 600, 100, 100] }]
+    const [, , wide, high] = cameraRectAt(tight, 5, capture, 2.2)
+    assert.ok(Math.abs(wide - 2700 / 2.2) < 1e-6, `largura ${wide}`)
+    assert.ok(Math.abs(high - 1644 / 2.2) < 1e-6, `altura ${high}`)
+    assert.deepEqual(cameraRectAt(tight, 5, capture, 1), capture, 'maxZoom 1: a câmera não aproxima')
+    const [, , standard] = cameraRectAt(tight, 5, capture)
+    assert.ok(Math.abs(standard - 2700 / 1.35) < 1e-6, 'sem maxZoom continua 1,35x')
+    const [x, y, width, height] = cameraRectAt(tight, 5, capture, 2.2)
+    assert.ok(x >= 100 - 1e-6 && x + width <= 2800 + 1e-6 && y >= 50 - 1e-6 && y + height <= 1694 + 1e-6)
+})
+
+test('renderScene passa o maxZoom da cena para cameraRectAt', () => {
+    assert.match(source, /cameraRectAt\(scene\.camera, local, scene\.crop, scene\.maxZoom\)/)
+})
+
 test('focusOpacity: acende em 0,4 s, fica até focusFor (padrão 2,5 s) e apaga em 0,4 s', () => {
     const { focusOpacity } = motion()
     assert.equal(focusOpacity(1, 2), 0)
