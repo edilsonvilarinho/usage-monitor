@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_VOICE, synthesizeSpeech } from './openrouter.mjs'
+import { beatsOf } from './timeline.mjs'
 
 export const LANGUAGES = ['en', 'pt']
 
@@ -24,9 +25,10 @@ export function voicePlan(project) {
     }
 }
 
-export function spokenText(scene, language) {
-    const line = scene.lines[language]
-    return line.say ?? line.text
+// Texto falado de uma fala (say vence text); sem o segundo argumento, a primeira fala da cena.
+export function spokenText(scene, language, position = 0) {
+    const beat = beatsOf(scene, language)[position]
+    return beat.say ?? beat.text
 }
 
 // Duração em segundos a partir do cabeçalho RIFF/WAVE, com três casas como o synthesize.py.
@@ -72,17 +74,20 @@ export async function speakScenes({ project, outDir, synthesize = synthesizeSpee
         mkdirSync(target, { recursive: true })
         durations[language] = {}
         for (const scene of project.scenes) {
-            const text = spokenText(scene, language)
-            const voice = plan.voice[language]
-            const signature = speechSignature({ model: plan.model, voice, text })
-            const wav = join(target, `${scene.id}.wav`)
-            const sig = join(target, `${scene.id}.sig`)
-            if (!(existsSync(wav) && existsSync(sig) && readFileSync(sig, 'utf8') === signature)) {
-                const { bytes, format } = await synthesize({ text, model: plan.model, voice, apiKey })
-                convert({ bytes, format, target: wav })
-                writeFileSync(sig, signature)
+            // Um áudio por fala: <id>.wav com uma só, <id>-<n>.wav com várias (a chave vem de beatsOf).
+            for (const [position, beat] of beatsOf(scene, language).entries()) {
+                const text = spokenText(scene, language, position)
+                const voice = plan.voice[language]
+                const signature = speechSignature({ model: plan.model, voice, text })
+                const wav = join(target, `${beat.key}.wav`)
+                const sig = join(target, `${beat.key}.sig`)
+                if (!(existsSync(wav) && existsSync(sig) && readFileSync(sig, 'utf8') === signature)) {
+                    const { bytes, format } = await synthesize({ text, model: plan.model, voice, apiKey })
+                    convert({ bytes, format, target: wav })
+                    writeFileSync(sig, signature)
+                }
+                durations[language][beat.key] = wavSeconds(readFileSync(wav))
             }
-            durations[language][scene.id] = wavSeconds(readFileSync(wav))
         }
     }
     writeFileSync(join(outDir, 'durations.json'), JSON.stringify(durations, null, 2))

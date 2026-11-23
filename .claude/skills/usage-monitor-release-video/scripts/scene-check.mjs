@@ -20,6 +20,19 @@ export function sceneProblems(scene) {
             }
         }
     }
+    // Falas por momento: lines[lang] pode ser uma lista [{ at, text, say? }]; precisam ter texto e crescer em `at`.
+    for (const [language, line] of Object.entries(scene.lines ?? {})) {
+        if (!Array.isArray(line)) continue
+        line.forEach((beat, index) => {
+            if (typeof beat.text !== 'string' || beat.text.trim() === '') {
+                problems.push(`${scene.id}: fala ${index + 1} (${language}) sem texto`)
+            }
+            if (index > 0 && (beat.at ?? 0) <= (line[index - 1].at ?? 0)) {
+                problems.push(`${scene.id}: falas (${language}) fora de ordem: a fala ${index + 1} em ${seconds(beat.at ?? 0)} s ` +
+                    `não vem depois da fala ${index} em ${seconds(line[index - 1].at ?? 0)} s`)
+            }
+        })
+    }
     if (scene.focusFor !== undefined && !(scene.focusFor > 0)) {
         problems.push(`${scene.id}: focusFor ${scene.focusFor} precisa ser maior que 0 s`)
     }

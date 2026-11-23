@@ -19,7 +19,7 @@ import { frameFile, frameHtml, previewAudioArgs, previewHtml } from './preview.m
 import { assertScenes } from './scene-check.mjs'
 import { setupTools } from './setup-tools.mjs'
 import { speakScenes } from './speak.mjs'
-import { LANGUAGES, RELEASE_PACING, buildTimeline, captionCues, toSrt } from './timeline.mjs'
+import { LANGUAGES, RELEASE_PACING, buildTimeline, captionCues, toSrt, voiceTracks } from './timeline.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2)
@@ -127,21 +127,21 @@ for (const language of languages) {
     // Áudio: cada fala no seu instante, sobre um drone grave a ≈ −30 dBFS que entra e sai em 2 s.
     const inputs = ['-i', silent]
     const filters = []
-    project.scenes.forEach((scene, index) => {
-        inputs.push('-i', join(voiceDir, language, `${scene.id}.wav`))
-        const delay = Math.round(timeline.scenes[index].voiceAt * 1000)
-        filters.push(`[${index + 1}:a]aresample=48000,adelay=${delay}:all=1[v${index}]`)
+    const tracks = voiceTracks(project.scenes, timeline)
+    tracks.forEach((track, index) => {
+        inputs.push('-i', join(voiceDir, language, `${track.key}.wav`))
+        filters.push(`[${index + 1}:a]aresample=48000,adelay=${Math.round(track.at * 1000)}:all=1[v${index}]`)
     })
     const total = timeline.total.toFixed(3)
-    const drone = project.scenes.length + 1
+    const drone = tracks.length + 1
     inputs.push('-f', 'lavfi', '-i', `sine=frequency=55:duration=${total}:sample_rate=48000`)
     inputs.push('-f', 'lavfi', '-i', `sine=frequency=82.41:duration=${total}:sample_rate=48000`)
     filters.push(
         `[${drone}:a][${drone + 1}:a]amix=inputs=2:normalize=0,lowpass=f=180,volume=-16dB,` +
             `afade=t=in:d=2,afade=t=out:st=${(timeline.total - 2).toFixed(3)}:d=2[drone]`,
     )
-    const voices = project.scenes.map((_, index) => `[v${index}]`).join('')
-    filters.push(`${voices}[drone]amix=inputs=${project.scenes.length + 1}:normalize=0,` +
+    const voices = tracks.map((_, index) => `[v${index}]`).join('')
+    filters.push(`${voices}[drone]amix=inputs=${tracks.length + 1}:normalize=0,` +
         'loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,apad[audio]')
     const video = join(outDir, `${name}-${language}.mp4`)
     execFileSync('ffmpeg', [

@@ -2,6 +2,7 @@
 // escalado para a tela, dirigido pela trilha da fala. Tudo é gerado como texto, sem servidor: a página do pai
 // conversa com o quadro por postMessage, porque o Chrome isola iframes de arquivos locais.
 import { join } from 'node:path'
+import { voiceTracks } from './timeline.mjs'
 
 export const LANGUAGES = ['en', 'pt']
 
@@ -137,18 +138,18 @@ requestAnimationFrame(tick)
 `
 }
 
-// Trilha de um idioma para o preview: cada fala no seu instante (voiceAt), sem drone, cortada no fim do vídeo.
-// voiceDir é a pasta do idioma, com <id>.wav por cena.
+// Trilha de um idioma para o preview: cada fala (cada beat de cada cena) no seu instante, sem drone, cortada no fim do
+// vídeo. voiceDir é a pasta do idioma, com <chave>.wav por fala (o id da cena, ou <id>-<n> com várias).
 export function previewAudioArgs({ scenes, timeline, voiceDir, output }) {
+    const tracks = voiceTracks(scenes, timeline)
     const inputs = []
     const filters = []
-    scenes.forEach((scene, index) => {
-        inputs.push('-i', join(voiceDir, `${scene.id}.wav`))
-        const delay = Math.round(timeline.scenes[index].voiceAt * 1000)
-        filters.push(`[${index}:a]aresample=48000,adelay=${delay}:all=1[v${index}]`)
+    tracks.forEach((track, index) => {
+        inputs.push('-i', join(voiceDir, `${track.key}.wav`))
+        filters.push(`[${index}:a]aresample=48000,adelay=${Math.round(track.at * 1000)}:all=1[v${index}]`)
     })
-    const labels = scenes.map((_, index) => `[v${index}]`).join('')
-    filters.push(`${labels}amix=inputs=${scenes.length}:normalize=0,aresample=48000[audio]`)
+    const labels = tracks.map((_, index) => `[v${index}]`).join('')
+    filters.push(`${labels}amix=inputs=${tracks.length}:normalize=0,aresample=48000[audio]`)
     return [
         '-v', 'error', '-y', ...inputs, '-filter_complex', filters.join(';'), '-map', '[audio]',
         '-t', timeline.total.toFixed(3), '-c:a', 'libmp3lame', '-b:a', '192k', output,
