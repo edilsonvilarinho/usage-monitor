@@ -1,0 +1,400 @@
+{
+  "version": "v42.3.0",
+  "label": "42.3",
+  "sources": {
+    "minimize": {
+      "frames": "build/video-media/{lang}/video-hud-minimize"
+    },
+    "floating": {
+      "frames": "build/video-media/{lang}/video-hud-floating"
+    },
+    "reorder": {
+      "frames": "build/video-media/{lang}/video-hud-reorder"
+    },
+    "codex": {
+      "frames": "build/video-media/{lang}/video-codex-sessions"
+    },
+    "analysis": {
+      "frames": "build/video-media/{lang}/video-analysis-all"
+    }
+  },
+  "scenes": [
+    {
+      "id": "title",
+      "kind": "title",
+      "headline": {
+        "en": "Your accounts, in orbit",
+        "pt": "Suas contas, em órbita"
+      },
+      "lines": {
+        "en": {
+          "text": "Usage Monitor 42.3. Your AI accounts, now in orbit.",
+          "say": "Usage Monitor forty-two point three. Your AI accounts, now in orbit."
+        },
+        "pt": {
+          "text": "Usage Monitor 42.3. Suas contas de IA, agora em órbita.",
+          "say": "Usage Monitor quarenta e dois ponto três. Suas contas de IA, agora em órbita."
+        }
+      }
+    },
+    {
+      "id": "minimize",
+      "kind": "screen",
+      "frames": "minimize",
+      "tag": "#576",
+      "kicker": {
+        "en": "hud",
+        "pt": "hud"
+      },
+      "headline": {
+        "en": "Minimize to the black hole",
+        "pt": "Minimize para o buraco negro"
+      },
+      "lines": {
+        "en": [
+          {
+            "at": 0,
+            "text": "Too many accounts on the bar? Open one and press minimize."
+          },
+          {
+            "at": 6,
+            "text": "It falls into the black hole, out of your way."
+          },
+          {
+            "at": 11,
+            "text": "Hover the hole. You will see every minimized account."
+          },
+          {
+            "at": 20,
+            "text": "Pick one to check it, then press plus to bring it back."
+          }
+        ],
+        "pt": [
+          {
+            "at": 0,
+            "text": "Contas demais na barra? Abra uma e toque em minimizar."
+          },
+          {
+            "at": 6,
+            "text": "Ela cai no buraco negro e sai do caminho."
+          },
+          {
+            "at": 11,
+            "text": "Passe o mouse no buraco para ver as contas minimizadas."
+          },
+          {
+            "at": 20,
+            "text": "Escolha uma para conferir e toque em mais para trazer de volta."
+          }
+        ]
+      },
+      "crop": [
+        180,
+        120,
+        2470,
+        1710
+      ],
+      "focus": [
+        970,
+        1475,
+        140,
+        135
+      ],
+      "focusAt": 4.3,
+      "surface": "hud"
+    },
+    {
+      "id": "floating",
+      "kind": "screen",
+      "frames": "floating",
+      "tag": "#619",
+      "kicker": {
+        "en": "hud",
+        "pt": "hud"
+      },
+      "headline": {
+        "en": "A floating HUD",
+        "pt": "A HUD flutuante"
+      },
+      "lines": {
+        "en": [
+          {
+            "at": 0,
+            "text": "In floating mode, the HUD rests as a black hole, anywhere on screen."
+          },
+          {
+            "at": 5.5,
+            "text": "Point at it. Your accounts open in a column, right beside it."
+          }
+        ],
+        "pt": [
+          {
+            "at": 0,
+            "text": "No modo flutuante, a HUD descansa como um buraco negro, em qualquer lugar da tela."
+          },
+          {
+            "at": 5.5,
+            "text": "Aponte para ele e as contas se abrem numa coluna ao lado."
+          }
+        ]
+      },
+      "crop": [
+        0,
+        0,
+        1008,
+        2068
+      ],
+      "surface": "hud"
+    },
+    {
+      "id": "reorder",
+      "kind": "screen",
+      "frames": "reorder",
+      "tag": "#584",
+      "kicker": {
+        "en": "hud",
+        "pt": "hud"
+      },
+      "headline": {
+        "en": "Drag to reorder",
+        "pt": "Arraste para reordenar"
+      },
+      "lines": {
+        "en": [
+          {
+            "at": 0,
+            "text": "Want your main account first?",
+            "say": "Want your main account... first?"
+          },
+          {
+            "at": 4.5,
+            "text": "Hold its ring and drag it into place. The new order is saved."
+          }
+        ],
+        "pt": [
+          {
+            "at": 0,
+            "text": "Quer a conta principal primeiro?",
+            "say": "Quer a conta principal... primeiro?"
+          },
+          {
+            "at": 4.5,
+            "text": "Segure o anel e arraste até o lugar. A nova ordem fica salva."
+          }
+        ]
+      },
+      "crop": [
+        180,
+        120,
+        2420,
+        1370
+      ],
+      "surface": "hud"
+    },
+    {
+      "id": "codex",
+      "kind": "screen",
+      "frames": "codex",
+      "tag": "#560",
+      "kicker": {
+        "en": "codex",
+        "pt": "codex"
+      },
+      "headline": {
+        "en": "Codex sessions, like Claude",
+        "pt": "Sessões do Codex, como no Claude"
+      },
+      "lines": {
+        "en": [
+          {
+            "at": 0,
+            "text": "Codex sessions now open like Claude's, with tokens and models."
+          },
+          {
+            "at": 5,
+            "text": "One click copies the resume command. Done."
+          }
+        ],
+        "pt": [
+          {
+            "at": 0,
+            "text": "As sessões do Codex agora abrem como as do Claude, com tokens e modelos."
+          },
+          {
+            "at": 5,
+            "text": "Um clique copia o comando para retomar a sessão."
+          }
+        ]
+      },
+      "crop": [
+        1800,
+        0,
+        2584,
+        1900
+      ],
+      "focus": [
+        3700,
+        150,
+        520,
+        200
+      ],
+      "focusAt": 4.3,
+      "maxZoom": 1
+    },
+    {
+      "id": "analysis",
+      "kind": "screen",
+      "frames": "analysis",
+      "tag": "#556",
+      "kicker": {
+        "en": "analysis",
+        "pt": "análise"
+      },
+      "headline": {
+        "en": "Your whole history",
+        "pt": "Todo o seu histórico"
+      },
+      "lines": {
+        "en": [
+          {
+            "at": 0,
+            "text": "In analysis, pick All to see your whole history."
+          },
+          {
+            "at": 8.5,
+            "text": "Then compare your average pace with the last hour."
+          }
+        ],
+        "pt": [
+          {
+            "at": 0,
+            "text": "Na análise, escolha Tudo para ver todo o histórico."
+          },
+          {
+            "at": 8.5,
+            "text": "Depois compare o ritmo médio com o da última hora."
+          }
+        ]
+      },
+      "crop": [
+        150,
+        300,
+        2150,
+        2650
+      ],
+      "camera": [
+        {
+          "at": 0,
+          "rect": [
+            150,
+            300,
+            2150,
+            2650
+          ]
+        },
+        {
+          "at": 3,
+          "rect": [
+            150,
+            300,
+            1654,
+            2038
+          ]
+        },
+        {
+          "at": 8,
+          "rect": [
+            150,
+            300,
+            1654,
+            2038
+          ]
+        },
+        {
+          "at": 10,
+          "rect": [
+            150,
+            912,
+            1654,
+            2038
+          ]
+        },
+        {
+          "at": 14,
+          "rect": [
+            150,
+            912,
+            1654,
+            2038
+          ]
+        }
+      ],
+      "focus": [
+        1100,
+        420,
+        220,
+        160
+      ],
+      "focusAt": 4.3,
+      "maxZoom": 1.8
+    },
+    {
+      "id": "more",
+      "kind": "list",
+      "stagger": 1.2,
+      "kicker": {
+        "en": "also in 42.3",
+        "pt": "também na 42.3"
+      },
+      "headline": {
+        "en": "And more",
+        "pt": "E mais"
+      },
+      "items": [
+        {
+          "en": "Ultra plan label",
+          "pt": "Rótulo do plano Ultra"
+        },
+        {
+          "en": "Out of credits · extra usage paused",
+          "pt": "Sem créditos · trabalho extra pausado"
+        },
+        {
+          "en": "Idle windows release their memory",
+          "pt": "Janelas paradas liberam memória"
+        },
+        {
+          "en": "A starfield behind the rings",
+          "pt": "Estrelas atrás dos anéis"
+        }
+      ],
+      "lines": {
+        "en": {
+          "text": "Also new: the Ultra plan label, paused extra usage explained, lighter idle windows, and a starfield behind the rings."
+        },
+        "pt": {
+          "text": "E mais: rótulo do plano Ultra, trabalho extra pausado explicado, janelas mais leves e estrelas atrás dos anéis."
+        }
+      }
+    },
+    {
+      "id": "closing",
+      "kind": "closing",
+      "headline": {
+        "en": "Get it on GitHub",
+        "pt": "Baixe no GitHub"
+      },
+      "link": "github.com/edilsonvilarinho/usage-monitor",
+      "lines": {
+        "en": {
+          "text": "Usage Monitor 42.3. Free and open source, on GitHub.",
+          "say": "Usage Monitor forty-two point three. Free and open source, on GitHub."
+        },
+        "pt": {
+          "text": "Usage Monitor 42.3. Grátis e de código aberto, no GitHub.",
+          "say": "Usage Monitor quarenta e dois ponto três. Grátis e de código aberto, no GitHub."
+        }
+      }
+    }
+  ]
+}

@@ -26,8 +26,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); color: var(--fg); }
 body { font-family: "Plex Sans", sans-serif; }
+#stars, #hole { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+#hole { pointer-events: none; }
 #stage { position: absolute; inset: 0; }
-.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform, filter; }
 .mono { font-family: "Plex Mono", monospace; }
 
 /* Cabeçalho fixo: marca, versão e progresso. Fica abaixo dos 250 px que as redes cobrem. */
@@ -44,17 +46,30 @@ body { font-family: "Plex Sans", sans-serif; }
 .kicker b { color: var(--gold); font-weight: 600; }
 .headline { position: absolute; left: var(--left); top: 432px; width: var(--width); font-family: "Plex Mono";
   font-size: 64px; font-weight: 600; line-height: 1.16; color: var(--fg); }
+/* Cena screen: cabeçalho compacto (título em até 2 linhas) para dar a maior zona possível ao painel; placeCapture mede. */
+.scene.screen .kicker { top: 350px; }
+.scene.screen .headline { top: 396px; font-size: 56px; }
 .visual { position: absolute; left: var(--left); top: 712px; width: var(--width); height: 590px;
   display: flex; align-items: center; justify-content: center; }
 
 /* Superfície única de dados: --surface, borda 1px acesa em cima, raio 8–10 (teto 10). */
 .panel { background: var(--surface); border: 1px solid var(--border); border-top-color: #4A4444; border-radius: 10px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 18px 48px rgba(0,0,0,.45); overflow: hidden; }
+/* Captura de cena screen: a janela tem a sombra mais funda do vídeo (profundidade sobre o fundo de estrelas). */
+.panel.cine { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 44px 110px rgba(0,0,0,.66), 0 0 0 1px rgba(232,174,99,.12); }
 .panel .bar { height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--border);
   font-family: "Plex Mono"; font-size: 22px; color: var(--muted); background: var(--raised); }
 .panel .bar i { width: 12px; height: 12px; border-radius: 6px; background: var(--term-dim); display: inline-block; }
 .shot { position: relative; overflow: hidden; background: #0F0D0D; }
 .shot img { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: auto; }
+/* Superfície hud: sem caixa, sem fundo, sem clip; a sombra acompanha o desenho (alfa) da captura. */
+.hudshot { position: relative; overflow: visible; }
+.hudshot img { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: auto;
+  filter: drop-shadow(0 18px 36px rgba(0,0,0,.55)); }
+.hudshot .focus { position: absolute; border: 2px solid var(--info); border-radius: 8px; opacity: 0; }
+/* Contorno de foco: borda --info e véu escuro em volta (o mesmo do tour); o véu é a sombra, recortada pela captura. */
+.shot .focus { position: absolute; border: 2px solid var(--info); border-radius: 8px; opacity: 0;
+  box-shadow: 0 0 0 9999px rgba(8, 11, 18, .6); }
 
 .term { width: 100%; padding: 28px 30px; font-family: "Plex Mono"; font-size: 33px; line-height: 1.5; background: #0F0D0D; }
 .term .line { white-space: pre; color: var(--fg); min-height: 50px; }
@@ -94,15 +109,17 @@ body { font-family: "Plex Sans", sans-serif; }
 /* No fechamento não há título acima do anel: o conjunto sobe para o link não encostar na legenda. */
 .hero.closing { transform: translateY(-90px); }
 
-/* Legenda: no máximo 2 linhas, dentro da área segura (acaba antes dos 420 px de baixo). */
-#caption { position: absolute; left: var(--left); width: var(--width); bottom: 430px; display: flex; justify-content: center; }
+/* Legenda: no máximo 2 linhas, na faixa ~1500–1680 px (acaba 240 px acima da borda; as redes cobrem só abaixo de ~1700). */
+#caption { position: absolute; left: var(--left); width: var(--width); bottom: 240px; display: flex; justify-content: center; }
 #caption div { background: rgba(8, 11, 18, .86); border: 1px solid rgba(232, 174, 99, .28); border-radius: 10px;
   padding: 14px 26px; text-align: center; font-family: "Plex Sans"; font-weight: 600; font-size: 50px; line-height: 1.24;
   color: var(--fg); }
 </style>
 </head>
 <body>
+<canvas id="stars" width="1080" height="1920"></canvas>
 <div id="stage"></div>
+<canvas id="hole" width="1080" height="1920"></canvas>
 <div id="header"><span class="brand">usage monitor</span><span class="count"></span></div>
 <div id="progress"></div>
 <div id="caption"><div></div></div>
@@ -110,18 +127,139 @@ body { font-family: "Plex Sans", sans-serif; }
 'use strict'
 const ENTER = 0.6
 const EXIT = 0.35
+// motion:begin
 const clamp = (value) => Math.max(0, Math.min(1, value))
 const easeOut = (value) => 1 - Math.pow(1 - clamp(value), 3)
 const easeIn = (value) => Math.pow(clamp(value), 3)
+// Ease-in-out cúbico: sem overshoot e sem velocidade nas pontas (movimento de câmera).
+const easeInOut = (value) => {
+  const x = clamp(value)
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+}
+// Zoom máximo padrão da câmera sobre a captura inteira (espelha scripts/scene-check.mjs, que recusa roteiro fora da regra).
+// A cena pode declarar `maxZoom` (ex.: 2.2 numa tela densa); 1 trava a câmera na captura inteira.
+const MAX_ZOOM = 1.35
+// Retângulo visível limitado à captura: nunca menor que 1/maxZoom dela, nunca maior que ela, sempre dentro dela.
+// O retângulo cresce em torno do próprio centro e depois desliza para dentro, sem mudar de proporção.
+function limitRect(rect, capture, maxZoom = MAX_ZOOM) {
+  const [cx, cy, cl, ca] = capture
+  const l = Math.min(cl, Math.max(cl / maxZoom, rect[2]))
+  const a = Math.min(ca, Math.max(ca / maxZoom, rect[3]))
+  const x = Math.min(cx + cl - l, Math.max(cx, rect[0] - (l - rect[2]) / 2))
+  const y = Math.min(cy + ca - a, Math.max(cy, rect[1] - (a - rect[3]) / 2))
+  return [x, y, l, a]
+}
+// Câmera de uma cena screen: keys = [{ at, rect: [x, y, l, a] }] (at em s desde o início da cena; rect em pixels da captura).
+// Entre duas chaves interpola o retângulo com easeInOut; antes da primeira e depois da última segura a chave.
+// Com `capture` ([x, y, l, a] da captura), o resultado respeita `maxZoom` (padrão MAX_ZOOM) e fica dentro dela.
+function cameraRectAt(keys, t, capture, maxZoom = MAX_ZOOM) {
+  if (!keys || keys.length === 0) return null
+  const sorted = [...keys].sort((a, b) => a.at - b.at)
+  const finish = (rect) => (capture ? limitRect(rect, capture, maxZoom) : rect)
+  if (t <= sorted[0].at) return finish(sorted[0].rect.slice())
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    const from = sorted[index]
+    const to = sorted[index + 1]
+    if (t >= to.at) continue
+    const u = easeInOut((t - from.at) / (to.at - from.at))
+    return finish(from.rect.map((value, position) => value + (to.rect[position] - value) * u))
+  }
+  return finish(sorted[sorted.length - 1].rect.slice())
+}
+// Contorno de foco: acende em 0,4 s a partir de focusAt, fica até focusFor (padrão 2,5 s) e some em 0,4 s.
+const FOCUS_FADE = 0.4
+function focusOpacity(local, focusAt = 0, focusFor = 2.5) {
+  const lit = easeOut((local - focusAt) / FOCUS_FADE)
+  const out = 1 - easeOut((local - focusAt - focusFor) / FOCUS_FADE)
+  return Math.min(lit, out)
+}
+// Transição buraco negro (#633): 1,8 s. A cena que sai começa a ser puxada 1,2 s antes da fronteira e a próxima
+// termina de nascer 0,6 s depois dela, quando a fala dela começa. Cabe no respiro: nunca cobre a fala.
+const TRANSITION = { lead: 1.2, duration: 1.8 }
+function transitionAt(timeline, t) {
+  for (let index = 0; index < timeline.scenes.length - 1; index += 1) {
+    const from = timeline.scenes[index].end - TRANSITION.lead
+    if (t >= from && t < from + TRANSITION.duration) {
+      return { from: index, to: index + 1, progress: (t - from) / TRANSITION.duration }
+    }
+  }
+  return null
+}
+// Fases da transição em função do progresso p (0 a 1), todas entre 0 e 1 e sem overshoot:
+//   pull   - a cena que sai é puxada em espiral (0 a 1 em p 0 a 0,5), ease-in-out
+//   hole   - presença do Gargantua: nasce em 0,18, pleno de 0,42 a 0,62, some até 0,86
+//   size   - tamanho do Gargantua: cresce até 0,55 e dilata ao sumir
+//   flash  - clarão curto do disco quando a próxima cena começa a sair do centro (pico em 0,58)
+//   arrive - a próxima cena nasce do centro (0 até 0,5; 0 a 1 em p 0,55 a 1), ease-out
+//   streak - estrelas puxadas para o centro (sobe até 0,4, desce até 0,85)
+function transitionPhases(progress) {
+  const p = clamp(progress)
+  const span = (from, to) => clamp((p - from) / (to - from))
+  const bump = (from, peak, to) => (p <= peak ? easeInOut(span(from, peak)) : 1 - easeInOut(span(peak, to)))
+  return {
+    pull: easeInOut(span(0, 0.5)),
+    hole: easeInOut(span(0.18, 0.42)) * (1 - easeInOut(span(0.62, 0.86))),
+    size: ((0.15 + 0.85 * easeOut(span(0.18, 0.55))) * (1 + 0.35 * easeInOut(span(0.62, 0.9)))) / 1.35,
+    flash: p <= 0.48 || p >= 0.68 ? 0 : Math.sin(Math.PI * (p - 0.48) / 0.2) ** 2,
+    arrive: easeOut(span(0.55, 1)),
+    streak: bump(0.02, 0.4, 0.85),
+  }
+}
+// motion:end
+const TRANSITION_TAIL = TRANSITION.duration - TRANSITION.lead
+// Quadro da sequência no instante `seconds` desde o início da cena: cada quadro dura o seu delayMillis;
+// depois do último segura o último, ou recomeça do primeiro se `loop`. Mesma regra de scripts/frames.mjs.
+function frameIndexAt(frames, seconds, loop = false) {
+  const total = frames.reduce((sum, frame) => sum + frame.delayMillis, 0)
+  let ms = Math.max(0, seconds * 1000)
+  if (loop && total > 0) ms %= total
+  let accumulated = 0
+  for (let index = 0; index < frames.length; index += 1) {
+    accumulated += frames[index].delayMillis
+    if (ms < accumulated) return index
+  }
+  return frames.length - 1
+}
 const escape = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
 let video = null
 const nodes = []
 
+// Estrelas de posição fixa (semente fixa) que descem devagar com o relógio t.
+const stars = (() => {
+  let seed = 7
+  const random = () => {
+    seed = (seed * 16807) % 2147483647
+    return seed / 2147483647
+  }
+  return Array.from({ length: 160 }, () => [random() * 1080, random() * 1920, 0.6 + random() * 1.6, random() * Math.PI * 2])
+})()
+
 function pick(value) {
   if (value == null) return ''
   return typeof value === 'object' && !Array.isArray(value) ? (value[video.lang] ?? value.en) : value
 }
+
+// layout:begin
+// Caixa da captura de uma cena screen: a maior escala que cabe em maxWidth × maxHeight, mantendo a proporção.
+// Captura pequena cresce até encostar num limite; nunca passa dos dois. Medidas inteiras (floor) para o DOM.
+// A zona do painel vai do fim do título (mais gap) ao começo da legenda (menos gap); a legenda acaba em captionEdge px do rodapé.
+const CAPTURE = { maxWidth: 950, chrome: 2, gap: 24, captionEdge: 240, headlineLines: 2, headlineMin: 40 }
+function fitCapture(crop, bounds) {
+  const [, , cropW, cropH] = crop
+  const scale = Math.min(bounds.maxWidth / cropW, bounds.maxHeight / cropH)
+  return { width: Math.floor(cropW * scale + 1e-6), height: Math.floor(cropH * scale + 1e-6), scale }
+}
+// layout:end
+
+// surface:begin
+// HTML da captura de uma cena screen. Sem barra de janela em nenhuma cena. Janela (padrão): cartão com raio, borda e sombra.
+// surface "hud": a captura (PNG com alfa) vai direto sobre as estrelas, sem caixa, fundo ou recorte; só drop-shadow no conteúdo.
+function screenVisual(scene, shots, focus) {
+  if (scene.surface === 'hud') return `<div class="hudshot">${shots}${focus}</div>`
+  return `<div class="panel cine"><div class="shot">${shots}${focus}</div></div>`
+}
+// surface:end
 
 function kickerHtml(scene) {
   const tag = scene.tag ? `<b>${escape(scene.tag)}</b> · ` : ''
@@ -130,7 +268,7 @@ function kickerHtml(scene) {
 
 function buildScene(scene) {
   const element = document.createElement('div')
-  element.className = 'scene'
+  element.className = scene.kind === 'screen' ? 'scene screen' : 'scene'
   const parts = {}
   if (scene.kind === 'title' || scene.kind === 'closing') {
     element.innerHTML = `<div class="hero ${scene.kind}"><canvas width="800" height="800"></canvas>
@@ -141,13 +279,14 @@ function buildScene(scene) {
   } else {
     let visual = ''
     if (scene.kind === 'screen') {
-      const [, , cropW, cropH] = scene.crop
-      const scale = Math.min(876 / cropW, 544 / cropH)
-      const width = Math.round(cropW * scale)
-      const height = Math.round(cropH * scale)
-      visual = `<div class="panel" style="width:${width}px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
-        <div class="shot" style="width:${width}px;height:${height}px"><img src="${escape(pick(scene.image))}"></div></div>`
-      parts.scale = scale
+      // Com sequence (cena de quadros), todos os quadros são carregados no setup e só o da vez fica visível.
+      const shots = scene.sequence
+        ? scene.sequence.map((frame) => `<img src="${escape(frame.src)}">`).join('')
+        : `<img src="${escape(pick(scene.image))}">`
+      const focus = scene.focus ? '<div class="focus"></div>' : ''
+      // Tamanho e posição saem de placeCapture (depois das fontes): ela mede o título e a legenda na página.
+      visual = screenVisual(scene, shots, focus)
+      parts.box = { width: 0, height: 0 }
     } else if (scene.kind === 'commands') {
       visual = `<div class="panel" style="width:876px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'terminal')}</div><div class="term">${
         scene.commands.map(() => `<div class="line"></div><div class="out"></div>`).join('')}</div></div>`
@@ -164,7 +303,8 @@ function buildScene(scene) {
     const chips = scene.chips ? `<div class="chips">${scene.chips.map((chip) => `<span class="chip">${escape(chip)}</span>`).join('')}</div>` : ''
     element.innerHTML = `${kickerHtml(scene)}<div class="headline">${escape(pick(scene.headline))}</div><div class="visual">${visual}</div>${chips}`
     parts.panel = element.querySelector('.panel')
-    parts.img = element.querySelector('.shot img')
+    parts.imgs = [...element.querySelectorAll('.shot img, .hudshot img')]
+    parts.focus = element.querySelector('.shot .focus, .hudshot .focus')
     parts.lines = [...element.querySelectorAll('.term .line')]
     parts.outs = [...element.querySelectorAll('.term .out')]
     parts.rows = [...element.querySelectorAll('.step, .item')]
@@ -174,23 +314,19 @@ function buildScene(scene) {
   return { scene, element, parts }
 }
 
-// Anel Gargantua: núcleo escuro, disco de acreção inclinado com Doppler (ouro de um lado, brasa
-// do outro), anel de fótons e até três arcos de cota que entram uma vez a partir das 12 h, sem
-// passar do valor. Cenário, nunca dado: os arcos não levam número.
-function drawRing(canvas, local) {
-  const context = canvas.getContext('2d')
-  const size = canvas.width
-  const center = size / 2
-  context.clearRect(0, 0, size, size)
-  const glow = context.createRadialGradient(center, center, 90, center, center, 390)
-  glow.addColorStop(0, 'rgba(232,174,99,0.20)')
-  glow.addColorStop(1, 'rgba(232,174,99,0)')
-  context.fillStyle = glow
-  context.fillRect(0, 0, size, size)
-  const lit = easeOut(local / 1.2)
+// Gargantua: nucleo escuro, disco de acrecao inclinado com Doppler (ouro de um lado, brasa do outro) e anel de
+// fotons. Desenho unico da abertura (drawRing) e da transicao entre cenas (drawHole). `lit` (0 a 1) e o brilho;
+// `local` (s) move os filamentos (orbita de 14 s, como no app). Opcoes so da transicao: `glow` acende o anel de
+// fotons e `spin` (s) gira o disco em fios. Centro em (cx, cy) do contexto atual.
+function drawGargantua(context, cx, cy, { lit, local, glow = 0, spin = null }) {
+  const halo = context.createRadialGradient(cx, cy, 90, cx, cy, 390)
+  halo.addColorStop(0, 'rgba(232,174,99,0.20)')
+  halo.addColorStop(1, 'rgba(232,174,99,0)')
+  context.fillStyle = halo
+  context.fillRect(cx - 390, cy - 390, 780, 780)
   const disc = (front) => {
     context.save()
-    context.translate(center, center)
+    context.translate(cx, cy)
     context.rotate(-0.22)
     context.scale(1, 0.26)
     const gradient = context.createLinearGradient(-260, 0, 260, 0)
@@ -198,38 +334,71 @@ function drawRing(canvas, local) {
     gradient.addColorStop(0.5, `rgba(232,174,99,${0.85 * lit})`)
     gradient.addColorStop(1, `rgba(180,80,30,${0.75 * lit})`)
     context.strokeStyle = gradient
+    const from = front ? 0 : Math.PI
+    const to = front ? Math.PI : Math.PI * 2
     for (let band = 0; band < 5; band += 1) {
       context.lineWidth = 16 - band * 2.5
+      const radius = 175 + band * 20
       context.beginPath()
-      context.ellipse(0, 0, 175 + band * 20, 175 + band * 20, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2)
+      context.ellipse(0, 0, radius, radius, 0, from, to)
       context.stroke()
+      if (spin !== null) {
+        // Fios claros girando em volta do buraco: mais perto, mais rapido.
+        context.save()
+        context.globalAlpha = 0.7
+        context.lineWidth = (16 - band * 2.5) * 0.5
+        context.strokeStyle = `rgba(255,240,203,${0.95 * lit})`
+        context.setLineDash([70, 150])
+        context.lineDashOffset = -spin * (260 - band * 30)
+        context.beginPath()
+        context.ellipse(0, 0, radius, radius, 0, from, to)
+        context.stroke()
+        context.restore()
+      }
     }
     context.restore()
   }
   disc(false)
   context.fillStyle = '#030508'
   context.beginPath()
-  context.arc(center, center, 128, 0, Math.PI * 2)
+  context.arc(cx, cy, 128, 0, Math.PI * 2)
   context.fill()
-  const photon = context.createLinearGradient(center - 140, center + 140, center + 140, center - 140)
+  const photon = context.createLinearGradient(cx - 140, cy + 140, cx + 140, cy - 140)
   photon.addColorStop(0, `rgba(180,80,30,${0.6 * lit})`)
   photon.addColorStop(0.5, `rgba(232,174,99,${0.8 * lit})`)
   photon.addColorStop(1, `rgba(255,240,203,${lit})`)
   context.strokeStyle = photon
-  context.lineWidth = 5
+  context.lineWidth = 5 + glow * 3
+  if (glow > 0) {
+    context.shadowColor = `rgba(255,240,203,${0.95 * glow})`
+    context.shadowBlur = 34 * glow
+  }
   context.beginPath()
-  context.arc(center, center, 134, 0, Math.PI * 2)
+  context.arc(cx, cy, 134, 0, Math.PI * 2)
   context.stroke()
+  context.shadowBlur = 0
+  context.shadowColor = 'transparent'
   disc(true)
-  // Filamentos decorativos: órbita de 14 s, como no app.
+  // Filamentos decorativos.
   context.lineWidth = 2
   for (let index = 0; index < 3; index += 1) {
     const angle = (local / 14) * Math.PI * 2 + index * 2.1
     context.strokeStyle = `rgba(255,240,203,${0.22 * lit})`
     context.beginPath()
-    context.arc(center, center, 150 + index * 6, angle, angle + 0.9)
+    context.arc(cx, cy, 150 + index * 6, angle, angle + 0.9)
     context.stroke()
   }
+}
+
+// Anel da abertura e do fechamento: o Gargantua mais ate tres arcos de cota que entram uma vez a partir das 12 h,
+// sem passar do valor. Cenario, nunca dado: os arcos nao levam numero.
+function drawRing(canvas, local) {
+  const context = canvas.getContext('2d')
+  const size = canvas.width
+  const center = size / 2
+  context.clearRect(0, 0, size, size)
+  const lit = easeOut(local / 1.2)
+  drawGargantua(context, center, center, { lit, local })
   const arcs = [['#4CAF50', 0.72], ['#FFA726', 0.48], ['#4C8DFF', 0.3]]
   arcs.forEach(([color, value], index) => {
     const radius = 290 + index * 34
@@ -249,30 +418,162 @@ function drawRing(canvas, local) {
   })
 }
 
-function setStyle(element, opacity, offset) {
-  element.style.opacity = String(opacity)
-  element.style.transform = `translateY(${offset}px)`
+// Buraco negro da transicao: o mesmo Gargantua da abertura (drawGargantua), que nasce no centro, cresce com o
+// anel de fotons aceso e um halo de lente dourado, e se desfaz no clarao do disco quando a proxima cena sai do
+// centro. Tudo sai do progresso da transicao.
+const holeCanvas = document.getElementById('hole')
+function drawHole(transition) {
+  const context = holeCanvas.getContext('2d')
+  context.clearRect(0, 0, holeCanvas.width, holeCanvas.height)
+  if (!transition) return
+  const phase = transitionPhases(transition.progress)
+  const cx = holeCanvas.width / 2
+  const cy = holeCanvas.height / 2
+  const seconds = transition.progress * TRANSITION.duration
+  if (phase.hole > 0.002) {
+    // Escurece as bordas: o buraco puxa a luz do quadro para o centro.
+    const vignette = context.createRadialGradient(cx, cy, 260, cx, cy, 1150)
+    vignette.addColorStop(0, 'rgba(3,5,8,0)')
+    vignette.addColorStop(1, `rgba(3,5,8,${0.6 * phase.hole})`)
+    context.fillStyle = vignette
+    context.fillRect(0, 0, holeCanvas.width, holeCanvas.height)
+    const scale = 1.15 * phase.size
+    context.save()
+    context.translate(cx, cy)
+    context.scale(scale, scale)
+    // Halo de lente dourado, sutil, e dois arcos de Einstein que giram devagar.
+    const lens = context.createRadialGradient(0, 0, 230, 0, 0, 470)
+    lens.addColorStop(0, 'rgba(232,174,99,0)')
+    lens.addColorStop(0.45, `rgba(232,174,99,${0.16 * phase.hole})`)
+    lens.addColorStop(1, 'rgba(232,174,99,0)')
+    context.fillStyle = lens
+    context.fillRect(-480, -480, 960, 960)
+    context.lineCap = 'round'
+    context.lineWidth = 3
+    context.strokeStyle = `rgba(255,240,203,${0.3 * phase.hole})`
+    for (let arc = 0; arc < 2; arc += 1) {
+      const angle = seconds * 0.9 + arc * Math.PI
+      context.beginPath()
+      context.arc(0, 0, 330, angle, angle + 1.1)
+      context.stroke()
+    }
+    context.globalAlpha = phase.hole
+    drawGargantua(context, 0, 0, { lit: 1, local: seconds, glow: 1, spin: seconds })
+    context.restore()
+  }
+  if (phase.flash > 0) {
+    const glow = context.createRadialGradient(cx, cy, 40, cx, cy, 820)
+    glow.addColorStop(0, `rgba(255,240,203,${0.9 * phase.flash})`)
+    glow.addColorStop(0.3, `rgba(232,174,99,${0.4 * phase.flash})`)
+    glow.addColorStop(1, 'rgba(232,174,99,0)')
+    context.fillStyle = glow
+    context.fillRect(0, 0, holeCanvas.width, holeCanvas.height)
+  }
 }
 
-function renderScene(node, index, t) {
+// Fundo de estrelas: a noite do app com pontos que descem devagar. Tudo sai de t (sem animacao propria).
+// Na transicao, `streak` (0 a 1) puxa as estrelas para o centro e as estica em riscos.
+function drawStars(t, streak = 0) {
+  const context = document.getElementById('stars').getContext('2d')
+  context.fillStyle = '#080B12'
+  context.fillRect(0, 0, 1080, 1920)
+  context.lineCap = 'round'
+  for (const [x, y, size, phase] of stars) {
+    const alpha = 0.3 + 0.25 * Math.sin(t * 0.8 + phase)
+    const py = (y + t * 4) % 1920
+    if (streak <= 0.001) {
+      context.fillStyle = `rgba(255,240,203,${alpha})`
+      context.beginPath()
+      context.arc(x, py, size, 0, Math.PI * 2)
+      context.fill()
+      continue
+    }
+    const dx = 540 - x
+    const dy = 960 - py
+    const head = 0.62 * streak
+    const tail = head * 0.5
+    context.strokeStyle = `rgba(255,240,203,${Math.min(1, alpha + 0.5 * streak)})`
+    context.lineWidth = size * (1 + streak)
+    context.beginPath()
+    context.moveTo(x + dx * tail, py + dy * tail)
+    context.lineTo(x + dx * head, py + dy * head)
+    context.stroke()
+  }
+}
+
+// Opacidade, deslocamento vertical, rotação e desfoque de uma cena (todos saem de t).
+function setStyle(element, { opacity, offset = 0, transform = '', blur = 0, radius = 0 }) {
+  element.style.opacity = String(opacity)
+  // Lente: a cena puxada ou nascendo do buraco arredonda ate virar disco (so ai corta o conteudo).
+  element.style.borderRadius = radius > 0 ? `${radius.toFixed(1)}%` : ''
+  element.style.overflow = radius > 0 ? 'hidden' : ''
+  element.style.transform = `translateY(${offset}px) ${transform}`
+  element.style.filter = blur > 0 ? `blur(${blur.toFixed(2)}px)` : 'none'
+}
+
+function renderScene(node, index, t, transition) {
   const timing = video.timeline.scenes[index]
   const last = index === video.timeline.scenes.length - 1
+  const leaving = transition?.from === index
+  const arriving = transition?.to === index
   const end = last ? video.timeline.total : timing.end
-  if (t < timing.start || t >= end) {
+  const phase = transition ? transitionPhases(transition.progress) : null
+  const before = arriving ? phase.arrive <= 0 : t < timing.start
+  if (before || t >= (leaving ? end + TRANSITION_TAIL : end)) {
     node.element.style.opacity = '0'
     return false
   }
-  const local = t - timing.start
+  const local = Math.max(0, t - timing.start)
   const enter = easeOut(local / ENTER)
   const exit = last ? 1 : 1 - easeIn((t - (end - EXIT)) / EXIT)
-  setStyle(node.element, Math.min(enter, exit), (1 - enter) * 40)
+  let look = { opacity: Math.min(enter, exit), offset: (1 - enter) * 40 }
+  if (leaving) {
+    // Puxada em espiral para o buraco: encolhe, gira ate 25 graus, desfoca, arredonda como lente e some no centro.
+    look = {
+      opacity: 1 - clamp((phase.pull - 0.7) / 0.3),
+      transform: `scale(${1 - 0.96 * phase.pull}) rotate(${25 * phase.pull}deg)`,
+      blur: 22 * phase.pull,
+      radius: 50 * phase.pull,
+    }
+  } else if (arriving) {
+    // Nasce do centro expandindo, com um giro contrario que se desfaz e o desfoque saindo.
+    const open = 1 - phase.arrive
+    look = {
+      opacity: clamp(phase.arrive * 4),
+      transform: `scale(${0.04 + 0.96 * phase.arrive}) rotate(${-25 * open}deg)`,
+      blur: 16 * open,
+      radius: 50 * open,
+    }
+  }
+  setStyle(node.element, look)
   const scene = node.scene
   const speaking = t - timing.voiceAt
   if (node.parts.canvas) drawRing(node.parts.canvas, local)
-  if (node.parts.img) {
-    const [cropX, cropY] = scene.crop
-    const zoom = 1 + 0.05 * clamp(local / (end - timing.start))
-    node.parts.img.style.transform = `scale(${node.parts.scale * zoom}) translate(${-cropX}px, ${-cropY}px)`
+  if (node.parts.imgs?.length > 0) {
+    const [cropX, cropY, cropW, cropH] = scene.crop
+    const { width, height } = node.parts.box
+    // Câmera: o retângulo visível (em pixels da captura) vem das chaves; sem elas, Ken Burns lento de 1 a 1,06.
+    const zoom = scene.surface === 'hud' ? 1 : 1 + 0.06 * clamp(local / (end - timing.start))
+    const [rx, ry, rl, ra] = scene.camera
+      ? cameraRectAt(scene.camera, local, scene.crop, scene.maxZoom)
+      : [cropX + (cropW - cropW / zoom) / 2, cropY + (cropH - cropH / zoom) / 2, cropW / zoom, cropH / zoom]
+    const k = Math.min(width / rl, height / ra)
+    const ox = (width - rl * k) / 2
+    const oy = (height - ra * k) / 2
+    const shown = scene.sequence ? frameIndexAt(scene.sequence, local, scene.loop) : 0
+    node.parts.imgs.forEach((img, position) => {
+      img.style.transform = `translate(${ox}px, ${oy}px) scale(${k}) translate(${-rx}px, ${-ry}px)`
+      img.style.visibility = position === shown ? 'visible' : 'hidden'
+    })
+    if (node.parts.focus) {
+      const [fx, fy, fl, fa] = scene.focus
+      const focus = node.parts.focus
+      focus.style.left = `${ox + k * (fx - rx)}px`
+      focus.style.top = `${oy + k * (fy - ry)}px`
+      focus.style.width = `${fl * k}px`
+      focus.style.height = `${fa * k}px`
+      focus.style.opacity = String(focusOpacity(local, scene.focusAt ?? 0, scene.focusFor))
+    }
   }
   // Comandos digitados a 30 caracteres/s, um depois do outro, a partir da fala.
   if (node.parts.lines?.length > 0) {
@@ -290,20 +591,23 @@ function renderScene(node, index, t) {
   const stagger = scene.stagger ?? 0.45
   node.parts.rows?.forEach((row, position) => {
     const shown = easeOut((speaking - position * stagger) / 0.4)
-    setStyle(row, scene.kind === 'steps' || scene.kind === 'list' ? shown : 1, (1 - shown) * 18)
+    setStyle(row, { opacity: scene.kind === 'steps' || scene.kind === 'list' ? shown : 1, offset: (1 - shown) * 18 })
   })
   node.parts.chips?.forEach((chip, position) => {
     const shown = easeOut((speaking - 0.3 - position * 0.25) / 0.4)
-    setStyle(chip, shown, (1 - shown) * 12)
+    setStyle(chip, { opacity: shown, offset: (1 - shown) * 12 })
   })
   return true
 }
 
 function renderFrame(t) {
+  const transition = transitionAt(video.timeline, t)
+  drawStars(t, transition ? transitionPhases(transition.progress).streak : 0)
   let current = 0
   nodes.forEach((node, index) => {
-    if (renderScene(node, index, t)) current = index
+    if (renderScene(node, index, t, transition)) current = index
   })
+  drawHole(transition)
   const kind = video.scenes[current].kind
   const chrome = kind === 'title' || kind === 'closing' ? 0 : 1
   document.getElementById('header').style.opacity = String(chrome)
@@ -325,6 +629,43 @@ function renderFrame(t) {
   }
 }
 
+// Medidas da página (com as fontes carregadas): a legenda de duas linhas é o pior caso, então a zona da captura não muda por cena.
+function measureCaption() {
+  const box = document.querySelector('#caption div')
+  const saved = box.innerHTML
+  box.innerHTML = 'Ag<br>Ag'
+  const height = box.offsetHeight
+  box.innerHTML = saved
+  return height
+}
+// A captura vai do fim do título (mais um respiro) ao começo da legenda (menos um respiro), e usa a maior caixa que cabe nela.
+function placeCapture(node, captionHeight) {
+  const { element, scene, parts } = node
+  const headline = element.querySelector('.headline')
+  // Título em no máximo 2 linhas: se passar, reduz a fonte de 2 em 2 px até caber (ou até o mínimo).
+  let size = parseFloat(getComputedStyle(headline).fontSize)
+  const lineHeight = () => parseFloat(getComputedStyle(headline).lineHeight)
+  while (headline.offsetHeight > lineHeight() * CAPTURE.headlineLines + 1 && size > CAPTURE.headlineMin) {
+    size -= 2
+    headline.style.fontSize = `${size}px`
+  }
+  if (headline.offsetHeight > lineHeight() * CAPTURE.headlineLines + 1) console.warn(`${scene.id}: título passa de 2 linhas`)
+  const top = headline.offsetTop + headline.offsetHeight + CAPTURE.gap
+  const bottom = 1920 - CAPTURE.captionEdge - captionHeight - CAPTURE.gap
+  const box = fitCapture(scene.crop, { maxWidth: CAPTURE.maxWidth, maxHeight: bottom - top - CAPTURE.chrome })
+  const visual = element.querySelector('.visual')
+  visual.style.left = '0'
+  visual.style.width = '1080px'
+  visual.style.top = `${top}px`
+  visual.style.height = `${bottom - top}px`
+  const panel = element.querySelector('.panel')
+  if (panel) panel.style.width = `${box.width + 2}px`
+  const shot = element.querySelector('.shot, .hudshot')
+  shot.style.width = `${box.width}px`
+  shot.style.height = `${box.height}px`
+  parts.box = { width: box.width, height: box.height }
+}
+
 async function setup(data) {
   video = data
   document.documentElement.lang = data.lang === 'pt' ? 'pt-BR' : 'en'
@@ -334,6 +675,10 @@ async function setup(data) {
   await Promise.all([...document.fonts].map((face) => face.load()))
   await document.fonts.ready
   await Promise.all([...document.images].map((image) => image.decode()))
+  const captionHeight = measureCaption()
+  nodes.forEach((node) => {
+    if (node.scene.kind === 'screen') placeCapture(node, captionHeight)
+  })
   return true
 }
 

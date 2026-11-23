@@ -107,9 +107,20 @@ fun main(args: Array<String>) {
         HelpTopic.APPEARANCE to ::recordAppearance,
         HelpTopic.UPDATES to ::recordUpdates
     )
+    val requested = options.topics
+    if (requested != null) {
+        val unknown = VideoDemos.unknownTopics(requested, recorders.map { (topic, _) -> HelpCatalog.mediaId(topic) }.toSet())
+        require(unknown.isEmpty()) { "Tópico desconhecido: ${unknown.joinToString(", ")}" }
+    }
     recorders
         .filter { (topic, _) -> options.topics == null || HelpCatalog.mediaId(topic) in options.topics }
         .forEach { (_, recordTopic) -> recordTopic(options) }
+    // Demos só de vídeo (#633): só entram por `--topic` explícito e só no formato de quadros.
+    if (requested != null && options.format == HelpMediaFormat.FRAMES) {
+        VideoDemos.recorders
+            .filter { (id, _) -> id in requested }
+            .forEach { (_, recordDemo) -> recordDemo(options) }
+    }
 
     println("Demos geradas em ${options.outputDir.absolutePath}")
 }
@@ -609,15 +620,31 @@ internal fun record(
     topic: HelpTopic,
     state: DemoState,
     script: (SceneRecorder) -> Unit
+) = recordMedia(options, HelpCatalog.mediaId(topic), state, script)
+
+/** Grava um roteiro sob [mediaId]; as demos só de vídeo (#633) passam o id e a cena que quiserem. */
+internal fun recordMedia(
+    options: HelpMediaOptions,
+    mediaId: String,
+    state: DemoState,
+    script: (SceneRecorder) -> Unit,
+    sceneWidthDp: Int = WIDTH_DP,
+    sceneHeightDp: Int = HEIGHT_DP,
+    videoScale: Int = SceneRecorder.SCALE,
+    /** Só vale nos quadros PNG do vídeo: o GIF não tem alfa e segue com o fundo do tema. */
+    transparent: Boolean = false
 ) {
-    // O vídeo guarda o quadro a 2×; o GIF da ajuda continua reduzido à metade.
+    // O vídeo guarda o quadro na escala pedida; o GIF da ajuda continua em 2× reduzido à metade.
     val frames = options.format == HelpMediaFormat.FRAMES
-    val recorder = SceneRecorder(widthDp = WIDTH_DP, heightDp = HEIGHT_DP, downsample = !frames)
+    val recorder = SceneRecorder(
+        widthDp = sceneWidthDp, heightDp = sceneHeightDp, downsample = !frames,
+        scale = if (frames) videoScale else SceneRecorder.SCALE,
+        transparent = frames && transparent
+    )
     try {
         state.cursor.pose = state.cursor.pose.copy(visible = false)
         script(recorder)
 
-        val mediaId = HelpCatalog.mediaId(topic)
         val seconds = recorder.frames.sumOf { frame -> frame.delayMillis } / 1_000.0
         if (frames) {
             val dir = options.framesDir(mediaId)

@@ -9,7 +9,9 @@ import { chromePath } from './setup-tools.mjs'
 
 export const WIDTH = 1080
 export const HEIGHT = 1920
-export const FPS = 30
+// Padrão do tour (#505); o vídeo de release (#633) passa RELEASE_ENCODE: câmera e transição pedem 60 fps.
+export const DEFAULT_ENCODE = { fps: 30, preset: 'medium', crf: 18 }
+export const RELEASE_ENCODE = { fps: 60, preset: 'slow', crf: 16 }
 // Vídeo de release vertical; o tour (#505) passa { width: 1920, height: 1080, page: 'tour.html' }.
 const VERTICAL = { width: WIDTH, height: HEIGHT, page: 'video.html' }
 
@@ -34,11 +36,12 @@ function capture(page, t) {
         .then(() => page.screenshot({ type: 'jpeg', quality: 92, optimizeForSpeed: true }))
 }
 
-export async function renderVideo({ nodeModules, stageDir, data, output, onProgress, frame }) {
+export async function renderVideo({ nodeModules, stageDir, data, output, onProgress, frame, encode = DEFAULT_ENCODE }) {
     const { browser, page } = await openPage(nodeModules, stageDir, data, frame)
+    const FPS = encode.fps
     const encoder = spawn('ffmpeg', [
         '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-        '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(FPS), output,
+        '-c:v', 'libx264', '-preset', encode.preset, '-crf', String(encode.crf), '-pix_fmt', 'yuv420p', '-r', String(FPS), output,
     ], { stdio: ['pipe', 'inherit', 'inherit'] })
     const finished = new Promise((resolve, reject) => {
         encoder.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg saiu com ${code}`))))

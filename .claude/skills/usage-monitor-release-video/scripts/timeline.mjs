@@ -9,6 +9,10 @@ export const PACING = {
     enter: 0.6,
     // Silêncio depois de cada fala: o pedido do dono foi "não ficar muito rápido".
     breath: 1.2,
+    // Cena com várias falas (beats): intervalo mínimo entre o fim de uma e o início da seguinte, e quanto uma fala
+    // pode passar do `at` da próxima antes de o roteiro ser recusado.
+    beatGap: 0.35,
+    beatOverrun: 1.5,
     lastExit: 1.8,
     // Normas de legenda para adulto aceitam até 17 caracteres/s; 15 fica abaixo, sem pressa.
     maxCharsPerSecond: 15,
@@ -35,6 +39,16 @@ export const TOUR_PACING = {
     captionChars: 42,
 }
 
+// Vídeo de release vertical (#633): cinematográfico e sem pressa. Fala de no máximo 12 caracteres/s; 1,8 s de
+// respiro, onde cabe a transição de buraco negro sem tocar na fala; 1,5 s depois de cada sequência de quadros.
+export const RELEASE_PACING = {
+    ...PACING,
+    breath: 1.8,
+    maxCharsPerSecond: 15,
+    maxTotal: 150,
+    sequenceTail: 1.5,
+}
+
 // Onde, dentro do capítulo, o foco de uma captura acende: no primeiro terço do tempo dela.
 const FOCUS_AT = 0.35
 // Os comandos são digitados a 30 caracteres/s, com 0,2 s até a saída e a pausa da cena entre eles.
@@ -49,6 +63,31 @@ export function spokenLength(line) {
     return (line.say ?? line.text).length
 }
 
+// Falas de uma cena em um idioma. `lines[lang]` é um objeto { text, say? } (uma fala em at 0) ou uma lista
+// [{ at, text, say? }, …]; `at` é relativo ao início da fala da cena. `key` nomeia o áudio e a duração: o id da
+// cena com uma fala só, `<id>-<n>` (n a partir de 1) com várias.
+export function beatsOf(scene, language) {
+    const line = scene.lines[language]
+    const list = Array.isArray(line) ? line : [{ at: 0, ...line }]
+    return list.map((beat, index) => ({
+        at: beat.at ?? 0,
+        text: beat.text,
+        say: beat.say,
+        key: list.length === 1 ? scene.id : `${scene.id}-${index + 1}`,
+    }))
+}
+
+const seconds = (value) => value.toFixed(1).replace('.', ',')
+
+// Cada fala no seu instante: [{ key, at }] em ordem. Linha do tempo sem beats (antiga) = a fala única em voiceAt.
+export function voiceTracks(scenes, timeline) {
+    return scenes.flatMap((scene, index) => {
+        const timing = timeline.scenes[index]
+        if (!timing.beats) return [{ key: scene.id, at: timing.voiceAt }]
+        return timing.beats.map((beat) => ({ key: beat.key, at: beat.start }))
+    })
+}
+
 // Capturas de um capítulo: a primeira entra com a fala, as outras dividem o resto do capítulo em partes iguais.
 function shotsOf(scene, voiceAt, end) {
     if (!scene.media) return undefined
@@ -59,28 +98,58 @@ function shotsOf(scene, voiceAt, end) {
     })
 }
 
-export function buildTimeline(scenes, durations, pacing = PACING) {
+// holds: { [id da cena]: segundos } de cenas com sequência de quadros. A cena dura pelo menos esse tempo
+// mais pacing.sequenceTail, mesmo com fala curta, para o demo acabar de ser visto.
+export function buildTimeline(scenes, durations, pacing = PACING, holds = {}) {
     const problems = []
     let cursor = 0
     const timed = scenes.map((scene, index) => {
-        for (const language of LANGUAGES) {
-            const seconds = durations[language][scene.id]
-            const characters = spokenLength(scene.lines[language])
-            if (characters / seconds > pacing.maxCharsPerSecond) {
-                const rate = (characters / seconds).toFixed(1)
-                problems.push(`${scene.id} (${language}): ${characters} caracteres em ${seconds.toFixed(2)} s (${rate}/s)`)
-            }
+        const perLanguage = Object.fromEntries(LANGUAGES.map((language) => [language, beatsOf(scene, language)]))
+        const planned = perLanguage.en
+        if (LANGUAGES.some((language) => perLanguage[language].length !== planned.length)) {
+            problems.push(`${scene.id}: EN e PT precisam ter o mesmo número de falas`)
         }
-        const longest = Math.max(...LANGUAGES.map((language) => durations[language][scene.id]))
+        const many = planned.length > 1
+        const length = (beat) => spokenLength(beat)
+        for (const language of LANGUAGES) {
+            perLanguage[language].forEach((beat, position) => {
+                const spoken = durations[language][beat.key]
+                const characters = length(beat)
+                if (characters / spoken > pacing.maxCharsPerSecond) {
+                    const rate = (characters / spoken).toFixed(1)
+                    const name = many ? `${scene.id}#${position + 1}` : scene.id
+                    problems.push(`${name} (${language}): ${characters} caracteres em ${spoken.toFixed(2)} s (${rate}/s)`)
+                }
+            })
+        }
         const start = cursor
         const voiceAt = start + (index === 0 ? pacing.firstEnter : pacing.enter)
-        const end = voiceAt + longest + pacing.breath
+        const placed = []
+        planned.forEach((beat, position) => {
+            const at = Math.max(...LANGUAGES.map((language) => perLanguage[language][position]?.at ?? 0))
+            const longest = Math.max(...LANGUAGES.map((language) => durations[language][beat.key] ?? 0))
+            const wanted = voiceAt + at
+            const previous = placed[position - 1]
+            if (previous) {
+                const overrun = previous.finish - wanted
+                if (overrun > pacing.beatOverrun + 1e-9) {
+                    problems.push(`${scene.id}: a fala ${position} termina a ${seconds(previous.finish - voiceAt)} s da cena e passa ` +
+                        `${seconds(overrun)} s do início da fala ${position + 1} (${seconds(at)} s); o máximo é ${seconds(pacing.beatOverrun)} s`)
+                }
+            }
+            const beatStart = previous ? Math.max(wanted, previous.finish + pacing.beatGap) : wanted
+            placed.push({ key: beat.key, at, start: beatStart, finish: beatStart + longest })
+        })
+        const last = placed[placed.length - 1]
+        const hold = holds[scene.id] ? holds[scene.id] + (pacing.sequenceTail ?? 0) : 0
+        const end = Math.max(last.finish + pacing.breath, start + hold)
         cursor = end
+        const beats = placed.map(({ key, at, start: beatStart }) => ({ key, at, start: beatStart }))
         const shots = shotsOf(scene, voiceAt, end)
-        return shots ? { id: scene.id, start, voiceAt, end, shots } : { id: scene.id, start, voiceAt, end }
+        return shots ? { id: scene.id, start, voiceAt, end, beats, shots } : { id: scene.id, start, voiceAt, end, beats }
     })
     if (problems.length > 0) {
-        throw new Error(`Fala acima de ${pacing.maxCharsPerSecond} caracteres/s — corte texto:\n${problems.join('\n')}`)
+        throw new Error(`Falas fora do ritmo (até ${pacing.maxCharsPerSecond} caracteres/s; falas de uma cena sem passar do at da próxima) — corte texto ou ajuste os at:\n${problems.join('\n')}`)
     }
     const total = cursor + pacing.lastExit
     if (total > pacing.maxTotal) {
@@ -184,20 +253,24 @@ export function captionBlocks(text, pacing = PACING) {
 export function captionCues(scenes, timeline, durations, language, pacing = PACING) {
     const cues = []
     scenes.forEach((scene, index) => {
-        const voiceAt = timeline.scenes[index].voiceAt
-        const spoken = durations[language][scene.id]
-        const blocks = captionBlocks(scene.lines[language].text, pacing)
-        const sizes = blocks.map((block) => block.join(' ').length)
-        const totalChars = sizes.reduce((sum, size) => sum + size, 0)
-        let before = 0
-        blocks.forEach((block, position) => {
-            const from = voiceAt + (spoken * before) / totalChars
-            before += sizes[position]
-            const last = position === blocks.length - 1
-            cues.push({
-                start: position === 0 ? from - pacing.captionLead : from,
-                end: last ? voiceAt + spoken + pacing.captionTail : voiceAt + (spoken * before) / totalChars,
-                lines: block,
+        const timing = timeline.scenes[index]
+        const beats = beatsOf(scene, language)
+        beats.forEach((beat, position) => {
+            const voiceAt = timing.beats ? timing.beats[position].start : timing.voiceAt
+            const spoken = durations[language][beat.key]
+            const blocks = captionBlocks(beat.text, pacing)
+            const sizes = blocks.map((block) => block.join(' ').length)
+            const totalChars = sizes.reduce((sum, size) => sum + size, 0)
+            let before = 0
+            blocks.forEach((block, at) => {
+                const from = voiceAt + (spoken * before) / totalChars
+                before += sizes[at]
+                const final = at === blocks.length - 1
+                cues.push({
+                    start: at === 0 ? from - pacing.captionLead : from,
+                    end: final ? voiceAt + spoken + pacing.captionTail : voiceAt + (spoken * before) / totalChars,
+                    lines: block,
+                })
             })
         })
     })

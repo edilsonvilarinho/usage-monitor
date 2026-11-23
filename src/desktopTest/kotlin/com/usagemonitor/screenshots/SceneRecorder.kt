@@ -1,9 +1,11 @@
 package com.usagemonitor.screenshots
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,6 +13,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -40,16 +43,20 @@ internal class SceneRecorder(
     heightDp: Int,
     private val frameMillis: Long = FRAME_MILLIS,
     /** `false` guarda o quadro a 2×: é o que o tour em vídeo usa (#505). */
-    private val downsample: Boolean = true
+    private val downsample: Boolean = true,
+    /** Densidade da cena; o vídeo grava a 4× porque a câmera dá zoom (#633), a ajuda fica em 2×. */
+    private val scale: Int = SCALE,
+    /** `true` não pinta o fundo da cena: o quadro sai com alfa, só os composables reais opacos (HUD sobre o céu do vídeo). */
+    private val transparent: Boolean = false
 ) {
 
     val frames = mutableListOf<GifFrame>()
 
     @OptIn(ExperimentalComposeUiApi::class)
     private val scene = ImageComposeScene(
-        width = widthDp * SCALE,
-        height = heightDp * SCALE,
-        density = Density(SCALE.toFloat())
+        width = widthDp * scale,
+        height = heightDp * scale,
+        density = Density(scale.toFloat())
     )
 
     private var sceneNanos = 0L
@@ -58,11 +65,18 @@ internal class SceneRecorder(
     fun setContent(content: @Composable () -> Unit) {
         scene.setContent {
             AppTheme(isDark = true) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    content()
+                if (transparent) {
+                    // Sem Surface não há fundo; a cor do texto padrão continua a do tema.
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                        content()
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        content()
+                    }
                 }
             }
         }
@@ -89,14 +103,49 @@ internal class SceneRecorder(
     /** Leva o ponteiro a ([xDp], [yDp]) da cena, para hover que só o mouse abre. */
     @OptIn(ExperimentalComposeUiApi::class)
     fun moveMouse(xDp: Float, yDp: Float) {
-        scene.sendPointerEvent(PointerEventType.Move, Offset(xDp * SCALE, yDp * SCALE))
+        scene.sendPointerEvent(PointerEventType.Move, Offset(xDp * scale, yDp * scale))
+    }
+
+    /** Aperta e solta o botão em ([xDp], [yDp]): o clique real do composable sob o ponteiro. */
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun clickMouse(xDp: Float, yDp: Float) {
+        val position = Offset(xDp * scale, yDp * scale)
+        scene.sendPointerEvent(PointerEventType.Press, position, buttons = PointerButtons(isPrimaryPressed = true))
+        scene.sendPointerEvent(PointerEventType.Release, position)
     }
 
     /** Roda o scroll real do composable; cabeçalho e rodapé não são deslocados junto. */
     @OptIn(ExperimentalComposeUiApi::class)
     fun scrollMouse(xDp: Float, yDp: Float, verticalDelta: Float) {
-        scene.sendPointerEvent(PointerEventType.Scroll, Offset(xDp * SCALE, yDp * SCALE),
+        scene.sendPointerEvent(PointerEventType.Scroll, Offset(xDp * scale, yDp * scale),
             scrollDelta = Offset(0f, verticalDelta))
+    }
+
+    /**
+     * Pressão longa e arrasto real: pressiona em [from], segura [holdMillis] (o tempo de espera do gesto é
+     * real, e cada quadro dorme `frameMillis`), move em um passo por quadro até [to] em [moveMillis] e solta.
+     * [onPointer] recebe cada posição (dp) para o ponteiro sintético acompanhar o gesto.
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun drag(from: Offset, to: Offset, holdMillis: Long, moveMillis: Long, onPointer: (Offset) -> Unit = {}) {
+        val primary = PointerButtons(isPrimaryPressed = true)
+        onPointer(from)
+        scene.sendPointerEvent(PointerEventType.Move, from * scale.toFloat())
+        scene.sendPointerEvent(PointerEventType.Press, from * scale.toFloat(), buttons = primary)
+        // A pressão longa é só tempo: nenhum evento chega à cena enquanto ela dura.
+        repeat((holdMillis / frameMillis).toInt()) {
+            frames += GifFrame(step(), frameMillis.toInt())
+        }
+        val count = (moveMillis / frameMillis).toInt().coerceAtLeast(1)
+        for (index in 1..count) {
+            val position = from + (to - from) * smoothStep(index.toFloat() / count)
+            onPointer(position)
+            scene.sendPointerEvent(PointerEventType.Move, position * scale.toFloat(), buttons = primary)
+            frames += GifFrame(step(), frameMillis.toInt())
+        }
+        scene.sendPointerEvent(PointerEventType.Release, to * scale.toFloat())
+        // Um quadro depois de soltar: a vaga nova começa a assentar.
+        frames += GifFrame(step(), frameMillis.toInt())
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
