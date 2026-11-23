@@ -27,16 +27,20 @@ private const val REORDER_ID = "video-hud-reorder"
 
 /** Mesma escala e margem das outras demos de HUD: o vídeo dá zoom na cena. */
 private const val REORDER_SCALE = 4
-private const val REORDER_MARGIN_DP = 24
+private const val REORDER_MARGIN_DP = VideoDemoPace.SCENE_MARGIN_DP
 
-// Centros dos anéis em dp da cena (notch no topo, sem balão); medidos no quadro 0.
-private const val RING_Y = 63f
-private const val RING_FIRST_X = 156f
-private const val RING_THIRD_X = 451f
+// Centros dos anéis em dp da cena (notch no topo, sem balão); medidos no quadro 0 com margem de 24 dp.
+private const val REORDER_MARGIN_SHIFT = (REORDER_MARGIN_DP - 24).toFloat()
+private const val RING_Y = 63f + REORDER_MARGIN_SHIFT
+private const val RING_FIRST_X = 156f + REORDER_MARGIN_SHIFT
+private const val RING_THIRD_X = 451f + REORDER_MARGIN_SHIFT
 
 // O ponteiro sintético nasce perto do terceiro anel, não no canto da cena.
 private const val REORDER_CURSOR_OFFSET_X = 40f
 private const val REORDER_CURSOR_OFFSET_Y = 30f
+
+// Tempo da pressão longa antes do arrasto; o gesto real do notch espera esse intervalo.
+private const val LONG_PRESS_HOLD = 600L
 
 /** Notch: segurar o terceiro anel, arrastá-lo até a vaga do primeiro e soltar; a ordem nova assenta. */
 internal fun recordHudReorder(options: HelpMediaOptions) {
@@ -69,11 +73,17 @@ internal fun recordHudReorder(options: HelpMediaOptions) {
         state.cursor.pose = state.cursor.pose.copy(
             x = (RING_THIRD_X + REORDER_CURSOR_OFFSET_X).dp, y = (RING_Y + REORDER_CURSOR_OFFSET_Y).dp, visible = true
         )
-        recorder.hold(1_200)
-        recorder.moveCursor(state.cursor, RING_THIRD_X.dp, RING_Y.dp, 600)
-        recorder.drag(Offset(RING_THIRD_X, RING_Y), Offset(RING_FIRST_X, RING_Y), holdMillis = 600, moveMillis = 1_400) { position ->
+        recorder.hold(VideoDemoPace.INTRO_HOLD)
+        recorder.moveCursor(state.cursor, RING_THIRD_X.dp, RING_Y.dp, VideoDemoPace.CURSOR_TRAVEL)
+        recorder.hold(VideoDemoPace.DWELL_BEFORE_CLICK)
+        recorder.drag(
+            Offset(RING_THIRD_X, RING_Y), Offset(RING_FIRST_X, RING_Y),
+            holdMillis = LONG_PRESS_HOLD, moveMillis = VideoDemoPace.MIN_ANIMATION
+        ) { position ->
             state.cursor.pose = state.cursor.pose.copy(x = position.x.dp, y = position.y.dp, visible = true)
         }
-        recorder.hold(2_000)
+        // A ordem nova assenta, depois o estado final fica parado.
+        recorder.animate(VideoDemoPace.MIN_ANIMATION) {}
+        recorder.hold(VideoDemoPace.OUTRO_HOLD)
     }, sceneWidth, sceneHeight, REORDER_SCALE)
 }

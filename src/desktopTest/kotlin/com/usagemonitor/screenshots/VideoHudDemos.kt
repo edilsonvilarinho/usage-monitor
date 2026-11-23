@@ -46,9 +46,9 @@ import kotlin.math.ceil
  * contínuo (órbita das contas) entra pela política `Live` em volta do conteúdo.
  */
 
-/** O vídeo dá zoom na cena: grava a 4×, com a cena justa ao conteúdo e 24 dp de margem. */
+/** O vídeo dá zoom na cena: grava a 4×, com a cena justa ao conteúdo e a margem do ritmo das demos. */
 private const val VIDEO_SCALE = 4
-private const val MARGIN_DP = 24
+private const val MARGIN_DP = VideoDemoPace.SCENE_MARGIN_DP
 
 // Caixa em que a HUD flutuante é desenhada; o buraco fica no centro dela.
 private const val FLOATING_BOX_WIDTH_DP = 1_000
@@ -84,12 +84,23 @@ internal fun recordHudFloating(options: HelpMediaOptions) {
                 }
             }
         }
-        recorder.hold(1_500)
-        expanded = true
-        recorder.animate(2_500) {}
-        recorder.hold(2_000)
+        // O ponteiro nasce dentro da cena, à direita do buraco, e anda até ele: nunca teleporta.
+        state.cursor.pose = state.cursor.pose.copy(x = FLOATING_CURSOR_START_X.dp, y = FLOATING_CURSOR_START_Y.dp, visible = true)
+        recorder.hold(VideoDemoPace.INTRO_HOLD)
+        recorder.moveCursor(state.cursor, FLOATING_HOLE_X.dp, FLOATING_HOLE_Y.dp, VideoDemoPace.CURSOR_TRAVEL)
+        recorder.hold(VideoDemoPace.DWELL_BEFORE_CLICK)
+        recorder.click(state.cursor) { expanded = true }
+        recorder.animate(VideoDemoPace.MIN_ANIMATION) {}
+        recorder.hold(VideoDemoPace.STEP_HOLD)
+        recorder.hold(VideoDemoPace.OUTRO_HOLD)
     }, FLOATING_SCENE_WIDTH_DP, FLOATING_SCENE_HEIGHT_DP, VIDEO_SCALE)
 }
+
+// O buraco no centro da caixa (500, 210), em dp da cena; o ponteiro parte do canto direito, ainda dentro dela.
+private const val FLOATING_HOLE_X = (FLOATING_BOX_WIDTH_DP / 2 - FLOATING_CONTENT_LEFT_DP + MARGIN_DP).toFloat()
+private const val FLOATING_HOLE_Y = (FLOATING_BOX_HEIGHT_DP / 2 - FLOATING_CONTENT_TOP_DP + MARGIN_DP).toFloat()
+private const val FLOATING_CURSOR_START_X = FLOATING_HOLE_X + 60f
+private const val FLOATING_CURSOR_START_Y = FLOATING_HOLE_Y - 90f
 
 @androidx.compose.runtime.Composable
 private fun FloatingHudContent(accounts: List<HudAccount>, options: HelpMediaOptions, expanded: Boolean) {
@@ -149,17 +160,18 @@ private fun BalloonActions(account: HudAccount, options: HelpMediaOptions, onTog
     }
 }
 
-// Pontos do ponteiro, em dp da cena; medidos nos quadros gravados.
-private const val MINIMIZE_BUTTON_X = 236f
-private const val MINIMIZE_BUTTON_Y = 361f
-private const val HOLE_ROW_X = 487f
-private const val HOLE_ROW_Y = 163f
-private const val RESTORE_BUTTON_X = 552f
-private const val RESTORE_BUTTON_Y = 385f
+// Pontos do ponteiro, em dp da cena; medidos nos quadros gravados com margem de 24 dp, somada ao de hoje.
+private const val MARGIN_SHIFT = (MARGIN_DP - 24).toFloat()
+private const val MINIMIZE_BUTTON_X = 236f + MARGIN_SHIFT
+private const val MINIMIZE_BUTTON_Y = 361f + MARGIN_SHIFT
+private const val HOLE_ROW_X = 487f + MARGIN_SHIFT
+private const val HOLE_ROW_Y = 163f + MARGIN_SHIFT
+private const val RESTORE_BUTTON_X = 552f + MARGIN_SHIFT
+private const val RESTORE_BUTTON_Y = 385f + MARGIN_SHIFT
 
 // O ponteiro nasce perto do anel da primeira conta, não no canto da cena.
-private const val CURSOR_START_X = 175f
-private const val CURSOR_START_Y = 90f
+private const val CURSOR_START_X = 175f + MARGIN_SHIFT
+private const val CURSOR_START_Y = 90f + MARGIN_SHIFT
 
 /** Notch: balão aberto, "Minimizar", a conta cai no buraco, a lista "N minimizadas" aparece e "Restaurar" a devolve. */
 internal fun recordHudMinimize(options: HelpMediaOptions) {
@@ -201,37 +213,40 @@ internal fun recordHudMinimize(options: HelpMediaOptions) {
             }
         }
         state.cursor.pose = state.cursor.pose.copy(x = CURSOR_START_X.dp, y = CURSOR_START_Y.dp, visible = true)
-        recorder.hold(1_200)
-        recorder.moveCursor(state.cursor, MINIMIZE_BUTTON_X.dp, MINIMIZE_BUTTON_Y.dp, 800)
+        recorder.hold(VideoDemoPace.INTRO_HOLD)
+        recorder.moveCursor(state.cursor, MINIMIZE_BUTTON_X.dp, MINIMIZE_BUTTON_Y.dp, VideoDemoPace.CURSOR_TRAVEL)
+        recorder.hold(VideoDemoPace.DWELL_BEFORE_CLICK)
         recorder.click(state.cursor) { }
-        // O voo da conta até o buraco: 15 quadros intermediários.
-        recorder.animate(1_500) { fraction ->
+        // O voo da conta até o buraco: no mínimo 1,6 s de quadros intermediários.
+        recorder.animate(VideoDemoPace.MIN_ANIMATION) { fraction ->
             progress = HudMinimizeProgress(mapOf(target to fraction), moving = fraction < 1f)
         }
         accounts = minimizedFirst
         progress = HudMinimizeProgress(mapOf(target to 1f), moving = false)
-        recorder.hold(1_000)
+        recorder.hold(VideoDemoPace.STEP_HOLD)
         // Lista do buraco (índice sentinela = quantidade de contas): "N minimizadas".
         sizes = listSizes
         balloonIndex = accounts.size
-        recorder.animate(700) {}
-        recorder.hold(1_200)
-        recorder.moveCursor(state.cursor, HOLE_ROW_X.dp, HOLE_ROW_Y.dp, 800)
+        recorder.animate(VideoDemoPace.MIN_ANIMATION) {}
+        recorder.hold(VideoDemoPace.STEP_HOLD)
+        recorder.moveCursor(state.cursor, HOLE_ROW_X.dp, HOLE_ROW_Y.dp, VideoDemoPace.CURSOR_TRAVEL)
         recorder.moveMouse(HOLE_ROW_X, HOLE_ROW_Y)
-        recorder.hold(600)
+        recorder.hold(VideoDemoPace.DWELL_BEFORE_CLICK)
         // A altura do balão troca no mesmo instante em que a conta abre, nunca antes.
         recorder.click(state.cursor) {
             recorder.clickMouse(HOLE_ROW_X, HOLE_ROW_Y)
             sizes = accountSizes
         }
-        recorder.animate(700) {}
-        recorder.moveCursor(state.cursor, RESTORE_BUTTON_X.dp, RESTORE_BUTTON_Y.dp, 800)
+        recorder.animate(VideoDemoPace.MIN_ANIMATION) {}
+        recorder.hold(VideoDemoPace.STEP_HOLD)
+        recorder.moveCursor(state.cursor, RESTORE_BUTTON_X.dp, RESTORE_BUTTON_Y.dp, VideoDemoPace.CURSOR_TRAVEL)
+        recorder.hold(VideoDemoPace.DWELL_BEFORE_CLICK)
         recorder.click(state.cursor) { }
         accounts = initial
-        recorder.animate(1_200) { fraction ->
+        recorder.animate(VideoDemoPace.MIN_ANIMATION) { fraction ->
             progress = HudMinimizeProgress(mapOf(target to 1f - fraction), moving = fraction < 1f)
         }
         progress = HudMinimizeProgress(emptyMap(), moving = false)
-        recorder.hold(2_000)
+        recorder.hold(VideoDemoPace.OUTRO_HOLD)
     }, sceneWidth, sceneHeight, VIDEO_SCALE)
 }
