@@ -8,7 +8,13 @@ class VideoDemosTest {
 
     @Test
     fun `o registro de video lista as demos de hud`() {
-        assertEquals(setOf("video-hud-minimize", "video-hud-floating", "video-hud-reorder"), VideoDemos.ids)
+        assertEquals(
+            setOf(
+                "video-hud-minimize", "video-hud-floating", "video-hud-reorder",
+                "video-codex-sessions", "video-analysis-all"
+            ),
+            VideoDemos.ids
+        )
     }
 
     @Test
