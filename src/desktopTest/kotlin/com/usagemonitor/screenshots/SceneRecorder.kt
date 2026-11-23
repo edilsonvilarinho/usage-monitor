@@ -11,6 +11,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -40,16 +41,18 @@ internal class SceneRecorder(
     heightDp: Int,
     private val frameMillis: Long = FRAME_MILLIS,
     /** `false` guarda o quadro a 2×: é o que o tour em vídeo usa (#505). */
-    private val downsample: Boolean = true
+    private val downsample: Boolean = true,
+    /** Densidade da cena; o vídeo grava a 4× porque a câmera dá zoom (#633), a ajuda fica em 2×. */
+    private val scale: Int = SCALE
 ) {
 
     val frames = mutableListOf<GifFrame>()
 
     @OptIn(ExperimentalComposeUiApi::class)
     private val scene = ImageComposeScene(
-        width = widthDp * SCALE,
-        height = heightDp * SCALE,
-        density = Density(SCALE.toFloat())
+        width = widthDp * scale,
+        height = heightDp * scale,
+        density = Density(scale.toFloat())
     )
 
     private var sceneNanos = 0L
@@ -89,13 +92,21 @@ internal class SceneRecorder(
     /** Leva o ponteiro a ([xDp], [yDp]) da cena, para hover que só o mouse abre. */
     @OptIn(ExperimentalComposeUiApi::class)
     fun moveMouse(xDp: Float, yDp: Float) {
-        scene.sendPointerEvent(PointerEventType.Move, Offset(xDp * SCALE, yDp * SCALE))
+        scene.sendPointerEvent(PointerEventType.Move, Offset(xDp * scale, yDp * scale))
+    }
+
+    /** Aperta e solta o botão em ([xDp], [yDp]): o clique real do composable sob o ponteiro. */
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun clickMouse(xDp: Float, yDp: Float) {
+        val position = Offset(xDp * scale, yDp * scale)
+        scene.sendPointerEvent(PointerEventType.Press, position, buttons = PointerButtons(isPrimaryPressed = true))
+        scene.sendPointerEvent(PointerEventType.Release, position)
     }
 
     /** Roda o scroll real do composable; cabeçalho e rodapé não são deslocados junto. */
     @OptIn(ExperimentalComposeUiApi::class)
     fun scrollMouse(xDp: Float, yDp: Float, verticalDelta: Float) {
-        scene.sendPointerEvent(PointerEventType.Scroll, Offset(xDp * SCALE, yDp * SCALE),
+        scene.sendPointerEvent(PointerEventType.Scroll, Offset(xDp * scale, yDp * scale),
             scrollDelta = Offset(0f, verticalDelta))
     }
 
