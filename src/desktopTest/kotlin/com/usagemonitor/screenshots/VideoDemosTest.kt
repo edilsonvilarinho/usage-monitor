@@ -7,8 +7,8 @@ import kotlin.test.assertEquals
 class VideoDemosTest {
 
     @Test
-    fun `o registro de video lista as duas demos de hud`() {
-        assertEquals(setOf("video-hud-minimize", "video-hud-floating"), VideoDemos.ids)
+    fun `o registro de video lista as demos de hud`() {
+        assertEquals(setOf("video-hud-minimize", "video-hud-floating", "video-hud-reorder"), VideoDemos.ids)
     }
 
     @Test

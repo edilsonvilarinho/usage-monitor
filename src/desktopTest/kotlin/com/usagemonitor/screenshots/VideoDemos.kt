@@ -8,7 +8,8 @@ internal object VideoDemos {
 
     val recorders: Map<String, (HelpMediaOptions) -> Unit> = mapOf(
         "video-hud-floating" to ::recordHudFloating,
-        "video-hud-minimize" to ::recordHudMinimize
+        "video-hud-minimize" to ::recordHudMinimize,
+        "video-hud-reorder" to ::recordHudReorder
     )
 
     val ids: Set<String> get() = recorders.keys

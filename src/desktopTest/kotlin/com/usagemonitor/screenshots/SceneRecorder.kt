@@ -110,6 +110,33 @@ internal class SceneRecorder(
             scrollDelta = Offset(0f, verticalDelta))
     }
 
+    /**
+     * Pressão longa e arrasto real: pressiona em [from], segura [holdMillis] (o tempo de espera do gesto é
+     * real, e cada quadro dorme `frameMillis`), move em um passo por quadro até [to] em [moveMillis] e solta.
+     * [onPointer] recebe cada posição (dp) para o ponteiro sintético acompanhar o gesto.
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun drag(from: Offset, to: Offset, holdMillis: Long, moveMillis: Long, onPointer: (Offset) -> Unit = {}) {
+        val primary = PointerButtons(isPrimaryPressed = true)
+        onPointer(from)
+        scene.sendPointerEvent(PointerEventType.Move, from * scale.toFloat())
+        scene.sendPointerEvent(PointerEventType.Press, from * scale.toFloat(), buttons = primary)
+        // A pressão longa é só tempo: nenhum evento chega à cena enquanto ela dura.
+        repeat((holdMillis / frameMillis).toInt()) {
+            frames += GifFrame(step(), frameMillis.toInt())
+        }
+        val count = (moveMillis / frameMillis).toInt().coerceAtLeast(1)
+        for (index in 1..count) {
+            val position = from + (to - from) * smoothStep(index.toFloat() / count)
+            onPointer(position)
+            scene.sendPointerEvent(PointerEventType.Move, position * scale.toFloat(), buttons = primary)
+            frames += GifFrame(step(), frameMillis.toInt())
+        }
+        scene.sendPointerEvent(PointerEventType.Release, to * scale.toFloat())
+        // Um quadro depois de soltar: a vaga nova começa a assentar.
+        frames += GifFrame(step(), frameMillis.toInt())
+    }
+
     @OptIn(ExperimentalComposeUiApi::class)
     fun close() = scene.close()
 
