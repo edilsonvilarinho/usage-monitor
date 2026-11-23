@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { RELEASE_ENCODE, renderStills, renderVideo } from './render.mjs'
 import { copyFrameSequences, sequenceHolds, withSequences } from './frames.mjs'
 import { frameFile, frameHtml, previewAudioArgs, previewHtml } from './preview.mjs'
+import { assertScenes } from './scene-check.mjs'
 import { setupTools } from './setup-tools.mjs'
 import { speakScenes } from './speak.mjs'
 import { LANGUAGES, RELEASE_PACING, buildTimeline, captionCues, toSrt } from './timeline.mjs'
@@ -43,6 +44,7 @@ const previewDir = preview ? (outOverride ?? join(work, 'preview')) : null
 const stage = preview ? join(previewDir, 'stage') : join(work, 'stage')
 const outDir = join(homedir(), 'Videos', 'usage-monitor', version)
 const project = JSON.parse(readFileSync(scenesOverride ?? join(docsDir, 'scenes.json'), 'utf8'))
+assertScenes(project.scenes)
 const log = (message) => process.stdout.write(`${message}\n`)
 
 const tools = await setupTools({ piper: false })
