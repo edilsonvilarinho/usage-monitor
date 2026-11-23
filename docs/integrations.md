@@ -226,7 +226,12 @@ For personal usage, this integration follows the individual-account source refer
   - macOS: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
   - Linux: `~/.config/Cursor/User/globalStorage/state.vscdb`
 - Uses the existing `cursorAuth/accessToken` and account identifier to construct the
-  `WorkosCursorSessionToken` cookie for `GET https://cursor.com/api/usage-summary`. The token is
+  `WorkosCursorSessionToken` cookie for `GET https://cursor.com/api/usage-summary`. The account
+  identifier is the first of `cursorAuth/stripeMembershipAuthId`, the `sub` of the access token when it
+  is a JWT, and `authId` of `cursorAuth/cachedScopedProfile` (`<issuer>|<userId>`). Cursor 3.27.12+
+  stores an opaque access token without dots, so the cached profile is what identifies the account;
+  invalid JSON or a blank `authId` is signed out. Whether the route accepts the opaque token is not
+  verified here. The token is
   read for each request, sent only to `cursor.com`, and never written to Usage Monitor storage or
   logs. Usage Monitor does not start a login flow.
 - The route is not part of Cursor's documented public API. The response can change without notice;

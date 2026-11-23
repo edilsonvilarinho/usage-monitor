@@ -44,6 +44,8 @@ Não muda o transporte: se a rota recusar o token opaco, o card mostra a recusa,
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `git worktree add .claude/worktrees/cursor-640 -b fix/issue-640-cursor-opaque-token origin/main` | plano escrito |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "*LocalCursorSessionDataSourceTest*" --tests "*ArchitectureRulesTest*"` | `opaque access token reads the account id from the cached scoped profile` FAILED: `CursorUsageException` (`SIGNED_OUT`) lançada em `LocalCursorSessionDataSource.kt:44` antes do `assertEquals` — o comportamento sob teste, não compilação; 37 testes, 1 falha |
+| A02 | verde: mesmo comando | BUILD SUCCESSFUL; `LocalCursorSessionDataSourceTest` 9/9 (4 novos; só o caso opaco era vermelho, os de prioridade e JSON inválido já passavam), `ArchitectureRulesTest` 28/28 |
 
 ## Problemas em aberto e riscos
 
