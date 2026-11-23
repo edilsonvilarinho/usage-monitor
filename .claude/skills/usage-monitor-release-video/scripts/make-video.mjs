@@ -13,12 +13,12 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { renderStills, renderVideo } from './render.mjs'
-import { copyFrameSequences, withSequences } from './frames.mjs'
+import { RELEASE_ENCODE, renderStills, renderVideo } from './render.mjs'
+import { copyFrameSequences, sequenceHolds, withSequences } from './frames.mjs'
 import { frameFile, frameHtml, previewAudioArgs, previewHtml } from './preview.mjs'
 import { setupTools } from './setup-tools.mjs'
 import { speakScenes } from './speak.mjs'
-import { LANGUAGES, buildTimeline, captionCues, toSrt } from './timeline.mjs'
+import { LANGUAGES, RELEASE_PACING, buildTimeline, captionCues, toSrt } from './timeline.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2)
@@ -70,7 +70,7 @@ const sequences = copyFrameSequences({ root, stage, sources: project.sources })
 log('Sintetizando as falas (OpenRouter, com cache por assinatura)…')
 const voiceDir = join(work, 'voice')
 const durations = await speakScenes({ project, outDir: voiceDir })
-const timeline = buildTimeline(project.scenes, durations)
+const timeline = buildTimeline(project.scenes, durations, RELEASE_PACING, sequenceHolds(project.scenes, sequences))
 writeFileSync(join(work, 'timeline.json'), JSON.stringify(timeline, null, 2))
 log(`Linha do tempo: ${timeline.total.toFixed(1)} s, ${timeline.scenes.length} cenas`)
 
@@ -119,6 +119,7 @@ for (const language of languages) {
         data,
         output: silent,
         onProgress: (frame, frames) => log(`  ${language}: ${Math.round((frame / frames) * 100)}%`),
+        encode: RELEASE_ENCODE,
     })
 
     // Áudio: cada fala no seu instante, sobre um drone grave a ≈ −30 dBFS que entra e sai em 2 s.

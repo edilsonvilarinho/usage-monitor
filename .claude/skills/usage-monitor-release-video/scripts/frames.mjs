@@ -46,6 +46,18 @@ export function copyFrameSequences({ root, stage, sources, languages = LANGUAGE_
     return sequences
 }
 
+// Segundos de cada sequência de quadros, por id de cena: a maior soma de delayMillis entre os idiomas.
+export function sequenceHolds(scenes, sequences) {
+    const holds = {}
+    for (const scene of scenes) {
+        if (!scene.frames) continue
+        const totals = Object.values(sequences[scene.frames] ?? {})
+            .map((frames) => frames.reduce((sum, frame) => sum + frame.delayMillis, 0))
+        if (totals.length > 0) holds[scene.id] = Math.max(...totals) / 1000
+    }
+    return holds
+}
+
 // Roteiro do idioma: cena `screen` com "frames" recebe `sequence` = [{ src, delayMillis }], com src relativo ao palco.
 export function withSequences(scenes, sequences, language) {
     return scenes.map((scene) => {

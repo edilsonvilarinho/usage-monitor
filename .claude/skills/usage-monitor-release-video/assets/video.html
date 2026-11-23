@@ -26,8 +26,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); color: var(--fg); }
 body { font-family: "Plex Sans", sans-serif; }
+#stars, #hole { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+#hole { pointer-events: none; }
 #stage { position: absolute; inset: 0; }
-.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform, filter; }
 .mono { font-family: "Plex Mono", monospace; }
 
 /* Cabeçalho fixo: marca, versão e progresso. Fica abaixo dos 250 px que as redes cobrem. */
@@ -50,11 +52,16 @@ body { font-family: "Plex Sans", sans-serif; }
 /* Superfície única de dados: --surface, borda 1px acesa em cima, raio 8–10 (teto 10). */
 .panel { background: var(--surface); border: 1px solid var(--border); border-top-color: #4A4444; border-radius: 10px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 18px 48px rgba(0,0,0,.45); overflow: hidden; }
+/* Captura de cena screen: a janela tem a sombra mais funda do vídeo (profundidade sobre o fundo de estrelas). */
+.panel.cine { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 44px 110px rgba(0,0,0,.66), 0 0 0 1px rgba(232,174,99,.12); }
 .panel .bar { height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--border);
   font-family: "Plex Mono"; font-size: 22px; color: var(--muted); background: var(--raised); }
 .panel .bar i { width: 12px; height: 12px; border-radius: 6px; background: var(--term-dim); display: inline-block; }
 .shot { position: relative; overflow: hidden; background: #0F0D0D; }
 .shot img { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: auto; }
+/* Contorno de foco: borda --info e véu escuro em volta (o mesmo do tour); o véu é a sombra, recortada pela captura. */
+.shot .focus { position: absolute; border: 2px solid var(--info); border-radius: 8px; opacity: 0;
+  box-shadow: 0 0 0 9999px rgba(8, 11, 18, .6); }
 
 .term { width: 100%; padding: 28px 30px; font-family: "Plex Mono"; font-size: 33px; line-height: 1.5; background: #0F0D0D; }
 .term .line { white-space: pre; color: var(--fg); min-height: 50px; }
@@ -102,7 +109,9 @@ body { font-family: "Plex Sans", sans-serif; }
 </style>
 </head>
 <body>
+<canvas id="stars" width="1080" height="1920"></canvas>
 <div id="stage"></div>
+<canvas id="hole" width="1080" height="1920"></canvas>
 <div id="header"><span class="brand">usage monitor</span><span class="count"></span></div>
 <div id="progress"></div>
 <div id="caption"><div></div></div>
@@ -110,9 +119,53 @@ body { font-family: "Plex Sans", sans-serif; }
 'use strict'
 const ENTER = 0.6
 const EXIT = 0.35
+// motion:begin
 const clamp = (value) => Math.max(0, Math.min(1, value))
 const easeOut = (value) => 1 - Math.pow(1 - clamp(value), 3)
 const easeIn = (value) => Math.pow(clamp(value), 3)
+// Ease-in-out cúbico: sem overshoot e sem velocidade nas pontas (movimento de câmera).
+const easeInOut = (value) => {
+  const x = clamp(value)
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+}
+// Câmera de uma cena screen: keys = [{ at, rect: [x, y, l, a] }] (at em s desde o início da cena; rect em pixels da captura).
+// Entre duas chaves interpola o retângulo com easeInOut; antes da primeira e depois da última segura a chave.
+function cameraRectAt(keys, t) {
+  if (!keys || keys.length === 0) return null
+  const sorted = [...keys].sort((a, b) => a.at - b.at)
+  if (t <= sorted[0].at) return sorted[0].rect.slice()
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    const from = sorted[index]
+    const to = sorted[index + 1]
+    if (t >= to.at) continue
+    const u = easeInOut((t - from.at) / (to.at - from.at))
+    return from.rect.map((value, position) => value + (to.rect[position] - value) * u)
+  }
+  return sorted[sorted.length - 1].rect.slice()
+}
+// Transição buraco negro (#633): a cena que sai começa a ser sugada 0,9 s antes da fronteira; a janela dura 1,2 s.
+// Cabe no respiro entre a última palavra da fala e a entrada da próxima cena: nunca cobre a fala.
+const TRANSITION = { lead: 0.9, duration: 1.2 }
+function transitionAt(timeline, t) {
+  for (let index = 0; index < timeline.scenes.length - 1; index += 1) {
+    const from = timeline.scenes[index].end - TRANSITION.lead
+    if (t >= from && t < from + TRANSITION.duration) {
+      return { from: index, to: index + 1, progress: (t - from) / TRANSITION.duration }
+    }
+  }
+  return null
+}
+// Sucção: ease-in cúbico (a cena acelera para dentro do buraco). 0 em 0, 1 em 1, sem overshoot.
+const transitionCurve = (progress) => easeIn(progress)
+// Clarão do disco: só no fim do colapso, pico em 0,875 da janela.
+const flashCurve = (progress) => {
+  const x = clamp((progress - 0.75) / 0.25)
+  return x <= 0 || x >= 1 ? 0 : Math.sin(Math.PI * x)
+}
+// Raio do buraco: abre até 0,6 da janela e colapsa para um núcleo pequeno no fim.
+const holeRadius = (progress) => 40 + 330 * easeOut(progress / 0.6) * (1 - easeIn((progress - 0.6) / 0.4))
+// motion:end
+const TRANSITION_TAIL = TRANSITION.duration - TRANSITION.lead
 // Quadro da sequência no instante `seconds` desde o início da cena: cada quadro dura o seu delayMillis;
 // depois do último segura o último, ou recomeça do primeiro se `loop`. Mesma regra de scripts/frames.mjs.
 function frameIndexAt(frames, seconds, loop = false) {
@@ -130,6 +183,16 @@ const escape = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;',
 
 let video = null
 const nodes = []
+
+// Estrelas de posição fixa (semente fixa) que descem devagar com o relógio t.
+const stars = (() => {
+  let seed = 7
+  const random = () => {
+    seed = (seed * 16807) % 2147483647
+    return seed / 2147483647
+  }
+  return Array.from({ length: 160 }, () => [random() * 1080, random() * 1920, 0.6 + random() * 1.6, random() * Math.PI * 2])
+})()
 
 function pick(value) {
   if (value == null) return ''
@@ -162,9 +225,10 @@ function buildScene(scene) {
       const shots = scene.sequence
         ? scene.sequence.map((frame) => `<img src="${escape(frame.src)}">`).join('')
         : `<img src="${escape(pick(scene.image))}">`
-      visual = `<div class="panel" style="width:${width}px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
-        <div class="shot" style="width:${width}px;height:${height}px">${shots}</div></div>`
-      parts.scale = scale
+      const focus = scene.focus ? '<div class="focus"></div>' : ''
+      visual = `<div class="panel cine" style="width:${width}px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
+        <div class="shot" style="width:${width}px;height:${height}px">${shots}${focus}</div></div>`
+      parts.box = { width, height }
     } else if (scene.kind === 'commands') {
       visual = `<div class="panel" style="width:876px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'terminal')}</div><div class="term">${
         scene.commands.map(() => `<div class="line"></div><div class="out"></div>`).join('')}</div></div>`
@@ -182,6 +246,7 @@ function buildScene(scene) {
     element.innerHTML = `${kickerHtml(scene)}<div class="headline">${escape(pick(scene.headline))}</div><div class="visual">${visual}</div>${chips}`
     parts.panel = element.querySelector('.panel')
     parts.imgs = [...element.querySelectorAll('.shot img')]
+    parts.focus = element.querySelector('.shot .focus')
     parts.lines = [...element.querySelectorAll('.term .line')]
     parts.outs = [...element.querySelectorAll('.term .out')]
     parts.rows = [...element.querySelectorAll('.step, .item')]
@@ -266,34 +331,128 @@ function drawRing(canvas, local) {
   })
 }
 
-function setStyle(element, opacity, offset) {
-  element.style.opacity = String(opacity)
-  element.style.transform = `translateY(${offset}px)`
+// Buraco negro da transição: disco de acreção (tokens do tema), núcleo escuro que cresce e colapsa,
+// e o clarão do disco no fim, que libera a cena que entra. Tudo sai de `progress`.
+const holeCanvas = document.getElementById('hole')
+function drawHole(transition) {
+  const context = holeCanvas.getContext('2d')
+  context.clearRect(0, 0, holeCanvas.width, holeCanvas.height)
+  if (!transition) return
+  const { progress } = transition
+  const pull = transitionCurve(progress)
+  const radius = holeRadius(progress)
+  const cx = holeCanvas.width / 2
+  const cy = holeCanvas.height / 2
+  context.save()
+  context.translate(cx, cy)
+  context.rotate(-0.22 + progress * 2.2)
+  context.scale(1, 0.3)
+  for (let band = 0; band < 4; band += 1) {
+    const reach = radius * (1.5 + band * 0.22)
+    const gradient = context.createLinearGradient(-reach, 0, reach, 0)
+    gradient.addColorStop(0, `rgba(255,240,203,${0.9 * pull})`)
+    gradient.addColorStop(0.5, `rgba(232,174,99,${0.8 * pull})`)
+    gradient.addColorStop(1, `rgba(180,80,30,${0.6 * pull})`)
+    context.strokeStyle = gradient
+    context.lineWidth = Math.max(2, radius * (0.14 - band * 0.025))
+    context.beginPath()
+    context.ellipse(0, 0, reach, reach, 0, 0, Math.PI * 2)
+    context.stroke()
+  }
+  context.restore()
+  context.fillStyle = '#030508'
+  context.beginPath()
+  context.arc(cx, cy, radius, 0, Math.PI * 2)
+  context.fill()
+  context.strokeStyle = `rgba(255,240,203,${0.85 * pull})`
+  context.lineWidth = 4
+  context.beginPath()
+  context.arc(cx, cy, radius + 3, 0, Math.PI * 2)
+  context.stroke()
+  const flash = flashCurve(progress)
+  if (flash > 0) {
+    const glow = context.createRadialGradient(cx, cy, radius, cx, cy, 760)
+    glow.addColorStop(0, `rgba(255,240,203,${0.85 * flash})`)
+    glow.addColorStop(0.35, `rgba(232,174,99,${0.35 * flash})`)
+    glow.addColorStop(1, 'rgba(232,174,99,0)')
+    context.fillStyle = glow
+    context.fillRect(0, 0, holeCanvas.width, holeCanvas.height)
+  }
 }
 
-function renderScene(node, index, t) {
+// Fundo de estrelas: a noite do app com pontos que descem devagar. Tudo sai de t (sem animação própria).
+function drawStars(t) {
+  const context = document.getElementById('stars').getContext('2d')
+  context.fillStyle = '#080B12'
+  context.fillRect(0, 0, 1080, 1920)
+  for (const [x, y, size, phase] of stars) {
+    context.fillStyle = `rgba(255,240,203,${0.3 + 0.25 * Math.sin(t * 0.8 + phase)})`
+    context.beginPath()
+    context.arc(x, (y + t * 4) % 1920, size, 0, Math.PI * 2)
+    context.fill()
+  }
+}
+
+// Opacidade, deslocamento vertical, rotação e desfoque de uma cena (todos saem de t).
+function setStyle(element, { opacity, offset = 0, transform = '', blur = 0 }) {
+  element.style.opacity = String(opacity)
+  element.style.transform = `translateY(${offset}px) ${transform}`
+  element.style.filter = blur > 0 ? `blur(${blur.toFixed(2)}px)` : 'none'
+}
+
+function renderScene(node, index, t, transition) {
   const timing = video.timeline.scenes[index]
   const last = index === video.timeline.scenes.length - 1
+  const leaving = transition?.from === index
+  const arriving = transition?.to === index
   const end = last ? video.timeline.total : timing.end
-  if (t < timing.start || t >= end) {
+  if (t < timing.start || t >= (leaving ? end + TRANSITION_TAIL : end)) {
     node.element.style.opacity = '0'
     return false
   }
   const local = t - timing.start
   const enter = easeOut(local / ENTER)
   const exit = last ? 1 : 1 - easeIn((t - (end - EXIT)) / EXIT)
-  setStyle(node.element, Math.min(enter, exit), (1 - enter) * 40)
+  let look = { opacity: Math.min(enter, exit), offset: (1 - enter) * 40 }
+  if (leaving) {
+    // Sugada para o buraco: encolhe, gira um pouco, desfoca de dentro para fora e some na metade final.
+    const pull = transitionCurve(transition.progress)
+    look = {
+      opacity: 1 - clamp((transition.progress - 0.5) / 0.5),
+      transform: `scale(${1 - 0.95 * pull}) rotate(${10 * pull}deg)`,
+      blur: 18 * pull,
+    }
+  }
+  if (arriving) look.opacity = Math.min(look.opacity, easeOut((transition.progress - 0.75) / 0.25))
+  setStyle(node.element, look)
   const scene = node.scene
   const speaking = t - timing.voiceAt
   if (node.parts.canvas) drawRing(node.parts.canvas, local)
   if (node.parts.imgs?.length > 0) {
-    const [cropX, cropY] = scene.crop
-    const zoom = 1 + 0.05 * clamp(local / (end - timing.start))
+    const [cropX, cropY, cropW, cropH] = scene.crop
+    const { width, height } = node.parts.box
+    // Câmera: o retângulo visível (em pixels da captura) vem das chaves; sem elas, Ken Burns lento de 1 a 1,06.
+    const zoom = 1 + 0.06 * clamp(local / (end - timing.start))
+    const [rx, ry, rl, ra] = scene.camera
+      ? cameraRectAt(scene.camera, local)
+      : [cropX + (cropW - cropW / zoom) / 2, cropY + (cropH - cropH / zoom) / 2, cropW / zoom, cropH / zoom]
+    const k = Math.min(width / rl, height / ra)
+    const ox = (width - rl * k) / 2
+    const oy = (height - ra * k) / 2
     const shown = scene.sequence ? frameIndexAt(scene.sequence, local, scene.loop) : 0
-    node.parts.imgs.forEach((img, index) => {
-      img.style.transform = `scale(${node.parts.scale * zoom}) translate(${-cropX}px, ${-cropY}px)`
-      img.style.visibility = index === shown ? 'visible' : 'hidden'
+    node.parts.imgs.forEach((img, position) => {
+      img.style.transform = `translate(${ox}px, ${oy}px) scale(${k}) translate(${-rx}px, ${-ry}px)`
+      img.style.visibility = position === shown ? 'visible' : 'hidden'
     })
+    if (node.parts.focus) {
+      const [fx, fy, fl, fa] = scene.focus
+      const focus = node.parts.focus
+      focus.style.left = `${ox + k * (fx - rx)}px`
+      focus.style.top = `${oy + k * (fy - ry)}px`
+      focus.style.width = `${fl * k}px`
+      focus.style.height = `${fa * k}px`
+      focus.style.opacity = String(easeOut((local - (scene.focusAt ?? 0)) / 0.4))
+    }
   }
   // Comandos digitados a 30 caracteres/s, um depois do outro, a partir da fala.
   if (node.parts.lines?.length > 0) {
@@ -311,20 +470,23 @@ function renderScene(node, index, t) {
   const stagger = scene.stagger ?? 0.45
   node.parts.rows?.forEach((row, position) => {
     const shown = easeOut((speaking - position * stagger) / 0.4)
-    setStyle(row, scene.kind === 'steps' || scene.kind === 'list' ? shown : 1, (1 - shown) * 18)
+    setStyle(row, { opacity: scene.kind === 'steps' || scene.kind === 'list' ? shown : 1, offset: (1 - shown) * 18 })
   })
   node.parts.chips?.forEach((chip, position) => {
     const shown = easeOut((speaking - 0.3 - position * 0.25) / 0.4)
-    setStyle(chip, shown, (1 - shown) * 12)
+    setStyle(chip, { opacity: shown, offset: (1 - shown) * 12 })
   })
   return true
 }
 
 function renderFrame(t) {
+  drawStars(t)
+  const transition = transitionAt(video.timeline, t)
   let current = 0
   nodes.forEach((node, index) => {
-    if (renderScene(node, index, t)) current = index
+    if (renderScene(node, index, t, transition)) current = index
   })
+  drawHole(transition)
   const kind = video.scenes[current].kind
   const chrome = kind === 'title' || kind === 'closing' ? 0 : 1
   document.getElementById('header').style.opacity = String(chrome)

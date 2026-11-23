@@ -35,6 +35,16 @@ export const TOUR_PACING = {
     captionChars: 42,
 }
 
+// Vídeo de release vertical (#633): cinematográfico e sem pressa. Fala de no máximo 12 caracteres/s; 1,8 s de
+// respiro, onde cabe a transição de buraco negro sem tocar na fala; 1,5 s depois de cada sequência de quadros.
+export const RELEASE_PACING = {
+    ...PACING,
+    breath: 1.8,
+    maxCharsPerSecond: 12,
+    maxTotal: 150,
+    sequenceTail: 1.5,
+}
+
 // Onde, dentro do capítulo, o foco de uma captura acende: no primeiro terço do tempo dela.
 const FOCUS_AT = 0.35
 // Os comandos são digitados a 30 caracteres/s, com 0,2 s até a saída e a pausa da cena entre eles.
@@ -59,7 +69,9 @@ function shotsOf(scene, voiceAt, end) {
     })
 }
 
-export function buildTimeline(scenes, durations, pacing = PACING) {
+// holds: { [id da cena]: segundos } de cenas com sequência de quadros. A cena dura pelo menos esse tempo
+// mais pacing.sequenceTail, mesmo com fala curta, para o demo acabar de ser visto.
+export function buildTimeline(scenes, durations, pacing = PACING, holds = {}) {
     const problems = []
     let cursor = 0
     const timed = scenes.map((scene, index) => {
@@ -74,7 +86,8 @@ export function buildTimeline(scenes, durations, pacing = PACING) {
         const longest = Math.max(...LANGUAGES.map((language) => durations[language][scene.id]))
         const start = cursor
         const voiceAt = start + (index === 0 ? pacing.firstEnter : pacing.enter)
-        const end = voiceAt + longest + pacing.breath
+        const hold = holds[scene.id] ? holds[scene.id] + (pacing.sequenceTail ?? 0) : 0
+        const end = Math.max(voiceAt + longest + pacing.breath, start + hold)
         cursor = end
         const shots = shotsOf(scene, voiceAt, end)
         return shots ? { id: scene.id, start, voiceAt, end, shots } : { id: scene.id, start, voiceAt, end }
