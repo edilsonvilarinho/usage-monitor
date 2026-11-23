@@ -1,5 +1,6 @@
 package com.usagemonitor.data.mapper
 
+import com.usagemonitor.data.dto.DeepSeekBalanceInfoDto
 import com.usagemonitor.data.dto.DeepSeekBalanceResponse
 import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.ApiUsageStats
@@ -16,10 +17,7 @@ object DeepSeekMapper {
             throw IllegalStateException("DeepSeek API: conta indisponível")
         }
 
-        val balanceInfo = response.balanceInfos
-            .firstOrNull { it.currency == "USD" }
-            ?: response.balanceInfos.firstOrNull()
-            ?: throw IllegalStateException("DeepSeek API: nenhuma informação de saldo disponível")
+        val balanceInfo = selectBalanceInfo(response.balanceInfos)
 
         val toppedUpCents = parseToCents(balanceInfo.toppedUpBalance)
         val grantedCents = parseToCents(balanceInfo.grantedBalance)
@@ -70,6 +68,19 @@ object DeepSeekMapper {
             apiName = "DeepSeek",
             quotas = quotas
         )
+    }
+
+    // Escolhe a entrada de `balance_infos` que tem saldo (`total_balance` > 0), preferindo USD
+    // entre as positivas. Sem nenhuma positiva, vale a regra antiga: USD, senão a primeira.
+    // `total_balance` decide, não `topped_up_balance`: conta só com saldo concedido também tem
+    // fundos. Issue #639: USD zerado com CNY com fundos saía com saldo 0.
+    private fun selectBalanceInfo(infos: List<DeepSeekBalanceInfoDto>): DeepSeekBalanceInfoDto {
+        val withBalance = infos.filter { (it.totalBalance.toDoubleOrNull() ?: 0.0) > 0.0 }
+        return withBalance.firstOrNull { it.currency == "USD" }
+            ?: withBalance.firstOrNull()
+            ?: infos.firstOrNull { it.currency == "USD" }
+            ?: infos.firstOrNull()
+            ?: throw IllegalStateException("DeepSeek API: nenhuma informação de saldo disponível")
     }
 
     private fun parseToCents(value: String): Long {

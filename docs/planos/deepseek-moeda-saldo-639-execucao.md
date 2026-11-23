@@ -38,6 +38,8 @@ fundos. A seleção passa a preferir a entrada com saldo, sem mudar nada para qu
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `git worktree add .claude/worktrees/deepseek-639 -b fix/issue-639-deepseek-currency origin/main` | plano escrito |
+| A02 | vermelho: `gradlew.bat desktopTest --tests "*DeepSeekMapperTest*" --tests "*ArchitectureRulesTest*"` | `DeepSeekMapperTest.kt:173` `prefers the currency with balance when USD is empty`: `expected:<10000> but was:<0>` |
+| A02 | verde: mesmo comando | BUILD SUCCESSFUL; `DeepSeekMapperTest` 11/11 (4 novos), `ArchitectureRulesTest` 28/28 |
 
 ## Problemas em aberto e riscos
 
