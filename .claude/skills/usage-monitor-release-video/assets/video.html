@@ -199,6 +199,17 @@ function pick(value) {
   return typeof value === 'object' && !Array.isArray(value) ? (value[video.lang] ?? value.en) : value
 }
 
+// layout:begin
+// Caixa da captura de uma cena screen: a maior escala que cabe em maxWidth × maxHeight, mantendo a proporção.
+// Captura pequena cresce até encostar num limite; nunca passa dos dois. Medidas inteiras (floor) para o DOM.
+const CAPTURE = { maxWidth: 950, chrome: 48, gap: 36 }
+function fitCapture(crop, bounds) {
+  const [, , cropW, cropH] = crop
+  const scale = Math.min(bounds.maxWidth / cropW, bounds.maxHeight / cropH)
+  return { width: Math.floor(cropW * scale + 1e-6), height: Math.floor(cropH * scale + 1e-6), scale }
+}
+// layout:end
+
 function kickerHtml(scene) {
   const tag = scene.tag ? `<b>${escape(scene.tag)}</b> · ` : ''
   return `<div class="kicker">${tag}${escape(pick(scene.kicker))}</div>`
@@ -217,18 +228,15 @@ function buildScene(scene) {
   } else {
     let visual = ''
     if (scene.kind === 'screen') {
-      const [, , cropW, cropH] = scene.crop
-      const scale = Math.min(876 / cropW, 544 / cropH)
-      const width = Math.round(cropW * scale)
-      const height = Math.round(cropH * scale)
       // Com sequence (cena de quadros), todos os quadros são carregados no setup e só o da vez fica visível.
       const shots = scene.sequence
         ? scene.sequence.map((frame) => `<img src="${escape(frame.src)}">`).join('')
         : `<img src="${escape(pick(scene.image))}">`
       const focus = scene.focus ? '<div class="focus"></div>' : ''
-      visual = `<div class="panel cine" style="width:${width}px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
-        <div class="shot" style="width:${width}px;height:${height}px">${shots}${focus}</div></div>`
-      parts.box = { width, height }
+      // Tamanho e posição saem de placeCapture (depois das fontes): ela mede o título e a legenda na página.
+      visual = `<div class="panel cine"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
+        <div class="shot">${shots}${focus}</div></div>`
+      parts.box = { width: 0, height: 0 }
     } else if (scene.kind === 'commands') {
       visual = `<div class="panel" style="width:876px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'terminal')}</div><div class="term">${
         scene.commands.map(() => `<div class="line"></div><div class="out"></div>`).join('')}</div></div>`
@@ -508,6 +516,34 @@ function renderFrame(t) {
   }
 }
 
+// Medidas da página (com as fontes carregadas): a legenda de duas linhas é o pior caso, então a zona da captura não muda por cena.
+function measureCaption() {
+  const box = document.querySelector('#caption div')
+  const saved = box.innerHTML
+  box.innerHTML = 'Ag<br>Ag'
+  const height = box.offsetHeight
+  box.innerHTML = saved
+  return height
+}
+// A captura vai do fim do título (mais um respiro) ao começo da legenda (menos um respiro), e usa a maior caixa que cabe nela.
+function placeCapture(node, captionHeight) {
+  const { element, scene, parts } = node
+  const headline = element.querySelector('.headline')
+  const top = headline.offsetTop + headline.offsetHeight + CAPTURE.gap
+  const bottom = 1920 - 430 - captionHeight - CAPTURE.gap
+  const box = fitCapture(scene.crop, { maxWidth: CAPTURE.maxWidth, maxHeight: bottom - top - CAPTURE.chrome })
+  const visual = element.querySelector('.visual')
+  visual.style.left = '0'
+  visual.style.width = '1080px'
+  visual.style.top = `${top}px`
+  visual.style.height = `${bottom - top}px`
+  element.querySelector('.panel').style.width = `${box.width + 2}px`
+  const shot = element.querySelector('.shot')
+  shot.style.width = `${box.width}px`
+  shot.style.height = `${box.height}px`
+  parts.box = { width: box.width, height: box.height }
+}
+
 async function setup(data) {
   video = data
   document.documentElement.lang = data.lang === 'pt' ? 'pt-BR' : 'en'
@@ -517,6 +553,10 @@ async function setup(data) {
   await Promise.all([...document.fonts].map((face) => face.load()))
   await document.fonts.ready
   await Promise.all([...document.images].map((image) => image.decode()))
+  const captionHeight = measureCaption()
+  nodes.forEach((node) => {
+    if (node.scene.kind === 'screen') placeCapture(node, captionHeight)
+  })
   return true
 }
 

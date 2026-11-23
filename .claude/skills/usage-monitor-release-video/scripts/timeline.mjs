@@ -40,7 +40,7 @@ export const TOUR_PACING = {
 export const RELEASE_PACING = {
     ...PACING,
     breath: 1.8,
-    maxCharsPerSecond: 12,
+    maxCharsPerSecond: 15,
     maxTotal: 150,
     sequenceTail: 1.5,
 }
