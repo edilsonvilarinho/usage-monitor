@@ -14,6 +14,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { renderStills, renderVideo } from './render.mjs'
+import { copyFrameSequences, withSequences } from './frames.mjs'
 import { frameFile, frameHtml, previewAudioArgs, previewHtml } from './preview.mjs'
 import { setupTools } from './setup-tools.mjs'
 import { speakScenes } from './speak.mjs'
@@ -53,6 +54,7 @@ copyFileSync(join(here, '..', 'assets', 'video.html'), join(stage, 'video.html')
 const fontsDir = join(root, 'src', 'desktopMain', 'resources', 'fonts')
 for (const font of readdirSync(fontsDir)) copyFileSync(join(fontsDir, font), join(stage, 'fonts', font))
 for (const [key, source] of Object.entries(project.sources ?? {})) {
+    if (source.frames) continue // sequência de quadros por idioma: copyFrameSequences, abaixo
     const target = join(stage, key)
     mkdirSync(target, { recursive: true })
     if (source.gif) {
@@ -61,6 +63,8 @@ for (const [key, source] of Object.entries(project.sources ?? {})) {
         for (const file of source.files) copyFileSync(join(root, file), join(target, basename(file)))
     }
 }
+// Cena screen com "frames": demo de cada idioma (build/video-media/{lang}/<demo>) vai para o palco como <chave>/<lang>/NNN.png.
+const sequences = copyFrameSequences({ root, stage, sources: project.sources })
 
 // Voz: a duração medida de cada fala decide a linha do tempo.
 log('Sintetizando as falas (OpenRouter, com cache por assinatura)…')
@@ -76,7 +80,7 @@ if (preview) {
     const tokensCss = readFileSync(join(root, 'docs', 'design-system', 'tokens', 'colors.css'), 'utf8')
     for (const language of languages) {
         const cues = captionCues(project.scenes, timeline, durations, language)
-        const data = { scenes: project.scenes, timeline, cues, lang: language, label: project.label }
+        const data = { scenes: withSequences(project.scenes, sequences, language), timeline, cues, lang: language, label: project.label }
         writeFileSync(join(previewDir, frameFile(language)), frameHtml({ videoHtml, data }))
         const track = join(previewDir, `${language}.mp3`)
         execFileSync('ffmpeg', previewAudioArgs({ scenes: project.scenes, timeline, voiceDir: join(voiceDir, language), output: track }), { stdio: 'inherit' })
@@ -93,7 +97,7 @@ const name = `usage-monitor-${project.label}`
 
 for (const language of languages) {
     const cues = captionCues(project.scenes, timeline, durations, language)
-    const data = { scenes: project.scenes, timeline, cues, lang: language, label: project.label }
+    const data = { scenes: withSequences(project.scenes, sequences, language), timeline, cues, lang: language, label: project.label }
     const checkTimes = timeline.scenes.map((scene) => Math.min(scene.end - 0.5, scene.voiceAt + 1.6))
     await renderStills({
         nodeModules: tools.nodeModules,

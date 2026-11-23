@@ -113,6 +113,19 @@ const EXIT = 0.35
 const clamp = (value) => Math.max(0, Math.min(1, value))
 const easeOut = (value) => 1 - Math.pow(1 - clamp(value), 3)
 const easeIn = (value) => Math.pow(clamp(value), 3)
+// Quadro da sequência no instante `seconds` desde o início da cena: cada quadro dura o seu delayMillis;
+// depois do último segura o último, ou recomeça do primeiro se `loop`. Mesma regra de scripts/frames.mjs.
+function frameIndexAt(frames, seconds, loop = false) {
+  const total = frames.reduce((sum, frame) => sum + frame.delayMillis, 0)
+  let ms = Math.max(0, seconds * 1000)
+  if (loop && total > 0) ms %= total
+  let accumulated = 0
+  for (let index = 0; index < frames.length; index += 1) {
+    accumulated += frames[index].delayMillis
+    if (ms < accumulated) return index
+  }
+  return frames.length - 1
+}
 const escape = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
 let video = null
@@ -145,8 +158,12 @@ function buildScene(scene) {
       const scale = Math.min(876 / cropW, 544 / cropH)
       const width = Math.round(cropW * scale)
       const height = Math.round(cropH * scale)
+      // Com sequence (cena de quadros), todos os quadros são carregados no setup e só o da vez fica visível.
+      const shots = scene.sequence
+        ? scene.sequence.map((frame) => `<img src="${escape(frame.src)}">`).join('')
+        : `<img src="${escape(pick(scene.image))}">`
       visual = `<div class="panel" style="width:${width}px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'usage-monitor')}</div>
-        <div class="shot" style="width:${width}px;height:${height}px"><img src="${escape(pick(scene.image))}"></div></div>`
+        <div class="shot" style="width:${width}px;height:${height}px">${shots}</div></div>`
       parts.scale = scale
     } else if (scene.kind === 'commands') {
       visual = `<div class="panel" style="width:876px"><div class="bar"><i></i><i></i><i></i>&nbsp;${escape(scene.window ?? 'terminal')}</div><div class="term">${
@@ -164,7 +181,7 @@ function buildScene(scene) {
     const chips = scene.chips ? `<div class="chips">${scene.chips.map((chip) => `<span class="chip">${escape(chip)}</span>`).join('')}</div>` : ''
     element.innerHTML = `${kickerHtml(scene)}<div class="headline">${escape(pick(scene.headline))}</div><div class="visual">${visual}</div>${chips}`
     parts.panel = element.querySelector('.panel')
-    parts.img = element.querySelector('.shot img')
+    parts.imgs = [...element.querySelectorAll('.shot img')]
     parts.lines = [...element.querySelectorAll('.term .line')]
     parts.outs = [...element.querySelectorAll('.term .out')]
     parts.rows = [...element.querySelectorAll('.step, .item')]
@@ -269,10 +286,14 @@ function renderScene(node, index, t) {
   const scene = node.scene
   const speaking = t - timing.voiceAt
   if (node.parts.canvas) drawRing(node.parts.canvas, local)
-  if (node.parts.img) {
+  if (node.parts.imgs?.length > 0) {
     const [cropX, cropY] = scene.crop
     const zoom = 1 + 0.05 * clamp(local / (end - timing.start))
-    node.parts.img.style.transform = `scale(${node.parts.scale * zoom}) translate(${-cropX}px, ${-cropY}px)`
+    const shown = scene.sequence ? frameIndexAt(scene.sequence, local, scene.loop) : 0
+    node.parts.imgs.forEach((img, index) => {
+      img.style.transform = `scale(${node.parts.scale * zoom}) translate(${-cropX}px, ${-cropY}px)`
+      img.style.visibility = index === shown ? 'visible' : 'hidden'
+    })
   }
   // Comandos digitados a 30 caracteres/s, um depois do outro, a partir da fala.
   if (node.parts.lines?.length > 0) {

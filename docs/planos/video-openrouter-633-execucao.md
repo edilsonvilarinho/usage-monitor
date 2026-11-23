@@ -35,6 +35,12 @@ skill. Também pediu protótipos de roteiro **no visual do app** para escolher o
 - Imagem (`google/gemini-3.1-flash-image`): só capa/ilustração, opcional por cena; **nunca** imita tela do app.
 - Regras de ritmo (15 caracteres/s, 90 s) inalteradas.
 
+- **Vídeo mostra o app real (2026-11-22, dono):** prévias só com texto (`steps`/`list`) foram reprovadas — "não
+  mostram como a aplicação funciona". As cenas passam a usar quadros das **telas reais** gravadas offscreen pelo
+  gerador de demos (`generateVideoMedia`, `ImageComposeScene`, dados sintéticos), nunca imitação em HTML. Os
+  composables da HUD não importam `java.awt` (grep), então gravam offscreen. Demo de vídeo tem registro próprio:
+  `HelpTopic` é enum e não ganha valor.
+
 ## Atividades
 
 | ID | Atividade |
@@ -43,8 +49,12 @@ skill. Também pediu protótipos de roteiro **no visual do app** para escolher o
 | A02 | Cliente OpenRouter (fala + imagem) com testes de contrato |
 | A03 | Síntese pelo OpenRouter no `make-video.mjs`, cache por assinatura |
 | A04 | `--preview`: HTML com `video.html` sincronizado à trilha |
-| A05 | 5 roteiros da v42.3.0 em prévia; escolha do dono |
-| A06 | Vídeo v42.3.0, `roteiro.md`, `social.json`, SKILL.md |
+| A05 | Registro de demos de vídeo + `video-hud-minimize` e `video-hud-floating` |
+| A06 | Helper de arrasto no `SceneRecorder` + `video-hud-reorder` |
+| A07 | `video-codex-sessions` e `video-analysis-all` |
+| A08 | Cena `screen` toca sequência de quadros (`frames.json`) no `video.html` e na prévia |
+| A09 | 5 roteiros da v42.3.0 com as demos, em prévia; escolha do dono |
+| A10 | Vídeo v42.3.0, `roteiro.md`, `social.json`, SKILL.md |
 
 ## Ponto de situação
 
@@ -54,6 +64,7 @@ skill. Também pediu protótipos de roteiro **no visual do app** para escolher o
 | A02 | `node --test …/scripts/test/openrouter.test.mjs` | vermelho: 9 × `Error: não implementado` (esboço); verde: exit 0 |
 | A03 | `node --test …/test/speak.test.mjs …/test/setup-tools.test.mjs` | vermelho: 6 × `Error: não implementado` (esboço do `speak`), depois `pt.status` 3.1 ≠ 3 (erro da fixture: `ó` tem 2 bytes); verde: 4 arquivos, 27/27, exit 0 |
 | A04 | `node --test …/test/preview.test.mjs`; `make-video.mjs v42.3.0 --preview --scenes prototipos/video-v42-3/p5/scenes.json --out …/p5` + captura Edge headless `?t=2`/`?t=9` | vermelho: módulo ausente; depois `AssertionError` (quadro não pintava antes do `ready`: título vazio em t=2); verde: 5/5, glob inteiro 50/50, exit 0; capturas com anel, nome, versão e legenda |
+| A08 | `node --test …/scripts/test/*.test.mjs`; `renderStills` de 3 PNG sintéticos | vermelho: `frameIndexAt` 0 ≠ 1 e `{lang}` não resolvido; verde: 57/57, exit 0; pixel central em t=0,8/1,8/2,8/3,9 = vermelho/verde/azul/azul (último quadro segurado) |
 
 ## Problemas em aberto e riscos
 
