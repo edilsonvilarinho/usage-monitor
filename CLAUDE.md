@@ -157,8 +157,9 @@ Decisões e histórico em [`docs/build-and-release.md`](docs/build-and-release.m
   protege quem não optou. Opt-in `receiveBetaUpdates`; desligar não faz downgrade; só o sufixo
   `-beta.N` é aceito (workflow e updater do Linux). Exe/Dmg levam só o número; Deb/Rpm `~beta.N`.
   Publicação pela skill `usage-monitor-release-beta`.
-- Vídeo de lançamento (#503): skill `usage-monitor-release-video` — vertical, PT e EN, voz Piper, legenda; ritmo é regra
-  (≤ 15 caracteres/s, ≤ 90 s): corta-se texto, nunca acelera a voz. Ferramentas fora de `build/`.
+- Vídeo de lançamento (#503, #633): skill `usage-monitor-release-video` — vertical, PT e EN, telas **reais** (demos `video-*`), HUD
+  sem moldura, voz OpenRouter (`eleven-v4`/`george`, chave só por `OPENROUTER_API_KEY`), uma fala por passo; ritmo é regra (≤ 15
+  caracteres/s, ≤ 150 s): corta-se texto, nunca acelera a voz. Ferramentas fora de `build/`.
 - Diagnóstico (#416): `app.log` recebe falha não tratada (registro no `CrashHandler`, nunca handler por escopo),
   `recordFailure`, `stderr` e EDT parado; `--diagnostics` empacota por **lista fechada**, sem janela.
 - Linha de comando (#418): `parseCommandLine` é o dono do `argv`; opção desconhecida avisa e **não** impede a abertura;
