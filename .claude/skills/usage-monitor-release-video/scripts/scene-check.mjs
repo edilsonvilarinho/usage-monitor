@@ -18,6 +18,13 @@ export function sceneProblems(scene) {
         !(typeof scene.maxZoom === 'number' && scene.maxZoom >= 1 && scene.maxZoom <= MAX_ZOOM_CEILING)) {
         problems.push(`${scene.id}: maxZoom ${scene.maxZoom} precisa ser um número de 1 a ${MAX_ZOOM_CEILING}`)
     }
+    // surface: só "hud" (captura com alfa direto sobre as estrelas); nela a câmera fica desligada.
+    if (scene.surface !== undefined && scene.surface !== 'hud') {
+        problems.push(`${scene.id}: surface "${scene.surface}" não existe; o único valor é "hud" (ou omita para o cartão de janela)`)
+    }
+    if (scene.surface === 'hud' && scene.camera) {
+        problems.push(`${scene.id}: surface "hud" não aceita camera (a captura aparece inteira, sem corte); remova a camera`)
+    }
     if (scene.camera) {
         const times = scene.camera.map((key) => key.at).sort((a, b) => a - b)
         for (let index = 0; index < times.length - 1; index += 1) {

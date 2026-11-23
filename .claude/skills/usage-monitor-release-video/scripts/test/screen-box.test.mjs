@@ -20,7 +20,7 @@ const PORTRAIT = [0, 0, 816, 1872]
 test('CAPTURE: painel de 952 px (950 de captura + borda de 1 px de cada lado)', () => {
     const { CAPTURE } = layout()
     assert.equal(CAPTURE.maxWidth + 2, 952)
-    assert.ok(CAPTURE.chrome >= 46 + 2, 'barra de 46 px mais a borda')
+    assert.equal(CAPTURE.chrome, 2, 'sem barra: só a borda do cartão')
 })
 
 test('fitCapture: retrato cabe na altura máxima e passa dos 236 px antigos de largura', () => {
