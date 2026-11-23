@@ -93,7 +93,7 @@ internal fun recordHudFloating(options: HelpMediaOptions) {
         recorder.animate(VideoDemoPace.MIN_ANIMATION) {}
         recorder.hold(VideoDemoPace.STEP_HOLD)
         recorder.hold(VideoDemoPace.OUTRO_HOLD)
-    }, FLOATING_SCENE_WIDTH_DP, FLOATING_SCENE_HEIGHT_DP, VIDEO_SCALE)
+    }, FLOATING_SCENE_WIDTH_DP, FLOATING_SCENE_HEIGHT_DP, VIDEO_SCALE, transparent = true)
 }
 
 // O buraco no centro da caixa (500, 210), em dp da cena; o ponteiro parte do canto direito, ainda dentro dela.
@@ -248,5 +248,5 @@ internal fun recordHudMinimize(options: HelpMediaOptions) {
         }
         progress = HudMinimizeProgress(emptyMap(), moving = false)
         recorder.hold(VideoDemoPace.OUTRO_HOLD)
-    }, sceneWidth, sceneHeight, VIDEO_SCALE)
+    }, sceneWidth, sceneHeight, VIDEO_SCALE, transparent = true)
 }

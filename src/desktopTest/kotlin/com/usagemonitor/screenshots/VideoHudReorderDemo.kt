@@ -85,5 +85,5 @@ internal fun recordHudReorder(options: HelpMediaOptions) {
         // A ordem nova assenta, depois o estado final fica parado.
         recorder.animate(VideoDemoPace.MIN_ANIMATION) {}
         recorder.hold(VideoDemoPace.OUTRO_HOLD)
-    }, sceneWidth, sceneHeight, REORDER_SCALE)
+    }, sceneWidth, sceneHeight, REORDER_SCALE, transparent = true)
 }

@@ -1,9 +1,11 @@
 package com.usagemonitor.screenshots
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -43,7 +45,9 @@ internal class SceneRecorder(
     /** `false` guarda o quadro a 2×: é o que o tour em vídeo usa (#505). */
     private val downsample: Boolean = true,
     /** Densidade da cena; o vídeo grava a 4× porque a câmera dá zoom (#633), a ajuda fica em 2×. */
-    private val scale: Int = SCALE
+    private val scale: Int = SCALE,
+    /** `true` não pinta o fundo da cena: o quadro sai com alfa, só os composables reais opacos (HUD sobre o céu do vídeo). */
+    private val transparent: Boolean = false
 ) {
 
     val frames = mutableListOf<GifFrame>()
@@ -61,11 +65,18 @@ internal class SceneRecorder(
     fun setContent(content: @Composable () -> Unit) {
         scene.setContent {
             AppTheme(isDark = true) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    content()
+                if (transparent) {
+                    // Sem Surface não há fundo; a cor do texto padrão continua a do tema.
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                        content()
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        content()
+                    }
                 }
             }
         }

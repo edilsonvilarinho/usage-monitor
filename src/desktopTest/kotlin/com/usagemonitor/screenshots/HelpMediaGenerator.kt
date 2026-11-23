@@ -630,13 +630,16 @@ internal fun recordMedia(
     script: (SceneRecorder) -> Unit,
     sceneWidthDp: Int = WIDTH_DP,
     sceneHeightDp: Int = HEIGHT_DP,
-    videoScale: Int = SceneRecorder.SCALE
+    videoScale: Int = SceneRecorder.SCALE,
+    /** Só vale nos quadros PNG do vídeo: o GIF não tem alfa e segue com o fundo do tema. */
+    transparent: Boolean = false
 ) {
     // O vídeo guarda o quadro na escala pedida; o GIF da ajuda continua em 2× reduzido à metade.
     val frames = options.format == HelpMediaFormat.FRAMES
     val recorder = SceneRecorder(
         widthDp = sceneWidthDp, heightDp = sceneHeightDp, downsample = !frames,
-        scale = if (frames) videoScale else SceneRecorder.SCALE
+        scale = if (frames) videoScale else SceneRecorder.SCALE,
+        transparent = frames && transparent
     )
     try {
         state.cursor.pose = state.cursor.pose.copy(visible = false)
