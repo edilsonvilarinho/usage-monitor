@@ -132,8 +132,9 @@ from the same terminal.
 ## DeepSeek
 
 - Same masked-key flow as MiniMax.
-- The dashboard shows the paid balance and, when present, the granted balance. Values are treated as
-  USD.
+- The dashboard shows the paid balance and, when present, the granted balance. Values are in the currency of the chosen
+  `balance_infos` entry (not always USD; no FX conversion): the first entry with `total_balance` > 0,
+  preferring USD among them; with no positive entry, USD, else the first (issue #639).
 - A prepaid balance does not reset, so it is **not** measured against the time-to-reset ruler used by
   windowed quotas. It uses an absolute runway instead: critical under 7 days, warning under 14.
 

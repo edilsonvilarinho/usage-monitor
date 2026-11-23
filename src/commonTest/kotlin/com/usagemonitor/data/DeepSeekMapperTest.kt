@@ -153,4 +153,78 @@ class DeepSeekMapperTest {
         assertEquals(1, stats.quotas.size)
         assertEquals(0L, stats.quotas[0].total)
     }
+
+    /**
+     * Issue #639: USD zerado com CNY com fundos saía com saldo 0 — a escolha
+     * pegava a entrada USD sem olhar o saldo.
+     */
+    @Test
+    fun `prefers the currency with balance when USD is empty`() {
+        val response = DeepSeekBalanceResponse(
+            isAvailable = true,
+            balanceInfos = listOf(
+                DeepSeekBalanceInfoDto("USD", "0.00", "0.00", "0.00"),
+                DeepSeekBalanceInfoDto("CNY", "120.00", "20.00", "100.00")
+            )
+        )
+
+        val stats = DeepSeekMapper.toUsageStats(response)
+
+        assertEquals(10000L, stats.quotas[0].total)
+        assertEquals("CNY", stats.quotas[0].currencyCode)
+        assertEquals("CNY", stats.quotas[1].currencyCode)
+    }
+
+    // Não regressão #639: USD com saldo continua sendo escolhido mesmo com CNY com saldo.
+    @Test
+    fun `keeps USD when USD and CNY both have balance and USD comes first`() {
+        val response = DeepSeekBalanceResponse(
+            isAvailable = true,
+            balanceInfos = listOf(
+                DeepSeekBalanceInfoDto("USD", "5.00", "0.00", "5.00"),
+                DeepSeekBalanceInfoDto("CNY", "100.00", "0.00", "100.00")
+            )
+        )
+
+        val stats = DeepSeekMapper.toUsageStats(response)
+
+        assertEquals(500L, stats.quotas[0].total)
+        assertEquals("USD", stats.quotas[0].currencyCode)
+    }
+
+    // Não regressão #639: sem nenhuma entrada com saldo, vale a regra antiga (USD).
+    @Test
+    fun `keeps USD when every currency is empty`() {
+        val response = DeepSeekBalanceResponse(
+            isAvailable = true,
+            balanceInfos = listOf(
+                DeepSeekBalanceInfoDto("CNY", "0.00", "0.00", "0.00"),
+                DeepSeekBalanceInfoDto("USD", "0.00", "0.00", "0.00")
+            )
+        )
+
+        val stats = DeepSeekMapper.toUsageStats(response)
+
+        assertEquals(0L, stats.quotas[0].total)
+        assertEquals("USD", stats.quotas[0].currencyCode)
+    }
+
+    // Decisão #639: `total_balance` decide. Conta CNY só com saldo concedido tem fundos.
+    @Test
+    fun `chooses CNY when it has only granted balance`() {
+        val response = DeepSeekBalanceResponse(
+            isAvailable = true,
+            balanceInfos = listOf(
+                DeepSeekBalanceInfoDto("USD", "0.00", "0.00", "0.00"),
+                DeepSeekBalanceInfoDto("CNY", "5.00", "5.00", "0.00")
+            )
+        )
+
+        val stats = DeepSeekMapper.toUsageStats(response)
+
+        assertEquals("CNY", stats.quotas[0].currencyCode)
+        assertEquals(0L, stats.quotas[0].total)
+        assertEquals(500L, stats.quotas[1].total)
+        assertEquals("CNY", stats.quotas[1].currencyCode)
+    }
 }
