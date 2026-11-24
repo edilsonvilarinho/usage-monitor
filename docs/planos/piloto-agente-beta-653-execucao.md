@@ -31,6 +31,11 @@ confirma só as suspeitas; nada abre issue sozinho.
   dado sintético. O agente não recebe o nome do defeito, só o roteiro e as regras escritas.
 - **Critério:** 70% dos casos com defeito apontados e no máximo 20% de alarme falso nas versões boas, 3 rodadas cada. Abaixo
   disso, mesmo piloto com o Sonnet navegando, se couber no teto.
+- **Decisões da A02:** `tools/ci/ai-pilot.mjs` não importa nada nem lê ambiente ou disco: cliente e tela entram por injeção. 100 mil
+  tokens é o tamanho do **prompt**, não a soma. Resposta sem `usage.cost` bloqueia o piloto inteiro (falha fechada, nunca estimada).
+  Ferramentas do turno que esgota o orçamento ainda rodam: já foram pagas. A confirmação pelo Sonnet é um roteiro próprio no orçamento
+  (quem chama faz `startScript()` antes); `null` é "não medido". Resposta HTTP 200 sem JSON pode ter custado e não ser somada: a
+  conferência de `/api/v1/key` antes de cada roteiro cobre.
 
 ## Mapa dos casos (A01)
 
@@ -62,6 +67,7 @@ na versão boa é conferido à mão antes de contar como falso.
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | catálogo e `/api/v1/key` do OpenRouter; `git tag --contains` por caso | fatos acima; 9 casos, 4 na 1ª rodada. Nenhum foi visto na tela ainda: a A03 confirma que cada defeito aparece no runner antes de gastar |
+| A02 | `node --test tools/ci/test/ai-pilot.test.mjs` | vermelho (stub) 81 de 92, 1ª asserção `actual: { ok: true }, expected: { ok: false, reason: 'invalid-response' }`; verde 92/92. Devolvida 1x (descartava as ferramentas do último turno pago): vermelho `:315 actual: 0, expected: 1`, `:323 actual: 'script-budget', expected: 'done'`, `:333`, `:350` e `:474 actual: { confirmed: true, why: 'ok' }`; verde **95/95**, em execução independente. Nenhuma chamada paga, nenhuma rede. Cobertura do diff: `tools/ci` não é medido por Kover nem pelo lcov do servidor |
 
 ## Problemas em aberto e riscos
 
