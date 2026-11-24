@@ -34,3 +34,4 @@ Não adotar detekt nem eslint; virar teste a regra que achou algo e corrigir os 
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | leitura do código | pontos acima |
+| A02 | `gradlew.bat desktopTest --tests "*HistoryViewModelTest*" …` | **não reproduzido**: o teste passou sem o `catch`, porque `breadcrumbs.recordFailure` já relança o cancelamento antes de publicar. Teste mantido; `catch` só pela regra. Verde 12/12 |
