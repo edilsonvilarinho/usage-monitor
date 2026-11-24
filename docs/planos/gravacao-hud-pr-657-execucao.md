@@ -57,11 +57,13 @@ PR que mexe na HUD ou em janela grava o app sozinho, em mais cenários que "para
 | A04 (detector) | `node --test "tools/ci/test/hud-pulses.test.mjs"` | vermelho (stub): `actual: 'ok'` contra `expected: 'not-moved'`, `'wrong-place'`, `'not-closed'` e `'not-visible'`; verde 38/38, em execução independente. |
 | A04 (cenários) | `Parser::ParseFile` nos dois scripts; `seed.ps1` local em `docked-top-hole-idle`, `floating-idle`, `floating-drag`; `python yaml.safe_load`; `node --test "tools/ci/test/hud-pulses.test.mjs"` | sem harness para PowerShell: 0 erros de parse; 3 contas e `hudMinimizedAccounts=CURSOR,ANTIGRAVITY` só nos cenários do buraco, sementes antigas iguais; YAML válido com 9 cenários; 38/38. **Falta:** o run no PR e a prova com defeito plantado (A05) |
 | A04 (1º run) | run [45483354886](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45483354886) (PR #667, `ec795b3d`) | 8/9: `floating-drag` deu `wrong-place`. Andou (-180, +108): falta exatamente o 1º passo de (-20, +12). `HudDragState.begin` lê o ponteiro já depois do 1º evento e descarta o delta dele; com mouse real é ~1 px. O roteiro ganhou um 1º evento de 1 px; **invariante e tolerância não mudaram**. `docked-top-hole-hover` conferido no quadro `013776.jpg`: lista "2 minimizadas" aberta |
+| A04 (2º run) | runs [45484820746](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45484820746) (PR, `9896de81`) e [45484824806](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45484824806) (manual, 5×) | PR 9/9 `ok`. `source` **15/15 `ok`**; o arrasto pousou em (-199, +119) nas 10 gravações (1 px do 1º evento, como previsto), repouso 0,994–1,001 do inicial. `v42.3.0-beta.15`: arrasto 5/5 `ok` e **buraco 10/10 `ok`, contra `pulsed`/`extra-pulse` esperados**: os cenários do buraco não veem o defeito dela, que depende do auto-recolher, desligado ali; esperado corrigido para `ok`. **Nenhum dos 3 cenários novos reprovou um defeito ainda:** é a A05, com defeito plantado |
 
 ## Problemas em aberto e riscos
 
 - Entrada sintética: chega ao Compose (A03).
 - `not-opened`, `opened-late` e `not-closed` só têm prova no teste do detector; nenhuma versão do app com esse defeito foi gravada.
 - Arrasto: o buraco fica atrás do ponteiro pelo tamanho do 1º evento. Arranque rápido pode mostrar isso; não medido com mouse real.
-- Depois de soltar, o ponteiro ficou 486 ms no buraco e saiu; o painel abriu 191 ms **depois** da saída e fechou 765 ms depois dela
-  (`frames.csv`, 14.358–15.123 ms). Uma gravação; não há invariante escrita para isso, e não foi tratado como defeito.
+- Depois de soltar e sair, o painel abre e fecha sozinho: no 1º run abriu 191 ms **depois** da saída do ponteiro, e nas 10 gravações
+  do 2º a abertura apareceu 330–592 ms depois de soltar e durou até 748–1.125 ms. Entrada sintética, sem invariante escrita: não foi
+  tratado como defeito nem conferido com mouse real.

@@ -202,9 +202,10 @@ jobs:
               Get-Process -Name 'Usage Monitor' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
               # beta.15 opens the HUD by itself at start (the known defect); every other version must not.
+              # The defect needs auto-retract, which the hole scenarios turn off (measured, run 45484824806).
               $expected = 'ok'
               if ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') {
-                  $expected = if ($scenario -like '*-hover') { 'extra-pulse' } elseif ($scenario -eq 'floating-drag') { 'ok' } else { 'pulsed' }
+                  $expected = if ($scenario -like 'docked-top-hole-*' -or $scenario -eq 'floating-drag') { 'ok' } elseif ($scenario -like '*-hover') { 'extra-pulse' } else { 'pulsed' }
               }
 
               $obtained = 'none'
