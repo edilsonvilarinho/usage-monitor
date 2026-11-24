@@ -261,6 +261,16 @@ tasks.withType<Test>().configureEach {
     maxHeapSize = "1g"
 }
 
+// Preferências em memória no `desktopTest` fora do Windows (#649). No Linux o `java.util.prefs`
+// grava um arquivo por nó e disputa uma trava por usuário: os forks paralelos batem nela. No Windows
+// a implementação é o registro, que não tem essa trava, e a suíte segue sem alteração.
+val runsOnWindows = System.getProperty("os.name").lowercase().contains("windows")
+if (!runsOnWindows) {
+    tasks.named<Test>("desktopTest") {
+        systemProperty("java.util.prefs.PreferencesFactory", "com.usagemonitor.InMemoryPreferencesFactory")
+    }
+}
+
 // Piso da catraca de cobertura de linhas do Kotlin. Meta: 95. Nunca desce.
 val coverageLineFloorPercent = 95
 

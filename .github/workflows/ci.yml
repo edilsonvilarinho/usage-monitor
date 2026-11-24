@@ -168,7 +168,7 @@ jobs:
         run: node --test "tools/ci/test/*.test.mjs"
 
   # windows-latest e a suite de referencia: os testes de componente usam
-  # `runDesktopComposeUiTest`, e o Linux (`desktop-linux`) ainda nao e gate.
+  # `runDesktopComposeUiTest`. O Linux (`desktop-linux`) tambem bloqueia (#649).
   desktop-windows:
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
@@ -280,14 +280,12 @@ jobs:
 
   # A suite no Linux antes da tag (issue #342). Pega o "passa no Windows, quebra
   # no Linux" de logica com caminho, relogio, fonte e Skia -- nao o gerenciador de
-  # janelas real, que nenhum teste exercita. Nasce SEM bloquear
-  # (`continue-on-error`, e o `ci-ok` o ignora): vira gate depois da sequencia
-  # verde registrada no plano da #342. Corre em paralelo com o Windows.
+  # janelas real, que nenhum teste exercita. Bloqueia o merge desde a #649.
+  # Corre em paralelo com o Windows.
   desktop-linux:
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -658,8 +656,7 @@ jobs:
 
   # O check unico que a protecao da `main` exige. `if: always()` para rodar
   # mesmo quando algo falhou ou foi pulado; `skipped` e sucesso (area nao
-  # tocada), `failure`/`cancelled` derrubam. `desktop-linux` fica fora ate virar
-  # gate (#342).
+  # tocada), `failure`/`cancelled` derrubam.
   ci-ok:
     if: always()
     needs:
@@ -681,11 +678,10 @@ jobs:
             pricing-parity=${{ needs.pricing-parity.result }}
             ci-scripts=${{ needs.ci-scripts.result }}
             desktop-windows=${{ needs.desktop-windows.result }}
+            desktop-linux=${{ needs.desktop-linux.result }}
             installer-windows=${{ needs.installer-windows.result }}
             linux-updater=${{ needs.linux-updater.result }}
             server=${{ needs.server.result }}
-          ADVISORY: |
-            desktop-linux=${{ needs.desktop-linux.result }}
         run: |
           set -euo pipefail
           failed=0
@@ -703,8 +699,4 @@ jobs:
               *) echo "::error::$job terminou em $result"; failed=1 ;;
             esac
           done <<< "$RESULTS"
-          while IFS='=' read -r job result; do
-            [ -z "$job" ] && continue
-            echo "| \`$job\` (nao bloqueia, #342) | $result |" >> "$GITHUB_STEP_SUMMARY"
-          done <<< "$ADVISORY"
           exit "$failed"
