@@ -459,6 +459,10 @@ eram descobertas por acidente.
 
 ## CI e testes — decisões
 
+**Telas antes e depois** (issue #651; plano [`telas-antes-depois-651-execucao.md`](planos/telas-antes-depois-651-execucao.md)): em PR que toca o desktop, o job `screen-diff` gera as
+capturas da base e do PR no mesmo runner e publica a tabela no resumo e o artefato `screen-diff` (`index.html`). Cobre as 17
+cenas do `generateScreenshots` e o `hud.gif`; tela sem cena não é vista. Informativo, fora do `ci-ok`.
+
 **App real gravado** (issue #652; plano [`app-real-no-ci-652-execucao.md`](planos/app-real-no-ci-652-execucao.md)): o workflow manual `real-app.yml` instala uma tag (ou
 compila `source`), abre com `--user-data-dir`, conta sintética e rede bloqueada, e reprova a HUD que abre sem entrada
 (`tools/ci/hud-pulses.mjs`). Prova: `v42.3.0-beta.15` 5/5 reprovada, `beta.16` e `source` 5/5 aprovadas. Fora do `ci-ok`.
