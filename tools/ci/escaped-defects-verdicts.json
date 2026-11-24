@@ -1,0 +1,18 @@
+[
+  { "fix": 447, "escaped": true, "origin": 446, "reason": "A aba de ajustes do #446 chamava `team join` sem `--accounts` e incluia todas as contas no time." },
+  { "fix": 455, "escaped": false, "origin": 446, "reason": "Largura de 96 colunas era a regra escrita no #446; o #455 mudou a regra." },
+  { "fix": 457, "escaped": true, "origin": 456, "reason": "O #456 apagava o PATH do usuario acima de 1024 caracteres." },
+  { "fix": 462, "escaped": true, "origin": 444, "reason": "O canal de pedidos do #444 descartava pedido ilegivel em silencio. Causa do sintoma nao reproduzida; as brechas valiam em producao." },
+  { "fix": 473, "escaped": true, "origin": 457, "reason": "O teto de 1024 do #457 deixava de fora quem tem PATH longo, sem dizer por que." },
+  { "fix": 490, "escaped": true, "origin": 472, "reason": "Rotulos da diagonal do ritmo, criada no #472, se sobrepunham. Escala e cadencia do mesmo PR sao anteriores a janela." },
+  { "fix": 534, "escaped": false, "origin": 458, "reason": "Modelos e precos novos do fornecedor; o blame acusa so linha vizinha." },
+  { "fix": 536, "escaped": true, "origin": 534, "reason": "A faixa de prompt longo do #534 nao chegou ao detalhe por modelo, que saia sem tarifa." },
+  { "fix": 557, "escaped": true, "origin": 554, "reason": "O seletor de periodo do #554 seguia desenhando no maximo 3 janelas anteriores." },
+  { "fix": 569, "escaped": false, "origin": 568, "reason": "Mudanca de resposta do fornecedor; o #568 so e citado." },
+  { "fix": 581, "escaped": true, "origin": 539, "reason": "A ordenacao do #539 deixava a primeira linha escondida sob o cabecalho." },
+  { "fix": 608, "escaped": false, "origin": 554, "reason": "O grafico sumir sem janela aberta nasceu no #472, 20 dias antes: fora da janela de 14 dias." },
+  { "fix": 624, "escaped": true, "origin": 622, "reason": "Balao da engrenagem do modo flutuante abria longe dela. A parte do Linux era restricao intencional." },
+  { "fix": 626, "escaped": true, "origin": 624, "reason": "O #624 ligou o modo flutuante no Linux e o gerenciador prendia a janela longe dos cantos." },
+  { "fix": 630, "escaped": true, "origin": 628, "reason": "O aquecimento do #628 abria e fechava a HUD visivel no arranque; revertido." },
+  { "fix": 632, "escaped": true, "origin": 622, "reason": "No modo flutuante do #622 o balao nao fechava ao minimizar e o clique nao recoletava. A parte do notch vem de PRs anteriores." }
+]
