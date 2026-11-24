@@ -17,7 +17,8 @@ escreveu à mão.
   (`HudWindowGeometry.kt`), `hudFloatingBounds` (`HudFloatingPlacement.kt:28`), `hudFloatingColumnParts`
   (`HudFloatingLayout.kt:76`).
 - Regras escritas em `docs/hud-notch.md`: notch parado na área útil (346); janela de origem e tamanho fixos ao abrir
-  (209); alças nunca fora da tela (330); teto do compacto 45% na horizontal e 80% na lateral (56); janela flutuante
+  (209); alças nunca fora da tela (330); a faixa **vira** compacta quando a completa passa de 45% da borda horizontal ou
+  80% da lateral (56 — não é teto da compacta, como a 1ª versão deste plano dizia); janela flutuante
   sempre na área útil, buraco se desloca (705). Exceções: auto-ocultação da barra (351) e arrasto livre (349).
 - "Alvo de clique contido na janela" **não** está escrito no documento.
 - Estado do balão: `HudNotchBalloonState` (`ringHovered`, `holeClicked`, `holeHovered`, `holeRowSelected`, `closeHole`) e
@@ -31,6 +32,8 @@ escreveu à mão.
   vira teste; o que parecer regra e não estiver escrito é listado para o dono decidir.
 - **Falha que aparecer é achado:** para e vira caso mínimo na issue. Não se estreita o gerador para o teste passar, salvo
   entrada impossível no produto, com a prova de que é impossível.
+- **A entrada passa pelo caminho do produto:** na lateral, `HudWindow.kt` aplica o auto-recolher (`HudAutoMinimize.kt`) antes
+  de `hudNotchSizes`. A 1ª rodada o pulou e deu contraexemplo que o produto não alcança.
 - **Prova do teste:** cada propriedade reprova com uma quebra proposital da função, desfeita em seguida.
 - Orçamento: até 5 s somados na suíte local.
 
