@@ -1,8 +1,6 @@
-# Experimento da #652: grava o app real (release publicado ou build do código) num runner Windows
+# Grava o app real (release publicado ou build do código) num runner Windows
 # e reprova pulsos de janela na HUD com o ponteiro parado. Fora do `ci-ok`. Ver docs/planos/app-real-no-ci-652-execucao.md.
-#
-# Gatilhos: `workflow_dispatch` (exige o arquivo na `main`) e `push` só nesta branch enquanto durar o
-# experimento. O gatilho `push` sai na A05.
+# Manual: Actions > Real app recording > Run workflow.
 name: Real app recording
 
 on:
@@ -18,9 +16,6 @@ on:
         required: true
         default: '5'
         type: string
-  push:
-    branches:
-      - ci/issue-652-real-app-recording
 
 permissions:
   contents: read

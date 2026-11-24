@@ -55,9 +55,22 @@ os testes não viram. É experimento: a resposta "não consegue" também encerra
 | A01 | sem harness de teste (plano) | conferido contra `HudGpuWarmUp.kt` da tag `v42.3.0-beta.15` e os arquivos citados |
 | A02 | `node --test "tools/ci/test/hud-pulses.test.mjs"` | vermelho (stub): `actual: [], expected: [3000, 4000, 5000]`; verde 12/12. Devolvida 1x na revisão: app que some ou cai saía `ok`. Vermelho do ajuste: `ruido de 100 px e some, ou fica`: `actual: 'pulsed', expected: 'not-visible'` (4 falhas em 16); verde 16/16, confirmado em execução independente. Não coberto: app que some e volta antes do fim |
 | A03 | `[Parser]::ParseFile` nos dois `.ps1` e compilação isolada do tipo C# | 0 erros de parse; tipo compilado sem ser chamado. Devolvida 1x: coluna `foreground` era marca de janela ativa, cabeçalho entre aspas e `runner.temp` em `env` de job. Scripts de captura sem harness de teste; a sonda é o run desta branch |
+| A03 (sonda) | run [45469197337](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45469197337) | desktop interativo (sessão 2, 1024×768, 96 dpi), `render=DIRECT3D`, janela com alfa capturada, ~9,4 quadros/s. `beta.15` `pulsed` (3 pulsos), `beta.16` `ok`. Console do runner e ícones atrás da HUD |
+| A04 | run [45470705430](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45470705430) (`d57718a1`) | `beta.15` 5/5 `pulsed`, sempre 3 pulsos; `beta.16` 5/5 `ok`; `source` (esta branch) 5/5 `ok`. Artefatos conferidos: HUD visível nas 15 (mediana 1.417–1.419 px depois de 15 s, mínimo 1.410), fundo estável nas 15, nenhum app encerrado. 65–88 s por tag; 121–264 s compilando |
+| A05 | `real-app.yml` sem `push` | decisão abaixo; YAML validado pelos dois runs, o corte do gatilho só depois do merge |
+
+## Decisão (A05)
+
+**O runner do GitHub serve.** Abre o produto instalado, captura a janela transparente e separou a versão com defeito das
+sem defeito em 15 de 15 gravações. Não é preciso runner próprio nem gravação local para este tipo de defeito.
+
+O que ele **não** prova: só o modo flutuante com auto-recolher, parado, por 30 s; a 9,4 quadros/s, pulso abaixo de ~200 ms
+pode escapar; um monitor, 100% de escala, sem barra de tarefas; Linux e macOS não. `source` compila um clone raso, com
+versão `1.0.0`. O workflow fica manual. Ligá-lo a PR de HUD e acrescentar cenários (hover, arrasto, encaixado) é outra
+decisão, com outra issue.
 
 ## Problemas em aberto e riscos
 
 - O runner não tem GPU: o Skiko pode cair para software e mudar o tempo, mas o aquecimento não depende da API gráfica.
-- A captura pode não ver a janela com alfa por pixel; a sonda da A03 responde antes de qualquer conclusão.
+- A captura podia não ver a janela com alfa por pixel: descartado pela sonda da A03.
 - Um detector que só reprova a `beta.15` pode estar ajustado a ela. A invariante "sem entrada, nenhum pulso" reduz o risco.
