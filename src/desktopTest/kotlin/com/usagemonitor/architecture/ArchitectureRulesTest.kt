@@ -533,9 +533,163 @@ class ArchitectureRulesTest {
         assertEquals(mapOf("small" to 5, "root" to 7), spans)
     }
 
+    /** Medição de comentário (issue #647): o scanner conta só comentário de verdade. */
+    @Test
+    fun `bloco de comentario conta a partir de seis linhas seguidas`() {
+        assertEquals(listOf(CommentBlock(startLine = 1, lineCount = 6)), longCommentBlocks("// a\n".repeat(6)))
+        assertEquals(emptyList<CommentBlock>(), longCommentBlocks("// a\n".repeat(5)))
+    }
+
+    @Test
+    fun `linha em branco fora do comentario separa os blocos`() {
+        val source = "// a\n".repeat(3) + "\n" + "// b\n".repeat(3)
+        assertEquals(emptyList<CommentBlock>(), longCommentBlocks(source))
+        assertEquals(2, longCommentBlocks(source, minLines = 3).size)
+    }
+
+    @Test
+    fun `delimitador e linha em branco dentro de bloco de barra-asterisco contam`() {
+        val source = """
+            /**
+             * primeira
+
+             * segunda
+             * terceira
+             */
+        """.trimIndent()
+        assertEquals(listOf(CommentBlock(startLine = 1, lineCount = 6)), longCommentBlocks(source))
+    }
+
+    @Test
+    fun `comentario depois de codigo na mesma linha nao e linha so de comentario`() {
+        val before = "// a\n".repeat(3) + "val x = 1 // nota\n" + "// b\n".repeat(3)
+        assertEquals(emptyList<CommentBlock>(), longCommentBlocks(before))
+        val after = "val x = 1 // nota\n" + "// b\n".repeat(6)
+        assertEquals(listOf(CommentBlock(startLine = 2, lineCount = 6)), longCommentBlocks(after))
+    }
+
+    @Test
+    fun `barra-asterisco aninhado so fecha no delimitador de fora`() {
+        val source = """
+            /*
+             * /* interno */
+             * ainda comentario
+             * linha
+             * linha
+             */
+            val depois = 1
+        """.trimIndent()
+        assertEquals(listOf(CommentBlock(startLine = 1, lineCount = 6)), longCommentBlocks(source))
+    }
+
+    @Test
+    fun `marcador dentro de string nao e comentario`() {
+        val triple = "\"\"\""
+        val rawText = "val texto = $triple\n" + "// linha\n".repeat(6) + "$triple\n"
+        assertEquals(emptyList<CommentBlock>(), longCommentBlocks(rawText))
+        val url = "val url = \"https://exemplo.com/#647\"\n" + "// a\n".repeat(6)
+        assertEquals(listOf(CommentBlock(startLine = 2, lineCount = 6)), longCommentBlocks(url))
+        assertEquals(emptyList<Int>(), issueReferenceCommentLines("val url = \"https://exemplo.com/#647\"\n"))
+    }
+
+    @Test
+    fun `aspas dentro de caractere nao abrem string`() {
+        val source = "val aspa = '\"'\n" + "// a\n".repeat(6)
+        assertEquals(listOf(CommentBlock(startLine = 2, lineCount = 6)), longCommentBlocks(source))
+    }
+
+    @Test
+    fun `referencia a issue conta com dois a quatro digitos e ignora cor e numero longo`() {
+        val source = """
+            // ver #647
+            // corrigido em #171414
+            // ordem #6
+            // cor #FF8800
+            val x = 1 // #1234
+        """.trimIndent()
+        assertEquals(listOf(1, 5), issueReferenceCommentLines(source))
+    }
+
+    /**
+     * Catraca de comentário longo e de referência a issue (issue #647). O teto é a medição de hoje,
+     * só produção. Acima do teto reprova; abaixo de `teto − folga` também, pedindo para baixar o teto.
+     */
+    @Test
+    fun `comentario longo de producao nao cresce e desce pelo teto`() {
+        val blocks = sources.associate { source -> source.path to longCommentBlocks(source.text).size }
+        val problem = commentCeilingProblem(
+            label = "Blocos de comentário longo em produção",
+            measured = blocks.values.sum(),
+            ceiling = LONG_COMMENT_BLOCKS_CEILING,
+            top = topFiles(blocks)
+        )
+        if (problem != null) fail(problem)
+    }
+
+    @Test
+    fun `referencia a issue em comentario de producao nao cresce e desce pelo teto`() {
+        val lines = sources.associate { source -> source.path to issueReferenceCommentLines(source.text).size }
+        val problem = commentCeilingProblem(
+            label = "Linhas de comentário com referência a issue em produção",
+            measured = lines.values.sum(),
+            ceiling = ISSUE_REFERENCE_LINES_CEILING,
+            top = topFiles(lines)
+        )
+        if (problem != null) fail(problem)
+    }
+
+    @Test
+    fun `teto de comentario reprova acima do teto e abaixo da folga`() {
+        val upper = checkNotNull(commentCeilingProblem("Blocos", measured = 1001, ceiling = 1000, top = listOf("a.kt" to 3)))
+        assertTrue(upper.contains("1001 acima do teto 1000"), upper)
+        assertTrue(upper.contains("a.kt (3)"), upper)
+        assertTrue(upper.contains("docs/"), upper)
+        assertEquals(null, commentCeilingProblem("Blocos", measured = 1000, ceiling = 1000, top = emptyList()))
+        assertEquals(null, commentCeilingProblem("Blocos", measured = 990, ceiling = 1000, top = emptyList()))
+        val lower = checkNotNull(commentCeilingProblem("Blocos", measured = 989, ceiling = 1000, top = emptyList()))
+        assertTrue(lower.contains("Baixe o teto de 1000 para 989"), lower)
+    }
+
+    @Test
+    fun `folga e um por cento do teto arredondado para baixo`() {
+        assertEquals(null, commentCeilingProblem("Blocos", measured = 149, ceiling = 150, top = emptyList()))
+        val lower = checkNotNull(commentCeilingProblem("Blocos", measured = 148, ceiling = 150, top = emptyList()))
+        assertTrue(lower.contains("Baixe o teto de 150 para 148"), lower)
+    }
+
+    @Test
+    fun `top de arquivos ordena por contagem e depois por caminho`() {
+        val top = topFiles(mapOf("b.kt" to 2, "a.kt" to 2, "c.kt" to 5, "d.kt" to 0))
+        assertEquals(listOf("c.kt" to 5, "a.kt" to 2, "b.kt" to 2), top)
+    }
+
+    /** Mensagem da catraca de comentário; `null` quando a contagem está dentro da faixa [teto − folga, teto]. */
+    private fun commentCeilingProblem(label: String, measured: Int, ceiling: Int, top: List<Pair<String, Int>>): String? {
+        val slack = ceiling / 100
+        val files = top.take(5).joinToString { file -> "${file.first} (${file.second})" }
+        return when {
+            measured > ceiling -> "$label: $measured acima do teto $ceiling. Maiores: $files. Mova o fato para um teste ou para docs/, depois remova o comentário."
+            measured < ceiling - slack -> "$label: $measured abaixo do teto $ceiling (folga $slack). Baixe o teto de $ceiling para $measured."
+            else -> null
+        }
+    }
+
+    /** Cinco maiores contagens, maior primeiro; empate ordenado por caminho; zero fica de fora. */
+    private fun topFiles(counts: Map<String, Int>): List<Pair<String, Int>> =
+        counts.filter { entry -> entry.value > 0 }
+            .toList()
+            .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+            .take(5)
+
     private companion object {
         const val MAX_FILE_LINES = 800
         const val MAX_FUNCTION_LINES = 300
+
+        /** Medido em 2026-11-24 pelo `CommentScanner` (#647). Só desce. */
+        const val LONG_COMMENT_BLOCKS_CEILING = 1498
+
+        /** Medido em 2026-11-24 pelo `CommentScanner` (#647). Só desce. */
+        const val ISSUE_REFERENCE_LINES_CEILING = 1324
 
         /** `.shape = ` e `setShape(`; o argumento nomeado `shape =` do Compose não tem ponto. */
         val NATIVE_WINDOW_SHAPE = Regex("""\.shape\s*=(?!=)|setShape\s*\(""")
