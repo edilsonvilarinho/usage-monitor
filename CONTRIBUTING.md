@@ -53,8 +53,8 @@ Parallel forks (`-PtestForks=4`) are opt-in and only safe on a machine with a wa
 
 ### Platform reality
 
-The maintainer works on **Windows**, and CI runs the suite **only on Windows**. Linux and macOS
-builds are packaged by the release workflow from the tag, but no test runs on them before that. What
+The maintainer works on **Windows**. CI runs the suite on **Windows and Linux** (Xvfb), and both block
+the merge (#649). macOS is only packaged by the release workflow from the tag; no test runs on it. What
 no test exercises on any platform is the **window system itself**: transparency, `Window.shape`,
 `alwaysOnTop` against the taskbar, window position and per-monitor scale. Component tests draw into
 an offscreen scene with no AWT window and no window manager.

@@ -459,6 +459,11 @@ eram descobertas por acidente.
 
 ## CI e testes — decisões
 
+**`desktop-linux` bloqueia o merge** (issue #649; plano [`linux-bloqueia-merge-649-execucao.md`](planos/linux-bloqueia-merge-649-execucao.md)): em 150 runs desde
+2026-10-28, o Linux reprovou sozinho em 2, por 3 testes instáveis e nenhum defeito de produto confirmado. Um vinha da
+disputa da trava do `java.util.prefs` entre os forks; dois, de ler o estado antes da publicação. Fora do Windows os
+testes usam `InMemoryPreferencesFactory`; no Windows continua o registro.
+
 > Movido do `CLAUDE.md` em 2026-09-27 pela skill `usage-monitor-token-cleanup` (#319). O `CLAUDE.md` guarda as regras curtas e aponta para cá; o texto abaixo é o original, com os links relativos ajustados a este diretório.
 
 ## CI e testes

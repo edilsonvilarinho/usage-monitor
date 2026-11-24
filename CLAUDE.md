@@ -330,8 +330,8 @@ de 512 px (detalhes em [`docs/build-and-release.md`](docs/build-and-release.md))
 Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-and-release.md), seção
 "CI e testes — decisões". Regras:
 
-- **Plataformas** ("Platform reality" no `CONTRIBUTING.md`, #342): a suíte só roda no Windows e nenhum
-  teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
+- **Plataformas** ("Platform reality" no `CONTRIBUTING.md`, #342): a suíte roda no Windows e no Linux (Xvfb),
+  os dois bloqueiam o merge (#649), e nenhum teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
   merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
 
 - Workflows (#344): `ci.yml` único — job `changes` recorta por path, jobs em paralelo só do que
