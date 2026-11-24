@@ -5,7 +5,7 @@
 .DESCRIPTION
   Runs only on GitHub Actions: it hides every other top-level window and the desktop icons,
   then waits for a still desktop before the baseline. The pointer is parked at the bottom centre.
-  No human input is simulated. frames.csv is t_ms,foreground,x,y,w,h; foreground = pixels that
+  Hover and drag scenarios send synthetic mouse input. frames.csv is t_ms,foreground,x,y,w,h; foreground = pixels that
   differ from the baseline (integer).
 .PARAMETER Exe
   Path to the app exe ('Usage Monitor.exe': installed or built).
@@ -16,8 +16,10 @@
 .PARAMETER Seconds
   Recording length.
 .PARAMETER Scenario
-  Same names as seed.ps1. docked-top-hover moves the pointer onto the last non-empty box at 12 s,
-  leaves to the bottom centre 3 s later, and writes events.json {enterMs, leaveMs} (same clock as t_ms).
+  Same names as seed.ps1. From 12 s the pointer follows one plan built from the last non-empty box.
+  Hover scenarios (docked-top-hover, docked-top-hole-hover) move onto it, leave to the bottom centre 3 s later
+  and write events.json {enterMs, leaveMs}. floating-drag presses, drags (-200, +120) and releases, and writes
+  {pressMs, releaseMs, dx, dy}. All times are on the t_ms clock; probe.json lists the executed pointer actions.
 #>
 [CmdletBinding()]
 param(
@@ -25,7 +27,7 @@ param(
     [Parameter(Mandatory)][string]$DataDir,
     [Parameter(Mandatory)][string]$OutDir,
     [int]$Seconds = 30,
-    [ValidateSet('floating-idle', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover')]
+    [ValidateSet('floating-idle', 'floating-drag', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover', 'docked-top-hole-idle', 'docked-top-hole-hover')]
     [string]$Scenario = 'floating-idle'
 )
 
@@ -67,6 +69,14 @@ public static class RealAppNative {
         input.mi.dx = (int)((x - vs.X) * 65535L / Math.Max(1, vs.Width - 1));
         input.mi.dy = (int)((y - vs.Y) * 65535L / Math.Max(1, vs.Height - 1));
         input.mi.dwFlags = 0x0001 | 0x4000 | 0x8000; // MOUSEEVENTF_MOVE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_ABSOLUTE
+        return SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT))) == 1;
+    }
+
+    // Presses (down) or releases the left button at the current pointer position.
+    public static bool Button(bool down) {
+        INPUT input = new INPUT();
+        input.type = 0; // INPUT_MOUSE
+        input.mi.dwFlags = down ? 0x0002u : 0x0004u; // MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP
         return SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT))) == 1;
     }
 
@@ -208,10 +218,16 @@ $backgroundStable = $false
 $fpsSamples = 0
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $vs = [System.Drawing.Rectangle]::Empty
-# docked-top-hover: last box with changed pixels, and the hover times on the t_ms clock.
+# Last box with changed pixels; the pointer plan (built at 12 s) and its marks on the t_ms clock.
 $lastBox = $null
-$enterMs = $null
-$leaveMs = $null
+$isHover = $Scenario -like '*-hover'
+$isDrag = $Scenario -eq 'floating-drag'
+$plan = $null
+$planStart = 0
+$planNext = 0
+$pressed = $false
+$pointer = [System.Collections.Generic.List[object]]::new()
+$marks = @{}
 
 try {
     # 1. Plain black desktop: every other top-level window and the desktop icons hidden.
@@ -266,23 +282,47 @@ try {
         [void]$csv.Append("$tMs,$count,$bx,$by,$bw,$bh`n")
         if ($count -gt 0) { $lastBox = @($bx, $by, $bw, $bh) }
 
-        if ($Scenario -eq 'docked-top-hover') {
-            if ($null -eq $enterMs -and $tMs -ge 12000) {
-                # Centre of the last non-empty box; top centre of the screen when nothing ever changed.
-                if ($lastBox) {
-                    $cx = $vs.X + $lastBox[0] + [int]($lastBox[2] / 2)
-                    $cy = $vs.Y + $lastBox[1] + [int]($lastBox[3] / 2)
-                } else {
-                    $cx = $vs.X + [int]($vs.Width / 2)
-                    $cy = $vs.Y + 1
+        # Plan built once, at the first frame from 12 s, from the last non-empty box.
+        # Without any box, a 2 px strip at the top centre stands in (as before).
+        if ($null -eq $plan -and ($isHover -or $isDrag) -and $tMs -ge 12000) {
+            $box = if ($lastBox) { $lastBox } else { @([int]($vs.Width / 2), 0, 0, 2) }
+            $centreX = $vs.X + $box[0] + [int]($box[2] / 2)
+            $centreY = $vs.Y + $box[1] + [int]($box[3] / 2)
+            $bottomX = $vs.X + [int]($vs.Width / 2)
+            $bottomY = $vs.Y + $vs.Height - 2
+            $planStart = $tMs
+            if ($isDrag) {
+                # Drag: ten steps of (-20, +12), then release; the drag ends at (-200, +120).
+                $plan = @(@{ at = 0; kind = 'move'; x = $centreX; y = $centreY })
+                $plan += @{ at = 400; kind = 'press'; x = $centreX; y = $centreY; mark = 'press' }
+                for ($i = 0; $i -lt 10; $i++) {
+                    $plan += @{ at = 500 + 100 * $i; kind = 'move'; x = $centreX - 20 * ($i + 1); y = $centreY + 12 * ($i + 1) }
                 }
-                [void][RealAppNative]::MoveTo($cx, $cy, $vs)
-                $enterMs = $tMs
+                $plan += @{ at = 1700; kind = 'release'; x = $centreX - 200; y = $centreY + 120; mark = 'release' }
+                $plan += @{ at = 2200; kind = 'move'; x = $bottomX; y = $bottomY }
+            } else {
+                # Hover: the hole is the last cell of the top strip (box right edge minus 60 px); the box itself otherwise.
+                $aimX = $centreX
+                $aimY = $centreY
+                if ($Scenario -eq 'docked-top-hole-hover') {
+                    $aimX = $vs.X + $box[0] + $box[2] - 60
+                    $aimY = $vs.Y + $box[1] + [int]($box[3] / 2)
+                }
+                $plan = @(
+                    @{ at = 0; kind = 'move'; x = $aimX; y = $aimY; mark = 'enter' },
+                    @{ at = 3000; kind = 'move'; x = $bottomX; y = $bottomY; mark = 'leave' }
+                )
             }
-            elseif ($null -ne $enterMs -and $null -eq $leaveMs -and $tMs -ge ($enterMs + 3000)) {
-                [void][RealAppNative]::MoveTo($vs.X + [int]($vs.Width / 2), $vs.Y + $vs.Height - 2, $vs)
-                $leaveMs = $tMs
-            }
+        }
+        # At most one pointer action per iteration, each at its scheduled time (ms after the plan start).
+        if ($null -ne $plan -and $planNext -lt $plan.Count -and $tMs -ge ($planStart + $plan[$planNext].at)) {
+            $act = $plan[$planNext]
+            $planNext++
+            if ($act.kind -eq 'press') { [void][RealAppNative]::Button($true); $pressed = $true }
+            elseif ($act.kind -eq 'release') { [void][RealAppNative]::Button($false); $pressed = $false }
+            else { [void][RealAppNative]::MoveTo($act.x, $act.y, $vs) }
+            if ($act.ContainsKey('mark')) { $marks[$act.mark] = $tMs }
+            $pointer.Add([pscustomobject]@{ kind = $act.kind; x = $act.x; y = $act.y; tMs = $tMs })
         }
 
         # JPEG when the count moves more than 5% from the last saved JPEG, or once a second.
@@ -296,13 +336,27 @@ try {
     }
 }
 finally {
+    # Never leave the left button down, even when the recording failed mid-drag.
+    if ($pressed) {
+        [void][RealAppNative]::Button($false)
+        $pressed = $false
+        $pointer.Add([pscustomobject]@{ kind = 'release'; x = $null; y = $null; tMs = [int]$sw.ElapsedMilliseconds })
+    }
     if ($proc) {
         $appExited = $proc.HasExited
         if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
     }
     [System.IO.File]::WriteAllText($csvPath, $csv.ToString(), [System.Text.UTF8Encoding]::new($false))
-    if ($Scenario -eq 'docked-top-hover' -and $null -ne $enterMs -and $null -ne $leaveMs) {
-        $eventsJson = [pscustomobject]@{ enterMs = $enterMs; leaveMs = $leaveMs } | ConvertTo-Json -Compress
+    # events.json: hover {enterMs, leaveMs}; drag {pressMs, releaseMs, dx, dy}. Written only when all fields exist.
+    $eventsObject = $null
+    if ($isHover -and $marks.ContainsKey('enter') -and $marks.ContainsKey('leave')) {
+        $eventsObject = [pscustomobject]@{ enterMs = $marks['enter']; leaveMs = $marks['leave'] }
+    }
+    if ($isDrag -and $marks.ContainsKey('press') -and $marks.ContainsKey('release')) {
+        $eventsObject = [pscustomobject]@{ pressMs = $marks['press']; releaseMs = $marks['release']; dx = -200; dy = 120 }
+    }
+    if ($null -ne $eventsObject) {
+        $eventsJson = $eventsObject | ConvertTo-Json -Compress
         [System.IO.File]::WriteAllText((Join-Path $OutDir 'events.json'), $eventsJson, [System.Text.UTF8Encoding]::new($false))
     }
 
@@ -321,5 +375,6 @@ finally {
         framesPerSecond  = [math]::Round($fpsSamples / [math]::Max(1, $sw.Elapsed.TotalSeconds), 1)
         seconds          = $Seconds
         appExited        = $appExited
+        pointer          = @($pointer)
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'probe.json') -Encoding utf8
 }

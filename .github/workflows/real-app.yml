@@ -29,7 +29,7 @@ on:
         default: '5'
         type: string
       scenarios:
-        description: '`all` ou lista separada por vírgula: floating-idle, docked-top-idle, docked-bottom-idle, docked-left-idle, docked-right-idle, docked-top-hover'
+        description: '`all` ou lista separada por vírgula: floating-idle, docked-top-idle, docked-bottom-idle, docked-left-idle, docked-right-idle, docked-top-hover, floating-drag, docked-top-hole-idle, docked-top-hole-hover'
         required: true
         default: 'all'
         type: string
@@ -65,7 +65,7 @@ jobs:
             ATTEMPTS=1
             SCENARIOS=all
           fi
-          ALL='floating-idle,docked-top-idle,docked-bottom-idle,docked-left-idle,docked-right-idle,docked-top-hover'
+          ALL='floating-idle,docked-top-idle,docked-bottom-idle,docked-left-idle,docked-right-idle,docked-top-hover,floating-drag,docked-top-hole-idle,docked-top-hole-hover'
           if [ "$SCENARIOS" = "all" ]; then SCENARIOS=$ALL; fi
           scenarios=$(printf '%s' "$SCENARIOS" | tr -d ' ')
           for s in $(printf '%s' "$scenarios" | tr ',' ' '); do
@@ -204,7 +204,7 @@ jobs:
               # beta.15 opens the HUD by itself at start (the known defect); every other version must not.
               $expected = 'ok'
               if ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') {
-                  $expected = if ($scenario -eq 'docked-top-hover') { 'extra-pulse' } else { 'pulsed' }
+                  $expected = if ($scenario -like '*-hover') { 'extra-pulse' } elseif ($scenario -eq 'floating-drag') { 'ok' } else { 'pulsed' }
               }
 
               $obtained = 'none'
@@ -219,11 +219,12 @@ jobs:
 
               $csv = Join-Path $outDir 'frames.csv'
               $verdictPath = Join-Path $outDir 'verdict.txt'
-              $isHover = $scenario -eq 'docked-top-hover'
+              $isHover = $scenario -like '*-hover'
+              $isDrag = $scenario -eq 'floating-drag'
               $eventsPath = Join-Path $outDir 'events.json'
               if (-not $recorded -or -not (Test-Path -LiteralPath $csv)) {
                   $obtained = 'none'
-              } elseif ($isHover -and -not (Test-Path -LiteralPath $eventsPath)) {
+              } elseif (($isHover -or $isDrag) -and -not (Test-Path -LiteralPath $eventsPath)) {
                   $obtained = 'no-events'
               } else {
                   $detectorArgs = @($csv)
@@ -231,6 +232,10 @@ jobs:
                       $ev = Get-Content -LiteralPath $eventsPath -Raw | ConvertFrom-Json
                       $eventsArg = [pscustomobject]@{ enterMs = $ev.enterMs; leaveMs = $ev.leaveMs } | ConvertTo-Json -Compress
                       $detectorArgs += @('--expect', 'hover', '--events', $eventsArg)
+                  } elseif ($isDrag) {
+                      # The whole events.json: pressMs, releaseMs, dx, dy.
+                      $eventsArg = (Get-Content -LiteralPath $eventsPath -Raw).Trim()
+                      $detectorArgs += @('--expect', 'drag', '--events', $eventsArg)
                   }
                   node tools/ci/hud-pulses.mjs @detectorArgs *> $verdictPath
                   $code = $LASTEXITCODE

@@ -16,13 +16,14 @@
   Release version written into releaseNotesSeenVersion and onboardingCompletedVersion.
 
 .PARAMETER Scenario
-  HUD placement to seed: floating-idle, docked-<top|bottom|left|right>-idle, or docked-top-hover.
+  HUD placement to seed: floating-idle, floating-drag (same seed), docked-<top|bottom|left|right>-idle,
+  docked-top-hover, or docked-top-hole-idle / docked-top-hole-hover (three accounts, two minimized).
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$DataDir,
     [Parameter(Mandatory)][string]$Version,
-    [ValidateSet('floating-idle', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover')]
+    [ValidateSet('floating-idle', 'floating-drag', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover', 'docked-top-hole-idle', 'docked-top-hole-hover')]
     [string]$Scenario = 'floating-idle'
 )
 
@@ -32,54 +33,76 @@ $ErrorActionPreference = 'Stop'
 # hudEdge :73 = HudEdge name TOP|BOTTOM|LEFT|RIGHT; hudEdgeOffset :74 = Float text; hudAutoRetract :122-131).
 $placements = @{
     'floating-idle'      = @{ floating = 'true';  edge = 'TOP' }
+    'floating-drag'      = @{ floating = 'true';  edge = 'TOP' }
     'docked-top-idle'    = @{ floating = 'false'; edge = 'TOP' }
     'docked-bottom-idle' = @{ floating = 'false'; edge = 'BOTTOM' }
     'docked-left-idle'   = @{ floating = 'false'; edge = 'LEFT' }
     'docked-right-idle'  = @{ floating = 'false'; edge = 'RIGHT' }
     'docked-top-hover'   = @{ floating = 'false'; edge = 'TOP' }
+    'docked-top-hole-idle'  = @{ floating = 'false'; edge = 'TOP' }
+    'docked-top-hole-hover' = @{ floating = 'false'; edge = 'TOP' }
 }
 $placement = $placements[$Scenario]
+# Hole scenarios: three accounts, two minimized, auto-retract off, so the strip stays visible.
+$isHole = $Scenario -like 'docked-top-hole-*'
+$autoRetract = if ($isHole) { 'false' } else { 'true' }
+$enabledApis = if ($isHole) { 'CODEX,CURSOR,ANTIGRAVITY' } else { 'CODEX' }
 
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 # Canonical form: the app hashes File.canonicalFile.path (DataRootResolution.kt:38).
 $root = [System.IO.Path]::GetFullPath($DataDir).TrimEnd('\')
 
-# --- dashboard-cache.json (fake CODEX account, two PERCENTAGE quotas) ---------------
+# --- dashboard-cache.json (fake accounts, two PERCENTAGE quotas each, one for ANTIGRAVITY) ---
 # DashboardCacheDto (src/commonMain/.../dto/DashboardCacheDto.kt): savedAtEpochMillis + entries.
-# targetKey = UsageTargetKey(CODEX, null).storageKey = "CODEX" (UsageTargetKey.kt:32-37).
+# targetKey = UsageTargetKey(source, null).storageKey = the enum name (UsageTargetKey.kt:32-37).
 # Enums are written by name (DashboardCacheMapper.kt:40-50): periodType INTERVAL|WEEKLY, unit PERCENTAGE.
 $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $hourMs = 3600000L
+
+# One quota like the CODEX ones: total 100, PERCENTAGE, known reset.
+function New-SeedQuota([string]$label, [long]$used, [string]$periodType, [long]$periodEndMs, [long]$periodStartMs) {
+    [ordered]@{
+        label = $label; used = $used; total = 100L
+        periodEndAtEpochMillis = $periodEndMs; hasKnownResetAt = $true
+        periodType = $periodType; unit = 'PERCENTAGE'
+        rawUsed = $used; rawTotal = 100L; currencyCode = 'USD'
+        periodStartAtEpochMillis = $periodStartMs; blockReason = $null
+    }
+}
+
+# One fake account; the caller passes its quotas from New-SeedQuota.
+function New-SeedEntry([string]$source, [string]$apiName, [object[]]$quotas) {
+    [ordered]@{
+        targetKey = $source
+        source = $source
+        apiName = $apiName
+        accountEmail = 'example@example.invalid'
+        profileLabel = 'Example account'
+        notices = @()
+        planLabel = 'Example'
+        fetchedAtEpochMillis = $nowMs
+        quotas = @($quotas)
+    }
+}
+
+$accounts = @(
+    New-SeedEntry 'CODEX' 'Codex' @(
+        (New-SeedQuota 'Example session' 35L 'INTERVAL' ($nowMs + 5 * $hourMs) ($nowMs - 1 * $hourMs)),
+        (New-SeedQuota 'Example weekly' 60L 'WEEKLY' ($nowMs + 7 * 24 * $hourMs) ($nowMs - 24 * $hourMs))
+    )
+)
+if ($isHole) {
+    $accounts += New-SeedEntry 'CURSOR' 'Cursor' @(
+        (New-SeedQuota 'Example session' 20L 'INTERVAL' ($nowMs + 5 * $hourMs) ($nowMs - 1 * $hourMs)),
+        (New-SeedQuota 'Example weekly' 45L 'WEEKLY' ($nowMs + 7 * 24 * $hourMs) ($nowMs - 24 * $hourMs))
+    )
+    $accounts += New-SeedEntry 'ANTIGRAVITY' 'Antigravity' @(
+        (New-SeedQuota 'Example session' 50L 'INTERVAL' ($nowMs + 5 * $hourMs) ($nowMs - 1 * $hourMs))
+    )
+}
 $cache = [ordered]@{
     savedAtEpochMillis = $nowMs
-    entries = @(
-        [ordered]@{
-            targetKey = 'CODEX'
-            source = 'CODEX'
-            apiName = 'Codex'
-            accountEmail = 'example@example.invalid'
-            profileLabel = 'Example account'
-            notices = @()
-            planLabel = 'Example'
-            fetchedAtEpochMillis = $nowMs
-            quotas = @(
-                [ordered]@{
-                    label = 'Example session'; used = 35L; total = 100L
-                    periodEndAtEpochMillis = $nowMs + 5 * $hourMs; hasKnownResetAt = $true
-                    periodType = 'INTERVAL'; unit = 'PERCENTAGE'
-                    rawUsed = 35L; rawTotal = 100L; currencyCode = 'USD'
-                    periodStartAtEpochMillis = $nowMs - 1 * $hourMs; blockReason = $null
-                }
-                [ordered]@{
-                    label = 'Example weekly'; used = 60L; total = 100L
-                    periodEndAtEpochMillis = $nowMs + 7 * 24 * $hourMs; hasKnownResetAt = $true
-                    periodType = 'WEEKLY'; unit = 'PERCENTAGE'
-                    rawUsed = 60L; rawTotal = 100L; currencyCode = 'USD'
-                    periodStartAtEpochMillis = $nowMs - 24 * $hourMs; blockReason = $null
-                }
-            )
-        }
-    )
+    entries = @($accounts)
 }
 $cache | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $DataDir 'dashboard-cache.json') -Encoding utf8
 
@@ -104,19 +127,21 @@ $keyPath = "HKCU:\Software\JavaSoft\Prefs\$node"
 New-Item -Path $keyPath -Force | Out-Null
 
 # enabledApis: comma-joined ApiSource.name, read by split(",") + valueOf (AppPreferenceKeys.kt:44-53; writer :55-64).
+# hudMinimizedAccounts: same comma-joined storage keys (HudMinimizedAccounts.kt:17-33, HudWindowPreferences.kt:169).
 # Version strings are stored without the tag's 'v' prefix.
 $bareVersion = $Version.TrimStart('v')
 $values = [ordered]@{
     hudFloating               = $placement.floating
-    hudAutoRetract            = 'true'
+    hudAutoRetract            = $autoRetract
     hudEdge                   = $placement.edge
     hudEdgeOffset             = '0.5'
-    enabledApis              = 'CODEX'
+    enabledApis               = $enabledApis
     releaseNotesSeenVersion   = $bareVersion
     onboardingCompletedVersion = $bareVersion
     startupTipsEnabled        = 'false'
     reducedMotion             = 'false'
 }
+if ($isHole) { $values['hudMinimizedAccounts'] = 'CURSOR,ANTIGRAVITY' }
 foreach ($name in $values.Keys) {
     # Value strings use the same simple encoding (toWindowsValueString): 'CODEX' -> '/C/O/D/E/X'.
     $regName = ConvertTo-JavaPrefsName $name
