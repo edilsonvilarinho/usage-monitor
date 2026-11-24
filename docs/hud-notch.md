@@ -350,6 +350,10 @@ linhas que ele substituiu. `HudEdge` é enum novo.
     monitor segue identificado pelos limites **inteiros**, que não mudam quando a barra é movida.
     Barra com ocultação automática não reserva área útil e continua podendo cobrir o notch quando
     sobe — escolha de quem a oculta.
+  - **Tela muito pequena para a escala é exceção** (#660, decisão do dono): se notch, alças e a margem de sombra (16 dp: duas ao
+    longo da borda, uma na outra dimensão) não cabem na área útil, a janela pode passar dela e as alças podem sair da tela.
+    Medido por sorteio: 4 dp numa borda lateral com 344 dp de altura útil; 18 dp embaixo, com 10 contas em 922 dp. A geometria
+    não muda; `HudGeometryPropertyTest` cobra a regra sempre que tudo cabe.
   - **E o monitor** (`hudScreenId`/`hudScreenBounds`, issue #273). Borda e fração eram resolvidas
     sempre contra o monitor padrão, então o arrasto era preso a ele e o notch nunca saía do primário.
     Agora o arrasto e o encaixe usam o monitor **sob o ponteiro** (`MouseInfo.getPointerInfo().device`),
