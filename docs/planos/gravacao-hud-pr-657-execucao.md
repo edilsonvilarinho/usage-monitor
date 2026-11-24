@@ -39,6 +39,11 @@ PR que mexe na HUD ou em janela grava o app sozinho, em mais cenários que "para
 - **A02** — detector: modo `--expect hover`, em TDD.
 - **A03** — cenários em `seed.ps1`/`record.ps1`, laço no workflow e gatilho de PR; 5 rodadas da `main`.
 - **A04** — arrasto e buraco negro.
+- **A04, invariantes escritas antes (branch `ci/issue-657-drag-hole`, base `35285e34`):**
+  - `floating-drag`: pressiona o buraco, anda (-200, +120) px em 10 passos, solta e sai. A HUD termina recolhida (repouso
+    ±10% do inicial) e o centro da caixa de repouso andou (-200, +120) ±8 px. Abertura durante o arrasto é permitida.
+  - `docked-top-hole-idle`: três contas, duas minimizadas, sem auto-recolher, ponteiro parado: nenhum pulso.
+  - `docked-top-hole-hover`: o mesmo, ponteiro no buraco e sai: exatamente 1 pulso, nos prazos do hover.
 - **A05** — prova com defeito plantado por cenário; critério para bloquear.
 
 ## Ponto de situação
