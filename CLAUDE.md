@@ -209,6 +209,9 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
   em produção — texto novo vai por `localized(language, pt, en)` ou objeto de rótulos (`CommonLabels`,
   `CliSessionsLabels`…); migrar um arquivo baixa o teto. Classificação de fonte é predicado do domain
   com `when` exaustivo (`ApiSourceClassification.kt`), nunca conjunto literal repetido.
+- **Regra em prosa que virou teste (#646, `ProseArchitectureRulesTest`):** `AlertDialog`, raio literal, `composeResources`,
+  `GlobalScope`, fuso do sistema, `X509TrustManager`, animação infinita, chave por variável de ambiente, `defaultScreenDevice` e
+  nome ou link deste arquivo que não existe mais. Regra nova que um teste consegue verificar nasce como teste.
 - **Comentário não cresce (#647):** blocos de 6+ linhas e linhas citando `#NNN` no Kotlin de produção têm teto que só desce
   (`LONG_COMMENT_BLOCKS_CEILING`, `ISSUE_REFERENCE_LINES_CEILING`, folga de 1%). Fato medido vira teste ou vai **literal** para
   `docs/`; a regra fica no código em até 3 linhas. Limpeza é arquivo a arquivo, com o código idêntico conferido por script.
@@ -302,8 +305,8 @@ já custaram uma suíte vermelha cada.
 
 **Janelas, cards e tooltips**: regras e histórico em [`docs/presentation.md`](docs/presentation.md),
 seção "Sistema visual — janelas, cards e tooltips" — **leia antes de mexer**. Inegociáveis: escala da
-interface troca só a densidade, nunca `fontScale`, e **cada** janela recebe o valor; monitor por
-`workAreaForPosition`, nunca `defaultScreenDevice`; **a barra HUD é o único modo de visualização** — não
+interface troca só a densidade, nunca `fontScale`, e **cada** janela recebe o valor; monitor da janela por
+`workAreaForPosition` (`defaultScreenDevice` só nos 3 arquivos que o teste lista); **a barra HUD é o único modo de visualização** — não
 reintroduzir seletor de modo nem segunda moldura (`DashboardScreen` só existe para testes e capturas).
 
 **Barra HUD — notch** (`Hud*.kt`): regras e histórico em [`docs/hud-notch.md`](docs/hud-notch.md) — **leia antes de
