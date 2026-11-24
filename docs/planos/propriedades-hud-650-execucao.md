@@ -49,6 +49,7 @@ escreveu à mão.
 |---|---|---|
 | A01 | sem harness de teste (plano) | regras conferidas contra `docs/hud-notch.md` |
 | A02 | `gradlew.bat desktopTest --tests "*HudGeometryPropertyTest*" --tests "*ArchitectureRulesTest*"` | vermelho do executor: `HudGeometryPropertyTest.kt:16` e `:22`, `AssertionError`; verde 37 testes, 2 ignorados, em execução independente. Mutações 5/5 mortas: origem/tamanho aberto × fechado (`:64`), flutuante na área útil (`:115`), finitude (`:197`), determinismo (`:150`), regra do compacto (`:100`). **Dois contraexemplos** pelo caminho do produto, ignorados com o menor caso: janela encaixada fora da área útil (RIGHT, 1534×344 dp, 1 conta, 3 cotas, sobra 4 dp) e alças fora da tela (BOTTOM, 922×885 dp, 10 contas, sobra 18 dp). 1ª rodada descartada: pulava o auto-recolher e lia mal a regra do compacto |
+| A03 | `gradlew.bat desktopTest --tests "*PropertyTest*" --tests "*ArchitectureRulesTest*"` | sem vermelho de implementação: o produto já cumpre as regras. Vermelho por mutação, 10/10: caso-guia #631 reintroduzido reprova em `:244 expected null, but was:<Account(index=0)>`, menor caso `Open(Account(0)), Toggle(0)`; as outras 9 nas invariantes do estado e do flutuante. Verde 39 testes, 2 ignorados (#660), em execução independente; 0,1 s e 0,3 s nas classes novas. `FollowAccounts` fora: nenhum teste o roda. Referências de linha do `docs/hud-notch.md` trocadas pelo texto da regra |
 
 ## Problemas em aberto e riscos
 

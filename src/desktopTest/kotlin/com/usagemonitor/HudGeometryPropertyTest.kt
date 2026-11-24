@@ -36,43 +36,43 @@ class HudGeometryPropertyTest {
     }
 
     /**
-     * docs/hud-notch.md:346 — encaixada e parada, a janela fica dentro da área útil.
+     * docs/hud-notch.md (notch parado na área útil): encaixada e parada, a janela fica dentro da área útil.
      * Pendente, achado do produto (não estreitado): menor caso borda=RIGHT, área=1534.39 x 343.99 dp, contas=1, cotas=3, escala=1.58;
      * janela y 300.44..648.44 passa da área 300.44..644.43.
      */
-    @Ignore
+    @Ignore("#660")
     @Test
-    fun dockedWindowStaysInsideWorkAreaDocs346() {
+    fun dockedWindowStaysInsideWorkArea() {
         forAllHud { s ->
             val window = hudDockedWindowBounds(s.edge, s.offsetFraction, sizesOf(s), s.areaDp)
-            assertInside("docs/hud-notch.md:346 janela encaixada fora da área útil", window, s.areaDp)
+            assertInside("docs/hud-notch.md (notch parado na área útil): janela encaixada fora da área útil", window, s.areaDp)
         }
     }
 
     /**
-     * docs/hud-notch.md:209 — abrir não move a janela. A função não recebe estado aberto/fechado:
+     * docs/hud-notch.md (janela de origem e tamanho fixos ao abrir): abrir não move a janela. A função não recebe estado aberto/fechado:
      * a prova é a independência de `collapsed`, o único tamanho que difere entre os dois estados.
      */
     @Test
-    fun windowOriginAndSizeSameOpenAndClosedDocs209() {
+    fun windowOriginAndSizeSameOpenAndClosed() {
         forAllHud { s ->
             val sizes = sizesOf(s)
             val open = hudDockedWindowBounds(s.edge, s.offsetFraction, sizes, s.areaDp)
             val closed = hudDockedWindowBounds(
                 s.edge, s.offsetFraction, sizes.copy(collapsed = DpSize(1.dp, 1.dp)), s.areaDp
             )
-            assertEquals(open, closed, "docs/hud-notch.md:209 origem ou tamanho depende do estado fechado")
+            assertEquals(open, closed, "docs/hud-notch.md (janela de origem e tamanho fixos ao abrir): origem ou tamanho depende do estado fechado")
         }
     }
 
     /**
-     * docs/hud-notch.md:330 — as alças cabem na tela, centradas no notch.
+     * docs/hud-notch.md (alças nunca fora da tela): as alças cabem na tela, centradas no notch.
      * Pendente, achado do produto (não estreitado): menor caso borda=BOTTOM, área=921.82 x 884.52 dp, contas=10, cotas=0, escala=2.14;
      * alças centro=2127.74 alcance=940.0 fora de área=[1641.74, 2563.57].
      */
-    @Ignore
+    @Ignore("#660")
     @Test
-    fun handlesInsideScreenDocs330() {
+    fun handlesInsideScreen() {
         forAllHud { s ->
             val sizes = sizesOf(s)
             val window = hudDockedWindowBounds(s.edge, s.offsetFraction, sizes, s.areaDp)
@@ -83,14 +83,14 @@ class HudGeometryPropertyTest {
             val length = (if (horizontal) s.areaDp.size.width else s.areaDp.size.height).value
             assertTrue(
                 center - reach / 2 >= start - EPS && center + reach / 2 <= start + length + EPS,
-                "docs/hud-notch.md:330 alças fora da tela: centro=$center alcance=$reach área=[$start, ${start + length}]"
+                "docs/hud-notch.md (alças nunca fora da tela): alças fora da tela: centro=$center alcance=$reach área=[$start, ${start + length}]"
             )
         }
     }
 
-    /** docs/hud-notch.md:56 — a faixa vira compacta exatamente quando há contas e a completa passa do teto. */
+    /** docs/hud-notch.md (regra da faixa compacta): a faixa vira compacta exatamente quando há contas e a completa passa do teto. */
     @Test
-    fun compactIffFullStripExceedsMaxDocs56() {
+    fun compactIffFullStripExceedsMax() {
         forAllHud { s ->
             val maxAlong = hudMaxAlong(s.edge, s.area, s.scale)
             val accounts = applyHudAutoMinimize(s.accounts, s.edge, FALLBACK_LABEL, maxAlong)
@@ -99,14 +99,14 @@ class HudGeometryPropertyTest {
             val expected = accounts.isNotEmpty() && fullAlong > maxAlong
             assertEquals(
                 expected, sizesOf(s).compact,
-                "docs/hud-notch.md:56 compacta fora da regra: completa=$fullAlong teto=$maxAlong"
+                "docs/hud-notch.md (regra da faixa compacta): compacta fora da regra: completa=$fullAlong teto=$maxAlong"
             )
         }
     }
 
-    /** docs/hud-notch.md:705 — a janela flutuante fica dentro da área útil. */
+    /** docs/hud-notch.md (janela flutuante sempre na área útil): a janela flutuante fica dentro da área útil. */
     @Test
-    fun floatingWindowInsideWorkAreaDocs705() {
+    fun floatingWindowInsideWorkArea() {
         forAll(SEED, ITERATIONS, ::generateFloatingScenario) { s ->
             val window = hudFloatingBounds(
                 s.center, s.notchCenter, s.windowWidthPx, s.windowHeightPx, s.workArea, s.anchorRadiusPx
@@ -115,7 +115,7 @@ class HudGeometryPropertyTest {
             assertTrue(
                 window.xPx >= area.xPx && window.xPx + window.widthPx <= area.xPx + area.widthPx &&
                     window.yPx >= area.yPx && window.yPx + window.heightPx <= area.yPx + area.heightPx,
-                "docs/hud-notch.md:705 janela flutuante fora da área útil: $window área=$area"
+                "docs/hud-notch.md (janela flutuante sempre na área útil): janela flutuante fora da área útil: $window área=$area"
             )
         }
     }
