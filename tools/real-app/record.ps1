@@ -292,9 +292,11 @@ try {
             $bottomY = $vs.Y + $vs.Height - 2
             $planStart = $tMs
             if ($isDrag) {
-                # Drag: ten steps of (-20, +12), then release; the drag ends at (-200, +120).
+                # Drag: a 1 px start, ten steps, then release; the drag ends at (-200, +120).
                 $plan = @(@{ at = 0; kind = 'move'; x = $centreX; y = $centreY })
                 $plan += @{ at = 400; kind = 'press'; x = $centreX; y = $centreY; mark = 'press' }
+                # The app drops the delta of the first move event (HudDragState.begin), so that event is 1 px, as a real mouse sends.
+                $plan += @{ at = 450; kind = 'move'; x = $centreX - 1; y = $centreY + 1 }
                 for ($i = 0; $i -lt 10; $i++) {
                     $plan += @{ at = 500 + 100 * $i; kind = 'move'; x = $centreX - 20 * ($i + 1); y = $centreY + 12 * ($i + 1) }
                 }
