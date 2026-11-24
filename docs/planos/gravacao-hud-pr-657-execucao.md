@@ -46,6 +46,7 @@ PR que mexe na HUD ou em janela grava o app sozinho, em mais cenários que "para
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (plano) | conferido contra `real-app.yml` e `HudWindowPreferences.kt` |
+| A02 | `node --test "tools/ci/test/hud-pulses.test.mjs"` | vermelho (stub): `actual: 'ok', expected: 'not-opened'`, idem `opened-late`, `not-closed`, `extra-pulse` e `not-visible`; verde 25/25, em execução independente; os 16 casos anteriores sem mudança |
 
 ## Problemas em aberto e riscos
 
