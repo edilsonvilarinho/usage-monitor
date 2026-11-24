@@ -326,6 +326,63 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Antes e depois das telas (#651): a base (`HEAD^1`, em worktree) e o PR geram as capturas
+  # no mesmo runner. Informativo: `continue-on-error`, e fora do `ci-ok`.
+  screen-diff:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Setup JDK
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # O merge commit tem `HEAD^1` como base; worktree a parte, o checkout do PR fica intacto.
+      - name: Check out the base
+        run: git worktree add "$RUNNER_TEMP/base" "HEAD^1"
+
+      - name: Generate the base screens
+        run: |
+          chmod +x "$RUNNER_TEMP/base/gradlew"
+          cd "$RUNNER_TEMP/base"
+          xvfb-run -a ./gradlew generateScreenshots -PscreenshotOutputDir="$RUNNER_TEMP/screens-base"
+
+      - name: Generate the PR screens
+        run: |
+          chmod +x ./gradlew
+          xvfb-run -a ./gradlew generateScreenshots -PscreenshotOutputDir="$RUNNER_TEMP/screens-head"
+
+      - name: Compare the screens
+        run: node tools/ci/screen-diff.mjs --base "$RUNNER_TEMP/screens-base" --head "$RUNNER_TEMP/screens-head" --out screen-diff
+
+      - name: Upload screen diff
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: screen-diff
+          path: screen-diff
+          if-no-files-found: ignore
+          retention-days: 7
+
   # O `allTests` NAO cobre o modo /UPDATE: e script NSIS, e a unica forma de
   # exercita-lo e compilar o instalador e roda-lo. Job proprio porque instala e
   # desinstala de verdade e mexe no registro do runner.
