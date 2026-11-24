@@ -1,0 +1,52 @@
+# Testes de propriedade da HUD — issue #650
+
+Procedência: Claude Opus 5.5 (orquestração) com agentes de implementação, Claude Code CLI no Windows 11, 2026-11-24,
+branch `test/issue-650-hud-properties` (worktree `.claude/worktrees/hud-property-650`, base `origin/main` `b19c688f`),
+commits com a identidade `claude <claude@anthropic.com>`. Parte da #644.
+
+## Objetivo
+
+Sortear combinações de contas, borda, monitor, escala e ações e conferir regras fixas, para achar o caso que ninguém
+escreveu à mão.
+
+## Fatos confirmados (2026-11-24, `b19c688f`)
+
+- Linha de base da #645: `hud-window` tem 3 origens com defeito em 16 PRs de produto.
+- Geometria pura: `hudNotchSizes` (`HudNotchGeometry.kt:167`), `hudWindowBounds` (`:576`), `hudDockedWindowBounds`
+  (`:630`), `hudRestHitRegion` (`:652`), `hudDragWindowBounds` (`:690`), `hudHostWindowBounds`, `hudMaxAlong`
+  (`HudWindowGeometry.kt`), `hudFloatingBounds` (`HudFloatingPlacement.kt:28`), `hudFloatingColumnParts`
+  (`HudFloatingLayout.kt:76`).
+- Regras escritas em `docs/hud-notch.md`: notch parado na área útil (346); janela de origem e tamanho fixos ao abrir
+  (209); alças nunca fora da tela (330); teto do compacto 45% na horizontal e 80% na lateral (56); janela flutuante
+  sempre na área útil, buraco se desloca (705). Exceções: auto-ocultação da barra (351) e arrasto livre (349).
+- "Alvo de clique contido na janela" **não** está escrito no documento.
+- Estado do balão: `HudNotchBalloonState` (`ringHovered`, `holeClicked`, `holeHovered`, `holeRowSelected`, `closeHole`) e
+  `hudFloatingBalloonAfterMinimize` (`HudFloatingHost.kt:185`). `FollowAccounts` é composable com efeitos.
+
+## Decisões
+
+- **Sem dependência nova:** `kotlin.random.Random(seed)` e um laço. Semente fixa por teste no CI; a falha imprime semente,
+  iteração e entrada, e a mesma semente refaz o caso.
+- **Invariante só entra se estiver no `docs/hud-notch.md` ou no comentário da função.** Regra que o código não promete não
+  vira teste; o que parecer regra e não estiver escrito é listado para o dono decidir.
+- **Falha que aparecer é achado:** para e vira caso mínimo na issue. Não se estreita o gerador para o teste passar, salvo
+  entrada impossível no produto, com a prova de que é impossível.
+- **Prova do teste:** cada propriedade reprova com uma quebra proposital da função, desfeita em seguida.
+- Orçamento: até 5 s somados na suíte local.
+
+## Atividades
+
+- **A01** — este plano.
+- **A02** — gerador e executor com semente, e as propriedades da geometria.
+- **A03** — sequência aleatória de ações sobre o balão; caso-guia: reintroduzir a #631 e ver reprovar.
+
+## Ponto de situação
+
+| Atividade | Comando | Resultado |
+|---|---|---|
+| A01 | sem harness de teste (plano) | regras conferidas contra `docs/hud-notch.md` |
+
+## Problemas em aberto e riscos
+
+- Propriedade não vê a janela nativa; isso é da #652.
+- Sorteio com semente fixa acha menos que semente livre, mas não deixa o CI instável.
