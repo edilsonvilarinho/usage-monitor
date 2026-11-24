@@ -44,6 +44,8 @@ faixa de atualização (4c) e, da HUD, buraco negro, modo flutuante e as quatro 
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `generateScreenshots` ×3 e `sha256sum` | 18/18 iguais no Windows 11 |
+| A02 | `node --test "tools/ci/test/screen-diff.test.mjs"` | vermelho (stub): `Expected values to be strictly deep-equal` e `The input did not match the regular expression /\| \`b\.png\` \| mudou \| 1 \| 1,2 1x1 \|/`; verde 9/9 e 71/71 na pasta, em execução independente. CLI sobre `img/*.png` com um bloco 60×40 alterado: só `dashboard.png`, 2.400 pixels, caixa `20,20 60x40` |
+| A03 | `yaml.safe_load` | job `screen-diff` lido, fora de `ci-ok.needs`; o run é a A04 |
 
 ## Problemas em aberto e riscos
 
