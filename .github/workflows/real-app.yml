@@ -254,9 +254,12 @@ jobs:
                       $eventsArg = (Get-Content -LiteralPath $eventsPath -Raw).Trim()
                       $detectorArgs += @('--expect', 'drag', '--events', $eventsArg)
                   }
+                  # Rest above the max = panel open at rest (open-at-rest): 2100 px for the rest of docked/floating (measured 1069-1426), 35500 for the hole strip (measured 28313-29107).
                   if ($scenario -like 'docked-top-hole-*') {
                       # Hole strips: rise ratio 1.25 is more sensitive than the default 1.5 (flags smaller hovers); the minimum rest width rejects wrong scenes.
-                      $detectorArgs += @('--rise-ratio', '1.25', '--min-rest-width', '300')
+                      $detectorArgs += @('--rise-ratio', '1.25', '--min-rest-width', '300', '--max-rest-foreground', '35500')
+                  } else {
+                      $detectorArgs += @('--max-rest-foreground', '2100')
                   }
                   node tools/ci/hud-pulses.mjs @detectorArgs *> $verdictPath
                   $code = $LASTEXITCODE

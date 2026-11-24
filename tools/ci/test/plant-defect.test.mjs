@@ -11,9 +11,30 @@ const SCRIPT = fileURLToPath(new URL('../../real-app/plant-defect.mjs', import.m
 const DEFECTS_PATH = fileURLToPath(new URL('../../real-app/defects.json', import.meta.url))
 const WORKFLOW_PATH = fileURLToPath(new URL('../../../.github/workflows/real-app.yml', import.meta.url))
 const DEFECTS = JSON.parse(readFileSync(DEFECTS_PATH, 'utf8'))
-const DEFECT_NAMES = ['drag-not-kept', 'drag-half-way', 'hover-stays-open', 'hover-opens-late', 'hole-ignores-hover', 'hole-opens-alone']
+const DEFECT_NAMES = [
+    'drag-not-kept',
+    'drag-half-way',
+    'hover-stays-open',
+    'hover-opens-late',
+    'hole-ignores-hover',
+    'hole-opens-alone',
+    'opens-and-stays',
+    'opens-late-and-stays',
+]
 // Veredictos que o detector imprime (hud-pulses.mjs); defeito com veredito fora disso nunca dispara.
-const DETECTOR_VERDICTS = ['ok', 'pulsed', 'not-visible', 'not-opened', 'opened-late', 'not-closed', 'extra-pulse', 'not-moved', 'wrong-place', 'wrong-scene']
+const DETECTOR_VERDICTS = [
+    'ok',
+    'pulsed',
+    'open-at-rest',
+    'not-visible',
+    'not-opened',
+    'opened-late',
+    'not-closed',
+    'extra-pulse',
+    'not-moved',
+    'wrong-place',
+    'wrong-scene',
+]
 const SOURCE_DIR = 'src/desktopMain/kotlin/com/usagemonitor'
 const WINDOW_FILE = `${SOURCE_DIR}/HudWindow.kt`
 const BALLOON_FILE = `${SOURCE_DIR}/presentation/ui/HudNotchBalloonState.kt`

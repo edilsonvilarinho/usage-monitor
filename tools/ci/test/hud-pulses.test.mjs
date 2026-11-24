@@ -11,6 +11,7 @@ const SCRIPT = fileURLToPath(new URL('../hud-pulses.mjs', import.meta.url))
 const HEADER = 't_ms,foreground,x,y,w,h'
 const HUD = 1000
 const PULSE = 3000
+const OPEN = 13000
 const dir = mkdtempSync(join(tmpdir(), 'hud-pulses-'))
 after(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -388,4 +389,65 @@ test('rise-ratio e min-rest-width invalidos: uso, codigo 2', () => {
     }
     assert.equal(cli(csv, '--rise-ratio').code, 2)
     assert.equal(cli(csv, '--min-rest-width').code, 2)
+})
+
+test('repouso do hover vem de antes de entrar: painel que nunca fecha e not-closed, nao not-opened', () => {
+    const csv = writeCsv('hover-never-closes.csv', toCsv(series(12000, (tMs) => (tMs < 3500 ? HUD : OPEN))))
+    const run = cli(csv, '--expect', 'hover', '--events', '{"enterMs":3000,"leaveMs":6000}')
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'not-closed')
+})
+
+test('repouso antes da entrada, unidade: detectPulses usa a mediana dos visiveis antes de restBeforeMs', () => {
+    const frames = series(12000, (tMs) => (tMs < 3500 ? HUD : OPEN))
+    assert.equal(detectPulses(frames, { restBeforeMs: 3000 }).restForeground, HUD)
+})
+
+test('idle que abre em 9 s e fica aberto ate o fim: pulsed', () => {
+    const csv = writeCsv('idle-opens-late.csv', toCsv(series(12000, (tMs) => (tMs < 9000 ? HUD : OPEN))))
+    const run = cli(csv)
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'pulsed')
+})
+
+test('idle aberto desde o primeiro quadro: ok sem flag, open-at-rest com --max-rest-foreground', () => {
+    const csv = writeCsv('idle-open-all.csv', toCsv(series(12000, () => OPEN)))
+    const plain = cli(csv)
+    assert.equal(plain.code, 0)
+    assert.equal(plain.stdout.split('\n')[0], 'ok')
+    const capped = cli(csv, '--max-rest-foreground', '2100')
+    assert.equal(capped.code, 1)
+    assert.equal(capped.stdout.split('\n')[0], 'open-at-rest')
+})
+
+test('--max-rest-foreground: repouso igual ao maximo passa', () => {
+    const csv = writeCsv('rest-at-max.csv', toCsv(series(12000, () => 2100)))
+    const run = cli(csv, '--max-rest-foreground', '2100')
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('--max-rest-foreground: hover e drag com repouso aberto dao open-at-rest', () => {
+    const csv = writeCsv('open-everywhere.csv', toCsv(series(12000, () => OPEN)))
+    const hover = cli(csv, '--expect', 'hover', '--events', '{"enterMs":4000,"leaveMs":7000}', '--max-rest-foreground', '2100')
+    assert.equal(hover.code, 1)
+    assert.equal(hover.stdout.split('\n')[0], 'open-at-rest')
+    const drag = cli(csv, '--expect', 'drag', '--events', '{"pressMs":6000,"releaseMs":8000,"dx":0,"dy":0}', '--max-rest-foreground', '2100')
+    assert.equal(drag.code, 1)
+    assert.equal(drag.stdout.split('\n')[0], 'open-at-rest')
+})
+
+test('limiar de repouso e p5: 3% de quadros baixos nao viram repouso', () => {
+    const csv = writeCsv('low-3pct.csv', toCsv(series(12000, (tMs) => ((tMs / 50) % 33 === 0 ? 400 : HUD))))
+    const run = cli(csv)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('--max-rest-foreground invalido: uso, codigo 2', () => {
+    const csv = writeCsv('max-rest-invalid.csv', toCsv(series(12000, () => HUD)))
+    for (const value of ['0', '-5', '1.5', 'abc', '']) {
+        assert.equal(cli(csv, '--max-rest-foreground', value).code, 2, `--max-rest-foreground "${value}"`)
+    }
+    assert.equal(cli(csv, '--max-rest-foreground').code, 2)
 })

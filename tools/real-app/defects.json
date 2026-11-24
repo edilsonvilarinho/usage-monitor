@@ -40,8 +40,54 @@
         "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
         "find": "LaunchedEffect(holeMembers) {",
         "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(14_200L); balloonIndex = holeIndex }\n    LaunchedEffect(holeMembers) {"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
+        "find": "LaunchedEffect(holeMembers) {",
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(1_200L); if (holeMembers.isNotEmpty()) balloonIndex = holeIndex }
+    LaunchedEffect(holeMembers) {"
       }
     ],
     "expect": { "docked-top-hole-idle": "pulsed", "docked-top-hole-hover": "extra-pulse" }
+  },
+  "opens-and-stays": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "LaunchedEffect(hovered, drag.dragging) {",
+        "replace": "LaunchedEffect(Unit) { delay(1_000L); windowOpen = true; withFrameNanos { }; expanded = true }\n    LaunchedEffect(hovered, drag.dragging) {"
+      }
+    ],
+    "expect": {
+      "floating-idle": "open-at-rest",
+      "docked-top-idle": "open-at-rest",
+      "docked-bottom-idle": "open-at-rest",
+      "docked-left-idle": "open-at-rest",
+      "docked-right-idle": "open-at-rest",
+      "docked-top-hole-idle": "open-at-rest"
+    }
+  },
+  "opens-late-and-stays": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "LaunchedEffect(hovered, drag.dragging) {",
+        "replace": "LaunchedEffect(Unit) { delay(6_000L); windowOpen = true; withFrameNanos { }; expanded = true }\n    LaunchedEffect(hovered, drag.dragging) {"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
+        "find": "LaunchedEffect(holeMembers) {",
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(6_200L); if (holeMembers.isNotEmpty()) balloonIndex = holeIndex }
+    LaunchedEffect(holeMembers) {"
+      }
+    ],
+    "expect": {
+      "floating-idle": "pulsed",
+      "docked-top-idle": "pulsed",
+      "docked-bottom-idle": "pulsed",
+      "docked-left-idle": "pulsed",
+      "docked-right-idle": "pulsed",
+      "docked-top-hole-idle": "pulsed"
+    }
   }
 }

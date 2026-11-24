@@ -2,9 +2,10 @@
 // Detector de pulsos da HUD (A02 do plano #652). Entrada: CSV de quadros da
 // captura (tools/real-app/record.ps1), um quadro a cada ~50 ms.
 //
-// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>]
+// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>] [--max-rest-foreground <n>]
 // Saida: veredito na primeira linha, depois um pulso por linha. Padrao: ok, pulsed, not-visible (0, 1, 4).
-// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Uso ou CSV invalido: 2.
+// Limiar: hover mede o repouso antes de entrar (mediana); os outros modos usam o p5 dos visiveis.
+// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Open-at-rest (1) com --max-rest-foreground (inteiro > 0): repouso acima do maximo, antes do veredito de pulso. Uso ou CSV invalido: 2.
 // --rise-ratio (> 1, padrao 1.5) troca o limiar de subida. --min-rest-width (inteiro > 0) confere a escala da cena antes de qualquer
 // outro veredito: mediana de w no repouso abaixo do minimo e wrong-scene (5); sem quadro nessa janela, not-visible.
 import { readFileSync } from 'node:fs'
@@ -12,7 +13,7 @@ import { pathToFileURL } from 'node:url'
 
 const HEADER = 't_ms,foreground,x,y,w,h'
 const DEFAULTS = { settleMs: 2000, riseRatio: 1.5, minFrames: 2, minForeground: 400, tailMs: 1000 }
-const EXIT = { ok: 0, pulsed: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5 }
+const EXIT = { ok: 0, pulsed: 1, 'open-at-rest': 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5 }
 
 export function parseFrames(csv) {
     const frames = []
@@ -42,9 +43,10 @@ export function parseFrames(csv) {
 
 // Visivel = foreground >= minForeground. Pulsos so depois do settle, contado da
 // primeira aparicao visivel (pixel solto antes nao adianta). Repouso abaixo de
-// minForeground, ou nada visivel nos ultimos tailMs, e not-visible.
+// minForeground, ou nada visivel nos ultimos tailMs, e not-visible. O limiar usa o
+// repouso de restLevel (nunca a mediana de tudo: painel aberto por muito tempo puxaria o limiar).
 export function detectPulses(frames, options = {}) {
-    const { settleMs, riseRatio, minFrames, minForeground, tailMs } = { ...DEFAULTS, ...options }
+    const { settleMs, riseRatio, minFrames, minForeground, tailMs, restBeforeMs } = { ...DEFAULTS, ...options }
     const notVisible = (appeared) => ({ appeared, restForeground: null, pulses: [] })
     const first = frames.find((frame) => frame.foreground >= minForeground)
     if (!first) return notVisible(false)
@@ -54,9 +56,10 @@ export function detectPulses(frames, options = {}) {
     if (frames.filter((frame) => frame.tMs >= lastMs - tailMs).every((frame) => frame.foreground < minForeground)) {
         return notVisible(true)
     }
+    if (median(settled.map((frame) => frame.foreground)) < minForeground) return notVisible(true)
 
-    const restForeground = median(settled.map((frame) => frame.foreground))
-    if (restForeground < minForeground) return notVisible(true)
+    const restForeground = restLevel(settled, { minForeground, restBeforeMs })
+    if (restForeground === null) return notVisible(true)
     const threshold = restForeground * riseRatio
     const pulses = []
     let run = []
@@ -125,6 +128,24 @@ function closeRun(pulses, run, minFrames) {
     })
 }
 
+// Repouso do limiar: hover mede a mediana dos visiveis antes de entrar (sem eles, null). Sem restBeforeMs,
+// p5 (posto mais proximo) dos visiveis: um quadro isolado ou 3% de quadros baixos nao viram repouso.
+function restLevel(settled, { minForeground, restBeforeMs }) {
+    const visible = settled.filter((frame) => frame.foreground >= minForeground)
+    if (restBeforeMs !== undefined) {
+        const before = visible.filter((frame) => frame.tMs < restBeforeMs)
+        return before.length === 0 ? null : median(before.map((frame) => frame.foreground))
+    }
+    if (visible.length === 0) return null
+    return nearestRank(visible.map((frame) => frame.foreground), 5)
+}
+
+function nearestRank(values, percent) {
+    const sorted = [...values].sort((left, right) => left - right)
+    const rank = Math.ceil((percent / 100) * sorted.length)
+    return sorted[Math.max(rank, 1) - 1]
+}
+
 function median(values) {
     const sorted = [...values].sort((left, right) => left - right)
     const middle = Math.floor(sorted.length / 2)
@@ -132,7 +153,7 @@ function median(values) {
 }
 
 const USAGE = 'uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events \'{"enterMs":n,"leaveMs":n}\']'
-const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width']
+const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width', '--max-rest-foreground']
 const REST_FROM_MS = 2000
 const REST_UNTIL_MS = 11500
 
@@ -150,7 +171,11 @@ function parseArgs(argv) {
     }
     if (positional.length !== 1) throw new Error(USAGE)
     const [csv] = positional
-    const tuning = { riseRatio: parseRiseRatio(flags['--rise-ratio']), minRestWidth: parseMinRestWidth(flags['--min-rest-width']) }
+    const tuning = {
+        riseRatio: parseRiseRatio(flags['--rise-ratio']),
+        minRestWidth: parsePositiveInteger('--min-rest-width', flags['--min-rest-width']),
+        maxRestForeground: parsePositiveInteger('--max-rest-foreground', flags['--max-rest-foreground']),
+    }
     if (flags['--expect'] === undefined) {
         if (flags['--events'] !== undefined) throw new Error(USAGE)
         return { csv, expect: 'default', ...tuning }
@@ -169,10 +194,9 @@ function parseRiseRatio(text) {
     return value
 }
 
-function parseMinRestWidth(text) {
+function parsePositiveInteger(flag, text) {
     if (text === undefined) return undefined
-    const message = 'uso: --min-rest-width exige inteiro positivo'
-    if (!/^[1-9]\d*$/.test(text)) throw new Error(message)
+    if (!/^[1-9]\d*$/.test(text)) throw new Error(`uso: ${flag} exige inteiro positivo`)
     return Number(text)
 }
 
@@ -221,8 +245,24 @@ function sceneVerdict(frames, minRestWidth) {
     return width < minRestWidth ? 'wrong-scene' : null
 }
 
+// Repouso aberto (--max-rest-foreground): repouso acima do maximo e open-at-rest (1), antes de qualquer veredito de pulso.
+function isOpenAtRest(rest, maxRestForeground) {
+    return maxRestForeground !== undefined && rest !== null && rest > maxRestForeground
+}
+
+function printOpenAtRest() {
+    console.log('open-at-rest')
+    return EXIT['open-at-rest']
+}
+
+// Arrasto: mediana dos visiveis antes do aperto (mesma janela de dragVerdict: 3 s antes de apertar).
+function dragRestForeground(frames, pressMs) {
+    const before = frames.filter((frame) => frame.tMs <= pressMs - 3000 && frame.foreground >= DEFAULTS.minForeground)
+    return before.length === 0 ? null : median(before.map((frame) => frame.foreground))
+}
+
 function main(argv) {
-    const { csv, expect, events, riseRatio, minRestWidth } = parseArgs(argv)
+    const { csv, expect, events, riseRatio, minRestWidth, maxRestForeground } = parseArgs(argv)
     const frames = parseFrames(readFileSync(csv, 'utf8'))
     const scene = sceneVerdict(frames, minRestWidth)
     if (scene !== null) {
@@ -231,10 +271,14 @@ function main(argv) {
     }
     if (expect === 'drag') {
         const verdict = dragVerdict(frames, events)
+        if (verdict !== 'not-visible' && isOpenAtRest(dragRestForeground(frames, events.pressMs), maxRestForeground)) return printOpenAtRest()
         console.log(verdict)
         return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
     }
-    const result = detectPulses(frames, riseRatio === undefined ? {} : { riseRatio })
+    const restBeforeMs = expect === 'hover' ? events.enterMs : undefined
+    const options = { ...(riseRatio === undefined ? {} : { riseRatio }), restBeforeMs }
+    const result = detectPulses(frames, options)
+    if (isOpenAtRest(result.restForeground, maxRestForeground)) return printOpenAtRest()
     if (expect === 'hover') {
         const verdict = hoverVerdict(result, events)
         printVerdict(verdict, result)
