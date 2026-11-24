@@ -39,6 +39,7 @@ Comentário narrativo para de crescer no Kotlin de produção e passa a cair, se
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (plano) | números acima, a remedir em A02 |
+| A02 | `gradlew.bat desktopTest --tests "*ArchitectureRulesTest*"` | vermelho (stub): `ArchitectureRulesTest.kt:539 expected:<[CommentBlock(startLine=1, lineCount=6)]> but was:<[]>`; verde 41/41. Remedido em `5304c92d`: **1.515 blocos** de 6+ linhas (folga 15) e **1.332 linhas** citando issue (folga 13). Teto baixado de propósito para 1.514 reprova com os números, os 5 maiores arquivos e o destino do fato |
 
 ## Problemas em aberto e riscos
 
