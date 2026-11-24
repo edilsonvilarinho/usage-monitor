@@ -209,6 +209,9 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
   em produção — texto novo vai por `localized(language, pt, en)` ou objeto de rótulos (`CommonLabels`,
   `CliSessionsLabels`…); migrar um arquivo baixa o teto. Classificação de fonte é predicado do domain
   com `when` exaustivo (`ApiSourceClassification.kt`), nunca conjunto literal repetido.
+- **Comentário não cresce (#647):** blocos de 6+ linhas e linhas citando `#NNN` no Kotlin de produção têm teto que só desce
+  (`LONG_COMMENT_BLOCKS_CEILING`, `ISSUE_REFERENCE_LINES_CEILING`, folga de 1%). Fato medido vira teste ou vai **literal** para
+  `docs/`; a regra fica no código em até 3 linhas. Limpeza é arquivo a arquivo, com o código idêntico conferido por script.
 - **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
   divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas,
   a próxima mudança começa extraindo, não crescendo.
