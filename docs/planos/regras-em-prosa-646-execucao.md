@@ -56,6 +56,8 @@ cita algo que não existe mais.
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | script de conferência e `grep` por regra | números acima |
+| A02, A03 | `gradlew.bat desktopTest --tests "*ArchitectureRulesTest*"` | vermelho com stubs: 12 falhas `AssertionError` em 23 (linhas 28, 43, 59, 74, 88, 102, 117, 134, 149, 161, 166, 177), uma por exemplo que reprova; verde 23/23 e 64/64 com `ArchitectureRulesTest`, em execução independente. Devolvida 1x: 7,3 s; com leitura única, 3,2 s. Nenhuma violação no código. Na revisão: `openrouter` entrou no R8 e `.md` saiu do corpus do R10 (prosa não prova que o nome existe) |
+| A04 | sem harness além do R10 (`CLAUDE.md`) | frase do `defaultScreenDevice` corrigida; regra dos testes no `CLAUDE.md`. O encurtamento ficou só nessas linhas: as demais frases guardam o motivo, que o teste não diz |
 
 ## Problemas em aberto e riscos
 
