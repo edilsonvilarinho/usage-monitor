@@ -10,6 +10,7 @@ import com.usagemonitor.domain.entity.ApiSource
 import com.usagemonitor.domain.entity.AnthropicProfileRef
 import com.usagemonitor.domain.entity.UsageTargetKey
 import com.usagemonitor.domain.repository.AnthropicRepository
+import kotlinx.coroutines.CancellationException
 
 /**
  * Implementação do contrato AnthropicRepository (definido no domain).
@@ -54,6 +55,8 @@ class AnthropicRepositoryImpl(
                     return stats
                 }
                 lastError = IllegalStateException(ACCOUNT_CHANGED_DURING_FETCH_MESSAGE)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 val sessionChanged = !credentialDataSource.isAnthropicSessionCurrent(profile, session)
                 if (!sessionChanged && !isScopeRequirementFailure(error)) {

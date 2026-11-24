@@ -35,3 +35,4 @@ Não adotar detekt nem eslint; virar teste a regra que achou algo e corrigir os 
 |---|---|---|
 | A01 | leitura do código | pontos acima |
 | A02 | `gradlew.bat desktopTest --tests "*HistoryViewModelTest*" …` | **não reproduzido**: o teste passou sem o `catch`, porque `breadcrumbs.recordFailure` já relança o cancelamento antes de publicar. Teste mantido; `catch` só pela regra. Verde 12/12 |
+| A03 | `gradlew.bat desktopTest --tests "*AnthropicRepository*" …` | **defeito reproduzido**: `AnthropicRepositoryImplTest.kt:143 AssertionError` (`assertNull(result)`): cancelar com a sessão trocada devolvia falha em vez de propagar. Verde 5/5. A `catch` de `loadAnthropicSession` fica para a A05 |
