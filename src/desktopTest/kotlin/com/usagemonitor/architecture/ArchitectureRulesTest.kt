@@ -685,11 +685,11 @@ class ArchitectureRulesTest {
         const val MAX_FILE_LINES = 800
         const val MAX_FUNCTION_LINES = 300
 
-        /** Medido em 2026-11-24 pelo `CommentScanner` na base `5304c92d` (#647). Só desce. */
-        const val LONG_COMMENT_BLOCKS_CEILING = 1515
+        /** Medido em 2026-11-24 pelo `CommentScanner` (#647). Só desce. */
+        const val LONG_COMMENT_BLOCKS_CEILING = 1498
 
-        /** Medido em 2026-11-24 pelo `CommentScanner` na base `5304c92d` (#647). Só desce. */
-        const val ISSUE_REFERENCE_LINES_CEILING = 1332
+        /** Medido em 2026-11-24 pelo `CommentScanner` (#647). Só desce. */
+        const val ISSUE_REFERENCE_LINES_CEILING = 1324
 
         /** `.shape = ` e `setShape(`; o argumento nomeado `shape =` do Compose não tem ponto. */
         val NATIVE_WINDOW_SHAPE = Regex("""\.shape\s*=(?!=)|setShape\s*\(""")
