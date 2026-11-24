@@ -9,6 +9,7 @@ import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import com.usagemonitor.domain.entity.UsageUnit
 import com.usagemonitor.domain.entity.requiresUsageAccount
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -76,6 +77,10 @@ class LocalUsageHistoryDataSource(
                     }
                     pruneExpiredSnapshots(connection, capturedAt)
                     connection.commit()
+                } catch (cancelled: CancellationException) {
+                    // Cancelamento faz o mesmo rollback de falha; sem ele, setAutoCommit(true) confirmaria o pendente.
+                    connection.rollback()
+                    throw cancelled
                 } catch (error: Throwable) {
                     connection.rollback()
                     throw error

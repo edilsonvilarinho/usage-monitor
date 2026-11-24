@@ -42,6 +42,8 @@ class AnthropicRepositoryImpl(
         for (attempt in 0..1) {
             val session = try {
                 credentialDataSource.loadAnthropicSession(profile)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 lastError = error
                 if (attempt == 0 && isConcurrentCredentialChange(error)) {

@@ -177,6 +177,8 @@ open class RemoteApiDataSource(
                     )
                 )
                 payload
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 codexDiagnosticsRecorder.recordFailure(
                     CodexDiagnosticsFailureEvent(

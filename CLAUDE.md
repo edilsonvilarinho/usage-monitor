@@ -212,6 +212,8 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
 - **Regra em prosa que virou teste (#646, `ProseArchitectureRulesTest`):** `AlertDialog`, raio literal, `composeResources`,
   `GlobalScope`, fuso do sistema, `X509TrustManager`, animação infinita, chave por variável de ambiente, `defaultScreenDevice` e
   nome ou link deste arquivo que não existe mais. Regra nova que um teste consegue verificar nasce como teste.
+- **Cancelamento não é engolido (#648, `CancellationArchitectureRulesTest`):** em `suspend fun`, `catch` de `Throwable`/`Exception`
+  vem depois de um `catch` de `CancellationException` que relança, com o mesmo `rollback` da falha se houver transação.
 - **Comentário não cresce (#647):** blocos de 6+ linhas e linhas citando `#NNN` no Kotlin de produção têm teto que só desce
   (`LONG_COMMENT_BLOCKS_CEILING`, `ISSUE_REFERENCE_LINES_CEILING`, folga de 1%). Fato medido vira teste ou vai **literal** para
   `docs/`; a regra fica no código em até 3 linhas. Limpeza é arquivo a arquivo, com o código idêntico conferido por script.
