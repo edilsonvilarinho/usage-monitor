@@ -49,6 +49,7 @@ Falha que só aparece no Linux passa a impedir o merge, sem trazer instabilidade
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | `gh api …/jobs` dos 150 runs e `gh run download 44303839875 -n test-reports-linux` | 3 vermelhos, 2 só no Linux; causas acima |
+| A02 | `gradlew.bat desktopTest --tests "*InMemoryPreferences*" …` | vermelho (stub): `InMemoryPreferencesFactoryTest.kt:18 expected:<valor> but was:<null>`; verde 5/5. Em Linux só o run do PR prova |
 
 ## Problemas em aberto e riscos
 
