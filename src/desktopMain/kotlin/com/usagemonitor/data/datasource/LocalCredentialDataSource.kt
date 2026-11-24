@@ -24,6 +24,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -126,6 +127,8 @@ internal class LocalCredentialDataSource(
             val currentAccount = loadAccountContext(location)
             creds.claudeAiOauth.accessToken == session.accessToken &&
                 currentAccount.key == session.accountContext.key
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Throwable) {
             false
         }

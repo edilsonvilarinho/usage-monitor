@@ -204,6 +204,8 @@ class HistoryViewModel(
                     selectedQuotaView = selectedQuotaView.value
                 )
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             breadcrumbs.recordFailure("carregar histórico de uso", error)
             publishIfLatest(
