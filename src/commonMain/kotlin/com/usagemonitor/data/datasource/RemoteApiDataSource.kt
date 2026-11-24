@@ -21,6 +21,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlin.time.Clock
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -176,6 +177,8 @@ open class RemoteApiDataSource(
                     )
                 )
                 payload
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 codexDiagnosticsRecorder.recordFailure(
                     CodexDiagnosticsFailureEvent(
@@ -187,6 +190,8 @@ open class RemoteApiDataSource(
                 failureRecorded = true
                 throw error
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             if (!failureRecorded) {
                 codexDiagnosticsRecorder.recordFailure(

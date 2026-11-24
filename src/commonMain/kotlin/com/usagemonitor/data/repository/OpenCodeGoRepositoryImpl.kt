@@ -4,6 +4,7 @@ import com.usagemonitor.data.datasource.RemoteApiDataSource
 import com.usagemonitor.data.mapper.OpenCodeGoMapper
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.repository.OpenCodeGoRepository
+import kotlinx.coroutines.CancellationException
 
 /**
  * Mensagem de "conta sem assinatura Go".
@@ -35,6 +36,8 @@ class OpenCodeGoRepositoryImpl(
 
             val response = try {
                 apiDataSource.fetchOpenCodeGoUsage(apiKey)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 // O 403 de "sem assinatura Go" é um estado normal de quem só usa o
                 // Zen pago: a chave é válida e não há nada a corrigir nela. Deixá-lo

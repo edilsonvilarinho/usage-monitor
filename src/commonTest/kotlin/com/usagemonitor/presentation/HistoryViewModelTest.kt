@@ -1,16 +1,21 @@
 package com.usagemonitor.presentation
 
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.Breadcrumb
+import com.usagemonitor.domain.entity.BreadcrumbCategory
 import com.usagemonitor.domain.entity.ApiUsageHistoryReport
 import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.HistoryRange
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
+import com.usagemonitor.domain.repository.BreadcrumbRecorder
 import com.usagemonitor.domain.repository.UsageHistoryRepository
 import com.usagemonitor.domain.usecase.GetUsageHistoryUseCase
 import com.usagemonitor.presentation.viewmodel.HistoryQuotaView
 import com.usagemonitor.presentation.viewmodel.HistoryUiState
 import com.usagemonitor.presentation.viewmodel.HistoryViewModel
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -172,6 +177,25 @@ class HistoryViewModelTest {
     }
 
     @Test
+    fun `cancelled history read publishes neither Error nor failure breadcrumb`() = runTest {
+        val repo = SuspendedHistoryRepo()
+        val breadcrumbs = RecordingBreadcrumbs()
+        val viewModel = HistoryViewModel(
+            getUsageHistory = GetUsageHistoryUseCase(repo) { now },
+            enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
+            breadcrumbs = breadcrumbs
+        )
+        repo.started.await()
+
+        viewModel.onDestroy()
+        repo.cancelled.await()
+        repeat(50) { pauseForBackgroundWork() }
+
+        assertIs<HistoryUiState.Loading>(viewModel.uiState.value)
+        assertEquals(emptyList<String>(), breadcrumbs.messages)
+    }
+
+    @Test
     fun `openForSource sets source and reloads`() = runTest {
         val repo = FakeRepo(report = emptyReport(ApiSource.ANTHROPIC))
         val viewModel = HistoryViewModel(
@@ -317,6 +341,47 @@ class HistoryViewModelTest {
             email = email,
             workspaceName = workspaceId
         )
+    }
+
+    private class SuspendedHistoryRepo : UsageHistoryRepository {
+        val started = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+
+        override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) = Unit
+
+        override suspend fun getHistoryReport(
+            source: ApiSource,
+            range: HistoryRange,
+            now: Instant
+        ): ApiUsageHistoryReport = suspendUntilCancelled()
+
+        override suspend fun listAccounts(source: ApiSource): List<UsageAccountContext> = emptyList()
+
+        override suspend fun getHistoryReport(
+            source: ApiSource,
+            accountKey: UsageAccountKey?,
+            range: HistoryRange,
+            now: Instant
+        ): ApiUsageHistoryReport = suspendUntilCancelled()
+
+        private suspend fun suspendUntilCancelled(): Nothing {
+            started.complete(Unit)
+            try {
+                awaitCancellation()
+            } finally {
+                cancelled.complete(Unit)
+            }
+        }
+    }
+
+    private class RecordingBreadcrumbs : BreadcrumbRecorder {
+        val messages = mutableListOf<String>()
+
+        override fun record(category: BreadcrumbCategory, message: String) {
+            messages += message
+        }
+
+        override fun read(limit: Int): List<Breadcrumb> = emptyList()
     }
 
     private class FakeRepo(

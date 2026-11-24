@@ -1,6 +1,7 @@
 package com.usagemonitor.data.datasource
 
 import com.usagemonitor.domain.entity.redactedSecret
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -76,6 +77,8 @@ class LocalCodexAuthDataSource(
     override suspend fun isSessionCurrent(session: CodexSession): Boolean {
         val current = try {
             loadSession()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Throwable) {
             return false
         }
