@@ -67,7 +67,7 @@ merge, por área. É a linha de base do critério da #644 ("até 1% em 30 dias")
 - Só 1 das 11 origens virou revert (#628): a taxa de revert (1,4% dos PRs de produto) esconde 10 defeitos.
 - O #628 como **correção** do #622 segue pendente: não há prova de que a pausa da GPU veio do modo flutuante. Não muda a
   taxa, porque o #622 já está confirmado pelos #624 e #632.
-- As 11 correções sem origem foram olhadas por `git log -S` quando havia dúvida: o código corrigido nasceu fora da janela
+- As 10 correções sem origem foram olhadas por `git log -S` quando havia dúvida: o código corrigido nasceu fora da janela
   de 14 dias (#475, #563, #580, #613, #642, #643) ou a causa é externa (#568). As demais não têm prova de origem recente.
 - Conferência feita por Claude Opus 5.5, não pelo dono do produto.
 
