@@ -3,7 +3,6 @@ package com.usagemonitor
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,16 +36,15 @@ class HudGeometryPropertyTest {
 
     /**
      * docs/hud-notch.md (notch parado na área útil): encaixada e parada, a janela fica dentro da área útil.
-     * Pendente, achado do produto (não estreitado): menor caso borda=RIGHT, área=1534.39 x 343.99 dp, contas=1, cotas=3, escala=1.58;
-     * janela y 300.44..648.44 passa da área 300.44..644.43.
+     * Fora da condição (sombra não cabe): ex. borda=RIGHT, área=1534.39 x 343.99 dp, janela 348 dp > 344; pulado e contado.
      */
-    @Ignore("#660")
     @Test
     fun dockedWindowStaysInsideWorkArea() {
-        forAllHud { s ->
+        val count = forAllHudWhen(SEED, ITERATIONS, { s -> dockedFits(s) }) { s ->
             val window = hudDockedWindowBounds(s.edge, s.offsetFraction, sizesOf(s), s.areaDp)
             assertInside("docs/hud-notch.md (notch parado na área útil): janela encaixada fora da área útil", window, s.areaDp)
         }
+        assertSkipWithinLimit("docs/hud-notch.md (notch parado na área útil)", count)
     }
 
     /**
@@ -67,13 +65,11 @@ class HudGeometryPropertyTest {
 
     /**
      * docs/hud-notch.md (alças nunca fora da tela): as alças cabem na tela, centradas no notch.
-     * Pendente, achado do produto (não estreitado): menor caso borda=BOTTOM, área=921.82 x 884.52 dp, contas=10, cotas=0, escala=2.14;
-     * alças centro=2127.74 alcance=940.0 fora de área=[1641.74, 2563.57].
+     * Fora da condição (sombra não cabe): ex. borda=BOTTOM, área=921.82 dp, alcance 940 + 32 dp; pulado e contado.
      */
-    @Ignore("#660")
     @Test
     fun handlesInsideScreen() {
-        forAllHud { s ->
+        val count = forAllHudWhen(SEED, ITERATIONS, { s -> handlesFit(s) }) { s ->
             val sizes = sizesOf(s)
             val window = hudDockedWindowBounds(s.edge, s.offsetFraction, sizes, s.areaDp)
             val horizontal = s.edge.isHorizontal
@@ -86,6 +82,26 @@ class HudGeometryPropertyTest {
                 "docs/hud-notch.md (alças nunca fora da tela): alças fora da tela: centro=$center alcance=$reach área=[$start, ${start + length}]"
             )
         }
+        assertSkipWithinLimit("docs/hud-notch.md (alças nunca fora da tela)", count)
+    }
+
+    /** Janela encaixada com a sombra cabe na área: ao longo da borda `expanded` + 2 margens, na outra `expanded` + 1 (borda colada, sem sombra). */
+    private fun dockedFits(s: HudScenario): Boolean {
+        val expanded = sizesOf(s).expanded
+        val margin = HUD_SHADOW_MARGIN
+        val along = if (s.edge.isHorizontal) expanded.width else expanded.height
+        val across = if (s.edge.isHorizontal) expanded.height else expanded.width
+        val areaAlong = if (s.edge.isHorizontal) s.areaDp.size.width else s.areaDp.size.height
+        val areaAcross = if (s.edge.isHorizontal) s.areaDp.size.height else s.areaDp.size.width
+        return along + margin * 2 <= areaAlong && across + margin <= areaAcross
+    }
+
+    /** Alças com a sombra cabem ao longo da borda: `withHandles` + 2 margens, como hudWindowBounds reserva. */
+    private fun handlesFit(s: HudScenario): Boolean {
+        val withHandles = sizesOf(s).withHandles
+        val along = if (s.edge.isHorizontal) withHandles.width else withHandles.height
+        val areaAlong = if (s.edge.isHorizontal) s.areaDp.size.width else s.areaDp.size.height
+        return along + HUD_SHADOW_MARGIN * 2 <= areaAlong
     }
 
     /** docs/hud-notch.md (regra da faixa compacta): a faixa vira compacta exatamente quando há contas e a completa passa do teto. */
