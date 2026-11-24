@@ -14,14 +14,31 @@
 
 .PARAMETER Version
   Release version written into releaseNotesSeenVersion and onboardingCompletedVersion.
+
+.PARAMETER Scenario
+  HUD placement to seed: floating-idle, docked-<top|bottom|left|right>-idle, or docked-top-hover.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$DataDir,
-    [Parameter(Mandatory)][string]$Version
+    [Parameter(Mandatory)][string]$Version,
+    [ValidateSet('floating-idle', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover')]
+    [string]$Scenario = 'floating-idle'
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Scenario -> HUD placement. Formats: HudWindowPreferences.kt (hudFloating :178-191 as 'true'/'false';
+# hudEdge :73 = HudEdge name TOP|BOTTOM|LEFT|RIGHT; hudEdgeOffset :74 = Float text; hudAutoRetract :122-131).
+$placements = @{
+    'floating-idle'      = @{ floating = 'true';  edge = 'TOP' }
+    'docked-top-idle'    = @{ floating = 'false'; edge = 'TOP' }
+    'docked-bottom-idle' = @{ floating = 'false'; edge = 'BOTTOM' }
+    'docked-left-idle'   = @{ floating = 'false'; edge = 'LEFT' }
+    'docked-right-idle'  = @{ floating = 'false'; edge = 'RIGHT' }
+    'docked-top-hover'   = @{ floating = 'false'; edge = 'TOP' }
+}
+$placement = $placements[$Scenario]
 
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 # Canonical form: the app hashes File.canonicalFile.path (DataRootResolution.kt:38).
@@ -90,9 +107,11 @@ New-Item -Path $keyPath -Force | Out-Null
 # Version strings are stored without the tag's 'v' prefix.
 $bareVersion = $Version.TrimStart('v')
 $values = [ordered]@{
-    hudFloating               = 'true'
+    hudFloating               = $placement.floating
     hudAutoRetract            = 'true'
-    enabledApis               = 'CODEX'
+    hudEdge                   = $placement.edge
+    hudEdgeOffset             = '0.5'
+    enabledApis              = 'CODEX'
     releaseNotesSeenVersion   = $bareVersion
     onboardingCompletedVersion = $bareVersion
     startupTipsEnabled        = 'false'

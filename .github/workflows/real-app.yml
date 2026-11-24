@@ -1,9 +1,21 @@
 # Grava o app real (release publicado ou build do código) num runner Windows
-# e reprova pulsos de janela na HUD com o ponteiro parado. Fora do `ci-ok`. Ver docs/planos/app-real-no-ci-652-execucao.md.
-# Manual: Actions > Real app recording > Run workflow.
+# e reprova pulsos de janela na HUD: parado (floating e docked) e um hover. Fora do `ci-ok`.
+# Ver docs/planos/app-real-no-ci-652-execucao.md e docs/planos/gravacao-hud-pr-657-execucao.md.
+# Manual: Actions > Real app recording > Run workflow. PR que mexe na HUD: `source`, 1 tentativa, todos os cenários.
 name: Real app recording
 
 on:
+  pull_request:
+    paths:
+      - 'src/desktopMain/**/Hud*.kt'
+      - 'src/desktopMain/**/*Window*.kt'
+      - 'src/desktopMain/**/*Frame*.kt'
+      - 'src/desktopMain/**/presentation/ui/Hud*.kt'
+      - 'src/commonMain/**/AppGargantua*.kt'
+      - 'src/commonMain/**/Hud*.kt'
+      - 'tools/real-app/**'
+      - 'tools/ci/hud-pulses.mjs'
+      - '.github/workflows/real-app.yml'
   workflow_dispatch:
     inputs:
       versions:
@@ -15,6 +27,11 @@ on:
         description: 'Quantas tentativas por versão'
         required: true
         default: '5'
+        type: string
+      scenarios:
+        description: '`all` ou lista separada por vírgula: floating-idle, docked-top-idle, docked-bottom-idle, docked-left-idle, docked-right-idle, docked-top-hover'
+        required: true
+        default: 'all'
         type: string
 
 permissions:
@@ -31,20 +48,39 @@ jobs:
     outputs:
       versions: ${{ steps.plan.outputs.versions }}
       attempts: ${{ steps.plan.outputs.attempts }}
+      scenarios: ${{ steps.plan.outputs.scenarios }}
     steps:
-      - name: Expand versions and attempts into matrix lists
+      - name: Expand versions, attempts and scenarios into matrix lists
         id: plan
         env:
+          EVENT_NAME: ${{ github.event_name }}
           VERSIONS: ${{ inputs.versions || 'v42.3.0-beta.15,v42.3.0-beta.16,source' }}
           ATTEMPTS: ${{ inputs.attempts || '5' }}
+          SCENARIOS: ${{ inputs.scenarios || 'all' }}
         run: |
           set -euo pipefail
+          # Pull requests record the source build once, with every scenario.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            VERSIONS=source
+            ATTEMPTS=1
+            SCENARIOS=all
+          fi
+          ALL='floating-idle,docked-top-idle,docked-bottom-idle,docked-left-idle,docked-right-idle,docked-top-hover'
+          if [ "$SCENARIOS" = "all" ]; then SCENARIOS=$ALL; fi
+          scenarios=$(printf '%s' "$SCENARIOS" | tr -d ' ')
+          for s in $(printf '%s' "$scenarios" | tr ',' ' '); do
+            case ",$ALL," in
+              *",$s,"*) ;;
+              *) echo "unknown scenario: $s" >&2; exit 1 ;;
+            esac
+          done
           versions=$(printf '%s' "$VERSIONS" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' \
             | jq -R . | jq -sc .)
           attempts=$(seq 1 "$ATTEMPTS" | jq -sc .)
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
           echo "attempts=$attempts" >> "$GITHUB_OUTPUT"
-          echo "versions=$versions attempts=$attempts"
+          echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
+          echo "versions=$versions attempts=$attempts scenarios=$scenarios"
 
   record:
     needs: plan
@@ -59,6 +95,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ matrix.version }}
+      ATTEMPT: ${{ matrix.attempt }}
+      SCENARIOS: ${{ needs.plan.outputs.scenarios }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -145,42 +183,78 @@ jobs:
           New-NetFirewallRule -DisplayName 'real-app-652 block outbound' -Direction Outbound `
             -Program $env:APP_EXE -Action Block -Profile Any | Out-Null
 
-      - name: Seed the data root (fake account, no credentials)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          pwsh -NoProfile -File tools/real-app/seed.ps1 -DataDir $env:DATA_DIR -Version $env:SEED_VERSION
-
-      - name: Record the screen while the app starts
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          pwsh -NoProfile -File tools/real-app/record.ps1 -Exe $env:APP_EXE -DataDir $env:DATA_DIR `
-            -OutDir $env:OUT_DIR -Seconds 30
-
-      - name: Detect pulses and publish the verdict
+      - name: Seed, record and judge each scenario
         if: always()
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          $title = "### real-app $env:RELEASE_VERSION (attempt ${{ matrix.attempt }})"
+          $summary = $env:GITHUB_STEP_SUMMARY
+          $title = "### real-app $env:RELEASE_VERSION (attempt $env:ATTEMPT)"
+          $rows = [System.Collections.Generic.List[string]]::new()
+          $details = [System.Collections.Generic.List[string]]::new()
+          $failed = 0
           $fence = '```'
-          $expected = if ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') { 'pulsed' } else { 'ok' }
-          $csv = Join-Path $env:OUT_DIR 'frames.csv'
-          if (-not (Test-Path -LiteralPath $csv)) {
-            "$title`n`nno frames.csv: the recording did not start`nexpected: $expected`nobtained: none`nmatched: false" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-            exit 2
+          foreach ($scenario in ($env:SCENARIOS -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+              $dataDir = Join-Path $env:DATA_DIR $scenario
+              $outDir = Join-Path $env:OUT_DIR $scenario
+              New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+              # The previous scenario's app must be gone before the next one starts.
+              Get-Process -Name 'Usage Monitor' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+              # Expectation: beta.15 floating-idle pulsed (the known defect); other beta.15 docked scenarios unjudged.
+              $expected = 'ok'
+              if ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') {
+                  $expected = if ($scenario -eq 'floating-idle') { 'pulsed' } else { '-' }
+              }
+
+              $obtained = 'none'
+              $recorded = $false
+              if ($env:APP_EXE) {
+                  pwsh -NoProfile -File tools/real-app/seed.ps1 -DataDir $dataDir -Version $env:SEED_VERSION -Scenario $scenario | Out-Null
+                  if ($LASTEXITCODE -eq 0) {
+                      pwsh -NoProfile -File tools/real-app/record.ps1 -Exe $env:APP_EXE -DataDir $dataDir -OutDir $outDir -Seconds 30 -Scenario $scenario
+                      $recorded = ($LASTEXITCODE -eq 0)
+                  }
+              }
+
+              $csv = Join-Path $outDir 'frames.csv'
+              $verdictPath = Join-Path $outDir 'verdict.txt'
+              $isHover = $scenario -eq 'docked-top-hover'
+              $eventsPath = Join-Path $outDir 'events.json'
+              if (-not $recorded -or -not (Test-Path -LiteralPath $csv)) {
+                  $obtained = 'none'
+              } elseif ($isHover -and -not (Test-Path -LiteralPath $eventsPath)) {
+                  $obtained = 'no-events'
+              } else {
+                  $detectorArgs = @($csv)
+                  if ($isHover) {
+                      $ev = Get-Content -LiteralPath $eventsPath -Raw | ConvertFrom-Json
+                      $eventsArg = [pscustomobject]@{ enterMs = $ev.enterMs; leaveMs = $ev.leaveMs } | ConvertTo-Json -Compress
+                      $detectorArgs += @('--expect', 'hover', '--events', $eventsArg)
+                  }
+                  node tools/ci/hud-pulses.mjs @detectorArgs *> $verdictPath
+                  $code = $LASTEXITCODE
+                  $obtained = (Get-Content -LiteralPath $verdictPath -TotalCount 1)
+                  $details.Add("$scenario (detector exit $code)`n$fence`n$(Get-Content -LiteralPath $verdictPath -Raw)$fence")
+              }
+
+              if ($expected -eq '-' -and $obtained -ne 'none' -and $obtained -ne 'no-events') {
+                  $matched = 'n/a'
+              } else {
+                  $matched = ($recorded -and ($obtained -eq $expected)).ToString().ToLower()
+              }
+              if ($matched -eq 'false') { $failed++ }
+              $rows.Add("| $scenario | $expected | $obtained | $matched |")
+              "$scenario expected: $expected obtained: $obtained matched: $matched"
           }
-          $verdictPath = Join-Path $env:OUT_DIR 'verdict.txt'
-          node tools/ci/hud-pulses.mjs $csv *> $verdictPath
-          $code = $LASTEXITCODE
-          $verdict = Get-Content -LiteralPath $verdictPath -Raw
-          $obtained = (Get-Content -LiteralPath $verdictPath -TotalCount 1)
-          $matched = ($obtained -eq $expected)
-          "$title`n`n$fence`n$verdict`n$fence`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          "expected: $expected`nobtained: $obtained`nmatched: $matched`nhud-pulses exit code: $code" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          "expected: $expected obtained: $obtained matched: $matched (hud-pulses exit code $code)"
-          if ($matched) { exit 0 } else { exit 1 }
+
+          $table = @("$title", '', '| Scenario | Expected | Obtained | Matched |', '|---|---|---|---|') + $rows
+          ($table -join "`n") + "`n" | Out-File -FilePath $summary -Append -Encoding utf8
+          if ($details.Count -gt 0) { ($details -join "`n") + "`n" | Out-File -FilePath $summary -Append -Encoding utf8 }
+          if ($failed -gt 0) {
+              "$failed scenario(s) differ from the expectation or did not record"
+              exit 1
+          }
 
       - name: Upload the recording
         if: always()
