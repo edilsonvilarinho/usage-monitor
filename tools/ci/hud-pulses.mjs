@@ -2,11 +2,9 @@
 // Detector de pulsos da HUD (A02 do plano #652). Entrada: CSV de quadros da
 // captura (tools/real-app/record.ps1), um quadro a cada ~50 ms.
 //
-// Uso:
-//   node tools/ci/hud-pulses.mjs <csv>
-//
-// Saida: a primeira linha e o veredito (ok, pulsed, not-visible); depois, um
-// pulso por linha. Codigos: 0 ok, 1 pulsed, 4 not-visible, 2 uso ou CSV invalido.
+// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}']
+// Saida: veredito na primeira linha, depois um pulso por linha. Padrao: ok, pulsed, not-visible (0, 1, 4).
+// Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4); uso ou CSV invalido: 2.
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
@@ -69,12 +67,25 @@ export function detectPulses(frames, options = {}) {
         run = []
     }
     closeRun(pulses, run, minFrames)
-    return { appeared: true, restForeground, pulses }
+    return { appeared: true, restForeground, pulses, lastMs }
 }
 
 export function verdictOf(result) {
     if (!result.appeared || result.restForeground === null) return 'not-visible'
     return result.pulses.length > 0 ? 'pulsed' : 'ok'
+}
+
+// Um pulso so: abre ate openWithinMs depois de entrar e fecha (ultimo quadro acima do limiar
+// antes do fim da gravacao) ate closeWithinMs depois de sair. Pulso antes de entrar conta como extra.
+export function hoverVerdict(result, { enterMs, leaveMs, openWithinMs = 1500, closeWithinMs = 2500 }) {
+    if (!result.appeared || result.restForeground === null) return 'not-visible'
+    if (result.pulses.length === 0) return 'not-opened'
+    if (result.pulses.length > 1) return 'extra-pulse'
+    const [pulse] = result.pulses
+    if (pulse.startMs < enterMs) return 'extra-pulse'
+    if (pulse.startMs - enterMs > openWithinMs) return 'opened-late'
+    const closed = pulse.endMs < result.lastMs && pulse.endMs <= leaveMs + closeWithinMs
+    return closed ? 'ok' : 'not-closed'
 }
 
 function closeRun(pulses, run, minFrames) {
@@ -92,12 +103,59 @@ function median(values) {
     return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
-function main(argv) {
-    if (argv.length !== 1) throw new Error('uso: node tools/ci/hud-pulses.mjs <csv>')
-    const result = detectPulses(parseFrames(readFileSync(argv[0], 'utf8')))
-    const verdict = verdictOf(result)
+const USAGE = 'uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events \'{"enterMs":n,"leaveMs":n}\']'
+
+function parseArgs(argv) {
+    const positional = []
+    const flags = {}
+    for (let index = 0; index < argv.length; index += 1) {
+        if (argv[index] !== '--expect' && argv[index] !== '--events') {
+            positional.push(argv[index])
+            continue
+        }
+        if (index + 1 >= argv.length) throw new Error(USAGE)
+        flags[argv[index]] = argv[index + 1]
+        index += 1
+    }
+    if (positional.length !== 1) throw new Error(USAGE)
+    const [csv] = positional
+    if (flags['--expect'] === undefined) {
+        if (flags['--events'] !== undefined) throw new Error(USAGE)
+        return { csv, expect: 'default' }
+    }
+    if (flags['--expect'] !== 'hover') throw new Error(USAGE)
+    return { csv, expect: 'hover', events: parseEvents(flags['--events']) }
+}
+
+function parseEvents(text) {
+    const message = 'uso: --expect hover exige --events {"enterMs":n,"leaveMs":n}, em ms, com leaveMs >= enterMs'
+    if (text === undefined) throw new Error(message)
+    let events
+    try {
+        events = JSON.parse(text)
+    } catch {
+        throw new Error(message)
+    }
+    const { enterMs, leaveMs } = events ?? {}
+    if (!Number.isFinite(enterMs) || !Number.isFinite(leaveMs) || leaveMs < enterMs) throw new Error(message)
+    return { enterMs, leaveMs }
+}
+
+function printVerdict(verdict, result) {
     console.log(verdict)
     result.pulses.forEach((pulse) => console.log(`pulso ${pulse.startMs}-${pulse.endMs} pico ${pulse.peakForeground}`))
+}
+
+function main(argv) {
+    const { csv, expect, events } = parseArgs(argv)
+    const result = detectPulses(parseFrames(readFileSync(csv, 'utf8')))
+    if (expect === 'hover') {
+        const verdict = hoverVerdict(result, events)
+        printVerdict(verdict, result)
+        return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
+    }
+    const verdict = verdictOf(result)
+    printVerdict(verdict, result)
     return EXIT[verdict]
 }
 

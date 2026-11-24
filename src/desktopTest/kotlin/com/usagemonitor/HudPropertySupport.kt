@@ -8,6 +8,7 @@ import com.usagemonitor.presentation.ui.HudAccount
 import com.usagemonitor.presentation.ui.HudQuota
 import com.usagemonitor.presentation.ui.components.AppTone
 import kotlin.random.Random
+import kotlin.test.assertTrue
 
 /**
  * Executor de propriedades da HUD: a mesma semente produz a mesma sequência de entradas.
@@ -23,6 +24,53 @@ internal fun <T> forAll(seed: Long, iterations: Int, generator: (Random) -> T, a
             throw AssertionError("propriedade falhou: semente=$seed, iteração=$iteration, entrada=$input: ${failure.message}", failure)
         }
     }
+}
+
+/** Teto de cenários pulados por [forAllHudWhen], em percentual: acima disso o teste reprova. */
+internal const val HUD_MAX_SKIPPED_PERCENT = 25
+
+/** Cenários em que a regra se aplicou ([checked]) e os que o tamanho pedido não coube na área ([skipped]). */
+internal data class HudFitCount(val checked: Int, val skipped: Int)
+
+/**
+ * Como [forAllHudShrinking], mas só afirma a regra nos cenários que [fits] aceita; os demais são contados como pulados.
+ * O gerador não muda: a mesma semente produz as mesmas entradas, e a contagem vai ao teste para reprovar acima do teto.
+ */
+internal fun forAllHudWhen(
+    seed: Long,
+    iterations: Int,
+    fits: (HudScenario) -> Boolean,
+    assertion: (HudScenario) -> Unit
+): HudFitCount {
+    val random = Random(seed)
+    var checked = 0
+    var skipped = 0
+    for (iteration in 0 until iterations) {
+        val input = generateHudScenario(random)
+        if (!fits(input)) {
+            skipped++
+            continue
+        }
+        checked++
+        val failure = failureOf(input, assertion) ?: continue
+        val smallest = shrinkHudScenario(input) { candidate -> fits(candidate) && failureOf(candidate, assertion) != null }
+        val reason = failureOf(smallest, assertion)?.message
+        throw AssertionError(
+            "propriedade falhou: semente=$seed, iteração=$iteration, menor caso=${summarizeHudScenario(smallest)}: $reason",
+            failure
+        )
+    }
+    return HudFitCount(checked, skipped)
+}
+
+/** Reprova quando mais de [HUD_MAX_SKIPPED_PERCENT]% dos cenários foram pulados, para o gerador não virar vazio sem ninguém ver. */
+internal fun assertSkipWithinLimit(rule: String, count: HudFitCount) {
+    val total = count.checked + count.skipped
+    val percent = if (total == 0) 100f else count.skipped * 100f / total
+    assertTrue(
+        count.skipped * 100 <= HUD_MAX_SKIPPED_PERCENT * total,
+        "$rule: pulou ${count.skipped} de $total cenários (${"%.1f".format(percent)}%), teto de $HUD_MAX_SKIPPED_PERCENT%"
+    )
 }
 
 /** Uma entrada de geometria da HUD. A área fica em pixels físicos; a geometria recebe [areaDp]. */
