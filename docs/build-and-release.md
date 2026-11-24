@@ -459,6 +459,19 @@ eram descobertas por acidente.
 
 ## CI e testes — decisões
 
+**Telas antes e depois** (issue #651; plano [`telas-antes-depois-651-execucao.md`](planos/telas-antes-depois-651-execucao.md)): em PR que toca o desktop, o job `screen-diff` gera as
+capturas da base e do PR no mesmo runner e publica a tabela no resumo e o artefato `screen-diff` (`index.html`). Cobre as 17
+cenas do `generateScreenshots` e o `hud.gif`; tela sem cena não é vista. Informativo, fora do `ci-ok`.
+
+**App real gravado** (issue #652; plano [`app-real-no-ci-652-execucao.md`](planos/app-real-no-ci-652-execucao.md)): o workflow manual `real-app.yml` instala uma tag (ou
+compila `source`), abre com `--user-data-dir`, conta sintética e rede bloqueada, e reprova a HUD que abre sem entrada
+(`tools/ci/hud-pulses.mjs`). Prova: `v42.3.0-beta.15` 5/5 reprovada, `beta.16` e `source` 5/5 aprovadas. Fora do `ci-ok`.
+
+**`desktop-linux` bloqueia o merge** (issue #649; plano [`linux-bloqueia-merge-649-execucao.md`](planos/linux-bloqueia-merge-649-execucao.md)): em 150 runs desde
+2026-10-28, o Linux reprovou sozinho em 2, por 3 testes instáveis e nenhum defeito de produto confirmado. Um vinha da
+disputa da trava do `java.util.prefs` entre os forks; dois, de ler o estado antes da publicação. Fora do Windows os
+testes usam `InMemoryPreferencesFactory`; no Windows continua o registro.
+
 > Movido do `CLAUDE.md` em 2026-09-27 pela skill `usage-monitor-token-cleanup` (#319). O `CLAUDE.md` guarda as regras curtas e aponta para cá; o texto abaixo é o original, com os links relativos ajustados a este diretório.
 
 ## CI e testes

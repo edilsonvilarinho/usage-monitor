@@ -209,6 +209,9 @@ Impostas por `ArchitectureRulesTest` (`src/desktopTest/.../architecture/`), que 
   em produção — texto novo vai por `localized(language, pt, en)` ou objeto de rótulos (`CommonLabels`,
   `CliSessionsLabels`…); migrar um arquivo baixa o teto. Classificação de fonte é predicado do domain
   com `when` exaustivo (`ApiSourceClassification.kt`), nunca conjunto literal repetido.
+- **Comentário não cresce (#647):** blocos de 6+ linhas e linhas citando `#NNN` no Kotlin de produção têm teto que só desce
+  (`LONG_COMMENT_BLOCKS_CEILING`, `ISSUE_REFERENCE_LINES_CEILING`, folga de 1%). Fato medido vira teste ou vai **literal** para
+  `docs/`; a regra fica no código em até 3 linhas. Limpeza é arquivo a arquivo, com o código idêntico conferido por script.
 - **Sem exceções:** `FILE_CEILINGS`/`FUNCTION_CEILINGS` estão vazias e **exceção nova não entra** —
   divida o arquivo (histórico em `docs/planos/divisao-arquivos-grandes-302-309-execucao.md`). Entre 750 e 800 linhas,
   a próxima mudança começa extraindo, não crescendo.
@@ -330,8 +333,8 @@ de 512 px (detalhes em [`docs/build-and-release.md`](docs/build-and-release.md))
 Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-and-release.md), seção
 "CI e testes — decisões". Regras:
 
-- **Plataformas** ("Platform reality" no `CONTRIBUTING.md`, #342): a suíte só roda no Windows e nenhum
-  teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
+- **Plataformas** ("Platform reality" no `CONTRIBUTING.md`, #342): a suíte roda no Windows e no Linux (Xvfb),
+  os dois bloqueiam o merge (#649), e nenhum teste exercita o sistema de janelas. Mudança em host de janela é aberta no Linux (X11) antes do
   merge, ou o PR diz o risco; o PR diz em que plataformas foi testado.
 
 - Workflows (#344): `ci.yml` único — job `changes` recorta por path, jobs em paralelo só do que
@@ -353,6 +356,8 @@ Decisões, medições e incidentes em [`docs/build-and-release.md`](docs/build-a
 - **Cobertura do diff** (#496, `tools/ci/diff-coverage.mjs`): linhas de produção que o PR altera, piso 90%, nos jobs
   `desktop-windows` (Kover) e `server` (`lcovonly`). Nasce **informativa** (aviso, fora do `ci-ok`) — o #495 mediu 60%;
   vira bloqueante pelo critério do plano [`fluxo-automatizado-496-execucao.md`](docs/planos/fluxo-automatizado-496-execucao.md).
+- Telas do PR (#651): o job `screen-diff` mostra antes/depois das cenas do `generateScreenshots`; informativo. Mudança de tela no PR
+  diz quais imagens mudaram e se era o esperado; tela nova pede cena nova.
 - Dependabot (#496): auto-merge só de minor/patch de `gradle`/`npm_and_yarn` (`dependabot-automerge.yml`); major e
   `github_actions` continuam manuais.
 - Job `test-report` (skill `usage-monitor-test-report`): HTML de testes e cobertura no artefato `test-report` a cada
