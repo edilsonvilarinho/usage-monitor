@@ -305,3 +305,87 @@ test('CLI drag: 0 ok, 1 falha, 4 nunca visivel, 2 uso', () => {
     assert.equal(cli(csv, '--expect', 'drag', '--events', '{"pressMs":5000,"releaseMs":5500,"dx":-200}').code, 2)
     assert.equal(cli(csv, '--expect', 'drag', '--events', 'nao e json').code, 2)
 })
+
+// Escala da cena (--min-rest-width): mediana de w entre 2 s depois da primeira aparicao e 11,5 s.
+const SCENE = ['--min-rest-width', '300']
+const withWidth = (frames, widthAt) => frames.map((frame) => ({ ...frame, w: widthAt(frame.tMs) }))
+const hoverAt = (fromMs, toMs, value) => series(12000, (t) => (t >= fromMs && t < toMs ? value : HUD))
+
+test('min-rest-width: repouso estreito e wrong-scene no padrao, no hover e no arrasto, com codigo 5', () => {
+    const narrowHud = withWidth(series(12000, () => HUD), () => 100)
+    const byDefault = cli(writeCsv('scene-default.csv', toCsv(narrowHud)), ...SCENE)
+    assert.equal(byDefault.code, 5)
+    assert.equal(byDefault.stdout.split('\n')[0], 'wrong-scene')
+
+    const narrowHover = withWidth(hoverPulse(4500, 7000), () => 100)
+    const hover = cli(writeCsv('scene-hover.csv', toCsv(narrowHover)), '--expect', 'hover', '--events', JSON.stringify(HOVER), ...SCENE)
+    assert.equal(hover.code, 5)
+    assert.equal(hover.stdout.split('\n')[0], 'wrong-scene')
+
+    const narrowDrag = withWidth(floatingDrag(), () => 100)
+    const drag = cli(writeCsv('scene-drag.csv', toCsv(narrowDrag)), '--expect', 'drag', '--events', JSON.stringify(DRAG), ...SCENE)
+    assert.equal(drag.code, 5)
+    assert.equal(drag.stdout.split('\n')[0], 'wrong-scene')
+})
+
+test('min-rest-width: largura igual ao minimo passa', () => {
+    const exact = cli(writeCsv('scene-exact.csv', toCsv(withWidth(series(12000, () => HUD), () => 300))), ...SCENE)
+    assert.equal(exact.code, 0)
+    assert.equal(exact.stdout.split('\n')[0], 'ok')
+})
+
+test('min-rest-width: quadros depois de 11,5 s nao entram na mediana', () => {
+    // 30 s: 191 quadros na janela (100 px) e 370 depois de 11,5 s (300 px). Se o corte falhasse, a mediana seria 300.
+    const wideAfter = withWidth(series(30000, () => HUD), (tMs) => (tMs > 11500 ? 300 : 100))
+    const run = cli(writeCsv('scene-after.csv', toCsv(wideAfter)), ...SCENE)
+    assert.equal(run.code, 5)
+    assert.equal(run.stdout.split('\n')[0], 'wrong-scene')
+})
+
+test('min-rest-width: sem quadro visivel na janela de 2 s a 11,5 s: not-visible, codigo 4', () => {
+    const lateStart = withWidth(series(12000, (t) => (t >= 10000 ? HUD : 0)), () => 300)
+    const run = cli(writeCsv('scene-late-start.csv', toCsv(lateStart)), ...SCENE)
+    assert.equal(run.code, 4)
+    assert.equal(run.stdout.split('\n')[0], 'not-visible')
+})
+
+test('rise-ratio: pico de 1,4x do repouso e not-opened no padrao e ok com 1,25', () => {
+    const csv = writeCsv('rise-14.csv', toCsv(hoverAt(4500, 7000, 1400)))
+    const events = JSON.stringify(HOVER)
+    const byDefault = cli(csv, '--expect', 'hover', '--events', events)
+    assert.equal(byDefault.code, 1)
+    assert.equal(byDefault.stdout.split('\n')[0], 'not-opened')
+
+    const tuned = cli(csv, '--expect', 'hover', '--events', events, '--rise-ratio', '1.25')
+    assert.equal(tuned.code, 0)
+    assert.equal(tuned.stdout.split('\n')[0], 'ok')
+})
+
+test('rise-ratio: subida de 1,13x e not-opened mesmo com 1,25', () => {
+    const csv = writeCsv('rise-113.csv', toCsv(hoverAt(4500, 7000, 1130)))
+    const run = cli(csv, '--expect', 'hover', '--events', JSON.stringify(HOVER), '--rise-ratio', '1.25')
+    assert.equal(run.code, 1)
+    assert.equal(run.stdout.split('\n')[0], 'not-opened')
+})
+
+test('rise-ratio e min-rest-width validos: aceitos com qualquer --expect', () => {
+    const csv = writeCsv('flags-valid.csv', toCsv(withWidth(series(12000, () => HUD), () => 300)))
+    const byDefault = cli(csv, '--rise-ratio', '1.25', '--min-rest-width', '300')
+    assert.equal(byDefault.code, 0)
+    assert.equal(byDefault.stdout.split('\n')[0], 'ok')
+    const hover = cli(csv, '--expect', 'hover', '--events', JSON.stringify(HOVER), '--rise-ratio', '1.25', '--min-rest-width', '300')
+    assert.equal(hover.code, 1)
+    assert.equal(hover.stdout.split('\n')[0], 'not-opened')
+})
+
+test('rise-ratio e min-rest-width invalidos: uso, codigo 2', () => {
+    const csv = writeCsv('flags-invalid.csv', toCsv(series(12000, () => HUD)))
+    for (const value of ['1', '0.5', 'abc', '', 'Infinity']) {
+        assert.equal(cli(csv, '--rise-ratio', value).code, 2, `--rise-ratio "${value}"`)
+    }
+    for (const value of ['0', '-5', '1.5', '1e3', 'abc', '']) {
+        assert.equal(cli(csv, '--min-rest-width', value).code, 2, `--min-rest-width "${value}"`)
+    }
+    assert.equal(cli(csv, '--rise-ratio').code, 2)
+    assert.equal(cli(csv, '--min-rest-width').code, 2)
+})

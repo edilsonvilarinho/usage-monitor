@@ -95,6 +95,11 @@ PR que mexe na HUD ou em janela grava o app sozinho, em mais cenários que "para
 | A04 (1º run) | run [45483354886](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45483354886) (PR #667, `ec795b3d`) | 8/9: `floating-drag` deu `wrong-place`. Andou (-180, +108): falta exatamente o 1º passo de (-20, +12). `HudDragState.begin` lê o ponteiro já depois do 1º evento e descarta o delta dele; com mouse real é ~1 px. O roteiro ganhou um 1º evento de 1 px; **invariante e tolerância não mudaram**. `docked-top-hole-hover` conferido no quadro `013776.jpg`: lista "2 minimizadas" aberta |
 | A04 (2º run) | runs [45484820746](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45484820746) (PR, `9896de81`) e [45484824806](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45484824806) (manual, 5×) | PR 9/9 `ok`. `source` **15/15 `ok`**; o arrasto pousou em (-199, +119) nas 10 gravações (1 px do 1º evento, como previsto), repouso 0,994–1,001 do inicial. `v42.3.0-beta.15`: arrasto 5/5 `ok` e **buraco 10/10 `ok`, contra `pulsed`/`extra-pulse` esperados**: os cenários do buraco não veem o defeito dela, que depende do auto-recolher, desligado ali; esperado corrigido para `ok`. **Nenhum dos 3 cenários novos reprovou um defeito ainda:** é a A05, com defeito plantado |
 | A05 (plano) | sem harness (plano); `frames.csv` das 26 gravações do buraco lidos um a um | 5 de 26 gravações do buraco sem o buraco na tela; correção, defeitos e critério acima |
+| A05 (ferramentas) | `node --test "tools/ci/test/*.test.mjs"`; `plant-defect.mjs --root` numa cópia dos 4 `.kt`; `Parser::ParseInput` nos 8 passos `pwsh` | vermelho: guarda de cena `actual: 2, expected: 5` (7 de 46), plantador com stub `actual: 'a = 1
+b = 2
+', expected: 'a = 9
+b = 2
+'` (12 de 12); verde 46/46 e 12/12, 208/208 na pasta, em execução independente. 6 defeitos plantados com saída 0. Semente e workflow sem harness: devolvidos 1x (`"$scenario: …"` não fazia parse); 0 erros. Cobertura do diff: `tools/` fora do Kover e do lcov |
 
 ## Problemas em aberto e riscos
 

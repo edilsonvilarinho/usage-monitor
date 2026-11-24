@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       versions:
-        description: 'Tags de release ou `source` (build do código), separados por vírgula (ex.: v42.3.0-beta.15,v42.3.0-beta.16,source)'
+        description: 'Tags de release, `source` (build do código) ou `source+<defect>` (build com um defeito plantado de tools/real-app/defects.json), separados por vírgula (ex.: v42.3.0-beta.15,v42.3.0-beta.16,source,source+hover-stays-open)'
         required: true
         default: 'v42.3.0-beta.15,v42.3.0-beta.16,source'
         type: string
@@ -86,7 +86,7 @@ jobs:
     needs: plan
     runs-on: windows-latest
     # The source case compiles the app with Gradle, so it gets more time than a tag download.
-    timeout-minutes: ${{ matrix.version == 'source' && 60 || 30 }}
+    timeout-minutes: ${{ startsWith(matrix.version, 'source') && 60 || 30 }}
     strategy:
       fail-fast: false
       matrix:
@@ -109,14 +109,14 @@ jobs:
           node-version: '22'
 
       - name: Setup Java (source only, as in the desktop-windows job of ci.yml)
-        if: matrix.version == 'source'
+        if: startsWith(matrix.version, 'source')
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup Gradle (source only, as in ci.yml)
-        if: matrix.version == 'source'
+        if: startsWith(matrix.version, 'source')
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
@@ -129,7 +129,7 @@ jobs:
           "OUT_DIR=$(Join-Path $env:GITHUB_WORKSPACE 'out')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Download the published installer
-        if: matrix.version != 'source'
+        if: "!startsWith(matrix.version, 'source')"
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -140,7 +140,7 @@ jobs:
           Get-ChildItem -LiteralPath $dir | Select-Object Name, Length
 
       - name: Install silently (per user, /S does not open the app)
-        if: matrix.version != 'source'
+        if: "!startsWith(matrix.version, 'source')"
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -151,8 +151,18 @@ jobs:
           if (-not (Test-Path -LiteralPath $exe)) { throw "installed exe not found: $exe" }
           "APP_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Plant the defect (source+<defect> only)
+        if: contains(matrix.version, '+')
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The defect name is the part after '+'; it reaches the script through RELEASE_VERSION, not the text.
+          $defect = $env:RELEASE_VERSION.Substring($env:RELEASE_VERSION.IndexOf('+') + 1)
+          node tools/real-app/plant-defect.mjs --defect $defect
+          if ($LASTEXITCODE -ne 0) { throw "plant-defect exit code $LASTEXITCODE for defect $defect" }
+
       - name: Build the app from source (source only)
-        if: matrix.version == 'source'
+        if: startsWith(matrix.version, 'source')
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -170,7 +180,7 @@ jobs:
           "compiled app version: $($match.Groups[1].Value)"
 
       - name: Seed version for tags (the release tag)
-        if: matrix.version != 'source'
+        if: "!startsWith(matrix.version, 'source')"
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -201,10 +211,16 @@ jobs:
               # The previous scenario's app must be gone before the next one starts.
               Get-Process -Name 'Usage Monitor' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-              # beta.15 opens the HUD by itself at start (the known defect); every other version must not.
-              # The defect needs auto-retract, which the hole scenarios turn off (measured, run 45484824806).
+              # A planted version expects the verdict of its defect; an empty answer means the defect does not apply here.
               $expected = 'ok'
-              if ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') {
+              if ($env:RELEASE_VERSION.Contains('+')) {
+                  $plantedDefect = $env:RELEASE_VERSION.Substring($env:RELEASE_VERSION.IndexOf('+') + 1)
+                  $expected = (node tools/real-app/plant-defect.mjs --defect $plantedDefect --expect $scenario | Out-String).Trim()
+                  if ($LASTEXITCODE -ne 0) { $failed++; "${scenario}: plant-defect --expect exit code $LASTEXITCODE"; continue }
+                  if (-not $expected) { "$scenario skipped: defect $plantedDefect has no expectation for it"; continue }
+              } elseif ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') {
+                  # beta.15 opens the HUD by itself at start (the known defect); every other version must not.
+                  # The defect needs auto-retract, which the hole scenarios turn off (measured, run 45484824806).
                   $expected = if ($scenario -like 'docked-top-hole-*' -or $scenario -eq 'floating-drag') { 'ok' } elseif ($scenario -like '*-hover') { 'extra-pulse' } else { 'pulsed' }
               }
 
@@ -237,6 +253,10 @@ jobs:
                       # The whole events.json: pressMs, releaseMs, dx, dy.
                       $eventsArg = (Get-Content -LiteralPath $eventsPath -Raw).Trim()
                       $detectorArgs += @('--expect', 'drag', '--events', $eventsArg)
+                  }
+                  if ($scenario -like 'docked-top-hole-*') {
+                      # Hole strips: rise ratio 1.25 is more sensitive than the default 1.5 (flags smaller hovers); the minimum rest width rejects wrong scenes.
+                      $detectorArgs += @('--rise-ratio', '1.25', '--min-rest-width', '300')
                   }
                   node tools/ci/hud-pulses.mjs @detectorArgs *> $verdictPath
                   $code = $LASTEXITCODE

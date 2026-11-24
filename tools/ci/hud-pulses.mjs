@@ -2,15 +2,17 @@
 // Detector de pulsos da HUD (A02 do plano #652). Entrada: CSV de quadros da
 // captura (tools/real-app/record.ps1), um quadro a cada ~50 ms.
 //
-// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}']
+// Uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events '{"enterMs":n,"leaveMs":n}' | --expect drag --events '{"pressMs":n,"releaseMs":n,"dx":n,"dy":n}'] [--rise-ratio <n>] [--min-rest-width <n>]
 // Saida: veredito na primeira linha, depois um pulso por linha. Padrao: ok, pulsed, not-visible (0, 1, 4).
 // Hover: ok (0), not-opened, opened-late, not-closed, extra-pulse (1), not-visible (4). Drag: ok (0), not-moved, wrong-place, not-closed (1), not-visible (4). Uso ou CSV invalido: 2.
+// --rise-ratio (> 1, padrao 1.5) troca o limiar de subida. --min-rest-width (inteiro > 0) confere a escala da cena antes de qualquer
+// outro veredito: mediana de w no repouso abaixo do minimo e wrong-scene (5); sem quadro nessa janela, not-visible.
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 const HEADER = 't_ms,foreground,x,y,w,h'
 const DEFAULTS = { settleMs: 2000, riseRatio: 1.5, minFrames: 2, minForeground: 400, tailMs: 1000 }
-const EXIT = { ok: 0, pulsed: 1, usage: 2, 'not-visible': 4 }
+const EXIT = { ok: 0, pulsed: 1, usage: 2, 'not-visible': 4, 'wrong-scene': 5 }
 
 export function parseFrames(csv) {
     const frames = []
@@ -130,12 +132,15 @@ function median(values) {
 }
 
 const USAGE = 'uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events \'{"enterMs":n,"leaveMs":n}\']'
+const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width']
+const REST_FROM_MS = 2000
+const REST_UNTIL_MS = 11500
 
 function parseArgs(argv) {
     const positional = []
     const flags = {}
     for (let index = 0; index < argv.length; index += 1) {
-        if (argv[index] !== '--expect' && argv[index] !== '--events') {
+        if (!VALUE_FLAGS.includes(argv[index])) {
             positional.push(argv[index])
             continue
         }
@@ -145,13 +150,30 @@ function parseArgs(argv) {
     }
     if (positional.length !== 1) throw new Error(USAGE)
     const [csv] = positional
+    const tuning = { riseRatio: parseRiseRatio(flags['--rise-ratio']), minRestWidth: parseMinRestWidth(flags['--min-rest-width']) }
     if (flags['--expect'] === undefined) {
         if (flags['--events'] !== undefined) throw new Error(USAGE)
-        return { csv, expect: 'default' }
+        return { csv, expect: 'default', ...tuning }
     }
-    if (flags['--expect'] === 'drag') return { csv, expect: 'drag', events: parseDragEvents(flags['--events']) }
+    if (flags['--expect'] === 'drag') return { csv, expect: 'drag', events: parseDragEvents(flags['--events']), ...tuning }
     if (flags['--expect'] !== 'hover') throw new Error(USAGE)
-    return { csv, expect: 'hover', events: parseEvents(flags['--events']) }
+    return { csv, expect: 'hover', events: parseEvents(flags['--events']), ...tuning }
+}
+
+function parseRiseRatio(text) {
+    if (text === undefined) return undefined
+    const message = 'uso: --rise-ratio exige numero decimal maior que 1'
+    if (!/^\d+(\.\d+)?$/.test(text)) throw new Error(message)
+    const value = Number(text)
+    if (!Number.isFinite(value) || value <= 1) throw new Error(message)
+    return value
+}
+
+function parseMinRestWidth(text) {
+    if (text === undefined) return undefined
+    const message = 'uso: --min-rest-width exige inteiro positivo'
+    if (!/^[1-9]\d*$/.test(text)) throw new Error(message)
+    return Number(text)
 }
 
 function parseJsonEvents(text, message) {
@@ -182,15 +204,37 @@ function printVerdict(verdict, result) {
     result.pulses.forEach((pulse) => console.log(`pulso ${pulse.startMs}-${pulse.endMs} pico ${pulse.peakForeground}`))
 }
 
+// Largura do repouso: mediana de w dos quadros visiveis entre 2 s depois da primeira aparicao e 11,5 s. Sem quadro nessa janela: null.
+function restWidth(frames) {
+    const first = frames.find((frame) => frame.foreground >= DEFAULTS.minForeground)
+    if (!first) return null
+    const inRest = frames.filter((frame) => frame.foreground >= DEFAULTS.minForeground
+        && frame.tMs >= first.tMs + REST_FROM_MS && frame.tMs <= REST_UNTIL_MS)
+    return inRest.length === 0 ? null : median(inRest.map((frame) => frame.w))
+}
+
+// Escala da cena (--min-rest-width): veredito proprio, antes de qualquer outro; null quando a cena confere.
+function sceneVerdict(frames, minRestWidth) {
+    if (minRestWidth === undefined) return null
+    const width = restWidth(frames)
+    if (width === null) return 'not-visible'
+    return width < minRestWidth ? 'wrong-scene' : null
+}
+
 function main(argv) {
-    const { csv, expect, events } = parseArgs(argv)
+    const { csv, expect, events, riseRatio, minRestWidth } = parseArgs(argv)
     const frames = parseFrames(readFileSync(csv, 'utf8'))
+    const scene = sceneVerdict(frames, minRestWidth)
+    if (scene !== null) {
+        console.log(scene)
+        return EXIT[scene]
+    }
     if (expect === 'drag') {
         const verdict = dragVerdict(frames, events)
         console.log(verdict)
         return verdict === 'ok' ? EXIT.ok : verdict === 'not-visible' ? EXIT['not-visible'] : EXIT.pulsed
     }
-    const result = detectPulses(frames)
+    const result = detectPulses(frames, riseRatio === undefined ? {} : { riseRatio })
     if (expect === 'hover') {
         const verdict = hoverVerdict(result, events)
         printVerdict(verdict, result)

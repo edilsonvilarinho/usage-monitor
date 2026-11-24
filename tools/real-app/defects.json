@@ -1,0 +1,47 @@
+{
+  "drag-not-kept": {
+    "edits": [
+      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt", "find": "floatCenter = center", "replace": "floatCenter = floatCenter" }
+    ],
+    "expect": { "floating-drag": "not-moved" }
+  },
+  "drag-half-way": {
+    "edits": [
+      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindowDrag.kt", "find": "position.x + (current.x - previous.x).dp", "replace": "position.x + ((current.x - previous.x) / 2).dp" }
+    ],
+    "expect": { "floating-drag": "wrong-place" }
+  },
+  "hover-stays-open": {
+    "edits": [
+      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt", "find": "delay(HUD_COLLAPSE_DELAY_MILLIS)", "replace": "delay(60_000L)" }
+    ],
+    "expect": { "docked-top-hover": "not-closed", "docked-top-hole-hover": "not-closed", "floating-drag": "not-closed" }
+  },
+  "hover-opens-late": {
+    "edits": [
+      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt", "find": "delay(hudOpenDelayMillis(", "replace": "delay(2_000L + hudOpenDelayMillis(" }
+    ],
+    "expect": { "docked-top-hover": "opened-late", "docked-top-hole-hover": "opened-late" }
+  },
+  "hole-ignores-hover": {
+    "edits": [
+      { "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt", "find": "onHoleHovered = { balloon.holeHovered(holeIndex) }", "replace": "onHoleHovered = { }" }
+    ],
+    "expect": { "docked-top-hole-hover": "not-opened" }
+  },
+  "hole-opens-alone": {
+    "edits": [
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "LaunchedEffect(hovered, drag.dragging) {",
+        "replace": "LaunchedEffect(Unit) { delay(14_000L); windowOpen = true; withFrameNanos { }; expanded = true; delay(2_000L); expanded = false; delay(1_000L); windowOpen = false }\n    LaunchedEffect(hovered, drag.dragging) {"
+      },
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
+        "find": "LaunchedEffect(holeMembers) {",
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(14_200L); balloonIndex = holeIndex }\n    LaunchedEffect(holeMembers) {"
+      }
+    ],
+    "expect": { "docked-top-hole-idle": "pulsed", "docked-top-hole-hover": "extra-pulse" }
+  }
+}
