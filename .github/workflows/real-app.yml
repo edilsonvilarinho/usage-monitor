@@ -1,0 +1,151 @@
+# Experimento da #652: grava o app real instalado (release publicado) num runner Windows e reprova
+# pulsos de janela na HUD com o ponteiro parado. Fora do `ci-ok`. Ver docs/planos/app-real-no-ci-652-execucao.md.
+#
+# Gatilhos: `workflow_dispatch` (exige o arquivo na `main`) e `push` só nesta branch enquanto durar o
+# experimento. O gatilho `push` sai na A05.
+name: Real app recording
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: 'Tags de release separadas por vírgula (ex.: v42.3.0-beta.15,v42.3.0-beta.16)'
+        required: true
+        default: 'v42.3.0-beta.15,v42.3.0-beta.16'
+        type: string
+      attempts:
+        description: 'Quantas tentativas por versão'
+        required: true
+        default: '1'
+        type: string
+  push:
+    branches:
+      - ci/issue-652-real-app-recording
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      versions: ${{ steps.plan.outputs.versions }}
+      attempts: ${{ steps.plan.outputs.attempts }}
+    steps:
+      - name: Expand versions and attempts into matrix lists
+        id: plan
+        env:
+          VERSIONS: ${{ inputs.versions || 'v42.3.0-beta.15,v42.3.0-beta.16' }}
+          ATTEMPTS: ${{ inputs.attempts || '1' }}
+        run: |
+          set -euo pipefail
+          versions=$(printf '%s' "$VERSIONS" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' \
+            | jq -R . | jq -sc .)
+          attempts=$(seq 1 "$ATTEMPTS" | jq -sc .)
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
+          echo "attempts=$attempts" >> "$GITHUB_OUTPUT"
+          echo "versions=$versions attempts=$attempts"
+
+  record:
+    needs: plan
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.plan.outputs.versions) }}
+        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ matrix.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Set data and output paths
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "DATA_DIR=$(Join-Path $env:RUNNER_TEMP 'real-app-data')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OUT_DIR=$(Join-Path $env:GITHUB_WORKSPACE 'out')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Download the published installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $env:RUNNER_TEMP 'installer'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          gh release download $env:RELEASE_VERSION --repo $env:GITHUB_REPOSITORY `
+            --pattern "UsageMonitor-Setup-$($env:RELEASE_VERSION.TrimStart('v')).exe" --dir $dir
+          Get-ChildItem -LiteralPath $dir | Select-Object Name, Length
+
+      - name: Install silently (per user, /S does not open the app)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'installer') -Filter '*.exe' | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA 'Usage Monitor\Usage Monitor.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "installed exe not found: $exe" }
+          "APP_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Block outbound network for the app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-NetFirewallRule -DisplayName 'real-app-652 block outbound' -Direction Outbound `
+            -Program $env:APP_EXE -Action Block -Profile Any | Out-Null
+
+      - name: Seed the data root (fake account, no credentials)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pwsh -NoProfile -File tools/real-app/seed.ps1 -DataDir $env:DATA_DIR -Version $env:RELEASE_VERSION
+
+      - name: Record the screen while the app starts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pwsh -NoProfile -File tools/real-app/record.ps1 -Exe $env:APP_EXE -DataDir $env:DATA_DIR `
+            -OutDir $env:OUT_DIR -Seconds 30
+
+      - name: Detect pulses and publish the verdict
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $title = "### real-app $env:RELEASE_VERSION (attempt ${{ matrix.attempt }})"
+          $csv = Join-Path $env:OUT_DIR 'frames.csv'
+          if (-not (Test-Path -LiteralPath $csv)) {
+            "$title`n`nno frames.csv: the recording did not start" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            exit 0
+          }
+          $verdictPath = Join-Path $env:OUT_DIR 'verdict.txt'
+          node tools/ci/hud-pulses.mjs $csv *> $verdictPath
+          $code = $LASTEXITCODE
+          $verdict = Get-Content -LiteralPath $verdictPath -Raw
+          $fence = '```'
+          "$title`n`n$fence`n$verdict`n$fence`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "hud-pulses exit code: $code"
+
+      - name: Upload the recording
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: real-app-${{ matrix.version }}-attempt-${{ matrix.attempt }}
+          path: out
+          retention-days: 7
+          if-no-files-found: warn

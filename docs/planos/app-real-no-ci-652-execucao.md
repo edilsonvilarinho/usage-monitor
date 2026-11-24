@@ -54,6 +54,7 @@ os testes não viram. É experimento: a resposta "não consegue" também encerra
 |---|---|---|
 | A01 | sem harness de teste (plano) | conferido contra `HudGpuWarmUp.kt` da tag `v42.3.0-beta.15` e os arquivos citados |
 | A02 | `node --test "tools/ci/test/hud-pulses.test.mjs"` | vermelho (stub): `actual: [], expected: [3000, 4000, 5000]`; verde 12/12. Devolvida 1x na revisão: app que some ou cai saía `ok`. Vermelho do ajuste: `ruido de 100 px e some, ou fica`: `actual: 'pulsed', expected: 'not-visible'` (4 falhas em 16); verde 16/16, confirmado em execução independente. Não coberto: app que some e volta antes do fim |
+| A03 | `[Parser]::ParseFile` nos dois `.ps1` e compilação isolada do tipo C# | 0 erros de parse; tipo compilado sem ser chamado. Devolvida 1x: coluna `foreground` era marca de janela ativa, cabeçalho entre aspas e `runner.temp` em `env` de job. Scripts de captura sem harness de teste; a sonda é o run desta branch |
 
 ## Problemas em aberto e riscos
 
