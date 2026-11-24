@@ -155,7 +155,7 @@ function median(values) {
 const USAGE = 'uso: node tools/ci/hud-pulses.mjs <csv> [--expect hover --events \'{"enterMs":n,"leaveMs":n}\']'
 const VALUE_FLAGS = ['--expect', '--events', '--rise-ratio', '--min-rest-width', '--max-rest-foreground']
 const REST_FROM_MS = 2000
-const REST_UNTIL_MS = 11500
+const REST_UNTIL_MS = 7000
 
 function parseArgs(argv) {
     const positional = []
@@ -228,12 +228,12 @@ function printVerdict(verdict, result) {
     result.pulses.forEach((pulse) => console.log(`pulso ${pulse.startMs}-${pulse.endMs} pico ${pulse.peakForeground}`))
 }
 
-// Largura do repouso: mediana de w dos quadros visiveis entre 2 s depois da primeira aparicao e 11,5 s. Sem quadro nessa janela: null.
+// Largura do repouso: mediana de w dos quadros visiveis entre +2 s e +7 s da primeira aparicao (relativo, nao ao processo). Sem quadro nessa janela: null.
 function restWidth(frames) {
     const first = frames.find((frame) => frame.foreground >= DEFAULTS.minForeground)
     if (!first) return null
     const inRest = frames.filter((frame) => frame.foreground >= DEFAULTS.minForeground
-        && frame.tMs >= first.tMs + REST_FROM_MS && frame.tMs <= REST_UNTIL_MS)
+        && frame.tMs >= first.tMs + REST_FROM_MS && frame.tMs <= first.tMs + REST_UNTIL_MS)
     return inRest.length === 0 ? null : median(inRest.map((frame) => frame.w))
 }
 

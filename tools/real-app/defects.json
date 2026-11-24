@@ -1,60 +1,96 @@
 {
   "drag-not-kept": {
     "edits": [
-      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt", "find": "floatCenter = center", "replace": "floatCenter = floatCenter" }
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "floatCenter = center",
+        "replace": "floatCenter = floatCenter"
+      }
     ],
-    "expect": { "floating-drag": "not-moved" }
+    "expect": {
+      "floating-drag": "not-moved"
+    }
   },
   "drag-half-way": {
     "edits": [
-      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindowDrag.kt", "find": "position.x + (current.x - previous.x).dp", "replace": "position.x + ((current.x - previous.x) / 2).dp" }
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindowDrag.kt",
+        "find": "position.x + (current.x - previous.x).dp",
+        "replace": "position.x + ((current.x - previous.x) / 2).dp"
+      }
     ],
-    "expect": { "floating-drag": "wrong-place" }
+    "expect": {
+      "floating-drag": "wrong-place"
+    }
   },
   "hover-stays-open": {
     "edits": [
-      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt", "find": "delay(HUD_COLLAPSE_DELAY_MILLIS)", "replace": "delay(60_000L)" }
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "delay(HUD_COLLAPSE_DELAY_MILLIS)",
+        "replace": "delay(60_000L)"
+      }
     ],
-    "expect": { "docked-top-hover": "not-closed", "docked-top-hole-hover": "not-closed", "floating-drag": "not-closed" }
+    "expect": {
+      "docked-top-hover": "not-closed",
+      "docked-top-hole-hover": "not-closed",
+      "floating-drag": "not-closed"
+    }
   },
   "hover-opens-late": {
     "edits": [
-      { "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt", "find": "delay(hudOpenDelayMillis(", "replace": "delay(2_000L + hudOpenDelayMillis(" }
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
+        "find": "delay(hudOpenDelayMillis(",
+        "replace": "delay(2_000L + hudOpenDelayMillis("
+      }
     ],
-    "expect": { "docked-top-hover": "opened-late", "docked-top-hole-hover": "opened-late" }
+    "expect": {
+      "docked-top-hover": "opened-late",
+      "docked-top-hole-hover": "opened-late"
+    }
   },
   "hole-ignores-hover": {
     "edits": [
-      { "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt", "find": "onHoleHovered = { balloon.holeHovered(holeIndex) }", "replace": "onHoleHovered = { }" }
+      {
+        "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotch.kt",
+        "find": "onHoleHovered = { balloon.holeHovered(holeIndex) }",
+        "replace": "onHoleHovered = { }"
+      }
     ],
-    "expect": { "docked-top-hole-hover": "not-opened" }
+    "expect": {
+      "docked-top-hole-hover": "not-opened"
+    }
   },
   "hole-opens-alone": {
     "edits": [
       {
         "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
         "find": "LaunchedEffect(hovered, drag.dragging) {",
-        "replace": "LaunchedEffect(Unit) { delay(14_000L); windowOpen = true; withFrameNanos { }; expanded = true; delay(2_000L); expanded = false; delay(1_000L); windowOpen = false }\n    LaunchedEffect(hovered, drag.dragging) {"
+        "replace": "LaunchedEffect(Unit) { delay(18_000L); repeat(40) { windowOpen = true; expanded = true; delay(50L) }; expanded = false; delay(1_000L); windowOpen = false }\n    LaunchedEffect(hovered, drag.dragging) {"
       },
       {
         "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
         "find": "LaunchedEffect(holeMembers) {",
-        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(14_200L); balloonIndex = holeIndex }\n    LaunchedEffect(holeMembers) {"
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(18_000L); repeat(40) { balloonIndex = holeIndex; kotlinx.coroutines.delay(50L) } }\n    LaunchedEffect(holeMembers) {"
       }
     ],
-    "expect": { "docked-top-hole-idle": "pulsed", "docked-top-hole-hover": "extra-pulse" }
+    "expect": {
+      "docked-top-hole-idle": "pulsed",
+      "docked-top-hole-hover": "extra-pulse"
+    }
   },
   "opens-and-stays": {
     "edits": [
       {
         "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
         "find": "LaunchedEffect(hovered, drag.dragging) {",
-        "replace": "LaunchedEffect(Unit) { delay(1_000L); windowOpen = true; withFrameNanos { }; expanded = true }\n    LaunchedEffect(hovered, drag.dragging) {"
+        "replace": "LaunchedEffect(Unit) { delay(0L); while (true) { windowOpen = true; expanded = true; delay(50L) } }\n    LaunchedEffect(hovered, drag.dragging) {"
       },
       {
         "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
         "find": "LaunchedEffect(holeMembers) {",
-        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(1_200L); if (holeMembers.isNotEmpty()) balloonIndex = holeIndex }\n    LaunchedEffect(holeMembers) {"
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(0L); while (true) { if (holeMembers.isNotEmpty()) balloonIndex = holeIndex; kotlinx.coroutines.delay(50L) } }\n    LaunchedEffect(holeMembers) {"
       }
     ],
     "expect": {
@@ -71,12 +107,12 @@
       {
         "file": "src/desktopMain/kotlin/com/usagemonitor/HudWindow.kt",
         "find": "LaunchedEffect(hovered, drag.dragging) {",
-        "replace": "LaunchedEffect(Unit) { delay(6_000L); windowOpen = true; withFrameNanos { }; expanded = true }\n    LaunchedEffect(hovered, drag.dragging) {"
+        "replace": "LaunchedEffect(Unit) { delay(12_000L); while (true) { windowOpen = true; expanded = true; delay(50L) } }\n    LaunchedEffect(hovered, drag.dragging) {"
       },
       {
         "file": "src/desktopMain/kotlin/com/usagemonitor/presentation/ui/HudNotchBalloonState.kt",
         "find": "LaunchedEffect(holeMembers) {",
-        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(6_200L); if (holeMembers.isNotEmpty()) balloonIndex = holeIndex }\n    LaunchedEffect(holeMembers) {"
+        "replace": "LaunchedEffect(Unit) { kotlinx.coroutines.delay(12_000L); while (true) { if (holeMembers.isNotEmpty()) balloonIndex = holeIndex; kotlinx.coroutines.delay(50L) } }\n    LaunchedEffect(holeMembers) {"
       }
     ],
     "expect": {

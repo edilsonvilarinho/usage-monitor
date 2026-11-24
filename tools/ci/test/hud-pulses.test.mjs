@@ -307,7 +307,7 @@ test('CLI drag: 0 ok, 1 falha, 4 nunca visivel, 2 uso', () => {
     assert.equal(cli(csv, '--expect', 'drag', '--events', 'nao e json').code, 2)
 })
 
-// Escala da cena (--min-rest-width): mediana de w entre 2 s depois da primeira aparicao e 11,5 s.
+// Escala da cena (--min-rest-width): mediana de w entre +2 s e +7 s da primeira aparicao.
 const SCENE = ['--min-rest-width', '300']
 const withWidth = (frames, widthAt) => frames.map((frame) => ({ ...frame, w: widthAt(frame.tMs) }))
 const hoverAt = (fromMs, toMs, value) => series(12000, (t) => (t >= fromMs && t < toMs ? value : HUD))
@@ -335,19 +335,44 @@ test('min-rest-width: largura igual ao minimo passa', () => {
     assert.equal(exact.stdout.split('\n')[0], 'ok')
 })
 
-test('min-rest-width: quadros depois de 11,5 s nao entram na mediana', () => {
-    // 30 s: 191 quadros na janela (100 px) e 370 depois de 11,5 s (300 px). Se o corte falhasse, a mediana seria 300.
-    const wideAfter = withWidth(series(30000, () => HUD), (tMs) => (tMs > 11500 ? 300 : 100))
+test('min-rest-width: quadros depois de +7 s da primeira aparicao nao entram na mediana', () => {
+    // 30 s, primeira aparicao em 0: 101 quadros na janela (100 px) e 460 depois de 7 s (300 px). Se o corte falhasse, a mediana seria 300.
+    const wideAfter = withWidth(series(30000, () => HUD), (tMs) => (tMs > 7000 ? 300 : 100))
     const run = cli(writeCsv('scene-after.csv', toCsv(wideAfter)), ...SCENE)
     assert.equal(run.code, 5)
     assert.equal(run.stdout.split('\n')[0], 'wrong-scene')
 })
 
-test('min-rest-width: sem quadro visivel na janela de 2 s a 11,5 s: not-visible, codigo 4', () => {
-    const lateStart = withWidth(series(12000, (t) => (t >= 10000 ? HUD : 0)), () => 300)
+test('min-rest-width: sem quadro visivel na janela de +2 s a +7 s da primeira aparicao: not-visible, codigo 4', () => {
+    // Primeira aparicao em 10 s; a serie termina em 11 s, antes de 12 s (+2 s). Janela sem quadro.
+    const lateStart = withWidth(series(11000, (t) => (t >= 10000 ? HUD : 0)), () => 300)
     const run = cli(writeCsv('scene-late-start.csv', toCsv(lateStart)), ...SCENE)
     assert.equal(run.code, 4)
     assert.equal(run.stdout.split('\n')[0], 'not-visible')
+})
+
+// Janela do repouso relativa a primeira aparicao: [+2 s, +7 s]. Quadro de 50 ms mais proximo de 13,236 s.
+const FIRST_VISIBLE_MS = 13250
+const appearsLate = (widthAt) => withWidth(series(30000, (t) => (t >= FIRST_VISIBLE_MS ? HUD : 0)), widthAt)
+
+test('min-rest-width: HUD aparece em 13,25 s com 357 px: ok (janela relativa, nao fixa)', () => {
+    const run = cli(writeCsv('scene-late-first.csv', toCsv(appearsLate(() => 357))), ...SCENE)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
+})
+
+test('min-rest-width: HUD aparece em 13,25 s com 100 px: wrong-scene dentro de +2 s a +7 s', () => {
+    const run = cli(writeCsv('scene-late-narrow.csv', toCsv(appearsLate(() => 100))), ...SCENE)
+    assert.equal(run.code, 5)
+    assert.equal(run.stdout.split('\n')[0], 'wrong-scene')
+})
+
+test('min-rest-width: quadros depois de +7 s da primeira aparicao nao entram na mediana', () => {
+    // Janela 15,25 s a 20,25 s: 300 px. Depois de 20,25 s: 100 px (195 quadros). Corte fixo ou sem teto daria wrong-scene.
+    const wideWindow = appearsLate((tMs) => (tMs >= FIRST_VISIBLE_MS + 2000 && tMs <= FIRST_VISIBLE_MS + 7000 ? 300 : 100))
+    const run = cli(writeCsv('scene-relative-window.csv', toCsv(wideWindow)), ...SCENE)
+    assert.equal(run.code, 0)
+    assert.equal(run.stdout.split('\n')[0], 'ok')
 })
 
 test('rise-ratio: pico de 1,4x do repouso e not-opened no padrao e ok com 1,25', () => {

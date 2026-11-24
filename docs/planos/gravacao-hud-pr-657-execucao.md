@@ -72,7 +72,7 @@ PR que mexe na HUD ou em janela grava o app sozinho, em mais cenários que "para
 | `hole-ignores-hover` | a lista do buraco não abre no hover | `docked-top-hole-hover`: `not-opened` |
 | `hole-opens-alone` | a lista do buraco abre sozinha | `docked-top-hole-idle`: `pulsed`; `docked-top-hole-hover`: `extra-pulse` |
 | `opens-and-stays` | o painel abre no arranque e não fecha | os 6 cenários parados: `open-at-rest` |
-| `opens-late-and-stays` | o painel abre 6 s depois e não fecha | os 6 cenários parados: `pulsed` |
+| `opens-late-and-stays` | o painel abre 12 s depois e não fecha | os 6 cenários parados: `pulsed` |
 
 **Critério para virar bloqueante, escrito antes de medir:**
 
@@ -103,6 +103,7 @@ b = 2
 b = 2
 '` (12 de 12); verde 46/46 e 12/12, 208/208 na pasta, em execução independente. 6 defeitos plantados com saída 0. Semente e workflow sem harness: devolvidos 1x (`"$scenario: …"` não fazia parse); 0 erros. Cobertura do diff: `tools/` fora do Kover e do lcov |
 | A05 (repouso) | run [45490240256](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45490240256) (`3d867d37`); `node --test "tools/ci/test/*.test.mjs"`; rejulgamento das gravações guardadas | run 40/50: `hover-stays-open` deu `not-opened` em 10/10 de hover. O repouso era a mediana da gravação inteira e, com o painel preso aberto (160 de 223 quadros), virou o estado aberto (13.651 contra 1.376). Cenário parado com a HUD aberta sairia `ok`. Corrigido: repouso antes do hover, p5 nos parados, teto `open-at-rest`. Vermelho `:398 actual: 'not-opened', expected: 'not-closed'`, `:403 actual: 13000, expected: 1000`, `:419 :426 :433 actual: 2`; verde 54/54, 216/216 na pasta. Rejulgado: defeitos **50/50**; 60 antigas sem mudança; `wrong-scene` acusou exatamente as 5 gravações sem buraco. O commit `48a32e7c` saiu com `defects.json` inválido (1 de 205 testes vermelho, run 45492474236 cancelado); corrigido no seguinte |
+| A05 (âncora) | run [45492616191](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45492616191) (`c0b349c6`, interrompido com 3 vermelhos); `node --test "tools/ci/test/*.test.mjs"`; `testbuild` com `gradlew` falso | três causas. (1) build: `Could not find …jdk-version-probe:1.12.2`, a mesma URL respondeu 200 depois; repetição só para resolução de dependência, provada em 4 casos (erro de compilação falha na 1ª). (2) HUD visível aos 13.236 ms (mediana de 186 gravações: 4.209) com a EDT parada 11,6 s: o relógio era o do processo; agora tudo conta da 1ª aparição. Vermelho `actual: 4, expected: 0` (2×) e `actual: 4, expected: 5`; verde 57/57, 219/219 na pasta. (3) os defeitos `opens-*` disputavam com o recolhimento do arranque: passaram a sustentar o estado. Gravador e workflow sem harness: 0 erros de parse |
 
 ## Problemas em aberto e riscos
 
@@ -112,3 +113,7 @@ b = 2
 - Depois de soltar e sair, o painel abre e fecha sozinho: no 1º run abriu 191 ms **depois** da saída do ponteiro, e nas 10 gravações
   do 2º a abertura apareceu 330–592 ms depois de soltar e durou até 748–1.125 ms. Entrada sintética, sem invariante escrita: não foi
   tratado como defeito nem conferido com mouse real.
+- EDT parada por mais de 5 s no arranque em 4 de 186 gravações (até 11,6 s), com a pilha em 4 pontos diferentes (carga de classe,
+  Direct3D 2×, descompressão de fonte), sempre abrindo a 1ª janela. Hipótese não provada: runner lento no arranque frio.
+- Ponto cego: mudança menor que o limiar (1,5×; 1,25× no buraco) passa. Visto: HUD marcada aberta e recortada na faixa, 1.440 contra
+  1.376 px, sai `ok`. Só foi alcançado por defeito plantado.

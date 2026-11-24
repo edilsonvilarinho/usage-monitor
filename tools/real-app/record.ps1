@@ -14,9 +14,11 @@
 .PARAMETER OutDir
   Output folder (frames.csv, frames/*.jpg, app.log, probe.json).
 .PARAMETER Seconds
-  Recording length.
+  Seconds recorded after the first visible frame (changed pixels >= 400). Default 26.
+.PARAMETER StartupSeconds
+  Longest wait for a first visible frame. Default 45; past it the recording stops (the detector answers not-visible).
 .PARAMETER Scenario
-  Same names as seed.ps1. From 12 s the pointer follows one plan built from the last non-empty box.
+  Same names as seed.ps1. From 7.5 s after the first visible frame the pointer follows one plan built from the last non-empty box.
   Hover scenarios (docked-top-hover, docked-top-hole-hover) move onto it, leave to the bottom centre 3 s later
   and write events.json {enterMs, leaveMs}. floating-drag presses, drags (-200, +120) and releases, and writes
   {pressMs, releaseMs, dx, dy}. All times are on the t_ms clock; probe.json lists the executed pointer actions.
@@ -26,7 +28,8 @@ param(
     [Parameter(Mandatory)][string]$Exe,
     [Parameter(Mandatory)][string]$DataDir,
     [Parameter(Mandatory)][string]$OutDir,
-    [int]$Seconds = 30,
+    [int]$Seconds = 26,
+    [int]$StartupSeconds = 45,
     [ValidateSet('floating-idle', 'floating-drag', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover', 'docked-top-hole-idle', 'docked-top-hole-hover')]
     [string]$Scenario = 'floating-idle'
 )
@@ -218,8 +221,10 @@ $backgroundStable = $false
 $fpsSamples = 0
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $vs = [System.Drawing.Rectangle]::Empty
-# Last box with changed pixels; the pointer plan (built at 12 s) and its marks on the t_ms clock.
+# Last box with changed pixels; the pointer plan (built 7.5 s after the first visible frame) and its marks on the t_ms clock.
 $lastBox = $null
+# First frame with at least 400 changed pixels (same number as the detector); null until then. Process clock, ms.
+$firstVisibleMs = $null
 $isHover = $Scenario -like '*-hover'
 $isDrag = $Scenario -eq 'floating-drag'
 $plan = $null
@@ -265,7 +270,10 @@ try {
     $lastJpegMs = -1000
     $lastJpegCount = 0
     $sw.Restart()
-    while ($sw.ElapsedMilliseconds -lt ($Seconds * 1000)) {
+    # Stops Seconds after the first visible frame, or at StartupSeconds when nothing has become visible.
+    while ($true) {
+        $elapsed = $sw.ElapsedMilliseconds
+        if (($null -eq $firstVisibleMs -and $elapsed -ge $StartupSeconds * 1000) -or ($null -ne $firstVisibleMs -and $elapsed -ge $firstVisibleMs + $Seconds * 1000)) { break }
         $tMs = [int]$sw.ElapsedMilliseconds
         if ($tMs -le $lastT) { Start-Sleep -Milliseconds 5; continue }   # the detector needs strictly rising t_ms
         $lastT = $tMs
@@ -281,10 +289,11 @@ try {
         $fpsSamples++
         [void]$csv.Append("$tMs,$count,$bx,$by,$bw,$bh`n")
         if ($count -gt 0) { $lastBox = @($bx, $by, $bw, $bh) }
+        if ($null -eq $firstVisibleMs -and $count -ge 400) { $firstVisibleMs = $tMs }
 
-        # Plan built once, at the first frame from 12 s, from the last non-empty box.
+        # Plan built once, at the first frame 7.5 s after the first visible frame, from the last non-empty box.
         # Without any box, a 2 px strip at the top centre stands in (as before).
-        if ($null -eq $plan -and ($isHover -or $isDrag) -and $tMs -ge 12000) {
+        if ($null -eq $plan -and ($isHover -or $isDrag) -and $null -ne $firstVisibleMs -and $tMs -ge ($firstVisibleMs + 7500)) {
             $box = if ($lastBox) { $lastBox } else { @([int]($vs.Width / 2), 0, 0, 2) }
             $centreX = $vs.X + $box[0] + [int]($box[2] / 2)
             $centreY = $vs.Y + $box[1] + [int]($box[3] / 2)
@@ -376,6 +385,7 @@ finally {
         windowTitles     = @($titles)
         framesPerSecond  = [math]::Round($fpsSamples / [math]::Max(1, $sw.Elapsed.TotalSeconds), 1)
         seconds          = $Seconds
+        firstVisibleMs   = $firstVisibleMs
         appExited        = $appExited
         pointer          = @($pointer)
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'probe.json') -Encoding utf8

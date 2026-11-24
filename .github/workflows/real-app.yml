@@ -166,8 +166,20 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          .\gradlew.bat createDistributable
-          if ($LASTEXITCODE -ne 0) { throw "gradlew createDistributable exit code $LASTEXITCODE" }
+          # Only a dependency resolution failure is tried again (2 more times); a compile error fails at once.
+          $gradleArgs = @('createDistributable')
+          for ($try = 1; $try -le 3; $try++) {
+              $ErrorActionPreference = 'Continue'
+              .\gradlew.bat @gradleArgs 2>&1 | Tee-Object -Variable gradleOutput
+              $code = $LASTEXITCODE
+              $ErrorActionPreference = 'Stop'
+              if ($code -eq 0) { break }
+              $resolution = ($gradleOutput | Out-String) -match 'Could not (find|resolve|GET|HEAD) '
+              if (-not $resolution -or $try -eq 3) { throw "gradlew createDistributable exit code $code (try $try)" }
+              "::warning::dependency resolution failed on try $try; trying again"
+              Start-Sleep -Seconds ([int]($env:BUILD_RETRY_SECONDS ?? '30'))
+              $gradleArgs = @('createDistributable', '--refresh-dependencies')
+          }
           # jpackage app-image folder (build.gradle.kts:531, packageName 'Usage Monitor' at :160).
           $exe = Join-Path $env:GITHUB_WORKSPACE 'build\compose\binaries\main\app\Usage Monitor\Usage Monitor.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw "built exe not found: $exe" }
@@ -229,7 +241,7 @@ jobs:
               if ($env:APP_EXE) {
                   pwsh -NoProfile -File tools/real-app/seed.ps1 -DataDir $dataDir -Version $env:SEED_VERSION -Scenario $scenario | Out-Null
                   if ($LASTEXITCODE -eq 0) {
-                      pwsh -NoProfile -File tools/real-app/record.ps1 -Exe $env:APP_EXE -DataDir $dataDir -OutDir $outDir -Seconds 30 -Scenario $scenario
+                      pwsh -NoProfile -File tools/real-app/record.ps1 -Exe $env:APP_EXE -DataDir $dataDir -OutDir $outDir -Seconds 26 -Scenario $scenario
                       $recorded = ($LASTEXITCODE -eq 0)
                   }
               }
