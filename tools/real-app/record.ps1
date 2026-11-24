@@ -15,13 +15,18 @@
   Output folder (frames.csv, frames/*.jpg, app.log, probe.json).
 .PARAMETER Seconds
   Recording length.
+.PARAMETER Scenario
+  Same names as seed.ps1. docked-top-hover moves the pointer onto the last non-empty box at 12 s,
+  leaves to the bottom centre 3 s later, and writes events.json {enterMs, leaveMs} (same clock as t_ms).
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Exe,
     [Parameter(Mandatory)][string]$DataDir,
     [Parameter(Mandatory)][string]$OutDir,
-    [int]$Seconds = 30
+    [int]$Seconds = 30,
+    [ValidateSet('floating-idle', 'docked-top-idle', 'docked-bottom-idle', 'docked-left-idle', 'docked-right-idle', 'docked-top-hover')]
+    [string]$Scenario = 'floating-idle'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,6 +55,20 @@ public static class RealAppNative {
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [StructLayout(LayoutKind.Sequential)] public struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public UIntPtr dwExtraInfo; }
+    [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public MOUSEINPUT mi; }
+
+    // Moves the pointer to (x, y) in virtual-screen pixels with an absolute SendInput mouse move.
+    public static bool MoveTo(int x, int y, Rectangle vs) {
+        INPUT input = new INPUT();
+        input.type = 0; // INPUT_MOUSE
+        input.mi.dx = (int)((x - vs.X) * 65535L / Math.Max(1, vs.Width - 1));
+        input.mi.dy = (int)((y - vs.Y) * 65535L / Math.Max(1, vs.Height - 1));
+        input.mi.dwFlags = 0x0001 | 0x4000 | 0x8000; // MOUSEEVENTF_MOVE | MOUSEEVENTF_VIRTUALDESK | MOUSEEVENTF_ABSOLUTE
+        return SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT))) == 1;
+    }
 
     public static Rectangle VirtualScreen() {
         return SystemInformation.VirtualScreen;
@@ -189,6 +208,10 @@ $backgroundStable = $false
 $fpsSamples = 0
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $vs = [System.Drawing.Rectangle]::Empty
+# docked-top-hover: last box with changed pixels, and the hover times on the t_ms clock.
+$lastBox = $null
+$enterMs = $null
+$leaveMs = $null
 
 try {
     # 1. Plain black desktop: every other top-level window and the desktop icons hidden.
@@ -241,6 +264,26 @@ try {
         $count = [RealAppNative]::Diff($pixels, $baseline, $w, $h, $stride, 8, [ref]$bx, [ref]$by, [ref]$bw, [ref]$bh)
         $fpsSamples++
         [void]$csv.Append("$tMs,$count,$bx,$by,$bw,$bh`n")
+        if ($count -gt 0) { $lastBox = @($bx, $by, $bw, $bh) }
+
+        if ($Scenario -eq 'docked-top-hover') {
+            if ($null -eq $enterMs -and $tMs -ge 12000) {
+                # Centre of the last non-empty box; top centre of the screen when nothing ever changed.
+                if ($lastBox) {
+                    $cx = $vs.X + $lastBox[0] + [int]($lastBox[2] / 2)
+                    $cy = $vs.Y + $lastBox[1] + [int]($lastBox[3] / 2)
+                } else {
+                    $cx = $vs.X + [int]($vs.Width / 2)
+                    $cy = $vs.Y + 1
+                }
+                [void][RealAppNative]::MoveTo($cx, $cy, $vs)
+                $enterMs = $tMs
+            }
+            elseif ($null -ne $enterMs -and $null -eq $leaveMs -and $tMs -ge ($enterMs + 3000)) {
+                [void][RealAppNative]::MoveTo($vs.X + [int]($vs.Width / 2), $vs.Y + $vs.Height - 2, $vs)
+                $leaveMs = $tMs
+            }
+        }
 
         # JPEG when the count moves more than 5% from the last saved JPEG, or once a second.
         $moved = [math]::Abs($count - $lastJpegCount) -gt [math]::Max(1, 0.05 * $lastJpegCount)
@@ -258,12 +301,17 @@ finally {
         if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
     }
     [System.IO.File]::WriteAllText($csvPath, $csv.ToString(), [System.Text.UTF8Encoding]::new($false))
+    if ($Scenario -eq 'docked-top-hover' -and $null -ne $enterMs -and $null -ne $leaveMs) {
+        $eventsJson = [pscustomobject]@{ enterMs = $enterMs; leaveMs = $leaveMs } | ConvertTo-Json -Compress
+        [System.IO.File]::WriteAllText((Join-Path $OutDir 'events.json'), $eventsJson, [System.Text.UTF8Encoding]::new($false))
+    }
 
     $log = Join-Path (Join-Path $DataDir 'diagnostics') 'app.log'
     if (Test-Path -LiteralPath $log) { Copy-Item -LiteralPath $log -Destination (Join-Path $OutDir 'app.log') }
 
     $dpi = (Get-ItemProperty -Path 'HKCU:\Control Panel\Desktop\WindowMetrics' -ErrorAction SilentlyContinue).AppliedDPI
     [pscustomobject]@{
+        scenario         = $Scenario
         screen           = [pscustomobject]@{ x = $vs.X; y = $vs.Y; width = $vs.Width; height = $vs.Height }
         dpi              = $dpi
         sessionId        = $sessionId

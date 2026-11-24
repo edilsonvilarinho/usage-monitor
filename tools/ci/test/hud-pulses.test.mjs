@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { detectPulses, parseFrames, verdictOf } from '../hud-pulses.mjs'
+import { detectPulses, hoverVerdict, parseFrames, verdictOf } from '../hud-pulses.mjs'
 
 const SCRIPT = fileURLToPath(new URL('../hud-pulses.mjs', import.meta.url))
 const HEADER = 't_ms,foreground,x,y,w,h'
@@ -151,4 +151,62 @@ test('CLI: codigos de saida 0, 1, 4 e 2 e veredito na primeira linha', () => {
     assert.equal(cli(writeCsv('bad.csv', `${HEADER}\n0,1000,10\n`)).code, 2)
     assert.equal(cli().code, 2)
     assert.equal(cli(join(dir, 'missing.csv')).code, 2)
+})
+
+// Hover: o ponteiro entra em enterMs e sai em leaveMs; o pulso deve abrir ate 1,5 s depois de entrar e fechar ate 2,5 s depois de sair.
+const HOVER = { enterMs: 4000, leaveMs: 6000 }
+const hoverPulse = (fromMs, toMs) => series(12000, (t) => (t >= fromMs && t < toMs ? PULSE : HUD))
+
+test('hover: abre 0,5 s depois de entrar e fecha 1 s depois de sair: ok', () => {
+    assert.equal(hoverVerdict(detectPulses(hoverPulse(4500, 7000)), HOVER), 'ok')
+})
+
+test('hover: nenhum pulso: not-opened', () => {
+    assert.equal(hoverVerdict(detectPulses(series(12000, () => HUD)), HOVER), 'not-opened')
+})
+
+test('hover: abre 2 s depois de entrar: opened-late', () => {
+    assert.equal(hoverVerdict(detectPulses(hoverPulse(6000, 7000)), HOVER), 'opened-late')
+})
+
+test('hover: ainda aberto 2,95 s depois de sair: not-closed', () => {
+    assert.equal(hoverVerdict(detectPulses(hoverPulse(4500, 9000)), HOVER), 'not-closed')
+})
+
+test('hover: aberto no ultimo quadro, sem tempo para fechar: not-closed', () => {
+    assert.equal(hoverVerdict(detectPulses(hoverPulse(9500, 12001)), { enterMs: 9000, leaveMs: 11000 }), 'not-closed')
+})
+
+test('hover: dois pulsos, um deles depois de sair: extra-pulse', () => {
+    const twoPulses = series(12000, (t) => ((t >= 4500 && t < 5000) || (t >= 8000 && t < 8500) ? PULSE : HUD))
+    assert.equal(hoverVerdict(detectPulses(twoPulses), HOVER), 'extra-pulse')
+})
+
+test('hover: pulso antes de entrar no notch: extra-pulse', () => {
+    assert.equal(hoverVerdict(detectPulses(hoverPulse(2000, 2500)), HOVER), 'extra-pulse')
+})
+
+test('hover: nunca visivel: not-visible', () => {
+    assert.equal(hoverVerdict(detectPulses(series(12000, () => 0)), HOVER), 'not-visible')
+})
+
+test('CLI hover: 0 ok, 1 falha, 4 nunca visivel, 2 uso', () => {
+    const events = JSON.stringify(HOVER)
+    const ok = cli(writeCsv('hover-ok.csv', toCsv(hoverPulse(4500, 7000))), '--expect', 'hover', '--events', events)
+    assert.equal(ok.code, 0)
+    assert.equal(ok.stdout.split('\n')[0], 'ok')
+
+    const late = cli(writeCsv('hover-late.csv', toCsv(hoverPulse(6000, 7000))), '--expect', 'hover', '--events', events)
+    assert.equal(late.code, 1)
+    assert.equal(late.stdout.split('\n')[0], 'opened-late')
+
+    assert.equal(cli(writeCsv('hover-none.csv', toCsv(series(12000, () => 0))), '--expect', 'hover', '--events', events).code, 4)
+
+    const csv = writeCsv('hover-usage.csv', toCsv(hoverPulse(4500, 7000)))
+    assert.equal(cli(csv, '--expect', 'hover').code, 2)
+    assert.equal(cli(csv, '--expect', 'hover', '--events', '{"enterMs":1}').code, 2)
+    assert.equal(cli(csv, '--expect', 'hover', '--events', '{"enterMs":6000,"leaveMs":4000}').code, 2)
+    assert.equal(cli(csv, '--expect', 'hover', '--events', 'nao e json').code, 2)
+    assert.equal(cli(csv, '--expect', 'pulse', '--events', events).code, 2)
+    assert.equal(cli(csv, '--events', events).code, 2)
 })
