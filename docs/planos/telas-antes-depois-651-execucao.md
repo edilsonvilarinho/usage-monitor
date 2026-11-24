@@ -11,7 +11,7 @@ O PR mostra quais telas mudaram e o antes/depois de cada uma, para revisar image
 ## Fatos confirmados (2026-11-24, `b527c552`)
 
 - `gradlew.bat generateScreenshots -PscreenshotOutputDir=…` três vezes seguidas, Windows 11: 18 arquivos, **18 iguais byte
-  a byte** nas três (`sha256sum`); 67 s, 52 s e 49 s. Em Linux não foi medido.
+  a byte** nas três (`sha256sum`); 67 s, 52 s e 49 s. Linux: medido na A04.
 - Cenas (`ScreenshotGenerator.kt`): dashboard, hud, hud-rest, new-integrations, history, settings, theme-presets,
   settings-team, cli-sessions, cli-breakdown, cli-session-detail, codex-session-detail, team-usage, team-trend, presence
   (claro e escuro), presence-accounts e `hud.gif`. O CI não chama a task.
@@ -46,6 +46,8 @@ faixa de atualização (4c) e, da HUD, buraco negro, modo flutuante e as quatro 
 | A01 | `generateScreenshots` ×3 e `sha256sum` | 18/18 iguais no Windows 11 |
 | A02 | `node --test "tools/ci/test/screen-diff.test.mjs"` | vermelho (stub): `Expected values to be strictly deep-equal` e `The input did not match the regular expression /\| \`b\.png\` \| mudou \| 1 \| 1,2 1x1 \|/`; verde 9/9 e 71/71 na pasta, em execução independente. CLI sobre `img/*.png` com um bloco 60×40 alterado: só `dashboard.png`, 2.400 pixels, caixa `20,20 60x40` |
 | A03 | `yaml.safe_load` | job `screen-diff` lido, fora de `ci-ok.needs`; o run é a A04 |
+| A04 (1) | run [45473622759](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45473622759) (`837cc87e`) | sem mudança visual: 0 mudou, 18 iguais no Linux; job em 1 min 51 s |
+| A04 (2) | run [45474172894](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45474172894) (`06add73d`, temporário: `HUD_RING_STROKE` 2,5 → 4 dp) | previsão escrita antes: só `hud.png`, `hud-rest.png` e `hud.gif`. Resultado: exatamente os três; 38.041 pixels, caixa `464,6 733x146` nos dois PNG; 15 iguais. Commit retirado da branch antes do merge |
 
 ## Problemas em aberto e riscos
 
