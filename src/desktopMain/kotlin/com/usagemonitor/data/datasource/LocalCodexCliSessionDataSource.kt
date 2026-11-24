@@ -17,6 +17,7 @@ import com.usagemonitor.domain.entity.TURN_GAP_CUTOFF_MILLIS
 import com.usagemonitor.domain.entity.activeMillisOfTimestamps
 import com.usagemonitor.domain.entity.combinedThroughput
 import com.usagemonitor.domain.entity.toCodexModelBreakdown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -97,6 +98,10 @@ class LocalCodexCliSessionDataSource(
                         skippedLines = parsed.skippedLines
                     )
                     connection.commit()
+                } catch (cancelled: CancellationException) {
+                    // Mesmo rollback da falha: o finally reativa autoCommit e confirmaria o pendente.
+                    connection.rollback()
+                    throw cancelled
                 } catch (error: Throwable) {
                     connection.rollback()
                     throw error

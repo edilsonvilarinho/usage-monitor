@@ -17,6 +17,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -114,6 +117,26 @@ class RemoteApiDataSourceCodexDiagnosticsTest {
         assertEquals(1, recorder.successEvents.size)
         assertTrue(recorder.failureEvents.isEmpty())
         assertEquals(21L, recorder.successEvents.single().primaryUsedPercent)
+    }
+
+    @Test
+    fun `cancelled Codex request records no request_error`() = runTest {
+        val recorder = RecordingCodexDiagnosticsRecorder()
+        val requestStarted = CompletableDeferred<Unit>()
+        val dataSource = RemoteApiDataSource(
+            httpClient = jsonHttpClient {
+                requestStarted.complete(Unit)
+                awaitCancellation()
+            },
+            codexDiagnosticsRecorder = recorder
+        )
+
+        val call = launch { dataSource.fetchCodexFiveHourUsage(sampleSession()) }
+        requestStarted.await()
+        call.cancel()
+        call.join()
+
+        assertEquals(emptyList<CodexDiagnosticsFailureEvent>(), recorder.failureEvents)
     }
 
     @Test

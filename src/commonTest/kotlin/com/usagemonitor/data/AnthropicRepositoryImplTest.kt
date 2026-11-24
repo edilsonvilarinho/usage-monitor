@@ -8,12 +8,17 @@ import com.usagemonitor.data.dto.AnthropicUsageResponse
 import com.usagemonitor.data.dto.AnthropicUsageWindow
 import com.usagemonitor.data.repository.AnthropicRepositoryImpl
 import com.usagemonitor.domain.entity.ApiSource
+import com.usagemonitor.domain.entity.ApiUsageStats
 import com.usagemonitor.domain.entity.UsageAccountContext
 import com.usagemonitor.domain.entity.UsageAccountKey
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlin.test.assertNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -132,6 +137,35 @@ class AnthropicRepositoryImplTest {
 
         assertTrue(error is com.usagemonitor.domain.entity.RateLimitedException, "erro: $error")
         assertEquals(0, apiCalls)
+    }
+
+    @Test
+    fun `cancellation during fetch propagates instead of reporting account change`() = runTest {
+        val fetchStarted = CompletableDeferred<Unit>()
+        val credentialDataSource = object : CredentialDataSource {
+            override suspend fun loadAnthropicSession(): AnthropicSession {
+                return session("token-a", "account-a", "a@example.com")
+            }
+
+            override suspend fun isAnthropicSessionCurrent(session: AnthropicSession): Boolean = false
+        }
+        val repository = AnthropicRepositoryImpl(
+            credentialDataSource = credentialDataSource,
+            apiDataSource = object : RemoteApiDataSource(noopHttpClient()) {
+                override suspend fun fetchAnthropicUsage(accessToken: String): AnthropicUsageResponse {
+                    fetchStarted.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+        )
+        var result: Result<ApiUsageStats>? = null
+
+        val call = launch { result = repository.getUsage() }
+        fetchStarted.await()
+        call.cancel()
+        call.join()
+
+        assertNull(result)
     }
 
     private fun successResponse(): AnthropicUsageResponse {
