@@ -47,8 +47,10 @@ PR que mexe na HUD ou em janela grava o app sozinho, em mais cenários que "para
 |---|---|---|
 | A01 | sem harness de teste (plano) | conferido contra `real-app.yml` e `HudWindowPreferences.kt` |
 | A02 | `node --test "tools/ci/test/hud-pulses.test.mjs"` | vermelho (stub): `actual: 'ok', expected: 'not-opened'`, idem `opened-late`, `not-closed`, `extra-pulse` e `not-visible`; verde 25/25, em execução independente; os 16 casos anteriores sem mudança |
+| A03 | run [45477540049](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45477540049) (PR, `819610a0`) | 6/6 `ok`, HUD visível nos 6 (repouso 1.069–1.420 px); job em 5 min 54 s com a compilação. Entrada sintética (`SendInput`) chega ao app |
+| A05 (parcial) | run [45478731870](https://github.com/edilsonvilarinho/usage-monitor/actions/runs/45478731870) | **60/60 vereditos certos:** `source` 30/30 `ok`; `v42.3.0-beta.15` 30/30 reprovada nos 6 cenários (25 `pulsed`, 5 `extra-pulse`). Nenhuma das 60 com tela vazia; hover abre em 694–1.111 ms e fecha em 367–531 ms. Em 2 gravações o detector viu 2 dos 3 pulsos: é o ponto cego dos ~9,4 quadros/s. Os 5 jobs da `beta.15` saíram vermelhos porque o passo herdou o código do detector; `exit 0` explícito e esperado por cenário fixados |
 
 ## Problemas em aberto e riscos
 
-- Entrada sintética (`SetCursorPos`/`SendInput`) pode não gerar o evento que o Compose espera; a A03 responde.
-- O repouso do encaixado com auto-recolher pode ter menos que os 400 px do detector: `not-visible` seria o resultado.
+- Entrada sintética: chega ao Compose (A03).
+- `not-opened`, `opened-late` e `not-closed` só têm prova no teste do detector; nenhuma versão do app com esse defeito foi gravada.
