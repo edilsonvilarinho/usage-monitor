@@ -50,6 +50,7 @@ Falha que só aparece no Linux passa a impedir o merge, sem trazer instabilidade
 |---|---|---|
 | A01 | `gh api …/jobs` dos 150 runs e `gh run download 44303839875 -n test-reports-linux` | 3 vermelhos, 2 só no Linux; causas acima |
 | A02 | `gradlew.bat desktopTest --tests "*InMemoryPreferences*" …` | vermelho (stub): `InMemoryPreferencesFactoryTest.kt:18 expected:<valor> but was:<null>`; verde 5/5. Em Linux só o run do PR prova |
+| A03 | `gradlew.bat desktopTest --tests "*InMemoryPreferences*" --tests "*HistoryViewModelTest*" --tests "*DashboardViewModelTest*" --tests "*AppSettingsFeedbackTest*" --tests "*ArchitectureRulesTest*"` | vermelho com o `FakeRepo` segurado depois do incremento (temporário): `HistoryViewModelTest.kt:206 expected:<…user-b…> but was:<…user-a…>` — hipótese confirmada. `DashboardViewModelTest`: o vermelho é o do CI (run 44303839875), não reproduzido localmente. Verde 96/96 |
 
 ## Problemas em aberto e riscos
 

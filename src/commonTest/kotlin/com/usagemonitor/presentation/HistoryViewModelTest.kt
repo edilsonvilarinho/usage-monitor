@@ -57,6 +57,19 @@ class HistoryViewModelTest {
         }
     }
 
+    // Espera o predicado, não só "não é Loading": após uma troca de seleção o
+    // `Success` anterior continua publicado até a nova seleção entrar.
+    private suspend fun awaitState(viewModel: HistoryViewModel, ready: (HistoryUiState) -> Boolean): HistoryUiState {
+        repeat(200) {
+            val state = viewModel.uiState.value
+            if (ready(state)) {
+                return state
+            }
+            pauseForBackgroundWork()
+        }
+        return viewModel.uiState.value
+    }
+
     @Test
     fun `emits Empty state when enabledApis is empty`() = runTest {
         val repo = FakeRepo()
@@ -97,7 +110,7 @@ class HistoryViewModelTest {
 
         viewModel.selectSource(ApiSource.MINIMAX)
         awaitInvocations(repo, callsBefore + 1)
-        val state = awaitNonLoading(viewModel)
+        val state = awaitState(viewModel) { it is HistoryUiState.Success && it.selectedSource == ApiSource.MINIMAX }
 
         assertIs<HistoryUiState.Success>(state)
         assertEquals(ApiSource.MINIMAX, state.selectedSource)
@@ -136,7 +149,7 @@ class HistoryViewModelTest {
         val callsBefore = repo.invocations
         viewModel.selectRange(HistoryRange.LAST_7_DAYS)
         awaitInvocations(repo, callsBefore + 1)
-        val state = awaitNonLoading(viewModel)
+        val state = awaitState(viewModel) { it is HistoryUiState.Success && it.selectedRange == HistoryRange.LAST_7_DAYS }
 
         assertIs<HistoryUiState.Success>(state)
         assertEquals(HistoryRange.LAST_7_DAYS, state.selectedRange)
@@ -171,7 +184,7 @@ class HistoryViewModelTest {
 
         viewModel.openForSource(ApiSource.CODEX)
         awaitInvocations(repo, callsBefore + 1)
-        val state = awaitNonLoading(viewModel)
+        val state = awaitState(viewModel) { it is HistoryUiState.Success && it.selectedSource == ApiSource.CODEX }
 
         assertIs<HistoryUiState.Success>(state)
         assertEquals(ApiSource.CODEX, state.selectedSource)
@@ -199,7 +212,7 @@ class HistoryViewModelTest {
 
         viewModel.selectAccount(accountB)
         awaitInvocations(repo, callsBefore + 1)
-        val updatedState = awaitNonLoading(viewModel)
+        val updatedState = awaitState(viewModel) { it is HistoryUiState.Success && it.selectedAccount == accountB }
 
         assertIs<HistoryUiState.Success>(updatedState)
         assertEquals(accountB, updatedState.selectedAccount)
@@ -224,7 +237,7 @@ class HistoryViewModelTest {
 
         viewModel.openForSource(ApiSource.CODEX, accountB.key)
         awaitInvocations(repo, callsBefore + 1)
-        val state = awaitNonLoading(viewModel)
+        val state = awaitState(viewModel) { it is HistoryUiState.Success && it.selectedAccount == accountB }
 
         assertIs<HistoryUiState.Success>(state)
         assertEquals(accountB, state.selectedAccount)
@@ -255,8 +268,7 @@ class HistoryViewModelTest {
         // A escolha sobrevive à próxima leitura: trocar o intervalo não volta para "Ambas".
         viewModel.selectRange(HistoryRange.LAST_7_DAYS)
         awaitInvocations(repo, callsBefore + 1)
-        repeat(5) { pauseForBackgroundWork() }
-        val reloaded = awaitNonLoading(viewModel)
+        val reloaded = awaitState(viewModel) { it is HistoryUiState.Success && it.selectedRange == HistoryRange.LAST_7_DAYS && !it.isRefreshing }
         assertIs<HistoryUiState.Success>(reloaded)
         assertEquals(HistoryQuotaView.WEEKLY, reloaded.selectedQuotaView)
         viewModel.onDestroy()
@@ -280,8 +292,7 @@ class HistoryViewModelTest {
         assertEquals(HistoryRange.LAST_7_DAYS, during.selectedRange)
 
         awaitInvocations(repo, callsBefore + 1)
-        repeat(5) { pauseForBackgroundWork() }
-        val after = viewModel.uiState.value
+        val after = awaitState(viewModel) { it is HistoryUiState.Success && !it.isRefreshing }
         assertIs<HistoryUiState.Success>(after)
         assertEquals(false, after.isRefreshing)
         viewModel.onDestroy()

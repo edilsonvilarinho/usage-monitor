@@ -902,7 +902,9 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
         // O `StateFlow` publica uma lista imutável a cada `update` atômico, então
         // ler e escrever ao mesmo tempo deixa de ser um problema.
         val calls = MutableStateFlow<List<String>>(emptyList())
-        val snapshots = mutableListOf<ApiUsageStats>()
+        // Gravado pelas coroutines de coleta e lido pela thread do teste: `StateFlow`
+        // com `update` atômico, a mesma razão de `calls` logo acima.
+        val snapshots = MutableStateFlow<List<ApiUsageStats>>(emptyList())
         val anthropicRepo = object : AnthropicRepository {
             override suspend fun getUsage(): Result<ApiUsageStats> {
                 return Result.failure(IllegalStateException("Perfil obrigatório"))
@@ -938,14 +940,24 @@ class DashboardViewModelTest : DashboardViewModelTestSupport() {
                 override suspend fun getUsage() = Result.failure<ApiUsageStats>(Exception("Não deve ser chamado"))
             }),
             enabledApis = MutableStateFlow(setOf(ApiSource.ANTHROPIC)),
-            recordUsageSnapshot = historyUseCase(snapshots),
+            recordUsageSnapshot = RecordUsageSnapshotUseCase(object : UsageHistoryRepository {
+                override suspend fun recordSnapshot(stats: ApiUsageStats, capturedAt: Instant) {
+                    snapshots.update { previous -> previous + stats }
+                }
+
+                override suspend fun getHistoryReport(
+                    source: ApiSource,
+                    range: HistoryRange,
+                    now: Instant
+                ): ApiUsageHistoryReport = throw UnsupportedOperationException("Não utilizado neste teste")
+            }),
             anthropicProfiles = MutableStateFlow(listOf(profileA, profileB)),
             config = manualRefreshConfig()
         )
 
         viewModel.refresh()
-        awaitCondition { snapshots.size == 2 }
-        val state = viewModel.uiState.value as UiState.Success
+        awaitCondition { snapshots.value.size == 2 }
+        val state = awaitSettledState(viewModel) as UiState.Success
         assertEquals(setOf("profile-a", "profile-b"), state.data.map { it.targetKey.profileId }.toSet())
         assertEquals(setOf("profile-a", "profile-b"), calls.value.toSet())
 
