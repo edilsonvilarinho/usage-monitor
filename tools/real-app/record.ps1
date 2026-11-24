@@ -3,11 +3,12 @@
 .SYNOPSIS
   Records the virtual screen while the real app starts: frames.csv, JPEG frames, probe.json.
 .DESCRIPTION
-  Runs only on GitHub Actions: it changes the desktop (black, no icons, no taskbar).
-  The pointer is parked at the bottom centre, away from the HUD. No human input is simulated.
-  frames.csv is t_ms,foreground,x,y,w,h. foreground = pixels that differ from the baseline (integer).
+  Runs only on GitHub Actions: it hides every other top-level window and the desktop icons,
+  then waits for a still desktop before the baseline. The pointer is parked at the bottom centre.
+  No human input is simulated. frames.csv is t_ms,foreground,x,y,w,h; foreground = pixels that
+  differ from the baseline (integer).
 .PARAMETER Exe
-  Path to the installed 'Usage Monitor.exe'.
+  Path to the app exe ('Usage Monitor.exe': installed or built).
 .PARAMETER DataDir
   Passed to the app as --user-data-dir.
 .PARAMETER OutDir
@@ -113,16 +114,60 @@ public static class RealAppNative {
 }
 '@
 
-Add-Type -ReferencedAssemblies System.Drawing.Common, System.Windows.Forms -TypeDefinition @'
+Add-Type -ReferencedAssemblies System.Drawing.Common, System.Windows.Forms, System.Collections -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class DesktopSetup {
     [DllImport("user32.dll", SetLastError = true)] public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, string pvParam, uint fWinIni);
-    [DllImport("user32.dll")] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-    [DllImport("user32.dll")] public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
-    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern bool SetSysColors(int cElements, int[] lpaElements, int[] lpaRgbValues);
+}
+
+// Progman and WorkerW hold the wallpaper, so they are never hidden.
+public static class DesktopWindows {
+    public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hWnd, StringBuilder text, int max);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
+
+    static string ClassOf(IntPtr hWnd) { StringBuilder sb = new StringBuilder(256); GetClassName(hWnd, sb, sb.Capacity); return sb.ToString(); }
+    static string TitleOf(IntPtr hWnd) { StringBuilder sb = new StringBuilder(512); GetWindowText(hWnd, sb, sb.Capacity); return sb.ToString(); }
+
+    // Hides every visible top-level window except Progman and WorkerW. Returns "class|title" for each.
+    public static List<string> HideTopLevel() {
+        List<string> hidden = new List<string>();
+        EnumWindows((hWnd, lParam) => {
+            if (!IsWindowVisible(hWnd)) return true;
+            string cls = ClassOf(hWnd);
+            if (cls == "Progman" || cls == "WorkerW") return true;
+            ShowWindow(hWnd, 0);
+            hidden.Add(cls + "|" + TitleOf(hWnd));
+            return true;
+        }, IntPtr.Zero);
+        return hidden;
+    }
+
+    // Hides SHELLDLL_DefView (desktop icons) under Progman and under every WorkerW.
+    public static List<string> HideDesktopIcons() {
+        List<IntPtr> parents = new List<IntPtr>();
+        IntPtr progman = FindWindow("Progman", null);
+        if (progman != IntPtr.Zero) parents.Add(progman);
+        EnumWindows((hWnd, lParam) => { if (ClassOf(hWnd) == "WorkerW") parents.Add(hWnd); return true; }, IntPtr.Zero);
+        List<string> hidden = new List<string>();
+        foreach (IntPtr parent in parents) {
+            IntPtr view = FindWindowEx(parent, IntPtr.Zero, "SHELLDLL_DefView", null);
+            if (view == IntPtr.Zero) continue;
+            ShowWindow(view, 0);
+            hidden.Add("SHELLDLL_DefView|under " + ClassOf(parent));
+        }
+        return hidden;
+    }
 }
 '@
 
@@ -139,29 +184,40 @@ $proc = $null
 $appExited = $true
 $sessionId = (Get-Process -Id $PID).SessionId
 $titles = [System.Collections.Generic.List[string]]::new()
+$hidden = [System.Collections.Generic.List[string]]::new()
+$backgroundStable = $false
 $fpsSamples = 0
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $vs = [System.Drawing.Rectangle]::Empty
 
 try {
-    # 1. Plain black desktop, no icons, no taskbar.
+    # 1. Plain black desktop: every other top-level window and the desktop icons hidden.
     [void][DesktopSetup]::SetSysColors(1, @(1), @(0))        # COLOR_DESKTOP -> black
     [void][DesktopSetup]::SystemParametersInfo(0x14, 0, '', 0x01 -bor 0x02)  # SPI_SETDESKWALLPAPER, clear
-    $progman = [DesktopSetup]::FindWindow('Progman', $null)
-    $shellView = [DesktopSetup]::FindWindowEx($progman, [IntPtr]::Zero, 'SHELLDLL_DefView', $null)
-    if ($shellView -ne [IntPtr]::Zero) { [void][DesktopSetup]::ShowWindow($shellView, 0) }
-    $taskbar = [DesktopSetup]::FindWindow('Shell_TrayWnd', $null)
-    if ($taskbar -ne [IntPtr]::Zero) { [void][DesktopSetup]::ShowWindow($taskbar, 0) }
+    foreach ($entry in [DesktopWindows]::HideTopLevel()) { $hidden.Add("window $entry") }
+    foreach ($entry in [DesktopWindows]::HideDesktopIcons()) { $hidden.Add("icons $entry") }
     Start-Sleep -Milliseconds 500
 
     # 2. Pointer parked at the bottom centre, away from the HUD.
     $vs = [RealAppNative]::VirtualScreen()
     [void][RealAppNative]::SetCursorPos($vs.X + [int]($vs.Width / 2), $vs.Y + $vs.Height - 2)
 
-    # 3. Baseline: the plain desktop before the app starts.
-    Start-Sleep -Milliseconds 300
+    # 3. Wait for a still desktop: two captures 500 ms apart with zero differing pixels, up to 10 s.
     $w = 0; $h = 0; $stride = 0
-    $baseline = [RealAppNative]::Capture([ref]$w, [ref]$h, [ref]$stride)
+    $baseline = $null
+    $lastChanged = -1
+    $stableWatch = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($stableWatch.ElapsedMilliseconds -lt 10000) {
+        $firstCapture = [RealAppNative]::Capture([ref]$w, [ref]$h, [ref]$stride)
+        Start-Sleep -Milliseconds 500
+        $secondCapture = [RealAppNative]::Capture([ref]$w, [ref]$h, [ref]$stride)
+        $bx = 0; $by = 0; $bw = 0; $bh = 0
+        $lastChanged = [RealAppNative]::Diff($secondCapture, $firstCapture, $w, $h, $stride, 0, [ref]$bx, [ref]$by, [ref]$bw, [ref]$bh)
+        if ($lastChanged -eq 0) { $baseline = $secondCapture; $backgroundStable = $true; break }
+    }
+    if (-not $backgroundStable) {
+        throw "desktop did not settle within 10 s: $lastChanged pixels still change 500 ms apart"
+    }
     [RealAppNative]::SaveJpeg($baseline, $w, $h, $stride, (Join-Path $framesDir 'baseline.jpg'))
 
     # 4. Start the app with an isolated data root, then sample until the time is up.
@@ -208,12 +264,14 @@ finally {
 
     $dpi = (Get-ItemProperty -Path 'HKCU:\Control Panel\Desktop\WindowMetrics' -ErrorAction SilentlyContinue).AppliedDPI
     [pscustomobject]@{
-        screen          = [pscustomobject]@{ x = $vs.X; y = $vs.Y; width = $vs.Width; height = $vs.Height }
-        dpi             = $dpi
-        sessionId       = $sessionId
-        windowTitles    = $titles
-        framesPerSecond = [math]::Round($fpsSamples / [math]::Max(1, $sw.Elapsed.TotalSeconds), 1)
-        seconds         = $Seconds
-        appExited       = $appExited
+        screen           = [pscustomobject]@{ x = $vs.X; y = $vs.Y; width = $vs.Width; height = $vs.Height }
+        dpi              = $dpi
+        sessionId        = $sessionId
+        backgroundStable = $backgroundStable
+        hidden           = @($hidden)
+        windowTitles     = @($titles)
+        framesPerSecond  = [math]::Round($fpsSamples / [math]::Max(1, $sw.Elapsed.TotalSeconds), 1)
+        seconds          = $Seconds
+        appExited        = $appExited
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'probe.json') -Encoding utf8
 }

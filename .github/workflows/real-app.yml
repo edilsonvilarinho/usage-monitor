@@ -1,5 +1,5 @@
-# Experimento da #652: grava o app real instalado (release publicado) num runner Windows e reprova
-# pulsos de janela na HUD com o ponteiro parado. Fora do `ci-ok`. Ver docs/planos/app-real-no-ci-652-execucao.md.
+# Experimento da #652: grava o app real (release publicado ou build do código) num runner Windows
+# e reprova pulsos de janela na HUD com o ponteiro parado. Fora do `ci-ok`. Ver docs/planos/app-real-no-ci-652-execucao.md.
 #
 # Gatilhos: `workflow_dispatch` (exige o arquivo na `main`) e `push` só nesta branch enquanto durar o
 # experimento. O gatilho `push` sai na A05.
@@ -9,14 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       versions:
-        description: 'Tags de release separadas por vírgula (ex.: v42.3.0-beta.15,v42.3.0-beta.16)'
+        description: 'Tags de release ou `source` (build do código), separados por vírgula (ex.: v42.3.0-beta.15,v42.3.0-beta.16,source)'
         required: true
-        default: 'v42.3.0-beta.15,v42.3.0-beta.16'
+        default: 'v42.3.0-beta.15,v42.3.0-beta.16,source'
         type: string
       attempts:
         description: 'Quantas tentativas por versão'
         required: true
-        default: '1'
+        default: '5'
         type: string
   push:
     branches:
@@ -40,8 +40,8 @@ jobs:
       - name: Expand versions and attempts into matrix lists
         id: plan
         env:
-          VERSIONS: ${{ inputs.versions || 'v42.3.0-beta.15,v42.3.0-beta.16' }}
-          ATTEMPTS: ${{ inputs.attempts || '1' }}
+          VERSIONS: ${{ inputs.versions || 'v42.3.0-beta.15,v42.3.0-beta.16,source' }}
+          ATTEMPTS: ${{ inputs.attempts || '5' }}
         run: |
           set -euo pipefail
           versions=$(printf '%s' "$VERSIONS" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' \
@@ -54,7 +54,8 @@ jobs:
   record:
     needs: plan
     runs-on: windows-latest
-    timeout-minutes: 30
+    # The source case compiles the app with Gradle, so it gets more time than a tag download.
+    timeout-minutes: ${{ matrix.version == 'source' && 60 || 30 }}
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +75,19 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Setup Java (source only, as in the desktop-windows job of ci.yml)
+        if: matrix.version == 'source'
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle (source only, as in ci.yml)
+        if: matrix.version == 'source'
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
       - name: Set data and output paths
         shell: pwsh
         run: |
@@ -82,6 +96,7 @@ jobs:
           "OUT_DIR=$(Join-Path $env:GITHUB_WORKSPACE 'out')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Download the published installer
+        if: matrix.version != 'source'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -92,6 +107,7 @@ jobs:
           Get-ChildItem -LiteralPath $dir | Select-Object Name, Length
 
       - name: Install silently (per user, /S does not open the app)
+        if: matrix.version != 'source'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -101,6 +117,31 @@ jobs:
           $exe = Join-Path $env:LOCALAPPDATA 'Usage Monitor\Usage Monitor.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw "installed exe not found: $exe" }
           "APP_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build the app from source (source only)
+        if: matrix.version == 'source'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat createDistributable
+          if ($LASTEXITCODE -ne 0) { throw "gradlew createDistributable exit code $LASTEXITCODE" }
+          # jpackage app-image folder (build.gradle.kts:531, packageName 'Usage Monitor' at :160).
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'build\compose\binaries\main\app\Usage Monitor\Usage Monitor.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "built exe not found: $exe" }
+          "APP_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # Compiled version (build.gradle.kts:220-228, CURRENT_APP_VERSION in the generated AppVersion.kt).
+          $versionFile = Join-Path $env:GITHUB_WORKSPACE 'build\generated\app-version\desktopMain\kotlin\com\usagemonitor\AppVersion.kt'
+          $match = [regex]::Match((Get-Content -LiteralPath $versionFile -Raw), 'CURRENT_APP_VERSION\s*=\s*"([^"]+)"')
+          if (-not $match.Success) { throw "CURRENT_APP_VERSION not found in $versionFile" }
+          "SEED_VERSION=$($match.Groups[1].Value)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "compiled app version: $($match.Groups[1].Value)"
+
+      - name: Seed version for tags (the release tag)
+        if: matrix.version != 'source'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "SEED_VERSION=$($env:RELEASE_VERSION)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Block outbound network for the app
         shell: pwsh
@@ -113,7 +154,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          pwsh -NoProfile -File tools/real-app/seed.ps1 -DataDir $env:DATA_DIR -Version $env:RELEASE_VERSION
+          pwsh -NoProfile -File tools/real-app/seed.ps1 -DataDir $env:DATA_DIR -Version $env:SEED_VERSION
 
       - name: Record the screen while the app starts
         shell: pwsh
@@ -128,18 +169,23 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $title = "### real-app $env:RELEASE_VERSION (attempt ${{ matrix.attempt }})"
+          $fence = '```'
+          $expected = if ($env:RELEASE_VERSION -eq 'v42.3.0-beta.15') { 'pulsed' } else { 'ok' }
           $csv = Join-Path $env:OUT_DIR 'frames.csv'
           if (-not (Test-Path -LiteralPath $csv)) {
-            "$title`n`nno frames.csv: the recording did not start" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-            exit 0
+            "$title`n`nno frames.csv: the recording did not start`nexpected: $expected`nobtained: none`nmatched: false" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            exit 2
           }
           $verdictPath = Join-Path $env:OUT_DIR 'verdict.txt'
           node tools/ci/hud-pulses.mjs $csv *> $verdictPath
           $code = $LASTEXITCODE
           $verdict = Get-Content -LiteralPath $verdictPath -Raw
-          $fence = '```'
+          $obtained = (Get-Content -LiteralPath $verdictPath -TotalCount 1)
+          $matched = ($obtained -eq $expected)
           "$title`n`n$fence`n$verdict`n$fence`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          "hud-pulses exit code: $code"
+          "expected: $expected`nobtained: $obtained`nmatched: $matched`nhud-pulses exit code: $code" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "expected: $expected obtained: $obtained matched: $matched (hud-pulses exit code $code)"
+          if ($matched) { exit 0 } else { exit 1 }
 
       - name: Upload the recording
         if: always()
