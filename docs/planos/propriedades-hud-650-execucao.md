@@ -48,6 +48,7 @@ escreveu à mão.
 | Atividade | Comando | Resultado |
 |---|---|---|
 | A01 | sem harness de teste (plano) | regras conferidas contra `docs/hud-notch.md` |
+| A02 | `gradlew.bat desktopTest --tests "*HudGeometryPropertyTest*" --tests "*ArchitectureRulesTest*"` | vermelho do executor: `HudGeometryPropertyTest.kt:16` e `:22`, `AssertionError`; verde 37 testes, 2 ignorados, em execução independente. Mutações 5/5 mortas: origem/tamanho aberto × fechado (`:64`), flutuante na área útil (`:115`), finitude (`:197`), determinismo (`:150`), regra do compacto (`:100`). **Dois contraexemplos** pelo caminho do produto, ignorados com o menor caso: janela encaixada fora da área útil (RIGHT, 1534×344 dp, 1 conta, 3 cotas, sobra 4 dp) e alças fora da tela (BOTTOM, 922×885 dp, 10 contas, sobra 18 dp). 1ª rodada descartada: pulava o auto-recolher e lia mal a regra do compacto |
 
 ## Problemas em aberto e riscos
 
